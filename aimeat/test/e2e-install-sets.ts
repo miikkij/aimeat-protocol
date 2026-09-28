@@ -18,6 +18,9 @@
  *   - Phase 7: a new node started with AIMEAT_INSTALL_SET links the repository, is refused until it
  *     is entitled, tries again and applies the set; the shop's agent grants the bundle and registers
  *     the node as a packages-only peer in one call; a key that differs is refused on both sides
+ *   - Phase 8: selling node to node with no token: R's author names C a seller; C's operator asks C,
+ *     which signs with its own key, for the questions, a grant, an end of updates and a revoke; a
+ *     node that is not a seller, an agent without operator:admin and a replayed signature are refused
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-install-sets
  * @version-history
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 4).
@@ -30,7 +33,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
-import { sign } from '../src/auth/keypair.js';
+import { sign, generateKeyPair } from '../src/auth/keypair.js';
 import type { AimeatConfig } from '../src/config.js';
 import type { Server } from 'node:http';
 
@@ -470,6 +473,72 @@ await test('A set naming the repository under another key than the linked peer i
         body: JSON.stringify({ install_set: installSet({ repository: { node_id: R.nodeId, url: R.baseUrl, public_key: 'AAAAnotthekey' } }), dry_run: true }),
     });
     assert(r.status === 409 && r.body.error?.code === 'PEER_KEY_MISMATCH', `expected 409 PEER_KEY_MISMATCH: ${r.status} ${JSON.stringify(r.body)}`);
+});
+
+console.log('\nPhase 8 — Selling node to node, with no token');
+
+const newNode = `aimeat-test-001-sold${ts}`;
+let newNodeKey = '';
+await test('Before R\'s author names C a seller, C\'s signed sale is refused, and C\'s agent without operator:admin cannot even ask', async () => {
+    newNodeKey = (await generateKeyPair()).publicKey;
+    const r = await C.json('/v1/package-sales/entitlements', {
+        method: 'PUT', headers: auth(opsToken),
+        body: JSON.stringify({ repository: R.nodeId, group_id: setupOnR, node_id: newNode, node: { url: 'http://127.0.0.1:40799', public_key: newNodeKey } }),
+    });
+    assert(r.status === 403 && r.body.error?.code === 'NOT_A_SELLER', `expected 403 NOT_A_SELLER: ${r.status} ${JSON.stringify(r.body)}`);
+    const helper = await registerAgent(C, opsToken, `ops${ts}`, 'shopbot', 'interactive', ['*']);
+    const q = await C.json(`/v1/package-sales/config-needs?repository=${encodeURIComponent(R.nodeId)}&group_id=${encodeURIComponent(setupOnR)}`, { headers: auth(helper) });
+    assert(q.status === 403, `an agent without operator:admin is refused: ${q.status} ${JSON.stringify(q.body)}`);
+});
+
+await test('R\'s author names C a seller; C then reads the bundle\'s questions and grants a new node, signed by C\'s own key', async () => {
+    const s = await R.json(`/v1/package-sellers/${C.nodeId}`, { method: 'PUT', headers: auth(vendorToken), body: JSON.stringify({ note: 'the shop' }) });
+    assert(s.status === 200 && s.body.data.seller.nodeId === C.nodeId, `seller: ${s.status} ${JSON.stringify(s.body)}`);
+    const q = await C.json(`/v1/package-sales/config-needs?repository=${encodeURIComponent(R.nodeId)}&group_id=${encodeURIComponent(setupOnR)}`, { headers: auth(opsToken) });
+    assert(q.status === 200 && (q.body.data.questions as any[]).some((x) => x.field === 'shop_name' && x.required), `questions: ${q.status} ${JSON.stringify(q.body)}`);
+    const g = await C.json('/v1/package-sales/entitlements', {
+        method: 'PUT', headers: auth(opsToken),
+        body: JSON.stringify({ repository: R.nodeId, group_id: setupOnR, node_id: newNode, node: { url: 'http://127.0.0.1:40799', public_key: newNodeKey }, note: 'order 3' }),
+    });
+    assert(g.status === 200 && g.body.data.peer_registered === true, `grant: ${g.status} ${JSON.stringify(g.body)}`);
+    const list = await R.json(`/v1/packages/${encodeURIComponent(setupOnR)}/entitlements`, { headers: auth(vendorToken) });
+    const e = (list.body.data.entitlements as any[]).find((x) => x.nodeId === newNode);
+    assert(e?.updatesUntil === null && String(e?.note).startsWith(`sold by ${C.nodeId}`), `the grant on R: ${JSON.stringify(e)}`);
+});
+
+await test('C ends the new node\'s updates and then revokes it, both signed', async () => {
+    const until = new Date().toISOString();
+    const end = await C.json('/v1/package-sales/entitlements', {
+        method: 'PUT', headers: auth(opsToken), body: JSON.stringify({ repository: R.nodeId, group_id: setupOnR, node_id: newNode, updates_until: until }),
+    });
+    assert(end.status === 200 && end.body.data.entitlement.updatesUntil === until, `end: ${end.status} ${JSON.stringify(end.body)}`);
+    const del = await C.json(`/v1/package-sales/entitlements?repository=${encodeURIComponent(R.nodeId)}&group_id=${encodeURIComponent(setupOnR)}&node_id=${encodeURIComponent(newNode)}`, {
+        method: 'DELETE', headers: auth(opsToken),
+    });
+    assert(del.status === 200 && del.body.data.revoked === true, `revoke: ${del.status} ${JSON.stringify(del.body)}`);
+    const list = await R.json(`/v1/packages/${encodeURIComponent(setupOnR)}/entitlements`, { headers: auth(vendorToken) });
+    assert(!(list.body.data.entitlements as any[]).some((x) => x.nodeId === newNode), 'the grant is gone');
+});
+
+await test('A seller\'s signature taken for reading the questions does not grant anything when replayed', async () => {
+    // A seller node whose key this test holds, so its signatures can be made and replayed.
+    const seller = await generateKeyPair();
+    const sellerId = `aimeat-test-001-seller${ts}`;
+    const add = await R.json(`/v1/package-sellers/${sellerId}`, {
+        method: 'PUT', headers: auth(vendorToken), body: JSON.stringify({ node: { url: 'http://127.0.0.1:40798', public_key: seller.publicKey } }),
+    });
+    assert(add.status === 200 && add.body.data.peer_registered === true, `add seller: ${add.status} ${JSON.stringify(add.body)}`);
+    const path = `/v1/federation/package-sales/${encodeURIComponent(setupOnR)}/config-needs`;
+    const timestamp = new Date().toISOString();
+    const digest = createHash('sha256').update('{}').digest('hex');
+    const signature = await sign(seller.privateKey, JSON.stringify({ source_node: sellerId, timestamp, purpose: 'package-sale', method: 'GET', path, body_sha256: digest }));
+    const headers = { 'x-source-node': sellerId, 'x-timestamp': timestamp, 'x-signature': signature };
+    const read = await R.json(path, { headers });
+    assert(read.status === 200, `the signed read works: ${read.status} ${JSON.stringify(read.body)}`);
+    const replay = await R.json(`/v1/federation/package-sales/${encodeURIComponent(setupOnR)}/entitlements/${sellerId}`, {
+        method: 'PUT', headers, body: JSON.stringify({ note: 'replayed' }),
+    });
+    assert(replay.status === 401, `the replay as a grant is refused: ${replay.status} ${JSON.stringify(replay.body)}`);
 });
 
 console.log('\nCleanup');

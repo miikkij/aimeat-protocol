@@ -14,6 +14,8 @@
  * @structure registerAdminInstallSetTools(mcp, storage, config, peers, getAgentGaii, scopes)
  * @usage registered from src/mcp/register-all.ts
  * @version-history
+ *   v1.1.0 — 2026-09-29 — aimeat_package_sale: this node, as a seller, signs a sale request to a
+ *     package repository with its own key; operator-only, the same test as the install set.
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 4).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -27,6 +29,7 @@ import { toolError } from './tool-error.js';
 import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
 import { applyInstallSet, listAppliedSets } from '../services/install-set-apply.js';
 import { getActiveScheduler } from '../services/scheduler.js';
+import { saleConfigNeeds, saleGrant, saleRevoke } from '../services/package-sale-client.js';
 
 const text = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
 
@@ -52,5 +55,31 @@ export function registerAdminInstallSetTools(
         });
         if (!out.ok) return { ...toolError(out.code, out.problems ? `${out.message} ${out.problems.join(' | ')}` : out.message) };
         return text(out);
+    });
+
+    // A selling node's signed sale requests: the same services /v1/package-sales/... calls.
+    mcp.tool('aimeat_package_sale', descriptionFor('aimeat_package_sale'), {
+        action: z.enum(['needs', 'grant', 'revoke']).describe('needs: the questions to ask; grant: serve (or change, or end the updates of) a customer node; revoke: stop serving it.'),
+        repository: z.string().describe('The package repository\'s node id.'),
+        repository_link: z.object({ url: z.string(), public_key: z.string() }).optional().describe('The first time only: { url, public_key } of the repository, to link it as a peer of this node.'),
+        group_id: z.string().describe('The package or install bundle group id on the repository.'),
+        node_id: z.string().optional().describe('For grant and revoke: the customer node.'),
+        node: z.object({ url: z.string(), public_key: z.string() }).optional().describe('For grant: { url, public_key } of a customer node the repository does not know yet.'),
+        updates_until: z.string().optional().describe('For grant: versions published after this ISO date-time are not served.'),
+        channel: z.enum(['stable', 'beta']).optional().describe('For grant: stable (the default) or beta.'),
+        note: z.string().optional().describe('For grant: the order it came from.'),
+    }, annotationsFor('aimeat_package_sale'), async (input) => {
+        if (!(await resolveOperatorAgentName(storage, getAgentGaii(), scopes))) return { content: [{ type: 'text' as const, text: OPERATOR_AGENT_REFUSAL }], isError: true };
+        const deps = { storage, config, peers };
+        const repository = input.repository_link ? { node_id: input.repository, ...input.repository_link } : input.repository;
+        const out = input.action === 'needs'
+            ? await saleConfigNeeds(deps, repository, input.group_id)
+            : input.action === 'revoke'
+                ? await saleRevoke(deps, repository, input.group_id, input.node_id ?? '')
+                : await saleGrant(deps, repository, input.group_id, input.node_id ?? '', input);
+        if (!out.ok) return { ...toolError(out.code, out.message) };
+        const answer = out.body as { ok?: boolean; data?: unknown; error?: { code?: string; message?: string } };
+        if (answer.ok === false) return { ...toolError(answer.error?.code ?? 'REPOSITORY_REFUSED', answer.error?.message ?? `The repository answered ${out.status}.`) };
+        return text({ repository: out.repository, ...(answer.data && typeof answer.data === 'object' ? answer.data : {}) });
     });
 }

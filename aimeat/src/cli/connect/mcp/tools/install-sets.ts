@@ -10,6 +10,7 @@
  * @structure registerInstallSetTools(mcp, registry)
  * @usage registered from cli/connect/mcp/tools/index.ts
  * @version-history
+ *   v1.1.0 — 2026-09-29 — aimeat_package_sale (GET, PUT, DELETE /v1/package-sales/...).
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 4).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -34,5 +35,29 @@ export function registerInstallSetTools(mcp: McpServer, registry: AgentRegistry)
     return text(await client.post('/v1/install-sets/apply', {
       install_set, dry_run: action === 'plan', ...(secrets !== undefined ? { secrets } : {}),
     }));
+  });
+
+  mcp.tool('aimeat_package_sale', descriptionFor('aimeat_package_sale'), {
+    agent_name: agentNameSchema,
+    action: z.enum(['needs', 'grant', 'revoke']).describe('needs: the questions to ask; grant: serve (or change, or end the updates of) a customer node; revoke: stop serving it.'),
+    repository: z.string().describe('The package repository\'s node id.'),
+    repository_link: z.object({ url: z.string(), public_key: z.string() }).optional().describe('The first time only: { url, public_key } of the repository, to link it as a peer of this node.'),
+    group_id: z.string().describe('The package or install bundle group id on the repository.'),
+    node_id: z.string().optional().describe('For grant and revoke: the customer node.'),
+    node: z.object({ url: z.string(), public_key: z.string() }).optional().describe('For grant: { url, public_key } of a customer node the repository does not know yet.'),
+    updates_until: z.string().optional().describe('For grant: versions published after this ISO date-time are not served.'),
+    channel: z.enum(['stable', 'beta']).optional().describe('For grant: stable (the default) or beta.'),
+    note: z.string().optional().describe('For grant: the order it came from.'),
+  }, annotationsFor('aimeat_package_sale'), async ({ agent_name, action, repository, repository_link, group_id, node_id, node, updates_until, channel, note }) => {
+    const { client } = pickAgent(registry, agent_name);
+    const qs = (extra: Record<string, string>) => new URLSearchParams({ repository, group_id, ...extra }).toString();
+    if (action === 'needs') return text(await client.get(`/v1/package-sales/config-needs?${qs({})}`));
+    if (action === 'revoke') return text(await client.delete(`/v1/package-sales/entitlements?${qs({ node_id: node_id ?? '' })}`));
+    const body: Record<string, unknown> = { repository: repository_link ? { node_id: repository, ...repository_link } : repository, group_id, node_id };
+    if (node !== undefined) body.node = node;
+    if (updates_until !== undefined) body.updates_until = updates_until;
+    if (channel !== undefined) body.channel = channel;
+    if (note !== undefined) body.note = note;
+    return text(await client.put('/v1/package-sales/entitlements', body));
   });
 }

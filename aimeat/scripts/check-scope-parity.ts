@@ -45,6 +45,8 @@
  *   cd aimeat && pnpm check:scope-parity --strict  # gate (pre-commit + CI)
  *   cd aimeat && pnpm check:scope-parity --seed    # rewrite the exemption file from today's state
  * @version-history
+ *   v1.0.1 — 2026-09-29 — mcp/catalog/scopes-operator.ts counts as a definition file: it is the operator
+ *     rows of the tool table, moved out of scopes.ts unchanged.
  *   v1.0.0 — 2026-09-04 — Initial (wish-invarianttiauditointi N3: the same word on every door).
  */
 import ts from 'typescript';
@@ -66,7 +68,8 @@ const EXEMPTIONS = join(AIMEAT, 'security', 'scope-parity-exemptions.json');
  * binds the names. Counting those would make every word look asked-for, and the whole gate would
  * answer nothing. Same exclusion list the inventory uses, for the same reason.
  */
-const DEFINITION_FILES = ['mcp/catalog/scopes.ts', 'utils/scope-coverage.ts'];
+// scopes-operator.ts is part of the tool table, moved out of scopes.ts for the line ceiling.
+const DEFINITION_FILES = ['mcp/catalog/scopes.ts', 'mcp/catalog/scopes-operator.ts', 'utils/scope-coverage.ts'];
 
 interface ExemptionFile { note: string; exempt: Record<string, string> }
 

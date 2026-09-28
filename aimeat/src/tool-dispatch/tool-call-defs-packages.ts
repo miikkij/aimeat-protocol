@@ -17,6 +17,7 @@
  * @structure packageTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { packageTools } from './tool-call-defs-packages.js';
  * @version-history
+ *   v1.8.0 -- 2026-09-29 -- aimeat_package_sellers (GET, PUT, DELETE /v1/package-sellers).
  *   v1.7.0 -- 2026-09-28 -- aimeat_package_config_needs (GET /v1/packages/:groupId/config-needs).
  *   v1.6.0 -- 2026-09-28 -- aimeat_package_entitlements forwards `node` (packages-only peer registered with a grant).
  *   v1.5.0 -- 2026-09-28 -- aimeat_package_instance_set, aimeat_package_check_updates,
@@ -306,6 +307,27 @@ export const packageTools: ConnectCliToolDefinition[] = [
             const note = optionalString(input, 'note');
             if (note !== undefined) body.note = note;
             return client.put(node, body);
+        },
+    },
+    {
+        name: 'aimeat_package_sellers',
+        description: 'On a package repository: list, add or remove the nodes that sell your packages with signed requests, no token.',
+        input: {
+            action: { type: 'string', required: true, enum: ['list', 'add', 'remove'], description: 'list your sellers, add (or change) one, or remove one.' },
+            node_id: { type: 'string', description: 'For add and remove: the seller node.' },
+            node: { type: 'object', description: 'For add: { url, public_key } of a node this repository does not know yet.' },
+            note: { type: 'string', description: 'For add: why.' },
+        },
+        handler: ({ client }, input) => {
+            const action = requiredString(input, 'action');
+            if (action === 'list') return client.get('/v1/package-sellers');
+            const path = `/v1/package-sellers/${encodeURIComponent(requiredString(input, 'node_id'))}`;
+            if (action === 'remove') return client.delete(path);
+            const body: JsonObject = {};
+            if (input.node !== undefined) body.node = input.node as JsonObject;
+            const note = optionalString(input, 'note');
+            if (note !== undefined) body.note = note;
+            return client.put(path, body);
         },
     },
     {

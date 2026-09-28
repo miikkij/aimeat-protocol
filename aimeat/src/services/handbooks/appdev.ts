@@ -5,6 +5,7 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-09-29 — aimeat_package_sellers: a shop's node sells your packages with no token.
  *   2026-09-28 — aimeat_package_config_needs: the settings a shop asks before the sale.
  *   2026-09-28 — A grant with `node` registers an unknown customer node (install packages, phase 5).
  *   2026-09-28 — The package line names the package repository tools.
@@ -75,7 +76,9 @@ installs whose \`auto_update\` is on (\`aimeat_package_instance_set\`). On the r
 \`channel\` beta gives a node the versions you set to \`beta\` with \`aimeat_package_status_set\`. A grant
 with \`node\` ({ url, public_key }) registers a node this repository does not know yet, which can then
 pull only what it is entitled to. \`aimeat_package_config_needs\` lists the settings a package or bundle
-of yours needs the customer to give, so a shop asks them before the sale.
+of yours needs the customer to give, so a shop asks them before the sale. \`aimeat_package_sellers\` names
+a shop's own AIMEAT a seller of your packages: it then sells them with requests signed by its own key,
+and nobody copies a token.
 
 **App config.** An app that needs values to work declares them as a JSON Schema in
 \`<script type="application/json" id="aimeat-config">\` (string, number, integer and boolean fields, never a
