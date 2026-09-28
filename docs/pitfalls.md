@@ -19,7 +19,7 @@ and its shape. Symptom first in the section too, then cause, then the rule.
 
 ## The five shapes
 
-1. **Silent success.** Something answers ok, 200, delivered or true, or logs green, on a path where the work did not happen: a branch that returns normally after skipping, `continue` inside a loop that decides, a catch that returns a plausible value, a parameter accepted and never read, a counter or a filter nobody can see working. *Ask what the caller sees when the work did NOT happen.* §1, 4, 5, 9, 16b, 28, 31, 36, 61, 63, 64, 65, 67, 73, 74, 75, 76, 77, 78b, 80, 82, 84, 88, 92, 93, 98
+1. **Silent success.** Something answers ok, 200, delivered or true, or logs green, on a path where the work did not happen: a branch that returns normally after skipping, `continue` inside a loop that decides, a catch that returns a plausible value, a parameter accepted and never read, a counter or a filter nobody can see working. *Ask what the caller sees when the work did NOT happen.* §1, 4, 5, 9, 16b, 28, 31, 36, 61, 63, 64, 65, 67, 73, 74, 75, 76, 77, 78b, 80, 82, 84, 88, 92, 93, 98, 101
 2. **A test or a measurement that cannot fail.** A test nobody saw red, a fixture smaller than the limit it tests, a comparison two empty results satisfy, a concurrency test run on sqlite only, a flag tested switched on only, a sweep total read as a regression. *Ask which line of the change turns the test red when it is reverted.* §12, 17, 18, 19, 21, 26, 34, 35, 37, 38, 45, 46, 50, 51, 54, 56, 57, 69, 72, 79, 89, 90, 91, 94, 99, 100
 3. **One rule, N doors, and one forgets.** A rule changed in one place while other doors reach the same capability: the REST route, the node MCP tool, the connector MCP tool, the CLI dispatch, an operator door, a second writer of the same record, a second backend. *Grep the capability's name and ask whether every door goes through the changed code.* §3, 7, 8b, 25, 33, 41, 44, 47, 48, 52, 58, 78, 81, 97
 4. **A name is not a principal.** A comparison or a storage key built from `req.auth.owner`, `sub`, a bare account name, a delivery target or a display identity where the holder or the addressed principal is meant. *Ask what the value holds for an agent, an app grant, a federated session and a namesake.* §6, 22, 43, 53, 66, 83
@@ -133,6 +133,7 @@ and its shape. Symptom first in the section too, then cause, then the rule.
 | 98 | A new provider fails only on the stand-in; Anthropic answers stop near 4096 tokens | 1 |
 | 99 | `pnpm gate` green, then the commit refused for a file over 800 lines | 2 |
 | 100 | An app never signs in on the sandbox; an owner-token check passes, the app's call fails | 2 |
+| 101 | A view-transition fade flashes the page light at its midpoint | 1 |
 
 ---
 
@@ -1140,3 +1141,12 @@ Two SESSIONS in one checkout is forbidden now (`CLAUDE.md`), so the case below i
 - **Why only setting the switch is not enough.** `config.ts` takes `appHost` from `AIMEAT_APP_HOST`, and otherwise from `deriveAppHost(baseUrl)` in `config-hosts.ts`, which returns `''` for `localhost`, an IP address or a `*.localhost` base URL. So a local node needs both `AIMEAT_APP_ORIGIN_ENABLED=true` and `AIMEAT_APP_HOST=apps.localhost`; with the switch alone the node has no host to serve apps on. `*.apps.localhost` is cross-site with `localhost`, so the app signs in through `AIMEAT.auth.signIn()`, not silently (node registry entry `apps-localhost-cross-site`).
 - **The rule.** For any change an app reaches through its own grant (the `AIMEAT.*` SDK, app scopes, app-grant tokens), a sandbox check or an owner-token curl proves the owner's path only. Check the app's path on a local node with `AIMEAT_APP_ORIGIN_ENABLED=true` and `AIMEAT_APP_HOST=apps.localhost`, signed in on the app's own origin, before calling it verified.
 - **The tell.** A verification note that says "checked in the sandbox" about something an app does.
+
+## 101. An `animation` shorthand on a view-transition snapshot drops the browser's own blend
+
+*Symptoms: every cross-fade between two screens flashes the page light, or shows the backdrop, at its midpoint. Screenshots of the transition look clean, the console is quiet, and the stylesheet reads correctly.*
+
+- **The case.** The Atelier kit's fade (`aimeat/public/lib/aimeat-atelier/transitions.css`) set `animation: ak-vt-out …` on `::view-transition-old(root)` and `animation: ak-vt-in …` on `::view-transition-new(root)`. Chromium gives the two snapshots their `mix-blend-mode: plus-lighter` through a UA animation in the same `animation` list, so the kit's shorthand replaced it. The two screens were laid over each other at normal blend, two half-opaque layers let about a quarter of the backdrop through at the midpoint, and every tab change flashed the whole page light. Jouni saw it on the tab row on 2026-09-28; fixed in `ac3c06071`.
+- **Why it hid.** The declaration that was lost is not in any stylesheet anyone wrote, so reading the CSS finds nothing wrong. Headless Playwright screenshots do not show the view-transition pseudo layers, so a screenshot taken mid-transition shows the new screen and no flash.
+- **The rule.** Any rule that sets `animation` on `::view-transition-old(*)` or `::view-transition-new(*)` also names `mix-blend-mode: plus-lighter` beside it. `test/unit/atelier-transitions-blend.test.ts` reads the fade rules out of the stylesheet and fails when either declaration goes. To measure in a browser, start a transition, pause it, and read `getComputedStyle(document.documentElement, '::view-transition-old(root)').mixBlendMode`; it read `normal` before the fix.
+- **The tell.** A custom keyframe on a view-transition snapshot, and a flash that is visible to a person and absent from every screenshot.
