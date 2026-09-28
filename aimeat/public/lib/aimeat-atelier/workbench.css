@@ -1,0 +1,352 @@
+/*
+ * @file aimeat-atelier/workbench.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The workbench pieces (atelier/workbench.js) and the shell's workbench frame: the
+ *   brand cluster (logo and name), the side-navigation frame, sideNav, statusBand, checkGrid,
+ *   choiceCards, settingsGroup, progressFigure, callout, the tone helpers they share, and the
+ *   per-field widths of the form. Drawn from the approved Postinjalostamo design (2026-09-28).
+ *
+ *   EVERY VALUE IS A TOKEN. Colours come from the contract (ink, ink-dim, surface, line, accent
+ *   and the ok/warn/err pairs the contrast matrix proves); the sizes a builder would reach for are
+ *   the per-component tokens declared in the base block of ../aimeat-atelier.css. Text on a toned
+ *   tint is always the ink or a proven *-text token, never the raw tone.
+ *
+ *   NOTHING HERE MOVES AT IDLE. There is no animation in this file; the count-up and the
+ *   entrance are the kit's one-shot JavaScript, and they stand down under reduced motion.
+ * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
+ * @version-history
+ *   v0.1.0 — 2026-09-28 — Initial.
+ */
+
+/* ── Tones shared by the pieces ───────────────────────────────────────────────────────────── */
+.ak-tone--ok { background: var(--ak-ok); }
+.ak-tone--warn { background: var(--ak-warn); }
+.ak-tone--err { background: var(--ak-err); }
+.ak-tone--accent, .ak-tone--info { background: var(--ak-accent); }
+.ak-tone--quiet { background: color-mix(in oklab, var(--ak-ink-dim) 55%, var(--ak-surface)); }
+.ak-tone-text--ok { color: var(--ak-ok-text); }
+.ak-tone-text--warn { color: var(--ak-warn-text); }
+.ak-tone-text--err { color: var(--ak-err-text); }
+.ak-tone-text--accent, .ak-tone-text--info { color: var(--ak-accent-text); }
+.ak-tone-text--quiet { color: var(--ak-ink-dim); }
+/* A MARK is a graphic, not text: it needs 3:1 against the card, which the raw tone gives, and it
+   reads as the tone itself (a green check, an amber bang) where the *-text ink would read black. */
+.ak-tone-mark--ok { color: var(--ak-ok); }
+.ak-tone-mark--warn { color: color-mix(in oklab, var(--ak-warn) 85%, var(--ak-surface)); }
+.ak-tone-mark--err { color: var(--ak-err); }
+.ak-tone-mark--accent, .ak-tone-mark--info { color: var(--ak-accent); }
+.ak-tone-mark--quiet { color: color-mix(in oklab, var(--ak-ink-dim) 70%, var(--ak-surface)); }
+.ak-tone-fill--ok { background: var(--ak-ok); }
+.ak-tone-fill--warn { background: var(--ak-warn); }
+.ak-tone-fill--err { background: var(--ak-err); }
+.ak-tone-fill--accent, .ak-tone-fill--info { background: var(--ak-accent); }
+.ak-tone-fill--quiet { background: var(--ak-ink-dim); }
+.ak-tone-soft--ok { background: color-mix(in oklab, var(--ak-ok) 12%, var(--ak-surface)); }
+.ak-tone-soft--warn { background: color-mix(in oklab, var(--ak-warn) 12%, var(--ak-surface)); }
+.ak-tone-soft--err { background: color-mix(in oklab, var(--ak-err) 10%, var(--ak-surface)); }
+.ak-tone-soft--accent, .ak-tone-soft--info { background: color-mix(in oklab, var(--ak-accent) 10%, var(--ak-surface)); }
+.ak-tone-soft--quiet { background: var(--ak-surface-2); }
+
+/* ── The brand cluster: the app's own mark before its name ────────────────────────────────── */
+.ak-app__brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.ak-app__logo {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: calc(var(--ak-radius-sm) - 1px);
+  object-fit: cover;
+}
+
+/* ── The side-navigation frame ────────────────────────────────────────────────────────────── */
+/* The frame is the one scroller in this mode: the column and the page move as one sheet and the
+   column stays pinned at the top of it, so the scrollbar sits at the window's edge rather than at
+   the edge of a 1040px column. */
+.ak-app__frame {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: calc(var(--ak-gap) * 2);
+  padding: calc(var(--ak-pad) * 2) calc(var(--ak-pad) * 2) 0;
+  /* The column must not step sideways when one page is long enough to scroll and the next is not. */
+  scrollbar-gutter: stable;
+}
+.ak-app__side {
+  flex: none;
+  width: var(--ak-sidenav-w);
+  position: sticky;
+  top: 0;
+}
+.ak-app--sidenav .ak-app__main {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: var(--ak-sidenav-main);
+  margin: 0;
+  padding: 0 0 calc(var(--ak-chrome-bottom) + var(--ak-pad) * 2);
+  gap: calc(var(--ak-gap) * 1.7);
+}
+.ak-app--gate .ak-app__frame { display: none; }
+/* Inside the workbench frame a plain section is a working card, not a feature: more room inside,
+   and a heading at the size of the pieces' own (the page title is the status band's). */
+.ak-app--sidenav .ak-section:not(.ak-section--flush) { --ak-section-pad: 24px 28px; --ak-section-gap: 10px; }
+.ak-app--sidenav .ak-section__title { font-size: 1.125rem; }
+.ak-app--sidenav .ak-section--flush .ak-section__title { font-size: 1.25rem; }
+.ak-app--sidenav .ak-section__hint { font-size: calc(var(--ak-text-body) - 0.5px); line-height: 1.5; max-width: 60ch; }
+@media (min-width: 761px) {
+  .ak-app--sidenav .ak-app__bar { padding-inline: calc(var(--ak-pad) * 2); }
+  .ak-app--sidenav.ak-app--bottomnav .ak-bottomnav { display: none; }
+}
+@media (max-width: 760px) {
+  .ak-app__side { display: none; }
+  .ak-app__frame { padding: var(--ak-pad) var(--ak-pad) 0; }
+  .ak-app--sidenav .ak-app__main { padding-bottom: calc(var(--ak-chrome-bottom) + var(--ak-touch) + var(--ak-pad) * 2); }
+}
+
+/* ── sideNav ──────────────────────────────────────────────────────────────────────────────── */
+.ak-sidenav { display: flex; flex-direction: column; gap: 16px; }
+.ak-sidenav__group { display: flex; flex-direction: column; gap: 4px; }
+.ak-sidenav__heading {
+  padding: 0 14px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ak-ink-dim);
+}
+.ak-sidenav__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: var(--ak-touch-min);
+  padding: 8px 14px;
+  border: 0;
+  border-radius: var(--ak-radius-sm);
+  background: none;
+  color: color-mix(in oklab, var(--ak-ink) 82%, var(--ak-surface));
+  font: inherit;
+  font-size: var(--ak-text-body);
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background var(--ak-motion) var(--ak-ease);
+}
+.ak-sidenav__item:hover { background: color-mix(in oklab, var(--ak-surface) 55%, transparent); }
+.ak-sidenav__item--active,
+.ak-sidenav__item--active:hover {
+  background: var(--ak-surface);
+  color: var(--ak-ink);
+  font-weight: 600;
+  box-shadow: 0 1px 2px color-mix(in oklab, var(--ak-ink) 10%, transparent);
+}
+.ak-sidenav__item:focus-visible { outline: 2px solid var(--ak-focus); outline-offset: 2px; }
+.ak-sidenav__dot { flex: none; width: 8px; height: 8px; border-radius: 50%; }
+.ak-sidenav__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ak-sidenav__count { flex: none; font-variant-numeric: tabular-nums; color: var(--ak-ink-dim); font-weight: 500; }
+.ak-sidenav__foot {
+  padding: 14px;
+  border-radius: calc(var(--ak-radius) - 4px);
+  background: var(--ak-surface);
+  font-size: var(--ak-text-fine);
+  line-height: 1.5;
+  color: var(--ak-ink-dim);
+}
+
+/* ── The cards the pieces share ───────────────────────────────────────────────────────────── */
+.ak-band, .ak-setgroup, .ak-progress, .ak-choices__card, .ak-choices__panel {
+  background: var(--ak-surface);
+  background-image: var(--ak-surface-image);
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius);
+  box-shadow: var(--ak-elev-1);
+}
+
+/* ── statusBand ───────────────────────────────────────────────────────────────────────────── */
+.ak-band {
+  padding: var(--ak-band-inset-y) var(--ak-band-inset-x);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  container-type: inline-size;
+}
+/* The three cards share one inset, and on a phone it narrows with the screen (about 20px at 390)
+   so the words keep their room. */
+.ak-band, .ak-setgroup, .ak-progress {
+  --ak-band-inset-y: min(var(--ak-band-pad), 5vw);
+  --ak-band-inset-x: min(calc(var(--ak-band-pad) + 4px), 5.5vw);
+}
+.ak-band__head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+.ak-band__words { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1 1 20rem; }
+.ak-band__title {
+  margin: 0;
+  font-family: var(--ak-font-display);
+  font-weight: var(--ak-weight-display);
+  font-size: clamp(1.4rem, 3vw, 1.75rem);
+  line-height: 1.15;
+}
+.ak-band__text { margin: 0; max-width: 60ch; color: var(--ak-ink-dim); font-size: calc(var(--ak-text-body) + 0.5px); line-height: 1.5; }
+.ak-band__actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.ak-band__actions .ak-btn { white-space: nowrap; }
+.ak-band__body { display: flex; flex-direction: column; gap: 12px; }
+.ak-band__body:empty { display: none; }
+.ak-band__bar, .ak-progress__bar {
+  height: 8px;
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--ak-ink) 7%, var(--ak-surface));
+  overflow: hidden;
+}
+.ak-band__fill, .ak-progress__fill {
+  width: var(--ak-fill, 0%);
+  height: 100%;
+  border-radius: inherit;
+  transition: width calc(var(--ak-motion) * 2) var(--ak-ease);
+}
+@container (max-width: 520px) {
+  .ak-band__actions, .ak-band__actions .ak-btn { width: 100%; }
+}
+
+/* ── checkGrid ────────────────────────────────────────────────────────────────────────────── */
+.ak-checkgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(var(--ak-checkgrid-min), 100%), 1fr));
+  gap: 12px;
+}
+.ak-checkgrid__cell { display: flex; min-width: 0; }
+.ak-checkgrid__tile {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: calc(var(--ak-radius) - 4px);
+  background: var(--ak-surface);
+  color: var(--ak-ink);
+  font: inherit;
+  text-align: left;
+}
+button.ak-checkgrid__tile { cursor: pointer; touch-action: manipulation; transition: border-color var(--ak-motion) var(--ak-ease); }
+button.ak-checkgrid__tile:hover { border-color: color-mix(in oklab, var(--ak-accent) 45%, var(--ak-line)); }
+button.ak-checkgrid__tile:focus-visible { outline: 2px solid var(--ak-focus); outline-offset: 2px; }
+.ak-checkgrid__tile--todo, .ak-checkgrid__tile--fail { border-color: color-mix(in oklab, var(--ak-warn) 40%, var(--ak-line)); }
+.ak-checkgrid__icon { flex: none; display: inline-flex; }
+.ak-checkgrid__words { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ak-checkgrid__title { font-weight: 600; font-size: calc(var(--ak-text-body) - 0.5px); }
+.ak-checkgrid__sub { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); overflow-wrap: anywhere; }
+
+/* ── choiceCards ──────────────────────────────────────────────────────────────────────────── */
+.ak-choices { display: flex; flex-direction: column; gap: 16px; }
+.ak-choices__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(var(--ak-choice-min), 100%), 1fr));
+  gap: 16px;
+}
+.ak-choices__card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 22px;
+  color: var(--ak-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: box-shadow var(--ak-motion) var(--ak-ease), border-color var(--ak-motion) var(--ak-ease);
+}
+.ak-choices__card:hover { border-color: color-mix(in oklab, var(--ak-accent) 35%, var(--ak-line)); }
+.ak-choices__card--on,
+.ak-choices__card--on:hover { border-color: var(--ak-accent); box-shadow: 0 0 0 1px var(--ak-accent), var(--ak-elev-1); }
+.ak-choices__card:focus-visible { outline: 2px solid var(--ak-focus); outline-offset: 3px; }
+.ak-choices__kicker {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ak-ink-dim);
+}
+.ak-choices__card--on .ak-choices__kicker { color: var(--ak-accent-text); }
+.ak-choices__title { font-family: var(--ak-font-display); font-weight: 700; font-size: 1.0625rem; line-height: 1.3; }
+.ak-choices__text { font-size: calc(var(--ak-text-body) - 0.5px); line-height: 1.5; color: var(--ak-ink-dim); }
+.ak-choices__panel { padding: 24px 28px; }
+
+/* ── settingsGroup ────────────────────────────────────────────────────────────────────────── */
+.ak-setgroup {
+  padding: var(--ak-band-inset-y) var(--ak-band-inset-x);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  container-type: inline-size;
+}
+.ak-setgroup__grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.ak-setgroup__help { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ak-setgroup__title { margin: 0; font-family: var(--ak-font-display); font-weight: 700; font-size: 1.0625rem; }
+.ak-setgroup__hint { margin: 0; max-width: 60ch; font-size: calc(var(--ak-text-body) - 0.5px); line-height: 1.5; color: var(--ak-ink-dim); }
+.ak-setgroup__body { display: flex; flex-direction: column; gap: 16px; min-width: 0; max-width: var(--ak-setgroup-measure); }
+@container (min-width: 840px) {
+  .ak-setgroup__grid { grid-template-columns: var(--ak-setgroup-help) minmax(0, var(--ak-setgroup-measure)); column-gap: 40px; }
+}
+.ak-setgroup .ak-form__bar { justify-content: flex-start; }
+
+/* ── progressFigure ───────────────────────────────────────────────────────────────────────── */
+.ak-progress { padding: var(--ak-band-inset-y) var(--ak-band-inset-x); display: flex; flex-direction: column; gap: 20px; }
+.ak-progress__head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.ak-progress__words { display: flex; flex-direction: column; gap: 4px; }
+.ak-progress__kicker {
+  font-size: var(--ak-text-fine);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ak-accent-text);
+}
+.ak-progress__line { font-family: var(--ak-font-display); line-height: 1; font-variant-numeric: tabular-nums; }
+.ak-progress__figure { font-weight: 800; font-size: var(--ak-progress-figure); }
+.ak-progress__total { font-weight: 700; font-size: var(--ak-progress-figure); color: color-mix(in oklab, var(--ak-ink-dim) 70%, var(--ak-surface)); }
+.ak-progress__bar { height: 10px; border-radius: 5px; }
+.ak-progress__now { display: flex; flex-direction: column; gap: 6px; }
+.ak-progress__now-label { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
+.ak-progress__now-text { font-weight: 600; font-size: 1rem; overflow-wrap: anywhere; }
+.ak-progress__chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.ak-progress__chip {
+  padding: 3px 10px;
+  border-radius: var(--ak-radius-pill);
+  font-size: var(--ak-text-fine);
+  background: var(--ak-surface-2);
+  color: var(--ak-ink-dim);
+}
+.ak-progress__chip--done { background: color-mix(in oklab, var(--ak-ok) 12%, var(--ak-surface)); color: var(--ak-ok-text); }
+.ak-progress__chip--now { background: color-mix(in oklab, var(--ak-accent) 10%, var(--ak-surface)); color: var(--ak-accent-text); font-weight: 600; }
+.ak-progress__counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(7.5rem, 100%), 1fr)); gap: 12px; }
+.ak-progress__count { display: flex; flex-direction: column; gap: 2px; padding: 14px 16px; border-radius: calc(var(--ak-radius) - 4px); }
+.ak-progress__count-n { font-family: var(--ak-font-display); font-weight: 800; font-size: 1.75rem; font-variant-numeric: tabular-nums; }
+.ak-progress__count-label { font-size: var(--ak-text-fine); color: var(--ak-ink); }
+
+/* ── callout ──────────────────────────────────────────────────────────────────────────────── */
+.ak-callout {
+  display: flex;
+  gap: 12px;
+  padding: var(--ak-callout-pad) calc(var(--ak-callout-pad) + 2px);
+  border-radius: calc(var(--ak-radius) - 4px);
+  background: color-mix(in oklab, var(--ak-accent) 8%, var(--ak-surface));
+  color: var(--ak-ink);
+}
+.ak-callout--ok { background: color-mix(in oklab, var(--ak-ok) 12%, var(--ak-surface)); }
+.ak-callout--warn { background: color-mix(in oklab, var(--ak-warn) 12%, var(--ak-surface)); }
+.ak-callout--err { background: color-mix(in oklab, var(--ak-err) 10%, var(--ak-surface)); }
+.ak-callout__icon { flex: none; display: inline-flex; color: var(--ak-accent); }
+.ak-callout--ok .ak-callout__icon { color: var(--ak-ok); }
+.ak-callout--warn .ak-callout__icon { color: var(--ak-warn); }
+.ak-callout--err .ak-callout__icon { color: var(--ak-err); }
+.ak-callout__words { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: calc(var(--ak-text-body) - 0.5px); line-height: 1.5; }
+.ak-callout__title { font-weight: 600; }
+
+/* ── The form's per-field widths ──────────────────────────────────────────────────────────── */
+/* The cap is on the control alone; 28px is the input's own padding and border, so "short" holds
+   ten characters, not ten minus the padding. */
+.ak-form__field--w-short .ak-input { max-width: calc(10ch + 28px); }
+.ak-form__field--w-date .ak-input { max-width: calc(18ch + 28px); }
+.ak-form__field--w-medium .ak-input { max-width: calc(30ch + 28px); }
+.ak-form__field--w-long .ak-input { max-width: 32rem; }
+.ak-form__field--w-full .ak-input { max-width: none; }

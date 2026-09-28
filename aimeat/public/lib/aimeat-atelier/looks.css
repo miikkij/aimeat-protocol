@@ -1064,3 +1064,49 @@
   --ak-ink-dim:    #b3a9ad;
   --ak-line:       #4a4152;
 }
+
+/* @preset-block workbench — a tool somebody works in every day: a cool grey desk, white cards, one accent, a heavy sans heading, nothing moving at idle.
+   The workbench world, drawn for the mail intake app and approved on 2026-09-28: a cool grey desk under white cards, a solid bar, Archivo headings at 800, short entrances and no ambient. Pair it with app({ nav: "side" }) and the workbench pieces; the dark twin keeps the same order of steps. */
+[data-ak-look='workbench'] {
+  --ak-page-image:        none;
+  --ak-surface-image:     none;
+  --ak-grain:             none;
+  --ak-hero-image:        radial-gradient(at 20% 20%, color-mix(in oklab, var(--ak-accent) 10%, var(--ak-bg)), transparent 60%);
+  --ak-glass:             var(--ak-surface);
+  --ak-blur:              0px;
+  --ak-grad:              linear-gradient(135deg, color-mix(in oklab, var(--ak-accent) 86%, var(--ak-ink)), color-mix(in oklab, var(--ak-accent) 86%, var(--ak-ink)));
+  --ak-radius:            16px;
+  --ak-radius-sm:         10px;
+  --ak-elev-1:            0 1px 2px color-mix(in oklab, var(--ak-ink) 6%, transparent);
+  --ak-elev-2:            0 8px 24px color-mix(in oklab, var(--ak-ink) 10%, transparent);
+  --ak-font-display:      Archivo, 'Segoe UI', system-ui, sans-serif;
+  --ak-font:              Archivo, 'Segoe UI', system-ui, sans-serif;
+  --ak-weight-display:    800;
+  --ak-gap:               14px;
+  --ak-enter-distance:    6px;
+  --ak-enter-stagger:     24ms;
+  --ak-motion:            180ms;
+  --ak-ambient:           none;
+  --ak-spring-stiffness:  260;
+  --ak-spring-damping:    30;
+  --ak-spring-mass:       1;
+  --ak-bg:                #e9edf5;
+  --ak-surface:           #ffffff;
+  --ak-surface-2:         #f4f6fa;
+  --ak-ink:               #151826;
+  --ak-ink-dim:           #5b6275;
+  --ak-line:              #d6dce7;
+  --ak-hero-ink:          var(--ak-ink);
+  --ak-hero-ink-dim:      var(--ak-hero-ink);
+  --ak-scrim:             color-mix(in oklab, var(--ak-bg) 78%, transparent);
+  --ak-kinetic:           none;
+}
+/* @preset-block workbench@dark — the world's dark ground (layered by the dark cascade). */
+[data-theme='dark'] [data-ak-look='workbench'], [data-ak-look='workbench'][data-theme='dark'] {
+  --ak-bg:         #10131b;
+  --ak-surface:    #1a1f2b;
+  --ak-surface-2:  #232938;
+  --ak-ink:        #e9ecf3;
+  --ak-ink-dim:    #a4abbc;
+  --ak-line:       #353c4e;
+}

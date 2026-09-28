@@ -33,6 +33,8 @@
  * @tokens form --ak-range-track · --ak-range-thumb
  * @fork form Copy .ak-form* and .ak-input* out of data.css and build the fields yourself; you keep the tokens, and you give up the label/hint/error wiring, the announced refusal with focus on the first problem, the submit guard and the range's reading.
  * @version-history
+ *   v0.54.0 — 2026-09-28 — A field's `width` (short, date, medium, long, full) caps the control at
+ *     the width its content needs; the settings-page layout rule in the Atelier spec names it.
  *   v0.53.0 — 2026-09-05 — `type: 'range'` (min, max, step, unit, the live reading beside the
  *     track, the 40px floor and aria-valuetext); per-field onInput/onChange on every control
  *     beside the submit path; `submit: false` for a form that is only controls; an optional
@@ -58,6 +60,9 @@ import { t } from './i18n.js';
  * @property {string} [unit]  what the number is measured in; shown in a range's reading
  * @property {number} [maxLength]
  * @property {string} [id]  the control's id, when the host wires its own label or readout to it
+ * @property {'short'|'date'|'medium'|'long'|'full'} [width]  how wide the control is drawn: short
+ *   (a number, about 10 characters), date (18), medium (a name, 30), long (a URL or a sentence,
+ *   32rem) or full. Omitted, the control fills its column as before.
  * @property {(value: any, field: FormField) => void} [onInput]  every keystroke, every drag
  * @property {(value: any, field: FormField) => void} [onChange]  when the person lets go
  */
@@ -170,8 +175,12 @@ export function form(spec) {
       : input;
 
     const inline = type === 'checkbox' || type === 'toggle';
+    // THE WIDTH IS THE CONTENT'S: a four-digit number in a field as wide as the page reads as a
+    // form nobody designed. The class caps the control, never the label or the hint.
+    const width = ['short', 'date', 'medium', 'long', 'full'].indexOf(field.width || '') >= 0 ? field.width : null;
     const wrap = el('div', {
-      class: 'ak-form__field' + (inline ? ' ak-form__field--inline' : '') + (type === 'range' ? ' ak-form__field--range' : ''),
+      class: 'ak-form__field' + (inline ? ' ak-form__field--inline' : '') + (type === 'range' ? ' ak-form__field--range' : '')
+        + (width ? ' ak-form__field--w-' + width : ''),
       'data-ak-part': 'field', 'data-ak-field': field.name,
     }, inline ? [input, label, hint, error] : [label, body, hint, error]);
     controls.set(field.name, { field: field, input: input, error: error, wrap: wrap, readout: readout });

@@ -13,6 +13,8 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.21.0 — 2026-09-28 — Step 3 names the workbench pieces beside the catalogue, and says that
+ *     genre-workbench is the one genre built on the app() shell, which a fork keeps.
  *   v1.20.0 — 2026-09-26 — Components: step 10 says every element closes inside the markup and a
  *     nested rule starts with "&", and that a proposer is told once, with the reason, when the bench
  *     stops passing a component they proposed.
@@ -195,7 +197,9 @@ moved under you says so.
    \`custom:<name>\`); the publish refuses an Atelier app that names none. Then compose screens
    from the catalogue in the spec (hero, list, listDetail, cardGrid, mediaCard, form, table,
    statRow, figure, searchBar, timeline, tabs, and the designed \`emptyState\` and \`skeleton\`
-   rather than a bare string or a grey box) where the page needs them; the \`section\`
+   rather than a bare string or a grey box, and for a tool someone works in every day the
+   workbench pieces: sideNav through \`app({ nav: 'side' })\`, statusBand, checkGrid,
+   choiceCards, settingsGroup, progressFigure and callout) where the page needs them; the \`section\`
    component is the ONLY place your own raw markup goes. **In a genre fork the genre IS the
    look.** Do not put a look preset and a stack of components in its place: that is the default
    page every app looks like, a genre's name in the head does not change what it is, and it is
@@ -223,6 +227,10 @@ moved under you says so.
    it stores that layout as the app's arrangement, so the owner's AI rearranges the screen later
    without a republish. The specification's part \`patterns\` has the pattern. Hand-made stays what the genre itself is made of: its masthead, a figure only
    this page has, a game board.
+   **One genre is built on the shell: \`genre-workbench\`.** An intake, review or admin tool is
+   pages rather than one poster, so that genre IS \`app({ look: 'workbench', nav: 'side', logo })\`
+   with the workbench pieces in \`a.main\`; keep its shell, its side column and its look, and swap
+   the pages, the sources and the logo (a square mark in storage, never a data: URI).
    **The fork signs people in and speaks two languages, and a genre does neither.** Mount the
    node's own bar (\`AIMEAT.auth.mountLoginButton('#pill', …)\`); never write a header control or a
    language switch of your own. Declare \`aimeat-locales\` "en fi" and every scope you use, put

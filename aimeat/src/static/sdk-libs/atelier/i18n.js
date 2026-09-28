@@ -15,6 +15,8 @@
  * @usage  AIMEAT.atelier.i18n.use({ fi: { addTask: 'Lisää tehtävä' }, en: { addTask: 'Add task' } });
  *         AIMEAT.atelier.i18n.t('addTask');
  * @version-history
+ *   v0.5.0 — 2026-09-28 — The workbench pieces' words (en/fi/es): chosen, now, ofTotal and the
+ *     five check states a screen reader hears before a tile's title.
  *   v0.4.0 — 2026-09-05 — ambient, ambientOff, ambientCalm, ambientFull (en/fi/es): the weather
  *     switch's name and its three levels, each language composed as itself.
  *   v0.3.0 — 2026-09-02 — lessMotion (en/fi/es): the label of the bar's less-motion switch.
@@ -91,6 +93,14 @@ const BASE = {
     delegateFailed: 'The agent could not finish it.',
     delegateNoAgents: 'No agent is connected to this account yet.',
     agentActivityNone: 'No agent activity yet.',
+    chosen: 'Chosen',
+    now: 'Now',
+    ofTotal: '{value} of {total}',
+    checkOk: 'Done',
+    checkTodo: 'Needs you',
+    checkFail: 'Failed',
+    checkWait: 'In progress',
+    checkOptional: 'Optional',
   },
   fi: {
     loading: 'Ladataan…',
@@ -155,6 +165,14 @@ const BASE = {
     delegateFailed: 'Agentti ei saanut sitä valmiiksi.',
     delegateNoAgents: 'Tähän tiliin ei ole vielä kytketty agenttia.',
     agentActivityNone: 'Ei agenttitoimintaa vielä.',
+    chosen: 'Valittu',
+    now: 'Nyt',
+    ofTotal: '{value} / {total}',
+    checkOk: 'Kunnossa',
+    checkTodo: 'Tarvitsee sinua',
+    checkFail: 'Epäonnistui',
+    checkWait: 'Kesken',
+    checkOptional: 'Valinnainen',
   },
   es: {
     loading: 'Cargando…',
@@ -219,6 +237,14 @@ const BASE = {
     delegateFailed: 'El agente no pudo terminarlo.',
     delegateNoAgents: 'Esta cuenta aún no tiene ningún agente conectado.',
     agentActivityNone: 'Sin actividad de agentes todavía.',
+    chosen: 'Elegida',
+    now: 'Ahora',
+    ofTotal: '{value} de {total}',
+    checkOk: 'Listo',
+    checkTodo: 'Te necesita',
+    checkFail: 'Falló',
+    checkWait: 'En curso',
+    checkOptional: 'Opcional',
   },
 };
 

@@ -28,6 +28,7 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.31.0 — 2026-09-28 — The workbench pieces join the component catalogue (ATELIER_WORKBENCH_COMPONENTS).
  *   v1.30.0 — 2026-09-28 — Twelve layout rules for a settings page and a queue page follow "COMPOSE" (build-atelier-layout-rules.ts).
  *   v1.29.0 — 2026-09-20 —The mosaic section ends with the working screen of a genre fork being a
  *     mosaic inside the genre (build-atelier-people.ts), which is what lets a Design Book part land.
@@ -141,7 +142,7 @@ import { EFFECTS, EFFECT_HOSTS, POST_IDS } from '../data/atelier-effects.js';
 import { renderCustomisation, renderLiving, renderPatterns } from './build-atelier-recipe.js';
 import { ATELIER_FORK_PEOPLE_SECTION, ATELIER_MOSAIC_IN_GENRE, ATELIER_PROPOSAL_SECTION } from './build-atelier-people.js';
 import { buildAtelierLibrarySection } from '../data/library-packs.js';
-import { atelierLayoutRules } from './build-atelier-layout-rules.js';
+import { atelierLayoutRules, ATELIER_WORKBENCH_COMPONENTS } from './build-atelier-layout-rules.js';
 
 /** Slot the publish gate's token is substituted into (mirrors build-app-prompt.ts). */
 const SPEC_TOKEN_SLOT = '{{aimeat_spec_token}}';
@@ -232,6 +233,7 @@ export const ATELIER_COMPONENTS: ReadonlyArray<{ id: string; summary: string; ex
     summary: 'Loading placeholder rows the real content replaces; the shimmer is finite.',
     example: 'var sk = AIMEAT.atelier.skeleton({ target: a.main, rows: 3 }); load().then(function (rows) { sk.destroy(); l.set({ items: rows }); });',
   },
+  ...ATELIER_WORKBENCH_COMPONENTS,
 ];
 
 /**

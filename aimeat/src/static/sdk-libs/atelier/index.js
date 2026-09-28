@@ -55,6 +55,9 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.54.0 — 2026-09-28 — THE WORKBENCH (workbench.js): sideNav, statusBand, checkGrid,
+ *     choiceCards, settingsGroup, progressFigure and callout, the pieces of the approved
+ *     Postinjalostamo design; app() takes `logo` and `nav: 'side'`, and form fields take `width`.
  *   v0.53.3 — 2026-09-20 — The mosaic reads its stored arrangement with ?catalogue=none
  *     (mosaic-layout.js): the route sent its whole 89 kB catalogue on every open of every app.
  *   v0.53.2 — 2026-09-13 — A section's fill runs with its body in the page, and a throwing fill no
@@ -322,6 +325,7 @@ import { settle, keyedRows, viewSwap } from './arrive.js';
 import { i18n } from './i18n.js';
 import { flapify, ransom, vu, typeout, dealIn } from './scenics.js';
 import { app, section, tabs, bottomNav } from './shell.js';
+import { sideNav, statusBand, checkGrid, choiceCards, settingsGroup, progressFigure, callout } from './workbench.js';
 import { hero, statRow, figure, rating } from './hero.js';
 import { aide } from './aide.js';
 import { delegate, agentActivity } from './agentic.js';
@@ -376,7 +380,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.53.3',
+  version: '0.54.0',
 
   /**
    * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
@@ -400,6 +404,9 @@ const atelier = {
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,
+
+  // ── The workbench: the pieces of a tool somebody works in every day ──
+  sideNav, statusBand, checkGrid, choiceCards, settingsGroup, progressFigure, callout,
 
   // ── The stored layout, rendered ──
   mosaic, appRef,
