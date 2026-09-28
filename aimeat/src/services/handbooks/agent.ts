@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/mcp/catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.14.0 -- 2026-09-28 -- Which AI models are allowed: the owner's model policy and aimeat_ai_policy_set.
  *   v1.13.0 -- 2026-09-25 -- Workflows: an agent step costs work:request.
  *   v1.12.0 -- 2026-09-25 -- Workflows: a trigger's run answers to whoever saved the workflow.
  *   v1.11.0 -- 2026-09-25 -- Workflows: maxCostUsd caps what one run's ai steps spend, in US dollars.
@@ -152,6 +153,14 @@ gate, which is off until the owner turns it on; (6) read the decisions and tune 
 a key is missing, the refusal says what to set and where: pass it to your owner as it is. No tool
 ever returns a key; \`aimeat_decide_settings\` names the environment variable that holds yours, when
 your owner set one.
+
+**Which AI models are allowed.** Your owner may limit the models their calls use: \`aimeat_ai_policy_set\`
+with no policy reads the policy and the node's recommended models. A call naming a model the rules
+leave out is refused 403 \`AI_MODEL_NOT_ALLOWED\` with the \`allowed\` list: call again with one of
+them, or without a model and let the node choose (the answer then says \`policy_chose_model\`). When
+your owner has a provider and no policy and the node recommends models, suggest \`{ mode:
+"recommended" }\` once; the tool proposes, you show the change, and the same call with
+\`confirm_token\` applies it. Skill: aimeat-ai-model-policy.
 
 **Self & onboarding.** \`aimeat_agent_profile\` · \`aimeat_agent_activity\` ·
 \`aimeat_agent_capabilities_report\` · \`aimeat_agent_telemetry_report\` · \`aimeat_agents_list\`

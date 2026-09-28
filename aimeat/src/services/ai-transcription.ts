@@ -13,6 +13,7 @@
  *   import { transcribeForOwner } from '../services/ai-transcription.js';
  *   const r = await transcribeForOwner(storage, config, gaii, { audio, appId: 'inbox' });
  * @version-history
+ *   v2.1.0 — 2026-09-28 — Takes caller and verifiedApp for the owner's model policy (V2).
  *   v2.0.0 — 2026-09-28 — Through the shared gate (System 2 plan, V1): prepareAiCall with op
  *     'transcribe', the gateway's transcribeAudio(), settleAiCall. An agent's own key and the
  *     node's key can pay (the node's only when the operator named a node default transcription
@@ -37,6 +38,7 @@ import { AiCompletionError, prepareAiCall, settleAiCall, targetOf } from './ai-c
 import { transcribeAudio } from './ai/gateway.js';
 import { logger } from '../utils/logger.js';
 import { resolveSttLanguage } from './ai-model-defaults.js';
+import type { CallerClass } from './ai/policy.js';
 
 /** Shown when the owner has no `sttModel`. Lives in services/ai/unset-model.ts since the gate refuses
  *  it; re-exported so the route, the message route and the UI copy point at the same instruction. */
@@ -57,6 +59,9 @@ export interface TranscribeForOwnerOptions {
   /** The owner's agent that asked, by bare name: its own key pays first and its cap applies. The
    *  caller derives it from the principal (aiPayerOf), never from a request body. */
   agent?: string;
+  /** Whose call this is and the app its grant names, for the owner's model policy. */
+  caller?: CallerClass;
+  verifiedApp?: string;
 }
 
 export interface TranscribeForOwnerResult {
@@ -107,6 +112,7 @@ export async function transcribeForOwner(
   // refusal stays: handing audio to a chat model turns a clear local error into an opaque provider one.
   const plan = await prepareAiCall(storage, config, gaii, {
     op: 'transcribe', model: opts.model, appId: opts.appId, ...(opts.agent ? { agent: opts.agent } : {}),
+    ...(opts.caller ? { caller: opts.caller } : {}), ...(opts.verifiedApp ? { verifiedApp: opts.verifiedApp } : {}),
   });
   const language = opts.language || resolveSttLanguage(config, plan.prefs);
 

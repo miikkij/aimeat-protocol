@@ -21,6 +21,13 @@
  *   import { completeForOwner, AiCompletionError } from '../services/ai-completion.js';
  *   const r = await completeForOwner(storage, config, gaii, { prompt });
  * @version-history
+ *   v3.6.0 — 2026-09-28 — The owner's model policy (System 2 plan, V2; services/ai/policy-gate.ts): the
+ *     model is chosen under it BEFORE the key, a named model the rules leave out is refused 403
+ *     AI_MODEL_NOT_ALLOWED, lists with nothing in common 403 AI_MODEL_POLICY_EMPTY, a model the
+ *     owner's role names but the rules leave out is replaced by the first allowed one
+ *     (`policyChoseModel`), and a spent allowance falls back to the free model only when the policy
+ *     allows it. With no policy anywhere every choice is as before. AiCompletionError moved to
+ *     services/ai/errors.ts (re-exported here) and carries `details`.
  *   v3.5.0 — 2026-09-28 — One gate for every operation (System 2 plan, V1). prepareAiCall takes an
  *     `op` (text, image, transcribe), resolves the model for it, and returns the target the gateway
  *     calls (services/ai/gateway.ts, on the AI SDK); completeForOwner calls the gateway instead of the
@@ -98,8 +105,11 @@ import type { Storage } from '../storage/interface.js';
 import { decrypt, getEncryptionKey } from './encryption.js';
 import { DEFAULT_BASE_URLS, type ProviderType, type CompletionReasoning } from './openrouter.js';
 import { text as gatewayText } from './ai/gateway.js';
-import { adapterTypeOf, type AiAdapterType, type AiOp, type AiTarget, type CostSource } from './ai/types.js';
+import { adapterTypeOf, type AiAdapterType, type AiCapability, type AiOp, type AiTarget, type CostSource } from './ai/types.js';
+import { loadPolicyDecision, chooseModel, freeModelAllowed, type PolicyCallContext } from './ai/policy-gate.js';
+import type { CallerClass } from './ai/policy.js';
 import { UNSET_MODEL } from './ai/unset-model.js';
+import { AiCompletionError } from './ai/errors.js';
 import { mintProvenance } from './ai-provenance.js';
 import type { AiProvenanceRecordRow } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
@@ -129,17 +139,9 @@ export function estimateCostUsd(promptTokens: number, completionTokens: number):
     + completionTokens * FALLBACK_COMPLETION_COST_PER_TOKEN;
 }
 
-/** Typed error so the HTTP route can map to a status/code and the scheduler can log it. */
-export class AiCompletionError extends Error {
-  code: string;
-  status: number;
-  constructor(code: string, status: number, message: string) {
-    super(message);
-    this.name = 'AiCompletionError';
-    this.code = code;
-    this.status = status;
-  }
-}
+// The typed error lives in services/ai/errors.ts (a leaf the policy code can throw too) and is
+// re-exported here, so every existing importer keeps its path.
+export { AiCompletionError };
 
 /**
  * Provider host allowlist — the guard that stands between a decrypted AI key and wherever an
@@ -236,6 +238,9 @@ export interface CompleteForOwnerOptions {
   appId?: string;
   /** The owner's agent that is asking, by bare name (see PrepareAiCallOptions.agent). */
   agent?: string;
+  /** Whose call this is and the app the node identified, for the model policy (PrepareAiCallOptions). */
+  caller?: CallerClass;
+  verifiedApp?: string;
   /** Optional image attachments (data: or https URLs) for vision-capable models. */
   images?: string[];
   /**
@@ -306,6 +311,11 @@ export interface CompleteForOwnerResult {
    * an unannounced one is not.
    */
   degradedToFreeModel?: boolean;
+  /**
+   * True when the owner's model policy chose the model: the one that would have answered is not
+   * allowed, or nobody chose one. Surfaced like degradedToFreeModel, so an app can say so.
+   */
+  policyChoseModel?: boolean;
 }
 
 /**
@@ -345,6 +355,12 @@ export interface AiCallPlan {
   op: AiOp;
   /** Which adapter builds the model for this provider (services/ai/adapters/). */
   providerType: AiAdapterType;
+  /** True when the owner's model policy chose the model because the one that would have answered
+   *  is not allowed, or nobody chose one (services/ai/policy-gate.ts). */
+  policyChoseModel: boolean;
+  /** The references this call's policy allows, or 'any'. A model list shown to the caller is
+   *  filtered by it, so nobody picks a model the node would then refuse. */
+  allowedModels: string[] | 'any';
 }
 
 /** Where the gateway sends a planned call: the adapter, the address and the key that pays. */
@@ -379,6 +395,12 @@ export interface PrepareAiCallOptions {
    *  applies. The door derives it from the principal (aiPayerOf), never from the body, and passes
    *  the agent's OWNER as `gaii`: the payer is the human. */
   agent?: string;
+  /** What the call asks for, when the operation alone does not say (a spoken reply is `speech`). */
+  capability?: AiCapability;
+  /** Whose call this is, for the owner's policy switches. Default: `agent` with an agent, else `owner`. */
+  caller?: CallerClass;
+  /** The app the node identified from an app grant (`owner/file.html`), never a body field. */
+  verifiedApp?: string;
 }
 
 /**
@@ -408,15 +430,38 @@ export async function prepareAiCall(
   assertProviderAllowed(config, baseUrl);
   assertAppAllowed(prefs, opts.appId, gaii);
 
-  // An image or a transcription has a model of its own or no answer at all, and that refusal comes
-  // BEFORE the key, in the order those paths have always refused: a person without a model hears
-  // which setting to fill in, not that a key is missing.
-  let opModel: string | undefined;
+  // ── The model, under the owner's model policy ──
+  // Chosen BEFORE the key, so every refusal about the model (a model the policy does not allow, rules
+  // with nothing in common, an image or a transcription with no model at all) comes before anything
+  // is decided about money. The policy is services/ai/policy-gate.ts; with no policy anywhere it
+  // leaves every choice below exactly as it was.
+  const providerType = adapterTypeOf(provider, baseUrl);
+  const capability: AiCapability = opts.capability
+    ?? (op === 'image' ? 'image' : op === 'transcribe' ? 'transcription' : opts.hasImages ? 'vision' : 'text');
+  const policyCtx: PolicyCallContext = {
+    capability, caller: opts.caller ?? (opts.agent ? 'agent' : 'owner'), providerType,
+    ...(opts.agent ? { agent: opts.agent } : {}),
+    ...(opts.verifiedApp ? { verifiedApp: opts.verifiedApp } : {}),
+    ...(opts.appId ? { appId: opts.appId } : {}),
+  };
+  const policy = await loadPolicyDecision(storage, config, gaii, policyCtx);
+  const requested = typeof opts.model === 'string' && opts.model ? opts.model : undefined;
+
+  // An image or a transcription has a model of its own or no answer at all: the refusal names the
+  // setting to fill in rather than handing the request to a chat model.
   const opRole = OP_ROLE[op];
-  if (opRole) {
-    opModel = (typeof opts.model === 'string' && opts.model) || roleModel(opRole);
+  // Text: each role asks the owner first and the node second (services/ai-model-defaults.ts), and
+  // with nothing chosen anywhere, OpenRouter's free-models router (no specific vendor hardcoded).
+  // Image inputs need a vision-capable model, whatever the owner's text default is.
+  const textFallback = (opts.hasImages && roleModel('vision'))
+    || (opts.modelRole === 'reasoning' && roleModel('reasoning'))
+    || (opts.modelRole === 'execution' && roleModel('execution'))
+    || roleModel('chat') || roleModel('execution') || roleModel('reasoning')
+    || 'openrouter/free';
+  const chosen = chooseModel(policy, policyCtx, requested, opRole ? roleModel(opRole) : textFallback);
+  if (!chosen) {
     const unset = UNSET_MODEL[op];
-    if (!opModel && unset) throw new AiCompletionError(unset.code, 400, unset.message);
+    throw new AiCompletionError(unset?.code ?? 'NO_MODEL', 400, unset?.message ?? 'No model is configured for this call.');
   }
 
   // Whose key pays is one decision and it lives in services/ai-allowance.ts: the person's own key,
@@ -435,61 +480,42 @@ export async function prepareAiCall(
   const overCap = await agentCapRefusal(storage, gaii, opts.agent);
   if (overCap) throw new AiCompletionError('AGENT_QUOTA_EXHAUSTED', 402, overCap);
 
-  const planOf = (model: string, degradedToFree: boolean): AiCallPlan => ({
+  const planOf = (model: string, degradedToFree: boolean, policyChoseModel: boolean): AiCallPlan => ({
     prefs, provider, baseUrl,
     key: keyChoice.key,
     keyScope: keyChoice.scope,
     ...(opts.agent ? { agent: opts.agent } : {}),
     ...(keyChoice.scope === 'node' ? { allowanceRemainingUsd: keyChoice.remainingUsd } : {}),
     usage, dailyBudgetUsd, model, degradedToFree,
-    op, providerType: adapterTypeOf(provider, baseUrl),
+    op, providerType, policyChoseModel, allowedModels: policy.decision.allowed,
   });
 
-  if (opModel) {
+  const spent = keyChoice.scope === 'node' && keyChoice.exhausted;
+  if (opRole) {
     // No free model makes a picture or a transcript: a spent allowance is a refusal here.
-    if (keyChoice.scope === 'node' && keyChoice.exhausted) {
+    if (spent) {
       throw new AiCompletionError('QUOTA_EXHAUSTED', 402,
         'Your allowance on this node is used up. Add more, or set your own OpenRouter key in Settings.');
     }
-    return planOf(opModel, false);
-  }
-
-  // ── Model selection ──
-  // Each role asks the owner first and the node second (services/ai-model-defaults.ts). With no
-  // instance defaults configured every branch resolves exactly as it did before that existed.
-  let model: string;
-  if (typeof opts.model === 'string' && opts.model) {
-    model = opts.model;
-  } else if (opts.hasImages && roleModel('vision')) {
-    // Image inputs need a vision-capable model — the owner's default may be text-only. Use the
-    // configured visionModel (e.g. qwen-2.5-VL) for any request carrying images.
-    model = roleModel('vision') as string;
-  } else if (opts.modelRole === 'reasoning' && roleModel('reasoning')) {
-    model = roleModel('reasoning') as string;
-  } else if (opts.modelRole === 'execution' && roleModel('execution')) {
-    model = roleModel('execution') as string;
-  } else {
-    model = roleModel('chat')
-      || roleModel('execution')
-      || roleModel('reasoning')
-      // Vendor-neutral default: OpenRouter's free-models router (no specific vendor hardcoded).
-      || 'openrouter/free';
+    return planOf(chosen.model, false, chosen.policyChoseModel);
   }
 
   // Allowance spent, on the node's key: answer on a free model rather than stopping, and say so.
   // A refusal is a dead end; a weaker answer with an honest label is not. An explicit model override
-  // is left alone — a caller that named one is not asking the node to choose.
-  let degradedToFree = false;
-  if (keyChoice.scope === 'node' && keyChoice.exhausted && !opts.model) {
-    if (!config.modelFreeFallback) {
+  // is left alone — a caller that named one is not asking the node to choose. And the free model is
+  // a model like any other: when the owner's policy does not allow it, the answer is a refusal, never
+  // a weaker model the owner ruled out (05, section 4).
+  if (spent && !requested) {
+    if (!config.modelFreeFallback || !freeModelAllowed(policy, config.modelFreeFallback, providerType)) {
       throw new AiCompletionError('QUOTA_EXHAUSTED', 402,
-        'Your allowance on this node is used up. Add more, or set your own OpenRouter key in Settings.');
+        config.modelFreeFallback
+          ? 'Your allowance on this node is used up, and your model policy does not allow the free model. Add your own key or more allowance.'
+          : 'Your allowance on this node is used up. Add more, or set your own OpenRouter key in Settings.');
     }
-    model = config.modelFreeFallback;
-    degradedToFree = true;
+    return planOf(config.modelFreeFallback, true, false);
   }
 
-  return planOf(model, degradedToFree);
+  return planOf(chosen.model, false, chosen.policyChoseModel);
 }
 
 export interface AiCallOutcome {
@@ -617,6 +643,8 @@ export async function completeForOwner(
   const hasImages = Array.isArray(opts.images) && opts.images.length > 0;
   const plan = await prepareAiCall(storage, config, gaii, {
     model: opts.model, modelRole: opts.modelRole, appId: opts.appId, hasImages, agent: opts.agent,
+    ...(opts.caller ? { caller: opts.caller } : {}),
+    ...(opts.verifiedApp ? { verifiedApp: opts.verifiedApp } : {}),
   });
   const { prefs } = plan;
 
@@ -690,5 +718,6 @@ export async function completeForOwner(
       ? { allowanceRemainingUsd: settled.allowanceRemainingUsd }
       : {}),
     ...(plan.degradedToFree ? { degradedToFreeModel: true } : {}),
+    ...(plan.policyChoseModel ? { policyChoseModel: true } : {}),
   };
 }

@@ -8,6 +8,7 @@
  *   client to use. Single-agent installs are unchanged in UX (agent_name is
  *   optional and defaults to the only loaded agent).
  * @version-history
+ *   v1.2.0 -- 2026-09-28 -- Register aimeat_ai_policy_set (the owner's model policy).
  *   v1.1.0 -- 2026-05-28 -- Register Hello Integration onboarding MCP tools
  *   v1.1.1 -- 2026-05-28 -- Register connector telemetry reporting MCP tool
  *   v2.0.0 -- 2026-05-29 -- Multi-agent: tool modules now take AgentRegistry
@@ -47,6 +48,7 @@ import { registerWorkflowTools } from './workflows.js';
 import { registerAiJobTools } from './ai-jobs.js';
 import { registerDecideTools } from './decide.js';
 import { registerAiVoiceTools } from './ai-voice.js';
+import { registerAiPolicyTools } from './ai-policy.js';
 import { registerConsentTools } from './consent.js';
 import { registerAccessTools } from './access.js';
 import { registerSecretTools } from './secrets.js';
@@ -99,6 +101,7 @@ export function registerAllTools(mcp: McpServer, registry: AgentRegistry): void 
   registerAiJobTools(mcp, registry);
   registerDecideTools(mcp, registry);
   registerAiVoiceTools(mcp, registry);
+  registerAiPolicyTools(mcp, registry);
   registerConsentTools(mcp, registry);
   registerAccessTools(mcp, registry);
   registerSecretTools(mcp, registry);

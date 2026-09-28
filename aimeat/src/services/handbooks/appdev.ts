@@ -5,6 +5,7 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-09-28 — AI models in an app: the owner's model policy and the app's own models= list.
  *   2026-09-25 — A contributor's change to a workspace: aimeat_workspace_space_add,
  *     aimeat_workspace_sections_set and aimeat_workspace_suggestions, under the workspace's rule.
  *   2026-09-25 — The package line says what an install without the memory words answers, and names
@@ -69,6 +70,14 @@ in one \`AIMEAT.decide.ask(state, questions, { subject, gates, thresholds, names
 app sends is the app's responsibility: send only the fields each question needs and pass the people
 the record mentions as \`names\`. The publish response lists departures as \`ai_hints\` starting
 \`DECIDE:\`. Never call TypeSafe or put its key in an app. Skill: typesafe-jev.
+
+**AI models in an app.** Ask for the work, not a model: \`AIMEAT.ai.complete\` without \`model\` uses
+what the owner allows. The owner's model policy may refuse a named model with 403
+\`AI_MODEL_NOT_ALLOWED\` and an \`allowed\` list: show that to the person, never an empty result. When
+the app truly needs certain models, declare them in the head,
+\`<meta name="aimeat-ai" content="generates=text; discloses=yes; models=openrouter:anthropic/claude-opus-5.5">\`
+(each \`<type>:<model id>\`); the app then uses only those, and a malformed entry comes back in
+\`ai_hints\`. Skill: aimeat-ai-model-policy.
 
 **Reference.** \`aimeat_handbook_get\` — read the appdev / generator directives.
 

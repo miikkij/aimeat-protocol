@@ -15,6 +15,7 @@
  *   import { aiModelDefaults } from './config-ai-models.js';
  *   const config = { ...aiModelDefaults(), ... };
  * @version-history
+ *   v1.1.0 — 2026-09-28 — aiRecommendedModels (AIMEAT_AI_RECOMMENDED_MODELS), System 2 plan V2.
  *   v1.0.0 — 2026-09-28 — Extracted from config.ts (pure extraction; no behaviour change), ahead of
  *     the recommended-models setting of the System 2 plan.
  */
@@ -23,7 +24,8 @@ import type { AiCapabilityConfig } from './config-types-ai.js';
 type AiModelSettings = Pick<AiCapabilityConfig,
   'openrouterInstanceKey' | 'chatFreeAllowanceUsd' | 'modelFreeFallback'
   | 'modelDefaultChat' | 'modelDefaultReasoning' | 'modelDefaultExecution'
-  | 'modelDefaultVision' | 'modelDefaultStt' | 'modelDefaultImage' | 'sttLanguageDefault'>;
+  | 'modelDefaultVision' | 'modelDefaultStt' | 'modelDefaultImage' | 'sttLanguageDefault'
+  | 'aiRecommendedModels'>;
 
 /** The node's AI key and model defaults, from the environment. */
 export function aiModelDefaults(): AiModelSettings {
@@ -38,5 +40,6 @@ export function aiModelDefaults(): AiModelSettings {
     modelDefaultStt: process.env.AIMEAT_MODEL_DEFAULT_STT ?? '',
     modelDefaultImage: process.env.AIMEAT_MODEL_DEFAULT_IMAGE ?? '',
     sttLanguageDefault: process.env.AIMEAT_STT_LANGUAGE_DEFAULT ?? '',
+    aiRecommendedModels: process.env.AIMEAT_AI_RECOMMENDED_MODELS ?? '',
   };
 }

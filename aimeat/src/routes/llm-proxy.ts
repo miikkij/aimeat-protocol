@@ -27,6 +27,8 @@
  *   - llmProxyRouter(config, storage) — POST /v1/llm/chat/completions, GET /v1/llm/models
  * @usage mounted in server-bootstrap/routes-loader.ts; an agent uses <node>/v1/llm as its base URL
  * @version-history
+ *   v1.2.0 — 2026-09-28 — The model policy: the caller goes to the gate, a refusal carries its details, and
+ *     GET /v1/llm/models lists only the models the owner's policy allows.
  *   v1.1.0 — 2026-09-20 — An agent's call is paid by its OWNER, in the agent's name (aiPayerOf): the
  *     agent's own key first, then the owner's, then the server's, under the owner's daily budget
  *     and the agent's cap. Until now the payer was the agent's own namespace.
@@ -41,6 +43,7 @@ import { assertAiUseAllowed } from '../auth/ai-gate.js';
 import { error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { aiPayerOf } from '../services/agent-ai-keys.js';
+import { aiCallerOf } from './ai-policy.js';
 import {
     prepareAiCall, settleAiCall, estimateCostUsd, AiCompletionError, type AiCallPlan,
 } from '../services/ai-completion.js';
@@ -80,12 +83,17 @@ export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
         // The same payer the completion below resolves, so the list is of the models that key reaches.
         const { payer: gaii, agent } = aiPayerOf(resolveIdentity(req.auth!, config.nodeId));
         try {
-            const plan = await prepareAiCall(storage, config, gaii, { appId: 'llm-proxy', ...(agent ? { agent } : {}) });
+            const plan = await prepareAiCall(storage, config, gaii, { appId: 'llm-proxy', ...(agent ? { agent } : {}), ...aiCallerOf(req, config.nodeId) });
             const models = await listModels(plan.key, plan.baseUrl, 'chat');
             // OpenAI's shape, because that is what a client asking this URL parses.
             res.json({
                 object: 'list',
-                data: models.map((m) => ({ id: m.id, object: 'model', owned_by: plan.provider })),
+                // Only the models the owner's policy allows: a client picking from this list must not
+                // pick one the node would then refuse.
+                data: models
+                    .filter((m) => plan.allowedModels === 'any'
+                        || plan.allowedModels.some((r) => r.toLowerCase() === `${plan.providerType}:${m.id}`.toLowerCase()))
+                    .map((m) => ({ id: m.id, object: 'model', owned_by: plan.provider })),
             });
         } catch (err) {
             sendError(res, config.nodeId, err);
@@ -123,7 +131,7 @@ export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
         try {
             // `model` is deliberately not passed through: see the file header. The node decides.
             // The agent's own key pays first and its daily cap applies; then the owner's key, then the server's.
-            plan = await prepareAiCall(storage, config, gaii, { appId: 'llm-proxy', ...(agent ? { agent } : {}) });
+            plan = await prepareAiCall(storage, config, gaii, { appId: 'llm-proxy', ...(agent ? { agent } : {}), ...aiCallerOf(req, config.nodeId) });
         } catch (err) {
             sendError(res, config.nodeId, err);
             return;
@@ -210,7 +218,7 @@ function sendError(res: Response, nodeId: string, err: unknown): void {
     const e = err as AiCompletionError;
     const status = typeof e?.status === 'number' ? e.status : 500;
     const code = typeof e?.code === 'string' ? e.code : 'INTERNAL_ERROR';
-    res.status(status).json(error(nodeId, code, e?.message || 'The completion failed.'));
+    res.status(status).json(error(nodeId, code, e?.message || 'The completion failed.', status, e?.details));
 }
 
 /** Whole-response: hand it on unchanged, and read the accounting out of it. */

@@ -11,6 +11,8 @@
  * @structure AiCapabilityConfig — extended by AimeatConfig in config-types.ts
  * @usage config.modelDefaultChat, config.openrouterInstanceKey, … (unchanged; the split is invisible)
  * @version-history
+ *   v1.2.0 — 2026-09-28 — aiRecommendedModels: the operator's recommended models per capability
+ *     (System 2 plan, V2).
  *   v1.1.0 — 2026-09-19 — Extends DecideConfig (config-decide.ts): the decision provider's settings,
  *     beside the text provider's and never inside them (TARGET-080).
  *   v1.0.0 — 2026-08-16 — Extracted from config-types.ts (pure extraction; no behaviour change).
@@ -93,6 +95,13 @@ export interface AiCapabilityConfig extends DecideConfig {
   modelDefaultImage: string;
   /** ISO-639-1 hint for speech-to-text when the owner has set none. Empty = let the model detect. */
   sttLanguageDefault: string;
+  /**
+   * The models this operator recommends, per capability, as JSON: `{ "text": ["openrouter:…"], … }`
+   * with `<type>:<model id>` references in order (services/ai/policy.ts). No model names live in
+   * code: a fresh node recommends nothing (Jouni, 2026-09-28), and the list restricts nobody until
+   * an owner chooses it as their model policy (`ai.policy.models` mode `recommended`).
+   */
+  aiRecommendedModels: string;
   /** How many on-demand app screenshots one owner may ask for per hour. Rendering is the most
    *  expensive thing this node does per request, and an unthrottled render is a denial-of-service
    *  shape, which is why the batch job never had a request path at all until this existed. */

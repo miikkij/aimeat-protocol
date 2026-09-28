@@ -21,6 +21,7 @@
  *   import { generateForOwner } from '../services/ai-image.js';
  *   const out = await generateForOwner(storage, config, gaii, { prompt: 'a red bicycle' });
  * @version-history
+ *   v2.1.0 — 2026-09-28 — Takes caller and verifiedApp for the owner's model policy (V2).
  *   v2.0.0 — 2026-09-28 — Through the shared gate (System 2 plan, V1): prepareAiCall with op
  *     `image`, the gateway's image(), settleAiCall. What changes for a person: an agent's own key and
  *     the node's key can pay for a picture the way they pay for text (the node's only when the
@@ -42,6 +43,7 @@ import type { Storage, AiProvenanceRecordRow } from '../storage/interface.js';
 import { AiCompletionError, prepareAiCall, settleAiCall, targetOf } from './ai-completion.js';
 import { image as gatewayImage } from './ai/gateway.js';
 import { contentHashOf } from './ai-provenance.js';
+import type { CallerClass } from './ai/policy.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -70,6 +72,9 @@ export interface GenerateForOwnerOptions {
   agent?: string;
   /** An outside reason to stop waiting, combined with the call's own timeout. */
   signal?: AbortSignal;
+  /** Whose call this is and the app its grant names, for the owner's model policy. */
+  caller?: CallerClass;
+  verifiedApp?: string;
 }
 
 export interface GenerateForOwnerResult {
@@ -134,6 +139,7 @@ export async function generateForOwner(
 
   const plan = await prepareAiCall(storage, config, gaii, {
     op: 'image', model: opts.model, appId: opts.appId, ...(opts.agent ? { agent: opts.agent } : {}),
+    ...(opts.caller ? { caller: opts.caller } : {}), ...(opts.verifiedApp ? { verifiedApp: opts.verifiedApp } : {}),
   });
 
   let result;

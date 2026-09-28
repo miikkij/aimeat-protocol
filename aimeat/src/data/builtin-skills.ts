@@ -124,7 +124,7 @@ import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-at
 import { GAME_SKILL_ENTRIES } from './builtin-skills-games.js';
 import { DECIDE_SKILL_ENTRY } from './builtin-skills.decide.js';
 import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
-import { AI_TRANSPARENCY_SKILL_ENTRY, CONFIGURE_ROUTING_SKILL_ENTRY } from './builtin-skills.ai.js';
+import { AI_TRANSPARENCY_SKILL_ENTRY, CONFIGURE_ROUTING_SKILL_ENTRY, AI_MODEL_POLICY_SKILL_ENTRY } from './builtin-skills.ai.js';
 
 export interface BuiltinSkill {
   name: string;
@@ -434,6 +434,7 @@ A pipeline = a WORKFLOW definition (chained steps dispatched to agents) + a TRIG
 `,
   },
   CONFIGURE_ROUTING_SKILL_ENTRY,
+  AI_MODEL_POLICY_SKILL_ENTRY,
   {
     name: 'use-app-bound-skills',
     skillMd: `---

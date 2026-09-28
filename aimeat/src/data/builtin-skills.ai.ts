@@ -6,9 +6,11 @@
  *   read (ai-transparency), and how AI routing and budget are inspected and changed
  *   (configure-routing). Their own file because builtin-skills.ts reached the 800-line ceiling; the
  *   entries are unchanged and keep their place in BUILTIN_SKILLS.
- * @structure AI_TRANSPARENCY_SKILL_ENTRY · CONFIGURE_ROUTING_SKILL_ENTRY
+ * @structure AI_TRANSPARENCY_SKILL_ENTRY · CONFIGURE_ROUTING_SKILL_ENTRY · AI_MODEL_POLICY_SKILL_ENTRY
  * @usage import { AI_TRANSPARENCY_SKILL_ENTRY, CONFIGURE_ROUTING_SKILL_ENTRY } from './builtin-skills.ai.js';
  * @version-history
+ *   v1.1.0 — 2026-09-28 — aimeat-ai-model-policy: the owner's model policy for an AI (System 2 plan,
+ *     V2); configure-routing points to it.
  *   v1.0.0 — 2026-09-28 — Extracted from builtin-skills.ts (pure extraction; no content change).
  */
 
@@ -167,11 +169,80 @@ Three separate "routing" layers — identify which one the owner means:
 3. **Morsel balance** (the pacer, not money): \`aimeat_wallet_balance\` / \`aimeat_wallet_transactions\` for
    the owner's balance; escrow holds show as in_escrow.
 
+**Which models are allowed at all** is a fourth thing, the owner's model policy: \`GET /v1/ai/policy\`
+or \`aimeat_ai_policy_set\` with no policy. The skill \`aimeat-ai-model-policy\` covers it. The
+node's recommended models are the operator's setting \`AIMEAT_AI_RECOMMENDED_MODELS\` (Config tab,
+AI group); \`GET /v1/ai/recommended\` shows them.
+
 ## Principles
 - Model routing and the daily budget go through \`aimeat_operator_ai_config\`: call it without
   \`confirm_token\` to get current/proposed/diff, show the owner the diff, then call again with
-  the token. The API key can never be read or changed through it.
+  the token. The API key can never be read or changed through it. The model policy works the same
+  way through \`aimeat_ai_policy_set\`.
 - When spend looks wrong, correlate \`/v1/ai/usage/history\` with schedules (\`aimeat_schedule_list\`)
   before blaming a model.
+`,
+};
+
+export const AI_MODEL_POLICY_SKILL_ENTRY: BuiltinSkillEntry = {
+    name: 'aimeat-ai-model-policy',
+    visibility: 'public',
+    skillMd: `---
+name: aimeat-ai-model-policy
+description: Which AI models the owner's calls may use on an AIMEAT node, and what to do when a call is refused because of it. Covers the owner's model policy (open, recommended, custom), the node's recommended models, an app's own models= list, the refusals AI_MODEL_NOT_ALLOWED and AI_MODEL_POLICY_EMPTY, policy_chose_model, and proposing a change with aimeat_ai_policy_set. Use when an AI call is refused over its model, when the owner wants quality without trying models, or when building an app that needs a particular model.
+license: MIT
+metadata:
+  audience: agent
+---
+
+# The owner's model policy
+
+A weak model gives poor answers and wastes the person's time. The model policy lets the owner say
+which models their AI calls may use, and it can only tighten, never loosen, what another rule says.
+
+## What decides
+
+Three lists, and a call may use only a model that every list with something in it allows:
+
+1. **The owner's policy** (\`GET /v1/ai/policy\`): \`open\` (no list), \`recommended\` (the node's
+   recommended models per capability, which follow the operator's updates), or \`custom\` (the
+   owner's own list). Four switches say whose calls it covers: the owner's own, the node's chat,
+   the owner's agents, apps. The owner can also tighten it for one app or one agent.
+2. **The node's recommended models** (\`GET /v1/ai/recommended\`), set by the operator. They
+   restrict nobody until the owner chooses \`recommended\`.
+3. **The app's own list**: \`models=\` in its \`<meta name="aimeat-ai">\`. It binds that app only.
+
+A model is written \`<type>:<model id>\`, for example \`openrouter:anthropic/claude-opus-5.5\`. A bare
+id means the owner's own provider.
+
+## When a call is refused
+
+- **403 \`AI_MODEL_NOT_ALLOWED\`**: the call named a model the rules leave out. \`error.details\`
+  names the layer that refused and lists \`allowed\`. Call again with an allowed model, or with no
+  model at all and let the node choose. Do not look for a way around the rule.
+- **403 \`AI_MODEL_POLICY_EMPTY\`**: two lists have no model in common (an app's own list and the
+  owner's policy, most often). A person has to widen one. Tell the owner which two lists, in one line.
+- **402 \`QUOTA_EXHAUSTED\` saying the policy does not allow the free model**: the node's allowance
+  is spent and the owner ruled the free model out. The answer is the owner's own key or more
+  allowance, never a weaker model.
+- **\`policy_chose_model: true\`** on an answer: the model the owner or the app would have used is
+  not allowed, so the node took the first allowed one. Say so when it matters to the person.
+
+## Proposing a change
+
+\`aimeat_ai_policy_set\` without a policy reads the current one and the recommended list. With a
+policy it changes nothing: it returns the proposal and a token. Show the owner what changes, in
+their words ("only the recommended models, for your apps and agents too"), then call again with
+the same policy and \`confirm_token\` (valid ten minutes, one use). The owner in person changes it
+at once (\`PUT /v1/ai/policy\` in their own session).
+
+When the owner has an AI provider and no policy, and the node recommends models, suggest
+\`{ mode: "recommended" }\` once: it gives quality at once, without trying models.
+
+## Building an app
+
+Ask for a capability, not a model. Name a model only when the app truly needs that one, and then
+declare it in the meta (\`models=openrouter:anthropic/claude-opus-5.5\`) so the app states its own
+rule. Handle \`AI_MODEL_NOT_ALLOWED\` visibly: show the person the message, never an empty result.
 `,
 };

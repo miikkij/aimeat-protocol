@@ -9,6 +9,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.63.0 -- 2026-09-28 -- e2e-ai-model-policy.ts joins the suites (not the guard tier): the model
+ *            policy of the System 2 plan, V2.
  *   v1.62.0 -- 2026-09-26 -- federation-messages.ts joins GUARD_SUITES (138 → 139), measured alone on
  *            a fresh database, three identical green runs on both backends.
  *   v1.61.0 -- 2026-09-26 -- 41 suites that carry the September 2026 security fixes join
@@ -533,6 +535,10 @@ const ALL_SUITES = [
     // The decision provider (TARGET-080): its own node on 40436 and a TypeSafe stand-in on an
     // ephemeral port, so what the scrubber let out is read from the bytes that arrived.
     'test/e2e-ai-decide.ts',
+    // The model policy (System 2, V2): its own node on 40438 with a recommended list set the way an
+    // operator sets it, and the OpenAI-compatible stub on an ephemeral port, so the model the node
+    // sent is read from what arrived. Follows the runner's backend.
+    'test/e2e-ai-model-policy.ts',
     // The operator's provider allowlist, on the two doors that were outside it. Spawns its own node
     // on 40420 with AIMEAT_AI_PROVIDER_ALLOWLIST set, because the list is read from the environment
     // at boot: on a node with no list every host is allowed and there is nothing to prove.

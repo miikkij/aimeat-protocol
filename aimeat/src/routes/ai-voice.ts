@@ -5,7 +5,9 @@
  * @description Validated app-attributed text and speech streaming, under the existing AI permission.
  * @structure registerVoiceRoutes; voiceAppId binds app tokens to their signed identity
  * @usage registerVoiceRoutes(router, config, storage)
- * @version-history v1.0.0 - 2026-09-19 - NDJSON voice stages with backpressure and disconnect cancellation.
+ * @version-history
+ *   v1.1.0 - 2026-09-28 - Passes who is calling to the owner's model policy and returns a refusal's details.
+ *   v1.0.0 - 2026-09-19 - NDJSON voice stages with backpressure and disconnect cancellation.
  */
 import type { Router, Request, Response } from 'express';
 import { once } from 'node:events';
@@ -21,6 +23,7 @@ import { streamReply, streamSpeech } from '../services/ai-voice.js';
 import { logger } from '../utils/logger.js';
 import { voiceReplySchema as reply, voiceSpeechSchema as speech } from '../services/ai-voice-contract.js';
 import { createVoiceResult } from '../services/ai-voice-result.js';
+import { aiCallerOf } from './ai-policy.js';
 
 /** App tokens may not charge another app's quota by changing a body field. */
 export function voiceAppId(req: Request, requested?: string): string | undefined {
@@ -55,8 +58,9 @@ export function registerVoiceRoutes(router: Router, config: AimeatConfig, storag
       };
       const principal = resolveIdentity(req.auth!, config.nodeId);
       const payer = ownerGhiiOf(principal);
-      if (kind === 'reply') await streamReply(storage, config, payer, reply.parse(body), controller.signal, emit);
-      else await streamSpeech(storage, config, payer, speech.parse(body), controller.signal, emit);
+      const who = aiCallerOf(req, config.nodeId);
+      if (kind === 'reply') await streamReply(storage, config, payer, { ...reply.parse(body), ...who }, controller.signal, emit);
+      else await streamSpeech(storage, config, payer, { ...speech.parse(body), ...who }, controller.signal, emit);
       if (buffered) {
         controller.signal.throwIfAborted();
         const result = kind === 'reply' ? buffered.reply() : await buffered.speech(storage, config, principal, speech.parse(body).response_format, controller.signal);
@@ -69,7 +73,7 @@ export function registerVoiceRoutes(router: Router, config: AimeatConfig, storag
       const code = typed ? failure.code : failure instanceof z.ZodError ? 'INVALID_BODY' : 'PROVIDER_ERROR';
       const message = failure instanceof z.ZodError ? failure.issues.map(issue => issue.path.join('.') + ': ' + issue.message).join('; ') : (failure as Error).message;
       if (res.headersSent) res.end(JSON.stringify({ type: 'error', code, message }) + '\n');
-      else res.status(typed ? failure.status : code === 'INVALID_BODY' ? 400 : 502).json(error(config.nodeId, code, message));
+      else res.status(typed ? failure.status : code === 'INVALID_BODY' ? 400 : 502).json(error(config.nodeId, code, message, undefined, typed ? failure.details : undefined));
     } finally { clearTimeout(timeout); res.off('close', closed); }
   }
   router.post('/v1/ai/stream', requireAuth(), requireScope('ai:use'), limit, (req, res) => run(req, res, 'reply'));

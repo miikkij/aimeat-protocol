@@ -13,6 +13,7 @@
  * @usage
  *   import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../../mcp/catalog/definitions.js';
  * @version-history
+ *   v1.x -- 2026-09-28 -- definitions/ai-models.ts: aimeat_ai_policy_set (System 2 plan, V2).
  *   v1.x -- 2026-09-27 -- definitions/app-manage.ts: aimeat_app_manage replaces the app-visitors and
  *     app-ui slices and six app tools of organisms-workspaces-apps.ts.
  *   2026-09-24 -- definitions/themes.ts: aimeat_theme_list, aimeat_theme_get and aimeat_theme_save.
@@ -52,6 +53,7 @@ import { schedulesTasksMemoryTools } from './definitions/schedules-tasks-memory.
 import { aiJobTools } from './definitions/ai-jobs.js';
 import { decideTools } from './definitions/decide.js';
 import { voiceTools } from './definitions/ai-voice.js';
+import { aiModelTools } from './definitions/ai-models.js';
 import { discoveryWorkBoardsTools } from './definitions/discovery-work-boards.js';
 import { capabilitiesGroupsSkillsTools } from './definitions/capabilities-groups-skills.js';
 import { organismsWorkspacesAppsTools } from './definitions/organisms-workspaces-apps.js';
@@ -76,6 +78,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     ...aiJobTools,
     ...decideTools,
     ...voiceTools,
+    ...aiModelTools,
     ...discoveryWorkBoardsTools,
     ...capabilitiesGroupsSkillsTools,
     ...organismsWorkspacesAppsTools,

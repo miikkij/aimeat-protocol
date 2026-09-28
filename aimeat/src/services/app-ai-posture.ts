@@ -34,6 +34,10 @@
  *   const { posture, hints } = lintAppAiDisclosure(html, previous?.manifest.aiPosture);
  *   if (posture) manifest.aiPosture = posture;
  * @version-history
+ *   v1.3.0 — 2026-09-28 — `models=` in the meta: the models the app allows itself, as
+ *     `<type>:<model id>` references, read without lower-casing and kept on the posture. An invalid
+ *     reference is left out and named in a hint; the publish goes through either way (D2). The node
+ *     applies the list to the app's AI calls (services/ai/policy-gate.ts, System 2 plan V2).
  *   v1.2.0 — 2026-09-19 — The decision model's publish hints (app-decide-posture.ts) join `hints`.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 8 step 0a: `AppAiLintResult` named, so the one shared
  *     publish path can carry the check's result instead of each door restating its shape.
@@ -41,6 +45,7 @@
  */
 import { parseAppScopes } from './protected-resource.js';
 import { lintAppDecideUse } from './app-decide-posture.js';
+import { isModelRef } from './ai/policy.js';
 
 /** The modalities Article 50(2) names. Frozen here so the meta and the catalogue agree. */
 export const AI_GENERATES_KINDS = ['text', 'image', 'audio', 'video'] as const;
@@ -69,6 +74,12 @@ export interface AppAiPosture {
   usesAi: boolean;
   /** The publish check's finding, when there is one. OWNER-ONLY — publicPosture() strips it. */
   gap?: { code: string; message: string; at: string };
+  /**
+   * The models the app allows ITSELF to use, from `models=` in its meta, as `<type>:<model id>`
+   * references (services/ai/policy.ts). The node applies it to every AI call the app makes, beside
+   * the owner's policy; it can only tighten. Absent means the app states no list.
+   */
+  models?: string[];
 }
 
 /**
@@ -105,25 +116,37 @@ export function appUsesAi(html: string): boolean {
  * Returns null when the app declares nothing or the value is unreadable — never an error, because a
  * malformed declaration must not be able to stop a publish or delist an offering.
  */
-export function parseAiPosture(html: string): Pick<AppAiPosture, 'generates' | 'discloses' | 'publicInterest'> | null {
+export function parseAiPosture(html: string): (Pick<AppAiPosture, 'generates' | 'discloses' | 'publicInterest' | 'models'> & { invalidModels?: string[] }) | null {
   const metas = html.slice(0, SCAN_BYTES).match(/<meta\b[^>]*>/gi) ?? [];
   for (const tag of metas) {
     if (!/name\s*=\s*["']aimeat-ai["']/i.test(tag)) continue;
     const m = /content\s*=\s*["']([^"']*)["']/i.exec(tag);
     if (!m) continue;
     const parts = new Map<string, string>();
+    // Model ids keep their case: `models=` is read from here, not from the lower-cased map, and is
+    // compared without regard to case where it is used.
+    const raw = new Map<string, string>();
     for (const chunk of m[1].split(';')) {
       const eq = chunk.indexOf('=');
       if (eq < 0) continue;
-      parts.set(chunk.slice(0, eq).trim().toLowerCase(), chunk.slice(eq + 1).trim().toLowerCase());
+      const key = chunk.slice(0, eq).trim().toLowerCase();
+      parts.set(key, chunk.slice(eq + 1).trim().toLowerCase());
+      raw.set(key, chunk.slice(eq + 1).trim());
     }
     const generates = (parts.get('generates') ?? '')
       .split(',').map((s) => s.trim())
       .filter((s): s is AiGeneratesKind => (AI_GENERATES_KINDS as readonly string[]).includes(s));
+    // An invalid reference is left out and reported, never fatal: a malformed declaration must not
+    // stop a publish (decision D2), and the hint names it so the AI that built the app fixes it.
+    const listed = (raw.get('models') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+    const models = listed.filter(isModelRef);
+    const invalidModels = listed.filter((s) => !isModelRef(s));
     return {
       generates,
       discloses: isYes(parts.get('discloses')),
       publicInterest: isYes(parts.get('public-interest')),
+      ...(models.length ? { models } : {}),
+      ...(invalidModels.length ? { invalidModels } : {}),
     };
   }
   return null;
@@ -153,11 +176,15 @@ function isYes(v: string | undefined): boolean {
  * about code that is no longer there would be worse than none.
  */
 export function lintAppAiDisclosure(html: string, previous?: AppAiPosture): AppAiLintResult {
-  const declared = parseAiPosture(html)
+  const parsed = parseAiPosture(html);
+  const declared: Pick<AppAiPosture, 'generates' | 'discloses' | 'publicInterest' | 'models'> | null = parsed
     ?? (previous?.source === 'declared'
-      ? { generates: previous.generates, discloses: previous.discloses, publicInterest: previous.publicInterest }
+      ? {
+        generates: previous.generates, discloses: previous.discloses, publicInterest: previous.publicInterest,
+        ...(previous.models?.length ? { models: previous.models } : {}),
+      }
       : null);
-  const inherited = !parseAiPosture(html) && !!declared;
+  const inherited = !parsed && !!declared;
   const disclosureCallFound = DISCLOSURE_CALL.test(html);
   const usesAi = appUsesAi(html);
   const hints: string[] = [];
@@ -169,7 +196,16 @@ export function lintAppAiDisclosure(html: string, previous?: AppAiPosture): AppA
     source: declared ? 'declared' : 'observed',
     disclosureCallFound,
     usesAi,
+    ...(declared?.models?.length ? { models: declared.models } : {}),
   };
+
+  if (parsed?.invalidModels?.length) {
+    hints.push(
+      `The aimeat-ai meta lists models this node cannot read, so they were left out: ${parsed.invalidModels.join(', ')}. `
+      + 'Write each one as <type>:<model id>, for example models=openrouter:anthropic/claude-opus-5.5, where the type is '
+      + 'openrouter, openai, anthropic, mistral, xai, local or openai-compatible. The app is published either way.',
+    );
+  }
 
   if (inherited) {
     hints.push(
@@ -177,7 +213,8 @@ export function lintAppAiDisclosure(html: string, previous?: AppAiPosture): AppA
       + 'was forked from) because this source declares none. Restate it so it travels with the code: '
       + '`<meta name="aimeat-ai" content="generates=' + (posture.generates.join(',') || 'text')
       + '; discloses=' + (posture.discloses ? 'yes' : 'no')
-      + '; public-interest=' + (posture.publicInterest ? 'yes' : 'no') + '">`.',
+      + '; public-interest=' + (posture.publicInterest ? 'yes' : 'no')
+      + (posture.models?.length ? '; models=' + posture.models.join(',') : '') + '">`.',
     );
   }
 
@@ -226,5 +263,6 @@ export function publicPosture(p: AppAiPosture | undefined): Omit<AppAiPosture, '
   return {
     generates: p.generates, discloses: p.discloses, publicInterest: p.publicInterest,
     source: p.source, disclosureCallFound: p.disclosureCallFound, usesAi: p.usesAi,
+    ...(p.models?.length ? { models: p.models } : {}),
   };
 }
