@@ -12,6 +12,7 @@
  * @structure packagesTools[] -- catalog entries, folded into definitions.ts
  * @usage import { packagesTools } from './packages.js';
  * @version-history
+ *   v1.5.1 -- 2026-09-28 -- aimeat_package_install takes `config` (PACKAGE_CONFIG_PARAM).
  *   v1.5.0 -- 2026-09-28 -- aimeat_package_install takes `mode` (managed | editable);
  *     aimeat_package_instances lists the installed copies and aimeat_package_fork releases a managed one.
  *   v1.4.0 -- 2026-09-25 -- aimeat_package_install_requests: list, read, approve or decline the
@@ -31,6 +32,9 @@
  */
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
+
+/** What `config` on aimeat_package_install is, on every interface. */
+export const PACKAGE_CONFIG_PARAM = 'Each part\'s config, keyed by component id: { "<component id>": { "<field>": value } }. An app part takes the fields its config schema declares; an extension part takes its config fields, and a secret field there is stored encrypted and never shown. Run with dry_run first: the answer lists every part\'s fields and which required ones are still empty, so you can ask your owner for them. A required field left empty refuses the install with CONFIG_REQUIRED naming it.';
 
 export const packagesTools: AimeatToolDefinition[] = [
     {
@@ -165,6 +169,7 @@ export const packagesTools: AimeatToolDefinition[] = [
             version: { type: 'string', description: 'A specific version. Defaults to the latest published one.' },
             dry_run: { type: 'boolean', description: 'Report what would be registered and register nothing.' },
             mode: { type: 'string', enum: ['managed', 'editable'], description: '"managed": the package owns the code and layout. "editable" (default): you may edit everything.' },
+            config: { type: 'object', description: PACKAGE_CONFIG_PARAM },
         },
     },
     {

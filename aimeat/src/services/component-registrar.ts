@@ -15,6 +15,9 @@
  * @usage
  *   import { registerComponent, deleteComponent, fetchComponentContent, computeHash } from '../services/component-registrar.js';
  * @version-history
+ *   v1.10.0 — 2026-09-28 — `configValues` and `previousConfig`: an app component's install config goes
+ *     into its config record, an extension's into its config with secrets encrypted, and an update
+ *     keeps the owner's extension config. fetchComponentContent moved unchanged to component-content.ts.
  *   v1.9.0 — 2026-09-26 — A cortex component reads its components from `spec.components`, the
  *     standard manifest, and from the top level when `spec` has none; each keeps what its author wrote.
  *     The schema locks and prompt records the registration writes are recorded in the activation
@@ -70,6 +73,8 @@ import { forgetDependencies, appRef } from './dependency-map.js';
 import { removeCortex } from './cortex-lifecycle.js';
 import { odpsWriteRefusal, extensionOdpsKey } from './exchange-odps-write.js';
 import { memoryComponentEntries, reservedKeysInComponent, reservedComponentMessage } from './package-memory-component.js';
+import { writeAppConfigValues, type AppConfigValues } from './app-config.js';
+import { mergeExtensionConfig } from './package-config.js';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -136,6 +141,13 @@ export interface ComponentRegistrationInput {
     /** Map<originalShortName, registeredAs> for extension components. */
     extensionNames?: Map<string, string>;
   };
+  /**
+   * The config the install gives this component, already checked (services/package-config.ts): an
+   * app's goes into its config record, an extension's into its own config with secrets encrypted.
+   */
+  configValues?: Record<string, unknown>;
+  /** An extension's config before an update replaced it, so the owner's values and secrets carry over. */
+  previousConfig?: Record<string, unknown>;
 }
 
 // ── Hash utility ─────────────────────────────────────────────────────
@@ -322,8 +334,16 @@ export async function registerComponent(
         if (odps) return { success: false, componentId, registeredAs, error: `${odps.code}: ${odps.message}` };
 
         if (input.dryRun) break;
+        // Given config and, on an update, the owner's previous config; secrets encrypted (package-config.ts).
+        const extConfig = (input.configValues || input.previousConfig)
+          ? mergeExtensionConfig(built.record.config ?? {}, input.configValues, input.previousConfig, config)
+          : built.record.config;
+        if (extConfig === null) {
+          return { success: false, componentId, registeredAs, error: 'ENCRYPTION_NOT_CONFIGURED: a secret config value needs AIMEAT_ENCRYPTION_KEY on this node' };
+        }
         await storage.createExtension({
           ...built.record,
+          config: extConfig,
           name: registeredAs,
           description: built.record.description || label,
           // A package component is live as soon as its package is installed; there is no separate
@@ -551,6 +571,10 @@ export async function registerComponent(
             });
           }
         }
+        // The config the install was given, checked before anything registered (package-config.ts).
+        if (!input.dryRun && input.configValues && Object.keys(input.configValues).length) {
+          await writeAppConfigValues(storage, ownerGaii, registeredAs, input.configValues as AppConfigValues);
+        }
         break;
       }
 
@@ -723,70 +747,5 @@ export async function deleteComponent(
   }
 }
 
-// ── Fetch component content ──────────────────────────────────────────
-
-/** Fetch current content string for a component (for hash comparison) */
-export async function fetchComponentContent(
-  storage: Storage,
-  type: PackageComponentType,
-  registeredAs: string,
-  ownerGaii: string,
-): Promise<string | null> {
-  try {
-    switch (type) {
-      case 'csm': {
-        const csm = await storage.getCsm(registeredAs);
-        if (!csm) return null;
-        return JSON.stringify(csm.definition);
-      }
-      case 'extension': {
-        const ext = await storage.getExtension(registeredAs);
-        if (!ext) return null;
-        return JSON.stringify({
-          name: ext.name,
-          version: ext.version,
-          actions: ext.actions.map(a => ({ id: a.id, scriptContent: a.scriptContent })),
-        });
-      }
-      case 'cortex': {
-        const ctx = await storage.getCortexExtension(registeredAs);
-        if (!ctx) return null;
-        return ctx.manifest;
-      }
-      case 'app': {
-        const app = await storage.getApp(ownerGaii, registeredAs);
-        if (!app) return null;
-        return app.data.toString('utf-8');
-      }
-      case 'msm': {
-        const msm = await storage.getMsm(registeredAs);
-        if (!msm) return null;
-        return JSON.stringify(msm.definition);
-      }
-      case 'memory': {
-        // Read the manifest key to find which memory keys belong to this component
-        const manifest = await storage.getMemory(ownerGaii, `_pkg:${registeredAs}`);
-        if (!manifest || !Array.isArray(manifest.value)) return null;
-        const keys = manifest.value as string[];
-        const entries: Array<{ key: string; value: unknown }> = [];
-        for (const key of keys) {
-          const mem = await storage.getMemory(ownerGaii, key);
-          if (mem) entries.push({ key: mem.key, value: mem.value });
-        }
-        if (entries.length === 0) return null;
-        const sorted = entries.sort((a, b) => a.key.localeCompare(b.key));
-        return JSON.stringify(sorted);
-      }
-      case 'translation': {
-        const mem = await storage.getMemory(ownerGaii, `i18n.${registeredAs}`);
-        if (!mem) return null;
-        return JSON.stringify(mem.value);
-      }
-      default:
-        return null;
-    }
-  } catch (err) {
-    logger.warn('component-registrar: suppressed failure, continuing', { error: String(err) });
-    return null;
-  }
-}
+// ── Fetch component content ── moved to component-content.ts (max-file-lines), re-exported here
+export { fetchComponentContent } from './component-content.js';

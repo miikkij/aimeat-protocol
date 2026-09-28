@@ -5,6 +5,8 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-09-28 — The package line names install config; App config: the aimeat-config block,
+ *     AIMEAT.data.appConfig(), config_get and config_set.
  *   2026-09-28 — The package line names managed installs, aimeat_package_instances and aimeat_package_fork.
  *   2026-09-28 — AI roles: declare a role per kind of AI work; it runs once the owner connects it (aimeat_ai_roles).
  *   2026-09-28 — Embeddings: never proposed, only for a collection far larger than one prompt, the person decides.
@@ -60,6 +62,14 @@ change to them answers \`MANAGED_BY_PACKAGE\`, an update replaces them, and the 
 (name, description, access code, parking, search visibility, legal texts). \`aimeat_package_instances\`
 lists the installed copies and their mode; \`aimeat_package_fork\` makes a managed copy the owner's own to
 edit, at the same addresses with the same records, and ends its updates. Fork only when the owner asks.
+An install takes \`config\`, each part's values: run it with \`dry_run\` first, and the answer lists every
+field and which required ones are empty, so you ask your owner for them before installing.
+
+**App config.** An app that needs values to work declares them as a JSON Schema in
+\`<script type="application/json" id="aimeat-config">\` (string, number, integer and boolean fields, never a
+secret: everyone who opens the app can read them) and reads them with \`AIMEAT.data.appConfig()\`. The owner
+changes them with \`aimeat_app_manage\` action \`config_set\`; \`config_get\` reads them with what is still
+missing. An API key belongs in an extension's \`type: secret\` config, which a package install fills too.
 
 **Extensions (server-side sandboxed WASM; can store ext: memory + ctx.fetch external APIs).**
 \`aimeat_extension_install\` (UPLOAD mode recommended: no manifest → get an upload_url, PUT a ZIP with

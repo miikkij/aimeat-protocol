@@ -796,6 +796,9 @@ const ALL_SUITES = [
     // A managed install: the package owns the code and layout, the owner keeps the settings, an
     // update replaces everything, and a fork gives the code back and ends the updates.
     'test/e2e-package-managed.ts',
+    // App config: what an app declares it needs, filled by a package install (app and extension parts,
+    // a secret included), changed by its owner, and kept over an update.
+    'test/e2e-app-config.ts',
     // The msm and memory component types through compose, install, status, and uninstall: the arms
     // of component-registrar no package in the sweep had ever carried.
     'test/e2e-package-components.ts',

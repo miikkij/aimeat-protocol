@@ -5,6 +5,7 @@
  * @description MCP tool registrations for app/package management -- publishing,
  *   listing, retrieving, archiving versions, version history, sanctioned forks, and drafts (staging).
  * @version-history
+ *   2026-09-28 — aimeat_package_install sends `config`, each part's config.
  *   2026-09-28 — aimeat_package_install sends `mode` (managed | editable), as the node's own tool does;
  *     aimeat_package_instances and aimeat_package_fork over GET /v1/instances and POST /v1/instances/:id/fork.
  *   2026-09-28 — aimeat_image_generate takes `role`, the AI role the call runs as, sent to POST /v1/ai/image.
@@ -39,6 +40,7 @@ import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 import { AI_ROLE_PARAM } from '../../../../mcp/catalog/definitions/ai-models.js';
+import { PACKAGE_CONFIG_PARAM } from '../../../../mcp/catalog/definitions/packages.js';
 import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
 import { provenanceEchoedResult, readPayloadWithProvenance } from '../../ai-provenance-carry.js';
 import { envelopeResult, payloadResult } from './_registry.js';
@@ -118,12 +120,14 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     version: z.string().optional().describe('A specific version (default: the latest published one)'),
     dry_run: z.boolean().optional().describe('Report what would be registered and register nothing'),
     mode: z.enum(['managed', 'editable']).optional().describe('"managed": the package owns the code and layout. "editable" (default): you may edit everything'),
-  }, annotationsFor('aimeat_package_install'), async ({ group_id, label, version, dry_run, mode }) => {
+    config: z.record(z.string(), z.record(z.string(), z.unknown())).optional().describe(PACKAGE_CONFIG_PARAM),
+  }, annotationsFor('aimeat_package_install'), async ({ group_id, label, version, dry_run, mode, config }) => {
     const body: Record<string, unknown> = {};
     if (label !== undefined) body.label = label;
     if (version !== undefined) body.version = version;
     if (dry_run !== undefined) body.dry_run = dry_run;
     if (mode !== undefined) body.mode = mode;
+    if (config !== undefined) body.config = config;
     return out(await client.post(`/v1/packages/${encodeURIComponent(group_id)}/install`, body));
   });
 

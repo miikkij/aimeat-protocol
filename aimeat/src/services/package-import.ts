@@ -23,6 +23,7 @@
  *   import { importParsedPackage } from '../services/package-import.js';
  *   const out = await importParsedPackage({ storage, config }, caller, { parsed, via: 'zip' });
  * @version-history
+ *   v1.1.0 — 2026-09-28 — The imported record keeps the ZIP's `expects` instead of an empty manifest.
  *   v1.0.1 — 2026-09-12 — The author GHII is resolved from the node instead of falling back to the
  *     caller's `sub`. wish-identity-gate-sees-resolveghii.
  *   v1.0.0 — 2026-09-05 — Extraction out of routes/packages.ts POST /v1/packages/import, so the
@@ -42,6 +43,7 @@ import {
     type PackageWriteResult, type PackageCreateCaller,
 } from './package-create.js';
 import { emitChange } from './event-bus.js';
+import { manifestWithExpects } from './package-expects.js';
 
 export interface PackageImportDeps { storage: Storage; config: AimeatConfig }
 
@@ -143,7 +145,8 @@ export async function importParsedPackage(
         visibility: 'private',
         status: 'published',
         components: normalizeComponents(parsed.components),
-        manifest: '',
+        // What the package needs the installing node to have, which the install checks (package-expects.ts).
+        manifest: manifestWithExpects(parsed.expects ?? { cortex: [], extensions: [], packs: [] }),
         ...(input.upstream ? { upstream: input.upstream } : {}),
         createdAt: now,
         updatedAt: now,

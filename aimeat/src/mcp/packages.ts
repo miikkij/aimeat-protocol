@@ -22,6 +22,7 @@
  *   aimeat_package_instances, aimeat_package_fork.
  * @usage import { registerPackageTools } from './packages.js';
  * @version-history
+ *   v1.4.1 — 2026-09-28 — install takes `config`, each part's config (services/package-config.ts).
  *   v1.4.0 — 2026-09-28 — install takes `mode` (managed | editable); aimeat_package_instances lists
  *     the owner's installed copies and aimeat_package_fork releases a managed one
  *     (services/package-managed.ts).
@@ -50,6 +51,7 @@ import { installOrRequest, updateOrRequest, requestedBody } from '../services/pa
 import { listPackagesFor, getPackageFor, listInstancesFor } from '../services/package-read.js';
 import { forkPackageInstance } from '../services/package-managed.js';
 import { toolError } from './tool-error.js';
+import { PACKAGE_CONFIG_PARAM } from './catalog/definitions/packages.js';
 import { setPackageVersionStatus } from '../services/package-create.js';
 import { composePackageFromApps } from '../services/package-compose.js';
 import { pullPackage } from '../services/package-pull.js';
@@ -240,7 +242,8 @@ export function registerPackageTools(
         version: z.string().optional().describe('A specific version to install. Defaults to the latest published one.'),
         dry_run: z.boolean().optional().describe('Report what would be registered and register nothing.'),
         mode: z.enum(['managed', 'editable']).optional().describe('"managed": the package owns the code and layout, updates replace them, and only settings are yours to change. "editable" (default): you may edit everything.'),
-    }, annotationsFor('aimeat_package_install'), async ({ group_id, label, version, dry_run: dryRun, mode }) => {
+        config: z.record(z.string(), z.record(z.string(), z.unknown())).optional().describe(PACKAGE_CONFIG_PARAM),
+    }, annotationsFor('aimeat_package_install'), async ({ group_id, label, version, dry_run: dryRun, mode, config: installConfig }) => {
         // Packages install under the OWNER, so resolve the agent's owner and never a supplied id.
         const gaii = getAgentGaii();
         const owner = localAccountName(gaii);
@@ -249,7 +252,7 @@ export function registerPackageTools(
         const out = await installOrRequest(
             { storage, config, scheduler: getActiveScheduler() ?? undefined },
             { owner, sub: gaii, ownerGhii, ...grant },
-            { groupId: group_id, label, version, dryRun: dryRun === true, mode },
+            { groupId: group_id, label, version, dryRun: dryRun === true, mode, config: installConfig },
         );
 
         if (!out.ok) {

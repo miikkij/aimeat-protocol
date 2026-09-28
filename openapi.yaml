@@ -27950,6 +27950,78 @@ paths:
         '200': { description: "{ ok: true, blocks } or { ok: false, code, message }" }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
+  /v1/apps/{owner}/{filename}/config:
+    get:
+      operationId: getAppConfig
+      summary: The config an app declares, with its owner's values
+      description: >-
+        The fields the app declares in its `<script type="application/json" id="aimeat-config">`
+        block (a JSON Schema of string, number, integer and boolean fields, stored on the manifest at
+        publish), the owner's values with the declared defaults filled in, and the required fields
+        still empty. Public: the app reads its owner's values in the browser of whoever opened it
+        (`AIMEAT.data.appConfig()`), which is why a config field is never a secret. An app that
+        declares no config answers `schema: null`.
+      tags: [Apps]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: '`data` is `{ app, schema, values, missing: [{ field, description? }], updated_at }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      operationId: setAppConfig
+      summary: Change an app's config values
+      description: >-
+        The named fields take the given values, a `null` puts a field back to its default, and fields
+        not named keep theirs. The result is checked against the app's declaration: a field it does not
+        declare or a value of the wrong type answers 422 INVALID_CONFIG and nothing is stored. An app
+        that declares no config answers 409 NO_CONFIG_SCHEMA. Only the app's owner and the agents
+        acting for them (app:write); anyone else 403. A managed package install allows it, since
+        config is a setting.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [values]
+              properties:
+                values: { type: object, additionalProperties: true, description: '{ "<field>": value }; null removes a field.' }
+      responses:
+        '200':
+          description: The config after the change, in the GET shape.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: '`NO_CONFIG_SCHEMA`: the app declares no config.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '422':
+          description: '`INVALID_CONFIG`: the values do not fit the declaration.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
   /v1/apps/{owner}/{filename}/ui:
     get:
       operationId: getAppUiLayout
@@ -43859,6 +43931,9 @@ paths:
         MANAGED_BY_PACKAGE, an update replaces them, and the owner changes only the settings (name,
         description, access code, parking, search visibility, legal texts) until they fork the install
         at POST /v1/instances/{id}/fork. `editable`, the default, leaves everything the owner's to edit.
+        A package that names what the node must have already (`expects`: cortexes, extensions, library
+        packs, carried in its manifest and its ZIP) is refused with 409 EXPECTS_MISSING naming each one
+        this node lacks; a dry run lists them as `expects_missing`.
       tags: [Instances]
       security:
         - BearerAuth: []
@@ -43883,6 +43958,17 @@ paths:
                   enum: [managed, editable]
                   default: editable
                   description: '`managed`: the package owns the code and layout. `editable`: the owner may edit everything.'
+                config:
+                  type: object
+                  additionalProperties: { type: object, additionalProperties: true }
+                  description: >-
+                    Each part's config, keyed by component id: an app part takes the fields its
+                    aimeat-config declaration names (stored as its config record), an extension part
+                    takes its config fields (a `type: secret` one is stored encrypted). Checked before
+                    anything registers: an unknown part or field, or a value of the wrong type, is 400
+                    INVALID_INPUT; a required app field left empty is 400 CONFIG_REQUIRED naming it.
+                    A dry run answers `config`, each part's fields and what is still empty, without
+                    refusing on the empty ones.
       responses:
         '201':
           description: Package installed

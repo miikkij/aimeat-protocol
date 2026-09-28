@@ -10,6 +10,7 @@
  * @structure appManageShape
  * @usage mcp.tool('aimeat_app_manage', description, { ...appManageShape, ...aiProvenanceInputs }, …)
  * @version-history
+ *   v1.1.0 — 2026-09-28 — `values`, for config_set.
  *   v1.0.0 — 2026-09-27 — Initial.
  */
 import { z } from 'zod';
@@ -59,4 +60,5 @@ export const appManageShape = {
     bundled_agent: z.string().optional().describe(d('bundled_agent')),
     runner_agent: z.string().optional().describe(d('runner_agent')),
     organism_id: z.string().optional().describe(d('organism_id')),
+    values: z.record(z.string(), z.unknown()).optional().describe(d('values')),
 };

@@ -17,6 +17,7 @@
  * @structure packageTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { packageTools } from './tool-call-defs-packages.js';
  * @version-history
+ *   v1.4.1 -- 2026-09-28 -- aimeat_package_install sends `config`.
  *   v1.4.0 -- 2026-09-28 -- aimeat_package_install sends `mode`; aimeat_package_instances and
  *     aimeat_package_fork over GET /v1/instances and POST /v1/instances/:id/fork.
  *   v1.3.0 -- 2026-09-25 -- aimeat_package_install_requests: list, read, approve or decline the
@@ -31,6 +32,7 @@
  *     at apps. Pure extraction: the handlers are unchanged, only their names and their home.
  */
 import type { ConnectCliToolDefinition, JsonObject } from './tool-call-helpers.js';
+import { PACKAGE_CONFIG_PARAM } from '../mcp/catalog/definitions/packages.js';
 import {
     query, requiredString, optionalString, optionalBoolean, optionalArray, optionalRecord, requiredArray,
 } from './tool-call-helpers.js';
@@ -214,6 +216,7 @@ export const packageTools: ConnectCliToolDefinition[] = [
             version: { type: 'string', description: 'A specific version. Defaults to the latest published one.' },
             dry_run: { type: 'boolean', description: 'Report what would be registered and register nothing.' },
             mode: { type: 'string', enum: ['managed', 'editable'], description: '"managed": the package owns the code and layout. "editable" (default): you may edit everything.' },
+            config: { type: 'object', description: PACKAGE_CONFIG_PARAM },
         },
         handler: ({ client }, input) => {
             const body: JsonObject = {};
@@ -225,6 +228,8 @@ export const packageTools: ConnectCliToolDefinition[] = [
             if (dryRun !== undefined) body.dry_run = dryRun;
             const mode = optionalString(input, 'mode');
             if (mode !== undefined) body.mode = mode;
+            const installConfig = optionalRecord(input, 'config');
+            if (installConfig !== undefined) body.config = installConfig;
             return client.post(`/v1/packages/${encodeURIComponent(requiredString(input, 'group_id'))}/install`, body);
         },
     },

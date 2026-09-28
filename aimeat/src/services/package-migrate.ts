@@ -29,6 +29,8 @@
  *   import { applyInstanceMigration } from '../services/package-migrate.js';
  *   const out = await applyInstanceMigration({ storage, config }, caller, { instanceId, targetVersion, actions });
  * @version-history
+ *   v1.5.0 — 2026-09-28 — A replaced extension keeps the owner's config, secrets included: it was
+ *     rebuilt from the new manifest's defaults, which dropped every value an install had given.
  *   v1.4.0 — 2026-09-28 — A forked install is refused (409 FORKED). A managed one takes only
  *     `replace` and `install_new`: `custom` and `skip` would leave code the package did not ship.
  *   v1.3.0 — 2026-09-25 — The words a caller lacks for a memory component are gathered through the
@@ -397,9 +399,14 @@ export async function applyInstanceMigration(
                 // Safe to delete first ONLY because the loop above already ran this registration
                 // dry and every one of them passed. The delete has to come first: createCsm and its
                 // siblings throw NAME_TAKEN rather than overwrite.
+                // An extension's config is the owner's (the install config, secrets included), so it is
+                // read before the delete and carried into the replacement.
+                const previousConfig = existing?.type === 'extension'
+                    ? (await storage.getExtension(registeredAs))?.config : undefined;
                 if (existing) await deleteComponent(storage, existing.type, registeredAs, ownerGhii);
 
                 const result = await registerComponent(storage, {
+                    ...(previousConfig ? { previousConfig } : {}),
                     config,
                     componentId: compId,
                     type,

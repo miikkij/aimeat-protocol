@@ -20,6 +20,10 @@
  *   import { installPackage } from '../services/package-install.js';
  *   const out = await installPackage({ storage, config, scheduler }, caller, { groupId });
  * @version-history
+ *   v1.6.0 — 2026-09-28 — The package's `expects` is checked: what this node lacks refuses a real
+ *     install with 409 EXPECTS_MISSING naming it, and a dry run lists it (package-expects.ts).
+ *   v1.5.0 — 2026-09-28 — `config`: each part's config, checked before anything registers; a required
+ *     app field left empty is 400 CONFIG_REQUIRED naming it, and the dry run lists it (package-config.ts).
  *   v1.4.0 — 2026-09-28 — `mode`: a managed install locks the code and layout of its components to
  *     the package (package-managed.ts). Editable stays the default.
  *   v1.3.0 — 2026-09-25 — A SCOPE_DENIED refusal names the words the caller lacks (`missing`) and the
@@ -54,6 +58,8 @@ import {
 } from './component-registrar.js';
 import { reservedKeysInComponent, reservedComponentMessage, memoryComponentWriteRefusal } from './package-memory-component.js';
 import { registerExtensionSchedules } from './extension-schedules.js';
+import { planPackageConfig, missingConfigMessage, configPreview } from './package-config.js';
+import { expectsOf, missingExpects, expectsMissingMessage, type PackageExpects } from './package-expects.js';
 import { emitChange } from './event-bus.js';
 import type { Scheduler } from './scheduler.js';
 import { logger } from '../utils/logger.js';
@@ -89,6 +95,8 @@ export interface PackageInstallInput {
      * `editable`, the default, leaves them the owner's to edit. Anything else is refused.
      */
     mode?: unknown;
+    /** `{ <componentId>: { <field>: value } }`: the config each part gets (package-config.ts). */
+    config?: unknown;
 }
 
 export interface PackageInstallPreview {
@@ -107,6 +115,10 @@ export interface PackageInstallPreview {
     }>;
     label: string;
     mode: 'managed' | 'editable';
+    /** What each part asks for, what was given, and which required app fields are still empty. */
+    config: Array<Record<string, unknown>>;
+    /** What the package needs this node to have and it does not: a real install refuses on it. */
+    expects_missing?: PackageExpects;
     /** Present when this caller lacks words the install needs: the real call files a request. */
     status?: 'would_await_owner';
     missing?: string[];
@@ -272,6 +284,25 @@ export async function installPackage(
             };
         }
     }
+    // The config the install was given (package-config.ts): every value checked against what its part
+    // declares, and a required app field left empty refused by name, before anything registers. A dry
+    // run lists the empty ones instead, so a chat can ask for them and then install.
+    // What the package needs this node to have already (package-expects.ts). A real install is refused
+    // naming each missing one; a dry run lists them.
+    const expectsMissing = await missingExpects(storage, expectsOf(pkg.manifest));
+    if (expectsMissing && !isDryRun) {
+        return { ok: false, status: 409, code: 'EXPECTS_MISSING', message: expectsMissingMessage(expectsMissing) };
+    }
+
+    const configPlan = planPackageConfig(pkg.components, plannedComponents, input.config, { config, owner });
+    if (!configPlan.ok) return configPlan;
+    if (!isDryRun && configPlan.missingCount > 0) {
+        return { ok: false, status: 400, code: 'CONFIG_REQUIRED', message: missingConfigMessage(configPlan) };
+    }
+    const configFor = new Map(configPlan.entries
+        .filter(e => Object.keys(e.values).length > 0)
+        .map(e => [e.componentId, e.values as Record<string, unknown>]));
+
     // And writing the owner's memory at all costs what the memory door asks of this caller. Words the
     // caller lacks are not the end of it: the doors file a request for the owner from this refusal,
     // so it carries what was missing and which version it would have been. A dry run says so instead.
@@ -310,6 +341,8 @@ export async function installPackage(
                 components: validationResults,
                 label: instanceLabel,
                 mode,
+                config: configPreview(configPlan),
+                ...(expectsMissing ? { expects_missing: expectsMissing } : {}),
                 ...(awaitsOwner ? { status: 'would_await_owner' as const, missing: writeRefusal!.missing } : {}),
             },
         };
@@ -346,6 +379,7 @@ export async function installPackage(
             meta: comp.meta,
             callerGaii: caller.sub,
             urlRewrites: { cortexNames: cortexNameMap, extensionNames: extensionNameMap },
+            ...(configFor.has(comp.id) ? { configValues: configFor.get(comp.id) } : {}),
         });
 
         if (result.success) {

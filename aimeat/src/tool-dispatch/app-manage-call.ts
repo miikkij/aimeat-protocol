@@ -11,6 +11,7 @@
  * @structure appManageCall
  * @usage return out(await appManageCall(client, owner, input));
  * @version-history
+ *   2026-09-28 -- config_get and config_set over GET and PUT /v1/apps/:owner/:filename/config.
  *   2026-09-27 -- Agent-facing texts use industry terms: door and surface became tool and interface (docs/coding-guidelines/shell-and-git.md).
  *   v1.0.0 — 2026-09-27 — Initial.
  */
@@ -85,6 +86,10 @@ export async function appManageCall(client: AimeatClient, owner: string, input: 
         }
         case 'ui_restore':
             return client.post(`/v1/apps/${enc(owner)}/${file}/ui/restore`, { version: input.version });
+        case 'config_get':
+            return client.get(`${app}/config`);
+        case 'config_set':
+            return client.put(`${app}/config`, { values: input.values });
         case 'cost':
             return client.get(`/v1/apps/cost?app_id=${enc(`${ownerName}/${String(input.filename)}`)}`);
         case 'agent_deploy':

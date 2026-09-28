@@ -31,8 +31,11 @@
  *     GET /v1/memory/discover, and the node's own shared-feed template used search(), which reads only
  *     the caller's namespaces, so every visitor of a community feed saw only their own posts (appdev
  *     pitfall search-does-not-read-across-users-use-discover). Additive.
+ *   v1.5.0 — 2026-09-28 — appConfig(): the config the app's owner set for it (GET
+ *     /v1/apps/:owner/:filename/config), found from the app's own #aimeat-app-ref block. Additive.
  */
-import { NODE_URL, NODE_ID } from '../_core/config.js';
+import { NODE_URL, NODE_ID, APEX_URL } from '../_core/config.js';
+import { appRef } from '../_core/app-ref.js';
 import { makeSession } from '../_core/session.js';
 const { authFetch } = makeSession('aimeat-data.js');
 import { attach } from '../_core/namespace.js';
@@ -366,6 +369,27 @@ const data = {
   async getPublicEntry(gaii, key) {
     const res = await publicEntryResponse(gaii, key);
     return res === null ? null : withProvenance(res);
+  },
+
+  /**
+   * This app's config: the values its owner set for the fields the app declares in its
+   * `<script type="application/json" id="aimeat-config">` block, with the declared defaults filled
+   * in. The OWNER's values, whoever opened the app, signed in or not, which is why a config field
+   * is never a secret. Resolves null on a page that is not a served app, or when the read fails.
+   * @returns {Promise<Record<string, string|number|boolean>|null>}
+   */
+  async appConfig() {
+    const ref = appRef();
+    if (!ref) return null;
+    try {
+      const res = await fetch((APEX_URL || '') + '/v1/apps/' + encodeURIComponent(ref.owner)
+        + '/' + encodeURIComponent(ref.filename) + '/config');
+      if (!res.ok) return null;
+      const body = await res.json();
+      return (body && body.data && body.data.values) || null;
+    } catch {
+      return null;
+    }
   },
 };
 

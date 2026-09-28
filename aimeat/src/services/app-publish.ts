@@ -40,6 +40,8 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-09-28 — The app's `aimeat-config` declaration is parsed into `manifest.configSchema`, and one
+ *     that cannot be used is refused, 422 APP_CONFIG_SCHEMA_INVALID (services/app-config.ts).
  *   2026-09-28 — An app a managed package install owns is refused a new version (409
  *     MANAGED_BY_PACKAGE, services/package-managed.ts) unless the package itself registers it.
  *   2026-09-28 — A declared model the catalogue does not know is a hint (app-ai-model-hints.ts; System 2 plan, V5).
@@ -129,6 +131,7 @@ import { announceApp } from './indexnow.js';
 import { logger } from '../utils/logger.js';
 import { refreshAppDependencies } from './dependency-map.js';
 import { managedChangeRefusal } from './package-managed.js';
+import { parseAppConfigSchema } from './app-config.js';
 
 /**
  * The manifest fields a caller may state. **`undefined` means "not mentioned"** and is filled from
@@ -320,6 +323,14 @@ export async function publishApp(
     };
   }
 
+  // The config the app declares (services/app-config.ts). A declaration that does not parse is
+  // refused here rather than stored: an install would otherwise fill values against a schema that
+  // cannot check them, and a secret field would put an API key in front of every visitor.
+  const configDecl = isHtml ? parseAppConfigSchema(html) : null;
+  if (configDecl && 'error' in configDecl) {
+    return { refusal: { status: 422, code: 'APP_CONFIG_SCHEMA_INVALID', message: `The app's config declaration cannot be used: ${configDecl.error}.` } };
+  }
+
   // Did whoever is publishing read the build spec that is in force NOW? This one only ever warns
   // (services/app-spec-gate.ts explains why), and an owner-declared skip is recorded on the change
   // log below rather than passing silently.
@@ -421,6 +432,8 @@ export async function publishApp(
     ? (requested.cortexAgents.length > 0 ? { agents: requested.cortexAgents } : undefined)
     : (prev?.cortex?.agents?.length ? prev.cortex : undefined);
   if (cortex) manifest.cortex = cortex;
+  // The config declaration is read from these bytes and never carried forward.
+  if (configDecl) manifest.configSchema = configDecl.schema as unknown as Record<string, unknown>;
   // Pricing: `0` unprices explicitly, silence keeps the price. An update that omits the field must
   // never silently turn a paid app free — which is what publishing a DRAFT used to do, because a
   // draft manifest cannot carry a price and the draft door published it verbatim.

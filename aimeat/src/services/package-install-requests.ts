@@ -31,7 +31,8 @@
  *   const out = await installOrRequest({ storage, config, scheduler }, caller, { groupId, label });
  *   if (out.ok && out.kind === 'requested') res.status(202).json(success(nodeId, requestedBody(out)));
  * @version-history
- *   v1.1.0 — 2026-09-28 — An install request keeps the `mode` it asked for, and the approval installs with it.
+ *   v1.1.0 — 2026-09-28 — An install request keeps the `mode` and the `config` it asked for, and the
+ *     approval installs with them. An install carrying a secret config value files no request.
  *   v1.0.0 — 2026-09-25 — Initial: package installs by agents become requests.
  */
 import { createHash } from 'node:crypto';
@@ -39,6 +40,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, PackageRecord, PackageInstanceRecord } from '../storage/interface.js';
 import type { Scheduler } from './scheduler.js';
 import { installPackage, type PackageInstallCaller, type PackageInstallInput, type PackageInstallResult } from './package-install.js';
+import { planPackageConfig } from './package-config.js';
 import {
     applyInstanceMigration, updateInstanceToLatest, MIGRATION_ACTIONS,
     type MigrationRequest, type PackageMigrateInput, type PackageMigrateResult, type InstanceUpdateResult,
@@ -155,9 +157,17 @@ export async function installOrRequest(
     if (out.ok || !out.missing?.length || !out.target) return out;
     const requester = requesterOf(caller, deps.config.nodeId);
     if (!requester) return out;
+    // A request is a record in the owner's memory, so the install config rides in it, and a secret
+    // never does: an install that carries one is left refused, and the owner installs it themselves.
+    const plan = planPackageConfig(out.target.components, [], input.config, { config: deps.config, owner: caller.owner });
+    const secretGiven = plan.ok && plan.entries.some(e => e.type === 'extension' && e.secretFields.some(k => e.values[k] !== undefined && e.values[k] !== ''));
+    if (secretGiven) {
+        return { ...out, message: `${out.message} The install carries a secret config value, which is never stored in a request, so no request was filed: your owner installs it, or grants memory:write and memory:write-as-owner.` };
+    }
     const options: PackageInstallRequest['options'] = {
         ...(typeof input.label === 'string' && input.label ? { label: input.label } : {}),
         ...(input.mode === 'managed' ? { mode: 'managed' as const } : {}),
+        ...(input.config && typeof input.config === 'object' ? { config: input.config as Record<string, unknown> } : {}),
     };
     return fileFrom(deps, caller, 'install', requester, out.missing, out.target, null, options, memoryIdsOf(out.target));
 }
@@ -265,6 +275,7 @@ async function perform(deps: RequestDeps, owner: string, ownerGhii: string, requ
         const out = await installPackage(deps, caller, {
             groupId: request.package.group_id, version: request.package.version, ...(request.options.label ? { label: request.options.label } : {}),
             ...(request.options.mode ? { mode: request.options.mode } : {}),
+            ...(request.options.config ? { config: request.options.config } : {}),
         });
         if (!out.ok) return fail(out.status, out.code, out.message);
         if (out.kind !== 'installed') return fail(500, 'INSTALL_FAILED', 'The install answered a preview instead of installing.');
