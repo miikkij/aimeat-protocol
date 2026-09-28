@@ -3933,7 +3933,7 @@ components:
           enum: [private, public]
         status:
           type: string
-          enum: [draft, published, archived]
+          enum: [draft, published, beta, archived]
         components:
           type: array
           items:
@@ -43262,7 +43262,7 @@ paths:
                 visibility: { type: string, enum: [private, public], default: private }
                 status:
                   type: string
-                  enum: [draft, published, archived]
+                  enum: [draft, published, beta, archived]
                   default: published
                   description: Only a published version can be installed.
                 components:
@@ -43321,7 +43321,7 @@ paths:
           schema: { type: string }
         - name: status
           in: query
-          schema: { type: string, enum: [draft, published, archived], default: published }
+          schema: { type: string, enum: [draft, published, beta, archived], default: published }
         - name: limit
           in: query
           schema: { type: integer, default: 50 }
@@ -43363,7 +43363,7 @@ paths:
                 category: { type: string }
                 tags: { type: array, items: { type: string } }
                 visibility: { type: string, enum: [private, public], default: private }
-                status: { type: string, enum: [draft, published, archived], default: published }
+                status: { type: string, enum: [draft, published, beta, archived], default: published }
                 include_cortex:
                   type: boolean
                   default: true
@@ -43436,8 +43436,10 @@ paths:
       description: >-
         Grant a customer node this private package, or change its grant. The node is served every
         published version made up to `updates_until`, and nothing newer: a monthly subscription that
-        ended. Null or omitted keeps the updates running. The node must also be an active peer of this
-        node with the catalogue shared. The package's author or an operator; requires packages:write.
+        ended. Null or omitted keeps the updates running. `channel` beta serves versions whose status
+        is beta too, whichever is newest; stable (the default) serves published versions only. The
+        node must also be an active peer of this node with the catalogue shared. The package's author
+        or an operator; requires packages:write.
       tags: [Packages]
       security:
         - BearerAuth: []
@@ -43451,6 +43453,7 @@ paths:
               type: object
               properties:
                 updates_until: { type: string, format: date-time, nullable: true }
+                channel: { type: string, enum: [stable, beta], default: stable }
                 note: { type: string, maxLength: 500 }
       responses:
         '200':
@@ -43493,7 +43496,7 @@ paths:
         '200':
           description: >-
             `data` is `{ node, packages: [{ group_id, name, version, published_at, description,
-            category, visibility, updates_until }] }`.
+            category, visibility, updates_until, channel }] }`.
           content:
             application/json:
               schema:
@@ -43671,7 +43674,7 @@ paths:
               type: object
               required: [status]
               properties:
-                status: { type: string, enum: [draft, published, archived] }
+                status: { type: string, enum: [draft, published, beta, archived] }
                 version:
                   type: string
                   description: Which version. Defaults to the newest one in the group.
@@ -43890,7 +43893,7 @@ paths:
           schema: { type: string }
         - name: status
           in: query
-          schema: { type: string, enum: [draft, published, archived] }
+          schema: { type: string, enum: [draft, published, beta, archived] }
         - name: limit
           in: query
           schema: { type: integer, default: 50 }
@@ -43954,7 +43957,7 @@ paths:
               type: object
               required: [status]
               properties:
-                status: { type: string, enum: [draft, published, archived] }
+                status: { type: string, enum: [draft, published, beta, archived] }
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'

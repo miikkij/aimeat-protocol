@@ -157,11 +157,11 @@ export const packageTools: ConnectCliToolDefinition[] = [
         // installable was a PATCH that no MCP or CLI surface carried. So publish could succeed and
         // leave a package its own author could neither see nor install.
         name: 'aimeat_package_status_set',
-        description: 'Move one package version between draft, published and archived. Only the author may.',
+        description: 'Move one package version between draft, published, beta and archived. Only the author may. A beta version goes only to beta-channel customer nodes.',
         input: {
             group_id: { type: 'string', required: true, description: 'Package group identifier.' },
             version: { type: 'string', description: 'Which version. Defaults to the newest one.' },
-            status: { type: 'string', required: true, enum: ['draft', 'published', 'archived'], description: 'The status to set.' },
+            status: { type: 'string', required: true, enum: ['draft', 'published', 'beta', 'archived'], description: 'The status to set.' },
         },
         handler: ({ client }, input) => {
             const body: JsonObject = { status: requiredString(input, 'status') };
@@ -285,6 +285,7 @@ export const packageTools: ConnectCliToolDefinition[] = [
             action: { type: 'string', required: true, enum: ['list', 'grant', 'revoke'], description: 'list the nodes, grant (or change) one, or revoke one.' },
             node_id: { type: 'string', description: 'For grant and revoke: the customer node.' },
             updates_until: { type: 'string', description: 'For grant: versions published after this ISO date-time are not served to the node.' },
+            channel: { type: 'string', enum: ['stable', 'beta'], description: 'For grant: stable (published versions, the default) or beta (beta versions too).' },
             note: { type: 'string', description: 'For grant: why.' },
         },
         handler: ({ client }, input) => {
@@ -296,6 +297,8 @@ export const packageTools: ConnectCliToolDefinition[] = [
             const body: JsonObject = {};
             const until = optionalString(input, 'updates_until');
             if (until !== undefined) body.updates_until = until;
+            const channel = optionalString(input, 'channel');
+            if (channel !== undefined) body.channel = channel;
             const note = optionalString(input, 'note');
             if (note !== undefined) body.note = note;
             return client.put(node, body);

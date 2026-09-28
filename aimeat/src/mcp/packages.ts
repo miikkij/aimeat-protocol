@@ -228,7 +228,7 @@ export function registerPackageTools(
     mcp.tool('aimeat_package_status_set', descriptionFor('aimeat_package_status_set'), {
         group_id: z.string().describe('Package group identifier.'),
         version: z.string().optional().describe('Which version. Defaults to the newest one.'),
-        status: z.enum(['draft', 'published', 'archived']).describe('The status to set. Only a published version can be installed.'),
+        status: z.enum(['draft', 'published', 'beta', 'archived']).describe('The status to set. Only a published version can be installed here; a beta version goes to beta-channel customer nodes.'),
     }, annotationsFor('aimeat_package_status_set'), async ({ group_id, version, status }) => {
         const owner = ownerOf();
         const out = await setPackageVersionStatus({ storage, config },
@@ -361,8 +361,9 @@ export function registerPackageTools(
         action: z.enum(['list', 'grant', 'revoke']).describe('list the nodes, grant (or change) one, or revoke one.'),
         node_id: z.string().optional().describe('For grant and revoke: the customer node.'),
         updates_until: z.string().nullable().optional().describe('For grant: versions published after this ISO date-time are not served to the node. null or omitted: the updates run on.'),
+        channel: z.enum(['stable', 'beta']).optional().describe('For grant: stable serves published versions (the default); beta serves versions set to beta too, whichever is newest.'),
         note: z.string().optional().describe('For grant: why, e.g. the order it came from.'),
-    }, annotationsFor('aimeat_package_entitlements'), async ({ group_id, action, node_id, updates_until, note }) => {
+    }, annotationsFor('aimeat_package_entitlements'), async ({ group_id, action, node_id, updates_until, channel, note }) => {
         const caller = { owner: ownerOf(), isOperator: false };
         if (action === 'list') {
             const out = await listEntitlements(storage, caller, group_id);
@@ -375,7 +376,7 @@ export function registerPackageTools(
             if (!out.ok) return { ...toolError(out.code, out.message) };
             return { content: [{ type: 'text' as const, text: JSON.stringify({ revoked: true, node_id }, null, 2) }] };
         }
-        const out = await grantEntitlement(storage, caller, { groupId: group_id, nodeId: node_id, updatesUntil: updates_until, note });
+        const out = await grantEntitlement(storage, caller, { groupId: group_id, nodeId: node_id, updatesUntil: updates_until, note, channel });
         if (!out.ok) return { ...toolError(out.code, out.message) };
         return { content: [{ type: 'text' as const, text: JSON.stringify({ entitlement: out.entitlement, repository_role: config.packageRepository }, null, 2) }] };
     });

@@ -69,7 +69,8 @@ A package repository is a peer node that serves private packages to the nodes en
 \`aimeat_package_repository\` lists what it serves this node, \`aimeat_package_pull\` takes one, and the
 node's daily check (\`aimeat_package_check_updates\` runs it now) pulls newer versions and updates the
 installs whose \`auto_update\` is on (\`aimeat_package_instance_set\`). On the repository itself,
-\`aimeat_package_entitlements\` grants and revokes the nodes and sets when their updates end.
+\`aimeat_package_entitlements\` grants and revokes the nodes and sets when their updates end, and
+\`channel\` beta gives a node the versions you set to \`beta\` with \`aimeat_package_status_set\`.
 
 **App config.** An app that needs values to work declares them as a JSON Schema in
 \`<script type="application/json" id="aimeat-config">\` (string, number, integer and boolean fields, never a

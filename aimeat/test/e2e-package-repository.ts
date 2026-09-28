@@ -121,11 +121,11 @@ let instanceId = '';
 
 const component = (v: string) => ({ id: 'csm-core', type: 'csm', label: 'Core', content: JSON.stringify({ fields: ['a'], v }), dependencies: [] });
 
-async function publishVersion(v: string): Promise<string> {
+async function publishVersion(v: string, status = 'published'): Promise<string> {
     await new Promise((r) => setTimeout(r, 1100));
     const r = await R.json(`/v1/packages/${encodeURIComponent(groupOnR)}/versions`, {
         method: 'POST', headers: auth(R.ownerToken),
-        body: JSON.stringify({ changelog: v, status: 'published', visibility: 'private', components: [component(v)] }),
+        body: JSON.stringify({ changelog: v, status, visibility: 'private', components: [component(v)] }),
     });
     assert(r.status === 201, `version ${v}: ${r.status} ${JSON.stringify(r.body)}`);
     return r.body.data.version as string;
@@ -284,6 +284,54 @@ await test('When the updates end, a version made after it is not served, and the
     });
     assert(direct.status === 200 && direct.body.data.applied === false, `a pull after the end brings nothing newer: ${direct.status} ${JSON.stringify(direct.body)}`);
     void v2;
+});
+
+console.log('\nPhase 6 — Release channels');
+
+let v4 = '';
+let v5 = '';
+await test('A new grant runs the updates again; the stable channel takes the newest published version', async () => {
+    const g = await R.json(`/v1/packages/${encodeURIComponent(groupOnR)}/entitlements/${C.nodeId}`, {
+        method: 'PUT', headers: auth(R.ownerToken), body: JSON.stringify({ note: 'order 2' }),
+    });
+    assert(g.status === 200 && g.body.data.entitlement.updatesUntil === null && g.body.data.entitlement.channel === 'stable', `regrant: ${g.status} ${JSON.stringify(g.body)}`);
+    const versions = await R.json(`/v1/packages/${encodeURIComponent(groupOnR)}/versions`, { headers: auth(R.ownerToken) });
+    v4 = (versions.body.data.versions as any[]).find((x) => x.changelog === 'v4')?.version;
+    assert(!!v4, `v4 on R: ${JSON.stringify(versions.body)}`);
+    const r = await C.json('/v1/instances/check-updates', { method: 'POST', headers: auth(C.ownerToken), body: '{}' });
+    const o = (r.body.data.outcomes as any[]).find((x) => x.instance_id === instanceId);
+    assert(o?.pulled === true && o?.result === 'updated', `v4 arrives: ${JSON.stringify(o)}`);
+});
+
+await test('A beta version is not served on the stable channel, and naming it answers not found', async () => {
+    v5 = await publishVersion('v5', 'beta');
+    const listing = await C.json(`/v1/federation/peers/${encodeURIComponent(R.nodeId)}/packages`, { headers: auth(C.ownerToken) });
+    const row = (listing.body.data.packages as any[]).find((p) => p.group_id === groupOnR);
+    assert(row?.version === v4 && row?.channel === 'stable', `stable lists v4: ${JSON.stringify(row)}`);
+    const direct = await C.json('/v1/federation/packages/pull', {
+        method: 'POST', headers: auth(C.ownerToken), body: JSON.stringify({ group_id: groupOnR, node_id: R.nodeId, version: v5 }),
+    });
+    assert(direct.status === 404 && direct.body.error?.code === 'NOT_FOUND', `v5 on stable: ${direct.status} ${JSON.stringify(direct.body)}`);
+});
+
+await test('An unknown channel is refused', async () => {
+    const g = await R.json(`/v1/packages/${encodeURIComponent(groupOnR)}/entitlements/${C.nodeId}`, {
+        method: 'PUT', headers: auth(R.ownerToken), body: JSON.stringify({ channel: 'nightly' }),
+    });
+    assert(g.status === 400 && g.body.error?.code === 'INVALID_INPUT', `nightly: ${g.status} ${JSON.stringify(g.body)}`);
+});
+
+await test('On the beta channel, the beta version is listed, pulled and applied', async () => {
+    const g = await R.json(`/v1/packages/${encodeURIComponent(groupOnR)}/entitlements/${C.nodeId}`, {
+        method: 'PUT', headers: auth(R.ownerToken), body: JSON.stringify({ channel: 'beta' }),
+    });
+    assert(g.status === 200 && g.body.data.entitlement.channel === 'beta', `beta grant: ${g.status} ${JSON.stringify(g.body)}`);
+    const listing = await C.json(`/v1/federation/peers/${encodeURIComponent(R.nodeId)}/packages`, { headers: auth(C.ownerToken) });
+    const row = (listing.body.data.packages as any[]).find((p) => p.group_id === groupOnR);
+    assert(row?.version === v5 && row?.channel === 'beta', `beta lists v5: ${JSON.stringify(row)}`);
+    const r = await C.json('/v1/instances/check-updates', { method: 'POST', headers: auth(C.ownerToken), body: '{}' });
+    const o = (r.body.data.outcomes as any[]).find((x) => x.instance_id === instanceId);
+    assert(o?.pulled === true && o?.result === 'updated', `v5 arrives: ${JSON.stringify(o)}`);
 });
 
 await test('Revoking the entitlement stops the listing and the pull', async () => {

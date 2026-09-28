@@ -120,7 +120,8 @@ export interface PackageRecord {
   category: string;                // "signage" | "marketplace" | "iot" | "social" | "productivity" | "communication" | "other"
   tags: string[];                  // free-form tags for search
   visibility: 'private' | 'public';
-  status: 'draft' | 'published' | 'archived';
+  /** `beta`: released on a repository's beta channel only (services/package-entitlements.ts). */
+  status: 'draft' | 'published' | 'beta' | 'archived';
 
   components: PackageComponent[];  // all components in this version
   manifest: string;                // full package YAML manifest (human-readable)
