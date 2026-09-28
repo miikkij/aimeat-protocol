@@ -9,6 +9,8 @@
  *   node would tell you what you had been given. Everything else on this page answers "who can see
  *   my things"; this one answers "what of other people's may I see".
  * @version-history
+ *   v1.6.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself, so names with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.6.0 — 2026-09-26 — Every part is a component that takes data, and the file writes no class
  *     (component plan, page group G3): the heading is the SubHeading with its intro, the shares a
  *     List (its loading line the List's), the date a dim tag as main's muted badge. `inRow` leaves
@@ -26,7 +28,6 @@ import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import * as sharesApi from '/js/services/shares.js';
 import { swallowed } from '/js/swallowed.js';
 import { date as fmtDate } from '/js/format.js';
@@ -72,7 +73,7 @@ export function SharesIncomingSection({ inRow } = {}) {
     <${List} cols="name-state" keepCols loading=${shares === null ? (t('profile.access.sgLoading') || 'Loading...') : false}>
       ${(shares || []).map(s => html`
         <${Row} key=${s.id}>
-          <${Name} title=${s.key_pattern} meta=${`${t('profile.access.shIncomingFrom')} ${escHtml(s.owner_gaii)}`}>${escHtml(s.key_pattern)}<//>
+          <${Name} title=${s.key_pattern} meta=${`${t('profile.access.shIncomingFrom')} ${s.owner_gaii ?? ''}`}>${s.key_pattern}<//>
           <${Cell}>${s.expires_at && html`<${Mark} tone="dim">${fmtDate(s.expires_at)}<//>`}<//>
         <//>
       `)}

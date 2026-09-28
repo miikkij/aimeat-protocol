@@ -26,6 +26,8 @@
  * @structure OpenItemsList({ maxAgeDays })
  * @usage html`<${OpenItemsList} />` — or `maxAgeDays={7}` to hide rows that have gone stale
  * @version-history
+ *   v1.3.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text itself, so an
+ *     item title or agent name with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.3.0 — 2026-09-24 — The copy button and the two review buttons are the underlined action link
  *     (Jouni's decision "Panel action").
  *   v1.2.0 — 2026-09-20 — A row the decision gate opened carries the two answers a person can give:
@@ -42,7 +44,7 @@ import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { escHtml, timeAgo } from '/js/utils.js';
+import { timeAgo } from '/js/utils.js';
 import { apiGet } from '/js/api.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { listOpenItems, switchOff } from '/js/services/open-items.js';
@@ -140,7 +142,7 @@ export function OpenItemsList({ maxAgeDays } = {}) {
                  right, and on a working row they disagreed: coral circle, green dots, one item.
                  One state, one place, and the place is the corner every card uses. */''}
             <div class="open-items-main">
-              <div class="open-items-item">${escHtml(i.title)}</div>
+              <div class="open-items-item">${i.title}</div>
             ${/* WHO put this here is a separate fact from WHAT is happening to it, and it used to be
                  the last arm of one ternary — so a row the AI switched on stopped saying so the
                  moment an agent picked it up or it turned out to be a suggestion. Measured: one row
@@ -149,7 +151,7 @@ export function OpenItemsList({ maxAgeDays } = {}) {
                 ${i.closes_when
                   ? tr('openItems.suggestion', 'Suggestion: it goes away once this is done')
                   : i.agent
-                    ? `${escHtml(String(i.agent).split('#')[0])} ${tr('openItems.isDoing', 'is doing this')}`
+                    ? `${String(i.agent).split('#')[0]} ${tr('openItems.isDoing', 'is doing this')}`
                     : `${originLabel(i.origin)} · ${timeAgo(i.createdAt)}`}
                 ${i.by === 'ai' && html`
                   <span class="open-items-byai">${tr('openItems.byAi', 'your AI put this here')}</span>`}

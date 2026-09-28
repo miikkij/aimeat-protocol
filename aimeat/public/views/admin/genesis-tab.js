@@ -11,6 +11,8 @@
  *   - doAction: confirm-then-call wrapper around approve/suspend/removeGenesisPeer with reload + error toast
  *
  * @version-history
+ *   v2.0.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself, so a peer's node id or URL with an ampersand (a query string) showed as &amp;.
  *   v2.0.0 — 2026-09-27 — Library components, no class or inline style: the explanation is a hint,
  *     the peers table is a List (the node id and address in typewriter, the status mark, the last
  *     sync as a time, the three actions as action links; suspend and remove in the danger tone,
@@ -22,7 +24,6 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { dt, Badge, StatsGrid, Empty, ExpandableHelp, useToast, Toast } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import { approveGenesisPeer, suspendGenesisPeer, removeGenesisPeer } from '/js/services/admin.js';
@@ -68,8 +69,8 @@ export default function GenesisTab({ data, reload }) {
           head=${[t('dashboard.nodeId'), 'URL', t('dashboard.statusLabel'), t('dashboard.lastSync'), t('dashboard.actions')]}>
           ${peers.map(p => html`
             <${ListRow} key=${p.id}>
-              <${Name} asKey>${escHtml(p.genesis_node_id)}<//>
-              <${Cell} meta>${escHtml(p.genesis_url || '—')}<//>
+              <${Name} asKey>${p.genesis_node_id}<//>
+              <${Cell} meta>${p.genesis_url || '—'}<//>
               <${Cell}><${Badge} type=${p.status === 'approved' || p.status === 'active' ? 'healthy' : p.status === 'suspended' ? 'critical' : 'watch'} label=${p.status} /><//>
               <${When}>${dt(p.last_sync_at)}<//>
               <${Doors}>

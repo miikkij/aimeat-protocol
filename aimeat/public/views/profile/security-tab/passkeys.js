@@ -19,6 +19,8 @@
  * @structure PasskeysSection({ showToast, inRow })
  * @usage html`<${PasskeysSection} showToast=${showToast} inRow />`
  * @version-history
+ *   v1.11.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself, so a passkey name with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.11.0 -- 2026-09-26 -- Every part is a component that takes data (Card section, List rows with
  *     the typewriter meta line and the doors at the end, Note, Action/Loud, TextField, SubHeading,
  *     Layout); the section writes no class. The devices are list rows (the majority look for rows
@@ -49,7 +51,6 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
 import * as securityService from '/js/services/security.js';
 import { passkeySupported, addPasskey } from '/js/services/auth.js';
@@ -145,7 +146,7 @@ export function PasskeysSection({ showToast, inRow }) {
               actions=${html`
                 <${Loud} control onClick=${() => saveName(p.id)}>${t('profile.security.save')}<//>
                 <${Action} small onClick=${() => setRenaming(null)}>${t('profile.cancel')}<//>`} />`
-          : escHtml(p.label)}
+          : p.label}
       <//>
       <${Doors}>${renaming !== p.id && html`
         <${Action} small row onClick=${() => { setRenaming(p.id); setRenameValue(p.label); }}>

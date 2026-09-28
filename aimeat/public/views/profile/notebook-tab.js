@@ -11,6 +11,9 @@
  *   - NotebookTab (default export) — capture box, trust toggles, librarian search, inbox list → NoteCard
  * @usage html`<${NotebookTab} session=${session} showToast=${showToast} onStats=${onStats} />`
  * @version-history
+ *   v1.16.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself, so a search hit's title, snippet or organism name with a quote or an ampersand showed
+ *     as &quot; / &amp;.
  *   v1.16.0 -- 2026-09-26 -- Every part is a component that takes data: the page frame (SettingsPage),
  *     the sections (Section), the capture box (TextArea, Loud, Note, Check), the scope tabs (Tabs bar),
  *     the search and filter lines (SearchLine with the sort Select in it), the hits (List), the notes
@@ -59,7 +62,6 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { Section } from '/components/Section.js';
 import { Tabs } from '/components/Tabs.js';
@@ -255,17 +257,17 @@ export default function NotebookTab({ session, showToast, onStats }) {
   // A hit's home as its tag: knowledge in the success colour (main's success badge), an organism
   // document and a personal note as the plain tag (main's info and plain badges drew alike here).
   const hitTag = (hit) => (hit.kind === 'knowledge'
-    ? html`<${Mark} tone="fine">${t('profile.notebook.kindKnowledge')}${hit.contentType ? ` · ${escHtml(hit.contentType)}` : ''}<//>`
+    ? html`<${Mark} tone="fine">${t('profile.notebook.kindKnowledge')}${hit.contentType ? ` · ${hit.contentType}` : ''}<//>`
     : hit.organismId
-      ? html`<${Mark}>${escHtml(orgNames[hit.organismId] || hit.organismId)}<//>`
+      ? html`<${Mark}>${orgNames[hit.organismId] || hit.organismId}<//>`
       : html`<${Mark}>${t('profile.notebook.personalNote')}<//>`);
 
   const renderHit = (hit) => html`
     <${ListRow} key=${hit.key}>
-      <${Name} title=${hit.key} meta=${escHtml(hit.key)}>${escHtml(hit.title || hit.key)}<//>
+      <${Name} title=${hit.key} meta=${hit.key}>${hit.title || hit.key}<//>
       <${Desc}>
-        ${searchScope === 'public' && html`<div>${t('profile.notebook.producer')}: ${escHtml(producerLabel(hit.producer))}</div>`}
-        ${hit.snippet && escHtml(hit.snippet)}
+        ${searchScope === 'public' && html`<div>${t('profile.notebook.producer')}: ${producerLabel(hit.producer)}</div>`}
+        ${hit.snippet}
       <//>
       <${Who}>${hitTag(hit)}<//>
       <${Doors}>${canOpen(hit) && html`<${Action} small row onClick=${() => openHit(hit)}>${t('profile.notebook.openInMemory')}<//>`}<//>

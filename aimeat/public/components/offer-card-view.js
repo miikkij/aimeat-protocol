@@ -20,11 +20,13 @@
  *     -reqs for the requirement list, -sample for the sample's box, -dot for the agent's dot); the
  *     rules moved with them out of css/views/offers.css and profile-poster.css into
  *     css/components/offer-card-view.css (a move).
+ *   v1.2.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself, so an offer title, ask, example, requirement or deliverable with a quote or an
+ *     ampersand showed as &quot; / &amp;.
  */
 import { h } from 'preact';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { DeliverableBody } from '/components/ImageDeliverable.js';
 
 const html = htm.bind(h);
@@ -38,13 +40,13 @@ export function OfferBadges({ offer }) {
   if (offer.dataHandling) chips.push(['data', t('profile.offers.dataHandling.' + offer.dataHandling) || offer.dataHandling]);
   if (offer.cost) chips.push(['cost', t('profile.offers.cost.' + offer.cost) || offer.cost]);
   if (offer.latency) chips.push(['lat', t('profile.offers.latency.' + offer.latency) || offer.latency]);
-  return html`<span class="offer-card-badges">${chips.map(([k, label]) => html`<span class="offer-card-badge offer-card-badge--${k}" key=${k}>${escHtml(label)}</span>`)}</span>`;
+  return html`<span class="offer-card-badges">${chips.map(([k, label]) => html`<span class="offer-card-badge offer-card-badge--${k}" key=${k}>${label}</span>`)}</span>`;
 }
 
 /** The "Example:" line. */
 export function OfferExample({ offer }) {
   if (!offer.example) return null;
-  return html`<div class="offer-card-example"><span class="offer-card-label">${t('profile.offers.example') || 'Example'}:</span> ${escHtml(offer.example)}</div>`;
+  return html`<div class="offer-card-example"><span class="offer-card-label">${t('profile.offers.example') || 'Example'}:</span> ${offer.example}</div>`;
 }
 
 /** The "Before you ask" requirements list. */
@@ -54,14 +56,14 @@ export function OfferRequirements({ offer }) {
   return html`
     <div class="offer-card-label">${t('profile.offers.requirements') || 'Before you ask'}</div>
     <div class="offer-card-reqs">${reqs.map((r, i) => html`
-      <span class="offer-card-req" key=${i}>${escHtml(r.need)}${r.instruction ? html` <span class="offer-card-mini">— ${escHtml(r.instruction)}</span>` : null}${r.fix ? html` <span class="offer-card-fix">${escHtml(r.fix)}</span>` : null}</span>`)}</div>`;
+      <span class="offer-card-req" key=${i}>${r.need}${r.instruction ? html` <span class="offer-card-mini">— ${r.instruction}</span>` : null}${r.fix ? html` <span class="offer-card-fix">${r.fix}</span>` : null}</span>`)}</div>`;
 }
 
 /** The "You'll get back" deliverable label + sample (or "untested" badge). */
 export function OfferDeliverable({ offer }) {
   if (!offer.deliverable) return null;
   return html`
-    <div class="offer-card-label">${t('profile.offers.deliverable') || 'You’ll get back'}: ${escHtml(offer.deliverable.format || '')}${offer.deliverable.location?.space ? html` <span class="offer-card-mini">→ ${escHtml(offer.deliverable.location.space)}</span>` : null}</div>
+    <div class="offer-card-label">${t('profile.offers.deliverable') || 'You’ll get back'}: ${offer.deliverable.format || ''}${offer.deliverable.location?.space ? html` <span class="offer-card-mini">→ ${offer.deliverable.location.space}</span>` : null}</div>
     ${offer.deliverable.sample === 'untested'
       ? html`<span class="offer-card-badge offer-card-badge--untested">${t('profile.offers.untested') || 'untested — no sample yet'}</span>`
       : html`<div class="offer-card-md offer-card-sample"><${DeliverableBody} value=${offer.deliverable.sample} alt=${offer.title} format=${offer.deliverable.format} /></div>`}`;
@@ -76,12 +78,12 @@ export function OfferCardView({ entry, offer, actions }) {
     <div class="offer-card offer-card--open">
       <div class="offer-card-head offer-card-head--static">
         <div class="offer-card-title">
-          <span class="offer-card-name">${escHtml(offer.title)}</span>
-          <span class="offer-card-agent">${escHtml(entry.agent)} <span class="offer-card-dot ${entry.online ? 'offer-card-dot--on' : 'offer-card-dot--off'}"></span></span>
+          <span class="offer-card-name">${offer.title}</span>
+          <span class="offer-card-agent">${entry.agent} <span class="offer-card-dot ${entry.online ? 'offer-card-dot--on' : 'offer-card-dot--off'}"></span></span>
         </div>
         <${OfferBadges} offer=${offer} />
       </div>
-      <div class="offer-card-ask">${escHtml(offer.ask)}</div>
+      <div class="offer-card-ask">${offer.ask}</div>
       <div class="offer-card-detail">
         <${OfferExample} offer=${offer} />
         <${OfferRequirements} offer=${offer} />

@@ -5,6 +5,8 @@
  * @description Sharing Groups section — CRUD for sharing groups with expandable
  *   member lists. Extracted from access-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.21.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself, so names with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.21.0 -- 2026-09-26 -- Every part is a component that takes data, and the file writes no class
  *     (component plan, page group G3): a group is a List row that opens and closes as a whole (the
  *     ▶/▼ before its name), its opened Panel holds the Facts, the members and shares as dense Lists
@@ -51,7 +53,6 @@ import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
 import { ContactPicker } from '/components/ContactPicker.js';
 import { List, Row, Name, Desc, Cell, Doors, Panel } from '/components/List.js';
@@ -307,7 +308,7 @@ export function SharingGroupsSection({ showToast, initial, inRow }) {
   // A member's kind: an agent (GAII) plain, a person (GHII) dim, as main's info and muted badges.
   const renderMemberRow = (groupId, member) => html`
     <${Row} key=${member.identifier}>
-      <${Name} asKey>${escHtml(member.identifier)}<//>
+      <${Name} asKey>${member.identifier}<//>
       <${Cell}><${Mark} tone=${member.identifierType === 'gaii' ? undefined : 'dim'}>${member.identifierType}<//><//>
       <${Cell} line>
         <${Mark} kind="status" tone=${member.permissions?.read ? 'fine' : 'off'}>${t('profile.access.sgRead') || 'read'}<//>
@@ -323,7 +324,7 @@ export function SharingGroupsSection({ showToast, initial, inRow }) {
 
   const renderShareRow = (share) => html`
     <${Row} key=${share.id}>
-      <${Name} asKey title=${share.key_pattern} meta=${share.note ? escHtml(share.note) : null}>${escHtml(share.key_pattern)}<//>
+      <${Name} asKey title=${share.key_pattern} meta=${share.note || null}>${share.key_pattern}<//>
       <${Doors}>
         <${Action} small row tone="danger" onClick=${(e) => { e.stopPropagation(); handleRevokeShare(share); }}>
           ${t('profile.access.shRevoke')}
@@ -342,8 +343,8 @@ export function SharingGroupsSection({ showToast, initial, inRow }) {
     // ▶/▼ before the name says which it is, as main's expand icon did.
     return html`
       <${Row} key=${group.id} open=${isExpanded} onToggle=${() => setExpandedId(isExpanded ? null : group.id)}>
-        <${Name} before=${html`<span aria-hidden="true">${isExpanded ? '▼' : '▶'}</span>`}>${escHtml(group.name)}<//>
-        <${Desc}>${group.description ? escHtml(group.description) : ''}<//>
+        <${Name} before=${html`<span aria-hidden="true">${isExpanded ? '▼' : '▶'}</span>`}>${group.name}<//>
+        <${Desc}>${group.description || ''}<//>
         <${Doors}>
           <${Mark} tone="dim">${memberCount} ${t('profile.access.sgMembers') || 'members'}<//>
           ${groupShares.length > 0 && html`

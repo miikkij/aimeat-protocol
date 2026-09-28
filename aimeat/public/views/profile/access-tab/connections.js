@@ -15,6 +15,8 @@
  * @structure ConnectionsSection — GET /v1/connections + /providers + /clients, connect via a
  *   pop-up, revoke · OwnApp — one service's own-app credentials.
  * @version-history
+ *   v1.7.2 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself, so names with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.7.1 — 2026-09-26 — An account's name turns coral under the pointer again, as main's
  *     .mem-item:hover drew it (Row hover; fix pass).
  *   v1.7.0 — 2026-09-26 — Every part is a component that takes data, and the file writes no class
@@ -43,7 +45,6 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
 import { List, Row, Name, Doors } from '/components/List.js';
 import { Action, Actions } from '/components/Action.js';
@@ -316,7 +317,7 @@ export function ConnectionsSection({ showToast, inRow }) {
     <${List} cols="name-state" keepCols empty=${t('profile.access.cxEmpty') || 'No connected accounts yet.'}>
       ${connections.map(c => html`
         <${Row} key=${c.id} hover>
-          <${Name} meta=${`${escHtml(c.provider)}${c.status === 'needs_reauth' ? ' · ' + (t('profile.access.cxNeedsReauth') || 'needs reconnecting') : ''}`}>${escHtml(c.accountLabel)}<//>
+          <${Name} meta=${`${c.provider ?? ''}${c.status === 'needs_reauth' ? ' · ' + (t('profile.access.cxNeedsReauth') || 'needs reconnecting') : ''}`}>${c.accountLabel}<//>
           <${Doors}>
             ${c.status === 'needs_reauth' && html`
               <${Action} small row onClick=${() => connect({ id: c.provider })}>${t('profile.access.cxReconnect') || 'Reconnect'}<//>
@@ -351,7 +352,7 @@ export function ConnectionsSection({ showToast, inRow }) {
           onClick=${() => (p.attachFields ? attach(p) : connect(p))}>
           ${busy === p.id
             ? (t('profile.access.cxConnecting') || 'Connecting…')
-            : `${t('profile.access.cxConnect') || 'Connect'} ${escHtml(p.label)}`}
+            : `${t('profile.access.cxConnect') || 'Connect'} ${p.label ?? ''}`}
         <//>
       <//>
       ${!p.attachFields && html`
@@ -399,7 +400,7 @@ function OwnApp({ provider, client, open, busy, draft, onToggle, onDraft, onSave
       <${Split} side above="small" pad="none" below="medium">
         <${Line} gap="small" wrap>
           <${Note} inline>
-            ${t('profile.access.cxOwnActive') || 'Using your own app'} · ${escHtml(client.clientId)}
+            ${t('profile.access.cxOwnActive') || 'Using your own app'} · ${client.clientId}
             ${client.connectionCount > 0 ? ' · ' + (t('profile.access.cxOwnCount')
               || '{n} account(s) connected with it').replace('{n}', String(client.connectionCount)) : ''}
           <//>

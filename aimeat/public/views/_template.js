@@ -12,6 +12,8 @@
  * @usage cp public/views/_template.js public/views/myview.js, then follow the numbered steps below.
  *
  * @version-history
+ *   v1.1.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself, so a view copied from this template showed a quote or an ampersand as &quot; / &amp;.
  *   v1.1.0 — 2026-07-17 — Teach the canonical patterns instead of anti-patterns:
  *     buttons use `.btn-primary`/`.btn-ghost` directly (there is NO `.btn` base class),
  *     the header uses `.page-title`/`.section-title`+`.section-desc`, and the render
@@ -36,7 +38,6 @@ import htm                         from 'htm';
 import { useState, useEffect }     from 'preact/hooks';
 const html = htm.bind(h);
 import { t }                       from '/js/i18n.js';
-import { escHtml }                 from '/js/utils.js';
 import { apiPost }                 from '/js/api.js';
 import { useApiCall }              from '/js/hooks.js';
 // Canonical primitives — prefer these over hand-rolled spinners/empty divs/dots.
@@ -84,9 +85,12 @@ export default function MyView({ navigate }) {
 
   // ── Render states (canonical: <Spinner> for loading, <Alert> markup for error) ─
   if (loading) return html`<${Spinner} text=${t('loading')} />`;
-  if (error)   return html`<div class="alert alert-error">${escHtml(error)}</div>`;
+  if (error)   return html`<div class="alert alert-error">${error}</div>`;
 
   // ── Main render ────────────────────────────────────────────────────────────
+  // Interpolate text as it is: preact escapes every text child and attribute value itself.
+  // escHtml() here escapes twice and shows &quot; / &amp;. Use escHtml() only on a string that
+  // is written as raw HTML (innerHTML, dangerouslySetInnerHTML, srcdoc).
   // Header pattern: `.page-title` at the top of a standalone view, or
   // `.section-title` + `.section-desc` for each section inside a tab. Buttons use
   // the canonical `.btn-*` classes directly — there is NO `.btn` base class.
@@ -96,7 +100,7 @@ export default function MyView({ navigate }) {
       <div class="section-desc">${t('myview.desc')}</div>
 
       ${data
-        ? html`<p>${escHtml(data.someField)}</p>`
+        ? html`<p>${data.someField}</p>`
         : html`<${EmptyState} text=${t('myview.empty')} />`}
 
       <form onSubmit=${handleSubmit}>

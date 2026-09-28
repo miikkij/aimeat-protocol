@@ -5,6 +5,9 @@
  * @description Portfolio view — builder (select content, generate AI prompt,
  *   upload HTML) and public viewer (sandboxed iframe render).
  * @version-history
+ *   v1.6.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and
+ *     attributes itself, so a display name, bio, promoted app name or pitch with a quote or an
+ *     ampersand showed as &quot; / &amp;. The srcdoc path is unchanged.
  *   v1.6.0 — 2026-07-13 — Split for max-file-lines: builder + prompt builder +
  *     shared helpers extracted to ./portfolio/{builder,prompt,shared}.js; this
  *     file keeps the public viewer and the mode-routing default export.
@@ -48,7 +51,6 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { listApps } from '/js/services/apps.js';
 import { NODE_URL, tr, stampCspNonce, getSession } from './portfolio/shared.js';
 import { onAuthChange } from '/js/services/auth.js';
@@ -185,8 +187,8 @@ function PortfolioViewer({ username, navigate }) {
           const pitch = p.text[getLocale()] || p.text.en || p.text.fi || '';
           return html`
             <a class="portfolio-promoted-card" href=${`${NODE_URL}/v1/apps/${encodeURIComponent(p.owner)}/${encodeURIComponent(p.filename)}?mode=inline`} target="_blank" rel="noopener">
-              <div class="portfolio-promoted-name">${p.icon} ${escHtml(p.name)}</div>
-              ${pitch ? html`<div class="portfolio-promoted-pitch">${escHtml(pitch)}</div>` : ''}
+              <div class="portfolio-promoted-name">${p.icon} ${p.name}</div>
+              ${pitch ? html`<div class="portfolio-promoted-pitch">${pitch}</div>` : ''}
             </a>`;
         })}
       </div>
@@ -219,7 +221,7 @@ function PortfolioViewer({ username, navigate }) {
           <button class="btn-ghost btn-sm" onClick=${() => navigate('/v1/portal')}>
             ← ${t('portfolio.viewer.backToPortal')}
           </button>
-          <span class="portfolio-viewer-owner">${escHtml(data.display_name || username)}'s portfolio</span>
+          <span class="portfolio-viewer-owner">${data.display_name || username}'s portfolio</span>
           ${data.standalone_url && html`
             <a class="btn-ghost btn-sm" href=${data.standalone_url} target="_blank" rel="noopener">
               ${tr('portfolio.viewer.standalone', 'Own address')} ↗
@@ -243,8 +245,8 @@ function PortfolioViewer({ username, navigate }) {
   return html`
     <div class="portfolio-container">
       <div class="portfolio-profile-head">
-        <h2>${escHtml(data.display_name || username)}</h2>
-        <p>${data.bio ? escHtml(data.bio) : t('portfolio.viewer.notFoundDesc')}</p>
+        <h2>${data.display_name || username}</h2>
+        <p>${data.bio ? data.bio : t('portfolio.viewer.notFoundDesc')}</p>
       </div>
       ${promotedBlock}
       <button class="btn-ghost" style="margin-top:1rem;" onClick=${() => navigate('/v1/portal')}>

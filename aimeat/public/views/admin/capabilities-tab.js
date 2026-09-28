@@ -11,6 +11,9 @@
  *   - schemaKeys(schema): summarizes a JSON schema's property keys + types for the compact columns
  *
  * @version-history
+ *   v1.2.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself, so a capability's name, summary, id, owner or usage text with a quote or an ampersand
+ *     showed as &quot; / &amp;.
  *   v1.2.0 — 2026-09-27 — On the library components (page group G5): the search is the Search line
  *     with its count, the table the List whose row opens its Panel in place (a click anywhere on the
  *     row, Enter on its name), the schemas Code blocks that scroll, the facts under them a Row of
@@ -24,7 +27,6 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { num, Badge, Empty, Spinner } from './shared.js';
 import { List, Row, Name, Cell, Num, Panel, SearchLine } from '/components/List.js';
 import { Code, Label } from '/components/Mark.js';
@@ -93,8 +95,8 @@ export default function CapabilitiesTab({ session }) {
         return html`
           <${Row} key=${c.id} faded=${!!override?.disabled} open=${isExp}
             onToggle=${() => setExpanded(isExp ? null : c.id)}>
-            <${Cell} meta clip title=${c.id}>${escHtml(c.id)}<//>
-            <${Name} meta=${c.summary ? escHtml(c.summary) : null} clip>${escHtml(c.name)}<//>
+            <${Cell} meta clip title=${c.id}>${c.id}<//>
+            <${Name} meta=${c.summary || null} clip>${c.name}<//>
             <${Cell} meta clip title=${inputKeys}>${inputKeys || dash}<//>
             <${Cell} meta clip title=${outputKeys}>${outputKeys || dash}<//>
             <${Cell}><${Badge} type=${c.source?.type || 'manual'} /><//>
@@ -107,13 +109,13 @@ export default function CapabilitiesTab({ session }) {
                 <${Schema} label="Output Schema" schema=${c.outputSchema} />
               <//>
               <${Line} wrap gap="large" above="small">
-                <span>Owner: <${Code}>${escHtml(c.ownerGhii || '')}<//></span>
+                <span>Owner: <${Code}>${c.ownerGhii || ''}<//></span>
                 <span>Status: <${Badge} type=${c.status === 'active' ? 'success' : c.status === 'disabled' ? 'danger' : 'warning'} label=${c.status} /></span>
                 <span>Auth: ${c.authRequired}</span>
                 <span>Vouches: ${c.trust?.vouchCount || 0}</span>
                 <span>Avg: ${s.avgResponseMs || 0}ms</span>
               <//>
-              ${c.usage ? html`<${Code} block>${escHtml(c.usage.slice(0,200))}<//>` : null}
+              ${c.usage ? html`<${Code} block>${c.usage.slice(0,200)}<//>` : null}
             <//>` : null}
           <//>`;
       })}

@@ -8,6 +8,8 @@
  *   take the shared ctx so all state/handlers still live in the MemoryTab component. Every part is a
  *   component of the kit that gets data; the file writes no class.
  * @version-history
+ *   v2.0.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself, so a key or a peer URL with an ampersand or a quote showed as &amp; / &quot;.
  *   v2.0.0 -- 2026-09-26 -- On the component kit, class-free (page group G3): a panel is a section
  *     (Card tone="section") with its grey line (HeadDesc); the search is the SearchLine (Enter
  *     searches); loading is the loading line (the words main's Spinner said); an error is the
@@ -37,7 +39,6 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { VisibilityPill } from '../shared.js';
 import { Action } from '/components/Action.js';
 import { Note } from '/components/Note.js';
@@ -219,7 +220,7 @@ export function renderBrowsePanel(ctx) {
                 return html`
                   <${Row} key=${id} open=${isExpanded} onToggle=${() => setExpandedDiscover(isExpanded ? null : id)}
                     panel=${isExpanded ? html`<${DiscoverPreview} ownerGaii=${entry.owner_gaii} memKey=${entry.key} />` : null}>
-                    <${Name} asKey title=${entry.key} meta=${escHtml(ownerShort)}>${escHtml(entry.key)}<//>
+                    <${Name} asKey title=${entry.key} meta=${ownerShort}>${entry.key}<//>
                     <${Desc} clip title=${entry.tags?.length > 0 ? entry.tags.join(', ') : undefined}>${entry.tags?.length > 0 ? entry.tags.join(', ') : ''}<//>
                     <${When}>${formatRelativeTime(entry.updated_at || entry.created_at)}<//>
                     <${Doors}>
@@ -250,7 +251,7 @@ export function renderBrowsePanel(ctx) {
           ? html`<${Note} kind="quiet">${t('profile.memory.noPeers')}<//>`
           : html`<${Select} fit ariaLabel=${t('profile.memory.browseRemoteSelect')} placeholder=${t('profile.memory.browseRemoteSelect')}
               onChange=${(peer) => loadBrowseRemote(ctx, peer)}
-              options=${remotePeers.map(p => [p.node_id, `${escHtml(p.node_id)} (${escHtml(p.url || '')})`])} />`) : null}
+              options=${remotePeers.map(p => [p.node_id, `${p.node_id ?? ''} (${p.url || ''})`])} />`) : null}
 
         ${browseLoading ? html`<${Note} kind="loading">${isHome ? t('profile.memory.loadingHome') : t('profile.memory.loadingRemote')}<//>` : null}
 
@@ -268,7 +269,7 @@ export function renderBrowsePanel(ctx) {
           <${List} cols="name-tags-doors" keepCols empty=${isHome ? t('profile.memory.noHomeEntries') : t('profile.memory.noRemoteEntries')}>
             ${remoteEntries.map(entry => html`
               <${Row} key=${entry.key}>
-                <${Name} asKey title=${entry.key}>${escHtml(entry.key)}<//>
+                <${Name} asKey title=${entry.key}>${entry.key}<//>
                 <${Cell} line>
                   <${VisibilityPill} visibility=${entry.visibility} />
                   ${entry.tags?.length > 0 ? html`<${Note} kind="meta" inline title=${entry.tags.join(', ')}>${entry.tags.join(', ')}<//>` : null}

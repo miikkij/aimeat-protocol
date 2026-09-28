@@ -19,6 +19,9 @@
  * @structure AppsAdminTab (default) · RightNow · FourStates · TakenDown
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v2.2.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself, so an app name, owner or take-down reason with a quote or an ampersand showed as
+ *     &quot; / &amp; in the take-down log, the newest-app line and the take-down and delete dialogs.
  *   v2.2.0 — 2026-09-27 — On the library components (page group G5): the sections are Sections, the
  *     verdict and its five readings the Verdict and Readings, the strip the FigureStrip whose taken-down
  *     and parked figures are filter buttons, the search the Search line with its magnifier, the
@@ -42,7 +45,6 @@ import { h } from 'preact';
 import { useState, useEffect, useCallback, useMemo } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { num, dt, fmtBytes, Badge, Spinner, ErrorBox, useToast, Toast } from './shared.js';
 import { Modal } from '/components/Modal.js';
 import { Section } from '/components/Section.js';
@@ -147,10 +149,10 @@ function TakenDown({ apps, number }) {
         ? html`<${Note} kind="quiet">${A('log.none')}<//>`
         : html`<${Readings} rows=${down.map((a, i) => ({
           key: a.filename,
-          name: escHtml(a.manifest?.name || a.filename),
-          why: a.operator_hide_reason ? `"${escHtml(a.operator_hide_reason)}"` : A('log.noReason'),
+          name: a.manifest?.name || a.filename || '',
+          why: a.operator_hide_reason ? `"${a.operator_hide_reason}"` : A('log.noReason'),
           mark: html`<${Badge} type="critical" label=${A('chip.down')} />`,
-          value: `${dt(a.operator_hidden_at)} · ${escHtml(a.operator_hidden_by || '-')}`,
+          value: `${dt(a.operator_hidden_at)} · ${a.operator_hidden_by || '-'}`,
           last: i === down.length - 1,
         }))} />`}
     <//>`;
@@ -204,7 +206,7 @@ export default function AppsAdminTab() {
       bytes: list.reduce((n, a) => n + (a.size || 0), 0),
       largest: list.reduce((n, a) => Math.max(n, a.size || 0), 0),
       newest: newest
-        ? A('now.newest', { when: dt(newest.created_at), who: escHtml(newest.owner) })
+        ? A('now.newest', { when: dt(newest.created_at), who: newest.owner || '' })
         : A('now.noApps'),
     };
   }, [apps]);
@@ -344,7 +346,7 @@ export default function AppsAdminTab() {
         <${Loud} control disabled=${busy} onClick=${doHide}>${A('takeDown')}<//>`}>
       ${hiding && html`
         <${Stack} gap="medium">
-          <span>${A('hideAsk', { name: escHtml(hiding.name), owner: escHtml(hiding.owner) })}</span>
+          <span>${A('hideAsk', { name: hiding.name || '', owner: hiding.owner || '' })}</span>
           <${Note}>${A('hideExplain')}<//>
           <${TextField} label=${A('reasonLabel')} value=${hiding.reason} placeholder=${A('reasonPh')}
             onInput=${(v) => setHiding({ ...hiding, reason: v })} />
@@ -358,7 +360,7 @@ export default function AppsAdminTab() {
           disabled=${busy || deleting.typed !== deleting.filename} onClick=${doDelete}>${A('deleteForGood')}<//>`}>
       ${deleting && html`
         <${Stack} gap="medium">
-          <span>${A('deleteAsk', { name: escHtml(deleting.name), owner: escHtml(deleting.owner) })}</span>
+          <span>${A('deleteAsk', { name: deleting.name || '', owner: deleting.owner || '' })}</span>
           <${SettingBox} label=${A('deleteWarnLabel')}>
             ${A('deleteWarn')}
           <//>

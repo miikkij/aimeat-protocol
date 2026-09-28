@@ -16,6 +16,9 @@
  * @structure WhichVersion · MenuLinks · OwnHtml · SavedTexts · AskAi · WhatChanged
  * @usage html`<${WhichVersion} hasCustom=${false} source="default" parts=${9} />`
  * @version-history
+ *   v2.0.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself, so a saved text's key or value, a change description or an editor name with a quote
+ *     or an ampersand showed as &quot; / &amp;.
  *   v2.0.0 — 2026-09-27 — Library components only (admin group G2): Section, the List (cuts
  *     n-name-doors, name-desc-doors, tag-name) for the ladder, the texts, the template names and
  *     the versions, Readings for the menu and the change log, MoveButtons for the menu's arrows,
@@ -30,7 +33,6 @@ import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { dt, Badge } from './shared.js';
 import { Section } from '/components/Section.js';
 import { Readings, Reading } from '/components/Readings.js';
@@ -138,14 +140,14 @@ export function SavedTexts({ memKeys, kv, newKey, newVal, onKey, onVal, onAdd, o
           <${List} cols="name-desc-doors" dense>
             ${(memKeys ?? []).map((k) => html`
               <${Row} key=${k.key}>
-                <${Name} asKey>${escHtml(k.key)}<//>
-                <${Desc} clip>${escHtml(String(k.value ?? ''))}<//>
+                <${Name} asKey>${k.key}<//>
+                <${Desc} clip>${String(k.value ?? '')}<//>
                 <${Doors}><${Action} small row soft tone="danger" onClick=${() => onDelete(k.key)}>${P('texts.delete')}<//><//>
               <//>`)}
             ${kvKeys.map((k) => html`
               <${Row} key=${k}>
-                <${Name} asKey>${escHtml(k)}<//>
-                <${Desc} clip>${escHtml(String(kv[k]))}<//>
+                <${Name} asKey>${k}<//>
+                <${Desc} clip>${String(kv[k])}<//>
                 <${Doors}><${Note} kind="meta" inline>${P('texts.fromSettings')}<//><//>
               <//>`)}
           <//>
@@ -202,9 +204,9 @@ export function WhatChanged({ changes, versions, onVersions, onRestore, number }
           key: c.id ?? i,
           name: P('log.action.' + (c.action ?? 'other')) !== 'admin.portal.log.action.' + (c.action ?? 'other')
             ? P('log.action.' + (c.action ?? 'other')) : (c.action ?? ''),
-          why: escHtml(c.description ?? c.detail ?? ''),
+          why: c.description ?? c.detail ?? '',
           mark: html`<${Badge} type="info" label=${c.action ?? ''} />`,
-          value: `${dt(c.changed_at ?? c.changedAt)} · ${escHtml(c.changed_by ?? c.changedBy ?? '-')}`,
+          value: `${dt(c.changed_at ?? c.changedAt)} · ${c.changed_by ?? c.changedBy ?? '-'}`,
           last: i === Math.min(changes.length, 12) - 1,
         }))} />`}
       ${versions !== null && html`
@@ -214,7 +216,7 @@ export function WhatChanged({ changes, versions, onVersions, onRestore, number }
             ${versions.map((v) => html`
               <${Row} key=${v.version}>
                 <${When}>${dt(v.recorded_at)}<//>
-                <${Desc}>${escHtml(v.changed_by ?? '')}<//>
+                <${Desc}>${v.changed_by ?? ''}<//>
                 <${Doors}><${Action} small row soft onClick=${() => onRestore(v.version)}>${P('log.restore')}<//><//>
               <//>`)}
           <//>

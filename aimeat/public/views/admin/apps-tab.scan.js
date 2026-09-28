@@ -16,6 +16,9 @@
  * @structure CopyScan · shot
  * @usage html`<${CopyScan} result=${scan} apps=${apps} scanning=${false} onScan=${fn} />`
  * @version-history
+ *   v1.2.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself, so an app filename, name, owner or viewer with a quote or an ampersand showed as
+ *     &quot; / &amp; in the copy-scan findings and under the screenshots.
  *   v1.2.0 — 2026-09-27 — On the library components (page group G5): the section is a Section with
  *     its scan action, the two findings two columns of Readings under their bold headings, the
  *     picture pair the Shots component, the notes Notes. The file writes no class and no style.
@@ -25,7 +28,6 @@
 import { h } from 'preact';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { dt, num } from './shared.js';
 import { Section } from '/components/Section.js';
 import { Readings } from '/components/Readings.js';
@@ -45,7 +47,7 @@ function shot(key, app, filename, caption) {
     src: app?.screenshot_url || null,
     none: A('scan.noShot'),
     caption,
-    sub: `${escHtml(app ? (app.manifest?.name || app.filename) : filename)} · ${escHtml(app?.owner || A('scan.unknownOwner'))}`,
+    sub: `${(app ? (app.manifest?.name || app.filename) : filename) ?? ''} · ${app?.owner || A('scan.unknownOwner')}`,
   };
 }
 
@@ -70,8 +72,8 @@ export function CopyScan({ result, apps, scanning, onScan, number }) {
             ${hits.length === 0 && html`<${Note} kind="quiet">${A('scan.noEvidence')}<//>`}
             <${Readings} rows=${hits.map((w, i) => ({
               key: i,
-              name: html`${escHtml(w.inApp)} ${A('scan.carries')} ${escHtml(w.watermarkOf)}`,
-              why: A('scan.servedTo', { who: escHtml(w.viewer), when: dt(w.servedAt) }),
+              name: html`${w.inApp} ${A('scan.carries')} ${w.watermarkOf}`,
+              why: A('scan.servedTo', { who: w.viewer || '', when: dt(w.servedAt) }),
               value: '',
               last: i === hits.length - 1,
             }))} />
@@ -91,8 +93,8 @@ export function CopyScan({ result, apps, scanning, onScan, number }) {
               const sameOwner = a && b && a.owner === b.owner;
               return {
                 key: i,
-                name: html`${escHtml(p.a)} ${A('scan.and')} ${escHtml(p.b)}`,
-                why: sameOwner ? A('scan.sameOwner', { who: escHtml(a.owner) }) : A('scan.differentOwners'),
+                name: html`${p.a} ${A('scan.and')} ${p.b}`,
+                why: sameOwner ? A('scan.sameOwner', { who: a.owner || '' }) : A('scan.differentOwners'),
                 value: `${Math.round((p.similarity || 0) * 100)} %`,
                 last: i === pairs.length - 1,
               };

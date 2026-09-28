@@ -8,6 +8,9 @@
  * @structure MembersView (default) — fetch + grid.
  * @usage routed at /v1/members by spa.html.
  * @version-history
+ *   2026-09-28 -- No escHtml() on text preact renders: preact escapes text itself, so a display
+ *     name, GHII or bio with a quote or an ampersand showed as &quot; / &amp;. The identicon's
+ *     dangerouslySetInnerHTML is unchanged.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.0.0 — 2026-06-23 — Initial node member showcase (published-portfolio owners).
  *   v1.1.0 — 2026-07-28 — Say that the reader can be on this page too. It listed other people
@@ -23,7 +26,6 @@ const html = htm.bind(h);
 import { useState, useEffect } from 'preact/hooks';
 import { t } from '/js/i18n.js';
 import { apiGet } from '/js/api.js';
-import { escHtml } from '/js/utils.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { Spinner } from '/components/Spinner.js';
 import { EmptyState } from '/components/EmptyState.js';
@@ -63,11 +65,11 @@ export default function MembersView() {
                     ? html`<div class="mbr-avatar mbr-avatar--emoji">${m.avatar}</div>`
                     : html`<div class="mbr-avatar" dangerouslySetInnerHTML=${{ __html: minidenticon(m.username || 'user') }}></div>`}
                   <div class="mbr-idlines">
-                    <div class="mbr-name">${escHtml(m.display_name || m.username)}</div>
-                    <div class="mbr-ghii" title=${m.ghii || m.username}>${escHtml(m.ghii || m.username)}</div>
+                    <div class="mbr-name">${m.display_name || m.username}</div>
+                    <div class="mbr-ghii" title=${m.ghii || m.username}>${m.ghii || m.username}</div>
                   </div>
                 </div>
-                ${m.bio ? html`<div class="mbr-bio">${escHtml(m.bio)}</div>` : null}
+                ${m.bio ? html`<div class="mbr-bio">${m.bio}</div>` : null}
               </a>`)}
           </div>`}
     </div>`;

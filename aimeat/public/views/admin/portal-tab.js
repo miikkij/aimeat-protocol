@@ -24,6 +24,8 @@
  *   portal-tab.sections.js · PartsList/AddPart from portal-tab.parts.js · PagePreview
  * @usage Mounted by the admin dashboard tab router.
  * @version-history
+ *   v3.0.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself, so a load-balancer origin URL with an ampersand (a query string) showed as &amp;.
  *   v3.0.0 — 2026-09-27 — Library components only (admin group G2): Section, Verdict and Readings,
  *     FigureStrip, SettingBox, Tabs (view) for the three pages, the library's SaveBar for the pinned
  *     row and Beside `stick` for the preview that follows the scroll, Loud and Action for the
@@ -44,7 +46,7 @@ import { h, Fragment } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { escHtml, copyToClipboard } from '/js/utils.js';
+import { copyToClipboard } from '/js/utils.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { num, dt, Badge, Spinner, useToast, Toast } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
@@ -448,7 +450,7 @@ export default function PortalTab({ data, reload }) {
 
       ${isLb && html`
         <${SettingBox} label=${P('lb.title')}>
-          ${P('lb.lead', { origin: escHtml(meta.lb_mode.origin_url || '-') })}
+          ${P('lb.lead', { origin: meta.lb_mode.origin_url || '-' })}
           <${Space} above="medium">
             <${Actions}>
               <${Action} small soft onClick=${doLbSync}>${P('lb.sync')}<//>

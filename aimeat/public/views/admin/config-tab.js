@@ -28,6 +28,9 @@
  *   - fieldEditor — one field's editor by its type
  *   - ConfigTab (default)
  * @version-history
+ *   v3.0.2 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself, so a setting's value, range, the unsaved-changes list (key, old and new value) or the
+ *     save message with a quote or an ampersand showed as &quot; / &amp;.
  *   v3.0.1 -- 2026-09-27 -- Each domain opens with its band across the column again (Section group),
  *     and the index is the rail's light tone, both as main drew them (Jouni).
  *   v3.0.0 -- 2026-09-27 -- Library components only: the page is a SettingsIndex (pinned search and
@@ -55,7 +58,6 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { Badge, Empty, ExpandableHelp, ErrorBox } from './shared.js';
 import { saveConfig, deleteConfig } from '/js/services/admin.js';
 import { DecideKeyTest } from './decide-key-test.js';
@@ -148,12 +150,12 @@ const editedMark = (words) => html`<${Tinted} tone="warn">${words}<//>`;
 
 /** One field's editor, by its type; a field the node does not let this page change says why. */
 function fieldEditor(p, e, val, editable, pending, onChange) {
-  const range = e.range ? html`<${Note} kind="meta" inline mono>${escHtml(e.range)}<//>` : null;
+  const range = e.range ? html`<${Note} kind="meta" inline mono>${e.range}<//>` : null;
   if (!e.mutable) {
     if (typeof e.value === 'boolean') {
       return html`${e.value ? html`<${Badge} type="healthy" /> ${t('dashboard.yesLabel')}` : html`<${Badge} type="critical" /> ${t('dashboard.noLabel')}`}${e.sealed ? html` <${Note} kind="meta" inline>${t('dashboard.cfgSealed')}<//>` : null}`;
     }
-    return html`<${Code}>${escHtml(String(e.value))}<//> <${Note} kind="meta" inline>${e.sealed ? t('dashboard.cfgSealed') : t('dashboard.readOnly')}<//>`;
+    return html`<${Code}>${String(e.value)}<//> <${Note} kind="meta" inline>${e.sealed ? t('dashboard.cfgSealed') : t('dashboard.readOnly')}<//>`;
   }
   if (e.type === 'boolean') {
     return html`<${Check} checked=${val} onChange=${(on) => onChange(p, on)} disabled=${!editable}>${val ? t('dashboard.enabled') : t('dashboard.disabled')}<//>`;
@@ -174,9 +176,9 @@ function fieldEditor(p, e, val, editable, pending, onChange) {
           onInput=${(v) => onChange(p, v)}
           placeholder=${t('dashboard.cfgOnePerLine')} />
         <${Note} kind="meta">${t('dashboard.cfgOnePerLine')}<//>`
-      : html`<${Code}>${escHtml(JSON.stringify(e.value)).substring(0, 100)}...<//>`;
+      : html`<${Code}>${(JSON.stringify(e.value) ?? '').substring(0, 100)}...<//>`;
   }
-  return html`<${Code}>${escHtml(String(e.value))}<//>`;
+  return html`<${Code}>${String(e.value)}<//>`;
 }
 
 export default function ConfigTab({ data, reload }) {
@@ -290,7 +292,7 @@ export default function ConfigTab({ data, reload }) {
 
   const before = html`
     ${editable && showChanges && pendingKeys.length > 0 && html`<${ChangeList} items=${pendingKeys.map(p => ({
-      key: p, code: escHtml(p), was: escHtml(shown(schema[p] && schema[p].value)), now: escHtml(shown(pending[p])),
+      key: p, code: p, was: shown(schema[p] && schema[p].value), now: shown(pending[p]),
     }))} />`}
 
     ${!editable && html`
@@ -304,7 +306,7 @@ export default function ConfigTab({ data, reload }) {
     ${s.sealed && s.sealed.length > 0 && html`<${Note} kind="aside" size="small">${t('dashboard.cfgSealedBanner')}<//>`}
 
     ${result && (result.ok
-      ? html`<${Note} kind="message">${escHtml(result.msg)}<//>`
+      ? html`<${Note} kind="message">${result.msg}<//>`
       : html`<${ErrorBox} message=${result.msg} />`)}`;
 
   const index = domainOrder.map(domain => ({

@@ -5,6 +5,8 @@
  * @description Admin dashboard tab for browsing all agent tasks across all owners.
  *   Provides status filtering, pagination, and TODO progress display.
  * @version-history
+ *   v1.2.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself, so a task title or agent GAII with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.2.0 -- 2026-09-27 -- On the library components (page group G5): the status filter is the
  *     Select, the refresh the loud action, the table the List with its heading row, the status the
  *     Status mark in its tone (done fine, failed danger, active and stalled attention, queued and
@@ -20,7 +22,6 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { dt, Empty, StatsGrid } from './shared.js';
 import { apiGet } from '/js/api.js';
 import { List, Row, Name, Cell, Num, When } from '/components/List.js';
@@ -104,8 +105,8 @@ export default function AgentTasksTab() {
       <${List} cols="id-name-state-n-when-when" head=${head} labels>
         ${tasks.map(task => html`
           <${Row} key=${task.id || task.title + task.created_at}>
-            <${Cell} meta>${escHtml(task.agent_gaii)}<//>
-            <${Name}>${escHtml(task.title)}<//>
+            <${Cell} meta>${task.agent_gaii}<//>
+            <${Name}>${task.title}<//>
             <${Cell}><${Mark} kind="status" tone=${statusTone(task.status)}>${task.status}<//><//>
             <${Num}>
               ${task.todo_progress.total > 0

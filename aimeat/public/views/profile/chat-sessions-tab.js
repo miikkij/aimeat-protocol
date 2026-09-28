@@ -6,6 +6,7 @@
  *   Shows active sessions, allows creating new ones via prompt copy, and
  *   removing existing sessions.
  * @version-history
+ *   v1.16.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes itself, so names with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.16.0 -- 2026-09-26 -- Every part is a component that takes data (page group G5): the head is the SettingsPage, the create card the Card's section tone, the sessions the List whose row opens its panel (the Facts, the copy and the remove at its foot), the copy the Action's copy; it writes no class.
  *   v1.15.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
  *   v1.14.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
@@ -48,7 +49,7 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml, timeAgo, copyToClipboard } from '/js/utils.js';
+import { timeAgo, copyToClipboard } from '/js/utils.js';
 import { LoadingLine } from './shared.js';
 import { PageSection } from '/components/PageSection.js';
 import { useConfirm } from '/components/Modal.js';
@@ -166,8 +167,8 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
             <${ListRow} key=${s.name} open=${isExpanded} onToggle=${() => toggleExpand(s.name)}
               panel=${html`
                   <${Facts} rows=${[
-                    { k: 'GAII', v: escHtml(s.gaii || '-'), mono: true },
-                    s.description && { k: t('profile.chatSessions.description'), v: escHtml(s.description) },
+                    { k: 'GAII', v: s.gaii || '-', mono: true },
+                    s.description && { k: t('profile.chatSessions.description'), v: s.description },
                     { k: t('profile.chatSessions.trust'), v: s.trust_score ?? '-' },
                     { k: t('profile.chatSessions.balance'), v: `${s.morsel_balance ?? '-'} morsels` },
                     s.roles && { k: t('profile.chatSessions.roles'), v: (s.roles || []).join(', ') },
@@ -179,9 +180,9 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
                       disabled=${deleting === s.name}>
                       ${deleting === s.name ? '...' : t('profile.chatSessions.remove')}
                     <//>`}>
-              <${Name}>${escHtml(s.display_name || s.name || '-')}<//>
+              <${Name}>${s.display_name || s.name || '-'}<//>
               <${Desc}>${t('profile.chatSessions.lastSeen')}: ${s.last_seen ? timeAgo(s.last_seen) : '-'}<//>
-              <${Doors}><${Mark}>${escHtml(s.name || '')}<//><${Icon} small>${isExpanded ? '\u25BC' : '\u25B6'}<//><//>
+              <${Doors}><${Mark}>${s.name || ''}<//><${Icon} small>${isExpanded ? '\u25BC' : '\u25B6'}<//><//>
             <//>
           `;
         })}

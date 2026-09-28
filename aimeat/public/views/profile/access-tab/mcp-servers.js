@@ -21,6 +21,8 @@
  * @structure McpServersSection — GET /v1/mcp-servers, attach, switch off, remove, and the tool list
  *   on demand.
  * @version-history
+ *   v1.10.2 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself, so names with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.10.1 — 2026-09-26 — A server's name turns coral under the pointer again, as main's
  *     .mem-item:hover drew it (Row hover; fix pass).
  *   v1.10.0 — 2026-09-26 — Every part is a component that takes data, and the file writes no class
@@ -53,7 +55,6 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
 import { List, Row, Name, Doors } from '/components/List.js';
 import { Action, Loud, Actions } from '/components/Action.js';
@@ -265,8 +266,8 @@ export function McpServersSection({ showToast, inRow }) {
               ? tools.map(x => x.name).join(', ')
               : (t('profile.access.mcpNoTools') || 'This server offers no tools right now.')}
           <//>` : null}>
-          <${Name} asKey meta=${`${escHtml(s.slug)} · ${(t('profile.access.mcpToolCount') || '{n} tools')
-            .replace('{n}', String(s.toolCount))}${statusNote(s) ? ' · ' + statusNote(s) : ''}`}>${escHtml(s.title || s.slug)}<//>
+          <${Name} asKey meta=${`${s.slug ?? ''} · ${(t('profile.access.mcpToolCount') || '{n} tools')
+            .replace('{n}', String(s.toolCount))}${statusNote(s) ? ' · ' + statusNote(s) : ''}`}>${s.title || s.slug}<//>
           <${Doors}>
             ${s.status === 'needs_reauth' && html`
               <${Action} small row disabled=${busy === s.id} onClick=${() => authorize(s)}>

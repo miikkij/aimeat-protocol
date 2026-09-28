@@ -12,6 +12,8 @@
  * @structure extractUrls(text,max) · useSeenInViewport(ref) · LinkPreview({url,onDismiss}) · MessageLinkPreviews({msg})
  * @usage html`<${MessageLinkPreviews} msg=${msg} />`
  * @version-history
+ *   v1.2.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text itself, so a
+ *     site name, title or description with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.2.0 — 2026-09-27 — Draws its own names: .inbox-linkcards is .link-preview-list,
  *     .inbox-linkcard(-main/-thumb/-text/-site/-title/-desc) is .link-preview(-…), and the ✕
  *     .inbox-linkcard-x is .link-preview-hide; the rules moved with them out of css/views/inbox.css
@@ -26,7 +28,6 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import * as unfurl from '/js/services/unfurl.js';
 
 /** True once `ref`'s element has been near the viewport (within 200px) at least once, then stays true.
@@ -99,9 +100,9 @@ export function LinkPreview({ url, onDismiss }) {
       <a class="link-preview-main" href=${meta.resolvedUrl || url} target="_blank" rel="noopener noreferrer nofollow">
         ${imgUrl ? html`<span class="link-preview-thumb"><img src=${imgUrl} alt="" loading="lazy" /></span>` : null}
         <span class="link-preview-text">
-          ${meta.siteName ? html`<span class="link-preview-site">${escHtml(meta.siteName)}</span>` : null}
-          ${meta.title ? html`<span class="link-preview-title">${escHtml(meta.title)}</span>` : null}
-          ${meta.description ? html`<span class="link-preview-desc">${escHtml(meta.description)}</span>` : null}
+          ${meta.siteName ? html`<span class="link-preview-site">${meta.siteName}</span>` : null}
+          ${meta.title ? html`<span class="link-preview-title">${meta.title}</span>` : null}
+          ${meta.description ? html`<span class="link-preview-desc">${meta.description}</span>` : null}
         </span>
       </a>
       <button class="link-preview-hide" title=${t('inbox.linkPreview.hide')}

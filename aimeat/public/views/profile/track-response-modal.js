@@ -13,6 +13,9 @@
  * @structure TrackResponseModal({ open, msg, onClose, onDone, showToast, defaultMode, allowPark })
  * @usage import { TrackResponseModal } from '/views/profile/track-response-modal.js';
  * @version-history
+ *   v1.7.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself, so an organism, workspace or record type name with a quote or an ampersand showed as
+ *     &quot; / &amp; in the pickers.
  *   v1.7.0 — 2026-09-26 — Every part is a component that takes data: the footer's ways are Action
  *     and Loud (the spinner on Create is components/Spinner.js), the waiting block is ProgressNow,
  *     the form is Fields with Select, TextField and TextArea (the label over each field is the row
@@ -33,7 +36,6 @@ import { useState, useEffect, useRef, useMemo } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { Modal } from '/components/Modal.js';
 import { Spinner } from '/components/Spinner.js';
 import * as tracked from '/js/services/tracked-responses.js';
@@ -186,20 +188,20 @@ export function TrackResponseModal({ open, msg, onClose, onDone, showToast, defa
       ${phase === 'error' ? html`
         <${Stack} gap="medium">
           <${Note}>${t('inbox.trackNeedsAi')}<//>
-          ${aiErr?.message ? html`<${Note} kind="message" error>${escHtml(aiErr.message)}<//>` : null}
+          ${aiErr?.message ? html`<${Note} kind="message" error>${aiErr.message}<//>` : null}
         <//>` : null}
 
       ${phase === 'review' ? html`
         <${Fields}>
           <${Note}>${t('inbox.trackHintAi')}<//>
           <${Select} label=${t('inbox.trackOrganism')} value=${orgId} onChange=${(v) => { setOrgId(v); setWsId(''); }}
-            options=${orgs.map(o => [o.id, escHtml(o.name || o.id)])} />
+            options=${orgs.map(o => [o.id, o.name || o.id])} />
           <${Select} label=${t('inbox.trackWorkspace')} value=${wsId} onChange=${(v) => setWsId(v)} disabled=${!orgId}
             placeholder=${t('inbox.trackChoose')}
-            options=${workspaces.map(w => [w.id, escHtml(w.name || w.id)])} />
+            options=${workspaces.map(w => [w.id, w.name || w.id])} />
           <${Select} label=${t('inbox.trackType')} value=${namespace} onChange=${(v) => setNamespace(v)} disabled=${!recTypes.length}
             placeholder=${recTypes.length === 0 ? t('inbox.trackNoTypes') : null}
-            options=${recTypes.map(tp => [tp.namespace, escHtml(tp.name)])} />
+            options=${recTypes.map(tp => [tp.namespace, tp.name])} />
           <${TextField} label=${t('inbox.trackTitle')} type="text" value=${title} onInput=${(v) => setTitle(v)} />
           <${TextArea} label=${t('inbox.trackContent')} rows=${4} value=${content} onInput=${(v) => setContent(v)} />
           <${Select} label=${t('inbox.trackReplyMode')} value=${replyMode} onChange=${(v) => setReplyMode(v)}

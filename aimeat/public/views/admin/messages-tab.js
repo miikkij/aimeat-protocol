@@ -9,6 +9,9 @@
  * @structure MessagesTab (default) — fetches GET /v1/admin/messages/stats, re-fetches on live updates.
  * @usage Registered in admin.js NAV_GROUPS (Data group).
  * @version-history
+ *   v1.1.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself, and the DataTable cells here are text cells, so a node id, origin or delivery error
+ *     with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.1.0 -- 2026-09-27 -- On the library components (page group G5): the page is a Section with its
  *     Note, the two tables the admin DataTable, a count or a status in its state colour (Tinted), the
  *     headings SubHeadings, the empty lines quiet Notes, the error the ErrorNote. No class, no style.
@@ -21,7 +24,6 @@ import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { date as fmtDate } from '/js/format.js';
-import { escHtml } from '/js/utils.js';
 import { StatsGrid, Spinner, DataTable } from './shared.js';
 import { Section } from '/components/Section.js';
 import { SubHeading } from '/components/SubHeading.js';
@@ -58,7 +60,7 @@ export default function MessagesTab() {
   useEffect(() => { load(); }, [load]);
   useEffect(() => onLiveUpdate(['messages', 'agent-messages'], () => load()), [load]);
 
-  if (err) return html`<${ErrorNote} text=${escHtml(err)} />`;
+  if (err) return html`<${ErrorNote} text=${err} />`;
   if (!data) return html`<${Spinner} text=${t('common.loading') || 'Loading…'} />`;
 
   const s = data.stats || { total: 0, total24h: 0, byStatus: {}, byStatus24h: {}, topTargetNodes: [] };
@@ -89,7 +91,7 @@ export default function MessagesTab() {
         : html`<${DataTable}
             headers=${[t('admin.messages.node') || 'Node', t('admin.messages.totalCol') || 'Total', t('admin.messages.failedCol') || 'Failed']}
             rows=${s.topTargetNodes.map(n => [
-              { text: escHtml(n.nodeId), mono: true },
+              { text: n.nodeId, mono: true },
               n.total,
               n.failed > 0 ? html`<${Tinted} tone="danger">${n.failed}<//>` : n.failed,
             ])} />`}
@@ -102,10 +104,10 @@ export default function MessagesTab() {
               t('admin.messages.statusCol') || 'Status', t('admin.messages.detail') || 'Detail']}
             rows=${recent.map(r => [
               relTime(r.createdAt),
-              escHtml(r.origin),
-              { text: escHtml(r.targetNodeId), mono: true },
-              html`<${Tinted} tone=${statusTone(r.status)}>${escHtml(r.status)}<//>`,
-              { text: escHtml([r.httpStatus ? `http ${r.httpStatus}` : '', r.errorMessage || '', `${r.latencyMs}ms`].filter(Boolean).join(' · ')), mono: true },
+              r.origin,
+              { text: r.targetNodeId, mono: true },
+              html`<${Tinted} tone=${statusTone(r.status)}>${r.status}<//>`,
+              { text: [r.httpStatus ? `http ${r.httpStatus}` : '', r.errorMessage || '', `${r.latencyMs}ms`].filter(Boolean).join(' · '), mono: true },
             ])} />`}
     <//>`;
 }

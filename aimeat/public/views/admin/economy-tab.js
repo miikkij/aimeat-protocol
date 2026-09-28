@@ -9,6 +9,8 @@
  *   the daily cap is. Every policy row carries a sentence about what it does.
  * @structure EconomyTab — strip · morsels · trade · money · grant form
  * @version-history
+ *   v3.0.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself, so a mint error message with a quote or an ampersand showed as &quot; / &amp;.
  *   v3.0.0 — 2026-09-27 — Library components only: the strip is the FigureStrip (the inflation
  *     figure in coral when it is high), the sections Section with their sub-words as the count, the
  *     policy rows Readings in Columns, the grant form TextFields and the Loud action with its
@@ -24,7 +26,7 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
-import { escHtml, fmtMoney } from '/js/utils.js';
+import { fmtMoney } from '/js/utils.js';
 import { num, Spinner } from './shared.js';
 import { mintMorsels } from '/js/services/admin.js';
 import { Section } from '/components/Section.js';
@@ -144,7 +146,7 @@ export default function EconomyTab({ data, reload }) {
       <//>
       <${FormActions}>
         <${Loud} control onClick=${doMint}>${t('dashboard.mint')}<//>
-        ${mintResult && html`<${Note} kind="message" error=${!mintResult.ok}>${escHtml(mintResult.msg)}<//>`}
+        ${mintResult && html`<${Note} kind="message" error=${!mintResult.ok}>${mintResult.msg}<//>`}
       <//>
     <//>
   `;

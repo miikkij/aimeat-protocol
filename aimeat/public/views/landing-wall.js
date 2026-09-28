@@ -13,6 +13,8 @@
  * @structure EyeMark · fmtPublished · WALL_FIRST_PAGE · Gallery · StatsPanel
  * @usage import { Gallery, StatsPanel } from './landing-wall.js';
  * @version-history
+ *   v1.1.2 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text itself, so an
+ *     app name, icon, description or author with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.1.1 -- 2026-09-24 -- The screenshots carry an alt that names the app.
  *   v1.1.0 -- 2026-09-13 -- V2: compose the search field with the shared poster frame.
  *   v1.0.0 — 2026-08-26 — Pure extraction from landing.js v5.3.0. No behaviour change.
@@ -22,7 +24,6 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { openAppSandboxed } from '/js/app-sandbox.js';
 import { storeHref } from '/js/site.js';
 import { swallowed } from '/js/swallowed.js';
@@ -159,11 +160,11 @@ export function Gallery() {
                 <div key=${a.owner + '/' + a.filename} class="ld-app-card" role="button" tabindex="0"
                   onClick=${open} onKeyDown=${(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } }}>
                   ${a.screenshot_url ? html`<img class="ld-app-shot" src=${a.screenshot_url} loading="lazy" alt=${shotAlt(m.name || a.filename)} />` : ''}
-                  <div class="ld-app-name">${m.icon ? escHtml(m.icon) + ' ' : ''}${escHtml(m.name || a.filename)}</div>
-                  ${desc && html`<div class="ld-app-desc">${escHtml(desc)}</div>`}
+                  <div class="ld-app-name">${m.icon ? m.icon + ' ' : ''}${m.name || a.filename}</div>
+                  ${desc && html`<div class="ld-app-desc">${desc}</div>`}
                   <div class="ld-app-foot">
                     <span class="ld-app-facts">${facts.map((f, i) => html`${i ? html`<span class="ld-app-sep">·</span>` : ''}${f}`)}</span>
-                    <span class="ld-app-by">${escHtml(author)}${when ? ' · ' + when : ''}</span>
+                    <span class="ld-app-by">${author}${when ? ' · ' + when : ''}</span>
                   </div>
                 </div>`;
             })}

@@ -5,6 +5,11 @@
  * @description Agent Defaults section — owner-level default rules and token
  *   budget for agents. Mounted at the foot of the Your agents page.
  * @version-history
+ *   v1.11.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself, so rules with a quote or an ampersand showed as &quot; / &amp;. A rule is the server's
+ *     { id, description } object, so the rows show its description (they showed "[object Object]", and
+ *     once escHtml was gone preact wrote into the object and Save failed on a circular structure), and
+ *     a new rule is sent in that shape (a string rule was refused with 400).
  *   v1.11.0 -- 2026-09-26 -- Every part is a component that takes data (page group G1a): the headings
  *     are SubHeading, the two boxes are the section card, the rules and the token budget are the
  *     List's rows with the name in the key's face (asKey), the new rule is the TextField with its Add
@@ -36,7 +41,6 @@ import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { getOwnerDefaults, upsertOwnerDefaults } from '/js/services/agent-directives.js';
 import { swallowed } from '/js/swallowed.js';
 import { num } from '/js/format.js';
@@ -47,6 +51,10 @@ import { Action, Loud } from '/components/Action.js';
 import { List, Row as ListRow, Name, Cell, Doors } from '/components/List.js';
 import { Field, Fields, FormActions } from '/components/Field.js';
 import { TextField } from '/components/TextField.js';
+
+/** A rule as the server stores it is { id, description, details? } (models/agent-directives-schemas.ts).
+ *  Its text is the description. A plain string is still read, in case an older record holds one. */
+const ruleText = (rule) => (typeof rule === 'string' ? rule : (rule?.description || rule?.id || ''));
 
 export function AgentDefaultsSection({ showToast, initial }) {
   const [defaults, setDefaults] = useState(initial?.defaults ?? null);   // seeded from /v1/access/overview; else self-loads
@@ -114,7 +122,10 @@ export function AgentDefaultsSection({ showToast, initial }) {
 
   const addRule = useCallback(() => {
     if (!newRule.trim()) return;
-    setEditRules(prev => [...prev, newRule.trim()]);
+    // The server accepts only { id, description }: a string rule was refused with 400, so a rule added
+    // here could never be saved.
+    const description = newRule.trim();
+    setEditRules(prev => [...prev, { id: `rule-${Date.now().toString(36)}`, description }]);
     setNewRule('');
   }, [newRule]);
 
@@ -143,7 +154,7 @@ export function AgentDefaultsSection({ showToast, initial }) {
           empty=${`${t('profile.access.adNoRules') || 'No default rules set.'} ${t('profile.access.adRuleExample') || 'Example: "Always answer in Finnish" or "Never spend morsels without asking".'}`}>
           ${rules.map((rule, i) => html`
             <${ListRow} key=${i}>
-              <${Name} asKey>${escHtml(rule)}<//>
+              <${Name} asKey>${ruleText(rule)}<//>
               <${Cell} />
             <//>
           `)}
@@ -168,7 +179,7 @@ export function AgentDefaultsSection({ showToast, initial }) {
             <${List} cols="name-doors" dense>
               ${editRules.map((rule, i) => html`
                 <${ListRow} key=${i}>
-                  <${Name} asKey>${escHtml(rule)}<//>
+                  <${Name} asKey>${ruleText(rule)}<//>
                   <${Doors}>
                     <${Action} small tone="danger" onClick=${() => removeRule(i)}>
                       ${t('profile.access.adRemoveRule') || 'Remove'}

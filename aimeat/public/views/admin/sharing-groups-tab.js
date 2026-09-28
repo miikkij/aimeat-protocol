@@ -10,6 +10,9 @@
  *     (rows/headers model); cell content preserved verbatim.
  *   v1.2.0 -- 2026-09-27 -- On the library components (page group G5): the owner is the table's own
  *     typewriter cell, the date the dim Tinted; the page writes no class and no style.
+ *   v1.2.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself, and the DataTable cells here are text cells, so a group name or owner with a quote or
+ *     an ampersand showed as &quot; / &amp;.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -17,7 +20,6 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { num, dt, Empty, StatsGrid, DataTable } from './shared.js';
 import { apiGet } from '/js/api.js';
 import { Tinted } from '/components/Figure.js';
@@ -57,8 +59,8 @@ export default function SharingGroupsTab() {
       <${DataTable}
         headers=${[t('dashboard.sharingGroupsName'), t('dashboard.sharingGroupsOwner'), t('dashboard.sharingGroupsMembers'), t('dashboard.sharingGroupsEntries'), t('dashboard.sharingGroupsCreated')]}
         rows=${groups.map(g => [
-          escHtml(g.name),
-          { text: escHtml(g.owner_gaii), mono: true },
+          g.name,
+          { text: g.owner_gaii, mono: true },
           num(g.member_count),
           num(g.entry_count),
           html`<${Tinted} tone="dim">${dt(g.created_at)}<//>`,

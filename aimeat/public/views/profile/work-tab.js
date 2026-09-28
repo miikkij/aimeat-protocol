@@ -6,6 +6,8 @@
  *   Displays inbox (received) and sent work items with accept/decline/deliver actions
  *   and a rating modal for completed deliveries.
  * @version-history
+ *   v1.16.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself, so a work description with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.16.0 -- 2026-09-26 -- Every part is a component that gets data (component plan, page group G4): the page frame
  *     (SettingsPage), the view tabs (Tabs bar), the list (List, Row, Name, Desc, Doors), the state (Mark status), the
  *     ways on (Loud, Action), the dialogs' words (Note, TextArea) and the stars to give (components/Stars.js, now
@@ -46,7 +48,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Modal } from '/components/Modal.js';
-import { escHtml, timeAgo } from '/js/utils.js';
+import { timeAgo } from '/js/utils.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { Tabs, TabPanel } from '/components/Tabs.js';
 import { List, Row, Name, Desc, Doors } from '/components/List.js';
@@ -183,9 +185,9 @@ export default function WorkTab({ session, showToast, onStats }) {
 
       return html`
         <${Row} key=${tc}>
-          <${Name}>${escHtml(w.description || w.action_name || '-')}<//>
+          <${Name}>${w.description || w.action_name || '-'}<//>
           <${Desc}>
-            ${type === 'sent' ? t('profile.work.provider') + ': ' + escHtml(w.provider_gaii || '-') : t('profile.work.from') + ': ' + escHtml(w.requester_gaii || '-')}
+            ${type === 'sent' ? t('profile.work.provider') + ': ' + (w.provider_gaii || '-') : t('profile.work.from') + ': ' + (w.requester_gaii || '-')}
             ${w.price_morsels != null ? ' \u2502 ' + t('profile.work.cost') + ': ' + w.price_morsels + ' \u2764\uFE0F' : ''}
             ${w.created_at ? ' \u2502 ' + timeAgo(w.created_at) : ''}
           <//>
@@ -247,7 +249,7 @@ function RateModal({ desc, onSubmit, onCancel }) {
         <${Action} onClick=${onCancel}>${t('profile.cancel')}<//>
         <${Loud} control onClick=${() => onSubmit(rating, comment)}>${t('profile.work.submitRating')}<//>`}>
       <${Stack} gap="large">
-        <${Note}>${t('profile.work.rateDesc')} ${escHtml(desc || '')}<//>
+        <${Note}>${t('profile.work.rateDesc')} ${desc || ''}<//>
         <${Stars} value=${rating} onPick=${setRating} label=${t('profile.work.rateTitle')} />
         <${TextArea} label=${t('profile.work.commentLabel')} rows=${2} value=${comment} onInput=${setComment} />
       <//>
@@ -264,7 +266,7 @@ function DeliverModal({ desc, loading, onSubmit, onCancel }) {
           ${loading ? t('profile.work.delivering') : t('profile.work.deliver')}
         <//>`}>
       <${Stack} gap="large">
-        <${Note}>${t('profile.work.delivering')}: ${escHtml(desc || '')}<//>
+        <${Note}>${t('profile.work.delivering')}: ${desc || ''}<//>
         <${TextArea} label=${t('profile.work.commentLabel')} rows=${4} placeholder="Describe the completed work or attach results..."
           value=${result} onInput=${setResult} />
       <//>

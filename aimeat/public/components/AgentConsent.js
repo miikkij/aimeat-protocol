@@ -21,6 +21,8 @@
  *   import { AgentConsent } from '/components/AgentConsent.js';
  *   html`<${AgentConsent} requests=${pending} onApprove=${fn} onDeny=${fn} />`
  * @version-history
+ *   v1.4.2 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text itself, so an
+ *     agent name, display name or boundary line with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.4.1 — 2026-09-27 — Draws only its own class names, its look in
  *     css/components/agent-consent.css: the panel .agent-consent (--inline in Settings, --step on the
  *     home; formerly .agent-cta .mb-1 .agc / .agc .agc-step), the card .agent-consent-card (formerly
@@ -58,7 +60,6 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { SCOPE_TEMPLATES, templateLabel } from '/views/profile/agents/scope-config.js';
 import { presetSummary, requestedSummary, boundaryLines } from '/js/consent-vocab.js';
 
@@ -110,7 +111,7 @@ function ConsentCard({ req, onApprove, onDeny, busy, variant }) {
       <div class="agent-consent-field">
         <div class="agent-consent-label">${t('profile.agents.pendingRequests.agentName')}</div>
         <div>
-          ${escHtml(req.agent_name)}${req.display_name ? ` (${escHtml(req.display_name)})` : ''}
+          ${req.agent_name}${req.display_name ? ` (${req.display_name})` : ''}
         </div>
       </div>
 
@@ -151,7 +152,7 @@ function ConsentCard({ req, onApprove, onDeny, busy, variant }) {
                 ? ` (${req.current_scopes.join(', ')})` : ''}
             </p>`}
           <ul class="agent-consent-caption agent-consent-boundary">
-            ${boundaryLines(t).map(line => html`<li key=${line}>${escHtml(line)}</li>`)}
+            ${boundaryLines(t).map(line => html`<li key=${line}>${line}</li>`)}
           </ul>
         </div>
         <div class="agent-consent-actions">

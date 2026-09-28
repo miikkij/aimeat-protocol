@@ -6,6 +6,8 @@
  *   permission checkboxes, read-only view for non-owners. Extracted from ../agents-tab.js
  *   to satisfy max-file-lines.
  * @version-history
+ *   v1.15.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
+ *     itself, so names with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.15.0 — 2026-09-26 — Every part is a component that takes data (page group G1a): the dialog's
  *     width is its md size (the page's 620px override goes), the address is Code with the envelope as
  *     the Icon link to the inbox thread, the presets are Tabs, "Advanced" a fold Tab, each area a
@@ -45,7 +47,6 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { inboxLinkHref } from '/components/InboxLink.js';
 import { Modal } from '/components/Modal.js';
 import {
@@ -123,14 +124,14 @@ export default function ScopesModal({ agent, session, onSave, onCancel }) {
           ${saving ? t('profile.agents.scopeUi.saving') : t('profile.agents.scopeUi.save')}
         <//>`}>
         <${Row} gap="medium" below="large">
-          <${Code}>${escHtml(agent.gaii || '')}<//>
+          <${Code}>${agent.gaii || ''}<//>
           ${agent.gaii ? html`<${Icon} small href=${inboxLinkHref(agent.gaii)} label=${t('inbox.messageThis')}>${MAIL_ICON}<//>` : null}
         <//>
 
         ${isReadOnly ? html`
           <${Note}>${t('profile.agents.scopeUi.readOnlyView')}<//>
           <${Marks}>
-            ${scopes.map(s => html`<${Mark} key=${s}>${escHtml(s)}<//>`)}
+            ${scopes.map(s => html`<${Mark} key=${s}>${s}<//>`)}
           <//>
         ` : html`
           <${Space} below="large">
@@ -181,7 +182,7 @@ export default function ScopesModal({ agent, session, onSave, onCancel }) {
                 <${List} cols="check-name-desc" keepCols dense>
                   ${unknown.map(scope => html`
                     <${ListRow} key=${scope} picked=${checked.has(scope)} pickLabel=${scope} onPick=${() => toggleScope(scope)}>
-                      <${Name} code>${escHtml(scope)}<//>
+                      <${Name} code>${scope}<//>
                       <${Cell} />
                     <//>`)}
                 <//>
