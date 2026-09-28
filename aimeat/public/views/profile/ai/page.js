@@ -12,6 +12,7 @@
  *   secConsumers
  * @usage import { renderPage } from './ai/page.js';
  * @version-history
+ *   v1.27.0 -- 2026-09-28 -- Three sections after the connection: 02 the providers, 03 the routing, 04 the model policy (ai/providers.js, System 2); the sections after them are 05 to 08.
  *   v1.26.0 -- 2026-09-26 -- Every part is a kit component (SettingsPage with its head, strip and rail as data; FigureStrip; Facts with a value left to the model grey; Meter; List; More; Box; Tabs; TextField, Select, Check; Label; Note; Action; Layout): the page passes data and writes no class. The key field stays hidden with no eye, kept out of password managers, as on main (page group G8).
  *   v1.25.0 -- 2026-09-26 -- The provider's radio dots and the retry check box carry the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
  *   v1.24.0 -- 2026-09-26 -- The figure on the budget bar is the Meter's figure (.poster-meter-figure), the Wallet meter's look (a unification: the lead's ruling on a figure written on a meter).
@@ -71,6 +72,7 @@ import { Action, Loud, Actions } from '/components/Action.js';
 import { Row as Line } from '/components/Layout.js';
 import { x, ROLES, money, compact, dateWord, crumb, pageLinks } from './frame.js';
 import { roleRow, appRow } from './rows.js';
+import { secProviders, secRouting, secPolicy } from './providers.js';
 import { Hint } from '/components/Hint.js';
 
 const SHOWN = 8;
@@ -89,16 +91,22 @@ export function renderPage(ctx) {
       railTitle=${x('railTitle')}
       sections=${[
         { id: 'ai-connection', num: '01', label: x('secConnection'), count: '' },
-        { id: 'ai-models', num: '02', label: x('secModels'), count: s ? `${chosen} / ${ROLES.length}` : '' },
-        { id: 'ai-budget', num: '03', label: x('secBudget'), count: ctx.usage ? x('perDayShort', { n: money(ctx.usage.daily_budget_usd) }) : '' },
-        { id: 'ai-params', num: '04', label: x('secParams'), count: '' },
-        { id: 'ai-consumers', num: '05', label: x('secConsumers'), count: '' },
+        { id: 'ai-providers', num: '02', label: x('pv.title'), count: ctx.pv.view ? String(ctx.pv.providers.length) : '' },
+        { id: 'ai-routing', num: '03', label: x('rt.title'), count: '' },
+        { id: 'ai-policy', num: '04', label: x('pol.title'), count: ctx.pv.policy ? x('pol.mode.' + (ctx.pv.policy.policy?.mode || 'open')) : '' },
+        { id: 'ai-models', num: '05', label: x('secModels'), count: s ? `${chosen} / ${ROLES.length}` : '' },
+        { id: 'ai-budget', num: '06', label: x('secBudget'), count: ctx.usage ? x('perDayShort', { n: money(ctx.usage.daily_budget_usd) }) : '' },
+        { id: 'ai-params', num: '07', label: x('secParams'), count: '' },
+        { id: 'ai-consumers', num: '08', label: x('secConsumers'), count: '' },
       ]}
       pagesLabel=${x('pages')}
       pages=${pageLinks(ctx.navigate)}
       after=${html`<${ctx.ConfirmUI} />`}>
       ${loading ? html`<${Note} kind="loading">${x('loading')}<//>` : html`
         ${secConnection(ctx)}
+        ${secProviders(ctx, '02')}
+        ${secRouting(ctx, '03')}
+        ${secPolicy(ctx, '04')}
         ${secModels(ctx, chosen)}
         ${secBudget(ctx)}
         ${secParams(ctx)}
@@ -175,7 +183,7 @@ function secConnection(ctx) {
 
 function secModels(ctx, chosen) {
   return html`
-    <${PageSection} id="ai-models" num="02" title=${x('secModels')} count=${x('secModelsSub', { n: chosen, total: ROLES.length })}>
+    <${PageSection} id="ai-models" num="05" title=${x('secModels')} count=${x('secModelsSub', { n: chosen, total: ROLES.length })}>
       ${ctx.modelsError ? html`<${Note} kind="message" error>${ctx.modelsError}<//>` : null}
       <${List} cols="name-who-desc-doors" head=${[x('colRole'), x('colModel'), x('colWhat'), '']}>
         ${ROLES.map((role) => roleRow(ctx, role))}
@@ -191,7 +199,7 @@ function secModels(ctx, chosen) {
 function secBudget(ctx) {
   const u = ctx.usage;
   const r = ctx.roll;
-  if (!u) return html`<${PageSection} id="ai-budget" num="03" title=${x('secBudget')} count=${null}><${Note} kind="loading">${x('loading')}<//><//>`;
+  if (!u) return html`<${PageSection} id="ai-budget" num="06" title=${x('secBudget')} count=${null}><${Note} kind="loading">${x('loading')}<//><//>`;
   const budget = Number(u.daily_budget_usd) || 0;
   const spent = Number(u.spent_today_usd) || 0;
   const pct = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
@@ -214,7 +222,7 @@ function secBudget(ctx) {
     ? html`<${Loud} control disabled=${ctx.busy === 'caps'} onClick=${() => ctx.saveCaps()}>${x('saveCaps')}<//><${Action} small soft onClick=${() => ctx.setCapsEditing(false)}>${x('cancel')}<//>`
     : html`<${Action} small soft onClick=${() => ctx.setCapsEditing(true)}>${x('setCaps')}<//>`;
   return html`
-    <${PageSection} id="ai-budget" num="03" title=${x('secBudget')} count=${x('secBudgetSub', { n: money(budget), today: money(spent) })}>
+    <${PageSection} id="ai-budget" num="06" title=${x('secBudget')} count=${x('secBudgetSub', { n: money(budget), today: money(spent) })}>
       <${Facts} rows=${[
         { k: x('dailyBudget'), v: budgetValue },
         { k: x('monthLabel'), v: r && r.days ? x('monthBody', { cost: money(r.cost), calls: r.calls, tokens: compact(r.tokens), apps: r.apps.length, big: r.apps.filter((a) => a.cost >= 0.1).length }) : x('monthNone'), sub: x('monthSub') },
@@ -276,7 +284,7 @@ function secParams(ctx) {
         ? x('reasoningOn', { level: x('reasoning.' + s.reasoning.effort) })
         : x('modelDefault'));
   return html`
-    <${PageSection} id="ai-params" num="04" title=${x('secParams')} count=${count}>
+    <${PageSection} id="ai-params" num="07" title=${x('secParams')} count=${count}>
       <${Note} kind="lead">${x('paramsIntro')}<//>
       <${Facts} rows=${[
         { k: x('param.temperature'), v: e ? field('temperature', 0, 2, 0.1) : (s.temperature != null ? x('tempBody', { n: s.temperature }) : x('modelDefault')), missing: !e && s.temperature == null, sub: x('tempSub') },
@@ -300,7 +308,7 @@ function secConsumers(ctx) {
   const top = (ctx.roll?.apps || []).filter((a) => !a.app.includes(':')).slice(0, 3).map((a) => a.app);
   const chat = ctx.chat;
   return html`
-    <${PageSection} id="ai-consumers" num="05" title=${x('secConsumers')} count=${null}>
+    <${PageSection} id="ai-consumers" num="08" title=${x('secConsumers')} count=${null}>
       <${Note} kind="lead">${x('consumersIntro')}<//>
       <${Facts} rows=${[
         { k: x('consumer.apps'), v: `${x('consumerAppsBody')}${top.length ? ` ${x('consumerAppsTop', { apps: top.join(', ') })}` : ''}` },
