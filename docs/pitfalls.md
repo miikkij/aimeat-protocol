@@ -20,7 +20,7 @@ and its shape. Symptom first in the section too, then cause, then the rule.
 ## The five shapes
 
 1. **Silent success.** Something answers ok, 200, delivered or true, or logs green, on a path where the work did not happen: a branch that returns normally after skipping, `continue` inside a loop that decides, a catch that returns a plausible value, a parameter accepted and never read, a counter or a filter nobody can see working. *Ask what the caller sees when the work did NOT happen.* §1, 4, 5, 9, 16b, 28, 31, 36, 61, 63, 64, 65, 67, 73, 74, 75, 76, 77, 78b, 80, 82, 84, 88, 92, 93, 98
-2. **A test or a measurement that cannot fail.** A test nobody saw red, a fixture smaller than the limit it tests, a comparison two empty results satisfy, a concurrency test run on sqlite only, a flag tested switched on only, a sweep total read as a regression. *Ask which line of the change turns the test red when it is reverted.* §12, 17, 18, 19, 21, 26, 34, 35, 37, 38, 45, 46, 50, 51, 54, 56, 57, 69, 72, 79, 89, 90, 91, 94, 99
+2. **A test or a measurement that cannot fail.** A test nobody saw red, a fixture smaller than the limit it tests, a comparison two empty results satisfy, a concurrency test run on sqlite only, a flag tested switched on only, a sweep total read as a regression. *Ask which line of the change turns the test red when it is reverted.* §12, 17, 18, 19, 21, 26, 34, 35, 37, 38, 45, 46, 50, 51, 54, 56, 57, 69, 72, 79, 89, 90, 91, 94, 99, 100
 3. **One rule, N doors, and one forgets.** A rule changed in one place while other doors reach the same capability: the REST route, the node MCP tool, the connector MCP tool, the CLI dispatch, an operator door, a second writer of the same record, a second backend. *Grep the capability's name and ask whether every door goes through the changed code.* §3, 7, 8b, 25, 33, 41, 44, 47, 48, 52, 58, 78, 81, 97
 4. **A name is not a principal.** A comparison or a storage key built from `req.auth.owner`, `sub`, a bare account name, a delivery target or a display identity where the holder or the addressed principal is meant. *Ask what the value holds for an agent, an app grant, a federated session and a namesake.* §6, 22, 43, 53, 66, 83
 5. **Parallel sessions and the machine.** A hardcoded port, a probe that binds narrower than the server, a file or a log used as state, a path from the other shell's world, a recursive delete near a link. *Ask what happens when a second session runs the same thing on this machine at the same moment.* §13, 14, 23, 32, 38b, 39, 60, 71, 77b
@@ -132,6 +132,7 @@ and its shape. Symptom first in the section too, then cause, then the rule.
 | 97 | An AI call paid by the operator's key, fetched around safeFetch, or charged twice | 3 |
 | 98 | A new provider fails only on the stand-in; Anthropic answers stop near 4096 tokens | 1 |
 | 99 | `pnpm gate` green, then the commit refused for a file over 800 lines | 2 |
+| 100 | An app never signs in on the sandbox; an owner-token check passes, the app's call fails | 2 |
 
 ---
 
@@ -1130,3 +1131,12 @@ Two SESSIONS in one checkout is forbidden now (`CLAUDE.md`), so the case below i
 - **Why.** `scripts/gate.ts` runs `check:fast`, `check:invariants`, the unit tests, the changed suites and the guard tier. ESLint (`pnpm lint`, where `aimeat/max-file-lines` lives) is in the pre-commit hook and in CI (`ci.yml`), not in the gate. CLAUDE.md says a green gate is what "done" needs, which reads as if the gate covered the hook.
 - **The rule.** Before `pnpm gate` on finished work, run `pnpm lint` from `aimeat/` (cached, seconds), or at least count the lines of every file the change grew. A split to get under 800 lines is a pure move, and it changes what the gate measured, so the gate runs after the split, not before it.
 - **The tell.** A change that added a hundred lines or more to a file that was already long.
+
+## 100. An app cannot sign in on `pnpm sandbox`, so its signed-in path cannot be checked there
+
+*Symptoms: in the sandbox an app's page opens, but `AIMEAT.auth` never gets a session and every `AIMEAT.ai.*` or memory call from the app answers as signed out; or a check that ran only as the owner (curl with the owner's token) passes, and the same call from the app fails later on a real node.*
+
+- **The case.** V5 of the System 2 AI plan (commit `13130511c`, 2026-09-28) had to prove that an app holding only `ai:use` can call `AIMEAT.ai.capabilities()` and show a picture from `AIMEAT.ai.image()`. The sandbox could not run that check: `aimeat/scripts/sandbox.ts` sets `AIMEAT_APP_ORIGIN_ENABLED=false` and `AIMEAT_APP_HOST=''`, so the sandbox serves every app inline on the node's own origin, where an app cannot sign in. The check ran on a throwaway node of the same code with app origins on, and it found a real defect (the private picture's `url` needs `storage:read`, which an `<img>` cannot send), which no owner-token check would have found.
+- **Why only setting the switch is not enough.** `config.ts` takes `appHost` from `AIMEAT_APP_HOST`, and otherwise from `deriveAppHost(baseUrl)` in `config-hosts.ts`, which returns `''` for `localhost`, an IP address or a `*.localhost` base URL. So a local node needs both `AIMEAT_APP_ORIGIN_ENABLED=true` and `AIMEAT_APP_HOST=apps.localhost`; with the switch alone the node has no host to serve apps on. `*.apps.localhost` is cross-site with `localhost`, so the app signs in through `AIMEAT.auth.signIn()`, not silently (node registry entry `apps-localhost-cross-site`).
+- **The rule.** For any change an app reaches through its own grant (the `AIMEAT.*` SDK, app scopes, app-grant tokens), a sandbox check or an owner-token curl proves the owner's path only. Check the app's path on a local node with `AIMEAT_APP_ORIGIN_ENABLED=true` and `AIMEAT_APP_HOST=apps.localhost`, signed in on the app's own origin, before calling it verified.
+- **The tell.** A verification note that says "checked in the sandbox" about something an app does.
