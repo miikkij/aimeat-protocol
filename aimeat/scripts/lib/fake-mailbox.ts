@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url';
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 
 interface SampleAttachment { file: string; name: string; mime: string }
-interface SampleMessage {
+export interface SampleMessage {
   id: string;
   from: string;
   subject: string;
@@ -32,6 +32,10 @@ interface SampleMessage {
   body: string;
   /** The class a person would give it: what a run's answers are checked against. */
   expect: string;
+  /** How sure the stand-in classifier says it is (default 0.93): a low one lands in Unclear. */
+  sure?: number;
+  /** The fields a correct extraction reads, which the stand-in model answers with. */
+  fields?: Record<string, unknown>;
   attachments?: SampleAttachment[];
 }
 
@@ -39,23 +43,31 @@ export const MAILBOX_ADDRESS = 'mailbox@sandbox.test';
 
 export const SAMPLE_MESSAGES: SampleMessage[] = [
   { id: 'm01', from: 'Wolt <receipts@wolt.com>', subject: 'Your Wolt receipt', hoursAgo: 5, expect: 'receipt',
-    body: 'Thanks for your order from Pho Viet.\nOrder total: 23.40 EUR\nPaid with Visa ending 4421 on 28.9.2026.\nOrder number W-88213-44' },
+    body: 'Thanks for your order from Pho Viet.\nOrder total: 23.40 EUR\nPaid with Visa ending 4421 on 28.9.2026.\nOrder number W-88213-44',
+    fields: { vendor: 'Wolt', amount: 23.4, currency: 'EUR', date: '2026-09-28', reference: 'W-88213-44', vat: null } },
   { id: 'm02', from: 'Esimerkki Energia <laskutus@esimerkki-energia.fi>', subject: 'Lasku EE-2026-0914', hoursAgo: 20, expect: 'invoice',
     body: 'Hei,\n\nliitteenä syyskuun sähkölasku. Eräpäivä 5.10.2026.\n\nYstävällisin terveisin\nEsimerkki Energia',
+    fields: { vendor: 'Esimerkki Energia Oy', amount: 41.57, currency: 'EUR', invoice_number: 'EE-2026-0914', date: '2026-09-20', due_date: '2026-10-05', reference: '11 22334 45566', iban: 'FI21 1234 5600 0007 85', vat: 8.45 },
     attachments: [{ file: 'invoice-digital.pdf', name: 'lasku-EE-2026-0914.pdf', mime: 'application/pdf' }] },
   { id: 'm03', from: 'Kiinteistöhuolto Mäkinen <toimisto@makinen-huolto.fi>', subject: 'Lasku 2026/117 (skannattu)', hoursAgo: 30, expect: 'invoice',
     body: 'Liitteenä skannattu lasku lumitöistä.',
+    fields: { vendor: 'Kiinteistöhuolto Mäkinen Ky', amount: 162.5, currency: 'EUR', invoice_number: '2026/117', date: '2026-09-20', due_date: '2026-10-15', reference: 'RF18 5390 0754 7034', iban: 'FI21 1234 5600 0007 85', vat: 33.03 },
     attachments: [{ file: 'invoice-scanned.pdf', name: 'skannaus_0117.pdf', mime: 'application/pdf' }] },
   { id: 'm04', from: 'Verkkokauppa.com <noreply@verkkokauppa.com>', subject: 'Tilauksesi 88213 on lähetetty', hoursAgo: 34, expect: 'order',
-    body: 'Tilauksesi 88213 on matkalla. Toimitus: Posti SmartPOST, arvioitu perillä 30.9.2026. Tuotteet: USB-C-telakka 1 kpl, 89,90 €.' },
+    body: 'Tilauksesi 88213 on matkalla. Toimitus: Posti SmartPOST, arvioitu perillä 30.9.2026. Tuotteet: USB-C-telakka 1 kpl, 89,90 €.',
+    fields: { merchant: 'Verkkokauppa.com', order_number: '88213', items: 'USB-C-telakka', total: 89.9, carrier: 'Posti SmartPOST', expected: '2026-09-30' } },
   { id: 'm05', from: 'LinkedIn Job Alerts <jobs-noreply@linkedin.com>', subject: 'Senior Solution Architect at Nordic Bank', hoursAgo: 40, expect: 'job',
-    body: 'A new job matches your alert: Senior Solution Architect, Nordic Bank, Helsinki (hybrid). Apply by 15.10.2026. https://example.linkedin.com/jobs/4242' },
+    body: 'A new job matches your alert: Senior Solution Architect, Nordic Bank, Helsinki (hybrid). Apply by 15.10.2026. https://example.linkedin.com/jobs/4242',
+    fields: { employer: 'Nordic Bank', title: 'Senior Solution Architect', location: 'Helsinki (hybrid)', deadline: '2026-10-15', link: 'https://example.linkedin.com/jobs/4242' } },
   { id: 'm06', from: 'GitHub <notifications@github.com>', subject: '[aimeat] Workflow "CI" succeeded on main', hoursAgo: 44, expect: 'system',
-    body: 'The workflow CI completed successfully for commit 36ee06b on main in 14m 02s. https://github.com/example/aimeat/actions/runs/1' },
+    body: 'The workflow CI completed successfully for commit 36ee06b on main in 14m 02s. https://github.com/example/aimeat/actions/runs/1',
+    fields: { system: 'GitHub Actions', event: 'Workflow CI succeeded on main', status: 'succeeded', action_required: false, link: 'https://github.com/example/aimeat/actions/runs/1' } },
   { id: 'm07', from: 'npm <support@npmjs.com>', subject: 'Successfully published aimeat@3.19.0', hoursAgo: 50, expect: 'system',
-    body: 'Hi! A new version of the package aimeat (3.19.0) was published at 2026-09-27T13:36:34Z.' },
-  { id: 'm08', from: 'Google <no-reply@accounts.google.com>', subject: 'Security alert: new sign-in on Windows', hoursAgo: 56, expect: 'system',
-    body: 'We noticed a new sign-in to your Google Account on a Windows device. If this was you, you do not need to do anything.' },
+    body: 'Hi! A new version of the package aimeat (3.19.0) was published at 2026-09-27T13:36:34Z.',
+    fields: { system: 'npm', event: 'aimeat 3.19.0 published', status: 'succeeded', action_required: false, link: null } },
+  { id: 'm08', from: 'Google <no-reply@accounts.google.com>', subject: 'Security alert: new sign-in on Windows', hoursAgo: 56, expect: 'system', sure: 0.64,
+    body: 'We noticed a new sign-in to your Google Account on a Windows device. If this was you, you do not need to do anything.',
+    fields: { system: 'Google Account', event: 'New sign-in on Windows', status: 'warning', action_required: null, link: null } },
   { id: 'm09', from: 'The Sequence <thesequence@substack.com>', subject: 'The Sequence Radar #940: Last Week in AI', hoursAgo: 60, expect: 'newsletter',
     body: 'This week: Opus 5.5 gets leaner, Meta goes wearable, Washington talks to Beijing. Read the full issue online.' },
   { id: 'm10', from: 'Kauppalehti <uutiskirje@kauppalehti.fi>', subject: 'Aamun tärkeimmät uutiset', hoursAgo: 70, expect: 'newsletter',
@@ -65,15 +77,20 @@ export const SAMPLE_MESSAGES: SampleMessage[] = [
   { id: 'm12', from: 'Matti Virtanen <matti.virtanen@example.com>', subject: 'Lounas perjantaina?', hoursAgo: 90, expect: 'personal',
     body: 'Moi! Ehtisitkö lounaalle perjantaina klo 11.30? Sama paikka kuin viimeksi.\n\n-Matti' },
   { id: 'm13', from: 'Asiakas Oy <tuki@asiakas.fi>', subject: 'En pääse kirjautumaan palveluun', hoursAgo: 100, expect: 'support',
-    body: 'Hei, en pääse kirjautumaan tililleni. Salasanan palautus ei lähetä viestiä. Asiakasnumero 55821. Voitteko auttaa?' },
+    body: 'Hei, en pääse kirjautumaan tililleni. Salasanan palautus ei lähetä viestiä. Asiakasnumero 55821. Voitteko auttaa?',
+    fields: { customer: 'Asiakas Oy', topic: 'Cannot log in, the password reset sends no message', customer_number: '55821', urgency: 'normal' } },
   { id: 'm14', from: 'Hotel Kämp <reservations@hotelkamp.fi>', subject: 'Varausvahvistus 12.–14.10.2026', hoursAgo: 110, expect: 'booking',
-    body: 'Varauksenne on vahvistettu. Saapuminen 12.10.2026, lähtö 14.10.2026. Huone: Superior King. Varausnumero HK-77120. Hinta yhteensä 612,00 €.' },
+    body: 'Varauksenne on vahvistettu. Saapuminen 12.10.2026, lähtö 14.10.2026. Huone: Superior King. Varausnumero HK-77120. Hinta yhteensä 612,00 €.',
+    fields: { provider: 'Hotel Kämp', booking_number: 'HK-77120', start: '2026-10-12', end: '2026-10-14', total: 612 } },
   { id: 'm15', from: 'Apple <no_reply@email.apple.com>', subject: 'Your receipt from Apple', hoursAgo: 120, expect: 'receipt',
-    body: 'iCloud+ 200 GB, monthly. Billed 2.99 EUR on 24.9.2026 to Visa 4421. Order ID MT8Q2X9L.' },
+    body: 'iCloud+ 200 GB, monthly. Billed 2.99 EUR on 24.9.2026 to Visa 4421. Order ID MT8Q2X9L.',
+    fields: { vendor: 'Apple', amount: 2.99, currency: 'EUR', date: '2026-09-24', reference: 'MT8Q2X9L', vat: null } },
   { id: 'm16', from: 'Laskutus Pilvipalvelu <billing@pilvipalvelu.example>', subject: 'Invoice INV-4431 due 15.10.2026', hoursAgo: 130, expect: 'invoice',
-    body: 'Invoice INV-4431\nAmount due: 149.00 EUR (VAT 25.5 % included)\nDue date: 15.10.2026\nReference: 4431 0000 2211' },
+    body: 'Invoice INV-4431\nAmount due: 149.00 EUR (VAT 25.5 % included)\nDue date: 15.10.2026\nReference: 4431 0000 2211',
+    fields: { vendor: 'Pilvipalvelu', amount: 149, currency: 'EUR', invoice_number: 'INV-4431', date: null, due_date: '2026-10-15', reference: '4431 0000 2211', iban: null, vat: 30.28 } },
   { id: 'm17', from: 'Disney+ <disneyplus@mail.disneyplus.com>', subject: 'Receipt for your payment to DisneyPlus', hoursAgo: 150, expect: 'receipt',
-    body: 'Thanks for your payment. Disney+ Standard, 9.99 EUR, charged on 22.9.2026. Transaction 51B2-9C.' },
+    body: 'Thanks for your payment. Disney+ Standard, 9.99 EUR, charged on 22.9.2026. Transaction 51B2-9C.',
+    fields: { vendor: 'Disney+', amount: 9.99, currency: 'EUR', date: '2026-09-22', reference: '51B2-9C', vat: null } },
   { id: 'm18', from: 'Liisa Korhonen <liisa@example.com>', subject: 'Kuvat viikonlopulta', hoursAgo: 170, expect: 'personal',
     body: 'Hei! Tässä vielä muutama kuva mökkiviikonlopulta. Kiitos kun tulitte!' },
 ];
