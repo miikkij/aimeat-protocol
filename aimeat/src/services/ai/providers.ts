@@ -40,10 +40,14 @@
  *   v1.0.1 — 2026-09-28 — ownerProviderRecords answers in id order, the same on every backend (V5).
  *   v1.1.0 — 2026-09-28 — Type `extension` (V6): a record names the owner's extension instead of an
  *     address (baseUrl `extension://<name>`), is the owner's only, and states where the data goes.
+ *   v1.1.1 — 2026-09-28 — A base URL loses its trailing slashes through stripTrailingSlashes, one
+ *     pass, instead of `replace(/\/+$/, '')`, which takes quadratic time on an address ending in
+ *     many slashes and another character (CodeQL js/polynomial-redos, alert 1673).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
+import { stripTrailingSlashes } from '../../utils/url-validator.js';
 import {
   isObj, isLoopbackHost, providerIdOf, PROVIDER_ID_PROBLEM, egressOriginsOf,
 } from '../ai-provider-common.js';
@@ -168,7 +172,7 @@ function fixedOverrides(config: AimeatConfig): Partial<Record<FixedProviderType,
     try {
       const parsed = JSON.parse(raw) as unknown;
       for (const [type, url] of Object.entries(isObj(parsed) ? parsed : {})) {
-        if (isFixedType(type) && typeof url === 'string' && URL.canParse(url)) map[type] = url.replace(/\/+$/, '');
+        if (isFixedType(type) && typeof url === 'string' && URL.canParse(url)) map[type] = stripTrailingSlashes(url);
         else logger.error('[ai] an AIMEAT_AI_FIXED_BASEURL_OVERRIDES entry was refused', { type, fix: 'a fixed type and an http(s) address' });
       }
       if (Object.keys(map).length) logger.warn('[ai] fixed provider addresses are overridden on this node', { types: Object.keys(map) });
@@ -308,14 +312,14 @@ export function parseAiProvider(
   } else if (type && isFixedType(type)) {
     // The address of a fixed type is not the record's to choose: a record that names another one is
     // told so, rather than having it silently replaced.
-    const given = typeof raw.baseUrl === 'string' ? raw.baseUrl.trim().replace(/\/+$/, '') : '';
+    const given = typeof raw.baseUrl === 'string' ? stripTrailingSlashes(raw.baseUrl.trim()) : '';
     if (given && given !== FIXED_BASE_URLS[type] && given !== fixedBaseUrlOf(config, type)) {
       problems.push(`baseUrl: a ${type} provider is reached at ${FIXED_BASE_URLS[type]}. For another address, use type openai-compatible.`);
     }
     baseUrl = fixedBaseUrlOf(config, type);
   } else if (type) {
     const u = URL.canParse(String(raw.baseUrl ?? '')) ? new URL(String(raw.baseUrl)) : null;
-    baseUrl = u && (u.protocol === 'https:' || u.protocol === 'http:') && !u.username && !u.password ? u.toString().replace(/\/+$/, '') : '';
+    baseUrl = u && (u.protocol === 'https:' || u.protocol === 'http:') && !u.username && !u.password ? stripTrailingSlashes(u.toString()) : '';
     if (!baseUrl) problems.push('baseUrl: the full http(s) address of the provider\'s OpenAI-compatible API root, with no credentials in it.');
     const host = u?.hostname.toLowerCase() ?? '';
     const listed = source !== 'owner' && !!u && !!opts.egress?.includes(u.origin);
