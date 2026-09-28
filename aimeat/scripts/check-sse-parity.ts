@@ -118,6 +118,9 @@ const EXEMPT: Record<string, string> = {
  * entry says which function carries it.
  */
 const DELEGATES: Record<string, string> = {
+    'src/mcp/refinery.ts': 'services/refinery/runs.ts, which runs pipeline.ts: every row a batch files '
+        + 'goes through appendRows (workspace-rows/row-service.ts emits organisms) and every record it '
+        + 'writes through writeMemoryRecord (memory-write.ts emits memory), two hops below the tool.',
     'src/mcp/agent-v2-tasks.ts': 'services/agent-v2-tasks-ops.ts, and for the same reason as '
         + 'the v2 messaging tools beside it: a v2 task is addressed to a PRINCIPAL rather than to '
         + 'a view. Whoever needs to know is told on the tunnel socket it is holding (emitDelivery, '
