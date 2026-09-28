@@ -31,6 +31,8 @@
  * @tokens listDetail --ak-list-gap · --ak-list-row-gap · --ak-list-aside-size
  * @fork listDetail Do not fork the container: mark your detail's own heading .ak-listdetail__title and the picked row's words travel into it. Its `variant` and `parts` are the list's, handed to the master pane.
  * @version-history
+ *   v0.57.0 — 2026-09-29 — A row's badge takes `badgeTone` (ok, warn, err, quiet): a queue or a
+ *     status reads by its colour as the approved Postinjalostamo drawing shows, with no app CSS.
  *   v0.50.0 — 2026-09-05 — THE CHANGE IS A MOVE, not three separate ones. The whole reconcile runs
  *     inside `settle`, so a row that arrived rises in on the LOOK's distance and pace, a row that
  *     left fades out where it stood instead of blinking away, and a row that moved glides from
@@ -75,7 +77,11 @@ const DETAIL_HEADING = 'h1, h2, h3';
  * @property {string} [sub]
  * @property {string} [meta]
  * @property {string} [badge]
+ * @property {'ok'|'warn'|'err'|'quiet'|'accent'} [badgeTone]  the badge's colour; accent when left out
  */
+
+/** The tones a badge may take: a status reads by its colour as well as by its word. */
+const BADGE_TONES = ['ok', 'warn', 'err', 'quiet'];
 
 /**
  * Render one row's inner content (shared by add and update, so the two can never drift).
@@ -99,7 +105,8 @@ function fillRow(row, item, spec) {
   slotInto(text, spec, 'sub', item.sub == null ? null : item.sub, { cls: 'ak-list__sub', args: [item] });
   slotInto(text, spec, 'extra', null, { cls: 'ak-list__extra', args: [item] });
   const side = partEl('span', 'ak-list__side', 'side');
-  slotInto(side, spec, 'badge', item.badge == null ? null : item.badge, { cls: 'ak-badge ak-list__badge', args: [item] });
+  const tone = BADGE_TONES.indexOf(item.badgeTone || '') >= 0 ? ' ak-badge--' + item.badgeTone : '';
+  slotInto(side, spec, 'badge', item.badge == null ? null : item.badge, { cls: 'ak-badge ak-list__badge' + tone, args: [item] });
   slotInto(side, spec, 'meta', item.meta == null ? null : item.meta, { cls: 'ak-list__meta', args: [item] });
   slotInto(side, spec, 'aside', null, { cls: 'ak-list__aside', args: [item] });
   append(row, side.childNodes.length ? [text, side] : [text]);
