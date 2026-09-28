@@ -2,6 +2,78 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does.",
   "entries": [
     {
+      "date": "2026-09-28",
+      "kind": "feature",
+      "title": {
+        "en": "The AI page: your providers, which one answers what, and which models are allowed",
+        "fi": "Tekoälysivu: tarjoajasi, mikä niistä vastaa mihinkin ja mitkä mallit ovat sallittuja"
+      },
+      "body": {
+        "en": "The AI page in Settings & Controls has three new sections. Providers: add OpenAI, Anthropic, Mistral, xAI, OpenRouter, a model server on your own machine, any OpenAI-compatible address or an extension, give it a key, choose what it does and with which model, and test it with the smallest real call. Routing: for each kind of work, the provider that answers first and two to try next when it does not answer, and the rules for moving on. Model policy: any model, the recommended models, or your own list, and whose calls it covers. Your AI can do all of this for you as well; the page shows what is set.",
+        "fi": "Asetukset ja hallinta -osion Tekoäly-sivulla on kolme uutta osaa. Tarjoajat: lisää OpenAI, Anthropic, Mistral, xAI, OpenRouter, mallipalvelin omalla koneellasi, mikä tahansa OpenAI-yhteensopiva osoite tai laajennus, anna sille avain, valitse mitä se tekee ja millä mallilla, ja testaa se pienimmällä oikealla kutsulla. Reititys: jokaiselle työlle tarjoaja, joka vastaa ensin, ja kaksi varalla olevaa tarjoajaa, jos se ei vastaa, sekä säännöt varalle siirtymiseen. Mallirajaus: mikä tahansa malli, suositellut mallit tai oma lista, ja keiden kutsuja rajaus koskee. Tekoälysi voi tehdä kaiken tämän myös puolestasi; sivu näyttää, mitä on asetettu."
+      }
+    },
+    {
+      "date": "2026-09-28",
+      "kind": "feature",
+      "title": {
+        "en": "An extension can be your AI provider, and it never sees your key",
+        "fi": "Laajennus voi olla tekoälyn tarjoajasi, eikä se koskaan näe avaintasi"
+      },
+      "body": {
+        "en": "A service this AIMEAT has no built-in support for, such as your company's own model service or a new vendor, can serve your AI calls through an extension you install. The extension states where your data goes and which addresses it calls. Your key is added to its calls outside the extension, only to those addresses and only over https, so the extension's code never reads it.",
+        "fi": "Palvelu, jolle tässä AIMEATissa ei ole valmista tukea, esimerkiksi yrityksesi oma mallipalvelu tai uusi valmistaja, voi hoitaa tekoälykutsusi asentamasi laajennuksen kautta. Laajennus kertoo, minne tietosi menevät ja mihin osoitteisiin se lähettää kutsuja. Avaimesi lisätään sen kutsuihin laajennuksen ulkopuolella, vain niihin osoitteisiin ja vain https-yhteydellä, joten laajennuksen koodi ei koskaan näe sitä."
+      }
+    },
+    {
+      "date": "2026-09-28",
+      "kind": "feature",
+      "title": {
+        "en": "Apps and agents ask for a capability, not a model",
+        "fi": "Sovellukset ja agentit pyytävät kykyä, eivät mallia"
+      },
+      "body": {
+        "en": "An app, an agent or your own AI first asks what it can do for you: write text, read an image, read a file or a PDF, make a picture, speak, transcribe, or make embeddings. The answer names the model, the provider and the price, and when something is off, what you can do to turn it on. Apps show that instead of a button that silently does nothing. Speech, transcription and embeddings run on your own providers and budget, and background jobs and workflow steps can make pictures and transcribe too. The built-in chat runs on your own providers as well.",
+        "fi": "Sovellus, agentti tai oma tekoälysi kysyy ensin, mitä se voi tehdä puolestasi: kirjoittaa tekstiä, lukea kuvan, lukea tiedoston tai PDF:n, tehdä kuvan, puhua, litteroida tai tehdä upotuksia. Vastaus kertoo mallin, tarjoajan ja hinnan, ja jos jokin ei ole käytössä, mitä voit tehdä sen käyttöön ottamiseksi. Sovellukset näyttävät tämän eivätkä jätä näkyviin nappia, joka ei tee mitään. Puhe, litterointi ja upotukset toimivat omilla tarjoajillasi ja budjetillasi, ja taustatyöt ja työnkulkujen vaiheet voivat myös tehdä kuvia ja litteroida. Myös sisäänrakennettu chat toimii omilla tarjoajillasi."
+      }
+    },
+    {
+      "date": "2026-09-28",
+      "kind": "feature",
+      "title": {
+        "en": "A model catalogue: what each model can do and what it costs",
+        "fi": "Malliluettelo: mitä kukin malli osaa ja mitä se maksaa"
+      },
+      "body": {
+        "en": "This AIMEAT keeps a list of AI models from public sources: what each one can do, how much text it reads, and what it costs. A call to a direct provider is priced from it, a model that is being retired is marked where you use it, and when a model is not available the same model at another provider can answer instead.",
+        "fi": "Tämä AIMEAT pitää julkisista lähteistä koottua luetteloa tekoälymalleista: mitä kukin osaa, kuinka paljon tekstiä se lukee ja mitä se maksaa. Suoran tarjoajan kutsu hinnoitellaan luettelon mukaan, poistuva malli merkitään siellä, missä käytät sitä, ja kun malli ei ole saatavilla, sama malli toisella tarjoajalla voi vastata sen sijaan."
+      }
+    },
+    {
+      "date": "2026-09-28",
+      "kind": "feature",
+      "title": {
+        "en": "Your own AI accounts side by side, with fallback when one does not answer",
+        "fi": "Omat tekoälytilisi rinnakkain, ja varalle siirtyminen, kun yksi ei vastaa"
+      },
+      "body": {
+        "en": "Use your own accounts at OpenAI, Anthropic, Mistral, xAI and OpenRouter, or a model server on your own machine, side by side. You choose which one answers each kind of work, and when one times out, is rate limited or refuses its key, the next one answers. By default a call that started on your own machine never moves to a service outside it. Every answer says which provider answered. Your keys are stored encrypted and go only to their own provider's address.",
+        "fi": "Käytä omia tilejäsi OpenAI:ssa, Anthropicissa, Mistralissa, xAI:ssa ja OpenRouterissa tai mallipalvelinta omalla koneellasi rinnakkain. Valitset, mikä niistä vastaa kuhunkin työhön, ja kun yksi ei vastaa ajoissa, on käyttörajallaan tai hylkää avaimensa, seuraava vastaa. Oletuksena omalla koneellasi alkanut kutsu ei koskaan siirry koneen ulkopuoliseen palveluun. Jokainen vastaus kertoo, mikä tarjoaja vastasi. Avaimesi tallennetaan salattuina, ja ne menevät vain oman tarjoajansa osoitteeseen."
+      }
+    },
+    {
+      "date": "2026-09-28",
+      "kind": "feature",
+      "title": {
+        "en": "Model policy: keep weak models out of your work",
+        "fi": "Mallirajaus: pidä heikot mallit poissa työstäsi"
+      },
+      "body": {
+        "en": "Choose the models the people who run this AIMEAT recommend, or a list of your own, and say whose calls it covers: your own, the chat, your agents, your apps. An app can limit itself further. A call for a model the rules leave out is refused and told which models are allowed. Every layer can only tighten, and your AI proposes a change that you confirm.",
+        "fi": "Valitse tämän AIMEATin ylläpitäjien suosittelemat mallit tai oma lista, ja kerro, keiden kutsuja rajaus koskee: omasi, chatin, agenttiesi ja sovellustesi. Sovellus voi rajata itseään lisää. Kutsu mallille, jonka säännöt jättävät ulos, hylätään, ja vastaus kertoo sallitut mallit. Jokainen taso voi vain tiukentaa, ja tekoälysi ehdottaa muutosta, jonka sinä vahvistat."
+      }
+    },
+    {
       "date": "2026-09-24",
       "version": "3.19.0",
       "kind": "feature",
