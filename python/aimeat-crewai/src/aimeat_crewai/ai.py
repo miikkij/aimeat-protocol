@@ -63,6 +63,15 @@ NODE_CHOOSES_MODEL = "aimeat-node-chooses"
 #: The capabilities ``GET /v1/ai/capabilities`` reports on, in the node's order.
 CAPABILITIES = ("text", "vision", "files", "image", "speech", "transcription", "embed")
 
+#: The header ``node_llm(role=...)`` sends the AI role in. ``POST /v1/llm/chat/completions``
+#: (aimeat/src/routes/llm-proxy.ts) reads it, or a body field ``role``. A header, because an
+#: OpenAI-compatible client sends one on every call on both CrewAI code paths, and a top-level body
+#: field it can only add through a client-specific option.
+_ROLE_HEADER = "X-AIMEAT-AI-Role"
+
+#: The longest role the node accepts (readCallRole in aimeat/src/services/ai-call-guards.ts).
+_ROLE_MAX_CHARS = 300
+
 
 # ── failures ──────────────────────────────────────────────────────────────────────────────────
 
@@ -137,6 +146,7 @@ def _as_ai_errors() -> Iterator[None]:
 def node_llm(
     *,
     model: str | None = None,
+    role: str | None = None,
     agent_name: str | None = None,
     node_url: str | None = None,
     agent_token: str | None = None,
@@ -154,6 +164,13 @@ def node_llm(
     owner's provider knows it, without the ``openai/`` prefix, which is added here), so it reaches
     the node if the node starts to read it. ``GET <node>/v1/llm/models`` lists the models the
     owner's policy allows.
+
+    ``role``: the AI role the crew's calls run as, one of the owner's role ids (``GET /v1/ai/roles``
+    lists them; ``reasoning`` and ``execution`` are built in). A capability says what a model does;
+    a role says what it is used for, and the owner's role names the providers and models to try, in
+    order. Sent on every call in the ``X-AIMEAT-AI-Role`` header, merged into any ``extra_headers``
+    you pass. A role the owner does not have is refused ``400 AI_ROLE_UNKNOWN``; a string that is
+    empty or longer than 300 characters raises ``AiError`` here, before anything is sent.
 
     The node and the token are resolved the way ``decide()`` resolves them: the argument, then the
     connector-stored token for ``agent_name``, then ``AIMEAT_NODE_URL`` and ``AIMEAT_AGENT_TOKEN``.
@@ -173,6 +190,17 @@ def node_llm(
                 f"node_llm() sets {key} itself: the LLM must call the node's /v1/llm route with the "
                 "agent's token. Pass node_url= and agent_token= instead."
             )
+    if role is not None:
+        if not isinstance(role, str) or not 1 <= len(role) <= _ROLE_MAX_CHARS:
+            raise AiError(
+                f"node_llm(role=...) is one of the owner's AI role ids, a string of 1 to {_ROLE_MAX_CHARS} "
+                "characters (GET /v1/ai/roles lists them)."
+            )
+        # extra_headers reaches the request on both code paths: the native OpenAI client takes it on
+        # every create() call, and LiteLLM's completion() takes it too.
+        headers = dict(llm_kwargs.pop("extra_headers", None) or {})
+        headers[_ROLE_HEADER] = role
+        llm_kwargs["extra_headers"] = headers
     with _as_ai_errors():
         node = _node(agent_name=agent_name, node_url=node_url, agent_token=agent_token)
     try:

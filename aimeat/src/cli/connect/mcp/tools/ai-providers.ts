@@ -6,9 +6,10 @@
  *   aimeat_ai_routing_set: parity with the server MCP (src/mcp/ai-providers.ts), as thin wrappers over
  *   GET /v1/ai/providers, POST /v1/ai/providers/:id/test and GET / PUT /v1/ai/routing. The node does
  *   the work; this code path carries the fields across, and `check:mcp-schemas` compares it with
- *   the node's surface.
+ *   the node's surface. aimeat_ai_roles and aimeat_ai_role_set wrap GET and PUT /v1/ai/roles the same way.
  * @structure registerAiProviderTools(mcp, registry)
  * @version-history
+ *   v1.1.0 — 2026-09-28 — aimeat_ai_roles and aimeat_ai_role_set (AI roles).
  *   v1.0.0 — 2026-09-28 — Initial (System 2 plan, V3).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -44,4 +45,17 @@ export function registerAiProviderTools(mcp: McpServer, registry: AgentRegistry)
       ...(a.confirm_token !== undefined ? { confirm_token: a.confirm_token } : {}),
     }));
   });
+
+  mcp.tool('aimeat_ai_roles', descriptionFor('aimeat_ai_roles'), {}, annotationsFor('aimeat_ai_roles'),
+    async () => out(await client.get('/v1/ai/roles')));
+
+  mcp.tool('aimeat_ai_role_set', descriptionFor('aimeat_ai_role_set'), {
+    roles: z.record(z.string(), z.unknown()).optional().describe('{ "<role id>": { title, purpose?, capabilities: {capability: [{provider, model?}]}, local?, maxCostPerCallUsd? } or null }.'),
+    bindings: z.record(z.string(), z.unknown()).optional().describe('{ "<owner>/<file>.html#<role name>": "<your role id>" or null }.'),
+    confirm_token: z.string().optional().describe('Token from the propose step; omit to propose.'),
+  }, annotationsFor('aimeat_ai_role_set'), async (a) => out(await client.put('/v1/ai/roles', {
+    ...(a.roles !== undefined ? { roles: a.roles as never } : {}),
+    ...(a.bindings !== undefined ? { bindings: a.bindings as never } : {}),
+    ...(a.confirm_token !== undefined ? { confirm_token: a.confirm_token } : {}),
+  })));
 }

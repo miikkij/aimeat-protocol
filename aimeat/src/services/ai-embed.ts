@@ -14,6 +14,7 @@
  * @usage
  *   const r = await embedForOwner(storage, config, payer, { input: ['a', 'b'], appId: 'notes' });
  * @version-history
+ *   v1.1.0 — 2026-09-28 — Takes `role`, the AI role the call runs as (services/ai/roles.ts).
  *   v1.0.0 — 2026-09-28 — Initial (V5 of the System 2 plan).
  */
 import type { AimeatConfig } from '../config.js';
@@ -40,6 +41,8 @@ export interface EmbedForOwnerOptions {
   verifiedApp?: string;
   provider?: string;
   fallback?: boolean;
+  /** The AI role the call runs as (services/ai/roles.ts). A named model or provider wins over it. */
+  role?: string;
   signal?: AbortSignal;
 }
 
@@ -71,6 +74,7 @@ export async function embedForOwner(
     op: 'embed', model: opts.model, appId: opts.appId, ...(opts.agent ? { agent: opts.agent } : {}),
     ...(opts.caller ? { caller: opts.caller } : {}), ...(opts.verifiedApp ? { verifiedApp: opts.verifiedApp } : {}),
     ...(opts.provider ? { provider: opts.provider } : {}), ...(opts.fallback !== undefined ? { fallback: opts.fallback } : {}),
+    ...(opts.role ? { role: opts.role } : {}),
   });
   let result;
   let answered: AiCallPlan;

@@ -8,6 +8,7 @@
  * @structure WorkflowAiStepAction · WorkflowAiStepActionSchema
  * @usage imported by models/workflow-schemas.ts
  * @version-history
+ *   v1.2.0 — 2026-09-28 — `role`, the AI role the step's call runs as, 1 to 300 characters.
  *   v1.1.0 — 2026-09-28 — System 2 plan, V5: `op` (text, image, transcribe), `provider`, `audio_key`
  *     and `language` for a transcription, `size` for an image. The schema refuses at save a field
  *     that does not go with the op, by the rule the background AI job asks (services/ai-jobs/op.ts).
@@ -69,6 +70,9 @@ export interface WorkflowAiStepAction {
   op?: 'text' | 'image' | 'transcribe';
   /** A provider to use, an id or a type. Naming one turns fallback off (services/ai/route-plan.ts). */
   provider?: string;
+  /** The AI role the call runs as: one of the owner's role ids (services/ai/roles.ts). A named model
+   *  or provider wins over it. */
+  role?: string;
   /** For `transcribe` (required there): the storage key of the audio, in the owner's own storage.
    *  Templated with the run's vars. A storage key, so the run's keyPrefix does not apply. */
   audio_key?: string;
@@ -97,6 +101,7 @@ export const WorkflowAiStepActionSchema = z.object({
   }).optional(),
   op: z.enum(['text', 'image', 'transcribe']).optional(),
   provider: z.string().min(1).max(200).optional(),
+  role: z.string().min(1).max(300).optional(),
   audio_key: z.string().min(1).max(400).optional(),
   language: z.string().min(2).max(20).optional(),
   size: z.string().min(1).max(40).optional(),

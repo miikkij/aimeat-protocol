@@ -2,13 +2,18 @@
  * @file ai-voice-contract.ts
  * @description One validated input contract for REST, node MCP and connector voice tools.
  * @version-history
+ *   v1.2.0 - 2026-09-28 - Reply and speech take `role`, the AI role the call runs as (services/ai/roles.ts).
  *   v1.1.0 - 2026-09-28 - Speech `model` and `voice` are optional: the speech role gives them; reply and
  *     speech take `provider` (an id or a type, no fallback then). System 2 plan, V5.
  *   v1.0.0 - 2026-09-19 - Share voice inputs across agent and browser transports.
  */
 import { z } from 'zod';
 
-const attribution = { app_id: z.string().min(1).max(200) };
+// `role`: the AI role the call runs as (services/ai/roles.ts), 1 to 300 characters as every AI route takes it.
+const attribution = {
+  app_id: z.string().min(1).max(200),
+  role: z.string().min(1).max(300).optional().describe('The AI role to run as: one of your roles (aimeat_ai_roles), or for an app a role it declares and you bound. A named model or provider wins over it.'),
+};
 export const voiceReplySchema = z.object({ ...attribution,
   messages: z.array(z.object({ role: z.enum(['system', 'user', 'assistant']), content: z.string().max(100000) }).strict()).min(1).max(201),
   model: z.string().max(200).optional(), provider: z.string().min(1).max(200).optional(), temperature: z.number().min(0).max(2).optional(),

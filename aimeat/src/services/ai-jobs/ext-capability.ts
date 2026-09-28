@@ -26,6 +26,7 @@
  *   const ctx = buildExtensionCtx({ …, ai: buildExtensionAi({ service, extName: ext.name,
  *       ownerGhii, nodeId }) });
  * @version-history
+ *   v1.2.0 — 2026-09-28 — `start` passes on `role`, the AI role the job's call runs as.
  *   v1.1.0 — 2026-09-28 — System 2 plan, V5: `start` passes on `op`, `provider`, `audio_key`,
  *     `language` and `size`. A transcription reads the audio from the extension owner's storage,
  *     the namespace the job belongs to.
@@ -111,6 +112,8 @@ export function buildExtensionAi(deps: ExtensionAiDeps): NonNullable<ExtensionCt
                 // does not know and a field that does not go with the op (op.ts).
                 ...(opts?.op !== undefined ? { op: String(opts.op) } : {}),
                 ...(typeof opts?.provider === 'string' ? { provider: opts.provider } : {}),
+                // As given: the start refuses a role that is not a string of 1 to 300 characters (op.ts).
+                ...(opts?.role !== undefined ? { role: opts.role } : {}),
                 ...(typeof opts?.audio_key === 'string' ? { audio_key: opts.audio_key } : {}),
                 ...(typeof opts?.language === 'string' ? { language: opts.language } : {}),
                 ...(typeof opts?.size === 'string' ? { size: opts.size } : {}),

@@ -16,6 +16,7 @@
  *   const { job_id } = await AIMEAT.ai.job.start({ prompt, result_key: 'report.latest' });
  *   const done = await AIMEAT.ai.job.waitFor(job_id);
  * @version-history
+ *   v1.2.0 — 2026-09-28 — start() sends `role`, the AI role the job's call runs as.
  *   v1.1.0 — 2026-09-28 — start() sends op (text | image | transcribe), provider, audio_key, language
  *     and size (System 2 plan, V5).
  *   v1.0.0 — 2026-08-31 — Initial.
@@ -73,6 +74,8 @@ export const job = {
     const body = {
       op: opts.op,
       provider: opts.provider,
+      // The AI role the job's call runs as (GET /v1/ai/roles); a named model or provider wins over it.
+      role: opts.role,
       audio_key: opts.audio_key,
       language: opts.language,
       size: opts.size,

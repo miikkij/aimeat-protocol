@@ -43,6 +43,8 @@
  * @structure aiJobsRouter(config, storage, service)
  * @usage app.use(aiJobsRouter(config, storage, aiJobService));
  * @version-history
+ *   v1.3.0 — 2026-09-28 — POST /v1/ai/jobs takes `role`, the AI role the job's call runs as; the
+ *     service refuses one that is not a string of 1 to 300 characters (op.ts).
  *   v1.2.0 — 2026-09-28 — System 2 plan, V5: POST /v1/ai/jobs takes `op` (text, image, transcribe),
  *     `provider`, `audio_key` and `language` for a transcription, and `size` for an image. The route
  *     passes them on; the service refuses a field that does not apply to the op, before it writes.
@@ -95,6 +97,7 @@ export function aiJobsRouter(config: AimeatConfig, storage: Storage, service: Ai
                 model?: string; system_prompt?: string; json?: boolean; app_id?: string;
                 on_done?: { extension?: string; action?: string };
                 op?: string; provider?: string; audio_key?: string; language?: string; size?: string;
+                role?: unknown;
             };
 
             if (body.input_keys !== undefined
@@ -126,6 +129,8 @@ export function aiJobsRouter(config: AimeatConfig, storage: Storage, service: Ai
                     // (services/ai-jobs/op.ts), so every code path refuses the same combinations.
                     ...(body.op !== undefined ? { op: String(body.op) } : {}),
                     ...(body.provider !== undefined ? { provider: String(body.provider) } : {}),
+                    // As given, not String()ed: op.ts refuses a role that is not a string of 1 to 300.
+                    ...(body.role !== undefined ? { role: body.role as string } : {}),
                     ...(body.audio_key !== undefined ? { audio_key: String(body.audio_key) } : {}),
                     ...(body.language !== undefined ? { language: String(body.language) } : {}),
                     ...(body.size !== undefined ? { size: String(body.size) } : {}),

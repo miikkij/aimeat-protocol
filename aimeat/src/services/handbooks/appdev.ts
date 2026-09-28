@@ -5,6 +5,7 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-09-28 — AI roles: declare a role per kind of AI work; it runs once the owner connects it (aimeat_ai_roles).
  *   2026-09-28 — Embeddings: never proposed, only for a collection far larger than one prompt, the person decides.
  *   2026-09-28 — AI capabilities: aimeat_ai_capabilities first, prefer.* and local.*, aimeat_ai_models (V5).
  *   2026-09-28 — AI providers: the owner's routing picks the provider; AI_CAPABILITY_UNAVAILABLE; route.
@@ -92,7 +93,9 @@ the person the fix; never hide a button in silence. Name what the app prefers in
 \`prefer.image=openrouter; local.transcription=yes\` (it orders the owner's providers and adds none).
 \`aimeat_ai_models\` lists the catalogue with the \`ref\` to use. Never propose embeddings: they are for a
 collection far larger than one prompt, only when the person decides, and a vector collection does not
-fit one memory value. Skill: aimeat-ai-capabilities.
+fit one memory value. More than one kind of AI work: declare a role for each in the meta
+(\`role.summarizer=text; role.summarizer.purpose=...\`) and call with \`role\`; it runs only once the owner
+connects it, and \`aimeat_ai_roles\` shows which app roles wait. Skill: aimeat-ai-capabilities.
 
 **Reference.** \`aimeat_handbook_get\` — read the appdev / generator directives.
 

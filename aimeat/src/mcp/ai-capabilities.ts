@@ -11,6 +11,7 @@
  *   storage and the call is paid by the owner, in the agent's name, as the REST route does.
  * @structure registerAiCapabilityTools(mcp, storage, config, getAgentGaii)
  * @version-history
+ *   v1.1.0 — 2026-09-28 — aimeat_ai_transcribe and aimeat_ai_embed take `role`, the AI role the call runs as.
  *   v1.0.0 — 2026-09-28 — Initial (System 2 plan, V5).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -27,6 +28,7 @@ import { queryModels } from '../services/ai/catalog/query.js';
 import { transcribeForOwner } from '../services/ai-transcription.js';
 import { embedForOwner } from '../services/ai-embed.js';
 import { readCallerAudio } from '../services/ai-call-files.js';
+import { AI_ROLE_PARAM } from './catalog/definitions/ai-models.js';
 
 export function registerAiCapabilityTools(
   mcp: McpServer,
@@ -76,7 +78,8 @@ export function registerAiCapabilityTools(
     model: z.string().optional().describe('A model reference; omit to let the owner\'s providers choose.'),
     provider: z.string().optional().describe('A provider id or type to use, with no fallback.'),
     app_id: z.string().optional().describe('The app this is for, so its spend is attributed.'),
-  }, annotationsFor('aimeat_ai_transcribe'), async ({ storage_key, filename, language, model, provider, app_id }) => {
+    role: z.string().min(1).max(300).optional().describe(AI_ROLE_PARAM),
+  }, annotationsFor('aimeat_ai_transcribe'), async ({ storage_key, filename, language, model, provider, app_id, role }) => {
     const w = who();
     try {
       // The caller's own storage, never another namespace: the lookup /v1/ai/transcribe makes.
@@ -85,6 +88,7 @@ export function registerAiCapabilityTools(
       const r = await transcribeForOwner(storage, config, w.payer, {
         audio,
         ...(language ? { language } : {}), ...(model ? { model } : {}), ...(provider ? { provider } : {}),
+        ...(role ? { role } : {}),
         ...(app_id ? { appId: app_id } : {}), caller: w.caller, ...(w.agent ? { agent: w.agent } : {}),
       });
       return text({
@@ -99,11 +103,13 @@ export function registerAiCapabilityTools(
     model: z.string().optional().describe('A model reference; omit to let the owner\'s providers choose.'),
     provider: z.string().optional().describe('A provider id or type to use, with no fallback.'),
     app_id: z.string().optional().describe('The app this is for, so its spend is attributed.'),
-  }, annotationsFor('aimeat_ai_embed'), async ({ input, model, provider, app_id }) => {
+    role: z.string().min(1).max(300).optional().describe(AI_ROLE_PARAM),
+  }, annotationsFor('aimeat_ai_embed'), async ({ input, model, provider, app_id, role }) => {
     const w = who();
     try {
       const r = await embedForOwner(storage, config, w.payer, {
         input, ...(model ? { model } : {}), ...(provider ? { provider } : {}), ...(app_id ? { appId: app_id } : {}),
+        ...(role ? { role } : {}),
         caller: w.caller, ...(w.agent ? { agent: w.agent } : {}),
       });
       return text({

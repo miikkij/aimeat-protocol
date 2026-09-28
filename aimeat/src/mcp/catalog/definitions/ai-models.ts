@@ -7,6 +7,8 @@
  *   and the shell dispatch (src/tool-dispatch/tool-call-defs-ai-models.ts) all read their name,
  *   description and input from here.
  * @version-history
+ *   v1.3.0 — 2026-09-28 — AI roles: aimeat_ai_roles and aimeat_ai_role_set; `role` (AI_ROLE_PARAM) on
+ *     aimeat_ai_transcribe and aimeat_ai_embed.
  *   v1.2.1 — 2026-09-28 — aimeat_ai_embed's description: only when the person decided it, for a
  *     collection far larger than one prompt; never proposed by the AI.
  *   v1.2.0 — 2026-09-28 — aimeat_ai_capabilities, aimeat_ai_models, aimeat_ai_transcribe and
@@ -16,6 +18,9 @@
  *   v1.0.0 — 2026-09-28 — aimeat_ai_policy_set (System 2 plan, V2).
  */
 import { type AimeatToolDefinition, agentEverywhere } from './types.js';
+
+/** The `role` parameter of every tool that makes an AI call, in one wording (services/ai/roles.ts). */
+export const AI_ROLE_PARAM = 'The AI role to run as: one of your roles (aimeat_ai_roles), or for an app a role it declares and you bound. A named model or provider wins over it.';
 
 export const aiModelTools: AimeatToolDefinition[] = [
   {
@@ -126,6 +131,7 @@ export const aiModelTools: AimeatToolDefinition[] = [
       model: { type: 'string', description: 'A model reference; omit to let the owner\'s providers choose.' },
       provider: { type: 'string', description: 'A provider id or type to use, with no fallback.' },
       app_id: { type: 'string', description: 'The app this is for, so its spend is attributed.' },
+      role: { type: 'string', description: AI_ROLE_PARAM },
     },
   },
   {
@@ -143,6 +149,40 @@ export const aiModelTools: AimeatToolDefinition[] = [
       model: { type: 'string', description: 'A model reference; omit to let the owner\'s providers choose.' },
       provider: { type: 'string', description: 'A provider id or type to use, with no fallback.' },
       app_id: { type: 'string', description: 'The app this is for, so its spend is attributed.' },
+      role: { type: 'string', description: AI_ROLE_PARAM },
+    },
+  },
+  {
+    name: 'aimeat_ai_roles',
+    caller: 'agent',
+    visibility: agentEverywhere,
+    description: 'List the owner\'s AI roles and the AI roles apps ask for. A capability says what a model does (text, '
+      + 'vision, files, image, speech, transcription, embed); a role says what it is used for: the built-in reasoning '
+      + 'and execution, or one the owner made (for example summarizer). For each capability it needs, a role has its own '
+      + 'ordered providers and models, and it may keep to this machine (local) or set a price ceiling per call. Pass a '
+      + 'role id as `role` in an AI call to run as it. An app declares the roles it needs in its aimeat-ai meta, and an '
+      + 'app\'s role runs only after the owner binds it to one of their roles. For each app the answer lists its roles '
+      + 'with the binding (boundTo, null while unbound) and, for an unbound role the app already asked for, requestedAt: '
+      + 'show the owner which app roles wait for a binding, and propose one with aimeat_ai_role_set.',
+    input: {},
+  },
+  {
+    name: 'aimeat_ai_role_set',
+    caller: 'agent',
+    visibility: agentEverywhere,
+    description: 'Change the owner\'s AI roles, or bind an app\'s AI role to one of them, with PROPOSE-THEN-CONFIRM. With '
+      + 'roles, bindings or both and no confirm_token: changes NOTHING and returns the current and proposed change with a '
+      + 'single-use token (10 min) bound to exactly that change; show it to the owner. With the same change plus the '
+      + 'token: applies it. roles: { "<role id>": { title, purpose?, capabilities: { "<capability>": [{ provider, '
+      + 'model? }, ...] }, local?, maxCostPerCallUsd? } or null to remove } (an id is lower-case letters, digits and '
+      + '"-"; the first provider is tried first, at most 5; the built-in reasoning and execution cannot be removed). '
+      + 'bindings: { "<owner>/<file>.html#<role name>": "<your role id>" or null to unbind }. Binding an app\'s role is '
+      + 'the owner\'s approval of what that app may run. Read the roles and the providers first (aimeat_ai_roles, '
+      + 'aimeat_ai_providers).',
+    input: {
+      roles: { type: 'object', description: '{ "<role id>": { title, purpose?, capabilities: {capability: [{provider, model?}]}, local?, maxCostPerCallUsd? } or null }.' },
+      bindings: { type: 'object', description: '{ "<owner>/<file>.html#<role name>": "<your role id>" or null }.' },
+      confirm_token: { type: 'string', description: 'Token from the propose step; omit to propose.' },
     },
   },
 ];

@@ -21,6 +21,8 @@
  *   import { aiRouter } from './routes/ai.js';
  *   app.use(aiRouter(config, storage));
  * @version-history
+ *   v1.x — 2026-09-28 — AI roles: /complete, /transcribe and /image take `role` (1 to 300 characters,
+ *     readCallRole), the AI role the call runs as; a named model or provider wins over it.
  *   v1.x — 2026-09-28 — Capabilities (System 2, V5): /complete takes `files` (services/ai-call-files.ts);
  *     GET /v1/ai/available asks the gate a text call runs, instead of the old OpenRouter setting;
  *     POST /v1/ai/image answers a signed download_url for a private picture, so an app with only
@@ -86,6 +88,7 @@ import { transcribeForOwner } from '../services/ai-transcription.js';
 import { registerVoiceRoutes, voiceAppId } from './ai-voice.js';
 import { generateForOwner } from '../services/ai-image.js';
 import { readCallFiles, readCallerAudio } from '../services/ai-call-files.js';
+import { readCallRole } from '../services/ai-call-guards.js';
 import { generateDownloadToken } from '../services/download-token.js';
 
 /** How long the signed address of a private picture loads without a sign-in. */
@@ -135,12 +138,12 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
       const { payer: gaii, agent } = aiPayerOf(resolve(req));
       const {
         prompt, systemPrompt, model: modelOverride, modelRole,
-        temperature, top_p, max_tokens, app_id, images, provider, fallback, files,
+        temperature, top_p, max_tokens, app_id, images, provider, fallback, files, role: roleField,
       } = req.body as {
         prompt?: string; systemPrompt?: string; model?: string;
         modelRole?: 'reasoning' | 'execution';
         temperature?: number; top_p?: number; max_tokens?: number;
-        app_id?: string; images?: string[]; provider?: string; fallback?: boolean; files?: unknown;
+        app_id?: string; images?: string[]; provider?: string; fallback?: boolean; files?: unknown; role?: unknown;
       };
 
       // Bound the image payload (vision attachments) — keep a runaway request from ballooning.
@@ -156,6 +159,8 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
       }
 
       try {
+        // The AI role the call runs as (services/ai/roles.ts), refused before anything is read.
+        const role = readCallRole(roleField);
         // Files for a model that reads them itself (the files capability), from the caller's own
         // storage or a data: URL (services/ai-call-files.ts).
         const fileList = files !== undefined ? await readCallFiles(storage, resolve(req), files) : undefined;
@@ -170,6 +175,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
           // A provider the call names (an id of the owner's, or a type) and its word on fallback.
           ...(typeof provider === 'string' && provider ? { provider } : {}),
           ...(typeof fallback === 'boolean' ? { fallback } : {}),
+          ...(role ? { role } : {}),
         });
         // TARGET-058: the provenance of the bytes we are about to hand back, on the ONE envelope
         // carrier. `meta`, never `data` — the `data` shape is what every published app reads, and it
@@ -232,11 +238,16 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
       res.setTimeout(180_000);
 
       const gaii = resolve(req);
-      const { storage_key, audio_base64, mime, filename, model, language, verbose, app_id, temperature, provider, fallback } = req.body as {
+      const { storage_key, audio_base64, mime, filename, model, language, verbose, app_id, temperature, provider, fallback, role: roleField } = req.body as {
         storage_key?: string; audio_base64?: string; mime?: string; filename?: string;
         model?: string; language?: string; verbose?: boolean; app_id?: string; temperature?: number;
-        provider?: string; fallback?: boolean;
+        provider?: string; fallback?: boolean; role?: unknown;
       };
+      let role: string | undefined;
+      try { role = readCallRole(roleField); } catch (e) {
+        const r = e as AiCompletionError;
+        return res.status(r.status).json(error(config.nodeId, r.code, r.message));
+      }
 
       let audio: { data: Buffer; mime: string; filename: string };
 
@@ -278,6 +289,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
           ...(agent ? { agent } : {}), ...aiCallerOf(req, config.nodeId),
           ...(typeof provider === 'string' && provider ? { provider } : {}),
           ...(typeof fallback === 'boolean' ? { fallback } : {}),
+          ...(role ? { role } : {}),
         });
         const prov = r.provenance ? servedProvenanceOf(config, r.provenance, { full: true }) : undefined;
         setProvenanceHeaders(res, prov);
@@ -324,12 +336,13 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
       // Paid by the human, in the agent's name, like /v1/ai/complete; the picture lands in the
       // payer's storage, which is where the MCP tool has always put it.
       const { payer: gaii, agent } = aiPayerOf(resolve(req));
-      const { prompt, model, size, storage_key, public: isPublic, app_id, provider, fallback } = req.body as {
+      const { prompt, model, size, storage_key, public: isPublic, app_id, provider, fallback, role: roleField } = req.body as {
         prompt?: string; model?: string; size?: string; storage_key?: string;
-        public?: boolean; app_id?: string; provider?: string; fallback?: boolean;
+        public?: boolean; app_id?: string; provider?: string; fallback?: boolean; role?: unknown;
       };
 
       try {
+        const role = readCallRole(roleField);
         // No cancel on a client disconnect: the picture is stored and billed when it arrives, as it
         // always has been, because a provider may charge for a generation the node stopped reading.
         const r = await generateForOwner(storage, config, gaii, {
@@ -338,6 +351,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
           ...(agent ? { agent } : {}), ...aiCallerOf(req, config.nodeId),
           ...(typeof provider === 'string' && provider ? { provider } : {}),
           ...(typeof fallback === 'boolean' ? { fallback } : {}),
+          ...(role ? { role } : {}),
         });
         const prov = r.provenance ? servedProvenanceOf(config, r.provenance, { full: true }) : undefined;
         setProvenanceHeaders(res, prov);

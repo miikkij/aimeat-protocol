@@ -10,6 +10,9 @@
  * @structure useProviders() → pv (state + handlers) · CAPS · PROVIDER_TYPES · slug
  * @usage const pv = useProviders(); … renderProviders(ctx) reads ctx.pv
  * @version-history
+ *   v1.1.0 — 2026-09-28 — A capability's editor holds its model and the settings its kind takes: the
+ *     speech voice, the transcription language, OpenRouter's PDF engine, and the default fine-tuning
+ *     of text, vision and files (AI roles).
  *   v1.0.0 — 2026-09-28 — Initial (System 2): the page for the providers, the routing and the model
  *     policy the node has had since V2 to V6, on the page's existing components.
  */
@@ -53,6 +56,30 @@ function bodyOf(p, capabilities) {
     auth: { type: p.auth?.type === 'none' ? 'none' : 'key' },
     capabilities,
   };
+}
+
+/** What the editor holds for one capability: its model and the settings its kind takes, as text. */
+function capDraftOf(v) {
+  const p = v?.params || {};
+  const s = (n) => (n != null ? String(n) : '');
+  return {
+    model: v?.model || '', voice: v?.voice || '', language: v?.language || '', parser: v?.parser || '',
+    temperature: s(p.temperature), top_p: s(p.top_p), max_tokens: s(p.max_tokens), reasoning: p.reasoning || '',
+  };
+}
+
+/** The patch a capability's editor saves: the model, and the settings of its kind. */
+export function capPatchOf(c, d, type) {
+  const patch = { model: d.model.trim() };
+  if (c === 'speech') patch.voice = d.voice.trim() || undefined;
+  if (c === 'transcription') patch.language = d.language || undefined;
+  if (c === 'files' && type === 'openrouter') patch.parser = d.parser || undefined;
+  if (c === 'text' || c === 'vision' || c === 'files') {
+    const num = (v) => (String(v).trim() === '' ? undefined : Number(v));
+    const params = { temperature: num(d.temperature), top_p: num(d.top_p), max_tokens: num(d.max_tokens), reasoning: d.reasoning || undefined };
+    patch.params = Object.values(params).some((v) => v !== undefined) ? params : undefined;
+  }
+  return patch;
 }
 
 /** The capability config without the view's own additions (model_status, model_retires_at). */
@@ -110,7 +137,7 @@ export function useProviders({ confirm, toast }) {
     setOpenId((cur) => (cur === id ? null : id));
     setKeyDraft('');
     const p = find(id);
-    setModelDraft(Object.fromEntries(Object.entries(p?.capabilities || {}).map(([c, v]) => [c, v?.model || ''])));
+    setModelDraft(Object.fromEntries(Object.entries(p?.capabilities || {}).map(([c, v]) => [c, capDraftOf(v)])));
   };
 
   const setDraft = (patch) => setDraftState((d) => {
@@ -187,6 +214,7 @@ export function useProviders({ confirm, toast }) {
     // (services/ai/route-plan.ts inPool); the server refuses a pool entry with no model.
     if (next.model) next.pool = true;
     else { delete next.model; next.pool = false; }
+    for (const k of ['voice', 'language', 'parser', 'params']) if (next[k] === undefined) delete next[k];
     caps[c] = next;
     setBusy('cap');
     try {
@@ -291,7 +319,7 @@ export function useProviders({ confirm, toast }) {
     view, policy, error, providers, owned, openId, adding, draft, keyDraft, modelDraft, testCap,
     routeDraft, rulesDraft, policyDraft, busy, msg, addMsg, routeMsg, policyMsg,
     load, toggle, setAdding, setDraft, toggleDraftCap, add, setKeyDraft, saveKey, removeKey,
-    setModelDraft: (c, v) => setModelDraft((d) => ({ ...d, [c]: v })), saveCap, setTestCap, test, remove,
+    setModelDraft: (c, patch) => setModelDraft((d) => ({ ...d, [c]: { ...(d[c] || capDraftOf(null)), ...patch } })), saveCap, setTestCap, test, remove,
     editRouting, setRoute, setRule, saveRouting, editPolicy, setPolicyField, savePolicy,
   };
 }

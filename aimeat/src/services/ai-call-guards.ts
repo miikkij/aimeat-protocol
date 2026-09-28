@@ -6,8 +6,10 @@
  *   estimate: the provider host allowlist, the owner's app allowlist, the owner's key, the daily
  *   budget and the per-app cap. A pure move out of ai-completion.ts (max-file-lines), which
  *   re-exports every name, so no importer changes.
- * @structure estimateCostUsd · assertProviderAllowed · assertAppAllowed · decryptOwnerKey · assertWithinBudget
+ * @structure estimateCostUsd · assertProviderAllowed · assertAppAllowed · decryptOwnerKey · assertWithinBudget ·
+ *   readCallRole
  * @version-history
+ *   v1.1.0 — 2026-09-28 — readCallRole: the one check of a call's `role` field (AI roles), shared by the routes.
  *   v1.0.0 — 2026-09-28 — Moved from ai-completion.ts, unchanged.
  */
 import type { AimeatConfig } from '../config.js';
@@ -114,4 +116,22 @@ export function assertWithinBudget(
     }
   }
   return dailyBudget;
+}
+
+/** The longest AI role name a call may give: an app's `<name>` or an owner's role id, with room. */
+export const CALL_ROLE_MAX_CHARS = 300;
+
+/**
+ * The `role` a call names (services/ai/roles.ts), read from a request body: absent, or a string of 1
+ * to 300 characters. Anything else is refused with INVALID_BODY before the call is planned, so a
+ * number or an empty string is never taken for "no role". Whether the role exists is prepareAiCall's
+ * question, answered with AI_ROLE_UNKNOWN, AI_ROLE_NOT_DECLARED or AI_ROLE_NOT_BOUND.
+ */
+export function readCallRole(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'string' || value.length < 1 || value.length > CALL_ROLE_MAX_CHARS) {
+    throw new AiCompletionError('INVALID_BODY', 400,
+      `role must be a string of 1 to ${CALL_ROLE_MAX_CHARS} characters: one of your AI roles (GET /v1/ai/roles), or for an app a role it declares.`);
+  }
+  return value;
 }

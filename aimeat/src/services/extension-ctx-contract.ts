@@ -13,6 +13,7 @@
  * @structure MemoryWriteResult · ExtensionCtx · EXT_HASH_REFERENCE_JS · ExtensionLimits
  * @usage import type { ExtensionCtx } from './extension-runtime.js';  // unchanged
  * @version-history
+ *   v1.4.0 — 2026-09-28 — `ctx.ai.start` takes `role`, the AI role the job's call runs as.
  *   v1.3.0 — 2026-09-28 — System 2 plan, V5: `ctx.ai.start` takes `op` (text, image, transcribe),
  *     `provider`, `audio_key`, `language` and `size`, the fields POST /v1/ai/jobs takes.
  *   v1.2.0 — 2026-09-06 — `fetch` takes a third, host-only argument. The VM bridge had written its
@@ -117,6 +118,8 @@ export interface ExtensionCtx {
             op?: 'text' | 'image' | 'transcribe';
             /** A provider id or type. Naming one turns fallback off. */
             provider?: string;
+            /** The AI role the call runs as: one of the owner's role ids (GET /v1/ai/roles). */
+            role?: string;
             /** For 'transcribe' (required there): the storage key of the audio. */
             audio_key?: string;
             /** For 'transcribe': an ISO-639-1 hint. */

@@ -11,6 +11,7 @@
  * @usage const r = await AIMEAT.ai.stream({ app_id, prompt, onText: (d, all) => (el.textContent = all) });
  *   const s = await AIMEAT.ai.speak({ app_id, input: 'Hello' }); new Audio(URL.createObjectURL(s.blob)).play();
  * @version-history
+ *   v1.1.0 - 2026-09-28 - stream() and speak() send `role`, the AI role the call runs as.
  *   v1.0.0 - 2026-09-28 - System 2 plan, V5. Initial: stream() and speak() for apps.
  */
 import { getSession } from '../_core/session.js';
@@ -117,9 +118,10 @@ export async function stream(opts) {
   const body = {
     app_id: opts.app_id, messages, model: opts.model,
     temperature: opts.temperature, top_p: opts.top_p, max_tokens: opts.max_tokens, reasoning: opts.reasoning,
+    role: typeof opts.role === 'string' && opts.role ? opts.role : undefined,
   };
   return paid(opts, {
-    key: ['ai-stream', opts.app_id, opts.model, JSON.stringify(messages)],
+    key: ['ai-stream', opts.app_id, opts.model, opts.role, JSON.stringify(messages)],
     what: 'Run an AI request on your own AI provider.',
   }, async () => {
     const response = await postStream('/v1/ai/stream', body, opts.signal);
@@ -162,9 +164,10 @@ export async function speak(opts) {
   const body = {
     app_id: opts.app_id, input: String(input), model: opts.model, voice: opts.voice,
     response_format: format, speed: opts.speed, instructions: opts.instructions,
+    role: typeof opts.role === 'string' && opts.role ? opts.role : undefined,
   };
   return paid(opts, {
-    key: ['ai-speak', opts.app_id, opts.model, opts.voice, format, opts.store ? 'store' : '', String(input)],
+    key: ['ai-speak', opts.app_id, opts.model, opts.voice, format, opts.role, opts.store ? 'store' : '', String(input)],
     what: 'Read text aloud on your own AI provider.',
     remember: 'ai-speak:' + (opts.app_id || 'app'),
     estimate: async () => {

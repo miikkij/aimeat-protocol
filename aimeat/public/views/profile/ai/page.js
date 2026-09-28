@@ -12,6 +12,7 @@
  *   secConsumers
  * @usage import { renderPage } from './ai/page.js';
  * @version-history
+ *   v1.28.0 -- 2026-09-28 -- AI roles (wish-tekoalyn-roolit): the six fixed model roles (05) and the fine-tuning (07) leave the page, since a capability's model and fine-tuning are set on its provider and what a model is for is a role; 04 is the roles and the apps' roles (ai/roles-section.js), the model policy is 05, the budget 06, the consumers 07. The strip's fourth figure counts the roles and says how many app roles wait for a binding.
  *   v1.27.0 -- 2026-09-28 -- Three sections after the connection: 02 the providers, 03 the routing, 04 the model policy (ai/providers.js, System 2); the sections after them are 05 to 08.
  *   v1.26.0 -- 2026-09-26 -- Every part is a kit component (SettingsPage with its head, strip and rail as data; FigureStrip; Facts with a value left to the model grey; Meter; List; More; Box; Tabs; TextField, Select, Check; Label; Note; Action; Layout): the page passes data and writes no class. The key field stays hidden with no eye, kept out of password managers, as on main (page group G8).
  *   v1.25.0 -- 2026-09-26 -- The provider's radio dots and the retry check box carry the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
@@ -64,15 +65,15 @@ import { List, More } from '/components/List.js';
 import { Box } from '/components/Box.js';
 import { Tabs } from '/components/Tabs.js';
 import { TextField } from '/components/TextField.js';
-import { Select } from '/components/Select.js';
 import { Check } from '/components/Check.js';
 import { Label } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Action, Loud, Actions } from '/components/Action.js';
 import { Row as Line } from '/components/Layout.js';
-import { x, ROLES, money, compact, dateWord, crumb, pageLinks } from './frame.js';
-import { roleRow, appRow } from './rows.js';
+import { x, money, compact, dateWord, crumb, pageLinks } from './frame.js';
+import { appRow } from './rows.js';
 import { secProviders, secRouting, secPolicy } from './providers.js';
+import { secRoles, roleTitle } from './roles-section.js';
 import { Hint } from '/components/Hint.js';
 
 const SHOWN = 8;
@@ -82,7 +83,6 @@ const msg = (m) => (m ? html`<${Note} kind="message" error=${!!m.error}>${m.text
 export function renderPage(ctx) {
   const s = ctx.settings;
   const loading = !s;
-  const chosen = ROLES.filter((r) => s?.[r.field]).length;
   return html`
     <${SettingsPage} name="ai"
       crumb=${crumb()}
@@ -93,11 +93,10 @@ export function renderPage(ctx) {
         { id: 'ai-connection', num: '01', label: x('secConnection'), count: '' },
         { id: 'ai-providers', num: '02', label: x('pv.title'), count: ctx.pv.view ? String(ctx.pv.providers.length) : '' },
         { id: 'ai-routing', num: '03', label: x('rt.title'), count: '' },
-        { id: 'ai-policy', num: '04', label: x('pol.title'), count: ctx.pv.policy ? x('pol.mode.' + (ctx.pv.policy.policy?.mode || 'open')) : '' },
-        { id: 'ai-models', num: '05', label: x('secModels'), count: s ? `${chosen} / ${ROLES.length}` : '' },
+        { id: 'ai-roles', num: '04', label: x('rl.title'), count: ctx.rl.view ? String(ctx.rl.roles.length) : '' },
+        { id: 'ai-policy', num: '05', label: x('pol.title'), count: ctx.pv.policy ? x('pol.mode.' + (ctx.pv.policy.policy?.mode || 'open')) : '' },
         { id: 'ai-budget', num: '06', label: x('secBudget'), count: ctx.usage ? x('perDayShort', { n: money(ctx.usage.daily_budget_usd) }) : '' },
-        { id: 'ai-params', num: '07', label: x('secParams'), count: '' },
-        { id: 'ai-consumers', num: '08', label: x('secConsumers'), count: '' },
+        { id: 'ai-consumers', num: '07', label: x('secConsumers'), count: '' },
       ]}
       pagesLabel=${x('pages')}
       pages=${pageLinks(ctx.navigate)}
@@ -106,10 +105,9 @@ export function renderPage(ctx) {
         ${secConnection(ctx)}
         ${secProviders(ctx, '02')}
         ${secRouting(ctx, '03')}
-        ${secPolicy(ctx, '04')}
-        ${secModels(ctx, chosen)}
+        ${secRoles(ctx, '04')}
+        ${secPolicy(ctx, '05')}
         ${secBudget(ctx)}
-        ${secParams(ctx)}
         ${secConsumers(ctx)}`}
     <//>`;
 }
@@ -119,7 +117,7 @@ function mast(ctx) {
   const s = ctx.settings;
   const keyed = ctx.keyed;
   const marks = !s ? [] : keyed
-    ? [{ label: s.provider === 'openrouter' ? x('chipOwnKey') : x('chipOwnProvider'), tone: 'sun' }, { label: x('provider.' + (s.provider || 'openrouter')) }, ctx.models.length ? { label: x('chipModels', { n: ctx.models.length }) } : null, ctx.usage ? { label: x('chipBudget', { n: money(ctx.usage.daily_budget_usd) }) } : null]
+    ? [{ label: s.provider === 'openrouter' ? x('chipOwnKey') : x('chipOwnProvider'), tone: 'sun' }, { label: x('provider.' + (s.provider || 'openrouter')) }, ctx.usage ? { label: x('chipBudget', { n: money(ctx.usage.daily_budget_usd) }) } : null]
     : [{ label: x('chipNoKey'), tone: 'coral' }, ctx.chat && ctx.chat.allowance_remaining_usd > 0 ? { label: x('chipHouseKey', { host: ctx.host, n: money(ctx.chat.allowance_remaining_usd) }) } : null, { label: x('provider.openrouter') }];
   const desc = !s ? '' : keyed ? x('desc', { host: ctx.host }) : x('descNoKey', { host: ctx.host, n: money(ctx.chat?.allowance_remaining_usd || 0) });
   const loud = keyed
@@ -139,14 +137,15 @@ function strip(ctx) {
   const u = ctx.usage;
   const r = ctx.roll;
   if (!s) return html`<${FigureStrip} loading=${4} />`;
-  const chosen = ROLES.filter((role) => s[role.field]);
+  const rl = ctx.rl;
   const payer = ctx.keyed ? x('stripOwnKey') : ctx.host;
   return html`<${FigureStrip} items=${[
     { key: 'pays', n: payer, tone: 'coral', label: x('stripPays'),
       sub: ctx.keyed ? x('stripPaysSub', { provider: x('provider.' + (s.provider || 'openrouter')), host: ctx.host }) : (ctx.chat ? x('stripAllowance', { n: money(ctx.chat.allowance_remaining_usd || 0) }) : '') },
     { key: 'today', n: u ? money(u.spent_today_usd) : '…', label: x('stripToday'), sub: u ? x('stripTodaySub', { n: money(u.daily_budget_usd) }) : '' },
     { key: 'month', n: r ? money(r.cost) : '…', label: x('stripMonth'), sub: r ? x('stripMonthSub', { calls: r.calls, apps: r.apps.length }) : '' },
-    { key: 'roles', n: `${chosen.length} / ${ROLES.length}`, label: x('stripRoles'), sub: chosen.length ? chosen.map((role) => x('role.' + role.id).toLowerCase()).join(' · ') : x('stripRolesNone') },
+    { key: 'roles', n: rl.view ? String(rl.roles.length) : '…', label: x('rl.title'), tone: rl.waiting ? 'coral' : undefined,
+      sub: rl.view ? (rl.waiting ? x('rl.stripWaiting', { n: rl.waiting }) : rl.roles.map(roleTitle).join(' · ')) : '' },
   ]} />`;
 }
 
@@ -162,7 +161,6 @@ function secConnection(ctx) {
     ${!isOr ? html`<${TextField} box type="url" value=${d.baseUrl} placeholder="https://…/v1" ariaLabel=${x('baseUrl')} onInput=${(v) => ctx.setConn({ baseUrl: v })} />` : null}`;
   const keyDoors = ctx.keyed ? html`
     <${Action} small soft disabled=${ctx.busy === 'test'} onClick=${() => ctx.testConnection()}>${ctx.busy === 'test' ? x('testing') : x('testConnection')}<//>
-    <${Action} small soft disabled=${ctx.busy === 'models'} onClick=${() => ctx.loadModels()}>${ctx.busy === 'models' ? x('loading') : x('refreshModels')}<//>
     ${s.hasApiKey ? html`<${Action} small soft tone="danger" onClick=${() => ctx.removeKey()}>${x('removeKey')}<//>` : null}` : null;
   const key = html`
     <${TextField} box unmanaged value=${d.apiKey} placeholder=${s.hasApiKey ? x('keyMasked') : 'sk-or-v1-…'} ariaLabel=${x('keyLabel')}
@@ -179,22 +177,7 @@ function secConnection(ctx) {
     <//>`;
 }
 
-/* ── 02 ───────────────────────────────────────────────────────────────────────────────────────── */
-
-function secModels(ctx, chosen) {
-  return html`
-    <${PageSection} id="ai-models" num="05" title=${x('secModels')} count=${x('secModelsSub', { n: chosen, total: ROLES.length })}>
-      ${ctx.modelsError ? html`<${Note} kind="message" error>${ctx.modelsError}<//>` : null}
-      <${List} cols="name-who-desc-doors" head=${[x('colRole'), x('colModel'), x('colWhat'), '']}>
-        ${ROLES.map((role) => roleRow(ctx, role))}
-      <//>
-      ${msg(ctx.modelsMsg)}
-      <${Hint}>${x('hintUnits')}<//>
-      <${Hint}>${ctx.keyed ? x('hintModels') : x('hintModelsNoKey')}<//>
-    <//>`;
-}
-
-/* ── 03 ───────────────────────────────────────────────────────────────────────────────────────── */
+/* ── 06 ───────────────────────────────────────────────────────────────────────────────────────── */
 
 function secBudget(ctx) {
   const u = ctx.usage;
@@ -259,56 +242,13 @@ function chart(ctx, history, r) {
     <//>`;
 }
 
-/* ── 04 ───────────────────────────────────────────────────────────────────────────────────────── */
-
-function secParams(ctx) {
-  const s = ctx.settings;
-  const p = ctx.params;   // the draft while editing
-  const e = ctx.paramsEditing;
-  const count = [s.temperature != null ? x('tempShort', { n: s.temperature }) : '', s.temperature == null && s.top_p == null && s.max_tokens == null ? x('allDefaults') : ''].filter(Boolean).join(' · ');
-  const field = (key, min, max, step) => html`<${TextField} type="number" size="short" min=${min} max=${max} step=${step} value=${p[key]} placeholder=${x('default')} ariaLabel=${x('param.' + key)} onInput=${(v) => ctx.setParams({ [key]: v })} />`;
-  // A value left to the model is said in grey (main's .is-unset): the Facts' missing value.
-  const reasoningSet = s.reasoning && (s.reasoning.enabled === false || s.reasoning.effort);
-  const retry = e
-    ? html`<${Line} wrap gap="medium">
-        <${Check} inline checked=${p.autoRetry} onChange=${(on) => ctx.setParams({ autoRetry: on })}>${x('retryOn')}<//>
-        ${p.autoRetry ? html`<${Note} inline>${x('retryMax')}<//>${field('maxRetries', 1, 10, 1)}` : null}
-      <//>`
-    : (s.autoRetry ? x('retryBody', { n: s.maxRetries || 3 }) : x('retryOff'));
-  const reasoning = e
-    ? html`<${Select} fit ariaLabel=${x('param.reasoning')} value=${p.reasoning} onChange=${(v) => ctx.setParams({ reasoning: v })}
-        options=${['', 'off', 'low', 'medium', 'high'].map((k) => [k, x('reasoning.' + (k || 'default'))])} />`
-    : (s.reasoning && s.reasoning.enabled === false
-      ? x('reasoningOff')
-      : s.reasoning && s.reasoning.effort
-        ? x('reasoningOn', { level: x('reasoning.' + s.reasoning.effort) })
-        : x('modelDefault'));
-  return html`
-    <${PageSection} id="ai-params" num="07" title=${x('secParams')} count=${count}>
-      <${Note} kind="lead">${x('paramsIntro')}<//>
-      <${Facts} rows=${[
-        { k: x('param.temperature'), v: e ? field('temperature', 0, 2, 0.1) : (s.temperature != null ? x('tempBody', { n: s.temperature }) : x('modelDefault')), missing: !e && s.temperature == null, sub: x('tempSub') },
-        { k: x('param.top_p'), v: e ? field('top_p', 0, 1, 0.05) : (s.top_p != null ? String(s.top_p) : x('modelDefault')), missing: !e && s.top_p == null, sub: x('topPSub') },
-        { k: x('param.max_tokens'), v: e ? field('max_tokens', 256, 128000, 256) : (s.max_tokens != null ? x('tokensN', { n: compact(s.max_tokens) }) : x('modelDefault')), missing: !e && s.max_tokens == null, sub: x('maxTokensSub') },
-        { k: x('param.retry'), v: retry, sub: x('retrySub') },
-        { k: x('param.reasoning'), v: reasoning, missing: !e && !reasoningSet, sub: x('reasoningSub') },
-      ]} />
-      <${Actions}>
-        ${e
-          ? html`<${Action} small disabled=${ctx.busy === 'params'} onClick=${() => ctx.saveParams()}>${x('save')}<//><${Action} small soft onClick=${() => ctx.setParamsEditing(false)}>${x('cancel')}<//>`
-          : html`<${Action} small onClick=${() => ctx.setParamsEditing(true)}>${x('change')}<//>`}
-      <//>
-      ${msg(ctx.paramsMsg)}
-    <//>`;
-}
-
-/* ── 05 ───────────────────────────────────────────────────────────────────────────────────────── */
+/* ── 07 ───────────────────────────────────────────────────────────────────────────────────────── */
 
 function secConsumers(ctx) {
   const top = (ctx.roll?.apps || []).filter((a) => !a.app.includes(':')).slice(0, 3).map((a) => a.app);
   const chat = ctx.chat;
   return html`
-    <${PageSection} id="ai-consumers" num="08" title=${x('secConsumers')} count=${null}>
+    <${PageSection} id="ai-consumers" num="07" title=${x('secConsumers')} count=${null}>
       <${Note} kind="lead">${x('consumersIntro')}<//>
       <${Facts} rows=${[
         { k: x('consumer.apps'), v: `${x('consumerAppsBody')}${top.length ? ` ${x('consumerAppsTop', { apps: top.join(', ') })}` : ''}` },

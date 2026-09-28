@@ -22,6 +22,8 @@
  * @version-history
  *   v1.0.0 — 2026-09-28 — Initial (V5 of the System 2 plan).
  *   v1.0.1 — 2026-09-28 — The embed howTo says embeddings are rare and the person's decision.
+ *   v1.1.0 — 2026-09-28 — `roles`: an app's declared AI roles, each bound or not with the fix; the
+ *     owner's roles for the owner and their agents (services/ai/roles.ts).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
@@ -30,8 +32,9 @@ import type { AiCapability, AiOp } from './types.js';
 import { TYPE_CAPABILITIES, typeAllowed, type AiProvider } from './providers.js';
 import { providersForOwner } from './provider-store.js';
 import { catalogMeta, catalogModel } from './catalog/store.js';
-import { readOwnerAiPolicy } from './policy-store.js';
+import { readOwnerAiPolicy, appAiMetaOf } from './policy-store.js';
 import type { CallerClass } from './policy.js';
+import { readRoles, rolesWithLegacy, bindingKey } from './roles.js';
 
 export const CAPABILITY_ORDER: readonly AiCapability[] = ['text', 'vision', 'files', 'image', 'speech', 'transcription', 'embed'];
 
@@ -171,6 +174,34 @@ export interface CapabilityCaller {
   appId?: string;
 }
 
+/**
+ * The roles this caller can run as (services/ai/roles.ts). An app sees the roles it declares, each
+ * bound or not with the fix, so it can show the owner what to connect instead of failing silently;
+ * the owner and their agents see the owner's roles.
+ */
+async function rolesOf(
+  storage: Storage, gaii: string, ctx: CapabilityCaller, prefs: Record<string, unknown>,
+  providers: { node: AiProvider[]; owner: AiProvider[] },
+): Promise<unknown[] | undefined> {
+  const record = await readRoles(storage, gaii);
+  const appRef = ctx.verifiedApp ?? ctx.appId;
+  const app = appRef ? await appAiMetaOf(storage, gaii, appRef) : undefined;
+  if (app?.roles?.length && (ctx.verifiedApp || ctx.caller === 'app' || ctx.appId)) {
+    return app.roles.map((r) => {
+      const bound = record.bindings[bindingKey(app.address ?? appRef!, r.name)];
+      return {
+        name: r.name, capabilities: r.capabilities, ...(r.purpose ? { purpose: r.purpose } : {}), bound: !!bound,
+        ...(bound ? {} : { fix: `The owner connects the role '${r.name}' to one of their AI roles on the AI page, or you propose it with aimeat_ai_role_set and the owner confirms. Until then a call with role '${r.name}' is refused.` }),
+      };
+    });
+  }
+  if (ctx.caller === 'app') return undefined;
+  return Object.values(rolesWithLegacy(record, prefs, providers)).map((r) => ({
+    id: r.id, title: r.title, ...(r.purpose ? { purpose: r.purpose } : {}),
+    capabilities: Object.keys(r.capabilities).filter((c) => r.capabilities[c as AiCapability]?.length),
+  }));
+}
+
 /** The whole answer for one caller. `gaii` is the payer: the owner, also for an agent's call. */
 export async function aiCapabilitiesView(
   storage: Storage, config: AimeatConfig, gaii: string, ctx: CapabilityCaller,
@@ -187,8 +218,10 @@ export async function aiCapabilitiesView(
   const switchOf: Record<CallerClass, keyof typeof policy.appliesTo> = { owner: 'owner', chat: 'chat', agent: 'agents', app: 'apps' };
   const meta = catalogMeta();
   const textState = states[0];
+  const roles = await rolesOf(storage, gaii, ctx, prefs, { node, owner });
   return {
     capabilities: Object.fromEntries(CAPABILITY_ORDER.map((cap, i) => [cap, states[i]])),
+    ...(roles ? { roles } : {}),
     policy: { mode: policy.mode, appliesToCaller: policy.mode !== 'open' && !!policy.appliesTo[switchOf[ctx.caller]] },
     budget: {
       dailyBudgetUsd: getDailyBudgetUsd(prefs), spentTodayUsd: usage.total_cost_usd,

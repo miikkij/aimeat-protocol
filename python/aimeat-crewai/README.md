@@ -201,6 +201,17 @@ the owner's preference decides, then the node's default, and the answer says whi
 With no `model=`, `node_llm()` sends the placeholder `aimeat-node-chooses`. `GET <node>/v1/llm/models`
 lists the models the owner's policy allows.
 
+**A role says what the calls are for (0.30.1+).** `node_llm(role="reasoning")` runs the crew's
+calls as one of the owner's AI roles: `reasoning` and `execution` are built in, and the owner can
+make others (`GET <node>/v1/ai/roles` lists them). The owner's role names the providers and models
+to try, in order. The role travels in the `X-AIMEAT-AI-Role` header on every call; a role the owner
+does not have is refused `400 AI_ROLE_UNKNOWN`.
+
+```python
+planner = Agent(role="Planner", goal="...", backstory="...", llm=node_llm(agent_name="company-crew", role="reasoning"))
+doer = Agent(role="Doer", goal="...", backstory="...", llm=node_llm(agent_name="company-crew", role="execution"))
+```
+
 Both CrewAI code paths reach the route: CrewAI 1.x sends an `openai/` model with a `base_url` to
 its native OpenAI client (LiteLLM is not needed), and `is_litellm=True` or CrewAI before 1.0 go
 through LiteLLM. A node refusal (such as `402 AGENT_QUOTA_EXHAUSTED`) comes out of `llm.call()` as

@@ -8,7 +8,7 @@
 > offers. The owner pays and sets the rules; the node holds the keys and applies
 > the rules.
 > **Status:** Available since AIMEAT 1.13.x via `/v1/libs/aimeat-ai.js`. Providers,
-> capabilities, files, streaming and embeddings: updated 2026-09-28.
+> capabilities, files, streaming, embeddings and AI roles: updated 2026-09-28.
 
 ---
 
@@ -462,6 +462,47 @@ does not know.
 A call can also name a `provider` (a provider type) and `fallback: false` (do
 not move on to another provider). An app cannot know the owner's provider ids,
 so prefer the meta over naming providers in calls.
+
+## AI roles: say what a model is for
+
+A capability says what a model does. A **role** says what it is used for: a
+summarizer, a writer, an illustrator. When an app has more than one kind of AI
+work, or one piece of work that needs its own fine-tuning, declare a role for
+each in the `aimeat-ai` meta, and call with `role`:
+
+```html
+<meta name="aimeat-ai" content="generates=text,image; discloses=yes;
+  role.summarizer=text; role.summarizer.purpose=Short summaries of a recipe; role.summarizer.temperature=0.2;
+  role.illustrator=text+image; role.illustrator.purpose=A picture for each recipe">
+```
+
+```javascript
+const r = await AIMEAT.ai.complete({ app_id, prompt, role: 'summarizer' });
+```
+
+| Key | What it says |
+|---|---|
+| `role.<name>=` | The capabilities the role needs, joined with `+` (`text`, `text+image`). The name is lower-case letters, digits and `-`. |
+| `role.<name>.purpose=` | What the role is for, in a few words the owner reads. No `;` inside. |
+| `role.<name>.local=yes` | Only providers on this machine. |
+| `role.<name>.context=` | The least context the role needs, in tokens. |
+| `role.<name>.temperature=`, `.top_p=`, `.max_tokens=`, `.reasoning=` | The fine-tuning this role wants. It overrides the provider's default, and the call's own value overrides it. `reasoning` is `off`, `low`, `medium` or `high`. |
+
+**A role says what the work needs, never which model.** The owner connects your
+role to one of their own roles, and theirs names the providers and models to try
+in order. So the app works on whatever providers the owner has, from any vendor.
+
+**Nothing runs until the owner connects the role.** A call with a role the owner
+has not connected is refused with `AI_ROLE_NOT_BOUND` (409), and the owner sees
+the request on the AI page with what the role needs. Check first:
+`AIMEAT.ai.capabilities()` answers `roles`, each with `bound` and, when it is
+not, a `fix` sentence to show. Keep the button visible and show the fix beside
+it. The owner's AI can propose the connection with `aimeat_ai_role_set`, and the
+owner confirms it.
+
+Other refusals: `AI_ROLE_NOT_DECLARED` (the meta does not declare that role) and
+`AI_ROLE_LACKS_CAPABILITY` (the owner's role has no provider for the capability
+the call needs). The owner's model policy still applies to every role.
 
 ---
 

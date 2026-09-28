@@ -15,6 +15,7 @@
  *   Both need `ai:use` (an owner session passes), as every AI route does (auth/ai-gate.ts).
  * @structure aiCapabilitiesRouter(config, storage)
  * @version-history
+ *   v1.1.0 — 2026-09-28 — POST /v1/ai/embed takes `role`, the AI role the call runs as (readCallRole).
  *   v1.0.0 — 2026-09-28 — Initial (V5 of the System 2 plan).
  */
 import { Router, type Request, type Response } from 'express';
@@ -29,6 +30,7 @@ import { aiPayerOf } from '../services/agent-ai-keys.js';
 import { AiCompletionError } from '../services/ai/errors.js';
 import { aiCapabilitiesView } from '../services/ai/capabilities.js';
 import { embedForOwner } from '../services/ai-embed.js';
+import { readCallRole } from '../services/ai-call-guards.js';
 import { aiCallerOf } from './ai-policy.js';
 
 export function aiCapabilitiesRouter(config: AimeatConfig, storage: Storage): Router {
@@ -61,17 +63,20 @@ export function aiCapabilitiesRouter(config: AimeatConfig, storage: Storage): Ro
     req.setTimeout(180_000);
     res.setTimeout(180_000);
     const { payer, agent } = aiPayerOf(resolveIdentity(req.auth!, config.nodeId));
-    const { input, model, app_id, provider, fallback } = (req.body ?? {}) as {
-      input?: unknown; model?: string; app_id?: string; provider?: string; fallback?: boolean;
+    const { input, model, app_id, provider, fallback, role: roleField } = (req.body ?? {}) as {
+      input?: unknown; model?: string; app_id?: string; provider?: string; fallback?: boolean; role?: unknown;
     };
     const texts = typeof input === 'string' ? [input] : input;
     try {
+      // The AI role the call runs as (services/ai/roles.ts), 1 to 300 characters or absent.
+      const role = readCallRole(roleField);
       const r = await embedForOwner(storage, config, payer, {
         input: texts as string[], appId: typeof app_id === 'string' ? app_id : undefined,
         ...(typeof model === 'string' && model ? { model } : {}),
         ...(agent ? { agent } : {}), ...aiCallerOf(req, config.nodeId),
         ...(typeof provider === 'string' && provider ? { provider } : {}),
         ...(typeof fallback === 'boolean' ? { fallback } : {}),
+        ...(role ? { role } : {}),
       });
       res.json(success(config.nodeId, {
         embeddings: r.embeddings, model: r.model, dimensions: r.dimensions, route: r.route,

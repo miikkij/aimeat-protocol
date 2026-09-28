@@ -21,9 +21,11 @@
  * @version-history
  *   v1.0.0 — 2026-09-28 — Initial (V2 of the System 2 plan).
  *   v1.1.0 — 2026-09-28 — appAiMetaOf(): the app's prefer.* and local.* beside its models (V5).
+ *   v1.2.0 — 2026-09-28 — appAiMetaOf(): the app's address and its declared AI roles (roles.ts).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { AiCapability } from './types.js';
+import type { AppAiRole } from '../app-ai-roles.js';
 import type { Storage } from '../../storage/interface.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
@@ -115,6 +117,10 @@ export interface AppAiMeta {
   models?: string[];
   prefer?: Partial<Record<AiCapability, string[]>>;
   local?: AiCapability[];
+  /** The app's address, `<owner>/<file>.html`: what an owner's binding of its roles is keyed by. */
+  address?: string;
+  /** The AI roles the app declares (app-ai-roles.ts). */
+  roles?: AppAiRole[];
 }
 
 /** The app's meta for its AI calls, read for a minute from memory like appModelsOf. */
@@ -134,6 +140,8 @@ export async function appAiMetaOf(storage: Storage, payerGaii: string, appRef: s
       ...(models.length ? { models } : {}),
       ...(posture?.prefer && typeof posture.prefer === 'object' ? { prefer: posture.prefer } : {}),
       ...(Array.isArray(posture?.local) && posture.local.length ? { local: posture.local } : {}),
+      ...(app ? { address: key } : {}),
+      ...(Array.isArray(posture?.roles) && posture.roles.length ? { roles: posture.roles } : {}),
     };
   } catch (err) {
     // An unreadable app is an app with no list of its own; the owner's policy still applies.

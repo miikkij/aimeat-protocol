@@ -32,6 +32,8 @@
  *   v1.0.0 — 2026-09-28 — Initial (V3 of the System 2 plan).
  *   v1.1.0 — 2026-09-28 — catalogCheck and model_status from the model catalogue (V4); an extension
  *     provider is checked against its extension when saved (assertOwnExtensionProvider, V6).
+ *   v1.2.0 — 2026-09-28 — The migrated provider carries the legacy page's fine-tuning as its text and
+ *     vision `params`, where the AI page shows it (AI roles).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
@@ -47,7 +49,7 @@ import { AiCompletionError } from './errors.js';
 import { clearHealth } from './health.js';
 import {
   parseAiProvider, nodeAiProviders, ownerProviderRecords, fixedBaseUrlOf, typeAllowed, providerView,
-  PROVIDER_PREFIX, MAX_OWNER_PROVIDERS, TYPE_CAPABILITIES, NODE_OPENROUTER_ID,
+  PROVIDER_PREFIX, MAX_OWNER_PROVIDERS, TYPE_CAPABILITIES, NODE_OPENROUTER_ID, readProviderParams,
   type AiProvider, type CapabilityHealth, type ProviderCapabilityConfig,
 } from './providers.js';
 import { readRouting, type RoutingDefaults, type RoutingRules } from './routing.js';
@@ -144,11 +146,17 @@ function legacyRecord(
     problem = 'The saved AI provider is outside this machine and not on https.';
   }
   const capabilities: Partial<Record<AiCapability, ProviderCapabilityConfig>> = {};
+  // The fine-tuning the legacy page set for every call is this provider's default for text now, where
+  // the AI page shows it (AI roles, 2026-09-28).
+  const params = readProviderParams({
+    temperature: prefs.temperature, top_p: prefs.top_p, max_tokens: prefs.max_tokens,
+    reasoning: isObj(prefs.reasoning) ? (prefs.reasoning.enabled === false ? 'off' : prefs.reasoning.effort) : undefined,
+  }, 'params', []);
   for (const c of TYPE_CAPABILITIES[type]) {
     if (c === 'files' || c === 'embed') continue;
     const role = ROLE_OF[c];
     const model = role ? resolveModelFor(config, prefs, role) : undefined;
-    capabilities[c] = { enabled: true, pool: false, ...(model ? { model } : {}) };
+    capabilities[c] = { enabled: true, pool: false, ...(model ? { model } : {}), ...(params && (c === 'text' || c === 'vision') ? { params } : {}) };
   }
   // A migrated provider worked before the migration, so it starts as tested. Its health is kept
   // when the record is written again.

@@ -34,6 +34,8 @@
  *   const { posture, hints } = lintAppAiDisclosure(html, previous?.manifest.aiPosture);
  *   if (posture) manifest.aiPosture = posture;
  * @version-history
+ *   v1.5.0 — 2026-09-28 — `role.<name>=` in the meta: the AI roles the app declares (app-ai-roles.ts),
+ *     kept on the posture and carried forward like the rest; an unreadable role is named in a hint.
  *   v1.4.0 — 2026-09-28 — `prefer.<capability>=` and `local.<capability>=yes` in the meta, kept on the
  *     posture for the routing (plan 11, section 9); the capability hints of app-ai-capability-hints.ts
  *     join `hints` for an app that requests ai:use (System 2 plan V5).
@@ -51,6 +53,9 @@ import { lintAppDecideUse } from './app-decide-posture.js';
 import { isModelRef } from './ai/policy.js';
 import type { AiCapability } from './ai/types.js';
 import { lintAppAiCapabilityUse } from './app-ai-capability-hints.js';
+import { parseAppAiRoles, type AppAiRole } from './app-ai-roles.js';
+
+type DeclaredPart = 'generates' | 'discloses' | 'publicInterest' | 'models' | 'prefer' | 'local' | 'roles';
 
 /** The modalities Article 50(2) names. Frozen here so the meta and the catalogue agree. */
 export const AI_GENERATES_KINDS = ['text', 'image', 'audio', 'video'] as const;
@@ -93,6 +98,11 @@ export interface AppAiPosture {
   prefer?: Partial<Record<AiCapability, string[]>>;
   /** The capabilities the app wants answered only on this machine, from `local.<capability>=yes`. */
   local?: AiCapability[];
+  /**
+   * The AI roles the app declares, from `role.<name>=` in its meta (app-ai-roles.ts): what each is for
+   * and what it needs. The owner binds each one to a role of theirs before it runs (ai/roles.ts).
+   */
+  roles?: AppAiRole[];
 }
 
 /** The capabilities `prefer.` and `local.` may name. */
@@ -132,7 +142,7 @@ export function appUsesAi(html: string): boolean {
  * Returns null when the app declares nothing or the value is unreadable — never an error, because a
  * malformed declaration must not be able to stop a publish or delist an offering.
  */
-export function parseAiPosture(html: string): (Pick<AppAiPosture, 'generates' | 'discloses' | 'publicInterest' | 'models' | 'prefer' | 'local'> & { invalidModels?: string[] }) | null {
+export function parseAiPosture(html: string): (Pick<AppAiPosture, DeclaredPart> & { invalidModels?: string[]; invalidRoles?: string[] }) | null {
   const metas = html.slice(0, SCAN_BYTES).match(/<meta\b[^>]*>/gi) ?? [];
   for (const tag of metas) {
     if (!/name\s*=\s*["']aimeat-ai["']/i.test(tag)) continue;
@@ -171,6 +181,7 @@ export function parseAiPosture(html: string): (Pick<AppAiPosture, 'generates' | 
         local.push(cap);
       }
     }
+    const { roles, invalid: invalidRoles } = parseAppAiRoles(raw);
     return {
       generates,
       discloses: isYes(parts.get('discloses')),
@@ -178,7 +189,9 @@ export function parseAiPosture(html: string): (Pick<AppAiPosture, 'generates' | 
       ...(models.length ? { models } : {}),
       ...(Object.keys(prefer).length ? { prefer } : {}),
       ...(local.length ? { local } : {}),
+      ...(roles.length ? { roles } : {}),
       ...(invalidModels.length ? { invalidModels } : {}),
+      ...(invalidRoles.length ? { invalidRoles } : {}),
     };
   }
   return null;
@@ -209,13 +222,14 @@ function isYes(v: string | undefined): boolean {
  */
 export function lintAppAiDisclosure(html: string, previous?: AppAiPosture): AppAiLintResult {
   const parsed = parseAiPosture(html);
-  const declared: Pick<AppAiPosture, 'generates' | 'discloses' | 'publicInterest' | 'models' | 'prefer' | 'local'> | null = parsed
+  const declared: Pick<AppAiPosture, DeclaredPart> | null = parsed
     ?? (previous?.source === 'declared'
       ? {
         generates: previous.generates, discloses: previous.discloses, publicInterest: previous.publicInterest,
         ...(previous.models?.length ? { models: previous.models } : {}),
         ...(previous.prefer ? { prefer: previous.prefer } : {}),
         ...(previous.local?.length ? { local: previous.local } : {}),
+        ...(previous.roles?.length ? { roles: previous.roles } : {}),
       }
       : null);
   const inherited = !parsed && !!declared;
@@ -233,7 +247,17 @@ export function lintAppAiDisclosure(html: string, previous?: AppAiPosture): AppA
     ...(declared?.models?.length ? { models: declared.models } : {}),
     ...(declared?.prefer ? { prefer: declared.prefer } : {}),
     ...(declared?.local?.length ? { local: declared.local } : {}),
+    ...(declared?.roles?.length ? { roles: declared.roles } : {}),
   };
+
+  if (parsed?.invalidRoles?.length) {
+    hints.push(
+      `The aimeat-ai meta declares AI roles this node cannot read, so they were left out: ${parsed.invalidRoles.join(', ')}. `
+      + 'Write a role as role.<name>=<capabilities joined with +>, for example role.summarizer=text or role.illustrator=text+image, '
+      + 'with a name of lower-case letters, digits and -, and capabilities from text, vision, files, image, speech, transcription and embed. '
+      + 'The owner connects each role to one of theirs before it runs. The app is published either way.',
+    );
+  }
 
   if (parsed?.invalidModels?.length) {
     hints.push(
@@ -306,5 +330,6 @@ export function publicPosture(p: AppAiPosture | undefined): Omit<AppAiPosture, '
     ...(p.models?.length ? { models: p.models } : {}),
     ...(p.prefer ? { prefer: p.prefer } : {}),
     ...(p.local?.length ? { local: p.local } : {}),
+    ...(p.roles?.length ? { roles: p.roles } : {}),
   };
 }

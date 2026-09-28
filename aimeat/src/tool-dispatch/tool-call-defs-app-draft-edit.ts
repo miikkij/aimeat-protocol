@@ -16,11 +16,13 @@
  * @usage
  *   import { appDraftEditTools } from './tool-call-defs-app-draft-edit.js';
  * @version-history
+ *   2026-09-28 -- aimeat_image_generate takes `role`, the AI role the call runs as.
  *   2026-09-27 -- aimeat_app_screenshot moved into aimeat_app_manage (action "screenshot").
  *   v1.0.0 — 2026-08-16 — Initial.
  */
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
 import { query, requiredString, optionalString, optionalNumber, optionalBoolean } from './tool-call-helpers.js';
+import { AI_ROLE_PARAM } from '../mcp/catalog/definitions/ai-models.js';
 
 export const appDraftEditTools: ConnectCliToolDefinition[] = [
     {
@@ -117,6 +119,7 @@ export const appDraftEditTools: ConnectCliToolDefinition[] = [
             app_id: { type: 'string', description: 'Attribution for the per-app quota and the spend report.' },
             provider: { type: 'string', description: 'One of the owner\'s AI providers, or a type. No fallback then.' },
             fallback: { type: 'boolean', description: 'false keeps the call on its first provider.' },
+            role: { type: 'string', description: AI_ROLE_PARAM },
         },
         handler: ({ client }, input) => {
             const body: JsonObject = { prompt: requiredString(input, 'prompt') };
@@ -127,6 +130,7 @@ export const appDraftEditTools: ConnectCliToolDefinition[] = [
             const appId = optionalString(input, 'app_id'); if (appId) body.app_id = appId;
             const provider = optionalString(input, 'provider'); if (provider) body.provider = provider;
             const fallback = optionalBoolean(input, 'fallback'); if (fallback !== undefined) body.fallback = fallback;
+            const role = optionalString(input, 'role'); if (role) body.role = role;
             return client.post('/v1/ai/image', body);
         },
     },

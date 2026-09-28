@@ -8,6 +8,7 @@
  *   POST /v1/ai/embed. The node does the work; `check:mcp-schemas` compares this with its surface.
  * @structure registerAiCapabilityTools(mcp, registry)
  * @version-history
+ *   v1.1.0 — 2026-09-28 — aimeat_ai_transcribe and aimeat_ai_embed take `role`, the AI role the call runs as.
  *   v1.0.0 — 2026-09-28 — Initial (System 2 plan, V5).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -15,6 +16,7 @@ import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
+import { AI_ROLE_PARAM } from '../../../../mcp/catalog/definitions/ai-models.js';
 
 export function registerAiCapabilityTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
@@ -46,10 +48,12 @@ export function registerAiCapabilityTools(mcp: McpServer, registry: AgentRegistr
     model: z.string().optional().describe('A model reference; omit to let the owner\'s providers choose.'),
     provider: z.string().optional().describe('A provider id or type to use, with no fallback.'),
     app_id: z.string().optional().describe('The app this is for, so its spend is attributed.'),
+    role: z.string().min(1).max(300).optional().describe(AI_ROLE_PARAM),
   }, annotationsFor('aimeat_ai_transcribe'), async (a) => out(await client.post('/v1/ai/transcribe', {
     storage_key: a.storage_key, ...(a.filename !== undefined ? { filename: a.filename } : {}),
     ...(a.language !== undefined ? { language: a.language } : {}), ...(a.model !== undefined ? { model: a.model } : {}),
     ...(a.provider !== undefined ? { provider: a.provider } : {}), ...(a.app_id !== undefined ? { app_id: a.app_id } : {}),
+    ...(a.role !== undefined ? { role: a.role } : {}),
   })));
 
   mcp.tool('aimeat_ai_embed', descriptionFor('aimeat_ai_embed'), {
@@ -57,9 +61,10 @@ export function registerAiCapabilityTools(mcp: McpServer, registry: AgentRegistr
     model: z.string().optional().describe('A model reference; omit to let the owner\'s providers choose.'),
     provider: z.string().optional().describe('A provider id or type to use, with no fallback.'),
     app_id: z.string().optional().describe('The app this is for, so its spend is attributed.'),
+    role: z.string().min(1).max(300).optional().describe(AI_ROLE_PARAM),
   }, annotationsFor('aimeat_ai_embed'), async (a) => out(await client.post('/v1/ai/embed', {
     input: a.input,
     ...(a.model !== undefined ? { model: a.model } : {}), ...(a.provider !== undefined ? { provider: a.provider } : {}),
-    ...(a.app_id !== undefined ? { app_id: a.app_id } : {}),
+    ...(a.app_id !== undefined ? { app_id: a.app_id } : {}), ...(a.role !== undefined ? { role: a.role } : {}),
   })));
 }

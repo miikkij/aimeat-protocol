@@ -21,6 +21,7 @@
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-09-28 — System 2 plan, V5: aimeat_ai_job_start declares and passes on `op`,
  *     `provider`, `audio_key`, `language` and `size`.
+ *   v1.2.0 — 2026-09-28 — aimeat_ai_job_start declares and passes on `role`, the AI role the call runs as.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -28,6 +29,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { AI_ROLE_PARAM } from './catalog/definitions/ai-models.js';
 import { localAccountName } from '../utils/gaii.js';
 import { AiJobError, getActiveAiJobService } from '../services/ai-jobs/index.js';
 import type { AiJobState } from '../services/ai-jobs/types.js';
@@ -75,6 +77,7 @@ export function registerAiJobTools(
             audio_key: z.string().optional().describe('For op "transcribe" (required there): the storage key of an audio file in your own storage.'),
             language: z.string().optional().describe('For op "transcribe": an ISO-639-1 language hint.'),
             size: z.string().optional().describe('For op "image": a provider-specific size, e.g. "1024x1024".'),
+            role: z.string().min(1).max(300).optional().describe(AI_ROLE_PARAM),
         },
         annotationsFor('aimeat_ai_job_start'),
         async (a) => {
@@ -93,6 +96,7 @@ export function registerAiJobTools(
                     ...(a.on_done ? { on_done: a.on_done } : {}),
                     ...(a.op !== undefined ? { op: a.op } : {}),
                     ...(a.provider !== undefined ? { provider: a.provider } : {}),
+                    ...(a.role !== undefined ? { role: a.role } : {}),
                     ...(a.audio_key !== undefined ? { audio_key: a.audio_key } : {}),
                     ...(a.language !== undefined ? { language: a.language } : {}),
                     ...(a.size !== undefined ? { size: a.size } : {}),

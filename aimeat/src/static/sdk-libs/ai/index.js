@@ -1,8 +1,8 @@
 /**
  * @file ai/index.js
  * @description The aimeat-ai library (SDK-libs migration Phase 1). Exposes AIMEAT.ai — a facade
- *   (capabilities/isAvailable/complete/completeJson/stream/image/speak/transcribe/embed/models/usage/
- *   invalidateCache) that proxies to /v1/ai/* on the person's own AI providers via the AIMEAT.auth
+ *   (capabilities/isAvailable/complete/completeJson/stream/image/speak/transcribe/embed/models/roles/
+ *   usage/invalidateCache) that proxies to /v1/ai/* on the person's own AI providers via the AIMEAT.auth
  *   session, so no key ever leaves the server; short in-memory caches + typed error `.code`s.
  *   Componentized ESM source esbuild bundles to the IIFE served at /v1/libs/aimeat-ai.js.
  * @structure imports authFetch (session) + attach (namespace) + the _core spend guard + ./call.js
@@ -13,6 +13,8 @@
  *   const caps = await AIMEAT.ai.capabilities({ app_id });
  *   if (caps.capabilities.text.on) { const r = await AIMEAT.ai.complete({ prompt, app_id }); }
  * @version-history
+ *   v1.7.0 - 2026-09-28 - AI roles: complete(), stream(), image(), speak(), transcribe(), embed() and
+ *     job.start() send `role`; roles() reads GET /v1/ai/roles.
  *   v1.6.0 - 2026-09-28 - System 2 plan, V5. capabilities() says per capability whether it is on
  *     and, when it is off, the fix to show the person. complete() sends `files` (storage keys, data:
  *     URLs or Blobs), `provider` and `fallback`. New: stream(), image(), speak(), transcribe(),
@@ -50,7 +52,7 @@ import { attachSpend } from '../_core/spend.js';
 import { disclose, chatNotice, declare } from './disclose.js';
 import { job } from './job.js';
 import { paid, postJson, isBlob, blobToDataUrl } from './call.js';
-import { capabilities, models, clearCaches } from './capabilities.js';
+import { capabilities, models, roles, clearCaches } from './capabilities.js';
 import { stream, speak } from './stream.js';
 import { image, transcribe, embed, routing } from './media.js';
 
@@ -176,6 +178,10 @@ const ai = {
    * `fallback: false` keeps the call on that one provider. Neither can add a provider or loosen
    * the owner's rules.
    *
+   * `role` names the AI role the call runs as: for an app, a role it declares in its aimeat-ai meta
+   * (role.<name>=text), which runs once the owner bound it to one of theirs; a named model or
+   * provider wins over it. See roles().
+   *
    * This spends the signed-in user's own money on their own AI provider, so two guards ride along:
    *   • repeats collapse — while an identical call (same app_id + model + prompts) is in flight,
    *     every further call gets the SAME promise. Five clicks on "Summarise" = one paid call.
@@ -195,6 +201,10 @@ const ai = {
    *   RATE_LIMITED          — provider rate limit
    *   PROVIDER_ERROR        — upstream provider failed
    *   SPEND_CANCELLED       — the user declined the confirm dialog
+   *   AI_ROLE_NOT_BOUND     — the owner has not bound this app's role yet (.details.binding)
+   *   AI_ROLE_NOT_DECLARED  — the app's meta does not declare that role
+   *   AI_ROLE_UNKNOWN       — the owner has no role of that id
+   *   AI_ROLE_LACKS_CAPABILITY — the role has no provider for what the call needs
    */
   async complete(opts) {
     if (!opts || typeof opts !== 'object') throw new Error('opts object required');
@@ -227,7 +237,7 @@ const ai = {
     return paid(opts, {
       key: ['ai', opts.app_id, opts.model || opts.modelRole, opts.systemPrompt, opts.prompt,
         Array.isArray(opts.images) ? opts.images.join('\n') : '',
-        files ? JSON.stringify(files) : '', opts.provider || ''],
+        files ? JSON.stringify(files) : '', opts.provider || '', opts.role || ''],
       what: 'Run an AI request on your own AI provider.',
     }, () => postJson('/v1/ai/complete', body, 'AI call failed'));
   },
@@ -319,6 +329,13 @@ const ai = {
    * context_length and pricing in the old OpenRouter listing's form. Cached 1 hour per query.
    */
   models,
+
+  /**
+   * The person's AI roles and the roles apps declare, with the owner's bindings (GET /v1/ai/roles):
+   * { roles, apps: [{ app, roles: [{ name, binding, boundTo, requestedAt? }] }] }. An app's role runs
+   * once boundTo is set; until then a call with that `role` is refused AI_ROLE_NOT_BOUND.
+   */
+  roles,
 
   /**
    * Today's spend snapshot (owner-only). Useful for "AI used: $0.04 / $1.00".

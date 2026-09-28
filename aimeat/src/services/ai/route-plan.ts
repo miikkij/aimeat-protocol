@@ -11,6 +11,8 @@
  *     its type in their default order. A fallback may only be the same model on another provider.
  *   - a provider (an id, or a type): that provider's model for the capability. No fallback: the
  *     caller named the provider.
+ *   - a role (services/ai/roles.ts): the role's providers for the capability, in its order, each with
+ *     the role's model or its own. Nothing else after them: the owner chose exactly these.
  *   - the capability only: the agent's list, the owner's list, then the owner's providers marked for
  *     the pool (`extendToPool`), and only when the owner has none of those, the node's default.
  *
@@ -29,6 +31,8 @@
  * @structure
  *   ChosenBy · AiCandidate · RejectedCandidate · RoutePlanInput · planRoute · refusalFor
  * @version-history
+ *   v1.4.0 — 2026-09-28 — A role's order (`roleOrder`, chosenBy 'role'): the owner's explicit choice, so
+ *     its untested providers are not skipped, as a named provider is not.
  *   v1.3.0 — 2026-09-28 — An extension provider (V6): its target carries the runner of its `ai.<op>`
  *     actions, and the address allowlist does not apply (its manifest's hosts do, in the runner).
  *   v1.2.0 — 2026-09-28 — Capabilities for apps and agents (V5): the app's prefer.* orders the owner's
@@ -58,7 +62,7 @@ import { textPricePerMtok } from './catalog/price.js';
 import { canonicalModelKey, equivalentModels } from './catalog/equivalence.js';
 import { extensionRunner } from './extension-provider.js';
 
-export type ChosenBy = 'call-model' | 'call-provider' | 'app-prefer' | 'agent-default' | 'owner-default' | 'pool' | 'node-default';
+export type ChosenBy = 'call-model' | 'call-provider' | 'role' | 'app-prefer' | 'agent-default' | 'owner-default' | 'pool' | 'node-default';
 
 export interface AiCandidate {
   provider: AiProvider;
@@ -119,6 +123,12 @@ export interface RoutePlanInput {
   /** The app's order of preference for this capability, from `prefer.<capability>` in its meta:
    *  provider types and model references. It orders the owner's candidates and adds none. */
   appPrefer?: string[];
+  /**
+   * The call's role's order for this capability (services/ai/roles.ts): the owner's providers, each
+   * with the model the role gives it or its own. It replaces the defaults and the pool; nothing else is
+   * tried after it, since the owner chose exactly these for the role.
+   */
+  roleOrder?: Array<{ provider: string; model?: string }>;
 }
 
 /** The capabilities whose price is per token, so the pool can be ordered by it. */
@@ -185,6 +195,17 @@ function rawOrder(input: RoutePlanInput): { list: RawEntry[]; chosenBy: ChosenBy
     }
     push(named, 'call-provider');
     return { list: out, chosenBy: 'call-provider', ownerListed: true };
+  }
+
+  if (input.roleOrder && !input.requested) {
+    // A role: its providers in its order, each with the role's model for it (carried like a same-model
+    // reference, so the policy judges it and a refusal moves to the next place). A provider the owner
+    // no longer has is left out; a list with none left refuses in planRoute.
+    for (const e of input.roleOrder) {
+      const p = byId.get(e.provider);
+      if (p) push(p, 'role', e.model);
+    }
+    return { list: out, chosenBy: 'role', ownerListed: true };
   }
 
   const d = defaultsFor(capability, input.routing);
@@ -381,7 +402,8 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
     // ── tested and healthy ──
     const hk = healthKey(nodeScope(p, gaii), p.id, capability);
     if (p.source === 'owner') seedHealth(hk, p.health.byCapability[capability]);
-    const nodeChose = by !== 'call-model' && by !== 'call-provider';
+    // A role's providers are the owner's own explicit choice, like a named one.
+    const nodeChose = by !== 'call-model' && by !== 'call-provider' && by !== 'role';
     const status = statusOf(hk) ?? p.health.byCapability[capability]?.status ?? 'untested';
     if (rules.onlyTested && nodeChose && p.source === 'owner' && status === 'untested') {
       reject(p, 'untested', `${p.title}'s ${capability} has not been tested. Test it on the AI settings page, or name it in the call.`);

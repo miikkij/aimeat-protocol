@@ -1,9 +1,13 @@
 /**
  * @file ai-voice.ts
  * @description Shared voice tool metadata for node MCP, connector MCP and CLI.
- * @version-history v1.0.0 - 2026-09-19 - Agent voice stage contract.
+ * @version-history
+ *   v1.1.0 - 2026-09-28 - Reply and speech take `role`, the AI role the call runs as, and declare
+ *     `provider`, which the shared schema took since V5 and the CLI dispatch refused as undeclared.
+ *   v1.0.0 - 2026-09-19 - Agent voice stage contract.
  */
 import { type AimeatToolDefinition, agentEverywhere } from './types.js';
+import { AI_ROLE_PARAM } from './ai-models.js';
 
 export const voiceTools: AimeatToolDefinition[] = [
   {
@@ -17,6 +21,8 @@ export const voiceTools: AimeatToolDefinition[] = [
       top_p: { type: 'number', description: 'Nucleus sampling, 0-1.' },
       max_tokens: { type: 'number', description: 'Optional explicit output cap, 1-32768. Omitted by default.' },
       reasoning: { type: 'object', description: 'Optional {enabled, effort: low|medium|high, max_tokens, exclude}; provider-dependent.' },
+      provider: { type: 'string', description: 'One of the owner\'s AI providers (aimeat_ai_providers), or a type. No fallback then.' },
+      role: { type: 'string', description: AI_ROLE_PARAM },
     },
   },
   {
@@ -30,6 +36,8 @@ export const voiceTools: AimeatToolDefinition[] = [
       response_format: { type: 'string', enum: ['pcm', 'mp3'], description: 'Audio format, default pcm. PCM rate and channel count follow the provider.' },
       speed: { type: 'number', description: 'Speech speed, 0.25-4, default 1.' },
       instructions: { type: 'string', description: 'Optional provider-specific speaking instructions, at most 2000 characters.' },
+      provider: { type: 'string', description: 'One of the owner\'s AI providers (aimeat_ai_providers), or a type. No fallback then.' },
+      role: { type: 'string', description: AI_ROLE_PARAM },
     },
   },
 ];
