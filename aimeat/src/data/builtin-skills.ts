@@ -11,6 +11,7 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.18.0 -- 2026-09-29 -- aimeat-refinery (builtin-skills.refinery.ts): the mail refinery from chat.
  *   v1.17.0 -- 2026-09-28 -- aimeat-ai-capabilities (builtin-skills.ai-capabilities.ts), System 2 plan V5;
  *            set-up-content-pipeline names the ai step's op (image, transcribe).
  *   v1.16.11 -- 2026-09-28 -- diagnose-a-workflow names the refusal reason too-costly (model catalogue, V4).
@@ -126,6 +127,7 @@ import { APP_BUILDER_SKILL_ENTRY } from './builtin-skills.app-builder.js';
 import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
 import { GAME_SKILL_ENTRIES } from './builtin-skills-games.js';
 import { DECIDE_SKILL_ENTRY } from './builtin-skills.decide.js';
+import { REFINERY_SKILL_ENTRY } from './builtin-skills.refinery.js';
 import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
 import { AI_TRANSPARENCY_SKILL_ENTRY, CONFIGURE_ROUTING_SKILL_ENTRY, AI_MODEL_POLICY_SKILL_ENTRY } from './builtin-skills.ai.js';
 import { AI_CAPABILITIES_SKILL_ENTRY } from './builtin-skills.ai-capabilities.js';
@@ -146,6 +148,7 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
   APP_BUILDER_SKILL_ENTRY,
   APP_BUILDER_ATELIER_SKILL_ENTRY,
   DECIDE_SKILL_ENTRY,
+  REFINERY_SKILL_ENTRY,
   ...GAME_SKILL_ENTRIES,
   {
     name: 'aimeat-node-guide',

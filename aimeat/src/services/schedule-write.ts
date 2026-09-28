@@ -40,6 +40,8 @@
  *   const out = await createScheduleRecord({ storage, config, scheduler }, caller, body);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-09-29 — The `refinery` kind: create and edit check input.prefix, the definition, and that its
+ *     mailbox is the runner's own (services/refinery/schedule-input.ts); only the prefix is stored.
  *   2026-09-27 — An edit takes `prompt` and puts it where the kind keeps it (services/schedule-prompt.ts):
  *     an ai schedule's prompt, an agent_task schedule's task description. Other kinds refuse NO_PROMPT.
  *   v1.2.0 — 2026-09-26 — An `ai` schedule reads no record the node keeps for itself and writes its
@@ -62,6 +64,7 @@ import { mergeConstraintDefaults, knownConstraintTypes } from './schedule-constr
 import { checkScheduleGate, isValidCron, type ScheduleKind } from './schedule-gate.js';
 import { getActiveScheduler, type Scheduler, type JobOutcome } from './scheduler.js';
 import { withSchedulePrompt } from './schedule-prompt.js';
+import { checkRefineryScheduleInput, refineryRunAs } from './refinery/schedule-input.js';
 
 export interface ScheduleWriteDeps {
     storage: Storage;
@@ -232,6 +235,11 @@ export async function createScheduleRecord(
         const bad = await checkConnectionsPublishInput(storage, owner, body.input);
         if (bad) return bad;
     }
+    if (kind === 'refinery') {
+        const runAs = refineryRunAs({ createdByAgent: !caller.isOwnerSession, createdBy: caller.identity, ownerScope: owner });
+        const bad = await checkRefineryScheduleInput(storage, owner, runAs, body.input);
+        if (bad) return { ok: false, ...bad };
+    }
 
     const cron = typeof body.cron === 'string' ? body.cron : '';
     const timezone = typeof body.timezone === 'string' ? body.timezone : undefined;
@@ -389,6 +397,9 @@ export async function createScheduleRecord(
             ...(raw.params && typeof raw.params === 'object' ? { params: raw.params } : {}),
             ...(typeof raw.ref === 'string' ? { ref: raw.ref.slice(0, 200) } : {}),
         };
+    } else if (kind === 'refinery') {
+        // Only the prefix: the definition lives in the owner's memory, where the app edits it.
+        base.input = { prefix: String((body.input as { prefix?: unknown }).prefix).trim() };
     }
 
     const created = await storage.createScheduledJob(base);
@@ -438,6 +449,11 @@ export async function updateScheduleRecord(
         if (job.type === 'connections-publish') {
             const bad = await checkConnectionsPublishInput(storage, ownerScope, patch.input);
             if (bad) return bad;
+        }
+        if (job.type === 'refinery') {
+            const bad = await checkRefineryScheduleInput(storage, job.ownerScope ?? ownerScope, refineryRunAs(job), patch.input);
+            if (bad) return { ok: false, ...bad };
+            patch = { ...patch, input: { prefix: String((patch.input as { prefix: string }).prefix).trim() } };
         }
         // Same rule as create for an `ai` job's input namespaces, and for the same reason: a gate that
         // only runs on create is walked around by editing the schedule afterwards.

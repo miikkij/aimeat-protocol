@@ -8,6 +8,7 @@
  *   client to use. Single-agent installs are unchanged in UX (agent_name is
  *   optional and defaults to the only loaded agent).
  * @version-history
+ *   v2.5.0 -- 2026-09-29 -- Register the mail refinery tools (aimeat_refinery_classes/run/status).
  *   v1.5.0 -- 2026-09-28 -- Register aimeat_admin_install_set.
  *   v1.4.0 -- 2026-09-28 -- Register aimeat_ai_capabilities, aimeat_ai_models, aimeat_ai_transcribe and aimeat_ai_embed.
  *   v1.3.0 -- 2026-09-28 -- Register aimeat_ai_providers, aimeat_ai_provider_test and aimeat_ai_routing_set.
@@ -45,6 +46,7 @@ import { registerSkillsTools } from './skills.js';
 import { registerOrganismsTools } from './organisms.js';
 import { registerWorkspaceTools } from './workspaces.js';
 import { registerConnectionTools } from './connections.js';
+import { registerRefineryTools } from './refinery.js';
 import { registerMcpProxyTools } from './mcp-proxy.js';
 import { registerSchedulesTools } from './schedules.js';
 import { registerWorkflowTools } from './workflows.js';
@@ -101,6 +103,7 @@ export function registerAllTools(mcp: McpServer, registry: AgentRegistry): void 
   registerOrganismsTools(mcp, registry);
   registerWorkspaceTools(mcp, registry);
   registerConnectionTools(mcp, registry);
+  registerRefineryTools(mcp, registry);
   registerMcpProxyTools(mcp, registry);
   registerSchedulesTools(mcp, registry);
   registerWorkflowTools(mcp, registry);

@@ -13,6 +13,7 @@
  * @usage
  *   import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../../mcp/catalog/definitions.js';
  * @version-history
+ *   v1.x -- 2026-09-29 -- definitions/refinery.ts: aimeat_refinery_classes, _run and _status (wish aimeat-refinery).
  *   v1.x -- 2026-09-28 -- definitions/install-sets.ts: aimeat_admin_install_set (install packages, phase 4).
  *   v1.x -- 2026-09-28 -- definitions/ai-models.ts: aimeat_ai_policy_set (System 2 plan, V2).
  *   v1.x -- 2026-09-27 -- definitions/app-manage.ts: aimeat_app_manage replaces the app-visitors and
@@ -71,6 +72,7 @@ import { designbookTools } from './definitions/designbook.js';
 import { uiLibraryTools } from './definitions/ui-library.js';
 import { themeTools } from './definitions/themes.js';
 import { connectionTools } from './definitions/connections.js';
+import { refineryTools } from './definitions/refinery.js';
 import { mcpProxyTools } from './definitions/mcp-proxy.js';
 
 export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
@@ -103,6 +105,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     ...uiLibraryTools,
     ...themeTools,
     ...connectionTools,
+    ...refineryTools,
     ...mcpProxyTools,
 ];
 

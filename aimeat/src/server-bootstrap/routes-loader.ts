@@ -9,6 +9,8 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   v1.21.0 — 2026-09-29 — Mounts refineryRouter (/v1/refinery/classes, /v1/refinery/runs). The
+ *     connections, refinery and mcp-servers mounts moved to routes-loader-outbound.ts in their order (a pure move, max-file-lines).
  *   v1.20.0 — 2026-09-28 — Mounts aiProvidersRouter (/v1/ai/providers, /v1/ai/routing), System 2 plan V3.
  *     The four System 2 AI mounts moved to routes-loader-ai.ts in their order (a pure move, max-file-lines).
  *   v1.19.0 — 2026-09-28 — Mounts aiPolicyRouter (/v1/ai/policy, /v1/ai/recommended), System 2 plan V2.
@@ -134,8 +136,7 @@ import { notificationsRouter } from '../routes/notifications.js';
 import { adminSecurityRouter } from '../routes/admin-security.js';
 import { adminCorsRouter } from '../routes/admin-cors.js';
 import { sharingGroupsRouter } from '../routes/sharing-groups.js';
-import { connectionsRouter } from '../routes/connections.js';
-import { mcpServersRouter } from '../routes/mcp-servers.js';
+import { mountOutboundRouters } from './routes-loader-outbound.js';
 import { specRouter } from '../routes/spec.js';
 import { disputesRouter } from '../routes/disputes.js';
 import { storageFilesRouter } from '../routes/storage-files.js';
@@ -589,8 +590,7 @@ export async function mountRoutes(
   app.use(adminSecurityRouter(config, storage));
   app.use(adminCorsRouter(config, storage));
   app.use(sharingGroupsRouter(config, storage));
-  app.use(connectionsRouter(config, storage));  // TARGET-057: outbound connections + delegations
-  app.use(mcpServersRouter(config, storage));   // the remote MCP servers this node connects OUT to
+  mountOutboundRouters(app, config, storage);    // connections, refinery, mcp-servers (routes-loader-outbound.ts)
   app.use(federationRouter(config, storage, peers, networkDirectory));
   app.use(disputesRouter(config, storage));
   app.use(flagsRouter(config, storage));

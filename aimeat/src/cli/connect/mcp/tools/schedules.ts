@@ -8,6 +8,7 @@
  *   has no dedicated REST route (it is a structured memory write), so it writes the
  *   `agents.<name>.scheduler` mirror via /v1/memory.
  * @version-history
+ *   v1.4.0 -- 2026-09-29 -- aimeat_schedule_create takes kind 'refinery' (input { prefix }), as the node MCP server does.
  *   v1.3.0 -- 2026-09-27 -- aimeat_schedule_list takes `detail` (GET /v1/schedules?detail=true) and
  *     aimeat_schedule_update takes `prompt` (PATCH /v1/schedules/:id), as the node MCP server does.
  *   v1.2.0 -- 2026-09-05 -- An extension schedule can carry the action's own `input` (and an
@@ -32,7 +33,7 @@ export function registerSchedulesTools(mcp: McpServer, registry: AgentRegistry):
     ({ content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) });
 
   mcp.tool('aimeat_schedule_create', descriptionFor('aimeat_schedule_create'), {
-    kind: z.enum(['ai', 'agent_task', 'extension']).describe('ai = server-side OpenRouter completion; agent_task = queue a task each fire; extension = run an installed extension action.'),
+    kind: z.enum(['ai', 'agent_task', 'extension', 'refinery']).describe('ai = server-side OpenRouter completion; agent_task = queue a task each fire; extension = run an installed extension action; refinery = one mail refinery batch (input { prefix }).'),
     cron: z.string().describe('Cron expression, e.g. "0 7 * * *".'),
     display_name: z.string().describe('Human-readable label.'),
     timezone: z.string().optional().describe('IANA timezone, e.g. "Europe/Helsinki".'),
@@ -49,7 +50,7 @@ export function registerSchedulesTools(mcp: McpServer, registry: AgentRegistry):
     extension_name: z.string().optional(),
     action_id: z.string().optional(),
     // The action's own parameters, which the route has always stored and no surface declared.
-    input: z.record(z.string(), z.unknown()).optional().describe('extension: the action\'s own parameters, passed on every fire.'),
+    input: z.record(z.string(), z.unknown()).optional().describe('refinery: { prefix }. extension: the action\'s own parameters, passed on every fire.'),
     instance_id: z.string().optional().describe('extension: run the action on one named instance rather than the default.'),
   }, annotationsFor('aimeat_schedule_create'), async (a) => {
     return out(await client.post('/v1/schedules', a as Record<string, unknown>));

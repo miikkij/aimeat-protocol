@@ -31,6 +31,7 @@
  * @usage
  *   import { RECURRING_WORK_SKILL_ENTRIES } from './builtin-skills.recurring-work.js';
  * @version-history
+ *   v1.4.0 — 2026-09-29 — `kind: "refinery"`, one mail refinery batch each fire.
  *   v1.3.0 — 2026-09-28 — `kind: "ai"` runs on the owner's AI providers; an ai step or job can make a
  *     picture or transcribe (op), and the capability is checked at setup (System 2 plan, V5).
  *   v1.2.0 — 2026-09-19 — The old name is gone for good (builtin-skills.retired.ts), and step 3
@@ -118,6 +119,9 @@ Then offer what the node itself can do, cheapest first:
   (\`op: "image"\`) or transcribe a stored recording (\`op: "transcribe"\`, \`audio_key\`). Check the
   capability with \`aimeat_ai_capabilities\` when you set it up: a capability that is off when the run
   comes stops that step with a refusal that names what to set.
+- **\`kind: "refinery"\`** — one batch of a mail refinery (\`input: { prefix }\`) each fire: the
+  mailbox read, sorted and filed as workspace rows. Right when the recurring work is "go through my
+  mail". It runs as you, so its mailbox must be one you connected. Skill: aimeat-refinery.
 
 Prefer the extension whenever the work does not need reasoning. A model called on a clock to do
 something a script could do is a bill that arrives every week for no reason.

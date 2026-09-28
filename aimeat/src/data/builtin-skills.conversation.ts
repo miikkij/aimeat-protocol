@@ -584,6 +584,14 @@ Over REST the same two are \`GET /v1/connections/providers\` and \`POST /v1/conn
 If the provider is missing from that list, this node has not registered an application at Google.
 That is the operator's to fix, not the person's, and the list says so.
 
+## Many messages, or every night: the refinery
+
+What follows is the hand-made road: one search, one message, one attachment at a time. When the job
+is "sort all my mail" or "collect every receipt from now on", the node does it for you: the mail
+refinery reads a batch from where the last one stopped, sorts each message into a kind, reads its
+fields from the text and the PDFs, and files it as a workspace row in a queue. \`aimeat_refinery_run\`
+runs one batch, a schedule of \`kind: "refinery"\` runs one every night. Skill: aimeat-refinery.
+
 ## Read, and read narrowly
 
 \`aimeat_mail_search\` with \`connection_id\`, \`query\` and \`limit\` (default 25, max 100;

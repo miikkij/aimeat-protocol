@@ -28,22 +28,27 @@
  *   const bad = checkScheduleGate({ kind, cron, timezone }, caller);
  *   if (bad) return renderRefusal(bad);   // each door renders its own way
  * @version-history
+ *   v1.1.0 — 2026-09-29 — The `refinery` kind, which needs all four words a refinery batch spends; a
+ *     kind's entry may name several words, and the caller holds every one.
  *   v1.0.0 — 2026-08-10 — Initial (August 2026 audit step 3, option B: shared gate, both doors).
  */
 import { Cron } from 'croner';
 import { logger } from '../utils/logger.js';
 
 /** Every schedule kind this node knows. */
-export type ScheduleKind = 'extension' | 'ai' | 'agent_task' | 'eco-capability' | 'connections-publish';
+export type ScheduleKind = 'extension' | 'ai' | 'agent_task' | 'eco-capability' | 'connections-publish' | 'refinery';
 
 /**
- * The scope a caller needs for the capability the schedule DRIVES. A kind absent from this map needs
- * nothing beyond being allowed to make a schedule at all — which is what the tool's own scope says.
+ * The scope a caller needs for the capability the schedule DRIVES, or every scope when it drives
+ * several. A kind absent from this map needs nothing beyond being allowed to make a schedule at
+ * all — which is what the tool's own scope says.
  */
-export const SCHEDULE_KIND_SCOPE: Partial<Record<ScheduleKind, string>> = {
+export const SCHEDULE_KIND_SCOPE: Partial<Record<ScheduleKind, string | readonly string[]>> = {
     ai: 'ai:use',
     agent_task: 'task:write',
     'connections-publish': 'connections:use',
+    // A refinery batch reads a mailbox, asks the models, writes rows and moves its cursor.
+    refinery: ['connections:read-through', 'ai:use', 'organism:rows', 'memory:write'],
 };
 
 export interface ScheduleCaller {
@@ -64,7 +69,7 @@ export interface ScheduleRefusal {
     message: string;
 }
 
-const VALID_KINDS: ScheduleKind[] = ['extension', 'ai', 'agent_task', 'eco-capability', 'connections-publish'];
+const VALID_KINDS: ScheduleKind[] = ['extension', 'ai', 'agent_task', 'eco-capability', 'connections-publish', 'refinery'];
 
 /** Validate a cron expression (or the @activate sentinel) using croner. Moved here from
  *  routes/schedules.ts so both doors judge the same string the same way. */
@@ -98,11 +103,15 @@ export function checkScheduleGate(input: ScheduleGateInput, caller: ScheduleCall
         return { status: 400, code: 'INVALID_KIND', message: `kind must be one of: ${VALID_KINDS.join(', ')}` };
     }
 
-    const needed = SCHEDULE_KIND_SCOPE[input.kind as ScheduleKind];
-    if (needed && !caller.isOwnerSession && !hasScope(caller.scopes, needed)) {
+    const entry = SCHEDULE_KIND_SCOPE[input.kind as ScheduleKind];
+    const needed = entry === undefined ? [] : typeof entry === 'string' ? [entry] : [...entry];
+    const missing = caller.isOwnerSession ? [] : needed.filter(s => !hasScope(caller.scopes, s));
+    if (missing.length) {
         return {
             status: 403, code: 'SCOPE_DENIED',
-            message: `Creating a "${input.kind}" schedule requires the "${needed}" scope.`,
+            message: needed.length === 1
+                ? `Creating a "${input.kind}" schedule requires the "${needed[0]}" scope.`
+                : `Creating a "${input.kind}" schedule requires the ${needed.map(s => `"${s}"`).join(', ')} scopes; missing ${missing.map(s => `"${s}"`).join(', ')}.`,
         };
     }
 
