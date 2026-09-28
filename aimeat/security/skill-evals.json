@@ -1,0 +1,17 @@
+{
+  "about": "For each skill with an eval suite under .claude/evals/<skill>/: the digest of the skill and its suite at the last decision, and whether the eval ran (with scores) or was skipped (with the reason and who decided). pnpm check:skill-evals fails when the digest changes. The eval costs money, so the developer decides: run it, or record a skip. Reasoning: aimeat/scripts/check-skill-evals.ts.",
+  "skills": {
+    "aimeat-writing": {
+      "digest": "sha256:06f9da7aa4873d382bc43f1b",
+      "decision": "seeded",
+      "on": "2026-09-28",
+      "note": "baseline when check:skill-evals was introduced; unchanged in this change"
+    },
+    "aimeat-ai-capabilities": {
+      "digest": "sha256:550bdb686e8e706919a2198e",
+      "decision": "skipped",
+      "on": "2026-09-28",
+      "note": "embedding guidance text only; Jouni 2026-09-28: finish now, no eval run"
+    }
+  }
+}
