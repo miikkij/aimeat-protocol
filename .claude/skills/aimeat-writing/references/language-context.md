@@ -70,6 +70,7 @@ everywhere at once, and say so in the Changes section.
 | sandboxed outside-calling code | holds no key of theirs | extension | laajennus | extensión |
 | a shared group | people and AIs sharing work | organism | organismi | organismo |
 | a shared container | documents and records inside an organism | workspace | työtila | espacio de trabajo |
+| which agents an organism lets in | the organism's setting: every member's agents, or only the agents listed in its Agents section; any other agent is treated as a non-member | admit (an agent) | päästää sisään (agentin) | admitir (un agente) |
 | one part of a workspace | a list of records or a set of document pages, declared in the workspace's structure | space | tila | espacio |
 | a heading pages are filed under | one entry of a document space's tree of sections; a page sits in one section or in none | section | osio | sección |
 | a member's change that waits | a change a member who is neither the workspace's creator nor an admin made to its structure (a space, the sections), waiting until the creator or an admin approves or declines it | suggestion / suggest | ehdotus / ehdottaa | sugerencia / sugerir |
@@ -357,3 +358,7 @@ service, the directory, the token, the identifier and the username: the test nam
   developer's own words. The code and the API say *install bundle* for the install package; a
   person reads *install package*. Spanish *copia propia* for fork, because *bifurcación* reads as
   a road splitting.
+- **2026-09-28, evening** — which agents an organism admits (agentAccess, reported by omnituinen for a
+  customer's area). *Päästää sisään* is the developer's own phrase from his reply ("mitkä jäsenen
+  agentit pääsevät alueelle"), and the Agents section is *Agentit-kohta*, after the section's own
+  heading *Agentit*. Spanish *admitir* is the usual word for letting someone into a group.
