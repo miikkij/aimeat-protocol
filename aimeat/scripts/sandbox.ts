@@ -112,7 +112,15 @@ interface SandboxState {
     owners: Account[];
     agent: AgentAccount | null;
     apps: string[];
+    /** The test mailbox's server (scripts/lib/fake-mail-server.ts): its port and process. */
+    mailPort?: number;
+    mailPid?: number;
+    /** The first owner's connection to it, once connected. */
+    mailbox?: string;
 }
+
+/** The test mailbox runs beside the node on the node's port plus this. */
+const MAIL_PORT_OFFSET = 100;
 
 // ── The environment the sandbox node runs with ──────────────────────────────────
 //
@@ -188,6 +196,12 @@ function sandboxEnv(port: number, dbPath: string): Record<string, string> {
         // does on aimeat.io. Off, an app ran in an opaque frame (origin null) whose sign-in the
         // browser refused, and an app could only be checked after it reached production.
         AIMEAT_APP_ORIGIN_ENABLED: 'true', AIMEAT_APP_HOST: 'apps.localhost',
+        // THE TEST MAILBOX: outbound connections on, and the test providers pointed at the local
+        // server this script starts (fake-mail, a Gmail-shaped mailbox of sample messages). Private
+        // egress is allowed because that server is on 127.0.0.1; it reaches nothing else.
+        AIMEAT_CONNECTIONS_ENABLED: 'true',
+        AIMEAT_CONNECT_FAKE_BASE_URL: `http://127.0.0.1:${port + MAIL_PORT_OFFSET}`,
+        AIMEAT_ALLOW_PRIVATE_EGRESS: 'true',
         AIMEAT_PORTFOLIO_ORIGIN_ENABLED: 'false', AIMEAT_PORTFOLIO_HOST: '',
         AIMEAT_CO_ORIGIN_ENABLED: 'false',
     };
@@ -287,6 +301,54 @@ function startNode(port: number, dbPath: string): number {
     });
     child.unref();
     return child.pid ?? 0;
+}
+
+// ── The test mailbox ───────────────────────────────────────────────────────────
+async function mailUp(mailPort: number): Promise<boolean> {
+    try {
+        const res = await fetch(`http://127.0.0.1:${mailPort}/health`, { signal: AbortSignal.timeout(1500) });
+        return res.ok;
+    } catch { return false; }
+}
+
+/** The mail server up beside the node; started detached when it is not. Returns its pid (0 when it was already up). */
+async function ensureMailServer(mailPort: number): Promise<number> {
+    if (await mailUp(mailPort)) return 0;
+    const log = openSync(LOG_FILE, 'a');
+    const child = spawn('node', ['--import', 'tsx', 'scripts/lib/fake-mail-server.ts', String(mailPort)], {
+        cwd: AIMEAT, stdio: ['ignore', log, log], detached: true,
+    });
+    child.unref();
+    for (let i = 0; i < 40 && !await mailUp(mailPort); i++) await new Promise(r => setTimeout(r, 250));
+    if (!await mailUp(mailPort)) throw new Error(`The test mailbox did not start on :${mailPort}. Its log is ${LOG_FILE}.`);
+    return child.pid ?? 0;
+}
+
+/**
+ * Connect the first owner to the test mailbox through the real authorization round: start, the
+ * provider's consent (which approves itself), the node's callback. Returns the connection id.
+ */
+async function connectMailbox(token: string): Promise<string> {
+    const start = await api<{ authorize_url: string }>('/v1/connections/start', { method: 'POST', token, body: { provider: 'fake-mail', return_url: '/' } });
+    if (start.body.ok !== true || !start.body.data) throw new Error(`connect the test mailbox: ${JSON.stringify(start.body.error)}`);
+    const consent = await fetch(start.body.data.authorize_url, { redirect: 'manual' });
+    const callback = consent.headers.get('location');
+    if (!callback) throw new Error('the test mailbox did not send the browser back');
+    const done = await fetch(callback, { redirect: 'manual' });
+    if (done.status >= 400) throw new Error(`the node refused the test mailbox: ${done.status} ${await done.text()}`);
+    const list = await api<{ connections: Array<{ id: string; provider: string }> }>('/v1/connections', { token });
+    const found = (list.body.data?.connections ?? []).find(c => c.provider === 'fake-mail');
+    if (!found) throw new Error('the test mailbox connection is not listed after the round');
+    return found.id;
+}
+
+/** Mail server up, and the first owner connected to it once: every path through up() ends here. */
+async function ensureMailbox(s: SandboxState): Promise<SandboxState> {
+    const mailPort = s.port + MAIL_PORT_OFFSET;
+    const pid = await ensureMailServer(mailPort);
+    const next: SandboxState = { ...s, mailPort, mailPid: pid || s.mailPid };
+    if (!next.mailbox && next.owners[0]) next.mailbox = await connectMailbox(next.owners[0].token);
+    return next;
 }
 
 async function waitUntilUp(baseUrl: string, timeoutMs = 60_000): Promise<void> {
@@ -407,6 +469,7 @@ function report(s: SandboxState): void {
     // where it signs in as it does on aimeat.io. The label is minted on the first open.
     if (s.apps.length) console.log(`  apps          ${s.apps.map(a => `${s.baseUrl}/v1/apps/${a}?mode=inline`).join('\n                ')}\n                (each opens on its own origin, <name>.apps.localhost:${s.port}, and signs in there)`);
     if (s.agent) console.log(`  mcp           ${s.baseUrl}/v1/mcp   with the ${s.agent.name} token above`);
+    if (s.mailbox) console.log(`  mailbox       ${s.owners[0]?.name}'s connection ${s.mailbox} to the test mailbox (18 messages, 2 PDFs) on :${s.mailPort}`);
     console.log(`  data          ${s.dbPath}`);
     console.log(`  log           ${LOG_FILE}`);
     console.log(`  credentials   ${STATE_FILE}  (gitignored; tokens refresh on every \`pnpm sandbox\`)`);
@@ -439,6 +502,7 @@ async function up(reset: boolean): Promise<void> {
         // The node is up and already seeded; the tokens are the only thing that goes stale.
         for (const o of s.owners) o.token = await mintToken(o.name, o.privateKey, false);
         if (s.agent) s.agent.token = await mintToken(s.agent.gaii, s.agent.privateKey, true);
+        s = await ensureMailbox(s);
         writeState(s);
         console.log(`  the sandbox on ${s.baseUrl} is already up; tokens refreshed.`);
         report(s);
@@ -460,7 +524,7 @@ async function up(reset: boolean): Promise<void> {
     if (existing) {
         for (const o of existing.owners) o.token = await mintToken(o.name, o.privateKey, false);
         if (existing.agent) existing.agent.token = await mintToken(existing.agent.gaii, existing.agent.privateKey, true);
-        const next: SandboxState = { ...existing, pid, baseUrl, port, dbPath };
+        const next: SandboxState = await ensureMailbox({ ...existing, pid, baseUrl, port, dbPath });
         writeState(next);
         console.log('  the node is back up on its own data; tokens refreshed.');
         report(next);
@@ -469,9 +533,9 @@ async function up(reset: boolean): Promise<void> {
 
     console.log('  seeding: three owners, an agent, two apps, a record each…');
     const { owners, agent, apps } = await seed();
-    const next: SandboxState = {
+    const next: SandboxState = await ensureMailbox({
         port, baseUrl, dbPath, pid, seededAt: new Date().toISOString(), owners, agent, apps,
-    };
+    });
     writeState(next);
     report(next);
 }
@@ -482,6 +546,7 @@ async function main(): Promise<void> {
 
     if (args.includes('--stop')) {
         if (!s) { console.log('  no sandbox on record.'); return; }
+        if (s.mailPid) stopNode(s.mailPid);
         console.log(stopNode(s.pid)
             ? `  stopped the sandbox on :${s.port} (pid ${s.pid}). Its data is kept; \`pnpm sandbox\` brings it back.`
             : `  no process ${s.pid} to stop. Its data is kept at ${s.dbPath}.`);
