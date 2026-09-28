@@ -18,6 +18,7 @@
  *   import { registerAgentScheduleTools } from './agent-schedules.js';
  *   registerAgentScheduleTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.5.0 — 2026-09-29 — aimeat_schedule_create takes kind 'refinery' (input { prefix }).
  *   v1.4.0 — 2026-09-27 — aimeat_schedule_list takes `detail` (each schedule's prompt, description, purpose
  *     and input) and aimeat_schedule_update takes `prompt` (services/schedule-prompt.ts, via the update service).
  *   v1.3.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
@@ -82,7 +83,7 @@ export function registerAgentScheduleTools(
     'aimeat_schedule_create',
     descriptionFor('aimeat_schedule_create'),
     {
-      kind: z.enum(['ai', 'agent_task', 'extension']).describe('ai = server-side OpenRouter completion; agent_task = queue a task for this agent each fire; extension = run an installed extension action.'),
+      kind: z.enum(['ai', 'agent_task', 'extension', 'refinery']).describe('ai = server-side OpenRouter completion; agent_task = queue a task for this agent each fire; extension = run an installed extension action; refinery = one mail refinery batch (input { prefix }).'),
       cron: z.string().describe('Cron expression, e.g. "0 7 * * *" for 07:00 daily.'),
       display_name: z.string().describe('Human-readable label, e.g. "Morning news translation".'),
       timezone: z.string().optional().describe('IANA timezone, e.g. "Europe/Helsinki" (recommended for daily schedules).'),
@@ -107,7 +108,7 @@ export function registerAgentScheduleTools(
       // put an action on a clock with its built-in defaults. Measured 2026-09-05: the AI Music
       // Charts radar swept the same thirty search terms for six days and added nothing, while the
       // same action with a wider term list found sixty-three tracks the bank had never held.
-      input: z.record(z.string(), z.unknown()).optional().describe('extension: the action\'s own parameters, passed on every fire.'),
+      input: z.record(z.string(), z.unknown()).optional().describe('refinery: { prefix }. extension: the action\'s own parameters, passed on every fire.'),
       instance_id: z.string().optional().describe('extension: run the action on one named instance rather than the default.'),
     },
     annotationsFor('aimeat_schedule_create'),

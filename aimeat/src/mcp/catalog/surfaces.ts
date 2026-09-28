@@ -22,6 +22,7 @@
  *   import { toolsForSurface } from '../catalog/surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
+ *   2026-09-29 — aimeat_refinery_classes, _run and _status on `agent`, beside the mail tools.
  *   2026-09-29 — aimeat_package_sellers on `appdev` and `agent`; aimeat_package_sale on the operator surface.
  *   2026-09-28 — aimeat_package_config_needs on `appdev` and `agent`, beside the entitlements.
  *   2026-09-28 — aimeat_admin_install_set on the operator surface.
@@ -245,6 +246,8 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         // through one are three different words.
         'aimeat_connection_providers', 'aimeat_connection_list', 'aimeat_connection_start',
         'aimeat_mail_search', 'aimeat_mail_read', 'aimeat_mail_aliases', 'aimeat_mail_send',
+        // The mail refinery: a batch that reads, classifies and files a connected mailbox.
+        'aimeat_refinery_classes', 'aimeat_refinery_run', 'aimeat_refinery_status',
         'aimeat_knowledge_list', 'aimeat_knowledge_get', 'aimeat_knowledge_contribute', 'aimeat_knowledge_links',
         'aimeat_appdev_overview', 'aimeat_appdev_pitfall_report', 'aimeat_appdev_pitfall_list', 'aimeat_appdev_pitfall_delete',
         'aimeat_app_template_propose', 'aimeat_app_template_list', 'aimeat_app_template_get', 'aimeat_app_template_delete',

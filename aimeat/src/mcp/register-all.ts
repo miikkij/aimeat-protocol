@@ -24,6 +24,7 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   v1.14.0 — 2026-09-29 — registerRefineryTools (aimeat_refinery_classes, _run, _status).
  *   v1.13.0 — 2026-09-28 — registerAdminInstallSetTools (aimeat_admin_install_set).
  *   v1.12.0 — 2026-09-28 — registerAiCapabilityTools (aimeat_ai_capabilities, aimeat_ai_models,
  *     aimeat_ai_transcribe, aimeat_ai_embed).
@@ -121,6 +122,7 @@ import { registerAgentManagementTools } from './agent-management.js';
 import { registerInvokeTool } from './invoke.js';
 import { registerAgentCrewTools } from './agent-crew.js';
 import { registerConnectionTools } from './connections.js';
+import { registerRefineryTools } from './refinery.js';
 import { registerMcpProxyTools } from './mcp-proxy.js';
 import { registerAccessTools } from './access.js';
 import { registerSecretTools } from './secrets.js';
@@ -162,6 +164,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerOrganismsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerWorkspaceTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerConnectionTools(mcp, storage, config, agentGaii, scopes);
+    registerRefineryTools(mcp, storage, config, agentGaii, scopes);
     registerMcpProxyTools(mcp, storage, config, agentGaii, scopes);
     registerKnowledgeTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     registerAppdevPitfallTools(mcp, storage, config, agentGaii, emitResourceUpdated, scopes);

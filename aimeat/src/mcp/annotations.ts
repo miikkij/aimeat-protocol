@@ -23,6 +23,8 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   2026-09-29 — aimeat_refinery_classes and _status (read only), aimeat_refinery_run (writes rows,
+ *     reads an outside mailbox, spends the model allowance).
  *   2026-09-29 — aimeat_package_sellers and aimeat_package_sale (a revoke is destructive; the sale reaches the repository).
  *   2026-09-28 — aimeat_package_config_needs (read only).
  *   2026-09-28 — aimeat_admin_install_set (idempotent, reaches the package repository).
@@ -247,6 +249,9 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_mail_search: { title: 'Search a Connected Mailbox', readOnlyHint: true, openWorldHint: true },
     aimeat_mail_read: { title: 'Read One Message', readOnlyHint: true, openWorldHint: true },
     aimeat_mail_aliases: { title: 'Addresses This Mailbox May Send As', readOnlyHint: true, openWorldHint: true },
+    aimeat_refinery_classes: { title: 'Mail Refinery Class Packs', readOnlyHint: true, openWorldHint: false },
+    aimeat_refinery_run: { title: 'Run a Mail Refinery Batch', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    aimeat_refinery_status: { title: 'Mail Refinery Batch Progress', readOnlyHint: true, openWorldHint: false },
     // NOT idempotent, and that is the whole point: a blind retry sends the message twice, which is
     // the one mistake in this family a person actually notices.
     aimeat_mail_send: { title: 'Send Mail', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },

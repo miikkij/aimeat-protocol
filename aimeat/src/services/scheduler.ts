@@ -7,6 +7,8 @@
  *   Supports special @activate trigger: runs on extension activation AND every server startup.
  *   Every execution creates an ExecutionLogEntry with timing, result, and memory I/O.
  * @version-history
+ *   v2.16.0 — 2026-09-29 — registerKindExecutor(): boot registers the `refinery` kind's executor, whose
+ *     imports reach back here, so this file does not import it.
  *   v2.15.2 — 2026-09-26 — A job's croner name is its id and this node's id. croner refuses a name
  *     the process already holds, so two nodes in one process (the multi-node E2E suites) each schedule
  *     their own copy of a seeded job. The scheduler still finds every job by its id.
@@ -189,6 +191,12 @@ export class Scheduler {
   registerCoreHandler(id: string, fn: () => Promise<void>): void {
     this.coreHandlers.set(id, fn);
   }
+
+  /** Register the executor of a schedule kind whose code imports what imports this file (refinery). */
+  registerKindExecutor(kind: ScheduledJobRecord['type'], fn: (job: ScheduledJobRecord) => Promise<JobRunResult>): void {
+    this.kindExecutors.set(kind, fn);
+  }
+  private kindExecutors = new Map<string, (job: ScheduledJobRecord) => Promise<JobRunResult>>();
 
   /**
    * Load all enabled jobs from storage and start scheduling them.
@@ -393,6 +401,8 @@ export class Scheduler {
         run = await this.executeEcoCapabilityJob(job);
       } else if (job.type === 'connections-publish') {
         run = await this.executeConnectionsPublishJob(job);
+      } else if (this.kindExecutors.has(job.type)) {
+        run = await this.kindExecutors.get(job.type)!(job);
       } else {
         // A kind with no branch used to fall through here and be recorded as a SUCCESSFUL run that
         // did nothing — a scheduled post that never leaves and a green run log saying it did. Caught

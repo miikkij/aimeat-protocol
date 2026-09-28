@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/mcp/catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.18.0 -- 2026-09-29 -- Mail refinery: aimeat_refinery_classes, _run, _status and the schedule kind.
  *   v1.17.0 -- 2026-09-28 -- AI roles: aimeat_ai_roles and aimeat_ai_role_set, one line each beside aimeat_ai_routing_set.
  *   v1.16.0 -- 2026-09-28 -- AI capabilities: aimeat_ai_capabilities first, aimeat_ai_models, aimeat_ai_transcribe, aimeat_ai_embed.
  *   v1.15.0 -- 2026-09-28 -- Which provider answers: aimeat_ai_providers, aimeat_ai_provider_test, aimeat_ai_routing_set.
@@ -156,6 +157,16 @@ gate, which is off until the owner turns it on; (6) read the decisions and tune 
 a key is missing, the refusal says what to set and where: pass it to your owner as it is. No tool
 ever returns a key; \`aimeat_decide_settings\` names the environment variable that holds yours, when
 your owner set one.
+
+**Mail refinery — a mailbox into records.** A refinery definition (the owner's memory record
+\`<prefix>.config\`: a mailbox from \`aimeat_connection_list\`, an organism workspace, a start date, the
+kinds of mail and the thresholds) turns mail into workspace rows. \`aimeat_refinery_classes\` lists the
+kinds and the fields each reads (receipt, invoice, order, booking, job, system, support, newsletter,
+personal) · \`aimeat_refinery_run { prefix }\` reads the next page of mail, sorts and extracts each
+message, and files it as clear, unclear, unusable or skipped · \`aimeat_refinery_status\` follows it.
+Every message costs the owner's decision and model allowance, so run one batch and report what it
+filed before running more. It never sends. It reads only a mailbox YOU connected; for a nightly run,
+\`aimeat_schedule_create { kind: "refinery", input: { prefix } }\`. Skill: aimeat-refinery.
 
 **Which AI models are allowed.** Your owner may limit the models their calls use: \`aimeat_ai_policy_set\`
 with no policy reads the policy and the node's recommended models. A call naming a model the rules

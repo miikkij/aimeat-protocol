@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Organism, federation/peering, notification, extension, scheduler, cortex, and knowledge record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 — 2026-09-29 — ScheduledJobRecord and ExecutionLogEntry types take 'refinery': one batch
+ *     of the owner's mail refinery on each fire.
  *   v1.6.0 — 2026-09-26 — CortexActivationArtifacts.actionProvider: the identity an activation
  *     published the cortex's actions under, so tearing them down deletes them there (secaudit 2026-09,
  *     R3 7c). Optional; a record stored without it keeps working.
@@ -455,8 +457,10 @@ export interface ScheduledJobRecord {
    * A one-shot ("post this on Tuesday at 09:00") is this kind plus a
    * max_runs:1 constraint, which the scheduler already auto-disables after the
    * fire; there is deliberately no second queue table beside this one.
+   * 'refinery' runs one batch of a mail refinery definition — its `input` is `{ prefix }`, the
+   * definition being the owner's memory record `<prefix>.config`.
    */
-  type: 'extension' | 'core' | 'ai' | 'agent_task' | 'workflow' | 'eco-capability' | 'connections-publish';
+  type: 'extension' | 'core' | 'ai' | 'agent_task' | 'workflow' | 'eco-capability' | 'connections-publish' | 'refinery';
   extensionName?: string;
   instanceId?: string;
   actionId?: string;
@@ -500,7 +504,7 @@ export interface ExecutionLogEntry {
   jobId: string;
   jobName: string;
   /** Mirrors ScheduledJobRecord['type'] — a run log that cannot name a kind cannot explain it. */
-  type: 'extension' | 'core' | 'ai' | 'agent_task' | 'workflow' | 'eco-capability' | 'connections-publish';
+  type: 'extension' | 'core' | 'ai' | 'agent_task' | 'workflow' | 'eco-capability' | 'connections-publish' | 'refinery';
   extensionName?: string;
   actionId?: string;
   trigger: 'cron' | 'manual' | 'activate';

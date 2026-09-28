@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Shared REST tool dispatch for node invoke, connector MCP and CLI.
  * @version-history
+ *   v1.3.0 -- 2026-09-29 -- refineryCliTools: aimeat_refinery_classes, _run and _status.
  *   v1.2.0 -- 2026-09-28 -- aiModelCliTools: aimeat_ai_policy_set on the shell dispatch.
  *   v1.1.0 -- 2026-09-27 -- Integrate the published app-manage tool into the shared dispatch table.
  *   v1.0.0 -- 2026-09-27 -- Extracted unchanged from the CLI shell adapter.
@@ -29,6 +30,7 @@ import { appDraftEditTools } from './tool-call-defs-app-draft-edit.js';
 import { appManageCliTools } from './tool-call-defs-app-manage.js';
 import { exchangeTools } from './tool-call-defs-exchange.js';
 import { connectionCliTools } from './tool-call-defs-connections.js';
+import { refineryCliTools } from './tool-call-defs-refinery.js';
 import { mcpProxyCliTools } from './tool-call-defs-mcp-proxy.js';
 import { adminCliTools } from './tool-call-defs-admin.js';
 import { themeCliTools } from './tool-call-defs-themes.js';
@@ -60,6 +62,7 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...appManageCliTools,
     ...exchangeTools,
     ...connectionCliTools,
+    ...refineryCliTools,
     ...mcpProxyCliTools,
     ...adminCliTools,
     ...themeCliTools,

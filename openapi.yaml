@@ -4470,6 +4470,86 @@ components:
           description: >
             Connected accounts created with this app. They can only be renewed by it, so this is
             also how many would stop renewing if it were removed.
+    RefineryClass:
+      type: object
+      description: >
+        One kind of email message a refinery sorts mail into. `describe` is written for the
+        decision model; `process: false` files the message under its class without extracting.
+      required: [id, label, process, type, describe, fields]
+      properties:
+        id:
+          type: string
+          example: invoice
+        label:
+          type: object
+          properties:
+            fi: { type: string }
+            en: { type: string }
+            es: { type: string }
+        process:
+          type: boolean
+        type:
+          type: string
+          description: The schema.org type a record of this class is.
+          example: schema:Invoice
+        describe:
+          type: string
+        fields:
+          type: array
+          items:
+            type: object
+            required: [name, type, required, describe]
+            properties:
+              name: { type: string }
+              type: { type: string, enum: [string, number, date, boolean] }
+              required: { type: boolean }
+              describe: { type: string }
+    RefineryRun:
+      type: object
+      description: One refinery batch, as the node keeps it while it works and for an hour after.
+      properties:
+        id: { type: string }
+        prefix: { type: string }
+        status: { type: string, enum: [running, done, failed] }
+        startedAt: { type: string, format: date-time }
+        finishedAt: { type: string, format: date-time }
+        n: { type: integer, description: Messages in this batch. }
+        i: { type: integer, description: The message being worked on, 1-based. }
+        step: { type: string, enum: ['', list, read, classify, attach, extract, save] }
+        subject: { type: string }
+        counts:
+          type: object
+          properties:
+            seen: { type: integer }
+            clear: { type: integer }
+            unclear: { type: integer }
+            bad: { type: integer }
+            skip: { type: integer }
+            skipped_seen: { type: integer, description: Already filed by an earlier batch, so passed over. }
+        rows:
+          type: array
+          description: The rows written so far, newest first.
+          items:
+            type: object
+            properties:
+              rowId: { type: string }
+              queue: { type: string, enum: [selkea, epaselva, kelvoton, ohitettu] }
+              subject: { type: string }
+              klass: { type: string }
+        error: { type: string }
+        by: { type: string }
+    RefineryRunEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/AimeatEnvelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                run:
+                  $ref: '#/components/schemas/RefineryRun'
+                already_running:
+                  type: boolean
     PublishMetricSample:
       type: object
       description: >
@@ -5301,7 +5381,7 @@ components:
       description: A recurring schedule owned by the server clock (reuses ScheduledJobRecord).
       properties:
         id: { type: string }
-        type: { type: string, enum: [extension, core, ai, agent_task, eco-capability] }
+        type: { type: string, enum: [extension, core, ai, agent_task, eco-capability, connections-publish, refinery] }
         cron: { type: string }
         enabled: { type: boolean }
         timezone: { type: string, description: IANA timezone }
@@ -5325,7 +5405,7 @@ components:
       type: object
       required: [kind, cron, display_name]
       properties:
-        kind: { type: string, enum: [ai, agent_task, extension, eco-capability, connections-publish] }
+        kind: { type: string, enum: [ai, agent_task, extension, eco-capability, connections-publish, refinery] }
         cron: { type: string, example: '0 7 * * *' }
         display_name: { type: string }
         timezone: { type: string, example: Europe/Helsinki }
@@ -5355,6 +5435,11 @@ components:
           type: object
           description: |
             Kind-specific input payload (extension scheduler input, or the eco-capability invoke input).
+
+            For `refinery` it is `{ prefix }`: one batch of the mail refinery definition
+            `<prefix>.config` on each fire. The creator needs connections:read-through, ai:use,
+            organism:rows and memory:write; the schedule runs as its creator, so an agent's
+            refinery schedule reads only a mailbox that agent connected.
 
             For `connections-publish` it is the post itself:
             `{ connection_id, caption?, storage_key?, params?, ref? }`. The connection must be one the
@@ -52110,6 +52195,123 @@ paths:
   # ============================================================
   # Sharing Groups
   # ============================================================
+
+  /v1/refinery/classes:
+    get:
+      operationId: listRefineryClasses
+      summary: The class packs a refinery definition can name
+      description: >
+        Each pack is a kind of email message (receipt, invoice, order, booking, job, system,
+        support, newsletter, personal): what the decision model is told it is, whether it is
+        processed, and the fields an extraction reads from it. A definition's `classes` lists pack
+        ids, or whole class objects of its own.
+      tags: [Refinery]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The packs.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          classes:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/RefineryClass'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /v1/refinery/runs:
+    post:
+      operationId: startRefineryRun
+      summary: Run one batch of a refinery definition
+      description: >
+        Reads the next page of mail from where the last batch stopped (or exactly `message_ids`,
+        which processes them again), classifies each message, extracts its class's fields from the
+        text and the attachments, and files it as a workspace row in a queue. The definition is the
+        owner's memory record `<prefix>.config`. Answers at once with the run; follow it with GET
+        /v1/refinery/runs/{id}. One run per definition at a time: a second start answers 200 with the
+        run already working. It never sends anything anywhere. A batch where every message fails
+        files nothing and leaves the cursor where it was.
+      tags: [Refinery]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [prefix]
+              properties:
+                prefix:
+                  type: string
+                  pattern: '^[a-z0-9][a-z0-9_-]{1,40}$'
+                  description: Names the definition, `<prefix>.config`.
+                  example: postinjalostamo
+                message_ids:
+                  type: array
+                  maxItems: 50
+                  items:
+                    type: string
+                  description: Run exactly these messages again, whether or not they have rows.
+      responses:
+        '200':
+          description: A run of this definition is already working; this is it.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefineryRunEnvelope'
+        '202':
+          description: The batch started.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefineryRunEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: >
+            A token without all four of connections:read-through, ai:use, organism:rows and
+            memory:write, or a visitor from another node (LOCAL_ACCOUNT_REQUIRED).
+  /v1/refinery/runs/{id}:
+    get:
+      operationId: getRefineryRun
+      summary: How far a refinery batch is
+      description: >
+        The run's step, the message it is on, the counts per queue and the rows written so far. Only
+        the owner the batch runs for sees it. A finished run is kept for an hour; the rows and
+        `<prefix>.runs` keep the rest.
+      tags: [Refinery]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The run.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefineryRunEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: A token without connections:read-through; the rows name the subjects of the mail read.
+        '404':
+          description: No such run of yours, or it finished more than an hour ago.
 
   /v1/connections/providers:
     get:

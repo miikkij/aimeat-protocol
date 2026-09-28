@@ -9,6 +9,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.65.0 -- 2026-09-29 -- e2e-refinery.ts joins the suites (not the guard tier): the mail refinery on
+ *            its own node on 40449, against the sandbox's test mailbox and its model stand-ins.
  *   v1.64.0 -- 2026-09-28 -- e2e-ai-roles.ts joins the suites (not the guard tier): AI roles on its own node on 40444.
  *   v1.63.0 -- 2026-09-28 -- e2e-ai-model-policy.ts joins the suites (not the guard tier): the model
  *            policy of the System 2 plan, V2.
@@ -539,6 +541,10 @@ const ALL_SUITES = [
     // The decision provider (TARGET-080): its own node on 40436 and a TypeSafe stand-in on an
     // ephemeral port, so what the scrubber let out is read from the bytes that arrived.
     'test/e2e-ai-decide.ts',
+    // The mail refinery: its own node on 40449, the sandbox's test mailbox in process with its
+    // decision and completion stand-ins on an ephemeral port, so each queue a message lands in is
+    // the pipeline's doing. Follows the runner's backend.
+    'test/e2e-refinery.ts',
     // The model policy (System 2, V2): its own node on 40438 with a recommended list set the way an
     // operator sets it, and the OpenAI-compatible stub on an ephemeral port, so the model the node
     // sent is read from what arrived. Follows the runner's backend.

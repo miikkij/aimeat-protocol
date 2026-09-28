@@ -5,6 +5,7 @@
  * @description Schedule, workflow, task lifecycle, and agent memory (read/write/list/search) tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-09-29 — aimeat_schedule_create takes kind "refinery" (one mail refinery batch each fire, input { prefix }).
  *   2026-09-27 — aimeat_schedule_list takes detail (each schedule's prompt); aimeat_schedule_update takes prompt.
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v1.7.5 — 2026-09-26 — aimeat_workflow_save says an ai step's call holds its share of maxCostUsd
@@ -49,11 +50,11 @@ import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenan
 export const schedulesTasksMemoryTools: AimeatToolDefinition[] = [
     {
         name: 'aimeat_schedule_create',
-        description: 'Create a recurring schedule the AIMEAT server runs on a cron clock (survives your disconnect; the owner can pause/cancel it any time). FIRST, if a person asked for an AGENT that does something regularly ("every morning", "each week", "keep track of"), load the skill `node:aimeat-recurring-work` and follow it instead of assembling this yourself: they may already have an agent that does this, and a schedule you build here over a key nothing writes looks finished and stays empty. kind="ai" runs a server-side OpenRouter completion over predefined owner memory keys and stores the result (use for "translate the news every morning"); kind="agent_task" queues a task into your own queue each fire (for work needing your tools); kind="extension" runs an installed extension action with zero tokens (for fetch+store). Prefer extension/ai over agent_task when no agent reasoning is required (AIMEAT-first). Pass a timezone for daily schedules.',
+        description: 'Create a recurring schedule the AIMEAT server runs on a cron clock (survives your disconnect; the owner can pause/cancel it any time). FIRST, if a person asked for an AGENT that does something regularly ("every morning", "each week", "keep track of"), load the skill `node:aimeat-recurring-work` and follow it instead of assembling this yourself: they may already have an agent that does this, and a schedule you build here over a key nothing writes looks finished and stays empty. kind="ai" runs a server-side OpenRouter completion over predefined owner memory keys and stores the result (use for "translate the news every morning"); kind="agent_task" queues a task into your own queue each fire (for work needing your tools); kind="extension" runs an installed extension action with zero tokens (for fetch+store); kind="refinery" runs one batch of a mail refinery definition each fire (input: { prefix }, the definition being the owner\'s `<prefix>.config`; needs connections:read-through, ai:use, organism:rows and memory:write, and runs as you, so its mailbox must be one you connected). Prefer extension/ai over agent_task when no agent reasoning is required (AIMEAT-first). Pass a timezone for daily schedules.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
-            kind: { type: 'string', required: true, description: 'ai | agent_task | extension', enum: ['ai', 'agent_task', 'extension'] },
+            kind: { type: 'string', required: true, description: 'ai | agent_task | extension | refinery', enum: ['ai', 'agent_task', 'extension', 'refinery'] },
             cron: { type: 'string', required: true, description: 'Cron expression, e.g. "0 7 * * *".' },
             display_name: { type: 'string', required: true, description: 'Human-readable label.' },
             timezone: { type: 'string', description: 'IANA timezone, e.g. "Europe/Helsinki".' },
@@ -64,7 +65,7 @@ export const schedulesTasksMemoryTools: AimeatToolDefinition[] = [
             task_title: { type: 'string', description: 'agent_task: title of the task created each fire.' },
             extension_name: { type: 'string', description: 'extension: installed extension name.' },
             action_id: { type: 'string', description: 'extension: action id to run.' },
-            input: { type: 'object', description: 'extension: the action\'s own parameters, passed on every fire. Without this the action runs on its built-in defaults, which is rarely what a clock is for: the AI Music Charts radar searched the same thirty terms every night for six days and added nothing, while the same action given a wider term list found sixty-three tracks it had never seen.' },
+            input: { type: 'object', description: 'refinery: { prefix }, the definition to run. extension: the action\'s own parameters, passed on every fire. Without this the action runs on its built-in defaults, which is rarely what a clock is for: the AI Music Charts radar searched the same thirty terms every night for six days and added nothing, while the same action given a wider term list found sixty-three tracks it had never seen.' },
             instance_id: { type: 'string', description: 'extension: run the action on one named instance of the extension rather than the default one.' },
         },
     },
