@@ -7,6 +7,8 @@
  *   best-effort note-value-to-text, and the placement "new" sentinel / classify progress-step keys /
  *   inbox key prefix. Kept dependency-light (only i18n) so both modules can import without cycles.
  * @version-history
+ *   2026-09-28 — firstLine() strips only markdown markers (quote, heading, bullet, emphasis, code),
+ *     not every * _ ` > # in the line: "<b>" lost its ">", "C#" its "#", snake_case its "_".
  *   v1.0.0 — 2026-06-21 — Extracted from notebook-tab.js when the tab was split into tab + card.
  */
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
@@ -31,7 +33,17 @@ export const relTime = formatRelativeTime;
 /** First non-empty line of a note (markdown heading marks stripped), for the collapsed one-line view. */
 export function firstLine(text) {
   const line = (text || '').split('\n').map(l => l.trim()).find(Boolean) || '';
-  return line.replace(/^#{1,6}\s+/, '').replace(/[*_`>#]/g, '').slice(0, 160);
+  // Only the markdown MARKERS go: a quote's and a heading's opening signs, a list bullet, the emphasis
+  // and code marks around words. It used to strip every * _ ` > # anywhere, so "<b>" lost its ">",
+  // "C#" its "#" and a snake_case name its "_".
+  return line
+    .replace(/^(>\s*)+/, '')
+    .replace(/^#{1,6}\s+/, '')
+    .replace(/^[-*+]\s+/, '')
+    .replace(/(\*\*|__)(.+?)\1/g, '$2')
+    .replace(/`([^`]*)`/g, '$1')
+    .replace(/(^|[\s(])[*_]([^*_\s][^*_]*?)[*_](?=[\s).,!?:;]|$)/g, '$1$2')
+    .slice(0, 160);
 }
 
 /** Best-effort plain text of a note value for the inbox preview. */

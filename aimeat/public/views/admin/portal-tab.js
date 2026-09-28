@@ -24,6 +24,7 @@
  *   portal-tab.sections.js · PartsList/AddPart from portal-tab.parts.js · PagePreview
  * @usage Mounted by the admin dashboard tab router.
  * @version-history
+ *   2026-09-28 — The change log reads the list GET /v1/site/changelog answers; it read `.entries` and was always empty.
  *   v3.0.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
  *     itself, so a load-balancer origin URL with an ampersand (a query string) showed as &amp;.
  *   v3.0.0 — 2026-09-27 — Library components only (admin group G2): Section, Verdict and Readings,
@@ -157,7 +158,9 @@ export default function PortalTab({ data, reload }) {
   const p = data.portal || {};
   const meta = p.meta || {};
   const tmpl = p.template || {};
-  const changes = (p.changelog?.entries) || [];
+  // GET /v1/site/changelog answers the list itself (storage.listSiteChangeLog), newest first. This read
+  // `.entries`, which the answer never had, so the log and "last change" were always empty.
+  const changes = Array.isArray(p.changelog) ? p.changelog : (p.changelog?.entries || []);
   const isLb = meta.lb_mode?.enabled;
   const hasCustom = !!meta.has_custom_template;
 

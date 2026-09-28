@@ -7,6 +7,8 @@
  * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
  *   (the shell block), and from every standalone page that links theme.css.
  * @version-history
+ *   v1.2.0 — 2026-09-28 — .data-table-wrap: a table wider than the page scrolls sideways instead of
+ *     being cut off (the admin sharing-groups table at 390 px); additive.
  *   v1.1.0 — 2026-09-27 — .data-table--compact (DataTable compact): the old app catalogue's backup import
  *     table, appcat parity (dialogs); additive.
  *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 1460-1491), so theme.css
@@ -44,6 +46,9 @@
 /* Generic scrollable wrapper (the admin-scoped `.adm .scrollable` already exists
    for admin tables; this one covers DataTable used outside `.adm`). */
 .scrollable { max-height: 600px; overflow-y: auto; }
+/* Every DataTable sits in this: it scrolls sideways when the columns are wider than the page, where
+   the page's own overflow would otherwise cut the last columns off. A table that fits is unchanged. */
+.data-table-wrap { overflow-x: auto; }
 
 /* The compact table (DataTable compact, appcat): a table to choose from inside a dialog, the old app
    catalogue's backup import (.backup-table): ink words at .85rem, 6px 8px cells on the hairline, the
