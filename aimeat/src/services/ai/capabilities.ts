@@ -24,6 +24,8 @@
  *   v1.0.1 — 2026-09-28 — The embed howTo says embeddings are rare and the person's decision.
  *   v1.1.0 — 2026-09-28 — `roles`: an app's declared AI roles, each bound or not with the fix; the
  *     owner's roles for the owner and their agents (services/ai/roles.ts).
+ *   v1.1.1 — 2026-09-28 — The settings read in aiCapabilitiesView's Promise.all is wrapped in an async
+ *     function: a storage that threw synchronously left the sibling reads' rejections unhandled.
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
@@ -208,11 +210,13 @@ export async function aiCapabilitiesView(
 ): Promise<Record<string, unknown>> {
   const { node, owner } = await providersForOwner(storage, config, gaii);
   const providers = [...owner, ...node];
+  // The storage read inside an async function, so a storage that throws before returning a promise
+  // rejects this call rather than leaving a sibling's rejection unhandled (as provider-store.ts does).
   const [states, policy, usage, prefsRecord] = await Promise.all([
     Promise.all(CAPABILITY_ORDER.map(cap => stateOf(storage, config, gaii, cap, ctx, providers))),
     readOwnerAiPolicy(storage, gaii),
     getTodayUsage(storage, gaii),
-    storage.getMemory(gaii, 'openrouter.settings'),
+    (async () => storage.getMemory(gaii, 'openrouter.settings'))(),
   ]);
   const prefs = (prefsRecord?.value as Record<string, unknown> | undefined) ?? {};
   const switchOf: Record<CallerClass, keyof typeof policy.appliesTo> = { owner: 'owner', chat: 'chat', agent: 'agents', app: 'apps' };
