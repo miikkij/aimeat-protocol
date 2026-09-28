@@ -8,10 +8,10 @@
       "note": "one row in the language context (admit / päästää sisään / admitir) and its dated log line; the skill's instructions are unchanged; Jouni, 2026-09-28"
     },
     "aimeat-ai-capabilities": {
-      "digest": "sha256:b622b9fd2ea0c5c557022d7f",
+      "digest": "sha256:d63709d870aee8d593e5bb5a",
       "decision": "skipped",
       "on": "2026-09-28",
-      "note": "guidance text only (section 2b, AI roles); Jouni 2026-09-28"
+      "note": "section 2b: context, connection needs every capability, roles() is the app's own; Jouni 2026-09-28 ('tee' to the proposed skip)"
     }
   }
 }
