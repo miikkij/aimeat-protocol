@@ -16,6 +16,9 @@
  *   entrance are the kit's one-shot JavaScript, and they stand down under reduced motion.
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.2.0 — 2026-09-28 — `.ak-setgroups` (the settings groups in one card, divided by hairlines)
+ *     and white inputs on the workbench look: the two things the first app built on it showed
+ *     off the approved design.
  *   v0.1.0 — 2026-09-28 — Initial.
  */
 
@@ -288,6 +291,24 @@ button.ak-checkgrid__tile:focus-visible { outline: 2px solid var(--ak-focus); ou
 @container (min-width: 840px) {
   .ak-setgroup__grid { grid-template-columns: var(--ak-setgroup-help) minmax(0, var(--ak-setgroup-measure)); column-gap: 40px; }
 }
+/* A SETTINGS PAGE IS ONE CARD. Put the groups in `.ak-setgroups` and they share one surface,
+   divided by hairlines, as the approved design draws it; a group on its own stays its own card. */
+.ak-setgroups {
+  background: var(--ak-surface);
+  background-image: var(--ak-surface-image);
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius);
+  box-shadow: var(--ak-elev-1);
+  padding: 0 min(calc(var(--ak-band-pad) + 4px), 5.5vw);
+}
+.ak-setgroups > .ak-setgroup {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: none;
+  padding-inline: 0;
+}
+.ak-setgroups > .ak-setgroup + .ak-setgroup { border-top: var(--ak-line-w) solid var(--ak-line); }
 .ak-setgroup .ak-form__bar { justify-content: flex-start; }
 
 /* ── progressFigure ───────────────────────────────────────────────────────────────────────── */
@@ -341,6 +362,13 @@ button.ak-checkgrid__tile:focus-visible { outline: 2px solid var(--ak-focus); ou
 .ak-callout--err .ak-callout__icon { color: var(--ak-err); }
 .ak-callout__words { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: calc(var(--ak-text-body) - 0.5px); line-height: 1.5; }
 .ak-callout__title { font-weight: 600; }
+
+/* ── Inputs on the workbench look ─────────────────────────────────────────────────────────── */
+/* The kit's input takes the page ground, which on most looks reads as a well in the card. On the
+   workbench the ground is the grey-blue desk, and a field that colour on a white card read as a
+   disabled one (the owner's words on Postinjalostamo, 2026-09-28): the field is the card's white,
+   and its border carries the edge. */
+[data-ak-look='workbench'] .ak-input:not(.ak-input--range) { background: var(--ak-surface); }
 
 /* ── The form's per-field widths ──────────────────────────────────────────────────────────── */
 /* The cap is on the control alone; 28px is the input's own padding and border, so "short" holds

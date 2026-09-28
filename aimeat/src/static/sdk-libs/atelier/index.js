@@ -55,6 +55,8 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.55.1 — 2026-09-28 — The workbench stylesheet carries `.ak-setgroups` (a settings page's
+ *     groups in one card) and white inputs on the workbench look.
  *   v0.55.0 — 2026-09-28 — THE TEN MOTION PARTS (Jouni's ask of 2026-09-28: controls that answer
  *     the hand). springs.js is the live spring (liveSpring, retargetable mid-flight, no frames at
  *     rest) and the edge pair; ink.js is the travelling marker, now the tab row's fill; controls.js
@@ -395,7 +397,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.55.0',
+  version: '0.55.1',
 
   /**
    * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's

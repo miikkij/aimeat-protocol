@@ -19,6 +19,8 @@
  * @usage body += atelierLayoutRules();
  *        export const ATELIER_COMPONENTS = [ ..., ...ATELIER_WORKBENCH_COMPONENTS ];
  * @version-history
+ *   v1.2.0 — 2026-09-28 — Rule 5 adds the one settings card (`.ak-setgroups`) and saving on change,
+ *     as the approved design draws the settings page.
  *   v1.1.0 — 2026-09-28 — The rules name the workbench pieces (settingsGroup, field `width`,
  *     statusBand + checkGrid, progressFigure, callout, app({ nav: 'side' })) where they named a
  *     proposed Design Book part and hand-set widths, and the pieces join the component catalogue.
@@ -74,7 +76,9 @@ export function atelierLayoutRules(): string {
     + 'phone; (2) help text is at most 60ch per line; (3) one column, the label above its field, and '
     + 'only short related fields share a row; (4) every group of settings is a `settingsGroup` with '
     + 'a heading and ONE sentence of help, and no field stands outside a group; (5) from 840 px the '
-    + 'group puts its help in a left column beside the controls, below that above them; (6) a tool '
+    + 'group puts its help in a left column beside the controls, below that above them, and the '
+    + 'groups of one page share ONE card divided by hairlines (target them into '
+    + '`<div class="ak-setgroups">`), each control saving on change; (6) a tool '
     + 'with more than two screens uses `app({ nav: \'side\' })`: the pages in a left column, the '
     + 'content capped at 65rem; (7) advanced settings go behind ONE closed disclosure (`reveal`); '
     + '(8) the primary button aligns left with the inputs, says its verb and spans the width on a '
