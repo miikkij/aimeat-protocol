@@ -91,15 +91,19 @@ contract. To **back up** your node, stop it and copy the whole app-data folder.
 > `cargo test --target x86_64-pc-windows-gnu` on an MSVC host still asks for `link.exe` and stops.
 > The installers that ship are built by CI with MSVC; this is for working on the app.
 
-**`cargo build` needs three things staged even when you are not making an installer**, because tauri-build
-validates them while cargo compiles: the Node sidecar (`node scripts/stage-node.mjs`), `WebView2Loader.dll`
-(`node scripts/stage-webview2.mjs`) and a `resources/server` and `resources/licenses` that are not empty —
-one placeholder file in each is enough, and `pnpm stage` empties both before writing the real thing.
-[.github/workflows/desktop-check.yml](../.github/workflows/desktop-check.yml) does exactly this on every
-push that touches this folder, which is what keeps the app from drifting away from the server again.
-Its second job does the same on Linux, so the crate's Unix-only code and tests run too. The DLL is
-Windows-only, so on Linux a placeholder file, `WebView2Loader.placeholder`, matches the `WebView2Loader.*`
-resource glob instead.
+**`cargo build` needs these staged even when you are not making an installer**, because tauri-build
+validates them while cargo compiles: the Node sidecar (`node scripts/stage-node.mjs`), a `resources/server`
+and `resources/licenses` that are not empty (one placeholder file in each is enough, and `pnpm stage`
+empties both before writing the real thing), and on Windows only `WebView2Loader.dll`
+(`node scripts/stage-webview2.mjs`), which only [tauri.windows.conf.json](src-tauri/tauri.windows.conf.json)
+names as a resource. [.github/workflows/desktop-check.yml](../.github/workflows/desktop-check.yml) does
+exactly this on every push that touches this folder, on Windows, Linux and macOS, which is what keeps the
+app from drifting away from the server again and compiles each platform's own code.
+
+**Per-platform configuration** is merged by Tauri over tauri.conf.json: `tauri.windows.conf.json` (NSIS and
+MSI, and the WebView2 loader), `tauri.macos.conf.json` (app and dmg, signed ad hoc, macOS 11 and later) and
+`tauri.linux.conf.json` (deb and AppImage). A list in a platform file replaces the base list rather than
+adding to it, which is why the Windows file repeats the two resource folders.
 
 > `pnpm stage` stages the Node sidecar under **both** Windows triples (`-gnu` and `-msvc`) because the Tauri
 > compiler and the Tauri CLI bundler can each resolve a different one. Whichever your toolchain uses, it's covered.
@@ -170,11 +174,16 @@ the app-data folder. To iterate on the **server** itself, run it the normal way 
 
 ## Known limitations (this pass)
 
-- **Windows-only.** macOS/Linux need per-OS builds (native `better-sqlite3` + Node sidecar can't cross-compile).
-  Adding them means a GitHub Actions matrix (one runner per OS).
-- **Unsigned, on purpose for now.** The first launch shows a Windows SmartScreen warning ("More info → Run
-  anyway"). Ruled 2026-09-18: no code signing until the app has been judged good; it costs money and the
-  free routes were all measured closed (see the Platform Development Note `installer-code-signing`).
+- **Windows, Apple-silicon Macs and Linux, built on their own runners** (native `better-sqlite3` and the
+  Node sidecar cannot be cross-compiled). Intel Macs are not built: GitHub's macOS runners are Apple
+  silicon, and a universal build would need a universal sidecar and the native module twice. The macOS and
+  Linux builds are proven to build and bundle in CI; nobody has yet run them on a real Mac or Linux desktop.
+- **Unsigned, on purpose for now.** On Windows the first launch shows a SmartScreen warning ("More info →
+  Run anyway"). On a Mac the app is refused as unverified the first time, and the person allows it under
+  System Settings → Privacy & Security → Open Anyway; the bundle is signed ad hoc so macOS says "unverified"
+  and offers that button, instead of "damaged", which offers none. Ruled 2026-09-18: no code signing until
+  the app has been judged good; it costs money and the free routes were all measured closed (see the
+  Platform Development Note `installer-code-signing`).
 - **Auto-update works from 0.5.0 onwards, and not backwards.** It broke because both paths looked at the
   repository's `releases/latest`, which this repository gives to the node's own far more frequent `v*`
   releases: the updater's `latest.json` answered 404 and the in-app banner returned early, silently, from June

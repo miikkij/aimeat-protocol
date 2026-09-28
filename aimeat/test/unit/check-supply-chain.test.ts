@@ -5,6 +5,8 @@
  *   case is a file's text in and a list of findings out.
  * @usage cd aimeat && pnpm exec vitest run test/unit/check-supply-chain.test.ts
  * @version-history
+ *   v1.1.1 — 2026-09-29 — The exemption case passes its own entry: the real list is empty since the
+ *     desktop app stopped shipping provision.mjs.
  *   v1.1.0 — 2026-09-24 — The pip rules in every workflow step, whatever the job holds.
  *   v1.0.0 — 2026-09-24 — Initial, with the gate.
  */
@@ -135,7 +137,8 @@ describe('check:supply-chain, workflows', () => {
 });
 
 describe('check:supply-chain, the desktop runtime scripts', () => {
-  const FILE = 'aimeat-desktop/src-tauri/resources/agent-runtime/provision.mjs';
+  // A sample path under the desktop resources; the app ships no script there today.
+  const FILE = 'aimeat-desktop/src-tauri/resources/runtime/setup.mjs';
 
   it('refuses the install script piped into PowerShell', () => {
     const js = "const r = await run('powershell', ['-NoProfile', '-Command', 'irm https://astral.sh/uv/install.ps1 | iex']);";
@@ -169,10 +172,12 @@ describe('check:supply-chain, the desktop runtime scripts', () => {
       };
       put('.github/workflows/ok.yml', GOOD_WORKFLOW);
       put('tools/systemone/README.md', 'Local models.\n');
+      const exemptions = { [`${FILE}#git-unpinned`]: 'The clone follows a branch on purpose.' };
       put(FILE, "const r = await run('git', ['clone', '--depth', '1', REPO, REPO_DIR]);\n");
-      expect(scan(root).findings).toEqual([]);
+      expect(scan(root, exemptions).findings).toEqual([]);
+      expect(scan(root).findings.map(f => f.rule)).toEqual(['git-unpinned']);
       put(FILE, "console.log('nothing is cloned here');\n");
-      expect(scan(root).findings.map(f => f.rule)).toEqual(['exemption']);
+      expect(scan(root, exemptions).findings.map(f => f.rule)).toEqual(['exemption']);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
