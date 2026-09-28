@@ -17,7 +17,9 @@
  *   on 40050 nor the E2E runner on 40251 and its lanes), its own SQLite file, and in it: three
  *   owners with passwords and fresh tokens (the first is the operator, the second is for anything
  *   cross-owner, the third is a third-party member), an agent belonging to the first owner, two
- *   published apps, and one memory record per owner. Everything a fresh node seeds itself — the
+ *   published apps, and one memory record per owner. Each app runs on its own origin,
+ *   `<name>.apps.localhost:<port>`, and signs in through the same grant window as on aimeat.io, so
+ *   an app is checked signed in here before anyone sees it in production. Everything a fresh node seeds itself — the
  *   Design Book, the bundled cortexes, the example packages, the built-in skills, the system
  *   prompts — is there because the node booted.
  *
@@ -46,6 +48,11 @@
  *   cd aimeat && pnpm sandbox --stop       # stop the node, keep the data
  *   cd aimeat && pnpm sandbox --status      # is it up, on which port, with what in it
  * @version-history
+ *   v1.3.0 — 2026-09-29 — THE APP ORIGIN IS ON, at `apps.localhost`. With it off, an app ran in an
+ *     opaque frame (origin null) and the browser refused its sign-in (CORS on a credentialed
+ *     request), so Postinjalostamo could be looked at only after it reached production and three
+ *     rounds of corrections were found by Jouni rather than by the session. Every browser resolves
+ *     *.localhost to loopback with no hosts file; the node derives the port-carrying redirect itself.
  *   v1.2.0 — 2026-09-19 — The free-port probe asks the wildcard, 127.0.0.1 and ::1 in turn, and
  *     both loopbacks whether somebody answers. v1.1.0 fixed the opposite mistake (a loopback probe
  *     that missed a wildcard holder) and left this one: a wildcard bind succeeds on Windows while
@@ -176,8 +183,11 @@ function sandboxEnv(port: number, dbPath: string): Record<string, string> {
         AIMEAT_OPERATOR_NAME: 'AIMEAT Sandbox Operator',
         AIMEAT_OPERATOR_EMAIL: 'operator@localhost',
         AIMEAT_OPERATOR_ADDRESS: 'Testikatu 1, Localhost',
-        // The sandbox's own subdomain origins stay off: they need a hosts file to mean anything.
-        AIMEAT_APP_ORIGIN_ENABLED: 'false', AIMEAT_APP_HOST: '',
+        // THE APP ORIGIN IS ON, at apps.localhost: every browser resolves *.localhost to loopback
+        // with no hosts file, so an app runs at <name>.apps.localhost:<port> and signs in the way it
+        // does on aimeat.io. Off, an app ran in an opaque frame (origin null) whose sign-in the
+        // browser refused, and an app could only be checked after it reached production.
+        AIMEAT_APP_ORIGIN_ENABLED: 'true', AIMEAT_APP_HOST: 'apps.localhost',
         AIMEAT_PORTFOLIO_ORIGIN_ENABLED: 'false', AIMEAT_PORTFOLIO_HOST: '',
         AIMEAT_CO_ORIGIN_ENABLED: 'false',
     };
@@ -393,8 +403,9 @@ function report(s: SandboxState): void {
     }
     console.log('');
     // The runnable address: /v1/apps/<owner>/<file> alone is the download (an attachment), and
-    // /apps/... exists only on a node with an app origin, which the sandbox pins off.
-    if (s.apps.length) console.log(`  apps          ${s.apps.map(a => `${s.baseUrl}/v1/apps/${a}?mode=inline`).join('\n                ')}`);
+    // ?mode=inline answers with the redirect to the app's own origin, <name>.apps.localhost:<port>,
+    // where it signs in as it does on aimeat.io. The label is minted on the first open.
+    if (s.apps.length) console.log(`  apps          ${s.apps.map(a => `${s.baseUrl}/v1/apps/${a}?mode=inline`).join('\n                ')}\n                (each opens on its own origin, <name>.apps.localhost:${s.port}, and signs in there)`);
     if (s.agent) console.log(`  mcp           ${s.baseUrl}/v1/mcp   with the ${s.agent.name} token above`);
     console.log(`  data          ${s.dbPath}`);
     console.log(`  log           ${LOG_FILE}`);
