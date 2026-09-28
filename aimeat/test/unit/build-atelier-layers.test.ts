@@ -7,6 +7,7 @@
  *   that lands in `start` by default can push it over the limit without anybody deciding so.
  * @usage cd aimeat && pnpm vitest run test/unit/build-atelier-layers.test.ts
  * @version-history
+ *   v1.2.0 — 2026-09-28 — The rules name the workbench pieces, and every piece is in the catalogue and exported by the kit.
  *   v1.1.0 — 2026-09-28 — The layout rules for a settings page and a queue page land in one part with their numbers.
  *   v1.0.0 — 2026-09-19 — Initial.
  */
@@ -51,8 +52,18 @@ describe('the Atelier specification in parts', () => {
     const parts = ATELIER_PARTS.map(p => atelierPiece(full, p.id, config.baseUrl)!.text);
     const holding = parts.filter(t => t.includes('A SETTINGS PAGE AND A QUEUE PAGE HAVE RULES'));
     expect(holding.length).toBe(1);
-    for (const fact of ['42rem', '60ch', '840 px', '--ak-main-max', 'component-settings-group', '"3 of 10"']) {
+    for (const fact of ['60ch', '840 px', '`settingsGroup`', '`width`', "nav: 'side'", '"3 / 10"', 'genre `workbench`']) {
       expect(holding[0], fact).toContain(fact);
+    }
+  });
+
+  it('lists every workbench piece in the component catalogue, each one an export of the kit', async () => {
+    const { ATELIER_COMPONENTS } = await import('../../src/services/build-atelier-prompt.js');
+    const ids = ATELIER_COMPONENTS.map(c => c.id);
+    const kit = await import('node:fs').then(fs => fs.readFileSync('src/static/sdk-libs/atelier/index.js', 'utf8'));
+    for (const id of ['sideNav', 'statusBand', 'checkGrid', 'choiceCards', 'settingsGroup', 'progressFigure', 'callout']) {
+      expect(ids, id).toContain(id);
+      expect(kit, id).toMatch(new RegExp('\\b' + id + '\\b[^\\n]*from \'\\./workbench\\.js\''));
     }
   });
 

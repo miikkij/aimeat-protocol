@@ -1011,7 +1011,15 @@
       delegateHanded: "Handed over",
       delegateFailed: "The agent could not finish it.",
       delegateNoAgents: "No agent is connected to this account yet.",
-      agentActivityNone: "No agent activity yet."
+      agentActivityNone: "No agent activity yet.",
+      chosen: "Chosen",
+      now: "Now",
+      ofTotal: "{value} of {total}",
+      checkOk: "Done",
+      checkTodo: "Needs you",
+      checkFail: "Failed",
+      checkWait: "In progress",
+      checkOptional: "Optional"
     },
     fi: {
       loading: "Ladataan…",
@@ -1085,7 +1093,15 @@
       delegateHanded: "Annettu hoidettavaksi",
       delegateFailed: "Agentti ei saanut sitä valmiiksi.",
       delegateNoAgents: "Tähän tiliin ei ole vielä kytketty agenttia.",
-      agentActivityNone: "Ei agenttitoimintaa vielä."
+      agentActivityNone: "Ei agenttitoimintaa vielä.",
+      chosen: "Valittu",
+      now: "Nyt",
+      ofTotal: "{value} / {total}",
+      checkOk: "Kunnossa",
+      checkTodo: "Tarvitsee sinua",
+      checkFail: "Epäonnistui",
+      checkWait: "Kesken",
+      checkOptional: "Valinnainen"
     },
     es: {
       loading: "Cargando…",
@@ -1159,7 +1175,15 @@
       delegateHanded: "Encargado",
       delegateFailed: "El agente no pudo terminarlo.",
       delegateNoAgents: "Esta cuenta aún no tiene ningún agente conectado.",
-      agentActivityNone: "Sin actividad de agentes todavía."
+      agentActivityNone: "Sin actividad de agentes todavía.",
+      chosen: "Elegida",
+      now: "Ahora",
+      ofTotal: "{value} de {total}",
+      checkOk: "Listo",
+      checkTodo: "Te necesita",
+      checkFail: "Falló",
+      checkWait: "En curso",
+      checkOptional: "Opcional"
     }
   };
   var HOST = { en: {}, fi: {}, es: {} };
@@ -3484,14 +3508,479 @@
     return v;
   }
 
+  // src/static/sdk-libs/atelier/workbench.js
+  var SVG_NS3 = "http://www.w3.org/2000/svg";
+  var TONES = ["ok", "warn", "err", "accent", "quiet", "info"];
+  function toneOf(tone) {
+    return TONES.indexOf(tone) >= 0 ? tone : "quiet";
+  }
+  function stateIcon(state) {
+    const svg6 = document.createElementNS(SVG_NS3, "svg");
+    svg6.setAttribute("viewBox", "0 0 24 24");
+    svg6.setAttribute("width", "22");
+    svg6.setAttribute("height", "22");
+    svg6.setAttribute("fill", "none");
+    svg6.setAttribute("stroke", "currentColor");
+    svg6.setAttribute("stroke-width", "2.4");
+    svg6.setAttribute("stroke-linecap", "round");
+    svg6.setAttribute("stroke-linejoin", "round");
+    svg6.setAttribute("aria-hidden", "true");
+    const ring2 = document.createElementNS(SVG_NS3, "circle");
+    ring2.setAttribute("cx", "12");
+    ring2.setAttribute("cy", "12");
+    ring2.setAttribute("r", "10");
+    svg6.appendChild(ring2);
+    const marks = {
+      ok: "M8 12.5l2.6 2.6L16 9.6",
+      todo: "M12 7v6M12 16.5v.5",
+      info: "M12 11v6M12 7.5v.5",
+      optional: "M8 12h8",
+      fail: "M9 9l6 6M15 9l-6 6",
+      wait: "M8 12h.01M12 12h.01M16 12h.01"
+    };
+    const path = document.createElementNS(SVG_NS3, "path");
+    path.setAttribute("d", marks[state] || marks.optional);
+    svg6.appendChild(path);
+    return svg6;
+  }
+  var STATE_TONE = { ok: "ok", todo: "warn", fail: "err", wait: "accent", optional: "quiet", info: "info" };
+  function stateWords(state) {
+    const key = { ok: "checkOk", todo: "checkTodo", fail: "checkFail", wait: "checkWait", optional: "checkOptional" }[state];
+    const said = key ? t(key) : "";
+    return said && said !== key ? said : "";
+  }
+  function sideNav(spec) {
+    const state = { items: spec.items || [], value: spec.value || (spec.items && spec.items[0] ? spec.items[0].id : "") };
+    const root = el("nav", { class: "ak-root ak-sidenav", "data-ak-part": "root", "aria-label": spec.label || null });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    function pick(item) {
+      if (item.id === state.value) {
+        if (item.onPick) item.onPick(item);
+        return;
+      }
+      viewSwap(function() {
+        state.value = item.id;
+        render();
+        if (item.onPick) item.onPick(item);
+        if (spec.onChange) spec.onChange(item.id, item);
+      }, { kind: spec.transition, node: root });
+    }
+    function render() {
+      clear(root);
+      let group = null;
+      let list2 = null;
+      for (const item of state.items) {
+        const g = item.group || "";
+        if (list2 === null || g !== group) {
+          group = g;
+          list2 = el(
+            "div",
+            { class: "ak-sidenav__group", "data-ak-part": "group", role: "group", "aria-label": g || null },
+            g ? el("div", { class: "ak-sidenav__heading", "aria-hidden": "true", text: g }) : null
+          );
+          root.appendChild(list2);
+        }
+        const active = item.id === state.value;
+        const given = partValue(spec, "item", item);
+        list2.appendChild(el("button", {
+          type: "button",
+          class: "ak-sidenav__item" + (active ? " ak-sidenav__item--active" : ""),
+          "data-ak-part": "item",
+          "data-ak-id": item.id,
+          "aria-current": active ? "page" : null,
+          "data-ak-noguard": true,
+          on: { click: function() {
+            pick(item);
+          } }
+        }, given !== void 0 ? given : [
+          item.tone ? el("span", { class: "ak-sidenav__dot ak-tone--" + toneOf(item.tone), "data-ak-part": "dot", "aria-hidden": "true" }) : null,
+          el("span", { class: "ak-sidenav__label", "data-ak-part": "label", text: item.label }),
+          item.count != null && item.count !== "" ? el("span", { class: "ak-sidenav__count" + (item.tone ? " ak-tone-text--" + toneOf(item.tone) : ""), "data-ak-part": "count", text: String(item.count) }) : null
+        ]));
+      }
+      slotInto(root, spec, "foot", null, { cls: "ak-sidenav__foot", tag: "div" });
+    }
+    render();
+    return {
+      el: root,
+      /** @param {{ value?: string, items?: any[] }} patch */
+      set(patch) {
+        if (!patch) return;
+        if (patch.items) state.items = patch.items;
+        if (patch.value != null) state.value = patch.value;
+        render();
+      },
+      destroy() {
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+  function progressBar(cls, p) {
+    if (p == null) return null;
+    const value = typeof p === "number" ? p : Number(p.value) || 0;
+    const total = typeof p === "number" ? 1 : Math.max(Number(p.total) || 0, 0);
+    const ratio = total > 0 ? Math.min(Math.max(value / total, 0), 1) : 0;
+    const tone = typeof p === "object" && p.tone ? toneOf(p.tone) : ratio >= 1 ? "ok" : "accent";
+    const fill = el("div", { class: cls + "__fill ak-tone-fill--" + tone, "data-ak-part": "fill", vars: { "--ak-fill": (ratio * 100).toFixed(1) + "%" } });
+    return el("div", {
+      class: cls + "__bar",
+      "data-ak-part": "bar",
+      role: "progressbar",
+      "aria-valuemin": "0",
+      "aria-valuemax": String(total || 1),
+      "aria-valuenow": String(value),
+      "aria-valuetext": total ? t("ofTotal", { value, total }) : null
+    }, fill);
+  }
+  function statusBand(spec) {
+    const s = Object.assign({}, spec);
+    const root = el("section", { class: "ak-root ak-band", "data-ak-part": "root" });
+    const body = el("div", { class: "ak-band__body", "data-ak-part": "body" });
+    function render() {
+      clear(root);
+      const head = el("div", { class: "ak-band__head", "data-ak-part": "head" }, [
+        el("div", { class: "ak-band__words", "data-ak-part": "words" }, [
+          el(s.level === 2 ? "h2" : "h1", { class: "ak-band__title", "data-ak-part": "title", text: s.title }),
+          s.text ? el("p", { class: "ak-band__text", "data-ak-part": "text", text: s.text }) : null
+        ])
+      ]);
+      const actions = el("div", { class: "ak-band__actions", "data-ak-part": "actions" });
+      if (s.action) {
+        actions.appendChild(el("button", {
+          type: "button",
+          class: "ak-btn" + (s.action.kind === "plain" ? "" : " ak-btn--" + (s.action.kind || "primary")),
+          on: { click: function() {
+            return s.action && s.action.onClick && s.action.onClick();
+          } }
+        }, s.action.label));
+      }
+      slotInto(actions, s, "actions", null, { cls: "ak-band__own", tag: "span" });
+      if (actions.firstChild) head.appendChild(actions);
+      root.appendChild(head);
+      const bar = progressBar("ak-band", s.progress);
+      if (bar) root.appendChild(bar);
+      root.appendChild(body);
+      slotInto(root, s, "after", null, { cls: "ak-band__after", tag: "div" });
+    }
+    render();
+    if (s.target) resolve(s.target).appendChild(root);
+    enter(root);
+    return {
+      el: root,
+      body,
+      /** @param {{ title?: string, text?: string, progress?: any, action?: any }} patch */
+      set(patch) {
+        if (!patch) return;
+        Object.assign(s, patch);
+        render();
+      },
+      destroy() {
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+  function checkGrid(spec) {
+    const state = { items: spec.items || [] };
+    const root = el("div", { class: "ak-root ak-checkgrid", "data-ak-part": "root", role: "list" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    function render() {
+      clear(root);
+      for (const item of state.items) {
+        const tone = STATE_TONE[item.state] || "quiet";
+        const heard = stateWords(item.state);
+        const inner = [
+          el("span", { class: "ak-checkgrid__icon ak-tone-mark--" + tone, "data-ak-part": "icon" }, stateIcon(item.state)),
+          (function() {
+            const words = el("span", { class: "ak-checkgrid__words" }, [
+              el("span", { class: "ak-checkgrid__title", "data-ak-part": "title" }, [
+                heard ? el("span", { class: "ak-sr-only", text: heard + ": " }) : null,
+                item.title
+              ])
+            ]);
+            slotInto(words, spec, "sub", item.sub || null, { cls: "ak-checkgrid__sub", args: [item] });
+            return words;
+          })()
+        ];
+        const tile = spec.onPick ? el("button", {
+          type: "button",
+          class: "ak-checkgrid__tile ak-checkgrid__tile--" + item.state,
+          "data-ak-part": "tile",
+          "data-ak-id": item.id,
+          on: { click: function() {
+            if (spec.onPick) spec.onPick(item);
+          } }
+        }, inner) : el("div", { class: "ak-checkgrid__tile ak-checkgrid__tile--" + item.state, "data-ak-part": "tile", "data-ak-id": item.id }, inner);
+        root.appendChild(el("div", { role: "listitem", class: "ak-checkgrid__cell" }, tile));
+      }
+    }
+    render();
+    enter(root);
+    return {
+      el: root,
+      /** @param {{ items?: any[] }} patch */
+      set(patch) {
+        if (patch && patch.items) {
+          state.items = patch.items;
+          render();
+        }
+      },
+      destroy() {
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+  function choiceCards(spec) {
+    const state = { items: spec.items || [], value: spec.value || (spec.items && spec.items[0] ? spec.items[0].id : "") };
+    const root = el("div", { class: "ak-root ak-choices", "data-ak-part": "root" });
+    const grid2 = el("div", { class: "ak-choices__grid", "data-ak-part": "grid", role: "radiogroup", "aria-label": spec.label || null });
+    const panel = el("div", { class: "ak-choices__panel", "data-ak-part": "panel" });
+    root.appendChild(grid2);
+    root.appendChild(panel);
+    if (spec.target) resolve(spec.target).appendChild(root);
+    function current2() {
+      for (const item of state.items) if (item.id === state.value) return item;
+      return null;
+    }
+    function renderPanel() {
+      clear(panel);
+      const item = current2();
+      panel.hidden = !item || !spec.renderPanel;
+      if (item && spec.renderPanel) spec.renderPanel(item, panel);
+    }
+    function choose(item, focus) {
+      if (item.id === state.value) return;
+      state.value = item.id;
+      renderCards(focus);
+      renderPanel();
+      if (spec.onChange) spec.onChange(item.id, item);
+    }
+    function renderCards(focus) {
+      clear(grid2);
+      const items = state.items;
+      items.forEach(function(item, i) {
+        const on = item.id === state.value;
+        const card = el("button", {
+          type: "button",
+          role: "radio",
+          class: "ak-choices__card" + (on ? " ak-choices__card--on" : ""),
+          "aria-checked": on ? "true" : "false",
+          tabindex: on ? "0" : "-1",
+          "data-ak-part": "card",
+          "data-ak-id": item.id,
+          "data-ak-noguard": true,
+          on: {
+            click: function() {
+              choose(item, false);
+            },
+            keydown: function(ev) {
+              const step = ev.key === "ArrowRight" || ev.key === "ArrowDown" ? 1 : ev.key === "ArrowLeft" || ev.key === "ArrowUp" ? -1 : 0;
+              if (!step) return;
+              ev.preventDefault();
+              choose(items[(i + step + items.length) % items.length], true);
+            }
+          }
+        }, [
+          el("span", { class: "ak-choices__kicker", "data-ak-part": "kicker", text: on ? t("chosen") : item.kicker || "" }),
+          el("span", { class: "ak-choices__title", "data-ak-part": "title", text: item.title })
+        ]);
+        slotInto(card, spec, "text", item.text || null, { cls: "ak-choices__text", args: [item] });
+        grid2.appendChild(card);
+        if (on && focus) card.focus();
+      });
+    }
+    renderCards(false);
+    renderPanel();
+    enter(grid2);
+    return {
+      el: root,
+      panel,
+      /** @param {{ value?: string, items?: any[] }} patch */
+      set(patch) {
+        if (!patch) return;
+        if (patch.items) state.items = patch.items;
+        if (patch.value != null) state.value = patch.value;
+        renderCards(false);
+        renderPanel();
+      },
+      destroy() {
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+  function settingsGroup(spec) {
+    const title = el("h2", { class: "ak-setgroup__title", "data-ak-part": "title", text: spec.title });
+    const hint = el("p", { class: "ak-setgroup__hint", "data-ak-part": "hint", text: spec.hint || "" });
+    hint.hidden = !spec.hint;
+    const body = el("div", { class: "ak-setgroup__body", "data-ak-part": "body" });
+    if (spec.body != null) {
+      const b = spec.body;
+      (Array.isArray(b) ? b : [b]).forEach(function(n) {
+        if (n) body.appendChild(typeof n === "object" ? n : document.createTextNode(String(n)));
+      });
+    }
+    const grid2 = el("div", { class: "ak-setgroup__grid" }, [
+      el("div", { class: "ak-setgroup__help", "data-ak-part": "help" }, [title, hint]),
+      body
+    ]);
+    const root = el("section", { class: "ak-root ak-setgroup", "data-ak-part": "root" }, grid2);
+    slotInto(root, spec, "after", null, { cls: "ak-setgroup__after", tag: "div" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    enter(root);
+    return {
+      el: root,
+      body,
+      /** @param {{ title?: string, hint?: string }} patch */
+      set(patch) {
+        if (!patch) return;
+        if (patch.title != null) title.textContent = patch.title;
+        if (patch.hint != null) {
+          hint.textContent = patch.hint;
+          hint.hidden = !patch.hint;
+        }
+      },
+      destroy() {
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+  function progressFigure(spec) {
+    const s = Object.assign({}, spec);
+    const root = el("section", { class: "ak-root ak-progress", "data-ak-part": "root" });
+    let shown = Number(s.value) || 0;
+    let shownCounts = {};
+    function render(prev) {
+      clear(root);
+      const figure2 = el("span", { class: "ak-progress__figure", "data-ak-part": "figure", text: String(prev != null ? prev : s.value) });
+      const actions = el("div", { class: "ak-progress__actions", "data-ak-part": "actions" });
+      if (s.action) {
+        actions.appendChild(el("button", {
+          type: "button",
+          class: "ak-btn",
+          on: { click: function() {
+            return s.action && s.action.onClick && s.action.onClick();
+          } }
+        }, s.action.label));
+      }
+      slotInto(actions, s, "actions", null, { cls: "ak-progress__own", tag: "span" });
+      root.appendChild(el("div", { class: "ak-progress__head" }, [
+        el("div", { class: "ak-progress__words" }, [
+          s.label ? el("div", { class: "ak-progress__kicker", "data-ak-part": "kicker", text: s.label }) : null,
+          el("div", { class: "ak-progress__line", role: "status", "aria-live": "polite", "aria-label": t("ofTotal", { value: s.value, total: s.total }) }, [
+            figure2,
+            el("span", { class: "ak-progress__total", "data-ak-part": "total", "aria-hidden": "true", text: " / " + s.total })
+          ])
+        ]),
+        actions.firstChild ? actions : null
+      ]));
+      root.appendChild(progressBar("ak-progress", { value: s.value, total: s.total, tone: "accent" }));
+      if (s.now || s.steps && s.steps.length) {
+        root.appendChild(el("div", { class: "ak-progress__now", "data-ak-part": "now" }, [
+          el("div", { class: "ak-progress__now-label", "data-ak-part": "nowLabel", text: t("now") }),
+          s.now ? el("div", { class: "ak-progress__now-text", "data-ak-part": "nowText", text: s.now }) : null,
+          s.steps && s.steps.length ? el("div", { class: "ak-progress__chips", "data-ak-part": "chips" }, s.steps.map(function(st) {
+            const kind = st.state === "done" || st.state === "now" ? st.state : "todo";
+            return el("span", { class: "ak-progress__chip ak-progress__chip--" + kind, "data-ak-part": "chip", "aria-current": kind === "now" ? "step" : null, text: st.label });
+          })) : null
+        ]));
+      }
+      if (s.counts && s.counts.length) {
+        root.appendChild(el("div", { class: "ak-progress__counts", "data-ak-part": "counts" }, s.counts.map(function(c) {
+          const n = el("span", { class: "ak-progress__count-n", text: String(c.value) });
+          const before = shownCounts[c.id];
+          if (before != null && before !== c.value) countUp(n, before, c.value);
+          return el("div", { class: "ak-progress__count ak-tone-soft--" + toneOf(c.tone), "data-ak-part": "count", "data-ak-id": c.id }, [
+            n,
+            el("span", { class: "ak-progress__count-label", text: c.label })
+          ]);
+        })));
+      }
+      const next = {};
+      (s.counts || []).forEach(function(c) {
+        next[c.id] = c.value;
+      });
+      shownCounts = next;
+      return figure2;
+    }
+    render(null);
+    if (s.target) resolve(s.target).appendChild(root);
+    enter(root);
+    return {
+      el: root,
+      /** @param {{ value?: number, total?: number, now?: string, steps?: any[], counts?: any[], label?: string }} patch */
+      set(patch) {
+        if (!patch) return;
+        const from = shown;
+        Object.assign(s, patch);
+        const figure2 = render(from);
+        const to = Number(s.value) || 0;
+        if (to !== from) {
+          countUp(figure2, from, to);
+          if (to > from) attention(figure2, "pulse");
+        } else figure2.textContent = String(to);
+        shown = to;
+      },
+      destroy() {
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+  function callout(spec) {
+    const s = Object.assign({ tone: "info" }, spec);
+    const root = el("div", { class: "ak-root ak-callout", "data-ak-part": "root" });
+    function render() {
+      clear(root);
+      const tone = ["info", "ok", "warn", "err"].indexOf(s.tone) >= 0 ? s.tone : "info";
+      root.className = "ak-root ak-callout ak-callout--" + tone;
+      root.setAttribute("role", tone === "err" ? "alert" : "status");
+      const icon3 = { info: "info", ok: "ok", warn: "todo", err: "fail" }[tone];
+      root.appendChild(el("span", { class: "ak-callout__icon", "data-ak-part": "icon" }, stateIcon(
+        /** @type {any} */
+        icon3
+      )));
+      root.appendChild(el("div", { class: "ak-callout__words", "data-ak-part": "words" }, [
+        s.title ? el("div", { class: "ak-callout__title", "data-ak-part": "title", text: s.title }) : null,
+        s.text ? el("div", { class: "ak-callout__text", "data-ak-part": "text", text: s.text }) : null
+      ]));
+      slotInto(root, s, "after", null, { cls: "ak-callout__after", tag: "div" });
+    }
+    render();
+    if (s.target) resolve(s.target).appendChild(root);
+    return {
+      el: root,
+      /** @param {{ tone?: string, title?: string, text?: string }} patch */
+      set(patch) {
+        if (patch) {
+          Object.assign(s, patch);
+          render();
+        }
+      },
+      destroy() {
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
   // src/static/sdk-libs/atelier/shell.js
+  function logoEl(src) {
+    if (typeof src !== "string" || !src.trim()) return null;
+    if (/^\s*data:/i.test(src)) {
+      console.warn("[atelier] app({ logo }) refuses a data: URI; upload the image to storage and pass its URL.");
+      return null;
+    }
+    return el("img", { class: "ak-app__logo", src, alt: "", width: "32", height: "32", decoding: "async" });
+  }
+  function bottomEntries(items) {
+    return items.filter(function(it) {
+      return it.bottom === true || it.bottom !== false && !it.group;
+    });
+  }
   function tabLabel(spec, name, item) {
     const given = partValue(spec, name, item);
     return given === void 0 ? item.label : given;
   }
   var BOOT_POLL_MS = 300;
   var SIGNIN_GRACE_MS = 2500;
-  var SVG_NS3 = "http://www.w3.org/2000/svg";
+  var SVG_NS4 = "http://www.w3.org/2000/svg";
   var MOTION_ATTR2 = "data-ak-motion";
   var MODE_BUTTON = "#aimeat-mode-switch button[data-mode]";
   function motionLabel() {
@@ -3499,7 +3988,7 @@
     return said === "lessMotion" ? "Less motion" : said;
   }
   function motionIcon() {
-    const svg6 = document.createElementNS(SVG_NS3, "svg");
+    const svg6 = document.createElementNS(SVG_NS4, "svg");
     svg6.setAttribute("viewBox", "0 0 24 24");
     svg6.setAttribute("width", "18");
     svg6.setAttribute("height", "18");
@@ -3508,10 +3997,10 @@
     svg6.setAttribute("stroke-width", "2");
     svg6.setAttribute("stroke-linecap", "round");
     svg6.setAttribute("aria-hidden", "true");
-    const lines = document.createElementNS(SVG_NS3, "path");
+    const lines = document.createElementNS(SVG_NS4, "path");
     lines.setAttribute("class", "ak-app__motion-lines");
     lines.setAttribute("d", "M4 7h15M4 12h11M4 17h7");
-    const slash = document.createElementNS(SVG_NS3, "path");
+    const slash = document.createElementNS(SVG_NS4, "path");
     slash.setAttribute("class", "ak-app__motion-slash");
     slash.setAttribute("d", "M20 4 5 20");
     svg6.appendChild(lines);
@@ -3558,7 +4047,9 @@
       motionBtn.setAttribute("aria-pressed", motionIsLess() ? "true" : "false");
     };
     window.addEventListener("ak-motion", syncMotion);
-    const bar = el("header", { class: "ak-app__bar" }, [heading, motionBtn, pill]);
+    const logo = logoEl(spec.logo);
+    const brand = logo ? el("span", { class: "ak-app__brand" }, [logo, heading]) : heading;
+    const bar = el("header", { class: "ak-app__bar" }, [brand, motionBtn, pill]);
     let replaying = false;
     const onBarClick = function(ev) {
       if (replaying) return;
@@ -3587,17 +4078,37 @@
     };
     bar.addEventListener("click", onBarClick, true);
     const statusHost = el("div", { class: "ak-app__status" });
-    const main = el("main", { class: "ak-app__main ak-scroll" });
+    const sideMode = spec.nav === "side" && !!(spec.navItems && spec.navItems.length);
+    const main = el("main", { class: "ak-app__main" + (sideMode ? "" : " ak-scroll") });
+    const sideHost = sideMode ? el("aside", { class: "ak-app__side" }) : null;
+    const frame2 = sideMode ? el("div", { class: "ak-app__frame ak-scroll" }, [sideHost, main]) : null;
     const footer = spec.footer != null ? el("footer", { class: "ak-app__foot", text: spec.footer }) : null;
     const root = el("div", {
-      class: "ak-root ak-app",
+      class: "ak-root ak-app" + (sideMode ? " ak-app--sidenav" : ""),
       "data-ak-look": state.look,
       "aria-labelledby": titleId
-    }, [bar, statusHost, main, footer]);
+    }, [bar, statusHost, frame2 || main, footer]);
     if (spec.motion === false) setMotionDefaults(root, false);
     let nav = null;
+    let side = null;
+    function linked(items) {
+      return items.map(function(it) {
+        return Object.assign({}, it, {
+          onPick: function(picked) {
+            if (side) side.set({ value: picked.id });
+            if (nav) nav.set({ value: picked.id });
+            if (it.onPick) it.onPick(it);
+          }
+        });
+      });
+    }
     if (spec.navItems && spec.navItems.length) {
-      nav = bottomNav({ items: spec.navItems });
+      const items = linked(spec.navItems);
+      const first = spec.navValue || items[0].id;
+      if (sideMode && sideHost) {
+        side = sideNav({ target: sideHost, items, value: first, label: spec.navLabel });
+      }
+      nav = bottomNav({ items: sideMode ? bottomEntries(items) : items, value: sideMode ? first : spec.navValue });
       root.appendChild(nav.el);
       root.classList.add("ak-app--bottomnav");
     }
@@ -3793,6 +4304,20 @@
       status,
       t,
       i18n,
+      /** The app's navigation (the side column and the phone's bottom bar together): move the
+       *  mark with `set({ value })`, change the counts with `set({ items })`. Null without navItems. */
+      get nav() {
+        if (!nav) return null;
+        return {
+          /** @param {{ value?: string, items?: any[] }} patch */
+          set(patch) {
+            if (!patch) return;
+            const next = patch.items ? linked(patch.items) : null;
+            if (side) side.set({ value: patch.value, items: next || void 0 });
+            if (nav) nav.set({ value: patch.value, items: next ? sideMode ? bottomEntries(next) : next : void 0 });
+          }
+        };
+      },
       get ambient() {
         return sky;
       },
@@ -3816,6 +4341,7 @@
         }
         if (statusCard) statusCard.destroy();
         if (nav) nav.destroy();
+        if (side) side.destroy();
         if (fullFrame) document.body.classList.remove("ak-body");
         if (root.parentNode) root.parentNode.removeChild(root);
       }
@@ -5312,8 +5838,9 @@
       error.hidden = true;
       const body = readout ? el("div", { class: "ak-form__range", "data-ak-part": "range" }, [input, readout]) : input;
       const inline = type === "checkbox" || type === "toggle";
+      const width = ["short", "date", "medium", "long", "full"].indexOf(field.width || "") >= 0 ? field.width : null;
       const wrap = el("div", {
-        class: "ak-form__field" + (inline ? " ak-form__field--inline" : "") + (type === "range" ? " ak-form__field--range" : ""),
+        class: "ak-form__field" + (inline ? " ak-form__field--inline" : "") + (type === "range" ? " ak-form__field--range" : "") + (width ? " ak-form__field--w-" + width : ""),
         "data-ak-part": "field",
         "data-ak-field": field.name
       }, inline ? [input, label, hint, error] : [label, body, hint, error]);
@@ -5665,9 +6192,9 @@
   }
 
   // src/static/sdk-libs/atelier/chart-core.js
-  var SVG_NS4 = "http://www.w3.org/2000/svg";
+  var SVG_NS5 = "http://www.w3.org/2000/svg";
   function svg(name, attrs) {
-    const node = document.createElementNS(SVG_NS4, name);
+    const node = document.createElementNS(SVG_NS5, name);
     for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
     return node;
   }
@@ -5728,7 +6255,7 @@
   }
 
   // src/static/sdk-libs/atelier/chart-shapes.js
-  var TONES = { ok: "var(--ak-ok-text)", warn: "var(--ak-warn-text)", err: "var(--ak-err-text)" };
+  var TONES2 = { ok: "var(--ak-ok-text)", warn: "var(--ak-warn-text)", err: "var(--ak-err-text)" };
   function renderDonut(ctx, data) {
     const slices = (data && Array.isArray(data.slices) ? data.slices : []).filter((s) => s && typeof s.value === "number" && s.value > 0);
     if (!slices.length) return ctx.empty();
@@ -5768,8 +6295,8 @@
       el("b", { text: fmtTick(total) }),
       data.delta && data.delta.text ? el("span", { class: "ak-chart__delta", text: String(data.delta.text) }) : null
     ]);
-    if (data.delta && TONES[data.delta.tone]) {
-      centre.lastChild.style.color = TONES[data.delta.tone];
+    if (data.delta && TONES2[data.delta.tone]) {
+      centre.lastChild.style.color = TONES2[data.delta.tone];
     }
     wrap.appendChild(centre);
     ctx.root.appendChild(wrap);
@@ -6450,7 +6977,7 @@
   }
 
   // src/static/sdk-libs/atelier/matrix.js
-  var TONES2 = ["ok", "warn", "err", "accent", "plain"];
+  var TONES3 = ["ok", "warn", "err", "accent", "plain"];
   function matrix(spec) {
     const root = el("div", { class: "ak-root ak-matrix" });
     if (spec.target) resolve(spec.target).appendChild(root);
@@ -6488,7 +7015,7 @@
         tr.appendChild(label);
         for (const col of cols) {
           const cell = cellsByCol.get(col.id);
-          const tone = cell && TONES2.includes(cell.tone || "") ? cell.tone : cell ? "plain" : null;
+          const tone = cell && TONES3.includes(cell.tone || "") ? cell.tone : cell ? "plain" : null;
           tr.appendChild(el("td", { class: "ak-matrix__cell" }, [
             tone === null ? null : el("span", {
               class: "ak-matrix__chip ak-matrix__cell--" + tone,
@@ -6539,9 +7066,9 @@
   var PILL_H = 34;
   var GUTTER = 4;
   var LABEL_MAX = 24;
-  var SVG_NS5 = "http://www.w3.org/2000/svg";
+  var SVG_NS6 = "http://www.w3.org/2000/svg";
   function svg2(name, attrs) {
-    const node = document.createElementNS(SVG_NS5, name);
+    const node = document.createElementNS(SVG_NS6, name);
     for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
     return node;
   }
@@ -6664,9 +7191,9 @@
   // src/static/sdk-libs/atelier/waveform.js
   var W3 = 720;
   var H3 = 120;
-  var SVG_NS6 = "http://www.w3.org/2000/svg";
+  var SVG_NS7 = "http://www.w3.org/2000/svg";
   function svg3(name, attrs) {
-    const node = document.createElementNS(SVG_NS6, name);
+    const node = document.createElementNS(SVG_NS7, name);
     for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
     return node;
   }
@@ -7938,15 +8465,15 @@
 
   // src/static/sdk-libs/atelier/ops.js
   var JOB = /* @__PURE__ */ new WeakMap();
-  var SVG_NS7 = "http://www.w3.org/2000/svg";
+  var SVG_NS8 = "http://www.w3.org/2000/svg";
   function svg4(name, attrs) {
-    const node = document.createElementNS(SVG_NS7, name);
+    const node = document.createElementNS(SVG_NS8, name);
     for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
     return node;
   }
-  var TONES3 = ["ok", "warn", "err", "plain"];
-  function toneOf(value) {
-    return TONES3.indexOf(value) >= 0 ? value : "plain";
+  var TONES4 = ["ok", "warn", "err", "plain"];
+  function toneOf2(value) {
+    return TONES4.indexOf(value) >= 0 ? value : "plain";
   }
   function health(spec) {
     const root = el("div", { class: "ak-root ak-health", role: "list", "data-ak-part": "root" });
@@ -7966,7 +8493,7 @@
         return;
       }
       for (const item of items) {
-        const tone = toneOf(item.tone);
+        const tone = toneOf2(item.tone);
         const row = el(spec.onPick ? "button" : "div", {
           class: "ak-health__row",
           role: "listitem",
@@ -8130,11 +8657,11 @@
       let tone = "plain";
       for (const band of bands) {
         if (data.value <= band.upTo) {
-          tone = toneOf(band.tone);
+          tone = toneOf2(band.tone);
           break;
         }
       }
-      if (bands.length && data.value > bands[bands.length - 1].upTo) tone = toneOf(bands[bands.length - 1].tone);
+      if (bands.length && data.value > bands[bands.length - 1].upTo) tone = toneOf2(bands[bands.length - 1].tone);
       root.setAttribute("aria-label", (data.label ? data.label + ": " : "") + data.value + (data.unit || ""));
       const node = svg4("svg", { viewBox: "0 0 240 132", class: "ak-gauge__svg", "aria-hidden": "true" });
       node.appendChild(svg4("path", { d: arcPath(0, 1, R), class: "ak-gauge__track" }));
@@ -8697,7 +9224,7 @@
 
   // src/static/sdk-libs/atelier/flow-parts.js
   var CARRY = { stiffness: 320, damping: 28 };
-  var TONES4 = ["ok", "warn", "err", "accent"];
+  var TONES5 = ["ok", "warn", "err", "accent"];
   var KINDS = ["info", "ok", "warn", "err"];
   function rowsOf(data) {
     if (Array.isArray(data)) return data;
@@ -8830,7 +9357,7 @@
         item.sub != null ? el("span", { class: "ak-sortable__sub", text: String(item.sub) }) : null
       ].filter(Boolean)));
       return el("div", {
-        class: "ak-sortable__row" + (TONES4.indexOf(item.tone) >= 0 ? " ak-sortable__row--" + item.tone : ""),
+        class: "ak-sortable__row" + (TONES5.indexOf(item.tone) >= 0 ? " ak-sortable__row--" + item.tone : ""),
         "data-id": String(item.id)
       }, kids);
     }
@@ -9459,10 +9986,10 @@
   }
 
   // src/static/sdk-libs/atelier/planner.js
-  var TONES5 = ["ok", "warn", "err", "accent"];
+  var TONES6 = ["ok", "warn", "err", "accent"];
   var CARD_SPRING = { stiffness: 300, damping: 26 };
-  function toneOf2(value, fallback) {
-    return TONES5.indexOf(value) >= 0 ? value : fallback || "accent";
+  function toneOf3(value, fallback) {
+    return TONES6.indexOf(value) >= 0 ? value : fallback || "accent";
   }
   function emptyInto(root, spec) {
     const e = spec.empty || {};
@@ -9515,7 +10042,7 @@
       columns.forEach((col, colIdx) => {
         const inCol = cards.filter((c) => c.column === col.id);
         const lane = el("div", { class: "ak-kanban__col", "data-ak-part": "col", "data-col": col.id, role: "group", "aria-label": `${col.label} · ${inCol.length}` });
-        const head = partEl("div", "ak-kanban__head ak-kanban__head--" + toneOf2(col.tone, "accent"), "head");
+        const head = partEl("div", "ak-kanban__head ak-kanban__head--" + toneOf3(col.tone, "accent"), "head");
         slotInto(head, spec, "colhead", col.label || col.id, { cls: "ak-kanban__colname", args: [col, inCol] });
         head.appendChild(el("span", { class: "ak-kanban__count", "data-ak-part": "count", text: String(inCol.length) }));
         lane.appendChild(head);
@@ -9535,7 +10062,7 @@
         }
         inCol.forEach((card, i) => {
           const node = el("div", {
-            class: "ak-kanban__card" + (TONES5.indexOf(card.tone) >= 0 ? " ak-kanban__card--" + card.tone : ""),
+            class: "ak-kanban__card" + (TONES6.indexOf(card.tone) >= 0 ? " ak-kanban__card--" + card.tone : ""),
             "data-ak-part": "card",
             "data-card": card.id,
             tabindex: movable ? "0" : void 0,
@@ -9643,7 +10170,7 @@
           const left = X(s.from);
           const width = Math.max(X(new Date(s.to.getTime() + DAY_MS)) - left, 1.2);
           const bar = el("span", {
-            class: "ak-plan__span ak-plan__span--" + toneOf2(s.tone, "accent"),
+            class: "ak-plan__span ak-plan__span--" + toneOf3(s.tone, "accent"),
             title: (s.label ? s.label + " · " : "") + `${s.from.toISOString().slice(0, 10)} → ${s.to.toISOString().slice(0, 10)}`
           }, s.label && width > 8 ? [el("span", { class: "ak-plan__spanlabel", text: s.label })] : []);
           bar.style.left = left + "%";
@@ -9714,7 +10241,7 @@
         const well = el("div", { class: "ak-schedule__well" });
         inDay.forEach((e, i) => {
           const block = el(spec.onPick ? "button" : "span", {
-            class: "ak-schedule__event ak-schedule__event--" + toneOf2(e.tone, "accent"),
+            class: "ak-schedule__event ak-schedule__event--" + toneOf3(e.tone, "accent"),
             type: spec.onPick ? "button" : void 0,
             title: `${e.label} · ${e.from}–${e.to}`
           }, [
@@ -9787,7 +10314,7 @@
 
   // src/static/sdk-libs/atelier/konsole.js
   var CAP_DEFAULT = 400;
-  var TONES6 = ["ok", "warn", "err", "plain"];
+  var TONES7 = ["ok", "warn", "err", "plain"];
   function stamp(ts) {
     if (ts == null) return "";
     const d = ts instanceof Date ? ts : new Date(ts);
@@ -9805,7 +10332,7 @@
       return vane.scrollHeight - vane.scrollTop - vane.clientHeight < 24;
     }
     function lineNode(line, entering) {
-      const tone = TONES6.indexOf(line.tone) >= 0 ? line.tone : "plain";
+      const tone = TONES7.indexOf(line.tone) >= 0 ? line.tone : "plain";
       const node = el("div", { class: "ak-console__line ak-console__line--" + tone }, [
         line.ts != null ? el("span", { class: "ak-console__ts", text: stamp(line.ts) }) : null,
         el("span", { class: "ak-console__text", text: String(line.text == null ? "" : line.text) })
@@ -11427,9 +11954,9 @@
       animeOff = true;
     });
   }
-  var TONES7 = ["ok", "warn", "err", "accent"];
-  function toneOf3(value) {
-    return TONES7.indexOf(value) >= 0 ? value : "accent";
+  var TONES8 = ["ok", "warn", "err", "accent"];
+  function toneOf4(value) {
+    return TONES8.indexOf(value) >= 0 ? value : "accent";
   }
   var WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   function pad2(n) {
@@ -11503,7 +12030,7 @@
       if (!events.length) return null;
       const wrap = el("span", { class: "ak-calendar__pips", "aria-hidden": "true" });
       events.slice(0, 3).forEach(function(e) {
-        wrap.appendChild(el("span", { class: "ak-calendar__pip ak-calendar__pip--" + toneOf3(e.tone) }));
+        wrap.appendChild(el("span", { class: "ak-calendar__pip ak-calendar__pip--" + toneOf4(e.tone) }));
       });
       if (events.length > 3) wrap.appendChild(el("span", { class: "ak-calendar__more" }, "+" + (events.length - 3)));
       return wrap;
@@ -11822,7 +12349,7 @@
   var LIFT = 1.05;
   var PULL = 0.28;
   var FLICK = 420;
-  var TONES8 = ["ok", "warn", "err"];
+  var TONES9 = ["ok", "warn", "err"];
   function rowsOf4(data) {
     if (Array.isArray(data)) return data;
     if (data && Array.isArray(data.items)) return data.items;
@@ -11935,7 +12462,7 @@
         el("span", { class: "ak-carousel__label" }, String(item.title || item.id || "")),
         item.sub != null ? el("span", { class: "ak-carousel__sub" }, String(item.sub)) : null
       ].filter(Boolean));
-      const tone = TONES8.indexOf(item.tone) >= 0 ? " ak-carousel__card--" + item.tone : "";
+      const tone = TONES9.indexOf(item.tone) >= 0 ? " ak-carousel__card--" + item.tone : "";
       const card = (
         /** @type {HTMLElement} */
         el(s.onPick ? "button" : "div", {
@@ -12325,13 +12852,13 @@
   }
 
   // src/static/sdk-libs/atelier/atlas.js
-  var SVG_NS8 = "http://www.w3.org/2000/svg";
+  var SVG_NS9 = "http://www.w3.org/2000/svg";
   function svg5(name, attrs) {
-    const node = document.createElementNS(SVG_NS8, name);
+    const node = document.createElementNS(SVG_NS9, name);
     for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
     return node;
   }
-  var TONES9 = ["ok", "warn", "err"];
+  var TONES10 = ["ok", "warn", "err"];
   var geoPromise = null;
   function ensureGeometry() {
     if (geoPromise) return geoPromise;
@@ -12433,7 +12960,7 @@
       const still2 = reducedMotion();
       for (const c of geo.countries) node.appendChild(svg5("path", { d: c.d, class: "ak-atlas__land" }));
       matched.forEach(function(m, i) {
-        const tone = TONES9.indexOf(m.row.tone) >= 0 ? m.row.tone : null;
+        const tone = TONES10.indexOf(m.row.tone) >= 0 ? m.row.tone : null;
         const attrs = { d: m.country.d, class: "ak-atlas__region" + (tone ? " ak-atlas__region--" + tone : "") };
         if (!tone) {
           const frac = maxValue > 0 && typeof m.row.value === "number" ? m.row.value / maxValue : 1;
@@ -12456,7 +12983,7 @@
       markers.forEach(function(m, i) {
         if (typeof m.lon !== "number" || typeof m.lat !== "number") return;
         const [x, y] = project(m.lon, m.lat);
-        const tone = TONES9.indexOf(m.tone) >= 0 ? m.tone : null;
+        const tone = TONES10.indexOf(m.tone) >= 0 ? m.tone : null;
         const dot = svg5("circle", { cx: x, cy: y, r: dotR, class: "ak-atlas__marker" + (tone ? " ak-atlas__marker--" + tone : "") });
         if (!still2) {
           dot.classList.add("ak-atlas__marker--enter");
@@ -12511,7 +13038,7 @@
     });
     return leafletPromise;
   }
-  var TONES10 = ["ok", "warn", "err"];
+  var TONES11 = ["ok", "warn", "err"];
   function map(spec) {
     const root = el("figure", { class: "ak-root ak-map" });
     if (spec.target) resolve(spec.target).appendChild(root);
@@ -12544,7 +13071,7 @@
       });
     });
     function pinIcon(L, tone) {
-      const cls = TONES10.indexOf(tone) >= 0 ? " ak-map__pin--" + tone : "";
+      const cls = TONES11.indexOf(tone) >= 0 ? " ak-map__pin--" + tone : "";
       return L.divIcon({
         className: "ak-map__pinwrap",
         html: '<span class="ak-map__pin' + cls + '"></span>',
@@ -13231,11 +13758,11 @@
 
   // src/static/sdk-libs/atelier/dialog.js
   var ENTER_FROM = { center: "12px", bottom: "100%" };
-  var TONES11 = ["plain", "danger", "celebrate", "ai"];
+  var TONES12 = ["plain", "danger", "celebrate", "ai"];
   var SIZES = ["compact", "roomy", "wide"];
   function dialog(spec) {
     const from = spec.from === "bottom" ? "bottom" : "center";
-    const tone = TONES11.indexOf(spec.tone || "") >= 0 ? spec.tone : "plain";
+    const tone = TONES12.indexOf(spec.tone || "") >= 0 ? spec.tone : "plain";
     const size = SIZES.indexOf(spec.size || "") >= 0 ? spec.size : "compact";
     const dismissible = spec.dismissible !== false;
     const node = (
@@ -14499,7 +15026,7 @@
   var animePromise2 = null;
   var animeOff2 = false;
   var LATE = 400;
-  var SVG_NS9 = "http://www.w3.org/2000/svg";
+  var SVG_NS10 = "http://www.w3.org/2000/svg";
   function ensureAnime2() {
     if (W5.anime && W5.anime.animate) return Promise.resolve(W5.anime);
     if (animePromise2) return animePromise2;
@@ -14969,11 +15496,11 @@
     if (o.path && typeof o.path !== "string") {
       path = o.path;
     } else if (typeof o.path === "string" && o.path.trim()) {
-      stage = document.createElementNS(SVG_NS9, "svg");
+      stage = document.createElementNS(SVG_NS10, "svg");
       stage.setAttribute("class", "ak-orbit__stage");
       stage.setAttribute("viewBox", o.viewBox || "0 0 100 100");
       stage.setAttribute("aria-hidden", "true");
-      path = document.createElementNS(SVG_NS9, "path");
+      path = document.createElementNS(SVG_NS10, "path");
       path.setAttribute("class", "ak-orbit__path");
       path.setAttribute("d", o.path);
       path.setAttribute("fill", "none");
@@ -15680,7 +16207,7 @@
   var SPIN = 18;
   var LOB = 60;
   var FLICK2 = 480;
-  var TONES12 = ["ok", "warn", "err"];
+  var TONES13 = ["ok", "warn", "err"];
   function rowsOf5(data) {
     if (Array.isArray(data)) return data;
     if (data && Array.isArray(data.items)) return data.items;
@@ -15916,7 +16443,7 @@
         el("span", { class: "ak-swipe__mark ak-swipe__mark--right", "aria-hidden": "true" }),
         el("span", { class: "ak-swipe__mark ak-swipe__mark--left", "aria-hidden": "true" })
       ]);
-      const tone = TONES12.indexOf(item.tone) >= 0 ? " ak-swipe__card--" + item.tone : "";
+      const tone = TONES13.indexOf(item.tone) >= 0 ? " ak-swipe__card--" + item.tone : "";
       const card = (
         /** @type {HTMLElement} */
         el("article", {
@@ -16276,6 +16803,14 @@
       fork: "Copy .ak-bottomnav* out of shell.css; the chrome reserve is the shell's.",
       file: "shell.js"
     },
+    "callout": {
+      parts: ["root", "icon", "words", "title", "text", "after"],
+      slots: ["after()"],
+      variants: [],
+      tokens: ["--ak-callout-pad"],
+      fork: "A tinted box with an icon; copy .ak-callout* out of workbench.css.",
+      file: "workbench.js"
+    },
     "cardGrid": {
       parts: ["root", "card", "art", "monogram", "badge", "body", "title", "sub", "extra", "aside"],
       slots: ["title(item)", "sub(item)", "extra(item)", "badge(item)", "aside(item)", "art(item)"],
@@ -16283,6 +16818,22 @@
       tokens: ["--ak-card-min", "--ak-card-gap", "--ak-card-aspect", "--ak-card-pad"],
       fork: "Copy .ak-grid and .ak-card* out of content.css; you keep the monogram washes and lose the keyed reconcile that stops the wall re-entering on every change.",
       file: "grid.js"
+    },
+    "checkGrid": {
+      parts: ["root", "tile", "icon", "title", "sub"],
+      slots: ["sub(item)"],
+      variants: [],
+      tokens: ["--ak-checkgrid-min"],
+      fork: "Copy .ak-checkgrid* out of workbench.css; the five state marks are inline SVG in this file.",
+      file: "workbench.js"
+    },
+    "choiceCards": {
+      parts: ["root", "grid", "card", "kicker", "title", "text", "panel"],
+      slots: ["text(item)"],
+      variants: [],
+      tokens: ["--ak-choice-min"],
+      fork: "A radio group drawn as cards; copy .ak-choices* out of workbench.css and keep role=radiogroup.",
+      file: "workbench.js"
     },
     "dialog": {
       parts: ["root", "panel", "head", "title", "close", "body", "text", "before", "after", "actions", "action"],
@@ -16356,6 +16907,14 @@
       fork: "Same as cardGrid; this is one card and its action row.",
       file: "grid.js"
     },
+    "progressFigure": {
+      parts: ["root", "kicker", "figure", "total", "actions", "bar", "fill", "now", "nowLabel", "nowText", "chips", "chip", "counts", "count"],
+      slots: ["actions()"],
+      variants: [],
+      tokens: ["--ak-progress-figure"],
+      fork: "Copy .ak-progress* out of workbench.css; the count-up is dom.js countUp.",
+      file: "workbench.js"
+    },
     "queue": {
       parts: ["root", "strip", "list", "row", "state", "words", "title", "sub", "extra", "aside"],
       slots: ["row(item)", "state(item)", "title(item)", "sub(item)", "extra(item)", "aside(item)"],
@@ -16388,6 +16947,22 @@
       fork: "It IS the escape hatch: put your own markup in its body and keep the frame.",
       file: "shell.js"
     },
+    "settingsGroup": {
+      parts: ["root", "help", "title", "hint", "body", "after"],
+      slots: ["after()"],
+      variants: [],
+      tokens: ["--ak-setgroup-help", "--ak-setgroup-measure"],
+      fork: "Two columns that fold to one; copy .ak-setgroup* out of workbench.css.",
+      file: "workbench.js"
+    },
+    "sideNav": {
+      parts: ["root", "group", "item", "dot", "label", "count", "foot"],
+      slots: ["item(entry)", "foot()"],
+      variants: [],
+      tokens: ["--ak-sidenav-w", "--ak-sidenav-main"],
+      fork: "Copy .ak-sidenav* out of workbench.css; you give up the grouping, the counts and the view transition.",
+      file: "workbench.js"
+    },
     "statRow": {
       parts: ["root", "tile", "value", "unit", "delta", "label", "hint", "trend", "aside"],
       slots: ["label(tile)", "hint(tile)", "aside(tile)"],
@@ -16395,6 +16970,14 @@
       tokens: ["--ak-stat-min", "--ak-stat-pad", "--ak-stat-gap", "--ak-stat-figure-size", "--ak-stat-unit-size", "--ak-stat-up", "--ak-stat-down"],
       fork: "Copy .ak-statrow* out of shell.css; you keep the tokens and lose countUp() on a changed figure.",
       file: "hero.js"
+    },
+    "statusBand": {
+      parts: ["root", "head", "words", "title", "text", "actions", "bar", "fill", "body", "after"],
+      slots: ["actions()", "after()"],
+      variants: [],
+      tokens: ["--ak-band-pad"],
+      fork: "A section with a heading, a sentence and a bar; copy .ak-band* out of workbench.css.",
+      file: "workbench.js"
     },
     "table": {
       parts: ["root", "table", "head", "headcell", "sort", "body", "row", "cell", "caption"],
@@ -16429,7 +17012,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.53.3",
+    version: "0.54.0",
     /**
      * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
      * named parts (every one carries `data-ak-part`, so an app's own CSS reaches it), the slots
@@ -16454,6 +17037,14 @@
     section,
     tabs,
     bottomNav,
+    // ── The workbench: the pieces of a tool somebody works in every day ──
+    sideNav,
+    statusBand,
+    checkGrid,
+    choiceCards,
+    settingsGroup,
+    progressFigure,
+    callout,
     // ── The stored layout, rendered ──
     mosaic,
     appRef,

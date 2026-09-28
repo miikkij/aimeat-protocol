@@ -41,6 +41,11 @@
  * @tokens bottomNav --ak-chrome-bottom
  * @fork bottomNav Copy .ak-bottomnav* out of shell.css; the chrome reserve is the shell's.
  * @version-history
+ *   v0.63.0 — 2026-09-28 — THE WORKBENCH FRAME: `logo` draws the app's own mark before the title
+ *     (the brand cluster; the login pill and its mount are untouched), and `nav: 'side'` puts the
+ *     pages in a left column (workbench.js sideNav) beside a capped content column, both inside
+ *     one scrolling frame, with the phone's bottom bar carrying the top-level pages. The handle
+ *     carries `nav.set({ value, items })` so counts and the mark follow the app.
  *   2026-09-09 - Public apps stay open when auth discards a stale session or logs out.
  *   v0.51.0 — 2026-09-05 — THE SECTION AND THE TWO NAVIGATIONS TAKE WHAT THE APP GIVES THEM:
  *     `parts.actions` puts the app's own right-hand side beside the section's title (and only
@@ -79,6 +84,34 @@ import { screenTransition, curtain } from './transitions.js';
 import { ambient } from './ambient.js';
 import { weather } from './ambient-parts.js';
 import { partEl, slotInto, applyVariant, hasPart, partValue } from './parts-model.js';
+import { sideNav } from './workbench.js';
+
+/**
+ * The app's own mark beside its name: an https URL (or a same-origin path) to a square image.
+ * A data: URI is refused like the hero refuses one: a picture the app carries inline is bytes
+ * every edit re-reads, and storage serves it better.
+ * @param {any} src
+ * @returns {HTMLElement|null}
+ */
+function logoEl(src) {
+  if (typeof src !== 'string' || !src.trim()) return null;
+  if (/^\s*data:/i.test(src)) {
+    console.warn('[atelier] app({ logo }) refuses a data: URI; upload the image to storage and pass its URL.');
+    return null;
+  }
+  // The name stands beside it, so the image is decoration to a screen reader.
+  return el('img', { class: 'ak-app__logo', src: src, alt: '', width: '32', height: '32', decoding: 'async' });
+}
+
+/**
+ * The entries the phone's bottom bar carries when the app runs the side navigation: the
+ * top-level pages (entries without a group), plus any entry that says `bottom: true`. An entry
+ * saying `bottom: false` is left out. A bar of eight is not a bar.
+ * @param {any[]} items
+ */
+function bottomEntries(items) {
+  return items.filter(function (it) { return it.bottom === true || (it.bottom !== false && !it.group); });
+}
 
 /** A navigation entry's own words, or whatever the app declared for that part — a string, a
  *  node, or an array of both. The kit's label is the default, never the ceiling. */
@@ -155,6 +188,7 @@ function motionIsLess() {
  * @property {(kind: 'loading'|'ready'|'empty'|'error'|'signin'|'none', opts?: { title?: string, hint?: string, onRetry?: () => void }) => void} status
  * @property {(key: string, vars?: Record<string, any>) => string} t
  * @property {typeof i18n} i18n
+ * @property {{ set: (patch: { value?: string, items?: any[] }) => void }|null} nav  the navigation, when navItems were given
  * @property {import('./ambient.js').AmbientHandle|null} ambient  the layer behind the frame (null after `ambient: false`)
  * @property {{ el: HTMLElement }|null} weather  the bar's weather switch
  * @property {() => void} destroy
@@ -188,10 +222,17 @@ function ambientSpec(want) {
  * The app shell.
  * @param {{
  *   target?: string|Element, title: string, tagline?: string, look?: string, footer?: string,
- *   navItems?: Array<{ id: string, label: string, onPick?: (item: any) => void }>,
+ *   logo?: string,
+ *   navItems?: Array<{ id: string, label: string, count?: number|string, tone?: string,
+ *     group?: string, bottom?: boolean, onPick?: (item: any) => void }>,
+ *   nav?: 'bottom'|'side', navValue?: string, navLabel?: string,
  *   requireLogin?: boolean, ambient?: AmbientWish, motion?: boolean,
  *   onReady?: (session: any) => void, onLogout?: () => void,
  * }} spec
+ *   `logo` is the app's own square mark (an https or storage URL, never data:), drawn at 32 px
+ *   before the title. `nav: 'side'` puts `navItems` in a left column beside a capped content
+ *   column (the workbench layout); an entry may carry a `count`, a `tone` dot and a `group`
+ *   heading, and on a phone the column becomes the bottom bar with the ungrouped entries.
  *   `motion: false` is the WHOLE opt-out from the kit's default motion for this app: no
  *   entrances, no enter/exit/move on a change, no count-up, no transition between views.
  *   Everything still renders and still works; nothing travels. It is one option because the
@@ -230,7 +271,11 @@ export function app(spec) {
   };
   window.addEventListener('ak-motion', syncMotion);
 
-  const bar = el('header', { class: 'ak-app__bar' }, [heading, motionBtn, pill]);
+  // The logo and the name travel together as one brand cluster; without a logo the bar keeps the
+  // markup it always had. The pill is not part of this and is not moved.
+  const logo = logoEl(spec.logo);
+  const brand = logo ? el('span', { class: 'ak-app__brand' }, [logo, heading]) : heading;
+  const bar = el('header', { class: 'ak-app__bar' }, [brand, motionBtn, pill]);
 
   // THE THEME OPENS AS AN IRIS. The light/dark control is not the shell's: it travels inside
   // the account pill and flips <html data-theme> the instant it is clicked, which is one frame
@@ -260,16 +305,23 @@ export function app(spec) {
   bar.addEventListener('click', onBarClick, true);
 
   const statusHost = el('div', { class: 'ak-app__status' });
-  const main = el('main', { class: 'ak-app__main ak-scroll' });
+  // THE SIDE NAVIGATION MODE (`nav: 'side'`): the pages stand in a column left of a capped
+  // content column, and the two scroll together inside one frame, so the column stays in place
+  // while the page moves. On a phone the column gives way to the bottom bar (the stylesheet
+  // decides by width), carrying the top-level pages only.
+  const sideMode = spec.nav === 'side' && !!(spec.navItems && spec.navItems.length);
+  const main = el('main', { class: 'ak-app__main' + (sideMode ? '' : ' ak-scroll') });
+  const sideHost = sideMode ? el('aside', { class: 'ak-app__side' }) : null;
+  const frame = sideMode ? el('div', { class: 'ak-app__frame ak-scroll' }, [sideHost, main]) : null;
   const footer = spec.footer != null
     ? el('footer', { class: 'ak-app__foot', text: spec.footer })
     : null;
 
   const root = el('div', {
-    class: 'ak-root ak-app',
+    class: 'ak-root ak-app' + (sideMode ? ' ak-app--sidenav' : ''),
     'data-ak-look': state.look,
     'aria-labelledby': titleId,
-  }, [bar, statusHost, main, footer]);
+  }, [bar, statusHost, frame || main, footer]);
 
   // The app's own answer about motion, stamped on the frame rather than kept in a closure: every
   // part built inside it — now or later, by the app or by the mosaic — reads the same mark, and
@@ -277,8 +329,26 @@ export function app(spec) {
   if (spec.motion === false) setMotionDefaults(root, false);
 
   let nav = null;
+  let side = null;
+  /** The entries as the app gave them, each pick also moving the other navigation's mark. */
+  function linked(items) {
+    return items.map(function (it) {
+      return Object.assign({}, it, {
+        onPick: function (picked) {
+          if (side) side.set({ value: picked.id });
+          if (nav) nav.set({ value: picked.id });
+          if (it.onPick) it.onPick(it);
+        },
+      });
+    });
+  }
   if (spec.navItems && spec.navItems.length) {
-    nav = bottomNav({ items: spec.navItems });
+    const items = linked(spec.navItems);
+    const first = spec.navValue || items[0].id;
+    if (sideMode && sideHost) {
+      side = sideNav({ target: sideHost, items: items, value: first, label: spec.navLabel });
+    }
+    nav = bottomNav({ items: sideMode ? bottomEntries(items) : items, value: sideMode ? first : spec.navValue });
     root.appendChild(nav.el);
     root.classList.add('ak-app--bottomnav');
   }
@@ -499,6 +569,20 @@ export function app(spec) {
     status: status,
     t: t,
     i18n: i18n,
+    /** The app's navigation (the side column and the phone's bottom bar together): move the
+     *  mark with `set({ value })`, change the counts with `set({ items })`. Null without navItems. */
+    get nav() {
+      if (!nav) return null;
+      return {
+        /** @param {{ value?: string, items?: any[] }} patch */
+        set(patch) {
+          if (!patch) return;
+          const next = patch.items ? linked(patch.items) : null;
+          if (side) side.set({ value: patch.value, items: next || undefined });
+          if (nav) nav.set({ value: patch.value, items: next ? (sideMode ? bottomEntries(next) : next) : undefined });
+        },
+      };
+    },
     get ambient() { return sky; },
     get weather() { return weatherCtl; },
 
@@ -513,6 +597,7 @@ export function app(spec) {
       if (graceTimer) { clearTimeout(graceTimer); graceTimer = null; }
       if (statusCard) statusCard.destroy();
       if (nav) nav.destroy();
+      if (side) side.destroy();
       if (fullFrame) document.body.classList.remove('ak-body');
       if (root.parentNode) root.parentNode.removeChild(root);
     },

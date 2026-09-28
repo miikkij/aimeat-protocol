@@ -70,7 +70,7 @@ export function renderCustomisation(): string {
     + 'rating; `dense` on tabs and bottomNav; `pill` on tabs; `quiet` on section. An unknown name '
     + 'is refused with a console line naming the real ones.\n'
     + '4. **Per-component tokens.** `--ak-list-aside-size`, `--ak-stat-figure-size`, '
-    + '`--ak-card-aspect`, `--ak-hero-title-size` and thirty-five more, each defaulting to the '
+    + '`--ak-card-aspect`, `--ak-hero-title-size` and forty-four more, each defaulting to the '
     + 'value the component already had. Set one on YOUR OWN element and exactly that part '
     + 'changes, in every look and both modes.\n\n'
     + 'A statRow tile and a figure also take `unit` (what the number is measured in) and '

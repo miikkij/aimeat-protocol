@@ -5,6 +5,9 @@
  *   plus the /v1/libs catalogue and the generated JS sources themselves.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=libs
  * @version-history
+ *   v1.13.0 — 2026-09-28 — The workbench: its seven pieces asserted as exports, workbench.css
+ *     among the fetched parts (it holds no animation, so the infinite count is unchanged), and
+ *     the workbench look among the preset blocks.
  *   v1.12.0 — 2026-09-05 — The effects (wish-atelier-post-process-effects): fx and fxPlay
  *     asserted, effects.css among the fetched parts (its one keyframe runs once, so the
  *     infinite claim stays at exactly two), the defs element and the colour-space declaration
@@ -1135,6 +1138,7 @@ await test('GET /v1/libs/aimeat-atelier.js — serves the Atelier kit with every
     // rather than as a missing screen in somebody's app.
     for (const part of [
         'app', 'section', 'tabs', 'bottomNav',
+        'sideNav', 'statusBand', 'checkGrid', 'choiceCards', 'settingsGroup', 'progressFigure', 'callout',
         'hero', 'statRow', 'figure', 'emptyState', 'skeleton',
         'list', 'listDetail', 'cardGrid', 'mediaCard', 'timeline', 'chart', 'matrix', 'graph', 'waveform', 'scene3d',
         'health', 'queue', 'gauge', 'atlas', 'konsole',
@@ -1266,14 +1270,14 @@ await test('GET /lib/aimeat-atelier.css — serves the theming contract, light, 
     const looksCss = withoutComments(looksText);
     for (const preset of ['flat', 'calm-card', 'editorial', 'sticker', 'neon-dense', 'poster',
         'broadsheet', 'gallery', 'brutalist', 'terminal', 'aurora', 'carnival', 'billboard',
-        'riso', 'stage', 'broadcast', 'lounge', 'dawn']) {
+        'riso', 'stage', 'broadcast', 'lounge', 'dawn', 'workbench']) {
         assert(looksCss.includes(`[data-ak-look='${preset}']`), `the ${preset} preset block must exist`);
         assert(looksText.includes(`@preset-block ${preset}`), `the ${preset} preset must carry its @preset-block tag`);
     }
     assert(text.includes('@preset-block vivid'), 'the base contract must carry the vivid @preset-block tag');
     // The parts the entry imports must actually be reachable, or the kit renders unstyled.
     let parts = '';
-    for (const part of ['shell.css', 'content.css', 'data.css', 'scenics.css', 'patterns.css', 'ambient.css', 'effects.css']) {
+    for (const part of ['shell.css', 'content.css', 'data.css', 'scenics.css', 'patterns.css', 'ambient.css', 'effects.css', 'workbench.css']) {
         assert(css.includes(part), `should import ${part}`);
         const partRes = await fetch(`${BASE}/lib/aimeat-atelier/${part}`);
         assert(partRes.ok, `/lib/aimeat-atelier/${part} failed: ${partRes.status}`);

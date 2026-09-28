@@ -121,8 +121,10 @@ describe('the customisation section is held to describe-data.js', () => {
     const named = new Set([...text.matchAll(/--ak-[a-z0-9-]+/g)].map((m) => m[0]));
     const WORDS: Record<string, number> = {
       'thirty-one': 31, 'thirty-two': 32, 'thirty-three': 33, 'thirty-four': 34, 'thirty-five': 35,
+      // The workbench pieces added nine on 2026-09-28.
+      'forty-four': 44, 'forty-five': 45, 'forty-six': 46, 'forty-seven': 47, 'forty-eight': 48,
     };
-    const said = [...text.matchAll(/and (thirty-[a-z]+) more/g)].map((m) => WORDS[m[1]]);
+    const said = [...text.matchAll(/and ((?:thirty|forty)-[a-z]+) more/g)].map((m) => WORDS[m[1]]);
     expect(said.length).toBe(1);
     expect(named.size + said[0]).toBe(perComponent.length);
   });

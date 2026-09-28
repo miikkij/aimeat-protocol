@@ -381,4 +381,58 @@ export const WORLD_LOOKS: readonly AtelierLook[] = [
     },
     note: 'The light twin of lounge: a warm paper world with a dark twin for night, so the aurora may run at full volume under it — the matrix proves the ink over each lobe. No still page image, because the moving one is the ground; the hero keeps a low two-lobe wash so a page without the layer (Less motion, an older kit) still opens warm.',
   },
+  {
+    id: 'workbench',
+    feel: 'a tool somebody works in every day: a cool grey desk, white cards, one accent, a heavy sans heading, nothing moving at idle',
+    imagery: 'clean flat vector marks on a light ground, one coral accent, crisp outlines, no scenery',
+    structures: [],
+    grounds: {
+      // The approved Postinjalostamo design (2026-09-28): a blue-grey desk a step under white
+      // cards (1.18 between them), and a hairline that still reads against the card (1.38).
+      light: {
+        '--ak-bg': '#e9edf5',
+        '--ak-surface': '#ffffff',
+        '--ak-surface-2': '#f4f6fa',
+        '--ak-ink': '#151826',
+        '--ak-ink-dim': '#5b6275',
+        '--ak-line': '#d6dce7',
+      },
+      dark: {
+        '--ak-bg': '#10131b',
+        '--ak-surface': '#1a1f2b',
+        '--ak-surface-2': '#232938',
+        '--ak-ink': '#e9ecf3',
+        '--ak-ink-dim': '#a4abbc',
+        '--ak-line': '#353c4e',
+      },
+    },
+    tokens: {
+      '--ak-page-image': 'none',
+      '--ak-surface-image': 'none',
+      '--ak-grain': 'none',
+      '--ak-hero-image': 'radial-gradient(at 20% 20%, color-mix(in oklab, var(--ak-accent) 10%, var(--ak-bg)), transparent 60%)',
+      // The bar is a solid white strip over the desk, not glass.
+      '--ak-glass': 'var(--ak-surface)',
+      '--ak-blur': '0px',
+      '--ak-grad': 'linear-gradient(135deg, color-mix(in oklab, var(--ak-accent) 86%, var(--ak-ink)), color-mix(in oklab, var(--ak-accent) 86%, var(--ak-ink)))',
+      '--ak-radius': '16px',
+      '--ak-radius-sm': '10px',
+      '--ak-elev-1': '0 1px 2px color-mix(in oklab, var(--ak-ink) 6%, transparent)',
+      '--ak-elev-2': '0 8px 24px color-mix(in oklab, var(--ak-ink) 10%, transparent)',
+      // Archivo at 800, not Archivo Black: the heading is heavy and still a working face.
+      '--ak-font-display': "Archivo, 'Segoe UI', system-ui, sans-serif",
+      '--ak-font': "Archivo, 'Segoe UI', system-ui, sans-serif",
+      '--ak-weight-display': '800',
+      '--ak-gap': '14px',
+      '--ak-enter-distance': '6px',
+      '--ak-enter-stagger': '24ms',
+      '--ak-motion': '180ms',
+      '--ak-ambient': 'none',
+      // Sure and quiet: it settles at once and never restates itself.
+      '--ak-spring-stiffness': '260',
+      '--ak-spring-damping': '30',
+      '--ak-spring-mass': '1',
+    },
+    note: 'The workbench world, drawn for the mail intake app and approved on 2026-09-28: a cool grey desk under white cards, a solid bar, Archivo headings at 800, short entrances and no ambient. Pair it with app({ nav: "side" }) and the workbench pieces; the dark twin keeps the same order of steps.',
+  },
 ];

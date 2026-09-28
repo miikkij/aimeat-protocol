@@ -49,6 +49,10 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.54.0 — 2026-09-28 — THE WORKBENCH: workbench.css joins the imports (the side-navigation
+ *     frame, the brand cluster, sideNav, statusBand, checkGrid, choiceCards, settingsGroup,
+ *     progressFigure, callout and the form's per-field widths), and nine per-component tokens
+ *     join the base block at the sizes of the approved Postinjalostamo design.
  *   v0.53.3 — 2026-09-20 — No rules changed. The version is pinned to AIMEAT.atelier.version, and
  *     that moved for the mosaic's layout read: it asks for the arrangement alone
  *     (`?catalogue=none`) and stops carrying 89 kB it never used. e2e-libs holds the two versions
@@ -347,6 +351,7 @@
 @import url('./aimeat-atelier/mosaic.css');
 @import url('./aimeat-atelier/ambient.css');
 @import url('./aimeat-atelier/effects.css');
+@import url('./aimeat-atelier/workbench.css');
 /* LAST on purpose: the generated look blocks (tokens + structure recipes) override the parts. */
 @import url('./aimeat-atelier/looks.css');
 
@@ -572,6 +577,16 @@
   --ak-tabs-gap:          6px;
   --ak-range-track:       6px;                  /* the slider's rail                         */
   --ak-range-thumb:       22px;                 /* the grip; the hit area is --ak-touch      */
+  /* The workbench pieces (0.54.0), at the sizes of the approved design. */
+  --ak-sidenav-w:         13.75rem;             /* the side navigation column (220px)        */
+  --ak-sidenav-main:      65rem;                /* the content column beside it (1040px)     */
+  --ak-band-pad:          28px;                 /* statusBand, settingsGroup, progressFigure */
+  --ak-checkgrid-min:     16rem;                /* the narrowest check tile                  */
+  --ak-choice-min:        14rem;                /* the narrowest choice card                 */
+  --ak-setgroup-help:     18.75rem;             /* the help column of a settings group       */
+  --ak-setgroup-measure:  32.5rem;              /* the cap on its controls column            */
+  --ak-progress-figure:   3.5rem;               /* "3 / 10"                                  */
+  --ak-callout-pad:       14px;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════════════════
