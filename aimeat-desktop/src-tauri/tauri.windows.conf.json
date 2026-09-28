@@ -1,0 +1,10 @@
+{
+  "bundle": {
+    "targets": ["nsis", "msi"],
+    "resources": [
+      "resources/server/**/*",
+      "resources/licenses/**/*",
+      "WebView2Loader.*"
+    ]
+  }
+}

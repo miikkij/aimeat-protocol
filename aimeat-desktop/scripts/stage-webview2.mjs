@@ -14,6 +14,8 @@
  *   (matches the version Tauri compiled against). Harmless on MSVC builds.
  * @usage  node scripts/stage-webview2.mjs   (run via `pnpm stage`)
  * @version-history
+ *   v0.3.0 — 2026-09-29 — Does nothing, and says so, off Windows: the macOS and Linux builds run
+ *     `pnpm stage` too.
  *   v0.2.0 — 2026-06-06 — Initial WebView2Loader.dll staging (fixes GNU-toolchain launch).
  */
 
@@ -22,6 +24,15 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, statSync } from 'node
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+// WebView2 is Windows's webview. macOS uses WKWebView and Linux WebKitGTK, both part of the system,
+// so there is no loader to stage there, and tauri.conf.json names this DLL as a resource only in
+// its Windows file (tauri.windows.conf.json). `pnpm stage` runs this script everywhere, so it says
+// why it did nothing and leaves.
+if (process.platform !== 'win32') {
+  console.log(`[stage-webview2] nothing to stage on ${process.platform}: WebView2 is Windows only`);
+  process.exit(0);
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const srcTauri = join(__dirname, '..', 'src-tauri');
