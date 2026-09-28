@@ -95,6 +95,9 @@
  *   v1.21.0 -- 2026-07-11 -- publishDraft normalizes embedded document image URLs (raw /v1/storage →
  *     owner-addressed /v1/pub) and scopes those files to the workspace (members-only) via
  *     services/doc-images, so a published doc's images load for members without going public.
+ *   v1.23.1 -- 2026-09-28 -- The agent guard passes an anonymous caller on by its `anonymous` flag as
+ *     well as a missing req.auth: optionalAuth sets req.auth for everyone (ast-grep
+ *     optional-auth-if-not-req-auth-gate, alert 1675). Same result, since no anonymous caller is an agent.
  *   v1.23.0 -- 2026-09-28 -- One guard in front of every /v1/organisms/:id route refuses an agent the
  *     organism does not admit (agentAccess 'listed', services/organism-agent-access.ts).
  *   v1.22.0 -- 2026-09-25 -- Mounts the member change doors (organisms/workspace-member-changes.ts):
@@ -131,7 +134,8 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
   // does; one refusal in front of all of them is what keeps a route added later from forgetting it.
   // Authentication is global (optionalAuth in server.ts), so req.auth is already set here.
   router.use('/v1/organisms/:id', async (req, res, next) => {
-    if (!req.auth) { next(); return; }
+    // Not a sign-in gate: an anonymous caller is no agent, so the check has nothing to refuse.
+    if (!req.auth || req.auth.anonymous === true) { next(); return; }
     const principal = resolveIdentity(req.auth, config.nodeId);
     const organism = await barredAgentFor(storage, String(req.params.id), principal);
     if (!organism) { next(); return; }

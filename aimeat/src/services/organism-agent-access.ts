@@ -26,6 +26,9 @@
  * @usage if (agentBarred(organism, req.auth?.sub)) → refuse as for a non-member
  * @version-history
  *   v1.0.0 — 2026-09-28 — Initial.
+ *   v1.0.1 — 2026-09-28 — agentBarred and barredAgentFor test that the principal is a string before
+ *     reading it; any other value is no agent, as a missing one is (CodeQL
+ *     js/type-confusion-through-parameter-tampering, alerts 1676 and 1677).
  */
 import type { Storage, OrganismRecord } from '../storage/interface.js';
 import { isGEAI } from '../utils/gaii.js';
@@ -43,7 +46,8 @@ export function agentBarred(
   organism: Pick<OrganismRecord, 'agentAccess' | 'agentGaiis'> | null | undefined,
   principal: string | null | undefined,
 ): boolean {
-  if (!organism || agentAccessOf(organism) !== 'listed' || !principal) return false;
+  // A type test, not a truthiness test: a caller can pass a request value, which may be an array.
+  if (!organism || agentAccessOf(organism) !== 'listed' || typeof principal !== 'string' || !principal) return false;
   if (isGEAI(principal) || !principal.includes('#')) return false;
   return !(organism.agentGaiis ?? []).includes(principal);
 }
@@ -71,7 +75,7 @@ export function agentBarredMessage(organism: Pick<OrganismRecord, 'name'>, princ
 export async function barredAgentFor(
   storage: Pick<Storage, 'getOrganism'>, organismId: string, principal: string | null | undefined,
 ): Promise<OrganismRecord | null> {
-  if (!principal || !principal.includes('#')) return null;
+  if (typeof principal !== 'string' || !principal.includes('#')) return null;
   const organism = await storage.getOrganism(organismId);
   return organism && agentBarred(organism, principal) ? organism : null;
 }
