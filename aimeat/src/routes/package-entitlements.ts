@@ -8,8 +8,9 @@
  *   calls the same functions.
  * @structure registerPackageEntitlementRoutes(router, config, storage, peers)
  *   GET /v1/packages/:groupId/entitlements · PUT and DELETE /v1/packages/:groupId/entitlements/:nodeId
- *   GET /v1/federation/packages (signed by the calling node)
+ *   GET /v1/federation/packages (signed by the calling node) · GET /v1/packages/:groupId/config-needs
  * @version-history
+ *   v1.2.0 — 2026-09-28 — GET /v1/packages/:groupId/config-needs: the questions a shop asks before payment.
  *   v1.1.0 — 2026-09-28 — The grant takes `node` ({ url, public_key }) and registers an unknown node as
  *     a packages-only peer; the listing serves such a peer only what it holds (install packages, phase 5).
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 3).
@@ -24,6 +25,7 @@ import {
     listEntitlements, grantEntitlement, revokeEntitlement, repositoryListing, entitledGroupsOf,
 } from '../services/package-entitlements.js';
 import { verifyPackageNode } from '../services/package-node-auth.js';
+import { packageConfigNeeds } from '../services/package-config-needs.js';
 
 export function registerPackageEntitlementRoutes(
     router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>,
@@ -49,6 +51,17 @@ export function registerPackageEntitlementRoutes(
         }, peers);
         if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
         res.json(success(config.nodeId, { entitlement: out.entitlement, peer_registered: out.peerRegistered === true, repository_role: config.packageRepository }));
+    });
+
+    // What a package or an install bundle needs the customer to give: the questions a shop asks
+    // before payment, with the permission it grants with (services/package-config-needs.ts).
+    router.get('/v1/packages/:groupId/config-needs', requireAuth(), requireLocalSession(), requireScope('packages:write'), async (req, res) => {
+        const out = await packageConfigNeeds(storage, config, callerOf(req), decodeURIComponent(req.params.groupId as string));
+        if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
+        res.json(success(config.nodeId, {
+            group_id: out.group_id, version: out.version, bundle: out.bundle, name: out.name,
+            questions: out.questions, defaults: out.defaults, problems: out.problems,
+        }));
     });
 
     router.delete('/v1/packages/:groupId/entitlements/:nodeId', requireAuth(), requireLocalSession(), requireScope('packages:write'), async (req, res) => {

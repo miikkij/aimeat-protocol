@@ -23,6 +23,7 @@
  *   aimeat_package_check_updates, aimeat_package_repository, aimeat_package_entitlements.
  * @usage import { registerPackageTools } from './packages.js';
  * @version-history
+ *   v1.7.0 — 2026-09-28 — aimeat_package_config_needs: the questions a shop asks before payment.
  *   v1.6.0 — 2026-09-28 — aimeat_package_entitlements takes `node` and registers an unknown node as a
  *     packages-only peer with the grant (install packages, phase 5).
  *   v1.5.0 — 2026-09-28 — aimeat_package_instance_set, aimeat_package_check_updates,
@@ -57,6 +58,7 @@ import { listPackagesFor, getPackageFor, listInstancesFor } from '../services/pa
 import { forkPackageInstance, setPackageInstance } from '../services/package-managed.js';
 import { refreshInstalledPackages } from '../services/package-upstream-refresh.js';
 import { listEntitlements, grantEntitlement, revokeEntitlement } from '../services/package-entitlements.js';
+import { packageConfigNeeds } from '../services/package-config-needs.js';
 import { toolError } from './tool-error.js';
 import { PACKAGE_CONFIG_PARAM } from './catalog/definitions/packages.js';
 import { setPackageVersionStatus } from '../services/package-create.js';
@@ -382,6 +384,16 @@ export function registerPackageTools(
         const out = await grantEntitlement(storage, caller, { groupId: group_id, nodeId: node_id, updatesUntil: updates_until, note, channel, node }, peers);
         if (!out.ok) return { ...toolError(out.code, out.message) };
         return { content: [{ type: 'text' as const, text: JSON.stringify({ entitlement: out.entitlement, peer_registered: out.peerRegistered === true, repository_role: config.packageRepository }, null, 2) }] };
+    });
+
+    // The questions a shop asks before payment: the same service GET /v1/packages/:groupId/config-needs calls.
+    mcp.tool('aimeat_package_config_needs', descriptionFor('aimeat_package_config_needs'), {
+        group_id: z.string().describe('The package or install bundle group id.'),
+    }, annotationsFor('aimeat_package_config_needs'), async ({ group_id }) => {
+        const out = await packageConfigNeeds(storage, config, { owner: ownerOf(), isOperator: false }, group_id);
+        if (!out.ok) return { ...toolError(out.code, out.message) };
+        const { group_id: g, version, bundle, name, questions, defaults, problems } = out;
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ group_id: g, version, bundle, name, questions, defaults, problems }, null, 2) }] };
     });
 
     // Releasing a managed install: the same service POST /v1/instances/:id/fork calls.

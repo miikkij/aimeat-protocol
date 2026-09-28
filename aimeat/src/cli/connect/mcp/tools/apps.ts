@@ -5,6 +5,7 @@
  * @description MCP tool registrations for app/package management -- publishing,
  *   listing, retrieving, archiving versions, version history, sanctioned forks, and drafts (staging).
  * @version-history
+ *   2026-09-28 — aimeat_package_config_needs (GET /v1/packages/:groupId/config-needs).
  *   2026-09-28 — aimeat_package_entitlements forwards `node` (packages-only peer registered with a grant).
  *   2026-09-28 — aimeat_package_instance_set, aimeat_package_check_updates, aimeat_package_repository and
  *     aimeat_package_entitlements over their REST endpoints.
@@ -202,6 +203,11 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     if (node !== undefined) body.node = node;
     return out(await client.put(nodePath, body));
   });
+
+  mcp.tool('aimeat_package_config_needs', descriptionFor('aimeat_package_config_needs'), {
+    group_id: z.string().describe('The package or install bundle group id'),
+  }, annotationsFor('aimeat_package_config_needs'), async ({ group_id }) =>
+    out(await client.get(`/v1/packages/${encodeURIComponent(group_id)}/config-needs`)));
 
   // Releasing a managed install: it becomes editable in place and its updates stop.
   mcp.tool('aimeat_package_fork', descriptionFor('aimeat_package_fork'), {

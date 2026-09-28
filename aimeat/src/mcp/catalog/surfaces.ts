@@ -22,6 +22,7 @@
  *   import { toolsForSurface } from '../catalog/surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
+ *   2026-09-28 — aimeat_package_config_needs on `appdev` and `agent`, beside the entitlements.
  *   2026-09-28 — aimeat_admin_install_set on the operator surface.
  *   2026-09-28 — aimeat_package_instance_set, aimeat_package_check_updates, aimeat_package_repository and
  *     aimeat_package_entitlements on `appdev` and `agent`, beside update.
@@ -157,6 +158,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_package_status_set', 'aimeat_package_install', 'aimeat_package_update',
         'aimeat_package_instances', 'aimeat_package_fork', 'aimeat_package_instance_set',
         'aimeat_package_check_updates', 'aimeat_package_repository', 'aimeat_package_entitlements',
+        'aimeat_package_config_needs',
         'aimeat_package_pull', 'aimeat_package_install_requests',
         'aimeat_app_draft_write', 'aimeat_app_draft_replace', 'aimeat_app_draft_read', 'aimeat_app_draft_seed',
         'aimeat_seo_status',
@@ -229,6 +231,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_package_status_set', 'aimeat_package_install', 'aimeat_package_update',
         'aimeat_package_instances', 'aimeat_package_fork', 'aimeat_package_instance_set',
         'aimeat_package_check_updates', 'aimeat_package_repository', 'aimeat_package_entitlements',
+        'aimeat_package_config_needs',
         'aimeat_package_pull',
         // An install that lacked the words becomes a request; the person's own agent answers it here.
         'aimeat_package_install_requests',

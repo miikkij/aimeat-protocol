@@ -23,6 +23,7 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   2026-09-28 — aimeat_package_config_needs (read only).
  *   2026-09-28 — aimeat_admin_install_set (idempotent, reaches the package repository).
  *   2026-09-28 — aimeat_ai_roles (read only) and aimeat_ai_role_set (propose-then-confirm), AI roles.
  *   2026-09-28 — aimeat_ai_routing_set (propose-then-confirm), aimeat_ai_providers (read only) and
@@ -404,6 +405,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_package_repository: { title: 'List Repository Packages', readOnlyHint: true, openWorldHint: true },
     // Destructive: a revoke stops a customer node's pulls. Idempotent: the same grant twice is one grant.
     aimeat_package_entitlements: { title: 'Package Entitlements', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    aimeat_package_config_needs: { title: 'Package Config Needs', readOnlyHint: true, openWorldHint: false },
     // Destructive: the updates it gives up do not come back to this copy. Not idempotent: a second
     // call is refused because the copy is no longer managed.
     aimeat_package_fork: { title: 'Fork Managed Package Install', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },

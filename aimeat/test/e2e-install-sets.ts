@@ -241,6 +241,20 @@ await test('An agent of the operator without operator:admin is refused', async (
     assert(r.status === 403, `expected 403, got ${r.status} ${JSON.stringify(r.body)}`);
 });
 
+await test('The shop learns before payment what the bundle needs asked: the app field, required, not secret', async () => {
+    const r = await R.json(`/v1/packages/${encodeURIComponent(setupOnR)}/config-needs`, { headers: auth(vendorToken) });
+    assert(r.status === 200 && r.body.data.bundle === true && r.body.data.name === 'Shop setup' && r.body.data.problems.length === 0,
+        `needs: ${r.status} ${JSON.stringify(r.body)}`);
+    const q = (r.body.data.questions as any[]).find((x) => x.package === shopOnR && x.component === 'app-shop' && x.field === 'shop_name');
+    assert(q?.kind === 'app' && q?.required === true && q?.secret === false && q?.schema?.title === 'Shop name', `the question: ${JSON.stringify(r.body.data.questions)}`);
+});
+
+await test('An agent of the author without packages:write cannot read the questions', async () => {
+    const reader = await registerAgent(R, vendorToken, `vendor${ts}`, 'reader', 'interactive', ['memory:read']);
+    const r = await R.json(`/v1/packages/${encodeURIComponent(setupOnR)}/config-needs`, { headers: auth(reader) });
+    assert(r.status === 403, `expected 403, got ${r.status} ${JSON.stringify(r.body)}`);
+});
+
 await test('A set with a user who has no email is refused, naming the field', async () => {
     const r = await C.json('/v1/install-sets/apply', {
         method: 'POST', headers: auth(opsToken),

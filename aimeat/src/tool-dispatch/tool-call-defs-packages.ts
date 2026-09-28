@@ -17,6 +17,7 @@
  * @structure packageTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { packageTools } from './tool-call-defs-packages.js';
  * @version-history
+ *   v1.7.0 -- 2026-09-28 -- aimeat_package_config_needs (GET /v1/packages/:groupId/config-needs).
  *   v1.6.0 -- 2026-09-28 -- aimeat_package_entitlements forwards `node` (packages-only peer registered with a grant).
  *   v1.5.0 -- 2026-09-28 -- aimeat_package_instance_set, aimeat_package_check_updates,
  *     aimeat_package_repository and aimeat_package_entitlements (the package repository).
@@ -306,6 +307,15 @@ export const packageTools: ConnectCliToolDefinition[] = [
             if (note !== undefined) body.note = note;
             return client.put(node, body);
         },
+    },
+    {
+        name: 'aimeat_package_config_needs',
+        description: 'The settings a package or install bundle of yours needs the customer to give: the questions a shop asks before payment.',
+        input: {
+            group_id: { type: 'string', required: true, description: 'The package or install bundle group id.' },
+        },
+        handler: ({ client }, input) =>
+            client.get(`/v1/packages/${encodeURIComponent(requiredString(input, 'group_id'))}/config-needs`),
     },
     {
         // Releasing a managed install: it becomes editable in place and its updates stop.
