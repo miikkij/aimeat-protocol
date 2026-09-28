@@ -496,6 +496,12 @@ await test('R\'s author names C a seller; C then reads the bundle\'s questions a
     assert(s.status === 200 && s.body.data.seller.nodeId === C.nodeId, `seller: ${s.status} ${JSON.stringify(s.body)}`);
     const q = await C.json(`/v1/package-sales/config-needs?repository=${encodeURIComponent(R.nodeId)}&group_id=${encodeURIComponent(setupOnR)}`, { headers: auth(opsToken) });
     assert(q.status === 200 && (q.body.data.questions as any[]).some((x) => x.field === 'shop_name' && x.required), `questions: ${q.status} ${JSON.stringify(q.body)}`);
+    // The link parameters of the questions call are read: the right address and key pass, a wrong key is refused.
+    const rKey = (await R.json('/.well-known/aimeat')).body.data.public_key as string;
+    const linked = await C.json(`/v1/package-sales/config-needs?repository=${encodeURIComponent(R.nodeId)}&group_id=${encodeURIComponent(setupOnR)}&repository_url=${encodeURIComponent(R.baseUrl)}&repository_public_key=${encodeURIComponent(rKey)}`, { headers: auth(opsToken) });
+    assert(linked.status === 200, `questions with the link: ${linked.status} ${JSON.stringify(linked.body)}`);
+    const wrongKey = await C.json(`/v1/package-sales/config-needs?repository=${encodeURIComponent(R.nodeId)}&group_id=${encodeURIComponent(setupOnR)}&repository_url=${encodeURIComponent(R.baseUrl)}&repository_public_key=AAAAnotthekey`, { headers: auth(opsToken) });
+    assert(wrongKey.status === 409 && wrongKey.body.error?.code === 'PEER_KEY_MISMATCH', `a wrong repository key is refused: ${wrongKey.status} ${JSON.stringify(wrongKey.body)}`);
     const g = await C.json('/v1/package-sales/entitlements', {
         method: 'PUT', headers: auth(opsToken),
         body: JSON.stringify({ repository: R.nodeId, group_id: setupOnR, node_id: newNode, node: { url: 'http://127.0.0.1:40799', public_key: newNodeKey }, note: 'order 3' }),
