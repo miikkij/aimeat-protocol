@@ -42,12 +42,15 @@
  *   - readOwnerAgentAccess(storage, ownerGhii) — every agent of an owner in one list read
  *   - openRefusals(entries, heldScopes, nowMs, since?) — which refusals still stand
  *   - refusalView / scopeRequestView / agentAccessView — the wire shape, one for every surface
+ *   - declineRefusals(storage, gaii, needed?) — the owner declines to give the permissions
  *   - forgetAgentAccess(storage, ownerGhii, agentName) — the agent was deleted
  *   - flushAgentRefusals() — write what the windows hold now (tests, shutdown)
  * @usage
  *   noteAgentRefusal(req.auth, ['agent:write'], false, 'PATCH /v1/agents/:name/tags');
  *   const { refusals, request } = await readAgentAccess(storage, ownerGhii, 'concierge', agent.defaultScopes ?? ['*']);
  * @version-history
+ *   v1.1.0 — 2026-09-30 — The owner can decline: a declined refusal leaves the owner's views and is
+ *     still told to the agent (`declined` on the wire). Jouni: accept some or all, or decline.
  *   v1.0.0 — 2026-09-30 — Initial.
  */
 import { randomUUID } from 'node:crypto';
@@ -55,6 +58,7 @@ import type { Storage, MemoryRecord, AgentTaskRecord } from '../storage/interfac
 import { parseGAII, ownerGhiiOf } from '../utils/gaii.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
+import { emitChange } from './event-bus.js';
 
 export const AGENT_REFUSALS_SPEC = 'aimeat.agent-refusals/v1';
 export const AGENT_SCOPE_REQUEST_SPEC = 'aimeat.agent-scope-request/v1';
@@ -77,6 +81,13 @@ export interface AgentRefusalEntry {
   count: number;
   firstAt: string;
   lastAt: string;
+  /**
+   * Set when the owner declined to give the permission. A declined refusal leaves the owner's views
+   * (the card, the agent list), because the owner has answered it; the agent is still told, since its
+   * run was still refused. It stays declined while it stays open, and a refusal that closed and came
+   * back starts without it.
+   */
+  declinedAt?: string;
 }
 
 interface AgentRefusalsRecord {
@@ -220,9 +231,16 @@ async function persistRefusal(
   // A closed entry starts over: the permission was granted and then taken away again, or the old
   // one aged out, and a count carried across that gap would describe two different situations.
   const stillOpen = at && openRefusals([at], held, Date.now()).length === 1;
+  // The owner declines a PERMISSION, not a route: a new call refused for the same scopes an open,
+  // declined refusal needed is declined with it, so the agent trying another door does not ask again.
+  const declinedBefore = rec.entries.find((e) => e.declinedAt && e !== at
+    && openRefusals([e], held, Date.now()).length === 1 && sameEntry(e, entry.needed, e.call))?.declinedAt;
   const merged: AgentRefusalEntry = at && stillOpen
     ? { ...at, anyOf: entry.anyOf, count: at.count + delta.count, lastAt: delta.lastAt }
-    : { needed: entry.needed, anyOf: entry.anyOf, call: entry.call, count: delta.count, firstAt: delta.firstAt, lastAt: delta.lastAt };
+    : {
+      needed: entry.needed, anyOf: entry.anyOf, call: entry.call, count: delta.count, firstAt: delta.firstAt, lastAt: delta.lastAt,
+      ...(declinedBefore ? { declinedAt: declinedBefore } : {}),
+    };
   const others = rec.entries.filter((e) => e !== at);
   const kept = openRefusals(others, held, Date.now())
     .sort((a, b) => b.lastAt.localeCompare(a.lastAt))
@@ -241,6 +259,8 @@ async function persistRefusal(
   };
   await storage.setMemory(record);
   await noteOpenTasks(storage, gaii, merged);
+  // The owner's open agents page reloads on this, so the refusal reaches the card without a reload.
+  emitChange('agents', ownerGhii);
 }
 
 /** The English sentence stored on the task event. The task view says it in the reader's language. */
@@ -389,10 +409,12 @@ export interface AgentRefusalView {
   count: number;
   first_at: string;
   last_at: string;
+  /** The owner declined to give the permission; the owner's views leave it out. */
+  declined: boolean;
 }
 
 export function refusalView(e: AgentRefusalEntry): AgentRefusalView {
-  return { needed: e.needed, any_of: e.anyOf, call: e.call, count: e.count, first_at: e.firstAt, last_at: e.lastAt };
+  return { needed: e.needed, any_of: e.anyOf, call: e.call, count: e.count, first_at: e.firstAt, last_at: e.lastAt, declined: !!e.declinedAt };
 }
 
 export function scopeRequestView(r: AgentScopeRequest | null): { requested: string[] | null; granted: string[]; at: string } | null {
@@ -409,9 +431,58 @@ export function agentAccessView(
   nowMs = Date.now(),
 ): { refusals: AgentRefusalView[]; scope_request: ReturnType<typeof scopeRequestView> } {
   return {
-    refusals: openRefusals(slot?.entries ?? [], heldScopes, nowMs).map(refusalView),
+    // The owner's view: a refusal the owner declined is answered, so it is not shown again.
+    refusals: openRefusals(slot?.entries ?? [], heldScopes, nowMs).filter((e) => !e.declinedAt).map(refusalView),
     scope_request: scopeRequestView(slot?.request ?? null),
   };
+}
+
+/**
+ * The owner declines to give the permissions behind the agent's open refusals: every open refusal
+ * when `needed` is omitted, else those that needed any of the listed scopes. Returns how many were
+ * declined. Written in the same per-agent order as the refusal notes, so a refusal arriving at the
+ * same moment cannot undo the decision or be lost by it.
+ */
+export async function declineRefusals(storage: Storage, gaii: string, needed?: string[]): Promise<number> {
+  const parsed = parseGAII(gaii);
+  if (!parsed) return 0;
+  let declined = 0;
+  const run = async () => {
+    const agent = await storage.getAgent(gaii);
+    if (!agent) return;
+    const ownerGhii = ownerGhiiOf(gaii);
+    const key = agentRefusalsKey(parsed.agent);
+    const existing = await storage.getMemory(ownerGhii, key);
+    if (!existing) return;
+    const rec = asRefusals(existing.value, gaii);
+    const open = new Set(openRefusals(rec.entries, agent.defaultScopes ?? ['*'], Date.now()));
+    const now = new Date().toISOString();
+    const entries = rec.entries.map((e) => {
+      if (!open.has(e) || e.declinedAt) return e;
+      if (needed && !e.needed.some((s) => needed.includes(s))) return e;
+      declined += 1;
+      return { ...e, declinedAt: now };
+    });
+    if (declined === 0) return;
+    await storage.setMemory({
+      ...existing,
+      value: { spec: AGENT_REFUSALS_SPEC, agentGaii: gaii, entries } satisfies AgentRefusalsRecord,
+      version: (existing.version ?? 0) + 1,
+      updatedAt: now,
+    });
+    emitChange('agents', ownerGhii);
+  };
+  const next = (chains.get(gaii) ?? Promise.resolve()).then(run);
+  // The chain holds a promise that cannot reject, so a failed decline does not stop later notes;
+  // this caller still receives the failure from `next`.
+  const tail = next.then(() => undefined, () => undefined);
+  chains.set(gaii, tail);
+  try {
+    await next;
+  } finally {
+    if (chains.get(gaii) === tail) chains.delete(gaii);
+  }
+  return declined;
 }
 
 /** The agent is gone: its refusals and its approval record go with it. Best effort. */

@@ -12,7 +12,10 @@
  *   - GET /v1/agents/:name/statistics    -- Quality tab: recomputed performance + per-context review rollups
  *   - GET /v1/agents/:name/quality/overview -- Quality subtab composite (statistics + done tasks)
  *   - GET /v1/agents/:name/refusals      -- calls the node refused this agent, still unresolved
+ *   - POST /v1/agents/:name/refusals/decline -- the owner will not give those permissions
  * @version-history
+ *   v1.6.0 -- 2026-09-30 -- POST /refusals/decline: the owner's "no", in person; GET /refusals flags
+ *     a declined refusal and still returns it to the agent.
  *   v1.5.0 -- 2026-09-30 -- GET /refusals: what the node refused this agent for a missing permission,
  *     with `since` for the run window a runtime asks about (services/agent-refusals.ts).
  *   v1.4.0 -- 2026-09-29 -- TARGET-082 V4: the custom statistics records of /statistics and /quality/overview
@@ -34,7 +37,8 @@ import { success, error } from '../middleware/envelope.js';
 import { refuseNotYours } from '../middleware/refusals.js';
 import { requireAuth } from '../auth/middleware.js';
 import { agentGaiiFromIdentifier, ownerGhiiOf } from '../utils/gaii.js';
-import { readAgentAccess, refusalView, scopeRequestView } from '../services/agent-refusals.js';
+import { readAgentAccess, refusalView, scopeRequestView, declineRefusals } from '../services/agent-refusals.js';
+import { requireOwnerPrincipal } from '../auth/account-security.js';
 import { recomputeAndCacheStatistics } from '../services/agent-statistics.js';
 import { createAgentActivityOverviewService } from '../services/db/agent-activity-overview-db-service.js';
 import { createAgentQualityOverviewService } from '../services/db/agent-quality-overview-db-service.js';
@@ -209,6 +213,32 @@ export function agentActivityRouter(config: AimeatConfig, storage: Storage): Rou
       scope_request: scopeRequestView(access.request),
     }, [
       { description: 'The owner grants a permission', method: 'PATCH', url: `/v1/agents/${agentName}/scopes` },
+    ]));
+  });
+
+  /* ── POST /v1/agents/:name/refusals/decline -- The owner answers "no" ──
+   *
+   * The owner has seen the refusals and will not give the permissions: those refusals leave the
+   * owner's views and the agent still reads them, flagged `declined`, because its run was still
+   * refused. `needed` limits it to the refusals that needed any of those scopes; omitted, every open
+   * one. The owner in person only, like the grant it is the other answer to (PATCH .../scopes).
+   */
+  router.post('/v1/agents/:name/refusals/decline', requireAuth(), requireOwnerPrincipal(), async (req, res) => {
+    const agentName = req.params.name as string;
+    const agentGaii = resolveAgentGaii(req, agentName);
+    const agent = await storage.getAgent(agentGaii);
+    if (!agent) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent '${agentName}' not found`));
+      return;
+    }
+    const needed = (req.body as { needed?: unknown } | undefined)?.needed;
+    if (needed !== undefined && (!Array.isArray(needed) || !needed.every((s) => typeof s === 'string' && s.length > 0 && s.length <= 100) || needed.length > 50)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'needed must be a list of up to 50 scope names'));
+      return;
+    }
+    const declined = await declineRefusals(storage, agentGaii, needed as string[] | undefined);
+    res.json(success(config.nodeId, { agent: agentGaii, declined }, [
+      { description: 'What is still refused', method: 'GET', url: `/v1/agents/${agentName}/refusals` },
     ]));
   });
 

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description CLI help text constants (top-level + connector) for the aimeat binary. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.6 — 2026-09-30 — `aimeat connect add --scopes`.
  *   v1.1.5 — 2026-09-29 — The serve help says that from 3.20.0 the daemon refuses a request without
  *     the secret.
  *   v1.1.4 — 2026-09-28 — `aimeat init --install-set` and `--install-set-secrets`.
@@ -190,7 +191,7 @@ USAGE
   aimeat connect logout
       Remove stored credentials for the configured agent.
 
-  aimeat connect add [--url <node-url> --owner <owner> --agent <name>] [--mode <mode>]
+  aimeat connect add [--url <node-url> --owner <owner> --agent <name>] [--mode <mode>] [--scopes <list>]
       Alias for the default \`aimeat connect\` flow -- adds another agent to
       the connector so a single \`aimeat connect serve\` process can serve
       multiple agents (e.g. one Claude Code interactive agent plus several
@@ -204,6 +205,10 @@ USAGE
                       target. You must still add a \`runner:\` block to
                       ~/.aimeat/agents/<name>/config.yaml to wire the
                       subprocess; mode alone does not configure execution.
+      --scopes <list> the permissions the agent asks for, comma-separated,
+                      e.g. task:read,task:write,agent:write. The owner sees
+                      them on the consent screen. Without it the agent gets
+                      the default set, which cannot take work.
 
   aimeat connect list
       Show every agent registered with the connector, including their mode

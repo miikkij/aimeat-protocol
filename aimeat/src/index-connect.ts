@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description `aimeat connect` subcommand dispatch (agent connector: auth, serve, tui, inbox, tasks, tools, list, remove, refresh, logout). Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-09-30 — `--scopes a,b,c` reaches the device authorization request.
  *   v1.1.0 — 2026-09-24 — `aimeat connect tui` (./cli/connect/tui/).
  *   v1.0.0 — 2026-07-13 — Extracted from index.ts (max-file-lines)
  */
@@ -231,6 +232,7 @@ export async function runConnectCli(positionals: string[]): Promise<void> {
       owner: connectFlags.owner,
       agent: connectFlags.agent,
       mode: connectFlags.mode,
+      scopes: connectFlags.scopes,
     });
   } else {
     // Default: run auth
@@ -240,6 +242,7 @@ export async function runConnectCli(positionals: string[]): Promise<void> {
       owner: connectFlags.owner,
       agent: connectFlags.agent,
       mode: connectFlags.mode,
+      scopes: connectFlags.scopes,
     });
   }
   if (shouldExitAfterConnect) {
