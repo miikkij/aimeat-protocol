@@ -504,6 +504,9 @@ const ALL_SUITES = [
     // What the agent ASKED FOR reaching the person who approves it — and not reaching the
     // unauthenticated door, and not rewriting a grant already made.
     'test/e2e-device-auth-requested-scopes.ts',
+    // A refusal of an agent is kept: on the owner's agent list, on its open tasks, for the agent
+    // itself, closed by the grant and removed with the agent.
+    'test/e2e-agent-refusals.ts',
     'test/e2e-agent-health.ts',
     'test/e2e-open-items.ts',
     'test/e2e-app-access-code.ts',

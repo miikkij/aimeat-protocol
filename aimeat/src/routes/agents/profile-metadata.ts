@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.10.0 — 2026-09-30 — GET /v1/agents gives each agent `refusals` (the calls the node refused it
+ *     for a missing permission, still unresolved) and `scope_request` (what it asked for and was
+ *     granted at its last approval), to the owner and the owner's agents (services/agent-refusals.ts).
  *   v1.9.0 — 2026-09-24 — GET /v1/agents/:gaii forwards a ported agent only to an active federation
  *     peer, at an address built from that peer's own URL (services/agent-port-redirect.ts). It
  *     forwarded to whatever the pointer said.
@@ -43,7 +46,8 @@ import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import { refuseNeedsPermission } from '../../middleware/refusals.js';
 import { success, error } from '../../middleware/envelope.js';
-import { buildGAII } from '../../utils/gaii.js';
+import { buildGAII, isForeignPrincipal } from '../../utils/gaii.js';
+import { readOwnerAgentAccess, agentAccessView } from '../../services/agent-refusals.js';
 import { calculateTrustScore } from '../../services/trust.js';
 import { emitChange } from '../../services/event-bus.js';
 import { markAgentSeen } from '../../services/telemetry-buffer.js';
@@ -194,6 +198,18 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
         ? await credentialHealthForOwner(storage, config, agents)
         : {};
 
+    // What the node refused each agent for a missing permission, and what it asked for when it was
+    // approved (services/agent-refusals.ts): one list read for the whole fleet. The owner and the
+    // owner's own agents see it; an app grant, an ecosystem app or a visitor does not, because none of
+    // them manages these agents' permissions.
+    const seesAccess = !isForeignPrincipal(req.auth!) && !req.auth!.roles.some(r => r === 'app' || r === 'ecosystem');
+    const access = seesAccess && agents.length > 0
+        ? await readOwnerAgentAccess(storage, `${req.auth!.owner}@${config.nodeId}`).catch((err) => {
+          logger.warn('GET /v1/agents: refusal notes not read, the list goes without them', { error: String(err) });
+          return new Map();
+        })
+        : null;
+
     if (wantStats && agents.length > 0) {
       const ownerGhii = `${req.auth!.owner}@${config.nodeId}`;
       const gaiis = agents.map(a => a.gaii);
@@ -264,6 +280,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
         card_enrolled: !!a.enrolledAt,
         enrolled_at: a.enrolledAt ?? null,
         ...(wantCredentials ? { credential: credentialHealth[a.gaii] } : {}),
+        ...(access ? agentAccessView(a.defaultScopes ?? ['*'], access.get(a.name)) : {}),
         schedule_constraint_defaults: a.scheduleConstraintDefaults ?? [],
         ...(wantStats ? {
           stats: {

@@ -16,6 +16,7 @@
  *   - the refusal path itself (deny401/deny403 and the audit context) lives in ./deny.ts
  *
  * @version-history
+ *   2026-09-30 — requireAnyScope tells denyScope403 that any one scope would do (the agent refusal note).
  *   2026-09-29 — resolvePatToken marks the identity `via: 'pat'`, so classification reads it as an AI
  *     (TARGET-082 V4). What the token may do is unchanged.
  *   2026-09-26 — Every read of the storage and the config, and the anonymous fallback, is for the node
@@ -774,7 +775,7 @@ export function requireAnyScope(...acceptableScopes: string[]) {
     logger.warn(`[scope-denied] ${req.auth.sub} needs any of "${acceptableScopes.join('", "')}", has [${held.join(', ')}] on ${req.method} ${req.path}`);
     // ANY of them is enough, so the header lists them all and the client picks. A header naming one
     // would send a client to ask for a permission it may not need.
-    denyScope403(req, res, acceptableScopes, `One of these scopes is required: ${acceptableScopes.join(', ')}. Agent scopes: [${held.join(', ')}]`);
+    denyScope403(req, res, acceptableScopes, `One of these scopes is required: ${acceptableScopes.join(', ')}. Agent scopes: [${held.join(', ')}]`, undefined, true);
   };
 }
 

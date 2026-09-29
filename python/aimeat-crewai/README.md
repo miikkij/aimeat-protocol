@@ -322,6 +322,7 @@ instead of waiting out the poll interval):
 - Polls AIMEAT every `poll_interval_seconds` for queued tasks
 - For each, calls `build_crew(task, liaison)` and runs the resulting Crew
 - Lets the liaison handle `aimeat_task_complete` per its persona
+- After each task run, asks the node whether it refused any of this agent's calls for a missing permission during the run (0.31.0+). A crew reads a 403 `SCOPE_DENIED` as one more tool result and finishes normally, so a run whose writes never landed used to look like a success. Now such a run raises `NodeRefusedDuringRun`: it is printed as `refused`, passed to `on_error`, and an EXECUTE task is failed with the call and the permission named. The owner grants the permission in Profile → Agents → Manage access rights. The node also shows the refusal on the task and on the agent's card.
 - Traps SIGINT / SIGTERM for clean shutdown
 - Does NOT manage its own restart — wrap in a supervisor (`examples/watchdog.sh`, systemd, pm2, etc.) with crash-loop protection
 
@@ -711,6 +712,7 @@ environment variable it lives in (`agent.key_env`) and never the key itself.
 | 0.22.x | 3.9.0+ node AND `aimeat` connector for server-initiated invokes (`/local/invoke/next` on the serve daemon). On an older serve daemon the listener logs once that the surface is missing and the rest of the daemon is unchanged. | 0.80+ |
 | 0.27.x | **Node 3.18.0+** for decision rules (`/v1/ai/decide`, `/v1/ai/decide/rules`, and `/v1/ai/decisions/stats` for `decision_stats()`), and an owner who has set a TypeSafe key. `settings()` says whether this owner can use it at all and why not — check it before building a path on it. A node below 3.18.0 has none of these doors. For the liaison to SEE the decide tools over MCP, the machine also needs the `aimeat` connector at 3.18.0+: an older CLI refuses an undeclared parameter, so check the CLI version before reporting a node fault. Direct mode needs no node at all. | 0.80+ |
 | 0.30.x | `node_llm()`: a node with `/v1/llm` (3.18.0+ for the owner's key order and budget, and the model policy on the release after 3.19.0). `capabilities()`: a node with `GET /v1/ai/capabilities`, which arrives in the release after 3.19.0. | 0.80+ (verified on 1.15 native and LiteLLM paths) |
+| 0.31.x | The run-refusal check needs `GET /v1/agents/{name}/refusals`, which arrives in the release after 3.20.0. Against an older node the check finds nothing and the daemon behaves as 0.30.x. | 0.80+ |
 
 ## License
 

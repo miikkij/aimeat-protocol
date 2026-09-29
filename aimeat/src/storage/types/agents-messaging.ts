@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Capability, agent-task, directive, sharing, usage-ledger, and messaging record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-09-30 — AgentTaskEventRecord type 'scope_denied': the node refused the task's agent
+ *     a call for a missing permission, noted on the task where the person who ordered it looks.
  *   v1.3.0 — 2026-08-23 — Direct-message types moved to ./direct-messages.ts (max-file-lines) and
  *     re-exported from here, so nothing that imported them has to change. Pure extraction, the same
  *     shape the Capability Layer was split out in; ConversationRecord.remote was what pushed the
@@ -211,10 +213,13 @@ export interface AgentTaskEventRecord {
   // 'rating' (Quality tab): logged when a task's deliverable is reviewed via
   // POST /tasks/:id/rate. `details` carries { stars, context, raterType,
   // sourceGrounded }.
+  // 'scope_denied' (2026-09-30): written by the NODE only, when it refused the task's agent a call
+  // for a missing permission (services/agent-refusals.ts). `details` carries { needed, any_of, call }.
+  // The event route does not accept it from an agent, so an agent cannot forge or fake one away.
   type: 'started' | 'progress' | 'todo_completed' | 'todo_failed' |
         'memory_write' | 'extension_install' | 'app_publish' |
         'verification' | 'completed' | 'failed' | 'message' |
-        'revision_requested' | 'rating';
+        'revision_requested' | 'rating' | 'scope_denied';
   message: string;
   details?: Record<string, unknown>;
   timestamp: string;

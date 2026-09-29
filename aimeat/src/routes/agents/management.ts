@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, read-through, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.10.0 -- 2026-09-30 -- Deleting an agent removes its refusal notes and approval record
+ *     (services/agent-refusals.ts).
  *   v1.9.0 -- 2026-09-26 -- POST and DELETE /v1/agents/:name/read-through: the owner, signed in
  *     themselves, adds connections:read-through to one agent that holds connections:use, or takes it
  *     away, as POST /v1/app-grants/:grantId/read-through does for an app. The agents' mail notice
@@ -39,8 +41,9 @@ import type { Storage } from '../../storage/interface.js';
 import { generateKeyPair } from '../../auth/keypair.js';
 import { requireAuth, requireRole, requireRoleOrScope, requireLocalSession, requireOwnerPrincipal } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
-import { buildGAII } from '../../utils/gaii.js';
+import { buildGAII, ownerGhiiOf } from '../../utils/gaii.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
+import { forgetAgentAccess } from '../../services/agent-refusals.js';
 import { READ_THROUGH_SCOPE } from '../../services/app-grant-scopes.js';
 import { calculateTrustScore } from '../../services/trust.js';
 import { fireHook } from '../../utils/fire-hook.js';
@@ -559,6 +562,7 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
       return;
     }
     evictAgentTelemetry(agent.gaii);
+    await forgetAgentAccess(storage, ownerGhiiOf(agent.gaii), agent.name);
 
     // The MCP connection rows are per TOOL, upserted by every session, and each keeps the agent
     // that opened the tool's first session. Left behind, a row would go on naming an agent that no

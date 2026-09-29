@@ -14,6 +14,14 @@ This is the second half of the AIMEAT-CrewAI integration story:
     them up automatically.
 
 Changelog:
+  0.31.0 -- 2026-09-30 -- A run the node refused is not reported as a success. After each task
+    kickoff the daemon asks the node which of this agent's calls it refused for a missing permission
+    since the run started (GET /v1/agents/{name}/refusals?since=...). If any, the run raises
+    `NodeRefusedDuringRun`: it is printed as "refused", passed to `on_error`, and an EXECUTE task is
+    failed with a message that names the call and the permission. A refused PROPOSE is not retried,
+    because the refusal stands until the owner grants the permission. The node puts the same
+    refusal on the task itself, so a task that is still queued shows it too. Measured 2026-09-29: a
+    crew on a sold seat ran to exit 0 while every write of it was refused.
   0.29.0 -- 2026-09-24 -- Every loopback request carries the serve daemon's secret. The daemon
     writes a fresh one into serve.json at each start (connector schema 3) and refuses a request
     without it, because it used to answer any web page or local process that reached 127.0.0.1
@@ -739,6 +747,75 @@ def _fail_cancelled(api: _Api, task_id: str) -> None:
         )
     except Exception:  # noqa: BLE001, S110 -- the task is being abandoned anyway; a failed /fail changes nothing here
         pass
+
+
+class NodeRefusedDuringRun(RuntimeError):
+    """The crew finished, but the node refused some of its calls for a missing permission (0.31.0).
+
+    A crew that meets a 403 SCOPE_DENIED in a tool call usually carries on: the model reads the
+    refusal as one more tool result and the kickoff returns normally. The run then looked like a
+    success while its writes never landed. Measured 2026-09-29 on a sold seat: exit 0, the
+    customer's task queued for good, and one `[scope-denied]` line in the node log was the only
+    trace. The node keeps every refusal of an agent (GET /v1/agents/{name}/refusals), so the daemon
+    asks it when the run ends instead of trying to spot refusals inside the crew.
+    """
+
+
+# The daemon's clock and the node's clock are not the same clock. Asking for refusals from a little
+# before the run started keeps a node that runs a few seconds behind from hiding the run's own.
+_RUN_CLOCK_MARGIN_S = 5.0
+
+
+def _run_started_iso() -> str:
+    """The `since` for a run starting now, in the ISO form the node parses."""
+    started = time.time() - _RUN_CLOCK_MARGIN_S
+    return time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(started)) + f".{int((started % 1) * 1000):03d}Z"
+
+
+def _refusals_since(api: _Api, since_iso: str) -> list[dict[str, Any]]:
+    """The node's refusals of this agent at or after `since_iso` that are still unresolved.
+
+    An empty list on any failure to ask. This runs after the crew already finished, so a read that
+    fails must not turn a good run into a failed one; a refusal of this read itself is reported by
+    `_Api.refused`, like every other node call.
+    """
+    try:
+        r = api.get(f"/v1/agents/{api.agent_name}/refusals", params={"since": since_iso}, timeout=10)
+    except Exception:  # noqa: BLE001 -- the run already finished; not knowing is not a refusal
+        return []
+    if r.status_code != 200:
+        api.refused(r, "run refusals")
+        return []
+    try:
+        items = ((r.json() or {}).get("data") or {}).get("refusals") or []
+    except Exception:  # noqa: BLE001 -- a body that is not the envelope says nothing about refusals
+        return []
+    return [x for x in items if isinstance(x, dict)]
+
+
+def _refusal_summary(refusals: list[dict[str, Any]]) -> str:
+    """One sentence for the task's failure and the log: which call, which permission, who fixes it."""
+    parts = []
+    for x in refusals[:5]:
+        needed = [str(s) for s in (x.get("needed") or [])]
+        parts.append(f"{x.get('call', '?')} needs {(' or ' if x.get('any_of') else ' and ').join(needed)}")
+    more = f" (and {len(refusals) - 5} more)" if len(refusals) > 5 else ""
+    return (
+        "AIMEAT refused calls of this run for a missing permission: " + "; ".join(parts) + more
+        + ". The owner grants it in Profile > Agents > Manage access rights, and then the task can run again."
+    )
+
+
+def _check_run_refusals(api: _Api, since_iso: str) -> None:
+    """Raise NodeRefusedDuringRun when the node refused this agent anything since the run started."""
+    refused = _refusals_since(api, since_iso)
+    if refused:
+        raise NodeRefusedDuringRun(_refusal_summary(refused))
+
+
+def _failure_message(inner: BaseException) -> str:
+    """What the task's /fail says: a refusal in its own words, anything else as the crash it was."""
+    return str(inner) if isinstance(inner, NodeRefusedDuringRun) else f"Crew crashed: {inner}"
 
 
 def _fetch_message_content(api: _Api, thread_id: str, msg_id: str) -> str:
@@ -1612,18 +1689,23 @@ def run_crew_daemon(
     futures: dict[Future, str] = {}    # Future -> task_id
 
     def _dispatch(phase_label: str, task: dict[str, Any], builder: BuildCrewCallback) -> bool:
-        """Run one crew against one task. Returns True on success, False on error."""
+        """Run one crew against one task. Returns True when this phase is finished with the task
+        (success, or a refused PROPOSE), False when a retry could help."""
         task_id = task.get("id", "(unknown id)")
         title = task.get("title", "(no title)")
         print(f"[daemon:{agent_name}] {phase_label} task {task_id}: {title}")
         crew = builder(task, liaison)
         try:
+            started = _run_started_iso()
             with usage_run(task_id, agent_name):
                 result = crew.kickoff()
+            # A kickoff that returned is not yet a run that worked: the node may have refused its
+            # writes, which the crew read as ordinary tool results (NodeRefusedDuringRun).
+            _check_run_refusals(api, started)
             print(f"[daemon:{agent_name}] {phase_label} task {task_id} done; first 200 chars: {str(result)[:200]}")
             return True
         except Exception as inner:  # noqa: BLE001 -- the crew is the user's own code; report it and keep the daemon alive
-            print(f"[daemon:{agent_name}] {phase_label} task {task_id} crashed: {inner}")
+            print(f"[daemon:{agent_name}] {phase_label} task {task_id} {'refused' if isinstance(inner, NodeRefusedDuringRun) else 'crashed'}: {inner}")
             if on_error:
                 try:
                     on_error(inner)
@@ -1636,12 +1718,15 @@ def run_crew_daemon(
                 try:
                     api.post(
                         f"/v1/agents/{agent_name}/tasks/{task_id}/fail",
-                        json={"message": f"Crew crashed: {inner}"},
+                        json={"message": _failure_message(inner)},
                         timeout=10,
                     )
                 except Exception:  # noqa: BLE001, S110 -- the task already crashed; a failed /fail leaves it queued for the next cycle
                     pass
-            return False
+            # A refused PROPOSE is not retried. The refusal stands until the owner grants the
+            # permission, so the next cycle would pay for the same run and meet the same refusal; the
+            # node has already put it on the queued task, where the person who ordered it looks.
+            return phase_label != "EXECUTE" and isinstance(inner, NodeRefusedDuringRun)
 
     def _execute_worker(task: dict[str, Any]) -> tuple[str, str]:
         """Run one EXECUTE task in its OWN liaison (for the concurrent path).
@@ -1669,12 +1754,14 @@ def run_crew_daemon(
                     _fail_cancelled(api, task_id)
                     return (task_id, "cancelled")
                 crew = build_crew(task, worker_liaison)
+                started = _run_started_iso()
                 with usage_run(task_id, agent_name):
                     result = crew.kickoff()
+                _check_run_refusals(api, started)
                 print(f"[daemon:{agent_name}] EXECUTE task {task_id} done; first 200 chars: {str(result)[:200]}")
                 return (task_id, "ok")
         except Exception as inner:  # noqa: BLE001 -- the crew is the user's own code; report it and keep the daemon alive
-            print(f"[daemon:{agent_name}] EXECUTE task {task_id} crashed: {inner}")
+            print(f"[daemon:{agent_name}] EXECUTE task {task_id} {'refused' if isinstance(inner, NodeRefusedDuringRun) else 'crashed'}: {inner}")
             if on_error:
                 try:
                     on_error(inner)
@@ -1683,7 +1770,7 @@ def run_crew_daemon(
             try:
                 api.post(
                     f"/v1/agents/{agent_name}/tasks/{task_id}/fail",
-                    json={"message": f"Crew crashed: {inner}"},
+                    json={"message": _failure_message(inner)},
                     timeout=10,
                 )
             except Exception:  # noqa: BLE001, S110 -- the task already crashed; a failed /fail leaves it queued for the next cycle

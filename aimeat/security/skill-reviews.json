@@ -195,13 +195,13 @@
       "digest": "sha256:03e6a1ea7cae56de132ca606"
     },
     "node:aimeat-node-guide": {
-      "reviewedOn": "2026-09-27",
+      "reviewedOn": "2026-09-29",
       "watches": [
         "aimeat/src/routes/agents/device-auth.ts",
         "aimeat/src/routes/ghii/register-login.ts",
         "aimeat/src/services/first-steps.ts"
       ],
-      "digest": "sha256:92f9fb214c8827035913f287"
+      "digest": "sha256:7fc835717e2392b6098c3f83"
     },
     "node:ai-transparency": {
       "reviewedOn": "2026-09-26",
@@ -224,7 +224,7 @@
         "aimeat/src/mcp/core.ts",
         "aimeat/src/mcp/catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:ee34d5f6dd96b79ce235ed99"
+      "digest": "sha256:e43ba1737eb1b4612b2f2672"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-09-27",
@@ -242,7 +242,7 @@
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/data/basic-agents.ts"
       ],
-      "digest": "sha256:6d08990c812702428108e69e"
+      "digest": "sha256:9da91d3fe27faf3528784f66"
     },
     "node:set-up-content-pipeline": {
       "reviewedOn": "2026-09-28",
@@ -472,7 +472,7 @@
       "aimeat/src/static/sdk-libs/phaser/chiptune.js": "4305c95f9370f982"
     },
     "node:aimeat-node-guide": {
-      "aimeat/src/routes/agents/device-auth.ts": "adf10232e2b2acac",
+      "aimeat/src/routes/agents/device-auth.ts": "a27cfc4e28469cf5",
       "aimeat/src/routes/ghii/register-login.ts": "ab22b99f8c27a3b8",
       "aimeat/src/services/first-steps.ts": "8b9905de90360fa2"
     },
@@ -484,14 +484,14 @@
       "aimeat/src/mcp/core-admin.ts": "17c66f53ecaa3360"
     },
     "node:manage-my-agents": {
-      "aimeat/src/mcp/core.ts": "f567ac38a047b398",
-      "aimeat/src/mcp/catalog/definitions/agent-messaging.ts": "758e870c0323ff11"
+      "aimeat/src/mcp/core.ts": "67cba1c1e3185cd9",
+      "aimeat/src/mcp/catalog/definitions/agent-messaging.ts": "637d71d666486dfe"
     },
     "node:manage-my-profile-data": {
       "aimeat/src/routes/memory/shared.ts": "4dfb11c1bdee087c"
     },
     "node:add-a-crew-agent": {
-      "aimeat/src/routes/agents/device-auth.ts": "adf10232e2b2acac",
+      "aimeat/src/routes/agents/device-auth.ts": "a27cfc4e28469cf5",
       "aimeat/src/mcp/catalog/scopes.ts": "ce63c2a4190eec32",
       "aimeat/src/mcp/catalog/definitions/crew.ts": "f18f927aad1a04d6",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "1da72b752ee164bc",

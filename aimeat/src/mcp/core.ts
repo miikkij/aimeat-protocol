@@ -11,6 +11,8 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.31.0 — 2026-09-30 — aimeat_agents_list carries default_scopes, refusals and scope_request, as
+ *     GET /v1/agents does (services/agent-refusals.ts).
  *   v1.30.0 — 2026-09-29 — aimeat_memory_read carries classification_warning for a warning-classified value (TARGET-082 V4).
  *   v1.29.0 — 2026-09-29 — aimeat_memory_read, aimeat_memory_list and aimeat_discover pass the
  *     classification reader (TARGET-082); values through presentMemory. The memory and storage resource templates moved
@@ -125,7 +127,8 @@ import { registerCoreBoardTools } from './core-boards.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { parseGAII, localAccountName } from '../utils/gaii.js';
+import { parseGAII, localAccountName, ownerGhiiOf } from '../utils/gaii.js';
+import { readOwnerAgentAccess, agentAccessView } from '../services/agent-refusals.js';
 import type { ResourceChangeEvent } from './index.js';
 import { resourceEvents } from './index.js';
 import { annotationsFor } from './annotations.js';
@@ -350,6 +353,11 @@ export function registerCoreTools(
                 return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
             }
             const agents = await storage.getAgentsByOwner(localAccountName(agentGaii));
+            // The same two fields GET /v1/agents gives the owner and the owner's agents.
+            const access = await readOwnerAgentAccess(storage, ownerGhiiOf(agentGaii)).catch((err) => {
+                logger.warn('aimeat_agents_list: refusal notes not read, the list goes without them', { error: String(err) });
+                return new Map();
+            });
             return structuredResult('aimeat_agents_list', undefined, {
                 agents: agents.map(a => ({
                     gaii: a.gaii,
@@ -372,6 +380,8 @@ export function registerCoreTools(
                     // said, which is NOT the same as 'spawn' — a runtime filtering for what it
                     // should serve has to be able to tell those apart.
                     run_mode: a.runMode ?? null,
+                    default_scopes: a.defaultScopes ?? ['*'],
+                    ...agentAccessView(a.defaultScopes ?? ['*'], access.get(a.name)),
                 })),
             });
         },

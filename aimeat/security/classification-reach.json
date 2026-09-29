@@ -679,6 +679,13 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The agent proposal approval queue, listed and settled for its owner."
     },
+    "src/services/agent-refusals.ts": {
+      "reads": {
+        "getMemory": 4,
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-09-30, the node's own read: the node's refusal notes and approval records for an owner's agents (audit.agents.*, a reserved prefix only this service writes), read to update them and to show them to that owner and the agent itself; no content anybody authored."
+    },
     "src/services/agent-statistics.ts": {
       "reads": {
         "getMemory": 1

@@ -485,7 +485,7 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_agents_list',
-        description: "List the calling owner's agents on the node (name, mode, capabilities, tags, last_seen, etc.). Use this to discover which agents you can delegate to via aimeat_task_create.",
+        description: "List the calling owner's agents on the node (name, mode, capabilities, tags, last_seen, etc.). Use this to discover which agents you can delegate to via aimeat_task_create. Each agent also carries its permissions (default_scopes), what it asked for at its last approval (scope_request), and `refusals`: calls the node refused it for a missing permission that is still missing. A refusal is often why an agent's tasks do not move; tell the owner which permission to grant.",
         caller: 'agent',
         visibility: agentEverywhere,
         input: {},

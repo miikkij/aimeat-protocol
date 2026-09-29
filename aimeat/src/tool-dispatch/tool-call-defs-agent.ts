@@ -482,7 +482,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_agents_list',
-        description: "List the calling owner's agents on the node (name, mode, capabilities, tags, last_seen, ...). Use this to discover delegation targets for aimeat_task_create.",
+        description: "List the calling owner's agents on the node (name, mode, capabilities, tags, last_seen, ...). Use this to discover delegation targets for aimeat_task_create. Each agent also carries default_scopes, scope_request (what it asked for at its last approval) and refusals (calls the node refused it for a permission it still lacks).",
         input: {},
         handler: ({ client }) => client.get('/v1/agents'),
     },
