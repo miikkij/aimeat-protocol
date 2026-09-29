@@ -15357,7 +15357,17 @@
         "askedNamed": "At its last approval it asked for {asked}.",
         "askedNothing": "At its last approval it asked for no permission by name, so it got the default permissions.",
         "notGranted": "Not given: {missing}.",
-        "taskEvent": "Your AIMEAT refused the agent: it needs the permission {permission}. Give it in the agent's access rights, and the task can go on."
+        "taskEvent": "Your AIMEAT refused the agent: it needs the permission {permission}. Give it in the agent's access rights, and the task can go on.",
+        "dialogTitle": "Missing permissions: {name}",
+        "dialogLead": "Your AIMEAT refused this agent these permissions. Tick the ones you give it. The ones you leave unticked you decline, and they leave the card.",
+        "dialogAfter": "The agent gets the permissions at its next connection. A declined refusal is not shown again, but the agent is still told that its run was refused.",
+        "giveSelected": "Give the selected ({n})",
+        "declineAll": "Decline all",
+        "editAll": "Edit all permissions",
+        "granted": "Permissions given.",
+        "grantedSome": "The selected permissions are given, the rest declined.",
+        "declined": "Declined. The agent does not get these permissions.",
+        "grantError": "Could not save the permissions."
       },
       "page": {
         "allTags": "All {n} tags",

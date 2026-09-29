@@ -421,7 +421,7 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
       <${AccessLine} agent=${agent} />
 
       ${/* What your AIMEAT refused this agent for a missing permission, with the way to grant it. */''}
-      <${RefusalNote} agent=${agent} onScopesClick=${onScopesClick} />
+      <${RefusalNote} agent=${agent} onScopesClick=${onScopesClick} showToast=${showToast} />
 
       ${/* The status banner while the agent is new, onboarding or in trouble. */''}
       ${renderZone2(state, agent, onboarding, setActiveTab, showToast, soloMode)}

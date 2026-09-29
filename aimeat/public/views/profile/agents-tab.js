@@ -7,6 +7,8 @@
  *   the agents as a table that opens into a card), the ink rail, the device-auth approvals, the
  *   scope modal.
  * @version-history
+ *   v4.16.0 -- 2026-09-30 -- "With a problem" counts an agent your AIMEAT refused a permission it still
+ *     lacks (Jouni: the summary said 0 while concierge could not work).
  *   v4.15.0 -- 2026-09-26 -- Every part is a component that takes data (page group G1a): the frame is
  *     SettingsPage (crumb, head with its tags, the strip, the rail with the four sections and the
  *     three pages), the sections are Section (the connect guide's three developer roads fold again as
@@ -150,6 +152,7 @@ import { loadAgentOrder, saveAgentOrder, UNGROUPED_ID, loadCollapsedGroups, save
 import { AgentSearch, FilterBar, ActiveTasksPanel, renderAgentGroups } from './agents/groups-render.js';
 import { agentState } from './agents/state-detector.js';
 import ScopesModal from './agents/scopes-modal.js';
+import { hasRefusals } from './agents/agent-card-access.js';
 import BasicAgentsPanel from './agents/basic-agents-panel.js';
 import NewAgentPanel from './agents/new-agent-panel.js';
 import { swallowed } from '/js/swallowed.js';
@@ -578,7 +581,8 @@ export default function AgentsTab({ session, showToast, onStats }) {
   // rows show, so the strip and the table cannot disagree.
   const ready = agents.filter(a => ['production', 'idle'].includes(agentState(a))).length;
   const never = agents.filter(a => !a.last_seen).length;
-  const problems = agents.filter(a => agentState(a) === 'problem');
+  // A refused agent is a problem too: it looks connected and its work does not get done.
+  const problems = agents.filter(a => agentState(a) === 'problem' || hasRefusals(a));
   const federated = agents.filter(a => a.federate).length;
   const tools = agents.filter(a => a.mode === 'workstation').length;
   const waiting = pendingRequests.length + waitingCount;
