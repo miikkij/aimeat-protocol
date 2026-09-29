@@ -1555,8 +1555,8 @@
                   onClick=${(e) => { handleNav(e, '/v1/home'); setMenuOpen(false); }}>${t('nav.home') || 'Home'}</a>
                 <a href="/v1/chat" class="${currentPath === '/v1/chat' ? 'active' : ''}"
                   onClick=${(e) => { handleNav(e, '/v1/chat'); setMenuOpen(false); }}>${t('nav.chat') || 'Chat'}</a>
-                <a href="/app-catalog.html" target="_blank" onClick=${() => setMenuOpen(false)}
-                  class="${currentPath === '/app-catalog.html' ? 'active' : ''}">${t('nav.apps') || 'Apps'}</a>
+                <a href="/v1/appcat" class="${currentPath === '/v1/appcat' ? 'active' : ''}"
+                  onClick=${(e) => { handleNav(e, '/v1/appcat'); setMenuOpen(false); }}>${t('nav.apps') || 'Apps'}</a>
                 <a href="/v1/profile" class="profile-link visible ${currentPath === '/v1/profile' ? 'active' : ''}"
                   onClick=${(e) => { handleNav(e, '/v1/profile'); setMenuOpen(false); }}>${t('nav.profile')}</a>
                 ${session.roles && session.roles.includes('operator') && html`
