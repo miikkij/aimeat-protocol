@@ -66,4 +66,5 @@ export type { AgentWebhookRepository } from './agent-webhook.repository.js';
 export type { AgentOnboardingRepository } from './agent-onboarding.repository.js';
 export type { AiProvenanceRepository } from './ai-provenance.repository.js';
 export type { AiDecisionRepository } from './ai-decisions.repository.js';
+export type { ContentLabelRepository } from './content-labels.repository.js';
 export type { McpServerRepository } from './mcp-server.repository.js';

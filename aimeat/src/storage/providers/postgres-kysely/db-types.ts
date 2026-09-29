@@ -512,6 +512,23 @@ export interface AiDecision {
   subject: string | null;
 }
 
+export interface ContentLabel {
+  history: Json;
+  humanSaid: string | null;
+  id: string;
+  justification: string | null;
+  key: string;
+  kind: string;
+  label: string;
+  locked: boolean;
+  ownerGaii: string | null;
+  scope: string;
+  setBy: string;
+  source: string;
+  suggestion: Json | null;
+  updatedAt: string;
+}
+
 export interface AiProvenance {
   contentHash: string | null;
   createdAt: string;
@@ -2298,6 +2315,7 @@ export interface DB {
   McpServer: McpServer;
   AiProvenance: AiProvenance;
   AiDecision: AiDecision;
+  ContentLabel: ContentLabel;
   App: App;
   AppDownload: AppDownload;
   AppDraft: AppDraft;

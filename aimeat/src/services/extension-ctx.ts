@@ -29,6 +29,8 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   v1.8.0 — 2026-09-29 — ctx.memory reads pass the classification reader (TARGET-082): the own
+ *     namespace as the node's own work, getPublic for the caller, both through presentMemory.
  *   v1.7.0 — 2026-09-28 — System 2 plan, V6: `providerCall` in ExtensionCtxDeps. Set when the
  *     extension runs as an AI provider: ctx.fetch refuses a hostname that is not exactly one of the
  *     declared hosts (`Fetch blocked: …`), and adds the owner's provider key header to a request to a
@@ -96,6 +98,8 @@ import { parseGAII, ownerGhiiOf, localAccountName } from '../utils/gaii.js';
 import { resolveSecretForHeaders, secretPlaceholderNames, secretUnknownMessage, secretHostMessage } from './owner-secrets.js';
 import { logger } from '../utils/logger.js';
 import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
+import { presentMemories, presentMemory } from './classification/present-memory.js';
+import { readerForCaller, systemReader } from './classification/reader.js';
 
 /** How long one guest-initiated outbound call may take. Same ceiling every copy used. */
 const FETCH_TIMEOUT_MS = 30_000;
@@ -485,18 +489,24 @@ async function resolveOutboundSecrets(
  */
 export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
     const { config, storage, extMemoryOwner, logPrefix } = deps;
+    // The classification readers (TARGET-082): the extension reading its own namespace is the node's
+    // own work; a read of somebody's public memory is made for the caller who invoked the action.
+    const ownReader = systemReader({ storage, config }, extMemoryOwner);
+    const callerReader = readerForCaller({ storage, config }, deps.caller);
 
     const ctx: ExtensionCtx = {
         memory: {
             get: async (key) => {
-                const record = await storage.getMemory(extMemoryOwner, key);
+                const stored = await storage.getMemory(extMemoryOwner, key);
+                const record = stored ? await presentMemory(ownReader, stored) : null;
                 return record ? record.value : null;
             },
 
             // The read half of compare-and-swap. `get` returns only the value, so a script had no
             // way to learn the version it needed to swap against.
             getVersioned: async (key) => {
-                const record = await storage.getMemory(extMemoryOwner, key);
+                const stored = await storage.getMemory(extMemoryOwner, key);
+                const record = stored ? await presentMemory(ownReader, stored) : null;
                 return record ? { value: record.value, version: record.version } : null;
             },
 
@@ -580,7 +590,7 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
             },
 
             search: async (prefix) => {
-                const records = await storage.listMemory(extMemoryOwner, { prefix });
+                const records = await presentMemories(ownReader, await storage.listMemory(extMemoryOwner, { prefix }));
                 return records.map(r => ({ key: r.key, value: r.value }));
             },
 
@@ -611,8 +621,11 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
                         if (r) { record = r; break; }
                     }
                 }
-                // An ext: namespace is world-readable by design, so only 'public' leaves it.
-                return (record && record.visibility === 'public') ? record.value : null;
+                // An ext: namespace is world-readable by design, so only 'public' leaves it, and it
+                // leaves through the one presentation of a memory value, for the caller.
+                if (!record || record.visibility !== 'public') return null;
+                const shown = await presentMemory(callerReader, record);
+                return shown ? shown.value : null;
             },
         },
 

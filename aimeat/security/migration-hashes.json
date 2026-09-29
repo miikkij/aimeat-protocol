@@ -91,6 +91,7 @@
     "0086_full_identity_on_evidence.sql": "7935ac1975263f68b90a2fc4d35824f90ec594dd8acf03c43326741d0264c26f",
     "0087_package_instance_mode.sql": "fb585ed05f397fc1cf63c55fc8f6ededb92e3bba7249eff1015bb0a67d59629f",
     "0088_package_instance_auto_update.sql": "4c3a7897d8445ae7e91f9510f3e05eca61a6411502fc1c86bb38cdb1bed411fc",
-    "0089_organism_agent_access.sql": "fe78b214ea0f54a98a7bb987ab917c97341d16506f9dfecfbfc4757b7c589090"
+    "0089_organism_agent_access.sql": "fe78b214ea0f54a98a7bb987ab917c97341d16506f9dfecfbfc4757b7c589090",
+    "0090_content_labels.sql": "9baff4dda6e792729168e26c58eddb01a364bfa9aa8d05b814e5864377bba42a"
   }
 }

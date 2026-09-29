@@ -23,6 +23,8 @@
  * @structure adminMemoryRouter · search · list · one record · delete · restore
  * @usage mounted by server-bootstrap/routes-loader.ts
  * @version-history
+ *   v2.3.0 — 2026-09-29 — The search and the one-record read present values through presentMemories
+ *     (classification reader + credential mask, TARGET-082).
  *   v2.2.0 — 2026-09-24 — SECURITY (audit A8-2): the search, the one-record read, the delete and the
  *     restore write the operator-access trail through recordOperatorAccess(), the usage row the
  *     usage and compliance doors already write and a line on the inspected owner's feed. The four
@@ -49,7 +51,8 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
 import { deleteMemoryRecord, restoreMemoryRecord } from '../services/memory-bin.js';
-import { shownMemoryValue } from '../services/secret-records.js';
+import { presentMemories, presentMemory } from '../services/classification/present-memory.js';
+import { readerFor } from '../services/classification/reader.js';
 import { recordOperatorAccess, type OperatorAccess } from '../services/operator-access-audit.js';
 
 /** How much of a value is scanned for the search excerpt. A megabyte value is legal; reading all of
@@ -143,7 +146,7 @@ export function adminMemoryRouter(
         const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 200);
         const maxFlagsRaw = req.query.max_flags as string | undefined;
 
-        const hits = await storage.searchText(q, {
+        const found = await storage.searchText(q, {
             ownerGaiis: owner ? [owner] : undefined,
             keyPrefix: (req.query.prefix as string) || undefined,
             visibility: (req.query.visibility as string) || undefined,
@@ -151,6 +154,10 @@ export function adminMemoryRouter(
             archived: archiveFilter(req.query.archived),
             limit,
         });
+        // The one presentation of memory values (classification reader + credential mask, TARGET-082).
+        const scoreOf = new Map(found.map(h => [`${h.record.ownerGaii}\u0000${h.record.key}`, h.score]));
+        const hits = (await presentMemories(readerFor({ storage, config }, req.auth), found.map(h => h.record)))
+            .map(record => ({ record, score: scoreOf.get(`${record.ownerGaii}\u0000${record.key}`) ?? 0 }));
 
         // Every hit carries an excerpt of its value, so every owner a hit belongs to has had part of
         // an entry read. One line each, with how many of theirs the search showed.
@@ -185,7 +192,7 @@ export function adminMemoryRouter(
                 // from the row's own byteSize — the one place in this router that does.
                 byte_size: Buffer.byteLength(typeof h.record.value === 'string' ? h.record.value : JSON.stringify(h.record.value) ?? '', 'utf8'),
                 score: h.score,
-                excerpt: excerpt(shownMemoryValue(h.record.key, h.record.value), q),
+                excerpt: excerpt(h.record.value, q),
             })),
             limit,
         }));
@@ -282,7 +289,9 @@ export function adminMemoryRouter(
         const ownerGaii = req.params.owner as string;
         const key = req.params.key as string;
 
-        const rec = await storage.getMemory(ownerGaii, key);
+        // The one presentation of a memory value (classification reader + credential mask, TARGET-082).
+        const stored = await storage.getMemory(ownerGaii, key);
+        const rec = stored ? await presentMemory(readerFor({ storage, config }, req.auth), stored) : null;
         if (!rec) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Memory key not found: ${ownerGaii}/${key}`));
             return;
@@ -305,7 +314,7 @@ export function adminMemoryRouter(
         res.json(success(config.nodeId, {
             key: rec.key,
             owner_gaii: rec.ownerGaii,
-            value: shownMemoryValue(rec.key, rec.value),
+            value: rec.value,
             visibility: rec.visibility,
             group_id: rec.groupId ?? null,
             workspace_ref: rec.workspaceRef ?? null,

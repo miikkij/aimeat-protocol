@@ -26,6 +26,8 @@
  *   v1.5.0 -- 2026-09-26 -- aimeat_memory_read_public answers a Design Book part with DESIGN_BOOK_PART,
  *     naming aimeat_designbook_get and GET /v1/designbook/:id, the one door that reads a part
  *     (utils/own-door-keys.ts), as GET /v1/memory/:gaii/:key does.
+ *   v1.6.0 -- 2026-09-29 -- Both tools present values through the classification reader and the
+ *     credential mask (presentMemories, TARGET-082). read_public had shown a raw value.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -37,6 +39,8 @@ import { descriptionFor } from './catalog/shape.js';
 import { toolError } from './tool-error.js';
 import { isVersionKey, searchHitShape, matchesType } from '../services/memory-search-shape.js';
 import { ownDoorRefusal } from '../utils/own-door-keys.js';
+import { presentMemories, presentMemory } from '../services/classification/present-memory.js';
+import { readerForAgent } from '../services/classification/reader.js';
 
 export function registerMemoryExtendedTools(
     mcp: McpServer,
@@ -92,7 +96,10 @@ export function registerMemoryExtendedTools(
             // Pull a bounded candidate set from storage (safety net over a pathological store), then drop
             // version history in-tool and cap to `cap` non-version hits.
             const candidates = await storage.searchMemory(agentGaii, effectiveQuery, { visibility, limit: cap * 4 });
-            const typed = wantedTypes.length ? candidates.filter(r => matchesType(r.value, wantedTypes)) : candidates;
+            // Typed against the stored value, then presented: the classification reader plus the
+            // credential mask (TARGET-082). A hit this agent may not see is not in the answer.
+            const typed = await presentMemories(readerForAgent({ storage, config }, agentGaii),
+                wantedTypes.length ? candidates.filter(r => matchesType(r.value, wantedTypes)) : candidates);
             const hits = (include_versions ? typed : typed.filter(r => !isVersionKey(r.key))).slice(0, cap);
             const q = effectiveQuery;
             return {
@@ -131,7 +138,10 @@ export function registerMemoryExtendedTools(
             const ownDoor = ownDoorRefusal(gaii, key, config.nodeId);
             if (ownDoor) return toolError(ownDoor.code, ownDoor.message);
 
-            const record = await storage.getMemory(gaii, key);
+            // The one presentation of a memory value (classification reader + credential mask,
+            // TARGET-082). A record this agent may not see answers as an absent one.
+            const stored = await storage.getMemory(gaii, key);
+            const record = stored ? await presentMemory(readerForAgent({ storage, config }, agentGaii), stored) : null;
 
             if (!record) {
                 return {

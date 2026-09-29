@@ -6,6 +6,7 @@
  *   domain and the outbound door). Split from schema-tables-3.ts at the max-file-lines
  *   boundary; idempotent (IF NOT EXISTS), applied after part 3.
  * @version-history
+ *   v1.11.0 — 2026-09-29 — content_labels table: classification labels (TARGET-082). Mirrors Postgres 0090.
  *   v1.10.0 — 2026-09-25 — Three partial indexes over the app opens that still name an account, for
  *     the thirteen-month visit fold. Mirrors Postgres 0082.
  *   v1.9.0 — 2026-09-16 — secrets.hosts: the hosts a vault secret may be sent to. Mirrors Postgres 0078.
@@ -704,6 +705,28 @@ export function applySchemaTables4(db: Database.Database): void {
       ON mcp_servers(slug, ownership, COALESCE(ownerGhii, ''), COALESCE(organismId, ''));
     CREATE INDEX IF NOT EXISTS idx_mcp_servers_owner ON mcp_servers(ownerGhii, status);
     CREATE INDEX IF NOT EXISTS idx_mcp_servers_organism ON mcp_servers(organismId, ws);
+
+    -- ── Classification labels (TARGET-082) ──
+    -- One row per labelled thing, addressed by (kind, scope, key). ownerGaii names the person whose
+    -- content it is, for erasure; NULL on organism content. Mirrors Postgres 0090.
+    CREATE TABLE IF NOT EXISTS content_labels (
+      id            TEXT PRIMARY KEY,
+      kind          TEXT NOT NULL,
+      scope         TEXT NOT NULL,
+      key           TEXT NOT NULL,
+      ownerGaii     TEXT,
+      label         TEXT NOT NULL,
+      source        TEXT NOT NULL,
+      locked        INTEGER NOT NULL DEFAULT 0,
+      suggestion    TEXT,
+      justification TEXT,
+      humanSaid     TEXT,
+      history       TEXT NOT NULL DEFAULT '[]',
+      setBy         TEXT NOT NULL,
+      updatedAt     TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_content_labels_target ON content_labels(kind, scope, key);
+    CREATE INDEX IF NOT EXISTS idx_content_labels_owner ON content_labels(ownerGaii);
 
   `);
 }

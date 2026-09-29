@@ -15,6 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.18.0 — 2026-09-29 — dataAccessDefaults(): consent settings (a pure move) and classificationMode.
  *   v1.17.0 — 2026-09-29 — federationDefaults(): the four federation settings, config-federation.ts.
  *     The relay-claim default is `required` from 3.20.0; an explicit `optional` is still taken.
  *   v1.16.2 — 2026-09-28 — installSetPath and installSetSecretsPath from AIMEAT_INSTALL_SET and
@@ -73,6 +74,7 @@ import { securityDoorDefaults } from './config-security.js';
 import { aiJobDefaults } from './config-ai-jobs.js';
 import { aiModelDefaults } from './config-ai-models.js';
 import { decideDefaults } from './config-decide.js';
+import { dataAccessDefaults } from './config-data-access.js';
 import { themesDefaults } from './config-themes.js';
 import { federationDefaults } from './config-federation.js';
 import { accountSecurityDefaults } from './config-types-account-security.js';
@@ -395,11 +397,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     jsonBodyLimitMb: parseInt(process.env.AIMEAT_JSON_BODY_LIMIT_MB ?? '5', 10),
     jsonBodyLimitLargeMb: parseInt(process.env.AIMEAT_JSON_BODY_LIMIT_LARGE_MB ?? '15', 10),
     genesisUrl: process.env.AIMEAT_GENESIS_URL ?? null,
-    consentEnabled: process.env.AIMEAT_CONSENT_ENABLED !== 'false',
-    consentAuditRetentionDays: parseInt(process.env.AIMEAT_CONSENT_AUDIT_RETENTION_DAYS ?? '365', 10),
-    accountEventWindow: parseInt(process.env.AIMEAT_ACCOUNT_EVENT_WINDOW ?? '100', 10),
-    executionLogRetentionDays: parseInt(process.env.AIMEAT_EXECUTION_LOG_RETENTION_DAYS ?? '30', 10),
-    consentMaxPerUser: parseInt(process.env.AIMEAT_CONSENT_MAX_PER_USER ?? '100', 10),
+    ...dataAccessDefaults(),
     // Two-step sign-in, passkeys, and the key that encrypts what they store at rest. The relying
     // party id is derived from the address this node believes it has, which is why baseUrl goes in.
     ...accountSecurityDefaults(resolvedBaseUrl, (process.env.AIMEAT_SEO_SITE_NAME ?? 'AIMEAT').trim()),

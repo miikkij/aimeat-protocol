@@ -25,6 +25,7 @@
  * @structure registerPatchRoutes(router, ctx) -> PATCH /v1/memory/:key
  * @usage mounted from src/routes/memory.ts alongside registerCrudRoutes
  * @version-history
+ *   v1.4.0 — 2026-09-29 — The answer echoes the value through presentMemory (TARGET-082).
  *   v1.3.1 — 2026-09-26 — The provenance record a merge stamps is stored only once its swap lands
  *     (secaudit 2026-09, N2). It was stored on every attempt, so each attempt that lost the swap left
  *     a record about bytes that were never stored.
@@ -58,7 +59,9 @@ import { emitEcosystemMemoryWrite } from '../../services/ecosystem-events.js';
 import { runAutomationRecipesForWrite } from '../../services/ecosystem-automation.js';
 import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
-import { isSecretRecordKey, secretRecordWriteRefusal, shownMemoryValue } from '../../services/secret-records.js';
+import { isSecretRecordKey, secretRecordWriteRefusal } from '../../services/secret-records.js';
+import { presentMemory } from '../../services/classification/present-memory.js';
+import { readerFor } from '../../services/classification/reader.js';
 import { resolveWriteTarget } from './owner-target.js';
 import { isKeyArchived } from '../../services/archive.js';
 import { undeclaredSpaceForKey } from '../../services/workspace-write-items.js';
@@ -324,7 +327,8 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
     res.status(created ? 201 : 200).json(success(config.nodeId, {
       key: record.key,
       owner_gaii: record.ownerGaii,
-      value: shownMemoryValue(record.key, record.value),
+      // Echoed through the one presentation of a memory value; null when this caller may not see it.
+      value: (await presentMemory(readerFor({ storage, config }, req.auth), record))?.value ?? null,
       visibility: record.visibility,
       zone: visibilityToZone(record.visibility),
       tags: record.tags,

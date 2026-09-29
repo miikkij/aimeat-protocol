@@ -15,6 +15,7 @@
  *   - scanOwnerDue(storage, config, ownerGaii) — pulse the owner's own due instances (manual trigger)
  *   - pulseInstanceServer(storage, config, ownerGaii, loc, cfg) — one instance, self-fulfilled
  * @version-history
+ *   v1.4.0 — 2026-09-29 — The gather step searches with a system classification reader (TARGET-082).
  *   v1.3.1 — 2026-09-26 — The owner's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.3.0 — 2026-09-08 — A section's dispatched task emits task_assigned. "The running crew picks
  *     it up" was the assumption, and being picked up without polling is what a wake is for.
@@ -34,6 +35,7 @@ import { logger } from '../utils/logger.js';
 import { localAccountName } from '../utils/gaii.js';
 import { completeForOwner, AiCompletionError } from './ai-completion.js';
 import { librarianSearch } from './librarian.js';
+import { systemReader } from './classification/reader.js';
 import type { PushService } from './push.js';
 import type { EmailService } from './email.js';
 import { emitDelivery } from './event-bus.js';
@@ -261,6 +263,8 @@ export async function pulseInstanceServer(
         const { hits } = await librarianSearch(storage, config, {
           ownerName, fanOutOwner: true, viewerGaii: ownerGaii,
           query: `${sec.section} ${charter.scope || ''}`.trim(), limit: 5, scope: 'own',
+          // The pulse runs with no caller; what it hands the model passes useForAi at the model.
+          reader: systemReader({ storage, config }, ownerGaii),
         });
         const { items } = await storage.listAllMemory({ prefix: `${wsRoot(loc)}.living-src.${loc.docId}__`, limit: 500 });
         const seen = new Set(items.map(i => (i.value as { origin?: string })?.origin).filter(Boolean));

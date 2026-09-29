@@ -40,6 +40,7 @@
  * @usage
  *   'aimeat/no-storage-in-mcp': 'error'
  * @version-history
+ *   v1.0.1 — 2026-09-29 — core-resources.ts inherits core.ts's line: the resource templates moved out.
  *   v1.0.0 — 2026-08-11 — Initial (August 2026 audit: enforcing the architecture the drift ignored).
  */
 
@@ -75,6 +76,7 @@ const EXEMPT = new Set([
   'src/mcp/consent.ts',
   'src/mcp/core-boards.ts',            // pure extraction out of core.ts (max-file-lines), same backlog
   'src/mcp/core-admin.ts',
+  'src/mcp/core-resources.ts',         // extraction out of core.ts (max-file-lines): the same four storage reads
   'src/mcp/core.ts',
   'src/mcp/cortex.ts',
   'src/mcp/exchange-run.ts',

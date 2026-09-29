@@ -19,6 +19,7 @@
  *   serverWrittenKeyRefusal(key) · appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   v1.18.0 — 2026-09-29 — `classification.policy.` joins the list: the owner's classification policy.
  *   v1.17.0 — 2026-09-28 — `ai.roles.` joins the list: the owner's AI roles and app role bindings.
  *   v1.16.0 — 2026-09-28 — `ai.providers.`, `ai.apikey.` and `ai.routing.` join the list: the owner's
  *     AI providers, their keys and the routing (System 2 plan, V3).
@@ -205,6 +206,13 @@ export const RESERVED_OWNER_KEY_PREFIXES = [
   // approval the owner gives. `ai.roles.used` and `ai.roles.requests` are the node's notes. The route
   // (/v1/ai/roles) and the propose-and-confirm tool are the writers. Searched 2026-09-28: new.
   'ai.roles.',
+  // 2026-09-29: the owner's classification policy (TARGET-082, services/classification/).
+  // `classification.policy.owner` says whether classification is on for this owner's content, and
+  // (from V2) which labels and rules the owner adds. An app or agent that could write it could switch
+  // the owner's classification off or loosen it, which only the owner in person may do. The
+  // classification service is the writer. By this narrow prefix rather than `classification.` as a
+  // whole, so an app's own `classification.*` data stays user data. Searched 2026-09-29: new.
+  'classification.policy.',
 ] as const;
 
 /**

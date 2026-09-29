@@ -12,6 +12,7 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   v1.17.0 — 2026-09-29 — classification.mode (AIMEAT_CLASSIFICATION): off, owner or all (TARGET-082).
  *   v1.16.1 — 2026-09-29 — federation.relay_claim: the description says the default is 'required'
  *     from 3.20.0 and that 'optional' is still taken when set, until 4.0.0.
  *   v1.15.3 — 2026-09-28 — The search-engine presence rows moved to config-schema-seo.ts unchanged
@@ -259,6 +260,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'consentEnabled', dotPath: 'consent.enabled', envVar: 'AIMEAT_CONSENT_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Consent layer enabled' },
   { key: 'accountEventWindow', dotPath: 'account_events.window', envVar: 'AIMEAT_ACCOUNT_EVENT_WINDOW', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 10 && (v as number) <= 10000, immutable: false, description: 'Events kept in an account live "what has happened" window before the oldest are archived', range: '10-10000' },
   { key: 'consentAuditRetentionDays', dotPath: 'consent.audit_retention_days', envVar: 'AIMEAT_CONSENT_AUDIT_RETENTION_DAYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 3650, immutable: false, description: 'Consent audit log retention in days', range: '1-3650' },
+  { key: 'classificationMode', dotPath: 'classification.mode', envVar: 'AIMEAT_CLASSIFICATION', type: 'string', validate: v => ['off', 'owner', 'all'].includes(v as string), immutable: false, description: 'Classification: off (nothing changes), owner (each owner decides for their own content) or all (on for every owner)' },
   { key: 'consentMaxPerUser', dotPath: 'consent.max_per_user', envVar: 'AIMEAT_CONSENT_MAX_PER_USER', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 10000, immutable: false, description: 'Max consent records per user', range: '1-10000' },
 
   // ── TOTP (Phase 0.5, mutable) ──

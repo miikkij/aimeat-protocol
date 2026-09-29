@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key, CORS management, and the public GET /v1/memory/:gaii/:key read. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.8.0 — 2026-09-29 — Both reads show a value through presentMemory (the classification reader
+ *     plus the credential mask, TARGET-082); a record the reader may not see answers as absent.
  *   v1.7.0 — 2026-09-26 — GET /v1/memory/:gaii/:key answers a Design Book part with 403
  *     DESIGN_BOOK_PART, naming GET /v1/designbook/:id, the one door that reads a part
  *     (utils/own-door-keys.ts). Soft or not, signed in or not.
@@ -52,7 +54,9 @@ import { emitChange } from '../../services/event-bus.js';
 import { recordMemoryTouch } from '../../services/data-map/write-tally-buffer.js';
 import { ecoMayReadKey, ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
-import { isSecretRecordKey, secretRecordWriteRefusal, shownMemoryValue } from '../../services/secret-records.js';
+import { isSecretRecordKey, secretRecordWriteRefusal } from '../../services/secret-records.js';
+import { presentMemory } from '../../services/classification/present-memory.js';
+import { readerFor } from '../../services/classification/reader.js';
 import { ownDoorRefusal } from '../../utils/own-door-keys.js';
 import { stampAgentWrite, resolveAttachableProvenanceId, storeHeldProvenance } from '../../services/ai-provenance.js';
 import { ownerGhiiOf, isForeignPrincipal } from '../../utils/gaii.js';
@@ -149,7 +153,10 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
         record = null;
       }
     }
-    if (!record) {
+    // The one presentation of a memory value (classification + credential mask). A record this
+    // reader may not see answers exactly as an absent one.
+    const shown = record ? await presentMemory(readerFor({ storage, config }, req.auth), record) : null;
+    if (!shown) {
       // Soft read: callers that treat absence as a normal empty state (UI preference
       // keys, optional config) pass ?soft=1 to get a 200 with a null value instead of a
       // 404. Avoids browser-console 404 noise for keys that legitimately may not exist yet.
@@ -160,6 +167,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Memory key not found: ${key}`));
       return;
     }
+    record = shown;
 
     stats?.increment('memory_reads');
 
@@ -175,7 +183,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
       // to return no `exists` field at all — so a caller written as `if (!data.exists)` read every
       // successful read as a miss, silently, and only on the path where the data WAS there.
       exists: true,
-      value: shownMemoryValue(record.key, record.value),
+      value: record.value,
       visibility: record.visibility,
       zone: visibilityToZone(record.visibility),
       tags: record.tags,
@@ -629,7 +637,10 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
       return;
     }
 
-    const record = await storage.getMemory(gaii, key);
+    // The one presentation of a memory value (classification + credential mask). A record this
+    // reader may not see answers exactly as an absent one.
+    const stored = await storage.getMemory(gaii, key);
+    const record = stored ? await presentMemory(readerFor({ storage, config }, req.auth), stored) : null;
     if (!record) {
       if (soft) { softMiss(); return; }
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Public memory not found: ${key}`));
@@ -657,7 +668,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
       res.json(success(config.nodeId, {
         key: record.key,
-        value: shownMemoryValue(record.key, record.value),
+        value: record.value,
         visibility: record.visibility,
         zone: visibilityToZone(record.visibility),
         tags: record.tags,
@@ -696,7 +707,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
         res.json(success(config.nodeId, {
           key: record.key,
-          value: shownMemoryValue(record.key, record.value),
+          value: record.value,
           visibility: record.visibility,
           zone: visibilityToZone(record.visibility),
           tags: record.tags,
@@ -758,7 +769,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     res.json(success(config.nodeId, {
       key: record.key,
-      value: shownMemoryValue(record.key, record.value),
+      value: record.value,
       visibility: record.visibility,
       zone: visibilityToZone(record.visibility),
       tags: record.tags,

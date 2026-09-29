@@ -13,6 +13,8 @@
  *   - Storage interface: the full CRUD surface aggregated from the per-domain repositories
  *
  * @version-history
+ *   v1.8.0 — 2026-09-29 — ContentLabelRepository joins the Storage composite: classification labels
+ *     (TARGET-082).
  *   v1.7.1 — 2026-09-28 — Re-exports types/packages.ts, moved out of types/apps.ts (max-file-lines).
  *   v1.7.0 — 2026-09-26 — HeldAccountNameRepository joins the Storage composite: the record of what
  *     the move to the full identity left for the operator, and the operator's decision on one name.
@@ -51,6 +53,7 @@ export * from './types/agent-v2-messaging.js';
 export * from './types/agent-v2-tasks.js';
 export * from './types/ai-provenance.js';
 export * from './types/ai-decisions.js';
+export * from './types/content-labels.js';
 export * from './types/usage.js';
 export * from './types/account-events.js';
 export * from './types/workspace-rows.js';
@@ -124,6 +127,7 @@ import type { AgentOnboardingRepository } from './repositories/agent-onboarding.
 import type { InvitationRepository } from './repositories/invitation.repository.js';
 import type { AiProvenanceRepository } from './repositories/ai-provenance.repository.js';
 import type { AiDecisionRepository } from './repositories/ai-decisions.repository.js';
+import type { ContentLabelRepository } from './repositories/content-labels.repository.js';
 import type { ConnectionRepository } from './repositories/connection.repository.js';
 import type { FinanceRepository } from './repositories/finance.repository.js';
 import type { OutboundRepository } from './repositories/outbound.repository.js';
@@ -167,6 +171,7 @@ export interface Storage extends
   InvitationRepository,
   AiProvenanceRepository,
   AiDecisionRepository,
+  ContentLabelRepository,
   ConnectionRepository,
   FinanceRepository,
   OutboundRepository,
