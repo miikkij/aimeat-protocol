@@ -382,6 +382,11 @@ await test('ann, whose account the apply created, is mailed a sign-in link that 
     assert(again.status === 302 && again.location === `${C.baseUrl}/?auth_error=INVALID_TOKEN` && !again.rt, `a used link opens nothing: ${JSON.stringify(again)}`);
 });
 
+await test('On a node that sends no mail, the sign-in dialog is told so and offers no emailed link', async () => {
+    const lib = await fetch(`${C.baseUrl}/v1/libs/aimeat-auth.js`).then(r => r.text());
+    assert(lib.includes('"emailLogin":false'), `the auth prelude must say emailLogin false: ${lib.slice(0, 400)}`);
+});
+
 await test('A made-up sign-in link opens nothing', async () => {
     const r = await openInBrowser(`${C.baseUrl}/v1/ghii/magic-link/open?token=${'0'.repeat(64)}`);
     assert(r.status === 302 && r.location.endsWith('?auth_error=INVALID_TOKEN') && !r.rt, `refused: ${JSON.stringify(r)}`);

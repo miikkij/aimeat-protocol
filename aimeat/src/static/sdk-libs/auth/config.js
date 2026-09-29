@@ -10,6 +10,7 @@
  *   AUTH_PROVIDERS · PROVIDER_ICONS.
  * @usage import { NODE_URL, APEX_URL, AUTH_PROVIDERS, appDeclaredScopes } from './config.js';
  * @version-history
+ *   v1.1.0 — 2026-09-29 — EMAIL_LOGIN: whether the node sends mail, read from the auth prelude.
  *   v1.0.1 — 2026-09-13 — The appDeclaredScopes comment says what the node does with an unknown
  *     scope word (refuses the whole sign-in) instead of the opposite.
  *   v1.0.0 — 2026-07-19 — Extracted from src/routes/libs/auth-lib-part1.ts (SDK-libs migration Phase 3).
@@ -47,6 +48,10 @@ export const AUTH_PROVIDERS = (window.__AIMEAT_AUTH_CFG__ && window.__AIMEAT_AUT
 // prelude, same injection point as the provider list. The Register tab asks for the email up front
 // when this is true, so the person types it once instead of meeting the demand after a failed create.
 export const EMAIL_REQUIRED = !!(window.__AIMEAT_AUTH_CFG__ && window.__AIMEAT_AUTH_CFG__.emailRequired);
+
+// Does this node send mail? The sign-in modal offers "Email me a sign-in link" only then, because on
+// a node without SMTP the request answers 200 and nothing arrives.
+export const EMAIL_LOGIN = !!(window.__AIMEAT_AUTH_CFG__ && window.__AIMEAT_AUTH_CFG__.emailLogin);
 
 // Per-provider button glyphs (inline SVG — no external fetch).
 export const PROVIDER_ICONS = {

@@ -221,6 +221,11 @@ async function run(): Promise<void> {
         assert(status.body.data.smtp_user_configured === true, 'the transport must be configured with credentials');
     });
 
+    await test('the sign-in dialog is told this node sends mail, so it offers the emailed sign-in link', async () => {
+        const lib = await fetch(`${BASE}/v1/libs/aimeat-auth.js`).then(r => r.text());
+        assert(lib.includes('"emailLogin":true'), `the auth prelude must say emailLogin true: ${lib.slice(0, 400)}`);
+    });
+
     await test('the node authenticated to the SMTP server, so the transport built its auth branch', async () => {
         // Registration above already sent one message, so at least one session has completed.
         assert(smtp!.authAttempts > 0, `expected an AUTH command, got ${smtp!.authAttempts}`);

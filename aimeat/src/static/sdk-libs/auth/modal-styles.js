@@ -10,6 +10,8 @@
  * @structure MODAL_CSS (one string, injected by modal.js into its own <style>).
  * @usage import { MODAL_CSS } from './modal-styles.js';
  * @version-history
+ *   v1.3.0 — 2026-09-29 — The link row under the sign-in form wraps: with the third link (the emailed
+ *     sign-in link) the Finnish row ran past the dialog's right edge.
  *   v1.2.0 — 2026-08-29 — The wordmark reads --font-wordmark (Archivo Black) rather than the headline
  *     face, and the headline reads the poster tracking and leading tokens, so Fjalla One is set with
  *     the room it needs.
@@ -112,7 +114,7 @@ export var MODAL_CSS = [
   '.aimeat-cancel{appearance:none;background:none;border:0;border-bottom:2px solid ' + ink + ';border-radius:0;padding:0 0 1px;',
     'cursor:pointer;font:600 12.5px/1.5 ' + font + ';text-transform:uppercase;letter-spacing:.04em;color:' + ink + '}',
   '.aimeat-cancel:hover{color:' + accent + ';border-bottom-color:' + accent + '}',
-  '.aimeat-links{display:flex;align-items:center;gap:18px;margin-top:16px}',
+  '.aimeat-links{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;margin-top:16px}',
   '.aimeat-link{font:600 11.5px/1.5 ' + font + ';text-transform:uppercase;letter-spacing:.04em;color:' + dim + ';',
     'text-decoration:none;border-bottom:2px solid ' + dim + ';padding-bottom:1px;cursor:pointer}',
   '.aimeat-link:hover{color:' + accent + ';border-bottom-color:' + accent + '}',
