@@ -32,6 +32,8 @@
  * @usage
  *   const out = await applyInstallSet({ storage, config, peers }, { installSet, secrets, dryRun: true });
  * @version-history
+ *   v1.4.0 — 2026-09-29 — The owner's welcome no longer depends on nobody having signed in: the
+ *     shop's crew image signs in as the owner at boot (ownerToWelcome()).
  *   v1.3.0 — 2026-09-29 — An owner account the shop created before the set is welcomed too, while
  *     nobody has signed in to it and its verified address is the set's (ownerToWelcome()).
  *   v1.2.0 — 2026-09-29 — The record keeps the accounts the set created (`accounts_created`) and the
@@ -322,7 +324,7 @@ export async function applyInstallSet(deps: ApplyDeps, input: ApplyInput): Promi
         Object.entries(comps).flatMap(([c, fields]) => Object.keys(fields).map(f => `${g}/${c}/${f}`)))])];
     const created = new Set(record.accounts_created ?? []);
     if (owner.created) created.add(set.owner.email.toLowerCase());
-    // An owner the shop created before the set is welcomed as well, while nobody has signed in to it.
+    // An owner the shop created before the set is welcomed as well, once, at its verified address.
     const ownerWelcome = !owner.created && await ownerToWelcome(storage, config, set.owner);
 
     // A step that fails part-way stops the apply, and what was made before it is still recorded, so
