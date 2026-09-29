@@ -7,6 +7,8 @@
  *   the gate counts and what it ignores, a new, grown and stale read each refused, and the three
  *   operations passing everything through without reading storage.
  * @version-history
+ *   v1.1.0 — 2026-09-29 — V4: "reads nothing" holds with the switch off; the decisions are tested in
+ *     classification-reader.test.ts.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V1. Initial.
  */
 import { describe, it, expect, vi } from 'vitest';
@@ -50,15 +52,18 @@ describe('check:classification-reach', () => {
   });
 });
 
-describe('the check component in V1', () => {
+describe('the check component with the switch off', () => {
   const items = [{ ownerGaii: 'alice@n', key: 'a' }, { ownerGaii: 'alice@n', key: 'b' }];
   const target = (r: { ownerGaii: string; key: string }) => memoryTarget(r.ownerGaii, r.key);
 
-  for (const mode of ['off', 'owner', 'all'] as const) {
+  // V1 held this for every switch position, because nothing was decided yet. From V4 the check reads
+  // labels where the switch is on (classification-reader.test.ts); off still reads nothing at all.
+  for (const mode of ['off'] as const) {
     it(`passes everything through and reads nothing, switch ${mode}`, async () => {
       const storage = new SqliteStorage(':memory:');
       const spies = [
         vi.spyOn(storage, 'getMemory'), vi.spyOn(storage, 'getContentLabels'), vi.spyOn(storage, 'getContentLabel'),
+        vi.spyOn(storage, 'getMembership'),
       ];
       const deps = { storage, config: { classificationMode: mode, nodeId: 'n' } };
       for (const reader of [

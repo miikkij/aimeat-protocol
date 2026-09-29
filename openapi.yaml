@@ -14670,6 +14670,27 @@ paths:
         '403': { description: PERSON_REQUIRED, or not allowed to change this level. }
         '404': { description: NO_PROPOSAL, or no such organism. }
 
+  /v1/classification/audit:
+    get:
+      summary: The classification audit log of one level
+      description: |
+        Which classified items were shown to or used by an AI, which were refused and which
+        classifications changed. One row per reader, item and action per minute, with a count;
+        newest first. Level owner is the caller's own content, organism needs its creator or an
+        admin, node needs an operator.
+      tags: [Memory]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: level, in: query, schema: { type: string, enum: [node, owner, organism], default: owner } }
+        - { name: organism_id, in: query, schema: { type: string } }
+        - { name: since, in: query, schema: { type: string, format: date-time } }
+        - { name: action, in: query, schema: { type: string, enum: [shown, used, refused, changed] } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 1000, default: 200 } }
+      responses:
+        '200': { description: The rows. }
+        '403': { description: Not an operator (node level). }
+        '404': { description: No such organism, or not its creator or an admin. }
+
   /v1/classification/label:
     get:
       summary: The classification of one piece of content

@@ -11,6 +11,8 @@
  *   import { memoryEntryOutput } from '../catalog/output-schemas.js';
  *   mcp.registerTool('aimeat_memory_read', { description, inputSchema, outputSchema: memoryEntryOutput, annotations }, handler)
  * @version-history
+ *   v1.2.0 -- 2026-09-29 -- memoryEntryOutput declares classification_warning (TARGET-082 V4), or the
+ *     schema would strip it.
  *   v1.1.0 -- 2026-08-01 -- TARGET-058 Phase 4: aiProvenanceOutput, declared here because an
  *     outputSchema STRIPS what it does not name — a read tool attaching provenance without declaring
  *     it would drop it silently, which is the exact loss this phase exists to prevent.
@@ -52,6 +54,8 @@ export const memoryEntryOutput = {
     version: z.number().optional(),
     updated_at: z.string().optional(),
     ai_provenance: aiProvenanceOutput,
+    /** TARGET-082: the content is classified with a warning label: use it only for the task. */
+    classification_warning: z.object({ label: z.string(), name: z.string(), says: z.string() }).optional(),
 };
 
 /** aimeat_memory_list — { items, count } plus the Phase 2 truncation markers and the

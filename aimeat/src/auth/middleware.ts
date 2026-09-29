@@ -16,6 +16,8 @@
  *   - the refusal path itself (deny401/deny403 and the audit context) lives in ./deny.ts
  *
  * @version-history
+ *   2026-09-29 — resolvePatToken marks the identity `via: 'pat'`, so classification reads it as an AI
+ *     (TARGET-082 V4). What the token may do is unchanged.
  *   2026-09-26 — Every read of the storage and the config, and the anonymous fallback, is for the node
  *     the code runs as (./node-auth.ts): initSessionAuth files them under the node id, and a process
  *     that serves more than one node checks each node's credentials against that node's storage.
@@ -185,6 +187,9 @@ async function resolvePatToken(token: string): Promise<VerifiedToken | null> {
     roles: r.roles,
     scopes: r.scopes,
     exp: r.expiresAt ? Math.floor(Date.parse(r.expiresAt) / 1000) : Math.floor(Date.now() / 1000) + 3600,
+    // Classification reads a PAT as an AI (services/classification/reader-kind.ts). Set here, where
+    // the token is resolved, so every PAT carries it without being issued again. Grants nothing.
+    via: 'pat',
   };
 }
 

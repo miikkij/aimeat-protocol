@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The process-level accumulators and listeners a node arms before it mounts a single
- *   route: the webhook dispatcher, the stats collector, the refusal log, the four write buffers and
+ *   route: the webhook dispatcher, the stats collector, the refusal log, the five write buffers and
  *   the cache-invalidation listener.
  *
  *   NONE OF IT MOUNTS A ROUTE, which is why it is not in routes-loader.ts. Pure extraction from
@@ -24,6 +24,7 @@
  *   v1.0.2 — 2026-09-26 — The cache-invalidation listener runs as this node (runAsNode), so the owner
  *     tag is cut for this node when another node in the same process emits. One node per process in
  *     production, so nothing there changes.
+ *   v1.1.0 — 2026-09-29 — The classification audit buffer is armed with the others (TARGET-082 V4).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -37,6 +38,7 @@ import { initTelemetryBuffer } from '../services/telemetry-buffer.js';
 import { initUsageBuffer } from '../services/usage/usage-buffer.js';
 import { initWriteTallyBuffer } from '../services/data-map/write-tally-buffer.js';
 import { initConsentAuditBuffer } from '../services/consent-audit-buffer.js';
+import { initClassificationAudit } from '../services/classification/audit.js';
 
 export interface ProcessBuffers {
   webhookDispatcher: ReturnType<typeof createWebhookDispatcher>;
@@ -67,6 +69,9 @@ export async function initProcessBuffers(config: AimeatConfig, storage: Storage)
 
   // Off-request-path buffer for consent-audit writes (denials + grant/revoke mutations).
   initConsentAuditBuffer(storage);
+  // Off-request-path buffer for the classification audit log (TARGET-082 V4): shown, used, refused
+  // and changed, merged per reader, item, action and minute.
+  initClassificationAudit(storage);
 
   // Generic read-cache invalidation: translate every mutation (`emitChange(domain, ownerGaii?)`)
   // into cache tag drops. The broad `domain:<d>` tag is the safety net for write paths that don't

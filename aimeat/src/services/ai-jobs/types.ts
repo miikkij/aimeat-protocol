@@ -10,9 +10,11 @@
  *   `completeForOwner` already picks the key, enforces the daily budget and the per-app quota,
  *   records per-app usage and stamps provenance. What is new is the queue, the handle and the
  *   callback.
- * @structure AiJobState · AiJobRecord · AiJobLogEntry · StartAiJobInput · AiJobError
+ * @structure AiJobState · AiJobRecord · AiJobStartedBy · AiJobLogEntry · StartAiJobInput · AiJobError
  * @usage import type { AiJobRecord } from './types.js';
  * @version-history
+ *   v1.3.0 — 2026-09-29 — `started_by` on the record and `startedBy` on the start context: the
+ *     starter's credential facts, so the job reads its inputs as that caller (TARGET-082 V4).
  *   v1.2.0 — 2026-09-28 — `role`, the AI role the job's call runs as, on the record and on the start input.
  *   v1.1.0 — 2026-09-28 — System 2 plan, V5: `op` (text, image, transcribe), `audio_key` and
  *     `language` for a transcription, `size` for an image, and `provider` for every operation, on the
@@ -87,6 +89,26 @@ export interface AiJobRecord {
     /** The principal that asked for it. Audit, not authority — what a job may do is decided by
      *  `owner`, which is resolved server-side. */
     created_by: string;
+    /** Who started it, as classification needs it to read the job's inputs as that caller
+     *  (starter.ts jobReader). Absent on a job started before 2026-09-29, by an extension, or by a
+     *  chain: such a job reads as an unattended AI run, the strictest reader. */
+    started_by?: AiJobStartedBy;
+}
+
+/**
+ * The starter's credential facts, taken from the verified credential when the job is created, never
+ * from the request body. Only what a reader is rebuilt from: never a token, and nothing here grants
+ * the job anything (what it may do is still decided by `owner`).
+ */
+export interface AiJobStartedBy {
+    /** The resolved identity (resolveIdentity): an owner's GHII, an agent's GAII. */
+    principal: string;
+    /** The bare account name the credential acts for (`req.auth.owner`). */
+    owner: string;
+    roles: string[];
+    scopes: string[];
+    /** 'pat' when the credential was made from a personal access token (auth/jwt.ts). */
+    via?: string;
 }
 
 /**
@@ -165,6 +187,8 @@ export interface StartAiJobResult {
 export interface StartAiJobContext {
     ownerGhii: string;
     createdBy: string;
+    /** The starter's credential facts (REST and MCP starts). Omitted: the job reads as an AI. */
+    startedBy?: AiJobStartedBy;
     /** Set when ctx.ai.start() created it. */
     extension?: string;
     parentJob?: string;

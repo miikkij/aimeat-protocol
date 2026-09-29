@@ -15,6 +15,7 @@
  * @structure registerClassificationTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage registerClassificationTools(mcp, storage, config, agentGaii, scopes);
  * @version-history
+ *   v1.1.0 — 2026-09-29 — V4: the audit action reads the audit log of a level.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V2. Initial.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -29,7 +30,7 @@ import { toolError } from './tool-error.js';
 import {
   ClassificationError, labelActorOf, readContentLabel, reviewLabel, setLabel, targetOf,
 } from '../services/classification/labels.js';
-import { readPolicy, writePolicy } from '../services/classification/policy-admin.js';
+import { readAuditLog, readPolicy, writePolicy } from '../services/classification/policy-admin.js';
 
 const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v, null, 2) }] });
 
@@ -48,7 +49,10 @@ export function registerClassificationTools(
     'aimeat_classification',
     descriptionFor('aimeat_classification'),
     {
-      action: z.enum(['get', 'set', 'review', 'policy_get', 'policy_set']).describe('What to do.'),
+      action: z.enum(['get', 'set', 'review', 'policy_get', 'policy_set', 'audit']).describe('What to do.'),
+      since: z.string().optional().describe('audit: only rows from this ISO time on.'),
+      audit_action: z.enum(['shown', 'used', 'refused', 'changed']).optional().describe('audit: only this kind of row.'),
+      limit: z.number().int().min(1).max(1000).optional().describe('audit: at most this many rows, default 200.'),
       kind: z.enum(['memory', 'file', 'row']).optional().describe('get, set, review: what the content is. Default memory.'),
       key: z.string().optional().describe('get, set, review: the memory key (an organism workspace key included) or the stored file key.'),
       organism_id: z.string().optional().describe('A row: its organism. policy_get, policy_set at level organism: the organism.'),
@@ -90,6 +94,9 @@ export function registerClassificationTools(
           }
           case 'policy_get':
             return text(await readPolicy(deps, actor, args.level ?? 'owner', args.organism_id));
+          case 'audit':
+            return text(await readAuditLog(deps, actor, args.level ?? 'owner', args.organism_id,
+              { since: args.since, action: args.audit_action, limit: args.limit }));
           case 'policy_set': {
             if (!args.policy) return toolError('INVALID_INPUT', 'policy is the whole level: read it with policy_get and send `stored` back changed.');
             const out = await writePolicy(deps, actor, args.level ?? 'owner', args.organism_id, args.policy, { humanSaid: args.human_said });

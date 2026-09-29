@@ -6,6 +6,9 @@
  *   email invitations, provisioned-code ("key") invitations, and the PUBLIC invitation token flow.
  *   Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.12.0 — 2026-09-29 — The workspace list's lastEvent passes the caller's classification reader
+ *     (show) after its per-record read check, as GET /workspace/activity does since V1: an event
+ *     about an item the caller may not see is not the list's last event (TARGET-082 V4).
  *   v1.11.1 — 2026-09-26 — The grantee's account in the grant and revoke doors comes from
  *     localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never
  *     names the local namesake (secaudit 2026-09, F-1).
@@ -68,6 +71,8 @@ import { getActiveEmailService } from '../../services/email.js';
 import { countWorkspaceInstances, latestWorkspaceEvent, aggregateParticipants } from '../../services/workspace-enrichment.js';
 import { isOrgManager } from '../../services/workspace-access.js';
 import { workspaceMetaReader } from '../../services/workspace-meta.js';
+import { readerFor } from '../../services/classification/reader.js';
+import { memoryTarget } from '../../services/classification/labels.js';
 import { decideAccessRequest, requestStatus } from '../../services/workspace-access-decision.js';
 import { createEmailInvitation, cancelEmailInvitation, invitePublic, hashInviteToken, inviteEmailHash, normalizeOrgRole, normalizeWorkspaceGrants, applyInvitationWorkspaceGrants, InvitationError, INVITE_CODE_QUOTA_PER_MEMBER, INVITE_DEFAULT_EXPIRY_DAYS, INVITE_MAX_EXPIRY_DAYS } from '../../services/invitations.js';
 import type { InvitationRecord, InvitationWorkspaceGrant } from '../../storage/repositories/invitation.repository.js';
@@ -177,6 +182,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
       }
       const enriched: Array<Record<string, unknown>> = [];
       const metaReader = workspaceMetaReader(storage, id, config.nodeId);
+      const reader = readerFor({ storage, config }, req.auth);
       for (const w of seen.values()) {
         if (w.access === 'none') { enriched.push({ ...w }); continue; }
         const root = `organism.${id}.w.${w.id}`;
@@ -196,13 +202,16 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
           }
           readable.push(r);
         }
+        // The classification reader (TARGET-082), as in GET /workspace/activity: the last event names
+        // an item (its space and id), so it comes only from items this caller may see.
+        const shown = await reader.show(readable, r => memoryTarget(r.ownerGaii, r.key));
         const { recs, docs } = countWorkspaceInstances(bucket, manifest, root);
         enriched.push({
           ...w,
           enrichment: {
             hasManifest: !!manifestRec,
             recs, docs,
-            lastEvent: latestWorkspaceEvent(readable, manifest, root),
+            lastEvent: latestWorkspaceEvent(shown, manifest, root),
             participants: aggregateParticipants(bucket, { root, members: organism.members ?? [], creator: w.created_by, viewerOwner: ownerName, nodeId: config.nodeId }),
             pendingReviews: reviewByWs[w.id] ?? 0,
             apps: ((appsRec?.value as { apps?: unknown[] } | undefined)?.apps) ?? [],

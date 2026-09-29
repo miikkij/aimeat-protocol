@@ -12,6 +12,7 @@
  * @structure cascadeMethods.cascadeDeleteAgentData(gaii) — every owner-scoped table for one identity
  * @usage Object.assign(SqliteStorage.prototype, cascadeMethods) in providers/sqlite/index.ts
  * @version-history
+ *   v1.6.0 — 2026-09-29 — classification_audit joins the cascade (TARGET-082 V4).
  *   v1.5.0 — 2026-09-29 — content_labels joins the cascade (TARGET-082).
  *   v1.4.0 — 2026-09-26 — Work leaves the per-identity cascade: deleteOwner and deleteAgent settle it
  *     first by one rule (repos/work-erasure.ts), and the rows that rule keeps belong to the other side.
@@ -122,6 +123,9 @@ export const cascadeMethods = {
     // The classification labels on this person's own content (TARGET-082). Labels on organism
     // content carry no ownerGaii and go with the organism.
     this.db.prepare('DELETE FROM content_labels WHERE ownerGaii = ?').run(gaii);
+    // The classification audit log of this person's own content (TARGET-082 V4). Rows in which they
+    // were only the reader of someone else's content are that person's record and stay.
+    this.db.prepare('DELETE FROM classification_audit WHERE ownerGaii = ?').run(gaii);
 
     // Sharing groups, and the key-space shares inside them. The shares go first and by two keys: by
     // ownerGaii for this person's own shares, then by the id of each group being removed, because a

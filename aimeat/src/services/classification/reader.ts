@@ -14,21 +14,37 @@
  *     useForAi(targets)      content going to a model: refuses what a model may not read;
  *     leave(items, where)    an export, a share link or federation: what may leave the organism.
  *
- *   V1 (this version): the switch is read and the operations pass everything through. With the
- *   switch off they pass without reading anything, which is what "off changes nothing" means in cost
- *   as well as in behaviour. V4 applies the decisions inside these three functions and nowhere else.
- * @structure ReaderAuth · EgressDestination · ContentReader · readerFor() · readerForCaller() ·
- *   systemReader()
+ *   THE DECISIONS (V4, decided 2026-09-29). With the switch off, or off for the content's owner or
+ *   organism, every operation passes and reads nothing. Where it is on:
+ *   - show: a reader outside a label's audience does not see the item, person or AI. An AI does not
+ *     see an item whose label hides it from AI; an item with a warning label is shown with
+ *     `classificationWarning` on it and in `warnings`. The node's own work (system) sees everything.
+ *   - useForAi: refuses the whole call (CLASSIFIED, naming the labels and the first keys) when any
+ *     item is hidden from AI or outside its audience, whoever asked, because what reaches a model
+ *     is decided by the content's label.
+ *   - leave: an organism's item whose label may not leave the organism stays behind, and every copy
+ *     that goes to another node obeys the same field; a person's export of their own content is
+ *     theirs. What stayed behind is returned with the reason.
+ *   A refusal is always written to the audit log, and showing or using an item whose label keeps an
+ *   audit trail is written too (audit.ts buffers it off the request path).
+ * @structure ReaderAuth · EgressDestination · ContentReader · decideAll() · readerFor() ·
+ *   readerForCaller() · readerForAgent() · systemReader() · CLASSIFIED_WARNING
  * @usage
  *   const reader = readerFor({ storage, config }, req.auth);
  *   const shown = await reader.show(records, r => memoryTarget(r.ownerGaii, r.key));
  * @version-history
+ *   v2.0.0 — 2026-09-29 — TARGET-082 V4: the decisions, the audience, the warnings and the audit.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V1. Initial: the component and its pass-through.
  */
 import type { Storage, ContentLabelTarget } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
-import { resolveIdentity, callerPrincipal, localAccountName } from '../../utils/gaii.js';
+import { resolveIdentity, callerPrincipal, localAccountName, localAccountOf, isForeignPrincipal } from '../../utils/gaii.js';
 import { readerKindOf, type ReaderKind } from './reader-kind.js';
+import { labelById, type ClassificationLabel, type ClassificationPolicy } from './defaults.js';
+import { classificationActiveFor, policyFor, scopeOrganism, scopeOwner } from './policy.js';
+import { ClassificationError, labelsFor, targetId } from './labels.js';
+import { audienceCheck } from './audience.js';
+import { recordClassificationAudit, type ClassificationAuditEvent } from './audit.js';
 
 /** The credential fields a reader is made from. `req.auth` fits. */
 export interface ReaderAuth {
@@ -58,8 +74,10 @@ export interface ContentReader {
   readonly principal: string;
   /** The credential, for the existing access checks a loader still makes. Null for anonymous and system. */
   readonly auth: ReaderAuth | null;
+  /** Items shown with a warning classification, collected for an answer that wants to say so. */
+  readonly warnings: Array<{ key: string; label: string; name: string }>;
   show<T>(items: readonly T[], targetOf: (item: T) => ContentLabelTarget | null): Promise<T[]>;
-  useForAi(targets: readonly ContentLabelTarget[], use: { capability: string }): Promise<void>;
+  useForAi(targets: readonly ContentLabelTarget[], use: { capability: string; model?: string }): Promise<void>;
   leave<T>(items: readonly T[], targetOf: (item: T) => ContentLabelTarget | null, where: EgressDestination):
     Promise<{ kept: T[]; left: Array<{ item: T; label: string; reason: string }> }>;
 }
@@ -69,16 +87,131 @@ interface ReaderDeps {
   config: Pick<AimeatConfig, 'classificationMode' | 'nodeId'>;
 }
 
-function makeReader(_deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identity' | 'principal' | 'auth'>): ContentReader {
-  // V1: every operation returns what it was given and reads nothing, whatever the switch says.
-  // V4 reads the switch (policy.ts classificationActiveFor) and the labels (labels.ts labelsFor) here.
+/** What the reader decided about one target: nothing (classification off there), or its label. */
+interface Decided {
+  target: ContentLabelTarget;
+  label: ClassificationLabel;
+}
+
+/**
+ * The label of each target where classification is on, in one pass: the switch and the policy once
+ * per scope, the labels in one batch per kind and scope. A row with no label of its own takes its
+ * row space's (decided 2026-09-29), addressed as the row key without the row id. Off reads nothing.
+ */
+async function decideAll(deps: ReaderDeps, targets: ReadonlyArray<ContentLabelTarget | null>): Promise<Array<Decided | null>> {
+  if (deps.config.classificationMode === 'off') return targets.map(() => null);
+  const scopes = [...new Set(targets.filter((t): t is ContentLabelTarget => !!t).map(t => t.scope))];
+  const policies = new Map<string, ClassificationPolicy>();
+  await Promise.all(scopes.map(async s => {
+    if (await classificationActiveFor(deps.storage, deps.config, s)) policies.set(s, await policyFor(deps.storage, deps.config, s));
+  }));
+  const out: Array<Decided | null> = targets.map(() => null);
+  for (const [scope, policy] of policies) {
+    const idx = targets.map((t, i) => (t && t.scope === scope ? i : -1)).filter(i => i >= 0);
+    const own = await labelsFor(deps.storage, policy, idx.map(i => targets[i]!));
+    const spaceOf = (t: ContentLabelTarget) => ({ ...t, key: t.key.split('/').slice(0, 2).join('/') });
+    const orphanRows = idx.filter(i => targets[i]!.kind === 'row' && !own.get(targetId(targets[i]!))?.row);
+    const spaces = orphanRows.length ? await labelsFor(deps.storage, policy, orphanRows.map(i => spaceOf(targets[i]!))) : new Map();
+    for (const i of idx) {
+      const t = targets[i]!;
+      const mine = own.get(targetId(t));
+      const id = mine?.row ? mine.label : t.kind === 'row' ? (spaces.get(targetId(spaceOf(t)))?.label ?? policy.defaultLabel) : (mine?.label ?? policy.defaultLabel);
+      const label = labelById(policy, id) ?? labelById(policy, policy.defaultLabel);
+      if (label) out[i] = { target: t, label };
+    }
+  }
+  return out;
+}
+
+function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identity' | 'principal' | 'auth'>): ContentReader {
+  // The owner this reader acts for: an AI reads for its owner, a visitor from another node is its
+  // home identity and no local account.
+  const foreign = !!who.auth && isForeignPrincipal(who.auth);
+  const ownerName = foreign ? null
+    : who.auth ? (who.auth.owner.includes('@') ? localAccountOf(who.auth.owner) : who.auth.owner)
+    : localAccountOf(who.identity);
+  const owner = who.kind === 'anonymous' ? null
+    : foreign ? who.auth!.owner
+    : ownerName ? `${ownerName}@${deps.config.nodeId}` : null;
+  const inside = audienceCheck(deps.storage, { owner, ownerName });
+  const warnings: ContentReader['warnings'] = [];
+  const audit = (d: Decided, action: ClassificationAuditEvent['action'], purpose?: string) => recordClassificationAudit({
+    scope: d.target.scope, ownerGaii: scopeOwner(d.target.scope), kind: d.target.kind, key: d.target.key,
+    label: d.label.id, reader: who.principal || 'anonymous', readerKind: who.kind, action, purpose: purpose ?? null,
+  });
+  const warn = (d: Decided) => {
+    if (!warnings.some(w => w.key === d.target.key)) warnings.push({ key: d.target.key, label: d.label.id, name: d.label.name.en });
+  };
+
   return {
     ...who,
-    async show(items) { return [...items]; },
-    async useForAi() { /* V4: refuse a target whose label hides it from AI */ },
-    async leave(items) { return { kept: [...items], left: [] }; },
+    warnings,
+
+    async show(items, targetOf) {
+      const decided = await decideAll(deps, items.map(targetOf));
+      const out: typeof items[number][] = [];
+      for (let i = 0; i < items.length; i++) {
+        const d = decided[i];
+        // The node's own work (a background run with no caller) is not a reader of content here;
+        // what it sends to a model still passes useForAi.
+        if (!d || who.kind === 'system') { out.push(items[i]); continue; }
+        if (!(await inside(d.label.audience, d.target.scope))) { audit(d, 'refused', 'audience'); continue; }
+        if (who.kind === 'ai') {
+          if (d.label.aiVisibility === 'hidden') { audit(d, 'refused', 'hidden from AI'); continue; }
+          if (d.label.audit) audit(d, 'shown');
+          if (d.label.aiVisibility === 'warning') {
+            warn(d);
+            const item = items[i];
+            out.push(item && typeof item === 'object' && !Array.isArray(item)
+              ? { ...item, classificationWarning: { label: d.label.id, name: d.label.name.en, says: CLASSIFIED_WARNING } } as typeof item
+              : item);
+            continue;
+          }
+        }
+        out.push(items[i]);
+      }
+      return out;
+    },
+
+    async useForAi(targets, use) {
+      const decided = await decideAll(deps, targets);
+      const refused: Decided[] = [];
+      for (const d of decided) {
+        if (!d) continue;
+        const outside = who.kind !== 'system' && !(await inside(d.label.audience, d.target.scope));
+        if (outside || d.label.aiVisibility === 'hidden') { refused.push(d); continue; }
+        if (d.label.aiVisibility === 'warning') warn(d);
+      }
+      const purpose = [use.capability, use.model].filter(Boolean).join(' ');
+      if (refused.length) {
+        for (const d of refused) audit(d, 'refused', purpose);
+        const names = [...new Set(refused.map(d => d.label.name.en))].join(', ');
+        throw new ClassificationError('CLASSIFIED', 403,
+          `${refused.length} of the items for this AI call are classified ${names}, which no AI may read here: ${refused.slice(0, 5).map(d => d.target.key).join(', ')}${refused.length > 5 ? ', …' : ''}. Leave them out, or ask the person who owns them.`);
+      }
+      for (const d of decided) if (d && d.label.audit) audit(d, 'used', purpose);
+    },
+
+    async leave(items, targetOf, where) {
+      const decided = await decideAll(deps, items.map(targetOf));
+      const kept: typeof items[number][] = [];
+      const left: Array<{ item: typeof items[number]; label: string; reason: string }> = [];
+      for (let i = 0; i < items.length; i++) {
+        const d = decided[i];
+        // The rule is about leaving an ORGANISM, and every copy that goes to another node leaves
+        // this one. A person's export of their own content is theirs to take, whatever its label.
+        const bound = !!d && !d.label.mayLeaveOrganism && (!!scopeOrganism(d.target.scope) || where.kind === 'federation');
+        if (!bound) { kept.push(items[i]); continue; }
+        audit(d!, 'refused', where.kind);
+        left.push({ item: items[i], label: d!.label.id, reason: `classified ${d!.label.name.en}, which may not leave its organism` });
+      }
+      return { kept, left };
+    },
   };
 }
+
+/** What the answer says about a warning-classified item an AI was shown. */
+export const CLASSIFIED_WARNING = 'This content is classified. Use it only for the task you were given, and do not copy it anywhere else.';
 
 /** The reader behind a request. No credential is an anonymous reader. */
 export function readerFor(deps: ReaderDeps, auth: ReaderAuth | null | undefined): ContentReader {

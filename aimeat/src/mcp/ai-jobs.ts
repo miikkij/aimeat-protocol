@@ -13,8 +13,8 @@
  *
  *   The tools are declared on THREE surfaces, and this is one of them. See the catalog entry
  *   (mcp/catalog/definitions/ai-jobs.ts) for the other two and for the gates that keep them in step.
- * @structure registerAiJobTools(mcp, storage, config, getAgentGaii)
- * @usage registerAiJobTools(mcp, storage, config, () => agentGaii);
+ * @structure registerAiJobTools(mcp, storage, config, getAgentGaii, scopes)
+ * @usage registerAiJobTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
  *   v1.0.0 — 2026-08-31 — Initial.
  *   v1.0.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
@@ -22,6 +22,9 @@
  *   v1.1.0 — 2026-09-28 — System 2 plan, V5: aimeat_ai_job_start declares and passes on `op`,
  *     `provider`, `audio_key`, `language` and `size`.
  *   v1.2.0 — 2026-09-28 — aimeat_ai_job_start declares and passes on `role`, the AI role the call runs as.
+ *   v1.3.0 — 2026-09-29 — aimeat_ai_job_start records who started the job (the agent, its account and
+ *     the session's scopes), so the job reads its inputs as that agent (TARGET-082 V4). Takes the
+ *     session's scopes as a fifth parameter.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -33,16 +36,21 @@ import { AI_ROLE_PARAM } from './catalog/definitions/ai-models.js';
 import { localAccountName } from '../utils/gaii.js';
 import { AiJobError, getActiveAiJobService } from '../services/ai-jobs/index.js';
 import type { AiJobState } from '../services/ai-jobs/types.js';
+import { startedByOf } from '../services/ai-jobs/starter.js';
 
 export function registerAiJobTools(
     mcp: McpServer,
     storage: Storage,
     config: AimeatConfig,
     getAgentGaii: () => string,
+    /** The session's scopes. Recorded on a started job so it reads its inputs as this agent. */
+    scopes: readonly string[] = [],
 ): void {
     const agentGaii = getAgentGaii();
     const owner = localAccountName(agentGaii);
     const ownerGhii = `${owner}@${config.nodeId}`;
+    // Every node MCP session is an agent (mcp/index.ts refuses any other credential).
+    const startedBy = startedByOf({ owner, roles: ['agent'], scopes }, agentGaii);
 
     const text = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] });
     const err = (msg: string) => ({ content: [{ type: 'text' as const, text: msg }], isError: true });
@@ -100,7 +108,7 @@ export function registerAiJobTools(
                     ...(a.audio_key !== undefined ? { audio_key: a.audio_key } : {}),
                     ...(a.language !== undefined ? { language: a.language } : {}),
                     ...(a.size !== undefined ? { size: a.size } : {}),
-                }, { ownerGhii, createdBy: agentGaii });
+                }, { ownerGhii, createdBy: agentGaii, startedBy });
                 return text(started);
             } catch (e) {
                 return failed(e);

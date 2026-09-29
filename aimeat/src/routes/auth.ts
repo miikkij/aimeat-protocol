@@ -10,6 +10,9 @@
  * @usage
  *   app.use(authRouter(config, storage));
  * @version-history
+ *   v1.9.0 -- 2026-09-29 -- The JWT minted from a PAT-backed refresh cookie carries the `via: 'pat'`
+ *     claim, and the Bearer refresh keeps it on a session that had it, so classification reads such a
+ *     session as an AI (TARGET-082 V4). Roles and scopes are unchanged.
  *   v1.8.2 -- 2026-09-26 -- The agent token's owner comes from localAccountName, the one cut of an
  *     identity to an account name (secaudit 2026-09, F-1). The name it gives is the one it gave.
  *   v1.8.1 -- 2026-09-24 -- The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
@@ -367,6 +370,8 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
         const patToken = await issueJWT({
           sub: r.sub, owner: r.owner, node: config.nodeId, roles: r.roles,
           ...(includeScopes ? { scopes: r.scopes } : {}),
+          // Made from a PAT: classification reads it as an AI (reader-kind.ts). Grants nothing.
+          via: 'pat',
         }, config.accessTtlSeconds);
         res.json(success(config.nodeId, {
           token: patToken,
@@ -473,6 +478,9 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
       node: config.nodeId,
       roles: freshRoles,
       ...(freshScopes !== undefined ? { scopes: freshScopes } : {}),
+      // A session made from a PAT stays marked across a refresh, or one refresh would turn a
+      // program's session into a person's for classification (reader-kind.ts).
+      ...(req.auth!.via === 'pat' ? { via: 'pat' as const } : {}),
     }, config.jwtTtlSeconds, refreshSessionId);
 
     await storage.createSession({

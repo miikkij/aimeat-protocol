@@ -43,6 +43,9 @@
  * @structure aiJobsRouter(config, storage, service)
  * @usage app.use(aiJobsRouter(config, storage, aiJobService));
  * @version-history
+ *   v1.4.0 — 2026-09-29 — POST /v1/ai/jobs records who started the job (identity, account, roles,
+ *     scopes and the PAT mark of the verified credential), so the job reads its inputs as that caller
+ *     (TARGET-082 V4).
  *   v1.3.0 — 2026-09-28 — POST /v1/ai/jobs takes `role`, the AI role the job's call runs as; the
  *     service refuses one that is not a string of 1 to 300 characters (op.ts).
  *   v1.2.0 — 2026-09-28 — System 2 plan, V5: POST /v1/ai/jobs takes `op` (text, image, transcribe),
@@ -68,6 +71,7 @@ import { rateLimit } from '../middleware/rate-limit.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { AiJobError } from '../services/ai-jobs/index.js';
+import { startedByOf } from '../services/ai-jobs/starter.js';
 import type { AiJobService } from '../services/ai-jobs/index.js';
 import type { AiJobState } from '../services/ai-jobs/types.js';
 
@@ -142,6 +146,9 @@ export function aiJobsRouter(config: AimeatConfig, storage: Storage, service: Ai
                     // other record on this node names (and the MCP door writes the agent's GAII).
                     ownerGhii: resolve(req),
                     createdBy: resolve(req),
+                    // The verified credential's facts, so the job reads its inputs as this caller
+                    // (services/ai-jobs/starter.ts). Never from the body; grants the job nothing.
+                    startedBy: startedByOf(req.auth!, resolve(req)),
                 });
 
                 // 202, not 200: accepted, not finished.
