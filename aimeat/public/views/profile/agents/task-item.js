@@ -7,6 +7,8 @@
  *   happened, details, memory entries, rating -- plus the actions row (start, request changes,
  *   triage, cancel, delete). The helpers it is built from live in ./task-item-parts.js.
  * @version-history
+ *   v2.21.0 — 2026-09-30 — A `scope_denied` event (the server refused the task's agent a permission) is
+ *     said in the reader's language and wears the trouble dot.
  *   v2.20.0 — 2026-09-26 — Every part is a component that takes data (page group G1a): the task is the
  *     List's row that opens on a press (the eye is the Icon before the name, the blurred name and the
  *     coral open name are the Name's options), the record is the List's Panel with its own title and
@@ -82,10 +84,17 @@ import { Facts, FactLine } from '/components/Facts.js';
 import { Folds } from '/components/Folds.js';
 import { Stars } from '/components/Stars.js';
 import { Row, Split, Space } from '/components/Layout.js';
+import { permissionWords } from './agent-card-access.js';
 
 /** The Timeline's dot for a task event: a failure is trouble, a thing written or installed is made,
  *  the rest is the agent's work. */
-const eventDot = (type = '') => (/fail|error/.test(type) ? 'trouble' : /memory_write|app_publish|extension_install/.test(type) ? 'made' : 'agent');
+const eventDot = (type = '') => (/fail|error|denied/.test(type) ? 'trouble' : /memory_write|app_publish|extension_install/.test(type) ? 'made' : 'agent');
+
+/** A task event's line. A refusal the server noted is said in the reader's language from its
+ *  details; every other event is its type and the message its writer gave it. */
+const eventText = (ev) => (ev.type === 'scope_denied' && Array.isArray(ev.details?.needed)
+  ? t('profile.agents.refusals.taskEvent', { permission: permissionWords(ev.details.needed, ev.details.any_of === true) })
+  : [ev.type, ev.message].filter(Boolean).join(': '));
 
 export function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }) {
   const [expanded, setExpanded] = useState(false);
@@ -453,7 +462,7 @@ export function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }
                 ${events.map(ev => html`
                   <${TimelineRow} key=${ev.id || ev.timestamp} category=${eventDot(ev.type)}
                     when=${ev.timestamp ? timeAgo(ev.timestamp) : ''}
-                    text=${[ev.type, ev.message].filter(Boolean).join(': ')} />
+                    text=${eventText(ev)} />
                 `)}
               <//>
             `}
