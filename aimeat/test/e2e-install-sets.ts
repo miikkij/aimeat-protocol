@@ -46,6 +46,7 @@ import type { AimeatConfig } from '../src/config.js';
 import type { Server } from 'node:http';
 import { setActiveEmailService, type EmailService } from '../src/services/email.js';
 import { provisionOwner } from '../src/services/owner-provisioning.js';
+import { publishSkill } from '../src/services/skills.js';
 import type { Storage } from '../src/storage/interface.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
@@ -167,6 +168,10 @@ const APP_HTML = '<!DOCTYPE html><html><head><title>Shop</title>'
     + `<script type="application/json" id="aimeat-crews">${JSON.stringify([CREW])}</script>`
     + '</head><body><div>shop</div></body></html>';
 
+/** The shop app's operating guide, carried in its package (a `skill` component). */
+const SHOP_SKILL_MD = '---\nname: shop-guide\ndescription: How to run the shop app, its products, orders and the shopkeeper agent.\n'
+    + 'metadata:\n  binding: app:vendor/app-shop.html\n---\n# Shop guide\n\nOpen the shop, add products, and ask the shopkeeper.\n';
+
 /** A workspace with one records type: the least a workspace manifest may hold. */
 const MANIFEST = (type: string, space: string) => ({
     objectTypes: [{ name: type, schemaRef: `schema:${type}@1`, namespace: space, backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true, mode: 'records' }],
@@ -246,7 +251,11 @@ await test('R publishes a private app package and a private bundle that lists it
     const shop = await R.json('/v1/packages', {
         method: 'POST', headers: auth(vendorToken),
         body: JSON.stringify({ name: SHOP, description: 'A shop app', category: 'utility', visibility: 'private',
-            components: [{ id: 'app-shop', type: 'app', label: 'Shop', content: APP_HTML, dependencies: [] }] }),
+            components: [
+                { id: 'app-shop', type: 'app', label: 'Shop', content: APP_HTML, dependencies: [] },
+                { id: 'skill-shop-guide', type: 'skill', label: 'Shop guide', content: JSON.stringify({ files: { 'SKILL.md': SHOP_SKILL_MD } }),
+                    dependencies: ['app-shop'], meta: { skill: { bindsTo: 'app-shop' } } },
+            ] }),
     });
     assert(shop.status === 201, `shop: ${shop.status} ${JSON.stringify(shop.body)}`);
     shopOnR = shop.body.data.packageGroupId;
@@ -512,13 +521,24 @@ await test('An owner the shop created, never signed in to, with the set\'s verif
     // no sign-in link switched on.
     await provisionOwner(C.storage, C.config, { via: 'provisioning', username: 'preco', displayName: 'Preco', verifiedEmail: PRECO });
     const body = JSON.stringify({ install_set: installSet({ owner: { name: 'preco', email: PRECO }, members: [], organism_names: { team: 'Preco' } }) });
+    // preco keeps a guide of their own under the package skill's name, so the install leaves the
+    // package's out. That used to happen in silence (aimeat-apps, 2026-09-29).
+    await publishSkill(C.storage, C.config, { scope: 'user', owner: 'preco', publisher: `preco@${C.nodeId}`,
+        files: new Map([['SKILL.md', '---\nname: shop-guide\ndescription: Preco\'s own notes on running a shop.\n---\n# Mine\n']]) });
+    const plan = await C.json('/v1/install-sets/apply', { method: 'POST', headers: auth(opsToken), body: JSON.stringify({ ...JSON.parse(body), dry_run: true }) });
+    assert(plan.status === 200 && (plan.body.data.plan.warnings ?? []).some((w: string) => w.includes('shop-guide')) && plan.body.data.plan.problems.length === 0,
+        `the plan says the skill will be left out, and it is not a problem: ${JSON.stringify(plan.body.data?.plan).slice(0, 400)}`);
     const r = await C.json('/v1/install-sets/apply', { method: 'POST', headers: auth(opsToken), body });
     assert(r.status === 201 && r.body.data.owner_created === false, `apply: ${r.status} ${JSON.stringify(r.body).slice(0, 400)}`);
+    const warned = (r.body.data.warnings ?? []) as string[];
+    assert(warned.length === 1 && warned[0].includes('shop-guide') && (r.body.data.record.packages[shopOnR]?.warnings ?? []).length === 1,
+        `the skipped skill is named in the answer and kept on the package step: ${JSON.stringify({ warned, step: r.body.data.record.packages[shopOnR] })}`);
     const sent = mailsTo(PRECO).filter(m => m.method === 'sendRaw');
     assert(r.body.data.record.welcomed?.includes(PRECO) && sent.length === 1 && String(sent[0].args[2]).includes('/v1/ghii/magic-link/open?token='),
         `preco is welcomed with a sign-in link: ${JSON.stringify(mailsTo(PRECO).map(m => [m.method, m.args[0]]))}`);
     const again = await C.json('/v1/install-sets/apply', { method: 'POST', headers: auth(opsToken), body });
     assert(again.status === 201 && mailsTo(PRECO).filter(m => m.method === 'sendRaw').length === 1, `welcomed once: ${mailsTo(PRECO).length}`);
+    assert((again.body.data.warnings ?? []).length === 1, `the warning stays on the second run: ${JSON.stringify(again.body.data.warnings)}`);
 });
 
 await test('An owner the shop\'s crew image already signed in as is still welcomed; another address is not', async () => {

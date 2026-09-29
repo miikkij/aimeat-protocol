@@ -18,6 +18,7 @@
  * @structure applyStartupInstallSet(deps)
  * @usage await applyStartupInstallSet({ storage, config, peers, scheduler });
  * @version-history
+ *   v1.1.0 — 2026-09-30 — The install's warnings (a skill left out) are logged, one line each.
  *   v1.0.1 — 2026-09-28 — A secrets file that cannot be read or parsed is logged by its kind of
  *     problem only: a JSON parse error quotes the text around the fault, and in that file the text is
  *     a secret (CodeQL js/clear-text-logging, alert 1674).
@@ -77,6 +78,8 @@ export async function applyStartupInstallSet(deps: ApplyDeps, attempt = 0): Prom
             logger.info(`[install-set] applied for ${out.record.owner} (run ${out.record.runs}): `
                 + `${Object.keys(out.record.packages).length} package(s), ${Object.keys(out.record.organisms).length} organism(s), `
                 + `${Object.keys(out.record.members).length} user(s)${pending ? `, ${pending} crew agent(s) waiting for a runner` : ''}`);
+            // What the install left out (a skill the owner already has of their own) is said, not dropped.
+            for (const w of out.warnings) logger.warn(`[install-set] ${w}`);
             return;
         }
         code = out.code;
