@@ -2,6 +2,18 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does.",
   "entries": [
     {
+      "date": "2026-09-29",
+      "kind": "feature",
+      "title": {
+        "en": "Data classification, first step: all content now passes one check",
+        "fi": "Tietojen luokittelu, ensimmäinen vaihe: kaikki sisältö kulkee nyt yhden tarkistuksen kautta"
+      },
+      "body": {
+        "en": "This is the first step toward a classification for all data on your AIMEAT: public, internal, confidential, or a level you add yourself, such as top secret. Every place that gives content to a person, to an AI, to an export or to another AIMEAT now passes the same check, so the rules that come next apply in all of them at once. The operator finds a new Classification setting in the configuration. It is off by default, and for now it changes nothing about how content is handled. One change you can see now: when your AI reads an organism's workspace, it follows the same rules as the web pages. An organism that admits only its listed agents now refuses the other agents there too, and the organism's managers can read its workspaces through their AI as they can on the web.",
+        "fi": "Tämä on ensimmäinen vaihe kohti sitä, että kaikella AIMEATisi tiedolla on luokitus: julkinen, sisäinen, luottamuksellinen tai itse lisäämäsi taso, kuten erittäin salainen. Jokainen kohta, joka antaa sisältöä ihmiselle, tekoälylle, vientiin tai toiselle AIMEATille, kulkee nyt saman tarkistuksen kautta. Siksi seuraavat säännöt koskevat heti kaikkia näitä kohtia. Palvelun ylläpitäjä löytää asetuksista uuden Luokittelu-asetuksen. Se on oletuksena pois, eikä se vielä muuta sisällön käsittelyä. Yksi muutos näkyy jo nyt: kun tekoälysi lukee organismin työtilaa, se noudattaa samoja sääntöjä kuin verkkosivut. Jos organismi päästää sisään vain listatut agentit, se kieltää nyt muut agentit myös tässä, ja organismin ylläpitäjät voivat lukea sen työtiloja tekoälynsä kautta samoin kuin verkossa."
+      }
+    },
+    {
       "date": "2026-09-28",
       "kind": "feature",
       "title": {
