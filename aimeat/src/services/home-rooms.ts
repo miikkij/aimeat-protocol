@@ -30,6 +30,8 @@
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 7).
  *   v1.1.0 — 2026-08-07 — The mailbox room, and with it a presence kind that asks about the
  *     ACCOUNT rather than the node ('has-content'). openRooms takes the owner GHII to answer it.
+ *   v1.1.1 — 2026-09-29 — The create and monetise rooms lead to /v1/appcat instead of
+ *     /app-catalog.html (Jouni).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -57,10 +59,10 @@ export interface RoomDef {
  * and the mailbox is last because it is not an ambition anyone arrives with — it fills by itself.
  */
 export const ROOMS: readonly RoomDef[] = [
-    // The catalog is a standalone static page, NOT an SPA route. /v1/app-store answers 200 because
-    // the server serves the SPA shell there, but the SPA has no route for it and silently falls
-    // back to the portal — a door that looks like it works and does not.
-    { id: 'create', url: '/app-catalog.html', presence: 'always' },
+    // The app catalogue is the SPA route /v1/appcat (spa.html ROUTES and portal.ts spaRoutes).
+    // Never /v1/app-store: the server answers 200 there with the SPA shell, but the SPA has no
+    // route for it and falls back to the portal, a link that looks like it works and does not.
+    { id: 'create', url: '/v1/appcat', presence: 'always' },
     { id: 'organise', url: '/v1/profile?tab=organisms', presence: 'always' },
     // Behind an operator flag, default OFF.
     //
@@ -70,7 +72,7 @@ export const ROOMS: readonly RoomDef[] = [
     // cold, so the app never rendered. A published file is not a working destination, and no
     // cheap check separates the two. So this is a person's judgement, recorded once, instead of
     // an inference that is confidently wrong. E11: never open a door into a room with nothing.
-    { id: 'monetise', url: '/app-catalog.html', presence: 'flag' },
+    { id: 'monetise', url: '/v1/appcat', presence: 'flag' },
     { id: 'company', url: '/v1/profile?tab=companies', presence: 'company' },
     // The mailbox, last — and the only room gated on THIS ACCOUNT rather than on this node.
     //

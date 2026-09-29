@@ -15,6 +15,8 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-09-29 — The publish walkthrough's first step opens /v1/appcat instead of /app-catalog.html
+ *     (Jouni). The address only; the steps are the same on both pages.
  *   2026-09-28 — The aimeat-ai line: the user's own AI providers, capabilities() for any capability
  *     but text, and ask for the capability, not a model (System 2 plan, V5). One line, in place.
  *   2026-09-19 — ADDITIVE, a new section after the aimeat-ai one: the decision model, checked for
@@ -722,7 +724,7 @@ function composeAppPrompt(
   if (!isImprove) {
     body += '## When the app is ready — tell me how to publish it\n';
     body += 'After you hand me the finished single HTML file, END your reply by telling me (in my language) to do exactly this:\n';
-    body += '1. Open ' + nodeUrl + '/app-catalog.html\n';
+    body += '1. Open ' + nodeUrl + '/v1/appcat\n';
     body += '2. Click "+" → "Add app" → the "Paste" tab → paste the HTML (or drop it as a file). The app name + description fill in automatically.\n';
     body += '3. Click Save. A second dialog opens: fill in the description and click Publish. (Two dialogs, not one — Save takes the file, Publish puts it on the node.)\n';
     body += 'I will be asked to sign in first — it is fast: one click with Google, or a quick email + password, and a brand-new account is created right there in seconds.\n';

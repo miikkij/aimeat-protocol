@@ -23,6 +23,8 @@
  *     (buildAppBuilderPrompt / buildConnectPrompt). Prompt text unchanged. Copy control unified:
  *     CopyPromptBtn now passes btn-primary instead of the bespoke .cl-copy-prompt-btn, and the
  *     "copied" tick comes from the shared t('common.copied') rather than a literal ✔.
+ *   v1.2.1 — 2026-09-29 — The launcher's open link goes to /v1/appcat (Jouni). The download link
+ *     still gives /app-catalog.html, the one file that works offline.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -434,7 +436,7 @@ export default function PortalClassicView({ navigate }) {
           </div>
         </div>
         <div class="cl-catalog-links">
-          <a href="/app-catalog.html" class="cl-launcher-cta">\u{1F680} ${ct('cards.launcher.openBtn')}</a>
+          <a href="/v1/appcat" class="cl-launcher-cta">\u{1F680} ${ct('cards.launcher.openBtn')}</a>
           <a href="/app-catalog.html" download="app-catalog.html" class="cl-launcher-cta secondary">\u{1F4E5} ${ct('cards.launcher.downloadBtn')}</a>
         </div>
         <div class="cl-return-section">

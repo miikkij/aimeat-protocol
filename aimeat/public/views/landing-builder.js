@@ -18,6 +18,7 @@
  *   tierTitle · packMatchesIdea · BuildAppPrompt · BuildInvite
  * @usage import { BuildInvite } from './landing-builder.js';
  * @version-history
+ *   (2026-09-29) Step 3's add link opens /v1/appcat?add=1 instead of /app-catalog.html (Jouni).
  *   (2026-08-28) fetchCanonicalBuildPrompt is exported for the build-story page, and BuildInvite
  *     takes openByDefault: the block declared that setting on 2026-08-26 and nothing read it.
  *   v1.1.0 — 2026-08-27 — The TRACK is the first decision (TARGET-074): Classic or Atelier as
@@ -312,7 +313,7 @@ function BuildAppPrompt() {
       <div class="ld-gen-step">
         <div class="ld-gen-head"><span class="ld-gen-num">3</span><span>${tr('landing.genStep3', 'Add & publish your app')}</span></div>
         <p class="ld-gen-hint">${tr('landing.genStep3Hint', 'Got the code or HTML file back from the AI? Create an account, it takes a minute, then paste the code or upload the file. The app goes live at its own address and you get a link to share.')}</p>
-        <a class="btn-outline ld-gen-action ld-gen-add" href="/app-catalog.html?add=1">
+        <a class="btn-outline ld-gen-action ld-gen-add" href="/v1/appcat?add=1">
           ${tr('landing.genStep3Btn', 'Register and add your app')}
         </a>
         <p class="ld-gen-hint ld-gen-mcp">${tr('landing.genStep3Mcp', 'If the AI you pasted the prompt into is connected to this node over MCP, it can publish the app for you, with no file to move by hand.')}</p>

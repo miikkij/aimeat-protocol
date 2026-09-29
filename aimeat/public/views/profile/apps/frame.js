@@ -3,19 +3,20 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What the Apps page's views share: the words (a), dates, the app's name and address,
- *   the launcher address with the profile's language and a filter or a search, the seven condition
- *   keys the launcher and this page agree on, the condition flags of one app and the counts over
- *   all of them, the note a row wears, a line-level diff of a draft against the live version, the
- *   crumb and the cross-page rail links.
+ *   the app catalogue's address with a filter or a search, the seven condition keys the catalogue
+ *   and this page agree on, the condition flags of one app and the counts over all of them, the
+ *   note a row wears, a line-level diff of a draft against the live version, the crumb and the
+ *   cross-page rail links.
  * @structure a · day · rel · kb · nameOf · appRef · appUrl · catalogUrl · KUNTO_KEYS · flagsOf ·
  *   computeKunto · noteFor · lineDiff · initials · crumb · pageLinks · goTab
  * @usage import { a, computeKunto, catalogUrl, crumb, pageLinks } from './frame.js';
  * @version-history
+ *   v1.2.0 — 2026-09-29 — catalogUrl points to /v1/appcat instead of /app-catalog.html (Jouni).
  *   v1.1.0 — 2026-09-26 — The crumb and the rail's page links are data for SettingsPage (Crumb, Rail);
  *     openTab is the Rail's (component plan C9, page group G6).
  *   v1.0.0 — 2026-09-02 — Initial (design canvas "AIMEAT Sovellukset-sivu", direction A).
  */
-import { t, getLocale } from '/js/i18n.js';
+import { t } from '/js/i18n.js';
 import { openTab } from '/components/Rail.js';
 import { date as fmtDate } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
@@ -33,15 +34,14 @@ export const appRef = (app) => `${app.owner}/${app.filename}`;
 export const appUrl = (app) => `/v1/apps/${encodeURIComponent(app.owner)}/${encodeURIComponent(app.filename)}?mode=inline${app.access_code ? `&code=${encodeURIComponent(app.access_code)}` : ''}`;
 
 /**
- * The launcher, opened in the profile's language, on one filter (a state or a condition key) or
- * with an app's name already in the search. The launcher has Finnish and English; Spanish reads
- * English there until it has its own table.
+ * The app catalogue (/v1/appcat), on one filter (a state or a condition key) or with an app's name
+ * already in the search. It is an SPA route, so it reads the site's language and needs no ?lang=.
  */
 export function catalogUrl(params = {}) {
   const q = new URLSearchParams();
-  q.set('lang', getLocale() === 'fi' ? 'fi' : 'en');
   for (const [k, v] of Object.entries(params)) if (v) q.set(k, String(v));
-  return '/app-catalog.html?' + q.toString();
+  const s = q.toString();
+  return '/v1/appcat' + (s ? '?' + s : '');
 }
 
 /**

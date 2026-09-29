@@ -13,6 +13,8 @@
  * @structure buildPrompt(opts) · classicFallback(nodeUrl, isImprove) · PB_LANGS
  * @usage buildPrompt({ track, app, description, lang, core, coreAtelier, template, packs, atelierLoading })
  * @version-history
+ *   v1.0.2 — 2026-09-29 — The publish walkthrough's first step opens /v1/appcat instead of
+ *     /app-catalog.html (Jouni). The address only.
  *   v1.0.1 — 2026-09-28 — The aimeat-ai line says the user's own AI providers and capabilities() first
  *     (System 2 plan, V5), as the library pack's promptLine does.
  *   v1.0.0 — 2026-09-27 — Initial (appcat, dialogs builder 2), moved from the old cortex.js with its
@@ -145,7 +147,7 @@ export function classicFallback(nodeUrl, isImprove) {
   if (!isImprove) {
     prompt += '## When the app is ready — tell me how to publish it\n';
     prompt += 'After you hand me the finished single HTML file, END your reply by telling me (in my language) to do exactly this:\n';
-    prompt += '1. Open ' + nodeUrl + '/app-catalog.html\n';
+    prompt += '1. Open ' + nodeUrl + '/v1/appcat\n';
     prompt += '2. Click "+ Add" → open the "Paste" tab → paste the HTML (or drop it as a file). The app name + description fill in automatically.\n';
     prompt += '3. Click Publish.\n';
     prompt += 'I will be asked to sign in first — it is fast: one click with Google, or a quick email + password, and a brand-new account is created right there in seconds.\n';

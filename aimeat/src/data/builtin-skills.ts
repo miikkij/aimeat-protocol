@@ -11,6 +11,7 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.18.1 -- 2026-09-29 -- The app-building skill points to the app catalogue at /v1/appcat instead of /app-catalog.html (Jouni).
  *   v1.18.0 -- 2026-09-29 -- aimeat-refinery (builtin-skills.refinery.ts): the mail refinery from chat.
  *   v1.17.0 -- 2026-09-28 -- aimeat-ai-capabilities (builtin-skills.ai-capabilities.ts), System 2 plan V5;
  *            set-up-content-pipeline names the ai step's op (image, transcribe).
@@ -246,7 +247,7 @@ from the node library.
 - \`GET /v1/prompts/build-app\` (public; \`?format=txt\` for plain text) — the canonical guided
   prompt for building a single-file HTML app on this node.
 - \`GET /v1/app-templates\` — starter scaffolds. Publish with \`POST /v1/apps\`;
-  browse the catalog at \`/app-catalog.html\`. Apps can bind skills that teach agents to
+  browse the catalog at \`/v1/appcat\`. Apps can bind skills that teach agents to
   drive them — check \`GET /v1/apps/{owner}/{filename}/skills\` before operating any app.
 
 Every published app also has an **agent face** — request its URL with

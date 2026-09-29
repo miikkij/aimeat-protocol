@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   v1.20.2 -- 2026-09-29 -- The build-an-app step opens /v1/appcat?create=1 instead of /app-catalog.html (Jouni).
  *   v1.20.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes itself, so an organism, workspace, agent, recent item or display name with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.20.0 -- 2026-09-26 -- Every part is a kit component (the panels are Card panel with its headline door and note, the rows FoldRow and List, the quota bars Meter, the figures FigureStrip and Card figure doors, the band NumberBand, the tags Mark with its live square, the promo a Box with framed Cards, the waiting box the aside Note with a Group): this file writes no class (page group G8).
  *   v1.19.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
@@ -54,7 +55,7 @@ import { IndexList, IndexItem } from '/components/NumberedIndex.js';
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import htm from "htm";
 const html = htm.bind(h);
-import { t, getLocale } from "/js/i18n.js";
+import { t } from "/js/i18n.js";
 import { fmtMoney } from "/js/utils.js";
 import { getNodeUrl } from "/js/services/auth.js";
 import { listAgents } from "/js/services/agents.js";
@@ -556,7 +557,7 @@ export function NextSteps({ switchTab, hasApps }) {
     return () => { cancelled = true; };
   }, []);
 
-  const buildAppUrl = `/app-catalog.html?lang=${encodeURIComponent(getLocale())}&create=1`;
+  const buildAppUrl = '/v1/appcat?create=1';
   const steps = [];
   // First and most important until it passes, then gone: a proven connection is the thing the
   // rest of the product is used through.
