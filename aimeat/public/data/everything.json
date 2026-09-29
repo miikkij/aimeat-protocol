@@ -714,10 +714,10 @@
      "slug": "g-5-data-map",
      "cells": [
       "<strong>Data map</strong>",
-      "Read what an app stores, why it stores it, the exact location, who can read it, how long it is kept and what could be lost. The map identifies personal data and missing explanations.",
+      "Read what an app stores, why it stores it, the exact location, who can read it, how long it is kept and what could be lost. The map identifies personal data and missing explanations. A row can also name the classification the app expects for that data by default, such as confidential (see section 24).",
       "<code>/v1/datamap/apps/:owner/:filename</code>, <code>aimeat_datamap_get</code>, <code>aimeat_datamap_set</code>"
      ],
-     "plain": "Data map Read what an app stores, why it stores it, the exact location, who can read it, how long it is kept and what could be lost. The map identifies personal data and missing explanations. /v1/datamap/apps/:owner/:filename, aimeat_datamap_get, aimeat_datamap_set"
+     "plain": "Data map Read what an app stores, why it stores it, the exact location, who can read it, how long it is kept and what could be lost. The map identifies personal data and missing explanations. A row can also name the classification the app expects for that data by default, such as confidential (see section 24). /v1/datamap/apps/:owner/:filename, aimeat_datamap_get, aimeat_datamap_set"
     },
     {
      "slug": "g-5-open-items",
@@ -3474,11 +3474,105 @@
      "plain": "Legacy Ed25519 challenge-response Deprecated, still mounted Device authorization and agent keys; the keypair still serves federation and node signing."
     }
    ]
+  },
+  {
+   "n": 24,
+   "title": "Data classification",
+   "slug": "g-24",
+   "lead": [
+    "Every piece of content you keep can carry a classification: how sensitive it is. The node comes with four: public, internal, confidential and highly confidential. You or an organism can add your own, such as top secret. The classification decides which people and which AI can read the content, and whether it can leave its organism. You classify content yourself, or the Content Classifier suggests a classification and you accept or reject it.",
+    "<strong>Availability.</strong> Off by default, and while it is off nothing changes. The operator turns it on for every owner, or lets each owner turn it on for their own content and each organism for its content. The setting is <code>AIMEAT_CLASSIFICATION</code> (<code>off</code>, <code>owner</code> or <code>all</code>).",
+    "<strong>Limitations.</strong>",
+    "- The node cannot check text that an agent writes into its own prompt. After an AI has read content, what it does with that text on its own side is outside the node.",
+    "- When an AI client drives your own signed-in REST session, the node cannot tell it apart from you, so it gets what you get.",
+    "- A published data package is not yet classified file by file.",
+    "- The classification pages in the Data Wallet and on the Security page are not yet on the node. Today you use the MCP tool or the REST endpoints below."
+   ],
+   "columns": [
+    "Feature",
+    "What you get",
+    "Reach"
+   ],
+   "reach": 2,
+   "rows": [
+    {
+     "slug": "g-24-classification-levels",
+     "cells": [
+      "<strong>Classification levels</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
+      "The four levels that come with the node, and the levels you or an organism add between them. An owner or an organism can only make the node's rules stricter: a change that would loosen a node rule is refused and names that rule.",
+      "<code>aimeat_classification</code> (<code>policy_get</code>, <code>policy_set</code>), <code>GET /v1/classification/policy</code>, <code>PUT /v1/classification/policy</code>"
+     ],
+     "plain": "Classification levels off The four levels that come with the node, and the levels you or an organism add between them. An owner or an organism can only make the node's rules stricter: a change that would loosen a node rule is refused and names that rule. aimeat_classification (policy_get, policy_set), GET /v1/classification/policy, PUT /v1/classification/policy"
+    },
+    {
+     "slug": "g-24-classify-content",
+     "cells": [
+      "<strong>Classify content</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
+      "Give a memory record, a workspace record or document, a stored file or a workspace row its classification. See its classification now, a waiting suggestion, and its last changes. An AI never lowers a classification and never changes one a person set: its choice becomes a suggestion that you accept or reject.",
+      "<code>aimeat_classification</code> (<code>get</code>, <code>set</code>, <code>review</code>), <code>GET /v1/classification/label</code>, <code>PUT /v1/classification/label</code>, <code>POST /v1/classification/label/review</code>"
+     ],
+     "plain": "Classify content off Give a memory record, a workspace record or document, a stored file or a workspace row its classification. See its classification now, a waiting suggestion, and its last changes. An AI never lowers a classification and never changes one a person set: its choice becomes a suggestion that you accept or reject. aimeat_classification (get, set, review), GET /v1/classification/label, PUT /v1/classification/label, POST /v1/classification/label/review"
+    },
+    {
+     "slug": "g-24-what-an-ai-sees",
+     "cells": [
+      "<strong>What an AI sees</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
+      "AI never sees content whose classification hides it: it is not in the AI's lists, and a call that names it is refused with <code>CLASSIFIED</code>. Content with a warning classification reaches the AI with a warning, and the AI uses it only for the task it was given. By default highly confidential content is hidden and confidential content carries a warning.",
+      "every MCP tool and REST read an AI uses"
+     ],
+     "plain": "What an AI sees off AI never sees content whose classification hides it: it is not in the AI's lists, and a call that names it is refused with CLASSIFIED. Content with a warning classification reaches the AI with a warning, and the AI uses it only for the task it was given. By default highly confidential content is hidden and confidential content carries a warning. every MCP tool and REST read an AI uses"
+    },
+    {
+     "slug": "g-24-content-that-stays-in-its-organism",
+     "cells": [
+      "<strong>Content that stays in its organism</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
+      "An organism's content whose classification must not leave stays out of exports and out of federation to other nodes. By default only public content leaves.",
+      "exports, federation"
+     ],
+     "plain": "Content that stays in its organism off An organism's content whose classification must not leave stays out of exports and out of federation to other nodes. By default only public content leaves. exports, federation"
+    },
+    {
+     "slug": "g-24-content-classifier",
+     "cells": [
+      "<strong>Content Classifier</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
+      "Suggests or sets the classification of memory records. Detection rules run first (identity codes, API keys, email addresses and the rules you add), then the decision model or the text model that the policy names. Personal data is removed before any text goes to a model. New content is checked with the detection rules when it is written. One key, or up to 20 keys, is classified at once; more keys or a key prefix wait in a queue that the node works through within its daily limits.",
+      "<code>aimeat_classification</code> (<code>scan</code>), <code>POST /v1/classification/scan</code>"
+     ],
+     "plain": "Content Classifier off Suggests or sets the classification of memory records. Detection rules run first (identity codes, API keys, email addresses and the rules you add), then the decision model or the text model that the policy names. Personal data is removed before any text goes to a model. New content is checked with the detection rules when it is written. One key, or up to 20 keys, is classified at once; more keys or a key prefix wait in a queue that the node works through within its daily limits. aimeat_classification (scan), POST /v1/classification/scan"
+    },
+    {
+     "slug": "g-24-changes-that-loosen-the-policy-wait-for-you",
+     "cells": [
+      "<strong>Changes that loosen the policy wait for you</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
+      "A policy change that only makes rules stricter applies at once. A change that loosens them (turns classification off, lets an AI see more, removes an audit log or a rule, lowers the default) waits until you accept it signed in yourself. An AI cannot accept it.",
+      "<code>POST /v1/classification/policy/review</code>"
+     ],
+     "plain": "Changes that loosen the policy wait for you off A policy change that only makes rules stricter applies at once. A change that loosens them (turns classification off, lets an AI see more, removes an audit log or a rule, lowers the default) waits until you accept it signed in yourself. An AI cannot accept it. POST /v1/classification/policy/review"
+    },
+    {
+     "slug": "g-24-audit-log",
+     "cells": [
+      "<strong>Audit log</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
+      "For each level: which classified items an AI was shown or used, which were refused, and which classifications changed. One row per reader, item and action per minute, with a count.",
+      "<code>aimeat_classification</code> (<code>audit</code>), <code>GET /v1/classification/audit</code>"
+     ],
+     "plain": "Audit log off For each level: which classified items an AI was shown or used, which were refused, and which classifications changed. One row per reader, item and action per minute, with a count. aimeat_classification (audit), GET /v1/classification/audit"
+    },
+    {
+     "slug": "g-24-apps-state-the-classification-they-expect",
+     "cells": [
+      "<strong>Apps state the classification they expect</strong>",
+      "An app's data map can name, for each group of keys, the classification the app expects that data to have by default. It classifies nothing: it lets you compare what the builder meant with what the content has.",
+      "<code>aimeat_datamap_set</code>, <code>PUT /v1/datamap/apps/:owner/:filename</code>"
+     ],
+     "plain": "Apps state the classification they expect An app's data map can name, for each group of keys, the classification the app expects that data to have by default. It classifies nothing: it lets you compare what the builder meant with what the content has. aimeat_datamap_set, PUT /v1/datamap/apps/:owner/:filename"
+    }
+   ]
   }
  ],
  "outro": "AIMEAT Feature List, reviewed 2026-09-15 against node 3.15.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
-  "groups": 23,
-  "rows": 346
+  "groups": 24,
+  "rows": 354
  }
 }

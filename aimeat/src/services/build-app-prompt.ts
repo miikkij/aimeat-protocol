@@ -15,6 +15,10 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-09-29 — ADDITIVE, one paragraph ending Data Storage on classified content (TARGET-082 V5). To stay
+ *     under 800 lines, the provenance paragraph before it and the section "Reading data your AGENTS
+ *     produced" moved verbatim to build-app-prompt-content.ts; the prompt text is unchanged there.
+ *   2026-09-29 — ADDITIVE, one sentence ending the data-map section: the optional `classification` on a held row (TARGET-082 V5).
  *   2026-09-29 — The publish walkthrough's first step opens /v1/appcat instead of /app-catalog.html
  *     (Jouni). The address only; the steps are the same on both pages.
  *   2026-09-28 — The aimeat-ai line: the user's own AI providers, capabilities() for any capability
@@ -158,6 +162,7 @@ import { buildPromptLibrarySections } from '../data/library-packs.js';
 import { buildPromptSessionSections } from './build-app-prompt-session.js';
 import { buildPromptDrivenSection } from './build-app-prompt-driven.js';
 import { buildDecideSection } from './build-app-prompt-decide.js';
+import { buildRenderedContentParagraphs, buildAgentDataSection } from './build-app-prompt-content.js';
 import { buildResearchStep, buildFinishChecklist } from './appdev-flow-constants.js';
 
 export interface BuildAppPromptOptions {
@@ -268,7 +273,7 @@ function composeAppPrompt(
   body += 'Works only when logged in. After a write, read it back to confirm it persisted.\n';
   body += 'A key is a plain string: `get(key)` / `getPublic(gaii, key)` always return the LATEST value — never append a version, index or `:0`/`:N` suffix to a key, and read back the SAME key you wrote (a store-as-`x` / read-as-`x:0` mismatch just 404s and your UI shows nothing). To page a large list, store it as ONE array under one key (or shard with your OWN explicit id scheme), not a magic version suffix.\n';
   body += 'Shared feeds, journals, comments and discussions are ALL built this way — one public key per entry, `getPublic()` to read others\'. ONE shape is served better by a BOARD (`AIMEAT.social`, the aimeat-social lib): a notice board many people and agents post to and a visitor reads without signing in — announcements, for sale, wanted, on offer, questions. A board carries what keys cannot: a notice that expires on its own, priced public posting that keeps flood out, threaded replies, subscriptions with category filters, and flagging. Reach for it when the app IS such a board; keep a per-user journal or an app\'s own records on keys. Do not use an organism workspace for a PERSONAL app\'s data. **A group application is the exception and the workspace is exactly where its data belongs — see the group section below before you choose.** When a rule must be enforced server-side (only-author-can-delete, one-vote-per-user), that logic goes into an extension — see the extension guide, not into organisms.\n';
-  body += 'If you RENDER content an agent wrote, read it with `getPublicEntry(gaii, key)` instead: it returns the same entry plus `provenance` — how that content was made, including the model and the `sources` the writer declared. `getPublic()` returns the bare value and cannot carry it. Showing agent-written text with no origin, when the node is holding the record that explains it, is the gap the label is meant to close.\n\n';
+  body += buildRenderedContentParagraphs();
 
   // A GROUP app is a different shape and the rules above are not enough for it. Added 2026-08-24
   // after the CADENCE campaign work, where four separate defects were the same defect: data put in
@@ -354,11 +359,8 @@ function composeAppPrompt(
   body += '- **`why` is the field this exists for.** It is read at the exact moment somebody is about to move that data. Write the reason, not a restatement of the row: "campaigns belong to the customer, not to whoever sent them" stops a mistake; "campaigns are stored here" does not.\n';
   body += '- **Leave a `why` you do not know EMPTY.** An empty one shows as unfinished and somebody fills it. A plausible-sounding wrong one is believed and acted on, which is worse than the blank it replaced.\n';
   body += '- **`form` must match where the rows actually land.** An app you declare as `group` whose every row sits in `owner-memory-private` is flagged on sight — that contradiction is the single check this whole thing exists to make. If it fires, the map is not wrong; the storage is.\n';
-  body += 'A static page that stores nothing declares `"form": "static"` with an empty `held`, and that is a complete map. Nothing here can refuse a publish.\n\n';
+  body += 'A static page that stores nothing declares `"form": "static"` with an empty `held`, and that is a complete map. Nothing here can refuse a publish. A `held` row may also carry the optional `"classification"`: the label id of the classification you expect that data to have by default, such as `"luottamuksellinen"` (1 to 40 lowercase letters, digits and dashes). It labels nothing; leave it out when you do not know.\n\n';
 
-  // Reading what the owner's AGENTS produced. This is the single most common "my app shows
-  // nothing" cause for fleet-facing apps: agent output is NOT in the owner's namespace, and an
-  // app-grant token gets no automatic broadening, so an unscoped list() legitimately returns [].
   // An app's audit trail on the group it belongs to. Added 2026-08-29 with the two-hand rule:
   // the organism names the app, the person approves the scope, and only both open ONE space.
   body += '### An event log or audit trail the app keeps on a group: organism row spaces\n';
@@ -372,17 +374,8 @@ function composeAppPrompt(
   body += '```\n';
   body += 'A space that does not name the app answers 403 and says so — show that sentence, and tell the person which organism admin can open it. Nothing else on the organism opens through this scope: no other space, no records, no documents. Put the space in the data map as `where: "organism-rows"`, and write `rowId` for anything that may be sent twice, so a retry replaces instead of duplicating.\n\n';
 
-  body += '### Reading data your AGENTS produced (not your own keys)\n';
-  body += 'An agent publishes under **its own** namespace (`agentname#owner@node`), NOT the owner\'s. Your app token is role `app`, which gets no automatic owner-scope broadening — so a plain `list({prefix})` returns NOTHING for agent data and the app looks empty while the data is right there. Say which namespace you mean:\n';
-  body += '```javascript\n';
-  body += '// every same-owner namespace (owner GHII + all their agents) — the usual choice:\n';
-  body += 'const { items } = await AIMEAT.data.list({ prefix: "crews.", ownerScope: true, meta: true });\n';
-  body += '// one specific agent (full GAII), e.g. from AIMEAT.agents.list():\n';
-  body += 'const mine = await AIMEAT.data.list({ prefix: "watch.", agent: "uutisankka#alice@node-id" });\n';
-  body += 'const value = await AIMEAT.data.get(items[0].key, { agent: items[0].owner_gaii });\n';
-  body += '```\n';
-  body += '**`meta: true` on any listing you render as a table/board/archive.** The default response inlines EVERY value, so a fleet-wide prefix can be megabytes on each load; `meta` returns keys + `bytes` + `tags` + `updated_at` and you fetch a value only when the user opens that row. `count: true` (or `AIMEAT.data.count({prefix})`) returns just a number — the cheap way to ask "did anything change?".\n';
-  body += 'Each listed item carries `owner_gaii` (which namespace it lives in) and `tags`. Agent task-runners commonly tag their published output `task:<taskId>`, which is how you tie a record back to the task that produced it — `task.deliverableKey` is OPTIONAL and many agents never set it, so never require that field to find a result. `AIMEAT.agents.deliverable()` already falls back to the tag.\n\n';
+  // Reading what the owner's AGENTS produced: services/build-app-prompt-content.ts (moved verbatim).
+  body += buildAgentDataSection();
 
   // Public Intake — the ONLY way an anonymous (not-logged-in) visitor can submit data into an owner's
   // space. Every other write path requires auth, so lead/contact/feedback/RSVP/survey forms need this.

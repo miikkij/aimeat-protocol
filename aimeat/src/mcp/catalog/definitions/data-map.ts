@@ -14,6 +14,7 @@
  * @structure dataMapTools — the three definitions
  * @usage imported by catalog/definitions.ts into CLI_FALLBACK_TOOL_DEFINITIONS
  * @version-history
+ *   2026-09-29 — The `data_map` parameter of aimeat_datamap_set names the optional `classification` on a held row (TARGET-082 V5). DATA_MAP_PARAM lists no optional fields, so it is unchanged.
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v2.1.0 — 2026-09-20 — DATA_MAP_PARAM: what the `data_map` parameter says on both MCP doors,
  *     built from the service's own spec constant, with a whole example object an E2E test writes.
@@ -56,7 +57,7 @@ export const dataMapTools: AimeatToolDefinition[] = [
         visibility: agentEverywhere,
         input: {
             app: { type: 'string', required: true, description: 'The app, as "owner/filename.html".' },
-            data_map: { type: 'object', required: true, description: 'The whole map, carrying spec "aimeat.datamap/2": what, usedFor, form, arrangement, machinery, leaves, held[], elsewhere[]. A held row may also carry `isA`, the semantic type its records ARE — schema:Person, aimeat:Task, or a full IRI (GET /v1/ns lists the ones this node names). It is the only optional field on a row: `kind` and `holds` say what the data is in the app\'s own words, and `isA` says the same in a word other systems already know, which is what makes the family findable with the type filter on memory search. A family that is genuinely nothing standard leaves it out rather than reaching for the nearest wrong type.' },
+            data_map: { type: 'object', required: true, description: 'The whole map, carrying spec "aimeat.datamap/2": what, usedFor, form, arrangement, machinery, leaves, held[], elsewhere[]. A held row may also carry `isA`, the semantic type its records ARE — schema:Person, aimeat:Task, or a full IRI (GET /v1/ns lists the ones this node names). `kind` and `holds` say what the data is in the app\'s own words, and `isA` says the same in a word other systems already know, which is what makes the family findable with the type filter on memory search. A family that is genuinely nothing standard leaves it out rather than reaching for the nearest wrong type. A held row may also carry `classification`, the label id of the classification the app expects for that family by default, such as "luottamuksellinen" (1 to 40 lowercase letters, digits and dashes). It labels nothing and never refuses the map; an id of the wrong shape comes back as a finding. These two are the only optional fields on a row.' },
         },
     },
     {

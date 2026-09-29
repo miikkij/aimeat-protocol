@@ -15,6 +15,8 @@
  * @structure summariseMap · checkMap · noMapStamp · FINDING_CODES
  * @usage import { summariseMap, checkMap } from './data-map-check.js';
  * @version-history
+ *   v1.2.0 — 2026-09-29 — DATAMAP_ROW_BAD_CLASSIFICATION: a row's optional `classification` that
+ *     cannot be a label id is a finding, last in the order, and never a refusal (TARGET-082 V5).
  *   v1.1.0 — 2026-08-26 — `organism-rows` gets its own words, and counts as being in an organism for
  *     the form contradiction — without that, an app whose only shared space is a row store would be
  *     accused of keeping the team's data in one person's memory.
@@ -34,7 +36,19 @@ export const FINDING_CODES = [
   'DATAMAP_FORM_CONTRADICTED',
   'DATAMAP_ROW_NO_WHY',
   'DATAMAP_NO_ROWS',
+  'DATAMAP_ROW_BAD_CLASSIFICATION',
 ] as const;
+
+/**
+ * The shape of a classification label id. The same pattern services/classification/levels.ts holds
+ * a level's id to, so a row can only name something that could be a label. It checks the SHAPE and
+ * not whether the level exists: the owner or an organism may add a level after the map is written.
+ */
+const LABEL_ID = /^[a-z0-9][a-z0-9-]{0,39}$/;
+
+/** True when a row's optional `classification` is present and cannot be a label id. */
+const badClassification = (r: DataMapRow): boolean =>
+  r.classification !== undefined && !(typeof r.classification === 'string' && LABEL_ID.test(r.classification));
 
 export type FindingCode = typeof FINDING_CODES[number];
 
@@ -163,6 +177,15 @@ export function checkMap(map: DataMap | null, at: string): MapCheck {
       code: 'DATAMAP_ROW_NO_WHY',
       message: `${noWhy.length} of ${map.held.length} rows do not say why the data is there rather `
         + 'than somewhere else. That sentence is read at the moment somebody is about to move it.',
+    });
+  }
+  const badLabel = map.held.filter(badClassification);
+  if (badLabel.length > 0) {
+    findings.push({
+      code: 'DATAMAP_ROW_BAD_CLASSIFICATION',
+      message: `${badLabel.length} of ${map.held.length} rows name a classification that cannot be a `
+        + 'label id: use 1 to 40 lowercase letters, digits and dashes, such as "luottamuksellinen", '
+        + `or leave the field out. Rows: ${badLabel.map(r => r.what).join(', ')}.`,
     });
   }
 

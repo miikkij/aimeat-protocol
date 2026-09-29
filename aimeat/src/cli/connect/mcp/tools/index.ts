@@ -8,6 +8,7 @@
  *   client to use. Single-agent installs are unchanged in UX (agent_name is
  *   optional and defaults to the only loaded agent).
  * @version-history
+ *   v2.6.0 -- 2026-09-29 -- Register aimeat_classification (TARGET-082 V5).
  *   v2.5.0 -- 2026-09-29 -- Register the mail refinery tools (aimeat_refinery_classes/run/status).
  *   v1.5.0 -- 2026-09-28 -- Register aimeat_admin_install_set.
  *   v1.4.0 -- 2026-09-28 -- Register aimeat_ai_capabilities, aimeat_ai_models, aimeat_ai_transcribe and aimeat_ai_embed.
@@ -81,6 +82,7 @@ import { registerOperatorTools } from './operator.js';
 import { registerComplianceTools } from './compliance.js';
 import { registerInstallSetTools } from './install-sets.js';
 import { registerDataMapTools } from './data-map.js';
+import { registerClassificationTools } from './classification.js';
 
 export function registerAllTools(mcp: McpServer, registry: AgentRegistry): void {
   registerCoreTools(mcp, registry);
@@ -138,4 +140,5 @@ export function registerAllTools(mcp: McpServer, registry: AgentRegistry): void 
   registerComplianceTools(mcp, registry);
   registerInstallSetTools(mcp, registry);
   registerDataMapTools(mcp, registry);
+  registerClassificationTools(mcp, registry);
 }

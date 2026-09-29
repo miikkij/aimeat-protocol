@@ -3,23 +3,70 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The classification tool (TARGET-082 V2): the classification of a piece of content,
- *   and the policy at the node, owner or organism level. On the node's MCP endpoint only until the
- *   connector and the CLI get it with the other surfaces (V5).
- * @structure classificationTools
- * @usage imported by catalog/definitions.ts
+ *   and the policy at the node, owner or organism level. On all three surfaces: the node's MCP
+ *   endpoint (src/mcp/classification.ts), the connector MCP (src/cli/connect/mcp/tools/classification.ts)
+ *   and the CLI dispatch (src/tool-dispatch/tool-call-defs-classification.ts); the last two send the
+ *   call to /v1/classification/* through src/tool-dispatch/classification-call.ts.
+ * @structure classificationTools · POLICY_PENDING_NEXT · CLASSIFICATION_ACTION_FIELDS ·
+ *   checkClassificationInput()
+ * @usage imported by catalog/definitions.ts and src/tool-dispatch/classification-call.ts
  * @version-history
+ *   v1.3.0 — 2026-09-29 — V5: visibility agentEverywhere (the connector MCP and the CLI dispatch);
+ *     POLICY_PENDING_NEXT, the hint added to a policy change that waits; and the field list per
+ *     action with checkClassificationInput(), which the REST-backed surfaces use to refuse a field
+ *     its action does not read.
  *   v1.2.0 — 2026-09-29 — V3: the scan action.
  *   v1.1.0 — 2026-09-29 — V4: the audit action, and what an AI sees of classified content.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V2. Initial.
  */
-import type { AimeatToolDefinition } from './types.js';
+import { agentEverywhere, type AimeatToolDefinition } from './types.js';
+
+/**
+ * Added to a policy_set answer that the node kept as a proposal, on every surface, so an AI knows
+ * the next step is the person's and not its own.
+ */
+export const POLICY_PENDING_NEXT = 'This gives something away, so it waits. Ask the person to accept or reject it signed in themselves (POST /v1/classification/policy/review); an AI cannot accept it.';
+
+const TARGET_FIELDS = ['kind', 'key', 'organism_id', 'ws', 'space', 'row_id'];
+
+/** The fields each action reads. A field outside its action's list would be ignored in silence. */
+export const CLASSIFICATION_ACTION_FIELDS: Record<string, string[]> = {
+    get: TARGET_FIELDS,
+    set: [...TARGET_FIELDS, 'label', 'justification', 'human_said', 'confidence', 'reason'],
+    review: [...TARGET_FIELDS, 'decision', 'justification', 'human_said'],
+    policy_get: ['level', 'organism_id'],
+    policy_set: ['level', 'organism_id', 'policy', 'human_said'],
+    audit: ['level', 'organism_id', 'since', 'audit_action', 'limit'],
+    scan: ['keys', 'prefix', 'key'],
+};
+
+/** Fields an interface or a wrapper adds to every call, which no action reads itself. */
+const INTERFACE_FIELDS = ['action', 'agent_name', 'response_format', 'ai_provenance', 'ai_provenance_id'];
+
+/**
+ * Check one call against its action's field list: an unknown action, or a field the action does not
+ * read, is refused with every problem named at once, so the caller does not lose a value it meant.
+ * @param {Record<string, unknown>} input the call's arguments
+ * @returns {{ ok: true, action: string } | { ok: false, message: string }}
+ */
+export function checkClassificationInput(input: Record<string, unknown>): { ok: true; action: string } | { ok: false; message: string } {
+    const action = typeof input.action === 'string' ? input.action : '';
+    const fields = CLASSIFICATION_ACTION_FIELDS[action];
+    if (!fields) {
+        return { ok: false, message: `action is one of: ${Object.keys(CLASSIFICATION_ACTION_FIELDS).join(', ')}.${action ? ` "${action}" is not one.` : ''}` };
+    }
+    const allowed = new Set([...fields, ...INTERFACE_FIELDS]);
+    const foreign = Object.keys(input).filter(f => input[f] !== undefined && input[f] !== null && !allowed.has(f));
+    if (!foreign.length) return { ok: true, action };
+    return { ok: false, message: `action "${action}" does not take: ${foreign.join(', ')}. Its fields: ${fields.join(', ')}.` };
+}
 
 export const classificationTools: AimeatToolDefinition[] = [
     {
         name: 'aimeat_classification',
         description: 'How sensitive a piece of content is, and the rules for that. Every memory record, workspace record or document, stored file and workspace row has a classification: public, internal, confidential, highly confidential, or a level the owner or an organism added, such as top secret. The classification decides which people and which AI may read it and whether it may leave its organism. ACTIONS: get (the classification of one item, its waiting suggestion and its last changes), set (give it a classification), review (the person accepts or rejects a waiting suggestion; relay their words in human_said), policy_get (the labels, detection rules, default and AI mode that apply at level node, owner or organism, and whether classification is on), policy_set (replace a level: read it with policy_get and send `stored` back changed), audit (the log of a level: which classified items were shown to or used by an AI, which were refused and which classifications changed; one row per reader, item and action per minute, with a count), scan (the Content Classifier judges memory keys: `key` or up to 20 `keys` at once, more keys or a `prefix` wait in a queue the server works through within the daily caps; detection rules run first, then the decision model or the text model the policy names, with personal data removed before anything leaves; its label follows the same AI rules as yours). WHAT YOU SEE: an item whose classification hides it from AI is not in your lists and reads as absent; an AI call that names one is refused (CLASSIFIED); an item with a warning classification carries classification_warning, and you use it only for the task you were given. WHAT YOU MAY DO: your own judgement never lowers a classification and never changes one a person set; it becomes a suggestion the person accepts or rejects. When the person told you what to set, pass their own words, verbatim, in human_said: the classification is then theirs. A policy change that only tightens applies at once. One that gives anything away (turns classification off, lets an AI see more, drops an audit trail or a rule, lowers the default) waits until the person accepts it signed in themselves; you cannot accept it. A lower level only tightens the node: an owner or an organism adds its own labels between the node\'s ones and adds rules, and a refusal names the node\'s rule it would have loosened.',
         caller: 'agent',
-        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        visibility: agentEverywhere,
         input: {
             action: { type: 'string', required: true, enum: ['get', 'set', 'review', 'policy_get', 'policy_set', 'audit', 'scan'], description: 'What to do.' },
             keys: { type: 'array', description: 'scan: memory keys to classify.' },
