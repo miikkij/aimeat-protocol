@@ -1562,6 +1562,9 @@ components:
         count: { type: integer, description: How many times it was refused while open. }
         first_at: { type: string, format: date-time }
         last_at: { type: string, format: date-time }
+        declined:
+          type: boolean
+          description: The owner declined to give the permission. The owner's agent list leaves a declined refusal out; the agent's own read keeps it.
 
     AgentScopeRequest:
       type: object
@@ -50956,6 +50959,60 @@ paths:
                               $ref: '#/components/schemas/AgentRefusal'
                           scope_request:
                             $ref: '#/components/schemas/AgentScopeRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/agents/{name}/refusals/decline:
+    post:
+      operationId: declineAgentRefusals
+      summary: The owner will not give the permissions behind the agent's refusals
+      description: |
+        The owner's answer "no" to the agent's open refusals: they leave the owner's views (the
+        agent card, `refusals` on the agent list) and the agent still reads them, flagged
+        `declined`, because its run was still refused. `needed` limits it to the refusals that
+        needed any of those scopes; omitted, every open refusal. The owner in person only, like
+        giving a permission (PATCH /v1/agents/{name}/scopes).
+      tags: [Agents]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                needed:
+                  type: array
+                  maxItems: 50
+                  items: { type: string }
+      responses:
+        '200':
+          description: How many refusals were declined
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          agent: { type: string }
+                          declined: { type: integer }
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':

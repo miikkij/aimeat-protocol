@@ -23,6 +23,7 @@
  * @version-history v1.9.19 -- 2026-05-28 -- Add shared owner-memory tag guidance after onboarding.
  * @version-history v1.9.20 -- 2026-05-28 -- Move Hello Integration instruction into shared onboarding-prompt.ts to remove duplication with skill-bundle.ts.
  * @version-history v2.0.0 -- 2026-05-29 -- Write per-agent config alongside token + token table; mark first agent as primary so multi-agent serve has a sensible default.
+ * @version-history v2.1.0 -- 2026-09-30 -- `--scopes a,b,c`: the permissions the agent asks for go into the device authorization request.
  */
 import { AimeatClient } from './api-client.js';
 import { storeToken, getToken, listAllTokens } from './keychain.js';
@@ -40,6 +41,13 @@ interface AuthArgs {
   owner?: string;
   agent?: string;
   mode?: string;
+  /**
+   * The permissions this agent asks for, comma-separated (`task:read,task:write,agent:write`). Sent
+   * as `scopes` in the device authorization request, so the owner's consent screen shows them and an
+   * approval that names none grants them. Without it the node's default set applies, which cannot
+   * take work, and the refusals come later as SCOPE_DENIED.
+   */
+  scopes?: string;
 }
 
 interface ProgressHandle {
@@ -252,6 +260,14 @@ export async function runAuth(args: AuthArgs): Promise<void> {
     }
   }
 
+  const scopes = typeof args.scopes === 'string'
+    ? args.scopes.split(',').map(x => x.trim()).filter(Boolean)
+    : [];
+  if (typeof args.scopes === 'string' && scopes.length === 0) {
+    fail('Invalid --scopes: give the permissions comma-separated, e.g. --scopes task:read,task:write');
+    process.exit(1);
+  }
+
   const s = createProgress(interactive, prompts);
   s.start('Requesting device authorization...');
 
@@ -261,6 +277,7 @@ export async function runAuth(args: AuthArgs): Promise<void> {
       agent_name: agentName,
       owner,
       ...(mode ? { mode } : {}),
+      ...(scopes.length ? { scopes } : {}),
     });
   } catch (e) {
     s.stop('Authorization request failed.');

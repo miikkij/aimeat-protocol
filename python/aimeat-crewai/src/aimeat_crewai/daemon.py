@@ -16,7 +16,8 @@ This is the second half of the AIMEAT-CrewAI integration story:
 Changelog:
   0.31.0 -- 2026-09-30 -- A run the node refused is not reported as a success. After each task
     kickoff the daemon asks the node which of this agent's calls it refused for a missing permission
-    since the run started (GET /v1/agents/{name}/refusals?since=...). If any, the run raises
+    since the run started (GET /v1/agents/{name}/refusals?since=...). The run starts before the crew
+    is built, because a builder may already act on the node. If any, the run raises
     `NodeRefusedDuringRun`: it is printed as "refused", passed to `on_error`, and an EXECUTE task is
     failed with a message that names the call and the permission. A refused PROPOSE is not retried,
     because the refusal stands until the owner grants the permission. The node puts the same
@@ -1694,9 +1695,11 @@ def run_crew_daemon(
         task_id = task.get("id", "(unknown id)")
         title = task.get("title", "(no title)")
         print(f"[daemon:{agent_name}] {phase_label} task {task_id}: {title}")
+        # The run starts before the crew is built: a builder may already act on the node (a
+        # deterministic crew does its whole job there), and a refusal then belongs to this run.
+        started = _run_started_iso()
         crew = builder(task, liaison)
         try:
-            started = _run_started_iso()
             with usage_run(task_id, agent_name):
                 result = crew.kickoff()
             # A kickoff that returned is not yet a run that worked: the node may have refused its
@@ -1753,8 +1756,8 @@ def run_crew_daemon(
                     print(f"[daemon:{agent_name}] EXECUTE task {task_id} cancelled before start -- skipping")
                     _fail_cancelled(api, task_id)
                     return (task_id, "cancelled")
-                crew = build_crew(task, worker_liaison)
                 started = _run_started_iso()
+                crew = build_crew(task, worker_liaison)
                 with usage_run(task_id, agent_name):
                     result = crew.kickoff()
                 _check_run_refusals(api, started)

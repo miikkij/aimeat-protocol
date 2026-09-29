@@ -12,11 +12,14 @@
  *     3. The agent reads the same refusal itself, and `since` after it hides it (the run window).
  *     4. The agent's open task carries a `scope_denied` event naming the permission.
  *     5. An agent cannot forge a `scope_denied` event, and another owner reads nothing.
- *     6. Granting the permission closes the refusal; deleting the agent removes its records.
+ *     6. The owner declines: the refusal leaves the owner's list and the agent still reads it,
+ *        flagged; the agent cannot decline for its owner.
+ *     7. Granting the permission closes the refusal; deleting the agent removes its records.
  * @usage
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=agent-refusals
  * @version-history
+ *   v1.1.0 — 2026-09-30 — The owner's decline (POST /v1/agents/:name/refusals/decline).
  *   v1.0.0 — 2026-09-30 — Initial, with the feature.
  */
 
@@ -214,7 +217,44 @@ await test('Another owner reads none of it', async () => {
     assert(!(l.body.data.agents as any[]).some(x => x.name === AGENT), 'another owner\'s list carried the agent');
 });
 
-console.log('\nPhase 4: how it goes stale');
+console.log('\nPhase 4: the owner declines');
+
+await test('A second refusal, for a permission the owner will not give, joins the first', async () => {
+    const r = await json('/v1/ai-transparency/mine', auth(agentToken));
+    assert(r.status === 403 && r.body.error?.code === 'SCOPE_DENIED', `expected 403 SCOPE_DENIED, got ${r.status} ${JSON.stringify(r.body.error)}`);
+    const a = await eventually(listedAgent, (x) => (x?.refusals?.length ?? 0) === 2, 'two refusals on the agent list');
+    assert(a.refusals.some((f: any) => f.needed[0] === 'wallet:read'), `refusals: ${JSON.stringify(a.refusals)}`);
+});
+
+await test('The agent cannot decline its own refusals', async () => {
+    const r = await json(`/v1/agents/${AGENT}/refusals/decline`, auth(agentToken, { method: 'POST', body: '{}' }));
+    assert(r.status === 403, `an agent declining for its owner: ${r.status} ${JSON.stringify(r.body)}`);
+});
+
+await test('The owner declines one permission: it leaves the list, the agent is still told', async () => {
+    const d = await json(`/v1/agents/${AGENT}/refusals/decline`, auth(ownerToken, { method: 'POST', body: JSON.stringify({ needed: ['wallet:read'] }) }));
+    assert(d.status === 200 && d.body.data.declined === 1, `decline: ${d.status} ${JSON.stringify(d.body)}`);
+    const a = await listedAgent();
+    assert(a.refusals.length === 1 && a.refusals[0].needed[0] === 'agent:write', `owner list after decline: ${JSON.stringify(a.refusals)}`);
+    const r = await json(`/v1/agents/${AGENT}/refusals`, auth(agentToken));
+    const w = (r.body.data.refusals as any[]).find(f => f.needed[0] === 'wallet:read');
+    assert(w && w.declined === true, `the agent's own read: ${JSON.stringify(r.body.data.refusals)}`);
+});
+
+await test('A declined permission stays declined when the agent tries it on another route', async () => {
+    const r = await json('/v1/app-store/purchases', auth(agentToken));
+    assert(r.status === 403 && r.body.error?.code === 'SCOPE_DENIED', `expected 403 SCOPE_DENIED, got ${r.status} ${JSON.stringify(r.body.error)}`);
+    // The agent's own read shows the new call, declined; the owner's list still has only agent:write.
+    const own = await eventually(async () => {
+        const x = await json(`/v1/agents/${AGENT}/refusals`, auth(agentToken));
+        return (x.body.data.refusals ?? []) as any[];
+    }, (list) => list.some(f => f.call === 'GET /v1/app-store/purchases'), 'the second wallet:read call on the agent\'s own read');
+    assert(own.find(f => f.call === 'GET /v1/app-store/purchases').declined === true, `not declined: ${JSON.stringify(own)}`);
+    const a = await listedAgent();
+    assert(a.refusals.length === 1 && a.refusals[0].needed[0] === 'agent:write', `owner list: ${JSON.stringify(a.refusals)}`);
+});
+
+console.log('\nPhase 5: how it goes stale');
 
 await test('Granting the permission closes the refusal on the next read', async () => {
     const g = await json(`/v1/agents/${AGENT}/scopes`, auth(ownerToken, {
