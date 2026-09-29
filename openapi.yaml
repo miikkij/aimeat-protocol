@@ -24636,8 +24636,8 @@ paths:
         because the node-wide policy and a per-peer switch must both say yes. `offer` counts only
         what somebody ticked Federate on. `versions_behind` is measured against `newest_version`,
         which spans the peers, the federation book and this node. `relay_claims` says which peers
-        are not ready for signed relay claims before the default becomes `required` (3.20.0;
-        `optional` is removed in 4.0.0): `not_ready`, `ready`, `unseen`, the peers kept on their own
+        are not ready for signed relay claims, which the default requires from 3.20.0 (`optional`
+        is still taken when set, and is removed in 4.0.0): `not_ready`, `ready`, `unseen`, the peers kept on their own
         setting, and `node_setting`. Each `roster` row carries `relay_claim`: the peer's own
         `setting` (or null), the `effective` one, `first_signed_at`, `last_claimed_at` and
         `last_unclaimed_at` (each written at most every ten minutes), and `state`. An unclaimed relay
@@ -24836,8 +24836,8 @@ paths:
       description: |
         Whether a relayed request that NAMES this peer and carries no signed relay claim is let
         through, decided for this peer alone. `federation.relay_claim` is the node's answer: its
-        default becomes `required` in 3.20.0, and `optional` is removed in 4.0.0. Until then
-        `optional` here keeps a peer that has not updated relaying after the node turns `required`,
+        default is `required` from 3.20.0, and `optional` is removed in 4.0.0. Until then
+        `optional` here keeps a peer that has not updated relaying while the node is on `required`,
         `required` holds one peer to signing before the node does, and `node` follows the node's
         setting again. The name on an unclaimed relay is the sender's own word, so keeping a peer on
         `optional` admits any unclaimed relay naming it. A peer that has ever presented a valid claim

@@ -6,6 +6,8 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.10.1 -- 2026-09-29 -- The federation paragraph says the relay-claim default is required from
+ *     3.20.0.
  *   v1.10.0 -- 2026-09-29 -- aimeat_package_sale: sell a repository's packages with no token.
  *   v1.9.0 -- 2026-09-28 -- aimeat_admin_install_set: plan first, ask for the missing values, apply.
  *   v1.8.0 -- 2026-09-25 -- The federation paragraph names relay_claims.not_ready and
@@ -65,8 +67,9 @@ true: \`signin.reaches_nobody\` means the sign-in policy is on and admits nobody
 \`offer.gives_nothing\` means this node reads the federation and puts nothing into it, which is
 usually nobody's decision. \`book.age_days\` says whether the directory is worth mirroring again.
 \`relay_claims.not_ready\` names the peers still relaying here without a signed claim: the default
-turns required in 3.20.0, so tell the operator before then. \`aimeat_admin_federation_relay_claim_set\`
-keeps one such peer on optional until it updates, or holds one to required early.
+is required from 3.20.0, so this node refuses those relays unless it is set to optional. Tell the
+operator. \`aimeat_admin_federation_relay_claim_set\` keeps one such peer on optional until it
+updates, or holds one to required while the node is on optional.
 
 **Install sets (operator).** \`aimeat_admin_install_set\` sets this node up for a customer from an
 install bundle bought from a package repository: the owner user, the packages, the organisms and
