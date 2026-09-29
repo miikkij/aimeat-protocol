@@ -16,6 +16,7 @@
  *   - Phase 4: the second apply: nothing twice, the agent deployed through the runner
  *   - Phase 5: a set whose owner has no account creates the account
  *   - Phase 6: the operator's agent, holding operator:admin, plans and lists over MCP
+ *   - Phase 6b: an owner the shop created before the set is welcomed while nobody has signed in to it
  *   - Phase 7: a new node started with AIMEAT_INSTALL_SET links the repository, is refused until it
  *     is entitled, tries again and applies the set; the shop's agent grants the bundle and registers
  *     the node as a packages-only peer in one call; a key that differs is refused on both sides
@@ -24,6 +25,7 @@
  *     node that is not a seller, an agent without operator:admin and a replayed signature are refused
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-install-sets
  * @version-history
+ *   v1.2.0 — 2026-09-29 — Phase 6b: the welcome for an owner the shop created before the set.
  *   v1.1.0 — 2026-09-29 — The welcome sign-in link for accounts the apply creates, and the browser
  *     endpoint it points at; mail is captured in process.
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 4).
@@ -40,6 +42,8 @@ import { sign, generateKeyPair } from '../src/auth/keypair.js';
 import type { AimeatConfig } from '../src/config.js';
 import type { Server } from 'node:http';
 import { setActiveEmailService, type EmailService } from '../src/services/email.js';
+import { provisionOwner } from '../src/services/owner-provisioning.js';
+import type { Storage } from '../src/storage/interface.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -53,7 +57,7 @@ async function test(name: string, fn: () => Promise<void>) {
 function assert(cond: boolean, msg: string) { if (!cond) throw new Error(msg); }
 
 interface NodeState {
-    server: Server; config: AimeatConfig; baseUrl: string; nodeId: string; adminPw: string;
+    server: Server; config: AimeatConfig; storage: Storage; baseUrl: string; nodeId: string; adminPw: string;
     json: (p: string, o?: RequestInit) => Promise<{ status: number; body: any }>;
 }
 
@@ -90,9 +94,9 @@ async function bootNode(port: number, nodeId: string, repository: boolean, extra
     config.packageRepository = repository;
     Object.assign(config, extra);
 
-    const { app } = await createServer(config);
+    const { app, storage } = await createServer(config);
     const server = await new Promise<Server>((resolve) => { const s = app.listen(port, '127.0.0.1', () => resolve(s)); });
-    return { server, config, baseUrl: `http://127.0.0.1:${port}`, nodeId, adminPw, json: makeJson(`http://127.0.0.1:${port}`) };
+    return { server, config, storage, baseUrl: `http://127.0.0.1:${port}`, nodeId, adminPw, json: makeJson(`http://127.0.0.1:${port}`) };
 }
 
 const ownerKeys = new Map<string, string>();
@@ -475,6 +479,35 @@ await test('An agent of the operator holding operator:admin plans and lists the 
     const list = await rpc('tools/call', { name: 'aimeat_admin_install_set', arguments: { action: 'list' } }, 3);
     const listed = JSON.parse(list.result.content[0].text);
     assert(listed.install_sets.length === 2, `list: ${JSON.stringify(listed).slice(0, 300)}`);
+});
+
+console.log('\nPhase 6b — An owner the shop created before the set');
+
+const PRECO = `preco${ts}@example.org`;
+const USEDCO = `usedco${ts}@example.org`;
+await test('An owner the shop created, never signed in to, with the set\'s verified address, is welcomed once', async () => {
+    // What the shop's automation does before the node applies the set: the account, verified email,
+    // no sign-in link switched on.
+    await provisionOwner(C.storage, C.config, { via: 'provisioning', username: 'preco', displayName: 'Preco', verifiedEmail: PRECO });
+    const body = JSON.stringify({ install_set: installSet({ owner: { name: 'preco', email: PRECO }, members: [], organism_names: { team: 'Preco' } }) });
+    const r = await C.json('/v1/install-sets/apply', { method: 'POST', headers: auth(opsToken), body });
+    assert(r.status === 201 && r.body.data.owner_created === false, `apply: ${r.status} ${JSON.stringify(r.body).slice(0, 400)}`);
+    const sent = mailsTo(PRECO).filter(m => m.method === 'sendRaw');
+    assert(r.body.data.record.welcomed?.includes(PRECO) && sent.length === 1 && String(sent[0].args[2]).includes('/v1/ghii/magic-link/open?token='),
+        `preco is welcomed with a sign-in link: ${JSON.stringify(mailsTo(PRECO).map(m => [m.method, m.args[0]]))}`);
+    const again = await C.json('/v1/install-sets/apply', { method: 'POST', headers: auth(opsToken), body });
+    assert(again.status === 201 && mailsTo(PRECO).filter(m => m.method === 'sendRaw').length === 1, `welcomed once: ${mailsTo(PRECO).length}`);
+});
+
+await test('An owner someone has already signed in to gets no welcome', async () => {
+    const made = await provisionOwner(C.storage, C.config, { via: 'provisioning', username: 'usedco', displayName: 'Usedco', verifiedEmail: USEDCO });
+    await C.storage.updateGHII(made.ghii.ghii, { loginCount: 1, lastLoginAt: new Date().toISOString() });
+    const r = await C.json('/v1/install-sets/apply', {
+        method: 'POST', headers: auth(opsToken),
+        body: JSON.stringify({ install_set: installSet({ owner: { name: 'usedco', email: USEDCO }, members: [], organism_names: { team: 'Usedco' } }) }),
+    });
+    assert(r.status === 201 && !(r.body.data.record.welcomed ?? []).includes(USEDCO) && mailsTo(USEDCO).length === 0,
+        `no mail for a used account: ${JSON.stringify({ welcomed: r.body.data.record.welcomed, mails: mailsTo(USEDCO).length })}`);
 });
 
 console.log('\nPhase 7 — A new node applies its set at start-up');

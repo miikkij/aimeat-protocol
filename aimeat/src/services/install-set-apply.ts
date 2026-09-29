@@ -32,6 +32,8 @@
  * @usage
  *   const out = await applyInstallSet({ storage, config, peers }, { installSet, secrets, dryRun: true });
  * @version-history
+ *   v1.3.0 — 2026-09-29 — An owner account the shop created before the set is welcomed too, while
+ *     nobody has signed in to it and its verified address is the set's (ownerToWelcome()).
  *   v1.2.0 — 2026-09-29 — The record keeps the accounts the set created (`accounts_created`) and the
  *     ones sent the welcome sign-in link (`welcomed`); a finished apply mails the rest.
  *   v1.1.0 — 2026-09-29 — The apply's pulls say they come from an install set, so the named repository
@@ -43,7 +45,7 @@ import type { Storage, PackageRecord, PackageComponent, InstalledComponent } fro
 import type { Scheduler } from './scheduler.js';
 import type { PeerInfo } from './federation.js';
 import { parseInstallSet, parseGroupConfig, bundleOfComponents, type InstallSet, type InstallBundle, type BundlePackage } from './install-set-spec.js';
-import { checkOwner, ensureOwner, joinMember, welcomeCreated, type MemberOutcome, type CreatedOrganisms } from './install-set-people.js';
+import { checkOwner, ensureOwner, joinMember, ownerToWelcome, welcomeCreated, type MemberOutcome, type CreatedOrganisms } from './install-set-people.js';
 import { installPackage, type PackageInstallCaller, type PackageInstallPreview } from './package-install.js';
 import { pullPackage } from './package-pull.js';
 import { getPackageFor } from './package-read.js';
@@ -320,6 +322,8 @@ export async function applyInstallSet(deps: ApplyDeps, input: ApplyInput): Promi
         Object.entries(comps).flatMap(([c, fields]) => Object.keys(fields).map(f => `${g}/${c}/${f}`)))])];
     const created = new Set(record.accounts_created ?? []);
     if (owner.created) created.add(set.owner.email.toLowerCase());
+    // An owner the shop created before the set is welcomed as well, while nobody has signed in to it.
+    const ownerWelcome = !owner.created && await ownerToWelcome(storage, config, set.owner);
 
     // A step that fails part-way stops the apply, and what was made before it is still recorded, so
     // applying the set again continues from there instead of making it twice.
@@ -339,7 +343,8 @@ export async function applyInstallSet(deps: ApplyDeps, input: ApplyInput): Promi
     }
     // The welcome goes out once everything the person was given exists.
     record.accounts_created = [...created];
-    record.welcomed = [...(record.welcomed ?? []), ...await welcomeCreated(storage, config, record.accounts_created, record.welcomed ?? [])];
+    const toWelcome = ownerWelcome ? [...created, set.owner.email.toLowerCase()] : [...created];
+    record.welcomed = [...(record.welcomed ?? []), ...await welcomeCreated(storage, config, toWelcome, record.welcomed ?? [])];
     await writeRecord(storage, key, record);
     return { ok: true, dry_run: false, record, owner_created: owner.created };
 }

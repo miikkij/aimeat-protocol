@@ -19,9 +19,13 @@
  *
  *   A CREATED ACCOUNT IS TOLD (2026-09-29). Once the apply has finished, welcomeCreated() mails every
  *   account it created a sign-in link that works for seven days and names the account. Until then
- *   nobody told the person the account existed; the aimeat-apps end-to-end run found it.
- * @structure checkOwner() · ensureOwner() · joinMember() · welcomeCreated() · MemberOutcome · CreatedOrganisms
+ *   nobody told the person the account existed; the aimeat-apps end-to-end run found it. An owner
+ *   the shop created before the set (ownerToWelcome()) is welcomed too, while nobody has signed in to
+ *   it and its verified address is the set's.
+ * @structure checkOwner() · ensureOwner() · joinMember() · ownerToWelcome() · welcomeCreated() · MemberOutcome · CreatedOrganisms
  * @version-history
+ *   v1.2.0 — 2026-09-29 — ownerToWelcome(): an existing owner account that has never been signed in
+ *     to and whose verified address is the set's gets the welcome too.
  *   v1.1.0 — 2026-09-29 — welcomeCreated(): the welcome sign-in link for accounts the install created.
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 4).
  */
@@ -157,6 +161,26 @@ export async function joinMember(
         }
     }
     return out;
+}
+
+/**
+ * Whether an owner account the set did NOT create is still welcomed, and if so, turns its sign-in
+ * link on. The shop creates the owner before the node applies the set (aimeat-commercial's AFCS),
+ * so the owner was the one person on a sold node who got no welcome mail (wish of 2026-09-29).
+ *
+ * Only an account nobody has signed in to yet (password, passkey, Google or Entra, or a link: each
+ * counts the sign-in), and only when its VERIFIED address is the one the set names. The mail goes to
+ * an address the account already proved, so it gives nobody more than asking for a sign-in link at
+ * that address does. Every condition is read before the one write.
+ */
+export async function ownerToWelcome(storage: Storage, config: AimeatConfig, owner: InstallSet['owner']): Promise<boolean> {
+    const ghii = await storage.getGHII(`${owner.name}@${config.nodeId}`);
+    if (!ghii || (ghii.loginCount ?? 0) > 0 || ghii.lastLoginAt) return false;
+    if (!ghii.emailVerifiedAt || ghii.emailHash !== emailHashOf(owner.email)) return false;
+    const account = await storage.getOwner(owner.name);
+    if (!account || account.disabledAt) return false;
+    if (!ghii.magicLinkEnabled) await storage.updateGHII(ghii.ghii, { magicLinkEnabled: true });
+    return true;
 }
 
 /**
