@@ -40,6 +40,7 @@
  *   const refused = await managedChangeRefusal(storage, ownerName, 'app', filename, 'code');
  *   if (refused) return { refusal: refused };
  * @version-history
+ *   v1.1.1 — 2026-09-30 — The refusal has a word for a `skill` component.
  *   v1.1.0 — 2026-09-28 — setPackageInstance(): label and auto-update (install packages, phase 3).
  *   v1.0.0 — 2026-09-28 — Initial: managed installs (install packages, phase 1).
  */
@@ -95,7 +96,7 @@ export async function managedLockFor(
 
 const NOUN: Record<PackageComponentType, string> = {
     app: 'app', cortex: 'library', extension: 'extension', csm: 'schema', msm: 'schema',
-    memory: 'record set', translation: 'translation',
+    memory: 'record set', translation: 'translation', skill: 'skill',
 };
 
 /**

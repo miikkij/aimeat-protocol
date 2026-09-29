@@ -23,6 +23,9 @@
  *   aimeat_package_check_updates, aimeat_package_repository, aimeat_package_entitlements.
  * @usage import { registerPackageTools } from './packages.js';
  * @version-history
+ *   v1.10.0 — 2026-09-30 — aimeat_package_compose takes `include_skills` (the composer's own skills
+ *     bound to the apps travel, default true); aimeat_package_install answers `warnings`, naming a
+ *     skill left out because the owner has one of that name of their own.
  *   v1.9.0 — 2026-09-29 — aimeat_package_check_updates runs with federation off when an install set named a repository.
  *   v1.8.0 — 2026-09-29 — aimeat_package_sellers: the nodes that sell your packages with no token.
  *   v1.7.0 — 2026-09-28 — aimeat_package_config_needs: the questions a shop asks before payment.
@@ -144,6 +147,7 @@ export function registerPackageTools(
         visibility: z.enum(['private', 'public']).optional().describe('Who may install it. Defaults to private.'),
         status: z.enum(['draft', 'published', 'archived']).optional().describe('Defaults to published.'),
         include_cortex: z.boolean().optional().describe('Package the cortexes you installed yourself. Default true.'),
+        include_skills: z.boolean().optional().describe('Package your own skills bound to these apps, so the installer\'s AI gets the operating guides. Default true.'),
         allow_expectations: z.boolean().optional().describe('Compose even when an app calls an extension the package cannot carry.'),
     }, annotationsFor('aimeat_package_compose'), async (args) => {
         const owner = ownerOf();
@@ -152,7 +156,8 @@ export function registerPackageTools(
             {
                 name: args.name, apps: args.apps, description: args.description, category: args.category,
                 tags: args.tags, visibility: args.visibility, status: args.status,
-                includeCortex: args.include_cortex, allowExpectations: args.allow_expectations,
+                includeCortex: args.include_cortex, includeSkills: args.include_skills,
+                allowExpectations: args.allow_expectations,
             });
         if (!out.ok) {
             return {
@@ -298,6 +303,7 @@ export function registerPackageTools(
                     components: out.instance.installedComponents.map(c => ({
                         component_id: c.componentId, type: c.type, registered_as: c.registeredAs,
                     })),
+                    ...(out.warnings.length ? { warnings: out.warnings } : {}),
                 }, null, 2),
             }],
         };

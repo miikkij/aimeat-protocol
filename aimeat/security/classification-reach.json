@@ -1634,6 +1634,13 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Install-request state records."
     },
+    "src/services/package-skill-component.ts": {
+      "reads": {
+        "getMemory": 6,
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-09-30, the node's own read: compose copies the composer's OWN skills bound to their own app into their own package, by their own act, as it copies the app's bytes and the cortex's libs; install, update and uninstall read the installer's own skill manifest to decide overwrite or delete, and hash its files. Nothing goes into a model prompt unless through fetchComponentContentForAi (component-content.ts), which asks useForAi for skillFileTargets first."
+    },
     "src/services/package-sellers.ts": {
       "reads": {
         "getMemory": 2

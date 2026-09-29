@@ -9,6 +9,8 @@
  *   componentContentTargets(storage, type, registeredAs, ownerGaii) ·
  *   fetchComponentContentForAi(storage, reader, type, registeredAs, ownerGaii, use)
  * @version-history
+ *   v1.2.0 — 2026-09-30 — A `skill` component's content is the installed skill's files, and its label
+ *     addresses are its manifest and file records (package-skill-component.ts).
  *   v1.1.0 — 2026-09-29 — TARGET-082 V4: componentContentTargets (the label addresses of the memory
  *     records a memory or translation component reads) and fetchComponentContentForAi, which asks the
  *     caller's ContentReader useForAi for them before the content is returned for a model prompt.
@@ -19,6 +21,7 @@ import type { Storage, PackageComponentType, ContentLabelTarget } from '../stora
 import { logger } from '../utils/logger.js';
 import { memoryTarget } from './classification/labels.js';
 import type { ContentReader } from './classification/reader.js';
+import { fetchSkillComponentContent, skillFileTargets } from './package-skill-component.js';
 
 // ── Fetch component content ──────────────────────────────────────────
 
@@ -78,6 +81,8 @@ export async function fetchComponentContent(
         if (!mem) return null;
         return JSON.stringify(mem.value);
       }
+      case 'skill':
+        return await fetchSkillComponentContent(storage, registeredAs, ownerGaii);
       default:
         return null;
     }
@@ -99,6 +104,7 @@ export async function componentContentTargets(
   ownerGaii: string,
 ): Promise<ContentLabelTarget[]> {
   if (type === 'translation') return [memoryTarget(ownerGaii, `i18n.${registeredAs}`)];
+  if (type === 'skill') return skillFileTargets(storage, registeredAs, ownerGaii);
   if (type !== 'memory') return [];
   return ((await manifestKeys(storage, ownerGaii, registeredAs)) ?? [])
     .filter((k): k is string => typeof k === 'string')

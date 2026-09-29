@@ -3916,7 +3916,13 @@ components:
           type: string
         type:
           type: string
-          enum: [csm, extension, cortex, app, msm, memory, translation]
+          enum: [csm, extension, cortex, app, msm, memory, translation, skill]
+          description: >-
+            `skill` is an app's operating guide, content `{ "files": { "SKILL.md": "...", ... } }`,
+            depending on its app component and naming it in `meta.skill.bindsTo`. Installing publishes
+            it in the installer's own skills under its own name, bound to their copy of the app; a
+            skill of that name the installer already has of their own is left alone and named in the
+            install's `warnings`.
         label:
           type: string
         content:
@@ -4107,7 +4113,7 @@ components:
           type: string
         type:
           type: string
-          enum: [csm, extension, cortex, app, msm, memory, translation]
+          enum: [csm, extension, cortex, app, msm, memory, translation, skill]
         registeredAs:
           type: string
         originalHash:
@@ -4200,7 +4206,7 @@ components:
           type: string
         type:
           type: string
-          enum: [csm, extension, cortex, app, msm, memory, translation]
+          enum: [csm, extension, cortex, app, msm, memory, translation, skill]
         status:
           type: string
           enum: [unchanged, updated, new, removed]
@@ -41199,7 +41205,9 @@ paths:
       description: >-
         Resolve a skill to its manifest plus file bodies. Unscoped lookups search the caller's
         own registry first, then the node library; scope/owner (or scope=workspace with
-        organism + ws) address a specific registry. manifest_only=true skips bodies.
+        organism + ws) address a specific registry. manifest_only=true skips bodies. A skill a
+        package install published carries `fromPackage` ({ groupId, instanceId }); the owner's own
+        republish keeps it, and only that install replaces or removes the skill.
       tags: [Skills]
       security:
         - BearerAuth: []
@@ -43664,7 +43672,7 @@ paths:
                     type: object
                     required: [type, label, content]
                     properties:
-                      type: { type: string, enum: [csm, extension, cortex, app, msm, memory, translation] }
+                      type: { type: string, enum: [csm, extension, cortex, app, msm, memory, translation, skill] }
                       label: { type: string }
                       content: { type: string }
                       dependencies: { type: array, items: { type: string } }
@@ -43734,7 +43742,9 @@ paths:
         the dependency map the node keeps from each app's source. A cortex the node itself ships, a
         library pack, and any extension are never packaged: they are recorded in `expects` so the
         installing node knows what it must already have. An app that calls an extension is refused
-        unless allow_expectations is set, because that package could not work as installed.
+        unless allow_expectations is set, because that package could not work as installed. The
+        caller's own skills bound to a chosen app (metadata.binding `app:{owner}/{filename}`) travel
+        as `skill` components, never a skill the caller merely can read and never a node skill.
       tags: [Packages]
       security:
         - BearerAuth: []
@@ -43761,6 +43771,10 @@ paths:
                   type: boolean
                   default: true
                   description: Package the cortexes the owner installed. Node-shipped ones are never packaged.
+                include_skills:
+                  type: boolean
+                  default: true
+                  description: Package the caller's own skills bound to these apps, one skill component each.
                 allow_expectations:
                   type: boolean
                   default: false
@@ -44516,7 +44530,7 @@ paths:
                     type: object
                     required: [type, label, content]
                     properties:
-                      type: { type: string, enum: [csm, extension, cortex, app, msm, memory, translation] }
+                      type: { type: string, enum: [csm, extension, cortex, app, msm, memory, translation, skill] }
                       label: { type: string }
                       content: { type: string }
                       dependencies: { type: array, items: { type: string } }
@@ -44737,7 +44751,12 @@ paths:
         at POST /v1/instances/{id}/fork. `editable`, the default, leaves everything the owner's to edit.
         A package that names what the node must have already (`expects`: cortexes, extensions, library
         packs, carried in its manifest and its ZIP) is refused with 409 EXPECTS_MISSING naming each one
-        this node lacks; a dry run lists them as `expects_missing`.
+        this node lacks; a dry run lists them as `expects_missing`. A skill component is published in
+        the owner's skills under its own name, bound to this install's copy of its app, and costs
+        memory:write as POST /v1/skills does. When the owner already has a skill of that name that
+        this package did not publish, that component is left out, the owner's skill stays as it is,
+        and `warnings` names it, on the answer and on a dry run. Removing the instance with
+        removeComponents removes only a skill this instance published.
       tags: [Instances]
       security:
         - BearerAuth: []
@@ -44784,7 +44803,14 @@ paths:
                   - type: object
                     properties:
                       data:
-                        $ref: '#/components/schemas/PackageInstanceRecord'
+                        allOf:
+                          - $ref: '#/components/schemas/PackageInstanceRecord'
+                          - type: object
+                            properties:
+                              warnings:
+                                type: array
+                                items: { type: string }
+                                description: A skill left out because the owner has one of that name of their own. Absent when none.
         '202':
           description: The install waits for the owner. Nothing was registered.
           content:

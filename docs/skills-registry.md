@@ -113,6 +113,18 @@ Response: manifest summaries (ref/name/description/version). Load bodies with
 before driving an app, list its bound skills; if any exist, resolve and apply them; if the
 description says "use whenever operating X", treat it as required reading.
 
+**A package carries them.** When you compose a package from your apps (`aimeat_package_compose`,
+`POST /v1/packages/compose`), each of YOUR OWN user-scope skills bound to one of those apps goes
+into the package as a `skill` component that depends on the app. A skill you can only read, and a
+node skill, stay behind; `include_skills: false` leaves them all behind. Installing the package
+publishes each skill in the installer's own registry under its own name, visibility `owner`, with
+`metadata.binding` rewritten to the installer's copy of the app, so the customer's AI has the
+operating guide for every app it installed. The installed skill carries `fromPackage`
+(`{ groupId, instanceId }`). The installer's own skill always wins: when they already have a skill
+of that name that the package did not publish, the install leaves it as it is and names it in
+`warnings`. An update replaces, and an uninstall with `removeComponents` removes, only a skill that
+install published. Code: `services/package-skill-component.ts`.
+
 ## Consuming from crewaimeat (JSON crew definitions)
 
 crewaimeat resolves registry skills at **crew build time** — fetch-fresh, materialized to a

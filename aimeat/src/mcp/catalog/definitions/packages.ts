@@ -12,6 +12,7 @@
  * @structure packagesTools[] -- catalog entries, folded into definitions.ts
  * @usage import { packagesTools } from './packages.js';
  * @version-history
+ *   v1.10.0 -- 2026-09-30 -- aimeat_package_compose: `include_skills`, the composer's own skills bound to the apps.
  *   v1.9.0 -- 2026-09-29 -- aimeat_package_sellers: the nodes that sell your packages with no token.
  *   v1.8.0 -- 2026-09-28 -- aimeat_package_config_needs: the questions a shop asks before payment.
  *   v1.7.0 -- 2026-09-28 -- aimeat_package_entitlements: `node`, the packages-only peer registered with a grant.
@@ -100,7 +101,7 @@ export const packagesTools: AimeatToolDefinition[] = [
         // getting the dependency order right, which is why the only packages on a node were the ones
         // it seeds itself. The node already knows what each app loads, so the caller names apps.
         name: 'aimeat_package_compose',
-        description: 'Make a package out of apps you already published, with the cortexes they load. Names what the installing node must supply itself.',
+        description: 'Make a package out of apps you already published, with the cortexes they load and your own skills bound to them. Names what the installing node must supply itself.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -112,6 +113,7 @@ export const packagesTools: AimeatToolDefinition[] = [
             visibility: { type: 'string', enum: ['private', 'public'], description: 'Who may install it. Defaults to private.' },
             status: { type: 'string', enum: ['draft', 'published', 'archived'], description: 'Defaults to published, so you can install it at once.' },
             include_cortex: { type: 'boolean', description: 'Package the cortexes you installed yourself. Default true. Node-shipped cortexes are never packaged.' },
+            include_skills: { type: 'boolean', description: 'Package your own skills bound to these apps, so the installer\'s AI has their operating guides. Default true. Installing publishes each in the installer\'s skills, bound to their copy of the app, and never overwrites a skill of theirs.' },
             allow_expectations: { type: 'boolean', description: 'Compose even when an app calls an extension the package cannot carry, recording it as a requirement instead.' },
         },
     },

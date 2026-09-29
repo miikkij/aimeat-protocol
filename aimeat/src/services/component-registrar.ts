@@ -15,6 +15,9 @@
  * @usage
  *   import { registerComponent, deleteComponent, fetchComponentContent, computeHash } from '../services/component-registrar.js';
  * @version-history
+ *   v1.11.0 — 2026-09-30 — A `skill` component (package-skill-component.ts): published in the owner's
+ *     registry bound to this install's app, `skipped` when the owner has a skill of that name of their
+ *     own; deleteComponent removes a skill only with the package install that published it.
  *   v1.10.0 — 2026-09-28 — `configValues` and `previousConfig`: an app component's install config goes
  *     into its config record, an extension's into its config with secrets encrypted, and an update
  *     keeps the owner's extension config. fetchComponentContent moved unchanged to component-content.ts.
@@ -75,6 +78,7 @@ import { odpsWriteRefusal, extensionOdpsKey } from './exchange-odps-write.js';
 import { memoryComponentEntries, reservedKeysInComponent, reservedComponentMessage } from './package-memory-component.js';
 import { writeAppConfigValues, type AppConfigValues } from './app-config.js';
 import { mergeExtensionConfig } from './package-config.js';
+import { registerSkillComponent, deleteSkillComponent } from './package-skill-component.js';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -85,6 +89,8 @@ export interface ComponentRegistrationResult {
   error?: string;
   /** Short name from the source manifest (only set for cortex + extension). */
   originalShortName?: string;
+  /** A skill left alone because the owner has one of that name of their own: the warning to show. */
+  skipped?: string;
 }
 
 export interface ComponentRegistrationInput {
@@ -148,6 +154,8 @@ export interface ComponentRegistrationInput {
   configValues?: Record<string, unknown>;
   /** An extension's config before an update replaced it, so the owner's values and secrets carry over. */
   previousConfig?: Record<string, unknown>;
+  /** The install a skill component belongs to, and each app component's name in it (package-skill-component.ts). */
+  packageContext?: { groupId: string; instanceId: string; appNames: Map<string, string> };
 }
 
 // ── Hash utility ─────────────────────────────────────────────────────
@@ -671,6 +679,18 @@ export async function registerComponent(
         break;
       }
 
+      case 'skill': {
+        // Published in the owner's registry, bound to this install's copy of its app; the owner's own
+        // skill of the same name is never overwritten (package-skill-component.ts).
+        const out = await registerSkillComponent(storage, {
+          config, owner, ownerGaii, publisher: input.callerGaii ?? ownerGaii, content, meta: input.meta,
+          packageContext: input.packageContext, dryRun: input.dryRun,
+        });
+        if (!out.ok) return { success: false, componentId, registeredAs, error: out.error };
+        if (out.skipped) return { success: true, componentId, registeredAs, skipped: out.skipped };
+        break;
+      }
+
       default:
         return { success: false, componentId, registeredAs, error: `Unknown component type: ${type}` };
     }
@@ -683,12 +703,16 @@ export async function registerComponent(
 
 // ── Delete component ─────────────────────────────────────────────────
 
-/** Delete a previously registered component from its native storage */
+/**
+ * Delete a previously registered component from its native storage. A skill is deleted only with
+ * `pkg`, and only when that package install published it: the name may be the owner's own skill.
+ */
 export async function deleteComponent(
   storage: Storage,
   type: PackageComponentType,
   registeredAs: string,
   ownerGaii: string,
+  pkg?: { config: AimeatConfig; groupId: string; instanceId: string },
 ): Promise<boolean> {
   try {
     switch (type) {
@@ -738,6 +762,8 @@ export async function deleteComponent(
       }
       case 'translation':
         return await storage.deleteMemory(ownerGaii, `i18n.${registeredAs}`);
+      case 'skill':
+        return pkg ? await deleteSkillComponent(storage, pkg.config, registeredAs, ownerGaii, pkg) : false;
       default:
         return false;
     }

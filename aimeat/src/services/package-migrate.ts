@@ -29,6 +29,9 @@
  *   import { applyInstanceMigration } from '../services/package-migrate.js';
  *   const out = await applyInstanceMigration({ storage, config }, caller, { instanceId, targetVersion, actions });
  * @version-history
+ *   v1.6.0 — 2026-09-30 — A `skill` component: named after itself, bound to this instance's copy of its
+ *     app, and carrying this instance's tag, so replace deletes only a skill this instance published.
+ *     One the owner has of their own is skipped and named in `warnings` (package-skill-component.ts).
  *   v1.5.0 — 2026-09-28 — A replaced extension keeps the owner's config, secrets included: it was
  *     rebuilt from the new manifest's defaults, which dropped every value an install had given.
  *   v1.4.0 — 2026-09-28 — A forked install is refused (409 FORKED). A managed one takes only
@@ -75,6 +78,8 @@ export interface MigrateOutcome {
     /** A component whose registration was refused. Its previous copy is left in place. */
     failedComponents: { componentId: string; error: string }[];
     newVersion: string;
+    /** A skill left out because the owner has one of that name of their own (package-skill-component.ts). */
+    warnings?: string[];
 }
 
 /**
@@ -262,14 +267,23 @@ export async function applyInstanceMigration(
     const urlRewrites = rewritesFor(instance, installedPkg ?? targetPkg);
     const shortId = instanceShortId(instance, targetPkg.name, owner);
 
-    /** The name a component of THIS instance is registered under. */
+    /** The name a component of THIS instance is registered under. A skill keeps its own name. */
     const nameFor = (compId: string, type: PackageComponentType): string => {
         const existing = existingMap.get(compId);
         if (existing) return existing.registeredAs;
-        return shortId
-            ? registeredNameFor(targetPkg.name, owner, shortId, { id: compId, type })
+        return shortId || type === 'skill'
+            ? registeredNameFor(targetPkg.name, owner, shortId ?? '', { id: compId, type, content: targetCompMap.get(compId)?.content })
             : `${targetPkg.name}-${owner}-${compId}`;
     };
+    // A skill component binds to this instance's copy of its app and carries this instance's tag, so it
+    // replaces and removes only a skill this instance published (package-skill-component.ts).
+    const pkgRef = { config, groupId: instance.packageGroupId, instanceId };
+    const packageContext = {
+        groupId: instance.packageGroupId, instanceId,
+        appNames: new Map([...instance.installedComponents, ...targetPkg.components.map(c => ({ componentId: c.id, type: c.type }))]
+            .filter(c => c.type === 'app').map(c => [c.componentId, nameFor(c.componentId, 'app')])),
+    };
+    const warnings: string[] = [];
 
     const updatedComponents: string[] = [];
     const newComponents: string[] = [];
@@ -355,6 +369,7 @@ export async function applyInstanceMigration(
             meta: targetComp?.meta,
             callerGaii: caller.sub,
             urlRewrites,
+            packageContext,
         });
         if (!wouldRegister.success) {
             return {
@@ -403,7 +418,7 @@ export async function applyInstanceMigration(
                 // read before the delete and carried into the replacement.
                 const previousConfig = existing?.type === 'extension'
                     ? (await storage.getExtension(registeredAs))?.config : undefined;
-                if (existing) await deleteComponent(storage, existing.type, registeredAs, ownerGhii);
+                if (existing) await deleteComponent(storage, existing.type, registeredAs, ownerGhii, pkgRef);
 
                 const result = await registerComponent(storage, {
                     ...(previousConfig ? { previousConfig } : {}),
@@ -422,8 +437,15 @@ export async function applyInstanceMigration(
                     meta: targetComp?.meta,
                     callerGaii: caller.sub,
                     urlRewrites,
+                    packageContext,
                 });
 
+                if (result.skipped) {
+                    // The owner's own skill of that name: left as it is, and no longer this instance's.
+                    warnings.push(result.skipped);
+                    skippedComponents.push(compId);
+                    break;
+                }
                 if (!result.success) {
                     // The old copy was already deleted, so there is nothing to keep; saying so is the
                     // only honest answer, and the instance keeps no entry claiming it is there.
@@ -463,8 +485,14 @@ export async function applyInstanceMigration(
                     meta: targetComp.meta,
                     callerGaii: caller.sub,
                     urlRewrites,
+                    packageContext,
                 });
 
+                if (result.skipped) {
+                    warnings.push(result.skipped);
+                    skippedComponents.push(compId);
+                    break;
+                }
                 if (!result.success) {
                     failedComponents.push({ componentId: compId, error: result.error ?? 'registration failed' });
                     break;
@@ -501,6 +529,7 @@ export async function applyInstanceMigration(
     }
 
     emitChange('instances');
+    if (newInstalledComponents.some(c => c.type === 'skill')) emitChange('skills');
 
     return {
         ok: true,
@@ -511,6 +540,7 @@ export async function applyInstanceMigration(
             skippedComponents,
             failedComponents,
             newVersion: targetVersion,
+            ...(warnings.length ? { warnings } : {}),
         },
     };
 }

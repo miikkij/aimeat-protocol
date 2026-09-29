@@ -20,6 +20,10 @@
  *   import { installPackage } from '../services/package-install.js';
  *   const out = await installPackage({ storage, config, scheduler }, caller, { groupId });
  * @version-history
+ *   v1.7.0 — 2026-09-30 — A `skill` component keeps its own name and binds to the name this install
+ *     gives its app (package-skill-component.ts). One the owner already has of their own is left out
+ *     and named in `warnings`, on the result and the dry run. The instance id is chosen before
+ *     anything registers, so a skill carries the install that published it.
  *   v1.6.0 — 2026-09-28 — The package's `expects` is checked: what this node lacks refuses a real
  *     install with 409 EXPECTS_MISSING naming it, and a dry run lists it (package-expects.ts).
  *   v1.5.0 — 2026-09-28 — `config`: each part's config, checked before anything registers; a required
@@ -61,6 +65,7 @@ import { registerExtensionSchedules } from './extension-schedules.js';
 import { planPackageConfig, missingConfigMessage, configPreview } from './package-config.js';
 import { expectsOf, missingExpects, expectsMissingMessage, type PackageExpects } from './package-expects.js';
 import { emitChange } from './event-bus.js';
+import { skillComponentName } from './package-skill-component.js';
 import type { Scheduler } from './scheduler.js';
 import { logger } from '../utils/logger.js';
 
@@ -122,6 +127,8 @@ export interface PackageInstallPreview {
     /** Present when this caller lacks words the install needs: the real call files a request. */
     status?: 'would_await_owner';
     missing?: string[];
+    /** A skill the install would leave out, because the owner has one of that name of their own. */
+    warnings?: string[];
 }
 
 /**
@@ -136,7 +143,7 @@ export interface PackageInstallRefusal {
 
 export type PackageInstallResult =
     | { ok: true; kind: 'dry-run'; preview: PackageInstallPreview }
-    | { ok: true; kind: 'installed'; instance: PackageInstanceRecord }
+    | { ok: true; kind: 'installed'; instance: PackageInstanceRecord; warnings: string[] }
     | PackageInstallRefusal;
 
 /**
@@ -185,9 +192,12 @@ function sortByDependencies(components: PackageComponent[]): string[] {
  */
 export function registeredNameFor(
     packageName: string, owner: string, shortId: string,
-    comp: { id: string; type: PackageComponentType },
+    comp: { id: string; type: PackageComponentType; content?: string },
 ): string {
     const base = `${packageName}-${owner}-${shortId}-${comp.id}`;
+    // A skill keeps its own name: that is the name its owner's AI loads it by, and the one a
+    // collision with the owner's own skill is decided on (package-skill-component.ts).
+    if (comp.type === 'skill') return skillComponentName(comp.content ?? '') ?? base;
     return comp.type === 'app' && !/\.html?$/i.test(base) ? `${base}.html` : base;
 }
 
@@ -269,6 +279,36 @@ export async function installPackage(
 
     const instanceLabel = (typeof label === 'string' && label) ? label : `${pkg.name} instance`;
 
+    // A skill component binds to the name this install gives its app, known before anything registers,
+    // and is tagged with this install so only this install replaces or removes it.
+    const instanceId = randomUUID();
+    const packageContext = {
+        groupId, instanceId,
+        appNames: new Map(plannedComponents.filter(p => p.type === 'app').map(p => [p.componentId, p.registeredAs])),
+    };
+    const pkgRef = { config, groupId, instanceId };
+    const warnings: string[] = [];
+    const registrationOf = (comp: PackageComponent, registeredAs: string, dryRun: boolean) => ({
+        config,
+        ...(dryRun ? { dryRun: true } : {}),
+        componentId: comp.id,
+        type: comp.type,
+        registeredAs,
+        content: comp.content,
+        label: comp.label,
+        owner,
+        ownerGaii,
+        packageName: pkg!.name,
+        packageCategory: pkg!.category,
+        packageTags: pkg!.tags,
+        packageDescription: pkg!.description,
+        // What the component says about itself, so an installed app carries the name, icon and
+        // category it was published under rather than the package's.
+        meta: comp.meta,
+        callerGaii: caller.sub,
+        packageContext,
+    });
+
     // ── Refuse before anything is written ────────────────────────────
     // A memory component names its own keys, and they land in THIS installer's namespace. None may be
     // a key the node reads and trusts (services/package-memory-component.ts). Every component is
@@ -328,6 +368,11 @@ export async function installPackage(
                 dependencies: comp.dependencies,
             };
         });
+        // Which skill the owner already has of their own, so the preview says what the install leaves out.
+        for (const ic of plannedComponents.filter(p => p.type === 'skill')) {
+            const dry = await registerComponent(storage, registrationOf(componentMap.get(ic.componentId)!, ic.registeredAs, true));
+            if (dry.skipped) warnings.push(dry.skipped);
+        }
 
         return {
             ok: true,
@@ -344,6 +389,7 @@ export async function installPackage(
                 config: configPreview(configPlan),
                 ...(expectsMissing ? { expects_missing: expectsMissing } : {}),
                 ...(awaitsOwner ? { status: 'would_await_owner' as const, missing: writeRefusal!.missing } : {}),
+                ...(warnings.length ? { warnings } : {}),
             },
         };
     }
@@ -362,27 +408,16 @@ export async function installPackage(
         const registeredAs = planned.registeredAs;
 
         const result = await registerComponent(storage, {
-            config,
-            componentId: comp.id,
-            type: comp.type,
-            registeredAs,
-            content: comp.content,
-            label: comp.label,
-            owner,
-            ownerGaii,
-            packageName: pkg.name,
-            packageCategory: pkg.category,
-            packageTags: pkg.tags,
-            packageDescription: pkg.description,
-            // What the component says about itself, so an installed app carries the name, icon and
-            // category it was published under rather than the package's.
-            meta: comp.meta,
-            callerGaii: caller.sub,
+            ...registrationOf(comp, registeredAs, false),
             urlRewrites: { cortexNames: cortexNameMap, extensionNames: extensionNameMap },
             ...(configFor.has(comp.id) ? { configValues: configFor.get(comp.id) } : {}),
         });
 
-        if (result.success) {
+        if (result.success && result.skipped) {
+            // The owner's own skill of that name stays; this install neither records nor removes it.
+            warnings.push(result.skipped);
+            plannedComponents.splice(plannedComponents.indexOf(planned), 1);
+        } else if (result.success) {
             registeredComponents.push({ componentId: comp.id, type: comp.type, registeredAs });
 
             // Capture the source-manifest short name so any later 'app' component
@@ -427,7 +462,7 @@ export async function installPackage(
             // ── Rollback: delete already-registered components in reverse ──
             const rollbackErrors: string[] = [];
             for (const reg of [...registeredComponents].reverse()) {
-                const deleted = await deleteComponent(storage, reg.type, reg.registeredAs, ownerGaii);
+                const deleted = await deleteComponent(storage, reg.type, reg.registeredAs, ownerGaii, pkgRef);
                 if (!deleted) rollbackErrors.push(reg.registeredAs);
             }
 
@@ -445,7 +480,7 @@ export async function installPackage(
     // All components registered — create instance record
     const now = new Date().toISOString();
     const instanceRecord: PackageInstanceRecord = {
-        id: randomUUID(),
+        id: instanceId,
         packageGroupId: groupId,
         packageVersion: pkg.version,
         packageRecordId: pkg.id,
@@ -475,11 +510,12 @@ export async function installPackage(
         }
 
         emitChange('instances');
-        return { ok: true, kind: 'installed', instance: created };
+        if (registeredComponents.some(r => r.type === 'skill')) emitChange('skills');
+        return { ok: true, kind: 'installed', instance: created, warnings };
     } catch (e) {
         // Instance record creation failed — rollback all registered components
         for (const reg of [...registeredComponents].reverse()) {
-            await deleteComponent(storage, reg.type, reg.registeredAs, ownerGaii);
+            await deleteComponent(storage, reg.type, reg.registeredAs, ownerGaii, pkgRef);
         }
         const msg = e instanceof Error ? e.message : String(e);
         return { ok: false, status: 500, code: 'INSTALL_FAILED', message: msg || 'Failed to create instance' };

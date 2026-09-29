@@ -9,6 +9,7 @@
  *   agentTextFor · crumb · pageLinks · openTab
  * @usage import { x, joinOffers } from './frame.js';
  * @version-history
+ *   v1.3.0 — 2026-09-30 — A `skill` part has its own word and lives on the Skills tab.
  *   v1.2.0 — 2026-09-26 — On the component kit (page group G7): the crumb and the rail's sibling pages
  *     are data (components/Crumb.js, Rail.js draw them); openTab is Rail.js's.
  *   v1.1.0 — 2026-09-05 — An offer carries its `manifest`, which is where a composed package records
@@ -21,10 +22,10 @@ import { date as fmtDate } from '/js/format.js';
 
 export const x = (key, vars) => t('pkpage.' + key, vars);
 
-const PART_KEYS = { app: 'part.app', extension: 'part.extension', cortex: 'part.cortex', memory: 'part.memory', translation: 'part.translation', csm: 'part.csm', msm: 'part.msm' };
+const PART_KEYS = { app: 'part.app', extension: 'part.extension', cortex: 'part.cortex', skill: 'part.skill', memory: 'part.memory', translation: 'part.translation', csm: 'part.csm', msm: 'part.msm' };
 export const partWord = (type) => x(PART_KEYS[type] || 'part.other');
 /** The tab a component's own page lives on. */
-export const partTab = (type) => (type === 'app' ? 'apps' : type === 'extension' || type === 'cortex' ? 'extensions' : 'memory');
+export const partTab = (type) => (type === 'app' ? 'apps' : type === 'extension' || type === 'cortex' ? 'extensions' : type === 'skill' ? 'skills' : 'memory');
 const CATEGORIES = ['knowledge', 'commerce', 'marketplace', 'security', 'iot', 'community', 'signage', 'social', 'productivity', 'communication', 'other'];
 export const categoryWord = (c) => (CATEGORIES.includes(c) ? x('cat.' + c) : (c || ''));
 export const listingWord = (s) => (s ? x('listing.' + s) : '');
