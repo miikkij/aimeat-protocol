@@ -9,6 +9,9 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.66.0 -- 2026-09-26 -- The node starts per suite with that suite's anonymous-mode setting
+ *            (ANONYMOUS_OFF_SUITES in run-e2e-server.ts: the credential suites run with it off, as
+ *            production does). The suite header, the lane line and the summary print the setting.
  *   v1.65.0 -- 2026-09-29 -- e2e-refinery.ts joins the suites (not the guard tier): the mail refinery on
  *            its own node on 40449, against the sandbox's test mailbox and its model stand-ins.
  *   v1.64.0 -- 2026-09-28 -- e2e-ai-roles.ts joins the suites (not the guard tier): AI roles on its own node on 40444.
@@ -242,6 +245,7 @@ import { platform } from 'node:os';
 import { basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+    anonymousModeFor,
     cleanDatabase,
     ensureDatabase,
     laneTarget,
@@ -1443,6 +1447,8 @@ interface SuiteResult {
     lane: number;
     /** Stop + clean + start before this suite, ms; 0 for a lane's first suite. */
     cycleMs: number;
+    /** The node's anonymous mode for this suite: 'on', 'off', or 'external' (not the runner's). */
+    anonymous: string;
 }
 
 async function runLane(lane: number, target: RunnerTarget, suites: string[], stream: boolean): Promise<SuiteResult[]> {
@@ -1456,45 +1462,49 @@ async function runLane(lane: number, target: RunnerTarget, suites: string[], str
     if (!target.external) {
         await cleanDatabase(target);
         console.log(`${tag}Cleaned ${target.dbType} test database before the first suite.`);
-        server = await startServer(target);
-        console.log(`${tag}Server ready on :${target.port}.\n`);
     }
 
     try {
         for (let i = 0; i < suites.length; i++) {
             const suite = suites[i];
             const name = basename(suite, '.ts');
+            // The node starts per suite, because the suite decides its anonymous-mode setting
+            // (ANONYMOUS_OFF_SUITES in run-e2e-server.ts). An external node has its own setting.
+            const anonymous = target.external ? 'external' : anonymousModeFor(name) === 'false' ? 'off' : 'on';
 
             // Clean DB and restart server between suites for isolation. stopServer does not return
             // until the old process is gone and its port is free, so the delete below cannot fail
             // on a live file handle and the next suite cannot reach the previous server.
             let cycleMs = 0;
-            if (i > 0 && server && !target.external) {
+            if (!target.external) {
                 const c0 = Date.now();
-                await stopServer(server, target);
-                server = null;
-                await cleanDatabase(target);
-                server = await startServer(target);
-                cycleMs = Date.now() - c0;
+                if (server) {
+                    await stopServer(server, target);
+                    server = null;
+                    await cleanDatabase(target);
+                }
+                server = await startServer(target, name);
+                if (i > 0) cycleMs = Date.now() - c0;
+                else console.log(`${tag}Server ready on :${target.port}.\n`);
             }
 
             if (stream) {
                 console.log(`\n${'─'.repeat(40)}`);
-                console.log(`  ${name}`);
+                console.log(`  ${name}  (anonymous mode ${anonymous})`);
                 console.log(`${'─'.repeat(40)}`);
             }
 
             const t0 = Date.now();
-            const { output, exitCode } = await runTest(suite, target, stream);
+            const { output, exitCode } = await runTest(suite, name, target, stream);
             const elapsed = ((Date.now() - t0) / 1000).toFixed(2);
             const parsed = parseResults(output);
             const red = parsed.failed > 0 || exitCode !== 0;
             if (!stream) {
-                console.log(`${tag}${red ? '✗' : '✓'} ${name}  ${parsed.passed}/${parsed.total} in ${elapsed}s`);
+                console.log(`${tag}${red ? '✗' : '✓'} ${name}  ${parsed.passed}/${parsed.total} in ${elapsed}s, anonymous mode ${anonymous}`);
                 // A green suite's output is what the summary already says; a red one's is the point.
                 if (red) console.log(output.trimEnd());
             }
-            results.push({ name, ...parsed, time: `${elapsed}s`, exitCode, lane, cycleMs });
+            results.push({ name, ...parsed, time: `${elapsed}s`, exitCode, lane, cycleMs, anonymous });
         }
     } finally {
         if (server) {
@@ -1509,14 +1519,14 @@ async function runLane(lane: number, target: RunnerTarget, suites: string[], str
 }
 
 // ── Run a single test suite ──
-function runTest(suitePath: string, target: RunnerTarget, stream: boolean): Promise<{ output: string; exitCode: number }> {
+function runTest(suitePath: string, name: string, target: RunnerTarget, stream: boolean): Promise<{ output: string; exitCode: number }> {
     return new Promise((settle) => {
         // The suite gets the SAME pins as the server. A suite derives what it expects from its own
         // environment, so any pin it cannot see is a place where the two can disagree about what is
         // being tested: e2e-x402-testnet skips when the off-chain double is in use, could not see
         // that it was, and so ran its real-network acceptance cases against the double.
         const child = spawn('node', ['--import', 'tsx', suitePath], {
-            env: { ...process.env, ...pinnedEnv(target), E2E_BASE: target.baseUrl },
+            env: { ...process.env, ...pinnedEnv(target, name), E2E_BASE: target.baseUrl },
             stdio: ['ignore', 'pipe', 'pipe'],
             cwd: process.cwd(),
         });
@@ -1649,8 +1659,8 @@ async function main() {
     console.log('  SUMMARY');
     console.log(`${'='.repeat(50)}`);
     console.log('');
-    console.log('Suite'.padEnd(30) + 'Passed'.padEnd(10) + 'Failed'.padEnd(10) + 'Total'.padEnd(10) + 'Time'.padEnd(10) + (lanes.length > 1 ? 'Lane' : ''));
-    console.log('-'.repeat(70));
+    console.log('Suite'.padEnd(30) + 'Passed'.padEnd(10) + 'Failed'.padEnd(10) + 'Total'.padEnd(10) + 'Time'.padEnd(10) + 'Anon'.padEnd(10) + (lanes.length > 1 ? 'Lane' : ''));
+    console.log('-'.repeat(80));
     let crashed = 0;
     for (const r of results) {
         // A suite that never RAN is not a suite that passed. One with a syntax error exits non-zero
@@ -1660,13 +1670,13 @@ async function main() {
         const status = didNotRun ? '!' : r.failed === 0 ? '✓' : '✗';
         const note = didNotRun ? `  DID NOT RUN (exit ${r.exitCode})` : '';
         if (didNotRun) crashed++;
-        console.log(`${status} ${r.name.padEnd(28)}${String(r.passed).padEnd(10)}${String(r.failed).padEnd(10)}${String(r.total).padEnd(10)}${r.time.padEnd(10)}${lanes.length > 1 ? String(r.lane) : ''}${note}`);
+        console.log(`${status} ${r.name.padEnd(28)}${String(r.passed).padEnd(10)}${String(r.failed).padEnd(10)}${String(r.total).padEnd(10)}${r.time.padEnd(10)}${r.anonymous.padEnd(10)}${lanes.length > 1 ? String(r.lane) : ''}${note}`);
     }
 
     const totalPassed = results.reduce((s, r) => s + r.passed, 0);
     const totalFailed = results.reduce((s, r) => s + r.failed, 0);
     const totalTests = results.reduce((s, r) => s + r.total, 0);
-    console.log('-'.repeat(70));
+    console.log('-'.repeat(80));
     console.log(`  Total: ${totalPassed} passed, ${totalFailed} failed out of ${totalTests}`);
     // Where the wall clock went: the suites themselves, and the restarts between them. The second
     // number is the runner's own cost, and it is what --workers divides.
