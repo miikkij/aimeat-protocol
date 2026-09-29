@@ -7,11 +7,13 @@
  *   In its own file, with its own three-language table, because email-templates.ts is near the
  *   800-line limit; the layout is the shared wrapHtml().
  *
- *   What "later" says is what the sign-in page offers on 2026-09-29: a username and password, with
- *   "Forgot password?" sending a reset code to the verified address, and Google or Microsoft when the
- *   node has them. The page has no button that asks for a sign-in link, so the mail does not promise one.
+ *   What "later" says is what the sign-in dialog offers: "Email me a sign-in link", which is on every
+ *   node that sends mail (and this mail was sent), and Google or Microsoft when the node has them.
+ *   The quoted labels are the dialog's own strings (locales modal.loginLinkAsk); change both together.
  * @structure welcomeEmail()
  * @version-history
+ *   v1.1.0 — 2026-09-29 — "Later" names the dialog's "Email me a sign-in link" instead of "Forgot
+ *     password?", now that the dialog has it (auth/modal-login-link.js).
  *   v1.0.0 — 2026-09-29 — Initial (install packages: users created at install can sign in).
  */
 import { wrapHtml, esc } from './email-templates.js';
@@ -23,7 +25,7 @@ const strings: Record<string, Record<string, string>> = {
         lead: 'An account was created for you at {site}. Your username is {user}. Press the button to sign in. You need no password for this.',
         button: 'Sign in',
         expiry: 'The button works once, for 7 days.',
-        later: 'To sign in later, choose "Forgot password?" on the sign-in page and set a password; the code comes to this address. If the sign-in page offers Google or Microsoft, they work with this address too.',
+        later: 'To sign in later, choose "Email me a sign-in link" on the sign-in page and enter this address. If the sign-in page offers Google or Microsoft, they work with this address too.',
         fallback: 'If the button does not work, open this address:',
         ignore: 'If you did not expect this message, you can ignore it.',
     },
@@ -33,7 +35,7 @@ const strings: Record<string, Record<string, string>> = {
         lead: 'Sinulle on luotu tili palveluun {site}. Käyttäjätunnuksesi on {user}. Kirjaudu sisään painikkeella. Salasanaa ei tarvita.',
         button: 'Kirjaudu',
         expiry: 'Painike toimii kerran, ja se on voimassa 7 päivää.',
-        later: 'Kun kirjaudut myöhemmin, valitse kirjautumissivulta "Unohditko salasanan?" ja aseta salasana. Koodi tulee tähän osoitteeseen. Jos kirjautumissivulla on Google- tai Microsoft-kirjautuminen, voit käyttää niitä tällä osoitteella.',
+        later: 'Kun kirjaudut myöhemmin, valitse kirjautumissivulta "Lähetä kirjautumislinkki sähköpostiin" ja anna tämä osoite. Jos kirjautumissivulla on Google- tai Microsoft-kirjautuminen, voit käyttää niitä tällä osoitteella.',
         fallback: 'Jos painike ei toimi, avaa tämä osoite:',
         ignore: 'Jos et odottanut tätä viestiä, voit jättää sen huomiotta.',
     },
@@ -43,7 +45,7 @@ const strings: Record<string, Record<string, string>> = {
         lead: 'Se creó una cuenta para ti en {site}. Tu nombre de usuario es {user}. Presiona el botón para iniciar sesión. No necesitas contraseña.',
         button: 'Iniciar sesión',
         expiry: 'El botón funciona una sola vez durante 7 días.',
-        later: 'Para iniciar sesión más adelante, elige "¿Olvidaste la contraseña?" en la página de inicio de sesión y crea una contraseña; el código llega a esta dirección. Si la página ofrece Google o Microsoft, también puedes usarlos con esta dirección.',
+        later: 'Para iniciar sesión más adelante, elige "Envíame un enlace de acceso" en la página de inicio de sesión y escribe esta dirección. Si la página ofrece Google o Microsoft, también puedes usarlos con esta dirección.',
         fallback: 'Si el botón no funciona, abre esta dirección:',
         ignore: 'Si no esperabas este correo, puedes ignorarlo.',
     },

@@ -147,6 +147,7 @@ everywhere at once, and say so in the Changes section.
 | an install the customer cannot edit | code and look come from the package and its updates; the settings are the owner's | managed install | hallittu asennus | instalación gestionada |
 | the customer's own copy of a managed install | free to change, and gets no more updates | fork | fork (oma kopio) | copia propia |
 | who gets a new version first | stable: published versions; beta: beta versions too | release channel | julkaisukanava | canal de publicación |
+| a link in an email that signs a person in | works once and needs no password; asked for on the sign-in dialog (15 minutes), or sent with the welcome mail when an install set creates the account (7 days) | sign-in link | kirjautumislinkki | enlace de acceso |
 | where an app runs on a shared server with no app addresses | a frame on the server's own address whose origin is opaque: the app reads nobody's sign-in and gets only its own permissions | isolated frame | eristetty kehys | marco aislado |
 
 ## Never translated, in any language
@@ -358,6 +359,9 @@ service, the directory, the token, the identifier and the username: the test nam
   developer's own words. The code and the API say *install bundle* for the install package; a
   person reads *install package*. Spanish *copia propia* for fork, because *bifurcación* reads as
   a road splitting.
+- **2026-09-29** — sign-in link (the emailed link, and the dialog's "Email me a sign-in link").
+  *Kirjautumislinkki* and *enlace de acceso* were already the words of the node's own login-link
+  email (email-templates.ts); the code and the API still say *magic link*.
 - **2026-09-28, evening** — which agents an organism admits (agentAccess, reported by omnituinen for a
   customer's area). *Päästää sisään* is the developer's own phrase from his reply ("mitkä jäsenen
   agentit pääsevät alueelle"), and the Agents section is *Agentit-kohta*, after the section's own

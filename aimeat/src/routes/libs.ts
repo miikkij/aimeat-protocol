@@ -8,7 +8,9 @@
  *   bundles from src/static/sdk-libs/dist/ via sdkLibSource(); the /v1/libs catalogue; the dev harness.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
- * v2.11.0 - 2026-09-29 - Serve aimeat-refinery.js: an app's side of the mail refinery the node runs.
+ * v2.12.0 - 2026-09-29 - The aimeat-auth prelude says whether the node sends mail (emailLogin), so the
+ *   sign-in modal offers the emailed sign-in link only where it can arrive.
+ * v2.11.0 - 2026-09-29 -Serve aimeat-refinery.js: an app's side of the mail refinery the node runs.
  * v2.10.0 - 2026-09-28 - Serve aimeat-webhook.js: an app sends to or reads an owner-allowlisted URL.
  * v2.9.0 - 2026-09-18 - Serve calendar computation and paged printing libraries.
  * v2.8.0 - 2026-09-15 - aimeat-push.js joins SDK_LIB_NAMES: an installed app turns on notifications
@@ -269,6 +271,9 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
       // email field up front when it does, instead of asking for it only AFTER the create attempt
       // fails with EMAIL_REQUIRED (which read as the form losing the person's work).
       emailRequired: config.emailConfirmationRequired === true,
+      // Whether this node sends mail. The modal offers "Email me a sign-in link" only then: on a
+      // node without SMTP the request would answer 200 and nothing would ever arrive.
+      emailLogin: config.emailEnabled === true,
     })};
 `;
     sendJavascriptLibrary(res, configPrelude(config) + authCfg + readSdkBundle('auth'));

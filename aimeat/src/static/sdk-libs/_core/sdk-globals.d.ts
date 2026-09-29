@@ -30,6 +30,8 @@ interface Window {
   __AIMEAT_AUTH_CFG__?: {
     providers: Array<{ id: string; label: string; i18nKey: string }>;
     emailRequired?: boolean;
+    /** Whether the node sends mail, so an emailed sign-in link can arrive. */
+    emailLogin?: boolean;
   };
   /** aimeat-header's idempotency guard (mounts the canonical nav at most once). */
   __AIMEAT_HEADER_MOUNTED__?: boolean;

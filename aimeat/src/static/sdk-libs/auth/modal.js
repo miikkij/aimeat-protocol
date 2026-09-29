@@ -13,6 +13,8 @@
  *   openEmailCompletion, sendEmailCode, showView, capture/restoreInputs }.
  * @usage import { showLoginModal } from './modal.js';
  * @version-history
+ *   v1.11.0 — 2026-09-29 — "Email me a sign-in link" joins the link row on a node that sends mail
+ *     (modal-login-link.js); a person with no password signs in from their inbox.
  *   v1.10.0 — 2026-09-13 — The modal stops calling opts.onLogin. The developer decided that onLogin runs
  *     for every session that becomes available, restores included, with { restored }; it is called
  *     from the 'login' event through on-login.js, by whoever opened the modal (the pill,
@@ -66,6 +68,7 @@ import { MODAL_CSS } from './modal-styles.js';
 import { totpViewHtml, wireTotpStep } from './modal-totp.js';
 import { recoveryViewsHtml } from './modal-recovery-views.js';
 import { passkeyButtonHtml, wirePasskeyButton } from './modal-passkey.js';
+import { loginLinkAskHtml, loginLinkViewHtml, wireLoginLinkStep } from './modal-login-link.js';
 
 /** An identifier is an email when it carries a dot-bearing domain. A GHII (`alice@node-id`) never
  *  does, so this separates the two without asking the person which one they typed. */
@@ -249,6 +252,7 @@ export function showLoginModal(opts, renderBtn, onClosed) {
       + '<div class="aimeat-links">'
       + '<a href="#" id="aimeat-forgot-pw" class="aimeat-link">' + escHtml(i.forgotPassword || 'Forgot password?') + '</a>'
       + '<a href="#" id="aimeat-forgot-user" class="aimeat-link">' + escHtml(i.forgotUsername || 'Forgot username?') + '</a>'
+      + loginLinkAskHtml(i)
       + '</div>'
       + '</div>'
       // ── Register tab: the account being made. The email field is here from the start when the
@@ -293,6 +297,7 @@ export function showLoginModal(opts, renderBtn, onClosed) {
       + '</div>'
       // The forgot-password, forgot-username and complete-account sub-views (all hidden here).
       + recoveryViewsHtml(i, field)
+      + loginLinkViewHtml(i, field)
       // Second-factor sub-view (hidden) — opened when the login answers TOTP_REQUIRED.
       + totpViewHtml(i, field)
       // Features footer — an argument FOR creating an account, so it rides with the Register tab.
@@ -401,6 +406,7 @@ export function showLoginModal(opts, renderBtn, onClosed) {
       document.getElementById('aimeat-forgot-user-view').style.display = view === 'forgot-user' ? '' : 'none';
       document.getElementById('aimeat-email-view').style.display = view === 'email' ? '' : 'none';
       document.getElementById('aimeat-totp-view').style.display = view === 'totp' ? '' : 'none';
+      var ll = document.getElementById('aimeat-login-link-view'); if (ll) ll.style.display = view === 'login-link' ? '' : 'none';
     }
 
     /** A finished sign-in, whichever step produced it. The caller's onLogin is not called here: the
@@ -417,6 +423,9 @@ export function showLoginModal(opts, renderBtn, onClosed) {
       signIn: function (username) { return auth.signInWithPasskey(username); },
       onSuccess: finishLogin,
     });
+
+    // "Email me a sign-in link": absent on a node that sends no mail.
+    wireLoginLinkStep({ i: i, api: api, showView: showView });
 
     // The second-factor step. It holds the password for its own call and drops it when it closes.
     var totpStep = wireTotpStep({
