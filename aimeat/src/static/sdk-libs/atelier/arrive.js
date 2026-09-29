@@ -32,9 +32,11 @@
  *   import { settle, keyedRows } from './arrive.js';
  *   keyedRows(tbody, rows, { key: r => r.id, build: r => rowEl(r), update: (el, r) => fill(el, r) });
  * @version-history
+ *   v0.59.0 — 2026-09-29 — A leaving row's ghost wears the look of the list it left (wearLook): it
+ *     fades on the body, outside the frame that carries the look's tokens.
  *   v0.50.0 — 2026-09-05 — Initial (wish-atelier-always-excellent, part 2: motion by default).
  */
-import { resolve, motionOff, reducedMotion } from './dom.js';
+import { resolve, motionOff, reducedMotion, wearLook } from './dom.js';
 import { screenTransition } from './transitions.js';
 
 /** The ceiling on the last row's entrance delay, whatever the look's beat and however many rows. */
@@ -130,7 +132,7 @@ function fadeOut(kid, box, pace) {
   ghost.style.setProperty('--ak-ghost-y', box.top + 'px');
   ghost.style.setProperty('--ak-ghost-w', box.width + 'px');
   ghost.style.setProperty('--ak-ghost-h', box.height + 'px');
-  document.body.appendChild(ghost);
+  document.body.appendChild(wearLook(ghost, kid));
   const drop = function () { if (ghost.parentNode) ghost.parentNode.removeChild(ghost); };
   if (typeof ghost.animate !== 'function') { drop(); return; }
   const anim = ghost.animate(

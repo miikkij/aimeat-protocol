@@ -15,6 +15,7 @@
  * @usage  AIMEAT.atelier.i18n.use({ fi: { addTask: 'Lisää tehtävä' }, en: { addTask: 'Add task' } });
  *         AIMEAT.atelier.i18n.t('addTask');
  * @version-history
+ *   v0.8.0 — 2026-09-29 — promptLine1 (en/fi/es): the prompt panel says "1 line", not "1 lines".
  *   v0.7.0 — 2026-09-29 — The prompt panel's words (en/fi/es): its two steps, copy, show and hide,
  *     the paste box, the apply button and the refusal when no JSON object is in the answer.
  *   v0.6.0 — 2026-09-28 — working and done (en/fi/es): what the state button's status says to a
@@ -113,7 +114,7 @@ const BASE = {
     promptHide: 'Hide the prompt',
     promptApply: 'Show the changes',
     promptPastePh: 'Paste the answer here',
-    promptLines: '{n} lines',
+    promptLines: '{n} lines', promptLine1: '1 line',
     promptCopied: 'Copied',
     promptNoJson: 'The answer has no JSON object in it. Paste the whole answer.',
     working: 'Working…',
@@ -198,7 +199,7 @@ const BASE = {
     promptHide: 'Piilota kehote',
     promptApply: 'Näytä muutokset',
     promptPastePh: 'Liitä vastaus tähän',
-    promptLines: '{n} riviä',
+    promptLines: '{n} riviä', promptLine1: '1 rivi',
     promptCopied: 'Kopioitu',
     promptNoJson: 'Vastauksessa ei ole JSON-oliota. Liitä koko vastaus.',
     working: 'Käsitellään…',
@@ -283,7 +284,7 @@ const BASE = {
     promptHide: 'Ocultar la instrucción',
     promptApply: 'Ver los cambios',
     promptPastePh: 'Pega aquí la respuesta',
-    promptLines: '{n} líneas',
+    promptLines: '{n} líneas', promptLine1: '1 línea',
     promptCopied: 'Copiado',
     promptNoJson: 'La respuesta no contiene ningún objeto JSON. Pega la respuesta entera.',
     working: 'Procesando…',

@@ -26,6 +26,8 @@
  * @variants dialog danger · celebrate · ai · roomy · wide
  * @fork dialog Do not: the focus trap, Escape and focus return are the browser's through native <dialog>, and a hand-rolled overlay loses all three. Put your own markup in body(host) instead.
  * @version-history
+ *   v0.59.0 — 2026-09-29 — A dialog wears the app's look (wearLook): it sits on the body, outside
+ *     the frame that carries the look's tokens, and a workbench app's dialog drew in the default look.
  *   v0.51.0 — 2026-09-05 — FOUR SLOTS AND ELEVEN NAMED PARTS: `parts.before` opens the body,
  *     `parts.after` closes it, `parts.actions` puts the app's own row (a "don't ask again", a
  *     note) beside the kit's buttons, `parts.aside` marks the head, and `tone` / `size` are
@@ -34,7 +36,7 @@
  *     return are the browser's through native <dialog>.
  *   v0.25.0 — 2026-08-29 — Initial (TARGET-074: the dialog department).
  */
-import { el, reducedMotion } from './dom.js';
+import { el, reducedMotion, wearLook } from './dom.js';
 import { t } from './i18n.js';
 import { mosaic } from './mosaic.js';
 import { slotInto } from './parts-model.js';
@@ -109,7 +111,7 @@ export function dialog(spec) {
 
   node.appendChild(el('div', { class: 'ak-dialog__panel', 'data-ak-part': 'panel' },
     [head, body, (spec.actions || []).length || foot.childNodes.length ? foot : null]));
-  document.body.appendChild(node);
+  document.body.appendChild(wearLook(node, document.activeElement));
 
   let closed = false;
   /** @param {string} [reason] */

@@ -55,6 +55,11 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.59.0 — 2026-09-29 — Every layer the kit puts on the body (a dialog, a drawer, a menu, a
+ *     popover, a tooltip, a toast, the palette, a tour note, the lightbox, a leaving row's ghost)
+ *     wears the look of the element it came from or of the page's app (dom.js wearLook). A look's
+ *     tokens are scoped to the app frame, so those layers drew in the default look: a workbench
+ *     app's dialog showed the vivid gradient. And the prompt panel says "1 line".
  *   v0.58.0 — 2026-09-29 — margins(choice) / marginsOf(prefs) and app({ margins }): the node's margin
  *     figures on the empty sides of a wide frame, the person's home choice when the app hands it over.
  *   v0.57.0 — 2026-09-29 — A list row's badge takes `badgeTone` (ok, warn, err, quiet), styled in shell.css.
@@ -404,7 +409,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.58.0',
+  version: '0.59.0',
 
   /**
    * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's

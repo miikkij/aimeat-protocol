@@ -13,6 +13,8 @@
  *   AIMEAT.atelier.toast({ title: 'Part adopted', sub: 'shop.html', action: { label: 'Undo', onPick } });
  *   AIMEAT.atelier.palette({ items: [{ id: 'adopt', label: 'Adopt…', run() {} }], hotkey: 'k' });
  * @version-history
+ *   v0.59.0 — 2026-09-29 — The toasts, the palette and a tour note wear the app's look (wearLook):
+ *     they sit on the body, outside the frame that carries the look's tokens.
  *   v0.55.0 — 2026-09-28 — The palette moves: it grows out of the button that opened it (`anchor`,
  *     or open(from)), its rows glide, rise and fade as the filter changes (settle), the highlight
  *     is the travelling ink, it closes with an exit, and an item with `done` turns the palette
@@ -23,7 +25,7 @@
  *     reads as a bug rather than as a message ending.
  *   v0.42.0 — 2026-09-01 — Initial (wish-atelier-night-gallery, stage 3).
  */
-import { el, resolve, enter, reducedMotion, motionOff } from './dom.js';
+import { el, resolve, enter, reducedMotion, motionOff, wearLook } from './dom.js';
 import { fadeIn, paceOf, settle } from './arrive.js';
 import { springFrames } from './motion.js';
 import { ink } from './ink.js';
@@ -43,6 +45,8 @@ export function toast(spec) {
     toastHost = el('div', { class: 'ak-root ak-toasts', role: 'status', 'aria-live': 'polite' });
     document.body.appendChild(toastHost);
   }
+  // Asked on every toast, not once: the host can be made before the page's app is.
+  wearLook(toastHost);
   let timer = null;
   const node = el('div', { class: 'ak-toast' + (spec.tone ? ' ak-toast--' + spec.tone : '') }, [
     el('div', { class: 'ak-toast__body' }, [
@@ -197,7 +201,7 @@ export function palette(spec) {
     } });
     box = el('div', { class: 'ak-palette__box', role: 'dialog', 'aria-modal': 'true', 'aria-label': s.placeholder || 'Commands' }, [input, list]);
     root = el('div', { class: 'ak-root ak-palette', on: { click: function (e) { if (e.target === root) close(); } } }, [box]);
-    document.body.appendChild(root);
+    document.body.appendChild(wearLook(root, opener));
     mark = ink(list, { axis: 'y', active: '.ak-palette__item[aria-selected="true"]:not(.ak-layout__ghost)', className: 'ak-palette__ink' });
     paintList();
     mark.jump();
@@ -341,7 +345,7 @@ export function tour(spec) {
         last ? null : el('button', { type: 'button', class: 'ak-btn ak-btn--ghost', on: { click: end } }, L.skip),
       ].filter(Boolean)),
     ]);
-    document.body.appendChild(note);
+    document.body.appendChild(wearLook(note, marked));
     place();
   }
   function clearStep() {

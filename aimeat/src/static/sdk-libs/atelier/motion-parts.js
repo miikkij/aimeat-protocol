@@ -25,9 +25,11 @@
  *     { id: 'a', title: 'Harbour', sub: 'May', image: '/files/harbour.jpg' } ] },
  *     onPick(item) { AIMEAT.atelier.lightbox({ items, from: document.activeElement }); } });
  * @version-history
+ *   v0.59.0 — 2026-09-29 — The lightbox wears the app's look (wearLook): it sits on the body,
+ *     outside the frame that carries the look's tokens.
  *   v0.44.0 — 2026-09-02 — Initial (wish-atelier-motion-libraries-and-parts, stage 3).
  */
-import { el, clear, resolve, uid, reducedMotion } from './dom.js';
+import { el, clear, resolve, uid, reducedMotion, wearLook } from './dom.js';
 import { svg } from './chart-core.js';
 import { emptyState } from './state.js';
 import { t } from './i18n.js';
@@ -556,7 +558,7 @@ export function lightbox(spec) {
   node.addEventListener('cancel', onCancel);
   node.addEventListener('click', onBackdrop);
 
-  document.body.appendChild(node);
+  document.body.appendChild(wearLook(node, document.activeElement));
   document.body.classList.add('ak-lightbox-open');
   if (!items.length) {
     clear(panel);

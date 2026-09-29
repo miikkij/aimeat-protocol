@@ -25,6 +25,7 @@
  * @parts queueRow root · top · who · when · title · chips · chip · note
  * @fork queueRow Build your own row content; copy .ak-qrow* out of workbench.css.
  * @version-history
+ *   v0.1.1 — 2026-09-29 — A one-line prompt's preview says "1 line" (promptLine1), not "1 lines".
  *   v0.1.0 — 2026-09-29 — Initial.
  */
 import { el, clear, resolve, whileBusy, uid } from './dom.js';
@@ -75,7 +76,7 @@ export function promptPanel(spec) {
 
   const shortText = function () {
     const lines = promptText().split('\n');
-    return lines[0].slice(0, 120) + '… (' + t('promptLines', { n: lines.length }) + ')';
+    return lines[0].slice(0, 120) + '… (' + (lines.length === 1 ? t('promptLine1') : t('promptLines', { n: lines.length })) + ')';
   };
   const one = el('div', { class: 'ak-promptpanel__col', 'data-ak-part': 'col' });
   one.appendChild(el('div', { class: 'ak-promptpanel__step', 'data-ak-part': 'step', text: answers ? t('promptStepCopy') : t('promptStepCopyOnly') }));

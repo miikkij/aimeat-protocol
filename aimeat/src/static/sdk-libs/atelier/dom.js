@@ -16,10 +16,15 @@
  *   surface repaints zero times — the finish gate measures exactly that.
  * @structure el · append · $ · $$ · clear · uid · reducedMotion · setMotion · motionOff ·
  *   setMotionDefaults · resolve · injectStyle · busy · guardButtons · whileBusy · enter ·
- *   kinetic · countUp · attention
+ *   kinetic · countUp · attention · wearLook
  * @usage  import { el, $, injectStyle, enter } from './dom.js';
  *   el('div', { class: 'ak-card', vars: { '--ak-fill': '42%' }, on: { click: fn } }, ['text']);
  * @version-history
+ *   v0.59.0 — 2026-09-29 — wearLook(node, from): a layer the kit appends to the body (a dialog, a
+ *     drawer, a menu, a popover, a tooltip, a toast, the palette, a tour note, a leaving row's
+ *     ghost) names the look of the element it came from, or of the page's app. A look's tokens
+ *     are scoped to the element that carries `data-ak-look`, so a layer on the body drew in the
+ *     default look: a workbench app's dialog showed the vivid gradient on its primary button.
  *   v0.50.0 — 2026-09-05 — MOTION IS THE DEFAULT, AND THE OPT-OUT IS ONE ATTRIBUTE.
  *     motionOff(node) is the one question every moving part in this kit asks: the viewer's
  *     answer, or an app's `app({ motion: false })` / a block's `motion: false`, both of which
@@ -40,6 +45,24 @@
  *     look's curve shapes its entrance and not only its transitions.
  *   v0.1.0 — 2026-08-27 — Initial (TARGET-074 phase 1, slice 1).
  */
+
+/**
+ * The look a layer outside the app frame wears. The kit appends a dialog, a menu, a toast, a drawer
+ * or a leaving row's ghost to the BODY, while a look's tokens are scoped to the element that carries
+ * `data-ak-look` (the app frame). The layer names the look of the element it belongs to, or of the
+ * page's app when it has none; a layer that already names a look keeps it.
+ * @param {HTMLElement} node  the layer
+ * @param {Element|null} [from]  the element it came from (an anchor, a leaving row), when there is one
+ * @returns {HTMLElement} the same node
+ */
+export function wearLook(node, from) {
+  if (!node || node.hasAttribute('data-ak-look')) return node;
+  const host = (from && typeof from.closest === 'function' && from.closest('[data-ak-look]'))
+    || document.querySelector('.ak-app[data-ak-look]');
+  const look = host ? host.getAttribute('data-ak-look') : null;
+  if (look) node.setAttribute('data-ak-look', look);
+  return node;
+}
 
 /** Attribute names handled specially by `el` rather than being set as attributes. */
 const SPECIAL = { text: 1, on: 1, vars: 1, children: 1 };

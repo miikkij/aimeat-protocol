@@ -14,6 +14,13 @@
   }
 
   // src/static/sdk-libs/atelier/dom.js
+  function wearLook(node, from) {
+    if (!node || node.hasAttribute("data-ak-look")) return node;
+    const host = from && typeof from.closest === "function" && from.closest("[data-ak-look]") || document.querySelector(".ak-app[data-ak-look]");
+    const look = host ? host.getAttribute("data-ak-look") : null;
+    if (look) node.setAttribute("data-ak-look", look);
+    return node;
+  }
   var SPECIAL = { text: 1, on: 1, vars: 1, children: 1 };
   var ENTER_MAX = 12;
   var ENTER_SPAN_CAP = 500;
@@ -815,7 +822,7 @@
     ghost.style.setProperty("--ak-ghost-y", box.top + "px");
     ghost.style.setProperty("--ak-ghost-w", box.width + "px");
     ghost.style.setProperty("--ak-ghost-h", box.height + "px");
-    document.body.appendChild(ghost);
+    document.body.appendChild(wearLook(ghost, kid));
     const drop = function() {
       if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
     };
@@ -1029,6 +1036,7 @@
       promptApply: "Show the changes",
       promptPastePh: "Paste the answer here",
       promptLines: "{n} lines",
+      promptLine1: "1 line",
       promptCopied: "Copied",
       promptNoJson: "The answer has no JSON object in it. Paste the whole answer.",
       working: "Working…",
@@ -1124,6 +1132,7 @@
       promptApply: "Näytä muutokset",
       promptPastePh: "Liitä vastaus tähän",
       promptLines: "{n} riviä",
+      promptLine1: "1 rivi",
       promptCopied: "Kopioitu",
       promptNoJson: "Vastauksessa ei ole JSON-oliota. Liitä koko vastaus.",
       working: "Käsitellään…",
@@ -1219,6 +1228,7 @@
       promptApply: "Ver los cambios",
       promptPastePh: "Pega aquí la respuesta",
       promptLines: "{n} líneas",
+      promptLine1: "1 línea",
       promptCopied: "Copiado",
       promptNoJson: "La respuesta no contiene ningún objeto JSON. Pega la respuesta entera.",
       working: "Procesando…",
@@ -5382,7 +5392,7 @@
     function open(at, fromKeys) {
       if (box) return;
       box = build();
-      document.body.appendChild(box);
+      document.body.appendChild(wearLook(box, anchor));
       const r = at ? { left: at.x, right: at.x, top: at.y, bottom: at.y } : anchor ? anchor.getBoundingClientRect() : { left: EDGE, right: EDGE, top: EDGE, bottom: EDGE };
       const origin = placeAt(box, r, { align: s.align });
       mark = ink2(box, { axis: "y", active: ".ak-menu__item--on", className: "ak-menu__ink" });
@@ -5523,7 +5533,7 @@
         },
         [el("div", { class: "ak-popover__body", "data-ak-part": "body" }, body)]
       );
-      document.body.appendChild(box);
+      document.body.appendChild(wearLook(box, anchor));
       openMotion(box, placeAt(box, anchor.getBoundingClientRect(), { align: spec.align || "center" }));
       anchor.setAttribute("aria-expanded", "true");
       unhook = outside([box, anchor], close);
@@ -5570,7 +5580,7 @@
       clearTimeout(timer);
       if (shown) return;
       shown = true;
-      document.body.appendChild(tip);
+      document.body.appendChild(wearLook(tip, node));
       openMotion(tip, placeAt(tip, node.getBoundingClientRect(), { align: "center", placement: o.placement || "above" }));
     }
     function hide() {
@@ -5616,6 +5626,7 @@
       toastHost = el("div", { class: "ak-root ak-toasts", role: "status", "aria-live": "polite" });
       document.body.appendChild(toastHost);
     }
+    wearLook(toastHost);
     let timer = null;
     const node = el("div", { class: "ak-toast" + (spec.tone ? " ak-toast--" + spec.tone : "") }, [
       el("div", { class: "ak-toast__body" }, [
@@ -5811,7 +5822,7 @@
       root = el("div", { class: "ak-root ak-palette", on: { click: function(e) {
         if (e.target === root) close();
       } } }, [box]);
-      document.body.appendChild(root);
+      document.body.appendChild(wearLook(root, opener));
       mark = ink2(list2, { axis: "y", active: '.ak-palette__item[aria-selected="true"]:not(.ak-layout__ghost)', className: "ak-palette__ink" });
       paintList();
       mark.jump();
@@ -5972,7 +5983,7 @@
           last ? null : el("button", { type: "button", class: "ak-btn ak-btn--ghost", on: { click: end } }, L.skip)
         ].filter(Boolean))
       ]);
-      document.body.appendChild(note);
+      document.body.appendChild(wearLook(note, marked));
       place2();
     }
     function clearStep() {
@@ -6028,7 +6039,7 @@
     const root = el("div", { class: "ak-root ak-promptpanel" + (answers ? "" : " ak-promptpanel--one"), "data-ak-part": "root" });
     const shortText = function() {
       const lines = promptText().split("\n");
-      return lines[0].slice(0, 120) + "… (" + t("promptLines", { n: lines.length }) + ")";
+      return lines[0].slice(0, 120) + "… (" + (lines.length === 1 ? t("promptLine1") : t("promptLines", { n: lines.length })) + ")";
     };
     const one = el("div", { class: "ak-promptpanel__col", "data-ak-part": "col" });
     one.appendChild(el("div", { class: "ak-promptpanel__step", "data-ak-part": "step", text: answers ? t("promptStepCopy") : t("promptStepCopyOnly") }));
@@ -9924,7 +9935,7 @@
       panel.appendChild(host);
     }
     node.appendChild(panel);
-    document.body.appendChild(node);
+    document.body.appendChild(wearLook(node, document.activeElement));
     const travel3 = side === "bottom" ? "0, 100%" : side === "right" ? "100%, 0" : "-100%, 0";
     function motion() {
       const cs = getComputedStyle(node);
@@ -14552,7 +14563,7 @@
     node.addEventListener("keydown", onKey);
     node.addEventListener("cancel", onCancel);
     node.addEventListener("click", onBackdrop);
-    document.body.appendChild(node);
+    document.body.appendChild(wearLook(node, document.activeElement));
     document.body.classList.add("ak-lightbox-open");
     if (!items.length) {
       clear(panel);
@@ -15545,7 +15556,7 @@
       { class: "ak-dialog__panel", "data-ak-part": "panel" },
       [head, body, (spec.actions || []).length || foot.childNodes.length ? foot : null]
     ));
-    document.body.appendChild(node);
+    document.body.appendChild(wearLook(node, document.activeElement));
     let closed = false;
     function close(reason) {
       if (closed) return;
@@ -18795,7 +18806,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.58.0",
+    version: "0.59.0",
     /**
      * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
      * named parts (every one carries `data-ak-part`, so an app's own CSS reaches it), the slots
