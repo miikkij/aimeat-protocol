@@ -11,13 +11,18 @@
  *   — a future `listKnowledgeForOrgs` primitive, not a mount composite). Single-master: the Knowledge tab
  *   mount only. The individual endpoints stay for interactive re-fetch (import/delete/federate).
  *
- * @structure KnowledgeTabService.overview(ownerGaii) → { packages, consents }
- * @usage const ov = await createKnowledgeTabService(storage).overview(resolve(req));
+ * @structure KnowledgeTabService.overview(ownerGaii, reader) → { packages, consents }
+ * @usage const ov = await createKnowledgeTabService(storage).overview(resolve(req), readerFor({ storage, config }, req.auth));
  * @version-history
+ *   v1.1.0 — 2026-09-29 — TARGET-082 V4: overview() takes the caller's classification reader and
+ *     passes the package manifests through presentMemories, so a manifest the caller may not see is
+ *     left out and one shown to an AI under a warning label carries `classificationWarning`.
  *   v1.0.0 — 2026-07-16 — Phase 4: fold the Knowledge tab's owner packages + consents into one composite.
  */
 import type { Storage } from '../../storage/interface.js';
 import { runInReadScope } from '../../storage/read-scope/read-scope.js';
+import type { ContentReader } from '../classification/reader.js';
+import { presentMemories, classificationWarningOf } from '../classification/present-memory.js';
 
 export interface KnowledgeOverview {
   packages: Array<Record<string, unknown>>;
@@ -31,20 +36,26 @@ export class KnowledgeTabService {
    * The Knowledge tab's owner-scoped mount for one owner in a single read scope: the owner's knowledge
    * packages (memory, `packages/` prefix tagged `knowledge-package`, values included — the tab renders each
    * manifest) + the consent list (the tab extracts the `federation` consents on `packages/…/*` to mark
-   * which packages are shared). Both mirror GET /v1/memory and GET /v1/consent respectively.
+   * which packages are shared). Both mirror GET /v1/memory and GET /v1/consent respectively. The
+   * manifests pass the caller's classification reader, as GET /v1/memory's records do.
    */
-  overview(ownerGaii: string): Promise<KnowledgeOverview> {
+  overview(ownerGaii: string, reader: ContentReader): Promise<KnowledgeOverview> {
     return runInReadScope(async () => {
-      const [pkgRecords, consents] = await Promise.all([
+      const [stored, consents] = await Promise.all([
         this.storage.listMemory(ownerGaii, { prefix: 'packages/', tags: ['knowledge-package'] }),
         this.storage.listConsents(ownerGaii),
       ]);
+      const pkgRecords = await presentMemories(reader, stored);
 
       return {
-        packages: pkgRecords.map(r => ({
-          key: r.key, value: r.value, owner_gaii: r.ownerGaii, visibility: r.visibility,
-          version: r.version, tags: r.tags, created_at: r.createdAt, updated_at: r.updatedAt,
-        })),
+        packages: pkgRecords.map(r => {
+          const warning = classificationWarningOf(r);
+          return {
+            key: r.key, value: r.value, owner_gaii: r.ownerGaii, visibility: r.visibility,
+            version: r.version, tags: r.tags, created_at: r.createdAt, updated_at: r.updatedAt,
+            ...(warning ? { classificationWarning: warning } : {}),
+          };
+        }),
         consents: consents.map(c => ({
           id: c.id, data_pattern: c.dataPattern, recipient: c.recipient, purpose: c.purpose,
           scope: c.scope, expires: c.expires, status: c.status, granted_at: c.grantedAt,

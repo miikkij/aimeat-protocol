@@ -8,6 +8,8 @@
  * @structure catalog / members / config (GET+PUT) / upload / data/:username
  *   portfolioWriteGaii() / portfolioReadGaiis() — which identity a portfolio is stored under
  * @version-history
+ *   v1.8.0 — 2026-09-29 — TARGET-082 V4: the catalog's memory entries pass the caller's ContentReader
+ *     (presentMemories) before a preview is cut from a value.
  *   v1.7.1 — 2026-09-24 — /v1/portfolio/members reads services/portfolio-members.ts (moved there
  *     unchanged, so the /v1/members page body can use the same list).
  *   v1.7.0 — 2026-09-03 — GET /v1/portfolio/config also says where the stored page IS: `html`
@@ -51,6 +53,8 @@ import { requireAuth, optionalAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { listPublishedMembers } from '../services/portfolio-members.js';
+import { readerFor } from '../services/classification/reader.js';
+import { presentMemories } from '../services/classification/present-memory.js';
 
 /** Result of resolving a username to their published portfolio. */
 export type PortfolioResolution =
@@ -259,23 +263,24 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
     // public-read URL (/v1/memory/:gaii/:key) for the generated portfolio.
     const memories: Array<{ key: string; gaii: string; visibility: string; tags: string[]; preview: string }> = [];
     // One IN query for all agents' memory (was listMemory per agent). Records carry ownerGaii.
-    const mems = await storage.listMemoryForOwners(agents.map(a => a.gaii));
+    // Only the records the builder could list pass the classification check, and it runs before a
+    // preview is cut, so a record the caller may not see gives no preview either.
+    const mems = await presentMemories(readerFor({ storage, config }, req.auth),
+      (await storage.listMemoryForOwners(agents.map(a => a.gaii))).filter(m => m.visibility !== 'private' && !m.key.startsWith('_sys.')));
     for (const m of mems) {
-      if (m.visibility !== 'private' && !m.key.startsWith('_sys.')) {
-        // Extract a short text preview from the value
-        let preview = '';
-        if (typeof m.value === 'string') {
-          preview = m.value.slice(0, 120);
-        } else if (m.value && typeof m.value === 'object') {
-          const v = m.value as Record<string, unknown>;
-          // Try common text fields: description, summary, title, text, content
-          for (const f of ['description', 'summary', 'title', 'text', 'content', 'name']) {
-            if (typeof v[f] === 'string' && v[f]) { preview = (v[f] as string).slice(0, 120); break; }
-          }
-          if (!preview) preview = JSON.stringify(m.value).slice(0, 120);
+      // Extract a short text preview from the value
+      let preview = '';
+      if (typeof m.value === 'string') {
+        preview = m.value.slice(0, 120);
+      } else if (m.value && typeof m.value === 'object') {
+        const v = m.value as Record<string, unknown>;
+        // Try common text fields: description, summary, title, text, content
+        for (const f of ['description', 'summary', 'title', 'text', 'content', 'name']) {
+          if (typeof v[f] === 'string' && v[f]) { preview = (v[f] as string).slice(0, 120); break; }
         }
-        memories.push({ key: m.key, gaii: m.ownerGaii, visibility: m.visibility, tags: m.tags || [], preview });
+        if (!preview) preview = JSON.stringify(m.value).slice(0, 120);
       }
+      memories.push({ key: m.key, gaii: m.ownerGaii, visibility: m.visibility, tags: m.tags || [], preview });
     }
 
     res.json(success(config.nodeId, {

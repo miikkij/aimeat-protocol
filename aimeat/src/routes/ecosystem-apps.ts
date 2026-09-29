@@ -22,6 +22,8 @@
  *     eco-capability schedules/pending advisories cleaned up; deposited data preserved)
  * @usage app.use(ecosystemAppsRouter(config, storage, scheduler));
  * @version-history
+ *   v1.7.0 — 2026-09-29 — GET /:app/data shows the app's records through presentMemories, the
+ *     classification check and the credential mask in one call (TARGET-082 V4).
  *   v1.3.0 — 2026-08-15 — Delete ends the app's credentials, and approve writes the row that makes
  *     that possible. The approve path generated a sessionId, stamped it into the ninety-day JWT and
  *     never created the session, so there was nothing to revoke and isSessionRevoked() read the
@@ -68,6 +70,8 @@ import { emitEcosystemBindingRevoked } from '../services/ecosystem-events.js';
 import { logger } from '../utils/logger.js';
 import { pendingPrefix, PENDING_TYPE, type PendingAdvisoryRecord } from '../services/ecosystem-automation-advisories.js';
 import { registerEcosystemAdvisoryRoutes } from './ecosystem-apps-advisories.js';
+import { readerFor } from '../services/classification/reader.js';
+import { presentMemories } from '../services/classification/present-memory.js';
 
 /** Hello-integration request codes expire after 30 minutes (parallel to device-auth). */
 const ECO_AUTH_EXPIRY_MS = 1_800_000;
@@ -483,7 +487,9 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
     const prefix = req.query.prefix as string | undefined;
     const visibility = req.query.visibility as string | undefined;
 
-    const records = await storage.listMemory(geai, { prefix, visibility });
+    // What this reader may see, with credential records masked: the one presentation of a memory
+    // value (TARGET-082). Hidden records are not counted in `total` either.
+    const records = await presentMemories(readerFor({ storage, config }, req.auth), await storage.listMemory(geai, { prefix, visibility }));
     // Newest first by updatedAt (fall back to createdAt), then cap to a sane limit.
     records.sort((a, b) => {
       const ta = new Date(a.updatedAt ?? a.createdAt ?? 0).getTime();

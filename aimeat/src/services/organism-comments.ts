@@ -11,8 +11,11 @@
  *   routes and the MCP tools so the two surfaces stay identical.
  * @structure
  *   - canAccessWorkspaceComments(...) -- membership + workspace-read gate
- *   - addComment(...) / listComments(...) -- create + read a target's thread
+ *   - addComment(...) / listComments(storage, reader, ...) -- create + read a target's thread
  * @version-history
+ *   v1.2.0 -- 2026-09-29 -- TARGET-082 V4: listComments takes the caller's ContentReader and returns
+ *     only the comments it may see (reader.show on each comment record); a warning an AI reader was
+ *     shown under rides on the comment as `classificationWarning`.
  *   v1.1.0 -- 2026-08-01 -- TARGET-058 Phase 8b: addComment() takes an optional `aiProvenanceId` and
  *     writes it onto the comment's memory row. A comment IS a memory record, so it already had the
  *     column — the id had nowhere to be passed in, which is a different problem with the same effect.
@@ -22,12 +25,17 @@ import { randomUUID } from 'node:crypto';
 import type { Storage, OrganismRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { canReadWorkspace } from './workspace-access.js';
+import { memoryTarget } from './classification/labels.js';
+import type { ContentReader } from './classification/reader.js';
+import { classificationWarningOf } from './classification/present-memory.js';
 
 export interface CommentAnchor { section?: string; quote?: string }
 export interface WorkspaceComment {
   id: string; ws: string; space: string; instanceId: string;
   anchor: CommentAnchor | null; author: string; body: string;
   parentId: string | null; createdAt: string;
+  /** Set on a listed comment when an AI reader was shown it under a warning classification. */
+  classificationWarning?: { label: string; name: string; says: string };
 }
 
 export const commentPrefix = (id: string, ws: string, space: string, instanceId: string): string =>
@@ -79,11 +87,16 @@ export async function addComment(
 }
 
 export async function listComments(
-  storage: Storage, organismId: string, ws: string, space: string, instanceId: string,
+  storage: Storage, reader: ContentReader, organismId: string, ws: string, space: string, instanceId: string,
 ): Promise<WorkspaceComment[]> {
   const { items } = await storage.listAllMemory({ prefix: commentPrefix(organismId, ws, space, instanceId), limit: 2000 });
-  return items
-    .map(r => r.value as unknown as WorkspaceComment)
+  return (await reader.show(items, r => memoryTarget(r.ownerGaii, r.key)))
+    .map(r => {
+      // An AI shown a warning-classified comment gets the warning on the comment itself.
+      const w = classificationWarningOf(r);
+      const c = r.value as unknown as WorkspaceComment;
+      return w && c && typeof c === 'object' ? { ...c, classificationWarning: w } : c;
+    })
     .filter(v => v && typeof v === 'object')
     .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
 }

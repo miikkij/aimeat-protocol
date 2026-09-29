@@ -5,12 +5,20 @@
  * @description The current content of one installed package component, as the string its hash is
  *   taken over. Moved unchanged out of services/component-registrar.ts, which had reached the
  *   800-line limit, and re-exported from there so no importer changes.
- * @structure fetchComponentContent(storage, type, registeredAs, ownerGaii)
+ * @structure fetchComponentContent(storage, type, registeredAs, ownerGaii) ·
+ *   componentContentTargets(storage, type, registeredAs, ownerGaii) ·
+ *   fetchComponentContentForAi(storage, reader, type, registeredAs, ownerGaii, use)
  * @version-history
+ *   v1.1.0 — 2026-09-29 — TARGET-082 V4: componentContentTargets (the label addresses of the memory
+ *     records a memory or translation component reads) and fetchComponentContentForAi, which asks the
+ *     caller's ContentReader useForAi for them before the content is returned for a model prompt.
+ *     fetchComponentContent is unchanged: its other callers only hash the content.
  *   v1.0.0 — 2026-09-28 — Pure extraction from services/component-registrar.ts (max-file-lines).
  */
-import type { Storage, PackageComponentType } from '../storage/interface.js';
+import type { Storage, PackageComponentType, ContentLabelTarget } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { memoryTarget } from './classification/labels.js';
+import type { ContentReader } from './classification/reader.js';
 
 // ── Fetch component content ──────────────────────────────────────────
 
@@ -54,9 +62,8 @@ export async function fetchComponentContent(
       }
       case 'memory': {
         // Read the manifest key to find which memory keys belong to this component
-        const manifest = await storage.getMemory(ownerGaii, `_pkg:${registeredAs}`);
-        if (!manifest || !Array.isArray(manifest.value)) return null;
-        const keys = manifest.value as string[];
+        const keys = await manifestKeys(storage, ownerGaii, registeredAs);
+        if (!keys) return null;
         const entries: Array<{ key: string; value: unknown }> = [];
         for (const key of keys) {
           const mem = await storage.getMemory(ownerGaii, key);
@@ -78,4 +85,45 @@ export async function fetchComponentContent(
     logger.warn('component-registrar: suppressed failure, continuing', { error: String(err) });
     return null;
   }
+}
+
+/**
+ * The label addresses of the owner's memory records a component's content is made of: every key a
+ * memory component's manifest names, or a translation component's record. Other component types are
+ * node-level definitions or published code and carry no content label.
+ */
+export async function componentContentTargets(
+  storage: Storage,
+  type: PackageComponentType,
+  registeredAs: string,
+  ownerGaii: string,
+): Promise<ContentLabelTarget[]> {
+  if (type === 'translation') return [memoryTarget(ownerGaii, `i18n.${registeredAs}`)];
+  if (type !== 'memory') return [];
+  return ((await manifestKeys(storage, ownerGaii, registeredAs)) ?? [])
+    .filter((k): k is string => typeof k === 'string')
+    .map(k => memoryTarget(ownerGaii, k));
+}
+
+/** The memory keys a memory component's `_pkg:` manifest names, or null when there is no manifest. */
+async function manifestKeys(storage: Storage, ownerGaii: string, registeredAs: string): Promise<string[] | null> {
+  const manifest = await storage.getMemory(ownerGaii, `_pkg:${registeredAs}`);
+  return manifest && Array.isArray(manifest.value) ? manifest.value as string[] : null;
+}
+
+/**
+ * fetchComponentContent for content that goes into a model prompt. The reader's useForAi runs first
+ * and throws ClassificationError (CLASSIFIED) when a record may not reach a model, so the caller
+ * answers with the refusal and composes no prompt.
+ */
+export async function fetchComponentContentForAi(
+  storage: Storage,
+  reader: ContentReader,
+  type: PackageComponentType,
+  registeredAs: string,
+  ownerGaii: string,
+  use: { capability: string },
+): Promise<string | null> {
+  await reader.useForAi(await componentContentTargets(storage, type, registeredAs, ownerGaii), use);
+  return fetchComponentContent(storage, type, registeredAs, ownerGaii);
 }

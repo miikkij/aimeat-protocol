@@ -14,6 +14,8 @@
  *   import { registerSkillsTools } from './skills.js';
  *   registerSkillsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
  * @version-history
+ *   v1.3.0 -- 2026-09-29 -- TARGET-082 V4: the skill accessor carries the agent's ContentReader
+ *     (readerForAgent), so the registry filters user and workspace skills through it.
  *   v1.2.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.2.0 -- 2026-09-24 -- SECURITY (audit A8-1): node-scope publishing and visibility, which put a
@@ -39,6 +41,7 @@ import {
   getAgentSkillLinks, linkSkillToAgent, unlinkSkillFromAgent, setSkillVisibility,
   listSkillsByBinding, type SkillAccessor, type SkillScope,
 } from '../services/skills.js';
+import { readerForAgent } from '../services/classification/reader.js';
 
 export function registerSkillsTools(
     mcp: McpServer,
@@ -61,6 +64,7 @@ export function registerSkillsTools(
         isOperator: (await resolveOperatorAgentName(storage, agentGaii, scopes)) !== null,
         sub: agentGaii,
         gaii: agentGaii,
+        reader: readerForAgent({ storage, config }, agentGaii, scopes),
     });
 
     const err = (text: string) => ({ content: [{ type: 'text' as const, text }], isError: true });

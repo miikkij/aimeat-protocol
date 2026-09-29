@@ -11,13 +11,18 @@
  *   only. The individual endpoints stay for interactive re-fetches (post-version-create, live-update batch
  *   reload) and for the template-backfill write, which lives in the route where the default templates do.
  *
- * @structure CalibratorDetailService.overview(gaii, projectId) → { project, dimensions, versions, currentVersion, batches } | null
- * @usage const detail = await createCalibratorDetailService(storage).overview(gaii, id);
+ * @structure CalibratorDetailService.overview(reader, projectId) → { project, dimensions, versions, currentVersion, batches } | null
+ * @usage const detail = await createCalibratorDetailService(storage).overview(readerFor({ storage, config }, req.auth), id);
  * @version-history
+ *   v1.1.0 — 2026-09-29 — TARGET-082 V4: takes the caller's ContentReader instead of an identity; every
+ *     record of the scan passes presentMemories, so a record the reader may not see is left out (the
+ *     project itself answers null, which the route maps to 404).
  *   v1.0.0 — 2026-07-16 — Phase 4: fold the Calibrator detail mount's 4-read waterfall into one prefix scan.
  */
 import type { Storage } from '../../storage/interface.js';
 import { runInReadScope } from '../../storage/read-scope/read-scope.js';
+import type { ContentReader } from '../classification/reader.js';
+import { presentMemories } from '../classification/present-memory.js';
 
 interface BatchModel {
   modelId?: string;
@@ -42,10 +47,10 @@ export class CalibratorDetailService {
    * key is absent (the route maps that to 404). The `project` value is returned as stored — the route
    * applies the lazy template backfill (it owns the default-template constants).
    */
-  overview(gaii: string, projectId: string): Promise<CalibratorDetail | null> {
+  overview(reader: ContentReader, projectId: string): Promise<CalibratorDetail | null> {
     return runInReadScope(async () => {
       const prefix = `calibrator.${projectId}.`;
-      const all = await this.storage.listMemory(gaii, { prefix });
+      const all = await presentMemories(reader, await this.storage.listMemory(reader.identity, { prefix }));
 
       const projectRec = all.find(m => m.key === `${prefix}project`);
       if (!projectRec) return null;

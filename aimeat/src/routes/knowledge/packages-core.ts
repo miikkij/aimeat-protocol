@@ -16,6 +16,9 @@
  *     import can use it too, and the refusal's `details` reach the caller: they were being passed
  *     as error()'s fourth argument, which is httpStatus, so "the details below say which part" has
  *     carried none since the line was written. The untyped require('ajv') hid it.
+ *   v1.4.0 — 2026-09-29 — TARGET-082 V4: GET /:id passes the manifest it found through the caller's
+ *     classification reader (readerFor, presentMemory): one the caller may not see answers 404 like a
+ *     missing one, and one shown to an AI under a warning label carries `classificationWarning`.
  */
 import type { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -31,6 +34,8 @@ import { mintProvenance } from '../../services/ai-provenance.js';
 import { loadServedProvenance, envelopeMeta, setProvenanceHeaders } from '../../services/ai-provenance-marks.js';
 import { ownerGhiiOf } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
+import { readerFor } from '../../services/classification/reader.js';
+import { presentMemory, classificationWarningOf } from '../../services/classification/present-memory.js';
 
 // The validator is shared with the operator's import, which used to write a manifest nothing
 // checked. → ./manifest-validator.ts
@@ -284,6 +289,9 @@ export function registerPackagesCoreRoutes(
       const found = await findOwnerScopeMemory(req, manifestKey);
       if (found) manifest = found.record;
     }
+    // What the caller is shown is the classification reader's decision (TARGET-082): a manifest the
+    // caller may not see answers the same as one that is not there.
+    if (manifest) manifest = (await presentMemory(readerFor({ storage, config }, req.auth), manifest)) ?? undefined;
     if (!manifest) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Package not found or not public'));
       return;
@@ -294,9 +302,11 @@ export function registerPackagesCoreRoutes(
     // travels with the content it describes, so no second check is owed here.
     const prov = await loadServedProvenance(storage, config, manifest.aiProvenanceId);
     setProvenanceHeaders(res, prov);
+    const warning = classificationWarningOf(manifest);
     res.json(success(config.nodeId, {
       package_id: packageId,
       manifest: manifest.value,
+      ...(warning ? { classificationWarning: warning } : {}),
       tags: manifest.tags,
       created_at: manifest.createdAt,
       updated_at: manifest.updatedAt,

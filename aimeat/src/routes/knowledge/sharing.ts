@@ -8,6 +8,12 @@
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/knowledge.ts (max-file-lines)
  *   v1.1.0 — 2026-07-16 — clone + export manifest lookups batch the per-identity scan (listMemoryForOwners)
+ *   v1.2.0 — 2026-09-29 — TARGET-082 V4: clone and export pass the source manifest and entries
+ *     through the requester's classification reader (readerFor). Clone copies only what the
+ *     requester may see (show); export hands out only what the requester may see and what may leave
+ *     (show, then leave with kind 'export'). A manifest the requester may not see answers 404; one
+ *     that may not leave answers 403 CLASSIFIED. An entry held back is left out of `entry_data` and
+ *     of the package's entry list alike.
  */
 import type { Router } from 'express';
 import { randomUUID } from 'node:crypto';
@@ -19,6 +25,17 @@ import { emitChange } from '../../services/event-bus.js';
 import { recordPublicActivity } from '../../services/public-activity.js';
 import type { KnowledgeHelpers } from './helpers.js';
 import { logger } from '../../utils/logger.js';
+import { readerFor } from '../../services/classification/reader.js';
+import { memoryTarget } from '../../services/classification/labels.js';
+
+/** The classification address of a package record (manifest or entry). */
+const targetOfRecord = (r: MemoryRecord) => memoryTarget(r.ownerGaii, r.key);
+
+/** The organism a package was contributed to, from the manifest's `organism:<id>` tag, else null. */
+function organismOfManifest(manifest: MemoryRecord): string | null {
+  const tag = (manifest.tags ?? []).find(t => t.startsWith('organism:'));
+  return tag ? tag.slice('organism:'.length) || null : null;
+}
 
 export function registerSharingRoutes(
   router: Router,
@@ -166,7 +183,11 @@ export function registerSharingRoutes(
     // Find the source manifest across all agents in ONE IN query (was getMemory per agent).
     const allAgents = await storage.listAgents();
     const rows = await storage.listMemoryForOwners(allAgents.map(a => a.gaii), { prefix: sourceManifestKey, visibility: 'public' });
-    const sourceManifest: MemoryRecord | null = rows.find(r => r.key === sourceManifestKey) ?? null;
+    const found: MemoryRecord | null = rows.find(r => r.key === sourceManifestKey) ?? null;
+    // A clone copies another owner's content to the requester: only what the requester may see is
+    // copied (the classification reader, TARGET-082). A hidden manifest answers like a missing one.
+    const reader = readerFor({ storage, config }, req.auth);
+    const [sourceManifest] = found ? await reader.show([found], targetOfRecord) : [];
     const sourceOwnerGaii = sourceManifest?.ownerGaii ?? '';
 
     if (!sourceManifest || !sourceManifest.value) {
@@ -183,7 +204,7 @@ export function registerSharingRoutes(
 
     // Clone requested entries (only public ones)
     const publicEntries = manifest.entries.filter(e => e.visibility === 'public');
-    const toClone = requestedEntries
+    const requested = requestedEntries
       ? publicEntries.filter(e => requestedEntries.includes(e.key.split('/').pop()))
       : publicEntries;
 
@@ -191,10 +212,18 @@ export function registerSharingRoutes(
     const newPackageId = randomUUID();
     const clonedEntries: string[] = [];
 
-    for (const entry of toClone) {
-      const sourceEntry = await storage.getMemory(sourceOwnerGaii, entry.key);
-      if (!sourceEntry) continue;
+    // Each stored entry passes the reader on its own label; one the requester may not see is not
+    // copied and is left out of the cloned manifest's entry list too.
+    const stored: Array<{ entry: (typeof requested)[number]; record: MemoryRecord }> = [];
+    for (const entry of requested) {
+      const record = await storage.getMemory(sourceOwnerGaii, entry.key);
+      if (record) stored.push({ entry, record });
+    }
+    const readable = await reader.show(stored, s => targetOfRecord(s.record));
+    const hidden = new Set(stored.filter(s => !readable.some(r => r.entry === s.entry)).map(s => s.entry.key));
+    const toClone = requested.filter(e => !hidden.has(e.key));
 
+    for (const { entry, record: sourceEntry } of readable) {
       const entryName = entry.key.split('/').pop() ?? entry.key;
       const newKey = `packages/${newPackageId}/${entryName}`;
 
@@ -283,18 +312,28 @@ export function registerSharingRoutes(
     const ownerRows = await storage.listMemoryForOwners(
       allOwners.map(o => `${o.name}@${config.nodeId}`), { prefix: manifestKey, visibility: 'public' },
     );
-    let sourceManifest: MemoryRecord | null = ownerRows.find(r => r.key === manifestKey) ?? null;
-    if (!sourceManifest) {
+    let found: MemoryRecord | null = ownerRows.find(r => r.key === manifestKey) ?? null;
+    if (!found) {
       const allAgents = await storage.listAgents();
       const agentRows = await storage.listMemoryForOwners(allAgents.map(a => a.gaii), { prefix: manifestKey, visibility: 'public' });
-      sourceManifest = agentRows.find(r => r.key === manifestKey) ?? null;
+      found = agentRows.find(r => r.key === manifestKey) ?? null;
     }
-    const sourceOwnerGaii = sourceManifest?.ownerGaii ?? '';
 
+    // An export takes content out: what the requester may see, then what may leave (the
+    // classification reader's show and leave, TARGET-082). A hidden manifest answers like a missing one.
+    const reader = readerFor({ storage, config }, req.auth);
+    const [sourceManifest] = found ? await reader.show([found], targetOfRecord) : [];
     if (!sourceManifest) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Package not found or not public'));
       return;
     }
+    const where = { kind: 'export' as const, organismId: organismOfManifest(sourceManifest) };
+    const manifestLeft = (await reader.leave([sourceManifest], targetOfRecord, where)).left[0];
+    if (manifestLeft) {
+      res.status(403).json(error(config.nodeId, 'CLASSIFIED', `This package is ${manifestLeft.reason}, so it cannot be exported.`));
+      return;
+    }
+    const sourceOwnerGaii = sourceManifest.ownerGaii;
 
     const manifest = sourceManifest.value as KnowledgeManifest;
     const nodeUrl = config.baseUrl || `http://localhost:${config.port}`;
@@ -302,16 +341,25 @@ export function registerSharingRoutes(
     // Collect public entry data
     const entryData: Record<string, unknown> = {};
     const publicEntries = manifest.entries.filter(e => e.visibility === 'public');
-    const entriesToExport = requestedEntries
+    const requested = requestedEntries
       ? publicEntries.filter(e => requestedEntries.includes(e.key.split('/').pop() ?? ''))
       : publicEntries;
 
-    for (const entry of entriesToExport) {
+    // Each stored entry passes show and leave on its own label; one held back is left out of
+    // `entry_data` and of the exported entry list alike.
+    const stored: Array<{ entry: (typeof requested)[number]; record: MemoryRecord }> = [];
+    for (const entry of requested) {
       const mem = await storage.getMemory(sourceOwnerGaii, entry.key);
-      if (mem) {
-        const entryName = entry.key.split('/').pop() ?? entry.key;
-        entryData[entryName] = mem.value;
-      }
+      if (mem) stored.push({ entry, record: mem });
+    }
+    const pairTarget = (s: { record: MemoryRecord }) => targetOfRecord(s.record);
+    const exported = (await reader.leave(await reader.show(stored, pairTarget), pairTarget, where)).kept;
+    const heldBack = new Set(stored.filter(s => !exported.some(x => x.entry === s.entry)).map(s => s.entry.key));
+    const entriesToExport = requested.filter(e => !heldBack.has(e.key));
+
+    for (const { entry, record } of exported) {
+      const entryName = entry.key.split('/').pop() ?? entry.key;
+      entryData[entryName] = record.value;
     }
 
     const exportData = {

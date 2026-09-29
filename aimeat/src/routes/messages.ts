@@ -21,6 +21,9 @@
  *   - GET    /v1/messages/contacts                         -- list contacts + states
  * @usage import { messagesRouter } from '../routes/messages.js'; app.use(messagesRouter(config, storage));
  * @version-history
+ *   v1.15.0 -- 2026-09-29 -- TARGET-082 V4: the transcribe route reads the audio bytes through
+ *     readAiFile with the caller's ContentReader (useForAi, capability 'transcription'); a classified
+ *     file answers with the refusal's status and code (CLASSIFIED, 403) before any model is called.
  *   v1.14.0 -- 2026-09-24 -- SECURITY (audit A5-3): the send limit moved into the send services and
  *     counts per ACCOUNT (services/message-send-limit.ts), so the aimeat_dm_* tools count too and an
  *     owner's agents share the owner's allowance. POST /v1/messages takes the turn before it writes
@@ -102,6 +105,9 @@ import { mailboxReaderOf, readOwnerInbox, readOwnerConversations, readOwnerThrea
 import { requireOwnerMailboxRead } from '../auth/owner-mailbox-gate.js';
 import { transcribeForOwner } from '../services/ai-transcription.js';
 import { AiCompletionError } from '../services/ai-completion.js';
+import { readAiFile } from '../services/ai-inputs.js';
+import { readerFor } from '../services/classification/reader.js';
+import { ClassificationError } from '../services/classification/labels.js';
 
 export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
   const router = Router();
@@ -547,7 +553,18 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
         att.expired ? 'This attachment expired before it could be stored.' : 'This attachment has not been stored locally yet. Try again shortly.'));
       return;
     }
-    const file = await storage.getStorageFile(ghii, key);
+    // The bytes go to a transcription model, so they are read through the classification check
+    // (readAiFile asks useForAi before it returns them): a refusal is this request's answer.
+    let file: Awaited<ReturnType<typeof readAiFile>>;
+    try {
+      file = await readAiFile(storage, readerFor({ storage, config }, req.auth), ghii, key, { capability: 'transcription' });
+    } catch (e) {
+      if (e instanceof ClassificationError) {
+        res.status(e.status).json(error(config.nodeId, e.code, e.message));
+        return;
+      }
+      throw e;
+    }
     if (!file) {
       res.status(409).json(error(config.nodeId, 'ATTACHMENT_NOT_READY', 'The file itself is not stored here, only the note about it. Ask the sender to send it again.'));
       return;

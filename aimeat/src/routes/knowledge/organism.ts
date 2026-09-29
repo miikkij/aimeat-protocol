@@ -6,6 +6,8 @@
  *   list packages shared with an organism, and read a package's reputation/quality signals.
  *   Extracted from src/routes/knowledge.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-09-29 — TARGET-082 V4: GET /v1/knowledge/organism/:id passes the contributed manifests
+ *     through the caller's classification reader (readerFor, reader.show) before they are listed.
  *   2026-09-28 — Both organism routes refuse an agent the organism does not admit (agentAccess 'listed').
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/knowledge.ts (max-file-lines)
  *   v1.1.0 — 2026-07-16 — organism-packages + reputation batch the per-agent scans (listConsentsForAgents / listMemoryForOwners)
@@ -20,6 +22,9 @@ import { emitChange } from '../../services/event-bus.js';
 import type { KnowledgeHelpers } from './helpers.js';
 import { agentBarred, agentBarredMessage, barredAgentFor } from '../../services/organism-agent-access.js';
 import { resolveIdentity } from '../../utils/gaii.js';
+import { readerFor } from '../../services/classification/reader.js';
+import { classificationWarningOf } from '../../services/classification/present-memory.js';
+import { memoryTarget } from '../../services/classification/labels.js';
 
 export function registerOrganismRoutes(
   router: Router,
@@ -124,7 +129,7 @@ export function registerOrganismRoutes(
     const consentsByAgent = await storage.listConsentsForAgents(
       allAgents.map(a => a.gaii), { recipient: `organism.${organismId}`, status: 'active' },
     );
-    const packages: Array<{ key: string; manifest: unknown; ownerGaii: string; contributed_at: string }> = [];
+    const found: Array<{ record: MemoryRecord; contributedAt: string }> = [];
 
     for (const agent of allAgents) {
       const consents = consentsByAgent[agent.gaii] ?? [];
@@ -133,16 +138,27 @@ export function registerOrganismRoutes(
           const prefix = consent.dataPattern.replace('/*', '/manifest');
           const manifest = await storage.getMemory(agent.gaii, prefix);
           if (manifest && (manifest.value as { type?: string })?.type === 'knowledge-package') {
-            packages.push({
-              key: prefix,
-              manifest: manifest.value,
-              ownerGaii: agent.gaii,
-              contributed_at: consent.grantedAt,
-            });
+            found.push({ record: manifest, contributedAt: consent.grantedAt });
           }
         }
       }
     }
+
+    // Contributed manifests are their owners' content: what this caller is shown of them is the
+    // classification reader's decision (TARGET-082). Order is kept. A manifest key is never on the
+    // credential list, so reader.show on the pair is all presentMemories would do here.
+    const shown = await readerFor({ storage, config }, req.auth)
+      .show(found, f => memoryTarget(f.record.ownerGaii, f.record.key));
+    const packages = shown.map(f => {
+      const warning = classificationWarningOf(f);
+      return {
+        key: f.record.key,
+        manifest: f.record.value,
+        ownerGaii: f.record.ownerGaii,
+        contributed_at: f.contributedAt,
+        ...(warning ? { classificationWarning: warning } : {}),
+      };
+    });
 
     res.json(success(config.nodeId, { packages, count: packages.length }));
   });
@@ -155,7 +171,11 @@ export function registerOrganismRoutes(
     // Find the manifest across all agents in ONE IN query (was getMemory per agent = node-scan).
     const allAgents = await storage.listAgents();
     const rows = await storage.listMemoryForOwners(allAgents.map(a => a.gaii), { prefix: manifestKey });
-    const manifest: MemoryRecord | null = rows.find(r => r.key === manifestKey) ?? null;
+    const found: MemoryRecord | null = rows.find(r => r.key === manifestKey) ?? null;
+    // TARGET-082: a manifest this caller may not see answers like a missing one.
+    const manifest = found
+      ? (await readerFor({ storage, config }, req.auth).show([found], r => memoryTarget(r.ownerGaii, r.key)))[0] ?? null
+      : null;
 
     if (!manifest) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Package not found'));

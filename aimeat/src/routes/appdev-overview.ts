@@ -9,6 +9,8 @@
  * @structure appdevOverviewRouter(config, storage) → Router
  * @usage app.use(appdevOverviewRouter(config, storage)) from the routes loader.
  * @version-history
+ *   v1.3.1 — 2026-09-29 — TARGET-082 V4: GET /v1/appdev/overview hands buildAppdevOverview() the
+ *     caller's classification reader (readerFor) instead of the resolved identity.
  *   v1.3.0 — 2026-09-20 — The two template routes also answer for a genre that grew out of an app.
  *   v1.2.0 — 2026-09-19 — GET /v1/appdev/templates/:id takes ?part=N for a large shipped template.
  *   v1.1.0 — 2026-09-18 — GET /v1/appdev/templates/:id answers for a template the node ships when
@@ -23,6 +25,7 @@ import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { buildAppdevOverview } from '../services/appdev-overview.js';
+import { readerFor } from '../services/classification/reader.js';
 import { logger } from '../utils/logger.js';
 import {
   listTemplateProposals, getTemplateProposal, deleteTemplateProposal,
@@ -33,12 +36,12 @@ export function appdevOverviewRouter(config: AimeatConfig, storage: Storage): Ro
   const router = Router();
 
   router.get('/v1/appdev/overview', requireAuth(), requireScope('memory:read'), async (req, res) => {
-    const identity = resolveIdentity(req.auth!, config.nodeId);
+    const reader = readerFor({ storage, config }, req.auth);
     const model = typeof req.query.model === 'string' ? req.query.model : undefined;
     const sections = typeof req.query.sections === 'string'
       ? req.query.sections.split(',').map(s => s.trim()).filter(Boolean)
       : undefined;
-    const overview = await buildAppdevOverview(storage, config, identity, { model, sections });
+    const overview = await buildAppdevOverview(storage, config, reader, { model, sections });
     res.json(success(config.nodeId, overview, [
       { description: 'Curated pitfalls', method: 'GET', url: '/v1/appdev/pitfalls' },
       { description: 'Library pack detail', method: 'GET', url: '/v1/library-packs/{id}' },

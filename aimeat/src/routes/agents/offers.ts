@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent offers routes (publish/read per-agent offers, owner aggregate feed, callable-offer invoke with settlement). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 — 2026-09-29 — GET /v1/offers evaluates prerequisites as the caller's classification
+ *     reader (TARGET-082 V4).
  *   v1.6.2 — 2026-09-26 — Whether the caller owns the agent is asked with localAccountName
  *     (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local
  *     namesake (secaudit 2026-09, F-1).
@@ -39,6 +41,7 @@ import { buildGAII, resolveIdentity, localAccountName } from '../../utils/gaii.j
 import { emitChange } from '../../services/event-bus.js';
 import { OffersDocSchema, type Offer } from '../../models/offer-schemas.js';
 import { evaluateOfferPrereqs, offerHasPrereqs } from '../../services/offer-prereqs.js';
+import { readerFor } from '../../services/classification/reader.js';
 import { settleMarketplaceFee } from '../../services/marketplace-fee.js';
 import { percentFee } from '../../commerce/money.js';
 import { listWorkflows } from '../../services/workflow/store.js';
@@ -114,6 +117,8 @@ export function registerOffersRoutes(router: Router, config: AimeatConfig, stora
     const ownerGhii = `${owner}@${config.nodeId}`;
     const agents = await storage.getAgentsByOwner(owner);
     const now = Date.now();
+    // The prerequisites read owner memory and answer observed values, as this caller (TARGET-082).
+    const reader = readerFor({ storage, config }, req.auth);
     // Workflows that BUNDLE an offer: the offer is a step of a multi-step chain, so the card can offer
     // "run the whole workflow" instead of just the one step. Listed once (owner-shared), matched below.
     const workflows = await listWorkflows(storage, ownerGhii).catch(err => { logger.warn('GET /v1/offers: continuing after a suppressed failure', { error: String(err) }); return []; });
@@ -138,7 +143,7 @@ export function registerOffersRoutes(router: Router, config: AimeatConfig, stora
         const o: Record<string, unknown> = { ...offer };
         // Prerequisites — evaluated only when the offer declares any (bounds the per-feed cost).
         if (offerHasPrereqs(offer)) {
-          try { o.prereq = await evaluateOfferPrereqs(storage, config, owner, a.name, offer); }
+          try { o.prereq = await evaluateOfferPrereqs(storage, config, owner, a.name, offer, reader); }
           catch (err) { logger.warn('offers: a prereq-eval error must never break the whole feed', { error: String(err) }); }
         }
         // Bundling workflows (a multi-step chain this offer is a step of). Each carries `scheduled`

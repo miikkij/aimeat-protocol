@@ -6,6 +6,9 @@
  *   and apply a migration to an instance (replace/skip/custom/install_new actions).
  *   Extracted from src/routes/instances.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-09-29 — TARGET-082 V4: migration-prompt reads the owner's live component content
+ *     through fetchComponentContentForAi with the caller's ContentReader; a memory or translation
+ *     record that may not reach a model answers CLASSIFIED (403) and no prompt is composed.
  *   v1.5.0 — 2026-09-25 — apply-migration and update answer 202 with a request for the owner when an
  *     agent or an app grant lacks the words a memory part needs, instead of 403.
  *   v1.4.0 — 2026-09-24 — apply-migration and update hand the session's roles and scopes to the
@@ -34,7 +37,9 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireScope, requireLocalSession } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
-import { fetchComponentContent } from '../../services/component-registrar.js';
+import { fetchComponentContentForAi } from '../../services/component-content.js';
+import { readerFor } from '../../services/classification/reader.js';
+import { ClassificationError } from '../../services/classification/labels.js';
 import { resolveGhii } from '../../utils/ghii-resolver.js';
 import { migrateOrRequest, updateOrRequest, requestedBody } from '../../services/package-install-requests.js';
 import { actCallerOf as callerOf } from './install-requests.js';
@@ -85,6 +90,7 @@ export function registerMigrationRoutes(
     }
 
     const promptOwnerGaii = await resolveGhii(storage, owner, config);
+    const reader = readerFor({ storage, config }, req.auth);
     const currentCompMap = new Map(currentPkg.components.map(c => [c.id, c]));
     const latestCompMap = new Map(latestPkg.components.map(c => [c.id, c]));
 
@@ -107,9 +113,20 @@ export function registerMigrationRoutes(
       const installed = instance.installedComponents.find(ic => ic.componentId === compId);
       let userCurrentContent = original.content; // fallback
       if (installed) {
-        const current = await fetchComponentContent(
-          storage, installed.type, installed.registeredAs, promptOwnerGaii,
-        );
+        // The prompt carries the owner's live content to a model, so the classification check
+        // (useForAi) runs first; a refusal is this request's answer and no prompt is composed.
+        let current: string | null;
+        try {
+          current = await fetchComponentContentForAi(
+            storage, reader, installed.type, installed.registeredAs, promptOwnerGaii, { capability: 'migration-prompt' },
+          );
+        } catch (e) {
+          if (e instanceof ClassificationError) {
+            res.status(e.status).json(error(config.nodeId, e.code, e.message));
+            return;
+          }
+          throw e;
+        }
         if (current !== null) userCurrentContent = current;
       }
 

@@ -28,6 +28,8 @@
  *   import { workflowsRouter } from './routes/workflows.js';
  *   app.use(workflowsRouter(config, storage));
  * @version-history
+ *   v1.7.0 — 2026-09-29 — GET /:id/runs and /:id/runs/:runId read runs as the caller's classification
+ *     reader, so an observed value the caller may not see is withheld (TARGET-082 V4).
  *   v1.6.1 — 2026-09-26 — PUT /:id and POST /:id/run take requireLocalSession(): a visitor signed in
  *     from another node saves and starts no workflow here (secaudit 2026-09, A6-4).
  *   v1.6.0 — 2026-09-25 — A save records who saved it (the session's identity, and an app's grant),
@@ -65,6 +67,7 @@ import { denyScope403 } from '../auth/deny.js';
 import type { WorkflowCaller } from '../services/workflow/step-authority.js';
 import { runRefusedAsOwner, clearRefusal } from '../services/workflow/trigger-authority.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { readerFor } from '../services/classification/reader.js';
 import { recordAccountEvent } from '../services/account-events.js';
 import { emitChange } from '../services/event-bus.js';
 import {
@@ -409,7 +412,7 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
   router.get('/v1/workflows/:id/runs', requireAuth(), requireScope('workflow:read'), async (req: Request, res: Response) => {
     const id = req.params.id as string;
     const checks = req.query.only === 'checks' ? 'only' : String(req.query.include ?? '').split(',').includes('checks') ? 'include' : 'exclude';
-    const all = await listRuns(storage, ownerGhiiOf(req), id, { checks });
+    const all = await listRuns(storage, ownerGhiiOf(req), id, { checks, reader: readerFor({ storage, config }, req.auth) });
     // ?limit=N: a run record carries the pinned definition and every step's observations, so a
     // cover that wants each workflow's LAST run should not be handed a hundred of them.
     const limit = Math.min(Math.max(0, parseInt(String(req.query.limit ?? '0'), 10) || 0), 200);
@@ -436,7 +439,7 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
   router.get('/v1/workflows/:id/runs/:runId', requireAuth(), requireScope('workflow:read'), async (req: Request, res: Response) => {
     const id = req.params.id as string;
     const runId = req.params.runId as string;
-    const run = await getRun(storage, ownerGhiiOf(req), id, runId);
+    const run = await getRun(storage, ownerGhiiOf(req), id, runId, readerFor({ storage, config }, req.auth));
     if (!run) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Run "${runId}" not found`)); return; }
     res.json(success(config.nodeId, run));
   });

@@ -5,6 +5,9 @@
  * @description Federation messaging + memory-replication routes — signed peer replicate, human↔human
  *   direct message, operator broadcast, delivery/read receipt, and attachment download grant. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-09-29 — POST /v1/federation/storage/grant passes the attachment through the
+ *     classification leave() (destination federation) before a download token is minted; a file
+ *     that may not leave its organism is 403 CLASSIFIED (TARGET-082 V4).
  *   v1.3.1 — 2026-09-26 — The recipient's account comes from localAccountName (utils/gaii.ts), which
  *     keeps an identity of another node whole, so it never names the local namesake
  *     (secaudit 2026-09, F-1).
@@ -44,6 +47,8 @@ import { isAliasAddress, receiveRemoteSupportMessage } from '../../services/mess
 import { listOperatorGhiis } from '../../services/operators.js';
 import { generateDownloadToken } from '../../services/download-token.js';
 import { duplicateMessageAttachments } from '../../services/attachment-duplication.js';
+import { systemReader } from '../../services/classification/reader.js';
+import { fileTarget } from '../../services/classification/labels.js';
 
 /**
  * An inbound attachment descriptor says which storage the bytes come from, so those two fields are
@@ -530,6 +535,15 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
         const file = await storage.getStorageFile(owner_ghii, storage_key);
         if (!file) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Attachment file not found'));
+            return;
+        }
+        // The download token lets the peer pull the bytes, so the file passes leave() before one is
+        // minted. Federation has no caller of this node behind it: the node's own reader (TARGET-082).
+        const { left } = await systemReader({ storage, config }, owner_ghii)
+            .leave([storage_key], k => fileTarget(owner_ghii, k), { kind: 'federation', peer: source_node });
+        if (left.length) {
+            logger.info('storage grant refused: the attachment is classified', { peer: source_node, key: storage_key, label: left[0]!.label });
+            res.status(403).json(error(config.nodeId, 'CLASSIFIED', `The attachment is ${left[0]!.reason}, so no download is granted.`));
             return;
         }
 

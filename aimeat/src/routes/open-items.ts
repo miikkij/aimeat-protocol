@@ -14,6 +14,8 @@
  *   DELETE /v1/open-items/:id
  * @usage app.use(openItemsRouter(config, storage))
  * @version-history
+ *   v1.1.0 — 2026-09-29 — TARGET-082 V4: GET /v1/open-items reads through showItems with the caller's
+ *     ContentReader. The count and the stats are numbers and read as before.
  *   v1.0.0 — 2026-08-09 — Replaces routes/intents.ts. One key instead of one record per item, and
  *     DELETE means "switch it off" rather than "erase it".
  */
@@ -26,9 +28,10 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import {
     ITEM_KINDS, CLOSES_CHECKS, MAX_ITEMS, OpenItemsConflict,
-    listItems, openCount, addItem, patchItem, closeItem, getItem, itemStats,
+    showItems, openCount, addItem, patchItem, closeItem, getItem, itemStats,
     type ItemKind, type ClosesCheck, type ItemPatch, type ItemStatus, type FlippedBy,
 } from '../services/open-items.js';
+import { readerFor } from '../services/classification/reader.js';
 
 const MAX_TITLE = 200;
 
@@ -53,7 +56,7 @@ export function openItemsRouter(config: AimeatConfig, storage: Storage): Router 
      * it as outstanding is the failure this whole surface exists to avoid.
      */
     router.get('/v1/open-items', requireAuth(), requireRole('owner'), async (req, res) => {
-        const all = await listItems(storage, config, resolve(req), req.auth!.owner);
+        const all = await showItems(storage, config, readerFor({ storage, config }, req.auth), req.auth!.owner);
         const includeSatisfied = String(req.query.include ?? '').split(',').includes('satisfied');
         const items = includeSatisfied ? all : all.filter(i => !i.satisfied);
         // How many suggestions were dropped because their condition already holds. Without this an

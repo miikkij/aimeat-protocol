@@ -15,6 +15,9 @@
  *   - chatRouter(config, storage) — GET/POST/DELETE threads, POST .../turn (SSE), GET /v1/chat/status
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.8.0 — 2026-09-29 — TARGET-082 V4: GET /v1/chat/threads and GET /v1/chat/threads/:id read
+ *     through showThreads and showThread with the caller's ContentReader. Delete, reset and turn keep
+ *     readThread, which only checks that the conversation exists.
  *   v1.7.0 — 2026-09-28 — System 2 plan, V5: /v1/chat/status answers `pays` and `model` from the
  *     route the chat runs on: the payer /v1/llm would pick for this person ('own', 'allowance', or
  *     null when the gate would refuse), and 'node' only on the operator's shared key.
@@ -41,8 +44,9 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import {
-    createThread, readThread, listThreads, deleteThread,
+    createThread, readThread, showThread, showThreads, deleteThread,
 } from '../services/chat-threads.js';
+import { readerFor } from '../services/classification/reader.js';
 import { chatEnabled, chatPayer, runChatTurn, resetChatSession } from '../services/chat-session.js';
 import { ensureChatAgent } from '../services/chat-agent.js';
 import { readAllowance, remainingOf } from '../services/ai-allowance.js';
@@ -103,7 +107,7 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
 
     // GET /v1/chat/threads — the person's open conversations, newest first.
     router.get('/v1/chat/threads', requireAuth(), requireRole('owner'), async (req, res) => {
-        const threads = await listThreads(storage, identity(req));
+        const threads = await showThreads(storage, readerFor({ storage, config }, req.auth));
         res.json(success(config.nodeId, {
             threads: threads.map((t) => ({
                 id: t.id, title: t.title, created_at: t.createdAt,
@@ -127,7 +131,7 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
 
     // GET /v1/chat/threads/:id — one conversation, in full.
     router.get('/v1/chat/threads/:id', requireAuth(), requireRole('owner'), async (req, res) => {
-        const thread = await readThread(storage, identity(req), req.params.id as string);
+        const thread = await showThread(storage, readerFor({ storage, config }, req.auth), req.params.id as string);
         if (!thread) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such conversation.'));
             return;

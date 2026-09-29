@@ -19,6 +19,8 @@
  *   import { knowledgeRouter } from '../routes/knowledge.js';
  *   app.use(knowledgeRouter(config, storage));
  * @version-history
+ *   v1.4.0 — 2026-09-29 — TARGET-082 V4: GET /v1/knowledge/tab hands the Knowledge tab service the
+ *     caller's classification reader (readerFor), which decides which manifests are listed.
  *   v1.3.0 — 2026-07-16 — Add GET /v1/knowledge/tab composite (owner packages + consents) folding the
  *     Knowledge tab's owner-scoped mount; discovery + per-organism packages stay separate (KnowledgeTabService).
  *   v1.0.0 — 2026-03-07 — initial knowledge package system
@@ -36,6 +38,7 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { createKnowledgeTabService } from '../services/db/knowledge-tab-db-service.js';
+import { readerFor } from '../services/classification/reader.js';
 import { makeKnowledgeHelpers } from './knowledge/helpers.js';
 import { registerPackagesCoreRoutes } from './knowledge/packages-core.js';
 import { registerTemplateRoutes } from './knowledge/templates.js';
@@ -53,7 +56,7 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
   // before the /v1/knowledge/:id captures below (a literal 'tab' would otherwise match :id).
   const knowledgeTabDb = createKnowledgeTabService(storage);
   router.get('/v1/knowledge/tab', requireAuth(), requireRole('owner'), async (req, res) => {
-    const data = await knowledgeTabDb.overview(resolveIdentity(req.auth!, config.nodeId));
+    const data = await knowledgeTabDb.overview(resolveIdentity(req.auth!, config.nodeId), readerFor({ storage, config }, req.auth));
     res.json(success(config.nodeId, data));
   });
 

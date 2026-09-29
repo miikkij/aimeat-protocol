@@ -8,11 +8,19 @@
  *   so the MCP tools (mcp/appdev-pitfalls.ts) and the profile-UI REST routes
  *   (routes/appdev-pitfalls.ts) can never drift. Owner scope = the owner GHII + every
  *   same-owner agent GAII, deduped by key GHII-first.
- * @structure listOwnerScopeMemory · findOwnEntry · listLearnedPitfalls · queryLearnedPitfalls ·
- *   filterPitfalls · pitfallFacets · setPitfallFlags · deletePitfallEntry · upsertPitfallManifest ·
- *   pitfallEntryKey · PITFALL_* constants
+ * @structure listOwnerScopeMemory · listOwnerScopeShown · findOwnEntry · ownPitfallRecords ·
+ *   sharedPitfallRecords · listLearnedPitfalls · queryLearnedPitfalls · filterPitfalls ·
+ *   pitfallFacets · setPitfallFlags · deletePitfallEntry · upsertPitfallManifest · pitfallEntryKey ·
+ *   PITFALL_* constants
  * @usage import { listLearnedPitfalls, setPitfallFlags } from './appdev-kb.js';
  * @version-history
+ *   v1.4.0 -- 2026-09-29 -- TARGET-082 V4: every listing that returns entries to a caller takes the
+ *     caller's classification reader (services/classification/reader.ts) instead of an identity and
+ *     passes the records through presentMemories: listOwnerScopeShown, ownPitfallRecords,
+ *     sharedPitfallRecords, listLearnedPitfalls, queryLearnedPitfalls. The MCP list tool reads its
+ *     own and shared entries through the last two instead of its own copy of the shared-entry query.
+ *     An entry shown with a warning label keeps `classificationWarning`. listOwnerScopeMemory and
+ *     findOwnEntry stay unchecked: they serve the read-to-update of the report, flag and delete paths.
  *   v1.3.1 -- 2026-09-26 -- ownerOf() names the caller's account with localAccountOf, so a visitor
  *     from another node reads and writes its own learned pitfalls, never the local namesake's
  *     (secaudit 2026-09, A3-1).
@@ -39,6 +47,8 @@ import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { isGEAI, localAccountOf } from '../utils/gaii.js';
 import { emitChange } from './event-bus.js';
 import { writeMemoryRecord } from './memory-write.js';
+import type { ContentReader } from './classification/reader.js';
+import { presentMemories, classificationWarningOf } from './classification/present-memory.js';
 
 export const PITFALL_PACKAGE_ID = 'appdev-pitfalls';
 export const PITFALL_PREFIX = `packages/${PITFALL_PACKAGE_ID}/`;
@@ -116,6 +126,19 @@ export async function listOwnerScopeMemory(
     return out;
 }
 
+/**
+ * The owner-scope records this reader may see: listOwnerScopeMemory for the reader's own identity,
+ * then the classification check and the credential mask (presentMemories). Every owner-scope
+ * listing that hands records to a caller goes through this; listOwnerScopeMemory itself is for
+ * the read-to-update paths.
+ */
+export async function listOwnerScopeShown(
+    storage: Storage, config: AimeatConfig, reader: ContentReader,
+    opts: { prefix?: string; tags?: string[]; visibility?: string },
+): Promise<MemoryRecord[]> {
+    return presentMemories(reader, await listOwnerScopeMemory(storage, config, reader.identity, opts));
+}
+
 /** The identity set (GHII + agent GAIIs) of the caller's owner — for own/other filtering. */
 export async function ownIdentitySet(
     storage: Storage, config: AimeatConfig, callerGaii: string,
@@ -179,10 +202,13 @@ export interface LearnedPitfallEntry extends Partial<LearnedPitfallValue> {
     /** 'own' = the caller's owner scope; 'shared' = another owner's public entry. */
     source: 'own' | 'shared';
     owner?: string;
+    /** Set when the entry was shown to an AI under a warning classification (reader.show). */
+    classificationWarning?: { label: string; name: string; says: string };
 }
 
 function toEntry(rec: MemoryRecord, source: 'own' | 'shared'): LearnedPitfallEntry {
     const v = rec.value as Partial<LearnedPitfallValue> | null;
+    const warning = classificationWarningOf(rec);
     return {
         key: rec.key,
         source,
@@ -201,20 +227,38 @@ function toEntry(rec: MemoryRecord, source: 'own' | 'shared'): LearnedPitfallEnt
         updated: v?.updated ?? rec.updatedAt,
         verified_at: v?.verified_at,
         verified_version: v?.verified_version,
+        ...(warning ? { classificationWarning: warning } : {}),
     };
+}
+
+/** The reader's own learned entries (any visibility, manifest left out), as this reader may see them. */
+export async function ownPitfallRecords(
+    storage: Storage, config: AimeatConfig, reader: ContentReader,
+): Promise<MemoryRecord[]> {
+    return (await listOwnerScopeShown(storage, config, reader, { prefix: PITFALL_PREFIX, tags: ['pitfall'] }))
+        .filter(r => r.key !== PITFALL_MANIFEST_KEY);
+}
+
+/**
+ * Other owners' public-shared learned entries, as this reader may see them. The one query for
+ * them: the MCP list tool had its own copy of it.
+ */
+export async function sharedPitfallRecords(
+    storage: Storage, config: AimeatConfig, reader: ContentReader,
+): Promise<MemoryRecord[]> {
+    const ownIds = await ownIdentitySet(storage, config, reader.identity);
+    const { items } = await storage.listAllMemory({ prefix: PITFALL_PREFIX, visibility: 'public', limit: 500 });
+    return presentMemories(reader, items
+        .filter(rec => rec.key !== PITFALL_MANIFEST_KEY)
+        .filter(rec => !ownIds.has(rec.ownerGaii))
+        .filter(rec => (rec.tags ?? []).includes('pitfall')));
 }
 
 /** Other owners' public-shared entries, as full entries (source 'shared', owner set). */
 async function listSharedByOthers(
-    storage: Storage, config: AimeatConfig, callerGaii: string,
+    storage: Storage, config: AimeatConfig, reader: ContentReader,
 ): Promise<LearnedPitfallEntry[]> {
-    const ownIds = await ownIdentitySet(storage, config, callerGaii);
-    const { items } = await storage.listAllMemory({ prefix: PITFALL_PREFIX, visibility: 'public', limit: 500 });
-    return items
-        .filter(rec => rec.key !== PITFALL_MANIFEST_KEY)
-        .filter(rec => !ownIds.has(rec.ownerGaii))
-        .filter(rec => (rec.tags ?? []).includes('pitfall'))
-        .map(rec => toEntry(rec, 'shared'));
+    return (await sharedPitfallRecords(storage, config, reader)).map(rec => toEntry(rec, 'shared'));
 }
 
 /**
@@ -223,14 +267,12 @@ async function listSharedByOthers(
  * merged here — the UI reads them from GET /v1/appdev/pitfalls directly.
  */
 export async function listLearnedPitfalls(
-    storage: Storage, config: AimeatConfig, callerGaii: string,
+    storage: Storage, config: AimeatConfig, reader: ContentReader,
     opts: { includeShared?: boolean } = {},
 ): Promise<LearnedPitfallEntry[]> {
-    const own = (await listOwnerScopeMemory(storage, config, callerGaii, { prefix: PITFALL_PREFIX, tags: ['pitfall'] }))
-        .filter(r => r.key !== PITFALL_MANIFEST_KEY)
-        .map(r => toEntry(r, 'own'));
+    const own = (await ownPitfallRecords(storage, config, reader)).map(r => toEntry(r, 'own'));
     if (!opts.includeShared) return own;
-    return [...own, ...await listSharedByOthers(storage, config, callerGaii)];
+    return [...own, ...await listSharedByOthers(storage, config, reader)];
 }
 
 /* ── One filter, sort, facet and page step for both doors ─────────────────────────────────────
@@ -365,11 +407,11 @@ export function filterPitfalls<T extends PitfallLike>(entries: T[], query: Pitfa
  * the page can say the number is zero instead of offering a toggle that shows nothing.
  */
 export async function queryLearnedPitfalls(
-    storage: Storage, config: AimeatConfig, callerGaii: string,
+    storage: Storage, config: AimeatConfig, reader: ContentReader,
     query: PitfallListQuery & { includeShared?: boolean },
 ) {
-    const own = await listLearnedPitfalls(storage, config, callerGaii);
-    const shared = await listSharedByOthers(storage, config, callerGaii);
+    const own = await listLearnedPitfalls(storage, config, reader);
+    const shared = await listSharedByOthers(storage, config, reader);
     const scope = query.includeShared ? [...own, ...shared] : own;
     return { ...filterPitfalls(scope, query), community: shared.length };
 }

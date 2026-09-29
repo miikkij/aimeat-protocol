@@ -13,6 +13,8 @@
  *   - GenesisSyncResult: per-run tally (peers checked/updated/failed, entries fetched/stored/removed, hash)
  *
  * @version-history
+ *   v1.2.0 — 2026-09-29 — syncSubscribedMemory sends only what leaveToPeer lets leave (TARGET-082
+ *     V4) and logs the keys that stayed behind, with the reason.
  *   v1.1.0 — 2026-09-08 — The stale-entry prune leaves the operator's subscription record and the
  *     memory cache alone (they share the prefix), and stop() clears the initial timer too.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
@@ -24,6 +26,7 @@ import { computeCatalogueHash } from '../utils/catalogue-hash.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import { sign } from '../auth/keypair.js';
 import { logger } from '../utils/logger.js';
+import { leaveToPeer } from './classification/egress.js';
 
 /** System GAII used to store genesis catalogue entries as memory. */
 const GENESIS_SYSTEM_GAII = '__genesis__';
@@ -284,15 +287,24 @@ export function createGenesisSyncService(config: AimeatConfig, storage: Storage)
         if (agent.gaii === GENESIS_SYSTEM_GAII) continue; // skip system agent
 
         try {
-          const memories = await storage.listMemory(agent.gaii, { prefix, visibility: 'public' });
+          // Federation-managed entries are not this node's to send on.
+          const candidates = (await storage.listMemory(agent.gaii, { prefix, visibility: 'public' })).filter(m =>
+            !(m.key.startsWith('replica:') || m.key.startsWith('federated:') ||
+              m.key.startsWith('genesis:') || m.key.startsWith('expiring:') ||
+              m.key.includes('._conflict_')));
+          // What leaves for the peer is decided by each record's classification (TARGET-082), and
+          // what stays behind is logged by key, so a missing record on the peer has a reason here.
+          const memories = await leaveToPeer({ storage, config }, candidates, peer.genesisNodeId);
+          if (memories.length < candidates.length) {
+            const sent = new Set(memories);
+            logger.info('genesis sync: classified memory stayed on this node', {
+              peer: peer.genesisNodeId, owner: agent.gaii,
+              reason: 'its classification may not leave its organism',
+              keys: candidates.filter(m => !sent.has(m)).map(m => m.key).slice(0, 20),
+            });
+          }
 
           for (const memory of memories) {
-            // Skip federation-managed entries
-            if (memory.key.startsWith('replica:') || memory.key.startsWith('federated:') ||
-                memory.key.startsWith('genesis:') || memory.key.startsWith('expiring:') ||
-                memory.key.includes('._conflict_')) {
-              continue;
-            }
 
             // Check for active federation consent
             const consents = await storage.listConsents(agent.gaii);

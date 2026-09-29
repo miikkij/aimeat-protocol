@@ -16,9 +16,12 @@
  *   - offerHasPrereqs(offer) — cheap guard so the feed only evaluates offers that declare any
  *   - evaluatePrereqs(offer, ctx, resolveDep) — pure recursive-friendly core (unit-tested)
  *   - buildOfferEvalCtx / makeOfferDepResolver — owner-scope bindings
- *   - evaluateOfferPrereqs(storage, config, ownerName, agentName, offer) — the route entry point
+ *   - evaluateOfferPrereqs(storage, config, ownerName, agentName, offer, reader) — the route entry point
  * @usage import { evaluateOfferPrereqs, offerHasPrereqs } from './offer-prereqs.js';
  * @version-history
+ *   v1.1.0 — 2026-09-29 — The owner-scope bindings read through presentMemory/presentMemories as the
+ *     caller's classification reader (TARGET-082 V4), so an observed json_field value is one the
+ *     caller may see, with credentials masked.
  *   v1.0.0 — 2026-06-16 — Initial: offer + signal prerequisites, deterministic owner-scope evaluation.
  */
 import type { AimeatConfig } from '../config.js';
@@ -29,6 +32,8 @@ import { buildGAII } from '../utils/gaii.js';
 import { listOwnerScopeMemory, getOwnerScopeMemory } from './owner-memory.js';
 import { evaluateSignal, globToRegExp, type SignalEvalCtx } from './workflow/signal-eval.js';
 import { validateValueAgainstSchema } from './schema-validator.js';
+import type { ContentReader } from './classification/reader.js';
+import { presentMemory, presentMemories } from './classification/present-memory.js';
 
 export interface PrereqItem {
   kind: 'required' | 'signal' | 'offer';
@@ -114,18 +119,23 @@ export async function evaluatePrereqs(
  * the workflow engine reads), with NO vars and NO llm (an `llm` leaf degrades to a pass on the feed;
  * we never spend on the node OpenRouter just to render a card). json_schema gets the real validator.
  */
-export function buildOfferEvalCtx(storage: Storage, config: AimeatConfig, ownerName: string): SignalEvalCtx {
+export function buildOfferEvalCtx(storage: Storage, config: AimeatConfig, ownerName: string, reader: ContentReader): SignalEvalCtx {
+  // A json_field leaf copies a field value into items[].observed, which goes back to the caller, so
+  // every record a signal reads passes presentMemories as that caller: the classification check and
+  // the credential mask (TARGET-082). A record the caller may not see reads as missing.
   return {
     read: async (key) => {
-      const rec = await getOwnerScopeMemory(storage, config.nodeId, ownerName, key);
+      const stored = await getOwnerScopeMemory(storage, config.nodeId, ownerName, key);
+      const rec = stored ? await presentMemory(reader, stored) : null;
       return rec ? { key, value: rec.value } : null;
     },
     listGlob: async (glob) => {
       const star = glob.indexOf('*');
       const listPrefix = star >= 0 ? glob.slice(0, star) : glob;
-      const recs = await listOwnerScopeMemory(storage, config.nodeId, ownerName, { prefix: listPrefix });
       const re = globToRegExp(glob);
-      return recs.filter(r => re.test(r.key)).map(r => ({ key: r.key, value: r.value }));
+      const recs = await presentMemories(reader,
+        (await listOwnerScopeMemory(storage, config.nodeId, ownerName, { prefix: listPrefix })).filter(r => re.test(r.key)));
+      return recs.map(r => ({ key: r.key, value: r.value }));
     },
     vars: {},
     llm: null,
@@ -147,11 +157,11 @@ export function makeOfferDepResolver(storage: Storage, config: AimeatConfig, own
   };
 }
 
-/** Route entry point: evaluate one offer's prerequisites against the owner's memory. */
+/** Route entry point: evaluate one offer's prerequisites against the owner's memory, as `reader`. */
 export async function evaluateOfferPrereqs(
-  storage: Storage, config: AimeatConfig, ownerName: string, agentName: string, offer: Offer,
+  storage: Storage, config: AimeatConfig, ownerName: string, agentName: string, offer: Offer, reader: ContentReader,
 ): Promise<OfferPrereq> {
-  const ctx = buildOfferEvalCtx(storage, config, ownerName);
+  const ctx = buildOfferEvalCtx(storage, config, ownerName, reader);
   const resolveDep = makeOfferDepResolver(storage, config, ownerName, agentName);
   return evaluatePrereqs(offer, ctx, resolveDep);
 }

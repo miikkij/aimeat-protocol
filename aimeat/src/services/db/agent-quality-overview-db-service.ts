@@ -10,14 +10,18 @@
  *   the Quality subtab mount only. The individual endpoints stay for interactive re-fetch (post-rate,
  *   live-update).
  *
- * @structure AgentQualityOverviewService.overview(agentGaii, agentName, nodeId, opts?) → { statistics, done_tasks }
- * @usage const ov = await createAgentQualityOverviewService(storage).overview(agentGaii, agentName, nodeId);
+ * @structure AgentQualityOverviewService.overview(reader, agentGaii, agentName, nodeId, opts?) → { statistics, done_tasks }
+ * @usage const ov = await createAgentQualityOverviewService(storage).overview(readerFor({ storage, config }, req.auth), agentGaii, agentName, nodeId);
  * @version-history
+ *   v1.1.0 — 2026-09-29 — TARGET-082 V4: takes the caller's ContentReader; the agent's custom statistics
+ *     records pass presentMemories before their values go into the answer.
  *   v1.0.0 — 2026-07-16 — Phase 4: fold the Quality subtab's statistics + done-tasks reads into one composite.
  */
 import type { Storage } from '../../storage/interface.js';
 import { recomputeAndCacheStatistics } from '../agent-statistics.js';
 import { logger } from '../../utils/logger.js';
+import type { ContentReader } from '../classification/reader.js';
+import { presentMemories } from '../classification/present-memory.js';
 
 export interface AgentQualityOverview {
   statistics: {
@@ -37,6 +41,7 @@ export class AgentQualityOverviewService {
    * statistics recompute + cache write is identical to the /statistics endpoint's.
    */
   async overview(
+    reader: ContentReader,
     agentGaii: string,
     agentName: string,
     nodeId: string,
@@ -52,7 +57,7 @@ export class AgentQualityOverviewService {
       this.storage.listMemory(agentGaii, { prefix: customPrefix }).catch(err => { logger.warn('constructor: continuing after a suppressed failure', { error: String(err) }); return []; }),
     ]);
 
-    const custom = (customRecords ?? []).map(r => ({
+    const custom = (await presentMemories(reader, customRecords ?? [])).map(r => ({
       key: r.key.slice(customPrefix.length), value: r.value, updated_at: r.updatedAt,
     }));
 

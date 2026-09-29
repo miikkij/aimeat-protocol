@@ -5,92 +5,85 @@
       "reads": {
         "listAllMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Public app tool manifests (app configuration) for the commerce and directory catalogue, published by design."
     },
     "src/commerce/beneficiary-book.ts": {
       "reads": {
         "getMemory": 4,
         "listAllMemory": 3
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's beneficiary ledger (commerce.benefit.*): read-to-update and ledger listings for its owner."
     },
     "src/commerce/beneficiary-payout.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The beneficiary's payment settings, read only for a payout address."
     },
     "src/commerce/beneficiary-release.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The operator's beneficiary approval record in a system namespace."
     },
     "src/commerce/beneficiary-split.ts": {
       "reads": {
         "getMemory": 1,
         "listAllMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's revenue-split configuration (bensplit.*)."
     },
     "src/commerce/hold-book.ts": {
       "reads": {
         "getMemory": 4,
         "listAllMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The hold ledger and its state machine, plus the seller's payment settings."
     },
     "src/commerce/payable-book.ts": {
       "reads": {
         "getMemory": 1,
         "listAllMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A node-written payables ledger: read-to-update and owner listing."
     },
     "src/commerce/psp-secrets.ts": {
       "reads": {
         "listAllMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Scans payment settings only to seal plaintext secrets in place."
     },
     "src/commerce/sellable-resolvers.ts": {
       "reads": {
         "getMemory": 5
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The seller's offers, tool manifests and payment settings, read to work out price and payment rail."
     },
     "src/commerce/session-service.ts": {
       "reads": {
         "getMemory": 2,
         "listAllMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The checkout-session and order ledger, returned to its buyer or seller."
     },
     "src/commerce/x402.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
-    },
-    "src/mcp/appdev-pitfalls.ts": {
-      "reads": {
-        "listOwnerScopeMemory": 1,
-        "listAllMemory": 1
-      },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The seller's payment settings, read for the x402 payTo address."
     },
     "src/mcp/catalogue.ts": {
       "reads": {
         "listMemoryForOwners": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Profile location and interests of people who opted into the public directory; published by their choice."
     },
     "src/mcp/commerce.ts": {
       "reads": {
         "listMemory": 1,
         "getMemory": 5
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Payment settings (the secret is never returned), a manifest read-to-update, app-id key names, and a tool manifest returned only when it is the caller's own or public."
     },
     "src/mcp/core-resources.ts": {
       "reads": {
@@ -114,15 +107,14 @@
         "listMemory": 1,
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A tool manifest read to route an invocation, and public manifest app ids for a hint."
     },
     "src/mcp/knowledge.ts": {
       "reads": {
-        "listOwnerScopeMemory": 2,
         "getMemory": 2,
         "listMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Manifests and entries reach the MCP caller through presentMemory/presentMemories next to each read."
     },
     "src/mcp/memory-extended.ts": {
       "reads": {
@@ -135,31 +127,31 @@
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The owner's AI settings record, read to update it."
     },
     "src/mcp/workspace-members.ts": {
       "reads": {
         "listAllMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Workspace access-request state records for the members tool."
     },
     "src/mcp/workspaces.ts": {
       "reads": {
         "listAllMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The organism workspace registry index, read to find a workspace entry."
     },
     "src/middleware/cors.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A memory record read only for its allowedOrigins CORS setting."
     },
     "src/routes/admin-features.ts": {
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The operator's e-mail template configuration (__site__ _email_tpl/*)."
     },
     "src/routes/admin-memory.ts": {
       "reads": {
@@ -173,192 +165,192 @@
       "reads": {
         "listMemory": 3
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The operator's backup of the node, which must hold everything, and system trust and relay records."
     },
     "src/routes/admin-security.ts": {
       "reads": {
         "getStorageFile": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Operator-only incident evidence: a quarantined payload downloaded by the operator."
     },
     "src/routes/admin.ts": {
       "reads": {
         "listAllMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Commerce ledger records aggregated into dashboard counts."
     },
     "src/routes/agent-activity.ts": {
       "reads": {
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The agent's self-reported metric counters."
     },
     "src/routes/agent-onboarding.ts": {
       "reads": {
         "getMemory": 1,
         "listMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Existence checks on commands, config and tag records; no values are returned."
     },
     "src/routes/agent-tasks/helpers.ts": {
       "reads": {
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Lists task live-trace keys only to delete them."
     },
     "src/routes/agent-tasks/lifecycle.ts": {
       "reads": {
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Lists task live-trace keys only to delete them on task delete."
     },
     "src/routes/agents/management.ts": {
       "reads": {
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The owner's portability export of their own agent's data; a person's own export is theirs."
     },
     "src/routes/agents/offers.ts": {
       "reads": {
         "getMemory": 3,
         "listMemoryForOwners": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Commerce offer declarations: read-to-update, visibility-filtered listing and pricing."
     },
     "src/routes/agents/profile-metadata.ts": {
       "reads": {
         "getMemoryByKeysAnyOwner": 1,
         "listAllMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The organism workspace registry index, read to resolve workspace names."
     },
     "src/routes/ai-provenance.ts": {
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Existence and visibility check before a provenance id is attached (read-to-update)."
     },
     "src/routes/ai.ts": {
       "reads": {
         "getMemory": 4
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The owner's AI budget settings."
     },
     "src/routes/app-store.ts": {
       "reads": {
         "getStorageFile": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A published app's screenshot copied into the buyer's receipt; the publish is the owner's decision to show it."
     },
     "src/routes/appeals.ts": {
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Checks a record exists only to resolve its owner for an appeal."
     },
     "src/routes/apps/icon.ts": {
       "reads": {
         "getStorageFile": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A published app icon, public by the owner's publish."
     },
     "src/routes/apps/read.ts": {
       "reads": {
         "getStorageFile": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A published app screenshot, public by the owner's publish."
     },
     "src/routes/calibrator.ts": {
       "reads": {
         "listMemory": 5,
         "getMemory": 11
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Projects, dimensions, versions and batches pass presentMemories/presentMemory; the rest are read-to-update, delete cascades and existence checks."
     },
     "src/routes/catalogue.ts": {
       "reads": {
         "listAllMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Public knowledge package manifests, published by their owners' choice."
     },
     "src/routes/chat.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Checks only whether an API key record exists."
     },
     "src/routes/commerce-acp.ts": {
       "reads": {
         "listAllMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Public offer declarations for the ACP product feed, published by design."
     },
     "src/routes/commerce-webhooks.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The seller's webhook secret, read to verify a signature."
     },
     "src/routes/commerce.ts": {
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The seller's payment settings record."
     },
     "src/routes/connections.ts": {
       "reads": {
         "getStorageFile": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The stored file passes reader.leave (external) before a delegated publish."
     },
     "src/routes/cortex/activation.ts": {
       "reads": {
         "getMemory": 3
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Read-to-update of cortex ontology, prompt and seed records."
     },
     "src/routes/ecosystem-apps-advisories.ts": {
       "reads": {
         "getMemory": 1,
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Advisory approval-queue records listed to their owner for approve or deny."
     },
     "src/routes/ecosystem-apps.ts": {
       "reads": {
         "listMemory": 3
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The app's data passes presentMemories; the pending-advisory records are the owner's own queue."
     },
     "src/routes/ecosystem-events.ts": {
       "reads": {
         "getOwnerScopeMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The ref record passes presentMemory; a hidden one answers 404."
     },
     "src/routes/exchange-market.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The provider's tool manifest, read to create an offering."
     },
     "src/routes/extensions/instances.ts": {
       "reads": {
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Lists instance namespace memory only to delete it."
     },
     "src/routes/extensions/paywall.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The tool manifest, read to check the paywall binding."
     },
     "src/routes/extensions/priced-binding.ts": {
       "reads": {
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Tool manifests, read to list the priced tool bindings."
     },
     "src/routes/federation-genesis.ts": {
       "reads": {
@@ -371,39 +363,39 @@
       "reads": {
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Rewrites replica records to expiring when a peer is removed (read-to-rewrite)."
     },
     "src/routes/federation-sync/messaging.ts": {
       "reads": {
         "getMemory": 1,
         "getStorageFile": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The attachment passes leave (federation) before a download token is minted; the other read is a replication version compare."
     },
     "src/routes/federation-sync/templates.ts": {
       "reads": {
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The memory list for a signed peer returns keys, visibility, tags and versions only, no values."
     },
     "src/routes/ghii/profile.ts": {
       "reads": {
         "getMemoryByKeysAnyOwner": 1,
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The directory_listed opt-in flags."
     },
     "src/routes/home/track.ts": {
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The UI-track settings record."
     },
     "src/routes/home/welcome-mat.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The portfolio config, read to update it."
     },
     "src/routes/knowledge/admin.ts": {
       "reads": {
@@ -411,47 +403,47 @@
         "listMemory": 2,
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Manifest lookup for delete, operator review (read-to-update) and an ownership existence check."
     },
     "src/routes/knowledge/helpers.ts": {
       "reads": {
         "getMemory": 1,
         "listMemoryForOwners": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Read-to-update for the sharing routes; GET /:id checks its result with presentMemory in packages-core."
     },
     "src/routes/knowledge/organism.ts": {
       "reads": {
         "getMemory": 2,
         "listMemoryForOwners": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The organism package list and the reputation manifest pass reader.show; the other read is read-to-update."
     },
     "src/routes/knowledge/packages-core.ts": {
       "reads": {
         "listMemoryForOwners": 2,
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The manifest passes presentMemory; the other reads are read-to-update and an ownership check."
     },
     "src/routes/knowledge/sharing.ts": {
       "reads": {
         "getMemory": 3,
         "listMemoryForOwners": 3
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Clone passes reader.show and export passes show and leave; the other read is read-to-update."
     },
     "src/routes/library-packs.ts": {
       "reads": {
         "listAllMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Public pack proof records of the library registry."
     },
     "src/routes/memory/batch-guards.ts": {
       "reads": {
         "getStorageFile": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Checks only that a referenced file exists."
     },
     "src/routes/memory/bulk.ts": {
       "reads": {
@@ -501,42 +493,36 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
     },
-    "src/routes/messages.ts": {
-      "reads": {
-        "getStorageFile": 1
-      },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
-    },
     "src/routes/notifications.ts": {
       "reads": {
         "listAllMemory": 2,
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Node-written notification records listed, marked read or cleared for their owner."
     },
     "src/routes/openrouter.ts": {
       "reads": {
         "getMemory": 9
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: AI settings and key configuration, and project existence checks."
     },
     "src/routes/organisms/crud.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The organisms.ui preferences record."
     },
     "src/routes/organisms/intake.ts": {
       "reads": {
         "listAllMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Intake form configuration records."
     },
     "src/routes/organisms/record-helpers.ts": {
       "reads": {
         "listAllMemory": 3
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Draft reopen copies internally, collapse deletes, and the organism meta.config."
     },
     "src/routes/organisms/shared-public.ts": {
       "reads": {
@@ -549,13 +535,13 @@
         "listAllMemory": 7,
         "getMemoryByKeysAnyOwner": 3
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The manifest for gate policy, decision-log pruning, the publish state machine, and registry and manifest indexes."
     },
     "src/routes/organisms/workspace-access.ts": {
       "reads": {
         "listAllMemory": 6
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The list enrichment's lastEvent records pass reader.show; the registry and access-request reads are the node's own."
     },
     "src/routes/organisms/workspace-ops.ts": {
       "reads": {
@@ -573,7 +559,7 @@
       "reads": {
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The owner's outbound theme configuration."
     },
     "src/routes/owners/export.ts": {
       "reads": {
@@ -588,13 +574,13 @@
         "listMemory": 1,
         "listStorageFiles": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Reads only visibility, existence and counts."
     },
     "src/routes/portal-api.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The board record, read to append a message."
     },
     "src/routes/portfolio.ts": {
       "reads": {
@@ -603,26 +589,26 @@
         "listMemoryForOwners": 1,
         "getStorageFileMeta": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The builder's memory previews pass presentMemories; the published page, its enabled gate, sizes and the config merge are the owner's published page and settings."
     },
     "src/routes/public-stats.ts": {
       "reads": {
         "listAllMemory": 3
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Counts and key tails of public memory; no values are returned."
     },
     "src/routes/schedules.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The agent's self-reported scheduler mirror record."
     },
     "src/routes/site.ts": {
       "reads": {
         "getStorageFile": 1,
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's own site template and portal keys, served by design."
     },
     "src/routes/storage-files.ts": {
       "reads": {
@@ -636,86 +622,86 @@
       "reads": {
         "getStorageFile": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A published app icon on the app's own origin."
     },
     "src/routes/tracked-responses.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The draft passes presentMemory."
     },
     "src/routes/webmcp.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The public tool manifest for the WebMCP listing."
     },
     "src/services/a2a-foreign-handler.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The seller's payment settings for charging."
     },
     "src/services/a2a-foreign.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The pinned-peer record."
     },
     "src/services/a2a-offering.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The provider's payout address."
     },
     "src/services/agent-ai-keys.ts": {
       "reads": {
         "getMemory": 9
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Per-agent encrypted AI keys, usage counters and settings."
     },
     "src/services/agent-offers-write.ts": {
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Offer declarations: the offers view and read-to-update."
     },
     "src/services/agent-port-redirect.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The port-redirect config record."
     },
     "src/services/agent-proposals.ts": {
       "reads": {
         "listMemory": 1,
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The agent proposal approval queue, listed and settled for its owner."
     },
     "src/services/agent-statistics.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The statistics record, read to update it."
     },
     "src/services/agent-task-fanout.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Reads the deliverable only to check whether it is public before logging activity."
     },
     "src/services/ai-allowance.ts": {
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The AI allowance counter."
     },
     "src/services/ai-completion.ts": {
       "reads": {
         "getMemory": 3
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: API key, settings and usage counter, read to plan an AI call."
     },
     "src/services/ai-inputs.ts": {
       "reads": {
@@ -742,37 +728,37 @@
         "getMemory": 4,
         "listMemory": 4
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: AI job state records, day logs and the active index: the job state machine."
     },
     "src/services/ai-usage-history.ts": {
       "reads": {
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: AI usage counters."
     },
     "src/services/ai-usage-record.ts": {
       "reads": {
         "getMemory": 3
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: AI usage counters."
     },
     "src/services/ai/capabilities.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The owner's AI settings."
     },
     "src/services/ai/catalog/store.ts": {
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The system AI model catalogue and its meta record."
     },
     "src/services/ai/policy-store.ts": {
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The owner's AI policy record."
     },
     "src/services/ai/provider-store.ts": {
       "reads": {
@@ -780,120 +766,120 @@
         "listMemoryMeta": 3,
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: AI provider records, encrypted keys and the settings migration."
     },
     "src/services/ai/providers.ts": {
       "reads": {
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The owner's AI provider records."
     },
     "src/services/ai/roles-view.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The owner's AI settings for the roles view."
     },
     "src/services/ai/roles.ts": {
       "reads": {
         "getMemory": 6
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: AI roles, roles-used and roles-requests configuration."
     },
     "src/services/ai/routing.ts": {
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: AI routing configuration."
     },
     "src/services/app-agent-deploy.ts": {
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Public offer declarations and the deploy state record."
     },
     "src/services/app-audit.ts": {
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The app audit-trail record."
     },
     "src/services/app-config.ts": {
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The app configuration values record."
     },
     "src/services/app-dev-grant.ts": {
       "reads": {
         "getMemory": 3
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: App-dev grant records in a system namespace."
     },
     "src/services/app-legal.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The tool manifest, read to check for priced tools."
     },
     "src/services/app-lifecycle.ts": {
       "reads": {
         "getStorageFile": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A published app's screenshot copied into a fork; published by the owner."
     },
     "src/services/app-members.ts": {
       "reads": {
         "listAllMemory": 1,
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: App membership and seen-visit records in system namespaces."
     },
     "src/services/app-record-keys.ts": {
       "reads": {
         "getMemory": 5,
         "listAllMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: App membership, plan, request and roadmap system records."
     },
     "src/services/app-seo.ts": {
       "reads": {
         "listStorageFiles": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Checks only whether an icon or screenshot exists."
     },
     "src/services/app-template-proposals.ts": {
       "reads": {
         "getMemory": 2,
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Template proposal manifests, listed to and read by their owner."
     },
     "src/services/app-tool-interfaces.ts": {
       "reads": {
         "getMemory": 3,
         "listAllMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Tool interface schema snapshots and the latest pointer."
     },
     "src/services/app-tool-names.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Public tool names from the manifest."
     },
     "src/services/app-tools-key.ts": {
       "reads": {
         "getMemory": 3,
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A one-time migration of manifest keys."
     },
     "src/services/app-ui/service.ts": {
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The app layout configuration record."
     },
     "src/services/appdev-kb.ts": {
       "reads": {
@@ -902,64 +888,52 @@
         "listOwnerScopeMemory": 2,
         "listAllMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
-    },
-    "src/services/appdev-overview.ts": {
-      "reads": {
-        "listOwnerScopeMemory": 1
-      },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Owner-scope and shared entries reach callers through presentMemories; findOwnEntry is read-to-update."
     },
     "src/services/archive.ts": {
       "reads": {
         "listAllMemory": 2,
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The workspace registry index and a record's archived flag."
     },
     "src/services/attachment-duplication.ts": {
       "reads": {
         "getStorageFile": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The attachment passes leave (external, to the recipient) before it is copied."
     },
     "src/services/attestation.ts": {
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Commerce attestation records in a system namespace."
     },
     "src/services/cache-cleanup.ts": {
       "reads": {
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Lists federation cache entries only to delete expired ones."
     },
     "src/services/call-timing.ts": {
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Call-timing counters."
     },
     "src/services/capability-aggregator.ts": {
       "reads": {
         "listMemory": 1,
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Tool manifests and public offer declarations for the capability index."
     },
     "src/services/chat-threads.ts": {
       "reads": {
         "getMemory": 3,
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
-    },
-    "src/services/classification/policy.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "The node's own read (TARGET-082 V1): the owner's classification switch record, never shown to anyone."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Threads reach callers through showThread/showThreads; the other reads are append, archive roll-over and version reads."
     },
     "src/services/classification/policy-admin.ts": {
       "reads": {
@@ -967,103 +941,109 @@
       },
       "why": "The node's own read (TARGET-082 V2): the stored policy record's version before it is rewritten; its content is never shown from here."
     },
+    "src/services/classification/policy.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "The node's own read (TARGET-082 V1): the owner's classification switch record, never shown to anyone."
+    },
     "src/services/company/company-portfolio.ts": {
       "reads": {
         "getStorageFile": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The company page file, published by its owner on the company origin."
     },
     "src/services/company/company-service.ts": {
       "reads": {
         "getStorageFile": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Checks only that the company page file exists."
     },
     "src/services/compliance-register.ts": {
       "reads": {
         "getMemory": 4,
         "listAllMemoryMeta": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's system compliance records."
     },
     "src/services/component-content.ts": {
       "reads": {
         "getMemory": 3
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Content for a model prompt passes useForAi in fetchComponentContentForAi; the other callers only hash it."
     },
     "src/services/component-registrar.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The component's key list, read only to delete those keys."
     },
     "src/services/connect-tunnel-push.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The cancel-marker record, read to push cancel wakes; no value leaves."
     },
     "src/services/connections/publish-run.ts": {
       "reads": {
         "getStorageFile": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The stored file passes reader.leave (external) before a publish attempt opens."
     },
     "src/services/contacts-together.ts": {
       "reads": {
         "listAllMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The organism workspace registry index, each entry gated by canReadWorkspace."
     },
     "src/services/contribution-proofs.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The pack-proofs record, read to append a proof."
     },
     "src/services/core-jobs.ts": {
       "reads": {
         "listMemoryMeta": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Value-free memory metadata for the TTL cleanup job."
     },
     "src/services/cortex-lifecycle.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Tags on seeded records, checked before uninstall deletes them."
     },
     "src/services/crew-def-store.ts": {
       "reads": {
         "getMemory": 6,
         "getMemoryByKeys": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The agent's own crew configuration envelopes."
     },
     "src/services/crew-menu.ts": {
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: LLM-choice settings and the agent's published LLM catalogue."
     },
     "src/services/dangling-refs.ts": {
       "reads": {
         "listAllMemory": 3
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Source records pass reader.show before titles and refs become findings; the archived rows and the registry give ids only."
     },
     "src/services/data-map/data-map-store.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: An app's public data-map declaration."
     },
     "src/services/datapackage/images.ts": {
       "reads": {
         "getStorageFileMeta": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Existence check through file metadata; no bytes are read."
     },
     "src/services/datapackage/store.ts": {
       "reads": {
@@ -1071,31 +1051,31 @@
         "listStorageFiles": 3,
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A published data package: public by the owner's publish, and the publish step passes leave()."
     },
     "src/services/db/agent-data-access-overview-db-service.ts": {
       "reads": {
         "listMemoryMeta": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Key metadata only (key, visibility, version), no values."
     },
     "src/services/db/agent-messages-overview-db-service.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The agent's command-catalogue configuration."
     },
     "src/services/db/agent-quality-overview-db-service.ts": {
       "reads": {
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The custom statistics records pass presentMemories."
     },
     "src/services/db/calibrator-detail-db-service.ts": {
       "reads": {
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The project records pass presentMemories."
     },
     "src/services/db/data-wallet-db-service.ts": {
       "reads": {
@@ -1104,38 +1084,38 @@
         "getMemoryByKeysAnyOwner": 1,
         "listAllMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Key and file metadata and the workspace registry index; no values."
     },
     "src/services/db/knowledge-tab-db-service.ts": {
       "reads": {
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The manifests pass presentMemories."
     },
     "src/services/db/living-docs-db-service.ts": {
       "reads": {
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The template and instance records pass presentMemories."
     },
     "src/services/db/messages-inbox-db-service.ts": {
       "reads": {
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Only the keys of message-flag records."
     },
     "src/services/db/notebook-db-service.ts": {
       "reads": {
         "listMemoryForOwners": 1,
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The inbox passes presentMemories; notebook.settings is the tab's own configuration."
     },
     "src/services/decide/gate.ts": {
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The decide gate-settings record."
     },
     "src/services/decide/providers.ts": {
       "reads": {
@@ -1143,7 +1123,7 @@
         "getMemory": 7,
         "listMemoryMeta": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Decision-provider configuration and encrypted keys (never returned)."
     },
     "src/services/decide/rules.ts": {
       "reads": {
@@ -1151,7 +1131,7 @@
         "getMemory": 2,
         "listMemoryMeta": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The owner's decision rules and rule proposals."
     },
     "src/services/decide/runs.ts": {
       "reads": {
@@ -1165,52 +1145,52 @@
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: AI settings for the allowlist and budget check."
     },
     "src/services/decide/settings.ts": {
       "reads": {
         "getMemory": 5
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The decide policy record and the encrypted own-key record."
     },
     "src/services/design-book/bench.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A Design Book part, read to stamp its bench result."
     },
     "src/services/design-book/component-notice.ts": {
       "reads": {
         "listMemory": 1,
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Parts read to run the bench and a notice digest; only ids and reasons reach the notification."
     },
     "src/services/design-book/reasons.ts": {
       "reads": {
         "getMemory": 13,
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Design Book reasons, published to the node's shared Design Book by their writers."
     },
     "src/services/design-book/service.ts": {
       "reads": {
         "getMemory": 3,
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Design Book parts, published to the node's shared Design Book by design."
     },
     "src/services/directory.ts": {
       "reads": {
         "getMemory": 4
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Profile values of people who opted into the public directory, gated on federation consent."
     },
     "src/services/discovery/sources/designbook-source.ts": {
       "reads": {
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Titles and summaries of published Design Book parts."
     },
     "src/services/discovery/sources/memory-source.ts": {
       "reads": {
@@ -1225,71 +1205,71 @@
         "listAllMemory": 1,
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Titles and descriptions of published template proposals."
     },
     "src/services/doc-images.ts": {
       "reads": {
         "getStorageFile": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Reads a file only to confirm it exists and widen its visibility; no bytes are returned."
     },
     "src/services/ecosystem-automation-advisories.ts": {
       "reads": {
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Advisories pass leave (external) before delivery to the app."
     },
     "src/services/ecosystem-automation-notify.ts": {
       "reads": {
         "listMemory": 1,
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The deliverable and advisories pass leave (external, e-mail); what stays behind is named in the mail."
     },
     "src/services/ecosystem-events.ts": {
       "reads": {
         "getMemory": 3
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The subscription index and inbound log, read to append."
     },
     "src/services/entitlement-merge.ts": {
       "reads": {
         "listAllMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Entitlement and grant records for the merge migration."
     },
     "src/services/exchange-market.ts": {
       "reads": {
         "listAllMemory": 7
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Public market listings, needs and bids, published to the exchange by their writers."
     },
     "src/services/exchange-projection.ts": {
       "reads": {
         "getMemory": 4,
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: App tool manifests and offer declarations, read to project listings."
     },
     "src/services/exchange-proposals.ts": {
       "reads": {
         "getMemory": 1,
         "listAllMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Contract-proposal state records."
     },
     "src/services/exchange-work.ts": {
       "reads": {
         "getMemory": 1,
         "listAllMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The node's own exchange-work ledger namespace, which no one can label: a default label would hide an agent's own work from it. Decided and documented in the file."
     },
     "src/services/ext-pay-token.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A single-use pay-token record, consumed on read."
     },
     "src/services/extension-ctx.ts": {
       "reads": {
@@ -1303,25 +1283,25 @@
       "reads": {
         "getStorageFile": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The file passes reader.show as the extension's caller, after authorizeRead."
     },
     "src/services/extension-lifecycle.ts": {
       "reads": {
         "listMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Lists ext: namespace keys to delete them on uninstall."
     },
     "src/services/extension-purchase.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The seller's public tool manifest, read to validate a purchase."
     },
     "src/services/federation-book.ts": {
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's federation book record."
     },
     "src/services/file-refs.ts": {
       "reads": {
@@ -1333,20 +1313,20 @@
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Accountant and client access lists."
     },
     "src/services/genesis-sync.ts": {
       "reads": {
         "listMemory": 2,
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Subscribed public memory passes leaveToPeer; the cache prune and the subscription record are the node's own."
     },
     "src/services/home-feed.ts": {
       "reads": {
         "listMemoryForOwners": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Onboarding marker records."
     },
     "src/services/home-state.ts": {
       "reads": {
@@ -1354,87 +1334,87 @@
         "getStorageFile": 1,
         "getOwnerScopeMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Onboarding markers and existence checks."
     },
     "src/services/hook-log.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's hook-run log."
     },
     "src/services/hooks-overview.ts": {
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Migration-settled marker records."
     },
     "src/services/inactivity-nudge.ts": {
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The e-mail notification setting and nudge marker."
     },
     "src/services/inbox-organize/record.ts": {
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The inbox-organize settings record."
     },
     "src/services/indexnow-log.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's IndexNow run log."
     },
     "src/services/install-set-apply.ts": {
       "reads": {
         "getMemory": 2,
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Applied install-set records."
     },
     "src/services/install-set-trust.ts": {
       "reads": {
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Applied install-set records, read for repository node ids."
     },
     "src/services/invitations.ts": {
       "reads": {
         "listAllMemory": 3
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The workspace registry index and access-request records, read to update."
     },
     "src/services/knowledge-overview.ts": {
       "reads": {
         "listMemoryForOwners": 1,
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Manifests pass presentMemories."
     },
     "src/services/knowledge-package-entry.ts": {
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Manifest existence check and read-to-update of an entry."
     },
     "src/services/ledger-billing.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: AI settings for the margin."
     },
     "src/services/ledger-budget-alerts.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The budget-alert state record."
     },
     "src/services/ledger-budget.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: AI settings for the budget."
     },
     "src/services/librarian.ts": {
       "reads": {
@@ -1447,7 +1427,7 @@
         "listMemory": 2,
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's link-invite records."
     },
     "src/services/living-pulse.ts": {
       "reads": {
@@ -1464,32 +1444,32 @@
         "getMemory": 2,
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A migration marker and a notification-type existence check."
     },
     "src/services/mcp-client/grants.ts": {
       "reads": {
         "listMemory": 1,
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: MCP grant records."
     },
     "src/services/memory-bin.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A key existence check before delete."
     },
     "src/services/memory-ceilings.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Reads a row only to measure its size for a ceiling check."
     },
     "src/services/memory-discover.ts": {
       "reads": {
         "listAllMemoryMeta": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Value-free public metadata (keys, owners, tags)."
     },
     "src/services/memory-replication.ts": {
       "reads": {
@@ -1502,56 +1482,56 @@
       "reads": {
         "getMemory": 3
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Read-to-update, shadow-copy existence and version-conflict reads."
     },
     "src/services/message-send.ts": {
       "reads": {
         "getStorageFileMeta": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: An attachment existence check through metadata."
     },
     "src/services/metered-entitlements.ts": {
       "reads": {
         "getMemory": 2,
         "listAllMemory": 5
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Entitlement, grant and history records."
     },
     "src/services/network-policy.ts": {
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's network policy record."
     },
     "src/services/notebook-ai.ts": {
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: API key presence and AI settings."
     },
     "src/services/notebook-classify.ts": {
       "reads": {
         "listAllMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The workspace registry index; content goes through collectWorkspaceSummary with the reader."
     },
     "src/services/notification-settings.ts": {
       "reads": {
         "getMemory": 4
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Mail log and notification settings."
     },
     "src/services/notification-sweeps.ts": {
       "reads": {
         "listAllMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Settings and node-generated notification records for the morning push."
     },
     "src/services/notify.ts": {
       "reads": {
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A notification's link field, read to dismiss it."
     },
     "src/services/offer-prereqs.ts": {
       "reads": {
@@ -1559,21 +1539,21 @@
         "listOwnerScopeMemory": 1,
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Signal values pass presentMemory/presentMemories as the caller; the offer spec is read for a key only."
     },
     "src/services/onboarding-funnel.ts": {
       "reads": {
         "getMemory": 7,
         "listMemoryForOwners": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Onboarding marker and track records."
     },
     "src/services/onboarding-validator.ts": {
       "reads": {
         "getMemory": 2,
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Agent commands, config and offers checked for onboarding."
     },
     "src/services/open-items.ts": {
       "reads": {
@@ -1581,25 +1561,25 @@
         "getOwnerScopeMemory": 1,
         "getStorageFile": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Items reach callers through showItems; the other reads are read-modify-write and existence checks."
     },
     "src/services/operator-admin-migration.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A migration marker."
     },
     "src/services/organism-comments.ts": {
       "reads": {
         "listAllMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Comments pass reader.show."
     },
     "src/services/organism-readme.ts": {
       "reads": {
         "listAllMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The README reaches callers through showOrganismReadme; getOrganismReadme feeds the update echo and read-to-update."
     },
     "src/services/organism-search.ts": {
       "reads": {
@@ -1612,7 +1592,7 @@
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The owner's own template and theme, sent by the owner; a person's own content is theirs to send."
     },
     "src/services/owner-memory.ts": {
       "reads": {
@@ -1620,70 +1600,70 @@
         "listMemoryMetaForOwners": 1,
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The owner-scope read helper; each caller that hands a value on is listed and checked on its own."
     },
     "src/services/package-entitlements.ts": {
       "reads": {
         "getMemory": 2,
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Package entitlement records."
     },
     "src/services/package-install-request-store.ts": {
       "reads": {
         "getMemory": 2,
         "listMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Install-request state records."
     },
     "src/services/package-sellers.ts": {
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The seller registry."
     },
     "src/services/package-upstream-refresh.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: An update-notice marker."
     },
     "src/services/portfolio-members.ts": {
       "reads": {
         "listMemoryForOwners": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: portfolio.config records."
     },
     "src/services/presence.ts": {
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The presence config record."
     },
     "src/services/private-record.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A read-to-update helper."
     },
     "src/services/proactive-mode.ts": {
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The proactive-mode setting."
     },
     "src/services/public-activity.ts": {
       "reads": {
         "listAllMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's own public activity events."
     },
     "src/services/quota.ts": {
       "reads": {
         "listStorageFiles": 1,
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: File sizes and key existence for quota."
     },
     "src/services/refinery/pipeline.ts": {
       "reads": {
@@ -1696,13 +1676,13 @@
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The refinery config record, read for its connection id."
     },
     "src/services/schedule-write.ts": {
       "reads": {
         "getStorageFile": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A stored-file existence check."
     },
     "src/services/scheduler-remote-jobs.ts": {
       "reads": {
@@ -1714,26 +1694,26 @@
       "reads": {
         "getStorageFile": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A screenshot-file existence check."
     },
     "src/services/security-incident.ts": {
       "reads": {
         "listAllMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: System security-incident records."
     },
     "src/services/signals/signal-service.ts": {
       "reads": {
         "getMemory": 2,
         "listAllMemory": 4
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Signal stream config and monthly counters."
     },
     "src/services/site-tags.ts": {
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Tags resolved against the operator's own __site__ content."
     },
     "src/services/site.ts": {
       "reads": {
@@ -1741,33 +1721,33 @@
         "listMemory": 2,
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's site template, portal keys and header navigation."
     },
     "src/services/skill-refs.ts": {
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A node skill body, read only to compare fingerprints."
     },
     "src/services/skill-seeds.ts": {
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Seed fingerprint stamps."
     },
     "src/services/skills.ts": {
       "reads": {
         "listAllMemory": 1,
-        "getMemory": 11,
+        "getMemory": 10,
         "listMemory": 8
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Skill bodies and manifests pass the reader (skill-reader.ts) in listing, resolve and pinned reads; publish, delete, visibility, version lists and links are the node's own."
     },
     "src/services/storage-file-write.ts": {
       "reads": {
         "getStorageFile": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: File existence and ownership check before delete."
     },
     "src/services/structure-overview.ts": {
       "reads": {
@@ -1779,32 +1759,32 @@
       "reads": {
         "listAllMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The previous structure fingerprint, read to decide whether to write."
     },
     "src/services/surface-layout/service.ts": {
       "reads": {
         "getMemory": 3
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's layout records."
     },
     "src/services/themes/service.ts": {
       "reads": {
         "listAllMemoryMeta": 1,
         "getMemory": 5
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: System theme records and each person's theme choice."
     },
     "src/services/track-registry.ts": {
       "reads": {
         "listAllMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Contract records scanned to rebuild the watched-key index."
     },
     "src/services/tracked-classify.ts": {
       "reads": {
         "listAllMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The workspace registry index; content goes through collectWorkspaceSummary with the reader."
     },
     "src/services/tracked-response.ts": {
       "reads": {
@@ -1812,13 +1792,13 @@
         "listAllMemory": 3,
         "listMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The watched value passes leave (external, to the peer) before it goes into a reply; the contract records are the node's own."
     },
     "src/services/usage-summary.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: API key presence."
     },
     "src/services/workflow/engine-ai-step.ts": {
       "reads": {
@@ -1830,7 +1810,7 @@
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Read-to-update of the answer key, and the reviewed record read only to stamp provenance."
     },
     "src/services/workflow/engine-steps.ts": {
       "reads": {
@@ -1838,13 +1818,13 @@
         "listOwnerScopeMemory": 1,
         "getOwnerScopeMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Export-out and the data package step pass leave; the other reads are read-to-update and the fresh clear."
     },
     "src/services/workflow/engine.ts": {
       "reads": {
         "getMemory": 10
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Workflow run records: the internal state machine."
     },
     "src/services/workflow/eval-context.ts": {
       "reads": {
@@ -1857,32 +1837,32 @@
       "reads": {
         "getMemory": 6
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: System active-run and event-trigger indexes."
     },
     "src/services/workflow/store.ts": {
       "reads": {
         "getMemory": 5,
         "listMemory": 3
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Run observations pass reader.show (withheldFor); definitions are the owner's own configuration."
     },
     "src/services/workflow/trigger-authority.ts": {
       "reads": {
         "getMemory": 4
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The system open-refusals index and refused-run state."
     },
     "src/services/workspace-access-decision.ts": {
       "reads": {
         "listAllMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: An access-request record, read to update."
     },
     "src/services/workspace-change-core.ts": {
       "reads": {
         "listAllMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A key existence scan (keys only)."
     },
     "src/services/workspace-content.ts": {
       "reads": {
@@ -1894,7 +1874,7 @@
       "reads": {
         "listAllMemory": 3
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Agent engagement records."
     },
     "src/services/workspace-export.ts": {
       "reads": {
@@ -1909,19 +1889,19 @@
         "getMemory": 2,
         "getStorageFile": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Read-to-update, file dedupe existence and registry append."
     },
     "src/services/workspace-meta.ts": {
       "reads": {
         "listAllMemory": 4
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Registry and meta-copy helpers; readme and manifest content reaches callers through workspace-content.ts with a reader."
     },
     "src/services/workspace-provision.ts": {
       "reads": {
         "getMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Read-to-update of meta records and the registry."
     },
     "src/services/workspace-rows/row-service.ts": {
       "reads": {
@@ -1940,31 +1920,31 @@
       "reads": {
         "listAllMemory": 3
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Version-row key refs and manifest retention config."
     },
     "src/services/workspace-write-guards.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The archived-flag check."
     },
     "src/services/workspace-write-items.ts": {
       "reads": {
         "listAllMemory": 1
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Manifest object types for a write."
     },
     "src/services/workspace-write.ts": {
       "reads": {
         "listAllMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Write and edit paths only, and a delete scan."
     },
     "src/services/write-guards.ts": {
       "reads": {
         "listAllMemory": 2
       },
-      "why": "Seeded 2026-09-29 before the gate existed; not yet reviewed. Move the read into a loader that takes a classification reader, or write why the read is the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Manifest namespace policy and the latest version for write guards."
     }
   }
 }

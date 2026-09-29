@@ -35,6 +35,9 @@
  *     organism in the "view it" line; persist advisoryCount/advisories/body on the report record.
  *     Degrades gracefully to the prior generic line when there are no advisories. Never throws.
  *   v1.1.1 — 2026-09-26 — The owner's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
+ *   v1.2.0 — 2026-09-29 — The deliverable and the advisories the report quotes pass the
+ *     classification leave() (external, to the owner's e-mail); what stays behind is named in the
+ *     report body, kept on the record as `classifiedLeftOut`, and logged (TARGET-082 V4).
  */
 import type { Storage, AgentTaskRecord, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -42,6 +45,8 @@ import { getActiveEmailService } from './email.js';
 import { outboxPrefix } from './ecosystem-automation-advisories.js';
 import { logger } from '../utils/logger.js';
 import { localAccountName } from '../utils/gaii.js';
+import { systemReader, type ContentReader } from './classification/reader.js';
+import { memoryTarget } from './classification/labels.js';
 
 /** Trim an arbitrary value to a short, human-readable excerpt for the report body. */
 function excerpt(value: unknown, max = 600): string {
@@ -89,6 +94,7 @@ function severityGlyph(severity: string | null): string {
  */
 async function readAdvisorySummaries(
   storage: Storage,
+  report: ReportEgress,
   ownerGhii: string,
   app: string,
 ): Promise<AdvisorySummary[]> {
@@ -100,7 +106,7 @@ async function readAdvisorySummaries(
     return [];
   }
   const out: AdvisorySummary[] = [];
-  for (const rec of outbox) {
+  for (const rec of await report.pass(outbox)) {
     const v = (rec.value ?? {}) as { title?: unknown; severity?: unknown; kind?: unknown };
     const title = typeof v.title === 'string' && v.title.trim() ? v.title.trim() : null;
     if (!title) continue; // skip records without a human-readable title
@@ -111,6 +117,28 @@ async function readAdvisorySummaries(
     });
   }
   return out;
+}
+
+/**
+ * The classification check for what the report quotes (TARGET-082). The report goes out as an e-mail,
+ * so every record it quotes passes leave() (external, to the owner's mailbox); what stays behind is
+ * counted, logged by key, and named in the report so it is never missing without a word.
+ */
+interface ReportEgress {
+  pass<T extends MemoryRecord>(records: readonly T[]): Promise<T[]>;
+  readonly left: Array<{ key: string; label: string; reason: string }>;
+}
+
+function reportEgress(reader: ContentReader, to: string): ReportEgress {
+  const left: ReportEgress['left'] = [];
+  return {
+    left,
+    async pass(records) {
+      const out = await reader.leave(records, r => memoryTarget(r.ownerGaii, r.key), { kind: 'external', to });
+      for (const l of out.left) left.push({ key: l.item.key, label: l.label, reason: l.reason });
+      return out.kept;
+    },
+  };
 }
 
 /** Build the bulleted advisory block (capped) shown in both the email + in-app report. */
@@ -147,19 +175,28 @@ export async function notifyAutomationTaskComplete(
     const ownerName = localAccountName(ownerGhii);
     const agentName = task.agentGaii.split('#')[0];
 
+    const report = reportEgress(systemReader({ storage, config }, ownerGhii), `email:${ownerGhii}`);
+
     // Pull the deliverable excerpt if the agent published one (best-effort).
     let deliverableExcerpt = '';
     if (task.deliverableKey) {
       try {
         const rec = await storage.getMemory(task.agentGaii, task.deliverableKey);
-        if (rec) deliverableExcerpt = excerpt(rec.value);
+        const [quotable] = rec ? await report.pass([rec]) : [];
+        if (quotable) deliverableExcerpt = excerpt(quotable.value);
       } catch (err) { logger.warn('notifyAutomationTaskComplete: best-effort — the link still works', { error: String(err) }); }
     }
 
     // What the agent actually produced: its `support-advisory@1` payloads in the owner's outbox.
     // Read BEFORE the sibling advisory-drain empties it (B6 is fired first in the completion route).
-    const advisories = await readAdvisorySummaries(storage, ownerGhii, auto.app);
+    const advisories = await readAdvisorySummaries(storage, report, ownerGhii, auto.app);
     const advisoryBlock = renderAdvisoryBlock(advisories);
+    if (report.left.length) {
+      logger.info('automation report: classified content left out', { owner: ownerName, recipe: auto.recipeId, left: report.left.slice(0, 20) });
+    }
+    const leftLine = report.left.length
+      ? `Left out: ${report.left.length} classified ${report.left.length === 1 ? 'item' : 'items'} that may not leave their organism (${report.left.slice(0, 3).map(l => l.key).join(', ')}${report.left.length > 3 ? ', …' : ''}).\n\n`
+      : '';
 
     const subject = advisories.length
       ? `AIMEAT: ${auto.app} — ${advisories.length} ${advisories.length === 1 ? 'advisory' : 'advisories'} from ${agentName}`
@@ -182,6 +219,7 @@ export async function notifyAutomationTaskComplete(
       (advisoryBlock ? `What was produced — ${advisoryBlock}\n\n` : '') +
       (completionMessage ? `Summary: ${completionMessage}\n\n` : '') +
       (deliverableExcerpt ? `Report excerpt:\n${deliverableExcerpt}\n\n` : '') +
+      leftLine +
       seeItLine;
 
     // ── Channel 1: in-app report record (always, SMTP-free) ──
@@ -207,6 +245,8 @@ export async function notifyAutomationTaskComplete(
         // so the in-app report carries the same task-relevant content as the email body.
         advisoryCount: advisories.length,
         advisories: advisories.slice(0, 8),
+        // What the classification check kept out of the report, and why (TARGET-082).
+        ...(report.left.length ? { classifiedLeftOut: report.left.slice(0, 20) } : {}),
         body: bodyText,
         emailed: false, // updated below if the email actually sent
         createdAt: now,

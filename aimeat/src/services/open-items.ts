@@ -30,12 +30,16 @@
  *     like the home's `initialized`. A satisfied suggestion stops being offered rather than being
  *     written done, so it comes back if the situation unwinds — right for a suggestion, wrong for
  *     something a person switched on themselves.
- * @structure OPEN_ITEMS_KEY · OpenItem · readList · listItems · addItem · patchItem · closeItem ·
- *   itemStats · evaluateCloses · closeItemsForTask
+ * @structure OPEN_ITEMS_KEY · OpenItem · readList · listItems · showItems · addItem · patchItem ·
+ *   closeItem · itemStats · evaluateCloses · closeItemsForTask
  * @usage
  *   import { listItems, addItem } from '../services/open-items.js';
  *   const open = await listItems(storage, config, ownerGhii, owner);
+ *   const shown = await showItems(storage, config, readerFor({ storage, config }, req.auth), owner);
  * @version-history
+ *   v1.2.0 — 2026-09-29 — TARGET-082 V4: showItems, the list as a caller may see it: the record passes
+ *     the caller's ContentReader (presentMemory) and a list the reader may not see reads as empty.
+ *     readList and listItems stay for the node's own read-modify-write, counts and duplicate checks.
  *   v1.1.1 — 2026-09-26 — closeItemsForTask takes the owner's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-09-20 — closeItemsForDecision: a decision a person has confirmed or overridden
  *     takes its own row off the list, whichever surface recorded the review.
@@ -52,6 +56,8 @@ import { HELLO_MCP_KEY } from './hello-mcp.js';
 import { loadOwnerAgents } from './db/owner-identity.js';
 import { BASIC_AGENTS } from '../data/basic-agents.js';
 import { localAccountName } from '../utils/gaii.js';
+import type { ContentReader } from './classification/reader.js';
+import { presentMemory } from './classification/present-memory.js';
 
 /** The one key. Named for what a person calls it, because their AI reads this name aloud. */
 export const OPEN_ITEMS_KEY = 'open-items.list';
@@ -201,10 +207,17 @@ export interface ReadList {
     memoryVersion: number;
 }
 
+/**
+ * The list as stored, for the node's own read-modify-write, counts and duplicate checks. What is
+ * returned to a caller goes through showItems.
+ */
 export async function readList(storage: Storage, ownerGhii: string): Promise<ReadList> {
-    const row = await storage.getMemory(ownerGhii, OPEN_ITEMS_KEY);
+    const row = await listRow(storage, ownerGhii);
     return { list: row ? toList(row.value) : { ...EMPTY }, memoryVersion: row?.version ?? 0 };
 }
+
+/** The stored list record; the one read readList and showItems share. */
+const listRow = (storage: Storage, ownerGhii: string) => storage.getMemory(ownerGhii, OPEN_ITEMS_KEY);
 
 /** Thrown when the list changed under a write and the retries ran out. */
 export class OpenItemsConflict extends Error {
@@ -305,6 +318,24 @@ export async function listItems(
     storage: Storage, config: AimeatConfig, ownerGhii: string, owner: string,
 ): Promise<ListedItem[]> {
     const { list } = await readList(storage, ownerGhii);
+    return listedOf(storage, config, owner, list);
+}
+
+/**
+ * listItems for a caller: the reader's own list, through the classification check. A list the
+ * reader may not see reads as empty.
+ */
+export async function showItems(
+    storage: Storage, config: AimeatConfig, reader: ContentReader, owner: string,
+): Promise<ListedItem[]> {
+    const row = await listRow(storage, reader.identity);
+    const shown = row ? await presentMemory(reader, row) : null;
+    return listedOf(storage, config, owner, shown ? toList(shown.value) : { ...EMPTY });
+}
+
+async function listedOf(
+    storage: Storage, config: AimeatConfig, owner: string, list: OpenItemsList,
+): Promise<ListedItem[]> {
     const out: ListedItem[] = [];
     for (const item of list.items) {
         const satisfied = item.closes_when

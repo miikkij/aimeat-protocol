@@ -19,6 +19,9 @@
  *   - TRACKED_RESPONSE_SPEC — served inline spec for self-description
  * @usage import { createTrackedResponse, evaluateTrackedKey } from '../services/tracked-response.js';
  * @version-history
+ *   v1.3.0 — 2026-09-29 — The watched record passes the classification leave() (destination: the
+ *     peer) before its field is injected into the reply; a classified result is left out and the
+ *     ledger records `result-withheld` with the key, label and reason (TARGET-082 V4).
  *   v1.2.0 — 2026-09-24 — The automatic reply does not count against the owner's message limit
  *     (services/message-send-limit.ts): the node sends it, once for each message that arrives.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 4: an AUTO-sent reply carries a provenance record —
@@ -37,6 +40,8 @@ import { sendDirectMessage } from './message-send.js';
 import { trackKey, untrackKey } from './track-registry.js';
 import type { DeliveryCtx } from './message-delivery.js';
 import { stampAutonomousOutput } from './ai-provenance.js';
+import { systemReader } from './classification/reader.js';
+import { memoryTarget } from './classification/labels.js';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 export type TrackedResponseState =
@@ -119,9 +124,26 @@ function ledger(c: TrackedResponse, event: string, extra?: Record<string, unknow
 
 /** Read the current value of an arbitrary watched memory key without knowing its owner GAII. The
  *  memory key is unique per (owner, key); a prefix scan on the exact key resolves it cross-owner. */
-async function readWatchedValue(storage: Storage, key: string): Promise<unknown | undefined> {
+async function readWatched(storage: Storage, key: string): Promise<{ ownerGaii: string; key: string; value: unknown } | undefined> {
   const { items } = await storage.listAllMemory({ prefix: key, limit: 5 });
-  return items.find(i => i.key === key)?.value;
+  return items.find(i => i.key === key);
+}
+
+/**
+ * The injected result, when it may go to the peer. The reply is a message to another account, so the
+ * watched record passes leave() (TARGET-082): a record whose label may not leave its organism gives
+ * no result, and the contract's ledger says which key was left out and why. The reply still goes,
+ * because the work it reports is done.
+ */
+async function resultForPeer(ctx: DeliveryCtx, c: TrackedResponse, watched: { ownerGaii: string; key: string; value: unknown }): Promise<string> {
+  const result = injectResult(watched.value, c.response.inject);
+  if (!result) return result;
+  const { left } = await systemReader(ctx, c.ownerGaii).leave([watched], w => memoryTarget(w.ownerGaii, w.key),
+    { kind: 'external', to: c.source.peerGhii });
+  if (!left.length) return result;
+  ledger(c, 'result-withheld', { key: watched.key, label: left[0]!.label, reason: left[0]!.reason });
+  logger.info('tracked-response: the injected result is classified and left out of the reply', { id: c.id, key: watched.key, label: left[0]!.label });
+  return '';
 }
 
 function conditionMet(value: unknown, cond: TrackedResponseWatch['condition']): boolean {
@@ -195,11 +217,12 @@ async function evaluateContract(ctx: DeliveryCtx, c: TrackedResponse): Promise<v
   inFlight.add(c.id);
   try {
     const { storage } = ctx;
-    const watchedValue = await readWatchedValue(storage, c.watch.key);
-    if (watchedValue !== undefined) c.tracking.lastUpdatedAt = new Date().toISOString();
-    if (!conditionMet(watchedValue, c.watch.condition)) return;   // not yet — stay watching
+    const watched = await readWatched(storage, c.watch.key);
+    if (watched !== undefined) c.tracking.lastUpdatedAt = new Date().toISOString();
+    if (!watched || !conditionMet(watched.value, c.watch.condition)) return;   // not yet — stay watching
 
-    const result = injectResult(watchedValue, c.response.inject);
+    // Both modes: an approved draft is sent to the same peer as it stands.
+    const result = await resultForPeer(ctx, c, watched);
     const body = renderTemplate(c, result);
     c.tracking.lastTriggeredAt = new Date().toISOString();
 

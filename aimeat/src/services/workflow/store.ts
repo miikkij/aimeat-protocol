@@ -55,14 +55,19 @@
  *     for an agent step, and keeps that version on the definition as `authority`.
  *   v1.15.1 — 2026-09-26 — The costCapMorsels warning names the field's removal: 4.0.0.
  *   v1.15.2 — 2026-09-28 — An ai step with op `transcribe` needs no prompt (System 2 plan, V5).
+ *   v1.16.0 — 2026-09-29 — listRuns (opts.reader) and getRun (reader) take the caller's
+ *     classification reader: an observed value copied from a record the caller may not see is
+ *     withheld (value null, `withheld` says why), and a warning label rides on the leaf (TARGET-082 V4).
  */
 import type { AimeatConfig } from '../../config.js';
-import type { Storage } from '../../storage/interface.js';
+import type { Storage, ContentLabelTarget } from '../../storage/interface.js';
 import { buildGAII, parseGEAI } from '../../utils/gaii.js';
 import { isReservedServerKey, RESERVED_OWNER_KEY_PREFIXES, SERVER_WRITTEN_KEYS, SERVER_WRITTEN_KEY_PREFIXES } from '../../utils/reserved-keys.js';
 import { template } from './engine-util.js';
 import { missingStepScopes, stepScopeRefusal, saverFromCaller, WORKFLOW_AUTHORITY_VERSION, type WorkflowCaller } from './step-authority.js';
 import { shownRun } from './run-redaction.js';
+import type { ContentReader } from '../classification/reader.js';
+import { memoryTarget } from '../classification/labels.js';
 import {
   WorkflowDefInputSchema, WORKFLOW_ID_RE,
   type WorkflowDef, type WorkflowDefInput, type WorkflowStep, type WorkflowRun, type Signal,
@@ -597,20 +602,64 @@ export const isCheckRun = (run: Pick<WorkflowRun, 'mode'>): boolean => run.mode 
  */
 export async function listRuns(
   storage: Storage, ownerGhii: string, id: string,
-  opts: { checks?: 'exclude' | 'include' | 'only' } = {},
+  opts: { checks?: 'exclude' | 'include' | 'only'; reader?: ContentReader } = {},
 ): Promise<WorkflowRun[]> {
   const recs = await storage.listMemory(ownerGhii, { prefix: runKeyPrefix(id) });
   const checks = opts.checks ?? 'exclude';
   // As a door may serve it: an observation of a credential record is redacted (run-redaction.ts).
-  return recs.map(r => shownRun(r.value as WorkflowRun))
+  const runs = recs.map(r => shownRun(r.value as WorkflowRun))
     .filter(r => checks === 'include' || (checks === 'only') === isCheckRun(r))
     .sort((a, b) => (b.startedAt ?? '').localeCompare(a.startedAt ?? ''));
+  return opts.reader ? withheldFor(opts.reader, ownerGhii, runs) : runs;
 }
 
-export async function getRun(storage: Storage, ownerGhii: string, id: string, runId: string): Promise<WorkflowRun | null> {
+/**
+ * One run. `reader` is given by a caller that serves the run's observed values (the run routes);
+ * the engine's own reads of its run state leave it out.
+ */
+export async function getRun(storage: Storage, ownerGhii: string, id: string, runId: string, reader?: ContentReader): Promise<WorkflowRun | null> {
   const rec = await storage.getMemory(ownerGhii, runKey(id, runId));
   // As a door may serve it: an observation of a credential record is redacted (run-redaction.ts).
-  return rec ? shownRun(rec.value as WorkflowRun) : null;
+  const run = rec ? shownRun(rec.value as WorkflowRun) : null;
+  return run && reader ? (await withheldFor(reader, ownerGhii, [run]))[0]! : run;
+}
+
+/** What an observed value reads as when the record it was copied from is hidden from the caller. */
+export const WITHHELD_CLASSIFIED = 'withheld: the record is classified, and this caller may not see it';
+
+/**
+ * Every observed value in these runs that `reader` may not see is withheld (TARGET-082). A
+ * json_field leaf copies a field of one of the owner's records into the run, so a run served to a
+ * caller shows that value only where the record itself would be shown to them. The leaf names its
+ * key without the holder, so the label is asked at the owner's address: an `organism.<id>.` key
+ * maps to its organism, and anything else is the owner's own. Leaves are the objects shownRun
+ * rebuilt, never the stored record; a leaf's own `value` is data and is not walked.
+ */
+async function withheldFor(reader: ContentReader, ownerGhii: string, runs: WorkflowRun[]): Promise<WorkflowRun[]> {
+  const leaves: Array<{ leaf: Record<string, unknown>; target: ContentLabelTarget }> = [];
+  const walk = (node: unknown, prefix: string): void => {
+    if (Array.isArray(node)) { for (const n of node) walk(n, prefix); return; }
+    if (!node || typeof node !== 'object') return;
+    const leaf = node as Record<string, unknown>;
+    if (typeof leaf.key === 'string' && 'value' in leaf) leaves.push({ leaf, target: memoryTarget(ownerGhii, prefix + leaf.key) });
+    for (const [field, v] of Object.entries(leaf)) if (field !== 'value') walk(v, prefix);
+  };
+  for (const run of runs) {
+    for (const step of Object.values(run.steps ?? {})) {
+      if (!step || typeof step !== 'object') continue;
+      walk(step.inputObserved, run.keyPrefix ?? '');
+      walk(step.outputObserved, run.keyPrefix ?? '');
+    }
+  }
+  if (!leaves.length) return runs;
+  const shown = await reader.show(leaves.map((l, i) => ({ i, target: l.target })), x => x.target);
+  const byIndex = new Map(shown.map(s => [s.i, s as { i: number; classificationWarning?: unknown }]));
+  leaves.forEach((l, i) => {
+    const s = byIndex.get(i);
+    if (!s) { l.leaf.value = null; l.leaf.withheld = WITHHELD_CLASSIFIED; return; }
+    if (s.classificationWarning) l.leaf.classificationWarning = s.classificationWarning;
+  });
+  return runs;
 }
 
 // ── blueprint (derived) ──────────────────────────────────────────────────────────

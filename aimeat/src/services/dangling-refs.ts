@@ -16,12 +16,16 @@
  *   Each candidate id is classified against the workspace's own id sets: present & live → OK; present
  *   only as an archived row → `archived`; absent everywhere → `dangling`.
  * @structure
- *   - scanOrganismDanglingRefs(storage, config, organism, callerGaii, onlyWs?) -> { findings, scannedWorkspaces, truncated }
+ *   - scanOrganismDanglingRefs(storage, config, organism, reader, onlyWs?) -> { findings, scannedWorkspaces, truncated }
  *   - DanglingRefFinding — { ws, wsName?, space, namespace, instance, title, field, kind, refId, state }
  * @usage
  *   import { scanOrganismDanglingRefs } from '../services/dangling-refs.js';
- *   const { findings } = await scanOrganismDanglingRefs(storage, config, organism, callerGaii, ws);
+ *   const { findings } = await scanOrganismDanglingRefs(storage, config, organism, readerFor({ storage, config }, req.auth), ws);
  * @version-history
+ *   v1.3.0 -- 2026-09-29 -- TARGET-082 V4: takes the caller's ContentReader instead of an identity. The
+ *     source records whose title and refs become findings pass reader.show first, so a record the
+ *     reader may not see gives no finding. The existence sets, the manifest gate and the workspace
+ *     registry stay the node's own reads (ids and structure, no content goes out).
  *   v1.0.0 -- 2026-07-11 -- Initial (TARGET-023): read-only dangling-reference scan shared by the
  *     REST route GET /v1/organisms/:id/workspace/dangling-refs. Same manifest read gate as the
  *     workspace read; structured-field + fence-stripped prose detectors; same-workspace resolution.
@@ -35,6 +39,8 @@ import type { AimeatConfig } from '../config.js';
 import { authorizeRead } from './access-guard.js';
 import { isSameOwner } from '../utils/gaii.js';
 import { workspaceMetaReader } from './workspace-meta.js';
+import { memoryTarget } from './classification/labels.js';
+import type { ContentReader } from './classification/reader.js';
 
 export interface DanglingRefFinding {
   ws: string;
@@ -149,10 +155,11 @@ async function scanWorkspace(
   orgId: string,
   ws: string,
   wsName: string | undefined,
-  callerGaii: string,
+  reader: ContentReader,
   budget: { left: number },
 ): Promise<{ readable: boolean; findings: DanglingRefFinding[] }> {
   const nsRoot = `organism.${orgId}.w.${ws}.`;
+  const callerGaii = reader.identity;
 
   // Live rows (archived excluded by default) + archived-only rows, in two bounded scans.
   // excludeVersionRows: the scan skips `.version.N` rows in SQL (they were loaded then discarded).
@@ -221,7 +228,9 @@ async function scanWorkspace(
     if (better) current.set(k, { space: rec.space, namespace: rec.namespace, instance: rec.instance, rec: r, role: rec.role });
   }
 
-  for (const src of current.values()) {
+  // A finding carries the source record's title, so only the records this reader may see are scanned.
+  const sources = await reader.show([...current.values()], s => memoryTarget(s.rec.ownerGaii, s.rec.key));
+  for (const src of sources) {
     if (budget.left <= 0) break;
     const value = src.rec.value;
     const title = titleOf(value, src.instance);
@@ -252,7 +261,7 @@ export async function scanOrganismDanglingRefs(
   storage: Storage,
   config: AimeatConfig,
   organism: OrganismRecord,
-  callerGaii: string,
+  reader: ContentReader,
   onlyWs?: string,
 ): Promise<{ findings: DanglingRefFinding[]; scannedWorkspaces: string[]; truncated: boolean }> {
   const id = organism.id;
@@ -274,7 +283,7 @@ export async function scanOrganismDanglingRefs(
   const findings: DanglingRefFinding[] = [];
   const scannedWorkspaces: string[] = [];
   for (const ws of wsList) {
-    const { readable, findings: f } = await scanWorkspace(storage, config, id, ws, wsName.get(ws), callerGaii, budget);
+    const { readable, findings: f } = await scanWorkspace(storage, config, id, ws, wsName.get(ws), reader, budget);
     if (readable) scannedWorkspaces.push(ws);
     findings.push(...f);
     if (budget.left <= 0) break;

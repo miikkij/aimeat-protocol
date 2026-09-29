@@ -30,10 +30,14 @@
  *   is the whole point of recording a review.
  * @structure
  *   - KnowledgeFilters / KnowledgeOverview
- *   - buildKnowledgeOverview(config, storage, operatorGaii, filters)
+ *   - buildKnowledgeOverview(config, storage, operatorGaii, reader, filters)
  * @usage
  *   import { buildKnowledgeOverview } from '../services/knowledge-overview.js';
  * @version-history
+ *   v1.2.0 — 2026-09-29 — TARGET-082 V4: takes the operator's classification reader. Every manifest
+ *     passes it (presentMemories) before it is counted or listed, so a package the operator may not
+ *     see is in neither the page nor the facets, and one shown to an AI under a warning label
+ *     carries `classificationWarning`.
  *   v1.1.1 — 2026-09-26 — authorKeyOf takes the author's name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so a visitor is never counted as the local namesake (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-09-12 — A page or a limit that is not a number falls back instead of becoming
  *     NaN. `?page=abc` had been answering with an empty array and paging numbers that serialise as
@@ -44,6 +48,8 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, KnowledgeManifest, OperatorReviewRecord } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { localAccountName } from '../utils/gaii.js';
+import type { ContentReader } from './classification/reader.js';
+import { presentMemories, classificationWarningOf } from './classification/present-memory.js';
 
 /** The maturity words this node actually defines. Anything else is reported, never silently kept. */
 export const DECLARED_MATURITY = ['draft', 'review', 'published'] as const;
@@ -75,6 +81,8 @@ interface Row {
   createdAt: string;
   updatedAt: string;
   isSystem: boolean;
+  /** Set when the manifest was shown to an AI under a warning classification. */
+  classificationWarning: { label: string; name: string; says: string } | null;
 }
 
 /**
@@ -98,16 +106,20 @@ function tally<T>(rows: T[], of: (r: T) => string): Array<{ name: string; packag
     .sort((a, b) => b.packages - a.packages);
 }
 
-/** Gather every knowledge manifest on the node: the agents' and the operator's own. */
-async function allManifests(storage: Storage, operatorGaii: string): Promise<Row[]> {
+/**
+ * Gather every knowledge manifest on the node that this reader may see: the agents' and the
+ * operator's own. The classification check runs on the manifests only, after the key and type
+ * filter, so the label lookups are bounded by the packages and not by every `packages/` record.
+ */
+async function allManifests(storage: Storage, operatorGaii: string, reader: ContentReader): Promise<Row[]> {
   const seen = new Set<string>();
   const out: Row[] = [];
+  const isManifest = (m: { key: string; value: unknown }) =>
+    m.key.endsWith('/manifest') && (m.value as { type?: string })?.type === 'knowledge-package';
   const take = (m: {
     key: string; value: unknown; ownerGaii: string; visibility: string;
     flagCount?: number; createdAt: string; updatedAt: string; tags?: string[];
   }, forceSystem: boolean) => {
-    if (!m.key.endsWith('/manifest')) return;
-    if ((m.value as { type?: string })?.type !== 'knowledge-package') return;
     if (seen.has(m.key)) return;
     seen.add(m.key);
     out.push({
@@ -119,6 +131,7 @@ async function allManifests(storage: Storage, operatorGaii: string): Promise<Row
       createdAt: m.createdAt,
       updatedAt: m.updatedAt,
       isSystem: forceSystem || (m.tags || []).includes('system-knowledge'),
+      classificationWarning: classificationWarningOf(m),
     });
   };
 
@@ -126,12 +139,12 @@ async function allManifests(storage: Storage, operatorGaii: string): Promise<Row
   const fromAgents = await storage.listMemoryForOwners(agents.map(a => a.gaii), {
     prefix: 'packages/', tags: ['knowledge-package'],
   });
-  for (const m of fromAgents) take(m, false);
+  for (const m of await presentMemories(reader, fromAgents.filter(isManifest))) take(m, false);
 
   const fromOperator = await storage.listMemory(operatorGaii, {
     prefix: 'packages/', tags: ['knowledge-package'],
   });
-  for (const m of fromOperator) take(m, true);
+  for (const m of await presentMemories(reader, fromOperator.filter(isManifest))) take(m, true);
 
   return out;
 }
@@ -150,10 +163,12 @@ export async function buildKnowledgeOverview(
   config: AimeatConfig,
   storage: Storage,
   operatorGaii: string,
+  /** The operator's classification reader: decides which manifests are counted and listed. */
+  reader: ContentReader,
   filters: KnowledgeFilters = {},
 ): Promise<KnowledgeOverview> {
   void config;
-  const all = await allManifests(storage, operatorGaii);
+  const all = await allManifests(storage, operatorGaii, reader);
 
   // ── Filters ──
   //
@@ -266,6 +281,7 @@ export async function buildKnowledgeOverview(
       last_review: last
         ? { action: last.action, reason: last.reason, at: last.timestamp, by: last.operatorGaii }
         : null,
+      ...(m.classificationWarning ? { classificationWarning: m.classificationWarning } : {}),
     };
   });
 

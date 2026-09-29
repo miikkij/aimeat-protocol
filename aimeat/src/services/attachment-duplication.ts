@@ -12,6 +12,9 @@
  *   - requestStorageGrant(ctx, message, attachment) — recipient→origin signed grant + download
  * @usage import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
  * @version-history
+ *   v1.3.0 -- 2026-09-29 -- A same-node copy passes the classification leave() (external, to the
+ *     recipient) before the bytes are copied; a classified attachment is not copied, is marked
+ *     expired so the sweep stops retrying it, and is logged with the reason (TARGET-082 V4).
  *   v1.2.3 -- 2026-09-26 -- readFromOwnAgents takes the account name from localAccountName
  *     (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local
  *     namesake (secaudit 2026-09, F-1).
@@ -42,6 +45,8 @@ import { logger } from '../utils/logger.js';
 import { parseGaiiLoose, localAccountName } from '../utils/gaii.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { readBodyCapped } from '../utils/read-capped.js';
+import { systemReader } from './classification/reader.js';
+import { fileTarget } from './classification/labels.js';
 
 /** The most a peer's grant answer may be: a few hundred bytes of JSON that name one download URL. */
 const MAX_GRANT_ANSWER_BYTES = 64 * 1024;
@@ -76,7 +81,9 @@ function localKeyFor(message: DirectMessageRecord, att: DirectMessageAttachment)
  * Pull the raw bytes for an attachment. Same-node: read the origin owner's storage directly.
  * Cross-node: request a signed download grant from the origin node, then fetch the bytes.
  */
-async function fetchAttachmentBytes(ctx: AttachmentCtx, message: DirectMessageRecord, att: DirectMessageAttachment): Promise<Buffer | null> {
+async function fetchAttachmentBytes(
+  ctx: AttachmentCtx, message: DirectMessageRecord, att: DirectMessageAttachment,
+): Promise<Buffer | { classified: string } | null> {
   // The only storage an attachment may be read from is the SENDER's ACCOUNT. The descriptor names an
   // owner and a key, and on an inbound federated message that name came off the wire, so reading it
   // unchecked turns "here is my photo" into "open this local owner's private file for me". The
@@ -96,19 +103,30 @@ async function fetchAttachmentBytes(ctx: AttachmentCtx, message: DirectMessageRe
   }
   if (att.originNodeId === ctx.config.nodeId) {
     const file = await ctx.storage.getStorageFile(att.ownerGhii, att.storageKey);
-    if (file) return file.data;
     // The descriptor named the right account and the wrong principal within it. Sends have pointed
     // at the holder since 2026-09-08, but every message written before that is still sitting in a
     // mailbox with the owner's name on a file its agent uploaded, and the sweep would retry it every
     // minute until it expired. The same account's own agents are searched once, so those messages
     // heal on the next sweep instead of needing the sender to send them again.
-    return readFromOwnAgents(ctx, att);
+    const held = file ? { holder: att.ownerGhii, data: file.data } : await readFromOwnAgents(ctx, att);
+    if (!held) return null;
+    // The copy goes to another account, so the sender's file passes leave() first (TARGET-082). A
+    // cross-node copy is checked by the origin node when it mints the grant (federation-sync/messaging.ts).
+    const { left } = await systemReader(ctx, held.holder)
+      .leave([held], h => fileTarget(h.holder, att.storageKey), { kind: 'external', to: message.recipientGhii });
+    if (left.length) {
+      logger.warn('attachment duplication: classified, not copied', {
+        messageId: message.id, attachmentId: att.id, key: att.storageKey, label: left[0]!.label, reason: left[0]!.reason,
+      });
+      return { classified: left[0]!.reason };
+    }
+    return held.data;
   }
   return requestStorageGrant(ctx, message, att);
 }
 
 /** The sender account's own agents, searched for a file the named principal does not have. */
-async function readFromOwnAgents(ctx: AttachmentCtx, att: DirectMessageAttachment): Promise<Buffer | null> {
+async function readFromOwnAgents(ctx: AttachmentCtx, att: DirectMessageAttachment): Promise<{ holder: string; data: Buffer } | null> {
   const owner = localAccountName(att.ownerGhii);
   const agents = await ctx.storage.getAgentsByOwner(owner).catch(err => {
     logger.warn('attachment duplication: agent lookup failed', { error: String(err), owner });
@@ -119,7 +137,7 @@ async function readFromOwnAgents(ctx: AttachmentCtx, att: DirectMessageAttachmen
     const file = await ctx.storage.getStorageFile(agent.gaii, att.storageKey);
     if (file) {
       logger.info('attachment duplication: found under the account\'s own agent', { key: att.storageKey, holder: agent.gaii });
-      return file.data;
+      return { holder: agent.gaii, data: file.data };
     }
   }
   return null;
@@ -220,6 +238,9 @@ export async function duplicateMessageAttachments(
 
     const bytes = await fetchAttachmentBytes(ctx, message, att);
     if (!bytes) { result.push({ ...att, mode: 'reference' }); continue; }
+    // Classified: never copied, so it is ended now rather than retried until it expires. The
+    // recipient sees the attachment as expired, and the log above names the key and the reason.
+    if (!Buffer.isBuffer(bytes)) { result.push({ ...att, mode: 'reference', expired: true }); changed = true; continue; }
 
     const localKey = localKeyFor(message, att);
     await ctx.storage.createStorageFile({

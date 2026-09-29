@@ -30,6 +30,8 @@
  *     /v1/pub embed form; see services/doc-images).
  *   v1.10.0 -- 2026-07-13 -- Split handlers into sibling modules under src/routes/memory/ (max-file-lines);
  *     behavior, routes, and registration order unchanged.
+ *   v1.11.0 -- 2026-09-29 -- TARGET-082 V4: GET /v1/notebook hands the caller's ContentReader to the
+ *     Notebook composite, which filters the inbox notes through it.
  */
 
 import { Router } from 'express';
@@ -41,6 +43,7 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success } from '../middleware/envelope.js';
 import { createMemoryTabService } from '../services/db/memory-tab-db-service.js';
 import { createNotebookService } from '../services/db/notebook-db-service.js';
+import { readerFor } from '../services/classification/reader.js';
 import { createMemoryDbService } from '../services/db/index.js';
 import type { StatsCollector } from '../services/stats.js';
 import type { MemoryRouteCtx } from './memory/shared.js';
@@ -84,7 +87,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
   const notebookDb = createNotebookService(storage);
   router.get('/v1/notebook', requireAuth(), requireRole('owner'), async (req, res) => {
     const owner = req.auth!.owner as string;
-    const data = await notebookDb.overview(owner, `${owner}@${config.nodeId}`);
+    const data = await notebookDb.overview(readerFor({ storage, config }, req.auth), owner, `${owner}@${config.nodeId}`);
     res.json(success(config.nodeId, data));
   });
 

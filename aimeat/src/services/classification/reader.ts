@@ -22,9 +22,9 @@
  *   - useForAi: refuses the whole call (CLASSIFIED, naming the labels and the first keys) when any
  *     item is hidden from AI or outside its audience, whoever asked, because what reaches a model
  *     is decided by the content's label.
- *   - leave: an organism's item whose label may not leave the organism stays behind, and every copy
- *     that goes to another node obeys the same field; a person's export of their own content is
- *     theirs. What stayed behind is returned with the reason.
+ *   - leave: an organism's item whose label may not leave the organism stays behind, wherever it
+ *     was going (an export, a share link, another node, an outside service); a person's own content
+ *     is theirs to send. What stayed behind is returned with the reason.
  *   A refusal is always written to the audit log, and showing or using an item whose label keeps an
  *   audit trail is written too (audit.ts buffers it off the request path).
  * @structure ReaderAuth · EgressDestination · ContentReader · decideAll() · readerFor() ·
@@ -63,7 +63,9 @@ export interface ReaderAuth {
 export type EgressDestination =
   | { kind: 'export'; organismId: string | null }
   | { kind: 'share'; organismId: string; ws: string }
-  | { kind: 'federation'; peer: string };
+  | { kind: 'federation'; peer: string }
+  /** An outside service or person: a connected provider, an e-mail, an ecosystem app, a message. */
+  | { kind: 'external'; to: string };
 
 export interface ContentReader {
   /** human, ai or anonymous from the credential; system for the node's own work with no caller. */
@@ -198,9 +200,10 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
       const left: Array<{ item: typeof items[number]; label: string; reason: string }> = [];
       for (let i = 0; i < items.length; i++) {
         const d = decided[i];
-        // The rule is about leaving an ORGANISM, and every copy that goes to another node leaves
-        // this one. A person's export of their own content is theirs to take, whatever its label.
-        const bound = !!d && !d.label.mayLeaveOrganism && (!!scopeOrganism(d.target.scope) || where.kind === 'federation');
+        // The rule is about leaving an ORGANISM, wherever the copy goes. A person's own content is
+        // theirs to send: the default label (internal) may not leave an organism, and binding
+        // personal content to it would stop every person's own public records at the border.
+        const bound = !!d && !d.label.mayLeaveOrganism && !!scopeOrganism(d.target.scope);
         if (!bound) { kept.push(items[i]); continue; }
         audit(d!, 'refused', where.kind);
         left.push({ item: items[i], label: d!.label.id, reason: `classified ${d!.label.name.en}, which may not leave its organism` });

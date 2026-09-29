@@ -14,6 +14,8 @@
  *   - DELETE /v1/ecosystem/subscriptions   — owner removes a subscription (?app=&event=)
  * @usage app.use(ecosystemEventsRouter(config, storage));
  * @version-history
+ *   v1.1.0 — 2026-09-29 — POST /read-through shows the ecosystem_ref record through presentMemory,
+ *     the classification check (TARGET-082 V4); a record the caller may not see answers 404.
  *   v1.0.0 — 2026-06-14 — Created for ecosystem events & triggers (chunk 2).
  */
 import { Router } from 'express';
@@ -26,6 +28,8 @@ import { parseGEAI, buildGEAI } from '../utils/gaii.js';
 import { getActiveWorkflowEngine } from '../services/workflow/engine.js';
 import { getActiveConnectTunnelManager } from '../services/connect-tunnel.js';
 import { getOwnerScopeMemory } from '../services/owner-memory.js';
+import { readerFor } from '../services/classification/reader.js';
+import { presentMemory } from '../services/classification/present-memory.js';
 import { ECOSYSTEM_EVENT_VERSION } from '../models/ecosystem-event-schemas.js';
 import {
   listSubscriptions, addSubscription, removeSubscriptions, appendInboundEcosystemLog,
@@ -120,7 +124,10 @@ export function ecosystemEventsRouter(config: AimeatConfig, storage: Storage): R
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'key is required'));
       return;
     }
-    const rec = await getOwnerScopeMemory(storage, config.nodeId, req.auth!.owner, key);
+    const stored = await getOwnerScopeMemory(storage, config.nodeId, req.auth!.owner, key);
+    // The cached title and schema go into the answer, so the reference record passes the
+    // classification check first; one this reader may not see reads as absent (TARGET-082).
+    const rec = stored ? await presentMemory(readerFor({ storage, config }, req.auth), stored) : null;
     const ref = rec?.value as { _type?: string; app?: string; remoteId?: string; readCapability?: string; schema?: unknown; title?: string; updatedAt?: string } | undefined;
     if (!ref || ref._type !== 'ecosystem_ref' || !ref.app) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No ecosystem_ref found at that key'));

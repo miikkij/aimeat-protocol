@@ -25,6 +25,8 @@
  *     the declared three reached the catalogue. Review and delete search the operator's own
  *     namespace as well as the agents': the operator could not act on a package they had created,
  *     because those two lookups read agents alone while the list always read both.
+ *   v1.4.1 — 2026-09-29 — TARGET-082 V4: GET /v1/admin/knowledge hands buildKnowledgeOverview() the
+ *     operator's classification reader (readerFor).
  */
 import type { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -36,6 +38,7 @@ import { emitChange } from '../../services/event-bus.js';
 import type { KnowledgeHelpers } from './helpers.js';
 import { validateManifest } from './manifest-validator.js';
 import { buildKnowledgeOverview, DEFAULT_PER_PAGE } from '../../services/knowledge-overview.js';
+import { readerFor } from '../../services/classification/reader.js';
 
 export function registerAdminRoutes(
   router: Router,
@@ -59,7 +62,7 @@ export function registerAdminRoutes(
    */
   router.get('/v1/admin/knowledge', requireAuth(), requireRole('operator'), async (req, res) => {
     const str = (k: string) => (typeof req.query[k] === 'string' ? req.query[k] as string : undefined);
-    const data = await buildKnowledgeOverview(config, storage, resolve(req), {
+    const data = await buildKnowledgeOverview(config, storage, resolve(req), readerFor({ storage, config }, req.auth), {
       page: parseInt(str('page') || '1'),
       perPage: parseInt(str('limit') || String(DEFAULT_PER_PAGE)),
       flagged: req.query.flagged === 'true',

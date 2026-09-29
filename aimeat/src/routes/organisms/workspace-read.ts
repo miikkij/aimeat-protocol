@@ -32,6 +32,9 @@
  *     loader readWorkspaceOp uses too: decideWorkspaceRead makes the decision (which adds Gate 0, an
  *     agent the organism does not list), and the classification reader passes the records (TARGET-082).
  *     The overviews, the graphs and the instruction block pass the caller's reader too.
+ *   v1.10.0 — 2026-09-29 — TARGET-082 V4: GET /comments and GET /workspace/dangling-refs hand the
+ *     caller's ContentReader to listComments and scanOrganismDanglingRefs; POST /comments/batch passes
+ *     its comment records through the same reader.
  *   v1.8.0 — 2026-09-25 — The workspace read carries `rules` (how the workspace takes a member's
  *     change) and `sections` (each document space's section index, the copy that counts) to a caller
  *     who can read the workspace.
@@ -57,6 +60,7 @@ import { loadServedProvenanceMany } from '../../services/ai-provenance-marks.js'
 import { fresherRec } from './shared.js';
 import { loadWorkspaceContent } from '../../services/workspace-content.js';
 import { readerFor } from '../../services/classification/reader.js';
+import { memoryTarget } from '../../services/classification/labels.js';
 import { logger } from '../../utils/logger.js';
 import { isOrganismOwner } from '../../services/organism-ownership.js';
 
@@ -397,9 +401,8 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     if (!isMember && ownerName) { const m = await storage.getMembership(id, ownerName); isMember = !!m && m.status === 'active'; }
     if (!isMember) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
 
-    const callerGaii = resolveIdentity(req.auth!, config.nodeId);
     const onlyWs = typeof req.query.ws === 'string' ? req.query.ws : undefined;
-    const { findings, scannedWorkspaces, truncated } = await scanOrganismDanglingRefs(storage, config, organism, callerGaii, onlyWs);
+    const { findings, scannedWorkspaces, truncated } = await scanOrganismDanglingRefs(storage, config, organism, readerFor({ storage, config }, req.auth), onlyWs);
     res.json(success(config.nodeId, { findings, total: findings.length, scannedWorkspaces, truncated }));
   });
 
@@ -527,7 +530,7 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     if (!(await canAccessWorkspaceComments(storage, config, organism, req.auth!.sub, req.auth!.owner, callerGaii, ws))) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You cannot read this workspace')); return;
     }
-    const comments = await listComments(storage, id, ws, space, instanceId);
+    const comments = await listComments(storage, readerFor({ storage, config }, req.auth), id, ws, space, instanceId);
     res.json(success(config.nodeId, { comments, total: comments.length }));
   });
 
@@ -558,9 +561,12 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     }
     const SEP = '\u0000';
     const out: Record<string, { comments?: WorkspaceComment[]; total: number }> = {};
+    const reader = readerFor({ storage, config }, req.auth);
     for (const [ws, targets] of byWs) {
       if (!(await canAccessWorkspaceComments(storage, config, organism, req.auth!.sub, req.auth!.owner, callerGaii, ws))) continue;   // omit unreadable ws
-      const { items } = await storage.listAllMemory({ prefix: `organism.${id}.w.${ws}.meta.comments.`, limit: 5000 });
+      // The same classification check listComments makes, so the batch shows and counts what the single read does.
+      const items = await reader.show((await storage.listAllMemory({ prefix: `organism.${id}.w.${ws}.meta.comments.`, limit: 5000 })).items,
+        r => memoryTarget(r.ownerGaii, r.key));
       const wanted = new Set(targets.map(t => `${t.space}~${t.instance_id}`));
       const threads = new Map<string, WorkspaceComment[]>();
       for (const r of items) {

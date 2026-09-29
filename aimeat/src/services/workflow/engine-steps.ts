@@ -6,6 +6,9 @@
  *   human-input ask delivery, step-failure + finish notifications, agent-offline heads-up, and
  *   fresh-mode output clearing. Extracted from engine.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 — 2026-09-29 — The export-out step and the datapackage step pass their source record
+ *     through the classification leave() (external to the app; export) before it goes out; a refusal
+ *     is a red step whose log names the key and the reason (TARGET-082 V4).
  *   v1.8.0 — 2026-09-26 — dispatchStep marks the call of an ai, extension or datapackage step open
  *     for its attempt (run-cost.ts markCallOpen), so the watchdog leaves the step to that call's
  *     answer (secaudit 2026-09, R4).
@@ -77,6 +80,8 @@ import { dispatchAiStep } from './engine-ai-step.js';
 import { dispatchInspector } from './engine-inspector.js';
 import { isAgentStep, anyAgentReachable, AGENT_OFFLINE_GRACE_MS } from './engine-reachability.js';
 import type { WorkflowRun, WorkflowRunStep, WorkflowStep } from '../../models/workflow-schemas.js';
+import { systemReader } from '../classification/reader.js';
+import { memoryTarget } from '../classification/labels.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
 
@@ -221,6 +226,17 @@ export function dispatchEcosystemStep(deps: StepDeps, ownerGhii: string, run: Wo
     // export-out: read the owner-namespace `from` key and push it to the GEAI's ingest capability.
     const fromKey = template(action.from, run.vars);
     const rec = await deps.storage.getMemory(ownerGhii, fromKey);
+    // The value goes to an outside app, so it passes leave() first (TARGET-082). A refused value
+    // makes the step red, and the log says which key and why.
+    if (rec) {
+      const { left } = await systemReader(deps, ownerGhii).leave([rec], r => memoryTarget(r.ownerGaii, r.key),
+        { kind: 'external', to: action.geai });
+      if (left.length) {
+        logger.warn(`workflow ${workflowId} run ${runId}: export-out step "${stepId}" sent nothing: "${fromKey}" is ${left[0]!.reason}`,
+          { label: left[0]!.label, geai: action.geai });
+        return false;
+      }
+    }
     const reply = await mgr.invokeOnPrincipal(action.geai, {
       capability: action.capability ?? '__deposit__',
       input: { from: fromKey, data: rec?.value ?? null },
@@ -362,6 +378,11 @@ export function dispatchDataPackageStep(
     if (!record) {
       throw new Error(`no value at "${key}" — the step that produces it either did not run or wrote somewhere else`);
     }
+    // A public data package is an export, so the source record passes leave() first (TARGET-082).
+    // A refusal is a red step with the reason, and the package stays on its previous version.
+    const { left } = await systemReader(deps, ownerGhii).leave([record], r => memoryTarget(r.ownerGaii, r.key),
+      { kind: 'export', organismId: null });
+    if (left.length) throw new Error(`CLASSIFIED: "${key}" is ${left[0]!.reason}, so nothing was published`);
     // A UNION publishes several lists as one table. `aiuutiset` answers with topics, actors and
     // sources — the same numbers under a differently-named label each time — and three near-identical
     // packages would be worse than one table with a `kind` column.
