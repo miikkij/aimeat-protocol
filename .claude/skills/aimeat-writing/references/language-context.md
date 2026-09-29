@@ -149,6 +149,8 @@ everywhere at once, and say so in the Changes section.
 | who gets a new version first | stable: published versions; beta: beta versions too | release channel | julkaisukanava | canal de publicación |
 | a link in an email that signs a person in | works once and needs no password; asked for on the sign-in dialog (15 minutes), or sent with the welcome mail when an install set creates the account (7 days) | sign-in link | kirjautumislinkki | enlace de acceso |
 | where an app runs on a shared server with no app addresses | a frame on the server's own address whose origin is opaque: the app reads nobody's sign-in and gets only its own permissions | isolated frame | eristetty kehys | marco aislado |
+| sorting content by how sensitive it is (the act) | a person, a rule or an AI gives a piece of content its classification; the verb is classify | classification; verb classify | luokittelu; verbi luokitella | clasificación; verbo clasificar |
+| the level a piece of content carries | public, internal, confidential, or a level the owner or an organism adds, such as top secret; it decides which people and which AI may read the content and whether it may leave; never *tunniste*, which is the machine identifier | classification | luokitus | clasificación |
 
 ## Never translated, in any language
 
@@ -257,6 +259,12 @@ service, the directory, the token, the identifier and the username: the test nam
 
 ## Changes
 
+- **2026-09-29** — classification, the act and the result, with the node's classification switch
+  (TARGET-082). The first spec said *tunniste* for the result, which the table already gives to the
+  machine identifier, so Finnish takes the two ordinary words: *luokittelu* for the act and
+  *luokitus* for what a piece of content carries, as *litterointi* and *transkriptio* above. English
+  and Spanish use one word for both; a sentence that needs the act says *classify* / *clasificar*.
+  Jouni approved the words; no cold reader has read them yet.
 - **2026-09-27** — spending limit, its second column: a step expected to cost more than the whole
   limit starts once, alone, and its real cost is what counts. The words in the three languages stay.
 - **2026-09-26** — spending limit, its second column corrected: the judging of a run's worded
