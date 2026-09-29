@@ -23,6 +23,7 @@
  *   aimeat_package_check_updates, aimeat_package_repository, aimeat_package_entitlements.
  * @usage import { registerPackageTools } from './packages.js';
  * @version-history
+ *   v1.9.0 — 2026-09-29 — aimeat_package_check_updates runs with federation off when an install set named a repository.
  *   v1.8.0 — 2026-09-29 — aimeat_package_sellers: the nodes that sell your packages with no token.
  *   v1.7.0 — 2026-09-28 — aimeat_package_config_needs: the questions a shop asks before payment.
  *   v1.6.0 — 2026-09-28 — aimeat_package_entitlements takes `node` and registers an unknown node as a
@@ -61,6 +62,7 @@ import { refreshInstalledPackages } from '../services/package-upstream-refresh.j
 import { listEntitlements, grantEntitlement, revokeEntitlement } from '../services/package-entitlements.js';
 import { packageConfigNeeds } from '../services/package-config-needs.js';
 import { listSellers, addSeller, removeSeller } from '../services/package-sellers.js';
+import { installSetRepositories } from '../services/install-set-trust.js';
 import { toolError } from './tool-error.js';
 import { PACKAGE_CONFIG_PARAM } from './catalog/definitions/packages.js';
 import { setPackageVersionStatus } from '../services/package-create.js';
@@ -345,7 +347,8 @@ export function registerPackageTools(
     // What POST /v1/instances/check-updates does, for this owner's installs.
     mcp.tool('aimeat_package_check_updates', descriptionFor('aimeat_package_check_updates'), {},
         annotationsFor('aimeat_package_check_updates'), async () => {
-            if (!config.packageFederationEnabled) {
+            // With federation off, the repository an install set named is still a source (install-set-trust.ts).
+            if (!config.packageFederationEnabled && (await installSetRepositories(storage)).size === 0) {
                 return { ...toolError('PACKAGE_FEDERATION_DISABLED', 'This node does not exchange packages with other nodes, so there is no source to check.') };
             }
             const outcomes = await refreshInstalledPackages({ storage, config, peers }, { owner: ownerOf() }, { notify: false });

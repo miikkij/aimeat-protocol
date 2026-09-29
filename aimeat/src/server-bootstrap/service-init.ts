@@ -48,6 +48,8 @@
  *     (services/install-set-startup.ts).
  *   v1.13.0 — 2026-09-29 — The `refinery` schedule kind's executor is registered on the scheduler
  *     (services/refinery/scheduled-job.ts), which the scheduler cannot import without a cycle.
+ *   v1.13.1 — 2026-09-29 — The daily package check also runs with package federation off when an
+ *     applied install set names a repository (services/install-set-trust.ts).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MaintenanceState } from '../storage/interface.js';
@@ -370,7 +372,11 @@ export async function initializeServices(
   // The daily package update check needs the peers, so its handler is registered here rather than
   // with the other core handlers above (services/package-upstream-refresh.ts).
   scheduler.registerCoreHandler('package-upstream-check', async () => {
-    if (!config.packageFederationEnabled) return;
+    // With federation off, the repository an install set named is still checked (install-set-trust.ts).
+    if (!config.packageFederationEnabled) {
+      const { installSetRepositories } = await import('../services/install-set-trust.js');
+      if ((await installSetRepositories(storage)).size === 0) return;
+    }
     const { refreshInstalledPackages } = await import('../services/package-upstream-refresh.js');
     const outcomes = await refreshInstalledPackages({ storage, config, peers }, {}, { notify: true });
     const moved = outcomes.filter(o => o.pulled || o.result === 'updated' || o.result === 'notified').length;

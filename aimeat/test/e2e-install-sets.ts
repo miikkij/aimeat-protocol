@@ -424,7 +424,9 @@ await test('A new node started with an install set links the repository, waits f
         owner: { name: 'dco', email: `dco${ts}@example.org` }, members: [],
         repository: { node_id: R.nodeId, url: R.baseUrl, public_key: card.body.data.public_key },
     })));
-    D = await bootNode(40735, `aimeat-test-001-isnew${ts}`, false, { installSetPath: setFile });
+    // Package federation stays off, as on a node nobody configured beyond its install set: the
+    // repository the set names is reached anyway (services/install-set-trust.ts).
+    D = await bootNode(40735, `aimeat-test-001-isnew${ts}`, false, { installSetPath: setFile, packageFederationEnabled: false });
     // A node booted in this process takes over the token signing the earlier two used, so their
     // tokens are minted again.
     vendorToken = await mintToken(R, `vendor${ts}`);
@@ -454,6 +456,11 @@ await test('A new node started with an install set links the repository, waits f
     const peers = await D.json('/v1/federation/peers', { headers: auth(dToken) });
     const link = (peers.body.data?.peers as any[] ?? []).find((p) => p.node_id === R.nodeId);
     assert(link?.status === 'active', `D links R as an active peer: ${JSON.stringify(peers.body.data).slice(0, 300)}`);
+    // Everything but the named repository stays refused with federation off.
+    const other = await D.json('/v1/federation/packages/pull', {
+        method: 'POST', headers: auth(dToken), body: JSON.stringify({ group_id: 'x::y', source_url: C.baseUrl, trust: 'tofu' }),
+    });
+    assert(other.status === 403 && other.body.error?.code === 'PACKAGE_FEDERATION_DISABLED', `another source is refused: ${other.status} ${JSON.stringify(other.body)}`);
 });
 
 await test('A grant naming a known peer under another key is refused, and grants nothing', async () => {

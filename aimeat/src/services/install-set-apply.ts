@@ -32,6 +32,8 @@
  * @usage
  *   const out = await applyInstallSet({ storage, config, peers }, { installSet, secrets, dryRun: true });
  * @version-history
+ *   v1.1.0 — 2026-09-29 — The apply's pulls say they come from an install set, so the named repository
+ *     is reached with package federation off (install-set-trust.ts); NS_INSTALL_SETS moved there.
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 4).
  */
 import type { AimeatConfig } from '../config.js';
@@ -49,8 +51,11 @@ import { createOrganismRecord } from './organism-lifecycle.js';
 import { provisionWorkspace, checkWorkspaceManifest, type ProvisionWorkspaceInput } from './workspace-provision.js';
 import { deployAppAgent } from './app-agent-deploy.js';
 import { deriveTierFlags } from './federation-tiers.js';
+import { NS_INSTALL_SETS } from './install-set-trust.js';
 
-export const NS_INSTALL_SETS = 'install-sets';
+// The namespace lives with the trust check (install-set-trust.ts), which package-pull.ts reads
+// without importing this file back.
+export { NS_INSTALL_SETS };
 const RECORD_SPEC = 'aimeat.install-set-applied/1';
 
 export interface ApplyDeps { storage: Storage; config: AimeatConfig; peers: Map<string, PeerInfo>; scheduler?: Scheduler }
@@ -147,7 +152,7 @@ async function reach(
     const localGroup = localGroupOf(groupId, owner, !!remote);
     if (remote) {
         const out = await pullPackage({ storage: deps.storage, config: deps.config, peers: deps.peers }, { owner, isOperator: false },
-            { groupId, nodeId: remote.nodeId, ...(version ? { version } : {}), preview });
+            { groupId, nodeId: remote.nodeId, ...(version ? { version } : {}), preview, installSet: true });
         if (!out.ok) return { ok: false, message: `${groupId}: ${out.code}: ${out.message}` };
         if (out.applied === false && out.reason === 'preview') {
             return { ok: true, local: null, components: out.parsed.components as PackageComponent[], version: out.upstream.version };
