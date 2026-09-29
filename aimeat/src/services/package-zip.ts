@@ -26,6 +26,7 @@
  *     column (yamlErrorText, shared with the extension manifest builder) instead of "not valid YAML".
  *   v1.4.0 — 2026-09-28 — `expects` travels in manifest.yaml (package-expects.ts), written only when
  *     there is some; a ZIP had dropped what the package needs the installing node to have.
+ *   v1.5.0 — 2026-09-30 — A `skill` component is written as `components/<id>.json` (its files as JSON).
  */
 
 import { createHash } from 'node:crypto';
@@ -107,6 +108,7 @@ const COMPONENT_EXTENSIONS: Record<PackageComponentType, string> = {
   msm: '.yaml',
   memory: '.json',
   translation: '.json',
+  skill: '.json',
 };
 
 const ZIP_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04]);

@@ -17,6 +17,7 @@
  * @structure packageTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { packageTools } from './tool-call-defs-packages.js';
  * @version-history
+ *   v1.9.0 -- 2026-09-30 -- aimeat_package_compose forwards `include_skills`.
  *   v1.8.0 -- 2026-09-29 -- aimeat_package_sellers (GET, PUT, DELETE /v1/package-sellers).
  *   v1.7.0 -- 2026-09-28 -- aimeat_package_config_needs (GET /v1/packages/:groupId/config-needs).
  *   v1.6.0 -- 2026-09-28 -- aimeat_package_entitlements forwards `node` (packages-only peer registered with a grant).
@@ -131,6 +132,7 @@ export const packageTools: ConnectCliToolDefinition[] = [
             visibility: { type: 'string', enum: ['private', 'public'], description: 'Who may install it. Defaults to private.' },
             status: { type: 'string', enum: ['draft', 'published', 'archived'], description: 'Defaults to published.' },
             include_cortex: { type: 'boolean', description: 'Package the cortexes you installed yourself. Default true.' },
+            include_skills: { type: 'boolean', description: 'Package your own skills bound to these apps. Default true.' },
             allow_expectations: { type: 'boolean', description: 'Compose even when an app calls an extension the package cannot carry.' },
         },
         handler: ({ client }, input) => {
@@ -150,6 +152,8 @@ export const packageTools: ConnectCliToolDefinition[] = [
             if (status !== undefined) body.status = status;
             const includeCortex = optionalBoolean(input, 'include_cortex');
             if (includeCortex !== undefined) body.include_cortex = includeCortex;
+            const includeSkills = optionalBoolean(input, 'include_skills');
+            if (includeSkills !== undefined) body.include_skills = includeSkills;
             const allowExpectations = optionalBoolean(input, 'allow_expectations');
             if (allowExpectations !== undefined) body.allow_expectations = allowExpectations;
             return client.post('/v1/packages/compose', body);

@@ -5,6 +5,7 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-09-30 — The package line says a composed package carries your skills bound to its apps.
  *   2026-09-29 — aimeat_package_sellers: a shop's node sells your packages with no token.
  *   2026-09-28 — aimeat_package_config_needs: the settings a shop asks before the sale.
  *   2026-09-28 — A grant with `node` registers an unknown customer node (install packages, phase 5).
@@ -68,6 +69,9 @@ lists the installed copies and their mode; \`aimeat_package_fork\` makes a manag
 edit, at the same addresses with the same records, and ends its updates. Fork only when the owner asks.
 An install takes \`config\`, each part's values: run it with \`dry_run\` first, and the answer lists every
 field and which required ones are empty, so you ask your owner for them before installing.
+\`aimeat_package_compose\` also carries your own skills bound to the chosen apps. Installing publishes each
+in the installer's skills, bound to their copy of the app; a skill of that name they already have stays
+theirs, and the answer names it in \`warnings\`.
 A package repository is a peer node that serves private packages to the nodes entitled to them:
 \`aimeat_package_repository\` lists what it serves this node, \`aimeat_package_pull\` takes one, and the
 node's daily check (\`aimeat_package_check_updates\` runs it now) pulls newer versions and updates the

@@ -31,6 +31,8 @@
  *   const out = await installOrRequest({ storage, config, scheduler }, caller, { groupId, label });
  *   if (out.ok && out.kind === 'requested') res.status(202).json(success(nodeId, requestedBody(out)));
  * @version-history
+ *   v1.2.0 — 2026-09-30 — A skill component is one of the `memory_parts` the owner is asked about:
+ *     it writes their skill registry, and it costs memory:write (package-memory-component.ts).
  *   v1.1.0 — 2026-09-28 — An install request keeps the `mode` and the `config` it asked for, and the
  *     approval installs with them. An install carrying a secret config value files no request.
  *   v1.0.0 — 2026-09-25 — Initial: package installs by agents become requests.
@@ -147,7 +149,9 @@ async function fileFrom(
     return { ok: true, kind: 'requested', request: filed.request, alreadyWaiting: filed.alreadyWaiting };
 }
 
-const memoryIdsOf = (pkg: PackageRecord): string[] => pkg.components.filter(c => c.type === 'memory').map(c => c.id);
+/** The parts that write into the owner's memory: record sets, and skills (the skill registry is memory). */
+const writesMemory = (type: string | undefined): boolean => type === 'memory' || type === 'skill';
+const memoryIdsOf = (pkg: PackageRecord): string[] => pkg.components.filter(c => writesMemory(c.type)).map(c => c.id);
 
 /** Install, or file a request for the owner when the only thing missing is the caller's words. */
 export async function installOrRequest(
@@ -196,7 +200,7 @@ export async function migrateOrRequest(
         .filter(a => a && typeof a.componentId === 'string' && (MIGRATION_ACTIONS as readonly string[]).includes(a.action))
         .map(a => ({ componentId: a.componentId, action: a.action, ...(typeof a.content === 'string' ? { content: a.content } : {}) }));
     const types = new Map([...out.instance.installedComponents.map(c => [c.componentId, c.type] as const), ...out.target.components.map(c => [c.id, c.type] as const)]);
-    const memoryParts = actions.filter(a => a.action !== 'skip' && types.get(a.componentId) === 'memory').map(a => a.componentId);
+    const memoryParts = actions.filter(a => a.action !== 'skip' && writesMemory(types.get(a.componentId))).map(a => a.componentId);
     return fileFrom(deps, caller, 'migrate', requester, out.missing, out.target, out.instance, { actions }, memoryParts);
 }
 

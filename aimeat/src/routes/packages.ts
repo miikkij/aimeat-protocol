@@ -42,6 +42,8 @@
  *     routes are registered here (routes/package-entitlements.ts).
  *   v2.4.0 — 2026-09-29 — The sale routes are registered here too (routes/package-sales.ts): seller
  *     nodes and their signed requests, with no token.
+ *   v2.5.0 — 2026-09-30 — POST /v1/packages/compose takes `include_skills`: the composer's own skills
+ *     bound to the apps travel as skill components (services/package-skill-component.ts).
  */
 
 import { Router } from 'express';
@@ -115,13 +117,13 @@ export function packagesRouter(
 
     const {
       name, apps, description, category, tags, visibility, status,
-      include_cortex: includeCortex, allow_expectations: allowExpectations,
+      include_cortex: includeCortex, include_skills: includeSkills, allow_expectations: allowExpectations,
     } = req.body ?? {};
 
     const ownerGhii = await resolveGhii(storage, owner, config);
     const out = await composePackageFromApps({ storage, config }, { owner, ownerGhii }, {
       name, apps, description, category, tags, visibility, status,
-      includeCortex, allowExpectations,
+      includeCortex, includeSkills, allowExpectations,
     });
     if (!out.ok) {
       res.status(out.status).json(error(config.nodeId, out.code, out.message));

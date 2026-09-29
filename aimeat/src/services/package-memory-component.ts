@@ -31,6 +31,8 @@
  *   const reserved = reservedKeysInComponent(comp.type, comp.content, registeredAs);
  *   if (reserved.length > 0) return refusal;   // before the first write
  * @version-history
+ *   v1.3.0 — 2026-09-30 — A skill component costs memory:write, what POST /v1/skills asks; an
+ *     ecosystem app is refused it as it is a memory component.
  *   v1.2.0 — 2026-09-25 — A translation component costs nothing beyond packages:write: its one record
  *     is the install's own key. The refusal carries the words it names as `missing`, which an install
  *     request records, and memoryWordsFor() says what the write costs each kind of caller.
@@ -111,14 +113,16 @@ export function memoryWordsFor(caller: ComponentWriteCaller, ownerGhii: string):
  * writes into the owner's namespace from outside it: memoryWordsFor(). An ecosystem app writes only
  * into its own namespace, so it is refused, and `missing` is empty because no word would change that.
  * The owner in person passes, as at every door. A translation component costs nothing here (the file
- * header says why).
+ * header says why). A skill component writes the owner's skill registry, which POST /v1/skills
+ * guards with memory:write alone, so that is what it costs.
  */
 export function memoryComponentWriteRefusal(
     components: Array<{ id: string; type: PackageComponentType }>,
     caller: ComponentWriteCaller,
     ownerGhii: string,
 ): { status: 403; code: 'SCOPE_DENIED' | 'FORBIDDEN'; message: string; missing: string[] } | null {
-    const memory = components.find(c => c.type === 'memory');
+    const writers = components.filter(c => c.type === 'memory' || c.type === 'skill');
+    const memory = writers.find(c => c.type === 'memory') ?? writers[0];
     if (!memory || ownerBypassesScopes(caller)) return null;
     if (caller.roles.includes('ecosystem')) {
         return {
@@ -126,7 +130,8 @@ export function memoryComponentWriteRefusal(
             message: `Component "${memory.id}" writes into the owner's memory, and an ecosystem app writes only into its own.`,
         };
     }
-    const missing = memoryWordsFor(caller, ownerGhii).filter(s => !scopeIsCovered(caller.scopes, s));
+    const words = memory.type === 'memory' ? memoryWordsFor(caller, ownerGhii) : ['memory:write'];
+    const missing = words.filter(s => !scopeIsCovered(caller.scopes, s));
     if (missing.length === 0) return null;
     return {
         status: 403, code: 'SCOPE_DENIED', missing,

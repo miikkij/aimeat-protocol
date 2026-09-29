@@ -27,11 +27,17 @@
  *
  *   Everything not packaged lands in `expects`, which travels on the package record so a person
  *   reading the offer sees what their node must already have.
+ *
+ *   AN APP'S SKILLS TRAVEL WITH IT. The composer's own skills bound to a chosen app become `skill`
+ *   components that depend on it (package-skill-component.ts), so the installer's AI has the
+ *   operating guide for every app it installs. `includeSkills: false` leaves them behind.
  * @structure ComposeExpectations · PackageComposeResult · composePackageFromApps(deps, caller, input)
  * @usage
  *   import { composePackageFromApps } from '../services/package-compose.js';
  *   const out = await composePackageFromApps({ storage, config }, caller, { name, apps });
  * @version-history
+ *   v1.2.0 — 2026-09-30 — The composer's own skills bound to each app travel as `skill` components
+ *     (`includeSkills`, default true), and the notes name them instead of saying they stay behind.
  *   v1.1.0 — 2026-09-12 — PackageComposeCaller loses `sub`: it was forwarded to createPackageGroup
  *     as the fallback identity resolveGhii took, and nothing needs it now.
  *     wish-identity-gate-sees-resolveghii.
@@ -44,6 +50,7 @@ import {
     createPackageGroup, hashContent,
     type PackageWriteResult, type RawComponentInput,
 } from './package-create.js';
+import { boundSkillComponents } from './package-skill-component.js';
 
 /** What the installing node must already have, because this package deliberately does not carry it. */
 export interface ComposeExpectations {
@@ -80,6 +87,8 @@ export interface PackageComposeInput {
     status?: string;
     /** Package the owner's own cortexes too. Default true. */
     includeCortex?: boolean;
+    /** Package the caller's own skills bound to these apps. Default true. */
+    includeSkills?: boolean;
     /** Compose even when an app calls an extension this package cannot carry. Default false. */
     allowExpectations?: boolean;
 }
@@ -148,6 +157,10 @@ export async function composePackageFromApps(
 ): Promise<PackageComposeResult> {
     const { storage, config } = deps;
     const includeCortex = input.includeCortex !== false;
+    const includeSkills = input.includeSkills !== false;
+    /** The composer's own skills bound to the apps, each after the app it binds to. */
+    const skillComponents: RawComponentInput[] = [];
+    const unreadableSkills: string[] = [];
 
     if (!input.name || typeof input.name !== 'string') {
         return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'name is required and must be a string' };
@@ -243,6 +256,14 @@ export async function composePackageFromApps(
             dependencies,
             meta: appMetaOf(app),
         });
+
+        // The app's operating guides: the caller's OWN skills bound to exactly this app, never one
+        // the caller merely can read (package-skill-component.ts).
+        if (includeSkills) {
+            const bound = await boundSkillComponents(storage, caller.ownerGhii, `app:${caller.owner}/${filename}`, filename);
+            for (const s of bound.components) skillComponents.push({ ...s, contentHash: hashContent(s.content) });
+            unreadableSkills.push(...bound.unreadable);
+        }
     }
 
     if (expects.extensions.length > 0 && input.allowExpectations !== true) {
@@ -253,8 +274,9 @@ export async function composePackageFromApps(
         };
     }
 
-    // A cortex registers before the app that names it. sortByDependencies at install time reads this.
-    const components: RawComponentInput[] = [...cortexComponents.values(), ...appComponents];
+    // A cortex registers before the app that names it, and a skill after the app it binds to.
+    // sortByDependencies at install time reads this.
+    const components: RawComponentInput[] = [...cortexComponents.values(), ...appComponents, ...skillComponents];
 
     if (expects.cortex.length > 0) {
         notes.push(`Expects cortexes this node ships: ${expects.cortex.join(', ')}`);
@@ -265,8 +287,17 @@ export async function composePackageFromApps(
     if (expects.extensions.length > 0) {
         notes.push(`Expects extensions installed separately: ${expects.extensions.join(', ')}`);
     }
+    if (skillComponents.length > 0) {
+        notes.push(`Carries the skills bound to these apps: ${skillComponents.map(s => s.label).join(', ')}. `
+            + 'Installing publishes each in the installer\'s own skills, bound to their copy of the app.');
+    } else if (!includeSkills) {
+        notes.push('Skills bound to these apps stay behind (include_skills was false).');
+    }
+    if (unreadableSkills.length > 0) {
+        notes.push(`These bound skills could not be read back and stay behind: ${unreadableSkills.join(', ')}`);
+    }
     // Said out loud because the omission is otherwise found by the installer, not by the author.
-    notes.push('Screenshots, app tools, agent faces, data maps, saved layouts and bound skills stay behind: '
+    notes.push('Screenshots, app tools, agent faces, data maps and saved layouts stay behind: '
         + 'each is addressed by a filename that only exists once the package is installed.');
 
     const written: PackageWriteResult = await createPackageGroup(

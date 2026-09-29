@@ -9,8 +9,12 @@
  *   - Phase 2: compose — components, dedup, dependency order, carried metadata
  *   - Phase 3: install — the composed package registers apps under their own names
  *   - Phase 4: the ZIP round trip keeps the metadata
- *   - Phase 5: refusals (extension, another owner's app, unknown app, no token)
+ *   - Phase 5: updating the whole instance in one act
+ *   - Phase 6: refusals (extension, another owner's app, unknown app, no token)
+ *   - Phase 7: the skills bound to the apps travel, install bound to the installed copy, never
+ *     overwrite the installer's own skill, update, and leave with the uninstall
  * @version-history
+ *   v1.1.0 — 2026-09-30 — Phase 7: a package carries the skills bound to its apps.
  *   v1.0.0 — 2026-09-05 — Initial.
  */
 
@@ -561,9 +565,159 @@ await test('Composing twice under one name is a conflict', async () => {
     assert(status === 409, `expected 409, got ${status}`);
 });
 
+console.log('\nPhase 7 — The skills bound to the apps travel with the package');
+
+// The app's operating guide is a skill bound to it. A package that carried the app without it gave
+// the customer's AI an app it had no instructions for.
+const APP_SKILLED = 'compose-skilled.html';
+const GUIDE = `compose-guide-${stamp}`;
+const CLASH = `compose-clash-${stamp}`;
+const LOOSE = `compose-loose-${stamp}`;
+const SKILL_PKG = `${PKG}-skills`;
+let skillGroupId = '';
+let skillInstanceId = '';
+let installedSkilledFilename = '';
+
+const skillMd = (name: string, binding: string | null, body: string) =>
+    `---\nname: ${name}\ndescription: How to operate the skilled compose fixture (${name}).\n`
+    + (binding ? `metadata:\n  binding: ${binding}\n` : '')
+    + `---\n\n# ${name}\n\n${body}\n`;
+
+async function publishSkillAs(token: string, name: string, binding: string | null, body: string, files?: Record<string, string>) {
+    const res = await json('/v1/skills', {
+        method: 'POST', headers: authed(token),
+        body: JSON.stringify({ skill_md: skillMd(name, binding, body), ...(files ? { files } : {}) }),
+    });
+    assert(res.status === 201, `publish skill ${name}: ${res.status} ${JSON.stringify(res.body)}`);
+}
+
+async function ownSkill(token: string, name: string) {
+    return json(`/v1/skills/${name}?scope=user`, { headers: authed(token) });
+}
+
+await test('The owner publishes an app and two skills bound to it, and one that is bound to nothing', async () => {
+    const pub = await json('/v1/apps', {
+        method: 'POST', headers: authed(ownerToken),
+        body: JSON.stringify({
+            filename: APP_SKILLED, content: b64('<!DOCTYPE html><html><head><title>Skilled</title></head><body><h1>Skilled</h1></body></html>'),
+            name: 'Compose Skilled', description: 'An app with an operating guide', category: 'utility', tags: [],
+        }),
+    });
+    assert(pub.status === 201, `publish app: ${pub.status} ${JSON.stringify(pub.body)}`);
+    const binding = `app:${ownerName}/${APP_SKILLED}`;
+    await publishSkillAs(ownerToken, GUIDE, binding, 'GUIDE-BODY-V1', { 'references/fields.md': 'FIELDS-REFERENCE' });
+    await publishSkillAs(ownerToken, CLASH, binding, 'CLASH-FROM-AUTHOR');
+    await publishSkillAs(ownerToken, LOOSE, null, 'LOOSE-BODY');
+});
+
+await test('Compose carries each bound skill as a component that depends on its app', async () => {
+    const { status, body } = await json('/v1/packages/compose', {
+        method: 'POST', headers: authed(ownerToken),
+        body: JSON.stringify({ name: SKILL_PKG, apps: [APP_SKILLED], visibility: 'public' }),
+    });
+    assert(status === 201, `compose: ${status} ${JSON.stringify(body)}`);
+    skillGroupId = body.data.packageGroupId;
+    const skills = (body.data.components ?? []).filter((c: any) => c.type === 'skill');
+    assert(skills.length === 2, `two skill components, got ${JSON.stringify((body.data.components ?? []).map((c: any) => c.id))}`);
+    const guide = skills.find((c: any) => c.id === `skill-${GUIDE}`);
+    assert(!!guide, `the guide is a component, got ${skills.map((c: any) => c.id).join(', ')}`);
+    assert(JSON.stringify(guide.dependencies) === JSON.stringify([APP_SKILLED]), `depends on the app, got ${JSON.stringify(guide.dependencies)}`);
+    assert(guide.meta?.skill?.bindsTo === APP_SKILLED, `meta.skill.bindsTo, got ${JSON.stringify(guide.meta)}`);
+    const files = JSON.parse(guide.content).files;
+    assert(Object.keys(files).join(',') === 'SKILL.md,references/fields.md', `files in a stable order, got ${Object.keys(files).join(',')}`);
+    assert(files['SKILL.md'].includes('GUIDE-BODY-V1') && files['references/fields.md'] === 'FIELDS-REFERENCE', 'the bodies travel');
+    assert(!(body.data.components ?? []).some((c: any) => c.id === `skill-${LOOSE}`), 'a skill bound to nothing stays behind');
+    assert((body.data.notes ?? []).some((n: string) => n.includes(GUIDE) && n.includes(CLASH)),
+        `the notes name what travelled, got ${JSON.stringify(body.data.notes)}`);
+});
+
+await test('include_skills false leaves the bound skills behind', async () => {
+    const { status, body } = await json('/v1/packages/compose', {
+        method: 'POST', headers: authed(ownerToken),
+        body: JSON.stringify({ name: `${SKILL_PKG}-bare`, apps: [APP_SKILLED], include_skills: false }),
+    });
+    assert(status === 201, `compose: ${status} ${JSON.stringify(body)}`);
+    assert(!(body.data.components ?? []).some((c: any) => c.type === 'skill'), 'no skill component');
+    await json(`/v1/packages/${encodeURIComponent(body.data.packageGroupId)}`, { method: 'DELETE', headers: authed(ownerToken) });
+});
+
+await test('Installing publishes the skill in the installer\'s registry, bound to their copy of the app', async () => {
+    // The installer already has a skill of the clash's name, their own. It must survive the install.
+    await publishSkillAs(otherToken, CLASH, null, 'CLASH-OWN-TO-INSTALLER');
+
+    const { status, body } = await json(`/v1/packages/${encodeURIComponent(skillGroupId)}/install`, {
+        method: 'POST', headers: authed(otherToken), body: JSON.stringify({ label: 'Skilled copy' }),
+    });
+    assert(status === 201, `install: ${status} ${JSON.stringify(body)}`);
+    skillInstanceId = body.data.id;
+    const comps = body.data.installedComponents ?? [];
+    installedSkilledFilename = comps.find((c: any) => c.componentId === APP_SKILLED)?.registeredAs ?? '';
+    assert(!!installedSkilledFilename, 'the app installed');
+    const guideComp = comps.find((c: any) => c.componentId === `skill-${GUIDE}`);
+    assert(guideComp?.registeredAs === GUIDE, `the skill keeps its name, got ${JSON.stringify(guideComp)}`);
+    assert(!comps.some((c: any) => c.componentId === `skill-${CLASH}`), 'the clashing skill is not recorded as installed');
+    assert((body.data.warnings ?? []).some((w: string) => w.includes(CLASH)),
+        `the install says which skill it left alone, got ${JSON.stringify(body.data.warnings)}`);
+
+    const guide = await ownSkill(otherToken, GUIDE);
+    assert(guide.status === 200, `the installer has the guide: ${guide.status} ${JSON.stringify(guide.body)}`);
+    const s = guide.body.data.skill;
+    assert(s.binding === `app:${otherName}/${installedSkilledFilename}`, `bound to the installed copy, got ${s.binding}`);
+    assert(s.visibility === 'owner', `visibility owner, got ${s.visibility}`);
+    assert(s.fromPackage?.groupId === skillGroupId, `tagged with the package, got ${JSON.stringify(s.fromPackage)}`);
+    assert(s.fileContents['SKILL.md'].includes(`binding: app:${otherName}/${installedSkilledFilename}`), 'SKILL.md carries the new binding');
+    assert(s.fileContents['references/fields.md'] === 'FIELDS-REFERENCE', 'the reference file installed');
+
+    const clash = await ownSkill(otherToken, CLASH);
+    assert(clash.body.data?.skill?.fileContents?.['SKILL.md']?.includes('CLASH-OWN-TO-INSTALLER'),
+        `the installer's own skill is untouched, got ${JSON.stringify(clash.body.data?.skill?.fileContents)}`);
+});
+
+await test('An update replaces the package\'s skill and leaves the installer\'s own alone', async () => {
+    const { body } = await json(`/v1/packages/${encodeURIComponent(skillGroupId)}`, { headers: authed(ownerToken) });
+    const components = (body.data.components ?? []).map((c: any) => {
+        if (c.type !== 'skill') return c;
+        const parsed = JSON.parse(c.content);
+        parsed.files['SKILL.md'] = parsed.files['SKILL.md'].replace(/BODY-V1|FROM-AUTHOR/, 'BODY-V2');
+        return { ...c, content: JSON.stringify(parsed) };
+    });
+    const ver = await json(`/v1/packages/${encodeURIComponent(skillGroupId)}/versions`, {
+        method: 'POST', headers: authed(ownerToken),
+        body: JSON.stringify({ changelog: 'guide v2', components, status: 'published' }),
+    });
+    assert(ver.status === 201, `publish version: ${ver.status} ${JSON.stringify(ver.body)}`);
+
+    const up = await json(`/v1/instances/${skillInstanceId}/update`, {
+        method: 'POST', headers: authed(otherToken), body: JSON.stringify({}),
+    });
+    assert(up.status === 200, `update: ${up.status} ${JSON.stringify(up.body)}`);
+    assert((up.body.data.applied?.failedComponents ?? []).length === 0, `nothing failed, got ${JSON.stringify(up.body.data.applied)}`);
+
+    const guide = await ownSkill(otherToken, GUIDE);
+    assert(guide.body.data.skill.fileContents['SKILL.md'].includes('GUIDE-BODY-V2'), 'the guide took the new version');
+    assert(guide.body.data.skill.binding === `app:${otherName}/${installedSkilledFilename}`, 'and is still bound to the installed copy');
+    const clash = await ownSkill(otherToken, CLASH);
+    assert(clash.body.data.skill.fileContents['SKILL.md'].includes('CLASH-OWN-TO-INSTALLER'), 'the installer\'s own skill is still theirs');
+});
+
+await test('Uninstalling removes the package\'s skill and only that one', async () => {
+    const del = await json(`/v1/instances/${skillInstanceId}`, {
+        method: 'DELETE', headers: authed(otherToken), body: JSON.stringify({ removeComponents: true }),
+    });
+    assert(del.status === 200, `uninstall: ${del.status} ${JSON.stringify(del.body)}`);
+    assert((await ownSkill(otherToken, GUIDE)).status === 404, 'the package\'s skill is gone');
+    const clash = await ownSkill(otherToken, CLASH);
+    assert(clash.status === 200 && clash.body.data.skill.fileContents['SKILL.md'].includes('CLASH-OWN-TO-INSTALLER'),
+        'the installer\'s own skill of the same name stays');
+    assert((await ownSkill(ownerToken, GUIDE)).status === 200, 'the author\'s skill was never touched');
+});
+
 console.log('\nCleanup');
 await json(`/v1/packages/${encodedGroupId}`, { method: 'DELETE', headers: authed(ownerToken) });
 await json(`/v1/cortex/${encodeURIComponent(CORTEX)}`, { method: 'DELETE', headers: authed(ownerToken) });
+if (skillGroupId) await json(`/v1/packages/${encodeURIComponent(skillGroupId)}`, { method: 'DELETE', headers: authed(ownerToken) });
+for (const name of [GUIDE, CLASH, LOOSE]) await json(`/v1/skills/${name}`, { method: 'DELETE', headers: authed(ownerToken) });
+await json(`/v1/skills/${CLASH}`, { method: 'DELETE', headers: authed(otherToken) });
 
 console.log(`\n📊 Results: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

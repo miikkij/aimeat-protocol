@@ -32,6 +32,8 @@
  * @usage
  *   import { publishSkill, resolveSkillRef, listSkillLibrary } from '../services/skills.js';
  * @version-history
+ *   v1.5.0 -- 2026-09-30 -- `fromPackage` on the manifest and the summary: the package install that
+ *     published a user skill (package-skill-component.ts). A republish without it keeps the tag.
  *   v1.4.0 -- 2026-09-29 -- TARGET-082 V4: every user and workspace record a list or a resolve returns
  *     (manifests, file bodies, version snapshots) passes the accessor's ContentReader through
  *     showSkillRecords (skill-reader.ts). A manifest the reader may not see reads as not found; a
@@ -72,6 +74,9 @@ interface SkillVersionSnapshot {
   files: Record<string, string>;
 }
 
+/** Which package install published a skill: the package group and the installed copy. */
+export interface SkillPackageTag { groupId: string; instanceId: string }
+
 
 // ── Stored shapes ──
 
@@ -91,6 +96,8 @@ export interface SkillManifestValue {
    *  (a ref such as `user:alice/new-name`, or a bare name in the same registry), so the
    *  registry knows a skill is retired instead of the reader having to spot it in prose. */
   supersededBy?: string;
+  /** Installed by a package (package-skill-component.ts); kept across the owner's own republish. */
+  fromPackage?: SkillPackageTag;
   /** File index (paths + sizes) — bodies live in the per-file records, never here. */
   files: Array<{ path: string; size: number }>;
   /** GAII/GHII that performed the (last) publish. */
@@ -117,6 +124,8 @@ export interface SkillSummary {
   binding?: string;
   /** The skill that replaces this one, when it is retired (frontmatter metadata.superseded_by). */
   supersededBy?: string;
+  /** The package install that published this skill; only such a skill is replaced or removed by it. */
+  fromPackage?: SkillPackageTag;
   /** Node scope: shipped with this build and kept in step by the seeder (a stamp record exists). */
   builtin?: boolean;
   /** Library view with links: the accessor's own agents that link this skill, with the ref they
@@ -176,6 +185,7 @@ function toSummary(record: MemoryRecord, scope: SkillScope, owner: string | null
   if (v.metadata) summary.metadata = v.metadata;
   if (v.binding) summary.binding = v.binding;
   if (v.supersededBy) summary.supersededBy = v.supersededBy;
+  if (v.fromPackage) summary.fromPackage = v.fromPackage;
   return summary;
 }
 
@@ -249,6 +259,8 @@ export interface PublishSkillOpts {
   organismId?: string;
   workspaceId?: string;
   accessor?: SkillAccessor;
+  /** User scope: the package install publishing this skill. Absent keeps the tag the skill had. */
+  fromPackage?: SkillPackageTag;
 }
 
 export async function publishSkill(
@@ -349,6 +361,9 @@ export async function publishSkill(
   if (parsed.frontmatter.metadata) manifest.metadata = parsed.frontmatter.metadata;
   if (typeof binding === 'string') manifest.binding = binding;
   if (typeof supersededBy === 'string') manifest.supersededBy = supersededBy;
+  // The owner editing a package's skill keeps it the package's: the update sees the edit, the uninstall removes it.
+  const fromPackage = opts.fromPackage ?? (opts.scope === 'user' ? existingValue?.fromPackage : undefined);
+  if (fromPackage) manifest.fromPackage = fromPackage;
 
   const ownExisting = await storage.getMemory(ownerGaii, mKey);
   const record = await storage.setMemory({

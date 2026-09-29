@@ -6,6 +6,8 @@
  *   src/storage/types/apps.ts, which had passed the 800-line limit; re-exported from
  *   src/storage/interface.ts like every other types file.
  * @version-history
+ *   v1.1.0 — 2026-09-30 — PackageComponentType gains `skill`: a package carries the skills bound to its
+ *     apps (wish-a-package-carries-the-skills-bound-to-its-apps).
  *   v1.0.0 — 2026-09-28 — Pure extraction from src/storage/types/apps.ts (max-file-lines), in the
  *     change that gave PackageInstanceRecord `mode` and `forkedAt`.
  */
@@ -13,7 +15,12 @@
 // ── Packages & Templates ────────────────────────────────────────────
 
 /** Shared type alias for all AIMEAT component types that can be included in a package. */
-export type PackageComponentType = 'csm' | 'extension' | 'cortex' | 'app' | 'msm' | 'memory' | 'translation';
+/**
+ * `skill`: an app's operating guide, a SKILL.md pack bound to one app component of the same package
+ * (services/package-skill-component.ts). The installer publishes it in their own skill registry,
+ * bound to their installed copy of that app.
+ */
+export type PackageComponentType = 'csm' | 'extension' | 'cortex' | 'app' | 'msm' | 'memory' | 'translation' | 'skill';
 
 /**
  * What an `app` component carries besides its bytes, so an installed app is not a nameless blob.

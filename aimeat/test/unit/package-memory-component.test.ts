@@ -10,6 +10,8 @@
  *   E2E half is e2e-package-components Part H.
  * @usage pnpm exec vitest run test/unit/package-memory-component.test.ts
  * @version-history
+ *   v1.2.0 — 2026-09-30 — A skill component costs memory:write. Failed on the old code, which let it
+ *     through with no word at all.
  *   v1.1.0 — 2026-09-25 — A translation component costs nothing extra; the refusal carries the words
  *     it names as `missing`, which an install request records. Both failed on the old code: the
  *     translation was refused, and the refusal had no `missing`.
@@ -73,6 +75,20 @@ describe('memoryComponentWriteRefusal', () => {
         const both = memoryComponentWriteRefusal([{ id: 'fi', type: 'translation' }, ...MEMORY], agent(['packages:write']), OWNER);
         expect(both?.code).toBe('SCOPE_DENIED');
         expect(both?.message).toContain('Component "seed"');
+    });
+
+    it('a skill component costs memory:write, what POST /v1/skills asks of every caller', () => {
+        const SKILL = [{ id: 'skill-guide', type: 'skill' as const }];
+        const out = memoryComponentWriteRefusal(SKILL, agent(['packages:write']), OWNER);
+        expect(out?.code).toBe('SCOPE_DENIED');
+        expect(out?.missing).toEqual(['memory:write']);
+        expect(out?.message).toContain('Component "skill-guide"');
+        expect(memoryComponentWriteRefusal(SKILL, agent(['packages:write', 'memory:write']), OWNER)).toBeNull();
+        expect(memoryComponentWriteRefusal(SKILL, appGrant(['packages:write', 'memory:write']), OWNER)).toBeNull();
+        expect(memoryComponentWriteRefusal(SKILL, { roles: ['owner'], scopes: [], sub: 'alice' }, OWNER)).toBeNull();
+        // Beside a memory component, the memory component decides, and asks for more.
+        expect(memoryComponentWriteRefusal([...SKILL, ...MEMORY], agent(['packages:write', 'memory:write']), OWNER)?.missing)
+            .toEqual(['memory:write-as-owner']);
     });
 
     it('memoryWordsFor: what writing the owner\'s memory costs each kind of caller', () => {

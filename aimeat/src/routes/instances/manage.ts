@@ -6,6 +6,8 @@
  *   check-update diff, instance details, and instance removal (optional component cleanup).
  *   Extracted from src/routes/instances.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-09-30 — DELETE with removeComponents removes a skill component only when this
+ *     instance published it (services/package-skill-component.ts).
  *   v1.4.0 — 2026-09-28 — PATCH /v1/instances/:id (label, auto_update) and POST /v1/instances/check-updates
  *     (services/package-upstream-refresh.ts), install packages phase 3.
  *   v1.3.0 — 2026-09-28 — POST /v1/instances/:id/fork: a managed install becomes editable in place and
@@ -226,10 +228,13 @@ export function registerManageRoutes(
     if (removeComponents) {
       // Delete all installed components in reverse dependency order
       const reversedComponents = [...instance.installedComponents].reverse();
+      // A skill goes only when this instance published it; the owner's own skill of that name stays.
+      const pkgRef = { config, groupId: instance.packageGroupId, instanceId: instance.id };
       for (const ic of reversedComponents) {
-        const deleted = await deleteComponent(storage, ic.type, ic.registeredAs, ownerGaii);
+        const deleted = await deleteComponent(storage, ic.type, ic.registeredAs, ownerGaii, pkgRef);
         if (deleted) componentsRemoved++;
       }
+      if (reversedComponents.some(ic => ic.type === 'skill')) emitChange('skills');
     }
 
     const deleted = await storage.deleteInstance(id);

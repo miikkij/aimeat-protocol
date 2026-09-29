@@ -6,6 +6,8 @@
  *   itself (dry_run validation, component registration, @activate-cron firing, rollback on failure)
  *   lives in the service, so this door and the MCP tool run the same code.
  * @version-history
+ *   v1.9.0 — 2026-09-30 — The 201 answer carries `warnings` when the install left out a skill because
+ *     the owner has one of that name of their own (services/package-skill-component.ts).
  *   v1.8.0 — 2026-09-28 — The body takes `mode` (managed | editable) and `config` (each part's config),
  *     handed to the service unchanged.
  *   v1.7.0 — 2026-09-25 — An agent or an app grant lacking the words a memory part needs gets 202 and
@@ -88,7 +90,8 @@ export function registerInstallRoutes(
       return;
     }
 
-    res.status(201).json(success(config.nodeId, out.instance, [
+    // `warnings` names a skill the install left out because the owner has one of that name of their own.
+    res.status(201).json(success(config.nodeId, { ...out.instance, ...(out.warnings.length ? { warnings: out.warnings } : {}) }, [
       { description: 'View instance', method: 'GET', url: `/v1/instances/${out.instance.id}` },
       { description: 'Check component status', method: 'GET', url: `/v1/instances/${out.instance.id}/status` },
     ]));
