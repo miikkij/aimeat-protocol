@@ -7,6 +7,9 @@
  *   process/port waiting, server start and stop.
  * @usage Imported by test/run-e2e-ci.ts. Not a suite; it runs nothing on its own.
  * @version-history
+ *   v1.6.0 -- 2026-09-26 -- ANONYMOUS_OFF_SUITES: the credential suites get a node started with
+ *            AIMEAT_ANONYMOUS=false, the setting production runs. pinnedEnv and startServer take the
+ *            suite name to choose the setting; every other suite keeps anonymous mode on.
  *   v1.5.0 -- 2026-09-13 -- Retain the last log lines independently of pipe chunk boundaries.
  *   v1.4.0 -- 2026-09-13 -- startServer keeps the tail of STDOUT as well as stderr, and names the
  *            port and backend. Winston writes every level to stdout, so the boot's own refusals
@@ -166,7 +169,37 @@ export async function ensureDatabase(base: RunnerTarget, lane: RunnerTarget): Pr
     }
 }
 
-export function pinnedEnv(target: RunnerTarget): Record<string, string> {
+/**
+ * The suites whose node starts with AIMEAT_ANONYMOUS=false, the setting production runs. Every other
+ * suite gets anonymous mode on (the runner's default below).
+ *
+ * With anonymous mode on, a request whose credential is refused falls back to the anonymous
+ * identity, so a suite that asserts a refusal can stay green while the credential check itself
+ * accepts what it should refuse. These suites prove the credential checks, so they run against the
+ * production setting. A suite joins the list the way a suite joins the guard tier: alone, on a
+ * freshly deleted database, three consecutive identical green runs on both backends with the
+ * setting off.
+ */
+export const ANONYMOUS_OFF_SUITES: readonly string[] = [
+    'e2e-security',
+    'e2e-account-doors',
+    'e2e-owner-deactivation',
+    'e2e-app-grants',
+    'e2e-mcp',
+    'e2e-agent-v2',
+];
+
+/** AIMEAT_ANONYMOUS for the node a suite runs against: 'false' for a listed suite, else the default. */
+export function anonymousModeFor(suite?: string): string {
+    if (suite && ANONYMOUS_OFF_SUITES.includes(suite)) return 'false';
+    return process.env.AIMEAT_ANONYMOUS ?? 'true';
+}
+
+/**
+ * Everything the runner decides for the node under test. `suite` is the suite's file name without
+ * `.ts`; it selects the anonymous-mode setting, and nothing else depends on it.
+ */
+export function pinnedEnv(target: RunnerTarget, suite?: string): Record<string, string> {
     return {
         AIMEAT_PORT: target.port,
         // Force the test server's public base URL to the local address. Otherwise a
@@ -243,7 +276,8 @@ export function pinnedEnv(target: RunnerTarget): Record<string, string> {
         AIMEAT_CONNECT_FAKE_BASE_URL: process.env.AIMEAT_CONNECT_FAKE_BASE_URL ?? 'http://127.0.0.1:40388',
         // The fake provider lives on loopback, which safeFetch refuses by default and must.
         AIMEAT_ALLOW_PRIVATE_EGRESS: process.env.AIMEAT_ALLOW_PRIVATE_EGRESS ?? 'true',
-        AIMEAT_ANONYMOUS: process.env.AIMEAT_ANONYMOUS ?? 'true',
+        // Off for the credential suites (ANONYMOUS_OFF_SUITES above), on for the rest.
+        AIMEAT_ANONYMOUS: anonymousModeFor(suite),
         AIMEAT_FEDERATION_AUTH_POLICY: process.env.AIMEAT_FEDERATION_AUTH_POLICY ?? 'all_peers',
         // Finvoice delivery uses the in-process mock operator in every e2e run so the
         // submit/refresh loop is provable without an operator account.
@@ -668,11 +702,11 @@ const SERVER_EXIT_TIMEOUT_MS = 10_000;
 const PORT_FREE_TIMEOUT_MS = 15_000;
 const SERVER_READY_TIMEOUT_MS = 60_000;
 
-export async function startServer(target: RunnerTarget): Promise<ChildProcess> {
+export async function startServer(target: RunnerTarget, suite?: string): Promise<ChildProcess> {
     await requirePortFree(Number(target.port), PORT_FREE_TIMEOUT_MS, 'the runner asked to start a server on it');
     authLogs.delete(target);
 
-    const env = { ...process.env, ...pinnedEnv(target) };
+    const env = { ...process.env, ...pinnedEnv(target, suite) };
     const serverArgs = [...nodeEntryArgs(), 'start', '--db', target.dbType];
     if (target.dbType === 'sqlite') {
         serverArgs.push('--db-path', target.dbPath);
