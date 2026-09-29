@@ -60303,6 +60303,8 @@ paths:
       description: |
         Sends a password reset code to the account's verified email (no auth). Always returns the
         same response regardless of whether the account exists, to avoid account enumeration.
+        The code is valid for 10 minutes, and only the newest code works: a new request expires
+        the codes sent before it. The username is taken case-insensitively.
       requestBody:
         required: false
         content:

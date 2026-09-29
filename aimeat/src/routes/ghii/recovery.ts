@@ -6,6 +6,10 @@
  *   POST /v1/ghii/email/verify, /email/confirm, /password/reset-request, /password/reset,
  *   /password/change, /account/recover. Extracted from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-09-29 — Password reset: only the newest code works (earlier pending codes expire
+ *     at the request; SQLite had checked the OLDEST, so asking twice made the newest mail's code
+ *     INVALID_CODE), the mail is the reset template instead of the email-verification one, and the
+ *     username is taken lower-case in both steps. Found by the shop's test on a sold customer node.
  *   v1.2.0 — 2026-08-11 — Security audit H-1/H-7: the password and the recovery address are behind
  *     requireOwnerPrincipal(). H-5 stopped a repointed address from opening the reset rail on the
  *     PREVIOUS address's verification mark; it left the loop, because the principal that repointed
@@ -31,6 +35,7 @@ import { rateLimit } from '../../middleware/rate-limit.js';
 import { isValidEmail } from '../../utils/email-validator.js';
 import { logger } from '../../utils/logger.js';
 import { appendMailLog } from '../../services/notification-settings.js';
+import { passwordResetEmail } from '../../services/email-template-reset.js';
 import { validatePasswordStrength } from '../../utils/password-validation.js';
 import { promoteContactsForVerifiedEmail } from '../../services/contacts.js';
 
@@ -201,9 +206,9 @@ export function registerRecoveryRoutes(
 
     // POST /v1/ghii/password/reset-request — Request password reset (NO auth)
     router.post('/v1/ghii/password/reset-request', rateLimit({ max: 3, windowMs: 10 * 60 * 1000 }), async (req, res) => {
-        const { username } = req.body ?? {};
+        const rawUsername = (req.body ?? {}).username;
 
-        if (!username || typeof username !== 'string') {
+        if (!rawUsername || typeof rawUsername !== 'string') {
             // Always return same response to not reveal if account exists
             res.json(success(config.nodeId, {
                 ok: true,
@@ -211,6 +216,8 @@ export function registerRecoveryRoutes(
             }));
             return;
         }
+        // Account names are stored lower-case; the reset below looks the code up by this same form.
+        const username = rawUsername.trim().toLowerCase();
 
         const ghii = `${username}@${config.nodeId}`;
         const ghiiRecord = await storage.getGHII(ghii);
@@ -220,6 +227,16 @@ export function registerRecoveryRoutes(
             const codeHash = createHash('sha256').update(code).digest('hex');
             const now = new Date().toISOString();
             const verId = randomBytes(16).toString('hex');
+
+            // ONLY THE NEWEST CODE WORKS. A person who asks twice has two codes in the mailbox, and
+            // the reset reads one pending code: SQLite took the OLDEST (no ORDER BY), so the code in
+            // the newest mail was refused as INVALID_CODE (found on a sold customer node,
+            // 2026-09-29). Earlier codes expire here, so the answer is the same on both backends.
+            for (let i = 0; i < 20; i++) {
+                const older = await storage.getActiveEmailVerification(username, 'password_reset');
+                if (!older) break;
+                await storage.updateEmailVerification(older.id, { status: 'expired' });
+            }
 
             await storage.createEmailVerification({
                 id: verId,
@@ -234,7 +251,10 @@ export function registerRecoveryRoutes(
                 verifiedAt: null,
             });
 
-            const sent = await emailService.sendVerificationCode(ghiiRecord.notificationEmail, code, ghiiRecord.locale);
+            // The reset template, not the email-verification one: that mail said "verify your email
+            // address" under the same subject as the sign-up code (email-template-reset.ts).
+            const m = passwordResetEmail(code, ghiiRecord.locale);
+            const sent = await emailService.sendRaw(ghiiRecord.notificationEmail, m.subject, m.html, m.text);
             if (sent) {
                 await appendMailLog(storage, ghiiRecord.ghii, { kind: 'password_reset', subject: 'password reset code' });
                 logger.info('Password reset code sent successfully');
@@ -254,12 +274,13 @@ export function registerRecoveryRoutes(
 
     // POST /v1/ghii/password/reset — Reset password with code (NO auth)
     router.post('/v1/ghii/password/reset', rateLimit({ max: 3, windowMs: 10 * 60 * 1000 }), async (req, res) => {
-        const { username, code, newPassword } = req.body ?? {};
+        const { username: rawUsername, code, newPassword } = req.body ?? {};
 
-        if (!username || typeof username !== 'string') {
+        if (!rawUsername || typeof rawUsername !== 'string') {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'username is required'));
             return;
         }
+        const username = rawUsername.trim().toLowerCase();
         if (!code || typeof code !== 'string') {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'code is required'));
             return;
