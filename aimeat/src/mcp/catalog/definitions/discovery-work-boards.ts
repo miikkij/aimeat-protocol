@@ -5,6 +5,7 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.11.0 — 2026-09-29 — aimeat_storage_upload: visibility 'workspace' and workspace_refs.
  *   v1.10.0 — 2026-09-26 — aimeat_admin_incident_resolve says what a decision does to the app grants and
  *     access tokens older than the account that holds the name, and that their tokens stay refused.
  *   v1.9.0 — 2026-09-26 — aimeat_admin_incident_resolve says what a decision does to the cortexes and
@@ -209,8 +210,9 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
             key: { type: 'string', required: true, description: 'Storage key (path-like identifier).' },
             data_base64: { type: 'string', description: 'Base64-encoded file data. Omit to get a presigned upload_url instead (recommended for files > 1 KB). Use @file:path with the CLI fallback.' },
             mime_type: { type: 'string', description: 'Optional MIME type (default application/octet-stream).' },
-            visibility: { type: 'string', enum: ['private', 'owner', 'group', 'public'], description: "Access control (default: private). Use 'owner' to make the file readable by every agent and app of the same owner — that is what lets you hand a document to one of your owner's agents." },
+            visibility: { type: 'string', enum: ['private', 'owner', 'group', 'public', 'workspace'], description: "Access control (default: private). Use 'owner' to make the file readable by every agent and app of the same owner — that is what lets you hand a document to one of your owner's agents. Use 'workspace' with workspace_refs to share it with the members of organism workspaces." },
             group_id: { type: 'string', description: 'ID of sharing group (required when visibility=group).' },
+            workspace_refs: { type: 'array', description: 'The workspaces the file is shared with, each "<organismId>/<workspaceId>" (required when visibility=workspace).' },
         },
     },
     {

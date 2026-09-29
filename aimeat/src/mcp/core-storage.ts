@@ -16,6 +16,8 @@
  *   import { registerCoreStorageTools } from './core-storage.js';
  *   registerCoreStorageTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.1.0 — 2026-09-29 — aimeat_storage_upload takes visibility 'workspace' with workspace_refs,
+ *     the binding POST /v1/storage takes; it had no way to name a workspace.
  *   v1.0.0 — 2026-07-26 — Extracted from src/mcp/core.ts together with the reference-read change.
  *   v1.1.0 — 2026-09-29 — aimeat_storage_download resolves with the agent's classification reader (TARGET-082).
  *   v1.1.0 — 2026-08-11 — aimeat_storage_upload stores through services/storage-file-write.ts, the
@@ -42,6 +44,7 @@ import type { Storage } from '../storage/interface.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { localAccountName } from '../utils/gaii.js';
 import { writeStorageFile, mintStorageUploadUrl, removeStorageFile } from '../services/storage-file-write.js';
+import { normalizeWorkspaceRefs } from '../utils/workspace-ref.js';
 import { resolveFileRef, handleFromResolved } from '../services/file-refs.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
 import { versionedAddress } from '../utils/http-range.js';
@@ -75,17 +78,21 @@ export function registerCoreStorageTools(
             key: z.string().describe('Storage key (path-like identifier)'),
             data_base64: z.string().optional().describe('Base64-encoded file data. Omit to get an upload URL instead (recommended for files > 1KB).'),
             mime_type: z.string().optional().describe('MIME type (default: application/octet-stream)'),
-            visibility: z.enum(['private', 'owner', 'group', 'public']).optional().describe('Access control (default: private)'),
+            visibility: z.enum(['private', 'owner', 'group', 'public', 'workspace']).optional().describe('Access control (default: private)'),
             group_id: z.string().optional().describe('ID of sharing group for group visibility'),
+            workspace_refs: z.array(z.string()).optional().describe('For visibility "workspace": the workspaces the file is shared with, each "<organismId>/<workspaceId>"'),
         },
         annotationsFor('aimeat_storage_upload'),
-        async ({ key, data_base64, mime_type, visibility, group_id }) => {
+        async ({ key, data_base64, mime_type, visibility, group_id, workspace_refs }) => {
             const deps = { storage, config, emitResourceUpdated, emitResourceListChanged };
+            // The same binding POST /v1/storage takes; the shared write refuses a workspace file
+            // that names none.
+            const workspaceRef = visibility === 'workspace' ? normalizeWorkspaceRefs(workspace_refs, undefined) || undefined : undefined;
 
             // --- UPLOAD MODE ---
             if (!data_base64) {
                 const minted = await mintStorageUploadUrl(deps, agentGaii, {
-                    key, mimeType: mime_type, visibility, groupId: group_id,
+                    key, mimeType: mime_type, visibility, groupId: group_id, workspaceRef,
                 });
                 if (!minted.ok) {
                     return { content: [{ type: 'text' as const, text: minted.message }], isError: true };
@@ -119,7 +126,7 @@ export function registerCoreStorageTools(
             }
 
             const written = await writeStorageFile(deps, agentGaii, {
-                key, data: fileData, mimeType: mime_type, visibility, groupId: group_id,
+                key, data: fileData, mimeType: mime_type, visibility, groupId: group_id, workspaceRef,
             });
             if (!written.ok) {
                 // Only the per-file ceiling has an answer the caller can act on. Offering the

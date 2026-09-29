@@ -696,10 +696,10 @@
      "slug": "g-5-files",
      "cells": [
       "<strong>Files</strong>",
-      "Upload up to 10 MB in one go or 5 GB in chunks (both set by the operator), resume downloads, set visibility per file. A file you download cannot run as a page on the node's address.",
+      "Upload up to 10 MB in one go or 5 GB in chunks (both set by the operator), resume downloads, set visibility per file. A file can be shared with a group or with the members of organism workspaces, in one piece or in chunks, from an app (<code>AIMEAT.storage</code>) or an AI (<code>aimeat_storage_upload</code>). A file you download cannot run as a page on the node's address.",
       "<code>/v1/storage</code>, <code>aimeat_storage_*</code>"
      ],
-     "plain": "Files Upload up to 10 MB in one go or 5 GB in chunks (both set by the operator), resume downloads, set visibility per file. A file you download cannot run as a page on the node's address. /v1/storage, aimeat_storage_*"
+     "plain": "Files Upload up to 10 MB in one go or 5 GB in chunks (both set by the operator), resume downloads, set visibility per file. A file can be shared with a group or with the members of organism workspaces, in one piece or in chunks, from an app (AIMEAT.storage) or an AI (aimeat_storage_upload). A file you download cannot run as a page on the node's address. /v1/storage, aimeat_storage_*"
     },
     {
      "slug": "g-5-presigned-uploads",

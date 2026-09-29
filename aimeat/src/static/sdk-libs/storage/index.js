@@ -11,6 +11,10 @@
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-storage.js"></script>
  *   await AIMEAT.storage.upload(file); await AIMEAT.storage.download('key');
  * @version-history
+ *   v1.3.0 — 2026-09-29 — upload() and uploadChunked() send the group or workspace a file is shared
+ *     with (group_id, workspace_ref, workspaceRefs). They sent only key, data, type and visibility,
+ *     so a 'workspace' file was refused for naming no workspace and apps posted to /v1/storage
+ *     themselves (aimeat-apps wish, LÄHETIN 4.8.0).
  *   v1.2.0 — 2026-09-13 — viewUrl() reads a `<gaii>/<key>` reference as an owner and a key, the way
  *     the server's parseFileRef does. It used to file the whole reference as a key under the
  *     signed-in person, so a picture an agent had uploaded answered 404 for its own owner.
@@ -24,8 +28,26 @@ import { makeSession } from '../_core/session.js';
 const { getSession, authFetch } = makeSession('aimeat-storage.js');
 import { attach } from '../_core/namespace.js';
 
+/**
+ * The group or workspace a file is shared with, in the node's field names. A 'group' file names its
+ * group (opts.group_id), a 'workspace' file one or more workspaces as "<organismId>/<workspaceId>"
+ * (opts.workspace_ref, a string, or opts.workspaceRefs, a list). Without them the node refuses a
+ * 'workspace' file and stores a 'group' file bound to nobody.
+ */
+function binding(opts) {
+  const o = opts || {};
+  const refs = o.workspaceRefs || o.workspace_refs;
+  return {
+    group_id: o.group_id || o.groupId,
+    workspace_ref: o.workspace_ref || o.workspaceRef,
+    workspace_refs: Array.isArray(refs) ? refs : undefined,
+  };
+}
+
 const storage = {
-  // Upload a file (File object, Blob, or base64 string)
+  // Upload a file (File object, Blob, or base64 string). opts: key, mime_type, visibility
+  // ('private' | 'owner' | 'group' | 'public' | 'workspace'), and for a shared file group_id or
+  // workspace_ref / workspaceRefs.
   async upload(fileOrData, opts) {
     let key, data, mime_type, visibility;
 
@@ -54,7 +76,7 @@ const storage = {
 
     const res = await authFetch('/v1/storage', {
       method: 'POST',
-      body: JSON.stringify({ key, data, mime_type, visibility }),
+      body: JSON.stringify({ key, data, mime_type, visibility, ...binding(opts) }),
     });
     if (!res.ok) throw new Error(res.error?.message || 'Upload failed');
     return res.data;
@@ -181,7 +203,7 @@ const storage = {
     // Init
     const initRes = await authFetch('/v1/storage/upload/init', {
       method: 'POST',
-      body: JSON.stringify({ key, mime_type, visibility, chunk_size: chunkSize, total_chunks: totalChunks }),
+      body: JSON.stringify({ key, mime_type, visibility, chunk_size: chunkSize, total_chunks: totalChunks, ...binding(opts) }),
     });
     if (!initRes.ok) throw new Error(initRes.error?.message || 'Chunked upload init failed');
     const uploadId = initRes.data.upload_id;

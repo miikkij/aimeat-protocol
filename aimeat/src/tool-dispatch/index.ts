@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Shared REST tool dispatch for node invoke, connector MCP and CLI.
  * @version-history
+ *   v1.5.0 -- 2026-09-29 -- storageCliTools: the storage tools moved out of tool-call-defs-core.ts.
  *   v1.4.0 -- 2026-09-29 -- classificationCliTools: aimeat_classification (TARGET-082 V5).
  *   v1.3.0 -- 2026-09-29 -- refineryCliTools: aimeat_refinery_classes, _run and _status.
  *   v1.2.0 -- 2026-09-28 -- aiModelCliTools: aimeat_ai_policy_set on the shell dispatch.
@@ -15,6 +16,7 @@ import type { ConnectCliToolDefinition } from './tool-call-helpers.js';
 
 import { agentTools } from './tool-call-defs-agent.js';
 import { coreTools } from './tool-call-defs-core.js';
+import { storageCliTools } from './tool-call-defs-storage.js';
 import { boardTools } from './tool-call-defs-boards.js';
 import { skillTools } from './tool-call-defs-skills.js';
 import { secretTools } from './tool-call-defs-secrets.js';
@@ -48,6 +50,7 @@ import { withProvenanceCarrying } from './ai-provenance-carry.js';
 export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...agentTools,
     ...coreTools,
+    ...storageCliTools,
     ...boardTools,
     ...skillTools,
     ...secretTools,

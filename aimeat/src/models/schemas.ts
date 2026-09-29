@@ -15,6 +15,8 @@
  *   - validateBody(schema, nodeId): Express middleware wiring a schema to the request pipeline
  *
  * @version-history
+ *   Chunked upload binding — 2026-09-29 — ChunkedUploadInitSchema takes 'workspace' visibility and
+ *     group_id / workspace_ref / workspace_refs, the binding POST /v1/storage already took.
  *   Semantic prefixes — 2026-09-08 — SemanticAnnotationSchema refuses a prefix no @context defines.
  *     It was `.passthrough()` with nothing checked, so `{"@type": "foo:Bar"}` was stored and served
  *     as though it meant something; it expands to nothing in any JSON-LD processor.
@@ -323,8 +325,13 @@ export const ChunkedUploadInitSchema = z.object({
     key: z.string().min(1).max(256),
     mime_type: z.string().min(1),
     chunk_size: z.number().int().positive(),
-    visibility: z.enum(['private', 'owner', 'group', 'public']).optional(),
+    visibility: z.enum(['private', 'owner', 'group', 'public', 'workspace']).optional(),
     total_chunks: z.number().int().positive().optional(),
+    // The same binding POST /v1/storage takes (2026-09-29): a 'group' file names its group, a
+    // 'workspace' file its workspaces as "<organismId>/<workspaceId>".
+    group_id: z.string().min(1).max(200).optional(),
+    workspace_ref: z.string().min(1).max(2000).optional(),
+    workspace_refs: z.array(z.string().min(1).max(200)).max(50).optional(),
 });
 
 // ── Schema Locking (Phase 0.1) ──────────────────────────────
