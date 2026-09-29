@@ -23,6 +23,8 @@
  *     573704db10ed).
  *   v1.5.0 — 2026-09-29 — An `ai` job reads its inputs through readAiRecords (services/ai-inputs.ts):
  *     the credential mask it lacked, and the classification check (TARGET-082).
+ *   v1.6.0 — 2026-09-29 — An `ai` job reads its inputs as an unattended AI run (ai-jobs/starter.ts
+ *     unattendedReader), not as the node's own reader (TARGET-082 V4).
  */
 import type { AimeatConfig } from '../config.js';
 import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
@@ -34,7 +36,7 @@ import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { buildGEAI, isSameOwner, localAccountName } from '../utils/gaii.js';
 import { aiJobKeyRefusal } from './ai-job-keys.js';
 import { readAiRecords } from './ai-inputs.js';
-import { systemReader } from './classification/reader.js';
+import { unattendedReader } from './ai-jobs/starter.js';
 
 /**
  * `ai` kind: gather predefined input memory keys, compose the prompt, run a
@@ -77,8 +79,9 @@ export async function runAiJob(storage: Storage, config: AimeatConfig, job: Sche
     reads.push(ns === owner ? key : `${ns}::${key}`);
   }
   // The one loader of what a model reads (services/ai-inputs.ts): the credential mask and the
-  // classification check, with the node's own reader since a schedule has no caller (TARGET-082).
-  const inputs = await readAiRecords({ storage, config }, systemReader({ storage, config }, owner), owner, named, { capability: 'text' });
+  // classification check. A schedule fires with nobody present, so it always reads as an unattended
+  // AI run (TARGET-082 V4, decided 2026-09-29), whoever saved it.
+  const inputs = await readAiRecords({ storage, config }, unattendedReader({ storage, config }, owner), owner, named, { capability: 'text' });
   for (const { key, value } of inputs) {
     const valueText = value === undefined
       ? '(empty)'

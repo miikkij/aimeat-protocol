@@ -15,13 +15,15 @@
  *   proposal, and a person accepts or rejects it in their own session; an AI cannot accept it, even
  *   with the person's words, which are kept on the proposal as its reason. Every change is kept in
  *   the level's history (the last 50).
- * @structure PolicyView · readPolicy() · writePolicy() · reviewPolicy()
+ * @structure PolicyView · readPolicy() · writePolicy() · reviewPolicy() · readAuditLog()
  * @usage
  *   const out = await writePolicy(deps, actor, 'owner', null, { enabled: true });
  * @version-history
+ *   v1.1.0 — 2026-09-29 — V4: readAuditLog, the audit log per level.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V2. Initial.
  */
-import type { Storage } from '../../storage/interface.js';
+import type { Storage, ClassificationAuditRow } from '../../storage/interface.js';
+import { listClassificationAuditMerged } from './audit.js';
 import { agentBarred } from '../organism-agent-access.js';
 import { isOrgManager } from '../workspace-access.js';
 import type { ClassificationPolicy } from './defaults.js';
@@ -163,6 +165,28 @@ export async function writePolicy(
   const history = [...rec.history, { at, by: actor.principal, source, action: 'set' as const, humanSaid, loosens: loosens.length ? loosens : undefined }].slice(-HISTORY);
   await store(deps.storage, home.owner, home.key, { policy: next, history, proposal: rec.proposal }, at);
   return { applied: true, loosens, view: await view(deps, level, subject) };
+}
+
+/**
+ * The audit log of one level: an owner's own content, an organism's content (its creator or an
+ * admin), or the whole node (an operator). Newest first, waiting rows included.
+ */
+export async function readAuditLog(
+  deps: ClassificationDeps, actor: LabelActor, level: PolicyLevel, organismId: string | null | undefined,
+  filter: { since?: string; action?: string; limit?: number } = {},
+): Promise<{ level: PolicyLevel; subject: string; rows: ClassificationAuditRow[] }> {
+  const subject = subjectOf(level, actor, organismId, deps.config.nodeId);
+  if (level === 'owner') {
+    if (actor.kind === 'rule') throw new ClassificationError('PERSON_REQUIRED', 403, 'A detection rule reads no log.');
+  } else {
+    await mayWrite(deps, actor, level, subject);
+  }
+  const limit = Math.min(Math.max(Number(filter.limit) || 200, 1), 1000);
+  const rows = await listClassificationAuditMerged(deps.storage, {
+    ...(level === 'owner' ? { ownerGaii: subject } : level === 'organism' ? { scope: `organism:${subject}` } : {}),
+    since: filter.since, action: filter.action, limit,
+  });
+  return { level, subject, rows };
 }
 
 /** A person accepts or rejects the AI's waiting proposal, in their own session. */

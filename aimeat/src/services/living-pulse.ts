@@ -14,7 +14,14 @@
  *   - scanAllDue(storage, config) — scheduler entrypoint: pulse every due instance across all owners
  *   - scanOwnerDue(storage, config, ownerGaii) — pulse the owner's own due instances (manual trigger)
  *   - pulseInstanceServer(storage, config, ownerGaii, loc, cfg) — one instance, self-fulfilled
+ *
+ *   CLASSIFICATION OF SOURCE COPIES (TARGET-082 V4): a `living-src` copy written here inherits the
+ *   strictest label of the items it was copied from (living-source-labels.ts). A source whose label
+ *   rises later does not raise its copies yet: a background pass raises copies when a source rises (V4, later).
  * @version-history
+ *   v1.5.0 — 2026-09-29 — A source copy inherits the strictest classification of its sources, set as a
+ *     rule label after the copy is written; a labelling failure logs a warning (TARGET-082 V4).
+ *     readDeliverable names the key it read, so the folded copy knows its source.
  *   v1.4.0 — 2026-09-29 — The gather step searches with a system classification reader, and the derive
  *     step asks useForAi for the sources it sends to the model (TARGET-082).
  *   v1.3.1 — 2026-09-26 — The owner's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
@@ -38,6 +45,7 @@ import { completeForOwner, AiCompletionError } from './ai-completion.js';
 import { librarianSearch } from './librarian.js';
 import { systemReader } from './classification/reader.js';
 import { memoryTarget } from './classification/labels.js';
+import { inheritSourceLabels, type SourceCopy } from './living-source-labels.js';
 import type { PushService } from './push.js';
 import type { EmailService } from './email.js';
 import { emitDelivery } from './event-bus.js';
@@ -168,9 +176,12 @@ function evaluateDue(cfg: Record<string, unknown>, wsItems: WsItem[], now = Date
   return false;
 }
 
-async function addSrc(storage: Storage, ownerGaii: string, loc: Loc, slot: string, src: { text: string; origin?: string; producer?: string | null }): Promise<void> {
+/** Write one source copy and answer its key, so the caller can label it after its sources. */
+async function addSrc(storage: Storage, ownerGaii: string, loc: Loc, slot: string, src: { text: string; origin?: string; producer?: string | null }): Promise<string> {
   const id = 's-' + Math.random().toString(36).slice(2, 10);
-  await upsert(storage, ownerGaii, srcKey(loc, id), { id, slot, text: src.text, origin: src.origin || '', producer: src.producer ?? null, active: true, addedAt: new Date().toISOString() });
+  const key = srcKey(loc, id);
+  await upsert(storage, ownerGaii, key, { id, slot, text: src.text, origin: src.origin || '', producer: src.producer ?? null, active: true, addedAt: new Date().toISOString() });
+  return key;
 }
 
 /** Create a queued offer task for a section's agent (fire-and-forget; the running crew picks it up). */
@@ -194,18 +205,19 @@ async function dispatchAgentTask(storage: Storage, config: AimeatConfig, ownerGa
 }
 
 /** Read a completed task's deliverable from the agent's memory (deliverableKey, then task tag, then
- *  longest *output value) — mirrors the client getDeliverableContent. */
-async function readDeliverable(storage: Storage, task: AgentTaskRecord): Promise<string | null> {
+ *  longest *output value) — mirrors the client getDeliverableContent. Answers the text and the agent
+ *  memory key it came from (the copy's source for classification). */
+async function readDeliverable(storage: Storage, task: AgentTaskRecord): Promise<{ text: string; key: string } | null> {
   if (task.deliverableKey) {
     const m = await storage.getMemory(task.agentGaii, task.deliverableKey);
-    if (m?.value != null) return typeof m.value === 'string' ? m.value : JSON.stringify(m.value, null, 2);
+    if (m?.value != null) return { text: typeof m.value === 'string' ? m.value : JSON.stringify(m.value, null, 2), key: m.key };
   }
   const items = await storage.listMemory(task.agentGaii);
   const tag = `task:${task.id}`;
   const cand = items.filter(i => (i.tags || []).includes(tag) || /latest_output$/.test(i.key));
   const pick = cand.sort((a, b) => (typeof b.value === 'string' ? b.value.length : 0) - (typeof a.value === 'string' ? a.value.length : 0))[0];
   if (!pick?.value) return null;
-  return typeof pick.value === 'string' ? pick.value : JSON.stringify(pick.value, null, 2);
+  return { text: typeof pick.value === 'string' ? pick.value : JSON.stringify(pick.value, null, 2), key: pick.key };
 }
 
 /** Handle an agent-backed section across pulses: dispatch a task, wait, then fold its deliverable.
@@ -225,7 +237,10 @@ async function handleAgentSection(
     if (!task) { await clear(); return 'failed'; }
     if (task.status === 'done') {
       const content = await readDeliverable(storage, task);
-      if (content) await addSrc(storage, ownerGaii, loc, slot, { text: content, origin: task.deliverableKey || `task:${task.id}`, producer: task.agentGaii });
+      if (content) {
+        const key = await addSrc(storage, ownerGaii, loc, slot, { text: content.text, origin: task.deliverableKey || `task:${task.id}`, producer: task.agentGaii });
+        await inheritSourceLabels({ storage, config }, ownerGaii, [{ key, sources: [memoryTarget(task.agentGaii, content.key)] }]);
+      }
       await addLedger(storage, ownerGaii, loc, { event: 'agent-folded', slot });
       await clear();
       return content ? 'folded' : 'failed';
@@ -261,6 +276,7 @@ export async function pulseInstanceServer(
       if (r !== 'folded') continue;   // dispatched / waiting / failed → nothing new to derive this pulse
     } else {
       // 1. Gather from the owner's own material.
+      const copies: SourceCopy[] = [];
       try {
         const { hits } = await librarianSearch(storage, config, {
           ownerName, fanOutOwner: true, viewerGaii: ownerGaii,
@@ -272,9 +288,13 @@ export async function pulseInstanceServer(
         const seen = new Set(items.map(i => (i.value as { origin?: string })?.origin).filter(Boolean));
         for (const h of hits) {
           if (h.key === configKey(loc) || seen.has(h.key)) continue;
-          await addSrc(storage, ownerGaii, loc, slot, { text: h.snippet || h.title || h.key, origin: h.key, producer: h.producer || null });
+          const key = await addSrc(storage, ownerGaii, loc, slot, { text: h.snippet || h.title || h.key, origin: h.key, producer: h.producer || null });
+          copies.push({ key, sources: [memoryTarget(h.ownerGaii, h.key)] });
         }
       } catch (err) { logger.warn('charter: gather best-effort', { error: String(err) }); }
+      // Every copy written above, also when a later write failed, takes the strictest label of what
+      // it was copied from (V4). inheritSourceLabels never throws.
+      await inheritSourceLabels({ storage, config }, ownerGaii, copies);
     }
 
     // 2. Re-derive from active sources.

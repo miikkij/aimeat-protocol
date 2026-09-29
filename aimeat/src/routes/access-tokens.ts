@@ -11,6 +11,8 @@
  *   POST/GET/DELETE /v1/access/tokens (owner) + POST /v1/auth/token/exchange (token is the auth).
  * @usage app.use(accessTokensRouter(config, storage));
  * @version-history
+ * v1.3.0 - 2026-09-29 - The exchanged JWT carries the `via: 'pat'` claim, so classification reads it as
+ *   an AI (TARGET-082 V4). Roles and scopes are unchanged.
  * v1.2.0 - 2026-09-05 - The overview carries the sign-in state, the open sessions grouped, the
  *   accounts connected elsewhere and the base package (AccessTabService v2), and opens to a principal
  *   holding account:security as well as the owner, so aimeat_access_list on the connector and CLI
@@ -199,6 +201,9 @@ export function accessTokensRouter(config: AimeatConfig, storage: Storage): Rout
         node: config.nodeId,
         roles: r.roles,
         ...(includeScopes ? { scopes: r.scopes } : {}),
+        // The mark the auth middleware sets on a raw PAT, carried into the JWT made from it, so
+        // classification reads this session as an AI (reader-kind.ts). It grants nothing.
+        via: 'pat',
       }, config.accessTtlSeconds);
 
       res.set('Cache-Control', 'no-store');

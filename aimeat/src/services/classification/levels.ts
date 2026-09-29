@@ -224,8 +224,15 @@ export function validateNodePolicy(input: unknown): ClassificationPolicy {
   if (!active.has(defaultLabel)) problems.push('defaultLabel names an active label.');
   const aiMode = readAiMode(input.aiMode, problems) ?? 'suggest';
   const aiThreshold = readThreshold(input.aiThreshold, problems) ?? 0.85;
+  let auditRetentionDays: number | null = 365;
+  if (input.auditRetentionDays === null) auditRetentionDays = null;
+  else if (input.auditRetentionDays !== undefined) {
+    const d = input.auditRetentionDays;
+    if (typeof d === 'number' && Number.isInteger(d) && d >= 1 && d <= 36_500) auditRetentionDays = d;
+    else problems.push('auditRetentionDays is a whole number of days from 1 to 36500, or null to keep every row.');
+  }
   if (problems.length) throw new PolicyError('INVALID_POLICY', problems);
-  return { labels: labels.sort((a, b) => a.rank - b.rank), rules, limits, defaultLabel, aiMode, aiThreshold };
+  return { labels: labels.sort((a, b) => a.rank - b.rank), rules, limits, defaultLabel, aiMode, aiThreshold, auditRetentionDays };
 }
 
 // ── A lower level ────────────────────────────────────────────────────────────────────────────────
@@ -382,6 +389,7 @@ export function mergePolicy(node: ClassificationPolicy, layer?: PolicyLayer | nu
     defaultLabel: layer.defaultLabel && rank(layer.defaultLabel) > rank(node.defaultLabel) ? layer.defaultLabel : node.defaultLabel,
     aiMode: stricterMode,
     aiThreshold: Math.max(node.aiThreshold, layer.aiThreshold ?? 0),
+    auditRetentionDays: node.auditRetentionDays,
   };
 }
 
@@ -409,5 +417,7 @@ export function loosenings(
   if (rankOf(after.defaultLabel) < beforeRank(before.defaultLabel)) out.push(`The default label goes from ${before.defaultLabel} to the less sensitive ${after.defaultLabel}.`);
   if (AI_MODE[after.aiMode] < AI_MODE[before.aiMode]) out.push(`The AI mode goes from ${before.aiMode} to ${after.aiMode}.`);
   if (after.aiThreshold < before.aiThreshold) out.push(`The AI confidence threshold goes down from ${before.aiThreshold} to ${after.aiThreshold}.`);
+  const keep = (d: number | null | undefined) => (d === null ? Infinity : d ?? 365);
+  if (keep(after.auditRetentionDays) < keep(before.auditRetentionDays)) out.push(`The audit log keeps its rows for ${after.auditRetentionDays} days instead of ${before.auditRetentionDays ?? 'ever'}.`);
   return out;
 }

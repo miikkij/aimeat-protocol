@@ -24,6 +24,8 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   v1.15.0 — 2026-09-29 — registerAiJobTools receives the session's scopes, recorded on a started job
+ *     so the job reads its inputs as the agent (TARGET-082 V4).
  *   v1.14.0 — 2026-09-29 — registerRefineryTools (aimeat_refinery_classes, _run, _status).
  *   v1.13.0 — 2026-09-28 — registerAdminInstallSetTools (aimeat_admin_install_set).
  *   v1.12.0 — 2026-09-28 — registerAiCapabilityTools (aimeat_ai_capabilities, aimeat_ai_models,
@@ -205,7 +207,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerAgentTaskTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerAgentScheduleTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     registerWorkflowTools(mcp, storage, config, agentGaii, scopes);
-    registerAiJobTools(mcp, storage, config, agentGaii);
+    registerAiJobTools(mcp, storage, config, agentGaii, scopes);
     registerDecideTools(mcp, storage, config, agentGaii);
     registerAiVoiceTools(mcp, storage, config, agentGaii);
     registerAiPolicyTools(mcp, storage, config, agentGaii);

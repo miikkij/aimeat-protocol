@@ -7,6 +7,7 @@
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
  *   v1.1.0 — 2026-07-16 — listConsentsForAgents batch primitive.
  *   v1.2.0 — 2026-09-29 — deleteOrganism removes the classification labels of the organism's content.
+ *   v1.3.0 — 2026-09-29 — deleteOrganism removes the classification audit log of the organism's content.
  *   v1.2.0 — 2026-07-23 — listOrganisms member-scoped queries return ALL matches (no default 20-item page cap).
  *   v1.3.0 — 2026-08-23 — consentFacets(), the node-wide SQL roll-up the compliance report reads (BR-02).
  *   v1.4.0 — 2026-09-09 — updateCsm deleted: no caller.
@@ -492,6 +493,8 @@ export const governanceMethods = {
       }
       // The classification labels on the organism's content go with it (TARGET-082).
       this.db.prepare('DELETE FROM content_labels WHERE scope = ?').run(`organism:${id}`);
+      // So does the classification audit log of that content (TARGET-082 V4).
+      this.db.prepare('DELETE FROM classification_audit WHERE scope = ?').run(`organism:${id}`);
 
       const result = this.db.prepare('DELETE FROM organisms WHERE id = ?').run(id);
       return result.changes > 0;

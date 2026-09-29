@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description `aimeat start` / `serve` runtime: asset self-heal, server listen + banner, WebSocket upgrade routing (personal tunnel / connector tunnel / realtime P2P + echat), and graceful shutdown. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-09-29 — Graceful shutdown flushes the classification audit buffer (TARGET-082 V4).
  *   v1.3.0 — 2026-09-26 — A WebSocket upgrade runs as this node (runAsNode, utils/gaii.ts), so it
  *     answers for this node also in a process that serves more than one node. The handler body is
  *     onUpgrade, unchanged. One node per process in production, so nothing there changes.
@@ -488,6 +489,8 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
     await shutdownWriteTallyBuffer();
     const { shutdownConsentAuditBuffer } = await import('./services/consent-audit-buffer.js');
     await shutdownConsentAuditBuffer();
+    const { shutdownClassificationAudit } = await import('./services/classification/audit.js');
+    await shutdownClassificationAudit();
     const { shutdownCache } = await import('./services/cache.js');
     shutdownCache();
     if (tunnelManager) await tunnelManager.shutdown();

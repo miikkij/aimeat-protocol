@@ -26,6 +26,8 @@
  *   const actor = labelActorOf(req.auth!, config.nodeId);
  *   await setLabel({ storage, config }, actor, memoryTarget(owner, key), { label: 'luottamuksellinen' });
  * @version-history
+ *   v1.2.0 — 2026-09-29 — V4: a label change goes to the audit log, and nobody sets a label whose
+ *     reader audience leaves them out (AUDIENCE_LOCKOUT).
  *   v1.1.0 — 2026-09-29 — V2: targetOf and readContentLabel, shared by the REST route and the MCP tool.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V1. Initial.
  */
@@ -37,6 +39,8 @@ import { agentBarred } from '../organism-agent-access.js';
 import { labelById, type ClassificationLabel, type ClassificationPolicy } from './defaults.js';
 import { policyFor, scopeOrganism, scopeOwner } from './policy.js';
 import { readerKindOf } from './reader-kind.js';
+import { audienceCheck } from './audience.js';
+import { recordClassificationAudit } from './audit.js';
 
 export class ClassificationError extends Error {
   constructor(public code: string, public status: number, message: string) {
@@ -171,6 +175,17 @@ export async function setLabel(
   const lowering = !!from && next.rank < from.rank;
   const at = (deps.now ?? (() => new Date().toISOString()))();
   const row: ContentLabelRow = prev ? { ...prev, history: [...prev.history] } : blankRow(target, policy, at, actor.principal);
+  // Whoever sets a label with a reader audience must be inside it (spec §4.1): nobody locks
+  // themselves out of their own content. A rule is the policy's own and has no self to lock out.
+  if (actor.kind !== 'rule' && next.audience
+    && !(await audienceCheck(deps.storage, { owner: actor.ownerGhii, ownerName: actor.ownerName })(next.audience, target.scope))) {
+    throw new ClassificationError('AUDIENCE_LOCKOUT', 400,
+      `"${next.name.en}" limits who may read the content, and you are not among them, so this would lock you out. Add yourself to the label's audience first, or pick another label.`);
+  }
+  const changed = (source: ContentLabelRow['source']) => recordClassificationAudit({
+    scope: target.scope, ownerGaii: scopeOwner(target.scope), kind: target.kind, key: target.key, label: next.id,
+    reader: actor.principal, readerKind: actor.kind === 'rule' ? 'system' : actor.kind, action: 'changed', purpose: `${fromId} → ${next.id} (${source})`,
+  });
 
   const asPerson = actor.kind === 'human' || (actor.kind === 'ai' && !!humanSaid);
   if (asPerson) {
@@ -183,6 +198,7 @@ export async function setLabel(
     row.justification = justification; row.humanSaid = humanSaid; row.setBy = actor.principal; row.updatedAt = at;
     row.history.push({ at, by: actor.principal, source, action: 'set', from: fromId, to: next.id, justification, humanSaid });
     await deps.storage.putContentLabel(row);
+    if (next.id !== fromId) changed(source);
     return { applied: true, label: next.id, from: fromId, source, locked: true };
   }
 
@@ -206,6 +222,7 @@ export async function setLabel(
     row.justification = null; row.humanSaid = null; row.setBy = actor.principal; row.updatedAt = at;
     row.history.push({ at, by: actor.principal, source, action: 'set', from: fromId, to: next.id, confidence, reason: reason ?? undefined });
     await deps.storage.putContentLabel(row);
+    changed(source);
     return { applied: true, label: next.id, from: fromId, source, locked: false };
   }
   row.suggestion = { label: next.id, by: actor.principal, at, source, confidence, reason: reason ?? undefined, why: pending };

@@ -11,6 +11,8 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   v1.8.0 — 2026-09-29 — consent-audit-prune also prunes the classification audit log past the
+ *     retention in the node's classification policy (TARGET-082 V4).
  *   v1.7.0 — 2026-09-28 — ai-catalog-refresh: the model catalogue from its public sources, when due.
  *   v1.6.0 — 2026-09-25 — usage-visit-retention: an app open older than thirteen months keeps its
  *     count and loses the visitor's account, as the privacy notice says.
@@ -64,7 +66,12 @@ export function registerCoreHandlers(
   });
   if (config.consentEnabled) {
     scheduler.registerCoreHandler('consent-expiry', () => runConsentExpiryJob(storage));
-    scheduler.registerCoreHandler('consent-audit-prune', () => runConsentAuditPruneJob(config, storage));
+    // The same nightly job prunes the classification audit log, each by its own retention. The
+    // second runs even when the first throws.
+    scheduler.registerCoreHandler('consent-audit-prune', async () => {
+      try { await runConsentAuditPruneJob(config, storage); }
+      finally { await runClassificationAuditPruneJob(config, storage); }
+    });
   }
   if (config.personalNodesEnabled) {
     scheduler.registerCoreHandler('mailbox-cleanup', () => runMailboxCleanupJob(storage));
@@ -354,4 +361,19 @@ async function runConsentAuditPruneJob(config: AimeatConfig, storage: Storage): 
   const cutoff = new Date(Date.now() - days * 86400000).toISOString();
   const pruned = await storage.pruneConsentAudit(cutoff);
   if (pruned > 0) logger.info(`Pruned ${pruned} consent-audit entries older than ${days} days`);
+}
+
+/**
+ * The classification audit log (TARGET-082 V4) past the node operator's retention. The days come
+ * from the node's classification policy: a number of days, or null to keep every row. A policy
+ * stored before the field existed has no value and gets the default, 365.
+ */
+async function runClassificationAuditPruneJob(config: AimeatConfig, storage: Storage): Promise<void> {
+  const { readNodePolicy } = await import('./classification/policy.js');
+  const { pruneClassificationAuditOlderThan } = await import('./classification/audit.js');
+  const policy = await readNodePolicy(storage, config.nodeId);
+  const stored = (policy as { auditRetentionDays?: number | null }).auditRetentionDays;
+  const days = stored === undefined ? 365 : stored;
+  const pruned = await pruneClassificationAuditOlderThan(storage, days);
+  if (pruned > 0) logger.info(`Pruned ${pruned} classification-audit rows older than ${days} days`);
 }

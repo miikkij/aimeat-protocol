@@ -512,6 +512,23 @@ export interface AiDecision {
   subject: string | null;
 }
 
+export interface ClassificationAudit {
+  action: string;
+  count: Generated<number>;
+  firstAt: string;
+  id: string;
+  key: string;
+  kind: string;
+  label: string;
+  lastAt: string;
+  minute: string;
+  ownerGaii: string | null;
+  purpose: string | null;
+  reader: string;
+  readerKind: string;
+  scope: string;
+}
+
 export interface ContentLabel {
   history: Json;
   humanSaid: string | null;
@@ -2316,6 +2333,7 @@ export interface DB {
   AiProvenance: AiProvenance;
   AiDecision: AiDecision;
   ContentLabel: ContentLabel;
+  ClassificationAudit: ClassificationAudit;
   App: App;
   AppDownload: AppDownload;
   AppDraft: AppDraft;

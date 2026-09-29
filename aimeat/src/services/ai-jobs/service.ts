@@ -22,6 +22,9 @@
  *   const service = new AiJobService(config, storage);
  *   await service.startJob({ prompt, result_key }, { ownerGhii, createdBy });
  * @version-history
+ *   v1.6.0 — 2026-09-29 — A job records who started it (`started_by`, from ctx.startedBy) and its
+ *     prompt is assembled with that starter's reader; a job with none reads as an AI (starter.ts,
+ *     TARGET-082 V4).
  *   v1.5.0 — 2026-09-29 — The prompt is assembled with the node's classification reader (TARGET-082).
  *   v1.4.0 — 2026-09-28 — A job may name a `role`, the AI role its call runs as; op.ts refuses one that
  *     is not a string of 1 to 300 characters, before the record exists.
@@ -53,7 +56,7 @@ import { aiJobKeyRefusal } from '../ai-job-keys.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { assembleJobPrompt } from './prompt.js';
-import { systemReader } from '../classification/reader.js';
+import { jobReader } from './starter.js';
 import { fireOnDone } from './on-done.js';
 import { aiOpOf, aiOpRefusal } from './op.js';
 import { runJobOp, assertAudioInReach } from './run-op.js';
@@ -136,7 +139,9 @@ export class AiJobService implements AiJobStarter {
         // INVALID_BODY when there is no prompt at all and AI_JOB_PROMPT_TOO_LARGE when the assembly is
         // over the cap. A transcription has no prompt: its read is the audio file's metadata, which
         // answers 404 for a key that is not in the owner's own storage.
-        const prompt = await this.prepareInput(ownerGhii, { ...input, op });
+        const prompt = await this.prepareInput(ownerGhii, {
+            ...input, op, ...(ctx.startedBy ? { started_by: ctx.startedBy } : {}),
+        });
 
         // ── nothing above this line has written anything ──
 
@@ -166,6 +171,7 @@ export class AiJobService implements AiJobStarter {
             ...(ctx.parentJob ? { parent_job: ctx.parentJob } : {}),
             queued_at: now,
             created_by: ctx.createdBy,
+            ...(ctx.startedBy ? { started_by: ctx.startedBy } : {}),
         };
 
         const queuePosition = this.pool.positionIfEnqueued();
@@ -442,16 +448,17 @@ export class AiJobService implements AiJobStarter {
      * the same reads.
      */
     private async prepareInput(
-        ownerGhii: string, spec: Pick<AiJobRecord, 'op' | 'prompt' | 'prompt_key' | 'input_keys' | 'audio_key'>,
+        ownerGhii: string,
+        spec: Pick<AiJobRecord, 'op' | 'prompt' | 'prompt_key' | 'input_keys' | 'audio_key' | 'started_by'>,
     ): Promise<string> {
         const deps = { storage: this.storage, config: this.config };
         if (aiOpOf(spec.op) === 'transcribe') {
             await assertAudioInReach(deps, ownerGhii, spec.audio_key ?? '');
             return '';
         }
-        // A job runs with no caller present: the node's own classification reader, whose useForAi
-        // still refuses content a model may not read (TARGET-082).
-        return assembleJobPrompt(deps, systemReader(deps, ownerGhii), ownerGhii, spec);
+        // The job reads as whoever started it; a job with no starter recorded reads as an unattended
+        // AI run (starter.ts). The same reader at the start and when a restart rebuilds the prompt.
+        return assembleJobPrompt(deps, jobReader(deps, { owner: ownerGhii, started_by: spec.started_by }), ownerGhii, spec);
     }
 
     /**

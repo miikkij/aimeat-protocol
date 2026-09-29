@@ -13,6 +13,7 @@
  *   defaultPolicy() · labelById()
  * @usage import { defaultPolicy } from './defaults.js';
  * @version-history
+ *   v1.2.0 — 2026-09-29 — V4: auditRetentionDays on the node's policy.
  *   v1.1.0 — 2026-09-29 — V2: a label's reader audience, a rule's scope and the classifier kind, and
  *     the per-level limits.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V1. Initial.
@@ -87,6 +88,9 @@ export interface ClassificationPolicy {
    *  above `aiThreshold` confidence applies; anything else waits. */
   aiMode: 'off' | 'suggest' | 'auto';
   aiThreshold: number;
+  /** How many days the audit log keeps its rows; null keeps them. Set by the operator (decided
+   *  2026-09-29: optional, default 365). Only the node level carries it. */
+  auditRetentionDays: number | null;
 }
 
 export const DEFAULT_LABELS: readonly ClassificationLabel[] = [
@@ -150,6 +154,7 @@ export function defaultPolicy(): ClassificationPolicy {
     defaultLabel: 'sisainen',
     aiMode: 'suggest',
     aiThreshold: 0.85,
+    auditRetentionDays: 365,
   };
 }
 

@@ -8,11 +8,12 @@
  *   `{ configured: true }`, services/secret-records.ts). Before this file, the mask was applied at
  *   21 places one by one and was missing from six more; a check added the same way would have had
  *   the same holes.
- * @structure presentMemories(reader, records) · presentMemory(reader, record)
+ * @structure presentMemories(reader, records) · presentMemory(reader, record) · classificationWarningOf(record)
  * @usage
  *   const shown = await presentMemories(reader, items);
  *   res.json({ items: shown.map(r => ({ key: r.key, value: r.value })) });
  * @version-history
+ *   v1.1.0 — 2026-09-29 — V4: classificationWarningOf, for answers that pick fields.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V1. Initial.
  */
 import { shownMemoryValue } from '../secret-records.js';
@@ -30,6 +31,12 @@ export interface PresentableMemory {
 export async function presentMemories<T extends PresentableMemory>(reader: ContentReader, records: readonly T[]): Promise<T[]> {
   const shown = await reader.show(records, r => memoryTarget(r.ownerGaii, r.key));
   return shown.map(r => ({ ...r, value: shownMemoryValue(r.key, r.value) }));
+}
+
+/** The warning reader.show put on a record, for an answer that lists its fields one by one. */
+export function classificationWarningOf(record: object): { label: string; name: string; says: string } | null {
+  const w = (record as { classificationWarning?: { label: string; name: string; says: string } }).classificationWarning;
+  return w ?? null;
 }
 
 /** One record, or null when this reader may not see it. */

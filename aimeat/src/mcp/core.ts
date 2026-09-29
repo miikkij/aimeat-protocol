@@ -11,6 +11,7 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.30.0 — 2026-09-29 — aimeat_memory_read carries classification_warning for a warning-classified value (TARGET-082 V4).
  *   v1.29.0 — 2026-09-29 — aimeat_memory_read, aimeat_memory_list and aimeat_discover pass the
  *     classification reader (TARGET-082); values through presentMemory. The memory and storage resource templates moved
  *     to mcp/core-resources.ts unchanged but for the same reader (max-file-lines).
@@ -151,7 +152,7 @@ import { flexibleBoolean } from './schema-flags.js';
 import { resolveMcpWriteTarget } from '../routes/memory/owner-target.js';
 import { versionConflict } from './memory-version-lock.js';
 import { writeMemoryRecord } from '../services/memory-write.js';
-import { presentMemory } from '../services/classification/present-memory.js';
+import { presentMemory, classificationWarningOf } from '../services/classification/present-memory.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { memoryTarget } from '../services/classification/labels.js';
 import { registerCoreResources } from './core-resources.js';
@@ -426,6 +427,8 @@ export function registerCoreTools(
                 // it". The caller has already passed the read gate above; provenance travels with the
                 // content it describes.
                 ...(await readProvenance(storage, config, record.aiProvenanceId)),
+                // TARGET-082 V4: a warning-classified value travels with its warning.
+                ...(classificationWarningOf(record) ? { classification_warning: classificationWarningOf(record) } : {}),
             });
         },
     );

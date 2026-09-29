@@ -6,6 +6,8 @@
  *   domain and the outbound door). Split from schema-tables-3.ts at the max-file-lines
  *   boundary; idempotent (IF NOT EXISTS), applied after part 3.
  * @version-history
+ *   v1.12.0 — 2026-09-29 — classification_audit table: the classification audit log (TARGET-082 V4).
+ *     Mirrors Postgres 0091.
  *   v1.11.0 — 2026-09-29 — content_labels table: classification labels (TARGET-082). Mirrors Postgres 0090.
  *   v1.10.0 — 2026-09-25 — Three partial indexes over the app opens that still name an account, for
  *     the thirteen-month visit fold. Mirrors Postgres 0082.
@@ -727,6 +729,32 @@ export function applySchemaTables4(db: Database.Database): void {
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_content_labels_target ON content_labels(kind, scope, key);
     CREATE INDEX IF NOT EXISTS idx_content_labels_owner ON content_labels(ownerGaii);
+
+    -- ── Classification audit log (TARGET-082 V4) ──
+    -- One row per (minute, reader, action, scope, kind, key) with a count, so repeated reads in one
+    -- minute are one row. Written in batches by services/classification/audit.ts, pruned by the
+    -- operator's retention. ownerGaii is NULL on organism content. Mirrors Postgres 0091.
+    CREATE TABLE IF NOT EXISTS classification_audit (
+      id         TEXT PRIMARY KEY,
+      minute     TEXT NOT NULL,
+      scope      TEXT NOT NULL,
+      ownerGaii  TEXT,
+      kind       TEXT NOT NULL,
+      key        TEXT NOT NULL,
+      label      TEXT NOT NULL,
+      reader     TEXT NOT NULL,
+      readerKind TEXT NOT NULL,
+      action     TEXT NOT NULL,
+      purpose    TEXT,
+      count      INTEGER NOT NULL DEFAULT 1,
+      firstAt    TEXT NOT NULL,
+      lastAt     TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_classification_audit_address
+      ON classification_audit(minute, reader, action, scope, kind, key);
+    CREATE INDEX IF NOT EXISTS idx_classification_audit_owner ON classification_audit(ownerGaii, lastAt);
+    CREATE INDEX IF NOT EXISTS idx_classification_audit_scope ON classification_audit(scope, lastAt);
+    CREATE INDEX IF NOT EXISTS idx_classification_audit_last ON classification_audit(lastAt);
 
   `);
 }

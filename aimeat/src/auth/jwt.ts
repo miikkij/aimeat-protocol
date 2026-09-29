@@ -9,6 +9,9 @@
  * @structure initNodeKeys / AccountDisabledError / issueJWT / verifyJWT (+ asVisitor) / generateSessionId / tokenIdOf / revokeToken / isRevoked
  * @usage import { issueJWT, verifyJWT } from '../auth/jwt.js';
  * @version-history
+ *   v1.9.0 — 2026-09-29 — The optional `via: 'pat'` claim: issueJWT writes it for a token minted from a
+ *     personal access token and verifyJWT carries it onto the verified token, so classification reads
+ *     such a session as an AI (TARGET-082 V4). It changes no role and no scope.
  *   v1.8.0 — 2026-09-26 — The revoked-token table is each node's own: initRevocationStorage files a
  *     node's storage under its node id, and isRevoked, revokeToken and the mint check in issueJWT read
  *     the one of the node the code runs as (./node-auth.ts), with its cache entries filed per node and
@@ -94,6 +97,10 @@ export interface JWTPayload {
   app_grant?: string;   // app-grant id for scoped, user-approved app tokens (role: app) — H-2
   app?: string;         // the app's own id ("owner/filename") for role-'app' tokens, so the caller
                         //   can be NAMED without a grant lookup — see gaii.ts callerPrincipal
+  /** 'pat' when the token was minted from a personal access token (the exchange, the PAT-backed
+   *  refresh cookie). A mark for classification only (services/classification/reader-kind.ts):
+   *  it grants and removes nothing. */
+  via?: 'pat';
 }
 
 /** Generate a unique session ID for JWT tracking. */
@@ -147,6 +154,7 @@ export async function issueJWT(payload: JWTPayload, ttlSeconds: number, sessionI
     ...(payload.eco_app ? { eco_app: payload.eco_app } : {}),
     ...(payload.app_grant ? { app_grant: payload.app_grant } : {}),
     ...(payload.app ? { app: payload.app } : {}),
+    ...(payload.via === 'pat' ? { via: 'pat' } : {}),
   })
     .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
     .setSubject(payload.sub)
@@ -179,6 +187,8 @@ export interface VerifiedToken {
   eco_app?: string;     // ecosystem app global name for GEAI (role: ecosystem) sessions
   app_grant?: string;   // app-grant id for scoped, user-approved app tokens (role: app)
   app?: string;         // the app's own id ("owner/filename") for role-'app' tokens
+  via?: 'pat';          // made from a personal access token: set by the auth middleware on a raw PAT
+                        //   and read from the `via` claim of a JWT minted from one
 }
 
 /**
@@ -228,6 +238,8 @@ export async function verifyJWT(token: string): Promise<VerifiedToken | null> {
       eco_app: payload.eco_app as string | undefined,
       app_grant: payload.app_grant as string | undefined,
       app: payload.app as string | undefined,
+      // Only the one known value is carried; anything else in the claim is not ours.
+      ...(payload.via === 'pat' ? { via: 'pat' as const } : {}),
     });
   } catch {
     // Fail-closed by design: any verification error (bad signature, expiry, malformed claims) means
