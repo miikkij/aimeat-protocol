@@ -6,6 +6,10 @@
  *   POST /v1/ghii/verify-email, POST /v1/ghii/magic-link, GET /v1/ghii/magic-link/verify. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 — 2026-09-29 — The emailed sign-in link points at GET /v1/ghii/magic-link/open
+ *     (login-link-open.ts), which opens a browser session and redirects; a person clicking the link
+ *     used to get this file's JSON answer. POST /v1/ghii/magic-link sends through
+ *     services/login-link.ts, which the install-set welcome mail uses too.
  *   v1.8.0 — 2026-09-14 — The welcome bonus is creditWelcomeBonus() from owner-provisioning, not a
  *     transaction this route writes itself.
  *   v1.7.0 -- 2026-09-06 -- Review item 2.5: both BR-04 refusals move ABOVE the writes they were
@@ -38,7 +42,8 @@ import { generateKeyPair } from '../../auth/keypair.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
-import { appendMailLog } from '../../services/notification-settings.js';
+import { sendLoginLink, LOGIN_LINK_TTL_MS } from '../../services/login-link.js';
+import { registerLoginLinkOpenRoute } from './login-link-open.js';
 import { validateOwnerName, buildGAII } from '../../utils/gaii.js';
 import { issueJWT } from '../../auth/jwt.js';
 import { createHash, randomBytes } from 'node:crypto';
@@ -435,34 +440,12 @@ export function registerWebVerifyRoutes(
         const emailHash = createHash('sha256').update(email.toLowerCase().trim()).digest('hex');
         const ghiiRecord = await storage.getGHIIByEmailHash(emailHash);
 
-        // A DEACTIVATED ACCOUNT IS NOT SENT A SIGN-IN LINK. The verify step refuses one now, but
-        // sending it anyway means the person keeps getting login mail for an account the
-        // organisation has switched off, and it leaves a live token in a mailbox for an account
-        // nobody may enter. The answer below is the same either way, so nothing is disclosed.
-        const linkOwner = ghiiRecord ? await storage.getOwner(ghiiRecord.ownerName) : null;
-
+        // A DEACTIVATED ACCOUNT IS NOT SENT A SIGN-IN LINK (sendLoginLink checks it): sending it
+        // anyway means the person keeps getting login mail for an account the organisation has
+        // switched off. The answer below is the same either way, so nothing is disclosed. The link
+        // points at the browser endpoint GET /v1/ghii/magic-link/open (login-link-open.ts).
         // Always return 200 to not reveal if user exists
-        if (ghiiRecord && !linkOwner?.disabledAt && ghiiRecord.magicLinkEnabled && emailService?.enabled) {
-            const token = randomBytes(32).toString('hex');
-            const codeHash = createHash('sha256').update(token).digest('hex');
-            const now = new Date().toISOString();
-            await storage.createEmailVerification({
-                id: token,
-                ownerName: ghiiRecord.ownerName,
-                emailHash,
-                code: codeHash,
-                purpose: 'login',
-                status: 'pending',
-                attempts: 0,
-                expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 min
-                createdAt: now,
-                verifiedAt: null,
-            });
-
-            const loginUrl = `${config.baseUrl}/v1/ghii/magic-link/verify?token=${token}`;
-            const sent = await emailService.sendMagicLink(email, loginUrl, ghiiRecord.locale);
-            if (sent) await appendMailLog(storage, ghiiRecord.ghii, { kind: 'magic_link', subject: 'login link' });
-        }
+        if (ghiiRecord) await sendLoginLink(storage, config, ghiiRecord, email, LOGIN_LINK_TTL_MS, emailService);
 
         res.json(success(config.nodeId, {
             sent: true,
@@ -471,7 +454,11 @@ export function registerWebVerifyRoutes(
         emitChange('ghii');
     });
 
-    // GET /v1/ghii/magic-link/verify — Verify magic link (query param: token)
+    // GET /v1/ghii/magic-link/open — the emailed link: a browser session, then the front page.
+    registerLoginLinkOpenRoute(router, config, storage);
+
+    // GET /v1/ghii/magic-link/verify — Verify magic link for a program (query param: token): JSON
+    // with an agent token and private keys. The emailed link no longer points here.
     router.get('/v1/ghii/magic-link/verify', async (req, res) => {
         const token = typeof req.query.token === 'string' ? req.query.token : undefined;
 

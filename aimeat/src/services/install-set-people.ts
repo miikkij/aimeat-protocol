@@ -16,8 +16,13 @@
  *
  *   The accounts are created as `provisioning`, the administrator's act SCIM uses: refused only when
  *   registration is closed, and never made the node's operator.
- * @structure checkOwner() · ensureOwner() · joinMember() · MemberOutcome · CreatedOrganisms
+ *
+ *   A CREATED ACCOUNT IS TOLD (2026-09-29). Once the apply has finished, welcomeCreated() mails every
+ *   account it created a sign-in link that works for seven days and names the account. Until then
+ *   nobody told the person the account existed; the aimeat-apps end-to-end run found it.
+ * @structure checkOwner() · ensureOwner() · joinMember() · welcomeCreated() · MemberOutcome · CreatedOrganisms
  * @version-history
+ *   v1.1.0 — 2026-09-29 — welcomeCreated(): the welcome sign-in link for accounts the install created.
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 4).
  */
 import type { AimeatConfig } from '../config.js';
@@ -26,6 +31,7 @@ import { validateOwnerName } from '../utils/gaii.js';
 import { provisionOwner, emailHashOf, registrationRefusal, ProvisionEmailTakenError, RegistrationClosedError } from './owner-provisioning.js';
 import { deriveUniqueUsername } from './external-login.js';
 import { addOrganismMember, createEmailInvitation, InvitationError } from './invitations.js';
+import { sendWelcomeLink } from './login-link.js';
 import type { InstallSet, InstallSetUser, WorkspaceRole, OrganismRole } from './install-set-spec.js';
 
 export type Refusal = { ok: false; status: number; code: string; message: string };
@@ -151,4 +157,19 @@ export async function joinMember(
         }
     }
     return out;
+}
+
+/**
+ * Mail each account this install created the welcome sign-in link (login-link.ts), once. `created`
+ * and `welcomed` are the record's lists of emails; the ones mailed now are returned. An email that
+ * could not be sent (this node sends no mail yet) stays unwelcomed, so applying the set again tries it.
+ */
+export async function welcomeCreated(storage: Storage, config: AimeatConfig, created: string[], welcomed: string[]): Promise<string[]> {
+    const sent: string[] = [];
+    for (const email of created) {
+        if (welcomed.includes(email)) continue;
+        const account = await accountOfEmail(storage, email);
+        if (account && await sendWelcomeLink(storage, config, account, email)) sent.push(email);
+    }
+    return sent;
 }

@@ -11,7 +11,8 @@
  *     package and the bundle, and entitles C to the bundle only
  *   - Phase 1: refusals: not the operator, a malformed set, a missing config value (nothing created)
  *   - Phase 2: the plan (dry run) and the first apply
- *   - Phase 3: what the apply made: the install, the app config, the organism, the members
+ *   - Phase 3: what the apply made: the install, the app config, the organism, the members, and the
+ *     welcome sign-in link mailed to the account it created, which opens a browser session once
  *   - Phase 4: the second apply: nothing twice, the agent deployed through the runner
  *   - Phase 5: a set whose owner has no account creates the account
  *   - Phase 6: the operator's agent, holding operator:admin, plans and lists over MCP
@@ -23,6 +24,8 @@
  *     node that is not a seller, an agent without operator:admin and a replayed signature are refused
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-install-sets
  * @version-history
+ *   v1.1.0 — 2026-09-29 — The welcome sign-in link for accounts the apply creates, and the browser
+ *     endpoint it points at; mail is captured in process.
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 4).
  */
 
@@ -36,6 +39,7 @@ import { loadConfig } from '../src/config.js';
 import { sign, generateKeyPair } from '../src/auth/keypair.js';
 import type { AimeatConfig } from '../src/config.js';
 import type { Server } from 'node:http';
+import { setActiveEmailService, type EmailService } from '../src/services/email.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -161,6 +165,30 @@ const MANIFEST = (type: string, space: string) => ({
     objectTypes: [{ name: type, schemaRef: `schema:${type}@1`, namespace: space, backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true, mode: 'records' }],
 });
 
+/**
+ * Every message the in-process nodes send, instead of SMTP. The email service is process-wide
+ * (email.ts setActiveEmailService), so it is installed after the nodes boot; each method records its
+ * arguments and reports the message as sent.
+ */
+const mails: { to: string; method: string; args: unknown[] }[] = [];
+const captureMail = new Proxy({ enabled: true } as Record<string | symbol, unknown>, {
+    get: (target, prop) => {
+        if (prop in target) return target[prop];
+        if (typeof prop !== 'string' || prop === 'then') return undefined;
+        return async (to: string, ...args: unknown[]) => { mails.push({ to, method: prop, args }); return true; };
+    },
+}) as unknown as EmailService;
+const mailsTo = (email: string) => mails.filter(m => m.to === email);
+
+/** A browser opening a link: no redirect followed, the refresh cookie kept. */
+async function openInBrowser(url: string): Promise<{ status: number; location: string; rt: string | null }> {
+    const res = await fetch(url, { redirect: 'manual', headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' } });
+    const h = res.headers as Headers & { getSetCookie?: () => string[] };
+    const cookies = typeof h.getSetCookie === 'function' ? h.getSetCookie() : [res.headers.get('set-cookie') ?? ''];
+    const rt = cookies.map(c => /(?:^|;\s*)aimeat_rt=([^;]*)/.exec(c)?.[1]).find(Boolean) ?? null;
+    return { status: res.status, location: res.headers.get('location') ?? '', rt: rt ? decodeURIComponent(rt) : null };
+}
+
 console.log('\n=== AIMEAT Install Sets E2E ===\n');
 
 let R: NodeState;
@@ -204,6 +232,7 @@ await test('Boot R (repository) and C (customer), each the other\'s active peer'
     acmeToken = await setupOwner(C, 'acme');
     await peer(C, opsToken, R);
     await peer(R, vendorToken, C);
+    setActiveEmailService(captureMail);
 });
 
 await test('R publishes a private app package and a private bundle that lists it, and entitles C to the bundle only', async () => {
@@ -332,6 +361,32 @@ await test('The organism is private and invite-only, ann is an active member, an
     assert(bob?.status === 'pending' && bob?.org_role === 'member', `bob's invitation: ${JSON.stringify(invites.body)}`);
 });
 
+await test('ann, whose account the apply created, is mailed a sign-in link that opens a browser session once', async () => {
+    assert(record.accounts_created?.includes(ANN) && record.welcomed?.includes(ANN) && !record.accounts_created.includes(`acme${ts}@example.org`),
+        `created and welcomed: ${JSON.stringify({ created: record.accounts_created, welcomed: record.welcomed })}`);
+    const sent = mailsTo(ANN).filter(m => m.method === 'sendRaw');
+    assert(sent.length === 1 && sent[0].args[0] === 'Your AIMEAT account is ready', `one welcome to ann: ${JSON.stringify(mailsTo(ANN).map(m => [m.method, m.args[0]]))}`);
+    const text = String(sent[0].args[2]);
+    assert(text.includes(record.members[ANN].account), `the mail names the account: ${text}`);
+    const url = /(http:\/\/\S+\/v1\/ghii\/magic-link\/open\?token=[a-f0-9]{64})/.exec(text)?.[1];
+    assert(!!url, `the mail carries the browser sign-in link: ${text}`);
+
+    const opened = await openInBrowser(url!);
+    assert(opened.status === 302 && opened.location === `${C.baseUrl}/` && !!opened.rt, `the link signs in and goes to the front page: ${JSON.stringify(opened)}`);
+    const refresh = await C.json('/v1/auth/refresh', { method: 'POST', headers: { Cookie: `aimeat_rt=${encodeURIComponent(opened.rt!)}`, 'X-AIMEAT-Refresh': '1' } });
+    assert(refresh.status === 200 && typeof refresh.body.data?.token === 'string', `the session refreshes: ${refresh.status} ${JSON.stringify(refresh.body)}`);
+    const me = await C.json('/v1/ghii/me', { headers: auth(refresh.body.data.token) });
+    assert(me.status === 200 && JSON.stringify(me.body.data).includes(record.members[ANN].account), `the session is ann's: ${JSON.stringify(me.body).slice(0, 300)}`);
+
+    const again = await openInBrowser(url!);
+    assert(again.status === 302 && again.location === `${C.baseUrl}/?auth_error=INVALID_TOKEN` && !again.rt, `a used link opens nothing: ${JSON.stringify(again)}`);
+});
+
+await test('A made-up sign-in link opens nothing', async () => {
+    const r = await openInBrowser(`${C.baseUrl}/v1/ghii/magic-link/open?token=${'0'.repeat(64)}`);
+    assert(r.status === 302 && r.location.endsWith('?auth_error=INVALID_TOKEN') && !r.rt, `refused: ${JSON.stringify(r)}`);
+});
+
 console.log('\nPhase 4 — Applying again');
 
 await test('With a runner connected, the second apply deploys the agent and creates nothing twice', async () => {
@@ -346,6 +401,7 @@ await test('With a runner connected, the second apply deploys the agent and crea
     assert(again.members[ANN].created === false && again.members[ANN].already[0] === 'team', `ann once: ${JSON.stringify(again.members[ANN])}`);
     assert(again.members[BOB].already[0] === 'team', `bob once: ${JSON.stringify(again.members[BOB])}`);
     assert(again.agents[`${shopOnR}/app-shop/shopkeeper`].result === 'deployed', `deployed: ${JSON.stringify(again.agents)}`);
+    assert(mailsTo(ANN).filter(m => m.method === 'sendRaw').length === 1, `ann is welcomed once: ${mailsTo(ANN).length}`);
 });
 
 console.log('\nPhase 5 — An owner who does not exist yet');
@@ -360,6 +416,8 @@ await test('A set whose owner has no account creates it, with the email verified
     assert(newco.status === 200, `newco exists: ${newco.status} ${JSON.stringify(newco.body)}`);
     const list = await C.json(`/v1/install-sets`, { headers: auth(opsToken) });
     assert(list.body.data.install_sets.length === 2, `two records, one per owner: ${JSON.stringify(list.body.data.install_sets.map((s: any) => s.owner))}`);
+    const welcome = mailsTo(NEWCO).find(m => m.method === 'sendRaw');
+    assert(r.body.data.record.welcomed?.includes(NEWCO) && String(welcome?.args[2]).includes('newco'), `newco is welcomed by name: ${JSON.stringify(mailsTo(NEWCO))}`);
 });
 
 console.log('\nPhase 6 — The operator\'s AI, over MCP');

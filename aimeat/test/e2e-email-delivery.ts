@@ -41,6 +41,8 @@
  *   cd aimeat && pnpm exec node --import tsx test/e2e-email-delivery.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=email-delivery
  * @version-history
+ *   v1.1.0 -- 2026-09-29 -- The magic link in the mail is the browser endpoint /v1/ghii/magic-link/open:
+ *     opening it sets the refresh cookie and redirects, and the refreshed session is the account's.
  *   v1.0.0 -- 2026-09-08 -- Initial. Written with the fix for sendWithAttachments dropping opts.headers.
  */
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -253,16 +255,21 @@ async function run(): Promise<void> {
 
         const req = await json('/v1/ghii/magic-link', { method: 'POST', body: JSON.stringify({ email: mlEmail }) });
         assert(req.status === 200, `magic-link ${req.status}: ${short(req.body)}`);
-        const mail = await smtp!.waitForMail(mlEmail, /magic-link\/verify\?token=/);
+        // The emailed link is the browser endpoint: it opens an owner session and redirects.
+        const mail = await smtp!.waitForMail(mlEmail, /magic-link\/open\?token=/);
         assert(mail.subject === 'Your AIMEAT Login Link', `subject: ${mail.subject}`);
         assert(/Sign In to AIMEAT/.test(mail.text), 'the magic-link template must render its heading');
-        magicToken = /magic-link\/verify\?token=([a-f0-9]{64})/.exec(mail.text)![1];
+        magicToken = /magic-link\/open\?token=([a-f0-9]{64})/.exec(mail.text)![1];
 
-        const opened = await json(`/v1/ghii/magic-link/verify?token=${magicToken}`);
-        assert(opened.status === 200, `the emailed link must open: ${opened.status} ${short(opened.body)}`);
-        const me = await json('/v1/ghii/me', { headers: bearer(opened.body.data.token) });
+        const opened = await fetch(`${BASE}/v1/ghii/magic-link/open?token=${magicToken}`, { redirect: 'manual' });
+        const rt = /(?:^|;\s*)aimeat_rt=([^;]*)/.exec(opened.headers.getSetCookie().join('\n'))?.[1];
+        assert(opened.status === 302 && opened.headers.get('location') === `${BASE}/` && !!rt,
+            `the emailed link must sign in and redirect: ${opened.status} ${opened.headers.get('location')}`);
+        const refresh = await json('/v1/auth/refresh', { method: 'POST', headers: { Cookie: `aimeat_rt=${rt}`, 'X-AIMEAT-Refresh': '1' } });
+        assert(refresh.status === 200, `the session must refresh: ${refresh.status} ${short(refresh.body)}`);
+        const me = await json('/v1/ghii/me', { headers: bearer(refresh.body.data.token) });
         assert(me.status === 200 && JSON.stringify(me.body.data).includes(mlName),
-            `the session it hands back must be ${mlName}: ${short(me.body)}`);
+            `the session it opens must be ${mlName}: ${short(me.body)}`);
     });
 
     await test('the owner door mails a code too, and confirming it verifies the address', async () => {
