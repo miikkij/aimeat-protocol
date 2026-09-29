@@ -1712,6 +1712,37 @@
     });
   }
 
+  // src/static/sdk-libs/auth/auth-error.js
+  function readAuthError() {
+    var url;
+    try {
+      url = new URL(location.href);
+    } catch {
+      return null;
+    }
+    var code = url.searchParams.get("auth_error");
+    if (!code) return null;
+    url.searchParams.delete("auth_error");
+    try {
+      history.replaceState(history.state, "", url.pathname + url.search + url.hash);
+    } catch {
+    }
+    return /^[A-Z0-9_]{1,64}$/.test(code) ? code : "UNKNOWN";
+  }
+  function authErrorText(i, code) {
+    i = i || {};
+    if (code === "INVALID_TOKEN") return i.authErrorUsedLink || "This sign-in link has already been used or is not valid. Ask for a new one below, or sign in another way.";
+    if (code === "EXPIRED") return i.authErrorExpired || "This sign-in link has expired. Ask for a new one below.";
+    if (code === "ACCOUNT_DISABLED") return i.authErrorDisabled || "This account has been deactivated. Contact the administrator of this service.";
+    return i.authErrorGeneric || "Sign-in did not go through. Try again, or choose another way to sign in.";
+  }
+  function showAuthErrorIn(i, code) {
+    var el = document.getElementById("aimeat-error");
+    if (!el) return;
+    el.textContent = authErrorText(i, code);
+    el.style.display = "block";
+  }
+
   // src/static/sdk-libs/auth/modal.js
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   var OWNER_NAME_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
@@ -1794,6 +1825,7 @@
     function render(anim) {
       modal.innerHTML = buildModalInner(i, lang, anim, tab);
       wireModal();
+      if (opts.authError) showAuthErrorIn(i, opts.authError);
     }
     document.body.appendChild(modal);
     render(true);
@@ -3411,6 +3443,15 @@
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", maybeShowGoogleSignup);
     else maybeShowGoogleSignup();
   }
+  function maybeShowAuthError() {
+    var code = readAuthError();
+    if (code) showLoginModal({ authError: code }, function() {
+    });
+  }
+  if (typeof document !== "undefined" && document.addEventListener) {
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", maybeShowAuthError);
+    else maybeShowAuthError();
+  }
   if (typeof document !== "undefined" && document.addEventListener) {
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible") refreshOnFocus();
@@ -3441,5 +3482,5 @@
     aimeatRestoreMode();
   }
   var ns = attach("auth", auth);
-  ns.version = "2026-09-25-001";
+  ns.version = "2026-09-29-001";
 })();

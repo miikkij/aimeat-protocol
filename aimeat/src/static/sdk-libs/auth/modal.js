@@ -13,6 +13,7 @@
  *   openEmailCompletion, sendEmailCode, showView, capture/restoreInputs }.
  * @usage import { showLoginModal } from './modal.js';
  * @version-history
+ *   v1.12.0 — 2026-09-29 — opts.authError: a refused sign-in's reason in the error line (auth-error.js).
  *   v1.12.0 — 2026-09-29 — opts.redirect names the place an emailed sign-in link returns to; without
  *     it the link returns to this page (modal-login-link.js).
  *   v1.11.0 — 2026-09-29 — "Email me a sign-in link" joins the link row on a node that sends mail
@@ -71,6 +72,7 @@ import { totpViewHtml, wireTotpStep } from './modal-totp.js';
 import { recoveryViewsHtml } from './modal-recovery-views.js';
 import { passkeyButtonHtml, wirePasskeyButton } from './modal-passkey.js';
 import { loginLinkAskHtml, loginLinkViewHtml, wireLoginLinkStep } from './modal-login-link.js';
+import { showAuthErrorIn } from './auth-error.js';
 
 /** An identifier is an email when it carries a dot-bearing domain. A GHII (`alice@node-id`) never
  *  does, so this separates the two without asking the person which one they typed. */
@@ -157,6 +159,7 @@ export function showLoginModal(opts, renderBtn, onClosed) {
   function render(anim) {
     modal.innerHTML = buildModalInner(i, lang, anim, tab);
     wireModal();
+    if (opts.authError) showAuthErrorIn(i, opts.authError);
   }
 
   document.body.appendChild(modal);
