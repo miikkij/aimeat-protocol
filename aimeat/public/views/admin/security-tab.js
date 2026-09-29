@@ -12,6 +12,8 @@
  * @structure SecurityTab({ switchPage }) — load · alertLine · RightNow · Strip · the sections from
  *   security-tab.refusals.js and security-tab.sections.js · the actions (resolve, delete, payload)
  * @version-history
+ *   v3.3.0 — 2026-09-26 — The question before a decision is made of one part per kind of row the name
+ *     holds (its rows, its cortexes and ecosystem apps, its app grants and access tokens).
  *   v3.2.0 — 2026-09-26 — The records the update at start left have a section of their own while
  *     such an incident exists, before "Refused and kept", and the open figure of the strip leads there
  *     while one is open; the sections after 02 are numbered as they come. The question before a
@@ -203,13 +205,20 @@ export default function SecurityTab(props) {
 function confirmText(n, resolution) {
   const rows = (n.actions || 0) + (n.work || 0) + (n.own_lines || 0) + (n.naming_lines || 0) > 0;
   const installs = (n.cortexes || 0) + (n.ecosystem_apps || 0) > 0;
+  const credentials = (n.app_grants || 0) + (n.access_tokens || 0) > 0;
   const ghii = n.holder_ghii || n.name;
+  const held = (key) => S('incidents.held.' + key, { name: n.name, ghii });
   if (resolution === 'holder') {
-    if (!rows) return S('incidents.held.confirmHolderOnlyInstalls', { name: n.name, ghii });
-    return [S('incidents.held.confirmHolder', { name: n.name, ghii }), installs ? S('incidents.held.confirmHolderInstalls') : ''].filter(Boolean).join(' ');
+    return [
+      held(rows ? 'confirmHolder' : 'confirmHolderKeep'),
+      installs ? held('confirmHolderInstalls') : '',
+      credentials ? held('confirmHolderCredentials') : '',
+    ].filter(Boolean).join(' ');
   }
-  const first = rows
-    ? [S('incidents.held.confirmPrevious', { name: n.name }), installs ? S('incidents.held.confirmPreviousInstalls') : '']
-    : [S('incidents.held.confirmPreviousOnlyInstalls', { name: n.name })];
-  return [...first, S('incidents.held.cannotUndo')].filter(Boolean).join(' ');
+  return [
+    held(rows ? 'confirmPrevious' : 'confirmPreviousDelete'),
+    installs ? held('confirmPreviousInstalls') : '',
+    credentials ? held('confirmPreviousCredentials') : '',
+    held('cannotUndo'),
+  ].filter(Boolean).join(' ');
 }

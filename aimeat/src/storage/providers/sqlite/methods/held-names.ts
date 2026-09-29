@@ -3,13 +3,14 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description HeldAccountNameRepository on SQLite: the records of what the move to the full identity
- *   and the start step for the cortexes and ecosystem apps of deleted accounts left for the operator,
- *   the start step itself, and the operator's decision on one name, each in one transaction. The SQL
- *   is in repos/held-names.ts, which the boot half of the move shares.
+ *   and the start steps for what deleted accounts installed and were issued left for the operator,
+ *   the start steps themselves, and the operator's decision on one name, each in one transaction. The
+ *   SQL is in repos/held-names.ts, which the boot half of the move shares.
  * @structure heldNameMethods — getHeldNamesRecord · saveHeldNamesRecord · settleInstallsOfDeletedAccounts ·
- *   resolveHeldAccountName
+ *   settleCredentialsOfDeletedAccounts · resolveHeldAccountName
  * @usage Object.assign(SqliteStorage.prototype, heldNameMethods) in providers/sqlite/index.ts
  * @version-history
+ *   v1.2.0 — 2026-09-26 — settleCredentialsOfDeletedAccounts; a decision takes `credentials`.
  *   v1.1.0 — 2026-09-26 — settleInstallsOfDeletedAccounts; the record methods take the key; a decision
  *     takes `nodeId`, `rows` and `installs`, and deletes an app's identity data through the provider's
  *     own cascade.
@@ -17,7 +18,9 @@
  */
 import type Database from 'better-sqlite3';
 import type { HeldNamesRecord, HeldNameOutcome, HeldNameResolution } from '../../../types/held-names.js';
-import { readHeldNamesRecord, writeHeldNamesRecord, resolveHeldNameIn, settleInstallsIn } from '../repos/held-names.js';
+import {
+  readHeldNamesRecord, writeHeldNamesRecord, resolveHeldNameIn, settleInstallsIn, settleCredentialsIn,
+} from '../repos/held-names.js';
 
 /**
  * What these methods use of the provider: its connection and its per-identity cascade. Named here
@@ -41,9 +44,13 @@ export const heldNameMethods = {
     return this.db.transaction(() => settleInstallsIn(this.db, input, id => this.cascadeDeleteAgentData(id)))();
   },
 
+  async settleCredentialsOfDeletedAccounts(this: ProviderHandle): Promise<HeldNamesRecord | null> {
+    return this.db.transaction(() => settleCredentialsIn(this.db))();
+  },
+
   async resolveHeldAccountName(this: ProviderHandle, input: {
     name: string; resolution: HeldNameResolution; holderGhii: string | null; namingBefore: string;
-    nodeId?: string; rows?: boolean; installs?: boolean;
+    nodeId?: string; rows?: boolean; installs?: boolean; credentials?: boolean;
   }): Promise<HeldNameOutcome> {
     return this.db.transaction(() => resolveHeldNameIn(this.db, input, id => this.cascadeDeleteAgentData(id)))();
   },

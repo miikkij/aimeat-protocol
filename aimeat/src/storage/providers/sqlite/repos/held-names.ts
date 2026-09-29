@@ -2,20 +2,24 @@
  * @file src/storage/providers/sqlite/repos/held-names.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description SQLite SQL for what the move to the full identity and the start step for the cortexes
- *   and ecosystem apps of deleted accounts left for the operator: the records (system_settings keys
- *   HELD_NAMES_RECORD_KEY and HELD_INSTALLS_RECORD_KEY), the start step, and the operator's decision
- *   on one held name. The boot half of the move (schema-identity-backfill.ts) writes its record and
- *   uses payerWhenWritten; methods/held-names.ts calls the rest. A free function over the connection,
- *   like the other erasure repos, so it runs before a provider instance exists; the per-identity
- *   cascade is handed in by the caller, which owns it. The Postgres twin is methods/held-names.ts in
- *   its provider.
+ * @description SQLite SQL for what the move to the full identity and the start steps for what deleted
+ *   accounts installed and were issued left for the operator: the records (system_settings keys
+ *   HELD_NAMES_RECORD_KEY, HELD_INSTALLS_RECORD_KEY and HELD_CREDENTIALS_RECORD_KEY), the start steps,
+ *   and the operator's decision on one held name. The boot half of the move
+ *   (schema-identity-backfill.ts) writes its record and uses payerWhenWritten; methods/held-names.ts
+ *   calls the rest. A free function over the connection, like the other erasure repos, so it runs
+ *   before a provider instance exists; the per-identity cascade is handed in by the caller, which owns
+ *   it. The Postgres twin is methods/held-names.ts in its provider.
  * @structure
  *   - payerWhenWritten(db, identity, writtenAt) — whose balance a held request goes back to
  *   - readHeldNamesRecord(db, key) / writeHeldNamesRecord(db, record, key)
- *   - settleInstallsIn(db, input, cascade) — the start step, in the caller's transaction
+ *   - settleInstallsIn(db, input, cascade) — the start step for installs, in the caller's transaction
+ *   - settleCredentialsIn(db) — the start step for credentials, in the caller's transaction
  *   - resolveHeldNameIn(db, input, cascade) — the decision on one name, in the caller's transaction
  * @version-history
+ *   v1.2.0 — 2026-09-26 — settleCredentialsIn, the start step for the app grants, personal access
+ *     tokens and session rows of deleted accounts, with its own record; a 'previous' decision deletes
+ *     the grants and tokens older than the account that holds the name (`credentials`).
  *   v1.1.0 — 2026-09-26 — settleInstallsIn, the start step for the cortexes and ecosystem apps of
  *     deleted accounts; a 'previous' decision deletes the cortexes and apps older than the account that
  *     holds the name, and `rows` / `installs` say which kinds a decision covers. The record functions
@@ -24,7 +28,9 @@
  */
 import type Database from 'better-sqlite3';
 import { erasedPartyPseudonym, erasedAccountParty, leavingAppsParty, ERASED_PARTY_PREFIX } from '../../../erased-party.js';
-import { HELD_NAMES_RECORD_KEY, HELD_INSTALLS_RECORD_KEY } from '../../../repositories/held-names.repository.js';
+import {
+  HELD_NAMES_RECORD_KEY, HELD_INSTALLS_RECORD_KEY, HELD_CREDENTIALS_RECORD_KEY,
+} from '../../../repositories/held-names.repository.js';
 import {
   emptyHeldNameOutcome, type HeldAccountName, type HeldNamesRecord, type HeldNameOutcome, type HeldNameResolution,
 } from '../../../types/held-names.js';
@@ -32,6 +38,7 @@ import { settleErasedPartyWork, settleLeavingPartyWork, type WorkErasureResult }
 import { pseudonymiseLedgerParty } from './ledger-erasure.js';
 import { deleteEcosystemApps } from './eco-app-erasure.js';
 import { deleteInstalledCortexes } from './cortex-erasure.js';
+import { deleteAccountCredentials } from './credential-erasure.js';
 import { resolveGhiiIn } from './ghii-resolve.js';
 import { validateOwnerName } from '../../../../utils/gaii.js';
 
@@ -154,27 +161,78 @@ export function settleInstallsIn(db: Database.Database, input: { nodeId: string 
 }
 
 /**
+ * The start step for credentials, in the caller's transaction. The rule is written on the repository
+ * (HeldAccountNameRepository.settleCredentialsOfDeletedAccounts); in short, for each name an app grant,
+ * a personal access token or a session row is stored under: no account holds it, and they go through
+ * the function the account deletion calls; an account holds it and a grant or token was created before
+ * that account (the grant's or token's createdAt against owners.createdAt), and the row stays and is
+ * recorded; otherwise nothing, and nothing is held for session rows. Returns the record it wrote, or
+ * null when it ran before.
+ */
+export function settleCredentialsIn(db: Database.Database): HeldNamesRecord | null {
+  if (db.prepare('SELECT 1 FROM system_settings WHERE key = ?').get(HELD_CREDENTIALS_RECORD_KEY)) return null;
+  // Only a value an account can be registered under names an account, as for the installs.
+  const names = [...new Set([
+    ...(db.prepare('SELECT DISTINCT owner AS name FROM app_grants').all() as { name: string }[]).map(r => r.name),
+    ...(db.prepare('SELECT DISTINCT owner AS name FROM personal_access_tokens').all() as { name: string }[]).map(r => r.name),
+    ...(db.prepare('SELECT DISTINCT owner AS name FROM sessions').all() as { name: string }[]).map(r => r.name),
+  ])].filter(n => validateOwnerName(n) === null).sort();
+
+  const held: HeldAccountName[] = [];
+  const deleted = { names: 0, app_grants: 0, access_tokens: 0, sessions: 0 };
+  for (const name of names) {
+    const holder = db.prepare('SELECT createdAt FROM owners WHERE name = ?').get(name) as { createdAt: string } | undefined;
+    if (!holder) {
+      // No account holds the name: its grants, tokens and session rows go as the account deletion takes them.
+      const gone = deleteAccountCredentials(db, name, { sessions: true });
+      if (gone.appGrants || gone.accessTokens || gone.sessions) deleted.names++;
+      deleted.app_grants += gone.appGrants;
+      deleted.access_tokens += gone.accessTokens;
+      deleted.sessions += gone.sessions;
+      continue;
+    }
+    // An account holds the name: a grant or token created before that account may be a previous holder's.
+    const grants = (db.prepare('SELECT COUNT(*) AS n FROM app_grants WHERE owner = ? AND createdAt < ?')
+      .get(name, holder.createdAt) as { n: number }).n;
+    const tokens = (db.prepare('SELECT COUNT(*) AS n FROM personal_access_tokens WHERE owner = ? AND createdAt < ?')
+      .get(name, holder.createdAt) as { n: number }).n;
+    if (grants === 0 && tokens === 0) continue;
+    const ghii = db.prepare('SELECT ghii FROM ghiis WHERE ownerName = ?').get(name) as { ghii: string } | undefined;
+    held.push({
+      name, holder_since: holder.createdAt, holder_ghii: ghii?.ghii ?? null,
+      actions: 0, work: 0, own_lines: 0, naming_lines: 0, app_grants: grants, access_tokens: tokens,
+    });
+  }
+  const record: HeldNamesRecord = { at: new Date().toISOString(), held, untied: [], deleted };
+  db.prepare("INSERT INTO system_settings (key, value, updatedAt) VALUES (?, ?, datetime('now'))")
+    .run(HELD_CREDENTIALS_RECORD_KEY, JSON.stringify(record));
+  return record;
+}
+
+/**
  * The operator's decision on one held name, in the caller's transaction. The rule is written on the
  * repository (HeldAccountNameRepository.resolveHeldAccountName); in short:
  *   - 'holder': the bare name's local actions, work sides and own lines move to the holder's GHII, and
- *     the cortexes and ecosystem apps older than the holder's account stay;
+ *     the cortexes, ecosystem apps, app grants and access tokens older than the holder's account stay;
  *   - 'previous': they are settled as deleting a previous holder's account would have settled them,
  *     the older lines in other people's ledgers that name the account take the same pseudonym, and the
- *     older cortexes and apps go as the start step takes a deleted account's.
+ *     older cortexes, apps, grants and tokens go as the start steps take a deleted account's.
  * Everything under the bare name is what the move left: every route writes the full identity now.
  */
 export function resolveHeldNameIn(db: Database.Database, input: {
   name: string; resolution: HeldNameResolution; holderGhii: string | null; namingBefore: string;
-  nodeId?: string; rows?: boolean; installs?: boolean;
+  nodeId?: string; rows?: boolean; installs?: boolean; credentials?: boolean;
 }, cascade: IdentityCascade): HeldNameOutcome {
   const { name } = input;
   const rows = input.rows !== false;
   const installs = input.installs !== false;
+  const credentials = input.credentials !== false;
   const out = emptyHeldNameOutcome();
   const actions = rows ? db.prepare(`SELECT id FROM actions WHERE providerGaii = ? AND ${LOCAL_ACTION}`).all(name) as { id: string }[] : [];
 
   if (input.resolution === 'holder') {
-    // The cortexes and ecosystem apps older than the holder's account are the holder's: they stay.
+    // The cortexes, ecosystem apps, app grants and access tokens older than the holder's account are
+    // the holder's: they stay.
     if (!rows) return out;
     const ghii = input.holderGhii;
     if (!ghii) throw new Error('A held name is moved to its holder only when the holder has a full identity.');
@@ -224,6 +282,12 @@ export function resolveHeldNameIn(db: Database.Database, input: {
     const cortexNames = (db.prepare('SELECT name FROM cortex_extensions WHERE installedBy = ? AND installedAt < ?')
       .all(name, input.namingBefore) as { name: string }[]).map(r => r.name);
     out.cortexes_deleted = deleteInstalledCortexes(db, name, forms, { names: cortexNames });
+  }
+  if (credentials) {
+    // The app grants and access tokens created before the holder's account, as the deletion takes them.
+    const gone = deleteAccountCredentials(db, name, { before: input.namingBefore });
+    out.app_grants_deleted = gone.appGrants;
+    out.access_tokens_deleted = gone.accessTokens;
   }
   return out;
 }

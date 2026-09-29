@@ -12,6 +12,9 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   v1.3.0 — 2026-09-26 — aimeat-node-operations names the start step for the app grants, personal
+ *     access tokens and sessions of deleted accounts, and that the tokens of a held grant or token stay
+ *     refused.
  *   v1.2.0 — 2026-09-26 — aimeat-node-operations names the start step for the cortexes and ecosystem
  *     apps of deleted accounts, and that a held app can still act for the account until the owner
  *     decides.
@@ -61,9 +64,12 @@ the others. The move of each person's older records to their full identity is su
 the step after it, which settles the cortexes and ecosystem apps of deleted accounts: those of a
 username that no account holds go as an account deletion takes them, and those older than the
 account that holds the name now join the same incident. Such an ecosystem app can still act for
-that account until the owner decides. The incident names each username whose records are older than
-the account that holds the name now, with the counts and the hooks bound to its actions. Show the
-owner each name and its counts, and wait for their decision on each one before you call
+that account until the owner decides. So is the step after that, which settles the app grants,
+personal access tokens and sessions of deleted accounts the same way; an app grant or access token
+older than the account joins the same incident, and its tokens stay refused whatever the owner
+decides. The incident names each username whose records are older than the account that holds the
+name now, with the counts and the hooks bound to its actions. Show the owner each name and its
+counts, and wait for their decision on each one before you call
 \`aimeat_admin_incident_resolve\` with \`name\` and \`resolution\`: "holder" when the records belong to
 the account that holds the name now, "previous" when they were a previous holder's. The incident
 closes with the last name. A gate bound to an action that no longer exists lets everything pass

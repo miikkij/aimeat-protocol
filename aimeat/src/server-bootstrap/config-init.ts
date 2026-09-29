@@ -12,6 +12,9 @@
  *     name an account by its bare name), and initializes revocation/session auth storage
  *
  * @version-history
+ *   v1.7.0 — 2026-09-26 — The app grants, personal access tokens and session rows of deleted accounts
+ *     are settled once per node after the installs, under their own record
+ *     (services/held-account-names.ts settleCredentialsAtStart), and join the same incident.
  *   v1.6.0 — 2026-09-26 — The revocation storage is filed under this node's id, as the session auth
  *     storage is, so a process that serves more than one node reads each node's own revoked tokens.
  *   v1.5.0 — 2026-09-26 — The cortexes and ecosystem apps of deleted accounts are settled once per node
@@ -43,7 +46,7 @@ import type { ConsulConfigService } from '../services/consul-config.js';
 import { initRevocationStorage } from '../auth/jwt.js';
 import { initSessionAuth } from '../auth/middleware.js';
 import { settleStoredHookBindings, moveAccountNameHookBindings } from '../services/hooks-overview.js';
-import { openHeldNamesIncident, settleInstallsAtStart } from '../services/held-account-names.js';
+import { openHeldNamesIncident, settleInstallsAtStart, settleCredentialsAtStart } from '../services/held-account-names.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import type { ConfigSources } from '../server.js';
@@ -176,7 +179,11 @@ export async function initializeConfig(
   // holds goes as an account deletion takes it, and every token of such an app stops with its record;
   // what is older than the account holding its name now is recorded for the operator.
   await settleInstallsAtStart(config, storage);
-  // What the move to the full identity and the step above could not place on positive evidence
+  // Their app grants, personal access tokens and session rows, once per node under a record of its
+  // own: what no account holds goes as an account deletion takes it; a grant or token older than the
+  // account holding its name now is recorded for the operator, and its tokens stay refused.
+  await settleCredentialsAtStart(storage);
+  // What the move to the full identity and the steps above could not place on positive evidence
   // becomes one incident on the operator's Security page, with every binding it leaves naming nothing.
   // Once per record; the node starts whatever the store answers.
   await openHeldNamesIncident(config, storage);

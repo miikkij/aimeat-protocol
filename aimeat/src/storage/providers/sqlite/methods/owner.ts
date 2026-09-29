@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Owner and Memory storage methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.20.0 -- 2026-09-26 -- The app grants, the personal access tokens and the session rows go through
+ *     repos/credential-erasure.ts deleteAccountCredentials, which the start step and the operator's
+ *     decision on a held name call too; deleteOwner deletes the session rows as the Postgres cascade does.
  *   v1.19.0 -- 2026-09-26 -- deleteOwner deletes the app grants and the personal access tokens issued
  *     in the account name (app_grants, personal_access_tokens).
  *   v1.18.0 -- 2026-09-26 -- The ecosystem apps go through repos/eco-app-erasure.ts deleteEcosystemApps,
@@ -74,6 +77,7 @@ import { settleErasedPartyWork } from '../repos/work-erasure.js';
 import { pseudonymiseLedgerParty } from '../repos/ledger-erasure.js';
 import { deleteInstalledCortexes } from '../repos/cortex-erasure.js';
 import { deleteEcosystemApps } from '../repos/eco-app-erasure.js';
+import { deleteAccountCredentials } from '../repos/credential-erasure.js';
 import { erasedPartyPseudonym, erasedAccountParty } from '../../../erased-party.js';
 import type { SqliteStorage } from '../index.js';
 import { searchTextMemory, countMemory as countMemoryRepo, countMemoryWithOrigins as countMemoryWithOriginsRepo, sumMemoryBytes as sumMemoryBytesRepo, sumMemoryBytesForOwners as sumMemoryBytesForOwnersRepo, archivedSql, archiveMemoryByKey as archiveMemoryByKeyRepo, unarchiveMemoryByRoot as unarchiveMemoryByRootRepo, unarchiveMemoryByKey as unarchiveMemoryByKeyRepo, countArchivedByKeyPrefix as countArchivedByKeyPrefixRepo } from '../repos/memory.js';
@@ -236,11 +240,11 @@ export const ownerMethods = {
       // released for reuse, so leaving one hands the next registrant somebody else's handshake.
       this.db.prepare('DELETE FROM eco_auth WHERE ownerName = ?').run(name);
 
-      // 10c. The apps the person granted access to and the personal access tokens they made. Both are
-      // credentials issued in the account name, which is released for reuse, so they go with the
-      // account and the next holder of the name starts with none.
-      this.db.prepare('DELETE FROM app_grants WHERE owner = ?').run(name);
-      this.db.prepare('DELETE FROM personal_access_tokens WHERE owner = ?').run(name);
+      // 10c. The apps the person granted access to, the personal access tokens they made and the
+      // session rows. They are credentials issued in the account name, which is released for reuse, so
+      // they go with the account and the next holder of the name starts with none, as on Postgres.
+      // repos/credential-erasure.ts, which the start step and the operator's decision call too.
+      deleteAccountCredentials(this.db, name, { sessions: true });
 
       // 11. Delete the owner record itself
       const result = this.db.prepare('DELETE FROM owners WHERE name = ?').run(name);

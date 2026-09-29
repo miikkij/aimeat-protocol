@@ -21,6 +21,11 @@
  *     the one-time spend of an assertion under concurrent requests
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-conformance.test.ts
  * @version-history
+ *   v1.20.0 -- 2026-09-26 -- The start step for credentials, on every provider: a name no account holds
+ *     loses its app grants, personal access tokens and session rows (revoked ones included), an older
+ *     grant and token of a held name stay and open the incident on their own, the holder's own stay,
+ *     nothing is held for sessions, the step runs once; "holder" keeps the grant and token, "previous"
+ *     deletes them and leaves the session rows. deleteOwner takes the session rows on every provider.
  *   v1.19.0 -- 2026-09-26 -- deleteOwner takes the app grants and the personal access tokens issued in
  *     the account name on every provider; another person's stay.
  *   v1.18.0 -- 2026-09-26 -- The start step for the cortexes and ecosystem apps of deleted accounts, on
@@ -425,6 +430,34 @@ async function installsLeft(s: Storage, x: Awaited<ReturnType<typeof seedInstall
     };
 }
 
+/**
+ * What an account name was issued at `at`, stored under the name whoever holds it now: an app grant, a
+ * personal access token, and two session rows, one of them revoked.
+ */
+async function seedCredentials(s: Storage, who: string, node: string, at: string) {
+    const x = { who, grantId: `appgrant-conf-${who}`, tokenHash: `pat-${who}`, sessions: [`sid-${who}-a`, `sid-${who}-b`] };
+    await s.createAppGrant({
+        grantId: x.grantId, app: `${who}/conf.html`, appName: 'conf', appOrigin: 'http://localhost:9911', owner: who, gaii: `${who}@${node}`,
+        scopes: ['memory:read'], refreshTokenHash: `rt-${who}`, createdAt: at, lastUsedAt: at, revoked: false,
+    });
+    await s.createPat({
+        id: randomUUID(), tokenHash: x.tokenHash, label: 'conformance', owner: who, scopes: [], grantOwner: true, grantOperator: false,
+        readOwnerData: false, gaii: `${who}@${node}`, createdAt: at, expiresAt: null, lastUsedAt: null, revoked: false,
+    });
+    const until = new Date(Date.now() + 86_400_000).toISOString();
+    for (const sessionId of x.sessions) await s.createSession({ sessionId, gaii: who, owner: who, issuedAt: at, expiresAt: until });
+    await s.revokeSession(x.sessions[1]);
+    return x;
+}
+
+/** What is left of what seedCredentials wrote: the session rows counted as stored, revoked ones included. */
+async function credentialsLeft(provider: string, s: Storage, x: Awaited<ReturnType<typeof seedCredentials>>) {
+    const sessions = provider === 'sqlite'
+        ? (sqliteDb(s).prepare('SELECT COUNT(*) AS n FROM sessions WHERE owner = ?').get(x.who) as { n: number }).n
+        : Number((await pgPool(s).query('SELECT COUNT(*) AS n FROM "Session" WHERE "owner" = $1', [x.who])).rows[0].n);
+    return { grant: !!(await s.getAppGrant(x.grantId)), token: !!(await s.getPatByHash(x.tokenHash)), sessions };
+}
+
 /** What is left of one seeded cortex, read back through the Storage interface. */
 async function cortexLeft(s: Storage, c: ReturnType<Awaited<ReturnType<typeof seedCortexErasure>>['cortexOf']>) {
     return {
@@ -584,6 +617,9 @@ async function forgetHeldRecord(provider: string, storage: Storage, key: string 
 
 /** The start step's record for the cortexes and ecosystem apps of deleted accounts. */
 const INSTALLS_RECORD = 'migration:installs:held';
+
+/** The start step's own record for the app grants, access tokens and session rows of deleted accounts. */
+const CREDENTIALS_RECORD = 'migration:credentials:held';
 
 /** Every incident this suite's node recorded, gone, so a start meets no open incident to join. */
 async function forgetIncidents(storage: Storage, nodeId: string): Promise<void> {
@@ -1588,6 +1624,82 @@ describe('storage providers agree on what they do, not just on their signatures'
             for (const n of [keep, prev, own, payer]) await storage.deleteOwner(n);
             for (const cx of [nodeOwn, reserved]) await storage.deleteCortexExtension(cx);
             await forgetHeldRecord(name, storage, INSTALLS_RECORD);
+        }
+    }, 60_000);
+
+    // The session rows are credentials issued in the account name too: the account deletion takes them
+    // on every provider, revoked ones included, with the grants and tokens.
+    it('deleteOwner takes the session rows issued in the account name, revoked ones included', async () => {
+        for (const { name, storage } of provs) {
+            const node = 'aimeat-conformance-001';
+            const tag = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+            const who = `confsess${tag}`;
+            await seedAccount(storage, who, node, new Date().toISOString());
+            const x = await seedCredentials(storage, who, node, new Date().toISOString());
+            await storage.deleteOwner(who);
+            expect.soft(await credentialsLeft(name, storage, x), `${name}: the erased person's credentials survived`).toEqual({ grant: false, token: false, sessions: 0 });
+        }
+    }, 60_000);
+
+    // The start step for credentials, once per node under its own record. A name no account holds
+    // loses its app grants, personal access tokens and session rows, revoked ones included, as an
+    // account deletion takes them. A grant or token older than the account that holds the name now
+    // (each by its own createdAt against the account's createdAt) stays and is recorded, and opens the
+    // incident on its own; newer ones are the holder's, and nothing is held for sessions. "It belongs
+    // to the current holder" keeps them; "it was a previous holder's" deletes them.
+    it('the start step for credentials settles what deleted accounts were issued, holds what is older than a name\'s account, and each decision acts on it', async () => {
+        const { settleCredentialsAtStart, openHeldNamesIncident, resolveHeldName } = await import('../../src/services/held-account-names.js');
+        const { findSecurityIncident } = await import('../../src/services/security-incident.js');
+        for (const { name, storage } of provs) {
+            const node = 'aimeat-conformance-001';
+            const config = { nodeId: node, extensionHooks: {} } as unknown as AimeatConfig;
+            const tag = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+            const hour = 3_600_000;
+            const earlier = new Date(Date.now() - hour).toISOString();
+            const longAgo = new Date(Date.now() - 48 * hour).toISOString();
+            const ages = new Date(Date.now() - 72 * hour).toISOString();
+            const gone = `confcg${tag}`, keep = `confck${tag}`, prev = `confcp${tag}`, own = `confco${tag}`;
+            await seedAccount(storage, keep, node, earlier);
+            await seedAccount(storage, prev, node, earlier);
+            await seedAccount(storage, own, node, ages);
+            const g = await seedCredentials(storage, gone, node, longAgo);
+            const k = await seedCredentials(storage, keep, node, longAgo);
+            const p = await seedCredentials(storage, prev, node, longAgo);
+            const o = await seedCredentials(storage, own, node, earlier);
+            // A start that meets no record of this step and no open incident: the move's record is seen.
+            await forgetHeldRecord(name, storage);
+            await forgetHeldRecord(name, storage, CREDENTIALS_RECORD);
+            await forgetIncidents(storage, node);
+
+            await settleCredentialsAtStart(storage);
+            const all = { grant: true, token: true, sessions: 2 };
+            expect.soft(await credentialsLeft(name, storage, g), `${name}: what a deleted account was issued survived the start`).toEqual({ grant: false, token: false, sessions: 0 });
+            expect.soft(await credentialsLeft(name, storage, k), `${name}: what is older than an account changed at start`).toEqual(all);
+            expect.soft(await credentialsLeft(name, storage, o), `${name}: what the holder was issued changed at start`).toEqual(all);
+            expect.soft(await storage.settleCredentialsOfDeletedAccounts(), `${name}: the start step ran twice`).toBeNull();
+            const record = await storage.getHeldNamesRecord(CREDENTIALS_RECORD);
+            const recorded = (n: string) => record?.held.find(h => h.name === n);
+            expect.soft(recorded(keep), `${name}: the older grant and token of a held name are not recorded`).toMatchObject({ app_grants: 1, access_tokens: 1, actions: 0 });
+            expect.soft([recorded(own), recorded(gone)], `${name}: the holder's own grant, or a deleted account's, is recorded as held`).toEqual([undefined, undefined]);
+
+            const opened = await openHeldNamesIncident(config, storage);
+            expect(opened.id, `${name}: no incident opened when only the start step for credentials had something to show`).toBeTruthy();
+            const id = opened.id as string;
+            const value = (await findSecurityIncident(storage, config, id))?.value as any;
+            const entry = (n: string) => value?.names?.find((e: any) => e.name === n);
+            expect.soft(entry(prev), `${name}: a name held only for its grant and token has no entry`).toMatchObject({ status: 'open', app_grants: 1, access_tokens: 1, actions: 0 });
+
+            const rk = await resolveHeldName(config, storage, { incidentId: id, name: keep, resolution: 'holder' });
+            expect.soft(rk.ok && rk.done, `${name}: deciding for the holder: ${JSON.stringify(rk)}`).toMatchObject({ app_grants_deleted: 0, access_tokens_deleted: 0 });
+            expect.soft(await credentialsLeft(name, storage, k), `${name}: "holder" did not keep the grant and token`).toEqual(all);
+
+            const rp = await resolveHeldName(config, storage, { incidentId: id, name: prev, resolution: 'previous' });
+            expect.soft(rp.ok && rp.done, `${name}: deciding for a previous holder: ${JSON.stringify(rp)}`).toMatchObject({ app_grants_deleted: 1, access_tokens_deleted: 1 });
+            expect.soft(await credentialsLeft(name, storage, p), `${name}: "previous" left the grant or token, or took the session rows`).toEqual({ grant: false, token: false, sessions: 2 });
+
+            await forgetIncidents(storage, node);
+            for (const n of [keep, prev, own]) await storage.deleteOwner(n);
+            await forgetHeldRecord(name, storage, CREDENTIALS_RECORD);
         }
     }, 60_000);
 

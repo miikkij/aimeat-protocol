@@ -2,21 +2,24 @@
  * @file src/services/held-account-names.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description What the move to the full identity and the start step for the cortexes and ecosystem
- *   apps of deleted accounts left for the operator, and the operator's decision on each name. No
+ * @description What the move to the full identity and the start steps for what deleted accounts
+ *   installed and were issued left for the operator, and the operator's decision on each name. No
  *   deploy step is done by hand: the move runs when the store opens (Postgres 0086,
- *   sqlite/schema-identity-backfill.ts), the start step runs right after it (settleInstallsAtStart),
- *   both act only on positive evidence, and both record what they could not place. This turns the
- *   records into ONE incident on the Security page at start, and settles a name the way the operator
- *   decides it.
+ *   sqlite/schema-identity-backfill.ts), the start steps run right after it (settleInstallsAtStart,
+ *   settleCredentialsAtStart), all act only on positive evidence, and all record what they could not
+ *   place. This turns the records into ONE incident on the Security page at start, and settles a name
+ *   the way the operator decides it.
  *
  *   WHAT IS HELD. Rows stored under a bare account name that are older than the account that holds
- *   the name now: actions, work and ledger lines (the move), and cortexes installed and ecosystem apps
- *   connected under the name (the start step). They may be that person's, or a previous holder's of
- *   the name, and nothing in the data says which. They stay exactly as they were until the operator
- *   decides, and a held ecosystem app acts for the account that holds the name until then:
+ *   the name now: actions, work and ledger lines (the move), cortexes installed and ecosystem apps
+ *   connected under the name, and app grants and personal access tokens issued in it (the start
+ *   steps). They may be that person's, or a previous holder's of the name, and nothing in the data
+ *   says which. They stay exactly as they were until the operator decides, and a held ecosystem app
+ *   acts for the account that holds the name until then. The tokens of a held grant or access token
+ *   are refused whatever the decision, because they are older than the account (auth/credential-age.ts):
  *   - 'holder': they are the holder's. The rows, the holder's own ledger lines and the hook bindings
- *     that name the actions move to the holder's full identity (GHII); the cortexes and apps stay.
+ *     that name the actions move to the holder's full identity (GHII); the cortexes, apps, grants and
+ *     tokens stay.
  *   - 'previous': they were a previous holder's, and are settled as deleting that account would have
  *     settled them (HeldAccountNameRepository.resolveHeldAccountName).
  *   A hook binding whose action the move did not put under a full identity is listed: with its name
@@ -32,12 +35,18 @@
  *   - HELD_NAMES_INCIDENT_TYPE, HELD_NAMES_INCIDENT_CODE, HELD_NAMES_SOURCE
  *   - settleInstallsAtStart(config, storage) — at start: the cortexes and ecosystem apps of deleted
  *     accounts, once per node
+ *   - settleCredentialsAtStart(storage) — at start: their app grants, access tokens and session rows,
+ *     once per node, under its own record
  *   - openHeldNamesIncident(config, storage) — at start: the records, once each, to one incident
  *   - resolveHeldName(config, storage, { incidentId, name, resolution }) — one decision
  * @usage
  *   await settleInstallsAtStart(config, storage);   // server-bootstrap/config-init.ts
+ *   await settleCredentialsAtStart(storage);
  *   await openHeldNamesIncident(config, storage);
  * @version-history
+ *   v1.2.0 — 2026-09-26 — settleCredentialsAtStart, the start step for the app grants, personal access
+ *     tokens and session rows of deleted accounts. Its record joins the same incident; a decision covers
+ *     the grants and tokens its entry holds.
  *   v1.1.0 — 2026-09-26 — settleInstallsAtStart, the start step for the cortexes and ecosystem apps of
  *     deleted accounts. The incident is made from both records, a name counted once with every kind
  *     of row it holds; a record whose run an open incident has not taken joins it. A decision covers
@@ -46,8 +55,12 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import type { HeldAccountName, HeldNameOutcome, HeldNameResolution, HeldNamesRecord, UntiedLedgerValue } from '../storage/types/held-names.js';
-import { HELD_NAMES_RECORD_KEY, HELD_INSTALLS_RECORD_KEY } from '../storage/repositories/held-names.repository.js';
+import type {
+  DeletedAtStart, HeldAccountName, HeldNameOutcome, HeldNameResolution, HeldNamesRecord, UntiedLedgerValue,
+} from '../storage/types/held-names.js';
+import {
+  HELD_NAMES_RECORD_KEY, HELD_INSTALLS_RECORD_KEY, HELD_CREDENTIALS_RECORD_KEY,
+} from '../storage/repositories/held-names.repository.js';
 import { HOOK_NAMES, hookKind, indexActionRefs } from './hooks.js';
 import { accountNameRef, followActionsToFullIdentity } from './hooks-overview.js';
 import {
@@ -63,7 +76,7 @@ export const HELD_NAMES_INCIDENT_CODE = 'NAMES_TO_DECIDE';
 export const HELD_NAMES_SOURCE = 'full_identity_move';
 
 /** The records an incident of this kind is made from, the move's first. */
-const RECORD_KEYS = [HELD_NAMES_RECORD_KEY, HELD_INSTALLS_RECORD_KEY];
+const RECORD_KEYS = [HELD_NAMES_RECORD_KEY, HELD_INSTALLS_RECORD_KEY, HELD_CREDENTIALS_RECORD_KEY];
 
 /** One run of one record, as an incident names what it took: `<key>@<at>`. */
 const sourceOf = (key: string, record: HeldNamesRecord): string => `${key}@${record.at}`;
@@ -76,6 +89,8 @@ const sourcesOf = (i: SecurityIncidentValue): string[] =>
 const holdsRows = (n: HeldAccountName): boolean => n.actions + n.work + n.own_lines + n.naming_lines > 0;
 /** Cortexes and ecosystem apps the start step recorded for a name. */
 const holdsInstalls = (n: HeldAccountName): boolean => (n.cortexes ?? 0) + (n.ecosystem_apps ?? 0) > 0;
+/** App grants and personal access tokens the start step for credentials recorded for a name. */
+const holdsCredentials = (n: HeldAccountName): boolean => (n.app_grants ?? 0) + (n.access_tokens ?? 0) > 0;
 
 /** Add what another record holds for the same name. */
 function addCounts(into: HeldAccountName, from: HeldAccountName): void {
@@ -85,6 +100,13 @@ function addCounts(into: HeldAccountName, from: HeldAccountName): void {
   into.naming_lines += from.naming_lines;
   into.cortexes = (into.cortexes ?? 0) + (from.cortexes ?? 0);
   into.ecosystem_apps = (into.ecosystem_apps ?? 0) + (from.ecosystem_apps ?? 0);
+  into.app_grants = (into.app_grants ?? 0) + (from.app_grants ?? 0);
+  into.access_tokens = (into.access_tokens ?? 0) + (from.access_tokens ?? 0);
+}
+
+/** What a start step deleted, as a list for the log: "2 cortexes, 1 ecosystem apps". */
+function deletedList(d: DeletedAtStart): string {
+  return Object.entries(d).filter(([kind]) => kind !== 'names').map(([kind, n]) => `${n} ${kind.replace('_', ' ')}`).join(', ');
 }
 
 /** The sentence an incident carries for a reader of the REST or MCP answer. The page words its own. */
@@ -92,11 +114,14 @@ function detailOf(names: HeldAccountName[], bindings: number, untied: number): s
   const parts: string[] = [];
   const n = names.length;
   if (n > 0) {
-    parts.push(`At start, the move to the full identity and the settling of deleted accounts' cortexes and ecosystem apps left the rows of ${n} account name${n === 1 ? '' : 's'} as they were: `
+    parts.push(`At start, the move to the full identity and the settling of what deleted accounts installed and were issued left the rows of ${n} account name${n === 1 ? '' : 's'} as they were: `
       + 'they are older than the account that holds the name now, so they may be that account\'s or a previous holder\'s. '
-      + 'Decide each name: "holder" moves its actions, work and own ledger lines to the account that holds it and keeps its cortexes and ecosystem apps, "previous" settles them all as a deleted account\'s.');
+      + 'Decide each name: "holder" moves its actions, work and own ledger lines to the account that holds it and keeps its cortexes, ecosystem apps, app grants and access tokens, "previous" settles them all as a deleted account\'s.');
     if (names.some(h => (h.ecosystem_apps ?? 0) > 0)) {
       parts.push('An ecosystem app among them can still act for the account that holds its name until you decide.');
+    }
+    if (names.some(holdsCredentials)) {
+      parts.push('The app grants and access tokens among them are refused whatever you decide, because they are older than the account.');
     }
   }
   if (bindings > 0) {
@@ -120,10 +145,28 @@ export async function settleInstallsAtStart(config: AimeatConfig, storage: Stora
     const record = await storage.settleInstallsOfDeletedAccounts({ nodeId: config.nodeId });
     const d = record?.deleted;
     if (d && d.names > 0) {
-      logger.info(`held-account-names: the cortexes and ecosystem apps of ${d.names} deleted account${d.names === 1 ? '' : 's'} went as an account deletion takes them (${d.cortexes} cortexes, ${d.ecosystem_apps} ecosystem apps).`);
+      logger.info(`held-account-names: the cortexes and ecosystem apps of ${d.names} deleted account${d.names === 1 ? '' : 's'} went as an account deletion takes them (${deletedList(d)}).`);
     }
   } catch (err) {
     logger.error('held-account-names: the cortexes and ecosystem apps of deleted accounts were not settled at start. The next start tries again.', { error: String(err) });
+  }
+}
+
+/**
+ * At start, after the step above: the app grants, personal access tokens and session rows of deleted
+ * accounts, once per node, under its own record (HeldAccountNameRepository.settleCredentialsOfDeletedAccounts).
+ * What no account holds goes as an account deletion takes it; a grant or token created before the
+ * account holding its name now is recorded for the operator. The node starts whatever the store answers.
+ */
+export async function settleCredentialsAtStart(storage: Storage): Promise<void> {
+  try {
+    const record = await storage.settleCredentialsOfDeletedAccounts();
+    const d = record?.deleted;
+    if (d && d.names > 0) {
+      logger.info(`held-account-names: the app grants, access tokens and session rows of ${d.names} deleted account${d.names === 1 ? '' : 's'} went as an account deletion takes them (${deletedList(d)}).`);
+    }
+  } catch (err) {
+    logger.error('held-account-names: the app grants, access tokens and session rows of deleted accounts were not settled at start. The next start tries again.', { error: String(err) });
   }
 }
 
@@ -131,7 +174,7 @@ export async function settleInstallsAtStart(config: AimeatConfig, storage: Stora
 function logHeld(names: HeldAccountName[], bindingsLeft: IncidentBinding[]): void {
   for (const n of names) {
     const apps = n.ecosystem_apps ?? 0;
-    logger.warn(`held-account-names: the rows under the name "${n.name}" are older than the account that holds it now, and stay as they are until an operator decides on the Security page (${n.actions} actions, ${n.work} work, ${n.own_lines} own lines, ${n.naming_lines} lines naming it, ${n.cortexes ?? 0} cortexes, ${apps} ecosystem apps${apps ? ', which act for that account until then' : ''}).`);
+    logger.warn(`held-account-names: the rows under the name "${n.name}" are older than the account that holds it now, and stay as they are until an operator decides on the Security page (${n.actions} actions, ${n.work} work, ${n.own_lines} own lines, ${n.naming_lines} lines naming it, ${n.cortexes ?? 0} cortexes, ${apps} ecosystem apps${apps ? ', which act for that account until then' : ''}, ${n.app_grants ?? 0} app grants and ${n.access_tokens ?? 0} access tokens, which are refused).`);
   }
   for (const b of bindingsLeft) {
     logger.warn(`held-account-names: "${b.ref}" on ${b.hook} names no published action${b.gate ? ', so this gate lets everything pass until it is bound again' : ''}.`);
@@ -139,8 +182,8 @@ function logHeld(names: HeldAccountName[], bindingsLeft: IncidentBinding[]): voi
 }
 
 /**
- * At start: turn what the move and the start step recorded into ONE incident, once per record. A
- * name both recorded is one entry with every count. Returns the incident's id when this start opened
+ * At start: turn what the move and the start steps recorded into ONE incident, once per record. A
+ * name several recorded is one entry with every count. Returns the incident's id when this start opened
  * it. A record already turned into an incident, or no record, opens nothing. So does a record with
  * nothing to show, which is then marked as seen. A record that comes after its incident was opened
  * joins it while it is open and none of its names is decided there; else it opens its own.
@@ -172,7 +215,12 @@ export async function openHeldNamesIncident(config: AimeatConfig, storage: Stora
     for (const h of p.record.held) {
       const entry = byName.get(h.name);
       if (entry) addCounts(entry, h);
-      else byName.set(h.name, { ...h, cortexes: h.cortexes ?? 0, ecosystem_apps: h.ecosystem_apps ?? 0, bindings: [], status: 'open' });
+      else {
+        byName.set(h.name, {
+          ...h, cortexes: h.cortexes ?? 0, ecosystem_apps: h.ecosystem_apps ?? 0,
+          app_grants: h.app_grants ?? 0, access_tokens: h.access_tokens ?? 0, bindings: [], status: 'open',
+        });
+      }
     }
   }
   const names = [...byName.values()];
@@ -287,6 +335,7 @@ export async function resolveHeldName(
 
   const rows = holdsRows(entry);
   const installs = holdsInstalls(entry);
+  const credentials = holdsCredentials(entry);
   let holderGhii: string | null = null;
   if (resolution === 'holder') {
     const owner = await storage.getOwner(name);
@@ -303,7 +352,7 @@ export async function resolveHeldName(
   }
 
   const done = await storage.resolveHeldAccountName({
-    name, resolution, holderGhii, namingBefore: entry.holder_since, nodeId: config.nodeId, rows, installs,
+    name, resolution, holderGhii, namingBefore: entry.holder_since, nodeId: config.nodeId, rows, installs, credentials,
   });
   let bindingsMoved: Array<{ hook: string; from: string; to: string }> = [];
   if (resolution === 'holder' && holderGhii && rows) {

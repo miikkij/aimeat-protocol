@@ -8074,8 +8074,9 @@ paths:
         credential the account issued: its sessions and refresh cookie, its agents' tokens and their
         MCP access tokens, its personal access tokens, and its app grants' access and refresh tokens
         are refused from the deletion on, also after the name is registered again and an agent of
-        the same name, which gets the same identity, is connected. The app grants and the personal
-        access tokens are deleted with the account, so the next holder of the name lists none.
+        the same name, which gets the same identity, is connected. The app grants, the personal
+        access tokens and the session rows are deleted with the account, so the next holder of the
+        name lists none.
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -56401,18 +56402,24 @@ paths:
         (`owner`, `createdAt`): those of a name no account holds go as an account deletion takes them
         (an app with what it holds, its recipes and every token it has), and those older than the
         account holding the name now are left as they were; such an app can still act for that
-        account until the name is decided. Both open one incident of type `held_account_names` that
-        lists each such name (`names`, with `actions`, `work`, `own_lines`, `naming_lines`,
-        `cortexes` and `ecosystem_apps`), the hook bindings that name nothing now (`bindings_left`)
-        and the ledger values nothing ties to a person (`untied`). With `{ name, resolution }` this
-        endpoint decides one name: `holder` moves its actions, its work and its own ledger lines to
-        the full identity of the account that holds the name, and the hook bindings to its actions
-        with them, and keeps its cortexes and ecosystem apps; `previous` settles them as a deleted
-        account's (actions deleted, open work cancelled with the held morsels going back only to an
-        account that existed when the row was written, finished work, disputes and the older lines
-        naming it under one pseudonym, its own lines deleted, its cortexes and ecosystem apps deleted
-        with what they hold). The incident closes when its last name is decided; resolving it without
-        a name before that answers 409. Deciding a name again the same way answers what that decision
+        account until the name is decided. A second start step, under its own record, reads the app
+        grants (`owner`, `createdAt`), the personal access tokens (`owner`, `createdAt`) and the
+        session rows (`owner`): those of a name no account holds go as an account deletion takes
+        them, and a grant or token whose `createdAt` is before the `createdAt` of the account holding
+        the name now is left as it was; its tokens are refused whatever the decision, and nothing is
+        held for session rows. All of them open one incident of type `held_account_names` that lists
+        each such name (`names`, with `actions`, `work`, `own_lines`, `naming_lines`, `cortexes`,
+        `ecosystem_apps`, `app_grants` and `access_tokens`), the hook bindings that name nothing now
+        (`bindings_left`) and the ledger values nothing ties to a person (`untied`). With
+        `{ name, resolution }` this endpoint decides one name: `holder` moves its actions, its work
+        and its own ledger lines to the full identity of the account that holds the name, and the
+        hook bindings to its actions with them, and keeps its cortexes, ecosystem apps, app grants and
+        access tokens; `previous` settles them as a deleted account's (actions deleted, open work
+        cancelled with the held morsels going back only to an account that existed when the row was
+        written, finished work, disputes and the older lines naming it under one pseudonym, its own
+        lines deleted, its cortexes and ecosystem apps deleted with what they hold, its older app
+        grants and access tokens deleted). The incident closes when its last name is decided;
+        resolving it without a name before that answers 409. Deciding a name again the same way answers what that decision
         did; deciding it the other way answers 409.
         Requires the `operator` role. Returns 404 if the incident, or the name in it, does not exist.
       security:
@@ -56430,7 +56437,7 @@ paths:
               type: object
               properties:
                 name: { type: string, description: 'An account name from the incident''s `names`.' }
-                resolution: { type: string, enum: [holder, previous], description: 'holder: the rows, cortexes and ecosystem apps are the account''s that holds the name now. previous: they were a previous holder''s.' }
+                resolution: { type: string, enum: [holder, previous], description: 'holder: the rows, cortexes, ecosystem apps, app grants and access tokens are the account''s that holds the name now. previous: they were a previous holder''s.' }
       responses:
         '200':
           description: Incident resolved, or one name of it decided
@@ -56466,6 +56473,8 @@ paths:
                               naming_lines: { type: integer }
                               cortexes_deleted: { type: integer, description: 'previous: the cortexes older than the account that holds the name, with what their activation made.' }
                               ecosystem_apps_deleted: { type: integer, description: 'previous: the ecosystem apps older than that account, with what they hold; their tokens stop.' }
+                              app_grants_deleted: { type: integer, description: 'previous: the app grants older than that account.' }
+                              access_tokens_deleted: { type: integer, description: 'previous: the personal access tokens older than that account.' }
                           bindings_moved:
                             type: array
                             description: With a name. The hook bindings moved to the holder's full identity.

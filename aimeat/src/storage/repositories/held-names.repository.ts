@@ -2,18 +2,23 @@
  * @file src/storage/repositories/held-names.repository.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Storage-layer interface for what the move to the full identity and the start step for
- *   the cortexes and ecosystem apps of deleted accounts left for the operator: the records they wrote
- *   (Postgres 0086 and sqlite/schema-identity-backfill.ts; settleInstallsOfDeletedAccounts), and the
- *   operator's decision on one name. Both providers settle a decision the way the move and the account
- *   deletion settle a placed row, so a decision reads the same on either backend.
+ * @description Storage-layer interface for what the move to the full identity and the start steps for
+ *   what deleted accounts installed and were issued left for the operator: the records they wrote
+ *   (Postgres 0086 and sqlite/schema-identity-backfill.ts; settleInstallsOfDeletedAccounts;
+ *   settleCredentialsOfDeletedAccounts), and the operator's decision on one name. Both providers
+ *   settle a decision the way the move and the account deletion settle a placed row, so a decision
+ *   reads the same on either backend.
  * @structure
  *   - getHeldNamesRecord(key) / saveHeldNamesRecord(record, key) — a record, by default the move's
  *     (`migration:0086:held`)
- *   - settleInstallsOfDeletedAccounts(input) — the start step, once per node
+ *   - settleInstallsOfDeletedAccounts(input) — the start step for cortexes and ecosystem apps
+ *   - settleCredentialsOfDeletedAccounts() — the start step for app grants, access tokens and sessions
  *   - resolveHeldAccountName(input) — move the name's rows to its holder, or settle them as a
  *     previous holder's
  * @version-history
+ *   v1.2.0 — 2026-09-26 — settleCredentialsOfDeletedAccounts and its own record
+ *     (HELD_CREDENTIALS_RECORD_KEY); a decision covers the app grants and personal access tokens older
+ *     than the account that holds the name (`credentials`).
  *   v1.1.0 — 2026-09-26 — settleInstallsOfDeletedAccounts and its record (HELD_INSTALLS_RECORD_KEY);
  *     the record methods take the key; a decision covers the cortexes and ecosystem apps older than
  *     the account that holds the name.
@@ -26,6 +31,12 @@ export const HELD_NAMES_RECORD_KEY = 'migration:0086:held';
 
 /** The system setting both providers keep the start step's record under. Its presence means it ran. */
 export const HELD_INSTALLS_RECORD_KEY = 'migration:installs:held';
+
+/**
+ * The record of the start step for credentials. A key of its own, so the step runs once on a node
+ * where the step above has run already.
+ */
+export const HELD_CREDENTIALS_RECORD_KEY = 'migration:credentials:held';
 
 export interface HeldAccountNameRepository {
   /** A record (by default the move's), or null when it recorded nothing (or has not run). */
@@ -57,13 +68,33 @@ export interface HeldAccountNameRepository {
   settleInstallsOfDeletedAccounts(input: { nodeId: string }): Promise<HeldNamesRecord | null>;
 
   /**
+   * The start step for credentials, once per node, in one transaction with its own record
+   * (HELD_CREDENTIALS_RECORD_KEY). It reads the app grants (`owner`, `createdAt`), the personal access
+   * tokens (`owner`, `createdAt`) and the session rows (`owner`) against the account that holds each
+   * name now (`createdAt`), and acts on positive evidence only:
+   *
+   *   - No account holds the name: its app grants, access tokens and session rows (revoked ones
+   *     included) go, through the function the account deletion calls.
+   *   - An account holds the name and a grant or token was created before that account: it is HELD.
+   *     It stays as it is, and the name is recorded with its counts (`app_grants`, `access_tokens`).
+   *     Its tokens are refused whatever the decision (auth/credential-age.ts). Nothing is held for
+   *     session rows.
+   *   - Otherwise nothing.
+   *
+   * Only a value an account can be registered under names an account, as for the step above. Returns
+   * the record it wrote, or null when an earlier start ran it. Applies no authorization: the caller is
+   * the node's start.
+   */
+  settleCredentialsOfDeletedAccounts(): Promise<HeldNamesRecord | null>;
+
+  /**
    * Settle what stays under the bare account name `name`, in one transaction.
    *
    * 'holder': the name's rows are the holder's. Its local actions, the sides of work under the bare
    * name and the lines filed under it move to `holderGhii`. An action whose id `holderGhii` already
    * publishes stays where it is. The lines in other people's ledgers that name the account stay as
-   * they are: they name the holder. The cortexes and ecosystem apps older than the holder's account
-   * stay as they are: they are the holder's.
+   * they are: they name the holder. The cortexes, ecosystem apps, app grants and access tokens older
+   * than the holder's account stay as they are: they are the holder's.
    *
    * 'previous': the rows were a previous holder's, and are settled as deleting that account would
    * have settled them: its local actions go; its work is settled by the erasure's rule (open work
@@ -71,11 +102,13 @@ export interface HeldAccountNameRepository {
    * work and disputes under one new pseudonym); its own lines go; the lines in other people's ledgers
    * that name it and are older than `namingBefore` take the same pseudonym. The cortexes and ecosystem
    * apps older than `namingBefore` go as the start step takes a deleted account's, under the same
-   * pseudonym.
+   * pseudonym, and the app grants and access tokens created before it go through the function the
+   * account deletion calls.
    *
    * `rows` (default true) covers what the move recorded (actions, work, lines); `installs` (default
-   * true) covers the cortexes and ecosystem apps. The caller passes what the name's entry holds, so a
-   * decision never acts on a kind of row another decision already settled.
+   * true) covers the cortexes and ecosystem apps; `credentials` (default true) the app grants and
+   * access tokens. The caller passes what the name's entry holds, so a decision never acts on a kind
+   * of row another decision already settled.
    *
    * Applies no authorization: the caller is the operator's decision (services/held-account-names.ts).
    */
@@ -90,5 +123,6 @@ export interface HeldAccountNameRepository {
     nodeId?: string;
     rows?: boolean;
     installs?: boolean;
+    credentials?: boolean;
   }): Promise<HeldNameOutcome>;
 }

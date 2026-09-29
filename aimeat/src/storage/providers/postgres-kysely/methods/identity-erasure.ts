@@ -2,19 +2,24 @@
  * @file src/storage/providers/postgres-kysely/methods/identity-erasure.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description What goes with one identity, and with the cortexes and ecosystem apps of an account,
- *   for the Postgres backend. Moved out of owner-cascade.ts, so the start step and the operator's
- *   decision on a held name (held-names.ts) reach the same functions the account deletion calls
- *   without importing the cascade and, through it, the provider class (an import cycle, check:deps).
- *   owner-cascade.ts exports them again for its callers.
+ * @description What goes with one identity, and with the cortexes, ecosystem apps and credentials of an
+ *   account, for the Postgres backend. Moved out of owner-cascade.ts, so the start steps and the
+ *   operator's decision on a held name (held-names.ts) reach the same functions the account deletion
+ *   calls without importing the cascade and, through it, the provider class (an import cycle,
+ *   check:deps). owner-cascade.ts exports them again for its callers.
  * @structure
  *   - cascadeDeleteIdentityData(db, gaii) — every owner-scoped table for ONE identity (GHII or GAII)
  *   - deleteInstalledCortexesDb(db, name, ghiis, opts) — the cortexes the account installed, with
  *     what their activation made
  *   - deleteEcosystemAppsDb(db, owner, geais, opts) — the ecosystem apps the account connected, as its
  *     agents go
+ *   - deleteAccountCredentialsDb(db, owner, opts) — the app grants, personal access tokens and session
+ *     rows issued in the account name
  * @usage import { cascadeDeleteIdentityData } from './identity-erasure.js';
  * @version-history
+ *   v1.1.0 — 2026-09-26 — deleteAccountCredentialsDb: what deleteOwnerCascade deleted inline for the
+ *     app grants, the personal access tokens and the session rows, with `before` for the operator's
+ *     decision on a held name.
  *   v1.0.0 — 2026-09-26 — cascadeDeleteIdentityData and deleteInstalledCortexesDb moved out of
  *     owner-cascade.ts; deleteInstalledCortexesDb takes `names`, for the operator's decision on a
  *     held name. deleteEcosystemAppsDb is what deleteOwnerCascade did for the ecosystem apps inline.
@@ -244,4 +249,35 @@ export async function deleteEcosystemAppsDb(
   if (opts.everyRecipe) await db.deleteFrom('EcoAutomationRecipe').where('owner', '=', owner).execute();
   else if (apps.length) await db.deleteFrom('EcoAutomationRecipe').where('owner', '=', owner).where('app', 'in', apps.map(a => a.app)).execute();
   return apps.length;
+}
+
+/**
+ * The credentials issued in an account name: the app grants the person gave, the personal access
+ * tokens they made and, with `sessions`, the session rows, revoked ones included. Each is issued in a
+ * name that is released for reuse, so it goes with the account, and the next holder of the name starts
+ * with none. The account deletion (owner-cascade.ts deleteOwnerCascade), the start step for credentials
+ * and the operator's decision on a held name (held-names.ts) call this one function.
+ *
+ * `before` limits it to the grants and tokens whose createdAt is before that time: the ones older than
+ * the account that holds the name now, when the operator decides they were a previous holder's.
+ * Returns what it deleted.
+ */
+export async function deleteAccountCredentialsDb(
+  db: Db, owner: string, opts: { before?: Date; sessions?: boolean } = {},
+): Promise<{ appGrants: number; accessTokens: number; sessions: number }> {
+  const before = opts.before;
+  const grants = await db.deleteFrom('AppGrant').where('owner', '=', owner)
+    .$if(before !== undefined, qb => qb.where('createdAt', '<', before as Date))
+    .executeTakeFirst();
+  const tokens = await db.deleteFrom('PersonalAccessToken').where('owner', '=', owner)
+    .$if(before !== undefined, qb => qb.where('createdAt', '<', before as Date))
+    .executeTakeFirst();
+  const sessions = opts.sessions
+    ? await db.deleteFrom('Session').where('owner', '=', owner).executeTakeFirst()
+    : null;
+  return {
+    appGrants: Number(grants.numDeletedRows ?? 0),
+    accessTokens: Number(tokens.numDeletedRows ?? 0),
+    sessions: Number(sessions?.numDeletedRows ?? 0),
+  };
 }

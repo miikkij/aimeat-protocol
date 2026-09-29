@@ -1,5 +1,24 @@
 {
   "admin": {
+    "portal": {
+      "log": {
+        "action": {
+          "template_upload": "HTML propio subido",
+          "template_delete": "HTML propio eliminado",
+          "import": "Importado",
+          "cache_invalidate": "Caché borrada",
+          "app_publish": "Aplicación publicada",
+          "app_update": "Aplicación actualizada",
+          "app_delete": "Aplicación eliminada",
+          "memory_set": "Texto guardado",
+          "memory_delete": "Texto eliminado",
+          "layout_set": "Diseño guardado",
+          "layout_delete": "Diseño eliminado",
+          "layout_restore": "Diseño anterior restaurado",
+          "other": "Otro cambio"
+        }
+      }
+    },
     "database": {
       "title": "Base de datos",
       "loading": "Cargando las estadísticas de almacenamiento…",
@@ -199,7 +218,7 @@
         "payload": "Contenido",
         "held": {
           "title": "Registros anteriores a la cuenta",
-          "lead": "Al iniciar, la actualización pasó los registros más antiguos de cada persona a su cuenta y eliminó los cortex y las aplicaciones del ecosistema de las cuentas eliminadas. Los registros de abajo son anteriores a la cuenta que tiene ahora el nombre de usuario. Pueden ser de esa persona o de alguien que tuvo el nombre antes, así que quedan tal como estaban hasta que decidas cada nombre.",
+          "lead": "Al iniciar, la actualización pasó los registros más antiguos de cada persona a su cuenta. También eliminó los cortex, las aplicaciones del ecosistema, los permisos de aplicación, los tokens de acceso y las sesiones de las cuentas eliminadas. Los registros de abajo son anteriores a la cuenta que tiene ahora el nombre de usuario. Pueden ser de esa persona o de alguien que tuvo el nombre antes, así que quedan tal como estaban hasta que decidas cada nombre.",
           "leadResolved": "Al iniciar, la actualización dejó como estaban registros anteriores a la cuenta que tiene ahora el nombre de usuario. Ya decidiste cada nombre, y abajo se ve de quién eran sus registros.",
           "rowOpen": "Por decidir: {n} de {total}",
           "rowResolved": "Todos los nombres están decididos.",
@@ -209,8 +228,11 @@
           "countNaming": "Líneas en el historial de pagos de otras personas: {n}",
           "countCortexes": "Cortex: {n}",
           "countApps": "Aplicaciones del ecosistema: {n}",
+          "countGrants": "Permisos de aplicación: {n}",
+          "countTokens": "Tokens de acceso: {n}",
           "appsActOne": "Su aplicación del ecosistema todavía puede actuar por esta cuenta hasta que decidas.",
           "appsActMany": "Sus {n} aplicaciones del ecosistema todavía pueden actuar por esta cuenta hasta que decidas.",
+          "credentialsRefused": "Sus permisos de aplicación y tokens de acceso no funcionan, decidas lo que decidas.",
           "holder": "Titular desde el {date}: {ghii}",
           "holderNoAddress": "Titular desde el {date}: una cuenta que aún no tiene dirección completa",
           "bound": "Ganchos vinculados a sus acciones: {list}",
@@ -222,11 +244,13 @@
           "decideHolder": "Pertenece al titular actual",
           "decidePrevious": "Era de un titular anterior",
           "confirmHolder": "¿Pasar los registros de {name} a {ghii}, la cuenta que tiene ahora el nombre de usuario? Sus acciones, sus trabajos y las líneas de su propio historial de pagos pasan a esa cuenta, y los ganchos vinculados a sus acciones los siguen.",
-          "confirmHolderInstalls": "Sus cortex y aplicaciones del ecosistema se quedan con esa cuenta.",
-          "confirmHolderOnlyInstalls": "¿Dejar los cortex y las aplicaciones del ecosistema de {name} con {ghii}, la cuenta que tiene ahora el nombre de usuario? Quedan tal como están, y sus aplicaciones del ecosistema siguen actuando por esa cuenta.",
+          "confirmHolderKeep": "¿Dejar lo que tiene {name} con {ghii}, la cuenta que tiene ahora el nombre de usuario?",
+          "confirmHolderInstalls": "Sus cortex y aplicaciones del ecosistema se quedan con esa cuenta, y las aplicaciones siguen actuando por ella.",
+          "confirmHolderCredentials": "Sus permisos de aplicación y tokens de acceso se quedan guardados, pero no funcionan.",
           "confirmPrevious": "¿Tratar los registros de {name} como los de una cuenta eliminada? Sus acciones se eliminan y su trabajo abierto se cancela. Su trabajo terminado, sus disputas y las líneas antiguas en el historial de pagos de otras personas llevan un seudónimo en lugar del nombre de usuario.",
+          "confirmPreviousDelete": "¿Eliminar lo que tiene {name} como lo de una cuenta eliminada?",
           "confirmPreviousInstalls": "Sus cortex y aplicaciones del ecosistema más antiguos se eliminan con todo lo que tienen, y los tokens de esas aplicaciones dejan de funcionar.",
-          "confirmPreviousOnlyInstalls": "¿Eliminar los cortex y las aplicaciones del ecosistema de {name} como los de una cuenta eliminada? Se eliminan con todo lo que tienen, y los tokens de esas aplicaciones dejan de funcionar.",
+          "confirmPreviousCredentials": "Sus permisos de aplicación y tokens de acceso más antiguos se eliminan.",
           "cannotUndo": "No se puede deshacer.",
           "decided": "Decidido",
           "bindingsLeft": "Estos vínculos de ganchos apuntan a acciones que ya no existen: {list}.",
@@ -2656,25 +2680,6 @@
       "visNote_group": "El grupo se nombra en el registro.",
       "visNote_owner": "Una cuenta humana y todo lo que actúa en su nombre.",
       "visNote_private": "Ni siquiera los otros agentes del propietario."
-    },
-    "portal": {
-      "log": {
-        "action": {
-          "template_upload": "HTML propio subido",
-          "template_delete": "HTML propio eliminado",
-          "import": "Importado",
-          "cache_invalidate": "Caché borrada",
-          "app_publish": "Aplicación publicada",
-          "app_update": "Aplicación actualizada",
-          "app_delete": "Aplicación eliminada",
-          "memory_set": "Texto guardado",
-          "memory_delete": "Texto eliminado",
-          "layout_set": "Diseño guardado",
-          "layout_delete": "Diseño eliminado",
-          "layout_restore": "Diseño anterior restaurado",
-          "other": "Otro cambio"
-        }
-      }
     }
   },
   "admin.messages.desc": "Telemetría de entrega de los mensajes entre personas. No se enseña el contenido de ningún mensaje ni quién participa.",
