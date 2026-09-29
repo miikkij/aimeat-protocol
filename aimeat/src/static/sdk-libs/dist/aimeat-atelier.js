@@ -4340,10 +4340,11 @@
   }
 
   // src/static/sdk-libs/atelier/shell.js
+  var LOGO_INLINE_MAX = 8192;
   function logoEl(src) {
     if (typeof src !== "string" || !src.trim()) return null;
-    if (/^\s*data:/i.test(src)) {
-      console.warn("[atelier] app({ logo }) refuses a data: URI; upload the image to storage and pass its URL.");
+    if (/^\s*data:/i.test(src) && (!/^\s*data:image\//i.test(src) || src.length > LOGO_INLINE_MAX)) {
+      console.warn("[atelier] app({ logo }) refuses this data: URI; an inline logo is a data:image of at most " + LOGO_INLINE_MAX + " characters, anything larger goes to storage as a URL.");
       return null;
     }
     return el("img", { class: "ak-app__logo", src, alt: "", width: "32", height: "32", decoding: "async" });
@@ -18806,7 +18807,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.59.1",
+    version: "0.60.0",
     /**
      * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
      * named parts (every one carries `data-ak-part`, so an app's own CSS reaches it), the slots

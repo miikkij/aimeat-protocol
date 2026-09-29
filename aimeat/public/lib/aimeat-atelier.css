@@ -49,6 +49,8 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.60.0 — 2026-09-29 — No rule changed: the stylesheet names the kit's version, whose app({ logo })
+ *     now takes a small inline image.
  *   v0.59.1 — 2026-09-29 — The node's marks moved onto one 46px row at the bottom-left: the
  *     --ak-chrome-bottom fallback follows (was 56px), and the side column of the workbench frame
  *     keeps that row free at its foot (workbench.css).

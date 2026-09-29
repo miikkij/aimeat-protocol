@@ -55,6 +55,8 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.60.0 — 2026-09-29 — app({ logo }) takes a small inline image, a data:image of at most 8192
+ *     characters (shell.js v0.66.0), the one form a package carries to a customer node.
  *   v0.59.1 — 2026-09-29 — No script changed: the stylesheet's version, for the node's marks on
  *     one row at the bottom-left (aimeat-atelier.css v0.59.1).
  *   v0.59.0 — 2026-09-29 — Every layer the kit puts on the body (a dialog, a drawer, a menu, a
@@ -411,7 +413,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.59.1',
+  version: '0.60.0',
 
   /**
    * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
