@@ -57,6 +57,9 @@
  *     getNodeUrl()) instead of a hard-coded "aimeat.io", and says what happens after login (the
  *     Connect screen for an app used the first time, then back in the app signed in) instead of
  *     asking the person to re-open the app's link, which nobody needs to do.
+ *   v1.6.0 — 2026-09-29 — Log in opens the dialog with `redirect` set to the app that asked, so an
+ *     emailed sign-in link returns the person to the app. This page cannot be the place: the request
+ *     it shows lives ten minutes, and a link opened from the mail has no popup opener to answer.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -99,8 +102,14 @@ export default function AppGrant() {
   // user signs in right here — the session hook flips this to the consent view on success.
   const authed = !!useSession();
 
-  function doLogin() {
-    if (!showLoginModal({})) window.location.href = '/v1/profile';
+  async function doLogin() {
+    // An emailed sign-in link returns to the app that asked, not to this page (v1.6.0).
+    let redirect = '';
+    try {
+      const res = await api(`/v1/app-grants/request/${encodeURIComponent(requestId)}`);
+      redirect = res.data?.app_origin || '';
+    } catch (err) { swallowed('app-grant: the app to return to', err); }
+    if (!showLoginModal(redirect ? { redirect } : {})) window.location.href = '/v1/profile';
   }
 
   useEffect(() => {

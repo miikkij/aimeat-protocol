@@ -19,8 +19,20 @@
  *   user whose account the install created, with a link that lasts days rather than minutes.
  *
  *   The API endpoint GET /v1/ghii/magic-link/verify is unchanged for callers that want the JSON.
- * @structure LOGIN_LINK_TTL_MS · WELCOME_LINK_TTL_MS · issueLoginLink() · sendLoginLink() · sendWelcomeLink() · redeemLoginLink()
+ *
+ *   THE RETURN ADDRESS. A link asked for inside an app, or on a page of the node, returns the person
+ *   there (loginReturnTarget). It is a path of this node, or an address on one of this node's own
+ *   published app origins: the sign-in dialog runs on an app's own subdomain as well as on the node,
+ *   and on an app origin the session reaches the app through the silent bridge once the node's
+ *   cookie is set, so the app is the place to land. The allowlist is the one the bridge binds a
+ *   token by (resolveAppOriginTarget), never a free URL. The address travels in the link, not in the
+ *   token record, and is checked twice: when the link is asked for, so a foreign address is never
+ *   mailed, and when it is opened, because a link in a mailbox can be edited. Anything that fails
+ *   either check goes to the front page.
+ * @structure LOGIN_LINK_TTL_MS · WELCOME_LINK_TTL_MS · loginReturnTarget() · issueLoginLink() ·
+ *   sendLoginLink() · sendWelcomeLink() · redeemLoginLink()
  * @version-history
+ *   v1.1.0 — 2026-09-29 — The return address: loginReturnTarget(), and a `redirect` the link carries.
  *   v1.0.0 — 2026-09-29 — Initial (install packages: users created at install can sign in).
  */
 import { createHash, randomBytes } from 'node:crypto';
@@ -29,6 +41,8 @@ import type { Storage, GHIIRecord } from '../storage/interface.js';
 import { getActiveEmailService, type EmailService } from './email.js';
 import { appendMailLog } from './notification-settings.js';
 import { welcomeEmail } from './email-template-welcome.js';
+import { resolveAppOriginTarget } from './app-origin-target.js';
+import { isSameOriginPath } from '../utils/same-origin-path.js';
 
 /** A link a person asks for: fifteen minutes, as it always was. */
 export const LOGIN_LINK_TTL_MS = 15 * 60 * 1000;
@@ -37,9 +51,48 @@ export const WELCOME_LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const emailHashOf = (email: string): string => createHash('sha256').update(email.toLowerCase().trim()).digest('hex');
 
-/** A single-use sign-in link for `ghii`'s account, valid for `ttlMs`. */
+// A backslash or a control character anywhere: a browser reads `\` as `/` and drops a tab or a line
+// break, so such an address is not the one it appears to be (utils/same-origin-path.ts).
+function hasUnsafeChar(s: string): boolean {
+    for (let i = 0; i < s.length; i++) {
+        const c = s.charCodeAt(i);
+        // 0x5C is the backslash; below 0x20, and 0x7F, are the control characters.
+        if (c === 0x5c || c < 0x20 || c === 0x7f) return true;
+    }
+    return false;
+}
+
+/**
+ * Where a sign-in link may return the person: the absolute address to redirect to, or null for the
+ * front page. `raw` is a path of this node (`/v1/profile?tab=x`), or an absolute address whose
+ * origin is this node's own or one of its published app, portfolio or company origins, with the
+ * node's scheme and port and no user name. Everything else is null.
+ */
+export async function loginReturnTarget(storage: Storage, config: AimeatConfig, raw: unknown): Promise<string | null> {
+    if (typeof raw !== 'string' || !raw || raw.length > 2048) return null;
+    if (isSameOriginPath(raw)) return `${config.baseUrl}${raw}`;
+    if (hasUnsafeChar(raw)) return null;
+    let url: URL;
+    let base: URL;
+    try {
+        url = new URL(raw);
+        base = new URL(config.baseUrl);
+    // eslint-disable-next-line aimeat/no-silent-catch -- an address that does not parse is the answer: none
+    } catch { return null; }
+    if (url.protocol !== base.protocol || url.port !== base.port || url.username || url.password) return null;
+    const rest = `${url.pathname}${url.search}${url.hash}`;
+    if (url.origin === base.origin) return isSameOriginPath(rest) ? `${config.baseUrl}${rest}` : null;
+    const app = await resolveAppOriginTarget(config, storage, url.origin);
+    return app.ok ? `${url.origin}${rest}` : null;
+}
+
+/**
+ * A single-use sign-in link for `ghii`'s account, valid for `ttlMs`. `redirect` rides in the link as
+ * it was given; the caller has checked it with loginReturnTarget(), and the open endpoint checks it
+ * again.
+ */
 export async function issueLoginLink(
-    storage: Storage, config: AimeatConfig, ghii: GHIIRecord, email: string, ttlMs: number,
+    storage: Storage, config: AimeatConfig, ghii: GHIIRecord, email: string, ttlMs: number, redirect?: string | null,
 ): Promise<string> {
     const token = randomBytes(32).toString('hex');
     const now = new Date().toISOString();
@@ -55,21 +108,25 @@ export async function issueLoginLink(
         createdAt: now,
         verifiedAt: null,
     });
-    return `${config.baseUrl}/v1/ghii/magic-link/open?token=${token}`;
+    const back = redirect ? `&redirect=${encodeURIComponent(redirect)}` : '';
+    return `${config.baseUrl}/v1/ghii/magic-link/open?token=${token}${back}`;
 }
 
 /**
  * Mail a sign-in link. False, and nothing stored, when the account has the link off, the account is
- * deactivated, or this node sends no mail; the caller decides whether that is worth saying.
+ * deactivated, or this node sends no mail; the caller decides whether that is worth saying. A
+ * `redirect` that loginReturnTarget() refuses is left out of the link, so a foreign address is never
+ * mailed.
  */
 export async function sendLoginLink(
     storage: Storage, config: AimeatConfig, ghii: GHIIRecord, email: string, ttlMs = LOGIN_LINK_TTL_MS,
-    mail: EmailService | null | undefined = getActiveEmailService(),
+    mail: EmailService | null | undefined = getActiveEmailService(), redirect?: unknown,
 ): Promise<boolean> {
     if (!mail?.enabled || !ghii.magicLinkEnabled) return false;
     const owner = await storage.getOwner(ghii.ownerName);
     if (!owner || owner.disabledAt) return false;
-    const url = await issueLoginLink(storage, config, ghii, email, ttlMs);
+    const back = (await loginReturnTarget(storage, config, redirect)) ? redirect as string : null;
+    const url = await issueLoginLink(storage, config, ghii, email, ttlMs, back);
     const sent = await mail.sendMagicLink(email, url, ghii.locale);
     if (sent) await appendMailLog(storage, ghii.ghii, { kind: 'magic_link', subject: 'login link' });
     return sent;

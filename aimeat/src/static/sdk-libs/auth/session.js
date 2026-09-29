@@ -694,7 +694,8 @@ export const auth = {
   isAppOrigin() { return isAppOrigin(); },
 
   /** Open the sign-in modal (password + Google if configured). If a session arrives while it is open,
-   *  `opts.onLogin(session)` and `opts.onSession(session, { restored })` are called once (on-login.js). */
+   *  `opts.onLogin(session)` and `opts.onSession(session, { restored })` are called once (on-login.js).
+   *  `opts.redirect` is where an emailed sign-in link returns the person; this page when absent. */
   showLoginModal(opts) {
     var o = opts || {};
     showLoginModal(o, function () {}, onLoginWhileOpen({ onLogin: o.onLogin, onSession: o.onSession }));

@@ -531,6 +531,10 @@ const ALL_SUITES = [
     // BR-04 again, on the two email doors: they used to re-key the owner and THEN refuse. Runs its
     // own node with a real SMTP sink, because the secret these paths turn on arrives only by mail.
     'test/e2e-magic-link-refusal.ts',
+    // The emailed link returns to the place it was asked from: a path, or one of the node's own app
+    // origins, and a foreign address lands on the front page. Own node on 40454 with a real SMTP
+    // sink and app origins on.
+    'test/e2e-magic-link-return.ts',
     // The email service, which no other suite executes: every .env.test.* leaves AIMEAT_SMTP_HOST
     // unset. Runs its own node on 40294 with a real SMTP sink and drives all eight send methods.
     'test/e2e-email-delivery.ts',

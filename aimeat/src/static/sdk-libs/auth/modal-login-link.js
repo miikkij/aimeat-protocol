@@ -4,9 +4,16 @@
  *   the step that asks for the address, and what happens when it is sent.
  *
  *   The node mails a link that works once, for 15 minutes (POST /v1/ghii/magic-link). Opening it
- *   lands on GET /v1/ghii/magic-link/open, which opens the session and redirects to the node's front
- *   page, so the person needs no password at all. Accounts an install set creates have no password
- *   until they set one; this is how they sign in again after their welcome link is used.
+ *   lands on GET /v1/ghii/magic-link/open, which opens the session and redirects to the place the
+ *   link was asked from, so the person needs no password at all. Accounts an install set creates
+ *   have no password until they set one; this is how they sign in again after their welcome link is
+ *   used.
+ *
+ *   THE PLACE IS THIS PAGE, unless the opener names another (showLoginModal's `opts.redirect`, which
+ *   the consent popup uses to name the app, because its own page does not outlive the popup). On
+ *   the node it is the path; on an app origin it is the whole address, and the node accepts that
+ *   only for one of its own published app origins. The node checks it again when the link is
+ *   opened, and anything it does not accept lands on the front page.
  *
  *   THE ANSWER NEVER SAYS WHETHER THE ACCOUNT EXISTS. The node answers 200 for any address, and the
  *   step shows the same sentence whatever it answered, including a network failure: telling a
@@ -15,13 +22,16 @@
  *   IT IS NOT RENDERED WHERE IT CANNOT WORK. On a node that sends no mail (EMAIL_LOGIN false) there
  *   is no link, because the request would answer 200 and nothing would ever arrive.
  *
- * @structure loginLinkAskHtml(i) · loginLinkViewHtml(i, field) · wireLoginLinkStep(ctx)
+ * @structure loginLinkAskHtml(i) · loginLinkViewHtml(i, field) · hereAddress() · wireLoginLinkStep(ctx)
  * @usage import { loginLinkAskHtml, loginLinkViewHtml, wireLoginLinkStep } from './modal-login-link.js';
  * @version-history
+ *   v1.1.0 — 2026-09-29 — The request carries `redirect`, so the link returns to this page or to
+ *     the place the opener names.
  *   v1.0.0 — 2026-09-29 — Initial (install packages: users created at install sign in by link).
  */
 import { escHtml } from './theme.js';
-import { EMAIL_LOGIN } from './config.js';
+import { EMAIL_LOGIN, APEX_URL, NODE_URL } from './config.js';
+import { inIsolatedFrame } from './app-frame.js';
 
 /** The link in the sign-in form's link row, or nothing on a node that sends no mail. */
 export function loginLinkAskHtml(i) {
@@ -49,12 +59,28 @@ export function loginLinkViewHtml(i, field) {
 }
 
 /**
+ * Where this page is, as the link should return to it: the path on the node itself, the whole
+ * address on any other origin (an app's own), and nothing in the isolated frame, whose address is
+ * not a page a person can be sent to.
+ * @returns {string}
+ */
+export function hereAddress() {
+  if (inIsolatedFrame()) return '';
+  if (location.protocol !== 'http:' && location.protocol !== 'https:') return '';
+  var node = '';
+  try { node = new URL(APEX_URL || NODE_URL).origin; } catch { /* no node address known: this page is the node */ }
+  if (!node || location.origin === node) return location.pathname + location.search + location.hash;
+  return location.href;
+}
+
+/**
  * Wire the link and the step. Called once per modal render, alongside the other views' wiring.
  *
  * @param {object} ctx
  * @param {Record<string, string>} ctx.i Modal strings.
  * @param {(path: string, opts: any) => Promise<any>} ctx.api The modal's request helper.
  * @param {(view: string) => void} ctx.showView Shows one view of the modal.
+ * @param {string} [ctx.redirect] The place the link returns to; this page when absent.
  */
 export function wireLoginLinkStep(ctx) {
   var i = ctx.i;
@@ -81,8 +107,12 @@ export function wireLoginLinkStep(ctx) {
     var label = i.loginLinkSend || 'Send the link';
     sendBtn.textContent = i.working || 'Working...';
     sendBtn.disabled = true;
+    /** @type {Record<string, string>} */
+    var body = { email: email };
+    var back = (typeof ctx.redirect === 'string' && ctx.redirect) ? ctx.redirect : hereAddress();
+    if (back) body.redirect = back;
     try {
-      await ctx.api('/v1/ghii/magic-link', { method: 'POST', body: JSON.stringify({ email: email }) });
+      await ctx.api('/v1/ghii/magic-link', { method: 'POST', body: JSON.stringify(body) });
     } catch { /* the same sentence either way: the answer must not say whether the account exists */ }
     msgEl.textContent = i.loginLinkSent || 'If an account here has this verified address, we sent a sign-in link to it. Check your inbox.';
     msgEl.style.display = 'block';
