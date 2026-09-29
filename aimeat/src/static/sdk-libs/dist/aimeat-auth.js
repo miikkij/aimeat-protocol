@@ -1589,6 +1589,51 @@
     });
   }
 
+  // src/static/sdk-libs/auth/app-frame.js
+  function inIsolatedFrame() {
+    try {
+      var f = (
+        /** @type {any} */
+        window.__AIMEAT_FRAME__
+      );
+      return !!(f && f.host) && window.parent !== window;
+    } catch {
+      return false;
+    }
+  }
+  var sequence = 0;
+  function askFrameHost(op, payload, timeoutMs) {
+    return new Promise(function(resolve) {
+      var id = "f" + ++sequence + "-" + Math.random().toString(36).slice(2);
+      var named = (
+        /** @type {any} */
+        window.__AIMEAT_FRAME__
+      );
+      var host = named && typeof named.origin === "string" && named.origin || location.protocol + "//" + location.host;
+      var timer = null;
+      function done(value) {
+        window.removeEventListener("message", onMessage);
+        if (timer) clearTimeout(timer);
+        resolve(value);
+      }
+      function onMessage(e) {
+        if (e.source !== window.parent || e.origin !== host) return;
+        var d = e.data || {};
+        if (d.type !== "aimeat_frame_res" || d.id !== id) return;
+        done(d.result === void 0 ? null : d.result);
+      }
+      window.addEventListener("message", onMessage);
+      if (timeoutMs) timer = setTimeout(function() {
+        done(null);
+      }, timeoutMs);
+      try {
+        window.parent.postMessage(Object.assign({ type: "aimeat_frame_req", id, op }, payload || {}), host);
+      } catch {
+        done(null);
+      }
+    });
+  }
+
   // src/static/sdk-libs/auth/modal-login-link.js
   function loginLinkAskHtml(i) {
     if (!EMAIL_LOGIN) return "";
@@ -1597,6 +1642,17 @@
   function loginLinkViewHtml(i, field) {
     if (!EMAIL_LOGIN) return "";
     return '<div id="aimeat-login-link-view" class="aimeat-body" style="display:none"><h3 class="aimeat-sub-title">' + escHtml(i.loginLinkTitle || "Sign in with an emailed link") + '</h3><p class="aimeat-sub-desc">' + escHtml(i.loginLinkDesc || "Enter the email address of your account. We send a link that signs you in. It works once, for 15 minutes.") + "</p>" + field(i.emailLabel || "Email", '<input id="aimeat-ll-email" class="aimeat-inp" type="email" autocomplete="email" placeholder="you@example.com">') + '<div class="aimeat-actions"><button id="aimeat-ll-send" class="aimeat-go">' + escHtml(i.loginLinkSend || "Send the link") + '</button><button id="aimeat-ll-back" class="aimeat-cancel">' + escHtml(i.backToLogin || "Back to Login") + '</button></div><p id="aimeat-ll-msg" class="aimeat-msg"></p></div>';
+  }
+  function hereAddress() {
+    if (inIsolatedFrame()) return "";
+    if (location.protocol !== "http:" && location.protocol !== "https:") return "";
+    var node = "";
+    try {
+      node = new URL(APEX_URL || NODE_URL).origin;
+    } catch {
+    }
+    if (!node || location.origin === node) return location.pathname + location.search + location.hash;
+    return location.href;
   }
   function wireLoginLinkStep(ctx) {
     var i = ctx.i;
@@ -1636,8 +1692,11 @@
       var label = i.loginLinkSend || "Send the link";
       sendBtn.textContent = i.working || "Working...";
       sendBtn.disabled = true;
+      var body = { email };
+      var back = typeof ctx.redirect === "string" && ctx.redirect ? ctx.redirect : hereAddress();
+      if (back) body.redirect = back;
       try {
-        await ctx.api("/v1/ghii/magic-link", { method: "POST", body: JSON.stringify({ email }) });
+        await ctx.api("/v1/ghii/magic-link", { method: "POST", body: JSON.stringify(body) });
       } catch {
       }
       msgEl.textContent = i.loginLinkSent || "If an account here has this verified address, we sent a sign-in link to it. Check your inbox.";
@@ -1892,7 +1951,7 @@
         },
         onSuccess: finishLogin
       });
-      wireLoginLinkStep({ i, api, showView });
+      wireLoginLinkStep({ i, api, showView, redirect: opts.redirect });
       var totpStep = wireTotpStep({
         i,
         showView,
@@ -2300,51 +2359,6 @@
       return { verifier, challenge: b64url(digest), method: "S256" };
     }
     return { verifier, challenge: verifier, method: "plain" };
-  }
-
-  // src/static/sdk-libs/auth/app-frame.js
-  function inIsolatedFrame() {
-    try {
-      var f = (
-        /** @type {any} */
-        window.__AIMEAT_FRAME__
-      );
-      return !!(f && f.host) && window.parent !== window;
-    } catch {
-      return false;
-    }
-  }
-  var sequence = 0;
-  function askFrameHost(op, payload, timeoutMs) {
-    return new Promise(function(resolve) {
-      var id = "f" + ++sequence + "-" + Math.random().toString(36).slice(2);
-      var named = (
-        /** @type {any} */
-        window.__AIMEAT_FRAME__
-      );
-      var host = named && typeof named.origin === "string" && named.origin || location.protocol + "//" + location.host;
-      var timer = null;
-      function done(value) {
-        window.removeEventListener("message", onMessage);
-        if (timer) clearTimeout(timer);
-        resolve(value);
-      }
-      function onMessage(e) {
-        if (e.source !== window.parent || e.origin !== host) return;
-        var d = e.data || {};
-        if (d.type !== "aimeat_frame_res" || d.id !== id) return;
-        done(d.result === void 0 ? null : d.result);
-      }
-      window.addEventListener("message", onMessage);
-      if (timeoutMs) timer = setTimeout(function() {
-        done(null);
-      }, timeoutMs);
-      try {
-        window.parent.postMessage(Object.assign({ type: "aimeat_frame_req", id, op }, payload || {}), host);
-      } catch {
-        done(null);
-      }
-    });
   }
 
   // src/static/sdk-libs/auth/app-origin.js
@@ -3073,7 +3087,8 @@
       return isAppOrigin();
     },
     /** Open the sign-in modal (password + Google if configured). If a session arrives while it is open,
-     *  `opts.onLogin(session)` and `opts.onSession(session, { restored })` are called once (on-login.js). */
+     *  `opts.onLogin(session)` and `opts.onSession(session, { restored })` are called once (on-login.js).
+     *  `opts.redirect` is where an emailed sign-in link returns the person; this page when absent. */
     showLoginModal(opts) {
       var o = opts || {};
       showLoginModal(o, function() {

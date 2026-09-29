@@ -6,6 +6,8 @@
  *   POST /v1/ghii/verify-email, POST /v1/ghii/magic-link, GET /v1/ghii/magic-link/verify. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.10.0 — 2026-09-29 — POST /v1/ghii/magic-link takes `redirect`, the place the link returns to
+ *     (services/login-link.ts loginReturnTarget).
  *   v1.9.0 — 2026-09-29 — The emailed sign-in link points at GET /v1/ghii/magic-link/open
  *     (login-link-open.ts), which opens a browser session and redirects; a person clicking the link
  *     used to get this file's JSON answer. POST /v1/ghii/magic-link sends through
@@ -429,7 +431,7 @@ export function registerWebVerifyRoutes(
     // Sending a sign-in link is sending mail on request. Unlimited, it is a way to use this node
     // to post at somebody else's address.
     router.post('/v1/ghii/magic-link', rateLimit({ max: 5, windowMs: 10 * 60 * 1000, keyBy: 'ip' }), async (req, res) => {
-        const { email } = req.body ?? {};
+        const { email, redirect } = req.body ?? {};
 
         if (!email || typeof email !== 'string') {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'email is required'));
@@ -443,9 +445,10 @@ export function registerWebVerifyRoutes(
         // A DEACTIVATED ACCOUNT IS NOT SENT A SIGN-IN LINK (sendLoginLink checks it): sending it
         // anyway means the person keeps getting login mail for an account the organisation has
         // switched off. The answer below is the same either way, so nothing is disclosed. The link
-        // points at the browser endpoint GET /v1/ghii/magic-link/open (login-link-open.ts).
+        // points at the browser endpoint GET /v1/ghii/magic-link/open (login-link-open.ts), with
+        // `redirect` when it is a place the link may return to (sendLoginLink drops any other).
         // Always return 200 to not reveal if user exists
-        if (ghiiRecord) await sendLoginLink(storage, config, ghiiRecord, email, LOGIN_LINK_TTL_MS, emailService);
+        if (ghiiRecord) await sendLoginLink(storage, config, ghiiRecord, email, LOGIN_LINK_TTL_MS, emailService, redirect);
 
         res.json(success(config.nodeId, {
             sent: true,

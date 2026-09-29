@@ -13,6 +13,8 @@
  *   openEmailCompletion, sendEmailCode, showView, capture/restoreInputs }.
  * @usage import { showLoginModal } from './modal.js';
  * @version-history
+ *   v1.12.0 — 2026-09-29 — opts.redirect names the place an emailed sign-in link returns to; without
+ *     it the link returns to this page (modal-login-link.js).
  *   v1.11.0 — 2026-09-29 — "Email me a sign-in link" joins the link row on a node that sends mail
  *     (modal-login-link.js); a person with no password signs in from their inbox.
  *   v1.10.0 — 2026-09-13 — The modal stops calling opts.onLogin. The developer decided that onLogin runs
@@ -425,7 +427,7 @@ export function showLoginModal(opts, renderBtn, onClosed) {
     });
 
     // "Email me a sign-in link": absent on a node that sends no mail.
-    wireLoginLinkStep({ i: i, api: api, showView: showView });
+    wireLoginLinkStep({ i: i, api: api, showView: showView, redirect: opts.redirect });
 
     // The second-factor step. It holds the password for its own call and drops it when it closes.
     var totpStep = wireTotpStep({
