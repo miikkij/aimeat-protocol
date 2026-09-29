@@ -28,9 +28,12 @@
  *   - refuseNeedsPermission() — the owner has not granted this agent that permission yet
  *   - refuseNotMember() — a shared space this person has not joined
  *   - refuseNeedsSignIn() — nobody is signed in
+ *   - refuseClassified() — the content's classification keeps it inside its organism
  * @usage
  *   res.status(403).json(refuseNotYours(config, { thing: 'app', action: 'change' }));
  * @version-history
+ *   v1.1.0 — 2026-09-29 — refuseClassified(), for content whose classification does not let it leave
+ *     its organism (TARGET-082).
  *   v1.0.0 — 2026-08-16 — Initial, from the measurement of what our refusals say.
  */
 import type { AimeatConfig } from '../config.js';
@@ -107,6 +110,34 @@ export function refuseNotMember(
         403,
         opts.details,
         next.length ? next : undefined,
+    );
+}
+
+/**
+ * The content's classification keeps it inside its organism, so it does not go where it was sent
+ * (TARGET-082). Nobody did anything wrong: the label is a decision somebody made about the content,
+ * and the way forward is to change that decision, which only a person who may change it can do,
+ * with a written reason. The label id and the reader's reason go in `details`.
+ *
+ * `done` is the past participle of what was refused: "published", "exported".
+ */
+export function refuseClassified(
+    config: AimeatConfig,
+    opts: { thing: string; done: string; details?: unknown },
+): AimeatResponse {
+    return error(
+        config.nodeId,
+        'CLASSIFIED',
+        `This ${opts.thing} is classified at a level that keeps it inside its organism, so it cannot be ${opts.done}. `
+        + 'A person who may change its classification can lower it, with a reason, in their Data Wallet or through their AI.',
+        403,
+        opts.details,
+        [{
+            description: 'Change the classification in the Data Wallet',
+            method: 'GET',
+            url: '/v1/profile?tab=dataWallet',
+            note: "Lowering a classification takes a written reason. Through an AI it is aimeat_classification, action set, with the person's own words in human_said.",
+        }],
     );
 }
 

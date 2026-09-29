@@ -28,6 +28,7 @@
  *   GET    /v1/connections/delegations/:did/quota -- allowance left, BEFORE anything is refused
  * @usage app.use(connectionsRouter(config, storage));
  * @version-history
+ *   v1.7.1 — 2026-09-29 — The delegated publish's CLASSIFIED refusal is refuseClassified(): a plain sentence and the way forward, the key and label in details.
  *   v1.7.0 — 2026-09-29 — POST /publish passes the stored file through the classification leave()
  *     on both paths before an attempt opens; a file that may not leave its organism is 403 CLASSIFIED.
  *   v1.6.0 — 2026-09-28 — POST /read/attachment with `store: true` stores the attachment as a private
@@ -56,15 +57,14 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
+import { refuseClassified } from '../middleware/refusals.js';
 import { requireAuth, requireScope, requireAnyScope } from '../auth/middleware.js';
 import { denyScope403 } from '../auth/deny.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { READ_THROUGH_SCOPE } from '../services/app-grant-scopes.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
-import {
-  buildOutboundProviders, listProviderMeta, findProvider,
-} from '../services/connections/providers.js';
+import { buildOutboundProviders, listProviderMeta, findProvider } from '../services/connections/providers.js';
 import { requireEncryptionKey, sealCredential } from '../services/connections/credential.js';
 import { listOwnConnections, requireOwnConnection, toPublicConnection, toPublicClient } from '../services/connections/access.js';
 import { startAuthorization, completeAuthorization, type ConnectContext } from '../services/connections/oauth.js';
@@ -576,7 +576,7 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
       // Leaving for an outside service, checked before the gate writes an attempt (TARGET-082).
       const { left } = await reader.leave([storageKey], k => fileTarget(principal, k), { kind: 'external', to: `app:${appId}/${action}` });
       if (left.length) {
-        res.status(403).json(error(config.nodeId, 'CLASSIFIED', `"${storageKey}" is ${left[0]!.reason}, so it is not published.`));
+        res.status(403).json(refuseClassified(config, { thing: 'file', done: 'published', details: { storage_key: storageKey, label: left[0]!.label, reason: left[0]!.reason } }));
         return;
       }
       file ={ bytes: stored.data, mimeType: stored.mimeType, name: storageKey.split('/').pop() ?? storageKey };

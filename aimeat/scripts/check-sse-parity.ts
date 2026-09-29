@@ -29,6 +29,8 @@
  * @structure EXEMPT (with reasons) · DELEGATES (files whose emit happens downstream) · main()
  * @usage pnpm check:sse-parity  ·  --strict fails the build
  * @version-history
+ *   v1.2.1 — 2026-09-29 — DELEGATES names src/mcp/classification.ts (TARGET-082): the label and
+ *     policy services emit 'classification'.
  *   v1.2.0 — 2026-08-29 — One hop of delegation is READ from the imports: a tool file that imports a
  *     services/ or routes/ module which itself calls emitChange() counts as announcing, and the
  *     summary names the pair. DELEGATES stays for deeper chains. This is what "one capability, one
@@ -215,6 +217,13 @@ const DELEGATES: Record<string, string> = {
         + "createWorkItem ('work'), services/memory-write.ts ('memory') and services/board-post.ts ('boards')",
     'src/mcp/core-admin.ts': "services/morsel.ts mintMorsels, which emits 'config' and 'wallet'",
     'src/mcp/core-storage.ts': "services/storage-file-write.ts, which emits 'files' and 'memory'",
+    'src/mcp/classification.ts': "services/classification/labels.ts, whose setLabel and reviewLabel "
+        + "emit 'classification' on every label row they store, and services/classification/policy-admin.ts, "
+        + "whose writePolicy and reviewPolicy emit 'classification' on every stored change to a level. "
+        + 'The scan action (services/classification/scan.ts) judges a few keys at once through '
+        + 'classifier.ts, which labels through setLabel, and queues the rest for the hourly job, which '
+        + 'labels the same way: the emit comes from the same line two hops below the tool. The REST routes '
+        + '(routes/classification.ts), the connector and the CLI dispatch reach the same functions.',
 };
 
 function walk(dir: string, out: string[] = []): string[] {

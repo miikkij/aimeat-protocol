@@ -19,10 +19,13 @@
  * @usage
  *   const out = await writePolicy(deps, actor, 'owner', null, { enabled: true });
  * @version-history
+ *   v1.2.0 — 2026-09-29 — V5: every stored change (a set, a proposal, an accept, a reject) emits the
+ *     change domain `classification`, so REST, MCP, the connector and extensions announce it from here.
  *   v1.1.0 — 2026-09-29 — V4: readAuditLog, the audit log per level.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V2. Initial.
  */
 import type { Storage, ClassificationAuditRow } from '../../storage/interface.js';
+import { emitChange } from '../event-bus.js';
 import { listClassificationAuditMerged } from './audit.js';
 import { agentBarred } from '../organism-agent-access.js';
 import { isOrgManager } from '../workspace-access.js';
@@ -78,12 +81,18 @@ async function mayWrite(deps: ClassificationDeps, actor: LabelActor, level: Poli
   throw new ClassificationError('NOT_FOUND', 404, "No such organism, or you are not its creator or an admin, who set the organism's policy.");
 }
 
-async function store(storage: Storage, owner: string, key: string, value: StoredLevel<unknown>, at: string): Promise<void> {
+/**
+ * Store a level and say so on the change bus, `classification`: an owner's policy tells only that
+ * owner's streams, the node's and an organism's tell every stream (the admin view and the Data
+ * Wallet listen on it).
+ */
+async function store(storage: Storage, level: PolicyLevel, owner: string, key: string, value: StoredLevel<unknown>, at: string): Promise<void> {
   const existing = await storage.getMemory(owner, key);
   await storage.setMemory({
     key, ownerGaii: owner, value, visibility: 'private', tags: ['classification-policy'], ttlHours: null,
     version: existing ? existing.version + 1 : 1, createdAt: existing?.createdAt ?? at, updatedAt: at,
   });
+  emitChange('classification', level === 'owner' ? owner : undefined);
 }
 
 async function view(deps: ClassificationDeps, level: PolicyLevel, subject: string): Promise<PolicyView> {
@@ -159,11 +168,11 @@ export async function writePolicy(
 
   if (actor.kind === 'ai' && loosens.length) {
     const history = [...rec.history, { at, by: actor.principal, source, action: 'propose' as const, humanSaid, loosens }].slice(-HISTORY);
-    await store(deps.storage, home.owner, home.key, { ...rec, history, proposal: { policy: next, by: actor.principal, at, humanSaid, loosens } }, at);
+    await store(deps.storage, level, home.owner, home.key, { ...rec, history, proposal: { policy: next, by: actor.principal, at, humanSaid, loosens } }, at);
     return { applied: false, pending: 'PERSON_APPROVES', loosens, view: await view(deps, level, subject) };
   }
   const history = [...rec.history, { at, by: actor.principal, source, action: 'set' as const, humanSaid, loosens: loosens.length ? loosens : undefined }].slice(-HISTORY);
-  await store(deps.storage, home.owner, home.key, { policy: next, history, proposal: rec.proposal }, at);
+  await store(deps.storage, level, home.owner, home.key, { policy: next, history, proposal: rec.proposal }, at);
   return { applied: true, loosens, view: await view(deps, level, subject) };
 }
 
@@ -205,12 +214,12 @@ export async function reviewPolicy(
   const at = (deps.now ?? (() => new Date().toISOString()))();
   if (decision === 'reject') {
     const history = [...rec.history, { at, by: actor.principal, source: 'human' as const, action: 'reject' as const, loosens: rec.proposal.loosens }].slice(-HISTORY);
-    await store(deps.storage, home.owner, home.key, { ...rec, history, proposal: null }, at);
+    await store(deps.storage, level, home.owner, home.key, { ...rec, history, proposal: null }, at);
     return { applied: false, loosens: [], view: await view(deps, level, subject) };
   }
   // Validated again: the node's policy may have changed since the AI proposed this.
   const { next, loosens } = await prepare(deps, level, subject, rec.proposal.policy);
   const history = [...rec.history, { at, by: actor.principal, source: 'human' as const, action: 'accept' as const, humanSaid: rec.proposal.humanSaid, loosens }].slice(-HISTORY);
-  await store(deps.storage, home.owner, home.key, { policy: next, history, proposal: null }, at);
+  await store(deps.storage, level, home.owner, home.key, { policy: next, history, proposal: null }, at);
   return { applied: true, loosens, view: await view(deps, level, subject) };
 }
