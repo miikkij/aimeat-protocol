@@ -25,9 +25,11 @@
  *   AIMEAT.atelier.contextMenu(row, { items: [...], onPick(id) {} });
  *   AIMEAT.atelier.tooltip(button, 'Copy link');
  * @version-history
+ *   v0.59.0 — 2026-09-29 — A menu, a popover and a tooltip wear the look of what opened them
+ *     (wearLook): they sit on the body, outside the frame that carries the look's tokens.
  *   v0.55.0 — 2026-09-28 — Initial (the ten motion parts).
  */
-import { el, resolve, motionOff } from './dom.js';
+import { el, resolve, motionOff, wearLook } from './dom.js';
 import { springFrames } from './motion.js';
 import { paceOf } from './arrive.js';
 import { ink } from './ink.js';
@@ -205,7 +207,7 @@ export function menu(spec) {
   function open(at, fromKeys) {
     if (box) return;
     box = build();
-    document.body.appendChild(box);
+    document.body.appendChild(wearLook(box, anchor));
     const r = at ? { left: at.x, right: at.x, top: at.y, bottom: at.y }
       : anchor ? anchor.getBoundingClientRect() : { left: EDGE, right: EDGE, top: EDGE, bottom: EDGE };
     const origin = placeAt(box, r, { align: s.align });
@@ -303,7 +305,7 @@ export function popover(spec) {
     box = el('div', { class: 'ak-root ak-popover', role: 'dialog', 'aria-label': spec.label || null, 'data-ak-part': 'root', tabindex: '-1',
       on: { keydown: function (e) { if (e.key === 'Escape') { e.preventDefault(); close(); anchor.focus(); } } } },
     [el('div', { class: 'ak-popover__body', 'data-ak-part': 'body' }, body)]);
-    document.body.appendChild(box);
+    document.body.appendChild(wearLook(box, anchor));
     openMotion(box, placeAt(box, anchor.getBoundingClientRect(), { align: spec.align || 'center' }));
     anchor.setAttribute('aria-expanded', 'true');
     unhook = outside([box, anchor], close);
@@ -343,7 +345,7 @@ export function tooltip(target, text, opts) {
     clearTimeout(timer);
     if (shown) return;
     shown = true;
-    document.body.appendChild(tip);
+    document.body.appendChild(wearLook(tip, node));
     openMotion(tip, placeAt(tip, node.getBoundingClientRect(), { align: 'center', placement: o.placement || 'above' }));
   }
   function hide() {

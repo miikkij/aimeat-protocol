@@ -22,9 +22,11 @@
  *   const menu = AIMEAT.atelier.drawer({ side: 'left', title: 'Menu',
  *     items: [{ id: 'home', label: 'Home' }], onPick: go });
  * @version-history
+ *   v0.59.0 — 2026-09-29 — The drawer wears the app's look (wearLook): it sits on the body, outside
+ *     the frame that carries the look's tokens.
  *   v0.25.0 — 2026-08-29 — Initial (TARGET-074: the fan and the sliding menu).
  */
-import { el, clear, resolve, uid, enter, reducedMotion } from './dom.js';
+import { el, clear, resolve, uid, enter, reducedMotion, wearLook } from './dom.js';
 import { t } from './i18n.js';
 
 /**
@@ -198,7 +200,7 @@ export function drawer(spec) {
   }
 
   node.appendChild(panel);
-  document.body.appendChild(node);
+  document.body.appendChild(wearLook(node, document.activeElement));
 
   const travel = side === 'bottom' ? '0, 100%' : side === 'right' ? '100%, 0' : '-100%, 0';
 
