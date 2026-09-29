@@ -61,6 +61,7 @@ import type { PeerInfo } from '../services/federation.js';
 import { registerCoreTools } from './core.js';
 import { registerComplianceTools } from './compliance.js';
 import { registerDataMapTools } from './data-map.js';
+import { registerClassificationTools } from './classification.js';
 import { registerBoardsTools } from './boards.js';
 import { registerOrganismsTools } from './organisms.js';
 import { registerWorkspaceTools } from './workspaces.js';
@@ -175,6 +176,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerOperatorConfigTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     registerComplianceTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     registerDataMapTools(mcp, storage, config, agentGaii, () => scopes);
+    registerClassificationTools(mcp, storage, config, agentGaii, scopes);
     registerExtensionsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     registerCatalogueTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerMemoryExtendedTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);

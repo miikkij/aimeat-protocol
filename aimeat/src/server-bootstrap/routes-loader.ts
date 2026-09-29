@@ -115,6 +115,7 @@ import { permissionsRouter } from '../routes/permissions.js';
 import { memoryRouter } from '../routes/memory.js';
 import { memoryHandsRouter } from '../routes/memory-hands.js';
 import { dataMapRouter } from '../routes/data-map.js';
+import { classificationRouter } from '../routes/classification.js';
 import { librarianRouter } from '../routes/librarian.js';
 import { discoverRouter } from '../routes/discover.js';
 import { livingRouter } from '../routes/living.js';
@@ -507,6 +508,7 @@ export async function mountRoutes(
   // "Public memory not found" for it. Two segments, two meanings, and the first one mounted wins.
   app.use(memoryHandsRouter(config, storage));
   app.use(dataMapRouter(config, storage));
+  app.use(classificationRouter(config, storage)); // TARGET-082: content classification and its policy
   app.use(memoryRouter(config, storage, stats, notifyDirectoryChange, peers));
   app.use(librarianRouter(config, storage));  // Tier-1 fan-across full-text retrieval
   app.use(discoverRouter(config, storage));   // Master directory — unified cross-domain discovery

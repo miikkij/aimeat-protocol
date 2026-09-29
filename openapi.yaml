@@ -14604,6 +14604,149 @@ paths:
         '404': { description: No such app }
         '422': { description: The map could not be stored }
 
+  /v1/classification/policy:
+    get:
+      summary: The classification policy at one level
+      description: |
+        The labels, detection rules, default label and AI mode at the node, owner or organism level
+        (TARGET-082). `stored` is what the level keeps itself; `effective` is what applies to its
+        content, the node's policy merged with the layer. `active` says whether classification is on
+        for this level's content, and `proposal` is an AI's loosening waiting for a person.
+      tags: [Memory]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: level, in: query, schema: { type: string, enum: [node, owner, organism], default: owner } }
+        - { name: organism_id, in: query, schema: { type: string }, description: The organism, at level organism. }
+      responses:
+        '200': { description: The level's policy. }
+        '404': { description: No such organism, or the caller is not a member. }
+    put:
+      summary: Replace the classification policy at one level
+      description: |
+        Replaces the level: read it first and send `stored` back changed. A lower level only tightens
+        the node: it adds labels and rules and makes node labels stricter, and a refusal
+        (POLICY_DILUTES) names each node rule it would have loosened. A person's change applies at
+        once. An AI's change applies at once when it only tightens; one that gives anything away is
+        kept as a proposal (`pending: PERSON_APPROVES`) for a person to review.
+      tags: [Memory]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [policy]
+              properties:
+                level: { type: string, enum: [node, owner, organism], default: owner }
+                organism_id: { type: string }
+                policy: { type: object, description: The whole level. The node level is the whole policy; an owner or organism level carries only what it adds or tightens, and `enabled`. }
+                humanSaid: { type: string, description: "The person's own words, verbatim, when an AI relays their instruction." }
+      responses:
+        '200': { description: Applied, or kept as a proposal. }
+        '400': { description: INVALID_POLICY or POLICY_DILUTES, listing every problem. }
+        '403': { description: Not an operator (node level). }
+        '404': { description: No such organism, or the caller is not its creator or an admin. }
+
+  /v1/classification/policy/review:
+    post:
+      summary: Accept or reject an AI's proposal to loosen a policy
+      description: A person, signed in themselves, decides on the waiting proposal. Refused (PERSON_REQUIRED) from an agent or app credential.
+      tags: [Memory]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                level: { type: string, enum: [node, owner, organism], default: owner }
+                organism_id: { type: string }
+                decision: { type: string, enum: [accept, reject] }
+      responses:
+        '200': { description: Applied or rejected. }
+        '403': { description: PERSON_REQUIRED, or not allowed to change this level. }
+        '404': { description: NO_PROPOSAL, or no such organism. }
+
+  /v1/classification/label:
+    get:
+      summary: The classification of one piece of content
+      description: The label, where it came from, whether a person locked it, a waiting suggestion and the last changes. Personal content is always the caller's own; organism content needs membership.
+      tags: [Memory]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: kind, in: query, schema: { type: string, enum: [memory, file, row], default: memory } }
+        - { name: key, in: query, schema: { type: string }, description: The memory key or stored file key. }
+        - { name: organism_id, in: query, schema: { type: string } }
+        - { name: ws, in: query, schema: { type: string } }
+        - { name: space, in: query, schema: { type: string } }
+        - { name: row_id, in: query, schema: { type: string } }
+      responses:
+        '200': { description: The classification. }
+        '404': { description: No such content, or not the caller's to read. }
+    put:
+      summary: Set the classification of one piece of content
+      description: |
+        A person's label locks. An AI's own judgement never lowers a label and never changes a
+        person's; it is kept as a suggestion (`pending`). With `humanSaid`, the person's own words,
+        the label counts as the person's. Lowering from a label that needs a reason needs
+        `justification`.
+      tags: [Memory]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [label]
+              properties:
+                kind: { type: string, enum: [memory, file, row] }
+                key: { type: string }
+                organism_id: { type: string }
+                ws: { type: string }
+                space: { type: string }
+                row_id: { type: string }
+                label: { type: string }
+                justification: { type: string }
+                humanSaid: { type: string }
+                confidence: { type: number, minimum: 0, maximum: 1 }
+                reason: { type: string }
+      responses:
+        '200': { description: Applied, or kept as a suggestion. }
+        '400': { description: LABEL_UNKNOWN, JUSTIFICATION_REQUIRED or INVALID_INPUT. }
+        '403': { description: AI_LABELLING_OFF. }
+        '404': { description: No such content, or not the caller's to label. }
+
+  /v1/classification/label/review:
+    post:
+      summary: Accept or reject a waiting classification suggestion
+      tags: [Memory]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                kind: { type: string, enum: [memory, file, row] }
+                key: { type: string }
+                organism_id: { type: string }
+                ws: { type: string }
+                space: { type: string }
+                row_id: { type: string }
+                decision: { type: string, enum: [accept, reject] }
+                justification: { type: string }
+                humanSaid: { type: string }
+      responses:
+        '200': { description: Accepted or rejected. }
+        '403': { description: PERSON_REQUIRED. }
+        '404': { description: NO_SUGGESTION, or no such content. }
+
   /v1/memory/{key}/hands:
     get:
       summary: Who has written to this key, and how often
