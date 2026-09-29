@@ -25,6 +25,7 @@
  *     tag is cut for this node when another node in the same process emits. One node per process in
  *     production, so nothing there changes.
  *   v1.1.0 — 2026-09-29 — The classification audit buffer is armed with the others (TARGET-082 V4).
+ *   v1.2.0 — 2026-09-30 — The agent refusal notes are armed with the refusal log (services/agent-refusals.ts).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -39,6 +40,7 @@ import { initUsageBuffer } from '../services/usage/usage-buffer.js';
 import { initWriteTallyBuffer } from '../services/data-map/write-tally-buffer.js';
 import { initConsentAuditBuffer } from '../services/consent-audit-buffer.js';
 import { initClassificationAudit } from '../services/classification/audit.js';
+import { initAgentRefusals } from '../services/agent-refusals.js';
 
 export interface ProcessBuffers {
   webhookDispatcher: ReturnType<typeof createWebhookDispatcher>;
@@ -72,6 +74,9 @@ export async function initProcessBuffers(config: AimeatConfig, storage: Storage)
   // Off-request-path buffer for the classification audit log (TARGET-082 V4): shown, used, refused
   // and changed, merged per reader, item, action and minute.
   initClassificationAudit(storage);
+  // The agent refusal notes: a scope refusal of an agent goes on its card and its open tasks
+  // (services/agent-refusals.ts). Armed with the refusal log, before any route can refuse.
+  initAgentRefusals(storage);
 
   // Generic read-cache invalidation: translate every mutation (`emitChange(domain, ownerGaii?)`)
   // into cache tag drops. The broad `domain:<d>` tag is the safety net for write paths that don't

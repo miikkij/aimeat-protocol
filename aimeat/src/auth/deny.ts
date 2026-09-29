@@ -21,6 +21,8 @@
  * @usage
  *   import { deny401, deny403 } from './deny.js';
  * @version-history
+ *   v1.3.0 — 2026-09-30 — denyScope403 notes an agent's refusal (services/agent-refusals.ts), so it
+ *     shows on the agent card and its open tasks instead of only in the node log. `anyOf` added.
  *   v1.2.0 — 2026-09-26 — deny401 reads the config of the node the code runs as (./node-auth.ts), so a
  *     process that serves more than one node names each node's own origin in the discovery hint.
  *     initSessionAuth files the config there, and this file holds no copy of its own. One node per
@@ -34,6 +36,7 @@ import { getPromMetrics } from '../services/prometheus.js';
 import { recordAuthFailure, type AuthFailureContext } from '../services/auth-audit.js';
 import { resourceMetadataUrl } from '../services/protected-resource.js';
 import { sessionConfig } from './node-auth.js';
+import { noteAgentRefusal } from '../services/agent-refusals.js';
 
 /**
  * What the refusal log needs, lifted off the request.
@@ -127,6 +130,11 @@ export function deny403(req: Request, res: Response, code: string, message: stri
  * `scope_denials_total` was declared in the snapshot, in the Prometheus registry and on the
  * Security page, and no line in the codebase had ever written it — so the operator reading "0
  * scope denials" was reading an unwired counter, not a quiet fence. Found 2026-09-12.
+ *
+ * THE AGENT'S REFUSAL IS NOTED HERE TOO, for the same reason: an agent refused a scope is noted on
+ * its card and its open tasks (services/agent-refusals.ts), and every scope refusal passes this line.
+ * `anyOf` says that any one of `needed` would have been enough (requireAnyScope), which decides when
+ * the refusal counts as resolved.
  */
 export function denyScope403(
   req: Request,
@@ -134,12 +142,16 @@ export function denyScope403(
   needed: string[],
   message: string,
   resourceMetadataUrl?: string,
+  anyOf = false,
 ): void {
   const stats = getStats();
   if (stats) stats.increment('scope_denials_total');
   const prom = getPromMetrics();
   if (prom) prom.scopeDenialsTotal.inc();
   recordAuthFailure(auditContext(req), { status: 403, code: 'SCOPE_DENIED', reason: message });
+  // The route pattern, not the concrete path: `/v1/agents/:name/tags`, so one refused call is one
+  // entry however many ids it was made with. A router-level guard has no route yet; its path stands.
+  noteAgentRefusal(req.auth, needed, anyOf, `${req.method} ${req.baseUrl}${req.route?.path ?? req.path}`);
   // Quoted and space-separated, which is the scope syntax RFC 6749 §3.3 defines and what a client
   // splits on. A comma-separated list here would parse as one scope with commas in it.
   const parts = [

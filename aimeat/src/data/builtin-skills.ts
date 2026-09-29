@@ -11,6 +11,9 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.19.0 -- 2026-09-30 -- aimeat-node-guide and add-a-crew-agent: name the scopes in device-authorize
+ *     (none gives the default set, which cannot take work), and a refused call is kept on the card, the
+ *     open tasks, aimeat_agents_list `refusals` and GET /v1/agents/{name}/refusals.
  *   v1.18.1 -- 2026-09-29 -- The app-building skill points to the app catalogue at /v1/appcat instead of /app-catalog.html (Jouni).
  *   v1.18.0 -- 2026-09-29 -- aimeat-refinery (builtin-skills.refinery.ts): the mail refinery from chat.
  *   v1.17.0 -- 2026-09-28 -- aimeat-ai-capabilities (builtin-skills.ai-capabilities.ts), System 2 plan V5;
@@ -209,6 +212,12 @@ Agents are never created implicitly. The paved path:
    \`POST /v1/auth/token\`. The node issues the scopes as the owner has them set at that moment,
    so narrowing them or removing the agent takes effect at once.
 
+Name the scopes the agent needs in step 1 (\`scopes\`): an agent that names none gets the node's
+default set, which cannot take work. The owner's agent card shows what was asked for beside what
+was granted. A call the node refuses for a missing scope answers 403 \`SCOPE_DENIED\` and is kept:
+on the owner's agent card, on the agent's open tasks, and for the agent at
+\`GET /v1/agents/{name}/refusals\` (with \`since\`, a run's own window).
+
 Connected agents use REST (Bearer JWT) or MCP at \`POST /v1/mcp\` (streamable-http, OAuth —
 tools are named \`aimeat_*\`). New agents: run the onboarding checks
 (\`aimeat_onboarding_status\`) and read your handbook first.
@@ -366,8 +375,10 @@ a worker per piece of work and suits bursty jobs; \`"resident"\` stays up and su
 
 For a Python crew built on \`aimeat-crewai\`, or any other runtime the owner hosts themselves, the
 agent side starts device authorization (RFC 8628): \`POST /v1/agents/device-authorize\`, which the
-runtime or the connect CLI does, and it shows a code. The owner approves in profile → Agents and
-chooses the scopes. If that agent is to run a JSON definition and has none yet,
+runtime or the connect CLI does, and it shows a code. The runtime names the scopes it needs in that
+call; one that names none gets the node's default set, which cannot take work. The owner approves in
+profile → Agents and chooses the scopes, and the agent's card keeps what was asked for beside what
+was granted. If that agent is to run a JSON definition and has none yet,
 \`aimeat_crew_seed\` gives it its first one; it is refused when a definition already exists. A
 crew that needs a tool of its own, outside the runtime's menu, is a Python crew and not a
 definition.
@@ -390,7 +401,8 @@ it lands in YOUR namespace, where neither the runtime nor the Crew tab looks.
 - **Organize it:** tags via \`aimeat_agent_tags_set\`; mode and display via
   \`aimeat_operator_agent_configure\` (propose, then confirm: show the owner the diff).
 - **Verify it came online:** \`aimeat_agents_list\`. The new agent's row carries \`last_seen\`,
-  \`mode\` and \`tags\`. \`aimeat_agent_activity\` and \`aimeat_onboarding_status\` report on the
+  \`mode\` and \`tags\`, and \`refusals\`: the calls the node refused it for a scope it lacks. An
+  agent that looks connected and does nothing usually has one there. \`aimeat_agent_activity\` and \`aimeat_onboarding_status\` report on the
   CALLING agent only, so neither one can answer for the agent you just added.
 
 ## Principles

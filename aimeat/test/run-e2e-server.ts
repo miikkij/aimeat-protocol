@@ -7,6 +7,8 @@
  *   process/port waiting, server start and stop.
  * @usage Imported by test/run-e2e-ci.ts. Not a suite; it runs nothing on its own.
  * @version-history
+ *   v1.6.1 -- 2026-09-30 -- e2e-agent-refusals joins ANONYMOUS_OFF_SUITES (three green runs alone on
+ *            each backend with the setting off).
  *   v1.6.0 -- 2026-09-26 -- ANONYMOUS_OFF_SUITES: the credential suites get a node started with
  *            AIMEAT_ANONYMOUS=false, the setting production runs. pinnedEnv and startServer take the
  *            suite name to choose the setting; every other suite keeps anonymous mode on.
@@ -187,6 +189,7 @@ export const ANONYMOUS_OFF_SUITES: readonly string[] = [
     'e2e-app-grants',
     'e2e-mcp',
     'e2e-agent-v2',
+    'e2e-agent-refusals',
 ];
 
 /** AIMEAT_ANONYMOUS for the node a suite runs against: 'false' for a listed suite, else the default. */

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description RFC 8628 device authorization flow routes (authorize, token poll, consent info, verify submit). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.0 — 2026-09-30 — An approval records what was asked for and granted (services/agent-refusals.ts).
  *   v1.10.2 — 2026-09-26 — POST /v1/agents/verify asks credentialRevoked of the owner token in its
  *     body, as every authenticated route asks of a bearer token: revoked, signed out, or of an account
  *     that no longer holds the name, it answers 401 AUTH_REQUIRED.
@@ -92,6 +93,7 @@ import { detectPlatform } from '../../services/platform-detector.js';
 import { resolveOwnerByVerifiedEmail } from '../../services/contacts.js';
 import { DEVICE_AUTH_EXPIRY_MS, DEVICE_AUTH_EXPIRY_SECONDS, VALID_MODES } from './constants.js';
 import { uncoveredScopes, scopeIsCovered, SCOPES_OUTSIDE_WILDCARD } from '../../utils/scope-coverage.js';
+import { recordAgentScopeRequest } from '../../services/agent-refusals.js';
 
 /** Validate requested scopes against the node maximum (shared by consent + auto-approve). */
 function scopesExceedNodeMax(config: AimeatConfig, finalScopes: string[]): string[] {
@@ -255,6 +257,8 @@ async function approveDeviceAuth(
       expires_at: expiresAt,
     },
   });
+  // What was asked for beside what was granted, kept after the device-auth row goes, for the card.
+  await recordAgentScopeRequest(storage, { gaii, requested: request.requestedScopes, granted: grantedScopes, approvedBy });
   emitChange('agents');
 
   // ── Auto-start Hello Integration onboarding ──

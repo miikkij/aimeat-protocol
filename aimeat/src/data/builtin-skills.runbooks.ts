@@ -12,6 +12,8 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   v1.4.0 — 2026-09-30 — manage-my-agents: aimeat_agents_list carries the permissions, the calls the
+ *     node refused an agent for a missing one, and what it asked for; read them when tasks do not move.
  *   v1.3.0 — 2026-09-26 — aimeat-node-operations names the start step for the app grants, personal
  *     access tokens and sessions of deleted accounts, and that the tokens of a held grant or token stay
  *     refused.
@@ -99,7 +101,14 @@ metadata:
 You are assisting an OWNER with their own agents (never another owner's).
 
 ## Common tasks
-- **List agents:** \`aimeat_agents_list\` — name, GAII, tags, mode, last-seen.
+- **List agents:** \`aimeat_agents_list\` — name, GAII, tags, mode, last-seen, and its permissions
+  (\`default_scopes\`).
+- **Why an agent's tasks do not move:** in the same list, \`refusals\` names every call the node
+  refused the agent for a permission it still lacks (the permission, the call, how many times,
+  when last), and \`scope_request\` says what the agent asked for at its last approval. A refusal is
+  often why a task waits or a run looked fine and wrote nothing. Tell the owner which permission is
+  missing, in words, and that they give it in Profile → Agents → Manage access rights. A refusal
+  goes away when the permission is given.
 - **Inspect one:** \`aimeat_agent_profile\` — capabilities, trust, linked skills; pass the agent's GAII.
 - **Onboarding state:** \`aimeat_onboarding_status\` — which Hello-Integration steps remain. It
   reports the calling agent's own onboarding only.

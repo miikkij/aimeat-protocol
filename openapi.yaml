@@ -1545,6 +1545,41 @@ components:
           nullable: true
           description: Set when the node stopped trying. Re-registering clears it.
 
+    AgentRefusal:
+      type: object
+      description: One call the node refused an agent for a missing permission, counted per route.
+      properties:
+        needed:
+          type: array
+          items: { type: string }
+          description: The permissions the call needed.
+        any_of:
+          type: boolean
+          description: True when any one of `needed` would have been enough.
+        call:
+          type: string
+          description: Method and route pattern (`PATCH /v1/agents/:name/tags`), or `MCP <tool>` for a tool.
+        count: { type: integer, description: How many times it was refused while open. }
+        first_at: { type: string, format: date-time }
+        last_at: { type: string, format: date-time }
+
+    AgentScopeRequest:
+      type: object
+      nullable: true
+      description: |
+        The agent's last approval through device authorization: what it asked for and what it was
+        granted. Null when it was approved before this was recorded or by another path.
+      properties:
+        requested:
+          type: array
+          nullable: true
+          items: { type: string }
+          description: What the agent named; null when it named nothing and got the node default.
+        granted:
+          type: array
+          items: { type: string }
+        at: { type: string, format: date-time }
+
     AgentProfile:
       type: object
       properties:
@@ -10883,6 +10918,17 @@ paths:
                                 - $ref: '#/components/schemas/AgentProfile'
                                 - type: object
                                   properties:
+                                    refusals:
+                                      type: array
+                                      description: |
+                                        Calls the node refused this agent with 403 SCOPE_DENIED for a permission it
+                                        still lacks, newest first. A refusal closes when the permission is granted and
+                                        ages out after 14 days. Given to the owner and the owner's agents, not to an app
+                                        grant, an ecosystem app or a visitor.
+                                      items:
+                                        $ref: '#/components/schemas/AgentRefusal'
+                                    scope_request:
+                                      $ref: '#/components/schemas/AgentScopeRequest'
                                     stats:
                                       type: object
                                       description: Present only when `include=stats` was requested.
@@ -50857,6 +50903,63 @@ paths:
           description: Agent capabilities and activity stats
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/agents/{name}/refusals:
+    get:
+      operationId: getAgentRefusals
+      summary: Calls the node refused this agent for a missing permission
+      description: |
+        The calls the node answered 403 SCOPE_DENIED for a permission the agent still lacks, and
+        what the agent asked for and was granted at its last approval. The owner or the agent itself.
+
+        `since` keeps only refusals at or after that time. A runtime asks with the start of a run
+        when the run ends: a refusal there means the run did not do everything it tried to,
+        whatever its exit code says. The same refusals are noted on the agent's open tasks as
+        `scope_denied` events.
+      tags: [Agents]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: since
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Only refusals at or after this time.
+      responses:
+        '200':
+          description: The open refusals and the last approval
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          agent: { type: string, description: The agent's GAII. }
+                          granted_scopes:
+                            type: array
+                            items: { type: string }
+                          refusals:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/AgentRefusal'
+                          scope_request:
+                            $ref: '#/components/schemas/AgentScopeRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
 

@@ -11,7 +11,10 @@
  *   - GET /v1/agents/:name/activity      -- stats + history + scheduled jobs
  *   - GET /v1/agents/:name/statistics    -- Quality tab: recomputed performance + per-context review rollups
  *   - GET /v1/agents/:name/quality/overview -- Quality subtab composite (statistics + done tasks)
+ *   - GET /v1/agents/:name/refusals      -- calls the node refused this agent, still unresolved
  * @version-history
+ *   v1.5.0 -- 2026-09-30 -- GET /refusals: what the node refused this agent for a missing permission,
+ *     with `since` for the run window a runtime asks about (services/agent-refusals.ts).
  *   v1.4.0 -- 2026-09-29 -- TARGET-082 V4: the custom statistics records of /statistics and /quality/overview
  *     pass the caller's ContentReader (presentMemories) before their values are returned.
  *   v1.3.0 -- 2026-07-16 -- Add GET /quality/overview composite (recomputed statistics + done tasks) folding
@@ -30,7 +33,8 @@ import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { refuseNotYours } from '../middleware/refusals.js';
 import { requireAuth } from '../auth/middleware.js';
-import { agentGaiiFromIdentifier } from '../utils/gaii.js';
+import { agentGaiiFromIdentifier, ownerGhiiOf } from '../utils/gaii.js';
+import { readAgentAccess, refusalView, scopeRequestView } from '../services/agent-refusals.js';
 import { recomputeAndCacheStatistics } from '../services/agent-statistics.js';
 import { createAgentActivityOverviewService } from '../services/db/agent-activity-overview-db-service.js';
 import { createAgentQualityOverviewService } from '../services/db/agent-quality-overview-db-service.js';
@@ -171,6 +175,41 @@ export function agentActivityRouter(config: AimeatConfig, storage: Storage): Rou
 
     const data = await activityOverviewDb.overview(agentGaii, agent);
     res.json(success(config.nodeId, data));
+  });
+
+  /* ── GET /v1/agents/:name/refusals -- What the node refused this agent, still unresolved ──
+   *
+   * The calls the node answered 403 SCOPE_DENIED for a permission the agent still lacks, and what it
+   * asked for and was granted at its last approval (services/agent-refusals.ts). `since` (ISO time)
+   * keeps only refusals at or after it: a runtime asks this after a run with the run's start, and a
+   * refusal there means the run did not do everything it tried to, whatever its exit code says.
+   * Owner-or-self, like the other reads here: the agent may know what it was refused.
+   */
+  router.get('/v1/agents/:name/refusals', requireAuth(), async (req, res) => {
+    const agentName = req.params.name as string;
+    const agentGaii = resolveAgentGaii(req, agentName);
+    if (!canAccess(req, agentGaii)) {
+      res.status(403).json(refuseNotYours(config, { thing: 'agent', action: 'use', listUrl: '/v1/agents' }));
+      return;
+    }
+    const agent = await storage.getAgent(agentGaii);
+    if (!agent) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent '${agentName}' not found`));
+      return;
+    }
+    const since = typeof req.query.since === 'string' && !Number.isNaN(Date.parse(req.query.since))
+      ? new Date(req.query.since).toISOString()
+      : undefined;
+    const held = agent.defaultScopes ?? ['*'];
+    const access = await readAgentAccess(storage, ownerGhiiOf(agentGaii), agent.name, held, since);
+    res.json(success(config.nodeId, {
+      agent: agentGaii,
+      granted_scopes: held,
+      refusals: access.refusals.map(refusalView),
+      scope_request: scopeRequestView(access.request),
+    }, [
+      { description: 'The owner grants a permission', method: 'PATCH', url: `/v1/agents/${agentName}/scopes` },
+    ]));
   });
 
   /* ── GET /v1/agents/:name/activity -- Stats + history + scheduled jobs ── */

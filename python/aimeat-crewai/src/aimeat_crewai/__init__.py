@@ -26,6 +26,10 @@ Typical use:
 See the package README and `examples/` for full recipes.
 
 Changelog:
+  0.31.0 -- 2026-09-30 -- A task run the node refused is no longer reported as a success. After each
+    kickoff the daemon asks the node for this agent's refusals since the run started; a refusal
+    raises `NodeRefusedDuringRun` (exported), which reaches `on_error` and fails an EXECUTE task with
+    the call and the permission named. A refused PROPOSE is not retried.
   0.30.1 -- 2026-09-28 -- `node_llm(role=...)` runs the crew's calls as one of the owner's AI roles
     (GET /v1/ai/roles): the role is sent in the X-AIMEAT-AI-Role header on every call, on both
     CrewAI code paths, and the owner's role names the providers and models.
@@ -50,6 +54,7 @@ from .daemon import (
     DAEMON_DEFAULT_TOOL_FILTER,
     BuildCrewCallback,
     InvokeHandler,
+    NodeRefusedDuringRun,
     run_crew_daemon,
     run_invoke_listener,
 )
@@ -176,7 +181,7 @@ from .workflow_spec import (
 
 # Kept in step with pyproject BY HAND, which is why it was wrong: 0.20.0 shipped announcing
 # itself as 0.19.0, and the first crew to install it reported the mismatch before we saw it.
-__version__ = "0.30.1"
+__version__ = "0.31.0"
 
 __all__ = [  # noqa: RUF022 -- grouped by topic with the version each group arrived in; alphabetical order would scatter those comments away from what they name
     "__version__",
@@ -194,6 +199,8 @@ __all__ = [  # noqa: RUF022 -- grouped by topic with the version each group arri
     "run_crew_daemon",
     "BuildCrewCallback",
     "DAEMON_DEFAULT_TOOL_FILTER",
+    # What `on_error` receives when the node refused a run's calls for a missing permission (0.31.0)
+    "NodeRefusedDuringRun",
     # Server-initiated invokes — the Crew tab's Validate and Try (0.22.0)
     "run_invoke_listener",
     "InvokeHandler",
