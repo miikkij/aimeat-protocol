@@ -5,6 +5,8 @@
  *   counts its entries and folds the top-level ones into the phone's bottom bar, and each piece
  *   renders the parts and the accessible names it promises.
  * @version-history
+ *   v1.1.0 - 2026-09-29 - A small data:image logo is drawn (it travels with the app to a customer
+ *     node); a large one or a data: URI that is not an image is still refused.
  *   v1.0.0 - 2026-09-28 - Initial.
  */
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -72,11 +74,23 @@ describe('the workbench frame', () => {
     expect(pillSeen).toBe(bar.lastElementChild);
   });
 
-  it('refuses a data: logo and draws no image', () => {
+  // A logo must travel with the app to a customer node, and a package carries no storage files, so a
+  // small image inline is the one form that arrives everywhere.
+  it('draws a small data:image logo inline', () => {
+    const small = 'data:image/webp;base64,' + 'A'.repeat(2000);
+    const a = mountApp({ logo: small });
+    expect(a.el.querySelector('.ak-app__logo').getAttribute('src')).toBe(small);
+  });
+
+  it('refuses a data: logo that is large or not an image, and draws no image', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const a = mountApp({ logo: 'data:image/png;base64,AAAA' });
-    expect(a.el.querySelector('.ak-app__logo')).toBeNull();
-    expect(warn).toHaveBeenCalled();
+    const big = mountApp({ logo: 'data:image/png;base64,' + 'A'.repeat(9000) });
+    expect(big.el.querySelector('.ak-app__logo')).toBeNull();
+    handle.destroy();
+    document.body.innerHTML = '';
+    const html = mountApp({ logo: 'data:text/html;base64,AAAA' });
+    expect(html.el.querySelector('.ak-app__logo')).toBeNull();
+    expect(warn).toHaveBeenCalledTimes(2);
     warn.mockRestore();
   });
 

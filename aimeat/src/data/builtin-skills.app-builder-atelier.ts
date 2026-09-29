@@ -13,6 +13,8 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.24.0 — 2026-09-29 — The workbench genre's logo may be a small data:image (kit shell v0.66.0):
+ *     it is the one form a package carries to a customer node.
  *   v1.23.0 — 2026-09-29 — Step 2 fixes the order after an approved drawing: genre first, the owner
  *     approves it running, then the app is forked from it. Step 3 names promptPanel and queueRow.
  *   v1.22.0 — 2026-09-28 — Step 3 names the controls that answer a press (toggle, segmented, slider,
@@ -245,7 +247,8 @@ moved under you says so.
    **One genre is built on the shell: \`genre-workbench\`.** An intake, review or admin tool is
    pages rather than one poster, so that genre IS \`app({ look: 'workbench', nav: 'side', logo })\`
    with the workbench pieces in \`a.main\`; keep its shell, its side column and its look, and swap
-   the pages, the sources and the logo (a square mark in storage, never a data: URI).
+   the pages, the sources and the logo (a square mark: a small data:image of at most 8192 characters,
+   such as a 64px WebP, which travels with the app to every node it is installed on, or a storage URL).
    **The fork signs people in and speaks two languages, and a genre does neither.** Mount the
    node's own bar (\`AIMEAT.auth.mountLoginButton('#pill', …)\`); never write a header control or a
    language switch of your own. Declare \`aimeat-locales\` "en fi" and every scope you use, put

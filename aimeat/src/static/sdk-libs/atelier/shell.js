@@ -41,6 +41,9 @@
  * @tokens bottomNav --ak-chrome-bottom
  * @fork bottomNav Copy .ak-bottomnav* out of shell.css; the chrome reserve is the shell's.
  * @version-history
+ *   v0.66.0 — 2026-09-29 — `logo` takes a small inline image (data:image, at most 8192 characters):
+ *     a package carries the app's file and not the owner's storage, so a mark read from storage was
+ *     missing on every customer node. A larger data: URI, or one that is not an image, is refused.
  *   v0.65.0 — 2026-09-29 — `margins` puts one of the node's margin figures on at start (margins.js).
  *   v0.64.0 — 2026-09-28 — The tab row's chosen fill is the ink (ink.js): one marker that travels
  *     to the next tab on two edge springs, kept live through the view transition.
@@ -91,17 +94,23 @@ import { sideNav } from './workbench.js';
 import { ink } from './ink.js';
 import { margins } from './margins.js';
 
+/** The longest inline logo drawn: a 64px WebP is 1 to 3 kB of base64, a photograph is not a logo. */
+const LOGO_INLINE_MAX = 8192;
+
 /**
- * The app's own mark beside its name: an https URL (or a same-origin path) to a square image.
- * A data: URI is refused like the hero refuses one: a picture the app carries inline is bytes
- * every edit re-reads, and storage serves it better.
+ * The app's own mark beside its name: an https URL (or a same-origin path) to a square image, or a
+ * SMALL inline image (a data:image URI of at most LOGO_INLINE_MAX characters). The inline form is
+ * the one that reaches every node the app is installed on, because a package carries the app's
+ * file and not the owner's storage. A larger data: URI, or one that is not an image, is refused
+ * like the hero refuses one: a picture that size belongs in storage.
  * @param {any} src
  * @returns {HTMLElement|null}
  */
 function logoEl(src) {
   if (typeof src !== 'string' || !src.trim()) return null;
-  if (/^\s*data:/i.test(src)) {
-    console.warn('[atelier] app({ logo }) refuses a data: URI; upload the image to storage and pass its URL.');
+  if (/^\s*data:/i.test(src) && (!/^\s*data:image\//i.test(src) || src.length > LOGO_INLINE_MAX)) {
+    console.warn('[atelier] app({ logo }) refuses this data: URI; an inline logo is a data:image of at most '
+      + LOGO_INLINE_MAX + ' characters, anything larger goes to storage as a URL.');
     return null;
   }
   // The name stands beside it, so the image is decoration to a screen reader.
@@ -236,7 +245,8 @@ function ambientSpec(want) {
  * }} spec
  *   `margins` puts one of the node's margin figures ('a'..'h', margins.js) on the empty sides of a
  *   wide frame; the person's own home choice is the app's to read and hand to margins().
- *   `logo` is the app's own square mark (an https or storage URL, never data:), drawn at 32 px
+ *   `logo` is the app's own square mark (an https or storage URL, or a data:image of at most 8192
+ *   characters, the one form a package carries to a customer node), drawn at 32 px
  *   before the title. `nav: 'side'` puts `navItems` in a left column beside a capped content
  *   column (the workbench layout); an entry may carry a `count`, a `tone` dot and a `group`
  *   heading, and on a phone the column becomes the bottom bar with the ungrouped entries.
