@@ -68,12 +68,11 @@ shared stdio subprocess). The daemon holds the agent tokens itself. What it
 checks is its own secret: a fresh one is written into `serve.json` at every
 start. Since 0.29.0, `serve_params()`, the daemon's REST helpers and
 `serve_client()` send it for you; a client that builds its own HTTP session
-adds `serve_auth_headers(ensure_serve())`. The daemon in aimeat 3.19.x still
-lets in a request that sends no secret, and names its caller once in the
-daemon's log so that you can find the program to update. From aimeat 3.20.0
-the daemon refuses that request with 401. The placeholder bearer
-`loopback-trusted` that this package sent before 0.29.0 counts as no secret.
-A request with a wrong secret gets 401 in both releases.
+adds `serve_auth_headers(ensure_serve())`. From aimeat 3.20.0 the daemon
+refuses a caller that sends no serve secret with 401, the same answer a wrong
+secret gets. This package sends it from 0.29.0. The placeholder bearer
+`loopback-trusted` that it sent before 0.29.0 is not the secret, so a crew on
+aimeat 3.20.0 or later needs aimeat-crewai 0.29.0 or later.
 
 ```python
 from aimeat_crewai import create_liaison_agent, serve_params

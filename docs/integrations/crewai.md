@@ -114,10 +114,11 @@ isn't already running, and reuses it across crews.
 
 The daemon checks a secret it writes into `serve.json` at every start. `serve_params`,
 the daemon REST helpers and `serve_client()` send it (aimeat-crewai 0.29.0+); a client
-that builds its own HTTP session adds `serve_auth_headers(ensure_serve())`. The daemon
-in aimeat 3.19.x still lets in a request that sends no secret, and names its caller once
-in the daemon's log so that you can find the program to update. From aimeat 3.20.0 it
-refuses that request with 401. A request with a wrong secret gets 401 in both releases.
+that builds its own HTTP session adds `serve_auth_headers(ensure_serve())`. From aimeat
+3.20.0 the daemon refuses a caller that sends no serve secret with 401, the same answer
+a wrong secret gets. So a crew on aimeat 3.20.0 or later needs aimeat-crewai 0.29.0 or
+later: the placeholder `Authorization: Bearer loopback-trusted` that older aimeat-crewai
+releases send is not the secret, and the daemon refuses it.
 
 ```python
 from aimeat_crewai import serve_params
