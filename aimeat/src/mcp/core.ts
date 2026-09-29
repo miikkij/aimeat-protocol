@@ -11,6 +11,9 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.29.0 — 2026-09-29 — aimeat_memory_read and aimeat_memory_list pass the classification reader
+ *     (TARGET-082); values through presentMemory. The memory and storage resource templates moved
+ *     to mcp/core-resources.ts unchanged but for the same reader (max-file-lines).
  *   v1.28.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.28.0 — 2026-09-24 — The eight admin registrations receive the session's scopes, so each
@@ -115,7 +118,7 @@
  *     a person editing the same record. Optional. Reasoning: mcp/memory-version-lock.ts.
  */
 
-import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerMemoryBinTools } from './core-memory-bin.js';
 import { registerCoreBoardTools } from './core-boards.js';
 import { z } from 'zod';
@@ -148,7 +151,10 @@ import { flexibleBoolean } from './schema-flags.js';
 import { resolveMcpWriteTarget } from '../routes/memory/owner-target.js';
 import { versionConflict } from './memory-version-lock.js';
 import { writeMemoryRecord } from '../services/memory-write.js';
-import { shownMemoryValue } from '../services/secret-records.js';
+import { presentMemory } from '../services/classification/present-memory.js';
+import { readerForAgent } from '../services/classification/reader.js';
+import { memoryTarget } from '../services/classification/labels.js';
+import { registerCoreResources } from './core-resources.js';
 import { createWorkItem } from '../routes/work.js';
 // Imported, not restated. The route ENFORCES this cap and this surface only announces it; the two
 // disagreeing is how a published number becomes a promise nobody keeps.
@@ -177,55 +183,8 @@ export function registerCoreTools(
     const agentGaii = getAgentGaii();
 
     // ── MCP Resources ──
-    // Resource template: memory entries
-    mcp.registerResource(
-        'agent-memory',
-        new ResourceTemplate('aimeat://memory/{key}', {
-            list: async () => {
-                const entries = await storage.listMemory(agentGaii, {});
-                return {
-                    resources: entries.map(e => ({
-                        uri: `aimeat://memory/${encodeURIComponent(e.key)}`,
-                        name: e.key,
-                        mimeType: 'application/json',
-                        description: `Memory entry: ${e.key}`,
-                    })),
-                };
-            }
-        }),
-        { mimeType: 'application/json', description: 'Agent memory entries' },
-        async (uri, variables) => {
-            const key = decodeURIComponent(variables.key as string);
-            const record = await storage.getMemory(agentGaii, key);
-            if (!record) return { contents: [{ uri: uri.toString(), text: 'Not found' }] };
-            return { contents: [{ uri: uri.toString(), text: JSON.stringify(record.value), mimeType: 'application/json' }] };
-        },
-    );
-
-    // Resource template: storage files
-    mcp.registerResource(
-        'agent-storage',
-        new ResourceTemplate('aimeat://storage/{key}', {
-            list: async () => {
-                const files = await storage.listStorageFiles(agentGaii);
-                return {
-                    resources: files.map(f => ({
-                        uri: `aimeat://storage/${encodeURIComponent(f.key)}`,
-                        name: f.key,
-                        mimeType: f.mimeType,
-                        description: `Storage file: ${f.key} (${f.size} bytes)`,
-                    })),
-                };
-            }
-        }),
-        { mimeType: 'application/octet-stream', description: 'Agent binary storage files' },
-        async (uri, variables) => {
-            const key = decodeURIComponent(variables.key as string);
-            const file = await storage.getStorageFile(agentGaii, key);
-            if (!file) return { contents: [{ uri: uri.toString(), text: 'Not found' }] };
-            return { contents: [{ uri: uri.toString(), blob: file.data.toString('base64'), mimeType: file.mimeType }] };
-        },
-    );
+    // The memory and storage templates (mcp/core-resources.ts, moved under the line ceiling).
+    registerCoreResources(mcp, storage, config, agentGaii);
 
     // Resource: wallet balance (static URI)
     mcp.registerResource(
@@ -423,10 +382,14 @@ export function registerCoreTools(
         async ({ key, owner_scope, response_format }) => {
             // Own namespace first, so a caller that holds its own copy is unaffected by the opt-in.
             const parsedRead = parseGAII(agentGaii);
-            let record = await storage.getMemory(agentGaii, key);
-            if (!record && owner_scope && parsedRead) {
-                record = await getOwnerScopeMemory(storage, config.nodeId, localAccountName(agentGaii), key);
+            const reader = readerForAgent({ storage, config }, agentGaii);
+            let stored = await storage.getMemory(agentGaii, key);
+            if (!stored && owner_scope && parsedRead) {
+                stored = await getOwnerScopeMemory(storage, config.nodeId, localAccountName(agentGaii), key);
             }
+            // The one presentation of a memory value (classification reader + credential mask). A
+            // record this agent may not see answers as an absent one, on the hint below as well.
+            const record = stored ? await presentMemory(reader, stored) : null;
             if (!record) {
                 // Memory is keyed by the WRITER, so a key an APP saved lives under the owner's GHII
                 // and a sibling agent's key lives under its GAII. A bare "Memory not found" here has
@@ -435,9 +398,10 @@ export function registerCoreTools(
                 // scope and, when the key does exist, say exactly where it lives and how to reach it.
                 // The extra query runs ONLY on the miss path, where the answer was an error anyway.
                 const parsed = parseGAII(agentGaii);
-                const elsewhere = parsed
+                const found = parsed
                     ? await getOwnerScopeMemory(storage, config.nodeId, localAccountName(agentGaii), key)
                     : null;
+                const elsewhere = found ? await presentMemory(reader, found) : null;
                 if (elsewhere) {
                     return {
                         content: [{
@@ -451,7 +415,7 @@ export function registerCoreTools(
             }
             return structuredResult('aimeat_memory_read', response_format, {
                 key: record.key,
-                value: shownMemoryValue(record.key, record.value),
+                value: record.value,
                 visibility: record.visibility,
                 tags: record.tags,
                 version: record.version,
@@ -600,6 +564,8 @@ export function registerCoreTools(
             } else {
                 entries = await storage.listMemoryMeta(agentGaii, { prefix, visibility, tags });
             }
+            // The classification reader (TARGET-082): a key this agent may not see is not listed.
+            entries = await readerForAgent({ storage, config }, agentGaii).show(entries, e => memoryTarget(e.ownerGaii, e.key));
             if (entries.length > cap) { entries = entries.slice(0, cap); truncated = true; }
             const items = entries.map(e => ({
                 key: e.key,

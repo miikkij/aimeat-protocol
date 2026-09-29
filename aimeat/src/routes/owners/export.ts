@@ -13,6 +13,8 @@
  *   import { registerOwnerExportRoute } from './owners/export.js';
  *   registerOwnerExportRoute(router, config, storage);
  * @version-history
+ *   v1.8.0 — 2026-09-29 — Memory values pass presentMemories (classification reader + credential
+ *     mask, TARGET-082).
  *   v1.7.0 — 2026-09-26 — `work_provided` and `work_requested` beside `memories`: the person's own
  *     work under their GHII, what they published and asked for in person, with the disputes on it.
  *     One view per side (workProvidedView, workRequestedView) for these and the per-agent sections.
@@ -52,7 +54,8 @@ import { requireAuth, requireOwnerPrincipal, requireLocalSession } from '../../a
 import { error, success } from '../../middleware/envelope.js';
 import { calculateTrustScore } from '../../services/trust.js';
 import { getPendingConsentAudit } from '../../services/consent-audit-buffer.js';
-import { shownMemoryValue } from '../../services/secret-records.js';
+import { presentMemories } from '../../services/classification/present-memory.js';
+import { readerFor } from '../../services/classification/reader.js';
 
 /** One work item this identity was to do, as the export shows it: the other side is the requester. */
 function workProvidedView(w: WorkRecord) {
@@ -135,8 +138,10 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
     }
     const allFlags = await storage.listFlags();
 
+    // The one presentation of memory values (classification reader + credential mask, TARGET-082).
+    const reader = readerFor({ storage, config }, req.auth);
     for (const agent of agents) {
-      const memories = await storage.listMemory(agent.gaii);
+      const memories = await presentMemories(reader, await storage.listMemory(agent.gaii));
       const providerWork = await storage.listWorkByProvider(agent.gaii);
       const requesterWork = await storage.listWorkByRequester(agent.gaii);
       for (const w of providerWork) allWorkTrackingCodes.add(w.trackingCode);
@@ -225,8 +230,8 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
         last_seen: agent.lastSeen,
         memories: memories.map(m => ({
           key: m.key,
-          // Same as the owner's own, above: an agent's namespace holds its own keys now.
-          value: shownMemoryValue(m.key, m.value),
+          // Same as the owner's own, below: an agent's namespace holds its own keys now.
+          value: m.value,
           visibility: m.visibility,
           tags: m.tags,
           version: m.version,
@@ -370,15 +375,15 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
     let ownerMemories: unknown[] = [];
     let ownerFiles: unknown[] = [];
     if (ghii) {
-      const memories = await storage.listMemory(ghii);
+      const memories = await presentMemories(reader, await storage.listMemory(ghii));
       ownerMemories = memories.map(m => ({
         key: m.key,
         // A credential comes out as `{ configured: true }`, the same as at every other door. The
         // value here is the CIPHERTEXT of an OpenRouter or TypeSafe key, or the PSP secret: useless
         // to the person (the node holds the decryption key, not them) and a real key to anybody who
         // has that. An export travels: a download, a cloud backup, a mail attachment, a chat. This
-        // door was the one the redaction never reached.
-        value: shownMemoryValue(m.key, m.value),
+        // door was the one the redaction never reached. presentMemories applies it.
+        value: m.value,
         visibility: m.visibility,
         tags: m.tags,
         version: m.version,

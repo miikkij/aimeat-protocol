@@ -28,6 +28,7 @@
  *   - fieldEditor — one field's editor by its type
  *   - ConfigTab (default)
  * @version-history
+ *   v3.0.4 -- 2026-09-29 -- The classification section sits under Identity, after Consent (TARGET-082).
  *   v3.0.3 -- 2026-09-28 -- An unset read-only value or an empty list shows "(empty)", not "null" or an empty box; an object's preview ends in "..." only when it was cut.
  *   v3.0.2 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
  *     itself, so a setting's value, range, the unsaved-changes list (key, old and new value) or the
@@ -93,7 +94,7 @@ const SOURCE_BADGE = {
 const DOMAINS = [
   { id: 'ai', groups: ['ai', 'decide', 'agent', 'tasks', 'mcp', 'cortex', 'calibrator'] },
   { id: 'money', groups: ['morsel_policy', 'commerce', 'marketplace', 'work', 'economy', 'portfolio'] },
-  { id: 'identity', groups: ['auth', 'totp', 'eudiw', 'consent', 'security', 'moderation'] },
+  { id: 'identity', groups: ['auth', 'totp', 'eudiw', 'consent', 'classification', 'security', 'moderation'] },
   { id: 'node', groups: ['node', 'storage', 'database_url', 'sqlite_path', 'admin_password', 'setup', 'consul', 'stats', 'metrics'] },
   { id: 'limits', groups: ['quotas', 'rate_limits', 'extensions', 'realtime'] },
   { id: 'federation', groups: ['federation', 'sync', 'personal_nodes', 'genesis', 'tunnel', 'msm'] },

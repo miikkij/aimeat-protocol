@@ -17,6 +17,7 @@
  *     rows issued in the account name
  * @usage import { cascadeDeleteIdentityData } from './identity-erasure.js';
  * @version-history
+ *   v1.2.0 — 2026-09-29 — ContentLabel joins the per-identity cascade (TARGET-082).
  *   v1.1.0 — 2026-09-26 — deleteAccountCredentialsDb: what deleteOwnerCascade deleted inline for the
  *     app grants, the personal access tokens and the session rows, with `before` for the operator's
  *     decision on a held name.
@@ -138,6 +139,9 @@ export async function cascadeDeleteIdentityData(db: Db, gaii: string): Promise<v
   // What an AI decided on this person's behalf (TARGET-080). Theirs, so it goes with them.
   await db.deleteFrom('AiDecision')
     .where(eb => eb.or([eb('ownerGhii', '=', gaii), eb('principal', '=', gaii)])).execute();
+  // The classification labels on this person's own content (TARGET-082). Labels on organism
+  // content carry no ownerGaii and go with the organism.
+  await db.deleteFrom('ContentLabel').where('ownerGaii', '=', gaii).execute();
 
   // Sharing groups, and the key-space shares inside them. The shares go first and by two keys: by
   // ownerGaii for this person's own shares, then by the id of each group being removed, because a

@@ -12,6 +12,7 @@
  *   carrying `memory:read`; otherwise it is scoped to the caller's own identity.
  * @usage app.use(librarianRouter(config, storage))
  * @version-history
+ *   v1.3.0 — 2026-09-29 — The search passes the caller's classification reader (TARGET-082).
  *   v1.0.0 — 2026-06-19 — Initial: Tier-1 fan-across librarian search.
  *   v1.1.0 — 2026-07-04 — classify/plan/distribute accept an `ai:use`-scoped token (H-2 app-grant)
  *     in addition to an owner session — the same capability boundary as /v1/ai/complete, so a
@@ -33,6 +34,7 @@ import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { librarianSearch } from '../services/librarian.js';
+import { readerFor } from '../services/classification/reader.js';
 import { classifyNote, distributeNote } from '../services/notebook-classify.js';
 import { NotebookAiError } from '../services/notebook-ai.js';
 import { planNote } from '../services/notebook-plan.js';
@@ -96,6 +98,7 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
       limit,
       keyPrefix,
       scope,
+      reader: readerFor({ storage, config }, req.auth),
     });
 
     res.json(success(config.nodeId, {

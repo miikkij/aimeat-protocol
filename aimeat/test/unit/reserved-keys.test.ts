@@ -21,6 +21,7 @@
  *   - appMayWriteKey: owner passes, app refused, delegated agent refused, reserved grant passes
  * @usage cd aimeat && pnpm exec vitest run test/unit/reserved-keys.test.ts
  * @version-history
+ *   v1.x — 2026-09-29 — `classification.policy.` makes twenty-two: the owner's classification switch.
  *   v1.x — 2026-09-28 — `ai.roles.` makes twenty-one: the owner's AI roles and app role bindings.
  *   v1.x — 2026-09-28 — `ai.providers.`, `ai.apikey.` and `ai.routing.` make twenty: the owner's AI
  *     providers, their keys and the routing (System 2, V3).
@@ -59,7 +60,7 @@ const ACCOUNTANTS_KEY = 'finance.accountants';
 const PSP_KEY = 'commerce.psp';
 
 describe('the list holds every prefix the server reads and acts on', () => {
-    it('carries all twenty-one, and a removal is a test failure rather than a silent regression', () => {
+    it('carries all twenty-two, and a removal is a test failure rather than a silent regression', () => {
         // `messages.organize.` (2026-09-13): the owner's archive and rules for their Messages list.
         // The server composes the list with it, so an app that could write it could archive the
         // message warning the owner about that very app.
@@ -91,9 +92,19 @@ describe('the list holds every prefix the server reads and acts on', () => {
         // provider record could send the owner's prompts and key to an address of its own.
         // `ai.roles.` (2026-09-28, AI roles): which providers a role runs on and which app role is
         // bound to it. An app that could write it could bind its own role, the owner's approval.
+        // `classification.policy.` (2026-09-29, TARGET-082): whether classification is on for the
+        // owner's content. An app that could write it could switch the owner's classification off.
         expect([...RESERVED_OWNER_KEY_PREFIXES].sort()).toEqual(
-            ['agents.proposals.', 'ai-usage.', 'ai.apikey.', 'ai.jobs.', 'ai.policy.', 'ai.providers.', 'ai.roles.', 'ai.routing.', 'audit.', 'chat.', 'commerce.', 'crews.llm.', 'decide.', 'finance.', 'messages.organize.', 'notifications.', 'openrouter.', 'packages.install-requests.', 'profile.', 'signals.', 'workflows.'],
+            ['agents.proposals.', 'ai-usage.', 'ai.apikey.', 'ai.jobs.', 'ai.policy.', 'ai.providers.', 'ai.roles.', 'ai.routing.', 'audit.', 'chat.', 'classification.policy.', 'commerce.', 'crews.llm.', 'decide.', 'finance.', 'messages.organize.', 'notifications.', 'openrouter.', 'packages.install-requests.', 'profile.', 'signals.', 'workflows.'],
         );
+    });
+
+    it('refuses a granted app and a delegated agent the classification policy, and leaves the rest of `classification.` alone', () => {
+        expect(isReservedServerKey('classification.policy.owner')).toBe(true);
+        expect(appMayWriteKey(['app'], 'classification.policy.owner')).toBe(false);
+        expect(appMayWriteKey(['agent'], 'classification.policy.owner', true)).toBe(false);
+        expect(appMayWriteKey(['owner'], 'classification.policy.owner')).toBe(true);
+        expect(isReservedServerKey('classification.results.2026-09')).toBe(false);
     });
 
     it('refuses a granted app and a delegated agent the install requests, and leaves the rest of `packages.` alone', () => {

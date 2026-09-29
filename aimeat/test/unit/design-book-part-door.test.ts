@@ -16,6 +16,7 @@ import type { Storage } from '../../src/storage/interface.js';
 import { loadConfig } from '../../src/config.js';
 import { buildExtensionCtx } from '../../src/services/extension-ctx.js';
 import { librarianSearch } from '../../src/services/librarian.js';
+import { systemReader } from '../../src/services/classification/reader.js';
 
 const config = loadConfig().config;
 const SYSTEM = `system@${config.nodeId}`;
@@ -62,6 +63,7 @@ describe('a Design Book part through the generic memory doors', () => {
     const storage = await store();
     const { hits } = await librarianSearch(storage, config, {
       ownerName: 'bob', fanOutOwner: false, viewerGaii: `bob@${config.nodeId}`, query: 'wkgrid', scope: 'public',
+      reader: systemReader({ storage, config }, `bob@${config.nodeId}`),
     });
     const found = hits.map(h => `${h.ownerGaii} ${h.key}`);
     expect(found).not.toContain(`${SYSTEM} ${KEY}`);

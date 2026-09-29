@@ -32,6 +32,7 @@
  *   v1.5.0 — 2026-07-13 — Split the method bodies into ./methods/<group>.ts modules
  *     (prototype-assignment + interface-merge) so every file is ≤800 lines; bodies
  *     are byte-identical, `db`/`chunkedUploads` widened to public for the groups.
+ *   v1.12.0 — 2026-09-29 — contentLabelMethods bound (TARGET-082, classification labels).
  *   v1.11.0 — 2026-09-26 — heldNameMethods bound (what the move to the full identity left for the
  *     operator).
  *   v1.10.0 — 2026-09-19 — aiDecisionMethods bound (TARGET-080, AIMEAT.decide).
@@ -66,6 +67,7 @@ import { capabilityAgentsMethods } from './methods/capability-agents.js';
 import { messagingMethods } from './methods/messaging.js';
 import { aiProvenanceMethods } from './methods/ai-provenance.js';
 import { aiDecisionMethods } from './methods/ai-decisions.js';
+import { contentLabelMethods } from './methods/content-labels.js';
 import { connectionMethods } from './methods/connections.js';
 import { mcpServerMethods } from './methods/mcp-servers.js';
 import { financeMethods } from './methods/finance.js';
@@ -222,6 +224,7 @@ Object.assign(
   messagingMethods,
   aiProvenanceMethods,
   aiDecisionMethods,
+  contentLabelMethods,
   connectionMethods,
   mcpServerMethods,
   financeMethods,

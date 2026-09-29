@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.8.0 — 2026-09-29 — Export and bundle pass the classification reader (TARGET-082): memory values
+ *     through presentMemories, files through reader.show.
  *   v1.7.0 — 2026-09-26 — copy refuses a Design Book part with 403 DESIGN_BOOK_PART, naming
  *     GET /v1/designbook/:id, the one door that reads a part (utils/own-door-keys.ts).
  *   v1.6.0 — 2026-09-26 — import and copy ask the organism rule (services/organism-namespace-access.ts)
@@ -36,7 +38,9 @@ import { validateMemoryWrite } from '../../services/schema-validator.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
 import { emitChange, emitMemoryWritten } from '../../services/event-bus.js';
 import { isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
-import { shownMemoryValue } from '../../services/secret-records.js';
+import { presentMemories, presentMemory } from '../../services/classification/present-memory.js';
+import { readerFor } from '../../services/classification/reader.js';
+import { fileTarget } from '../../services/classification/labels.js';
 import { ownDoorRefusal } from '../../utils/own-door-keys.js';
 import { undeclaredSpaceForKey } from '../../services/workspace-write-items.js';
 import { checkOrganismNamespaceAccess } from '../../services/organism-namespace-access.js';
@@ -192,12 +196,14 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     }
     const prefix = req.query.prefix as string | undefined;
 
-    let records: MemoryRecord[];
+    let loaded: MemoryRecord[];
     if (isOwnerSession && !agentParam) {
-      records = await memoryDb.listOwnerScope(req.auth!.owner, { prefix });
+      loaded = await memoryDb.listOwnerScope(req.auth!.owner, { prefix });
     } else {
-      records = await storage.listMemory(gaii, { prefix });
+      loaded = await storage.listMemory(gaii, { prefix });
     }
+    // The one presentation of memory values: the classification reader plus the credential mask.
+    const records = await presentMemories(readerFor({ storage, config }, req.auth), loaded);
 
     res.json(success(config.nodeId, {
       exported_at: new Date().toISOString(),
@@ -205,7 +211,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       count: records.length,
       entries: records.map(r => ({
         key: r.key,
-        value: shownMemoryValue(r.key, r.value),
+        value: r.value,
         visibility: r.visibility,
         tags: r.tags,
         ...(r.ttlHours != null ? { ttl_hours: r.ttlHours } : {}),
@@ -416,6 +422,8 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       for (const a of agents) allowed.add(a.gaii);
     }
 
+    // The classification reader (TARGET-082): an item this caller may not see is not bundled.
+    const reader = readerFor({ storage, config }, req.auth);
     const archive = new ZipArchive({ zlib: { level: 6 } });
     const chunks: Buffer[] = [];
     archive.on('data', (c: Buffer) => chunks.push(c));
@@ -452,14 +460,16 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       if (!allowed.has(owner)) { manifest.items.push({ kind, key, owner_gaii: owner, included: false, reason: 'not_owned' }); continue; }
       try {
         if (kind === 'file') {
-          const file = await storage.getStorageFile(owner, key);
+          const stored = await storage.getStorageFile(owner, key);
+          const [file] = stored ? await reader.show([stored], () => fileTarget(owner, key)) : [];
           if (!file) { manifest.items.push({ kind, key, owner_gaii: owner, included: false, reason: 'not_found' }); continue; }
           archive.append(file.data as Buffer, { name: `files/${sanitize(key)}` });
           manifest.items.push({ kind, key, owner_gaii: owner, included: true, mime_type: file.mimeType, size: file.size, url: `${config.baseUrl}/v1/pub/${encodeURIComponent(owner)}/${encKeyPath(key)}` });
         } else {
-          const record = await storage.getMemory(owner, key);
+          const stored = await storage.getMemory(owner, key);
+          const record = stored ? await presentMemory(reader, stored) : null;
           if (!record) { manifest.items.push({ kind, key, owner_gaii: owner, included: false, reason: 'not_found' }); continue; }
-          const shown = shownMemoryValue(record.key, record.value);
+          const shown = record.value;
           const content = typeof shown === 'string' ? shown : JSON.stringify(shown, null, 2);
           archive.append(content, { name: `memory/${sanitize(key)}.json` });
           manifest.items.push({ kind, key, owner_gaii: owner, included: true, visibility: record.visibility, url: `${config.baseUrl}/v1/memory/${encodeURIComponent(owner)}/${encodeURIComponent(key)}` });

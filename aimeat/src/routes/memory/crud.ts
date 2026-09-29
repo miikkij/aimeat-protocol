@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Core memory CRUD routes: POST /v1/memory (write), GET /v1/memory (list), GET /v1/memory/search. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 -- 2026-09-29 -- The list (values and meta) and the search pass the classification reader:
+ *     values through presentMemories, meta rows through reader.show (TARGET-082).
  *   v1.8.1 -- 2026-09-26 -- The count's cache tag names the owner with localAccountName (utils/gaii.ts),
  *     which keeps an identity of another node whole, so it never names the local namesake
  *     (secaudit 2026-09, F-1).
@@ -56,7 +58,9 @@ import { resolveIdentity, isForeignPrincipal, localAccountName } from '../../uti
 import { exchangeOutcome } from '../../services/exchange-projection.js';
 import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone, MEMORY_LIST_MAX_LIMIT } from './shared.js';
 import { isVersionKey, searchHitShape, matchesType } from '../../services/memory-search-shape.js';
-import { shownMemoryValue } from '../../services/secret-records.js';
+import { presentMemories } from '../../services/classification/present-memory.js';
+import { readerFor } from '../../services/classification/reader.js';
+import { memoryTarget } from '../../services/classification/labels.js';
 
 export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
   //  is no longer destructured here: identity for a write now comes from
@@ -326,10 +330,13 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // ever loaded or serialised — a keyspace of thousands of keys lists cheaply, and used_bytes sums the
     // stored byteSize instead of JSON.stringify-ing every value. (The old meta path loaded all values
     // just to omit them from the response and total the bytes in JS.)
+    // The classification reader (TARGET-082): a key this reader may not see is neither listed nor counted.
+    const reader = readerFor({ storage, config }, req.auth);
     if (metaOnly) {
-      const allMeta = (ownerScope && !agentParam)
+      const allMeta = await reader.show((ownerScope && !agentParam)
         ? await memoryDb.listOwnerScopeMeta(req.auth!.owner, { prefix, visibility, tags, maxFlags, archived })
-        : await storage.listMemoryMeta(gaii, { prefix, visibility, tags, maxFlags, archived });
+        : await storage.listMemoryMeta(gaii, { prefix, visibility, tags, maxFlags, archived }),
+        r => memoryTarget(r.ownerGaii, r.key));
       // A count is a count of what MATCHES, never of what was returned — so it is answered before
       // the limit is applied, or `?count=true&limit=10` would report ten for a keyspace of a thousand.
       if (req.query.count === 'true') {
@@ -376,15 +383,17 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       return;
     }
 
-    let allRecords: MemoryRecord[];
+    let loaded: MemoryRecord[];
     if (ownerScope && !agentParam) {
       // Owner-scope: GHII + all the owner's agents + eco apps (deduped, GHII first) via the service.
       // (services/owner-memory.ts remains the shared impl the service composes, so the workflow signal
       // evaluator reads the exact same set — same-owner-access invariant.)
-      allRecords = await memoryDb.listOwnerScope(req.auth!.owner, { prefix, visibility, tags, maxFlags, archived });
+      loaded = await memoryDb.listOwnerScope(req.auth!.owner, { prefix, visibility, tags, maxFlags, archived });
     } else {
-      allRecords = await storage.listMemory(gaii, { prefix, visibility, tags, maxFlags, archived });
+      loaded = await storage.listMemory(gaii, { prefix, visibility, tags, maxFlags, archived });
     }
+    // The one presentation of memory values: the classification reader plus the credential mask.
+    const allRecords = await presentMemories(reader, loaded);
 
     // ?count=true with tag/maxFlags filters — count from the materialized list (rare path). Before
     // the limit, like the meta path: a count answers "how many are there", not "how many did I ask for".
@@ -412,7 +421,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       items: records.map(r => ({
         key: r.key,
         owner_gaii: r.ownerGaii,
-        value: shownMemoryValue(r.key, r.value),
+        value: r.value,
         visibility: r.visibility,
         zone: visibilityToZone(r.visibility),
         tags: r.tags,
@@ -506,7 +515,10 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     const includeVersions = req.query.include_versions !== 'false';
     const all: MemoryRecord[] = hits.map(h => h.record);
     const kept = includeVersions ? all : all.filter(r => !isVersionKey(r.key));
-    const results = wantedTypes.length ? kept.filter(r => matchesType(r.value, wantedTypes)) : kept;
+    // Typed against the stored value, then presented: the classification reader plus the credential
+    // mask (TARGET-082). A hit this reader may not see is not in the answer or the total.
+    const results = await presentMemories(readerFor({ storage, config }, req.auth),
+      wantedTypes.length ? kept.filter(r => matchesType(r.value, wantedTypes)) : kept);
 
     // `include=meta` answers with a SNIPPET and the byte size instead of the whole value, which is
     // the shape the node MCP tool has always returned. Without it, "which keys mention this" pulled
@@ -525,7 +537,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     res.json(success(config.nodeId, {
       results: results.map(r => ({
         key: r.key,
-        value: shownMemoryValue(r.key, r.value),
+        value: r.value,
         visibility: r.visibility,
         zone: visibilityToZone(r.visibility),
         tags: r.tags,

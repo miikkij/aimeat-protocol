@@ -23,10 +23,13 @@
  *   v1.2.0 — 2026-09-16 — A credential record is titled and snippeted from its redacted value.
  *   v1.3.0 — 2026-09-26 — No hit is a Design Book part: a part is found and read through the Design
  *     Book, the one door that reads it (utils/own-door-keys.ts).
+ *   v1.4.0 — 2026-09-29 — The caller passes a classification reader, and every hit is presented
+ *     through presentMemories (TARGET-082): what the reader may not see is not a hit.
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
-import { shownMemoryValue } from './secret-records.js';
+import { presentMemories } from './classification/present-memory.js';
+import type { ContentReader } from './classification/reader.js';
 import { ownDoorRefusal } from '../utils/own-door-keys.js';
 
 export interface LibrarianHit {
@@ -131,7 +134,7 @@ function snippetOf(text: string, tokens: string[]): string {
 export async function librarianSearch(
   storage: Storage,
   config: AimeatConfig,
-  opts: { ownerName: string; fanOutOwner: boolean; viewerGaii: string; query: string; limit?: number; keyPrefix?: string; scope?: 'own' | 'public' },
+  opts: { ownerName: string; fanOutOwner: boolean; viewerGaii: string; query: string; limit?: number; keyPrefix?: string; scope?: 'own' | 'public'; reader: ContentReader },
 ): Promise<{ hits: LibrarianHit[]; ownersSearched: number }> {
   const tokens = queryTokens(opts.query);
   if (tokens.length === 0) return { hits: [], ownersSearched: 0 };
@@ -160,14 +163,18 @@ export async function librarianSearch(
 
   // ONE CAPABILITY, ONE DOOR: a Design Book part is public, and it is found and read through the
   // Design Book (its search, and GET /v1/designbook/:id), so no hit here is one.
-  const hits: LibrarianHit[] = raw.filter(({ record }) => !ownDoorRefusal(record.ownerGaii, record.key, config.nodeId)).map(({ record, score }) => {
+  const candidates = raw.filter(({ record }) => !ownDoorRefusal(record.ownerGaii, record.key, config.nodeId));
+  // The one presentation of memory values (classification reader + credential mask, TARGET-082).
+  const scoreOf = new Map(candidates.map(h => [`${h.record.ownerGaii}\u0000${h.record.key}`, h.score]));
+  const presented = await presentMemories(opts.reader, candidates.map(h => h.record));
+  const hits: LibrarianHit[] = presented.map(record => ({ record, score: scoreOf.get(`${record.ownerGaii}\u0000${record.key}`) ?? 0 })).map(({ record, score }) => {
     const m = ORG_KEY.exec(record.key);
     const pkg = PKG_KEY.exec(record.key);
     const v = (record.value && typeof record.value === 'object') ? record.value as Record<string, unknown> : null;
     const isManifest = record.key.endsWith('/manifest') && !!pkg;
     const kind: LibrarianHit['kind'] = pkg ? 'knowledge' : m ? 'document' : 'memory';
-    // A record holding a credential is searched and snippeted as its redacted value.
-    const shown = shownMemoryValue(record.key, record.value);
+    // A presented record: a credential's value is already its redacted form.
+    const shown = record.value;
     const text = flatten(shown);
     return {
       key: record.key,

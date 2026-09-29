@@ -7,6 +7,7 @@
  *   from the Prisma implementation against the same tables. deleteOrganism cascades to memberships /
  *   join-requests / reputation / board rows / all `organism.{id}.*` memory + versions + schema locks.
  * @version-history
+ *   v1.5.0 — 2026-09-29 — deleteOrganism removes the classification labels of the organism's content.
  *   v1.4.0 — 2026-09-09 — getOrganismReputation deleted: no caller.
  *   v1.3.0 — 2026-07-23 — listOrganisms member-scoped queries return ALL matches (no default 20-item page cap);
  *     fixes an owner's oldest organisms silently dropping out of "My Organisms" past 20 memberships.
@@ -132,6 +133,8 @@ export const organismMethods = {
       await this.db.deleteFrom(tbl).where(eb => eb.or([eb('key', '=', orgKey), eb('key', 'like', `${orgKey}.%`)])).execute();
     }
     await this.db.deleteFrom('SchemaLock').where(eb => eb.or([eb('keyPattern', '=', orgKey), eb('keyPattern', 'like', `${orgKey}.%`)])).execute();
+    // The classification labels on the organism's content go with it (TARGET-082).
+    await this.db.deleteFrom('ContentLabel').where('scope', '=', `organism:${id}`).execute();
     await this.db.deleteFrom('Organism').where('id', '=', id).execute();
     return true;
   },
