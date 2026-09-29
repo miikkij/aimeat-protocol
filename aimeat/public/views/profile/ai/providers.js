@@ -9,9 +9,19 @@
  *   for moving on) and the model policy (open, the recommended models, or the owner's own list, and
  *   whose calls it covers). Pure render over ctx.pv (ai/use-providers.js), on the page's existing
  *   components.
- * @structure secProviders · providerRow · providerOpen · addForm · secRouting · secPolicy
+ * @structure secProviders · providerRow · providerOpen · addForm · classifierOptions · classifierRow ·
+ *   secRouting · secPolicy
  * @usage import { secProviders, secRouting, secPolicy } from './ai/providers.js';
  * @version-history
+ *   v1.3.0 — 2026-09-29 — Jouni's review: in the routing editor the Content Classifier's row has a
+ *     select like the other rows (the decision model, each decision provider, the text routing, each
+ *     text provider), saved with them; its status line stays under it; a daily cap of none says so.
+ *   v1.2.1 — 2026-09-29 — The Content Classifier row says the fix for CLASSIFICATION_OFF_FOR_OWNER (off
+ *     for the person's own content while the operator leaves it to each person); the routing rules'
+ *     label stands the section space below the capability rows, so the classifier's fix line no
+ *     longer reads as part of the rules.
+ *   v1.2.0 — 2026-09-29 — The routing's capability rows end with the Content Classifier (classifierRow,
+ *     TARGET-082 V5): on or off, decision model or text model, and the fix when it is off.
  *   v1.1.0 — 2026-09-28 — A capability's editor (capEditor): its model with the settings its kind
  *     takes, the speech voice, the transcription language, OpenRouter's PDF engine and the default
  *     fine-tuning of text, vision and files, saved together (AI roles).
@@ -33,7 +43,7 @@ import { Mark, Marks, Code, Label } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Hint } from '/components/Hint.js';
 import { Action, Loud, Actions } from '/components/Action.js';
-import { Row as Line } from '/components/Layout.js';
+import { Row as Line, Space } from '/components/Layout.js';
 import { x, dateWord } from './frame.js';
 import { CAPS, PROVIDER_TYPES, slug, capPatchOf } from './use-providers.js';
 import { t } from '/js/i18n.js';
@@ -236,6 +246,53 @@ function addForm(ctx) {
 
 /* ── Routing ──────────────────────────────────────────────────────────────────────────────────── */
 
+/** The fix the page says in the reader's language, by the server's reason; any other reason keeps the server's words. */
+const CLASSIFIER_FIX = {
+  CLASSIFICATION_OFF: 'cc.fixOff', CLASSIFICATION_OFF_FOR_OWNER: 'cc.fixOwnerOff', AI_LABELLING_OFF: 'cc.fixAiOff', DECIDE_DISABLED: 'cc.fixDecide',
+};
+
+/**
+ * The Content Classifier's choices in the routing editor: the decision model (the owner's default
+ * decision provider, then each decision provider by name) and a text model (the text routing, then
+ * each provider that serves text). The current choice stays in the list even when its provider is
+ * no longer listed.
+ * @param {any} pv @param {Array<any>} textServers
+ * @returns {Array<[string, string]>}
+ */
+function classifierOptions(pv, textServers) {
+  const opts = [
+    ['jev:', x('cc.optJevDefault')],
+    ...(pv.decideProviders || []).map((p) => [`jev:${p.id}`, x('cc.optJev', { name: p.title || p.id })]),
+    ['llm:', x('cc.optLlmRouting')],
+    ...textServers.map((p) => [`llm:${p.id}`, x('cc.optLlm', { name: p.title || p.id })]),
+  ];
+  const cur = pv.ccDraft;
+  if (cur && !opts.some(([v]) => v === cur)) opts.push([cur, cur.slice(cur.indexOf(':') + 1)]);
+  return opts;
+}
+
+/**
+ * The Content Classifier as one more row among the capabilities (content_classifier of GET
+ * /v1/ai/capabilities): on or off, the kind of model it runs on, and the fix when it is off. In the
+ * editor its value is a select like the other rows' (classifierOptions), saved with them. It has no
+ * provider order of its own: a decision model classifier uses the decision model, a text model
+ * classifier the text row above unless a provider is named. Null until the answer is in.
+ */
+function classifierRow(cc, pv, e, textServers) {
+  if (!cc) return null;
+  const kind = x(cc.type === 'llm' ? 'cc.typeLlm' : 'cc.typeJev');
+  const v = e
+    ? html`<${Select} fit ariaLabel=${x('cc.name')} value=${pv.ccDraft || ''} onChange=${(val) => pv.setCcDraft(val)} options=${classifierOptions(pv, textServers)} />`
+    : x(cc.on ? 'cc.on' : 'cc.off', { kind });
+  if (cc.on) {
+    const mode = x('cc.mode.' + (cc.aiMode || 'suggest'));
+    const sub = cc.dailyPerOwner == null ? x('cc.onSubNoCap', { mode }) : x('cc.onSub', { n: cc.dailyPerOwner, mode });
+    return { key: 'classifier', k: x('cc.name'), v, sub };
+  }
+  const fix = CLASSIFIER_FIX[cc.reason] ? x(CLASSIFIER_FIX[cc.reason]) : cc.fix || '';
+  return { key: 'classifier', k: x('cc.name'), v, missing: !e, sub: fix, subTone: 'notice' };
+}
+
 export function secRouting(ctx, num) {
   const pv = ctx.pv;
   if (!pv.view) return null;
@@ -272,9 +329,11 @@ export function secRouting(ctx, num) {
   return html`
     <${PageSection} id="ai-routing" num=${num} title=${x('rt.title')} count=${x('rt.count', { n: set, total: CAPS.length })}>
       <${Note} kind="lead">${x('rt.lead')}<//>
-      <${Facts} rows=${CAPS.map(capRow)} />
-      <${Label} block>${x('rt.rules')}<//>
-      <${Facts} rows=${rules} />
+      <${Facts} rows=${[...CAPS.map(capRow), classifierRow(pv.classifier, pv, e, servers('text'))]} />
+      <${Space} above="section">
+        <${Label} block>${x('rt.rules')}<//>
+        <${Facts} rows=${rules} />
+      <//>
       <${Actions}>
         ${e
           ? html`<${Action} small disabled=${pv.busy === 'routing'} onClick=${() => pv.saveRouting()}>${x('save')}<//><${Action} small soft onClick=${() => pv.editRouting(false)}>${x('cancel')}<//>`

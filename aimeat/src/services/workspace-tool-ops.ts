@@ -28,6 +28,9 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   v1.7.0 — 2026-09-29 — TARGET-082 review: readWorkspaceOp tells an AI which records carry a
+ *     warning classification: `classification_warning` on each index entry and opened item, and
+ *     `classification_warnings` over the whole read (the manifest and meta records included).
  *   v1.6.0 — 2026-09-29 — readWorkspaceOp takes a classification reader and loads through
  *     services/workspace-content.ts, the loader the REST read uses (TARGET-082). The read is decided
  *     by decideWorkspaceRead, so this operation now also refuses an agent the organism does not list
@@ -82,6 +85,7 @@ import { entryTitle } from './structure-overview.js';
 import { isMemoryBackedSpace, readWorkspaceSchemas, normalizeMemberChangeRule, DEFAULT_MEMBER_CHANGE_RULE, type WorkspaceMetaReader } from './workspace-meta.js';
 import { loadWorkspaceContent } from './workspace-content.js';
 import type { ContentReader } from './classification/reader.js';
+import { warningFieldSnake } from './classification-exits.js';
 import { readStoredSections } from './workspace-sections.js';
 import { emitChange } from './event-bus.js';
 import { updateOrganismStructure } from './structure-snapshot.js';
@@ -279,12 +283,15 @@ export async function readWorkspaceOp(
                     // The draft's own version is what a compare-and-swap write needs to name.
                     ...(slot.draft ? { draft: slot.draft.value, _draftVersion: slot.draft.version } : {}),
                     ...provFor(cur.aiProvenanceId),
+                    // TARGET-082: an AI shown a warning-classified record is told so, per item.
+                    ...warningFieldSnake(cur),
                 });
                 hit = true; break;
             }
             if (!hit) missing.push(asked);
         }
-        return { ok: true, data: { organism_id: organismId, ws, mode: 'content', items: found, ...(missing.length ? { missing } : {}) } };
+        return { ok: true, data: { organism_id: organismId, ws, mode: 'content', items: found, ...(missing.length ? { missing } : {}),
+            ...(args.reader.warnings.length ? { classification_warnings: args.reader.warnings } : {}) } };
     }
 
     const apps = (((await metaReader.pick(ws, 'meta.apps', items))?.value as { apps?: unknown[] } | undefined)?.apps) ?? [];
@@ -304,7 +311,7 @@ export async function readWorkspaceOp(
         const entries = [...s.inst.entries()]
             .map(([id, slot]) => {
                 const cur = slot.latest ?? slot.draft!;
-                return { id, title: entryTitle(cur.value, id), updated: cur.updatedAt, version: slot.latest?.version ?? 0, bytes: byteLen(cur.value), published: !!slot.latest, has_draft: !!slot.draft };
+                return { id, title: entryTitle(cur.value, id), updated: cur.updatedAt, version: slot.latest?.version ?? 0, bytes: byteLen(cur.value), published: !!slot.latest, has_draft: !!slot.draft, ...warningFieldSnake(cur) };
             })
             .sort((a, b) => (a.updated < b.updated ? 1 : a.updated > b.updated ? -1 : a.id < b.id ? -1 : 1));
         index[name] = entries;
@@ -316,6 +323,8 @@ export async function readWorkspaceOp(
     const schemas = await readWorkspaceSchemas(storage, organismId, ws);
 
     return { ok: true, data: { organism_id: organismId, ws, mode: 'index', manifest, apps, rules, counts, index,
+        // Every warning-classified record this read showed, the manifest and meta records included.
+        ...(args.reader.warnings.length ? { classification_warnings: args.reader.warnings } : {}),
         ...(Object.keys(sections).length ? { sections } : {}),
         ...(Object.keys(schemas).length ? { schemas } : {}),
         ...(Object.keys(rowSpaces).length ? { row_spaces: rowSpaces } : {}),

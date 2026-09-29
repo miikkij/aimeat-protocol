@@ -21,6 +21,9 @@
  *   const got = await loadWorkspaceContent({ storage, config }, reader, { sub, ownerName, accessorGaii }, { organismId, ws });
  *   if (!got.ok) return refuse(got.status, got.code, got.message);
  * @version-history
+ *   v1.1.0 — 2026-09-29 — TARGET-082 review: `manRec` and the descriptor's manifest and readme pass
+ *     reader.show. They came from the unfiltered load, so a structure overview handed an AI the
+ *     readme's first line and the workspace name whatever their label.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V1. The REST workspace read and readWorkspaceOp load here.
  */
 import type { Storage, MemoryRecord, OrganismRecord } from '../storage/interface.js';
@@ -101,11 +104,19 @@ export async function loadWorkspaceContent(
   const decision = await decideWorkspaceRead(storage, config, organism, who.sub, who.ownerName, who.accessorGaii, ws, { manRec: manifest });
   if (!decision.member) return { ok: false, status: 403, code: 'ACCESS_DENIED', message: 'Not an active member of this organism' };
 
-  const items = decision.canRead ? await reader.show(loaded, r => memoryTarget(r.ownerGaii, r.key)) : [];
+  const target = (r: MemoryRecord) => memoryTarget(r.ownerGaii, r.key);
+  const items = decision.canRead ? await reader.show(loaded, target) : [];
   const readme = meta ? await meta.pick(ws!, 'meta.readme', loaded) : (loaded.find(r => r.key === `${root}meta.readme`) ?? null);
+  // The read is DECIDED on the stored manifest, but what is HANDED OUT (the manifest, the readme a
+  // member sees of a workspace they may not read, and the name an overview takes from them) passes
+  // the reader like every other record (TARGET-082 review): a label that hides the manifest or the
+  // readme from this reader hides it here too.
+  const shownOne = async (r: MemoryRecord | null): Promise<MemoryRecord | null> => (r ? (await reader.show([r], target))[0] ?? null : null);
+  const shownManifest = await shownOne(manifest);
+  const manRec = !decision.canRead ? null : decision.manRec === manifest ? shownManifest : await shownOne(decision.manRec);
   return {
     ok: true, organism, root, manager: decision.manager, canRead: decision.canRead,
-    manRec: decision.canRead ? decision.manRec : null, items, meta,
-    descriptor: { manifest, readme },
+    manRec, items, meta,
+    descriptor: { manifest: shownManifest, readme: await shownOne(readme) },
   };
 }

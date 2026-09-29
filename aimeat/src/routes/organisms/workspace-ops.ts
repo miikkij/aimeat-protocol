@@ -7,6 +7,9 @@
  *   export/import, workspace wipe, and archive/unarchive. Extracted from src/routes/organisms.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.10.0 -- 2026-09-29 -- TARGET-082 review: the three public share reads answer the 404
+ *     no-disclosure check and the share gate BEFORE the classification reader runs, so a visitor the
+ *     gate refuses writes no refusal row into the organism's audit log.
  *   v1.9.0 -- 2026-09-29 -- The public documents and records, the member records, the activity feed and
  *     the agents' activity pass the caller's classification reader; a share passes show and leave
  *     (TARGET-082).
@@ -389,11 +392,14 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     const organism = await storage.getOrganism(id);
     if (!organism || !ws) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Not found')); return; }
     const share = await readShareMeta(id, ws);
-    let docs = await collectPublicDocs(id, ws, share, readerFor({ storage, config }, req.auth));
-    if (space) docs = docs.filter(d => d.type === space);
-    if (docs.length === 0) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No public documents')); return; }
+    // What the share opens (404 no-disclosure), then the share gate, then the classification reader:
+    // a visitor the gate refuses leaves no classification audit row (TARGET-082 review).
+    const found = await collectPublicDocs(id, ws, share, space ? { type: space } : undefined);
+    if (found.count === 0) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No public documents')); return; }
     const denied = await shareGateDenied(req, organism, id, ws, share);
     if (denied) { res.status(401).json(error(config.nodeId, denied.code, denied.message)); return; }
+    const docs = await found.release(readerFor({ storage, config }, req.auth));
+    if (docs.length === 0) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No public documents')); return; }
     if (req.query.format === 'md') {
       const entry = await findWsEntry(id, ws);
       res.type('text/markdown; charset=utf-8').send(docsToMarkdown(entry?.name, docs));
@@ -412,11 +418,12 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     const organism = await storage.getOrganism(id);
     if (!organism || !ws || !type || !docId) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Not found')); return; }
     const share = await readShareMeta(id, ws);
-    const docs = await collectPublicDocs(id, ws, share, readerFor({ storage, config }, req.auth), { type, id: docId });
-    if (docs.length === 0) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Document not found or not public')); return; }
+    const found = await collectPublicDocs(id, ws, share, { type, id: docId });
+    if (found.count === 0) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Document not found or not public')); return; }
     const denied = await shareGateDenied(req, organism, id, ws, share);
     if (denied) { res.status(401).json(error(config.nodeId, denied.code, denied.message)); return; }
-    const doc = docs[0];
+    const [doc] = await found.release(readerFor({ storage, config }, req.auth));
+    if (!doc) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Document not found or not public')); return; }
     if (req.query.format === 'md') {
       res.type('text/markdown; charset=utf-8').send(`# ${doc.title}\n\n${doc.markdown.trim()}\n`);
       return;
@@ -438,10 +445,12 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     const organism = await storage.getOrganism(id);
     if (!organism || !ws) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Not found')); return; }
     const share = await readShareMeta(id, ws);
-    const records = await collectPublicRecords(id, ws, share, readerFor({ storage, config }, req.auth), space ? { space } : undefined);
-    if (records.length === 0) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No public records')); return; }
+    const found = await collectPublicRecords(id, ws, share, space ? { space } : undefined);
+    if (found.count === 0) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No public records')); return; }
     const denied = await shareGateDenied(req, organism, id, ws, share);
     if (denied) { res.status(401).json(error(config.nodeId, denied.code, denied.message)); return; }
+    const records = await found.release(readerFor({ storage, config }, req.auth));
+    if (records.length === 0) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No public records')); return; }
     res.json(success(config.nodeId, { organism_id: id, ws, records }));
   });
 

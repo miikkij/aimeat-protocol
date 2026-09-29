@@ -60,6 +60,11 @@ https://aimeat.io/v1/publicworkspaceviewer?org=<org>&ws=<ws>&type=<spaceName>&id
 Here `type` IS the space name (`handbook`, `platformnote`, …), unlike the Pages link which does not
 need it. Two preconditions, and the viewer 404s or refuses without either: the document is **shared**
 from the Pages share modal, and it is **published** (only published versions reach the public link).
+Its **classification** decides too, when classification is on: a document whose classification keeps
+it inside its organism, or hides it from the reader, answers 404 on the viewer like one that is not
+shared. The share's own access check (`account`, `password`) answers first, and the classification is
+read only for a visitor that check lets in. When a shared, published document still 404s, read its
+classification (`aimeat_classification` action `get`) before you look for anything else.
 
 Pages' share modal offers both, as "Copy Pages link" and "Copy viewer link".
 

@@ -12,6 +12,10 @@
  *   one and writes no grid of its own.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.29.0 — 2026-09-29 — The cut name-desc-count-when-doors (the Data Wallet's trail and its
+ *     classification log): the words under a count break at a space, so they no longer push the
+ *     count over the time beside it; folded under 860px, the count stands beside the name (dense
+ *     flow) with no rule under it, instead of alone on a line of its own (Jouni approved the fold).
  *   v1.28.0 — 2026-09-27 — The cut name-price-delivery-doors draws the rest of the old .mz-tool: one
  *     rule under the whole row, 14px around, the heavy rule over the list, the cells' letters, the
  *     doors 16px apart, the blocked reason under the row, one column under 900px; appcat parity
@@ -193,9 +197,15 @@
   .listing--name-desc-span-doors > .listing-row > :nth-child(4) { grid-column: 1 / -1; justify-content: flex-start; padding-top: .1rem; }
 }
 .listing--name-desc-count-when-doors { grid-template-columns: minmax(0, .9fr) minmax(0, 1.6fr) 5.5rem 8rem auto; }
+/* The words under a count break at a space, so a long one ("luokiteltu uudelleen") stays inside the
+   count's 5.5rem instead of widening the cell's track over the time beside it. */
+.listing--name-desc-count-when-doors > .listing-row > .listing-n small { white-space: normal; }
 @media (max-width: 860px) {
-  .listing--name-desc-count-when-doors { grid-template-columns: minmax(0, 1fr) 5.5rem; }
+  /* Folded, the count stands beside the name: dense flow puts it back into the line the name leaves
+     free, since the description spans the row between them. No rule under either. */
+  .listing--name-desc-count-when-doors { grid-template-columns: minmax(0, 1fr) 5.5rem; grid-auto-flow: dense; }
   .listing--name-desc-count-when-doors > .listing-row > :nth-child(1) { border-bottom: 0; padding-bottom: .1rem; }
+  .listing--name-desc-count-when-doors > .listing-row > :nth-child(3) { border-bottom: 0; }
   .listing--name-desc-count-when-doors > .listing-row > :nth-child(2), .listing--name-desc-count-when-doors > .listing-row > :nth-child(4) { grid-column: 1 / -1; padding-top: 0; border-bottom: 0; }
   .listing--name-desc-count-when-doors > .listing-row > :nth-child(5) { grid-column: 1 / -1; justify-content: flex-start; padding-top: .1rem; }
   .listing--name-desc-count-when-doors > .listing-row > .listing-open { padding: .8rem .8rem .9rem; }

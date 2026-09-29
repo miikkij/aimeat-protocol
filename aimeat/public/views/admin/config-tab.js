@@ -25,9 +25,13 @@
  *   components/SettingsIndex.js; this file gives it the schema as data.
  * @structure
  *   - DOMAINS / domainOf — the grouping behind the index
- *   - fieldEditor — one field's editor by its type
+ *   - choiceLabel / shownIn — a fixed value in words
+ *   - fieldEditor — one field's editor by its type (a Select when the field has choices)
  *   - ConfigTab (default)
  * @version-history
+ *   v3.1.0 -- 2026-09-29 -- A string setting with `choices` (the API names its fixed values) is a Select:
+ *     each value in words (dashboard.cfgOpt_<path>_<value>, the raw value otherwise), the raw value
+ *     stored; the read-only value and the old → new list use the same words.
  *   v3.0.4 -- 2026-09-29 -- The classification section sits under Identity, after Consent (TARGET-082).
  *   v3.0.3 -- 2026-09-28 -- An unset read-only value or an empty list shows "(empty)", not "null" or an empty box; an object's preview ends in "..." only when it was cut.
  *   v3.0.2 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
@@ -72,6 +76,7 @@ import { Tinted } from '/components/Figure.js';
 import { Tabs } from '/components/Tabs.js';
 import { Check } from '/components/Check.js';
 import { TextField, TextArea } from '/components/TextField.js';
+import { Select } from '/components/Select.js';
 
 // Map config source to Badge type for visual distinction
 const SOURCE_BADGE = {
@@ -138,6 +143,12 @@ function domainLabel(id) {
 function sourceWord(src) {
   return tr('dashboard.cfgSrc_' + src, src);
 }
+/** One of a setting's fixed values as a person reads it: dashboard.cfgOpt_<path>_<value>, the raw value otherwise. */
+function choiceLabel(path, value) {
+  return tr('dashboard.cfgOpt_' + path.replace(/\./g, '_') + '_' + value, String(value));
+}
+/** Whether a schema entry is a pick from fixed values (the API's `choices`) rather than free text. */
+const hasChoices = (e) => !!e && Array.isArray(e.choices) && e.choices.length > 0;
 
 /** A value as a person reads it in the change list: a secret is never one of them (see the API). */
 function shown(v) {
@@ -145,6 +156,10 @@ function shown(v) {
   if (typeof v === 'boolean') return v ? t('dashboard.enabled') : t('dashboard.disabled');
   const s = String(v);
   return s.length > 60 ? s.slice(0, 57) + '…' : s;
+}
+/** shown(), with a fixed value in its words rather than the raw value the API stores. */
+function shownIn(path, e, v) {
+  return hasChoices(e) && typeof v === 'string' && v !== '' ? choiceLabel(path, v) : shown(v);
 }
 
 /** An object value in one line: the first 100 characters, with "..." only when something was cut. */
@@ -166,7 +181,7 @@ function fieldEditor(p, e, val, editable, pending, onChange) {
     // An unset value or an empty list reads as the change list's "(empty)", never as the word "null"
     // or an empty box; a list reads as its items.
     const unset = e.value === null || e.value === undefined || e.value === '' || (Array.isArray(e.value) && e.value.length === 0);
-    const shownValue = unset ? tr('dashboard.cfgEmpty', '(empty)') : Array.isArray(e.value) ? e.value.join(', ') : String(e.value);
+    const shownValue = unset ? tr('dashboard.cfgEmpty', '(empty)') : Array.isArray(e.value) ? e.value.join(', ') : shownIn(p, e, String(e.value));
     return html`<${Code}>${shownValue}<//> <${Note} kind="meta" inline>${e.sealed ? t('dashboard.cfgSealed') : t('dashboard.readOnly')}<//>`;
   }
   if (e.type === 'boolean') {
@@ -177,6 +192,16 @@ function fieldEditor(p, e, val, editable, pending, onChange) {
   }
   if (e.type === 'float') {
     return html`<${TextField} type="number" size="short" step="0.01" ariaLabel=${label(p)} value=${val} onInput=${(v) => onChange(p, parseFloat(v))} disabled=${!editable} />${range}`;
+  }
+  if (e.type === 'string' && hasChoices(e)) {
+    // The pick shows each value in words and stores the raw value. A stored value the list does not
+    // name (set before the list existed) stays in the list and picked, so the select never shows the
+    // first option as if it were the setting; an unset value shows "(empty)" until a pick.
+    const current = val === null || val === undefined ? '' : String(val);
+    const values = current && !e.choices.includes(current) ? [...e.choices, current] : e.choices;
+    return html`<${Select} fit ariaLabel=${label(p)} value=${current} disabled=${!editable}
+      placeholder=${current === '' ? tr('dashboard.cfgEmpty', '(empty)') : undefined} placeholderDisabled
+      options=${values.map(v => [v, choiceLabel(p, v)])} onChange=${(v) => onChange(p, v)} />`;
   }
   if (e.type === 'string') {
     return html`<${TextField} size="medium" ariaLabel=${label(p)} value=${val || ''} onInput=${(v) => onChange(p, v)} disabled=${!editable} />`;
@@ -304,7 +329,7 @@ export default function ConfigTab({ data, reload }) {
 
   const before = html`
     ${editable && showChanges && pendingKeys.length > 0 && html`<${ChangeList} items=${pendingKeys.map(p => ({
-      key: p, code: p, was: shown(schema[p] && schema[p].value), now: shown(pending[p]),
+      key: p, code: p, was: shownIn(p, schema[p], schema[p] && schema[p].value), now: shownIn(p, schema[p], pending[p]),
     }))} />`}
 
     ${!editable && html`
@@ -355,7 +380,7 @@ export default function ConfigTab({ data, reload }) {
             const SectionAction = SECTION_ACTIONS[g];
             return html`
               <${Section} key=${g} id=${'cfg-' + g} title=${groupLabel(g)}
-                count=${html`${tr('dashboard.cfgSecCount', '{n} settings').replace('{n}', items.length)}${changedHere ? ' · ' + tr('dashboard.cfgSecChanged', '{n} changed').replace('{n}', changedHere) : ''}${editedHere > 0 ? html` ${editedMark(`● ${editedHere}`)}` : ''}`}>
+                count=${html`${(items.length === 1 ? tr('dashboard.cfgSecCountOne', '{n} setting') : tr('dashboard.cfgSecCount', '{n} settings')).replace('{n}', items.length)}${changedHere ? ' · ' + tr('dashboard.cfgSecChanged', '{n} changed').replace('{n}', changedHere) : ''}${editedHere > 0 ? html` ${editedMark(`● ${editedHere}`)}` : ''}`}>
                 ${hasHelp && html`<${ExpandableHelp} title=${t('dashboard.cfgHelpTitle')}>${helpText}<//>`}
                 ${items.map(({ path: p, entry: e }) => {
                   const edited = p in pending;

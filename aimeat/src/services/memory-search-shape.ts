@@ -24,6 +24,7 @@
  * @usage
  *   import { isVersionKey, searchHitShape, matchesType } from '../services/memory-search-shape.js';
  * @version-history
+ *   v1.4.0 — 2026-09-30 — A hit carries classification_warning, as a read does (TARGET-082 review).
  *   v1.3.0 — 2026-09-29 — searchHitShape takes a presented record (presentMemories, TARGET-082),
  *     which has already masked a credential; it no longer masks on its own.
  *   v1.2.0 — 2026-09-16 — searchHitShape cuts a credential record's snippet from its redacted value.
@@ -35,6 +36,7 @@
  */
 import type { MemoryRecord } from '../storage/interface.js';
 import { contextOf, expandTerm } from '../utils/onto-context.js';
+import { classificationWarningOf } from './classification/present-memory.js';
 
 /** Characters kept either side of the match. Enough to read the sentence, not the record. */
 export const SNIPPET_RADIUS = 120;
@@ -60,6 +62,7 @@ export interface MemorySearchHit {
     visibility: string;
     tags?: string[];
     updated_at?: string;
+    classification_warning?: { label: string; name: string; says: string };
 }
 
 /**
@@ -115,5 +118,7 @@ export function searchHitShape(r: MemoryRecord, query: string): MemorySearchHit 
         visibility: r.visibility,
         tags: r.tags,
         updated_at: r.updatedAt,
+        // TARGET-082: a warning-classified hit travels with its warning, as a read does.
+        ...(classificationWarningOf(r) ? { classification_warning: classificationWarningOf(r)! } : {}),
     };
 }

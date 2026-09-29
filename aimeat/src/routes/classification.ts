@@ -18,6 +18,10 @@
  * @structure classificationRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.4.0 — 2026-09-29 — GET /v1/classification/labels (the explorer: the classifications on the
+ *     caller's own content and the items where a suggestion waits) and PUT /v1/classification/switch
+ *     (the node's switch, set by an operator and kept in the audit log). The label routes pass
+ *     `owner`, the agent or app of the caller's owner that holds the key (labels.ts targetOf).
  *   v1.3.0 — 2026-09-29 — V5: every route is a plain (req, res) handler reading its own fields, and
  *     only the ClassificationError-to-envelope mapping is shared (fail), so check:field-reach can
  *     pair each route with aimeat_classification.
@@ -36,6 +40,8 @@ import {
 import { readAuditLog, readPolicy, reviewPolicy, writePolicy } from '../services/classification/policy-admin.js';
 import type { PolicyLevel } from '../services/classification/policy.js';
 import { scanContent } from '../services/classification/scan.js';
+import { explorerQueryOf, listLabels } from '../services/classification/explorer.js';
+import { setClassificationSwitch } from '../services/classification/switch.js';
 
 const LEVELS = new Set(['node', 'owner', 'organism']);
 
@@ -108,12 +114,34 @@ export function classificationRouter(config: AimeatConfig, storage: Storage): Ro
     } catch (err) { fail(res, err); }
   });
 
+  router.get('/v1/classification/labels', requireAuth(), requireScope('memory:read'), async (req, res) => {
+    try {
+      const actor = labelActorOf(req.auth!, config.nodeId);
+      const q = explorerQueryOf({
+        level: req.query.level, organism_id: req.query.organism_id, label: req.query.label,
+        pending: req.query.pending, kind: req.query.kind, limit: req.query.limit, cursor: req.query.cursor,
+      });
+      res.json(success(config.nodeId, await listLabels(deps, actor, q)));
+    } catch (err) { fail(res, err); }
+  });
+
+  // The switch is a node setting, so the operator test is the service's (operator-principal.ts);
+  // memory:write is the word every classification write takes from an agent.
+  router.put('/v1/classification/switch', requireAuth(), requireScope('memory:write'), async (req, res) => {
+    try {
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      // The whole credential goes to the service, which names the caller itself.
+      const out = await setClassificationSwitch({ storage, config }, req.auth!, body.mode);
+      res.json(success(config.nodeId, out));
+    } catch (err) { fail(res, err); }
+  });
+
   router.get('/v1/classification/label', requireAuth(), requireScope('memory:read'), async (req, res) => {
     try {
       const actor = labelActorOf(req.auth!, config.nodeId);
       const target = targetOf(actor, {
         kind: req.query.kind, key: req.query.key, organism_id: req.query.organism_id,
-        ws: req.query.ws, space: req.query.space, row_id: req.query.row_id,
+        ws: req.query.ws, space: req.query.space, row_id: req.query.row_id, owner: req.query.owner,
       });
       res.json(success(config.nodeId, await readContentLabel(deps, actor, target)));
     } catch (err) { fail(res, err); }
@@ -126,7 +154,7 @@ export function classificationRouter(config: AimeatConfig, storage: Storage): Ro
       if (typeof body.label !== 'string') throw new ClassificationError('INVALID_INPUT', 400, 'label is a label id.');
       const target = targetOf(actor, {
         kind: body.kind, key: body.key, organism_id: body.organism_id,
-        ws: body.ws, space: body.space, row_id: body.row_id,
+        ws: body.ws, space: body.space, row_id: body.row_id, owner: body.owner,
       });
       const out = await setLabel(deps, actor, target, {
         // Passed as sent: the service answers 400 for a value that is not text.
@@ -145,7 +173,7 @@ export function classificationRouter(config: AimeatConfig, storage: Storage): Ro
       if (decision !== 'accept' && decision !== 'reject') throw new ClassificationError('INVALID_INPUT', 400, 'decision is accept or reject.');
       const target = targetOf(actor, {
         kind: body.kind, key: body.key, organism_id: body.organism_id,
-        ws: body.ws, space: body.space, row_id: body.row_id,
+        ws: body.ws, space: body.space, row_id: body.row_id, owner: body.owner,
       });
       const out = await reviewLabel(deps, actor, target, {
         decision, justification: body.justification as string | undefined, humanSaid: body.humanSaid as string | undefined,

@@ -8,10 +8,14 @@
  *   right now (every number with a sentence and a zone the server decided from this instance's own
  *   history), the numeral strip, who was turned away (grouped, then listed), what was refused and
  *   kept (with the one loud action, Resolve), who holds the keys, what the doors are set to (read as
- *   sentences with a door to change them), and the paste for the operator's own AI.
+ *   sentences with a door to change them), the node's classification (security-tab.classification.js,
+ *   which reads its own endpoints), and the paste for the operator's own AI.
  * @structure SecurityTab({ switchPage }) — load · alertLine · RightNow · Strip · the sections from
- *   security-tab.refusals.js and security-tab.sections.js · the actions (resolve, delete, payload)
+ *   security-tab.refusals.js, security-tab.sections.js and security-tab.classification.js · the
+ *   actions (resolve, delete, payload)
  * @version-history
+ *   v3.4.0 — 2026-09-29 — The node's classification has a section before "Ask your AI" (TARGET-082
+ *     V5): the switch, the node policy, a waiting proposal, the labels and rules, the audit log.
  *   v3.3.0 — 2026-09-26 — The question before a decision is made of one part per kind of row the name
  *     holds (its rows, its cortexes and ecosystem apps, its app grants and access tokens).
  *   v3.2.0 — 2026-09-26 — The records the update at start left have a section of their own while
@@ -45,6 +49,7 @@ import { getSecurityOverview, resolveSecurityIncident, deleteSecurityIncident, r
 import { authHeaders } from '/js/services/auth.js';
 import { RefusalsSection, ipText } from './security-tab.refusals.js';
 import { HeldSection, IncidentsSection, AccountsSection, SettingsSection, AskAiSection, isHeldIncident } from './security-tab.sections.js';
+import { ClassificationSection } from './security-tab.classification.js';
 import { Section } from '/components/Section.js';
 import { Verdict, Readings } from '/components/Readings.js';
 import { FigureStrip } from '/components/FigureStrip.js';
@@ -195,6 +200,7 @@ export default function SecurityTab(props) {
       <${AccountsSection} ov=${ov} number=${n()} switchPage=${switchPage} />
       <${SettingsSection} ov=${ov} number=${n()} switchPage=${switchPage} />
     <//>
+    <${ClassificationSection} number=${n()} switchPage=${switchPage} confirm=${confirm} onOk=${showOk} onError=${showErr} />
     <${AskAiSection} number=${n()} />`;
 }
 

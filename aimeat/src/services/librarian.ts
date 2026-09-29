@@ -25,12 +25,15 @@
  *     Book, the one door that reads it (utils/own-door-keys.ts).
  *   v1.4.0 — 2026-09-29 — The caller passes a classification reader, and every hit is presented
  *     through presentMemories (TARGET-082): what the reader may not see is not a hit.
+ *   v1.5.0 — 2026-09-30 — The public scope leaves out an organism's public record whose label keeps it
+ *     inside the organism, for a viewer who is not a member (TARGET-082 review, item 1).
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { presentMemories } from './classification/present-memory.js';
 import type { ContentReader } from './classification/reader.js';
 import { ownDoorRefusal } from '../utils/own-door-keys.js';
+import { organismKeysCarried } from './group-shares-classification.js';
 
 export interface LibrarianHit {
   key: string;
@@ -163,7 +166,13 @@ export async function librarianSearch(
 
   // ONE CAPABILITY, ONE DOOR: a Design Book part is public, and it is found and read through the
   // Design Book (its search, and GET /v1/designbook/:id), so no hit here is one.
-  const candidates = raw.filter(({ record }) => !ownDoorRefusal(record.ownerGaii, record.key, config.nodeId));
+  let candidates = raw.filter(({ record }) => !ownDoorRefusal(record.ownerGaii, record.key, config.nodeId));
+  // The public scope is other accounts' public records: an organism's record among them reaches a
+  // viewer outside that organism only when its label lets it leave (TARGET-082 review, item 1).
+  if (opts.scope === 'public') {
+    const carried = new Set((await organismKeysCarried({ storage, config }, candidates.map(h => h.record), opts.viewerGaii)).kept);
+    candidates = candidates.filter(h => carried.has(h.record));
+  }
   // The one presentation of memory values (classification reader + credential mask, TARGET-082).
   const scoreOf = new Map(candidates.map(h => [`${h.record.ownerGaii}\u0000${h.record.key}`, h.score]));
   const presented = await presentMemories(opts.reader, candidates.map(h => h.record));

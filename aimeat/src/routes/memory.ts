@@ -32,6 +32,8 @@
  *     behavior, routes, and registration order unchanged.
  *   v1.11.0 -- 2026-09-29 -- TARGET-082 V4: GET /v1/notebook hands the caller's ContentReader to the
  *     Notebook composite, which filters the inbox notes through it.
+ *   v1.12.0 -- 2026-09-29 -- TARGET-082 review: GET /v1/memory/tab hands the caller's ContentReader to
+ *     the Memory tab composite, which lists only the keys and files it may show.
  */
 
 import { Router } from 'express';
@@ -77,7 +79,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
   const memoryTabDb = createMemoryTabService(config, storage);
   router.get('/v1/memory/tab', requireAuth(), requireRole('owner'), async (req, res) => {
     const owner = req.auth!.owner as string;
-    const data = await memoryTabDb.overview(owner, `${owner}@${config.nodeId}`);
+    const data = await memoryTabDb.overview(readerFor({ storage, config }, req.auth), owner, `${owner}@${config.nodeId}`);
     res.json(success(config.nodeId, data));
   });
 

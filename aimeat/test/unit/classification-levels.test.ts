@@ -7,6 +7,7 @@
  *   it, the merge takes the stricter value even from a stale layer, and an AI's loosening waits for
  *   a person while its tightening applies at once.
  * @version-history
+ *   v1.1.0 — 2026-09-29 — null as no classifier cap: taken at the node level, refused at the owner's.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V2. Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -44,6 +45,19 @@ describe('a lower level only tightens the node', () => {
     expect(top.name.en).toBe('Top secret');
     expect(dilutes({ labels: [{ id: 'johto', rank: 25, audit: false }] }).join(' ')).toMatch(/inherits from node label luottamuksellinen/);
     expect(dilutes({ labels: [{ id: 'x', rank: 20 }] }).join(' ')).toMatch(/Rank 20 of label x is taken by node label luottamuksellinen/);
+  });
+
+  it('takes null as no classifier cap at the node level and refuses it at the owner level', () => {
+    const p = validateNodePolicy({ ...node, classifier: { ...node.classifier, dailyPerOwner: null, dailyNode: null } });
+    expect(p.classifier).toMatchObject({ dailyPerOwner: null, dailyNode: null });
+    expect(mergePolicy(p, validateLayer(p, { classifier: { type: 'llm' } })).classifier).toMatchObject({ dailyPerOwner: null, dailyNode: null });
+    const refusals = (() => {
+      try { validateLayer(node, { classifier: { dailyPerOwner: null, dailyNode: null } }); } catch (e) { return (e as PolicyError).problems; }
+      return [];
+    })().join(' ');
+    expect(refusals).toMatch(/classifier\.dailyPerOwner is the operator's, set at the node level/);
+    expect(refusals).toMatch(/classifier\.dailyNode is the operator's, set at the node level/);
+    expect(() => validateNodePolicy({ ...node, classifier: { ...node.classifier, dailyNode: -1 } })).toThrow(/whole number from 0 to 1000000, or null for no cap/);
   });
 
   it('merges a stale layer to the stricter value', () => {

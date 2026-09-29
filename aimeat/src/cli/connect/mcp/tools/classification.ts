@@ -9,6 +9,8 @@
  * @structure registerClassificationTools(mcp, registry)
  * @usage registered from cli/connect/mcp/tools/index.ts
  * @version-history
+ *   v1.1.0 — 2026-09-29 — The explorer and switch_set actions, with pending, cursor and mode; owner
+ *     on get, set and review.
  *   v1.0.0 — 2026-09-29 — Initial (TARGET-082 V5).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -17,7 +19,7 @@ import type { AgentRegistry } from '../../agent-registry.js';
 import { agentNameSchema, envelopeResult, pickAgent } from './_registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
-import { classificationTools } from '../../../../mcp/catalog/definitions/classification.js';
+import { CLASSIFICATION_ACTIONS, classificationTools } from '../../../../mcp/catalog/definitions/classification.js';
 import { classificationCall } from '../../../../tool-dispatch/classification-call.js';
 
 /** A parameter's description, from the catalog entry every surface publishes. */
@@ -26,18 +28,22 @@ const d = (field: string): string => classificationTools[0]?.input?.[field]?.des
 export function registerClassificationTools(mcp: McpServer, registry: AgentRegistry): void {
   mcp.tool('aimeat_classification', descriptionFor('aimeat_classification'), {
     agent_name: agentNameSchema,
-    action: z.enum(['get', 'set', 'review', 'policy_get', 'policy_set', 'audit', 'scan']).describe(d('action')),
+    action: z.enum(CLASSIFICATION_ACTIONS).describe(d('action')),
     keys: z.array(z.string()).max(500).optional().describe(d('keys')),
     prefix: z.string().optional().describe(d('prefix')),
     since: z.string().optional().describe(d('since')),
     audit_action: z.enum(['shown', 'used', 'refused', 'changed']).optional().describe(d('audit_action')),
     limit: z.number().int().min(1).max(1000).optional().describe(d('limit')),
+    pending: z.boolean().optional().describe(d('pending')),
+    cursor: z.string().optional().describe(d('cursor')),
+    mode: z.enum(['off', 'owner', 'all']).optional().describe(d('mode')),
     kind: z.enum(['memory', 'file', 'row']).optional().describe(d('kind')),
     key: z.string().optional().describe(d('key')),
     organism_id: z.string().optional().describe(d('organism_id')),
     ws: z.string().optional().describe(d('ws')),
     space: z.string().optional().describe(d('space')),
     row_id: z.string().optional().describe(d('row_id')),
+    owner: z.string().optional().describe(d('owner')),
     label: z.string().optional().describe(d('label')),
     justification: z.string().optional().describe(d('justification')),
     human_said: z.string().optional().describe(d('human_said')),

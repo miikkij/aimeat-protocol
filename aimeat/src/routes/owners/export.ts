@@ -13,6 +13,9 @@
  *   import { registerOwnerExportRoute } from './owners/export.js';
  *   registerOwnerExportRoute(router, config, storage);
  * @version-history
+ *   v1.9.0 — 2026-09-29 — TARGET-082 review: memory passes leave() with the destination `export`
+ *     after show(), so an organism's record held under the person's or an agent's name stays
+ *     behind; the answer names it in `left_out` ({ key, label, reason }).
  *   v1.8.0 — 2026-09-29 — Memory values pass presentMemories (classification reader + credential
  *     mask, TARGET-082).
  *   v1.7.0 — 2026-09-26 — `work_provided` and `work_requested` beside `memories`: the person's own
@@ -49,13 +52,14 @@
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
-import type { Storage, WorkRecord } from '../../storage/interface.js';
+import type { Storage, WorkRecord, MemoryRecord } from '../../storage/interface.js';
 import { requireAuth, requireOwnerPrincipal, requireLocalSession } from '../../auth/middleware.js';
 import { error, success } from '../../middleware/envelope.js';
 import { calculateTrustScore } from '../../services/trust.js';
 import { getPendingConsentAudit } from '../../services/consent-audit-buffer.js';
 import { presentMemories } from '../../services/classification/present-memory.js';
 import { readerFor } from '../../services/classification/reader.js';
+import { leaveMemories, type LeftOut } from '../../services/classification-exits.js';
 
 /** One work item this identity was to do, as the export shows it: the other side is the requester. */
 function workProvidedView(w: WorkRecord) {
@@ -138,10 +142,19 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
     }
     const allFlags = await storage.listFlags();
 
-    // The one presentation of memory values (classification reader + credential mask, TARGET-082).
+    // The one presentation of memory values (classification reader + credential mask, TARGET-082),
+    // then what may leave: the export file leaves the node, and an organism's record held under this
+    // person's or an agent's name is the organism's. leave() binds only organism content, so the
+    // person's own records all go; what stayed behind is named in `left_out`.
     const reader = readerFor({ storage, config }, req.auth);
+    const leftOut: LeftOut[] = [];
+    const exportable = async (records: MemoryRecord[]): Promise<MemoryRecord[]> => {
+      const out = await leaveMemories(reader, await presentMemories(reader, records), { kind: 'export', organismId: null });
+      leftOut.push(...out.leftOut);
+      return out.kept;
+    };
     for (const agent of agents) {
-      const memories = await presentMemories(reader, await storage.listMemory(agent.gaii));
+      const memories = await exportable(await storage.listMemory(agent.gaii));
       const providerWork = await storage.listWorkByProvider(agent.gaii);
       const requesterWork = await storage.listWorkByRequester(agent.gaii);
       for (const w of providerWork) allWorkTrackingCodes.add(w.trackingCode);
@@ -375,7 +388,7 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
     let ownerMemories: unknown[] = [];
     let ownerFiles: unknown[] = [];
     if (ghii) {
-      const memories = await presentMemories(reader, await storage.listMemory(ghii));
+      const memories = await exportable(await storage.listMemory(ghii));
       ownerMemories = memories.map(m => ({
         key: m.key,
         // A credential comes out as `{ configured: true }`, the same as at every other door. The
@@ -476,6 +489,8 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
       organism_memberships: organismMemberships,
       chat_instances: chatInstancesExport,
       ghii_flags_filed: ghiiFlags,
+      // What the export left behind, by key, with its label and why (TARGET-082 review).
+      ...(leftOut.length ? { left_out: leftOut } : {}),
       exported_at: new Date().toISOString(),
     }));
   });

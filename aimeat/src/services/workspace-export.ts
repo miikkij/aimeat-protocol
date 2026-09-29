@@ -31,6 +31,8 @@
  *   v1.4.0 — 2026-09-29 — The workspace gate is decideWorkspaceRead, the one read decision, and what
  *     the export carries passes the exporter's classification reader: show, then leave with the
  *     destination `export` (TARGET-082). The caller passes the reader.
+ *   v1.5.0 — 2026-09-29 — TARGET-082 review: what leave() keeps back is named in workspace.json
+ *     `leftOut` ({ key, label, reason }, records and images) and returned by exportWorkspace.
  */
 import { ZipArchive } from 'archiver';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
@@ -41,6 +43,7 @@ import { workspaceMetaReader } from './workspace-meta.js';
 import { decideWorkspaceRead } from './workspace-access.js';
 import { memoryTarget, fileTarget } from './classification/labels.js';
 import type { ContentReader } from './classification/reader.js';
+import { leaveMemories, leftOutOf, type LeftOut } from './classification-exits.js';
 import { logger } from '../utils/logger.js';
 
 export const WS_EXPORT_VERSION = '1.0';
@@ -69,6 +72,8 @@ export interface WorkspaceExportJson {
   sources: unknown;
   objects: ExportObject[];
   images: ExportImage[];
+  /** What the classification kept out of the export, by key (records and images), with the label and why. */
+  leftOut: LeftOut[];
 }
 
 /** Pull storage keys out of an image URL: /v1/storage/<key> or /v1/pub/<ghii>/<key>. */
@@ -125,14 +130,16 @@ export async function collectWorkspace(
   }
   // An export takes content out of the organism: what the exporter may see, then what may leave
   // (the classification component's show and leave, TARGET-082).
+  // What stays behind is named in the bundle's `leftOut` (TARGET-082 review): the exporter is a
+  // member who may see the keys, and a backup that is silently smaller than the workspace is wrong.
   const target = (r: MemoryRecord) => memoryTarget(r.ownerGaii, r.key);
-  const readable = (await reader.leave(await reader.show(permitted, target), target, { kind: 'export', organismId: orgId })).kept;
+  const { kept: readable, leftOut } = await leaveMemories(reader, await reader.show(permitted, target), { kind: 'export', organismId: orgId });
 
   const out: WorkspaceExportJson = {
     aimeatWorkspaceExport: WS_EXPORT_VERSION, exportedAt,
     source: { organismId: orgId, ws, nodeId: config.nodeId },
     name: ws, manifest: null, readme: null, config: null,
-    schemas: {}, sections: {}, sources: null, objects: [], images: [],
+    schemas: {}, sections: {}, sources: null, objects: [], images: [], leftOut,
   };
   const namespaces = new Set<string>();
   const imageKeys = new Set<string>();
@@ -188,7 +195,8 @@ export async function collectWorkspace(
     const stored = await storage.getStorageFile(exporterGaii, key).catch(err => { logger.warn('md: continuing after a suppressed failure', { error: String(err) }); return null; });
     // An image leaves with the export under the same two questions as a record.
     const shown = stored ? await reader.show([stored], () => fileTarget(exporterGaii, key)) : [];
-    const [file] = (await reader.leave(shown, () => fileTarget(exporterGaii, key), { kind: 'export', organismId: orgId })).kept;
+    const { kept: [file], left } = await reader.leave(shown, () => fileTarget(exporterGaii, key), { kind: 'export', organismId: orgId });
+    out.leftOut.push(...leftOutOf(left, () => key));
     if (!file) continue;
     const ext = (file.mimeType.split('/')[1] || 'bin').replace(/[^a-z0-9]/gi, '').slice(0, 8) || 'bin';
     const fileName = `images/img-${imgN++}.${ext}`;
@@ -203,7 +211,7 @@ export async function exportWorkspace(
   storage: Storage,
   config: AimeatConfig,
   opts: { orgId: string; ws: string; exporterGaii: string; exportedAt: string; isOrgManager?: boolean; reader: ContentReader },
-): Promise<{ buffer: Buffer; filename: string }> {
+): Promise<{ buffer: Buffer; filename: string; leftOut: LeftOut[] }> {
   const { json, images } = await collectWorkspace(storage, config, opts);
   const archive = new ZipArchive({ zlib: { level: 6 } });
   const chunks: Buffer[] = [];
@@ -217,5 +225,5 @@ export async function exportWorkspace(
   archive.finalize();
   const buffer = await done;
   const safe = String(json.name).replace(/[^a-z0-9_-]+/gi, '-').slice(0, 40) || 'workspace';
-  return { buffer, filename: `workspace-${safe}.zip` };
+  return { buffer, filename: `workspace-${safe}.zip`, leftOut: json.leftOut };
 }

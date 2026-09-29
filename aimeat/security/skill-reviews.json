@@ -20,7 +20,7 @@
         "aimeat/src/services/refinery/schedule-input.ts",
         "aimeat/src/data/refinery-classes.ts"
       ],
-      "digest": "sha256:f41b0acc694cdd5871853e18"
+      "digest": "sha256:5230ce6c8dafa530225d0444"
     },
     "node:aimeat-open-items": {
       "reviewedOn": "2026-09-29",
@@ -212,11 +212,11 @@
       "digest": "sha256:8e9a3eef329456c02c82950b"
     },
     "node:aimeat-node-operations": {
-      "reviewedOn": "2026-09-24",
+      "reviewedOn": "2026-09-29",
       "watches": [
         "aimeat/src/mcp/core-admin.ts"
       ],
-      "digest": "sha256:bd0275b0ac9ac6fb4bc75bdf"
+      "digest": "sha256:39793056139392b98ae5374f"
     },
     "node:manage-my-agents": {
       "reviewedOn": "2026-09-29",
@@ -259,7 +259,7 @@
         "aimeat/src/routes/ai-providers.ts",
         "aimeat/src/services/ai/routing.ts"
       ],
-      "digest": "sha256:bf374807fa6bd3be10ee301e"
+      "digest": "sha256:bbb2d4c7322997eb834d1310"
     },
     "node:aimeat-ai-model-policy": {
       "reviewedOn": "2026-09-28",
@@ -364,7 +364,7 @@
       "watches": [
         "aimeat/src/routes/organisms/workspace-ops.ts"
       ],
-      "digest": "sha256:9fb6618ca3b4c7831a0aff8b"
+      "digest": "sha256:9f7cc907cedbf99ac30724f4"
     },
     "project:aimeat-video": {
       "reviewedOn": "2026-09-19",
@@ -481,7 +481,7 @@
       "aimeat/src/services/ai-provenance.ts": "1d5afa89a96cc67c"
     },
     "node:aimeat-node-operations": {
-      "aimeat/src/mcp/core-admin.ts": "17c66f53ecaa3360"
+      "aimeat/src/mcp/core-admin.ts": "17356e536f598087"
     },
     "node:manage-my-agents": {
       "aimeat/src/mcp/core.ts": "67cba1c1e3185cd9",
@@ -502,7 +502,7 @@
       "aimeat/src/services/workflow/lifecycle.ts": "a6a052a36360f00f"
     },
     "node:configure-routing": {
-      "aimeat/src/routes/ai.ts": "19ed1a5176bac41c",
+      "aimeat/src/routes/ai.ts": "b93cd90c2504327d",
       "aimeat/src/routes/ai-providers.ts": "8746b4b6947a31a1",
       "aimeat/src/services/ai/routing.ts": "af79eb8511cc0ed1"
     },
@@ -544,7 +544,7 @@
     },
     "project:aimeat-organism-records": {},
     "project:aimeat-pages-links": {
-      "aimeat/src/routes/organisms/workspace-ops.ts": "6fe72eff68179b09"
+      "aimeat/src/routes/organisms/workspace-ops.ts": "732ff788c0db6774"
     },
     "project:aimeat-video": {},
     "project:aimeat-writing": {
@@ -575,7 +575,7 @@
       "aimeat/src/static/sdk-libs/ai/index.js": "241d20196c36fb3f"
     },
     "node:aimeat-refinery": {
-      "aimeat/src/services/refinery/pipeline.ts": "68b053bd9a46b140",
+      "aimeat/src/services/refinery/pipeline.ts": "d4481883f6dcb4e0",
       "aimeat/src/services/refinery/message.ts": "049996a45f32b89a",
       "aimeat/src/services/refinery/schedule-input.ts": "4c85272fafdfb026",
       "aimeat/src/data/refinery-classes.ts": "ab723c0852c19267"

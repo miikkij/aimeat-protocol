@@ -16,6 +16,8 @@
  * @structure REFINERY_SKILL_ENTRY
  * @usage import { REFINERY_SKILL_ENTRY } from './builtin-skills.refinery.js';
  * @version-history
+ *   v1.1.1 — 2026-09-30 — "The queues": an attachment its classification keeps from every model is
+ *     named on the row with a CLASSIFIED error and left out of the extraction (TARGET-082 review).
  *   v1.1.0 — 2026-09-29 — "In an app": aimeat-refinery.js and its console.
  *   v1.0.0 — 2026-09-29 — Initial (wish aimeat-refinery).
  */
@@ -91,7 +93,10 @@ which fields it reads. A newsletter and a personal letter are filed, not process
 | \`ohitettu\` (skipped) | a kind that is not processed |
 
 A row's \`fields\` holds what was read, \`classifier\` and \`extractor\` say which model answered and how
-sure, and \`attachments\` names the stored PDFs.
+sure, and \`attachments\` names the stored PDFs. An attachment whose classification lets no model read
+it is still stored and named there, with an \`error\` that says why (\`CLASSIFIED: …\`), and its text is left
+out of what the model reads; the message itself is filed as usual. To have it read, the person lowers
+that file's classification (\`aimeat_classification\`) and you rerun the message with \`message_ids\`.
 
 ## Running
 

@@ -35,6 +35,9 @@
  *   v1.10.0 — 2026-09-29 — TARGET-082 V4: GET /comments and GET /workspace/dangling-refs hand the
  *     caller's ContentReader to listComments and scanOrganismDanglingRefs; POST /comments/batch passes
  *     its comment records through the same reader.
+ *   v1.11.0 — 2026-09-29 — TARGET-082 review: the workspace read tells an AI which records carry a
+ *     warning classification (`_classificationWarning` on each, `classificationWarnings` over the
+ *     read), and GET /structure/history passes the current record and its versions through the reader.
  *   v1.8.0 — 2026-09-25 — The workspace read carries `rules` (how the workspace takes a member's
  *     change) and `sections` (each document space's section index, the copy that counts) to a caller
  *     who can read the workspace.
@@ -61,6 +64,7 @@ import { fresherRec } from './shared.js';
 import { loadWorkspaceContent } from '../../services/workspace-content.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
+import { classificationWarningOf } from '../../services/classification/present-memory.js';
 import { logger } from '../../utils/logger.js';
 import { isOrganismOwner } from '../../services/organism-ownership.js';
 
@@ -91,7 +95,8 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     // manage the organism), they see ALL of the workspace's content, whoever wrote it. If not, they see
     // nothing (org membership alone is discovery-only). The one loader (services/workspace-content.ts)
     // loads, decides (decideWorkspaceRead) and passes the classification reader; this route shapes.
-    const got = await loadWorkspaceContent({ storage, config }, readerFor({ storage, config }, req.auth), {
+    const contentReader = readerFor({ storage, config }, req.auth);
+    const got = await loadWorkspaceContent({ storage, config }, contentReader, {
       sub: req.auth!.sub, ownerName: req.auth!.owner, accessorGaii: resolveIdentity(req.auth!, config.nodeId),
     }, { organismId: id, ws, archived });
     if (!got.ok) {
@@ -180,10 +185,13 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
         const v = rec.value;
         if (!v || typeof v !== 'object' || Array.isArray(v)) return v;
         const prov = rec.aiProvenanceId ? provenanceById.get(rec.aiProvenanceId) : undefined;
+        const warned = classificationWarningOf(rec);
         return {
           ...(v as Record<string, unknown>),
           _createdAt: rec.createdAt, _updatedAt: rec.updatedAt, _version: rec.version,
           ...(prov ? { _aiProvenance: prov.record, _aiProvenanceUrl: prov.recordUrl } : {}),
+          // TARGET-082: an AI shown a warning-classified record is told so, on the record it reads.
+          ...(warned ? { _classificationWarning: warned } : {}),
         };
       };
       const current: unknown[] = [];
@@ -231,6 +239,8 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
 
     res.json(success(config.nodeId, {
       manifest, readme, apps, objects, drafts, decisions, resources, todos,
+      // Every warning-classified record this read showed an AI, the manifest and readme included.
+      ...(contentReader.warnings.length ? { classificationWarnings: contentReader.warnings } : {}),
       ...(rules ? { rules, sections } : {}),
       ...(Object.keys(schemas).length ? { schemas } : {}),
       ...(Object.keys(rowSpaces).length ? { row_spaces: rowSpaces } : {}),
@@ -426,9 +436,13 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
 
     const creatorGhii = organism.creatorGhii.includes('@') ? organism.creatorGhii : `${organism.creatorGhii}@${config.nodeId}`;
     const key = `organism.${id}.meta.structure`;
-    const curRec = (await storage.listAllMemory({ prefix: key, limit: 5 })).items.find(r => r.key === key) ?? null;
-    const owner = curRec?.ownerGaii ?? creatorGhii;
-    const history = await storage.listMemoryHistory(owner, key, { limit: 500 });
+    const stored = (await storage.listAllMemory({ prefix: key, limit: 5 })).items.find(r => r.key === key) ?? null;
+    const owner = stored?.ownerGaii ?? creatorGhii;
+    // The structure record and its earlier versions are content: both pass the caller's
+    // classification reader (TARGET-082 review), the versions under the record's own label.
+    const reader = readerFor({ storage, config }, req.auth);
+    const curRec = stored ? (await reader.show([stored], r => memoryTarget(r.ownerGaii, r.key)))[0] ?? null : null;
+    const history = await reader.show(await storage.listMemoryHistory(owner, key, { limit: 500 }), () => memoryTarget(owner, key));
     const current = curRec
       ? { version: curRec.version, value: curRec.value, recordedAt: curRec.updatedAt }
       : null;

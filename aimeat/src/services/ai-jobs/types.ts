@@ -13,6 +13,8 @@
  * @structure AiJobState · AiJobRecord · AiJobStartedBy · AiJobLogEntry · StartAiJobInput · AiJobError
  * @usage import type { AiJobRecord } from './types.js';
  * @version-history
+ *   v1.4.0 — 2026-09-30 — `classification_warnings` on the record and on the start answer: the
+ *     warning-classified items the job gave its model (TARGET-082 review, item 2).
  *   v1.3.0 — 2026-09-29 — `started_by` on the record and `startedBy` on the start context: the
  *     starter's credential facts, so the job reads its inputs as that caller (TARGET-082 V4).
  *   v1.2.0 — 2026-09-28 — `role`, the AI role the job's call runs as, on the record and on the start input.
@@ -22,8 +24,12 @@
  *   v1.0.0 — 2026-08-31 — Initial.
  */
 import type { AiOp } from './op.js';
+import type { warningsNote } from '../classification/reader.js';
 
 export type { AiOp as AiJobOp } from './op.js';
+
+/** The warning-classified items a model was given, as warningsNote (classification/reader.ts) names them. */
+export type AiJobClassificationWarnings = NonNullable<ReturnType<typeof warningsNote>['classification_warnings']>;
 
 export type AiJobState = 'queued' | 'running' | 'done' | 'failed' | 'cancelled';
 
@@ -93,6 +99,9 @@ export interface AiJobRecord {
      *  (starter.ts jobReader). Absent on a job started before 2026-09-29, by an extension, or by a
      *  chain: such a job reads as an unattended AI run, the strictest reader. */
     started_by?: AiJobStartedBy;
+    /** The warning-classified items the job gave its model: the prompt's records when the job was
+     *  started, the audio when it ran. Absent when there were none. */
+    classification_warnings?: AiJobClassificationWarnings;
 }
 
 /**
@@ -174,6 +183,8 @@ export interface StartAiJobResult {
     job_id: string;
     state: AiJobState;
     queue_position: number;
+    /** The warning-classified records the assembled prompt holds. Absent when there were none. */
+    classification_warnings?: AiJobClassificationWarnings;
 }
 
 /**

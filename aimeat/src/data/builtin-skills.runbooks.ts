@@ -12,6 +12,8 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   v1.4.1 — 2026-09-30 — aimeat-node-operations: aimeat_admin_config reports the classification
+ *     switch, and aimeat_classification switch_set is what changes it (TARGET-082).
  *   v1.4.0 — 2026-09-30 — manage-my-agents: aimeat_agents_list carries the permissions, the calls the
  *     node refused an agent for a missing one, and what it asked for; read them when tasks do not move.
  *   v1.3.0 — 2026-09-26 — aimeat-node-operations names the start step for the app grants, personal
@@ -56,7 +58,12 @@ show the owner what you found before acting.
 3. \`aimeat_organism_list\` + \`aimeat_organism_overview\` — the shared workspaces and what lives in them.
 4. \`aimeat_discover\` with \`mode: "map"\` — a faceted map of every content type (skills,
    knowledge, workflows, apps, documents) the caller can see.
-5. \`aimeat_admin_config\` — current node configuration.
+5. \`aimeat_admin_config\` — current node configuration. It is read-only. It also reports the
+   classification switch (\`classification_mode\`: off, owner or all). You change it with
+   \`aimeat_classification\` action \`switch_set\` (it needs the same \`operator:admin\` permission), and
+   only with the owner's confirmation: turning it
+   on, or from owner to all, applies at once; turning it off, or from all to owner, is refused from
+   an AI, because the operator does that on the admin Config page.
 
 ## After an update
 Every step an update brings runs by itself when the node starts: there is no script to run by hand,

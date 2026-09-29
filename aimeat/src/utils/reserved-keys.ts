@@ -15,10 +15,15 @@
  *   (services/ecosystem-access.ts). See
  *   docs/coding-guidelines/security-development-dna.md invariant #2.
  * @structure RESERVED_OWNER_KEY_PREFIXES · isReservedServerKey(key) ·
- *   SERVER_WRITTEN_KEYS · SERVER_WRITTEN_KEY_PREFIXES · isServerWrittenKey(key) ·
- *   serverWrittenKeyRefusal(key) · appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
+ *   SERVER_WRITTEN_KEYS · SERVER_WRITTEN_KEY_PREFIXES · SERVICE_OWNED_KEY_PREFIXES ·
+ *   isServiceOwnedKey(key) · isServerWrittenKey(key) · serverWrittenKeyRefusal(key) ·
+ *   appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   v1.19.0 — 2026-09-29 — `classification.policy.` is also a SERVICE-OWNED prefix: no memory route
+ *     writes, patches, imports, copies, restores or deletes it for any principal, the account owner
+ *     included, and appMayWriteKey refuses it to every role. Only services/classification/
+ *     policy-admin.ts writes it, straight to storage (TARGET-082 review, finding 2).
  *   v1.18.0 — 2026-09-29 — `classification.policy.` joins the list: the owner's classification policy.
  *   v1.17.0 — 2026-09-28 — `ai.roles.` joins the list: the owner's AI roles and app role bindings.
  *   v1.16.0 — 2026-09-28 — `ai.providers.`, `ai.apikey.` and `ai.routing.` join the list: the owner's
@@ -247,12 +252,35 @@ export const SERVER_WRITTEN_KEYS: readonly string[] = ['__redirect__'];
 export const SERVER_WRITTEN_KEY_PREFIXES: readonly string[] = ['notif.'];
 
 /**
+ * Key prefixes one named service owns outright: no memory route writes them, and no memory route
+ * DELETES or RESTORES them either, for any principal, the account owner and an operator included.
+ * A `notif.` record is the owner's to clear; a key here is not, because removing it is as much a
+ * change of what the server does as writing it.
+ *
+ * `classification.policy.` (2026-09-29, TARGET-082 review finding 2) holds the owner's, an
+ * organism's and the node's classification policy: the switch, the labels, the rules, the history
+ * and the AI's waiting proposal. Written past the service, an owner PAT, an agent or a granted app
+ * could turn classification off or loosen it without the proposal a person must accept, and a
+ * delete through the bin did the same by removing the record. services/classification/policy-admin.ts
+ * is the one writer, straight to storage. It stays in RESERVED_OWNER_KEY_PREFIXES as well, so every
+ * list that asks "is this reserved" still answers yes.
+ */
+export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.'];
+
+/** True iff `key` is owned by one service and no memory route writes, restores or deletes it. */
+export function isServiceOwnedKey(key: unknown): boolean {
+  return typeof key === 'string' && SERVICE_OWNED_KEY_PREFIXES.some((prefix) => key.startsWith(prefix));
+}
+
+/**
  * True iff `key` is written only by the node itself: one of SERVER_WRITTEN_KEYS exactly (a key is an
- * address, so `__redirect__.old` is ordinary data), or a key under one of SERVER_WRITTEN_KEY_PREFIXES.
+ * address, so `__redirect__.old` is ordinary data), a key under one of SERVER_WRITTEN_KEY_PREFIXES,
+ * or a key under one of SERVICE_OWNED_KEY_PREFIXES.
  */
 export function isServerWrittenKey(key: unknown): boolean {
   if (typeof key !== 'string') return false;
-  return SERVER_WRITTEN_KEYS.includes(key) || SERVER_WRITTEN_KEY_PREFIXES.some((prefix) => key.startsWith(prefix));
+  return SERVER_WRITTEN_KEYS.includes(key) || SERVER_WRITTEN_KEY_PREFIXES.some((prefix) => key.startsWith(prefix))
+    || isServiceOwnedKey(key);
 }
 
 /**
@@ -266,6 +294,13 @@ export function isReservedServerKey(key: string): boolean {
 
 /** What a memory door answers when asked to write one of them, and which act writes it instead. */
 export function serverWrittenKeyRefusal(key: string): { code: 'RESERVED_KEY'; message: string } {
+  if (isServiceOwnedKey(key)) {
+    return {
+      code: 'RESERVED_KEY',
+      message: `"${key}" is a classification policy, and only the classification service writes or removes it. `
+        + 'Read and change it with GET and PUT /v1/classification/policy or the aimeat_classification MCP tool.',
+    };
+  }
   if (key.startsWith('notif.')) {
     return {
       code: 'RESERVED_KEY',
@@ -298,10 +333,15 @@ export function serverWrittenKeyRefusal(key: string): { code: 'RESERVED_KEY'; me
  * their own keys is the whole point of those keys; passing `true` for an owner session locks the
  * owner out of their own record, which is what happened the first time this parameter was added and
  * what test/e2e-app-grants.ts ("guard is app-scoped") exists to catch.
+ *
+ * A service-owned key (SERVICE_OWNED_KEY_PREFIXES) is the one exception: it is refused to every
+ * role, the owner session and `memory:write-reserved` included, because its one writer is a service
+ * that writes straight to storage and never asks this gate.
  */
 export function appMayWriteKey(
   roles: string[], key: string, delegatedOwnerWrite = false, reservedAllowed = false,
 ): boolean {
+  if (isServiceOwnedKey(key)) return false;
   const isOwnerSession = roles.includes('owner') && !roles.includes('agent') && !roles.includes('ecosystem');
   if (isOwnerSession) return true;
   if (!roles.includes('app') && !delegatedOwnerWrite) return true;

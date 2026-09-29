@@ -20,6 +20,9 @@
  * @structure MemoryBinRefusal · binRefusal() · deleteMemoryRecord() · restoreMemoryRecord()
  * @usage const out = await deleteMemoryRecord({ storage, config }, { caller, ownerName, key });
  * @version-history
+ *   v1.2.0 — 2026-09-29 — Delete and restore refuse a service-owned key (utils/reserved-keys.ts
+ *     SERVICE_OWNED_KEY_PREFIXES, the classification policy) for every caller, the owner and an
+ *     operator included: 403 RESERVED_KEY (TARGET-082 review finding 2).
  *   v1.1.0 — 2026-09-24 — Restore asks the two refusals delete asks (A6-12), through one binRefusal():
  *     the organism namespace rule and the append-only guard. It asked neither, so a member who had
  *     left an organism put their own record back into it, and a record binned before its space
@@ -31,12 +34,13 @@ import type { Storage } from '../storage/interface.js';
 import { emitChange } from './event-bus.js';
 import { checkDeleteGuard } from './write-guards.js';
 import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
+import { isServiceOwnedKey, serverWrittenKeyRefusal } from '../utils/reserved-keys.js';
 
 export interface MemoryBinDeps { storage: Storage; config: AimeatConfig }
 
 export interface MemoryBinRefusal {
   ok: false;
-  code: 'NOT_FOUND' | 'NOT_RESTORABLE' | 'WRITE_CONFLICT' | 'AUTH_REQUIRED' | 'ACCESS_DENIED' | 'CONSENT_REQUIRED';
+  code: 'NOT_FOUND' | 'NOT_RESTORABLE' | 'WRITE_CONFLICT' | 'AUTH_REQUIRED' | 'ACCESS_DENIED' | 'CONSENT_REQUIRED' | 'RESERVED_KEY';
   message: string;
   /** What the door should answer. 404 for the two original codes, so an old caller reads the same. */
   status?: number;
@@ -102,6 +106,15 @@ async function locate(
  * binned before its space became append-only could be put back past the space's write path.
  */
 async function binRefusal(deps: MemoryBinDeps, req: MemoryBinRequest, act: 'delete' | 'restore'): Promise<MemoryBinRefusal | null> {
+  // A service-owned key (utils/reserved-keys.ts) is neither deleted nor put back by anyone, the
+  // account owner and an operator naming another namespace included. Removing the classification
+  // policy switched classification off for its owner without the proposal a person must accept
+  // (TARGET-082 review finding 2), and putting an old copy back would restore a policy the person
+  // has since changed. Asked first, so it says nothing about whether the record exists.
+  if (isServiceOwnedKey(req.key)) {
+    const refusal = serverWrittenKeyRefusal(req.key);
+    return { ok: false, code: refusal.code, message: refusal.message, status: 403 };
+  }
   const operatorOverride = !!req.ownerOverride && (req.roles ?? []).includes('operator');
   if (!operatorOverride) {
     const denied = await checkOrganismNamespaceAccess(deps, {

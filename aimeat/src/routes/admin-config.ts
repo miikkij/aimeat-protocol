@@ -18,6 +18,12 @@
  *   - mutation routes: validate + persist mutable config, emit change events
  *
  * @version-history
+ *   v1.6.0 -- 2026-09-29 -- PUT and the classification switch (classification.mode): an AI
+ *     credential (a personal access token) is refused a change that turns classification off or
+ *     from all to owner, before anything in the request is applied, and every applied change of the
+ *     switch is kept in the classification audit log (services/classification/switch.ts).
+ *   v1.5.0 -- 2026-09-29 -- GET serves a field's `choices` (the fixed values of a string setting),
+ *     so the Config tab offers a pick instead of a text field.
  *   v1.4.0 -- 2026-09-24 -- PUT's loop moved to services/config-apply.ts unchanged (a second door,
  *     Themes & Styles' who-chooses, applies settings through it).
  *   v1.3.0 -- 2026-09-16 -- PUT answers a secret field (adminDisplay configured) with
@@ -49,6 +55,7 @@ import type { ConfigProvenance } from '../services/config-provenance.js';
 import type { ConsulConfigService } from '../services/consul-config.js';
 import { applyConsulValues } from '../services/consul-config.js';
 import { emitChange } from '../services/event-bus.js';
+import { CLASSIFICATION_MODE_PATH, recordSwitchChange, switchRefusal } from '../services/classification/switch.js';
 import { logger } from '../utils/logger.js';
 
 export function adminConfigRouter(
@@ -64,7 +71,7 @@ export function adminConfigRouter(
     router.get('/v1/admin/config', requireAuth(), requireRole('operator'), async (_req, res) => {
         const editable = storage.supportsConfigPersistence();
         type SchemaEntry = {
-            value: unknown; type: string; description: string; range?: string;
+            value: unknown; type: string; description: string; range?: string; choices?: readonly string[];
             mutable: boolean; editable: boolean; path: string;
             source?: string; canReset?: boolean; sealed?: boolean;
         };
@@ -105,6 +112,7 @@ export function adminConfigRouter(
                 type: typeStr,
                 description: field.description,
                 ...(field.range ? { range: field.range } : {}),
+                ...(field.choices ? { choices: field.choices } : {}),
                 mutable: !field.immutable && !sealed,
                 editable: editable && !field.immutable && !sealed,
                 path: field.dotPath,
@@ -174,9 +182,26 @@ export function adminConfigRouter(
             return;
         }
 
+        // The classification switch gives protection away when it goes off or from all to owner, and
+        // an AI credential does not make that change (services/classification/switch.ts). Refused
+        // before any of the request is applied, as the sealed scan above.
+        const modeChange = (changes as Array<{ path?: unknown; value?: unknown }>).find(c => c?.path === CLASSIFICATION_MODE_PATH);
+        if (modeChange && typeof modeChange.value === 'string') {
+            const refusal = switchRefusal(req.auth!, config.classificationMode, modeChange.value);
+            if (refusal) {
+                res.status(refusal.status).json(error(config.nodeId, refusal.code, `${refusal.message} Nothing in this request was applied.`));
+                return;
+            }
+        }
+        const modeBefore = config.classificationMode;
+
         // The loop that checks, persists and applies each change: services/config-apply.ts, shared with
         // the other door that changes settings (Themes & Styles' who-chooses).
         const { applied, errors } = await applyConfigChanges({ config, storage, provenance }, changes as ConfigChange[]);
+        if (applied.some(a => a.path === CLASSIFICATION_MODE_PATH) && config.classificationMode !== modeBefore) {
+            recordSwitchChange(config.nodeId, req.auth!, modeBefore, config.classificationMode);
+            emitChange('classification');
+        }
 
         if (applied.length === 0 && errors.length > 0) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'No valid changes applied', undefined, { errors }));

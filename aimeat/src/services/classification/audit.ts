@@ -22,15 +22,30 @@
  *   (listClassificationAuditMerged), so an event is visible at once rather than after the flush.
  *   A failed flush puts its rows back for the next window, bounded by the queue cap; a hard kill
  *   loses at most one window.
+ *
+ *   EVIDENCE IS NEVER EVICTED (review of 2026-09-29). The buffer keeps two lists: routine rows
+ *   (shown, used) and evidence (refused, changed). Past the cap the oldest ROUTINE row goes; evidence
+ *   is kept up to a larger cap of its own, and past that a new evidence row is refused and logged
+ *   rather than an older one dropped. Evidence is flushed first. A CHANGE is recorded to the
+ *   millisecond (its `minute` is the exact time), so two changes of one item in one minute are two
+ *   rows, each with its own from → to in `purpose`, and neither is merged into the other. The
+ *   caller aggregates a long list of `shown` items into one row per label (reader.ts, key `*:<label>`
+ *   and a `count`), so one AI list call cannot fill the buffer. `ownerGaii` is always the person:
+ *   an agent's or an app's identity is collapsed to its owner, so the owner's log and the owner's
+ *   erasure find the rows. purgeClassificationAudit drops the waiting rows of an erased person or a
+ *   deleted organism, so the next flush does not write them back after the storage cascade.
  * @structure ClassificationAuditEvent · recordClassificationAudit · flushClassificationAudit ·
  *   initClassificationAudit · shutdownClassificationAudit · pendingClassificationAudit ·
- *   listClassificationAuditMerged · pruneClassificationAuditOlderThan · minuteOf ·
- *   resetClassificationAudit
+ *   listClassificationAuditMerged · pruneClassificationAuditOlderThan · purgeClassificationAudit ·
+ *   minuteOf · resetClassificationAudit
  * @usage
  *   import { recordClassificationAudit } from '../classification/audit.js';
  *   recordClassificationAudit({ scope, ownerGaii, kind: 'memory', key, label: 'luottamuksellinen',
  *     reader: 'claude#alice@node', readerKind: 'ai', action: 'used', purpose: 'chat:anthropic/claude' });
  * @version-history
+ *   v1.1.0 — 2026-09-29 — Review fixes: evidence (refused, changed) is never evicted and flushes
+ *     first; a change is its own row to the millisecond; an event may carry a count; ownerGaii is
+ *     collapsed to the owner; purgeClassificationAudit for erasure and organism delete.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V4. Initial.
  */
 import { randomUUID } from 'node:crypto';
@@ -39,8 +54,9 @@ import type {
   ClassificationAuditReaderKind, ClassificationAuditAction,
 } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
+import { ownerGhiiOf } from '../../utils/gaii.js';
 
-/** One thing that happened to one labelled item. `at` defaults to now. */
+/** One thing that happened to one labelled item, or to `count` items at once. `at` defaults to now. */
 export interface ClassificationAuditEvent {
   scope: string;
   ownerGaii: string | null;
@@ -52,6 +68,8 @@ export interface ClassificationAuditEvent {
   action: ClassificationAuditAction;
   purpose?: string | null;
   at?: string;
+  /** How many events this one stands for (an aggregated `shown` row). Defaults to 1. */
+  count?: number;
 }
 
 /** Flush cadence. The stored log is at most this far behind; the merged read never is. */
@@ -60,13 +78,21 @@ const FLUSH_INTERVAL_MS = 60_000;
 const FLUSH_CHUNK = 500;
 /** Hard cap on distinct rows waiting, so a stuck database cannot grow the queue without bound. */
 const MAX_QUEUE = 10_000;
+/** The cap on waiting evidence rows. Past it a NEW evidence row is refused; none is evicted. */
+const MAX_EVIDENCE = 50_000;
 
 let storageRef: Storage | null = null;
 let flushTimer: ReturnType<typeof setInterval> | null = null;
 let flushing = false;
-/** Waiting rows, by address, in insertion order (a Map keeps it), so the oldest go first. */
-let queue = new Map<string, ClassificationAuditRow>();
+/** Waiting rows, by address, in insertion order (a Map keeps it), so the oldest go first.
+ *  `routine` holds shown and used, `evidence` holds refused and changed. */
+let routine = new Map<string, ClassificationAuditRow>();
+let evidence = new Map<string, ClassificationAuditRow>();
 let dropped = 0;
+let refusedEvidence = 0;
+
+const isEvidence = (a: ClassificationAuditAction) => a === 'refused' || a === 'changed';
+const waitingRows = (): ClassificationAuditRow[] => [...evidence.values(), ...routine.values()];
 
 /** The ISO timestamp of the minute `at` falls in, in UTC. An unreadable `at` counts as now. */
 export function minuteOf(at: string): string {
@@ -80,7 +106,7 @@ function addressOf(r: Pick<ClassificationAuditRow, 'minute' | 'reader' | 'action
   return [r.minute, r.reader, r.action, r.scope, r.kind, r.key].join('\u0000');
 }
 
-/** Fold `r` into `into`, the way storage folds a row into the table. */
+/** Fold `r` into `into`, the way storage folds a row into the table: the later row's label wins. */
 function mergeInto(into: ClassificationAuditRow, r: ClassificationAuditRow): void {
   into.count += r.count;
   if (r.firstAt < into.firstAt) into.firstAt = r.firstAt;
@@ -93,20 +119,36 @@ function mergeInto(into: ClassificationAuditRow, r: ClassificationAuditRow): voi
   if (r.ownerGaii) into.ownerGaii = r.ownerGaii;
 }
 
-/** Put a row in the queue, merging on its address, and keep the queue under its cap. */
+/**
+ * Put a row in the buffer, merging on its address. Past the cap the oldest routine row is evicted;
+ * evidence is never evicted, and past its own cap a new evidence row is refused and logged.
+ */
 function enqueue(r: ClassificationAuditRow): void {
   const address = addressOf(r);
-  const had = queue.get(address);
+  const into = isEvidence(r.action) ? evidence : routine;
+  const had = into.get(address);
   if (had) { mergeInto(had, r); return; }
-  if (queue.size >= MAX_QUEUE) {
-    const oldest = queue.keys().next().value;
-    if (oldest !== undefined) queue.delete(oldest);
+  if (into === evidence && evidence.size >= MAX_EVIDENCE) {
+    refusedEvidence++;
+    if (refusedEvidence === 1 || refusedEvidence % 100 === 0) {
+      logger.warn(`classification-audit: ${MAX_EVIDENCE} refusals and changes wait for storage; this one is not recorded (storage down?)`, { refusedEvidence });
+    }
+    return;
+  }
+  if (routine.size + evidence.size >= MAX_QUEUE) {
+    const oldest = routine.keys().next().value;
+    if (oldest === undefined && into === routine) {
+      // Everything waiting is evidence: the new routine row is the one that goes.
+      dropped++;
+      return;
+    }
+    if (oldest !== undefined) routine.delete(oldest);
     dropped++;
     if (dropped === 1 || dropped % 100 === 0) {
-      logger.warn(`classification-audit buffer over ${MAX_QUEUE} rows; dropping the oldest (storage slow or down?)`, { dropped });
+      logger.warn(`classification-audit buffer over ${MAX_QUEUE} rows; dropping the oldest shown or used row (storage slow or down?)`, { dropped });
     }
   }
-  queue.set(address, r);
+  into.set(address, r);
 }
 
 /**
@@ -117,11 +159,14 @@ export function recordClassificationAudit(e: ClassificationAuditEvent): void {
   try {
     if (!e || !e.reader || !e.scope || !e.key || !e.action) return;
     const at = e.at && !Number.isNaN(new Date(e.at).getTime()) ? new Date(e.at).toISOString() : new Date().toISOString();
+    const count = typeof e.count === 'number' && Number.isFinite(e.count) && e.count >= 1 ? Math.floor(e.count) : 1;
     enqueue({
       id: randomUUID(),
-      minute: minuteOf(at),
+      // A change is an event, not a count: to the millisecond, so a second change is a second row.
+      minute: e.action === 'changed' ? at : minuteOf(at),
       scope: e.scope,
-      ownerGaii: e.ownerGaii ?? null,
+      // The person, never their agent or app: the owner's log and erasure read this column.
+      ownerGaii: e.ownerGaii ? ownerGhiiOf(e.ownerGaii) : null,
       kind: e.kind,
       key: e.key,
       label: e.label,
@@ -129,7 +174,7 @@ export function recordClassificationAudit(e: ClassificationAuditEvent): void {
       readerKind: e.readerKind,
       action: e.action,
       purpose: e.purpose ?? null,
-      count: 1,
+      count,
       firstAt: at,
       lastAt: at,
     });
@@ -139,15 +184,37 @@ export function recordClassificationAudit(e: ClassificationAuditEvent): void {
 }
 
 /**
+ * Drop the waiting rows of an erased person (`owner`, their GHII) or of a deleted scope (`scope`,
+ * such as `organism:<id>`), so the next flush does not write back what the storage cascade removed.
+ * Call it next to the storage delete. Answers how many waiting rows were dropped.
+ */
+export function purgeClassificationAudit(what: { owner?: string; scope?: string }): number {
+  const owner = what.owner ? ownerGhiiOf(what.owner) : null;
+  const scope = what.scope ?? null;
+  if (!owner && !scope) return 0;
+  let n = 0;
+  for (const m of [routine, evidence]) {
+    for (const [address, r] of m) {
+      const hit = (scope && r.scope === scope)
+        || (owner && (r.ownerGaii === owner || ownerGhiiOf(r.scope) === owner));
+      if (hit) { m.delete(address); n++; }
+    }
+  }
+  return n;
+}
+
+/**
  * Write the waiting rows to storage. The queue is swapped out first, so events arriving during the
  * flush wait for the next one. A chunk that fails goes back into the queue, merged by address.
  */
 export async function flushClassificationAudit(): Promise<void> {
-  if (!storageRef || flushing || queue.size === 0) return;
+  if (!storageRef || flushing || routine.size + evidence.size === 0) return;
   flushing = true;
   const storage = storageRef;
-  const batch = [...queue.values()];
-  queue = new Map();
+  // Evidence first, so a failing store loses routine rows before it loses a refusal or a change.
+  const batch = waitingRows();
+  routine = new Map();
+  evidence = new Map();
   const failed: ClassificationAuditRow[] = [];
   try {
     for (let i = 0; i < batch.length; i += FLUSH_CHUNK) {
@@ -163,10 +230,11 @@ export async function flushClassificationAudit(): Promise<void> {
     if (failed.length > 0) {
       // Put the failed rows back ahead of what arrived meanwhile, so they are the first to go
       // when the cap is reached rather than the newest.
-      const arrived = queue;
-      queue = new Map();
+      const arrived = waitingRows();
+      routine = new Map();
+      evidence = new Map();
       for (const r of failed) enqueue(r);
-      for (const r of arrived.values()) enqueue(r);
+      for (const r of arrived) enqueue(r);
     }
     flushing = false;
   }
@@ -196,7 +264,7 @@ function matches(r: ClassificationAuditRow, f: ClassificationAuditFilter): boole
 /** Copies of the rows not yet flushed that match the filter. */
 export function pendingClassificationAudit(filter: { ownerGaii?: string; scope?: string } = {}): ClassificationAuditRow[] {
   const out: ClassificationAuditRow[] = [];
-  for (const r of queue.values()) if (matches(r, filter)) out.push({ ...r });
+  for (const r of waitingRows()) if (matches(r, filter)) out.push({ ...r });
   return out;
 }
 
@@ -210,7 +278,7 @@ export async function listClassificationAuditMerged(storage: Storage, filter: Cl
   const stored = await storage.listClassificationAudit({ ...filter, limit });
   const byAddress = new Map<string, ClassificationAuditRow>();
   for (const r of stored) byAddress.set(addressOf(r), { ...r });
-  for (const r of queue.values()) {
+  for (const r of waitingRows()) {
     if (!matches(r, filter)) continue;
     const address = addressOf(r);
     const had = byAddress.get(address);
@@ -234,7 +302,9 @@ export async function pruneClassificationAuditOlderThan(storage: Storage, days: 
 
 /** Test seam: drop everything waiting and forget the storage. Not used by the running node. */
 export function resetClassificationAudit(): void {
-  queue = new Map();
+  routine = new Map();
+  evidence = new Map();
   dropped = 0;
+  refusedEvidence = 0;
   storageRef = null;
 }

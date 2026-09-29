@@ -17,6 +17,8 @@
  * @structure classificationCall
  * @usage return envelopeResult(await classificationCall(client, args));
  * @version-history
+ *   v1.1.0 — 2026-09-29 — explorer → GET /v1/classification/labels (pending as the query text
+ *     "true"), switch_set → PUT /v1/classification/switch; get, set and review pass `owner`.
  *   v1.0.0 — 2026-09-29 — Initial (TARGET-082 V5).
  */
 import type { AimeatClient, ApiResponse } from './api-client.js';
@@ -37,7 +39,7 @@ function q(v: unknown): string | number | undefined {
     return typeof v === 'string' || typeof v === 'number' ? v : undefined;
 }
 
-const TARGET = ['kind', 'key', 'organism_id', 'ws', 'space', 'row_id'];
+const TARGET = ['kind', 'key', 'organism_id', 'ws', 'space', 'row_id', 'owner'];
 
 /** `human_said` under the name the REST bodies read. */
 function humanSaid(input: Input): Input {
@@ -58,7 +60,7 @@ export async function classificationCall(client: Pick<AimeatClient, 'get' | 'pos
         case 'get':
             return client.get(`/v1/classification/label${query({
                 kind: q(input.kind), key: q(input.key), organism_id: q(input.organism_id),
-                ws: q(input.ws), space: q(input.space), row_id: q(input.row_id),
+                ws: q(input.ws), space: q(input.space), row_id: q(input.row_id), owner: q(input.owner),
             })}`);
         case 'set':
             return client.put('/v1/classification/label', {
@@ -91,6 +93,17 @@ export async function classificationCall(client: Pick<AimeatClient, 'get' | 'pos
                 ...(keys ? { keys } : {}), ...pick(input, ['prefix']),
             });
         }
+        case 'explorer':
+            return client.get(`/v1/classification/labels${query({
+                level: q(input.level), organism_id: q(input.organism_id), label: q(input.label),
+                pending: typeof input.pending === 'boolean' ? String(input.pending) : q(input.pending),
+                kind: q(input.kind), limit: q(input.limit), cursor: q(input.cursor),
+            })}`);
+        case 'switch_set':
+            if (input.level !== undefined && input.level !== null && input.level !== 'node') {
+                return { ok: false, error: { code: 'INVALID_INPUT', message: 'switch_set is at level node, the only one.' } };
+            }
+            return client.put('/v1/classification/switch', pick(input, ['mode']));
         default:
             return { ok: false, error: { code: 'INVALID_INPUT', message: `action "${checked.action}" has no endpoint.` } };
     }

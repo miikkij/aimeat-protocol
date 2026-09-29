@@ -9,6 +9,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.67.0 -- 2026-09-29 -- e2e-classification.ts joins the suites (not the guard tier): content
+ *            classification's four-path parity, the node switch and the explorer (TARGET-082).
  *   v1.66.0 -- 2026-09-26 -- The node starts per suite with that suite's anonymous-mode setting
  *            (ANONYMOUS_OFF_SUITES in run-e2e-server.ts: the credential suites run with it off, as
  *            production does). The suite header, the lane line and the summary print the setting.
@@ -598,6 +600,10 @@ const ALL_SUITES = [
     // Where a published app says it puts what, the draft the node makes when it says nothing, and
     // the check that reports the difference — asserting at every door that it WARNS and never blocks.
     'test/e2e-data-map.ts',
+    // Content classification (TARGET-082): what an AI sees of a hidden, a warning and an allowed item
+    // on REST, the node MCP, the connector daemon (spawned, as e2e-ai-provenance-connector does) and
+    // an extension; the node switch and its audit rows; the explorer; the denials.
+    'test/e2e-classification.ts',
     'test/e2e-notifications.ts',
     'test/e2e-hooks.ts',
     'test/e2e-knowledge.ts',

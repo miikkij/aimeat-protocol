@@ -7,6 +7,7 @@
  *   CONFIG_FIELDS spreads these rows where they stood, so the Config tab lists them in the same order.
  * @structure SYSTEM2_AI_CONFIG_FIELDS
  * @version-history
+ *   v1.2.1 — 2026-09-29 — ai.catalog_refresh takes oneOf(): its three values are the Config tab's pick.
  *   v1.2.0 — 2026-09-28 — ai.model_default_tts, ai.tts_voice_default, ai.model_default_embed (V5).
  *   v1.1.1 — 2026-09-28 — Typed by AiCapabilityConfig, not AimeatConfig, which closed an import cycle.
  *   v1.1.0 — 2026-09-28 — The model catalogue (System 2 plan, V4): ai.catalog_refresh,
@@ -18,7 +19,7 @@
 import type { AiCapabilityConfig } from '../config-types-ai.js';
 import type { ConfigFieldShape } from './config-field-def.js';
 import { parseRecommendedModels } from './ai/policy.js';
-import { isJsonObject } from './config-schema-validators.js';
+import { isJsonObject, oneOf } from './config-schema-validators.js';
 
 export const SYSTEM2_AI_CONFIG_FIELDS: ConfigFieldShape<keyof AiCapabilityConfig>[] = [
   // The two roles V5 adds (services/ai-model-defaults.ts), after the six in config-schema.ts. The
@@ -36,7 +37,7 @@ export const SYSTEM2_AI_CONFIG_FIELDS: ConfigFieldShape<keyof AiCapabilityConfig
   { key: 'aiLegacySettingsRoutes', dotPath: 'ai.legacy_settings_routes', envVar: 'AIMEAT_AI_LEGACY_SETTINGS_ROUTES', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'The AI settings routes from before providers (/v1/openrouter/settings, /models, /test, /v1/ai/settings) still answer. Deprecated: they are removed in 4.0.0; off, they answer 410 Gone naming /v1/ai/providers' },
   { key: 'aiRecommendedModels', dotPath: 'ai.recommended_models', envVar: 'AIMEAT_AI_RECOMMENDED_MODELS', type: 'string', validate: v => typeof v === 'string' && parseRecommendedModels(v).problems.length === 0, immutable: false, description: 'The models this node recommends, per capability, as JSON: {"text": ["openrouter:anthropic/claude-opus-5.5"], "image": [...]}, in order. An owner who chooses the recommended models may use only these. Empty recommends nothing' },
   // The model catalogue (System 2 plan, V4; services/ai/catalog/).
-  { key: 'aiCatalogRefresh', dotPath: 'ai.catalog_refresh', envVar: 'AIMEAT_AI_CATALOG_REFRESH', type: 'string', validate: v => v === 'weekly' || v === 'daily' || v === 'off', immutable: false, description: 'How often the node refreshes its model catalogue (what each model can do and costs) from models.dev, OpenRouter and LiteLLM: weekly, daily or off. Off keeps the list the build shipped with', range: 'weekly|daily|off' },
+  { key: 'aiCatalogRefresh', dotPath: 'ai.catalog_refresh', envVar: 'AIMEAT_AI_CATALOG_REFRESH', type: 'string', ...oneOf('weekly', 'daily', 'off'), immutable: false, description: 'How often the node refreshes its model catalogue (what each model can do and costs) from models.dev, OpenRouter and LiteLLM: weekly, daily or off. Off keeps the list the build shipped with', range: 'weekly|daily|off' },
   { key: 'aiPriceOverrides', dotPath: 'ai.price_overrides', envVar: 'AIMEAT_AI_PRICE_OVERRIDES', type: 'string', validate: v => typeof v === 'string' && (!(v as string).trim() || isJsonObject(v as string)), immutable: false, description: 'Price corrections that win over the catalogue sources, as JSON {"anthropic:claude-opus-5-5": {"inPerMtok": 4, "outPerMtok": 20}}, in USD per million tokens (perImage, speechPerChar, transcriptionPerSecond per unit)' },
   { key: 'aiCatalogSources', dotPath: 'ai.catalog_sources', envVar: 'AIMEAT_AI_CATALOG_SOURCES', type: 'string', validate: v => typeof v === 'string' && (!(v as string).trim() || isJsonObject(v as string)), immutable: true, description: 'Other addresses for the catalogue sources, as JSON {"modelsDev": "...", "openRouter": "...", "liteLlm": "..."}, for a mirror or a test stub. Empty uses the public sources' },
 ];

@@ -13,6 +13,8 @@
  *   defaultPolicy() · labelById()
  * @usage import { defaultPolicy } from './defaults.js';
  * @version-history
+ *   v1.3.2 — 2026-09-30 — The e-mail rule starts a match only where a local part starts (17 s → under 1 ms on 200 kB).
+ *   v1.3.1 — 2026-09-29 — The classifier's two daily caps may be null, for no cap.
  *   v1.3.0 — 2026-09-29 — V3: the Content Classifier's settings (ClassifierSettings).
  *   v1.2.0 — 2026-09-29 — V4: auditRetentionDays on the node's policy.
  *   v1.1.0 — 2026-09-29 — V2: a label's reader audience, a rule's scope and the classifier kind, and
@@ -82,9 +84,12 @@ export interface ClassifierSettings {
   type: 'jev' | 'llm';
   /** A decision provider id (jev) or an AI provider id (llm); absent: the default one. */
   provider?: string | null;
-  /** Calls per owner (or organism) per day, and per node per day. Past them, content waits in a queue. */
-  dailyPerOwner: number;
-  dailyNode: number;
+  /**
+   * Calls per owner (or organism) per day, and per node per day. Past them, content waits in a queue.
+   * null is no cap: the calls are still counted, and nothing waits for that cap.
+   */
+  dailyPerOwner: number | null;
+  dailyNode: number | null;
   /** Which content kinds the classifier judges when they are written. Rules always run. */
   onWrite: Array<'memory' | 'file' | 'row'>;
 }
@@ -157,7 +162,9 @@ export const DEFAULT_RULES: readonly ClassificationRule[] = [
   },
   {
     id: 'sahkoposti', name: 'E-mail address', kind: 'regex',
-    pattern: '[A-Za-z0-9._%+-]+@[A-Za-z][A-Za-z0-9-]*(?:\\.[A-Za-z0-9-]+)*\\.(?!(?:js|mjs|cjs|css|json|ts|html?|min|map|png|svg)\\b)[A-Za-z]{2,}\\b',
+    // A match starts only where a local part starts: without the lookbehind every position of a long
+    // run of letters was a new start, 175 ms on 20 000 characters and 17 s on 200 000 (measured).
+    pattern: '(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@[A-Za-z][A-Za-z0-9-]*(?:\\.[A-Za-z0-9-]+)*\\.(?!(?:js|mjs|cjs|css|json|ts|html?|min|map|png|svg)\\b)[A-Za-z]{2,}\\b',
     flags: '', minLabel: 'luottamuksellinen', enabled: true,
   },
 ];

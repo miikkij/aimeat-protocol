@@ -19,6 +19,8 @@
  * @structure runJobOp(deps, job, prompt, signal) → JobOpOutcome · assertAudioInReach(deps, owner, key)
  * @usage const outcome = await runJobOp({ storage, config }, entry.job, entry.prompt, signal);
  * @version-history
+ *   v1.4.0 — 2026-09-30 — A transcription hands back the warning-classified audio it gave the model
+ *     (`warnings` on the outcome), which service.ts keeps on the job (TARGET-082 review, item 2).
  *   v1.3.0 — 2026-09-29 — The transcription reads its audio as the job's starter (starter.ts jobReader),
  *     and as an AI when no starter is recorded (TARGET-082 V4).
  *   v1.2.0 — 2026-09-29 — The transcription reads its audio through readAiFile (TARGET-082).
@@ -31,11 +33,12 @@ import type { Storage } from '../../storage/interface.js';
 import { completeForOwner } from '../ai-completion.js';
 import { readAiFile } from '../ai-inputs.js';
 import { jobReader } from './starter.js';
+import { warningsNote } from '../classification/reader.js';
 import { generateForOwner } from '../ai-image.js';
 import { transcribeForOwner } from '../ai-transcription.js';
 import { aiPayerOf } from '../agent-ai-keys.js';
 import { aiOpOf } from './op.js';
-import { AiJobError, type AiJobRecord } from './types.js';
+import { AiJobError, type AiJobRecord, type AiJobClassificationWarnings } from './types.js';
 
 /** What the provider's answer cost, carried onto the job record for every op the same way. */
 export interface JobSpend {
@@ -54,6 +57,8 @@ export interface JobOpOutcome {
     /** True only for a text answer that service.ts must parse as JSON before writing. */
     parseJson: boolean;
     spend: JobSpend;
+    /** The warning-classified items this call read (the transcription's audio). Absent when none. */
+    warnings?: AiJobClassificationWarnings;
 }
 
 const MB = 1024 * 1024;
@@ -117,7 +122,8 @@ export async function runJobOp(
         // been deleted while the job queued.
         // The one loader of what a model reads (services/ai-inputs.ts), as whoever started the job;
         // a job with no starter recorded reads as an AI (starter.ts).
-        const file = await readAiFile(storage, jobReader({ storage, config }, job), job.owner, key, { capability: 'transcription' });
+        const reader = jobReader({ storage, config }, job);
+        const file = await readAiFile(storage, reader, job.owner, key, { capability: 'transcription' });
         if (!file) throw new AiJobError('NOT_FOUND', 404, `No such file in your storage: audio_key "${key}".`);
         const r = await transcribeForOwner(storage, config, payer, {
             ...common,
@@ -128,6 +134,7 @@ export async function runJobOp(
             },
             ...(job.language ? { language: job.language } : {}),
         });
+        const warnings = warningsNote(reader).classification_warnings;
         return {
             value: job.json
                 ? { text: r.text, language: r.language ?? null, seconds: r.seconds, model: r.model }
@@ -137,6 +144,7 @@ export async function runJobOp(
                 cost_usd: r.usage.costUsd, tokens: r.usage.totalTokens,
                 ...(r.provenance ? { provenance_id: r.provenance.id } : {}),
             },
+            ...(warnings ? { warnings } : {}),
         };
     }
 
