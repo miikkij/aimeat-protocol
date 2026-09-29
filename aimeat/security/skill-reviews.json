@@ -13,14 +13,14 @@
       "digest": "sha256:9acaa15b2faeb3d83f3afab3"
     },
     "node:aimeat-refinery": {
-      "reviewedOn": "2026-09-28",
+      "reviewedOn": "2026-09-29",
       "watches": [
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/services/refinery/message.ts",
         "aimeat/src/services/refinery/schedule-input.ts",
         "aimeat/src/data/refinery-classes.ts"
       ],
-      "digest": "sha256:d1d6a0b4664ae9a6d11c8955"
+      "digest": "sha256:6c2945e91123b7c0a44ad6d7"
     },
     "node:aimeat-open-items": {
       "reviewedOn": "2026-09-26",
@@ -576,7 +576,7 @@
     },
     "node:aimeat-refinery": {
       "aimeat/src/services/refinery/pipeline.ts": "867c43ee054173fc",
-      "aimeat/src/services/refinery/message.ts": "284b1870ef8f22d6",
+      "aimeat/src/services/refinery/message.ts": "049996a45f32b89a",
       "aimeat/src/services/refinery/schedule-input.ts": "4c85272fafdfb026",
       "aimeat/src/data/refinery-classes.ts": "ab723c0852c19267"
     }

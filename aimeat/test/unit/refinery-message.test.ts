@@ -6,6 +6,7 @@
  * @usage cd aimeat && pnpm vitest run test/unit/refinery-message.test.ts
  * @version-history
  *   v1.0.0 — 2026-09-29 — Initial (wish aimeat-refinery).
+ *   v1.0.1 — 2026-09-29 — stripHtml decodes each entity once (CodeQL js/double-escaping, alert 1682).
  */
 import { describe, it, expect } from 'vitest';
 import {
@@ -124,6 +125,10 @@ describe('queueFor', () => {
 
   it('stripHtml keeps line breaks where blocks end', () => {
     expect(stripHtml('<p>a</p><p>b</p>')).toBe('a\n b');
+  });
+
+  it('stripHtml decodes each entity once: &amp;lt; is the text &lt;, not <', () => {
+    expect(stripHtml('<p>a &amp;lt;b&amp;gt; &amp;amp; c&nbsp;&quot;d&quot; &#39;e&#39; &lt;f&gt;</p>')).toBe('a &lt;b&gt; &amp; c "d" \'e\' <f>');
   });
 });
 

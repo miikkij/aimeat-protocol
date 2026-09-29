@@ -22,6 +22,9 @@
  *
  * @version-history
  *   v1.0.0 — 2026-07-21 — Initial link-preview endpoints (inbox message link cards).
+ *   v1.0.1 — 2026-09-29 — decodeEntities decodes in one pass and is exported for its test. The chain
+ *     decoded &amp; before &lt;, so a page title with `&amp;lt;` came out as `<` (CodeQL
+ *     js/double-escaping, the same fault as alert 1682).
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -57,12 +60,14 @@ async function readCapped(resp: Response, maxBytes: number): Promise<Buffer> {
   return Buffer.concat(chunks);
 }
 
-/** Minimal HTML-entity decode for the short text we pull out of meta tags. */
-function decodeEntities(s: string): string {
-  return s
-    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"').replace(/&#0?39;|&apos;/gi, "'").replace(/&#x27;/gi, "'")
-    .replace(/&nbsp;/g, ' ');
+const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", '#39': "'", '#039': "'", '#x27': "'", nbsp: ' ' };
+
+/**
+ * Minimal HTML-entity decode for the short text we pull out of meta tags. One pass, so each entity
+ * is decoded once: `&amp;lt;` is the text `&lt;`.
+ */
+export function decodeEntities(s: string): string {
+  return s.replace(/&(amp|lt|gt|quot|apos|#0?39|#x27|nbsp);/gi, (_, name: string) => ENTITIES[name.toLowerCase()]);
 }
 
 /** Find a <meta> tag's content by property/name, tolerating attribute order (content before or after). */

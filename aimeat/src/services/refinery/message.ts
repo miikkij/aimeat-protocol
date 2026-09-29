@@ -13,6 +13,8 @@
  * @usage import { parseMessage, queueFor } from './message.js';
  * @version-history
  *   v1.0.0 — 2026-09-29 — Initial (wish aimeat-refinery).
+ *   v1.0.1 — 2026-09-29 — stripHtml decodes its entities in one pass. The chain decoded &amp; before
+ *     &lt;, so `&amp;lt;` became `<` instead of the text `&lt;` (CodeQL js/double-escaping, alert 1682).
  */
 import type { RefineryClass } from '../../data/refinery-classes.js';
 
@@ -40,13 +42,18 @@ function b64urlText(data: string): string {
   return Buffer.from(data.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
 }
 
-/** HTML to readable text, without a DOM: scripts and styles out, tags out, entities that matter in. */
+const ENTITIES: Record<string, string> = { nbsp: ' ', amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'" };
+
+/**
+ * HTML to readable text, without a DOM: scripts and styles out, tags out, entities that matter in.
+ * The entities are decoded in one pass, so each is decoded once: `&amp;lt;` is the text `&lt;`.
+ */
 export function stripHtml(html: string): string {
   return html
     .replace(/<(script|style)[\s\S]*?<\/\1>/gi, ' ')
     .replace(/<br\s*\/?>|<\/p>|<\/div>|<\/tr>|<\/h\d>/gi, '\n')
     .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/&(nbsp|amp|lt|gt|quot|#39);/g, (_, name: string) => ENTITIES[name])
     .replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
 }
 
