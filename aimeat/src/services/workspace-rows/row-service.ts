@@ -28,6 +28,8 @@
  *   - appendRows / readRows / readRow / deleteRow / sweepRows / spaceStats / workspaceRowIndex
  * @usage const res = await appendRows(deps, caller, { organismId, wsId, space, rows });
  * @version-history
+ *   v1.4.0 — 2026-09-29 — readRows and readRow take a classification reader, which every row read
+ *     passes (TARGET-082).
  *   v1.3.0 — 2026-09-24 — A write on the app path meets the space's writeRole too, with the person's
  *     membership (secaudit 2026-09, A6-8). gate() returned after authorizeApp, so a plain member's
  *     app wrote a space kept to admins; the comment on authorizeApp that said the naming replaced the
@@ -48,6 +50,8 @@ import { checkOrganismNamespaceAccess } from '../organism-namespace-access.js';
 import { readWorkspaceManifest, isRowBackedSpace } from '../workspace-meta.js';
 import { emitChange } from '../event-bus.js';
 import { logger } from '../../utils/logger.js';
+import { rowTarget } from '../classification/labels.js';
+import type { ContentReader } from '../classification/reader.js';
 import {
   WorkspaceRowError, resolveRowSpace, columnsForBody, columnsForWhere, retentionOf,
   type RowSpace, type RowObjectType,
@@ -364,6 +368,8 @@ export interface ReadRowsInput {
   limit?: number;
   cursor?: string;
   order?: 'asc' | 'desc';
+  /** The classification reader (TARGET-082): the loader takes one, so no read skips the check. */
+  reader: ContentReader;
 }
 
 export async function readRows(
@@ -386,10 +392,12 @@ export async function readRows(
     ...(input.order ? { order: input.order } : {}),
   });
 
+  // A row this reader may not see is not on the page. The cursor still names where the page ended.
+  const shown = await input.reader.show(page.rows, r => rowTarget(input.organismId, input.wsId, space.name, r.id));
   return {
     space: space.name,
     namespace: space.namespace,
-    rows: page.rows.map(publicRow),
+    rows: shown.map(publicRow),
     cursor: page.cursor,
     indexed: space.indexOn,
   };
@@ -397,11 +405,13 @@ export async function readRows(
 
 export async function readRow(
   deps: RowServiceDeps, caller: RowCaller,
-  organismId: string, wsId: string, spaceName: string, rowId: string,
+  organismId: string, wsId: string, spaceName: string, rowId: string, reader: ContentReader,
 ): Promise<ReadRowsResult['rows'][number]> {
   const space = await loadSpace(deps, organismId, wsId, spaceName);
   await gate(deps, caller, organismId, wsId, space, 'read');
-  const row = await deps.storage.getWorkspaceRow(organismId, wsId, space.namespace, rowId);
+  const stored = await deps.storage.getWorkspaceRow(organismId, wsId, space.namespace, rowId);
+  // A row this reader may not see answers as an absent one.
+  const [row] = stored ? await reader.show([stored], () => rowTarget(organismId, wsId, space.name, rowId)) : [];
   if (!row) {
     throw new WorkspaceRowError('NOT_FOUND', 404, `No row "${rowId}" in ${space.name}.`);
   }

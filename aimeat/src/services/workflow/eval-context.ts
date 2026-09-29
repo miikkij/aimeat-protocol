@@ -23,6 +23,9 @@
  *   v1.3.0 — 2026-09-26 — The llm judge answers to the run's cost cap: what a call cost is kept on
  *     the run (`signalCostUsd`), and past maxCostUsd the judge is not asked and the leaf passes
  *     (secaudit 2026-09, A6-11).
+ *   v1.4.0 — 2026-09-29 — read and listGlob present values through presentMemories with the node's
+ *     classification reader, the one presentation of a memory value, and the llm judge asks useForAi
+ *     for the record it is about to send; a refusal is a red leaf (TARGET-082).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
@@ -30,7 +33,10 @@ import { localAccountName } from '../../utils/gaii.js';
 import { completeForOwner } from '../ai-completion.js';
 import { validateValueAgainstSchema } from '../schema-validator.js';
 import { listOwnerScopeMemory, getOwnerScopeMemory } from '../owner-memory.js';
-import { shownMemoryValue } from '../secret-records.js';
+import { presentMemories, presentMemory } from '../classification/present-memory.js';
+import { systemReader, type ContentReader } from '../classification/reader.js';
+import { memoryTarget, ClassificationError } from '../classification/labels.js';
+import type { ContentLabelTarget } from '../../storage/interface.js';
 import { globToRegExp, type SignalEvalCtx } from './signal-eval.js';
 import { costCapReached, recordSignalCost } from './run-cost.js';
 import type { WorkflowRun } from '../../models/workflow-schemas.js';
@@ -42,9 +48,22 @@ import type { WorkflowRun } from '../../models/workflow-schemas.js';
  * the leaf passes, as it does when the judge is unavailable. The engine saves the run after it
  * evaluates, so the cost is kept with everything else the evaluation changed.
  */
-function makeLlmJudge(storage: Storage, config: AimeatConfig, ownerGhii: string, run: WorkflowRun) {
-  return async ({ content, ask }: { key: string; content: unknown; ask: string }): Promise<{ ok: boolean; reason: string }> => {
+function makeLlmJudge(
+  storage: Storage, config: AimeatConfig, ownerGhii: string, run: WorkflowRun,
+  reader: ContentReader, targetOf: (key: string) => ContentLabelTarget | undefined,
+) {
+  return async ({ key, content, ask }: { key: string; content: unknown; ask: string }): Promise<{ ok: boolean; reason: string }> => {
     if (costCapReached(run)) return { ok: true, reason: 'llm not asked: this run has spent its maxCostUsd — degraded to pass' };
+    // The content goes to a model: the classification component decides first (TARGET-082). A
+    // refusal is a red leaf with its reason, never a silent pass.
+    const target = targetOf(key);
+    if (target) {
+      try { await reader.useForAi([target], { capability: 'text' }); }
+      catch (err) {
+        if (err instanceof ClassificationError) return { ok: false, reason: `llm not asked: ${err.message}` };
+        throw err;
+      }
+    }
     try {
       const text = typeof content === 'string' ? content : JSON.stringify(content);
       const result = await completeForOwner(storage, config, ownerGhii, {
@@ -71,6 +90,9 @@ export function buildEvalCtx(storage: Storage, config: AimeatConfig, ownerGhii: 
   const prefix = run.keyPrefix ?? '';
   const ownerName = localAccountName(ownerGhii);
   const llmEnabled = !!run.defSnapshot.llm?.approved;
+  const reader = systemReader({ storage, config }, ownerGhii);
+  // Which record a key the signal read came from, so the llm judge can name it to useForAi.
+  const read = new Map<string, ContentLabelTarget>();
   return {
     // OWNER-SCOPE reads: pipeline agents write their deliverables into their OWN (GAII) keyspaces, so
     // a signal over agent-produced keys must read across the owner's GHII + every agent (the same
@@ -79,20 +101,26 @@ export function buildEvalCtx(storage: Storage, config: AimeatConfig, ownerGhii: 
     // What a signal sees of a record is what the memory doors show of it (services/secret-records.ts):
     // a credential reads as { configured: true }. The run keeps what a leaf saw, and the llm judge
     // sends it to the model, so neither ever holds the credential itself.
+    // Both through presentMemories, the one presentation of a memory value, with the node's own
+    // classification reader: a signal runs with no caller present (TARGET-082).
     read: async (key) => {
-      const rec = await getOwnerScopeMemory(storage, config.nodeId, ownerName, prefix + key);
-      return rec ? { key, value: shownMemoryValue(rec.key, rec.value) } : null;
+      const stored = await getOwnerScopeMemory(storage, config.nodeId, ownerName, prefix + key);
+      const rec = stored ? await presentMemory(reader, stored) : null;
+      if (rec) read.set(key, memoryTarget(rec.ownerGaii, rec.key));
+      return rec ? { key, value: rec.value } : null;
     },
     listGlob: async (glob) => {
       const full = prefix + glob;
       const star = full.indexOf('*');
       const listPrefix = star >= 0 ? full.slice(0, star) : full;
-      const recs = await listOwnerScopeMemory(storage, config.nodeId, ownerName, { prefix: listPrefix });
       const re = globToRegExp(full);
-      return recs.filter(r => re.test(r.key)).map(r => ({ key: r.key.slice(prefix.length), value: shownMemoryValue(r.key, r.value) }));
+      const recs = await presentMemories(reader,
+        (await listOwnerScopeMemory(storage, config.nodeId, ownerName, { prefix: listPrefix })).filter(r => re.test(r.key)));
+      for (const r of recs) read.set(r.key.slice(prefix.length), memoryTarget(r.ownerGaii, r.key));
+      return recs.map(r => ({ key: r.key.slice(prefix.length), value: r.value }));
     },
     vars: run.vars,
-    llm: llmEnabled ? makeLlmJudge(storage, config, ownerGhii, run) : null,
+    llm: llmEnabled ? makeLlmJudge(storage, config, ownerGhii, run, reader, key => read.get(key)) : null,
     // Real ajv validation for the json_schema leaf — a step must NOT report success while producing
     // schema-invalid output (previously this degraded to json_valid → a false GREEN).
     validateJsonSchema: (value, schema) => validateValueAgainstSchema(value, schema),

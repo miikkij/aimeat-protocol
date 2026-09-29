@@ -17,6 +17,7 @@
  *   registerCoreStorageTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
  *   v1.0.0 — 2026-07-26 — Extracted from src/mcp/core.ts together with the reference-read change.
+ *   v1.1.0 — 2026-09-29 — aimeat_storage_download resolves with the agent's classification reader (TARGET-082).
  *   v1.1.0 — 2026-08-11 — aimeat_storage_upload stores through services/storage-file-write.ts, the
  *     same write POST /v1/storage runs. This copy had never checked the account-wide storage quota
  *     and never charged the overage that follows it, so an agent could pass the node's storage
@@ -38,6 +39,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import { readerForAgent } from '../services/classification/reader.js';
 import { localAccountName } from '../utils/gaii.js';
 import { writeStorageFile, mintStorageUploadUrl, removeStorageFile } from '../services/storage-file-write.js';
 import { resolveFileRef, handleFromResolved } from '../services/file-refs.js';
@@ -164,7 +166,7 @@ export function registerCoreStorageTools(
         async ({ key, owner, inline }) => {
             const ref = owner ? `${owner}/${key}` : key;
             const resolved = await resolveFileRef(storage, config, ref, {
-                gaii: agentGaii, sub: agentGaii, owner: localAccountName(agentGaii),
+                gaii: agentGaii, sub: agentGaii, owner: localAccountName(agentGaii), reader: readerForAgent({ storage, config }, agentGaii),
             });
             if (resolved.access !== 'granted' || !resolved.file) {
                 // Name the alternative instead of a bare "not found": asking for the OWNER's file by

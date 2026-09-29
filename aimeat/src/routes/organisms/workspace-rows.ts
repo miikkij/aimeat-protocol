@@ -18,6 +18,7 @@
  * @structure registerOrganismWorkspaceRowRoutes(router, config, storage)
  * @usage registerOrganismWorkspaceRowRoutes(router, config, storage) in routes/organisms.ts
  * @version-history
+ *   v1.2.0 — 2026-09-29 — Reading rows passes the caller's classification reader (TARGET-082).
  *   v1.1.0 — 2026-08-29 — The app path: `organism:rows` accepted beside organism:write/read, and
  *     the caller carries the grant's `app` claim for the space's `apps` list to match.
  *   v1.0.0 — 2026-08-26 — Initial.
@@ -30,6 +31,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireScope, requireAnyScope } from '../../auth/middleware.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { resolveIdentity } from '../../utils/gaii.js';
+import { readerFor } from '../../services/classification/reader.js';
 import {
   appendRows, readRows, readRow, deleteRow, deleteRowsBefore, spaceStats,
   WorkspaceRowError,
@@ -150,6 +152,7 @@ export function registerOrganismWorkspaceRowRoutes(
           ...(q.limit ? { limit: Number(q.limit) } : {}),
           ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
           ...(q.order === 'asc' ? { order: 'asc' as const } : {}),
+          reader: readerFor(deps, req.auth),
         });
 
         const next = page.cursor
@@ -175,6 +178,7 @@ export function registerOrganismWorkspaceRowRoutes(
         const row = await readRow(
           deps, callerOf(req), req.params.id as string, ws,
           req.params.space as string, req.params.rowId as string,
+          readerFor(deps, req.auth),
         );
         res.json(success(config.nodeId, { row }));
       } catch (err) { fail(res, err); }

@@ -22,6 +22,7 @@
  *   const service = new AiJobService(config, storage);
  *   await service.startJob({ prompt, result_key }, { ownerGhii, createdBy });
  * @version-history
+ *   v1.5.0 — 2026-09-29 — The prompt is assembled with the node's classification reader (TARGET-082).
  *   v1.4.0 — 2026-09-28 — A job may name a `role`, the AI role its call runs as; op.ts refuses one that
  *     is not a string of 1 to 300 characters, before the record exists.
  *   v1.3.0 — 2026-09-28 — System 2 plan, V5: a job has an `op` (text, image, transcribe) and may name
@@ -52,6 +53,7 @@ import { aiJobKeyRefusal } from '../ai-job-keys.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { assembleJobPrompt } from './prompt.js';
+import { systemReader } from '../classification/reader.js';
 import { fireOnDone } from './on-done.js';
 import { aiOpOf, aiOpRefusal } from './op.js';
 import { runJobOp, assertAudioInReach } from './run-op.js';
@@ -447,7 +449,9 @@ export class AiJobService implements AiJobStarter {
             await assertAudioInReach(deps, ownerGhii, spec.audio_key ?? '');
             return '';
         }
-        return assembleJobPrompt(deps, ownerGhii, spec);
+        // A job runs with no caller present: the node's own classification reader, whose useForAi
+        // still refuses content a model may not read (TARGET-082).
+        return assembleJobPrompt(deps, systemReader(deps, ownerGhii), ownerGhii, spec);
     }
 
     /**

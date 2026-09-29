@@ -28,13 +28,19 @@
  *     come from the copies that count (services/workspace-meta.ts), not the first copy the scan
  *     returned for the gate and the last one the loop met for the bundle.
  *   v1.3.1 — 2026-09-26 — The exporter's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
+ *   v1.4.0 — 2026-09-29 — The workspace gate is decideWorkspaceRead, the one read decision, and what
+ *     the export carries passes the exporter's classification reader: show, then leave with the
+ *     destination `export` (TARGET-082). The caller passes the reader.
  */
 import { ZipArchive } from 'archiver';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { authorizeRead } from './access-guard.js';
-import { isSameOwner, localAccountName } from '../utils/gaii.js';
+import { localAccountName, localAccountOf } from '../utils/gaii.js';
 import { workspaceMetaReader } from './workspace-meta.js';
+import { decideWorkspaceRead } from './workspace-access.js';
+import { memoryTarget, fileTarget } from './classification/labels.js';
+import type { ContentReader } from './classification/reader.js';
 import { logger } from '../utils/logger.js';
 
 export const WS_EXPORT_VERSION = '1.0';
@@ -74,9 +80,9 @@ const STORAGE_URL_RE = /\/v1\/(?:storage|pub\/[^/)\s]+)\/([^\s)\]"'>]+)/g;
 export async function collectWorkspace(
   storage: Storage,
   config: AimeatConfig,
-  opts: { orgId: string; ws: string; exporterGaii: string; exportedAt: string; isOrgManager?: boolean },
+  opts: { orgId: string; ws: string; exporterGaii: string; exportedAt: string; isOrgManager?: boolean; reader: ContentReader },
 ): Promise<{ json: WorkspaceExportJson; images: Map<string, Buffer> }> {
-  const { orgId, ws, exporterGaii, exportedAt } = opts;
+  const { orgId, ws, exporterGaii, exportedAt, reader } = opts;
   const root = `organism.${orgId}.w.${ws}`;
 
   // An owner-level exporter (GHII, no '#') who is an active member of the organism reads the whole
@@ -101,27 +107,26 @@ export async function collectWorkspace(
   // here is what makes the route's promise true: the bundle carries what the member can read live.
   // The workspace's own records are the copies that count (services/workspace-meta.ts), for the gate
   // and for what the bundle carries, not the first copy the scan returned or the last one looped over.
+  // The decision is the one every workspace read makes (decideWorkspaceRead: membership, the
+  // manifest, managers, the ecosystem allowlist); a caller that already knows the exporter manages
+  // the organism still says so.
   const metaReader = workspaceMetaReader(storage, orgId, config.nodeId);
   const manifestRec = await metaReader.pick(ws, 'meta.manifest', items);
-  let canReadWorkspace = opts.isOrgManager === true;
-  if (!canReadWorkspace && manifestRec) {
-    canReadWorkspace = manifestRec.ownerGaii === exporterGaii || isSameOwner(manifestRec.ownerGaii, exporterGaii);
-    if (!canReadWorkspace) {
-      const d = await authorizeRead(storage, config, {
-        ownerGaii: manifestRec.ownerGaii, accessorGaii: exporterGaii, resourceKey: manifestRec.key,
-        visibility: manifestRec.visibility, groupId: manifestRec.groupId, action: 'read',
-      });
-      canReadWorkspace = d.allowed;
-    }
-  }
+  const organism = await storage.getOrganism(orgId);
+  const canReadWorkspace = opts.isOrgManager === true || (!!organism && (await decideWorkspaceRead(storage, config, organism,
+    exporterGaii, localAccountOf(exporterGaii) ?? undefined, exporterGaii, ws, { manRec: manifestRec })).canRead);
   if (!canReadWorkspace) throw new WorkspaceNotReadableError(orgId, ws);
 
-  const readable: MemoryRecord[] = [];
+  const permitted: MemoryRecord[] = [];
   for (const r of items) {
-    if (isActiveMemberOwner || r.ownerGaii === exporterGaii) { readable.push(r); continue; }
+    if (isActiveMemberOwner || r.ownerGaii === exporterGaii) { permitted.push(r); continue; }
     const d = await authorizeRead(storage, config, { ownerGaii: r.ownerGaii, accessorGaii: exporterGaii, resourceKey: r.key, visibility: r.visibility, groupId: r.groupId, action: 'read' });
-    if (d.allowed) readable.push(r);
+    if (d.allowed) permitted.push(r);
   }
+  // An export takes content out of the organism: what the exporter may see, then what may leave
+  // (the classification component's show and leave, TARGET-082).
+  const target = (r: MemoryRecord) => memoryTarget(r.ownerGaii, r.key);
+  const readable = (await reader.leave(await reader.show(permitted, target), target, { kind: 'export', organismId: orgId })).kept;
 
   const out: WorkspaceExportJson = {
     aimeatWorkspaceExport: WS_EXPORT_VERSION, exportedAt,
@@ -180,7 +185,10 @@ export async function collectWorkspace(
   const images = new Map<string, Buffer>();
   let imgN = 0;
   for (const key of imageKeys) {
-    const file = await storage.getStorageFile(exporterGaii, key).catch(err => { logger.warn('md: continuing after a suppressed failure', { error: String(err) }); return null; });
+    const stored = await storage.getStorageFile(exporterGaii, key).catch(err => { logger.warn('md: continuing after a suppressed failure', { error: String(err) }); return null; });
+    // An image leaves with the export under the same two questions as a record.
+    const shown = stored ? await reader.show([stored], () => fileTarget(exporterGaii, key)) : [];
+    const [file] = (await reader.leave(shown, () => fileTarget(exporterGaii, key), { kind: 'export', organismId: orgId })).kept;
     if (!file) continue;
     const ext = (file.mimeType.split('/')[1] || 'bin').replace(/[^a-z0-9]/gi, '').slice(0, 8) || 'bin';
     const fileName = `images/img-${imgN++}.${ext}`;
@@ -194,7 +202,7 @@ export async function collectWorkspace(
 export async function exportWorkspace(
   storage: Storage,
   config: AimeatConfig,
-  opts: { orgId: string; ws: string; exporterGaii: string; exportedAt: string; isOrgManager?: boolean },
+  opts: { orgId: string; ws: string; exporterGaii: string; exportedAt: string; isOrgManager?: boolean; reader: ContentReader },
 ): Promise<{ buffer: Buffer; filename: string }> {
   const { json, images } = await collectWorkspace(storage, config, opts);
   const archive = new ZipArchive({ zlib: { level: 6 } });

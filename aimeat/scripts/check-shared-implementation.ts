@@ -24,6 +24,7 @@
  *   cd aimeat && pnpm check:shared-impl            # report
  *   cd aimeat && pnpm check:shared-impl --strict   # the hook/CI gate
  * @version-history
+ *   v1.3.0 — 2026-09-29 — SEED 38 → 39: src/mcp/core-resources.ts, a pure extraction out of core.ts.
  *   v1.2.0 — 2026-08-14 — SEED 39 → 38: src/mcp/feedback.ts is gone, and with it the last
  *     `storage.listFeedbackBySender()` call under src/mcp/. WRITE_SEED is untouched at 1.
  *   v1.1.0 — 2026-08-11 — WRITE_SEED 2 → 1: aimeat_operator_agent_configure writes through
@@ -79,8 +80,13 @@ const NOT_A_TOOL_SURFACE = new Set<string>([
  * src/mcp/tool-usage-wrap.ts arrived in the same window and calls no storage, so it does not offset
  * the drop. Both halves were checked before this line was lowered; a seed moved on a guess is worse
  * than no seed, because it looks like evidence.
+ *
+ * 39 on 2026-09-29, and like the 2026-08-11 raise it is not a new offender: src/mcp/core-resources.ts
+ * is the memory and storage resource templates moved out of core.ts, which had reached
+ * max-file-lines when TARGET-082 gave them the classification reader. The same four reads, counted in
+ * two files instead of one; clearing core.ts's resources clears this one with it.
  */
-const SEED = 38;
+const SEED = 39;
 
 /**
  * The number that actually matters. A READ through storage is the same read whichever door asks;

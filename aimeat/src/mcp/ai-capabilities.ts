@@ -11,6 +11,7 @@
  *   storage and the call is paid by the owner, in the agent's name, as the REST route does.
  * @structure registerAiCapabilityTools(mcp, storage, config, getAgentGaii)
  * @version-history
+ *   v1.2.0 — 2026-09-29 — aimeat_ai_transcribe reads the audio with the agent's classification reader (TARGET-082).
  *   v1.1.0 — 2026-09-28 — aimeat_ai_transcribe and aimeat_ai_embed take `role`, the AI role the call runs as.
  *   v1.0.0 — 2026-09-28 — Initial (System 2 plan, V5).
  */
@@ -28,6 +29,7 @@ import { queryModels } from '../services/ai/catalog/query.js';
 import { transcribeForOwner } from '../services/ai-transcription.js';
 import { embedForOwner } from '../services/ai-embed.js';
 import { readCallerAudio } from '../services/ai-call-files.js';
+import { readerForAgent } from '../services/classification/reader.js';
 import { AI_ROLE_PARAM } from './catalog/definitions/ai-models.js';
 
 export function registerAiCapabilityTools(
@@ -83,7 +85,7 @@ export function registerAiCapabilityTools(
     const w = who();
     try {
       // The caller's own storage, never another namespace: the lookup /v1/ai/transcribe makes.
-      const audio = await readCallerAudio(storage, getAgentGaii(), storage_key, { ...(filename ? { filename } : {}) });
+      const audio = await readCallerAudio(storage, readerForAgent({ storage, config }, getAgentGaii()), getAgentGaii(), storage_key, { ...(filename ? { filename } : {}) });
       if (!audio) return toolError('NOT_FOUND', 'No such file in your storage.');
       const r = await transcribeForOwner(storage, config, w.payer, {
         audio,

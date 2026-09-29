@@ -7,6 +7,9 @@
  *   export/import, workspace wipe, and archive/unarchive. Extracted from src/routes/organisms.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 -- 2026-09-29 -- The public documents and records, the member records, the activity feed and
+ *     the agents' activity pass the caller's classification reader; a share passes show and leave
+ *     (TARGET-082).
  *   v1.8.1 -- 2026-09-26 -- Whether the caller owns the agent is asked with localAccountName
  *     (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local
  *     namesake (secaudit 2026-09, F-1).
@@ -48,6 +51,8 @@ import { isKeyArchived } from '../../services/archive.js';
 import { checkDeleteGuard } from '../../services/write-guards.js';
 import { updateOrganismStructure } from '../../services/structure-snapshot.js';
 import { isOrgManager } from '../../services/workspace-access.js';
+import { readerFor } from '../../services/classification/reader.js';
+import { memoryTarget } from '../../services/classification/labels.js';
 import type { OrganismHelpers, ShareMeta, ResolvedShare } from './shared.js';
 import { logger } from '../../utils/logger.js';
 
@@ -151,7 +156,9 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
       }
       readable.push(r);
     }
-    const events = deriveWorkspaceEvents(readable, manifest, root);
+    // The classification reader (TARGET-082): an event about a record the caller may not see is not shown.
+    const shown = await readerFor({ storage, config }, req.auth).show(readable, r => memoryTarget(r.ownerGaii, r.key));
+    const events = deriveWorkspaceEvents(shown, manifest, root);
     events.sort((a, b) => (b.at || '').localeCompare(a.at || ''));
     res.json(success(config.nodeId, { ws, events: events.slice(0, 300), total: events.length }));
   });
@@ -205,6 +212,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     }
     const agg: Record<string, { count: number; lastAt: string; workspaces: Set<string> }> = {};
     const metaReader = workspaceMetaReader(storage, id, config.nodeId);
+    const reader = readerFor({ storage, config }, req.auth);
     for (const w of wss) {
       const root = `organism.${id}.w.${w.id}`;
       const bucket = perWsScan ? (await storage.listAllMemory({ prefix: `${root}.`, limit: 10000 })).items : (buckets.get(w.id) ?? []);
@@ -217,7 +225,9 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
         readable.push(r);
       }
       const manifest = ((await metaReader.pick(w.id, 'meta.manifest', bucket))?.value as Record<string, unknown> | undefined) ?? null;
-      for (const e of deriveWorkspaceEvents(readable, manifest, root)) {
+      // The classification reader (TARGET-082), as in the workspace activity feed above.
+      const shown = await reader.show(readable, r => memoryTarget(r.ownerGaii, r.key));
+      for (const e of deriveWorkspaceEvents(shown, manifest, root)) {
         if (!e.agent) continue;
         const a = agg[e.agent] ?? (agg[e.agent] = { count: 0, lastAt: '', workspaces: new Set<string>() });
         a.count++; a.workspaces.add(w.name);
@@ -379,7 +389,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     const organism = await storage.getOrganism(id);
     if (!organism || !ws) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Not found')); return; }
     const share = await readShareMeta(id, ws);
-    let docs = await collectPublicDocs(id, ws, share);
+    let docs = await collectPublicDocs(id, ws, share, readerFor({ storage, config }, req.auth));
     if (space) docs = docs.filter(d => d.type === space);
     if (docs.length === 0) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No public documents')); return; }
     const denied = await shareGateDenied(req, organism, id, ws, share);
@@ -402,7 +412,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     const organism = await storage.getOrganism(id);
     if (!organism || !ws || !type || !docId) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Not found')); return; }
     const share = await readShareMeta(id, ws);
-    const docs = await collectPublicDocs(id, ws, share, { type, id: docId });
+    const docs = await collectPublicDocs(id, ws, share, readerFor({ storage, config }, req.auth), { type, id: docId });
     if (docs.length === 0) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Document not found or not public')); return; }
     const denied = await shareGateDenied(req, organism, id, ws, share);
     if (denied) { res.status(401).json(error(config.nodeId, denied.code, denied.message)); return; }
@@ -428,7 +438,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     const organism = await storage.getOrganism(id);
     if (!organism || !ws) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Not found')); return; }
     const share = await readShareMeta(id, ws);
-    const records = await collectPublicRecords(id, ws, share, space ? { space } : undefined);
+    const records = await collectPublicRecords(id, ws, share, readerFor({ storage, config }, req.auth), space ? { space } : undefined);
     if (records.length === 0) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No public records')); return; }
     const denied = await shareGateDenied(req, organism, id, ws, share);
     if (denied) { res.status(401).json(error(config.nodeId, denied.code, denied.message)); return; }
@@ -452,7 +462,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     if (!organism || !ws) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Not found')); return; }
     const callerGaii = resolveIdentity(req.auth!, config.nodeId);
     if (!(await canReadWs(id, ws, callerGaii))) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Not found')); return; }
-    const records = await collectWsRecords(id, ws, space ? { space } : undefined);
+    const records = await collectWsRecords(id, ws, readerFor({ storage, config }, req.auth), space ? { space } : undefined);
     res.json(success(config.nodeId, { organism_id: id, ws, records }));
   });
 

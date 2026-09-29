@@ -19,6 +19,8 @@
  *     (listOrganismWorkspaceEntries) — reading only the exporter's own record made exports empty
  *     for any exporter who didn't personally create the workspaces.
  *   v1.2.1 -- 2026-09-26 -- The exporter's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
+ *   v1.3.0 -- 2026-09-29 -- The caller passes a classification reader, which every workspace's
+ *     collection passes (TARGET-082).
  */
 import { ZipArchive } from 'archiver';
 import type { Storage } from '../storage/interface.js';
@@ -27,15 +29,16 @@ import { collectWorkspace } from './workspace-export.js';
 import { listOrganismWorkspaceEntries } from './workspace-meta.js';
 import { logger } from '../utils/logger.js';
 import { localAccountName } from '../utils/gaii.js';
+import type { ContentReader } from './classification/reader.js';
 
 export const ORG_EXPORT_VERSION = '1.0';
 
 export async function exportOrganism(
   storage: Storage,
   config: AimeatConfig,
-  opts: { orgId: string; exporterGaii: string; exportedAt: string },
+  opts: { orgId: string; exporterGaii: string; exportedAt: string; reader: ContentReader },
 ): Promise<{ buffer: Buffer; filename: string; workspaces: number }> {
-  const { orgId, exporterGaii, exportedAt } = opts;
+  const { orgId, exporterGaii, exportedAt, reader } = opts;
   const org = await storage.getOrganism(orgId);
   if (!org) throw new Error('Organism not found');
 
@@ -72,7 +75,7 @@ export async function exportOrganism(
   let count = 0;
   for (const w of wss) {
     try {
-      const { json, images } = await collectWorkspace(storage, config, { orgId, ws: w.id, exporterGaii, exportedAt, isOrgManager });
+      const { json, images } = await collectWorkspace(storage, config, { orgId, ws: w.id, exporterGaii, exportedAt, isOrgManager, reader });
       const folder = `workspaces/${w.id}`;
       for (const [name, data] of images) archive.append(data, { name: `${folder}/${name}` });
       archive.append(JSON.stringify(json, null, 2), { name: `${folder}/workspace.json` });

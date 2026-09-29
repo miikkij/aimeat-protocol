@@ -43,6 +43,8 @@
  *     { text, language, seconds, model } with `json`. `provider` reaches every call. Each op's cost
  *     counts toward the run's cost cap as a text call's does.
  *   v1.9.0 — 2026-09-28 — `role` reaches every call, as `provider` does: the AI role the step runs as.
+ *   v1.10.0 — 2026-09-29 — prompt_key, input_keys and audio_key are read through the one loader of
+ *     what a model reads (services/ai-inputs.ts), with the node's classification reader (TARGET-082).
  */
 import type { StepDeps, OnPushTerminal } from './engine-steps.js';
 import type { WorkflowRun, WorkflowStep } from '../../models/workflow-schemas.js';
@@ -50,11 +52,11 @@ import { completeForOwner } from '../ai-completion.js';
 import { generateForOwner } from '../ai-image.js';
 import { transcribeForOwner } from '../ai-transcription.js';
 import { aiOpOf, aiOpRefusal } from '../ai-jobs/op.js';
-import { getOwnerScopeMemory } from '../owner-memory.js';
 import { template } from './engine-util.js';
 import { reportOutcome, type ResultWrite } from './engine-answer.js';
 import { logger } from '../../utils/logger.js';
-import { localAccountName } from '../../utils/gaii.js';
+import { readAiRecords, readAiFile } from '../ai-inputs.js';
+import { systemReader } from '../classification/reader.js';
 
 /**
  * Run a prompt on the owner's own model and land the answer in their namespace.
@@ -87,6 +89,9 @@ export function dispatchAiStep(
     if (typeof cost === 'number' && Number.isFinite(cost) && cost > 0) spentUsd += cost;
   };
   const appId = `workflow:${workflowId}`;
+  // A step runs with no caller present: the node's own classification reader, whose useForAi
+  // still refuses content a model may not read (TARGET-082).
+  const reader = systemReader(deps, ownerGhii);
 
   // The write of the step's answer to result_to_key. The engine makes it, and only while the step
   // still waits for the answer: once the step has ended, a later answer writes nothing (engine.ts
@@ -110,7 +115,8 @@ export function dispatchAiStep(
   // prompt. A storage key, so the run's keyPrefix (a memory-key prefix) does not apply to it.
   const transcribe = async (): Promise<ResultWrite | undefined> => {
     const audioKey = template(action.audio_key ?? '', run.vars);
-    const file = await deps.storage.getStorageFile(ownerGhii, audioKey);
+    // The one loader of what a model reads (services/ai-inputs.ts).
+    const file = await readAiFile(deps.storage, reader, ownerGhii, audioKey, { capability: 'transcription' });
     if (!file) throw new Error(`audio_key "${audioKey}" is not a file in the owner's storage`);
     const r = await transcribeForOwner(deps.storage, deps.config, ownerGhii, {
       audio: { data: file.data, mime: file.mimeType || 'application/octet-stream', filename: audioKey.split('/').pop() || 'audio' },
@@ -140,7 +146,7 @@ export function dispatchAiStep(
     let prompt = action.prompt ? template(action.prompt, run.vars) : '';
     if (action.prompt_key) {
       const key = template(action.prompt_key, run.vars);
-      const rec = await getOwnerScopeMemory(deps.storage, deps.config.nodeId, localAccountName(ownerGhii), key);
+      const [rec] = await readAiRecords(deps, reader, ownerGhii, [{ key }], { capability: 'text' });
       const val = rec?.value as unknown;
       const fromRecord = typeof val === 'string' ? val : (val && typeof val === 'object' && typeof (val as { prompt?: unknown }).prompt === 'string'
         ? (val as { prompt: string }).prompt : '');
@@ -154,19 +160,16 @@ export function dispatchAiStep(
     // A missing record is said out loud in the prompt rather than left as a silence the model fills
     // in with an invention, which is exactly what it did when the reading was only asked for.
     if (action.input_keys?.length) {
-      const parts: string[] = [];
-      for (const raw of action.input_keys) {
-        // keyPrefix, for the same reason the datapackage step's from_key honours it: these name what
-        // an EARLIER STEP WROTE, and in a sandbox run that lives behind the run's prefix. Without it
-        // a trial read the live keys instead, the producing step still greened (signal evaluation
-        // has always been prefix-aware, eval-context.ts), and the assembling step answered
-        // confidently from the previous run's data. Green and wrong is the worst shape available.
-        const key = (run.keyPrefix ?? '') + template(raw, run.vars);
-        const rec = await getOwnerScopeMemory(deps.storage, deps.config.nodeId, localAccountName(ownerGhii), key);
-        parts.push(rec
-          ? `### ${key}\n${typeof rec.value === 'string' ? rec.value : JSON.stringify(rec.value, null, 2)}`
+      // keyPrefix, for the same reason the datapackage step's from_key honours it: these name what
+      // an EARLIER STEP WROTE, and in a sandbox run that lives behind the run's prefix. Without it
+      // a trial read the live keys instead, the producing step still greened (signal evaluation
+      // has always been prefix-aware, eval-context.ts), and the assembling step answered
+      // confidently from the previous run's data. Green and wrong is the worst shape available.
+      const keys = action.input_keys.map(raw => ({ key: (run.keyPrefix ?? '') + template(raw, run.vars) }));
+      const parts = (await readAiRecords(deps, reader, ownerGhii, keys, { capability: 'text' })).map(({ key, value }) =>
+        value !== undefined
+          ? `### ${key}\n${typeof value === 'string' ? value : JSON.stringify(value, null, 2)}`
           : `### ${key}\n(no such record — do not invent its contents)`);
-      }
       prompt += `\n\n---\nINPUT DATA. This is the whole of what you have been given; anything not\nstated here is unknown, and unknown is reported, never filled in.\n\n${parts.join('\n\n')}\n`;
     }
 

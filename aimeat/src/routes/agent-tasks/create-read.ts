@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Agent-task create + read routes (POST create, GET list, GET detail). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-09-29 — Attachments resolve with the caller's classification reader (TARGET-082).
  *   v1.3.0 — 2026-08-11 — The create WRITE moves to services/agent-task-write.ts, so aimeat_task_create
  *     stops building its own record. Behaviour here is unchanged; the tool gains this route's input
  *     caps, its unique-index race backstop and its `task_assigned` wake.
@@ -20,6 +21,7 @@
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AgentTaskRecord } from '../../storage/interface.js';
+import { readerFor } from '../../services/classification/reader.js';
 import { success, error } from '../../middleware/envelope.js';
 import { refuseNotYours, refuseNeedsPermission } from '../../middleware/refusals.js';
 import { requireAuth, agentNotFoundResponse } from '../../auth/middleware.js';
@@ -104,7 +106,7 @@ export function registerTaskCreateReadRoutes(
     // own, and the two had already drifted apart in four places.
     const result = await createTask({ storage, config, webhook: webhookDispatcher }, {
       agent, agentGaii, agentName,
-      creator: { gaii: resolve(req), sub: req.auth!.sub, owner: req.auth!.owner as string | undefined },
+      creator: { gaii: resolve(req), sub: req.auth!.sub, owner: req.auth!.owner as string | undefined, reader: readerFor({ storage, config }, req.auth) },
       body: req.body,
       actor: resolve(req),
     });
@@ -240,7 +242,7 @@ export function registerTaskCreateReadRoutes(
 
     // Attachments come back as presigned handles, authorized for THIS reader on THIS read.
     const withFiles = await taskWithFileHandles(storage, config, task, {
-      gaii: resolve(req), sub: req.auth!.sub, owner: req.auth!.owner as string | undefined,
+      gaii: resolve(req), sub: req.auth!.sub, owner: req.auth!.owner as string | undefined, reader: readerFor({ storage, config }, req.auth),
     });
     // …and WHAT IT PRODUCED, on the same read. Both doors, because a finished task whose result
     // nobody can reach is indistinguishable from one that produced nothing, and which door the

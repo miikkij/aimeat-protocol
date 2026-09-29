@@ -13,10 +13,14 @@
  *   MUST require the same access as a REST read, so the push path calls this and nothing else.
  * @structure
  *   - canReadWorkspace(...) -- membership + manifest-gate read decision (boolean).
+ *   - decideWorkspaceRead(...) -- the same, with each gate's answer and the manifest it read.
  * @usage
  *   import { canReadWorkspace } from '../services/workspace-access.js';
  *   const ok = await canReadWorkspace(storage, config, organism, callerSub, callerOwner, callerGaii, ws);
  * @version-history
+ *   2026-09-29 — decideWorkspaceRead: the same gates with each answer, taking the manifest a loader
+ *     already holds. canReadWorkspace is its boolean. The REST read and readWorkspaceOp, which each
+ *     carried their own copy, decide here now (TARGET-082, one check component).
  *   2026-09-28 — Gate 0: an agent the organism does not admit (agentAccess 'listed') reads no workspace.
  *   v1.0.0 -- 2026-06-21 -- Extract the workspace read gate (was inline in the route + organism-comments)
  *     so the connector record-push subscription enforces byte-identical access.
@@ -29,7 +33,7 @@
  *   v1.3.0 -- 2026-09-24 -- Gate 2 reads the copy of the manifest that counts (readWorkspaceMetaRecord:
  *     the workspace creator's, then an organism manager's), not the first copy the store returns.
  */
-import type { Storage, OrganismRecord } from '../storage/interface.js';
+import type { Storage, OrganismRecord, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { authorizeRead } from './access-guard.js';
 import { isSameOwner, isGEAI } from '../utils/gaii.js';
@@ -54,6 +58,15 @@ export async function isOrgManager(
   return !!m && m.status === 'active' && (m.role === 'creator' || m.role === 'admin');
 }
 
+/** Each gate's answer, for a caller that must tell "not a member" from "cannot read this workspace". */
+export interface WorkspaceReadDecision {
+  member: boolean;
+  manager: boolean;
+  canRead: boolean;
+  /** The manifest the decision was made on, or null when there is none. */
+  manRec: MemoryRecord | null;
+}
+
 /**
  * Decide whether the caller may READ the content of one workspace.
  *
@@ -75,8 +88,28 @@ export async function canReadWorkspace(
   callerGaii: string,
   ws: string,
 ): Promise<boolean> {
+  return (await decideWorkspaceRead(storage, config, organism, callerSub, callerOwner, callerGaii, ws)).canRead;
+}
+
+/**
+ * The same decision with each gate's answer. A loader that already holds the workspace's records
+ * passes the manifest it picked from them (`manRec`, the copy that counts, or null for none), so the
+ * decision reads nothing twice; `ws` null is an organism's legacy root, whose manifest the caller
+ * must pass. This is the one place the workspace read is decided (TARGET-082, spec §13.2).
+ */
+export async function decideWorkspaceRead(
+  storage: Storage,
+  config: AimeatConfig,
+  organism: OrganismRecord,
+  callerSub: string | undefined,
+  callerOwner: string | undefined,
+  callerGaii: string,
+  ws: string | null,
+  known?: { manRec: MemoryRecord | null },
+): Promise<WorkspaceReadDecision> {
+  const no = (member: boolean, manager: boolean, manRec: MemoryRecord | null): WorkspaceReadDecision => ({ member, manager, canRead: false, manRec });
   // Gate 0: an organism that admits only listed agents treats every other agent as a non-member.
-  if (agentBarred(organism, callerSub)) return false;
+  if (agentBarred(organism, callerSub)) return no(false, false, null);
   // Gate 1: membership. The owner's membership row also decides org-manager status (creator/admin),
   // which grants an automatic pass on Gate 2 below — resolve it in the same lookup.
   let isMember = !!callerSub && organism.agentGaiis.includes(callerSub);
@@ -88,15 +121,16 @@ export async function canReadWorkspace(
       manager = m.role === 'creator' || m.role === 'admin';
     }
   }
-  if (!isMember) return false;
+  if (!isMember) return no(false, false, null);
 
   // Gate 2: workspace read (manifest is the single gate record). An org manager (creator/admin) passes
   // unconditionally — they own the organism's access, so they read every workspace under it. The
   // record is the copy that counts (services/workspace-meta.ts), never the first one the store
   // returns: a member's own copy of the manifest would otherwise make them its owner here.
-  const manKey = `organism.${organism.id}.w.${ws}.meta.manifest`;
-  const manRec = await readWorkspaceMetaRecord(storage, organism.id, ws, 'meta.manifest', config.nodeId);
-  if (!manRec) return false;
+  const manRec = known ? known.manRec
+    : ws === null ? null : await readWorkspaceMetaRecord(storage, organism.id, ws, 'meta.manifest', config.nodeId);
+  if (!manRec) return no(true, manager, null);
+  const manKey = manRec.key;
   let allowed: boolean;
   if (manager || manRec.ownerGaii === callerGaii || isSameOwner(manRec.ownerGaii, callerGaii)) {
     allowed = true;
@@ -113,5 +147,5 @@ export async function canReadWorkspace(
   // a matching owner-granted 'read' data-area — the same allowlist the write path enforces — so the
   // owner-selected read scope actually bites (and the tunnel record-push honours it identically).
   if (allowed && callerSub && isGEAI(callerSub)) allowed = await ecoMayReadKey(storage, callerSub, manKey);
-  return allowed;
+  return { member: true, manager, canRead: allowed, manRec };
 }

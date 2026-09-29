@@ -29,6 +29,8 @@
  * @usage
  *   const run = await startDecideRun(storage, config, caller, { questions, keys, fields });
  * @version-history
+ *   v1.4.0 — 2026-09-29 — A run reads each record through readAiRecords (services/ai-inputs.ts): the
+ *     credential mask and the classification check; a refused record is that item's error (TARGET-082).
  *   v1.3.0 — 2026-09-24 — A run never sends a record the node reads and trusts (utils/reserved-keys.ts)
  *     to the provider: a `keys` list naming one is refused 403 RESERVED_KEY, a `prefix` runs over the
  *     keys it resolves to less those, and the read itself checks again. The old guard read only the
@@ -53,6 +55,9 @@ import { getProvider } from './providers.js';
 import { DecideError } from './errors.js';
 import { Semaphore } from './pacer.js';
 import { isReservedServerKey } from '../../utils/reserved-keys.js';
+import { readAiRecords } from '../ai-inputs.js';
+import { systemReader } from '../classification/reader.js';
+import { ClassificationError } from '../classification/labels.js';
 
 const RUN_PREFIX = 'decide.runs.';
 const RUNS_KEPT = 50;
@@ -168,8 +173,18 @@ async function work(storage: Storage, config: AimeatConfig, caller: DecideCaller
         run.results[item.subject] = { error: { code: 'RESERVED_KEY', message: reservedSubjectMessage([item.subject]) } };
         return;
       }
-      const rec = await storage.getMemory(caller.gaii, item.subject);
-      if (!rec) {
+      // The one loader of what a model reads (services/ai-inputs.ts): the credential mask and the
+      // classification check, with the node's own reader since a run continues with no caller.
+      let rec: { value: unknown } | undefined;
+      try {
+        [rec] = await readAiRecords({ storage, config }, systemReader({ storage, config }, caller.gaii), caller.gaii,
+          [{ key: item.subject, namespace: caller.gaii }], { capability: 'decide' });
+      } catch (err) {
+        if (!(err instanceof ClassificationError)) throw err;
+        run.results[item.subject] = { error: { code: err.code, message: err.message } };
+        return;
+      }
+      if (!rec || rec.value === undefined) {
         run.results[item.subject] = { error: { code: 'NOT_FOUND', message: 'The record is gone.' } };
         return;
       }

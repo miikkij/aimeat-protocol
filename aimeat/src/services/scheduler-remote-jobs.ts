@@ -21,6 +21,8 @@
  *     itself fails before anything is read, sent or written (services/ai-job-keys.ts). The create
  *     and edit doors refuse it, and this covers schedules stored earlier (secaudit 2026-09: A6-1,
  *     573704db10ed).
+ *   v1.5.0 — 2026-09-29 — An `ai` job reads its inputs through readAiRecords (services/ai-inputs.ts):
+ *     the credential mask it lacked, and the classification check (TARGET-082).
  */
 import type { AimeatConfig } from '../config.js';
 import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
@@ -31,6 +33,8 @@ import { getActiveWorkflowEngine } from './workflow/engine.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { buildGEAI, isSameOwner, localAccountName } from '../utils/gaii.js';
 import { aiJobKeyRefusal } from './ai-job-keys.js';
+import { readAiRecords } from './ai-inputs.js';
+import { systemReader } from './classification/reader.js';
 
 /**
  * `ai` kind: gather predefined input memory keys, compose the prompt, run a
@@ -57,22 +61,28 @@ export async function runAiJob(storage: Storage, config: AimeatConfig, job: Sche
   const inputKeys = Array.isArray(cfg.inputKeys) ? cfg.inputKeys : [];
   const reads: string[] = [];
   const parts: string[] = [cfg.prompt];
+  const named: Array<{ key: string; namespace: string }> = [];
   for (let i = 0; i < inputKeys.length; i++) {
     const key = inputKeys[i];
     const ns: string = cfg.inputNamespaces?.[i] || owner;
-    // SECURITY (C-2): getMemory is the raw composite-key lookup — it applies no visibility or consent
-    // check — and the value below is pasted into a prompt whose output the job owner keeps. A
+    // SECURITY (C-2): the read below is the raw composite-key lookup — it applies no visibility or
+    // consent check — and the value is pasted into a prompt whose output the job owner keeps. A
     // namespace belonging to anyone else is therefore a verbatim read of their private memory. The
     // create and patch routes refuse one, and this refuses it again at run time, which is what
     // covers jobs stored before that gate existed.
     if (ns !== owner && !isSameOwner(ns, owner)) {
       throw new Error(`AI job "${job.id}" names an input namespace outside its owner: ${ns}`);
     }
-    const rec = await storage.getMemory(ns, key);
+    named.push({ key, namespace: ns });
     reads.push(ns === owner ? key : `${ns}::${key}`);
-    const valueText = rec == null
+  }
+  // The one loader of what a model reads (services/ai-inputs.ts): the credential mask and the
+  // classification check, with the node's own reader since a schedule has no caller (TARGET-082).
+  const inputs = await readAiRecords({ storage, config }, systemReader({ storage, config }, owner), owner, named, { capability: 'text' });
+  for (const { key, value } of inputs) {
+    const valueText = value === undefined
       ? '(empty)'
-      : (typeof rec.value === 'string' ? rec.value : JSON.stringify(rec.value, null, 2));
+      : (typeof value === 'string' ? value : JSON.stringify(value, null, 2));
     parts.push(`\n--- INPUT: ${key} ---\n${valueText}`);
   }
   const composedPrompt = parts.join('\n');

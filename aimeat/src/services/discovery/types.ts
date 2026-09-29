@@ -15,6 +15,7 @@
  * @usage
  *   import type { DiscoverySource, DiscoveryEntry } from '../discovery/types.js';
  * @version-history
+ *   v0.5.0 — 2026-09-29 — DiscoveryContext carries the caller's classification reader (TARGET-082).
  *   v0.4.0 — 2026-08-31 — +'tool' (an app's published tool, apps.{appId}.tools). Until now the one
  *     directory that answers "what exists here that I can use?" had no word for the callable thing,
  *     while the manifest itself was already reaching the directory as an untyped 'memory' record.
@@ -28,6 +29,7 @@
  *     reaches the MCP door.
  *   v0.1.0 — 2026-06-23 — Phase 0: initial contract (design doc 2026-06-23-master-directory-discovery).
  */
+import type { ContentReader } from '../classification/reader.js';
 
 /** The taxonomy an LLM filters on. Extend here + add an llms.txt word when a new kind ships (§7.3). */
 export type DiscoveryType =
@@ -121,6 +123,9 @@ export interface DiscoveryContext {
   scope: 'own' | 'public' | 'shared';
   filters: DiscoveryFilters;
   nodeId: string;
+  /** The caller's classification reader (TARGET-082): a source of stored content passes its hits
+   *  through it, so a discovery never shows what the caller may not see. */
+  reader: ContentReader;
 }
 
 /** A source-native candidate row, pre-normalization. `record` is the domain's own record. */

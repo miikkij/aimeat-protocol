@@ -19,6 +19,7 @@
  * @usage const run = await runBatch(deps, caller, 'postinjalostamo', { onProgress });
  * @version-history
  *   v1.0.0 — 2026-09-29 — Initial.
+ *   v1.0.1 — 2026-09-29 — The "already filed?" row read uses a system classification reader (TARGET-082).
  */
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
@@ -36,6 +37,7 @@ import { appendRows, readRow, type RowCaller } from '../workspace-rows/row-servi
 import { WorkspaceRowError } from '../workspace-rows/row-space.js';
 import { logger } from '../../utils/logger.js';
 import { writeMemoryRecord } from '../memory-write.js';
+import { systemReader, readerForCaller } from '../classification/reader.js';
 import {
   parseMessage, listPage, isGraph, redact, senderDomain, ruleFor, extractionPrompt, parseJsonAnswer, queueFor,
   type MailMessage, type RefineryRule, type Queue,
@@ -203,7 +205,10 @@ async function readAttachments(ctx: Ctx, msg: MailMessage): Promise<{ text: stri
 }
 
 async function extract(ctx: Ctx, cls: RefineryClass, msg: MailMessage, att: { text: string; fileKeys: string[] }): Promise<Json> {
-  const files = att.fileKeys.length ? await readCallFiles(ctx.deps.storage, ctx.caller.principal, att.fileKeys.map((k) => ({ storage_key: k }))) : undefined;
+  const files = att.fileKeys.length
+    ? await readCallFiles(ctx.deps.storage, readerForCaller(ctx.deps, { gaii: ctx.caller.principal, owner: ctx.caller.owner, roles: ctx.caller.roles, scopes: ctx.caller.scopes }),
+      ctx.caller.principal, att.fileKeys.map((k) => ({ storage_key: k })))
+    : undefined;
   const model = (files ? ctx.def.models.vision : ctx.def.models.text) || undefined;
   const ask = () => completeForOwner(ctx.deps.storage, ctx.deps.config, ctx.caller.ownerGhii, {
     prompt: extractionPrompt(cls, msg, att.text, att.fileKeys.length), model, temperature: 0, appId: ctx.def.app, files,
@@ -267,7 +272,9 @@ async function processOne(ctx: Ctx, run: RunState, id: string, tick: () => void)
 /** Whether an earlier batch filed this message. Only "no such row" is a no; any other failure stops the batch. */
 async function alreadyDone(ctx: Ctx, id: string): Promise<boolean> {
   try {
-    await readRow(ctx.deps, rowCaller(ctx.caller), ctx.def.organismId, ctx.def.workspaceId, ctx.def.spaces.items, rowIdOf(ctx.def, id));
+    // Bookkeeping, not a read for anyone: a system reader, so a labelled row still counts as filed.
+    await readRow(ctx.deps, rowCaller(ctx.caller), ctx.def.organismId, ctx.def.workspaceId, ctx.def.spaces.items, rowIdOf(ctx.def, id),
+      systemReader(ctx.deps, ctx.caller.principal));
     return true;
   } catch (err) {
     if (err instanceof WorkspaceRowError && err.code === 'NOT_FOUND') return false;

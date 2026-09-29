@@ -6,12 +6,18 @@
  *   been asserted at all.
  * @version-history
  *   v1.0.0 -- 2026-08-17 -- Initial.
+ *   v1.1.0 -- 2026-09-29 -- readAttachments takes a classification reader (TARGET-082).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { readAttachments } from '../../src/services/chat-attachments.js';
+import { readAttachments as readAttachmentsWithReader } from '../../src/services/chat-attachments.js';
 import type { Storage } from '../../src/storage/interface.js';
+import { systemReader } from '../../src/services/classification/reader.js';
+
+/** The attachments read with a classification reader (TARGET-082), which in V1 reads nothing. */
+const readAttachments = (storage: Storage, gaii: string, keys: string[]) =>
+    readAttachmentsWithReader(storage, systemReader({ storage, config: { classificationMode: 'off', nodeId: 'n' } }, gaii), gaii, keys);
 
 const dir = fileURLToPath(new URL('../fixtures/file-text/', import.meta.url));
 const GAII = 'alice@node-1';

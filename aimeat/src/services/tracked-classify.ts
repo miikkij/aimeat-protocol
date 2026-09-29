@@ -18,11 +18,13 @@
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 8b: the two completions here run through the chokepoint
  *     (via notebook-ai.ts) and are attributed as `tracked:triage` / `tracked:fill`, so the owner can
  *     see what this feature spends. Nothing here decrypts a key any more.
+ *   v1.2.0 — 2026-09-29 — triageMessage takes the caller's classification reader (TARGET-082).
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { stripCodeblock } from './llm-strip.js';
 import { collectWorkspaceSummary } from './structure-overview.js';
+import type { ContentReader } from './classification/reader.js';
 import { validateMemoryWrite } from './schema-validator.js';
 import { NotebookAiError, resolveOwnerModel, completeOwner } from './notebook-ai.js';
 
@@ -83,7 +85,7 @@ Rules:
 /** Build the compact organism → workspace → RECORD-type map the model triages against. Only the
  *  caller's readable workspaces and their RECORD spaces (mode:'records') are included. */
 export async function buildRecordContext(
-  storage: Storage, config: AimeatConfig, opts: { ownerName: string; viewerGaii: string },
+  storage: Storage, config: AimeatConfig, opts: { ownerName: string; viewerGaii: string; reader: ContentReader },
 ): Promise<TriageOrganism[]> {
   const orgItems = await storage.listOrganisms({ member: opts.ownerName, page: 1, perPage: MAX_ORGS });
   const organisms: TriageOrganism[] = [];
@@ -98,7 +100,7 @@ export async function buildRecordContext(
     }
     const workspaces: TriageWorkspace[] = [];
     for (const w of [...wsSeen.values()].slice(0, MAX_WS_PER_ORG)) {
-      const summary = await collectWorkspaceSummary(storage, config, { orgId: org.id, ws: w.id, name: w.name, viewerGaii: opts.viewerGaii });
+      const summary = await collectWorkspaceSummary(storage, config, { orgId: org.id, ws: w.id, name: w.name, viewerGaii: opts.viewerGaii, reader: opts.reader });
       if (!summary.readable) continue;
       const recordTypes = summary.spaces.filter(s => s.mode === 'records').map(s => ({ namespace: s.namespace, name: s.name }));
       if (recordTypes.length) workspaces.push({ id: w.id, name: summary.name, recordTypes });
@@ -136,13 +138,13 @@ function resolveTriage(context: TriageOrganism[], raw: RawTriage, fallbackText: 
 }
 
 export async function triageMessage(
-  storage: Storage, config: AimeatConfig, opts: { gaii: string; ownerName: string; viewerGaii: string; text: string },
+  storage: Storage, config: AimeatConfig, opts: { gaii: string; ownerName: string; viewerGaii: string; text: string; reader: ContentReader },
 ): Promise<TriageResult> {
   const text = opts.text.trim();
   if (!text) throw new NotebookAiError('INVALID_INPUT', 'text is required');
 
   const owner = await resolveOwnerModel(storage, config, opts.gaii, 'tracked:triage');   // throws NO_OPENROUTER_KEY when missing
-  const context = await buildRecordContext(storage, config, { ownerName: opts.ownerName, viewerGaii: opts.viewerGaii });
+  const context = await buildRecordContext(storage, config, { ownerName: opts.ownerName, viewerGaii: opts.viewerGaii, reader: opts.reader });
   const prompt = TRIAGE_TEMPLATE
     .split('{{structure}}').join(JSON.stringify({ organisms: context }, null, 2))
     .split('{{message}}').join(text);

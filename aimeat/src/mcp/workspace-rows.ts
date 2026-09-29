@@ -14,11 +14,13 @@
  * @usage registerWorkspaceRowTools(mcp, { storage, config, agentGaii, writerGaii, ownerName });
  * @version-history
  *   v1.0.0 — 2026-08-26 — Initial: extracted from mcp/workspaces.ts.
+ *   v1.1.0 — 2026-09-29 — aimeat_workspace_rows_read passes the agent's classification reader (TARGET-082).
  */
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import { readerForAgent } from '../services/classification/reader.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import {
@@ -97,6 +99,7 @@ export function registerWorkspaceRowTools(mcp: McpServer, deps: WorkspaceRowTool
                     ...(changed_since ? { changedSince: changed_since } : {}),
                     ...(limit ? { limit } : {}), ...(cursor ? { cursor } : {}),
                     ...(order ? { order } : {}),
+                    reader: readerForAgent({ storage, config }, agentGaii),
                 });
                 return ok(page);
             } catch (err) { return rowFail(err); }

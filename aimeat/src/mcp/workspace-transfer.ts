@@ -16,6 +16,7 @@
  *   registerWorkspaceTransferTool(mcp, storage, config, { ownerName, ownerGhii, ok, fail, denyReason, findWsEntry, roleOf });
  * @version-history
  *   v1.0.0 — 2026-08-01 — Extracted from mcp/workspaces.ts (max-file-lines, pure extraction).
+ *   v1.1.0 — 2026-09-29 — The export passes the agent's classification reader (TARGET-082).
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -25,6 +26,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { emitChange } from '../services/event-bus.js';
 import { exportWorkspace } from '../services/workspace-export.js';
+import { readerForAgent } from '../services/classification/reader.js';
 import { importWorkspace } from '../services/workspace-import.js';
 import { ZipSecurityError } from '../services/safe-zip.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
@@ -34,6 +36,8 @@ type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean
 export interface WorkspaceTransferToolCtx {
     ownerName: string;
     ownerGhii: string;
+    /** The session's agent, whose classification reader an export passes (TARGET-082). */
+    agentGaii: string;
     ok: (obj: unknown) => TextResult;
     fail: (msg: string) => TextResult;
     denyReason: (orgId: string) => Promise<string | null>;
@@ -50,7 +54,7 @@ export function registerWorkspaceTransferTool(
     config: AimeatConfig,
     ctx: WorkspaceTransferToolCtx,
 ): void {
-    const { ownerName, ownerGhii, ok, fail, denyReason, findWsEntry, roleOf } = ctx;
+    const { ownerName, ownerGhii, agentGaii, ok, fail, denyReason, findWsEntry, roleOf } = ctx;
 
     mcp.tool('aimeat_workspace_transfer', descriptionFor('aimeat_workspace_transfer'),
         {
@@ -71,6 +75,7 @@ export function registerWorkspaceTransferTool(
                 const { buffer, filename } = await exportWorkspace(storage, config, {
                     orgId: organism_id, ws, exporterGaii: ownerGhii, exportedAt: new Date().toISOString(),
                     isOrgManager: role === 'creator' || role === 'admin',
+                    reader: readerForAgent({ storage, config }, agentGaii),
                 });
                 if (buffer.length > MAX_INLINE_EXPORT_BYTES) return fail(`Workspace too large for inline export (${buffer.length} bytes) — download it from the UI/REST instead.`);
                 return ok({ filename, size_bytes: buffer.length, zip_base64: buffer.toString('base64') });

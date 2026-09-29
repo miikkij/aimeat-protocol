@@ -18,12 +18,16 @@
  *     threaded to searchText, backing archive search (the live FTS index excludes archived rows).
  *   v1.3.0 -- 2026-09-24 -- Each workspace's read gate and spaces come from the copy of its manifest
  *     that counts (services/workspace-meta.ts), not the first copy the store returned.
+ *   v1.4.0 -- 2026-09-29 -- The caller passes a classification reader, which the candidates pass, and
+ *     each workspace's read is decided by decideWorkspaceRead, the one decision (TARGET-082).
  */
 import type { ArchiveFilter, Storage, MemoryRecord, OrganismRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
-import { authorizeRead } from './access-guard.js';
-import { isSameOwner } from '../utils/gaii.js';
+import { localAccountOf } from '../utils/gaii.js';
 import { workspaceMetaReader } from './workspace-meta.js';
+import { decideWorkspaceRead } from './workspace-access.js';
+import { memoryTarget } from './classification/labels.js';
+import type { ContentReader } from './classification/reader.js';
 
 export interface OrganismSearchHit {
   ws: string;
@@ -55,8 +59,8 @@ export async function searchOrganismContent(
   organism: OrganismRecord,
   callerGaii: string,
   q: string,
-  onlyWs?: string,
-  opts?: { archived?: ArchiveFilter },
+  onlyWs: string | undefined,
+  opts: { archived?: ArchiveFilter; reader: ContentReader },
 ): Promise<{ results: OrganismSearchHit[]; truncated: boolean }> {
   const id = organism.id;
   const needle = q.toLowerCase();
@@ -74,24 +78,22 @@ export async function searchOrganismContent(
 
   // Indexed full-text candidates, scoped to the organism (or one workspace).
   const keyPrefix = onlyWs ? `organism.${id}.w.${onlyWs}.` : `organism.${id}.w.`;
-  const hits = await storage.searchText(q, { keyPrefix, maxFlags: 0, limit: CANDIDATES, archived: opts?.archived });
+  // The classification reader (TARGET-082): a hit this reader may not see is not a candidate.
+  const hits = await opts.reader.show(
+    await storage.searchText(q, { keyPrefix, maxFlags: 0, limit: CANDIDATES, archived: opts.archived }),
+    h => memoryTarget(h.record.ownerGaii, h.record.key));
 
   // Per-workspace manifest + read-permission cache (resolved once per workspace). The manifest is the
-  // copy that counts (services/workspace-meta.ts), not the first one the store returns.
+  // copy that counts (services/workspace-meta.ts), not the first one the store returns, and the read
+  // is decided where every workspace read is decided (decideWorkspaceRead).
   const wsMeta = new Map<string, { canRead: boolean; types: Array<{ name: string; ns: string }> } | null>();
   const metaReader = workspaceMetaReader(storage, id, config.nodeId);
   const resolveWs = async (ws: string) => {
     if (wsMeta.has(ws)) return wsMeta.get(ws);
     const manRec = await metaReader.read(ws, 'meta.manifest');
     if (!manRec) { wsMeta.set(ws, null); return null; }
-    let canRead = manRec.ownerGaii === callerGaii || isSameOwner(manRec.ownerGaii, callerGaii);
-    if (!canRead) {
-      const decision = await authorizeRead(storage, config, {
-        ownerGaii: manRec.ownerGaii, accessorGaii: callerGaii, resourceKey: manRec.key,
-        visibility: manRec.visibility, groupId: manRec.groupId, action: 'read',
-      });
-      canRead = decision.allowed;
-    }
+    const { canRead } = await decideWorkspaceRead(storage, config, organism, callerGaii,
+      localAccountOf(callerGaii) ?? undefined, callerGaii, ws, { manRec });
     const manifest = manRec.value as { objectTypes?: Array<Record<string, unknown>> } | undefined;
     const types = (manifest?.objectTypes ?? [])
       .map(ot => ({ name: String(ot.name ?? ''), ns: String(ot.namespace ?? '') }))

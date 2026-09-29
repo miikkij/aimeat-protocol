@@ -16,11 +16,14 @@
  *   Anything left over is NAMED in the prompt rather than dropped, because the agent is the one who
  *   has to tell the person their file was not read, and it can only do that if it knows.
  * @structure ReadAttachments; readAttachments()
- * @usage const { images, quoted, notes, skipped } = await readAttachments(storage, gaii, keys);
+ * @usage const { images, quoted, notes, skipped } = await readAttachments(storage, reader, gaii, keys);
  * @version-history
  *   v1.0.0 -- 2026-08-17 -- Initial: pure extraction out of chat-session, plus office and PDF files.
+ *   v1.1.0 -- 2026-09-29 -- Files are read through readAiFile with a classification reader (TARGET-082).
  */
 import type { Storage } from '../storage/interface.js';
+import { readAiFile } from './ai-inputs.js';
+import type { ContentReader } from './classification/reader.js';
 import type { PromptImage } from './goose-acp.js';
 import { extractFileText, extractableKind, isLegacyOfficeFile, NAME } from './file-text/index.js';
 import { logger } from '../utils/logger.js';
@@ -71,12 +74,13 @@ export function readableAsText(mimeType: string, key: string): boolean {
  * our side and not something the person can act on.
  */
 export async function readAttachments(
-    storage: Storage, gaii: string, keys: string[],
+    storage: Storage, reader: ContentReader, gaii: string, keys: string[],
 ): Promise<ReadAttachments> {
     const out: ReadAttachments = { images: [], quoted: [], notes: [], skipped: [] };
 
     for (const key of keys.slice(0, MAX_ATTACHMENTS_PER_TURN)) {
-        const file = await storage.getStorageFile(gaii, key);
+        // The one loader of what a model reads (services/ai-inputs.ts): classification first.
+        const file = await readAiFile(storage, reader, gaii, key, { capability: 'text' });
         if (!file) {
             logger.warn(`[chat] attachment not found for ${gaii}: ${key}`);
             continue;

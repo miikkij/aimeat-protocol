@@ -9,6 +9,7 @@
  *   import { registerAgentTaskTools } from './agent-tasks.js';
  *   registerAgentTaskTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.10.0 — 2026-09-29 — Attachments resolve with the agent's classification reader (TARGET-082).
  *   v1.9.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   2026-08-15 — aimeat_task_get answers the principal that CREATED the task, not only the one it
@@ -70,6 +71,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentTaskRecord } from '../storage/interface.js';
+import { readerForAgent } from '../services/classification/reader.js';
 import { readinessRefusal } from '../middleware/readiness-gate.js';
 import { createTask, recordTaskEvent, applyProposedPlan, setTodoStatus } from '../services/agent-task-write.js';
 import { annotationsFor } from './annotations.js';
@@ -159,7 +161,7 @@ export function registerAgentTaskTools(
                 agent: targetAgent,
                 agentGaii: targetGaii,
                 agentName: target_agent,
-                creator: { gaii: agentGaii, sub: agentGaii, owner: localAccountName(agentGaii) },
+                creator: { gaii: agentGaii, sub: agentGaii, owner: localAccountName(agentGaii), reader: readerForAgent({ storage, config }, agentGaii) },
                 // 'queued' is THIS tool's documented default (an agent delegating work means the
                 // target to see it now); the HTTP body defaults to 'draft', which is the owner
                 // drafting a task in the dashboard.
@@ -273,7 +275,7 @@ export function registerAgentTaskTools(
             // Attachments become presigned handles here, authorized for THIS agent on THIS read — the
             // task assignment carries the reference, the read carries the permission.
             const withFiles = await taskWithFileHandles(storage, config, task, {
-                gaii: agentGaii, sub: agentGaii, owner: localAccountName(agentGaii),
+                gaii: agentGaii, sub: agentGaii, owner: localAccountName(agentGaii), reader: readerForAgent({ storage, config }, agentGaii),
             });
 
             return {

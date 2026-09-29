@@ -49,12 +49,17 @@
  *     only to be skipped by the role filter.
  *   v1.8.0 — 2026-09-24 — collectWorkspaceSummary gates on, and summarises, the copies of the manifest
  *     and readme that count (services/workspace-meta.ts), not the first copy the scan returned.
+ *   v1.9.0 — 2026-09-29 — collectWorkspaceSummary loads through services/workspace-content.ts, the one
+ *     workspace loader: the read is decided by decideWorkspaceRead (membership and managers included)
+ *     and the records pass the caller's classification reader, which every overview now takes
+ *     (TARGET-082). A non-member's summary is the name the caller already had.
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
-import { authorizeRead } from './access-guard.js';
-import { isSameOwner } from '../utils/gaii.js';
-import { isMemoryBackedSpace, workspaceMetaReader } from './workspace-meta.js';
+import { localAccountOf } from '../utils/gaii.js';
+import { isMemoryBackedSpace } from './workspace-meta.js';
+import { loadWorkspaceContent } from './workspace-content.js';
+import type { ContentReader } from './classification/reader.js';
 import { isRecordsSource, evaluateRecordsKpi } from './kpi-rollup.js';
 import { logger } from '../utils/logger.js';
 
@@ -168,40 +173,31 @@ function oneLine(md: unknown): string | null {
 export async function collectWorkspaceSummary(
   storage: Storage,
   config: AimeatConfig,
-  opts: { orgId: string; ws: string; name?: string; viewerGaii: string; archived?: boolean; itemLimit?: number },
+  opts: { orgId: string; ws: string; name?: string; viewerGaii: string; archived?: boolean; itemLimit?: number; reader: ContentReader },
 ): Promise<WorkspaceSummary> {
   const { orgId, ws, viewerGaii } = opts;
   const itemLimit = opts.itemLimit ?? MAX_ITEMS;
   const root = `organism.${orgId}.w.${ws}`;
-  // excludeVersionRows: the overview collapses instances to `.latest`/bare and ignores `.version.N`
-  // history — dropping those rows in SQL avoids loading every historic full-copy value.
-  const { items } = await storage.listAllMemory({ prefix: `${root}.`, limit: 5000, excludeVersionRows: true });
-
-  // The meta records are the copies that count (services/workspace-meta.ts), for the gate and the summary.
-  const metaReader = workspaceMetaReader(storage, orgId, config.nodeId);
-  const manRec = await metaReader.pick(ws, 'meta.manifest', items);
   const summary: WorkspaceSummary = {
     ws, name: opts.name || ws, readme: null, readable: false,
     spaces: [], skills: [], objectives: [], totalRecords: 0, totalDocuments: 0, lastActivity: null,
     archived: opts.archived ?? false, archivedCount: 0,
   };
-  if (!manRec) return summary;   // empty / non-existent workspace
+  // The one loader (services/workspace-content.ts): it loads (version rows excluded in SQL), decides
+  // the read with decideWorkspaceRead and passes the classification reader. A member who may not read
+  // the workspace sees its name and readme; anyone else sees what the caller already knew.
+  const got = await loadWorkspaceContent({ storage, config }, opts.reader,
+    { sub: viewerGaii, ownerName: localAccountOf(viewerGaii) ?? undefined, accessorGaii: viewerGaii }, { organismId: orgId, ws });
+  if (!got.ok || !got.descriptor.manifest) return summary;   // not a member / empty / non-existent workspace
   // Hint count of archived rows under this workspace (cheap aggregate; default-excluded everywhere else).
   try { summary.archivedCount = (await storage.countArchivedByKeyPrefix(`${root}.`)).archived; } catch (err) { logger.warn('collectWorkspaceSummary: best-effort', { error: String(err) }); }
 
-  let readable = manRec.ownerGaii === viewerGaii || isSameOwner(manRec.ownerGaii, viewerGaii);
-  if (!readable) {
-    const d = await authorizeRead(storage, config, {
-      ownerGaii: manRec.ownerGaii, accessorGaii: viewerGaii, resourceKey: manRec.key,
-      visibility: manRec.visibility, groupId: manRec.groupId, action: 'read',
-    });
-    readable = d.allowed;
-  }
-  const manifest = manRec.value as { name?: unknown; objectTypes?: ObjType[]; objectives?: RawObjective[] } | null;
+  const manifest = got.descriptor.manifest.value as { name?: unknown; objectTypes?: ObjType[]; objectives?: RawObjective[] } | null;
   if (typeof manifest?.name === 'string') summary.name = manifest.name;
-  summary.readme = oneLine((await metaReader.pick(ws, 'meta.readme', items))?.value);
-  summary.readable = readable;
-  if (!readable) return summary;
+  summary.readme = oneLine(got.descriptor.readme?.value);
+  summary.readable = got.canRead;
+  if (!got.canRead) return summary;
+  const items = got.items;
 
   for (const ot of manifest?.objectTypes ?? []) {
     const name = typeof ot.name === 'string' ? ot.name : undefined;
@@ -323,7 +319,7 @@ function date(iso: string | null): string {
 export async function buildWorkspaceOverview(
   storage: Storage,
   config: AimeatConfig,
-  opts: { orgId: string; ws: string; name?: string; viewerGaii: string },
+  opts: { orgId: string; ws: string; name?: string; viewerGaii: string; reader: ContentReader },
 ): Promise<{ markdown: string; readable: boolean; summary: WorkspaceSummary }> {
   // DEEP view of ONE workspace: list EVERY instance id (uncapped), not just the MAX_ITEMS most-recent
   // — this is the agent's "table of contents" for a targeted batch read, so a big space (e.g. 40+
@@ -445,7 +441,7 @@ function objectiveLines(objectives: ObjectiveSummary[], hashes: string): string[
 export async function buildOrganismOverview(
   storage: Storage,
   config: AimeatConfig,
-  opts: { orgId: string; viewerGaii: string; includeArchived?: boolean },
+  opts: { orgId: string; viewerGaii: string; includeArchived?: boolean; reader: ContentReader },
 ): Promise<{ markdown: string; workspaces: number; archivedWorkspaces: number }> {
   const { orgId, viewerGaii, includeArchived } = opts;
   const org = await storage.getOrganism(orgId);
@@ -455,7 +451,7 @@ export async function buildOrganismOverview(
   const archivedWss = allWss.filter(w => w.archived);
   const wss = includeArchived ? allWss : allWss.filter(w => !w.archived);
   const summaries: WorkspaceSummary[] = [];
-  for (const w of wss) summaries.push(await collectWorkspaceSummary(storage, config, { orgId, ws: w.id, name: w.name, viewerGaii, archived: w.archived }));
+  for (const w of wss) summaries.push(await collectWorkspaceSummary(storage, config, { orgId, ws: w.id, name: w.name, viewerGaii, archived: w.archived, reader: opts.reader }));
 
   const totalRecords = summaries.reduce((n, s) => n + s.totalRecords, 0);
   const totalDocs = summaries.reduce((n, s) => n + s.totalDocuments, 0);

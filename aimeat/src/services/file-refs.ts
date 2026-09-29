@@ -29,11 +29,15 @@
  * @version-history
  *   v1.0.0 — 2026-07-26 — Initial: shared file-reference resolution so an agent can read a file it
  *     does not own (owner-uploaded PDFs, DM attachments, task attachments) through one guard.
+ *   v1.1.0 — 2026-09-29 — The accessor carries a classification reader, and a granted file passes it
+ *     (TARGET-082): a file the caller may not see resolves as missing.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, StorageFileRecord } from '../storage/interface.js';
 import { authorizeRead } from './access-guard.js';
 import { generateDownloadToken } from './download-token.js';
+import { fileTarget } from './classification/labels.js';
+import type { ContentReader } from './classification/reader.js';
 
 /** A handle for one of the caller's OWN files may live an hour (parity with GET /v1/storage?mode=handle). */
 export const OWN_HANDLE_TTL_SECONDS = 3600;
@@ -47,6 +51,8 @@ export interface FileRefAccessor {
     sub?: string;
     /** The caller's bare owner name (threaded into the workspace read gate). */
     owner?: string;
+    /** The caller's classification reader (TARGET-082): a file it may not see resolves as absent. */
+    reader: ContentReader;
 }
 
 export type FileRefAccess = 'granted' | 'denied' | 'missing';
@@ -146,8 +152,11 @@ export async function resolveFileRef(
     if (!decision.allowed) {
         return { access: 'denied', ref: canonical, ownerGaii: gaii, key, reason: decision.reason ?? 'not_permitted' };
     }
+    // The classification reader: a file this caller may not see answers as an absent one.
+    const [shown] = await accessor.reader.show([file], () => fileTarget(gaii, key));
+    if (!shown) return { access: 'missing', ref: canonical, ownerGaii: gaii, key, reason: 'not_found' };
 
-    return { access: 'granted', ref: canonical, ownerGaii: gaii, key, file };
+    return { access: 'granted', ref: canonical, ownerGaii: gaii, key, file: shown };
 }
 
 /**
