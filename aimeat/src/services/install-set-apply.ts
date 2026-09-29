@@ -32,6 +32,9 @@
  * @usage
  *   const out = await applyInstallSet({ storage, config, peers }, { installSet, secrets, dryRun: true });
  * @version-history
+ *   v1.5.0 — 2026-09-30 — The install's warnings reach the operator: each package step keeps them,
+ *     the apply answer lists them (`warnings`) and so does the plan. A skill the owner already had
+ *     of their own was skipped in silence (aimeat-apps, 2026-09-29).
  *   v1.4.0 — 2026-09-29 — The owner's welcome no longer depends on nobody having signed in: the
  *     shop's crew image signs in as the owner at boot (ownerToWelcome()).
  *   v1.3.0 — 2026-09-29 — An owner account the shop created before the set is welcomed too, while
@@ -47,6 +50,7 @@ import type { Storage, PackageRecord, PackageComponent, InstalledComponent } fro
 import type { Scheduler } from './scheduler.js';
 import type { PeerInfo } from './federation.js';
 import { parseInstallSet, parseGroupConfig, bundleOfComponents, type InstallSet, type InstallBundle, type BundlePackage } from './install-set-spec.js';
+import { registerSkillComponent } from './package-skill-component.js';
 import { checkOwner, ensureOwner, joinMember, ownerToWelcome, welcomeCreated, type MemberOutcome, type CreatedOrganisms } from './install-set-people.js';
 import { installPackage, type PackageInstallCaller, type PackageInstallPreview } from './package-install.js';
 import { pullPackage } from './package-pull.js';
@@ -77,7 +81,11 @@ export interface ApplyInput {
     appliedBy: string;
 }
 
-export interface PackageStep { group_id: string; local_group_id: string; instance_id?: string; result: 'installed' | 'present' | 'would_install' | 'would_pull'; mode: string }
+export interface PackageStep {
+    group_id: string; local_group_id: string; instance_id?: string; result: 'installed' | 'present' | 'would_install' | 'would_pull'; mode: string;
+    /** What the install left out and why (a skill the owner already has of their own). Kept across runs. */
+    warnings?: string[];
+}
 export interface AgentStep { group_id: string; app: string; agent: string; result: 'deployed' | 'present' | 'pending' | 'error' | 'would_deploy'; task_id?: string; detail?: string }
 
 export interface AppliedRecord {
@@ -100,7 +108,7 @@ export interface AppliedRecord {
 
 export type ApplyResult =
     | { ok: true; dry_run: true; plan: Record<string, unknown> }
-    | { ok: true; dry_run: false; record: AppliedRecord; owner_created: boolean }
+    | { ok: true; dry_run: false; record: AppliedRecord; owner_created: boolean; warnings: string[] }
     | { ok: false; status: number; code: string; message: string; problems?: string[] };
 
 const recordKey = (owner: string, localGroupId: string): string =>
@@ -221,7 +229,7 @@ async function linkRepository(
  */
 async function prepare(deps: ApplyDeps, input: ApplyInput): Promise<
     | { ok: false; status: number; code: string; message: string; problems?: string[] }
-    | { ok: true; set: InstallSet; bundle: InstallBundle; bundleVersion: string; bundleLocalGroup: string; remote: boolean; secrets: ConfigBySet; ownerExists: boolean; problems: string[] }
+    | { ok: true; set: InstallSet; bundle: InstallBundle; bundleVersion: string; bundleLocalGroup: string; remote: boolean; secrets: ConfigBySet; ownerExists: boolean; problems: string[]; warnings: string[] }
 > {
     const { storage, config } = deps;
     const shape = parseInstallSet(input.installSet);
@@ -251,6 +259,7 @@ async function prepare(deps: ApplyDeps, input: ApplyInput): Promise<
     }
 
     const problems: string[] = [];
+    const warnings: string[] = [];
     for (const org of bundle.organisms) {
         for (const ws of org.workspaces) {
             const why = await checkWorkspaceManifest(storage, 'install-set-check', ws.name, ws.manifest);
@@ -268,7 +277,10 @@ async function prepare(deps: ApplyDeps, input: ApplyInput): Promise<
                 groupId: localGroup, mode: pkg.mode, config: merged, dryRun: true,
             });
             if (!dry.ok) problems.push(`${pkg.groupId}: ${dry.code}: ${dry.message}`);
-            else if (dry.kind === 'dry-run') problems.push(...installProblems(pkg.groupId, dry.preview));
+            else if (dry.kind === 'dry-run') {
+                problems.push(...installProblems(pkg.groupId, dry.preview));
+                warnings.push(...(dry.preview.warnings ?? []).map(w => `${pkg.groupId}: ${w}`));
+            }
             continue;
         }
         // A preview: nothing is stored, so the config is checked against the verified parts.
@@ -276,8 +288,10 @@ async function prepare(deps: ApplyDeps, input: ApplyInput): Promise<
         const plan = planPackageConfig(got.components, planned, merged, { config, owner: ownerName });
         if (!plan.ok) problems.push(`${pkg.groupId}: ${plan.code}: ${plan.message}`);
         else if (plan.missingCount > 0) problems.push(`${pkg.groupId}: CONFIG_REQUIRED: ${missingConfigMessage(plan)}`);
+        // The skills the install would leave out, by the check the install itself makes.
+        warnings.push(...(await skillsLeftOut(deps, ownerName, localGroup, got.components)).map(w => `${pkg.groupId}: ${w}`));
     }
-    return { ok: true, set: full.value, bundle, bundleVersion: reached.version, bundleLocalGroup: localGroupOf(shape.value.bundle.groupId, ownerName, !!remote), remote: !!remote, secrets, ownerExists: owner.exists, problems };
+    return { ok: true, set: full.value, bundle, bundleVersion: reached.version, bundleLocalGroup: localGroupOf(shape.value.bundle.groupId, ownerName, !!remote), remote: !!remote, secrets, ownerExists: owner.exists, problems, warnings };
 }
 
 /** Apply (or with dryRun, plan) an install set. The caller has already been checked as the operator. */
@@ -298,6 +312,8 @@ export async function applyInstallSet(deps: ApplyDeps, input: ApplyInput): Promi
             agents: bundle.agents.map(a => ({ group_id: a.groupId, app: a.app, agent: a.agent })),
             auto_update: set.autoUpdate,
             problems: prep.problems,
+            // What the install would leave out: not a problem, the set applies, but the operator hears it.
+            warnings: prep.warnings,
         };
         return { ok: true, dry_run: true, plan };
     }
@@ -348,7 +364,29 @@ export async function applyInstallSet(deps: ApplyDeps, input: ApplyInput): Promi
     const toWelcome = ownerWelcome ? [...created, set.owner.email.toLowerCase()] : [...created];
     record.welcomed = [...(record.welcomed ?? []), ...await welcomeCreated(storage, config, toWelcome, record.welcomed ?? [])];
     await writeRecord(storage, key, record);
-    return { ok: true, dry_run: false, record, owner_created: owner.created };
+    return { ok: true, dry_run: false, record, owner_created: owner.created, warnings: setWarnings(record) };
+}
+
+/**
+ * For a package still on the repository: the skill components the owner already has a skill of that
+ * name for, in the words the install would use (registerSkillComponent, as a dry run).
+ */
+async function skillsLeftOut(deps: ApplyDeps, owner: string, localGroup: string, components: PackageComponent[]): Promise<string[]> {
+    const appNames = new Map(components.filter(c => c.type === 'app').map(c => [c.id, `${c.id}.html`] as [string, string]));
+    const out: string[] = [];
+    for (const c of components.filter(k => k.type === 'skill')) {
+        const dry = await registerSkillComponent(deps.storage, {
+            config: deps.config, owner, ownerGaii: `${owner}@${deps.config.nodeId}`, publisher: `${owner}@${deps.config.nodeId}`,
+            content: c.content, meta: c.meta, packageContext: { groupId: localGroup, instanceId: 'plan', appNames }, dryRun: true,
+        });
+        if (dry.ok && dry.skipped) out.push(dry.skipped);
+    }
+    return out;
+}
+
+/** Every package step's warnings, each prefixed with its package, for the apply answer. */
+function setWarnings(record: AppliedRecord): string[] {
+    return Object.values(record.packages).flatMap(p => (p.warnings ?? []).map(w => `${p.group_id}: ${w}`));
 }
 
 async function installPackages(deps: ApplyDeps, set: InstallSet, bundle: InstallBundle, remote: boolean, secrets: ConfigBySet, record: AppliedRecord): Promise<void> {
@@ -358,7 +396,8 @@ async function installPackages(deps: ApplyDeps, set: InstallSet, bundle: Install
         const local = localGroupOf(pkg.groupId, owner, remote);
         const present = await installedInstanceOf(storage, owner, local);
         if (present) {
-            record.packages[pkg.groupId] = { group_id: pkg.groupId, local_group_id: local, instance_id: present.id, result: 'present', mode: present.mode ?? 'editable' };
+            const before = record.packages[pkg.groupId]?.warnings;
+            record.packages[pkg.groupId] = { group_id: pkg.groupId, local_group_id: local, instance_id: present.id, result: 'present', mode: present.mode ?? 'editable', ...(before?.length ? { warnings: before } : {}) };
             continue;
         }
         const out = await installPackage({ storage, config, scheduler: deps.scheduler }, ownerCaller(owner, config), {
@@ -367,7 +406,9 @@ async function installPackages(deps: ApplyDeps, set: InstallSet, bundle: Install
         if (!out.ok) throw new Error(`${pkg.groupId}: ${out.code}: ${out.message}`);
         if (out.kind !== 'installed') continue;
         if ((out.instance.autoUpdate ?? false) !== set.autoUpdate) await storage.updateInstance(out.instance.id, { autoUpdate: set.autoUpdate });
-        record.packages[pkg.groupId] = { group_id: pkg.groupId, local_group_id: local, instance_id: out.instance.id, result: 'installed', mode: pkg.mode };
+        // The install's warnings (a skill left out because the owner has one of that name) were
+        // dropped here until 2026-09-30, so the operator never learned a skill was skipped.
+        record.packages[pkg.groupId] = { group_id: pkg.groupId, local_group_id: local, instance_id: out.instance.id, result: 'installed', mode: pkg.mode, ...(out.warnings.length ? { warnings: out.warnings } : {}) };
     }
 }
 

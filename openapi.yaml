@@ -45256,13 +45256,13 @@ paths:
                 dry_run: { type: boolean, default: false }
       responses:
         '200':
-          description: '`data` is `{ ok, dry_run: true, plan: { owner, bundle, packages, organisms, members, agents, auto_update, problems } }`.'
+          description: '`data` is `{ ok, dry_run: true, plan: { owner, bundle, packages, organisms, members, agents, auto_update, problems, warnings } }`. `warnings` names what the install would leave out (a skill the owner already has of their own); unlike `problems`, the set still applies.'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '201':
-          description: '`data` is `{ ok, dry_run: false, owner_created, record }`: the record of what this and every earlier apply of the set made.'
+          description: '`data` is `{ ok, dry_run: false, owner_created, record, warnings }`: the record of what this and every earlier apply of the set made, and what the installs left out (each package step keeps its own `warnings`).'
           content:
             application/json:
               schema:
