@@ -5,6 +5,8 @@
  *   which creates a consent grant. Covers: discovery, denied-before-approval, request, list-requests,
  *   approve → read, and deny → revoke.
  * @version-history
+ *   2026-09-29 — 17b: a chunked upload bound to the workspace lands bound, and init refuses a
+ *     workspace file that names no workspace.
  *   v1.0.0 — 2026-06-08 — Initial: workspace access request/approve/consent flow.
  *   v1.1.0 — 2026-07-15 — Org-admin auto-access: a promoted admin (D) reads + writes a workspace they
  *     did not create, with no per-workspace grant; a plain member (B) still cannot (regression guard).
@@ -256,6 +258,30 @@ await test('17. A file bound to MULTIPLE workspaces is readable via ANY one the 
     if (C) {
         const cres = await fetch(`${BASE}/v1/pub/${encodeURIComponent(A_GHII)}/${encodeURIComponent(multiKey)}`, { headers: auth(C.token) });
         assert(cres.status === 403, `non-member expected 403 on multi-bound file, got ${cres.status}`);
+    }
+});
+
+await test('17b. A CHUNKED upload bound to the workspace lands bound: member B reads it, non-member C does not', async () => {
+    // The chunked door took no binding and wrote the file itself, so a team file could only be sent
+    // in one piece (aimeat-apps wish, 2026-09-29).
+    const noWs = await json('/v1/storage/upload/init', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ key: `wsfile-chunk-none-${Date.now()}`, mime_type: 'text/plain', chunk_size: 1024, visibility: 'workspace' }) });
+    assert(noWs.status === 400 && noWs.body.error?.code === 'INVALID_INPUT', `a workspace file that names no workspace is refused at init: ${noWs.status} ${JSON.stringify(noWs.body.error)}`);
+
+    const chunkKey = `wsfile-chunk-${Date.now()}`;
+    const init = await json('/v1/storage/upload/init', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ key: chunkKey, mime_type: 'text/plain', chunk_size: 1024, total_chunks: 1, visibility: 'workspace', workspace_ref: `${orgId}/${WS}` }) });
+    assert(init.status === 201, `init ${init.status}: ${JSON.stringify(init.body.error)}`);
+    const uploadId = init.body.data.upload_id;
+    const put = await fetch(`${BASE}/v1/storage/upload/${uploadId}/0`, { method: 'PUT', headers: { ...auth(A.token), 'Content-Type': 'application/octet-stream' }, body: Buffer.from('workspace chunk') });
+    assert(put.status === 200, `chunk ${put.status}`);
+    const done = await json(`/v1/storage/upload/${uploadId}/complete`, { method: 'POST', headers: auth(A.token), body: '{}' });
+    assert(done.status === 201 && done.body.data.visibility === 'workspace', `complete ${done.status}: ${JSON.stringify(done.body).slice(0, 300)}`);
+
+    const url = `${BASE}/v1/pub/${encodeURIComponent(A_GHII)}/${encodeURIComponent(chunkKey)}`;
+    const b = await fetch(url, { headers: auth(B.token) });
+    assert(b.status === 200, `member with access expected 200, got ${b.status}`);
+    if (C) {
+        const c = await fetch(url, { headers: auth(C.token) });
+        assert(c.status === 403, `non-member expected 403, got ${c.status}`);
     }
 });
 

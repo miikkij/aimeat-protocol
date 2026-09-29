@@ -10,6 +10,7 @@
  * @structure SDK_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.19.0 — 2026-09-29 — aimeat-storage 1.3.0: the aiDoc says how a team (workspace) or group file is stored.
  *   v1.18.0 — 2026-09-29 — aimeat-labels joins after aimeat-organism, from library-packs/sdk-labels.ts (TARGET-082 V5).
  *   v1.17.0 — 2026-09-29 — aimeat-refinery joins after aimeat-decide, from library-packs/sdk-refinery.ts.
  *   v1.16.3 — 2026-09-28 — aimeat-data's aiDoc names the aimeat-config block and AIMEAT.data.appConfig().
@@ -238,8 +239,9 @@ export const SDK_PACKS: LibraryPack[] = [
     requires: ['aimeat-auth'],
     license: 'MIT',
     apiSurface: 'AIMEAT.storage',
-    aiDoc: 'File upload/download, chunked upload, drag & drop helper. Cross-user image display: upload with visibility "public" and reference /v1/pub/<owner-ghii>/<key> — publicUrl() returns an owner-auth URL that will NOT load for other users. Never embed images as base64 in memory values. AIMEAT.storage.viewUrl(address) returns a URL that loads in an <img> for a file that is not public; it takes a full URL, a /v1/pub/ path, a "<gaii>/<key>" reference as ctx.files.write() and the agent file tools return it, or a bare key of the signed-in person. Call it when you draw the picture: the URL expires. After a re-upload to the same key, point at the upload answer\'s versioned_url, which changes on every write.',
+    aiDoc: 'File upload/download, chunked upload, drag & drop helper. Cross-user image display: upload with visibility "public" and reference /v1/pub/<owner-ghii>/<key> — publicUrl() returns an owner-auth URL that will NOT load for other users. Never embed images as base64 in memory values. AIMEAT.storage.viewUrl(address) returns a URL that loads in an <img> for a file that is not public; it takes a full URL, a /v1/pub/ path, a "<gaii>/<key>" reference as ctx.files.write() and the agent file tools return it, or a bare key of the signed-in person. Call it when you draw the picture: the URL expires. After a re-upload to the same key, point at the upload answer\'s versioned_url, which changes on every write. A team file is stored for the people who share an organism workspace: upload(file, { visibility: "workspace", workspace_ref: "<organismId>/<workspaceId>" }) (or workspaceRefs: [...] for several); a group file: { visibility: "group", group_id }. uploadChunked() takes the same options. Without the workspace the node refuses a "workspace" file.',
     changelog: [
+      { version: '1.3.0', date: '2026-09-29', summary: 'upload() and uploadChunked() send the workspace or group a file is shared with: visibility "workspace" with workspace_ref "<organismId>/<workspaceId>" (or workspaceRefs), visibility "group" with group_id. They used to drop it, so a workspace file was refused.' },
       { version: '1.2.0', date: '2026-09-13', summary: 'viewUrl() reads a "<gaii>/<key>" reference as an owner and a key, so a picture an agent uploaded opens for its owner instead of answering 404. Upload answers carry versioned_url.' },
     ],
     tierHint: 'T1',

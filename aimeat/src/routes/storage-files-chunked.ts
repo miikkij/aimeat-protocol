@@ -17,6 +17,10 @@
  *   import { storageChunkedUploadRouter } from './storage-files-chunked.js';
  *   router.use(storageChunkedUploadRouter(config, storage));   // before the wildcard routes
  * @version-history
+ *   v1.3.0 -- 2026-09-29 -- A chunked upload lands bound like POST /v1/storage: init takes 'workspace'
+ *     visibility and group_id / workspace_ref / workspace_refs (refusing a workspace file that names
+ *     no workspace before any chunk), and complete writes through writeStorageFile. Complete used to
+ *     create the file itself and dropped the binding, so a chunked 'group' file was bound to nothing.
  *   v1.2.0 -- 2026-09-24 -- Init refuses an app's icon and screenshot keys with 403, through the same
  *     appOwnedKeyRefusal() as POST /v1/storage (A7-2).
  *   v1.1.0 -- 2026-09-13 -- The complete answer carries owner_gaii and versioned_url, like every
@@ -30,8 +34,8 @@ import { requireAuth, requireExternalPrincipal, requireScope } from '../auth/mid
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { checkStorageQuota, chargeOverage } from '../services/quota.js';
-import { appOwnedKeyRefusal } from '../services/storage-file-write.js';
+import { appOwnedKeyRefusal, writeStorageFile } from '../services/storage-file-write.js';
+import { normalizeWorkspaceRefs } from '../utils/workspace-ref.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
 import { ChunkedUploadInitSchema, validateBody } from '../models/schemas.js';
 import { randomBytes } from 'node:crypto';
@@ -59,7 +63,14 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
     // POST /v1/storage/upload/init — initiate chunked upload
     router.post('/v1/storage/upload/init', requireAuth(), requireExternalPrincipal(), requireScope('storage:write'), validateBody(ChunkedUploadInitSchema, config.nodeId), async (req, res) => {
         const gaii = resolve(req);
-        const { key, mime_type, visibility, chunk_size, total_chunks } = req.body ?? {};
+        const { key, mime_type, visibility, chunk_size, total_chunks, group_id, workspace_ref, workspace_refs } = req.body ?? {};
+        const workspaceRef = visibility === 'workspace' ? normalizeWorkspaceRefs(workspace_refs, workspace_ref) : undefined;
+        // Refused here, before any chunk, with the answer POST /v1/storage gives at its shared write.
+        if (visibility === 'workspace' && !workspaceRef) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+                'visibility "workspace" requires workspace_refs (or workspace_ref) as one or more "<organismId>/<workspaceId>"'));
+            return;
+        }
 
         // Anonymous namespace enforcement
         if (isAnonymousGaii(gaii) && !key.startsWith('anonymous/')) {
@@ -92,6 +103,8 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
             key,
             mimeType: mime_type ?? 'application/octet-stream',
             visibility: visibility ?? 'private',
+            groupId: visibility === 'group' ? group_id : undefined,
+            workspaceRef,
             chunkSize: chunk_size ?? 10 * 1024 * 1024, // 10MB default
             totalChunks: total_chunks,
             receivedChunks: new Map(),
@@ -199,41 +212,26 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
             }
         }
 
-        // Per-file size limit (must match POST /v1/storage enforcement)
-        if (assembledData.length > config.storageMaxFileSizeMb * 1024 * 1024) {
-            res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Assembled file size (${assembledData.length} bytes) exceeds ${config.storageMaxFileSizeMb}MB per-file limit`));
-            return;
-        }
-
-        // M-2: Total storage quota check before committing assembled file
-        const gaii = upload.ownerGaii;
-        const storageQuota = await checkStorageQuota(config, storage, gaii, assembledData.length);
-        if (!storageQuota.allowed) {
-            res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', storageQuota.reason!));
-            return;
-        }
-
-        // Create the final storage file
-        const file = await storage.createStorageFile({
+        // The shared write (services/storage-file-write.ts): the key fence, the per-file and account
+        // ceilings, the group or workspace binding, the overage charge and the change events, the
+        // same as POST /v1/storage and the MCP tool. This door used to create the file itself and
+        // dropped the binding, so a chunked 'group' file was bound to no group (2026-09-29).
+        const written = await writeStorageFile({ storage, config, emitResourceUpdated, emitResourceListChanged }, upload.ownerGaii, {
             key: upload.key,
-            ownerGaii: upload.ownerGaii,
-            visibility: upload.visibility,
-            mimeType: upload.mimeType,
-            size: assembledData.length,
             data: assembledData,
-            createdAt: new Date().toISOString(),
+            mimeType: upload.mimeType,
+            visibility: upload.visibility,
+            groupId: upload.groupId,
+            workspaceRef: upload.workspaceRef,
         });
-
-        // M-3: Charge overage morsels if over quota (§15)
-        if (storageQuota.overageMorsels > 0) {
-            await chargeOverage(storage, gaii, storageQuota.overageMorsels, 'storage_overage');
+        if (!written.ok) {
+            res.status(written.status).json(error(config.nodeId, written.code, written.message));
+            return;
         }
+        const file = written.file;
 
         // Clean up chunked upload
         await storage.deleteChunkedUpload(uploadId);
-
-        emitResourceUpdated(gaii, `aimeat://storage/${encodeURIComponent(upload.key)}`);
-        emitResourceListChanged(gaii);
 
         res.status(201).json(success(config.nodeId, {
             key: file.key,

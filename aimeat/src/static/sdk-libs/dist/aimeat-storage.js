@@ -53,8 +53,19 @@
 
   // src/static/sdk-libs/storage/index.js
   var { getSession: getSession2, authFetch: authFetch2 } = makeSession("aimeat-storage.js");
+  function binding(opts) {
+    const o = opts || {};
+    const refs = o.workspaceRefs || o.workspace_refs;
+    return {
+      group_id: o.group_id || o.groupId,
+      workspace_ref: o.workspace_ref || o.workspaceRef,
+      workspace_refs: Array.isArray(refs) ? refs : void 0
+    };
+  }
   var storage = {
-    // Upload a file (File object, Blob, or base64 string)
+    // Upload a file (File object, Blob, or base64 string). opts: key, mime_type, visibility
+    // ('private' | 'owner' | 'group' | 'public' | 'workspace'), and for a shared file group_id or
+    // workspace_ref / workspaceRefs.
     async upload(fileOrData, opts) {
       let key, data, mime_type, visibility;
       if (fileOrData instanceof File || fileOrData instanceof Blob) {
@@ -82,7 +93,7 @@
       }
       const res = await authFetch2("/v1/storage", {
         method: "POST",
-        body: JSON.stringify({ key, data, mime_type, visibility })
+        body: JSON.stringify({ key, data, mime_type, visibility, ...binding(opts) })
       });
       if (!res.ok) throw new Error(res.error?.message || "Upload failed");
       return res.data;
@@ -189,7 +200,7 @@
       const totalChunks = Math.ceil(file.size / chunkSize);
       const initRes = await authFetch2("/v1/storage/upload/init", {
         method: "POST",
-        body: JSON.stringify({ key, mime_type, visibility, chunk_size: chunkSize, total_chunks: totalChunks })
+        body: JSON.stringify({ key, mime_type, visibility, chunk_size: chunkSize, total_chunks: totalChunks, ...binding(opts) })
       });
       if (!initRes.ok) throw new Error(initRes.error?.message || "Chunked upload init failed");
       const uploadId = initRes.data.upload_id;

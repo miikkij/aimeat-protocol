@@ -8,6 +8,7 @@
  * @structure
  *   - registerCoreTools() -- Registers core REST-backed connector MCP tools
  * @version-history
+ *   v1.18.0 -- 2026-09-29 -- aimeat_storage_upload forwards workspace_refs for a 'workspace' file.
  *   v1.17.2 -- 2026-09-26 -- The `resolution` description of aimeat_admin_incident_resolve names the app
  *     grants and access tokens too.
  *   v1.17.1 -- 2026-09-26 -- The `resolution` description of aimeat_admin_incident_resolve names the
@@ -386,13 +387,15 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     mime_type: z.string().optional().describe('MIME type of the file'),
     visibility: z.string().optional().describe('Access control (default: private)'),
     group_id: z.string().optional().describe('ID of sharing group (required for group visibility)'),
-  }, annotationsFor('aimeat_storage_upload'), async ({ agent_name, key, data_base64, mime_type, visibility, group_id }) => {
+    workspace_refs: z.array(z.string()).optional().describe('For visibility "workspace": the workspaces the file is shared with, each "<organismId>/<workspaceId>"'),
+  }, annotationsFor('aimeat_storage_upload'), async ({ agent_name, key, data_base64, mime_type, visibility, group_id, workspace_refs }) => {
     const { client } = pickAgent(registry, agent_name);
     // REST POST /v1/storage reads the base64 payload as `data`.
     const body: Record<string, unknown> = { key, data: data_base64 };
     if (mime_type) body.mime_type = mime_type;
     if (visibility) body.visibility = visibility;
     if (group_id) body.group_id = group_id;
+    if (workspace_refs?.length) body.workspace_refs = workspace_refs;
     const resp = await client.post('/v1/storage', body);
     return envelopeResult(resp);
   });

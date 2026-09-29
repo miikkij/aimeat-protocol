@@ -25786,12 +25786,26 @@ paths:
                 chunk_size:
                   type: integer
                 visibility:
-                  $ref: '#/components/schemas/Visibility'
+                  type: string
+                  enum: [private, owner, group, public, workspace]
                 total_chunks:
                   type: integer
+                group_id:
+                  type: string
+                  description: The group a `group` file is shared with.
+                workspace_ref:
+                  type: string
+                  description: For a `workspace` file, one or more "<organismId>/<workspaceId>" separated by spaces.
+                workspace_refs:
+                  type: array
+                  items:
+                    type: string
+                  description: For a `workspace` file, the workspaces as a list of "<organismId>/<workspaceId>".
       responses:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          description: A `workspace` file that names no workspace, refused before any chunk is sent.
         '403':
           description: >
             An anonymous principal targeted a key outside `anonymous/*`, or the key is under

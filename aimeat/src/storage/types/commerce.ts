@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Memory, action/work/wallet, boards, disputes, files, and flags record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-09-29 — ChunkedUploadRecord carries 'workspace' visibility and the group or
+ *     workspace binding, so a chunked upload lands bound like POST /v1/storage.
  *   v1.2.0 — 2026-09-09 — ListingRecord, PurchaseRecord and EscrowHoldRecord deleted with the
  *     marketplace and generic-escrow storage methods: no caller. The tables stay.
  *   v1.1.0 — 2026-07-27 — WalletTransaction.initiatorGaii: `gaii` is the payer and can only be a human,
@@ -268,7 +270,10 @@ export interface ChunkedUploadRecord {
   ownerGaii: string;
   key: string;
   mimeType: string;
-  visibility: 'private' | 'owner' | 'group' | 'public';
+  visibility: 'private' | 'owner' | 'group' | 'public' | 'workspace';
+  /** The group a 'group' file is for, and the "<organismId>/<workspaceId>" refs a 'workspace' file is for. */
+  groupId?: string;
+  workspaceRef?: string;
   chunkSize: number;
   totalChunks?: number;
   receivedChunks: Map<number, Buffer>;
