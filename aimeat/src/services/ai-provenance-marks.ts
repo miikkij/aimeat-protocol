@@ -42,6 +42,12 @@
  *   setProvenanceHeaders(res, prov);
  *   res.json(success(config.nodeId, data, hints, envelopeMeta(prov)));
  * @version-history
+ *   v1.8.0 — 2026-09-29 — The visible label is the EU icon alone on every viewport (developer
+ *     decision 2026-09-29), and its statement opens in a panel above the chip on hover, focus or a
+ *     tap, so the chip never moves (it used to jump from bottom:12px to bottom:58px and grow). The
+ *     chip has a fixed width, declared as --aimeat-mark-ai-w, and the other marks line up after it
+ *     on one row at the bottom-left. A tap elsewhere closes the panel, and opening it closes the
+ *     attribution badge's pill. It stays in the top layer: the regulation requires it.
  *   v1.7.0 — 2026-09-26 — reviewedForLabel() takes the app's real visibility (`publiclyReadable`,
  *     default true) instead of assuming public, and under a strict node policy the chip names the
  *     reviewer and shows the AI-involvement icon instead of "AI-generated". Reported by the
@@ -222,6 +228,8 @@ export const PROVENANCE_HTML_MARK = 'id="aimeat-ai-provenance"';
 
 /** The visible chip's element id. Distinct from `aimeat-app-badge` — two chips, two corners. */
 const VISIBLE_LABEL_ID = 'aimeat-ai-label';
+/** The EU icon's height in the chip, in px. The chip's width is derived from it. */
+const ICON_H = 15;
 
 function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -297,20 +305,22 @@ export function markDocumentElement(text: string, value: string): string {
  *
  * Built the same way as the aimeat.io attribution badge next to it (utils/app-badge.ts): pure static
  * markup plus a scoped `<style>`, no script, every declaration `!important` so arbitrary app CSS
- * cannot restyle a compliance mark. It sits bottom-LEFT precisely because that badge is bottom-right
- * — two fixed chips in one corner would overlay each other, and "no intervening overlay elements" is
- * a requirement of the Code, not a preference. The z-index is the maximum, so nothing an app draws
- * can cover it.
+ * cannot restyle a compliance mark. It is the FIRST mark on the node's one row at the bottom-left:
+ * it declares its width as `--aimeat-mark-ai-w`, and the attribution bolt and the install button
+ * line up after it, so no two marks overlay each other ("no intervening overlay elements" is a
+ * requirement of the Code, not a preference). The z-index is the maximum and the script below puts
+ * it in the top layer, so nothing an app draws can cover it.
  *
  * The icon is referenced by absolute URL on the serving node rather than inlined: `img-src * data:`
  * in the app CSP already permits it, a 6 KB data URI on every response would not cache, and CSS
  * background-image is governed by `img-src`. The `aria-label` carries the statement, so the mark
  * never depends on the image loading.
  *
- * On narrow viewports (<=640px) the chip is COLLAPSED by default: a compact icon-only pill on the
- * same 34px row as the attribution badge's collapsed button, expanding to the full statement on tap
- * (hidden-checkbox toggle, no extra script). One short row is the whole footprint the two marks cost
- * a phone — the strip apps keep clear via `--aimeat-chrome-bottom` (utils/app-chrome-reserve.ts).
+ * On every viewport the chip is the EU icon alone in a 34px pill (developer decision 2026-09-29; it
+ * was the phone rule since 2026-08-02). The words and the details link open in a panel ABOVE the
+ * chip on hover, on keyboard focus and on a tap, and the chip itself never moves. One short row is
+ * the whole footprint the marks cost — the strip apps keep clear via `--aimeat-chrome-bottom`
+ * (utils/app-chrome-reserve.ts).
  *
  * Returns '' when no visible label is owed — which is disclosureFor()'s decision, pre-rendered into
  * the record at mint time. Nothing here re-decides it.
@@ -328,69 +338,68 @@ function visibleLabelMarkup(p: ServedProvenance, config: AimeatConfig, locale: L
   const dark = `${base}/assets/eu-ai-icons/svg/${icon.file}_white.svg`;
   // The SVGs' own viewBox ratios. Two of the three are wide lockups, not glyphs, and a square box
   // would distort them — which the Code forbids ("proportions are preserved on resize").
-  const ratio = icon.file === 'ai-basic' ? '1 / 1'
-    : icon.file === 'ai-generated' ? '1789.84 / 566.93' : '1700.79 / 566.93';
+  const [rw, rh] = icon.file === 'ai-basic' ? [1, 1]
+    : icon.file === 'ai-generated' ? [1789.84, 566.93] : [1700.79, 566.93];
+  const ratio = icon.file === 'ai-basic' ? '1 / 1' : `${rw} / ${rh}`;
+  // The chip's width is fixed, not shrink-wrapped, because the next mark on the row is placed after
+  // it: 15px of icon height at the lockup's ratio, 10px of padding each side, a 1px border each side.
+  const chipW = Math.ceil(ICON_H * rw / rh) + 22;
 
+  // The colours as variables on the chip, so the chip and the panel above it change together in
+  // dark mode instead of each carrying its own copy of every declaration.
+  const palette = (bg: string, fg: string, line: string): string =>
+    `--aimeat-ail-bg:${bg}!important;--aimeat-ail-fg:${fg}!important;--aimeat-ail-line:${line}!important;`;
   const surface =
-    'background:#fff!important;color:#14151a!important;'
-    + 'box-shadow:0 4px 16px rgba(0,0,0,.28)!important;border:1px solid #d5d5d5!important;';
+    'background:var(--aimeat-ail-bg)!important;color:var(--aimeat-ail-fg)!important;'
+    + 'box-shadow:0 4px 16px rgba(0,0,0,.28)!important;border:1px solid var(--aimeat-ail-line)!important;';
   // `position:fixed` + the maximum z-index is the FALLBACK. The real answer is the top layer, put on
   // by the script below; both need the same box, so the rules are shared and `:popover-open` only
   // undoes the UA popover defaults (which would otherwise centre it and shrink-wrap it to nothing).
+  //
+  // THE CHIP NEVER CHANGES. On every viewport it is the EU icon in a 34px pill at the bottom-left
+  // corner, and no state of the label moves it or resizes it (developer decision 2026-09-29: the
+  // tapped label used to jump 46px up and grow, because the open statement took the chip's place).
   const box =
     'position:fixed!important;left:12px!important;bottom:12px!important;top:auto!important;right:auto!important;'
     + 'margin:0!important;inset:auto auto 12px 12px!important;'
-    + 'z-index:2147483647!important;display:inline-flex!important;align-items:center!important;'
-    + 'flex-wrap:wrap!important;gap:4px 8px!important;padding:6px 10px!important;border-radius:14px!important;'
-    + 'max-width:min(92vw,420px)!important;width:auto!important;height:auto!important;overflow:visible!important;'
-    + 'font:600 11px/1.25 system-ui,-apple-system,Segoe UI,Roboto,sans-serif!important;' + surface;
+    + 'z-index:2147483647!important;display:flex!important;align-items:center!important;justify-content:center!important;'
+    + `width:${chipW}px!important;height:34px!important;box-sizing:border-box!important;padding:0 10px!important;`
+    + 'border-radius:9999px!important;overflow:visible!important;'
+    + 'font:600 13px/1.35 system-ui,-apple-system,Segoe UI,Roboto,sans-serif!important;' + palette('#fff', '#14151a', '#d5d5d5') + surface;
+  const panel = `#${VISIBLE_LABEL_ID}>span`;
   const css =
-    `#${VISIBLE_LABEL_ID}{${box}}`
+    // The next mark on the row (the attribution bolt, then the install button) starts after this.
+    `:root{--aimeat-mark-ai-w:${chipW + 8}px}`
+    + `#${VISIBLE_LABEL_ID}{${box}}`
     + `#${VISIBLE_LABEL_ID}:popover-open{${box}}`
-    + `#${VISIBLE_LABEL_ID} i{display:block!important;flex:0 0 auto!important;height:18px!important;width:auto!important;`
+    + `#${VISIBLE_LABEL_ID} i{display:block!important;flex:0 0 auto!important;height:${ICON_H}px!important;width:auto!important;`
     + `aspect-ratio:${ratio}!important;background:url("${esc(light)}") center/contain no-repeat!important}`
+    // THE STATEMENT, the interactive second layer the Code encourages: the words and the details
+    // link, in a panel that opens ABOVE the chip, left edge on the chip's left edge. Closed, it is
+    // visually hidden rather than display:none, so a screen reader reads the statement at all
+    // times and the link stays in the tab order (tabbing to it opens the panel).
+    + `${panel}{position:absolute!important;left:-1px!important;bottom:100%!important;width:1px!important;height:1px!important;`
+    + 'margin:0!important;padding:0!important;border:0!important;overflow:hidden!important;clip-path:inset(50%)!important;white-space:nowrap!important}'
+    + `#${VISIBLE_LABEL_ID}:hover>span,#${VISIBLE_LABEL_ID}:focus-within>span,#${VISIBLE_LABEL_ID} input:checked~span`
+    + '{bottom:calc(100% + 6px)!important;display:flex!important;flex-wrap:wrap!important;align-items:baseline!important;'
+    + 'gap:4px 10px!important;width:max-content!important;max-width:min(420px,calc(100vw - 24px))!important;height:auto!important;'
+    + 'box-sizing:border-box!important;padding:10px 14px!important;border-radius:14px!important;overflow:visible!important;'
+    + `clip-path:none!important;white-space:normal!important;${surface}}`
+    // The 6px between the panel and the chip, made hoverable, so the pointer can reach the link.
+    + `${panel}::after{content:""!important;position:absolute!important;left:0!important;right:0!important;top:100%!important;height:8px!important}`
     + `#${VISIBLE_LABEL_ID} b{font-weight:600!important;overflow-wrap:anywhere!important}`
-    // The link is the interactive second layer the Code encourages, so it survives every viewport:
-    // the chip WRAPS on a narrow screen instead of dropping it. An earlier version hid it below
-    // 520px, which removed the second layer on the commonest viewport there is.
     + `#${VISIBLE_LABEL_ID} a{color:inherit!important;opacity:.8!important;font-weight:500!important;`
     + 'text-decoration:underline!important}'
-    // The mobile toggle plumbing, inert on wide viewports: a visually-hidden (never display:none —
-    // keyboard a11y) checkbox plus its tap-target label. Same CSS-only mechanism as the attribution
-    // badge next door — the only way to get tap-to-expand without another script.
+    // The toggle plumbing: a visually-hidden (never display:none — keyboard a11y) checkbox plus a
+    // tap target over the chip. A touch screen has no hover to hold the panel open, so a tap does.
     + `#${VISIBLE_LABEL_ID} input{position:absolute!important;width:1px!important;height:1px!important;`
     + 'margin:0!important;opacity:0!important;pointer-events:none!important}'
-    + `#${VISIBLE_LABEL_ID} label{display:none!important}`
+    + `#${VISIBLE_LABEL_ID} label{display:block!important;position:absolute!important;inset:0!important;`
+    + 'margin:0!important;cursor:pointer!important;border-radius:inherit!important;z-index:2!important}'
     + `#${VISIBLE_LABEL_ID} input:focus-visible~label{outline:2px solid var(--color-primary,#E8564A)!important;outline-offset:2px!important}`
     + '@media (prefers-color-scheme:dark){'
-    + `#${VISIBLE_LABEL_ID}{background:#14151a!important;color:#fff!important;border-color:#3a3a44!important}`
-    + `#${VISIBLE_LABEL_ID}:popover-open{background:#14151a!important;color:#fff!important;border-color:#3a3a44!important}`
+    + `#${VISIBLE_LABEL_ID},#${VISIBLE_LABEL_ID}:popover-open{${palette('#14151a', '#fff', '#3a3a44')}}`
     + `#${VISIBLE_LABEL_ID} i{background-image:url("${esc(dark)}")!important}`
-    + '}'
-    // Narrow viewports: COLLAPSED by default — a compact pill carrying only the EU icon, on the SAME
-    // 34px row as the attribution badge's collapsed ⚡ button (bottom:12), so together the two marks
-    // occupy one short strip instead of two stacked rows eating the app's bottom. An earlier version
-    // parked the full-text chip on its own row at bottom:58px, which cost ~90px of every phone
-    // viewport and still collided with app dialogs (Oma talo, 2026-08-02). The icon is the official
-    // Art. 50 mark, so the disclosure stays visible at all times; tapping expands the FULL statement
-    // (icon + text + details link, larger type than the old always-on chip) on the row above, which
-    // is the interactive second layer the Code encourages. The label overlay toggles it closed from
-    // anywhere on the panel; the details link sits above the overlay so it stays clickable.
-    + `@media (max-width:640px){`
-    + `#${VISIBLE_LABEL_ID},#${VISIBLE_LABEL_ID}:popover-open`
-    + '{bottom:12px!important;inset:auto auto 12px 12px!important;height:34px!important;'
-    + 'padding:0 10px!important;border-radius:9999px!important;flex-wrap:nowrap!important;box-sizing:border-box!important}'
-    + `#${VISIBLE_LABEL_ID} label{display:block!important;position:absolute!important;inset:0!important;`
-    + 'cursor:pointer!important;border-radius:inherit!important;z-index:2!important}'
-    + `#${VISIBLE_LABEL_ID} i{height:15px!important}`
-    + `#${VISIBLE_LABEL_ID} b,#${VISIBLE_LABEL_ID} a{display:none!important}`
-    + `#${VISIBLE_LABEL_ID}:has(input:checked),#${VISIBLE_LABEL_ID}:has(input:checked):popover-open`
-    + '{bottom:58px!important;inset:auto auto 58px 12px!important;height:auto!important;'
-    + 'padding:10px 14px!important;border-radius:14px!important;flex-wrap:wrap!important;'
-    + 'font-size:13px!important;line-height:1.35!important}'
-    + `#${VISIBLE_LABEL_ID}:has(input:checked) i{height:20px!important}`
-    + `#${VISIBLE_LABEL_ID}:has(input:checked) b{display:inline!important}`
-    + `#${VISIBLE_LABEL_ID}:has(input:checked) a{display:inline!important;position:relative!important;z-index:3!important}`
     + '}';
 
   // THE TOP LAYER, AND WHY IT NEEDS THREE LINES OF SCRIPT. The Code requires the mark to sit "where
@@ -415,9 +424,21 @@ function visibleLabelMarkup(p: ServedProvenance, config: AimeatConfig, locale: L
   // re-showing mutates the element, which re-triggers the observer, which is a repaint loop for as
   // long as the dialog stays open. The two conditions below both become false after one repair, so
   // this cannot spin.
+  //
+  // TWO MORE LINES, FOR THE TAPPED PANELS. A tap opens this label's statement or the attribution
+  // badge's pill, and both open above the same row, so opening one closes the other; a tap anywhere
+  // else closes both, as a touch reader expects of anything that opened on a tap. Only the
+  // checkboxes change, never the elements, so the observer below does not see it.
+  const tapIds = `var A=${JSON.stringify(`${VISIBLE_LABEL_ID}-open`)},B="aimeat-app-badge-open";`;
   const script =
     `(function(){var e=document.getElementById(${JSON.stringify(VISIBLE_LABEL_ID)});`
-    + 'if(!e||typeof e.showPopover!=="function")return;'
+    + 'if(!e)return;' + tapIds
+    + 'function g(i){return document.getElementById(i);}'
+    + 'document.addEventListener("change",function(v){var t=v.target,o=t&&t.id===A?B:t&&t.id===B?A:"";'
+    + 'if(o&&t.checked){var x=g(o);if(x)x.checked=false;}},true);'
+    + 'document.addEventListener("pointerdown",function(v){[[A,e],[B,g("aimeat-app-badge")]].forEach(function(p){'
+    + 'var x=g(p[0]);if(x&&x.checked&&p[1]&&!p[1].contains(v.target))x.checked=false;});},true);'
+    + 'if(typeof e.showPopover!=="function")return;'
     + 'var q=0;function up(){q=0;'
     + 'if(!e.isConnected){try{document.body.appendChild(e);}catch(_){return;}}'
     + 'try{e.popover="manual";if(!e.matches(":popover-open"))e.showPopover();}catch(_){}}'
@@ -435,8 +456,9 @@ function visibleLabelMarkup(p: ServedProvenance, config: AimeatConfig, locale: L
     + `<input type="checkbox" id="${VISIBLE_LABEL_ID}-open">`
     + `<label for="${VISIBLE_LABEL_ID}-open" aria-label="${escAscii(t('aiLabel.expand'))}"></label>`
     + `<i role="img" aria-label="${escAscii(alt)}"></i>`
-    + `<b>${escAscii(short)}</b>`
-    + `<a href="${esc(p.recordUrl)}" target="_blank" rel="noopener noreferrer">${escAscii(t('aiLabel.detailsLink'))}</a>`
+    // A span, never a div: the publish strip finds the end of this block at its first `</div>`.
+    + `<span><b>${escAscii(short)}</b>`
+    + `<a href="${esc(p.recordUrl)}" target="_blank" rel="noopener noreferrer">${escAscii(t('aiLabel.detailsLink'))}</a></span>`
     + `</div><script>${script}</script>`;
 }
 

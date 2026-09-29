@@ -55,6 +55,8 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.59.1 — 2026-09-29 — No script changed: the stylesheet's version, for the node's marks on
+ *     one row at the bottom-left (aimeat-atelier.css v0.59.1).
  *   v0.59.0 — 2026-09-29 — Every layer the kit puts on the body (a dialog, a drawer, a menu, a
  *     popover, a tooltip, a toast, the palette, a tour note, the lightbox, a leaving row's ghost)
  *     wears the look of the element it came from or of the page's app (dom.js wearLook). A look's
@@ -409,7 +411,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.59.0',
+  version: '0.59.1',
 
   /**
    * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's

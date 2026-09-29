@@ -15,6 +15,9 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-09-29 — The bottom-chrome paragraph says where the marks are now (one row at the bottom-left,
+ *     the developer's decision of 2026-09-29) and the fallback height they take (46px, was 56px).
+ *     Nothing else in the paragraph changed.
  *   2026-09-29 — ADDITIVE, one paragraph ending Data Storage on classified content (TARGET-082 V5). To stay
  *     under 800 lines, the provenance paragraph before it and the section "Reading data your AGENTS
  *     produced" moved verbatim to build-app-prompt-content.ts; the prompt text is unchanged there.
@@ -615,19 +618,19 @@ function composeAppPrompt(
   body += '- **A game that needs continuous direction** uses `AIMEAT.input.pad(host, { onChange })`, a virtual thumbstick whose vector WASD and the arrow keys also drive. Read `pad.value()` from the game loop.\n';
   body += '- **Verify with a real touch:** every interactive element measures at least 44x44 CSS px, and a tap handler runs ONCE (log a counter and tap once — two entries means a hand-rolled touch listener is still there).\n\n';
 
-  // The reserved bottom strip. Two fixed node marks (the AI-disclosure label bottom-left, the
-  // aimeat.io attribution badge bottom-right) ride every served app and always win the paint, so an
+  // The reserved bottom strip. Fixed node marks (the AI-disclosure label and the aimeat.io
+  // attribution badge, one row at the bottom-left) ride every served app and always win the paint, so an
   // app's own fixed bottom bar ends up covered unless it lifts itself clear. The node publishes the
   // strip height as --aimeat-chrome-bottom (utils/app-chrome-reserve.ts via app-serve-marks.ts);
   // this section is the app-side half of that contract. (Oma talo stats bar under both marks at
   // 390px, 2026-08-02.)
   body += '### The node\'s bottom chrome strip — lift your bottom UI clear of it\n';
-  body += 'Every served app carries two permanent marks fixed to the bottom corners: the AI-disclosure label (bottom-left; on phones a compact icon pill that expands on tap) and the aimeat.io attribution badge (bottom-right). They are node chrome, they always paint on top, and they stay — so design the bottom edge of the app as RESERVED. The node tells you exactly how much: at serve time it sets `--aimeat-chrome-bottom` on `:root` (one strip height in px, every viewport). Read the variable rather than hardcoding numbers, and give it a fallback matching the current geometry (56px) so a locally previewed file lays out correctly too:\n';
+  body += 'Every served app carries permanent marks on one row fixed to the bottom-left corner: the AI-disclosure label (a compact icon pill whose statement opens above it on hover or tap) and the aimeat.io attribution badge (a small round button beside it). They are node chrome, they always paint on top, and they stay — so design the bottom edge of the app as RESERVED. The node tells you exactly how much: at serve time it sets `--aimeat-chrome-bottom` on `:root` (one strip height in px, every viewport). Read the variable rather than hardcoding numbers, and give it a fallback matching the current geometry (46px) so a locally previewed file lays out correctly too:\n';
   body += '```css\n';
   body += '/* Fixed/sticky bottom bars sit ABOVE the strip */\n';
-  body += '.bottom-bar { bottom: var(--aimeat-chrome-bottom, 56px); }\n';
+  body += '.bottom-bar { bottom: var(--aimeat-chrome-bottom, 46px); }\n';
   body += '/* Scroll containers pad past it so the last row is reachable */\n';
-  body += '.scroll-area { padding-bottom: calc(var(--aimeat-chrome-bottom, 56px) + 12px); }\n';
+  body += '.scroll-area { padding-bottom: calc(var(--aimeat-chrome-bottom, 46px) + 12px); }\n';
   body += '```\n';
   body += 'The same applies to full-screen focused views: give their bottom input row the same `padding-bottom`. When the node\'s chrome geometry changes, the served variable overrides your fallback automatically — that is the point of reading it.\n\n';
 

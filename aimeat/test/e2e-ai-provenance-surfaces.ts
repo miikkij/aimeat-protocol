@@ -15,6 +15,9 @@
  * @structure owner + agent setup · agent publishes an app · four fetches · serve-time HTML
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ai-provenance-surfaces
  * @version-history
+ *   v1.3.0 — 2026-09-29 — The marks share one row at the bottom-left: the label declares its width
+ *     and the bolt is placed after it, and the tapped statement opens above the chip while the chip
+ *     stays put (was: the whole label moved to bottom:58px on a narrow viewport).
  *   v1.2.0 — 2026-08-12 — The viewport half of the top-layer test now asserts the rule instead of
  *     one spelling of the CSS. It had been failing since the mobile presentation changed on
  *     2026-08-03 (ai-provenance-marks.ts v1.5.0, which updated the golden fixture but not this
@@ -279,8 +282,12 @@ const APP_HTML = [
         assert(html.includes('aspect-ratio:1789.84 / 566.93'), 'the lockup aspect ratio is not preserved');
         assert(/aria-label="[^"]+"/.test(html), 'the icon carries no aria-label');
         assert(html.includes('AI-generated'), 'the plain-language text beside the icon is absent');
-        // It must not collide with the aimeat.io attribution badge, which is bottom-RIGHT.
-        assert(html.includes('left:12px!important'), 'the label is not placed clear of the attribution badge');
+        // It is the first mark on the node's one row at the bottom-left, and it declares its width so
+        // the aimeat.io attribution bolt lines up after it instead of on top of it.
+        assert(html.includes('left:12px!important'), 'the label is not at the start of the marks row');
+        assert(/--aimeat-mark-ai-w:\d+px/.test(html), 'the label does not declare its width, so the bolt would sit on it');
+        assert(html.includes('left:calc(12px + var(--aimeat-mark-ai-w,0px))!important'),
+            'the attribution bolt is not placed after the label');
         assert(html.includes('id="aimeat-app-badge"'), 'the attribution badge went missing');
         // And it must still not have landed inside the app's own JavaScript.
         assert(html.includes('const trap = "</" + "body>";'), 'the app script was corrupted by injection');
@@ -301,15 +308,10 @@ const APP_HTML = [
         assert(!/<div id="aimeat-ai-label"[^>]*\spopover[=\s>]/.test(html),
             'a hard-coded popover attribute would hide the label whenever the script is blocked');
         // WHAT "SURVIVES EVERY VIEWPORT" MEANS, and why it is not "nothing is ever collapsed".
-        // A viewport of 640px or less shows the EU icon alone, on the same 34px row as the aimeat.io
-        // attribution badge, and moves the words plus the details link behind one tap (developer
-        // decision 2026-08-02, after the always-expanded chip collided with an app dialog in Oma
-        // talo). Measured in a browser on 2026-08-12 against this served document: at 390x844 the
-        // collapsed pill is 69x34 at x=12 carrying the official 47x15 lockup, the badge button is
-        // 36x36 at x=328, and the two do not overlap; one tap gives a 301x42 panel at bottom:58px
-        // whose link is 114x18 and hit-tests as the topmost element, so it is clickable through the
-        // toggle overlay. At 320x568, 642x800 and 1280x460 the mark is inside the viewport with no
-        // overflow, and above 640px the words and the link are on screen without any tap.
+        // Every viewport shows the EU icon alone, in a 34px chip at the start of the marks row, and
+        // keeps the words plus the details link in a panel that opens above the chip on hover, on
+        // keyboard focus and on a tap (developer decision 2026-09-29; the phone rule since
+        // 2026-08-02, after the always-expanded chip collided with an app dialog in Oma talo).
         //
         // So the standing rules are: the MARK itself is never hidden at any viewport, anything
         // collapsed away has a state that brings it back, and the control that opens it is reachable
@@ -340,12 +342,18 @@ const APP_HTML = [
         assert(html.includes('<input type="checkbox" id="aimeat-ai-label-open">')
             && /<label for="aimeat-ai-label-open"[^>]*aria-label="[^"]+"/.test(html),
             'the tap-to-expand control lost its markup, so the collapsed pill cannot be opened at all');
-        // The EXPANDED panel moves off the bottom row rather than covering the attribution badge,
-        // which is the other overlay element the Code asks for spacing from.
-        const narrow = rules.filter((r) => r.at === '@media (max-width:640px)');
-        assert(narrow.length > 0, 'the narrow-viewport rules are gone — the two marks would fight over one corner');
-        assert(narrow.some((r) => r.selectors.some((s) => s.includes(':has(input:checked)')) && /bottom:58px/.test(r.decls)),
-            'the expanded label sits on the attribution badge row on a narrow viewport');
+        // The statement opens ABOVE the chip, off the marks row, and the chip itself never moves:
+        // until 2026-09-29 a tap moved the whole label from bottom:12px to bottom:58px and grew it,
+        // which read as the mark jumping. So no rule may give the chip a different bottom edge, and
+        // the open panel is placed against the chip's top edge.
+        // A selector for the chip itself in an opened state: `#aimeat-ai-label` plus only state pseudo-classes.
+        const OPENED_CHIP = /^#aimeat-ai-label(?::popover-open)?(?::hover|:focus-within|:has\(input:checked\))+(?::popover-open)?$/;
+        const chipMoves = rules.filter((r) => r.selectors.some((s) => OPENED_CHIP.test(s)) && /bottom\s*:/.test(r.decls));
+        assert(chipMoves.length === 0, `the chip moves when it opens (${chipMoves[0]?.selectors.join(', ')})`);
+        assert(rules.some((r) => r.selectors.some((s) => s.includes('input:checked~span')) && /bottom:calc\(100% \+ 6px\)/.test(r.decls)),
+            'the tapped statement does not open above the chip');
+        assert(rules.some((r) => r.selectors.some((s) => s.includes(':hover>span')) && r.selectors.some((s) => s.includes(':focus-within>span'))),
+            'the statement does not open on hover and on keyboard focus');
     });
 
     await test('The visible label follows Accept-Language — the Finnish reader gets Finnish', async () => {
