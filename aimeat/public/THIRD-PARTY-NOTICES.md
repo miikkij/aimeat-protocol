@@ -316,7 +316,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [fast-levenshtein](https://github.com/hiddentao/fast-levenshtein#readme) | 2.0.6 | MIT |
 | [fast-string-truncated-width](https://github.com/fabiospampinato/fast-string-truncated-width#readme) | 3.0.3 | MIT |
 | [fast-string-width](https://github.com/fabiospampinato/fast-string-width#readme) | 3.0.2 | MIT |
-| [fast-uri](https://github.com/fastify/fast-uri) | 4.1.3 | BSD-3-Clause |
+| [fast-uri](https://github.com/fastify/fast-uri) | 3.1.8 | BSD-3-Clause |
 | [fast-wrap-ansi](https://github.com/43081j/fast-wrap-ansi#readme) | 0.2.2 | MIT |
 | [fecha](https://github.com/taylorhakes/fecha) | 4.2.3 | MIT |
 | [file-uri-to-path](https://github.com/TooTallNate/file-uri-to-path) | 1.0.0 | MIT |
@@ -545,8 +545,8 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [type-check](https://github.com/gkz/type-check) | 0.3.2 | MIT |
 | [type-is](https://github.com/jshttp/type-is#readme) | 2.1.0 | MIT |
 | [undici-types](https://undici.nodejs.org) | 7.24.6 | MIT |
+| [undici](https://undici.nodejs.org) | 6.29.0 | MIT |
 | [undici](https://undici.nodejs.org) | 7.30.0 | MIT |
-| [undici](https://undici.nodejs.org) | 8.10.0 | MIT |
 | [unicode-properties](https://github.com/devongovett/unicode-properties) | 1.4.1 | MIT |
 | [unicode-trie](https://github.com/devongovett/unicode-trie) | 2.0.0 | MIT |
 | [unpdf](https://github.com/unjs/unpdf#readme) | 1.8.1 | MIT |
@@ -6108,7 +6108,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-### fast-uri 4.1.3
+### fast-uri 3.1.8
 
 ```text
 Copyright (c) 2011-2021, Gary Court until https://github.com/garycourt/uri-js/commit/a1acf730b4bba3f1097c9f52e7d9d3aba8cdcaae
@@ -12278,7 +12278,7 @@ If the Work includes a "NOTICE" text file as part of its distribution, then any 
 END OF TERMS AND CONDITIONS
 ```
 
-### undici-types 7.24.6, undici 7.30.0, undici 8.10.0
+### undici-types 7.24.6, undici 6.29.0, undici 7.30.0
 
 ```text
 MIT License
