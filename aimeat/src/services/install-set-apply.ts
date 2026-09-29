@@ -32,6 +32,8 @@
  * @usage
  *   const out = await applyInstallSet({ storage, config, peers }, { installSet, secrets, dryRun: true });
  * @version-history
+ *   v1.2.0 — 2026-09-29 — The record keeps the accounts the set created (`accounts_created`) and the
+ *     ones sent the welcome sign-in link (`welcomed`); a finished apply mails the rest.
  *   v1.1.0 — 2026-09-29 — The apply's pulls say they come from an install set, so the named repository
  *     is reached with package federation off (install-set-trust.ts); NS_INSTALL_SETS moved there.
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 4).
@@ -41,7 +43,7 @@ import type { Storage, PackageRecord, PackageComponent, InstalledComponent } fro
 import type { Scheduler } from './scheduler.js';
 import type { PeerInfo } from './federation.js';
 import { parseInstallSet, parseGroupConfig, bundleOfComponents, type InstallSet, type InstallBundle, type BundlePackage } from './install-set-spec.js';
-import { checkOwner, ensureOwner, joinMember, type MemberOutcome, type CreatedOrganisms } from './install-set-people.js';
+import { checkOwner, ensureOwner, joinMember, welcomeCreated, type MemberOutcome, type CreatedOrganisms } from './install-set-people.js';
 import { installPackage, type PackageInstallCaller, type PackageInstallPreview } from './package-install.js';
 import { pullPackage } from './package-pull.js';
 import { getPackageFor } from './package-read.js';
@@ -83,6 +85,9 @@ export interface AppliedRecord {
     members: Record<string, MemberOutcome>;
     agents: Record<string, AgentStep>;
     secrets_given: string[];
+    /** Emails of the accounts this set created, and of those already sent the welcome sign-in link. */
+    accounts_created?: string[];
+    welcomed?: string[];
     applied_by: string;
     created_at: string;
     applied_at: string;
@@ -313,18 +318,28 @@ export async function applyInstallSet(deps: ApplyDeps, input: ApplyInput): Promi
     record.runs += 1;
     record.secrets_given = [...new Set([...record.secrets_given, ...Object.entries(secrets).flatMap(([g, comps]) =>
         Object.entries(comps).flatMap(([c, fields]) => Object.keys(fields).map(f => `${g}/${c}/${f}`)))])];
+    const created = new Set(record.accounts_created ?? []);
+    if (owner.created) created.add(set.owner.email.toLowerCase());
 
     // A step that fails part-way stops the apply, and what was made before it is still recorded, so
     // applying the set again continues from there instead of making it twice.
     try {
         await installPackages(deps, set, bundle, remote, secrets, record);
         await createOrganisms(deps, set, bundle, record);
-        for (const user of set.members) record.members[user.email.toLowerCase()] = await joinMember(storage, config, ownerName, user, record.organisms);
+        for (const user of set.members) {
+            const outcome = await joinMember(storage, config, ownerName, user, record.organisms);
+            record.members[user.email.toLowerCase()] = outcome;
+            if (outcome.created) created.add(user.email.toLowerCase());
+        }
         await deployAgents(deps, bundle, record);
     } catch (err) {
+        record.accounts_created = [...created];
         await writeRecord(storage, key, record);
         return { ok: false, status: 500, code: 'APPLY_FAILED', message: `The set was applied in part: ${String(err instanceof Error ? err.message : err)}. What was made is recorded, and applying the set again continues from there.` };
     }
+    // The welcome goes out once everything the person was given exists.
+    record.accounts_created = [...created];
+    record.welcomed = [...(record.welcomed ?? []), ...await welcomeCreated(storage, config, record.accounts_created, record.welcomed ?? [])];
     await writeRecord(storage, key, record);
     return { ok: true, dry_run: false, record, owner_created: owner.created };
 }

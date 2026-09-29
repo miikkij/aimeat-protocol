@@ -32581,7 +32581,9 @@ paths:
       description: |
         Request a magic link to be sent to the specified email address.
         Always returns 200 to prevent email enumeration attacks.
-        If the email is registered, a magic link is sent.
+        If the email is registered, a magic link is sent. The link in the
+        mail is GET /v1/ghii/magic-link/open, the browser endpoint; it is
+        valid for 15 minutes and works once.
       tags: [GHII-Web]
       requestBody:
         required: true
@@ -32608,6 +32610,39 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
 
+  /v1/ghii/magic-link/open:
+    get:
+      operationId: ghiiMagicLinkOpen
+      summary: Sign in with an emailed link, in a browser
+      description: |
+        The address a sign-in link in an email points at: the link sent on
+        request (POST /v1/ghii/magic-link, 15 minutes) and the welcome link
+        sent to an account an install set created (7 days). It checks the
+        token, spends it, marks the email verified, opens an owner session
+        (the httpOnly refresh cookie, as a Google or Entra sign-in does)
+        and redirects to the node's front page, where the app starts signed
+        in. A refused link redirects to the front page with
+        `auth_error=INVALID_TOKEN`, `EXPIRED` or `ACCOUNT_DISABLED`, and a
+        refusal does not spend the token. For a program that wants an agent
+        token instead, GET /v1/ghii/magic-link/verify takes the same token.
+      tags: [GHII-Web]
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Sign-in link token from the email
+      responses:
+        '302':
+          description: Redirect to the front page; on success with the refresh cookie set, on refusal with `auth_error`
+          headers:
+            Location:
+              schema:
+                type: string
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
   /v1/ghii/magic-link/verify:
     get:
       operationId: ghiiMagicLinkVerify
@@ -32615,7 +32650,9 @@ paths:
       description: |
         Verify a magic link token from the email. Returns the GHII and
         a JWT session token on success. The token is single-use and expires
-        after a short period.
+        after a short period. The emailed link points at the browser
+        endpoint GET /v1/ghii/magic-link/open; this endpoint is for a
+        program that holds the token.
       tags: [GHII-Web]
       parameters:
         - name: token

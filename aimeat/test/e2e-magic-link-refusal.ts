@@ -26,6 +26,9 @@
  *   `E2E_MAGIC_LINK_PORT` moves it (default 40289, with the SMTP sink one port above).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=magic-link-refusal
  * @version-history
+ *   v1.1.0 — 2026-09-29 — The emailed link is GET /v1/ghii/magic-link/open, the browser endpoint; it
+ *     is refused for a deactivated account before it spends the token, and the API endpoint's
+ *     refusal is still asked with the same token.
  *   v1.0.0 — 2026-09-06 — Written with the fix for review item 2.5.
  */
 import { createServer, type Server, type Socket } from 'node:net';
@@ -281,14 +284,23 @@ async function run() {
         inbox.length = 0;
         const r = await json('/v1/ghii/magic-link', { method: 'POST', body: JSON.stringify({ email: victimEmail }) });
         assert(r.status === 200, `magic-link ${r.status}`);
-        const mail = await waitForMail(victimEmail, /magic-link\/verify\?token=/);
-        magicToken = /magic-link\/verify\?token=([a-f0-9]+)/.exec(mail)![1];
+        const mail = await waitForMail(victimEmail, /magic-link\/open\?token=/);
+        magicToken = /magic-link\/open\?token=([a-f0-9]+)/.exec(mail)![1];
         assert(magicToken.length === 64, `token looks wrong: ${magicToken}`);
     });
 
     await test('setup: the operator deactivates the account', async () => {
         const r = await json(`/v1/admin/owners/${victimName}/disable`, { method: 'POST', headers: bearer(opToken) });
         assert(r.status === 200, `disable ${r.status}: ${JSON.stringify(r.body).slice(0, 300)}`);
+    });
+
+    await test('the emailed link, opened in a browser, is refused for a deactivated account and opens no session', async () => {
+        const r = await fetch(`${BASE}/v1/ghii/magic-link/open?token=${magicToken}`, { redirect: 'manual' });
+        assert(r.status === 302 && r.headers.get('location') === `${BASE}/?auth_error=ACCOUNT_DISABLED`,
+            `expected a redirect naming ACCOUNT_DISABLED, got ${r.status} ${r.headers.get('location')}`);
+        assert(!r.headers.getSetCookie().some(c => c.startsWith('aimeat_rt=') && !/aimeat_rt=;/.test(c)), 'no session cookie may be set');
+        // The token is not spent by a refusal: the API endpoint below still answers ACCOUNT_DISABLED,
+        // not INVALID_TOKEN.
     });
 
     // ── The finding ──
@@ -332,7 +344,7 @@ async function run() {
         inbox.length = 0;
         const r = await json('/v1/ghii/magic-link', { method: 'POST', body: JSON.stringify({ email: victimEmail }) });
         assert(r.status === 200, `magic-link ${r.status}`);
-        const mail = await waitForMail(victimEmail, /magic-link\/verify\?token=/);
+        const mail = await waitForMail(victimEmail, /magic-link\/open\?token=/);
         assert(/token=[a-f0-9]{64}/.test(mail), 'the link must carry a token');
     });
 
