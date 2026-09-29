@@ -5,6 +5,7 @@
  *   henkilötunnus. The negatives matter as much: a date, a time, a price, a Y-tunnus, a year range,
  *   a bad IBAN checksum and a bad hetu check character must all reach the model unchanged.
  * @version-history
+ *   v1.1.0 — 2026-09-29 — Object keys are scrubbed; the report names the allowed classes.
  *   v1.0.0 — 2026-09-19 — TARGET-080 Module A, initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -50,7 +51,15 @@ describe('contact record (CADENCE shape)', () => {
     expect(sc.report()).toEqual({
       removed: { email: 1, phone: 2, hetu: 0, iban: 0, address: 1, person: 2 },
       total: 6,
+      allowed: [],
     });
+  });
+
+  it('scrubs object keys as well as values (an object keyed by address sent its keys out)', () => {
+    const sc = createScrubber();
+    const out = sc.value({ 'jounimiikki@gmail.com': { text: 'This was sent to jounimiikki@gmail.com' } }) as Record<string, { text: string }>;
+    expect(Object.keys(out)).toEqual(['[EMAIL_1]']);
+    expect(out['[EMAIL_1]'].text).toBe('This was sent to [EMAIL_1]');
   });
 
   it('learns hinted names before scrubbing, even when the mention comes first', () => {
@@ -68,6 +77,8 @@ describe('contact record (CADENCE shape)', () => {
     expect(out.name).toBe(record.name);
     expect(out.phone).toBe('[PHONE_1]');
     expect(sc.report().removed.email).toBe(0);
+    // "0 removed" says why: the owner let e-mails through (incident 2026-09-27).
+    expect(sc.report().allowed.sort()).toEqual(['email', 'person']);
   });
 });
 
@@ -174,7 +185,10 @@ describe('stability, restore and mapping', () => {
     const sc = createScrubber({ knownNames: ['Aino Mäkelä', 'Liisa Korhonen'] });
     const criteria = sc.value({ 'Aino Mäkelä': 'account owner', 'Liisa Korhonen': null });
     const keys = Object.keys(criteria);
-    expect(keys).toEqual(['Aino Mäkelä', 'Liisa Korhonen']); // keys are field names, kept
+    // Keys leave the node too. This line asserted they were kept until 2026-09-29, which is the
+    // defect the TARGET-082 spec named (scrub.ts left object keys alone): the source was broken.
+    expect(keys).toEqual(['[PERSON_1]', '[PERSON_2]']);
+    expect(keys.map(k => sc.restore(k))).toEqual(['Aino Mäkelä', 'Liisa Korhonen']);
     const opt = sc.text('Liisa Korhonen');
     expect(sc.mapping().get(opt)).toBe('Liisa Korhonen');
     expect(sc.restore(`${opt} and [PERSON_9]`)).toBe('Liisa Korhonen and [PERSON_9]');

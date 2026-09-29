@@ -56,6 +56,7 @@
  *   const r = await decideForOwner(storage, config, { gaii, principal, appId, isOwner }, { state, questions });
  *   const g = await decideForOwner(storage, config, caller, { state, rule: 'send-reply' });
  * @version-history
+ *   v1.4.2 — 2026-09-29 — The decision's scrub record names the classes the owner allowed through.
  *   v1.4.1 — 2026-09-26 — A provider answer past the outbound ceiling (JEV_TOO_LARGE) is PROVIDER_ERROR
  *     502 with the client's sentence, which names the provider and the 4 MB limit (secaudit 2026-09, N3).
  *   v1.4.0 — 2026-09-25 — reviewDecision takes the reviewer as a principal and whether it is the
@@ -420,7 +421,7 @@ export async function decideForOwner(
   });
   const state = scrubber ? scrubber.value(input.state) : input.state;
   const { sent, optionBack } = scrubQuestions(questions, scrubber);
-  const scrubReport = scrubber ? scrubber.report() : { removed: {}, total: 0 };
+  const scrubReport = scrubber ? scrubber.report() : { removed: {}, total: 0, allowed: [] };
 
   const model = provider.model;
   const stateJson = canonicalJson(state);
@@ -438,7 +439,9 @@ export async function decideForOwner(
     spec: 'aimeat.decision/v1' as const, provider: provider.id, providerKind: provider.kind,
     questions: sent as Record<string, AiDecisionQuestion>,
     thresholds: input.thresholds ?? null, gates: input.gates ?? null, subject: input.subject ?? null,
-    stateHash, scrub: { removed: scrubReport.removed as Record<string, number>, total: scrubReport.total },
+    // `allowed` names the classes the owner let through, so "0 removed" is not read as "none
+    // found" (incident 2026-09-27: an address left while the record said nothing was removed).
+    stateHash, scrub: { removed: scrubReport.removed as Record<string, number>, total: scrubReport.total, allowed: scrubReport.allowed },
     ...(policy.storeState ? { scrubbedState: state } : {}),
     ...(rule ? { bands: rule.bands } : {}),
   };
