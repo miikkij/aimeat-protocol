@@ -17,7 +17,7 @@
  *   WARNINGS. Content with a warning classification carries classificationWarning when it reaches
  *   an AI reader; warningOf() and renderWarning() read it (warning.js). Content hidden from AI reads
  *   as absent to an AI, and an AI call that names it by key fails with the code CLASSIFIED.
- * @structure labelsError · call · targetParams · get · set · review · policy · audit · scan ·
+ * @structure labelsError · call · targetParams · get · set · review · policy · audit · list · scan ·
  *   isClassified · warningOf / renderWarning (warning.js) · attach('labels', …)
  * @usage
  *   <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-labels.js"></script>
@@ -25,6 +25,9 @@
  *   await AIMEAT.labels.set({ key: 'notes.2026-09', label: picked });   // from the person's own pick
  *   AIMEAT.labels.renderWarning(item, cardEl);
  * @version-history
+ *   v1.1.0 - 2026-09-29 - list(): the classifications on the person's content, and the items where a
+ *     suggestion waits (GET /v1/classification/labels). A target takes owner: the agent or app of
+ *     the person that holds the key.
  *   v1.0.0 - 2026-09-29 - Initial (TARGET-082 V5).
  */
 import { makeSession } from '../_core/session.js';
@@ -101,8 +104,9 @@ function query(params) {
  * What a piece of content is, in the node's field names.
  * A string is a memory key. { key } is a memory key (an organism workspace key included);
  * { kind: 'file', key } is a stored file; a row is { row: { organismId, ws, space, rowId } } or the
- * same fields with kind: 'row'.
- * @typedef {string | { key?: string, kind?: 'memory'|'file'|'row', organismId?: string, ws?: string, space?: string, rowId?: string, row?: { organismId: string, ws: string, space: string, rowId: string } }} LabelTarget
+ * same fields with kind: 'row'. owner names the person's agent or app that holds a memory key or a
+ * file (an item list() returned carries it); absent, the person's own.
+ * @typedef {string | { key?: string, kind?: 'memory'|'file'|'row', owner?: string|null, organismId?: string, ws?: string, space?: string, rowId?: string, row?: { organismId: string, ws: string, space: string, rowId: string } }} LabelTarget
  */
 
 /**
@@ -119,7 +123,7 @@ function targetParams(t) {
       row_id: row.rowId ?? row.row_id,
     };
   }
-  return { kind: o.kind || 'memory', key: o.key };
+  return { kind: o.kind || 'memory', key: o.key, owner: o.owner };
 }
 
 /**
@@ -188,6 +192,24 @@ function audit(opts) {
 }
 
 /**
+ * A page of the classifications stored on the person's own content (level owner: theirs and what
+ * their agents and apps wrote) or on an organism's content (level organism, for its creator or an
+ * admin). pending: true keeps the items where a suggestion waits for the person, which review()
+ * answers. Content with no stored classification reads as the default and is not listed. Resolves
+ * with { level, subject, items, next, scanned }; pass next back as cursor for the next page, and
+ * next is null on the last page. Each item: { kind, key, scope, organismId, owner, label,
+ * labelDetail, source, locked, suggestion, justification, humanSaid, setBy, updatedAt }.
+ * @param {{ level?: 'owner'|'organism', organismId?: string, label?: string, pending?: boolean, kind?: 'memory'|'file'|'row', limit?: number, cursor?: string }} [opts]
+ */
+function list(opts) {
+  const o = opts || {};
+  return call('/v1/classification/labels' + query({
+    level: o.level, organism_id: o.organismId, label: o.label, pending: o.pending ? 'true' : undefined,
+    kind: o.kind, limit: o.limit, cursor: o.cursor,
+  }));
+}
+
+/**
  * Ask the Content Classifier to judge memory keys. Up to 20 named keys are judged now; more keys,
  * or a prefix, wait in a queue the node works through. Its label follows the AI rules: it never
  * lowers a label and never changes one a person set. Resolves with { classified, queued, missing }.
@@ -211,6 +233,6 @@ function isClassified(err) {
   return !!err && err.code === 'CLASSIFIED';
 }
 
-export const labels = { get, set, review, policy, audit, scan, warningOf, renderWarning, isClassified };
+export const labels = { get, set, review, policy, audit, list, scan, warningOf, renderWarning, isClassified };
 
 attach('labels', labels);

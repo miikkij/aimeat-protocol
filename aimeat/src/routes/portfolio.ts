@@ -8,6 +8,7 @@
  * @structure catalog / members / config (GET+PUT) / upload / data/:username
  *   portfolioWriteGaii() / portfolioReadGaiis() — which identity a portfolio is stored under
  * @version-history
+ *   v1.9.0 — 2026-09-29 — TARGET-082 review: the catalog's images pass the caller's reader too.
  *   v1.8.0 — 2026-09-29 — TARGET-082 V4: the catalog's memory entries pass the caller's ContentReader
  *     (presentMemories) before a preview is cut from a value.
  *   v1.7.1 — 2026-09-24 — /v1/portfolio/members reads services/portfolio-members.ts (moved there
@@ -55,6 +56,7 @@ import { emitChange } from '../services/event-bus.js';
 import { listPublishedMembers } from '../services/portfolio-members.js';
 import { readerFor } from '../services/classification/reader.js';
 import { presentMemories } from '../services/classification/present-memory.js';
+import { fileTarget } from '../services/classification/labels.js';
 
 /** Result of resolving a username to their published portfolio. */
 export type PortfolioResolution =
@@ -201,11 +203,13 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
 
     // One IN query for all agents' file metadata (was listStorageFiles per agent, twice over).
     const filesByAgent = await storage.listStorageFilesForOwners(agents.map(a => a.gaii));
+    // The files the catalog offers pass the caller's classification reader, as its memory entries do.
+    const fileReader = readerFor({ storage, config }, req.auth);
 
     // Gather images from storage files
     const images: Array<{ key: string; gaii: string; mimeType: string; size: number; url: string; tags: string[] }> = [];
     for (const agent of agents) {
-      const files = filesByAgent[agent.gaii] ?? [];
+      const files = await fileReader.show(filesByAgent[agent.gaii] ?? [], f => fileTarget(f.ownerGaii, f.key));
       for (const f of files) {
         if (f.mimeType.startsWith('image/')) {
           images.push({

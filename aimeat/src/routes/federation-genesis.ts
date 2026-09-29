@@ -14,6 +14,8 @@
  *   - subscriptions + network-stats + /v1/organisms/:id/reputation
  *
  * @version-history
+ *   v1.6.0 — 2026-09-29 — TARGET-082 review: what leave() keeps from a peer's memory read is counted
+ *     in the answer (`withheld: { count, reason }`, no keys) and logged by key on this node.
  *   v1.5.0 — 2026-09-29 — A peer's memory read passes leaveToPeer, the classification component's
  *     leave for federation (TARGET-082), before anything is answered.
  *   v1.4.0 — 2026-09-08 — A genesis entry in the cross-catalogue is addressed by its memory key,
@@ -48,7 +50,7 @@ import { createGenesisPeeringService } from '../services/genesis-peering.js';
 import { createOrganismReputationService } from '../services/organism-reputation.js';
 import { matchesKeyword, matchesActionKeyword, matchesGenesisKeyword, matchesLocation } from '../services/federation-helpers.js';
 import { cacheGenesisResults, findCachedGenesis } from '../services/genesis-memory-cache.js';
-import { leaveToPeer } from '../services/classification/egress.js';
+import { leaveMemoriesToPeer } from '../services/classification-exits.js';
 import { logger } from '../utils/logger.js';
 
 export function federationGenesisRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>, networkDirectory?: Map<string, ServiceSummary>): Router {
@@ -619,12 +621,14 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
             }
 
             // Memory leaving this node for a peer asks the classification component first (TARGET-082).
-            const leaving = await leaveToPeer({ storage, config },
-                results.map(r => ({ ...r, ownerGaii: String(r.gaii), key: String(r.key) })), 'genesis-peer');
+            // What stays is counted in the answer, never named: the keys are logged on this node.
+            const { kept: leaving, withheld } = await leaveMemoriesToPeer({ storage, config },
+                results.map(r => ({ ...r, ownerGaii: String(r.gaii), key: String(r.key) })), 'genesis-peer', 'genesis memory read');
             const sent = leaving.map(({ ownerGaii: _o, ...r }) => r);
             res.json(success(config.nodeId, {
                 results: sent,
                 total: sent.length,
+                ...(withheld ? { withheld } : {}),
             }));
         } catch (err) {
             res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));

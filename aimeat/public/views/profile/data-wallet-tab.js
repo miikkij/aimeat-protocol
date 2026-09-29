@@ -9,10 +9,13 @@
  *   This file holds the reads and the handlers: the composite mount (consents, the grouped trail,
  *   the summary, the names), the trail's window, the rows of one group page by page, a grant (a
  *   workspace role through the workspace door, anything else through the consent door), a revoke,
- *   the export. The render is data-wallet/page.js and data-wallet/rows.js.
+ *   the export. The render is data-wallet/page.js and data-wallet/rows.js; the classification
+ *   section's reads and handlers are data-wallet/classification.js, passed to the render as ctx.cls.
  * @structure DataWalletTab() — state + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'dataWallet'
  * @version-history
+ *   v2.1.0 — 2026-09-29 — The classification section (TARGET-082 V5): its state is
+ *     useClassification (data-wallet/classification.js), ctx.cls.
  *   v2.0.0 — 2026-09-04 — The poster face (design canvas "AIMEAT Tietolompakko-sivu", direction A):
  *     permissions grouped by target and said in words with names, the trail grouped and the grants
  *     and revocations read off the permissions' own timestamps, the form as a fold whose target is
@@ -32,6 +35,7 @@ import { onLiveUpdate } from '/lib/live-updates.js';
 import { renderPage } from './data-wallet/page.js';
 import { x, targetRows, targetOf, targetWords, whoOf, roleOf, consentEvents, openTab } from './data-wallet/frame.js';
 import { groupId } from './data-wallet/rows.js';
+import { useClassification } from './data-wallet/classification.js';
 
 const ENTRY_LIMIT = 20;
 const ROWS_PAGE = 50;
@@ -63,6 +67,7 @@ export default function DataWalletTab({ session, showToast }) {
 
   const toast = (m, isErr) => showToast?.(m, !!isErr);
   const federated = !!session?.federated;
+  const cls = useClassification({ federated, confirm, toast });
 
   /* ── Reads ─────────────────────────────────────────────────────────────────────────────────── */
 
@@ -267,7 +272,7 @@ export default function DataWalletTab({ session, showToast }) {
   const ctx = {
     session, federated, ov, failed, names, consents, active, revokedList, targets, people, kinds, groups, events, trail, shownTrail,
     days, reloading, deniedCount, deniedGroups: deniedGroupsList.length, manifestDenied, manifestShare: deniedCount ? manifestDenied / deniedCount : 0,
-    swapped, expiring, quota, filter, trailFilter, personFocus, openTarget, openGroup, groupRows, form, orgs, formMsg, exportMsg, exporting, exportName, busy, ConfirmUI,
+    swapped, expiring, quota, filter, trailFilter, personFocus, openTarget, openGroup, groupRows, form, orgs, formMsg, exportMsg, exporting, exportName, busy, ConfirmUI, cls,
     setDays, setFilter, setTrailFilter, toggleTarget, toggleGroup, showMoreTrail, showPerson, loadGroupRows, setForm, toggleForm, prefillGrant, submitGrant, revoke, exportAll,
     openOrganisms: () => openTab('organisms'),
     openAgents: () => openTab('agents'),

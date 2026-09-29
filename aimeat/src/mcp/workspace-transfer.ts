@@ -17,6 +17,7 @@
  * @version-history
  *   v1.0.0 — 2026-08-01 — Extracted from mcp/workspaces.ts (max-file-lines, pure extraction).
  *   v1.1.0 — 2026-09-29 — The export passes the agent's classification reader (TARGET-082).
+ *   v1.2.0 — 2026-09-29 — The export answers `left_out`, what the classification kept out (TARGET-082 review).
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -72,13 +73,13 @@ export function registerWorkspaceTransferTool(
                 if (!entry) return fail('Workspace not found');
                 const role = await roleOf(organism_id);
                 if (entry.createdBy !== ownerName && role !== 'creator' && role !== 'admin') return fail('Only the workspace creator or an org admin can export.');
-                const { buffer, filename } = await exportWorkspace(storage, config, {
+                const { buffer, filename, leftOut } = await exportWorkspace(storage, config, {
                     orgId: organism_id, ws, exporterGaii: ownerGhii, exportedAt: new Date().toISOString(),
                     isOrgManager: role === 'creator' || role === 'admin',
                     reader: readerForAgent({ storage, config }, agentGaii),
                 });
                 if (buffer.length > MAX_INLINE_EXPORT_BYTES) return fail(`Workspace too large for inline export (${buffer.length} bytes) — download it from the UI/REST instead.`);
-                return ok({ filename, size_bytes: buffer.length, zip_base64: buffer.toString('base64') });
+                return ok({ filename, size_bytes: buffer.length, zip_base64: buffer.toString('base64'), ...(leftOut.length ? { left_out: leftOut } : {}) });
             }
             if (direction === 'import') {
                 if (!zip_base64) return fail("direction='import' needs zip_base64.");

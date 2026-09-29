@@ -28,6 +28,9 @@
  *     (utils/own-door-keys.ts), as GET /v1/memory/:gaii/:key does.
  *   v1.6.0 -- 2026-09-29 -- Both tools present values through the classification reader and the
  *     credential mask (presentMemories, TARGET-082). read_public had shown a raw value.
+ *   v1.7.0 -- 2026-09-30 -- aimeat_memory_read_public answers CLASSIFIED for an organism's record whose
+ *     label keeps it inside the organism, when the agent's owner is not a member (TARGET-082 review,
+ *     item 1, services/group-shares-classification.ts).
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -41,6 +44,7 @@ import { isVersionKey, searchHitShape, matchesType } from '../services/memory-se
 import { ownDoorRefusal } from '../utils/own-door-keys.js';
 import { presentMemories, presentMemory } from '../services/classification/present-memory.js';
 import { readerForAgent } from '../services/classification/reader.js';
+import { shareCarriesKey } from '../services/group-shares-classification.js';
 
 export function registerMemoryExtendedTools(
     mcp: McpServer,
@@ -155,6 +159,14 @@ export function registerMemoryExtendedTools(
                     content: [{ type: 'text' as const, text: 'Access denied: entry is not public' }],
                     isError: true,
                 };
+            }
+
+            // An organism's record reaches an agent whose owner is not a member of that organism only
+            // when its classification lets it leave (TARGET-082 review, item 1), as on
+            // GET /v1/memory/:gaii/:key.
+            const carried = await shareCarriesKey({ storage, config }, record.ownerGaii, record.key, agentGaii);
+            if (!carried.carries) {
+                return toolError('CLASSIFIED', `This record belongs to an organism your owner is not a member of, and it is ${carried.reason}, so it is not handed out as a public record (label ${carried.label}).`);
             }
 
             return {

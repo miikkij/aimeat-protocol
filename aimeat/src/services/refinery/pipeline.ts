@@ -15,11 +15,13 @@
  *
  *   IT NEVER SENDS. Approving a record and sending it onward is a person's act in the app, through
  *   their own allowlist; a batch that runs at night only reads, decides and files.
- * @structure RefineryDefinition · RefineryCaller · RunState · loadDefinition · runBatch
+ * @structure RefineryDefinition · RefineryCaller · RunState · Ctx · loadDefinition · readAttachments · runBatch
  * @usage const run = await runBatch(deps, caller, 'postinjalostamo', { onProgress });
  * @version-history
  *   v1.0.0 — 2026-09-29 — Initial.
  *   v1.0.1 — 2026-09-29 — The "already filed?" row read uses a system classification reader (TARGET-082).
+ *   v1.0.2 — 2026-09-29 — TARGET-082 review: an attachment whose text goes to the model is read
+ *     through readAiFile (useForAi first); a refused one is named on the row and left out.
  */
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
@@ -38,6 +40,8 @@ import { WorkspaceRowError } from '../workspace-rows/row-space.js';
 import { logger } from '../../utils/logger.js';
 import { writeMemoryRecord } from '../memory-write.js';
 import { systemReader, readerForCaller } from '../classification/reader.js';
+import { ClassificationError } from '../classification/labels.js';
+import { readAiFile } from '../ai-inputs.js';
 import {
   parseMessage, listPage, isGraph, redact, senderDomain, ruleFor, extractionPrompt, parseJsonAnswer, queueFor,
   type MailMessage, type RefineryRule, type Queue,
@@ -150,7 +154,7 @@ function rowCaller(caller: RefineryCaller): RowCaller {
   return { principal: caller.principal, identity: caller.ownerGhii, owner: caller.owner, roles: caller.roles, app: caller.appRef };
 }
 
-interface Ctx { deps: RefineryDeps; caller: RefineryCaller; def: RefineryDefinition; conn: { config: AimeatConfig; storage: Storage; providers: ReturnType<typeof buildOutboundProviders>; key: Buffer } }
+export interface Ctx { deps: RefineryDeps; caller: RefineryCaller; def: RefineryDefinition; conn: { config: AimeatConfig; storage: Storage; providers: ReturnType<typeof buildOutboundProviders>; key: Buffer } }
 
 async function read(ctx: Ctx, resource: string, params: Json): Promise<unknown> {
   const r = await readResource(ctx.conn as never, ctx.def.connectionId, resource, params);
@@ -183,8 +187,9 @@ async function classify(ctx: Ctx, msg: MailMessage): Promise<Json> {
   };
 }
 
-/** Store the PDFs and pictures; a PDF's text layer is read here, a PDF with none goes to the model whole. */
-async function readAttachments(ctx: Ctx, msg: MailMessage): Promise<{ text: string; fileKeys: string[]; stored: Json[] }> {
+/** Store the PDFs and pictures; a PDF's text layer is read here, a PDF with none goes to the model whole.
+ *  Exported for the unit test of its classification check; runBatch is the caller. */
+export async function readAttachments(ctx: Ctx, msg: MailMessage): Promise<{ text: string; fileKeys: string[]; stored: Json[] }> {
   const wanted = msg.attachments.filter((a) => /pdf|image\//i.test(a.mime) || /\.pdf$/i.test(a.filename)).slice(0, 4);
   const out = { text: '', fileKeys: [] as string[], stored: [] as Json[] };
   for (const att of wanted) {
@@ -193,8 +198,18 @@ async function readAttachments(ctx: Ctx, msg: MailMessage): Promise<{ text: stri
       { message_id: msg.id, attachment_id: att.id, filename: att.filename, mime_type: att.mime });
     if (!s.ok) { out.stored.push({ filename: att.filename, error: s.message }); continue; }
     const stored = s;
+    // Its text goes to a model, so the file is read through readAiFile: useForAi refuses a file a
+    // model may not read before a byte of it is extracted (TARGET-082 review). A refused attachment
+    // is named on the row and left out of the extraction; the message is still filed.
+    let file;
+    try {
+      file = await readAiFile(ctx.deps.storage, callerReader(ctx), ctx.caller.principal, stored.key, { capability: 'refinery.extract' });
+    } catch (err) {
+      if (!(err instanceof ClassificationError)) throw err;
+      out.stored.push({ filename: att.filename, key: stored.key, mime: stored.mime_type, size: stored.size, error: `${err.code}: ${err.message}` });
+      continue;
+    }
     out.stored.push({ filename: att.filename, key: stored.key, mime: stored.mime_type, size: stored.size });
-    const file = await ctx.deps.storage.getStorageFile(ctx.caller.principal, stored.key);
     if (!file) continue;
     const isPdf = /pdf/i.test(stored.mime_type) || /\.pdf$/i.test(att.filename);
     const text = isPdf ? await extractFileText(file.data, stored.mime_type, att.filename) : null;
@@ -204,10 +219,14 @@ async function readAttachments(ctx: Ctx, msg: MailMessage): Promise<{ text: stri
   return out;
 }
 
+/** The classification reader of whoever runs the batch: what reaches a model is decided per file. */
+function callerReader(ctx: Ctx) {
+  return readerForCaller(ctx.deps, { gaii: ctx.caller.principal, owner: ctx.caller.owner, roles: ctx.caller.roles, scopes: ctx.caller.scopes });
+}
+
 async function extract(ctx: Ctx, cls: RefineryClass, msg: MailMessage, att: { text: string; fileKeys: string[] }): Promise<Json> {
   const files = att.fileKeys.length
-    ? await readCallFiles(ctx.deps.storage, readerForCaller(ctx.deps, { gaii: ctx.caller.principal, owner: ctx.caller.owner, roles: ctx.caller.roles, scopes: ctx.caller.scopes }),
-      ctx.caller.principal, att.fileKeys.map((k) => ({ storage_key: k })))
+    ? await readCallFiles(ctx.deps.storage, callerReader(ctx), ctx.caller.principal, att.fileKeys.map((k) => ({ storage_key: k })))
     : undefined;
   const model = (files ? ctx.def.models.vision : ctx.def.models.text) || undefined;
   const ask = () => completeForOwner(ctx.deps.storage, ctx.deps.config, ctx.caller.ownerGhii, {

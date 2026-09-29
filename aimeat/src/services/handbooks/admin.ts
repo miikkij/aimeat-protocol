@@ -6,6 +6,8 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.11.0 -- 2026-09-29 -- Classification (TARGET-082): the node's switch and switch_set, the node
+ *     policy at level node, the audit log, and the Content Classifier's daily caps.
  *   v1.10.1 -- 2026-09-29 -- The federation paragraph says the relay-claim default is required from
  *     3.20.0.
  *   v1.10.0 -- 2026-09-29 -- aimeat_package_sale: sell a repository's packages with no token.
@@ -70,6 +72,24 @@ usually nobody's decision. \`book.age_days\` says whether the directory is worth
 is required from 3.20.0, so this node refuses those relays unless it is set to optional. Tell the
 operator. \`aimeat_admin_federation_relay_claim_set\` keeps one such peer on optional until it
 updates, or holds one to required while the node is on optional.
+
+**Classification (operator).** Content on this node can carry a classification (public, internal,
+confidential, highly confidential, or a level an owner or an organism adds), which decides which
+people and which AI may read it. The node's switch, \`classification.mode\`, is off (nothing is
+classified or checked), owner (each owner turns it on for their own content, and an organism's
+creator or admin for the organism's) or all. \`aimeat_admin_config\` shows it as
+\`classification_mode\`, and \`aimeat_classification\` with \`action: "switch_set"\` and \`mode\` sets it:
+you may turn it on, or from owner to all, but turning it off, or from all to owner, gives protection
+away, so you are refused (PERSON_REQUIRED) and the operator does it on the admin Config page. Every
+change of the switch is a row in the audit log. The node policy is \`policy_get\` and \`policy_set\`
+at \`level: "node"\`: the labels, the detection rules, the default label, whether an AI may label,
+how many days the log keeps its rows, and the Content Classifier's daily caps per owner and for the
+whole node (past a cap, content keeps its label and waits in a queue; null is no cap). Read it,
+change \`stored\`, and send the whole level back. A change that only tightens applies at once; one
+that gives anything away waits until the operator accepts it on the admin Security page. \`audit\` at
+\`level: "node"\` reads the whole node's log: what was shown to or used by an AI, what was refused,
+and which classifications and switch settings changed. If this surface does not list
+\`aimeat_classification\`, it is on the agent surface and the full MCP endpoint.
 
 **Install sets (operator).** \`aimeat_admin_install_set\` sets this node up for a customer from an
 install bundle bought from a package repository: the owner user, the packages, the organisms and

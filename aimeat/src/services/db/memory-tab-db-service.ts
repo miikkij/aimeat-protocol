@@ -10,9 +10,11 @@
  *   memory list is re-fetched interactively (agent filter / archived toggle), so this serves the MOUNT
  *   default; the individual /v1/memory endpoint stays for those. Single-master: the Memory tab mount only.
  *
- * @structure MemoryTabService.overview(ownerName, ownerGhii) → { agents, memory, files, consents, groups, organisms }
- * @usage const m = await createMemoryTabService(config, storage).overview(owner, `${owner}@${nodeId}`);
+ * @structure MemoryTabService.overview(reader, ownerName, ownerGhii) → { agents, memory, files, consents, groups, organisms }
+ * @usage const m = await createMemoryTabService(config, storage).overview(readerFor({ storage, config }, req.auth), owner, `${owner}@${nodeId}`);
  * @version-history
+ *   v1.2.0 — 2026-09-29 — TARGET-082 review: the memory keys and the files pass the caller's
+ *     classification reader, as the two endpoints this composite folds already did.
  *   v1.1.0 — 2026-07-31 — files carries max_file_size_bytes so the upload form states the node's real limit.
  *   v1.0.0 — 2026-07-16 — Phase 4: fold the Memory tab's 6-request fan-out into one composite (meta-only memory).
  */
@@ -24,6 +26,8 @@ import { MemoryRepository } from '../../storage/repositories-impl/memory-reposit
 import { MemoryDbService } from './memory-db-service.js';
 import { resolveOwnerIdentities } from './owner-identity.js';
 import { visibilityToZone } from '../../routes/memory/shared.js';
+import { memoryTarget, fileTarget } from '../classification/labels.js';
+import type { ContentReader } from '../classification/reader.js';
 
 export interface MemoryTabOverview {
   agents: unknown[];
@@ -50,12 +54,12 @@ export class MemoryTabService {
    * (owner-scope: GHII + agents + eco apps, via MemoryDbService — the same set the standalone endpoint
    * returns), so a large keyspace never loads a single value.
    */
-  overview(ownerName: string, ownerGhii: string): Promise<MemoryTabOverview> {
+  overview(reader: ContentReader, ownerName: string, ownerGhii: string): Promise<MemoryTabOverview> {
     return runInReadScope(async () => {
       const agents = await this.storage.getAgentsByOwner(ownerName);
       const gaiis = [ownerGhii, ...agents.map(a => a.gaii)];
 
-      const [metaRows, filesByOwner, consents, ownedGroups, memberGroups, organisms] = await Promise.all([
+      const [allMeta, filesByOwner, consents, ownedGroups, memberGroups, organisms] = await Promise.all([
         this.memoryDb.listOwnerScopeMeta(ownerName, {}),
         this.storage.listStorageFilesForOwners(gaiis),
         this.storage.listConsents(ownerGhii),
@@ -63,6 +67,9 @@ export class MemoryTabService {
         this.storage.listSharingGroupsByMember(ownerGhii),
         this.storage.listOrganisms({ member: ownerName }),
       ]);
+      // The same classification reader GET /v1/memory?include=meta and GET /v1/memory/files pass
+      // (TARGET-082 review): a key or file this reader may not see is neither listed nor counted.
+      const metaRows = await reader.show(allMeta, r => memoryTarget(r.ownerGaii, r.key));
 
       // memory (mirrors GET /v1/memory?include=meta): metadata rows + quota, no values.
       let totalBytes = 0;
@@ -83,7 +90,7 @@ export class MemoryTabService {
       // files (mirrors GET /v1/memory/files owner session: GHII files first, then each agent).
       const fileRows: Array<Record<string, unknown>> = [];
       for (const g of gaiis) {
-        for (const f of (filesByOwner[g] ?? [])) {
+        for (const f of await reader.show(filesByOwner[g] ?? [], x => fileTarget(x.ownerGaii, x.key))) {
           fileRows.push({
             key: f.key, owner_gaii: f.ownerGaii, size: f.size, mime_type: f.mimeType,
             visibility: f.visibility, tags: f.tags || [], created_at: f.createdAt,

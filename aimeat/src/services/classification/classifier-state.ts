@@ -9,6 +9,7 @@
  * @structure ClassifierState · classifierState()
  * @usage const cc = await classifierState(storage, config, gaii, textState);
  * @version-history
+ *   v1.1.1 — 2026-09-29 — dailyPerOwner is null when the operator set no cap, reported as it is.
  *   v1.1.0 — 2026-09-29 — Off when the owner's own switch is off (the node let each owner decide).
  *   v1.0.0 — 2026-09-29 — TARGET-082 V3. Initial.
  */
@@ -21,7 +22,8 @@ export interface ClassifierState {
   type: 'jev' | 'llm';
   provider: string | null;
   aiMode: 'off' | 'suggest' | 'auto';
-  dailyPerOwner: number;
+  /** Classifier calls per owner per day; null when the operator set no cap. */
+  dailyPerOwner: number | null;
   reason?: string;
   fix?: string;
   how: string;

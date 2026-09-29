@@ -21,6 +21,10 @@
  *   import { aiRouter } from './routes/ai.js';
  *   app.use(aiRouter(config, storage));
  * @version-history
+ *   v1.x — 2026-09-30 — /complete and /transcribe answer `classification_warnings` when a file or the
+ *     audio the model was given is warning-classified (TARGET-082 review, item 2). A file the
+ *     classification keeps from every model answers its own 403 CLASSIFIED on both; /complete said
+ *     502 PROVIDER_ERROR and /transcribe left it to the global error handler.
  *   v1.x — 2026-09-29 — /complete's files and /transcribe's audio are read with the caller's
  *     classification reader (TARGET-082).
  *   v1.x — 2026-09-28 — AI roles: /complete, /transcribe and /image take `role` (1 to 300 characters,
@@ -98,7 +102,8 @@ const IMAGE_DOWNLOAD_TTL_SECONDS = 3600;
 import { servedProvenanceOf, envelopeMeta, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
 import { upsertPrivateRecord } from '../services/private-record.js';
 import { legacyAiSettingsRoute } from './openrouter.js';
-import { readerFor } from '../services/classification/reader.js';
+import { readerFor, warningsNote } from '../services/classification/reader.js';
+import { ClassificationError } from '../services/classification/labels.js';
 
 /** ~6 MB of audio once decoded. Inline base64 is the fallback path, so it is bounded well below the
  *  JSON body limit; anything real goes through storage. */
@@ -166,7 +171,8 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
         const role = readCallRole(roleField);
         // Files for a model that reads them itself (the files capability), from the caller's own
         // storage or a data: URL (services/ai-call-files.ts).
-        const fileList = files !== undefined ? await readCallFiles(storage, readerFor({ storage, config }, req.auth), resolve(req), files) : undefined;
+        const reader = readerFor({ storage, config }, req.auth);
+        const fileList = files !== undefined ? await readCallFiles(storage, reader, resolve(req), files) : undefined;
         const r = await completeForOwner(storage, config, gaii, {
           prompt: prompt as string, systemPrompt, model: modelOverride, modelRole,
           temperature, topP: top_p, maxTokens: max_tokens, appId: app_id, images: imageList,
@@ -213,11 +219,15 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
             spent_today_usd: r.budget.spentTodayUsd,
             remaining_usd: r.budget.remainingUsd,
           },
+          // Additive: the warning-classified files the model was given (TARGET-082 review, item 2).
+          ...warningsNote(reader),
         }, undefined, envelopeMeta(prov)));
       } catch (e) {
         if (e instanceof AiCompletionError) {
           return res.status(e.status).json(error(config.nodeId, e.code, e.message, e.status, e.details));
         }
+        // A file no model may read is refused before the call, and said as that, not as a provider fault.
+        if (e instanceof ClassificationError) return res.status(e.status).json(error(config.nodeId, e.code, e.message));
         return res.status(502).json(error(config.nodeId, 'PROVIDER_ERROR', (e as Error).message));
       }
     });
@@ -253,9 +263,16 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
       }
 
       let audio: { data: Buffer; mime: string; filename: string };
+      const reader = readerFor({ storage, config }, req.auth);
 
       if (typeof storage_key === 'string' && storage_key) {
-        const found = await readCallerAudio(storage, readerFor({ storage, config }, req.auth), gaii, storage_key, { mime, filename });
+        let found: Awaited<ReturnType<typeof readCallerAudio>>;
+        try {
+          found = await readCallerAudio(storage, reader, gaii, storage_key, { mime, filename });
+        } catch (e) {
+          if (!(e instanceof ClassificationError)) throw e;
+          return res.status(e.status).json(error(config.nodeId, e.code, e.message));
+        }
         if (!found) {
           return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such file in your storage.'));
         }
@@ -312,6 +329,8 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
             spent_today_usd: r.budget.spentTodayUsd,
             remaining_usd: r.budget.remainingUsd,
           },
+          // Additive: the audio was warning-classified (TARGET-082 review, item 2).
+          ...warningsNote(reader),
         }, undefined, envelopeMeta(prov)));
       } catch (e) {
         if (e instanceof AiCompletionError) {

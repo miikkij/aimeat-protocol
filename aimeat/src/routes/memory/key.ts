@@ -2,8 +2,12 @@
  * @file src/routes/memory/key.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key, CORS management, and the public GET /v1/memory/:gaii/:key read. Extracted from src/routes/memory.ts to satisfy max-file-lines.
+ * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key and CORS management; the public GET /v1/memory/:gaii/:key read is registered from routes/memory/public-read.ts. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.10.0 — 2026-09-29 — TARGET-082 review: GET /v1/memory/:key answers `classificationWarning`
+ *     when an AI is shown a warning-classified record. GET /v1/memory/:gaii/:key moved to
+ *     routes/memory/public-read.ts (max-file-lines), where its visibility gate now runs before the
+ *     classification reader. GET /v1/memory/deleted lists only the bin keys the reader may see.
  *   v1.9.0 — 2026-09-29 — PUT schedules write-time classification of a changed value
  *     (services/classify-on-write.ts, TARGET-082 V3).
  *   v1.8.0 — 2026-09-29 — Both reads show a value through presentMemory (the classification reader
@@ -51,7 +55,6 @@ import { odpsWriteRefusal } from '../../services/exchange-odps-write.js';
 import { undeclaredSpaceForKey } from '../../services/workspace-write-items.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
 import { enqueueMemoryReplication } from '../../services/memory-replication.js';
-import { authorizeRead } from '../../services/access-guard.js';
 import { emitChange } from '../../services/event-bus.js';
 import { recordMemoryTouch } from '../../services/data-map/write-tally-buffer.js';
 import { ecoMayReadKey, ecoMayWriteKey } from '../../services/ecosystem-access.js';
@@ -59,7 +62,9 @@ import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../
 import { isSecretRecordKey, secretRecordWriteRefusal } from '../../services/secret-records.js';
 import { presentMemory } from '../../services/classification/present-memory.js';
 import { readerFor } from '../../services/classification/reader.js';
-import { ownDoorRefusal } from '../../utils/own-door-keys.js';
+import { warningField } from '../../services/classification-exits.js';
+import { memoryTarget } from '../../services/classification/labels.js';
+import { registerPublicReadRoute } from './public-read.js';
 import { stampAgentWrite, resolveAttachableProvenanceId, storeHeldProvenance } from '../../services/ai-provenance.js';
 import { ownerGhiiOf, isForeignPrincipal } from '../../utils/gaii.js';
 import { loadServedProvenance, envelopeMeta, setProvenanceHeaders } from '../../services/ai-provenance-marks.js';
@@ -84,7 +89,9 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
   router.get('/v1/memory/deleted', requireAuth(), requireExternalPrincipal(), requireScope('memory:read'), async (req, res) => {
     const gaii = resolve(req);
     const graceMs = config.memoryDeleteGraceDays * 86_400_000;
-    const rows = await storage.listDeletedMemory(gaii);
+    // What is in the bin is still content: a key this reader may not see is not listed (TARGET-082).
+    const rows = await readerFor({ storage, config }, req.auth)
+      .show(await storage.listDeletedMemory(gaii), r => memoryTarget(r.ownerGaii, r.key));
     res.json(success(config.nodeId, {
       items: rows.map(r => ({
         key: r.key,
@@ -196,6 +203,8 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
       // The ATTACHED half of AI provenance (TARGET-058). null = UNSTATED, which is not the same as
       // "a human wrote it" — resolve it at /v1/provenance/:id to find out what was actually claimed.
       ai_provenance_id: record.aiProvenanceId ?? null,
+      // TARGET-082: an AI shown a warning-classified record is told so, on this door as on MCP.
+      ...warningField(record),
       _ddc: {
         flagCount: record.flagCount ?? 0,
         version: record.version,
@@ -621,173 +630,6 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     emitChange('memory');
   });
 
-  // GET /v1/memory/:gaii/:key — public memory read (no auth for public entries)
-  // This allows Tier 0 access to public memory, with consent checking for non-public data
-  router.get('/v1/memory/:gaii/:key', async (req, res) => {
-    const gaii = decodeURIComponent(req.params.gaii as string);
-    const key = decodeURIComponent(req.params.key as string);
-
-    // Soft read (?soft=1): 200 + { value: null, exists: false } instead of a 404 for keys that
-    // legitimately may not exist yet — avoids browser-console 404 noise. SECURITY: the soft
-    // response is byte-identical for "missing" and "exists but hidden" so it never reveals
-    // the existence of non-public records (mirrors the 404 parity of the hard path).
-    const soft = !!req.query.soft;
-    const softMiss = () => { res.json(success(config.nodeId, { key, value: null, exists: false })); };
-
-    // ONE CAPABILITY, ONE DOOR: a Design Book part is read through the Design Book, which benches a
-    // component again before it hands one out. This door names that one (utils/own-door-keys.ts).
-    const ownDoor = ownDoorRefusal(gaii, key, config.nodeId);
-    if (ownDoor) {
-      res.status(403).json(error(config.nodeId, ownDoor.code, ownDoor.message, 403, { door: ownDoor.door }));
-      return;
-    }
-
-    // The one presentation of a memory value (classification + credential mask). A record this
-    // reader may not see answers exactly as an absent one.
-    const stored = await storage.getMemory(gaii, key);
-    const record = stored ? await presentMemory(readerFor({ storage, config }, req.auth), stored) : null;
-    if (!record) {
-      if (soft) { softMiss(); return; }
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Public memory not found: ${key}`));
-      return;
-    }
-
-    // Public data — always allow
-    if (record.visibility === 'public') {
-      stats?.increment('memory_reads');
-
-      // TARGET-058: an anonymous reader of public content gets the public projection of its
-      // provenance. This is the SAME record `/v1/provenance/:id` serves them, because the item is
-      // public — which is exactly what makes that record resolvable in the first place.
-      const prov = await loadServedProvenance(storage, config, record.aiProvenanceId);
-      setProvenanceHeaders(res, prov);
-
-      // Shared guard: audits the public read when the consent layer is enabled.
-      await authorizeRead(storage, config, {
-        ownerGaii: record.ownerGaii,
-        accessorGaii: req.auth?.sub ?? 'anonymous',
-        resourceKey: key,
-        visibility: 'public',
-        action: 'read',
-      });
-
-      res.json(success(config.nodeId, {
-        key: record.key,
-        value: record.value,
-        visibility: record.visibility,
-        zone: visibilityToZone(record.visibility),
-        tags: record.tags,
-        version: record.version,
-        owner_gaii: record.ownerGaii,
-        created_at: record.createdAt,
-        updated_at: record.updatedAt,
-        ai_provenance_id: record.aiProvenanceId ?? null,
-        _ddc: {
-          flagCount: record.flagCount ?? 0,
-          version: record.version,
-          freshness: record.updatedAt,
-          visibility: record.visibility,
-        },
-      }, undefined, envelopeMeta(prov)));
-      return;
-    }
-
-    // Members data — readable by any authenticated user of this node. The check
-    // MUST exclude the anonymous-mode shared identity: global optionalAuth injects
-    // a truthy req.auth (anonymous: true) for unauthenticated visitors, so a bare
-    // req.auth truthiness gate would leak members records to everyone.
-    if (record.visibility === 'members') {
-      const isAuthenticatedMember = !!req.auth && req.auth.anonymous !== true;
-      if (isAuthenticatedMember) {
-        stats?.increment('memory_reads');
-
-        // Shared guard: audits the members read when the consent layer is enabled.
-        await authorizeRead(storage, config, {
-          ownerGaii: record.ownerGaii,
-          accessorGaii: req.auth!.sub,
-          resourceKey: key,
-          visibility: 'members',
-          action: 'read',
-        });
-
-        res.json(success(config.nodeId, {
-          key: record.key,
-          value: record.value,
-          visibility: record.visibility,
-          zone: visibilityToZone(record.visibility),
-          tags: record.tags,
-          version: record.version,
-          owner_gaii: record.ownerGaii,
-          created_at: record.createdAt,
-          updated_at: record.updatedAt,
-          _ddc: {
-            flagCount: record.flagCount ?? 0,
-            version: record.version,
-            freshness: record.updatedAt,
-            visibility: record.visibility,
-          },
-        }));
-        return;
-      }
-      // Anonymous (incl. the shared anonymous identity): behave like other
-      // non-public records — 404 (or the identical soft miss), don't reveal existence.
-      if (soft) { softMiss(); return; }
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Public memory not found: ${key}`));
-      return;
-    }
-
-    // Non-public data: if consent is not enabled, fall back to old behavior (404)
-    if (!config.consentEnabled) {
-      if (soft) { softMiss(); return; }
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Public memory not found: ${key}`));
-      return;
-    }
-
-    // Non-public data with consent enabled: shared guard decides + audits the attempt. For a
-    // 'workspace' record the guard runs canReadWorkspace(record.workspaceRef) — thread the ref + the
-    // accessor's sub/owner so a workspace member is recognised (parity with the storage-file /v1/pub path).
-    // Resolve to the GHII/GAII. An OWNER session carries a BARE `sub` (just `alice`), while group
-    // membership and consent grants are both keyed under the resolved identity (`alice@node`), so
-    // passing the bare name matched neither and a human could not read what was shared with them —
-    // only their agents could, whose `sub` is already a full GAII. Same fix, same reason, as the
-    // storage-file twin GET /v1/pub, which resolves here and has since 2026-07-05.
-    const isAnonymousReader = !req.auth?.sub || req.auth.anonymous === true;
-    const accessorGaii = isAnonymousReader ? 'anonymous' : resolve(req);
-    const consentResult = await authorizeRead(storage, config, {
-      ownerGaii: record.ownerGaii,
-      accessorGaii,
-      resourceKey: key,
-      visibility: record.visibility,
-      groupId: record.groupId,
-      workspaceRef: record.workspaceRef,
-      accessorSub: req.auth?.sub,
-      accessorOwner: req.auth?.owner as string | undefined,
-      action: 'read',
-    });
-
-    if (!consentResult.allowed) {
-      res.status(403).json(error(config.nodeId, 'CONSENT_DENIED', `You have not given permission for this: ${consentResult.reason}. You can change what you share in Profile → Consent.`));
-      return;
-    }
-
-    stats?.increment('memory_reads');
-
-    res.json(success(config.nodeId, {
-      key: record.key,
-      value: record.value,
-      visibility: record.visibility,
-      zone: visibilityToZone(record.visibility),
-      tags: record.tags,
-      version: record.version,
-      owner_gaii: record.ownerGaii,
-      created_at: record.createdAt,
-      updated_at: record.updatedAt,
-      _ddc: {
-        flagCount: record.flagCount ?? 0,
-        version: record.version,
-        freshness: record.updatedAt,
-        visibility: record.visibility,
-      },
-    }));
-  });
+  // GET /v1/memory/:gaii/:key, the cross-owner read: routes/memory/public-read.ts (max-file-lines).
+  registerPublicReadRoute(router, ctx);
 }

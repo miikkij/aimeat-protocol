@@ -151,6 +151,9 @@ everywhere at once, and say so in the Changes section.
 | where an app runs on a shared server with no app addresses | a frame on the server's own address whose origin is opaque: the app reads nobody's sign-in and gets only its own permissions | isolated frame | eristetty kehys | marco aislado |
 | sorting content by how sensitive it is (the act) | a person, a rule or an AI gives a piece of content its classification; the verb is classify | classification; verb classify | luokittelu; verbi luokitella | clasificación; verbo clasificar |
 | the level a piece of content carries | public, internal, confidential, or a level the owner or an organism adds, such as top secret; it decides which people and which AI may read the content and whether it may leave; never *tunniste*, which is the machine identifier | classification | luokitus | clasificación |
+| the model that gives content a classification | the decision model or the owner's text model, as the classification policy says; detection rules run before it, and it runs when content is written and on request | Content Classifier | sisällön luokittelija | clasificador de contenido |
+| the most Content Classifier calls in a day | per owner or organism, and for the whole server; past it, content keeps its label and waits in a queue; the operator may set no cap | daily cap | päiväraja | límite diario |
+| the rules of classification at one level | the server's, an owner's or an organism's labels, detection rules, default and AI mode; a lower level may add and tighten but never loosen, and an AI's loosening waits for a person | classification policy | luokittelukäytäntö | política de clasificación |
 
 ## Never translated, in any language
 
@@ -259,6 +262,11 @@ service, the directory, the token, the identifier and the username: the test nam
 
 ## Changes
 
+- **2026-09-29** — Content Classifier and classification policy, with the classification pages
+  (TARGET-082 V5). *Sisällön luokittelija* says what it does to what; *luokittelukäytäntö* over the
+  spec's *politiikka*, because *käytäntö* is the plain Finnish word for a set of rules one follows.
+  Jouni approved both; no cold reader has read them yet. The same day, *päiväraja* for the
+  classifier's daily cap, the ordinary word for a limit per day; approved the same way.
 - **2026-09-29** — classification, the act and the result, with the node's classification switch
   (TARGET-082). The first spec said *tunniste* for the result, which the table already gives to the
   machine identifier, so Finnish takes the two ordinary words: *luokittelu* for the act and

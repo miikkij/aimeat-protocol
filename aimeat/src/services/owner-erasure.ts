@@ -23,6 +23,7 @@
  * @structure eraseOwner(storage, nodeId, name) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name);
  * @version-history
+ *   v1.4.0 — 2026-09-30 — Unflushed classification audit rows of the owner are purged first.
  *   v1.3.0 — 2026-09-26 — Work is settled inside storage.deleteOwner() on both backends, for every
  *     door that deletes an account: open work cancelled, the held morsels back with a ledger line,
  *     finished work kept for the other side under the erasure's pseudonym (secaudit 2026-09: A8-4, N6).
@@ -43,6 +44,7 @@
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { evictAgentTelemetry } from './telemetry-buffer.js';
+import { purgeClassificationAudit } from './classification/audit.js';
 
 export interface OwnerErasureResult {
   agentsDeleted: number;
@@ -69,6 +71,9 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
   const agents = await storage.getAgentsByOwner(name);
   const ghii = `${name}@${nodeId}`;
   const deletionLog: string[] = [];
+  // Classification audit rows still in memory would be written after the cascade and bring the
+  // erased owner back into the log (TARGET-082 review).
+  purgeClassificationAudit({ owner: ghii });
 
   await storage.transaction(async () => {
     // 1. The agents' cached telemetry. Their work is settled inside storage.deleteOwner(), on every

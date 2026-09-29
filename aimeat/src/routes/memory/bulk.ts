@@ -4,6 +4,14 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.0 — 2026-09-29 — TARGET-082 review: export and bundle pass leave() with the destination
+ *     `export` after show(), so an organism's record held under the person's name stays behind; the
+ *     export answers `left_out` and the bundle's manifest says `classified` per item. copy reads the
+ *     source through presentMemory (hidden answers 404 like a read) and carries the source's label
+ *     onto the copy, never lower (services/classification-exits.ts carryLabelToCopy).
+ *   v1.10.0 — 2026-09-29 — bulk-delete leaves a service-owned key (the classification policy) in
+ *     place, and refuses one named in `keys` with 403 RESERVED_KEY (TARGET-082 review finding 2).
+ *     bulk, import and copy already refuse it through isServerWrittenKey.
  *   v1.9.0 — 2026-09-29 — copy schedules write-time classification of the copied value (TARGET-082
  *     V3); bulk and import get it from services/memory-batch-write.ts.
  *   v1.8.0 — 2026-09-29 — Export and bundle pass the classification reader (TARGET-082): memory values
@@ -39,10 +47,11 @@ import { checkMemoryQuota } from '../../services/quota.js';
 import { validateMemoryWrite } from '../../services/schema-validator.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
 import { emitChange, emitMemoryWritten } from '../../services/event-bus.js';
-import { isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
+import { isServerWrittenKey, isServiceOwnedKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
 import { presentMemories, presentMemory } from '../../services/classification/present-memory.js';
 import { readerFor } from '../../services/classification/reader.js';
-import { fileTarget } from '../../services/classification/labels.js';
+import { fileTarget, memoryTarget } from '../../services/classification/labels.js';
+import { leaveMemories, carryLabelToCopy, CopyLabelError } from '../../services/classification-exits.js';
 import { ownDoorRefusal } from '../../utils/own-door-keys.js';
 import { undeclaredSpaceForKey } from '../../services/workspace-write-items.js';
 import { checkOrganismNamespaceAccess } from '../../services/organism-namespace-access.js';
@@ -206,12 +215,16 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       loaded = await storage.listMemory(gaii, { prefix });
     }
     // The one presentation of memory values: the classification reader plus the credential mask.
-    const records = await presentMemories(readerFor({ storage, config }, req.auth), loaded);
+    // Then what may leave: an export file leaves the node, and an organism's record held under this
+    // person's name is the organism's (leave binds only organism content). What stayed is named.
+    const reader = readerFor({ storage, config }, req.auth);
+    const { kept: records, leftOut } = await leaveMemories(reader, await presentMemories(reader, loaded), { kind: 'export', organismId: null });
 
     res.json(success(config.nodeId, {
       exported_at: new Date().toISOString(),
       node_id: config.nodeId,
       count: records.length,
+      ...(leftOut.length ? { left_out: leftOut } : {}),
       entries: records.map(r => ({
         key: r.key,
         value: r.value,
@@ -366,6 +379,15 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'prefix or keys is required'));
       return;
     }
+    // A service-owned key (the classification policy) is removed by no memory route, for any
+    // principal (TARGET-082 review finding 2). Named outright it is refused; matched by a prefix it is
+    // left in place, so clearing `classification.` still clears the rest.
+    const namedServiceKey = keys ? ([...keys] as string[]).find(k => isServiceOwnedKey(k)) : undefined;
+    if (namedServiceKey) {
+      const refusal = serverWrittenKeyRefusal(namedServiceKey);
+      res.status(403).json(error(config.nodeId, refusal.code, refusal.message));
+      return;
+    }
 
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
     let gaii = resolve(req);
@@ -391,6 +413,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     let deleted = 0;
     for (const r of records) {
       if (keys && !keys.has(r.key)) continue;
+      if (isServiceOwnedKey(r.key)) continue;
       if (await storage.deleteMemory(r.ownerGaii, r.key)) {
         deleted++;
         emitResourceUpdated(r.ownerGaii, `aimeat://memory/${encodeURIComponent(r.key)}`);
@@ -472,6 +495,9 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
           const stored = await storage.getMemory(owner, key);
           const record = stored ? await presentMemory(reader, stored) : null;
           if (!record) { manifest.items.push({ kind, key, owner_gaii: owner, included: false, reason: 'not_found' }); continue; }
+          // The bundle leaves the node: an organism's record may stay behind, and the manifest says why.
+          const [left] = (await leaveMemories(reader, [record], { kind: 'export', organismId: null })).leftOut;
+          if (left) { manifest.items.push({ kind, key, owner_gaii: owner, included: false, reason: 'classified', label: left.label, detail: left.reason }); continue; }
           const shown = record.value;
           const content = typeof shown === 'string' ? shown : JSON.stringify(shown, null, 2);
           archive.append(content, { name: `memory/${sanitize(key)}.json` });
@@ -557,8 +583,13 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       return;
     }
 
-    const sourceRecord = await storage.getMemory(source_gaii, key);
-    if (!sourceRecord || sourceRecord.visibility !== 'public') {
+    // A copy is a read first: public only, then the one presentation of a memory value (the
+    // classification reader and the credential mask), so a record this caller may not see answers
+    // 404 exactly as an absent one (TARGET-082 review).
+    const stored = await storage.getMemory(source_gaii, key);
+    const sourceRecord = stored && stored.visibility === 'public'
+      ? await presentMemory(readerFor({ storage, config }, req.auth), stored) : null;
+    if (!stored || !sourceRecord) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public memory entry not found'));
       return;
     }
@@ -575,6 +606,17 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     const odps = odpsWriteRefusal(key, sourceRecord.value, existing?.value);
     if (odps) { res.status(odps.status).json(error(config.nodeId, odps.code, odps.message, odps.status, odps.details)); return; }
     const newVersion = existing ? existing.version + 1 : 1;
+
+    // The copy keeps its source's classification (never lower), set before the bytes land so the
+    // copy is never readable under a lower label. A label the copy's policy lacks refuses the copy.
+    let carried: string | null;
+    try {
+      carried = (await carryLabelToCopy({ storage, config }, memoryTarget(stored.ownerGaii, key), memoryTarget(callerGaii, key))).carried;
+    } catch (err) {
+      if (!(err instanceof CopyLabelError)) throw err;
+      res.status(403).json(error(config.nodeId, err.code, err.message));
+      return;
+    }
 
     await storage.setMemory({
       key,
@@ -599,6 +641,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       key,
       copied_from: source_gaii,
       version: newVersion,
+      ...(carried ? { classification: carried } : {}),
     }));
     emitChange('memory');
   });

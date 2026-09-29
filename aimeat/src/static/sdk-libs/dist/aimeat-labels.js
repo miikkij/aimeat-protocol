@@ -137,7 +137,7 @@
         row_id: row.rowId ?? row.row_id
       };
     }
-    return { kind: o.kind || "memory", key: o.key };
+    return { kind: o.kind || "memory", key: o.key, owner: o.owner };
   }
   function get(target) {
     return call("/v1/classification/label" + query(targetParams(target)));
@@ -184,6 +184,18 @@
       limit: o.limit
     }));
   }
+  function list(opts) {
+    const o = opts || {};
+    return call("/v1/classification/labels" + query({
+      level: o.level,
+      organism_id: o.organismId,
+      label: o.label,
+      pending: o.pending ? "true" : void 0,
+      kind: o.kind,
+      limit: o.limit,
+      cursor: o.cursor
+    }));
+  }
   async function scan(input) {
     const o = input || {};
     if (o.prefix) return send("POST", "/v1/classification/scan", { prefix: o.prefix });
@@ -194,6 +206,6 @@
   function isClassified(err) {
     return !!err && err.code === "CLASSIFIED";
   }
-  var labels = { get, set, review, policy, audit, scan, warningOf, renderWarning, isClassified };
+  var labels = { get, set, review, policy, audit, list, scan, warningOf, renderWarning, isClassified };
   attach("labels", labels);
 })();

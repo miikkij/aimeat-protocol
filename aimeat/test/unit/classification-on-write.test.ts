@@ -7,8 +7,11 @@
  *   write and not during it; an organism workspace write is labelled in the organism's scope; a write
  *   under the reserved `classification.policy.` is not judged; with the switch off nothing is scheduled and nothing is
  *   read; with no classifier set at boot nothing is scheduled; the queue job judges queued memory
- *   items with a stubbed model and drops file items and records that are gone.
+ *   items with a stubbed model and drops file items and records that are gone. The review fixes:
+ *   past the in-process limit a write goes to the persistent queue instead of being dropped, and the
+ *   write hook hands the classifier the policy it read.
  * @version-history
+ *   v1.1.0 — 2026-09-29 — The review fixes (TARGET-082 review, findings 5 and 6).
  *   v1.0.0 — 2026-09-29 — TARGET-082 V3. Initial.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -16,7 +19,7 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { writeMemoryRecord } from '../../src/services/memory-write.js';
 import { writeWorkspaceRecord } from '../../src/services/workspace-write.js';
-import { flushWriteClassification, pendingWriteClassifications, setWriteClassifier } from '../../src/services/classify-on-write.js';
+import { classifyAfterWrite, flushWriteClassification, pendingWriteClassifications, setWriteClassifier } from '../../src/services/classify-on-write.js';
 import { runClassificationQueueJob, installWriteClassifier } from '../../src/services/classification-queue-job.js';
 import { enqueue, readQueue } from '../../src/services/classification/classifier.js';
 import { memoryTarget, fileTarget } from '../../src/services/classification/labels.js';
@@ -83,6 +86,26 @@ describe('write-time classification', () => {
     expect(pendingWriteClassifications()).toBeGreaterThan(0);
     await flushWriteClassification();
     expect(await storage.getContentLabel(memoryTarget(ALICE, 'classification.notes'))).toMatchObject({ label: 'luottamuksellinen' });
+  });
+
+  it('hands the classifier the policy it read, so the classifier reads it no second time (finding 5)', async () => {
+    const seen: unknown[] = [];
+    setWriteClassifier(async (_d, _t, _text, opts) => { seen.push(opts.policy); });
+    await writeMemoryRecord(deps(), owner, write('notes.invoice', { text: IBAN }));
+    await flushWriteClassification();
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toMatchObject({ defaultLabel: 'sisainen' });
+  });
+
+  it('past the in-process limit a write waits in the persistent queue instead of being dropped (finding 6)', async () => {
+    let judged = 0;
+    const { enqueue } = await import('../../src/services/classification/classifier.js');
+    setWriteClassifier(async () => { judged++; }, enqueue);
+    // All scheduled in one tick, so the worker has not started: the 2001st is past the limit.
+    for (let i = 0; i <= 2000; i++) classifyAfterWrite(deps(), ALICE, `bulk.${i}`, 'text');
+    await flushWriteClassification();
+    expect(judged).toBe(2000);
+    expect(await readQueue(storage, NODE)).toMatchObject([{ key: 'bulk.2000', scope: ALICE, origin: 'write' }]);
   });
 
   it('with the switch off nothing is scheduled and nothing is read', async () => {

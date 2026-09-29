@@ -14,11 +14,16 @@
  *   once when it only tightens. When it gives anything away (levels.ts loosenings), it is kept as a
  *   proposal, and a person accepts or rejects it in their own session; an AI cannot accept it, even
  *   with the person's words, which are kept on the proposal as its reason. Every change is kept in
- *   the level's history (the last 50).
+ *   the level's history (the last 50). A person's own change supersedes a waiting proposal.
  * @structure PolicyView · readPolicy() · writePolicy() · reviewPolicy() · readAuditLog()
  * @usage
  *   const out = await writePolicy(deps, actor, 'owner', null, { enabled: true });
  * @version-history
+ *   v1.3.0 — 2026-09-29 — TARGET-082 review. The view carries `dropped`, what reading the stored
+ *     layer against the current node took away, and `stored` is that normalised layer (finding 4). A
+ *     person's change drops the AI's waiting proposal and says so in the history (`supersede`), and
+ *     an accept measures what it gives away against the level as it stands (finding 5). The owner's
+ *     audit log covers the owner's agents and ecosystem apps (finding 1).
  *   v1.2.0 — 2026-09-29 — V5: every stored change (a set, a proposal, an accept, a reject) emits the
  *     change domain `classification`, so REST, MCP, the connector and extensions announce it from here.
  *   v1.1.0 — 2026-09-29 — V4: readAuditLog, the audit log per level.
@@ -51,6 +56,12 @@ export interface PolicyView {
   effective: ClassificationPolicy;
   proposal: StoredLevel<unknown>['proposal'];
   history: PolicyChange[];
+  /**
+   * What reading the stored layer against the current node dropped or raised, one sentence each
+   * (levels.ts normaliseLayer). Empty when the stored layer still fits the node. `stored` is already
+   * the normalised layer, so sending it back with a change saves.
+   */
+  dropped: string[];
 }
 
 function subjectOf(level: PolicyLevel, actor: LabelActor, organismId: string | null | undefined, nodeId: string): string {
@@ -97,14 +108,14 @@ async function store(storage: Storage, level: PolicyLevel, owner: string, key: s
 
 async function view(deps: ClassificationDeps, level: PolicyLevel, subject: string): Promise<PolicyView> {
   const { storage, config } = deps;
-  const rec = await readLevel<PolicyLayer | ClassificationPolicy>(storage, config.nodeId, level, subject);
   const node = await readNodePolicy(storage, config.nodeId);
+  const rec = await readLevel<PolicyLayer | ClassificationPolicy>(storage, config.nodeId, level, subject, node);
   const layer = level === 'node' ? null : rec.policy as PolicyLayer | null;
   const mode = config.classificationMode;
   const active = mode === 'all' || (mode === 'owner' && level !== 'node' && layer?.enabled === true);
   return {
     level, subject, mode, active, stored: rec.policy, effective: mergePolicy(node, layer),
-    proposal: rec.proposal, history: rec.history.slice(-10),
+    proposal: rec.proposal, history: rec.history.slice(-10), dropped: rec.dropped,
   };
 }
 
@@ -130,8 +141,10 @@ function asClassificationError(err: unknown): never {
 /** What `input` would make of the level, validated, and what it gives away against what is stored. */
 async function prepare(deps: ClassificationDeps, level: PolicyLevel, subject: string, input: unknown) {
   const { storage, config } = deps;
-  const rec = await readLevel<PolicyLayer | ClassificationPolicy>(storage, config.nodeId, level, subject);
   const node = await readNodePolicy(storage, config.nodeId);
+  // The stored level as it applies NOW (normalised and validated), so `loosens` is measured against
+  // the current state, whatever changed since a proposal was made.
+  const rec = await readLevel<PolicyLayer | ClassificationPolicy>(storage, config.nodeId, level, subject, node);
   try {
     if (level === 'node') {
       const next = validateNodePolicy(input);
@@ -168,11 +181,16 @@ export async function writePolicy(
 
   if (actor.kind === 'ai' && loosens.length) {
     const history = [...rec.history, { at, by: actor.principal, source, action: 'propose' as const, humanSaid, loosens }].slice(-HISTORY);
-    await store(deps.storage, level, home.owner, home.key, { ...rec, history, proposal: { policy: next, by: actor.principal, at, humanSaid, loosens } }, at);
+    await store(deps.storage, level, home.owner, home.key, { policy: rec.policy, history, proposal: { policy: next, by: actor.principal, at, humanSaid, loosens } }, at);
     return { applied: false, pending: 'PERSON_APPROVES', loosens, view: await view(deps, level, subject) };
   }
-  const history = [...rec.history, { at, by: actor.principal, source, action: 'set' as const, humanSaid, loosens: loosens.length ? loosens : undefined }].slice(-HISTORY);
-  await store(deps.storage, level, home.owner, home.key, { policy: next, history, proposal: rec.proposal }, at);
+  // A person changing the level supersedes an AI's waiting proposal: it was a whole level written
+  // against what stood before, and accepting it later would overwrite the person's newer change
+  // (TARGET-082 review finding 5). The history says it went, and why.
+  const superseded = actor.kind === 'human' && rec.proposal
+    ? [{ at, by: actor.principal, source: 'human' as const, action: 'supersede' as const, loosens: rec.proposal.loosens }] : [];
+  const history = [...rec.history, ...superseded, { at, by: actor.principal, source, action: 'set' as const, humanSaid, loosens: loosens.length ? loosens : undefined }].slice(-HISTORY);
+  await store(deps.storage, level, home.owner, home.key, { policy: next, history, proposal: superseded.length ? null : rec.proposal }, at);
   return { applied: true, loosens, view: await view(deps, level, subject) };
 }
 
@@ -191,10 +209,25 @@ export async function readAuditLog(
     await mayWrite(deps, actor, level, subject);
   }
   const limit = Math.min(Math.max(Number(filter.limit) || 200, 1), 1000);
-  const rows = await listClassificationAuditMerged(deps.storage, {
-    ...(level === 'owner' ? { ownerGaii: subject } : level === 'organism' ? { scope: `organism:${subject}` } : {}),
-    since: filter.since, action: filter.action, limit,
-  });
+  const common = { since: filter.since, action: filter.action, limit };
+  if (level !== 'owner') {
+    const rows = await listClassificationAuditMerged(deps.storage, { ...(level === 'organism' ? { scope: `organism:${subject}` } : {}), ...common });
+    return { level, subject, rows };
+  }
+  // The owner's log covers what their agents and ecosystem apps hold too (finding 1). A row names
+  // the owner GHII (policy.ts ownerOfScope); one recorded before that names the agent or the app,
+  // so those identities are asked as well, and the answers are merged newest first.
+  const holders = [subject];
+  if (actor.ownerName) {
+    const [agents, apps] = await Promise.all([
+      deps.storage.getAgentsByOwner(actor.ownerName), deps.storage.getEcosystemAppsByOwner(actor.ownerName),
+    ]);
+    holders.push(...agents.map(a => a.gaii), ...apps.map(a => a.geai));
+  }
+  const lists = await Promise.all([...new Set(holders)].map(ownerGaii => listClassificationAuditMerged(deps.storage, { ownerGaii, ...common })));
+  const rows = lists.flat()
+    .sort((a, b) => (a.lastAt < b.lastAt ? 1 : a.lastAt > b.lastAt ? -1 : 0))
+    .slice(0, limit);
   return { level, subject, rows };
 }
 
@@ -214,10 +247,12 @@ export async function reviewPolicy(
   const at = (deps.now ?? (() => new Date().toISOString()))();
   if (decision === 'reject') {
     const history = [...rec.history, { at, by: actor.principal, source: 'human' as const, action: 'reject' as const, loosens: rec.proposal.loosens }].slice(-HISTORY);
-    await store(deps.storage, level, home.owner, home.key, { ...rec, history, proposal: null }, at);
+    await store(deps.storage, level, home.owner, home.key, { policy: rec.policy, history, proposal: null }, at);
     return { applied: false, loosens: [], view: await view(deps, level, subject) };
   }
-  // Validated again: the node's policy may have changed since the AI proposed this.
+  // Validated again, and what it gives away measured against the level as it stands now: the
+  // node's policy may have changed since the AI proposed this. A person's own change in between
+  // has already removed the proposal (writePolicy).
   const { next, loosens } = await prepare(deps, level, subject, rec.proposal.policy);
   const history = [...rec.history, { at, by: actor.principal, source: 'human' as const, action: 'accept' as const, humanSaid: rec.proposal.humanSaid, loosens }].slice(-HISTORY);
   await store(deps.storage, level, home.owner, home.key, { policy: next, history, proposal: null }, at);

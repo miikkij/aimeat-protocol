@@ -5,12 +5,15 @@
  * @description Postgres+Kysely implementation of the classification audit log (TARGET-082 V4). A
  *   batch is ONE INSERT … ON CONFLICT per 500 rows that adds counts on the unique address (minute,
  *   reader, action, scope, kind, key). Postgres refuses an ON CONFLICT DO UPDATE that touches one row
- *   twice in a statement, so rows with the same address inside a batch are merged here first.
+ *   twice in a statement, so rows with the same address inside a batch are merged here first. The
+ *   label and reader kind of the row with the later lastAt win, in the merge and in the conflict
+ *   clause, so a retried older batch never overwrites a newer label.
  *   Mirrors ../../sqlite/methods/classification-audit.ts. Schema: migrations/0091_classification_audit.sql.
  * @structure mergeByAddress · classificationAuditMethods — addClassificationAudit ·
  *   listClassificationAudit · pruneClassificationAudit · deleteClassificationAuditByScope
  * @usage merged onto PostgresKyselyStorage.prototype in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-09-29 — An older row no longer overwrites a newer row's label (compare lastAt).
  *   v1.0.0 — 2026-09-29 — TARGET-082 V4. Initial.
  */
 import { sql, type Kysely, type Selectable } from 'kysely';
@@ -54,9 +57,11 @@ function mergeByAddress(rows: ClassificationAuditRow[]): ClassificationAuditRow[
     if (!had) { byAddress.set(address, { ...r }); continue; }
     had.count += r.count;
     if (r.firstAt < had.firstAt) had.firstAt = r.firstAt;
-    if (r.lastAt > had.lastAt) had.lastAt = r.lastAt;
-    had.label = r.label;
-    had.readerKind = r.readerKind;
+    if (r.lastAt >= had.lastAt) {
+      had.lastAt = r.lastAt;
+      had.label = r.label;
+      had.readerKind = r.readerKind;
+    }
     if (r.purpose) had.purpose = r.purpose;
     if (r.ownerGaii) had.ownerGaii = r.ownerGaii;
   }
@@ -79,8 +84,9 @@ export const classificationAuditMethods = {
           count: eb => sql`${eb.ref('ClassificationAudit.count')} + excluded."count"`,
           firstAt: eb => sql`least(${eb.ref('ClassificationAudit.firstAt')}, excluded."firstAt")`,
           lastAt: eb => sql`greatest(${eb.ref('ClassificationAudit.lastAt')}, excluded."lastAt")`,
-          label: () => sql`excluded."label"`,
-          readerKind: () => sql`excluded."readerKind"`,
+          // The later row's label wins: a retried, older batch never overwrites a newer label.
+          label: eb => sql`case when excluded."lastAt" >= ${eb.ref('ClassificationAudit.lastAt')} then excluded."label" else ${eb.ref('ClassificationAudit.label')} end`,
+          readerKind: eb => sql`case when excluded."lastAt" >= ${eb.ref('ClassificationAudit.lastAt')} then excluded."readerKind" else ${eb.ref('ClassificationAudit.readerKind')} end`,
           purpose: eb => sql`coalesce(excluded."purpose", ${eb.ref('ClassificationAudit.purpose')})`,
           ownerGaii: eb => sql`coalesce(excluded."ownerGaii", ${eb.ref('ClassificationAudit.ownerGaii')})`,
         }))

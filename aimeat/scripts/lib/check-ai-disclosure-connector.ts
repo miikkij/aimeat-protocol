@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Connector provenance checks extracted unchanged from the disclosure gate.
  * @version-history
+ *   v1.0.1 -- 2026-09-30 -- ENVELOPE_PROVENANCE_ROUTES names src/routes/memory/public-read.ts, the
+ *     public read moved out of routes/memory/key.ts (TARGET-082 review).
  *   v1.0.0 -- 2026-09-27 -- Keep the gate below its file-size ceiling while moving shared dispatch.
  */
 import { join } from 'node:path';
@@ -162,7 +164,12 @@ function checkSurfaces(): void {
 /** Routes that serve a provenance record on `meta.provenance`, and what carries it to a caller. */
 const ENVELOPE_PROVENANCE_ROUTES: Record<string, string> = {
   'src/routes/memory/key.ts':
-    'GET /v1/memory/:key (+ the public read) — connector: aimeat_memory_read, folded.',
+    'GET /v1/memory/:key — connector: aimeat_memory_read, folded.',
+  'src/routes/memory/public-read.ts':
+    'GET /v1/memory/:gaii/:key, the public read, moved out of key.ts on 2026-09-29 — shell path: '
+    + 'aimeat_memory_read_public, folded inside withProvenanceCarrying; connector MCP: '
+    + 'aimeat_memory_read_public unwraps with envelopeResult(), so it hands on ai_provenance_id from '
+    + 'the body and not the statement, as it did while this route was in key.ts.',
   'src/routes/apps/read.ts':
     'the app detail read — connector: aimeat_app_get, folded.',
   'src/routes/knowledge/packages-core.ts':

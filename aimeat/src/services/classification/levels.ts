@@ -20,18 +20,30 @@
  *   whether a change to one level gives anything away, which decides whether an AI's change applies
  *   at once or waits for a person (decided 2026-09-29: an AI tightens at once and loosens only as a
  *   proposal a person approves in their own session).
- * @structure PolicyLayer · validateNodePolicy() · validateLayer() · mergePolicy() · loosenings()
+ * @structure PolicyLayer · validateNodePolicy() · validateLayer() · normaliseStoredLabels() ·
+ *   normaliseLayer() · mergePolicy() · weakerFields() · loosenings()
  * @usage
  *   const layer = validateLayer(node, input);        // throws POLICY_DILUTES naming the node's rule
+ *   const { layer: stored, dropped } = normaliseLayer(node, record.policy);   // a STORED layer first
  *   const effective = mergePolicy(node, layer);
  *   const given = loosenings(before, after);         // [] when the change only tightens
  * @version-history
+ *   v1.2.0 — 2026-09-29 — TARGET-082 review. loosenings() compares what content effectively gets: a
+ *     rule's and the default's target label field by field (weakerFields), and a change of the
+ *     classifier's type, provider, caps or kinds judged on write (finding 3). normaliseLayer() brings
+ *     a stored layer up to the current node and lists what it dropped; mergePolicy matches a rule
+ *     override by id whatever its pattern; an own label inherits and intersects its base's reader
+ *     list; inheritance skips retired labels (finding 4). An audience names groups by id only
+ *     (finding 6). The node's default label has no audience (finding 9).
+ *   v1.1.0 — 2026-09-29 — classifier.dailyPerOwner and classifier.dailyNode take null for no cap
+ *     (node level only, as the numbers).
  *   v1.0.0 — 2026-09-29 — TARGET-082 V2. Initial.
  */
 import {
   DEFAULT_CLASSIFIER, DEFAULT_LIMITS, type AiVisibility, type ClassificationLabel, type ClassificationPolicy,
   type ClassificationRule, type ClassifierSettings, type LabelAudience, type RuleScope,
 } from './defaults.js';
+import { unsafeRegexReason } from './regex-safety.js';
 
 /** Thrown for a policy that cannot be stored. `problems` lists every one, so a caller fixes all at once. */
 export class PolicyError extends Error {
@@ -75,13 +87,22 @@ function strList(v: unknown, field: string, problems: string[]): string[] | unde
   return [...new Set(v.map(x => (x as string).trim()))];
 }
 
+/** A sharing group's id (services/sharing-group-members.ts mints a v4 UUID). */
+const GROUP_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function readAudience(v: unknown, where: string, problems: string[]): LabelAudience | null | undefined {
   if (v === undefined) return undefined;
   if (v === null) return null;
   if (!isObj(v)) { problems.push(`${where}.audience is an object with roles, groups and people.`); return undefined; }
   const a: LabelAudience = {};
   const roles = strList(v.roles, `${where}.audience.roles`, problems);
-  const groups = strList(v.groups, `${where}.audience.groups`, problems);
+  let groups = strList(v.groups, `${where}.audience.groups`, problems);
+  // A group is named by its id only. Anyone may create a group and call it anything, so a name
+  // in the audience let whoever chose that name in (TARGET-082 review finding 6).
+  if (groups?.some(g => !GROUP_ID.test(g))) {
+    problems.push(`${where}.audience.groups lists sharing group ids, not names: anyone may give a group any name.`);
+    groups = undefined;
+  }
   const people = strList(v.people, `${where}.audience.people`, problems);
   if (roles?.length) a.roles = roles;
   if (groups?.length) a.groups = groups;
@@ -162,6 +183,9 @@ function readRule(v: unknown, i: number, problems: string[]): ClassificationRule
   if (kind === 'regex') {
     // eslint-disable-next-line aimeat/no-silent-catch -- the failure is the answer: it becomes a problem the caller is told
     try { new RegExp(pattern, flags); } catch { problems.push(`${where} (${id}).pattern is not a valid regular expression.`); }
+    // A pattern that can take exponential time would stop the node on every write (review H6).
+    const why = unsafeRegexReason(pattern, flags);
+    if (why) problems.push(`${where} (${id}).pattern ${why}`);
   }
   const minLabel = typeof v.minLabel === 'string' ? v.minLabel.trim() : '';
   if (!minLabel) problems.push(`${where} (${id}).minLabel names a label.`);
@@ -222,8 +246,9 @@ function readClassifier(v: unknown, problems: string[], base: ClassifierSettings
     if (v[f] === undefined) continue;
     if (!node) { problems.push(`classifier.${f} is the operator's, set at the node level.`); continue; }
     const n = v[f];
-    if (typeof n === 'number' && Number.isInteger(n) && n >= 0 && n <= 1_000_000) out[f] = n;
-    else problems.push(`classifier.${f} is a whole number from 0 to 1000000.`);
+    // null is "no cap": the calls are still counted, and nothing waits in the queue for this cap.
+    if (n === null || (typeof n === 'number' && Number.isInteger(n) && n >= 0 && n <= 1_000_000)) out[f] = n;
+    else problems.push(`classifier.${f} is a whole number from 0 to 1000000, or null for no cap.`);
   }
   return out;
 }
@@ -255,6 +280,11 @@ export function validateNodePolicy(input: unknown): ClassificationPolicy {
   for (const r of rules) if (r.minLabel && !active.has(r.minLabel)) problems.push(`Rule ${r.id} names ${r.minLabel}, which is not an active label.`);
   const defaultLabel = typeof input.defaultLabel === 'string' ? input.defaultLabel : '';
   if (!active.has(defaultLabel)) problems.push('defaultLabel names an active label.');
+  // Every piece of content nobody labelled carries the default, so a reader list on it would shut
+  // people out of whole organisms at once (TARGET-082 review finding 9).
+  else if (!audienceEmpty(labels.find(l => l.id === defaultLabel)?.audience)) {
+    problems.push(`defaultLabel ${defaultLabel} limits its readers; the default label applies to all unlabelled content, so it has no audience.`);
+  }
   const aiMode = readAiMode(input.aiMode, problems) ?? 'suggest';
   const aiThreshold = readThreshold(input.aiThreshold, problems) ?? 0.85;
   let auditRetentionDays: number | null = 365;
@@ -271,10 +301,33 @@ export function validateNodePolicy(input: unknown): ClassificationPolicy {
 
 // ── A lower level ────────────────────────────────────────────────────────────────────────────────
 
-/** The node label an own label at `rank` inherits from: the one at or below it, else the lowest. */
+/**
+ * The node label an own label at `rank` inherits from: the ACTIVE one at or below it, else the
+ * lowest active one. A retired label is no longer in force, so nothing inherits from it.
+ */
 function inheritFrom(node: ClassificationPolicy, rank: number): ClassificationLabel {
-  const sorted = [...node.labels].sort((a, b) => a.rank - b.rank);
+  const active = node.labels.filter(l => l.status === 'active');
+  const sorted = (active.length ? active : [...node.labels]).sort((a, b) => a.rank - b.rank);
   return [...sorted].reverse().find(l => l.rank <= rank) ?? sorted[0];
+}
+
+/**
+ * The readers both audiences admit, list by list, so the answer is never wider than either. An empty
+ * audience admits everyone. When the lists share nothing, `base` stands: the node's list is the one
+ * a lower level may not widen, and an empty result would read as "everyone".
+ */
+function intersectAudience(base: LabelAudience | null | undefined, over: LabelAudience | null | undefined): LabelAudience | null {
+  if (audienceEmpty(over)) return audienceEmpty(base) ? null : base!;
+  if (audienceEmpty(base)) return over!;
+  const both = (a?: string[], b?: string[]) => (a ?? []).filter(x => (b ?? []).includes(x));
+  const out: LabelAudience = {};
+  const roles = both(over!.roles, base!.roles);
+  const groups = both(over!.groups, base!.groups);
+  const people = both(over!.people, base!.people);
+  if (roles.length) out.roles = roles;
+  if (groups.length) out.groups = groups;
+  if (people.length) out.people = people;
+  return audienceEmpty(out) ? base! : out;
 }
 
 /** Is `inner` no wider than `outer`? An empty outer admits everyone, so anything is within it. */
@@ -287,7 +340,7 @@ function audienceWithin(inner: LabelAudience | null | undefined, outer: LabelAud
 
 /** `base` with every rule field of `over` that is stricter; names and rank stay the base's. */
 function stricterLabel(base: ClassificationLabel, over: ClassificationLabel): ClassificationLabel {
-  const narrower = audienceWithin(over.audience, base.audience) && !audienceEmpty(over.audience) ? over.audience : base.audience;
+  const narrower = intersectAudience(base.audience, over.audience);
   return {
     ...base,
     aiVisibility: VIS[over.aiVisibility] > VIS[base.aiVisibility] ? over.aiVisibility : base.aiVisibility,
@@ -309,13 +362,16 @@ function labelLoosenings(next: ClassificationLabel, base: ClassificationLabel, b
   return out;
 }
 
-/** Every way rule `next` is weaker than `base` in `policy`'s ranks. */
-function ruleLoosenings(next: ClassificationRule | undefined, base: ClassificationRule, rankOf: (id: string) => number, who: string): string[] {
+/**
+ * Every way rule `next` is weaker than `base` in `policy`'s ranks. `rankOf` null leaves the minimum
+ * label out, for a caller that compares it by what the label does (loosenings).
+ */
+function ruleLoosenings(next: ClassificationRule | undefined, base: ClassificationRule, rankOf: ((id: string) => number) | null, who: string): string[] {
   if (!base.enabled) return [];
   if (!next || !next.enabled) return [`${who} rule ${base.id} cannot be turned off or removed.`];
   const out: string[] = [];
   if (next.kind !== base.kind || next.pattern !== base.pattern || next.flags !== base.flags) out.push(`${who} rule ${base.id} cannot be changed, only added to.`);
-  if (rankOf(next.minLabel) < rankOf(base.minLabel)) out.push(`${who} rule ${base.id} gives at least ${base.minLabel}, and ${next.minLabel} is lower.`);
+  if (rankOf && rankOf(next.minLabel) < rankOf(base.minLabel)) out.push(`${who} rule ${base.id} gives at least ${base.minLabel}, and ${next.minLabel} is lower.`);
   if (JSON.stringify(next.appliesTo ?? null) !== JSON.stringify(base.appliesTo ?? null) && base.appliesTo) {
     out.push(`${who} rule ${base.id} cannot be narrowed to fewer places.`);
   }
@@ -397,23 +453,213 @@ export function validateLayer(node: ClassificationPolicy, input: unknown): Polic
   return layer;
 }
 
+// ── A stored layer against the current node ─────────────────────────────────────────────────────
+
+/** A group id no group has: uuidv4 never mints version 0. A stored group NAME becomes this. */
+const NOBODY_GROUP = '00000000-0000-0000-0000-000000000000';
+
+/**
+ * A stored label whose audience names sharing groups by NAME, as it could before group ids were
+ * required (finding 6), with the names replaced by a group nobody is in. The audience stays as
+ * narrow as it was, or narrower; it never opens to everyone. `notes` says which label and names.
+ */
+function groupIdsOnly(raw: unknown, notes: string[]): unknown {
+  if (!isObj(raw) || !isObj(raw.audience) || !Array.isArray(raw.audience.groups)) return raw;
+  const groups = raw.audience.groups.filter((g): g is string => typeof g === 'string').map(g => g.trim());
+  const names = groups.filter(g => !GROUP_ID.test(g));
+  if (!names.length) return raw;
+  const ids = groups.filter(g => GROUP_ID.test(g));
+  notes.push(`Label ${String(raw.id)} named sharing groups by name (${names.join(', ')}). A group is named by its id now, so those names admit nobody until the groups are picked again.`);
+  return { ...raw, audience: { ...raw.audience, groups: ids.length ? ids : [NOBODY_GROUP] } };
+}
+
+/** A stored node policy's labels with group names made safe (groupIdsOnly), and what changed. */
+export function normaliseStoredLabels(labels: unknown): { labels: unknown; notes: string[] } {
+  const notes: string[] = [];
+  return { labels: Array.isArray(labels) ? labels.map(l => groupIdsOnly(l, notes)) : labels, notes };
+}
+
+/** A stored audience, read leniently: what does not parse admits no one extra. */
+function storedAudience(v: unknown): LabelAudience | null {
+  return readAudience(v, '', []) ?? null;
+}
+
+/** The node label's rule fields that `raw` makes stricter, as an override; null when none. */
+function tighterThan(n: ClassificationLabel, raw: Record<string, unknown>): Record<string, unknown> | null {
+  const o: Record<string, unknown> = { id: n.id };
+  const vis = raw.aiVisibility;
+  if (typeof vis === 'string' && vis in VIS && VIS[vis as AiVisibility] > VIS[n.aiVisibility]) o.aiVisibility = vis;
+  if (raw.audit === true && !n.audit) o.audit = true;
+  if (raw.mayLeaveOrganism === false && n.mayLeaveOrganism) o.mayLeaveOrganism = false;
+  if (raw.lowerNeedsJustification === true && !n.lowerNeedsJustification) o.lowerNeedsJustification = true;
+  const narrowed = intersectAudience(n.audience, storedAudience(raw.audience));
+  if (!audienceEmpty(narrowed) && JSON.stringify(narrowed) !== JSON.stringify(n.audience ?? null)) o.audience = narrowed;
+  return Object.keys(o).length > 1 ? o : null;
+}
+
+/** Does the stored override `raw` say anything about node label `n` beyond repeating it? */
+function saysMore(n: ClassificationLabel, raw: Record<string, unknown>): boolean {
+  return (['aiVisibility', 'audit', 'mayLeaveOrganism', 'lowerNeedsJustification'] as const).some(f => raw[f] !== undefined && raw[f] !== n[f])
+    || (raw.audience !== undefined && JSON.stringify(storedAudience(raw.audience)) !== JSON.stringify(n.audience ?? null));
+}
+
+/** An own label with every rule field that is now looser than its base raised to the base's. */
+function raiseToBase(base: ClassificationLabel, raw: Record<string, unknown>): { label: Record<string, unknown>; raised: LabelField[] } {
+  const o: Record<string, unknown> = { ...raw };
+  const raised: LabelField[] = [];
+  const vis = raw.aiVisibility;
+  if (typeof vis === 'string' && vis in VIS && VIS[vis as AiVisibility] < VIS[base.aiVisibility]) { o.aiVisibility = base.aiVisibility; raised.push('aiVisibility'); }
+  if (raw.audit === false && base.audit) { o.audit = true; raised.push('audit'); }
+  if (raw.mayLeaveOrganism === true && !base.mayLeaveOrganism) { o.mayLeaveOrganism = false; raised.push('mayLeaveOrganism'); }
+  if (raw.lowerNeedsJustification === false && base.lowerNeedsJustification) { o.lowerNeedsJustification = true; raised.push('lowerNeedsJustification'); }
+  const aud = storedAudience(raw.audience);
+  if (!audienceWithin(aud, base.audience)) { o.audience = intersectAudience(base.audience, aud); raised.push('audience'); }
+  return { label: o, raised };
+}
+
+/** A stored layer brought up to the current node, and what that took away from it. */
+export interface NormalisedLayer {
+  /** The layer to validate (validateLayer) and merge. Malformed parts are left for validation to name. */
+  layer: unknown;
+  /** One sentence per thing dropped or raised, for the person to read (the policy view shows them). */
+  dropped: string[];
+}
+
+/**
+ * A STORED owner or organism layer, read against the CURRENT node before it is validated and merged
+ * (TARGET-082 review finding 4). The node may have tightened, retired or removed what the layer was
+ * written against; validated as it was stored, the layer would fail, and the person could not save
+ * their own switch any more (the Data Wallet sends the stored layer back with `enabled` changed).
+ *
+ * - An override of a node label keeps only the fields that are still stricter than the node's; one
+ *   with none left is dropped, and so is one of a label the node retired.
+ * - An own label whose rank the node has taken since is dropped; a field looser than the node label
+ *   it now inherits from is raised to it, the reader list intersected.
+ * - An override of a node rule, matched by id, takes the node's pattern and keeps the stricter
+ *   minimum label; one the node already meets is dropped. An own rule naming a retired or removed
+ *   label is dropped.
+ * - A default label, AI mode or threshold the node already meets or exceeds is dropped.
+ *
+ * Nothing moves silently: every change that is not a plain repeat of the node is in `dropped`. The
+ * function never throws; what it cannot read it leaves as it is, for validateLayer to report.
+ */
+export function normaliseLayer(node: ClassificationPolicy, input: unknown): NormalisedLayer {
+  if (!isObj(input)) return { layer: input, dropped: [] };
+  const dropped: string[] = [];
+  const out: Record<string, unknown> = { ...input };
+  const nodeById = new Map(node.labels.map(l => [l.id, l]));
+  const nodeRanks = new Map(node.labels.map(l => [l.rank, l.id]));
+  const ownRank = new Map<string, number>();
+
+  if (Array.isArray(input.labels)) {
+    const kept: unknown[] = [];
+    for (const stored of input.labels) {
+      const raw = groupIdsOnly(stored, dropped);
+      const id = isObj(raw) && typeof raw.id === 'string' ? raw.id.trim() : '';
+      if (!isObj(raw) || !id) { kept.push(raw); continue; }
+      const n = nodeById.get(id);
+      if (n) {
+        if (n.status !== 'active') { dropped.push(`Your change to label ${id} is dropped: the node has retired that label.`); continue; }
+        const over = tighterThan(n, raw);
+        if (over) kept.push(over);
+        else if (saysMore(n, raw)) dropped.push(`Your change to label ${id} is dropped: the node's label is now at least as strict.`);
+        continue;
+      }
+      if (typeof raw.rank !== 'number') { kept.push(raw); continue; }
+      const taken = nodeRanks.get(raw.rank);
+      if (taken) { dropped.push(`Label ${id} is dropped: the node now has label ${taken} at rank ${raw.rank}.`); continue; }
+      const base = inheritFrom(node, raw.rank);
+      const { label, raised } = raiseToBase(base, raw);
+      if (raised.length) dropped.push(`Label ${id} now follows node label ${base.id}, which is stricter in: ${raised.map(f => FIELD_NAMES[f]).join(', ')}.`);
+      kept.push(label);
+      if (label.status !== 'retired') ownRank.set(id, raw.rank);
+    }
+    out.labels = kept;
+  }
+
+  const activeRank = (id: unknown): number => {
+    if (typeof id !== 'string') return -1;
+    const n = nodeById.get(id);
+    if (n) return n.status === 'active' ? n.rank : -1;
+    return ownRank.get(id) ?? -1;
+  };
+
+  if (Array.isArray(input.rules)) {
+    const nodeRules = new Map(node.rules.map(r => [r.id, r]));
+    const kept: unknown[] = [];
+    for (const raw of input.rules) {
+      const id = isObj(raw) && typeof raw.id === 'string' ? raw.id.trim() : '';
+      if (!isObj(raw) || !id) { kept.push(raw); continue; }
+      const n = nodeRules.get(id);
+      if (n) {
+        const minLabel = activeRank(raw.minLabel) > activeRank(n.minLabel) ? raw.minLabel as string : n.minLabel;
+        const enabled = n.enabled || raw.enabled !== false;
+        const samePattern = raw.kind === n.kind && raw.pattern === n.pattern && (raw.flags ?? '') === n.flags;
+        if (minLabel === n.minLabel && enabled === n.enabled) {
+          if (!samePattern || raw.minLabel !== n.minLabel || (raw.enabled ?? true) !== n.enabled) {
+            dropped.push(`Your change to rule ${id} is dropped: the node's rule is now at least as strict.`);
+          }
+          continue;
+        }
+        if (!samePattern) dropped.push(`Rule ${id} now uses the node's changed pattern; your minimum label ${minLabel} stays.`);
+        kept.push({ ...n, appliesTo: n.appliesTo ?? null, enabled, minLabel });
+        continue;
+      }
+      if (typeof raw.minLabel === 'string' && activeRank(raw.minLabel) < 0) {
+        dropped.push(`Rule ${id} is dropped: its label ${raw.minLabel} is retired or no longer exists.`);
+        continue;
+      }
+      kept.push(raw);
+    }
+    out.rules = kept;
+  }
+
+  const d = input.defaultLabel;
+  if (typeof d === 'string') {
+    if (activeRank(d) < 0) {
+      dropped.push(`Your default label ${d} is dropped: it is retired or no longer exists.`);
+      delete out.defaultLabel;
+    } else if (activeRank(d) <= activeRank(node.defaultLabel)) {
+      if (d !== node.defaultLabel) dropped.push(`Your default label ${d} is dropped: the node's default, ${node.defaultLabel}, is now at least as sensitive.`);
+      delete out.defaultLabel;
+    }
+  }
+  const mode = input.aiMode;
+  if (typeof mode === 'string' && mode in AI_MODE && AI_MODE[mode as ClassificationPolicy['aiMode']] <= AI_MODE[node.aiMode]) {
+    if (mode !== node.aiMode) dropped.push(`Your AI mode ${mode} is dropped: the node's AI mode, ${node.aiMode}, is now stricter.`);
+    delete out.aiMode;
+  }
+  const t = input.aiThreshold;
+  if (typeof t === 'number' && t <= node.aiThreshold) {
+    if (t < node.aiThreshold) dropped.push(`Your AI confidence threshold ${t} is dropped: the node's, ${node.aiThreshold}, is now higher.`);
+    delete out.aiThreshold;
+  }
+  return { layer: out, dropped };
+}
+
 /** The policy that applies: the node's, with the layer's additions and tightenings. */
 export function mergePolicy(node: ClassificationPolicy, layer?: PolicyLayer | null): ClassificationPolicy {
   if (!layer) return node;
   // The merge takes the stricter value field by field, so a layer stored before the node tightened
   // a label or a rule can never hand back what the node took away since.
+  // An own label inherits every rule field from the active node label at or below its rank, the
+  // reader audience included, and may only narrow it: a node label that gains an audience later
+  // narrows every own label above it too.
   const own = new Map((layer.labels ?? []).map(l => [l.id, l]));
   const labels = [
     ...node.labels.map(l => (own.has(l.id) ? stricterLabel(l, own.get(l.id)!) : l)),
     ...(layer.labels ?? []).filter(l => !node.labels.some(n => n.id === l.id))
-      .map(l => stricterLabel({ ...inheritFrom(node, l.rank), id: l.id, name: l.name, color: l.color, description: l.description, rank: l.rank, status: l.status, audience: null }, l)),
+      .map(l => stricterLabel({ ...inheritFrom(node, l.rank), id: l.id, name: l.name, color: l.color, description: l.description, rank: l.rank, status: l.status }, l)),
   ].sort((a, b) => a.rank - b.rank);
-  const rank = (id: string) => labels.find(l => l.id === id)?.rank ?? -1;
+  // A retired label ranks as nothing, so an override naming one never wins.
+  const rank = (id: string) => labels.find(l => l.id === id && l.status === 'active')?.rank ?? -1;
   const ownRules = new Map((layer.rules ?? []).map(r => [r.id, r]));
   const rules = [
+    // Matched by id whatever the pattern: when the node changes a rule's pattern after a layer
+    // raised its minimum label, the rule keeps the node's pattern and the layer's stricter label.
     ...node.rules.map(r => {
       const o = ownRules.get(r.id);
-      if (!o || o.kind !== r.kind || o.pattern !== r.pattern || o.flags !== r.flags) return r;
+      if (!o) return r;
       return { ...r, enabled: r.enabled || o.enabled, minLabel: rank(o.minLabel) > rank(r.minLabel) ? o.minLabel : r.minLabel };
     }),
     ...(layer.rules ?? []).filter(r => !node.rules.some(n => n.id === r.id)),
@@ -436,9 +682,70 @@ export function mergePolicy(node: ClassificationPolicy, layer?: PolicyLayer | nu
   };
 }
 
+/** What each rule field of a label is called in a sentence. */
+const FIELD_NAMES = {
+  aiVisibility: 'what an AI sees', audit: 'the audit trail', mayLeaveOrganism: 'staying in the organism',
+  lowerNeedsJustification: 'a reason for lowering', audience: 'the reader list',
+} as const;
+export type LabelField = keyof typeof FIELD_NAMES;
+
+/**
+ * The rule fields in which `next` protects content less than `base`: an AI sees more, no audit
+ * trail, it may leave the organism, no reason needed to lower it, or a wider reader list. [] when
+ * `next` is at least as strict as `base` on every field. The rank plays no part: two labels are
+ * compared by what they DO to content (TARGET-082 review finding 3).
+ */
+export function weakerFields(next: ClassificationLabel, base: ClassificationLabel): LabelField[] {
+  const out: LabelField[] = [];
+  if (VIS[next.aiVisibility] < VIS[base.aiVisibility]) out.push('aiVisibility');
+  if (base.audit && !next.audit) out.push('audit');
+  if (!base.mayLeaveOrganism && next.mayLeaveOrganism) out.push('mayLeaveOrganism');
+  if (base.lowerNeedsJustification && !next.lowerNeedsJustification) out.push('lowerNeedsJustification');
+  if (!audienceWithin(next.audience, base.audience)) out.push('audience');
+  return out;
+}
+
+/**
+ * What moving content from label `was` to label `now` gives away, as sentences naming `what`. The
+ * change of a label's own fields is reported under the label; this is about which label content gets.
+ */
+function targetLoosenings(was: ClassificationLabel | undefined, now: ClassificationLabel | undefined, nowId: string, what: string): string[] {
+  if (!was) return [];
+  if (!now || now.status !== 'active') return [`${what} would get ${nowId}, which is not an active label.`];
+  if (now.id === was.id) return [];
+  const out: string[] = [];
+  if (now.rank < was.rank) out.push(`${what} gets ${now.id} instead of the more sensitive ${was.id}.`);
+  const weaker = weakerFields(now, was);
+  if (weaker.length) out.push(`${what} gets ${now.id} instead of ${was.id}, which protects it less: ${weaker.map(f => FIELD_NAMES[f]).join(', ')}.`);
+  return out;
+}
+
+/** What a change of the classifier settings gives away: another model, more calls, more content. */
+function classifierLoosenings(before: ClassifierSettings | undefined, after: ClassifierSettings | undefined): string[] {
+  const b = before ?? DEFAULT_CLASSIFIER;
+  const a = after ?? DEFAULT_CLASSIFIER;
+  const out: string[] = [];
+  if (a.type !== b.type) out.push(`The classifier changes from ${b.type} to ${a.type}.`);
+  if ((a.provider ?? null) !== (b.provider ?? null)) out.push(`The classifier's provider changes from ${b.provider ?? 'the default'} to ${a.provider ?? 'the default'}.`);
+  const cap = (n: number | null | undefined) => (n === null ? Infinity : n ?? 0);
+  for (const [f, name] of [['dailyPerOwner', 'daily cap per owner'], ['dailyNode', 'daily cap for the node']] as const) {
+    if (cap(a[f]) > cap(b[f])) out.push(a[f] === null ? `The classifier's ${name} is removed.` : `The classifier's ${name} goes up from ${b[f]} to ${a[f]}.`);
+  }
+  const kinds = (s: ClassifierSettings) => [...(s.onWrite ?? [])].sort().join(', ') || 'none';
+  if (kinds(a) !== kinds(b)) out.push(`The content the classifier judges on write changes from ${kinds(b)} to ${kinds(a)}.`);
+  return out;
+}
+
 /**
  * Every way `after` gives away something `before` held, as sentences; [] when the change only
  * tightens. Adding a label or a rule, and changing a name, colour or description, gives nothing away.
+ *
+ * WHAT CONTENT GETS, NOT THE RANK (TARGET-082 review finding 3). A rule, and the default for
+ * unlabelled content, is compared by the label content ends up with: a rule pointed at a new label
+ * of a higher rank that lets an AI see everything gives content away, and says so. A change of the
+ * classifier's type or provider, a raised or removed cap, and a change of what it judges on write
+ * count too: they send content to another model, or more of it. Each is the operator's or the
+ * person's to accept, so an AI proposes it and a person decides.
  */
 export function loosenings(
   before: ClassificationPolicy, after: ClassificationPolicy, enabled?: { before: boolean; after: boolean },
@@ -446,6 +753,7 @@ export function loosenings(
   const out: string[] = [];
   if (enabled?.before && !enabled.after) out.push('Classification is turned off.');
   const afterLabels = new Map(after.labels.map(l => [l.id, l]));
+  const beforeLabels = new Map(before.labels.map(l => [l.id, l]));
   for (const b of before.labels) {
     if (b.status !== 'active') continue;
     const a = afterLabels.get(b.id);
@@ -454,13 +762,19 @@ export function loosenings(
     out.push(...labelLoosenings(a, b, `Label ${b.id}`));
   }
   const afterRules = new Map(after.rules.map(r => [r.id, r]));
-  const rankOf = (id: string) => after.labels.find(l => l.id === id)?.rank ?? -1;
-  for (const b of before.rules) out.push(...ruleLoosenings(afterRules.get(b.id), b, rankOf, 'The'));
-  const beforeRank = (id: string) => before.labels.find(l => l.id === id)?.rank ?? -1;
-  if (rankOf(after.defaultLabel) < beforeRank(before.defaultLabel)) out.push(`The default label goes from ${before.defaultLabel} to the less sensitive ${after.defaultLabel}.`);
+  for (const b of before.rules) {
+    const a = afterRules.get(b.id);
+    // The pattern, the scope and the switch; the minimum label is compared below by its effect.
+    out.push(...ruleLoosenings(a, b, null, 'The'));
+    if (b.enabled && a?.enabled) {
+      out.push(...targetLoosenings(beforeLabels.get(b.minLabel), afterLabels.get(a.minLabel), a.minLabel, `Content rule ${b.id} finds`));
+    }
+  }
+  out.push(...targetLoosenings(beforeLabels.get(before.defaultLabel), afterLabels.get(after.defaultLabel), after.defaultLabel, 'Unlabelled content'));
   if (AI_MODE[after.aiMode] < AI_MODE[before.aiMode]) out.push(`The AI mode goes from ${before.aiMode} to ${after.aiMode}.`);
   if (after.aiThreshold < before.aiThreshold) out.push(`The AI confidence threshold goes down from ${before.aiThreshold} to ${after.aiThreshold}.`);
   const keep = (d: number | null | undefined) => (d === null ? Infinity : d ?? 365);
   if (keep(after.auditRetentionDays) < keep(before.auditRetentionDays)) out.push(`The audit log keeps its rows for ${after.auditRetentionDays} days instead of ${before.auditRetentionDays ?? 'ever'}.`);
+  out.push(...classifierLoosenings(before.classifier, after.classifier));
   return out;
 }

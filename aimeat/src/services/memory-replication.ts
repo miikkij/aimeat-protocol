@@ -13,6 +13,8 @@
  *   - (module) replicationState + tracking-key helpers for per-peer/per-key sync state
  *
  * @version-history
+ *   v1.2.0 — 2026-09-29 — TARGET-082 review: what the classification keeps on this node is counted
+ *     (`classified_withheld` per peer) and logged by key; a single replication says CLASSIFIED.
  *   v1.1.0 — 2026-09-29 — Both replications ask leaveToPeer before a record leaves (TARGET-082).
  *   v1.0.1 — 2026-09-13 — A consent pattern that will not compile now says so and matches nothing.
  *     It fell back to `key === pattern`, which cannot be true — the equal case returns true at the
@@ -27,13 +29,15 @@ import type { PeerInfo } from '../services/federation.js';
 import { sign } from '../auth/keypair.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import { logger } from '../utils/logger.js';
-import { leaveToPeer } from './classification/egress.js';
+import { leaveMemoriesToPeer, WITHHELD_REASON } from './classification-exits.js';
 
 export interface ReplicationResult {
   peer_node_id: string;
   entries_sent: number;
   entries_failed: number;
   consent_denied: number;
+  /** Public records the classification kept on this node (TARGET-082); their keys are in the log. */
+  classified_withheld: number;
   success: boolean;
   error?: string;
 }
@@ -117,9 +121,10 @@ export async function replicateMemoryToPeer(
 ): Promise<{ success: boolean; error?: string }> {
   const found = await storage.getMemory(ownerGaii, key);
   if (!found) return { success: false, error: 'Memory entry not found' };
-  // Memory leaving for a peer asks the classification component first (TARGET-082).
-  const [memory] = await leaveToPeer({ storage, config }, [found], peer.nodeId);
-  if (!memory) return { success: false, error: 'Entry not eligible for replication' };
+  // Memory leaving for a peer asks the classification component first (TARGET-082). A record that
+  // stays says why here and in the log; the peer is sent nothing.
+  const { kept: [memory], withheld } = await leaveMemoriesToPeer({ storage, config }, [found], peer.nodeId, 'memory replication');
+  if (!memory) return { success: false, error: `CLASSIFIED: ${withheld?.reason ?? WITHHELD_REASON}` };
 
   // Check eligibility
   const eligibility = await isEligibleForReplication(storage, ownerGaii, key);
@@ -206,12 +211,16 @@ export async function replicateMemoryToAllPeers(
     let entriesSent = 0;
     let entriesFailed = 0;
     let consentDenied = 0;
+    let classifiedWithheld = 0;
 
     for (const agent of agents) {
       try {
         const memories = await storage.listMemory(agent.gaii, {});
-        // Memory leaving for a peer asks the classification component first (TARGET-082).
-        const publicMemories = await leaveToPeer({ storage, config }, memories.filter(m => m.visibility === 'public'), peer.nodeId);
+        // Memory leaving for a peer asks the classification component first (TARGET-082), and what
+        // stays is counted in the peer's result (keys in the log only).
+        const { kept: publicMemories, withheld } = await leaveMemoriesToPeer({ storage, config },
+          memories.filter(m => m.visibility === 'public'), peer.nodeId, 'memory replication');
+        classifiedWithheld += withheld?.count ?? 0;
 
         for (const memory of publicMemories) {
           // Skip federation-managed entries
@@ -254,6 +263,7 @@ export async function replicateMemoryToAllPeers(
       entries_sent: entriesSent,
       entries_failed: entriesFailed,
       consent_denied: consentDenied,
+      classified_withheld: classifiedWithheld,
       success: entriesFailed === 0,
     });
 

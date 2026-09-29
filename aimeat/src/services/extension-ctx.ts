@@ -29,6 +29,11 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   v1.10.0 — 2026-09-30 — TARGET-082 review, item 1: ctx.memory.getPublic reads an organism's public
+ *     record as absent for a caller outside that organism when its label keeps it inside.
+ *   v1.9.0 — 2026-09-29 — TARGET-082 review: ctx.memory.getPublic tells an AI caller that the record
+ *     it read is warning-classified: an object value comes back with `classificationWarning`
+ *     ({ label, name, says }) beside its fields; any other value is returned as it is and logged.
  *   v1.8.0 — 2026-09-29 — ctx.memory reads pass the classification reader (TARGET-082): the own
  *     namespace as the node's own work, getPublic for the caller, both through presentMemory.
  *   v1.7.0 — 2026-09-28 — System 2 plan, V6: `providerCall` in ExtensionCtxDeps. Set when the
@@ -98,8 +103,9 @@ import { parseGAII, ownerGhiiOf, localAccountName } from '../utils/gaii.js';
 import { resolveSecretForHeaders, secretPlaceholderNames, secretUnknownMessage, secretHostMessage } from './owner-secrets.js';
 import { logger } from '../utils/logger.js';
 import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
-import { presentMemories, presentMemory } from './classification/present-memory.js';
+import { presentMemories, presentMemory, classificationWarningOf } from './classification/present-memory.js';
 import { readerForCaller, systemReader } from './classification/reader.js';
+import { shareCarriesKey } from './group-shares-classification.js';
 
 /** How long one guest-initiated outbound call may take. Same ceiling every copy used. */
 const FETCH_TIMEOUT_MS = 30_000;
@@ -624,8 +630,20 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
                 // An ext: namespace is world-readable by design, so only 'public' leaves it, and it
                 // leaves through the one presentation of a memory value, for the caller.
                 if (!record || record.visibility !== 'public') return null;
+                // An organism's record reaches a caller outside that organism only when its label lets
+                // it leave (TARGET-082 review, item 1); kept inside, it reads as absent.
+                if (!(await shareCarriesKey({ storage, config }, record.ownerGaii, record.key, deps.caller.gaii)).carries) return null;
                 const shown = await presentMemory(callerReader, record);
-                return shown ? shown.value : null;
+                if (!shown) return null;
+                // TARGET-082 review: an AI caller shown a warning-classified record is told so. The
+                // answer is the value, so an object value carries `classificationWarning` beside its
+                // own fields (a copy; the record is untouched); any other value is logged with it.
+                const warned = classificationWarningOf(shown);
+                if (!warned) return shown.value;
+                const v = shown.value;
+                if (v && typeof v === 'object' && !Array.isArray(v)) return { ...(v as Record<string, unknown>), classificationWarning: warned };
+                logger.info(`${logPrefix} getPublic: a warning-classified value was read`, { key, label: warned.label, reader: deps.caller.gaii });
+                return v;
             },
         },
 

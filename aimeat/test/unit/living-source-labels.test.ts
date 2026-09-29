@@ -70,6 +70,7 @@ describe('a living source copy inherits the strictest label of its sources', () 
 
   it("never changes a person's locked label: a lower one gets a suggestion, a higher one nothing", async () => {
     // A person labels organism content only as an active member.
+    await storage.createGHII({ username: 'alice', nodeId: NODE, ghii: ALICE, displayName: 'Alice', ownerName: 'alice', verificationLevel: 0, totpEnabled: false, createdAt: now(), updatedAt: now() } as never);
     await storage.createOrganism({
       id: ORG, name: 'Org', description: 'x', type: 'project', interests: [], creatorGhii: ALICE, admins: [ALICE],
       members: [ALICE], agentGaiis: [], boardId: 'b1', joinPolicy: 'open', maxMembers: 10, visibility: 'private',

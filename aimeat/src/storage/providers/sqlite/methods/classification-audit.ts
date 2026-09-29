@@ -6,11 +6,14 @@
  *   transaction running one prepared upsert per row, which is the fast path in better-sqlite3; a row
  *   with an address (minute, reader, action, scope, kind, key) that already exists has its count
  *   added to. Rows repeated inside a batch merge the same way, because each statement sees the one
- *   before it. Mirrors ../../postgres-kysely/methods/classification-audit.ts. Schema: ../schema-tables-4.ts.
+ *   before it. The label and reader kind of the row with the later lastAt win, so a batch that
+ *   arrives late (a retried flush) never overwrites a newer label with an older one.
+ *   Mirrors ../../postgres-kysely/methods/classification-audit.ts. Schema: ../schema-tables-4.ts.
  * @structure classificationAuditMethods — addClassificationAudit · listClassificationAudit ·
  *   pruneClassificationAudit · deleteClassificationAuditByScope
  * @usage merged onto SqliteStorage.prototype in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-09-29 — An older row no longer overwrites a newer row's label (compare lastAt).
  *   v1.0.0 — 2026-09-29 — TARGET-082 V4. Initial.
  */
 import type {
@@ -50,8 +53,8 @@ const UPSERT = `
     count = classification_audit.count + excluded.count,
     firstAt = min(classification_audit.firstAt, excluded.firstAt),
     lastAt = max(classification_audit.lastAt, excluded.lastAt),
-    label = excluded.label,
-    readerKind = excluded.readerKind,
+    label = CASE WHEN excluded.lastAt >= classification_audit.lastAt THEN excluded.label ELSE classification_audit.label END,
+    readerKind = CASE WHEN excluded.lastAt >= classification_audit.lastAt THEN excluded.readerKind ELSE classification_audit.readerKind END,
     purpose = coalesce(excluded.purpose, classification_audit.purpose),
     ownerGaii = coalesce(excluded.ownerGaii, classification_audit.ownerGaii)
 `;

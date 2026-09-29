@@ -21,6 +21,8 @@
  *   - GET    /v1/messages/contacts                         -- list contacts + states
  * @usage import { messagesRouter } from '../routes/messages.js'; app.use(messagesRouter(config, storage));
  * @version-history
+ *   v1.16.0 -- 2026-09-30 -- The transcribe route answers `classification_warnings` when the audio is
+ *     warning-classified (TARGET-082 review, item 2).
  *   v1.15.0 -- 2026-09-29 -- TARGET-082 V4: the transcribe route reads the audio bytes through
  *     readAiFile with the caller's ContentReader (useForAi, capability 'transcription'); a classified
  *     file answers with the refusal's status and code (CLASSIFIED, 403) before any model is called.
@@ -106,7 +108,7 @@ import { requireOwnerMailboxRead } from '../auth/owner-mailbox-gate.js';
 import { transcribeForOwner } from '../services/ai-transcription.js';
 import { AiCompletionError } from '../services/ai-completion.js';
 import { readAiFile } from '../services/ai-inputs.js';
-import { readerFor } from '../services/classification/reader.js';
+import { readerFor, warningsNote } from '../services/classification/reader.js';
 import { ClassificationError } from '../services/classification/labels.js';
 
 export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
@@ -556,8 +558,9 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     // The bytes go to a transcription model, so they are read through the classification check
     // (readAiFile asks useForAi before it returns them): a refusal is this request's answer.
     let file: Awaited<ReturnType<typeof readAiFile>>;
+    const reader = readerFor({ storage, config }, req.auth);
     try {
-      file = await readAiFile(storage, readerFor({ storage, config }, req.auth), ghii, key, { capability: 'transcription' });
+      file = await readAiFile(storage, reader, ghii, key, { capability: 'transcription' });
     } catch (e) {
       if (e instanceof ClassificationError) {
         res.status(e.status).json(error(config.nodeId, e.code, e.message));
@@ -598,6 +601,8 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
           spent_today_usd: r.budget.spentTodayUsd,
           remaining_usd: r.budget.remainingUsd,
         },
+        // Additive: the audio was warning-classified (TARGET-082 review, item 2).
+        ...warningsNote(reader),
       }));
     } catch (e) {
       if (e instanceof AiCompletionError) {

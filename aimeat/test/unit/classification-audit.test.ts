@@ -7,8 +7,12 @@
  *   flushes; another minute is another row; the merged read shows waiting rows at once; the list
  *   filters by owner, scope and action; the prune removes rows past the retention and keeps
  *   everything on null; the scope delete, the owner cascade and the organism delete remove the rows.
- *   Postgres mirrors these expectations (its methods are not run here).
+ *   Postgres mirrors these expectations (its methods are not run here). The review fixes: a refusal
+ *   or a change is never evicted by routine rows; two changes in a minute are two rows; an event can
+ *   carry a count; an agent's identity is collapsed to its owner; the waiting rows of an erased
+ *   owner or a deleted organism are purged; an older row never overwrites a newer label in storage.
  * @version-history
+ *   v1.1.0 — 2026-09-29 — The review fixes (TARGET-082 review, finding 4).
  *   v1.0.0 — 2026-09-29 — TARGET-082 V4. Initial.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -16,7 +20,7 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import {
   recordClassificationAudit, flushClassificationAudit, initClassificationAudit, shutdownClassificationAudit,
   pendingClassificationAudit, listClassificationAuditMerged, pruneClassificationAuditOlderThan,
-  resetClassificationAudit, minuteOf, type ClassificationAuditEvent,
+  resetClassificationAudit, minuteOf, purgeClassificationAudit, type ClassificationAuditEvent,
 } from '../../src/services/classification/audit.js';
 
 const ALICE = 'alice@test-node';
@@ -137,6 +141,53 @@ describe('classification audit log (sqlite)', () => {
     expect(() => recordClassificationAudit(ev({ key: '' }))).not.toThrow();
     expect(() => recordClassificationAudit(null as never)).not.toThrow();
     expect(pendingClassificationAudit()).toHaveLength(0);
+  });
+
+  it('never evicts a refusal or a change for routine rows (finding 4)', () => {
+    recordClassificationAudit(ev({ action: 'refused', key: 'secret', purpose: 'hidden from AI' }));
+    recordClassificationAudit(ev({ action: 'changed', key: 'moved', purpose: 'sisainen → luottamuksellinen (human)' }));
+    for (let i = 0; i < 10_050; i++) recordClassificationAudit(ev({ key: `list.${i}` }));
+    const waiting = pendingClassificationAudit();
+    expect(waiting.find(r => r.key === 'secret')?.action).toBe('refused');
+    expect(waiting.find(r => r.key === 'moved')?.action).toBe('changed');
+    expect(waiting.length).toBeLessThanOrEqual(10_000);
+  });
+
+  it('keeps two changes of one item in one minute as two rows, each with its from and to (finding 4)', async () => {
+    recordClassificationAudit(ev({ action: 'changed', purpose: 'sisainen → luottamuksellinen (human)', at: '2026-09-29T10:15:10.000Z' }));
+    recordClassificationAudit(ev({ action: 'changed', purpose: 'luottamuksellinen → sisainen (human)', at: '2026-09-29T10:15:40.000Z' }));
+    await flushClassificationAudit();
+    const rows = await storage.listClassificationAudit({ action: 'changed' });
+    expect(rows.map(r => r.purpose)).toEqual(['luottamuksellinen → sisainen (human)', 'sisainen → luottamuksellinen (human)']);
+    expect(rows.every(r => r.count === 1)).toBe(true);
+  });
+
+  it("counts an aggregated event, and files an agent's content under its owner (finding 4)", () => {
+    recordClassificationAudit(ev({ key: '*:luottamuksellinen', count: 250, scope: AGENT, ownerGaii: AGENT }));
+    expect(pendingClassificationAudit({ ownerGaii: ALICE })).toMatchObject([{ key: '*:luottamuksellinen', count: 250, ownerGaii: ALICE }]);
+  });
+
+  it('purges the waiting rows of an erased owner and of a deleted organism (finding 4)', async () => {
+    recordClassificationAudit(ev());
+    recordClassificationAudit(ev({ scope: AGENT, ownerGaii: AGENT, key: 'agent.notes' }));
+    recordClassificationAudit(ev({ scope: BOB, ownerGaii: BOB }));
+    recordClassificationAudit(ev({ scope: ORG, ownerGaii: null, kind: 'row', key: 'ws/space/r1', action: 'refused' }));
+    expect(purgeClassificationAudit({ owner: ALICE })).toBe(2);
+    expect(purgeClassificationAudit({ scope: ORG })).toBe(1);
+    await flushClassificationAudit();
+    expect((await storage.listClassificationAudit({})).map(r => r.scope)).toEqual([BOB]);
+  });
+
+  it('storage keeps the newer label when an older row arrives later (finding 4)', async () => {
+    const base = {
+      minute: '2026-09-29T10:15:00.000Z', scope: ALICE, ownerGaii: ALICE, kind: 'memory' as const, key: 'k',
+      reader: AGENT, readerKind: 'ai' as const, action: 'shown' as const, purpose: null,
+    };
+    await storage.addClassificationAudit([{ ...base, id: 'new', count: 1, label: 'luottamuksellinen', firstAt: '2026-09-29T10:15:40.000Z', lastAt: '2026-09-29T10:15:40.000Z' }]);
+    await storage.addClassificationAudit([{ ...base, id: 'old', count: 1, label: 'sisainen', firstAt: '2026-09-29T10:15:10.000Z', lastAt: '2026-09-29T10:15:10.000Z' }]);
+    expect(await storage.listClassificationAudit({})).toMatchObject([
+      { count: 2, label: 'luottamuksellinen', firstAt: '2026-09-29T10:15:10.000Z', lastAt: '2026-09-29T10:15:40.000Z' },
+    ]);
   });
 
   it('storage adds counts on the address, inside one batch and onto a stored row, and keeps the id', async () => {

@@ -26,13 +26,28 @@
  *     was going (an export, a share link, another node, an outside service); a person's own content
  *     is theirs to send. What stayed behind is returned with the reason.
  *   A refusal is always written to the audit log, and showing or using an item whose label keeps an
- *   audit trail is written too (audit.ts buffers it off the request path).
- * @structure ReaderAuth · EgressDestination · ContentReader · decideAll() · readerFor() ·
- *   readerForCaller() · readerForAgent() · systemReader() · CLASSIFIED_WARNING
+ *   audit trail is written too (audit.ts buffers it off the request path). One show() that reveals
+ *   more than AUDIT_SHOWN_ITEMS items of one audited label writes ONE row for them, key `*:<label>`
+ *   with their count, so a long list cannot fill the buffer; `used` stays one row per item.
+ *
+ *   COST (review of 2026-09-29). activePolicies() reads the node's policy once per call and each
+ *   scope's own level once, and merges them itself (the switch and the policy used to be read twice
+ *   per scope); the labels of each scope are read concurrently. The system reader's show() reads
+ *   nothing, because it shows everything.
+ *
+ *   WARNINGS. warningsNote(reader) is what an AI-call answer spreads into itself, so the caller is
+ *   told which warning-classified items it was given.
+ * @structure ReaderAuth · EgressDestination · ContentReader · activePolicies() · decideAll() ·
+ *   readerFor() · readerForCaller() · readerForAgent() · systemReader() · warningsNote() ·
+ *   CLASSIFIED_WARNING
  * @usage
  *   const reader = readerFor({ storage, config }, req.auth);
  *   const shown = await reader.show(records, r => memoryTarget(r.ownerGaii, r.key));
+ *   res.json(success(nodeId, { answer, ...warningsNote(reader) }));
  * @version-history
+ *   v2.1.0 — 2026-09-29 — Review fixes: the node policy once per call, the system reader's show()
+ *     reads nothing, labels per scope concurrently, a long shown list is one audit row per label,
+ *     warningsNote(), and activePolicies() for the classifier and the write hook.
  *   v2.0.0 — 2026-09-29 — TARGET-082 V4: the decisions, the audience, the warnings and the audit.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V1. Initial: the component and its pass-through.
  */
@@ -41,7 +56,8 @@ import type { AimeatConfig } from '../../config.js';
 import { resolveIdentity, callerPrincipal, localAccountName, localAccountOf, isForeignPrincipal } from '../../utils/gaii.js';
 import { readerKindOf, type ReaderKind } from './reader-kind.js';
 import { labelById, type ClassificationLabel, type ClassificationPolicy } from './defaults.js';
-import { classificationActiveFor, policyFor, scopeOrganism, scopeOwner } from './policy.js';
+import { ownerOfScope, readLevel, readNodePolicy, scopeOrganism } from './policy.js';
+import { mergePolicy, type PolicyLayer } from './levels.js';
 import { ClassificationError, labelsFor, targetId } from './labels.js';
 import { audienceCheck } from './audience.js';
 import { recordClassificationAudit, type ClassificationAuditEvent } from './audit.js';
@@ -96,22 +112,40 @@ interface Decided {
 }
 
 /**
- * The label of each target where classification is on, in one pass: the switch and the policy once
- * per scope, the labels in one batch per kind and scope. A row with no label of its own takes its
- * row space's (decided 2026-09-29), addressed as the row key without the row id. Off reads nothing.
+ * The policy of each scope where classification is on; a scope where it is off is absent. The same
+ * decision as policy.ts classificationActiveFor + policyFor, with each level read once: the node's
+ * policy once for all scopes, and each scope's own level (the organism's, or the owner's for any
+ * personal scope) once, as the switch in owner mode and as the layer of the merge. Off reads nothing.
+ */
+export async function activePolicies(deps: ReaderDeps, scopes: Iterable<string>): Promise<Map<string, ClassificationPolicy>> {
+  const out = new Map<string, ClassificationPolicy>();
+  const mode = deps.config.classificationMode;
+  if (mode !== 'all' && mode !== 'owner') return out;
+  const unique = [...new Set(scopes)];
+  if (!unique.length) return out;
+  const node = await readNodePolicy(deps.storage, deps.config.nodeId);
+  await Promise.all(unique.map(async s => {
+    const org = scopeOrganism(s);
+    const layer = (await readLevel<PolicyLayer>(deps.storage, deps.config.nodeId, org ? 'organism' : 'owner', org ?? ownerOfScope(s) ?? s, node)).policy;
+    if (mode === 'all' || layer?.enabled === true) out.set(s, mergePolicy(node, layer));
+  }));
+  return out;
+}
+
+/**
+ * The label of each target where classification is on, in one pass: the policies once (see
+ * activePolicies), the labels in one batch per kind and scope, the scopes concurrently. A row with
+ * no label of its own takes its row space's (decided 2026-09-29), addressed as the row key without
+ * the row id. Off reads nothing.
  */
 async function decideAll(deps: ReaderDeps, targets: ReadonlyArray<ContentLabelTarget | null>): Promise<Array<Decided | null>> {
   if (deps.config.classificationMode === 'off') return targets.map(() => null);
-  const scopes = [...new Set(targets.filter((t): t is ContentLabelTarget => !!t).map(t => t.scope))];
-  const policies = new Map<string, ClassificationPolicy>();
-  await Promise.all(scopes.map(async s => {
-    if (await classificationActiveFor(deps.storage, deps.config, s)) policies.set(s, await policyFor(deps.storage, deps.config, s));
-  }));
+  const policies = await activePolicies(deps, targets.filter((t): t is ContentLabelTarget => !!t).map(t => t.scope));
   const out: Array<Decided | null> = targets.map(() => null);
-  for (const [scope, policy] of policies) {
+  const spaceOf = (t: ContentLabelTarget) => ({ ...t, key: t.key.split('/').slice(0, 2).join('/') });
+  await Promise.all([...policies].map(async ([scope, policy]) => {
     const idx = targets.map((t, i) => (t && t.scope === scope ? i : -1)).filter(i => i >= 0);
     const own = await labelsFor(deps.storage, policy, idx.map(i => targets[i]!));
-    const spaceOf = (t: ContentLabelTarget) => ({ ...t, key: t.key.split('/').slice(0, 2).join('/') });
     const orphanRows = idx.filter(i => targets[i]!.kind === 'row' && !own.get(targetId(targets[i]!))?.row);
     const spaces = orphanRows.length ? await labelsFor(deps.storage, policy, orphanRows.map(i => spaceOf(targets[i]!))) : new Map();
     for (const i of idx) {
@@ -121,9 +155,15 @@ async function decideAll(deps: ReaderDeps, targets: ReadonlyArray<ContentLabelTa
       const label = labelById(policy, id) ?? labelById(policy, policy.defaultLabel);
       if (label) out[i] = { target: t, label };
     }
-  }
+  }));
   return out;
 }
+
+/** One show() that reveals more items than this of one audited label writes one row for them. */
+const AUDIT_SHOWN_ITEMS = 3;
+
+/** The owner an audit row belongs to: the person behind a personal scope, null for an organism. */
+const auditOwnerOf = (scope: string): string | null => ownerOfScope(scope);
 
 function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identity' | 'principal' | 'auth'>): ContentReader {
   // The owner this reader acts for: an AI reads for its owner, a visitor from another node is its
@@ -138,9 +178,26 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
   const inside = audienceCheck(deps.storage, { owner, ownerName });
   const warnings: ContentReader['warnings'] = [];
   const audit = (d: Decided, action: ClassificationAuditEvent['action'], purpose?: string) => recordClassificationAudit({
-    scope: d.target.scope, ownerGaii: scopeOwner(d.target.scope), kind: d.target.kind, key: d.target.key,
+    scope: d.target.scope, ownerGaii: auditOwnerOf(d.target.scope), kind: d.target.kind, key: d.target.key,
     label: d.label.id, reader: who.principal || 'anonymous', readerKind: who.kind, action, purpose: purpose ?? null,
   });
+  /** The audited items one show() revealed: a few one row each, more one row per scope and label. */
+  const auditShown = (shown: Decided[]) => {
+    const groups = new Map<string, Decided[]>();
+    for (const d of shown) {
+      const g = `${d.target.scope}\u0000${d.target.kind}\u0000${d.label.id}`;
+      groups.set(g, [...(groups.get(g) ?? []), d]);
+    }
+    for (const list of groups.values()) {
+      if (list.length <= AUDIT_SHOWN_ITEMS) { for (const d of list) audit(d, 'shown'); continue; }
+      const d = list[0]!;
+      recordClassificationAudit({
+        scope: d.target.scope, ownerGaii: auditOwnerOf(d.target.scope), kind: d.target.kind, key: `*:${d.label.id}`,
+        label: d.label.id, reader: who.principal || 'anonymous', readerKind: who.kind, action: 'shown', purpose: null,
+        count: list.length,
+      });
+    }
+  };
   const warn = (d: Decided) => {
     if (!warnings.some(w => w.key === d.target.key)) warnings.push({ key: d.target.key, label: d.label.id, name: d.label.name.en });
   };
@@ -150,17 +207,19 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
     warnings,
 
     async show(items, targetOf) {
+      // The node's own work (a background run with no caller) is not a reader of content here, so
+      // it reads nothing; what it sends to a model still passes useForAi.
+      if (who.kind === 'system') return [...items];
       const decided = await decideAll(deps, items.map(targetOf));
       const out: typeof items[number][] = [];
+      const shown: Decided[] = [];
       for (let i = 0; i < items.length; i++) {
         const d = decided[i];
-        // The node's own work (a background run with no caller) is not a reader of content here;
-        // what it sends to a model still passes useForAi.
-        if (!d || who.kind === 'system') { out.push(items[i]); continue; }
+        if (!d) { out.push(items[i]); continue; }
         if (!(await inside(d.label.audience, d.target.scope))) { audit(d, 'refused', 'audience'); continue; }
         if (who.kind === 'ai') {
           if (d.label.aiVisibility === 'hidden') { audit(d, 'refused', 'hidden from AI'); continue; }
-          if (d.label.audit) audit(d, 'shown');
+          if (d.label.audit) shown.push(d);
           if (d.label.aiVisibility === 'warning') {
             warn(d);
             const item = items[i];
@@ -172,6 +231,7 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
         }
         out.push(items[i]);
       }
+      if (shown.length) auditShown(shown);
       return out;
     },
 
@@ -215,6 +275,16 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
 
 /** What the answer says about a warning-classified item an AI was shown. */
 export const CLASSIFIED_WARNING = 'This content is classified. Use it only for the task you were given, and do not copy it anywhere else.';
+
+/**
+ * What an AI-call answer spreads into itself: the warning-classified items this reader was given,
+ * with what that asks of the model, or nothing when there were none.
+ *   res.json(success(nodeId, { ...answer, ...warningsNote(reader) }));
+ */
+export function warningsNote(reader: Pick<ContentReader, 'warnings'>): { classification_warnings?: Array<{ key: string; label: string; name: string; says: string }> } {
+  if (!reader.warnings.length) return {};
+  return { classification_warnings: reader.warnings.map(w => ({ ...w, says: CLASSIFIED_WARNING })) };
+}
 
 /** The reader behind a request. No credential is an anonymous reader. */
 export function readerFor(deps: ReaderDeps, auth: ReaderAuth | null | undefined): ContentReader {

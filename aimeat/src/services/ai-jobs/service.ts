@@ -22,6 +22,9 @@
  *   const service = new AiJobService(config, storage);
  *   await service.startJob({ prompt, result_key }, { ownerGhii, createdBy });
  * @version-history
+ *   v1.7.0 — 2026-09-30 — The warning-classified items a job gives its model are kept on the job
+ *     (`classification_warnings`): the prompt's records at the start, which the start answer names
+ *     too, and a transcription's audio when it runs (TARGET-082 review, item 2).
  *   v1.6.0 — 2026-09-29 — A job records who started it (`started_by`, from ctx.startedBy) and its
  *     prompt is assembled with that starter's reader; a job with none reads as an AI (starter.ts,
  *     TARGET-082 V4).
@@ -57,6 +60,7 @@ import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { assembleJobPrompt } from './prompt.js';
 import { jobReader } from './starter.js';
+import { warningsNote } from '../classification/reader.js';
 import { fireOnDone } from './on-done.js';
 import { aiOpOf, aiOpRefusal } from './op.js';
 import { runJobOp, assertAudioInReach } from './run-op.js';
@@ -66,7 +70,7 @@ import {
 } from './store.js';
 import {
     AiJobError,
-    type AiJobRecord, type AiJobState, type AiJobLogEntry,
+    type AiJobRecord, type AiJobState, type AiJobLogEntry, type AiJobClassificationWarnings,
     type StartAiJobInput, type StartAiJobContext, type StartAiJobResult, type AiJobStarter,
 } from './types.js';
 
@@ -139,7 +143,7 @@ export class AiJobService implements AiJobStarter {
         // INVALID_BODY when there is no prompt at all and AI_JOB_PROMPT_TOO_LARGE when the assembly is
         // over the cap. A transcription has no prompt: its read is the audio file's metadata, which
         // answers 404 for a key that is not in the owner's own storage.
-        const prompt = await this.prepareInput(ownerGhii, {
+        const { prompt, warnings } = await this.prepareInput(ownerGhii, {
             ...input, op, ...(ctx.startedBy ? { started_by: ctx.startedBy } : {}),
         });
 
@@ -172,6 +176,7 @@ export class AiJobService implements AiJobStarter {
             queued_at: now,
             created_by: ctx.createdBy,
             ...(ctx.startedBy ? { started_by: ctx.startedBy } : {}),
+            ...(warnings ? { classification_warnings: warnings } : {}),
         };
 
         const queuePosition = this.pool.positionIfEnqueued();
@@ -187,7 +192,7 @@ export class AiJobService implements AiJobStarter {
         // design ever holds an HTTP request for the duration of a model call.
         void this.run(job.id);
 
-        return { job_id: job.id, state: 'queued', queue_position: queuePosition };
+        return { job_id: job.id, state: 'queued', queue_position: queuePosition, ...(warnings ? { classification_warnings: warnings } : {}) };
     }
 
     // ── read ──────────────────────────────────────────────────────────────────
@@ -305,6 +310,12 @@ export class AiJobService implements AiJobStarter {
             // cancelled call is not a free call, and a record that dropped them would make the spend
             // charts disagree with the usage row that is already written.
             const spend = outcome.spend;
+            // What the call itself read (a transcription's audio) joins what the prompt held.
+            if (outcome.warnings?.length) {
+                const had = entry.job.classification_warnings ?? [];
+                const more = outcome.warnings.filter(w => !had.some(h => h.key === w.key));
+                entry.job = { ...entry.job, classification_warnings: [...had, ...more] };
+            }
 
             if (entry.controller.signal.aborted) {
                 await this.finish(jobId, { state: 'cancelled', ...spend });
@@ -450,15 +461,19 @@ export class AiJobService implements AiJobStarter {
     private async prepareInput(
         ownerGhii: string,
         spec: Pick<AiJobRecord, 'op' | 'prompt' | 'prompt_key' | 'input_keys' | 'audio_key' | 'started_by'>,
-    ): Promise<string> {
+    ): Promise<{ prompt: string; warnings?: AiJobClassificationWarnings }> {
         const deps = { storage: this.storage, config: this.config };
         if (aiOpOf(spec.op) === 'transcribe') {
             await assertAudioInReach(deps, ownerGhii, spec.audio_key ?? '');
-            return '';
+            return { prompt: '' };
         }
         // The job reads as whoever started it; a job with no starter recorded reads as an unattended
         // AI run (starter.ts). The same reader at the start and when a restart rebuilds the prompt.
-        return assembleJobPrompt(deps, jobReader(deps, { owner: ownerGhii, started_by: spec.started_by }), ownerGhii, spec);
+        const reader = jobReader(deps, { owner: ownerGhii, started_by: spec.started_by });
+        const prompt = await assembleJobPrompt(deps, reader, ownerGhii, spec);
+        // The warning-classified records the prompt holds go on the job, so the caller is told.
+        const warnings = warningsNote(reader).classification_warnings;
+        return { prompt, ...(warnings ? { warnings } : {}) };
     }
 
     /**
@@ -528,7 +543,8 @@ export class AiJobService implements AiJobStarter {
                     this.assertOpFields(job);
                     // Re-assembled rather than carried: the assembled prompt lives in the dead
                     // process's heap, and the record has the fields it was built from.
-                    const prompt = await this.prepareInput(job.owner, job);
+                    const { prompt, warnings } = await this.prepareInput(job.owner, job);
+                    if (warnings) job.classification_warnings = warnings;
                     let resolveFinished!: () => void;
                     const finished = new Promise<void>(resolve => { resolveFinished = resolve; });
                     this.live.set(job.id, { job, controller: new AbortController(), prompt, finished, resolveFinished });

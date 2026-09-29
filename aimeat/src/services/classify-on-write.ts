@@ -17,9 +17,15 @@
  *   policy), writes into the node's own `system@` namespace, and a value that holds no content
  *   (undefined, null, an empty string).
  *
- *   BOUNDED. The list holds at most MAX_PENDING writes; past that a write is not classified on write
- *   and a warning says how many were dropped. The value is held, not its text, so the text is made
- *   only when the item is judged.
+ *   BOUNDED. The list holds at most MAX_PENDING writes. Past that a write is not judged in process:
+ *   its address goes to the classifier's persistent queue instead (classifier.ts enqueue, origin
+ *   'write', so the model runs there only where classifier.onWrite says), in batches of up to
+ *   OVERFLOW_BATCH, and the hourly queue job judges it from the value stored then. Only when that
+ *   buffer too is full (storage down) is a write dropped, with a warning. The value is held, not its
+ *   text, so the text is made only when the item is judged.
+ *
+ *   ONE POLICY READ PER WRITE. The worker reads the switch and the policy once
+ *   (reader.ts activePolicies) and hands the policy to the classifier, which then reads neither again.
  *
  *   THE CLASSIFIER IS SET AT BOOT (setWriteClassifier), as the workflow engine and the AI job service
  *   are. A static import would close an import cycle: the classifier reaches the decision service,
@@ -30,28 +36,37 @@
  *   The callers: services/memory-write.ts writeMemoryRecord, services/workspace-write.ts
  *   writeWorkspaceRecord, services/memory-batch-write.ts writeMemoryBatch, PUT and PATCH
  *   /v1/memory/:key, POST /v1/memory/copy, and the organism publish paths in routes/organisms/shared.ts.
- * @structure WriteClassifier · MAX_TEXT · contentText() · setWriteClassifier() · classifyAfterWrite() ·
- *   flushWriteClassification() · pendingWriteClassifications()
+ * @structure WriteClassifier · WriteQueue · MAX_TEXT · contentText() · setWriteClassifier() ·
+ *   classifyAfterWrite() · flushWriteClassification() · pendingWriteClassifications()
  * @usage classifyAfterWrite({ storage, config }, record.ownerGaii, record.key, record.value);
  * @version-history
+ *   v1.1.0 — 2026-09-29 — Review fixes: past MAX_PENDING a write goes to the persistent queue in
+ *     batches instead of being dropped; the policy is read once and passed to the classifier.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V3. Initial.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ContentLabelTarget } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import type { ClassificationPolicy } from './classification/defaults.js';
 import { memoryTarget } from './classification/labels.js';
-import { classificationActiveFor, policyFor } from './classification/policy.js';
+import { activePolicies } from './classification/reader.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
 
 /** The shape of services/classification/classifier.ts classifyText, as far as this file uses it. */
 export type WriteClassifier = (
-  deps: Deps, target: ContentLabelTarget, text: string, opts: { useModel?: boolean },
+  deps: Deps, target: ContentLabelTarget, text: string, opts: { useModel?: boolean; policy?: ClassificationPolicy },
 ) => Promise<unknown>;
+
+/** The shape of services/classification/classifier.ts enqueue, as far as this file uses it. */
+export type WriteQueue = (deps: Deps, targets: readonly ContentLabelTarget[], opts: { origin: 'write' }) => Promise<void>;
 
 /** The most text the classifier is given from one value. */
 export const MAX_TEXT = 200_000;
 const MAX_PENDING = 2000;
+/** Writes past MAX_PENDING wait here for the persistent queue, at most this many per enqueue. */
+const OVERFLOW_BATCH = 500;
+const MAX_OVERFLOW = 20_000;
 // The reserved prefix only (utils/reserved-keys.ts): an app's own `classification.*` data is user
 // data and is classified like any other.
 const RESERVED_PREFIX = 'classification.policy.';
@@ -61,12 +76,16 @@ interface PendingWrite { deps: Deps; ownerGaii: string; key: string; value: unkn
 const pending: PendingWrite[] = [];
 let worker: Promise<void> | null = null;
 let classifier: WriteClassifier | null = null;
+let writeQueue: WriteQueue | null = null;
+const overflow: Array<{ deps: Deps; target: ContentLabelTarget }> = [];
+let overflowFlush: Promise<void> | null = null;
 let dropped = 0;
 let saidUnset = false;
 
-/** Set the classifier the write hook calls. Called once at boot. */
-export function setWriteClassifier(fn: WriteClassifier | null): void {
+/** Set the classifier the write hook calls, and the queue it hands overflow to. Called once at boot. */
+export function setWriteClassifier(fn: WriteClassifier | null, queue: WriteQueue | null = null): void {
   classifier = fn;
+  writeQueue = queue;
 }
 
 /** A stored value as the text the classifier reads: a string as it is, anything else as JSON. */
@@ -88,14 +107,43 @@ async function classifyOne(fn: WriteClassifier, item: PendingWrite): Promise<voi
   const { deps, ownerGaii, key, value } = item;
   const target = memoryTarget(ownerGaii, key);
   try {
-    if (!(await classificationActiveFor(deps.storage, deps.config, target.scope))) return;
     const text = contentText(value);
     if (!text) return;
-    const policy = await policyFor(deps.storage, deps.config, target.scope);
-    await fn(deps, target, text, { useModel: policy.classifier.onWrite.includes('memory') });
+    // The switch and the policy, once; the classifier reads neither again.
+    const policy = (await activePolicies(deps, [target.scope])).get(target.scope);
+    if (!policy) return;
+    await fn(deps, target, text, { useModel: policy.classifier.onWrite.includes('memory'), policy });
   } catch (e) {
     logger.warn('classification: classifying a memory write failed; the write stands', { key, error: String(e) });
   }
+}
+
+/** Hand the overflow to the persistent queue, a batch per storage at a time, until it is empty. */
+async function flushOverflow(): Promise<void> {
+  while (overflow.length && writeQueue) {
+    const first = overflow[0]!.deps;
+    const batch: ContentLabelTarget[] = [];
+    for (let i = 0; i < overflow.length && batch.length < OVERFLOW_BATCH;) {
+      if (overflow[i]!.deps === first) batch.push(overflow.splice(i, 1)[0]!.target);
+      else i++;
+    }
+    try {
+      await writeQueue(first, batch, { origin: 'write' });
+    } catch (e) {
+      dropped += batch.length;
+      logger.warn('classification: writes past the in-process limit could not be queued; they are not classified on write', { count: batch.length, dropped, error: String(e) });
+    }
+  }
+}
+
+function startOverflowFlush(): void {
+  if (overflowFlush) return;
+  overflowFlush = new Promise<void>(resolve => setImmediate(resolve))
+    .then(flushOverflow)
+    .finally(() => {
+      overflowFlush = null;
+      if (overflow.length && writeQueue) startOverflowFlush();
+    });
 }
 
 async function drain(): Promise<void> {
@@ -129,6 +177,12 @@ export function classifyAfterWrite(deps: Deps, ownerGaii: string, key: string, v
     return;
   }
   if (pending.length >= MAX_PENDING) {
+    // Past the in-process limit the write waits in the persistent queue, which reads the value again.
+    if (writeQueue && overflow.length < MAX_OVERFLOW) {
+      overflow.push({ deps, target: memoryTarget(ownerGaii, key) });
+      startOverflowFlush();
+      return;
+    }
     dropped += 1;
     if (dropped === 1 || dropped % 500 === 0) {
       logger.warn('classification: too many writes wait for the classifier; this one is not classified on write', { key, dropped });
@@ -139,12 +193,15 @@ export function classifyAfterWrite(deps: Deps, ownerGaii: string, key: string, v
   if (!worker) startWorker();
 }
 
-/** Resolves when every scheduled write has been judged. For tests and an orderly shutdown. */
+/** Resolves when every scheduled write has been judged or queued. For tests and an orderly shutdown. */
 export async function flushWriteClassification(): Promise<void> {
-  while (worker) await worker;
+  while (worker || overflowFlush) {
+    if (worker) await worker;
+    if (overflowFlush) await overflowFlush;
+  }
 }
 
-/** How many writes wait for the classifier, the one in progress included. */
+/** How many writes wait for the classifier, the one in progress included, and those on their way to the queue. */
 export function pendingWriteClassifications(): number {
-  return pending.length + (worker ? 1 : 0);
+  return pending.length + (worker ? 1 : 0) + overflow.length;
 }

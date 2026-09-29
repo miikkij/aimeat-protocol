@@ -16,6 +16,8 @@
  *   - toEntry() — classify + normalize → DiscoveryEntry
  * @usage registry.register(createMemorySource(storage, config));
  * @version-history
+ *   v0.7.0 — 2026-09-30 — The public scope leaves out an organism's public record whose label keeps it
+ *     inside the organism, for a caller who is not a member (TARGET-082 review, item 1).
  *   v0.6.0 — 2026-09-29 — Every hit passes the caller's classification reader (ctx.reader, TARGET-082).
  *   v0.5.1 — 2026-09-24 — A workspace's name is read from its creator's copy of the manifest
  *     (readWorkspaceManifest takes the node id; secaudit 2026-09, A6-9).
@@ -44,6 +46,7 @@ import type { AimeatConfig } from '../../../config.js';
 import type { Storage, MemoryRecord, OrganismRecord } from '../../../storage/interface.js';
 import { canReadWorkspace } from '../../workspace-access.js';
 import { memoryTarget } from '../../classification/labels.js';
+import { organismKeysCarried } from '../../group-shares-classification.js';
 import type { DiscoveryContext, DiscoveryEntry, DiscoverySource, RawHit } from '../types.js';
 import { classifyMemoryKey } from '../classify.js';
 import { bestTitle, bestDescription, normalizeTags, normalizeVisibility, toFullOwner } from '../normalize.js';
@@ -297,8 +300,11 @@ export function createMemorySource(storage: Storage, config: AimeatConfig): Disc
         hits = items.filter(r => (r.flagCount ?? 0) === 0).map(rec => toMemHit(rec, 0));
       }
 
-      const kept = await ctx.reader.show(hits.filter(h => !isOwnedElsewhere(h.key) && !isCopyOrMeta(h.key)),
-        h => memoryTarget(h.ownerGaii, h.key));
+      let candidates = hits.filter(h => !isOwnedElsewhere(h.key) && !isCopyOrMeta(h.key));
+      // The public scope is other accounts' public records: an organism's record among them reaches a
+      // caller outside that organism only when its label lets it leave (TARGET-082 review, item 1).
+      if (!ownerGaiis) candidates = (await organismKeysCarried({ storage, config }, candidates, ctx.caller.gaii)).kept;
+      const kept = await ctx.reader.show(candidates, h => memoryTarget(h.ownerGaii, h.key));
       await attachPlaces(storage, config.nodeId, kept);
       return kept.map(h => ({ sourceId: MEMORY_SOURCE_ID, record: h, score: h.score }));
     },

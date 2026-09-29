@@ -29,6 +29,9 @@
  * @usage
  *   const run = await startDecideRun(storage, config, caller, { questions, keys, fields });
  * @version-history
+ *   v1.5.0 — 2026-09-30 — One classification reader per run, and the warning-classified records it
+ *     sent to the decision model are kept on the run as `classification_warnings` (TARGET-082
+ *     review, item 2), so a run's record and its summary name them.
  *   v1.4.0 — 2026-09-29 — A run reads each record through readAiRecords (services/ai-inputs.ts): the
  *     credential mask and the classification check; a refused record is that item's error (TARGET-082).
  *   v1.3.0 — 2026-09-24 — A run never sends a record the node reads and trusts (utils/reserved-keys.ts)
@@ -56,7 +59,7 @@ import { DecideError } from './errors.js';
 import { Semaphore } from './pacer.js';
 import { isReservedServerKey } from '../../utils/reserved-keys.js';
 import { readAiRecords } from '../ai-inputs.js';
-import { systemReader } from '../classification/reader.js';
+import { systemReader, warningsNote, type ContentReader } from '../classification/reader.js';
 import { ClassificationError } from '../classification/labels.js';
 
 const RUN_PREFIX = 'decide.runs.';
@@ -100,6 +103,8 @@ export interface DecideRun {
   app_id: string | null;
   created_at: string;
   updated_at: string;
+  /** The warning-classified records the run sent to the decision model. Absent when there were none. */
+  classification_warnings?: NonNullable<ReturnType<typeof warningsNote>['classification_warnings']>;
 }
 
 export interface StartRunInput {
@@ -156,12 +161,25 @@ async function pruneRuns(storage: Storage, owner: string): Promise<void> {
   }
 }
 
+/** The reader's warning-classified records join the run's, one entry per key, so a save carries them. */
+function noteWarnings(run: DecideRun, reader: ContentReader): void {
+  const found = warningsNote(reader).classification_warnings;
+  if (!found) return;
+  const had = run.classification_warnings ?? [];
+  const more = found.filter(w => !had.some(h => h.key === w.key));
+  if (more.length) run.classification_warnings = [...had, ...more];
+}
+
 async function work(storage: Storage, config: AimeatConfig, caller: DecideCaller, run: DecideRun): Promise<void> {
   const flag = { stop: false };
   active.set(run.id, flag);
   const gate = new Semaphore(config.decideConcurrency);
   let sinceSave = 0;
   const pending = run.items.filter(i => !run.results[i.subject]?.decision_id);
+  // The one loader of what a model reads (services/ai-inputs.ts) asks with the node's own reader,
+  // since a run continues with no caller. One reader for the run, so the warning-classified records
+  // it sent are collected in one place and kept on the run (TARGET-082 review, item 2).
+  const reader = systemReader({ storage, config }, caller.gaii);
 
   const one = async (item: RunItem): Promise<void> => {
     if (flag.stop) return;
@@ -174,10 +192,10 @@ async function work(storage: Storage, config: AimeatConfig, caller: DecideCaller
         return;
       }
       // The one loader of what a model reads (services/ai-inputs.ts): the credential mask and the
-      // classification check, with the node's own reader since a run continues with no caller.
+      // classification check, with the run's reader.
       let rec: { value: unknown } | undefined;
       try {
-        [rec] = await readAiRecords({ storage, config }, systemReader({ storage, config }, caller.gaii), caller.gaii,
+        [rec] = await readAiRecords({ storage, config }, reader, caller.gaii,
           [{ key: item.subject, namespace: caller.gaii }], { capability: 'decide' });
       } catch (err) {
         if (!(err instanceof ClassificationError)) throw err;
@@ -234,6 +252,7 @@ async function work(storage: Storage, config: AimeatConfig, caller: DecideCaller
       await one(item);
       if (++sinceSave >= SAVE_EVERY) {
         sinceSave = 0;
+        noteWarnings(run, reader);
         await save(storage, caller.gaii, run).catch(err =>
           logger.warn('[decide] run progress save failed; it is saved again at the end', { id: run.id, error: String(err) }));
       }
@@ -244,6 +263,7 @@ async function work(storage: Storage, config: AimeatConfig, caller: DecideCaller
     logger.error('[decide] run failed', { id: run.id, error: String(err) });
   } finally {
     active.delete(run.id);
+    noteWarnings(run, reader);
     await save(storage, caller.gaii, run).catch(err =>
       logger.error('[decide] run final save failed', { id: run.id, error: String(err) }));
   }

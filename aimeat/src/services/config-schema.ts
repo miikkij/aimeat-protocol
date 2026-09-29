@@ -12,6 +12,8 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   v1.18.0 — 2026-09-29 — The mutable fixed-set string rows take oneOf(): the same check, and
+ *     `choices` served to the Config tab, which offers a pick instead of a text field.
  *   v1.17.0 — 2026-09-29 — classification.mode (AIMEAT_CLASSIFICATION): off, owner or all (TARGET-082).
  *   v1.16.1 — 2026-09-29 — federation.relay_claim: the description says the default is 'required'
  *     from 3.20.0 and that 'optional' is still taken when set, until 4.0.0.
@@ -76,7 +78,7 @@ import type { AimeatConfig } from '../config.js';
 import type { SiteLinksConfig } from '../config-types-site-links.js';
 import type { OperatorConfig } from '../config-types.js';
 import type { ConfigFieldShape } from './config-field-def.js';
-import { isEmptyOrHttpUrl, isContactList } from './config-schema-validators.js';
+import { isEmptyOrHttpUrl, isContactList, oneOf } from './config-schema-validators.js';
 import { SYSTEM2_AI_CONFIG_FIELDS } from './config-schema-ai.js';
 import { SEO_CONFIG_FIELDS } from './config-schema-seo.js';
 
@@ -133,7 +135,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
     validate: v => typeof v === 'string' && (v as string).length <= 200, immutable: false,
     description: 'Legal name of the data controller: the person or company running this node. Named in the privacy policy and the terms' },
   { key: 'operator.type', dotPath: 'operator.type', envVar: 'AIMEAT_OPERATOR_TYPE', type: 'string',
-    validate: v => ['natural_person', 'company', 'organisation', 'association'].includes(v as string), immutable: false,
+    ...oneOf('natural_person', 'company', 'organisation', 'association'), immutable: false,
     description: 'What kind of party that is. Decides the words the pages use ("a company", "a natural person"), so it has to match the legal reality',
     range: 'natural_person | company | organisation | association' },
   { key: 'operator.businessId', dotPath: 'operator.business_id', envVar: 'AIMEAT_OPERATOR_BUSINESS_ID', type: 'string',
@@ -226,7 +228,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
 
   // ── Federation (mutable) ──
   { key: 'maxRelayHops', dotPath: 'federation.max_relay_hops', envVar: 'AIMEAT_MAX_RELAY_HOPS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max relay hops for federated requests', range: '1-10' },
-  { key: 'federationRelayClaim', dotPath: 'federation.relay_claim', envVar: 'AIMEAT_FEDERATION_RELAY_CLAIM', type: 'string', validate: v => v === 'optional' || v === 'required', immutable: false, description: "Must an inbound relayed request carry a signed relay claim? 'required' refuses one without; 'optional' lets an older peer through and is a migration position rather than protection. The default is 'required' from 3.20.0; 'optional' is still taken when set, and is removed in 4.0.0. Until then one peer can keep its own answer (relay_claim on the peer), and the federation overview names the peers that still relay without a claim", range: 'optional | required' },
+  { key: 'federationRelayClaim', dotPath: 'federation.relay_claim', envVar: 'AIMEAT_FEDERATION_RELAY_CLAIM', type: 'string', ...oneOf('optional', 'required'), immutable: false, description: "Must an inbound relayed request carry a signed relay claim? 'required' refuses one without; 'optional' lets an older peer through and is a migration position rather than protection. The default is 'required' from 3.20.0; 'optional' is still taken when set, and is removed in 4.0.0. Until then one peer can keep its own answer (relay_claim on the peer), and the federation overview names the peers that still relay without a claim", range: 'optional | required' },
 
   // ── Rate Limits (mutable, per-endpoint with global fallback) ──
   { key: 'rlGlobal', dotPath: 'rate_limits.global', envVar: 'AIMEAT_RL_GLOBAL', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Global rate limit (requests/second)', range: '1-10000' },
@@ -260,7 +262,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'consentEnabled', dotPath: 'consent.enabled', envVar: 'AIMEAT_CONSENT_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Consent layer enabled' },
   { key: 'accountEventWindow', dotPath: 'account_events.window', envVar: 'AIMEAT_ACCOUNT_EVENT_WINDOW', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 10 && (v as number) <= 10000, immutable: false, description: 'Events kept in an account live "what has happened" window before the oldest are archived', range: '10-10000' },
   { key: 'consentAuditRetentionDays', dotPath: 'consent.audit_retention_days', envVar: 'AIMEAT_CONSENT_AUDIT_RETENTION_DAYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 3650, immutable: false, description: 'Consent audit log retention in days', range: '1-3650' },
-  { key: 'classificationMode', dotPath: 'classification.mode', envVar: 'AIMEAT_CLASSIFICATION', type: 'string', validate: v => ['off', 'owner', 'all'].includes(v as string), immutable: false, description: 'Classification: off (nothing changes), owner (each owner decides for their own content) or all (on for every owner)' },
+  { key: 'classificationMode', dotPath: 'classification.mode', envVar: 'AIMEAT_CLASSIFICATION', type: 'string', ...oneOf('off', 'owner', 'all'), immutable: false, description: 'Classification: off (nothing changes), owner (each owner decides for their own content) or all (on for every owner)' },
   { key: 'consentMaxPerUser', dotPath: 'consent.max_per_user', envVar: 'AIMEAT_CONSENT_MAX_PER_USER', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 10000, immutable: false, description: 'Max consent records per user', range: '1-10000' },
 
   // ── TOTP (Phase 0.5, mutable) ──
@@ -302,16 +304,16 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'marketplaceEscrowEnabled', dotPath: 'marketplace.escrow_enabled', envVar: 'AIMEAT_MARKETPLACE_ESCROW', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Escrow for marketplace transactions' },
 
   // ── Commerce core + fee policy (TARGET-033, mutable) ──
-  { key: 'marketplaceFeeMode', dotPath: 'commerce.fee_mode', envVar: 'AIMEAT_MARKETPLACE_FEE_MODE', type: 'string', validate: v => v === 'operator' || v === 'burn', immutable: false, description: 'Marketplace fee destination: operator (credited to node operator) or burn', range: 'operator|burn' },
+  { key: 'marketplaceFeeMode', dotPath: 'commerce.fee_mode', envVar: 'AIMEAT_MARKETPLACE_FEE_MODE', type: 'string', ...oneOf('operator', 'burn'), immutable: false, description: 'Marketplace fee destination: operator (credited to node operator) or burn', range: 'operator|burn' },
   { key: 'operatorFeeAccount', dotPath: 'commerce.operator_fee_account', envVar: 'AIMEAT_OPERATOR_FEE_ACCOUNT', type: 'string', validate: v => v === null || (typeof v === 'string' && (v as string).length <= 100), immutable: false, description: 'Owner name whose GHII receives operator-mode fees (empty = first operator-role owner)' },
   { key: 'commerceFeePercent', dotPath: 'commerce.fee_percent', envVar: 'AIMEAT_COMMERCE_FEE_PERCENT', type: 'number', validate: v => v === null || (typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 50), immutable: false, description: 'Checkout fee percentage (empty inherits marketplace tx fee percent)', range: '0-50' },
   { key: 'commerceEnabled', dotPath: 'commerce.enabled', envVar: 'AIMEAT_COMMERCE_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Checkout sessions (/v1/commerce) enabled' },
   { key: 'commerceSessionTtlMinutes', dotPath: 'commerce.session_ttl_minutes', envVar: 'AIMEAT_COMMERCE_SESSION_TTL_MINUTES', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 5 && (v as number) <= 10080, immutable: false, description: 'Open checkout-session lifetime in minutes', range: '5-10080' },
-  { key: 'mcpCardCommerceTools', dotPath: 'commerce.mcp_card_tools', envVar: 'AIMEAT_MCP_CARD_COMMERCE_TOOLS', type: 'string', validate: v => v === 'inline' || v === 'pointer', immutable: false, description: 'MCP Server Card commerce_tools mode: inline (embed priced app-tool catalog) or pointer (link /v1/commerce/tools)' },
+  { key: 'mcpCardCommerceTools', dotPath: 'commerce.mcp_card_tools', envVar: 'AIMEAT_MCP_CARD_COMMERCE_TOOLS', type: 'string', ...oneOf('inline', 'pointer'), immutable: false, description: 'MCP Server Card commerce_tools mode: inline (embed priced app-tool catalog) or pointer (link /v1/commerce/tools)' },
   { key: 'contentSignal', dotPath: 'site.content_signal', envVar: 'AIMEAT_CONTENT_SIGNAL', type: 'string', validate: v => typeof v === 'string' && (v.trim() === '' || /^(off|(search|ai-input|ai-train)=(yes|no)(\s*,\s*(search|ai-input|ai-train)=(yes|no)){0,2})$/i.test(v.trim())), immutable: false, description: 'robots.txt Content Signals Policy directive (contentsignals.org), e.g. "search=yes, ai-input=yes, ai-train=no"; "off" removes it; empty pairs it to AIMEAT_AI_TRAINING' },
-  { key: 'aiTraining', dotPath: 'site.ai_training', envVar: 'AIMEAT_AI_TRAINING', type: 'string', validate: v => v === 'allow' || v === 'deny', immutable: false, description: 'Allow AI training crawlers in robots.txt ("allow" | "deny"). Search and retrieval bots are always allowed' },
-  { key: 'appBadge', dotPath: 'site.app_badge', envVar: 'AIMEAT_APP_BADGE', type: 'string', validate: v => v === 'aimeat' || v === 'off', immutable: false, description: 'The "aimeat.io · Publish your own app for free" badge on every served app: "aimeat" keeps it (default), "off" removes it from every app on this node. An owner can still switch it off per app' },
-  { key: 'frontPage', dotPath: 'site.front_page', envVar: 'AIMEAT_FRONT_PAGE', type: 'string', validate: v => v === 'classic' || v === 'demo' || v === 'os', immutable: false, description: 'Which front page the root serves to browsers: "classic" (the SPA landing), "demo" (the static showroom, public/front-demo.html) or "os" (the static OS page, public/front-os.html)' },
+  { key: 'aiTraining', dotPath: 'site.ai_training', envVar: 'AIMEAT_AI_TRAINING', type: 'string', ...oneOf('allow', 'deny'), immutable: false, description: 'Allow AI training crawlers in robots.txt ("allow" | "deny"). Search and retrieval bots are always allowed' },
+  { key: 'appBadge', dotPath: 'site.app_badge', envVar: 'AIMEAT_APP_BADGE', type: 'string', ...oneOf('aimeat', 'off'), immutable: false, description: 'The "aimeat.io · Publish your own app for free" badge on every served app: "aimeat" keeps it (default), "off" removes it from every app on this node. An owner can still switch it off per app' },
+  { key: 'frontPage', dotPath: 'site.front_page', envVar: 'AIMEAT_FRONT_PAGE', type: 'string', ...oneOf('classic', 'demo', 'os'), immutable: false, description: 'Which front page the root serves to browsers: "classic" (the SPA landing), "demo" (the static showroom, public/front-demo.html) or "os" (the static OS page, public/front-os.html)' },
   { key: 'webBotAuthSign', dotPath: 'federation.web_bot_auth_sign', envVar: 'AIMEAT_WEB_BOT_AUTH_SIGN', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Sign outbound HTTP with the node Ed25519 key (RFC 9421 Web Bot Auth); the key directory is always served' },
   { key: 'installSetPath', dotPath: 'packages.install_set', envVar: 'AIMEAT_INSTALL_SET', type: 'string', validate: v => v === null || typeof v === 'string', immutable: true, description: 'An install set file (JSON, spec aimeat.install-set/1) this node applies at start-up: the owner user, a bundle\'s packages, its organisms, the other users and the crew agents. Applying again creates nothing twice, so the file may stay. Unset: nothing is applied' },
   { key: 'installSetSecretsPath', dotPath: 'packages.install_set_secrets', envVar: 'AIMEAT_INSTALL_SET_SECRETS', type: 'string', validate: v => v === null || typeof v === 'string', immutable: true, description: 'A JSON file of the secret config values for that install set; read at start-up and never stored in the record of the apply' },
@@ -338,7 +340,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'extensionMaxApiCalls', dotPath: 'extensions.max_api_calls', envVar: 'AIMEAT_EXT_MAX_API_CALLS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 10000, immutable: false, description: 'Max API calls per extension execution', range: '1-10000' },
   { key: 'extensionMaxCodeSizeKb', dotPath: 'extensions.max_code_size_kb', envVar: 'AIMEAT_EXT_MAX_CODE_SIZE_KB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 16 && (v as number) <= 2048, immutable: false, description: 'Max code size per extension (KB)', range: '16-2048' },
   { key: 'extensionMaxInstalled', dotPath: 'extensions.max_installed', envVar: 'AIMEAT_EXT_MAX_INSTALLED', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 100, immutable: false, description: 'Max installed extensions', range: '1-100' },
-  { key: 'extInstallRole', dotPath: 'extensions.install_role', envVar: 'AIMEAT_EXT_INSTALL_ROLE', type: 'string', validate: v => ['operator', 'owner'].includes(v as string), immutable: false, description: 'Role required to install extensions: operator or owner' },
+  { key: 'extInstallRole', dotPath: 'extensions.install_role', envVar: 'AIMEAT_EXT_INSTALL_ROLE', type: 'string', ...oneOf('operator', 'owner'), immutable: false, description: 'Role required to install extensions: operator or owner' },
   { key: 'maxExtensionsPerOwner', dotPath: 'extensions.max_per_owner', envVar: 'AIMEAT_MAX_EXTENSIONS_PER_OWNER', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 100, immutable: false, description: 'Max extensions per owner', range: '1-100' },
 
 
@@ -359,7 +361,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'genesisSyncIntervalHours', dotPath: 'cross_federation.sync_interval_hours', envVar: 'AIMEAT_GENESIS_SYNC_INTERVAL_HOURS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 168, immutable: false, description: 'Hours between genesis sync rounds', range: '1-168' },
 
   // ── Federation Data Sync (mutable) ──
-  { key: 'syncMode', dotPath: 'federation_sync.mode', envVar: 'AIMEAT_SYNC_MODE', type: 'string', validate: v => ['bulk', 'instant', 'hybrid'].includes(v as string), immutable: false, description: 'Sync mode: bulk (scheduled), instant (event-driven), or hybrid (both)' },
+  { key: 'syncMode', dotPath: 'federation_sync.mode', envVar: 'AIMEAT_SYNC_MODE', type: 'string', ...oneOf('bulk', 'instant', 'hybrid'), immutable: false, description: 'Sync mode: bulk (scheduled), instant (event-driven), or hybrid (both)' },
   { key: 'syncIntervalHours', dotPath: 'federation_sync.interval_hours', envVar: 'AIMEAT_SYNC_INTERVAL_HOURS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 168, immutable: false, description: 'Hours between scheduled sync rounds', range: '1-168' },
   { key: 'syncBatchDelayMs', dotPath: 'federation_sync.batch_delay_ms', envVar: 'AIMEAT_SYNC_BATCH_DELAY_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 100 && (v as number) <= 60000, immutable: false, description: 'Event batching window in ms (instant/hybrid mode)', range: '100-60000' },
   { key: 'replicationQueueMax', dotPath: 'federation_sync.replication_queue_max', envVar: 'AIMEAT_REPLICATION_QUEUE_MAX', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 100 && (v as number) <= 100000, immutable: false, description: 'Max replication queue entries', range: '100-100000' },
@@ -387,9 +389,9 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // ── Federation (mutable, additional) ──
   { key: 'depeeringGracePeriodHours', dotPath: 'federation.depeering_grace_hours', envVar: 'AIMEAT_DEPEERING_GRACE_HOURS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Grace period before depeering in hours', range: '1-720' },
   { key: 'keyCacheRefreshMinutes', dotPath: 'federation.key_cache_refresh_minutes', envVar: 'AIMEAT_KEY_CACHE_REFRESH_MINUTES', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Minutes between key cache refreshes', range: '1-60' },
-  { key: 'federationRole', dotPath: 'federation.role', envVar: 'AIMEAT_FEDERATION_ROLE', type: 'string', validate: v => ['operator', 'contributor', 'standalone'].includes(v as string), immutable: false, description: 'Federation role: operator, contributor, or standalone' },
+  { key: 'federationRole', dotPath: 'federation.role', envVar: 'AIMEAT_FEDERATION_ROLE', type: 'string', ...oneOf('operator', 'contributor', 'standalone'), immutable: false, description: 'Federation role: operator, contributor, or standalone' },
   { key: 'genesisUrl', dotPath: 'federation.genesis_url', envVar: 'AIMEAT_GENESIS_URL', type: 'string', validate: () => true, immutable: false, description: 'Genesis node URL for federation' },
-  { key: 'federationAuthPolicy', dotPath: 'federation.auth_policy', envVar: 'AIMEAT_FEDERATION_AUTH_POLICY', type: 'string', validate: v => ['disabled', 'all_peers', 'specific_peers'].includes(v as string), immutable: false, description: 'Federation auth policy: disabled, all_peers, or specific_peers' },
+  { key: 'federationAuthPolicy', dotPath: 'federation.auth_policy', envVar: 'AIMEAT_FEDERATION_AUTH_POLICY', type: 'string', ...oneOf('disabled', 'all_peers', 'specific_peers'), immutable: false, description: 'Federation auth policy: disabled, all_peers, or specific_peers' },
   { key: 'federationDefaultScopes', dotPath: 'federation.default_scopes', envVar: 'AIMEAT_FEDERATION_DEFAULT_SCOPES', type: 'string', validate: () => true, immutable: false, description: 'Default scopes for federated users (comma-separated)' },
   { key: 'federationOpenJoin', dotPath: 'federation.open_join', envVar: 'AIMEAT_FEDERATION_OPEN_JOIN', type: 'boolean', validate: () => true, immutable: false, description: 'Open join: a signed introduce self-admits as a low-trust visiting peer (no manual approval)' },
   { key: 'federationBookListed', dotPath: 'federation.book_listed', envVar: 'AIMEAT_FEDERATION_BOOK_LISTED', type: 'boolean', validate: () => true, immutable: false, description: 'List this node (operators + resources) in the federation book; off = privacy opt-out' },
@@ -472,7 +474,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'totpBackupCodeCount', dotPath: 'totp.backup_code_count', envVar: 'AIMEAT_TOTP_BACKUP_CODE_COUNT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 20, immutable: true, description: 'Number of TOTP backup codes to generate', range: '1-20' },
 
   // ── MSM (mutable) ──
-  { key: 'msmInstallRole', dotPath: 'msm.install_role', envVar: 'AIMEAT_MSM_INSTALL_ROLE', type: 'string', validate: v => ['operator', 'owner'].includes(v as string), immutable: false, description: 'Role required to install MSM modules: operator or owner' },
+  { key: 'msmInstallRole', dotPath: 'msm.install_role', envVar: 'AIMEAT_MSM_INSTALL_ROLE', type: 'string', ...oneOf('operator', 'owner'), immutable: false, description: 'Role required to install MSM modules: operator or owner' },
 
   // ── Personal Nodes (mutable, additional) ──
   { key: 'personalNodeMailboxQuotaMb', dotPath: 'personal_nodes.mailbox_quota_mb', envVar: 'AIMEAT_PERSONAL_MAILBOX_QUOTA_MB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Personal node mailbox quota in MB', range: '1-1000' },
@@ -533,16 +535,16 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
 
   // ── Stats & Metrics (mutable) ──
   { key: 'statsEnabled', dotPath: 'stats.enabled', envVar: 'AIMEAT_STATS_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable stats API' },
-  { key: 'statsAccess', dotPath: 'stats.access', envVar: 'AIMEAT_STATS_ACCESS', type: 'string', validate: v => ['public', 'authenticated', 'operator'].includes(v as string), immutable: false, description: 'Stats API visibility: public, authenticated, or operator' },
+  { key: 'statsAccess', dotPath: 'stats.access', envVar: 'AIMEAT_STATS_ACCESS', type: 'string', ...oneOf('public', 'authenticated', 'operator'), immutable: false, description: 'Stats API visibility: public, authenticated, or operator' },
   { key: 'metricsEnabled', dotPath: 'metrics.enabled', envVar: 'AIMEAT_METRICS_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable Prometheus metrics endpoint' },
-  { key: 'metricsAccess', dotPath: 'metrics.access', envVar: 'AIMEAT_METRICS_ACCESS', type: 'string', validate: v => ['public', 'authenticated', 'operator'].includes(v as string), immutable: false, description: 'Metrics endpoint visibility: public, authenticated, or operator' },
+  { key: 'metricsAccess', dotPath: 'metrics.access', envVar: 'AIMEAT_METRICS_ACCESS', type: 'string', ...oneOf('public', 'authenticated', 'operator'), immutable: false, description: 'Metrics endpoint visibility: public, authenticated, or operator' },
 
   // ── MCP sessions (mutable) ──
   { key: 'mcpSessionIdleMinutes', dotPath: 'mcp.session_idle_minutes', envVar: 'AIMEAT_MCP_SESSION_IDLE_MINUTES', type: 'number', validate: v => typeof v === 'number' && (v as number) >= 0.05 && (v as number) <= 1440, immutable: false, description: 'Close an MCP session after this many minutes without a request (fractions allowed; a reaped client re-initializes)', range: '0.05-1440' },
   { key: 'mcpSessionSweepMs', dotPath: 'mcp.session_sweep_ms', envVar: 'AIMEAT_MCP_SESSION_SWEEP_MS', type: 'number', validate: v => typeof v === 'number' && (v as number) >= 250 && (v as number) <= 600000, immutable: true, description: 'How often the idle sweep looks for sessions to close, in milliseconds (read at boot)', range: '250-600000' },
 
   // ── Registration (mutable) ──
-  { key: 'registrationMode', dotPath: 'registration.mode', envVar: 'AIMEAT_REGISTRATION_MODE', type: 'string', validate: v => ['open', 'oauth', 'invite', 'closed'].includes(v as string), immutable: false, description: 'Who may get a new account: open (everyone), oauth (first sign-in through a configured identity provider, or an invitation — no password registration), invite (member-minted invitations only), closed (nobody). Existing accounts always sign in.' },
+  { key: 'registrationMode', dotPath: 'registration.mode', envVar: 'AIMEAT_REGISTRATION_MODE', type: 'string', ...oneOf('open', 'oauth', 'invite', 'closed'), immutable: false, description: 'Who may get a new account: open (everyone), oauth (first sign-in through a configured identity provider, or an invitation — no password registration), invite (member-minted invitations only), closed (nobody). Existing accounts always sign in.' },
 
   // ── Scoped Agent Capabilities (mutable) ──
   { key: 'defaultAgentScopes', dotPath: 'scopes.default_agent_scopes', envVar: 'AIMEAT_DEFAULT_AGENT_SCOPES', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'Default agent capability scopes (comma-separated)' },
@@ -633,7 +635,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // touched by this. `off` is accepted here as a value and REFUSED at runtime on a node whose
   // security profile is public (config.ts coerces it to strict and says so in the posture
   // warnings), so the one combination that must be unreachable by accident stays unreachable.
-  { key: 'aiLabelPublic', dotPath: 'ai.label_public', envVar: 'AIMEAT_AI_LABEL_PUBLIC', type: 'string', validate: v => v === 'strict' || v === 'light' || v === 'off', immutable: false, description: 'How eagerly a VISIBLE AI label is shown ("strict" | "light" | "off"). strict also labels what Article 50 exempts, so an app or a legal page with a named reviewer keeps the light "a model was involved" label; light shows only what the law requires, so the reviewer lifts it; off shows none and is refused on a public node. The interactive notice and the machine planes never change' },
+  { key: 'aiLabelPublic', dotPath: 'ai.label_public', envVar: 'AIMEAT_AI_LABEL_PUBLIC', type: 'string', ...oneOf('strict', 'light', 'off'), immutable: false, description: 'How eagerly a VISIBLE AI label is shown ("strict" | "light" | "off"). strict also labels what Article 50 exempts, so an app or a legal page with a named reviewer keeps the light "a model was involved" label; light shows only what the law requires, so the reviewer lifts it; off shows none and is refused on a public node. The interactive notice and the machine planes never change' },
   { key: 'modelDefaultImage', dotPath: 'ai.model_default_image', envVar: 'AIMEAT_MODEL_DEFAULT_IMAGE', type: 'string', validate: () => true, immutable: false, description: 'Default model for generating images. Must produce image output' },
   { key: 'sttLanguageDefault', dotPath: 'ai.stt_language_default', envVar: 'AIMEAT_STT_LANGUAGE_DEFAULT', type: 'string', validate: () => true, immutable: false, description: 'Language hint for transcription (e.g. fi) when the owner has not set one' },
   // The System 2 rows (providers, recommended models, the model catalogue) live in

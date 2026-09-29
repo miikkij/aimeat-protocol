@@ -92,6 +92,10 @@
  *   v1.17.0 -- 2026-09-29 -- The list, GET /v1/pub, HEAD and GET /v1/storage pass the classification
  *     reader on the metadata, before any access decision or byte read (TARGET-082). A file the
  *     caller may not see answers as absent; a download handle is minted only after it.
+ *   v1.18.0 -- 2026-09-29 -- TARGET-082 review: GET /v1/pub runs the classification reader AFTER its
+ *     visibility and consent decision, as GET /v1/memory/:gaii/:key now does, so an outsider leaves no
+ *     refusal row in the owner's classification audit log. An admitted caller the label hides the
+ *     file from still gets 404; a caller the access decision refuses gets that refusal, as for any file.
  */
 import { Router } from 'express';
 import type { Request } from 'express';
@@ -375,13 +379,16 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         // Metadata first, and the bytes only after the access decision below. The authorization
         // inputs — visibility, groupId, workspaceRef — all live in the metadata, so a request that
         // ends in 403 or 404 no longer reads a 25 MB file on its way there.
-        // The classification reader (TARGET-082) first: a file this caller may not see answers as absent.
-        const meta = await storage.getStorageFileMeta(gaii, key);
-        const [file] = meta ? await contentReaderFor({ storage, config }, req.auth).show([meta], () => fileTarget(gaii, key)) : [];
+        const file = await storage.getStorageFileMeta(gaii, key);
         if (!file) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));
             return;
         }
+        // The classification reader (TARGET-082) runs once the access decision below has admitted the
+        // caller, so an outsider writes no refusal row into the owner's classification audit log
+        // (TARGET-082 review). A file the admitted caller may not see answers as absent.
+        const hiddenFromCaller = async (): Promise<boolean> =>
+            !(await contentReaderFor({ storage, config }, req.auth).show([file], () => fileTarget(gaii, key)))[0];
 
         // ?mode=handle — answer an ALLOWED read with a presigned URL + metadata instead of the bytes.
         // Same access decision as the byte path (this runs only after it passes); the caller just gets
@@ -412,6 +419,10 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
                 visibility: 'public',
                 action: 'read',
             });
+            if (await hiddenFromCaller()) {
+                res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));
+                return;
+            }
             if (handleMode) { await sendHandle(req.auth?.sub ? resolveIdentity(req.auth, config.nodeId) : gaii); return; }
             // A public file is world-readable by definition, and for a long time only by <img>: a
             // script that fetched the same bytes got no Access-Control-Allow-Origin and was blocked.
@@ -491,6 +502,10 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
                 return;
             }
             res.status(403).json(error(config.nodeId, 'CONSENT_DENIED', `You have not given permission for this: ${result.reason}. You can change what you share in Profile → Consent.`));
+            return;
+        }
+        if (await hiddenFromCaller()) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));
             return;
         }
 

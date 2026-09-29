@@ -1909,6 +1909,8 @@ components:
             reads via /v1/memory/{gaii}/{key} AND on every write response, because with `owner_scope`
             a caller can now place a record somewhere other than its own namespace and needs to be
             told which.
+        classificationWarning:
+          $ref: '#/components/schemas/ClassificationWarning'
         also_under:
           type: array
           items:
@@ -1930,6 +1932,57 @@ components:
               format: date-time
             visibility:
               type: string
+
+    ClassificationWarning:
+      type: object
+      description: >
+        Present when an AI reader is shown content whose classification label carries a warning
+        (TARGET-082): use the content only for the task at hand and do not copy it elsewhere. Absent
+        for a person, and for content without such a label.
+      required: [label, name, says]
+      properties:
+        label:
+          type: string
+          description: The label's id.
+        name:
+          type: string
+          description: The label's English name.
+        says:
+          type: string
+          description: What the reader is asked to do with the content.
+
+    ClassificationWarnings:
+      type: array
+      description: >
+        `classification_warnings` on the answer of an AI call (TARGET-082): the items the model was
+        given whose classification label carries a warning, one entry per item. Absent when there
+        were none. The caller uses the answer only for the task at hand and does not copy the
+        content elsewhere.
+      items:
+        allOf:
+          - $ref: '#/components/schemas/ClassificationWarning'
+          - type: object
+            required: [key]
+            properties:
+              key:
+                type: string
+                description: The item's memory key or storage key.
+
+    ClassificationLeftOut:
+      type: object
+      description: >
+        One item an export or a bundle left behind because its classification label does not let it
+        leave its organism (TARGET-082).
+      required: [key, label, reason]
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+          description: The label's id.
+        reason:
+          type: string
+          description: Why it stayed, in words.
 
     # === Actions ===
     ActionPublish:
@@ -8082,6 +8135,11 @@ paths:
         their GHII: the work on actions they published in person, and the requests they made in
         person. Each agent carries its own `work_provided` and `work_requested` beside them, and
         `disputes` covers the work in both.
+
+        Memory passes the classification check for an export (TARGET-082): an organism's record held
+        under the person's or an agent's name whose label does not let it leave its organism is not in
+        `memories`; `left_out` names it ({ key, label, reason }, ClassificationLeftOut). The person's
+        own records are theirs to export and always come out.
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -14679,13 +14737,33 @@ paths:
         (TARGET-082). `stored` is what the level keeps itself; `effective` is what applies to its
         content, the node's policy merged with the layer. `active` says whether classification is on
         for this level's content, and `proposal` is an AI's loosening waiting for a person.
+        `dropped` lists, one sentence each, what the server left out of the stored layer because the
+        node's policy now covers it.
       tags: [Memory]
       security: [{ bearerAuth: [] }]
       parameters:
         - { name: level, in: query, schema: { type: string, enum: [node, owner, organism], default: owner } }
         - { name: organism_id, in: query, schema: { type: string }, description: The organism, at level organism. }
       responses:
-        '200': { description: The level's policy. }
+        '200':
+          description: 'The level: { level, subject, mode, active, stored, effective, proposal, history, dropped }.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      level: { type: string, enum: [node, owner, organism] }
+                      subject: { type: string }
+                      mode: { type: string, enum: ['off', owner, all] }
+                      active: { type: boolean }
+                      stored: { type: object, nullable: true }
+                      effective: { type: object }
+                      proposal: { type: object, nullable: true }
+                      history: { type: array, items: { type: object } }
+                      dropped: { type: array, items: { type: string }, description: 'What the server dropped from the stored layer because the node now covers it.' }
         '404': { description: No such organism, or the caller is not a member. }
     put:
       summary: Replace the classification policy at one level
@@ -14783,6 +14861,58 @@ paths:
         '403': { description: Not an operator (node level). }
         '404': { description: No such organism, or not its creator or an admin. }
 
+  /v1/classification/labels:
+    get:
+      summary: The classifications stored on the caller's content, a page at a time
+      description: |
+        The explorer. Level owner lists the caller's owner's own content and the content their
+        agents and ecosystem apps wrote; level organism lists an organism's content, for its creator
+        or an admin. Only stored classifications are listed: content without one reads as the
+        policy's default. `pending=true` keeps the items where a suggestion waits for a person.
+        Where classification is on, an AI caller is not shown an item hidden from AI, and nobody is
+        shown an item whose label's audience leaves them out. Pass `next` back as `cursor`.
+      tags: [Memory]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: level, in: query, schema: { type: string, enum: [owner, organism], default: owner } }
+        - { name: organism_id, in: query, schema: { type: string } }
+        - { name: label, in: query, schema: { type: string }, description: Only items with this label id. }
+        - { name: pending, in: query, schema: { type: boolean, default: false } }
+        - { name: kind, in: query, schema: { type: string, enum: [memory, file, row] } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: '{ level, subject, items, next, scanned }. Each item: kind, key, scope, organismId, owner, label, labelDetail, source, locked, suggestion (with its labelDetail), justification, humanSaid, setBy, updatedAt.'
+        '400': { description: A field is not valid, or the cursor is not one this list gave out. }
+        '401': { description: Not signed in. }
+        '404': { description: No such organism, or not its creator or an admin. }
+
+  /v1/classification/switch:
+    put:
+      summary: Set the node's classification switch (operator)
+      description: |
+        The node's `classification.mode`: off, owner (each owner decides for their own content) or
+        all. The operator in person, or the operator's agent holding `operator:admin`. Turning it
+        off, or from all to owner, gives protection away and is refused from an AI credential
+        (PERSON_REQUIRED): the operator does it on the admin Config page. Every change is kept in the
+        classification audit log (action `changed`, key `classification.mode`), readable at level node.
+      tags: [Memory]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mode]
+              properties:
+                mode: { type: string, enum: ['off', owner, all] }
+      responses:
+        '200': { description: '{ applied, mode, from }. applied is false when the switch already had that value.' }
+        '400': { description: mode is not off, owner or all. }
+        '403': { description: 'OPERATOR_REQUIRED, SEALED_CONFIG, or PERSON_REQUIRED for an AI loosening.' }
+
   /v1/classification/label:
     get:
       summary: The classification of one piece of content
@@ -14796,6 +14926,7 @@ paths:
         - { name: ws, in: query, schema: { type: string } }
         - { name: space, in: query, schema: { type: string } }
         - { name: row_id, in: query, schema: { type: string } }
+        - { name: owner, in: query, schema: { type: string }, description: "A memory key or a stored file held by one of the caller's owner's agents or apps: that identity. Absent: the owner's own." }
       responses:
         '200': { description: The classification. }
         '404': { description: No such content, or not the caller's to read. }
@@ -14822,6 +14953,7 @@ paths:
                 ws: { type: string }
                 space: { type: string }
                 row_id: { type: string }
+                owner: { type: string, description: "A memory key or a stored file held by one of the caller's owner's agents or apps: that identity. Absent: the owner's own." }
                 label: { type: string }
                 justification: { type: string }
                 humanSaid: { type: string }
@@ -14852,6 +14984,7 @@ paths:
                 ws: { type: string }
                 space: { type: string }
                 row_id: { type: string }
+                owner: { type: string, description: "A memory key or a stored file held by one of the caller's owner's agents or apps: that identity. Absent: the owner's own." }
                 decision: { type: string, enum: [accept, reject] }
                 justification: { type: string }
                 humanSaid: { type: string }
@@ -14983,7 +15116,10 @@ paths:
     get:
       operationId: readMemory
       summary: Read memory
-      description: Read a specific memory entry by key. Requires authentication. For unauthenticated public reads, use GET /v1/memory/{gaii}/{key} instead.
+      description: >-
+        Read a specific memory entry by key. Requires authentication. For unauthenticated public reads,
+        use GET /v1/memory/{gaii}/{key} instead. An AI shown a warning-classified record gets
+        `classificationWarning` (TARGET-082), as each item of GET /v1/memory and GET /v1/memory/search does.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -15282,12 +15418,30 @@ paths:
       responses:
         '200':
           description: >-
-            JSON backup: { exported_at, node_id, count, entries[] }. Each entry includes its
+            JSON backup: { exported_at, node_id, count, entries[], left_out[]? }. Each entry includes its
             ai_provenance_id when present, for same-node restores that can verify its owner and content.
+            An organism's record held under the caller's name whose classification does not let it leave
+            its organism is not in `entries`; it is named in `left_out` with its label and why (TARGET-082).
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AimeatEnvelope'
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          exported_at: { type: string, format: date-time }
+                          node_id: { type: string }
+                          count: { type: integer }
+                          entries:
+                            type: array
+                            items: { type: object }
+                          left_out:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/ClassificationLeftOut'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -15479,7 +15633,9 @@ paths:
         "collection cart"). The archive contains memory/<key>.json for each entry, files/<key> for each
         file, and a manifest.json listing every item with its public URL. Owner-scoped: each item must
         be owned by the caller or one of their agents; non-owned or missing items are skipped and noted
-        in the manifest. Responds 404 if nothing accessible was bundled.
+        in the manifest. An organism's record whose classification does not let it leave its organism
+        is skipped with reason `classified`, its `label` and a `detail` (TARGET-082). Responds 404 if
+        nothing accessible was bundled.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -15643,6 +15799,8 @@ paths:
             data.policy_chose_model is true when the owner's model policy chose the model. data.route
             is { capability, chosenBy, answeredBy: { provider, model }, attempts: [{ provider, model,
             ok | error, costUsd }], fellBack }. The provenance record rides in meta.provenance.
+            data.classification_warnings (ClassificationWarnings) names the files the model was given
+            whose classification carries a warning; absent when there were none.
           content:
             application/json:
               schema:
@@ -15661,9 +15819,10 @@ paths:
           $ref: '#/components/responses/AimeatError'
         '403':
           description: >
-            Refused: the caller lacks `ai:use`, the app is not on the owner's allowlist, or the model
+            Refused: the caller lacks `ai:use`, the app is not on the owner's allowlist, the model
             policy refused (`AI_MODEL_NOT_ALLOWED` with `error.details.allowed`, `layer`, `source`;
-            `AI_MODEL_POLICY_EMPTY` with `error.details.layers`).
+            `AI_MODEL_POLICY_EMPTY` with `error.details.layers`), or a file in `files` is classified
+            so that no model may read it (`CLASSIFIED`, before anything is spent).
           content:
             application/json:
               schema:
@@ -16498,7 +16657,9 @@ paths:
                     action: { type: string }
       responses:
         '202':
-          description: Accepted. `data` is `{ job_id, state, queue_position }`.
+          description: >
+            Accepted. `data` is `{ job_id, state, queue_position }`, plus `classification_warnings`
+            (ClassificationWarnings) when the assembled prompt holds warning-classified records.
           content:
             application/json:
               schema:
@@ -16592,7 +16753,9 @@ paths:
       description: >
         The record, live or finished. Reachable only by its owner, resolved server-side and never
         from anything the caller sends; another owner's id is a 404 rather than a 403, because whose
-        jobs exist is not a stranger's business.
+        jobs exist is not a stranger's business. `classification_warnings` (ClassificationWarnings)
+        names the warning-classified items the job gave its model: the prompt's records, and a
+        transcription's audio once it ran.
 
 
         Requires an owner session or a token carrying `ai:use`.
@@ -17402,7 +17565,10 @@ paths:
     get:
       operationId: getDecideRun
       summary: One run with its per-item results
-      description: A run this process is no longer working on reads as `interrupted` and can be resumed.
+      description: >
+        A run this process is no longer working on reads as `interrupted` and can be resumed.
+        `classification_warnings` (ClassificationWarnings) names the warning-classified records the
+        run sent to the decision model; the list and the start, stop and resume answers carry it too.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -17881,6 +18047,8 @@ paths:
                           text: { type: string }
                           model: { type: string }
                           language: { type: string, nullable: true }
+                          classification_warnings:
+                            $ref: '#/components/schemas/ClassificationWarnings'
                           seconds:
                             type: number
                             description: Audio duration as the provider measured it; 0 if unreported.
@@ -20795,6 +20963,12 @@ paths:
         or CONSENT_REQUIRED, 404 NOT_FOUND for an organism that does not exist). A
         Design Book part is not copied: 403 DESIGN_BOOK_PART names GET /v1/designbook/{id},
         the one door that reads a part.
+
+        The source is read the way GET /v1/memory/{gaii}/{key} reads it: a record the caller's
+        classification hides from them answers 404 like an absent one (TARGET-082). Where
+        classification is on, the copy keeps the source's label, never lower: the answer's
+        `classification` names the label set on the copy, and a source label the copy's policy does
+        not have refuses the copy with 403 CLASSIFIED.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -20819,7 +20993,23 @@ paths:
                   description: Visibility for the copied entry
       responses:
         '200':
-          $ref: '#/components/responses/AimeatSuccess'
+          description: 'Copied: { key, copied_from, version, classification? }'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          key: { type: string }
+                          copied_from: { type: string }
+                          version: { type: integer }
+                          classification:
+                            type: string
+                            description: The label id the copy took from its source, when one was set.
         '403':
           $ref: '#/components/responses/AimeatError'
         '404':
@@ -20888,7 +21078,9 @@ paths:
       description: |
         Save a local memory entry back to the user's home node via federation
         replication. Only available for federated sessions. The remote node sends
-        the entry to the home node's /v1/federation/replicate endpoint.
+        the entry to the home node's /v1/federation/replicate endpoint. An entry whose
+        classification does not let it leave its organism is not sent: 403 CLASSIFIED names
+        its label (TARGET-082).
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -20926,6 +21118,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/AimeatError'
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -21243,6 +21437,13 @@ paths:
         through the Design Book, the one door that reads it: this door answers
         403 DESIGN_BOOK_PART, with or without `soft`, and its `details.door` names
         GET /v1/designbook/{id}.
+
+        Classification (TARGET-082): the visibility and consent decision runs first; a caller it
+        admits and whose classification hides the record gets 404, as for a missing one. An
+        organism's record (a key under `organism.<id>.`) read by someone who is not an active member
+        of that organism, whether a group share or the record's own visibility (`public`, `members`)
+        let them in, answers 403 CLASSIFIED with `details.label` when its classification keeps it
+        inside its organism. An AI shown a warning-classified record gets `classificationWarning`.
       tags: [Memory]
       parameters:
         - name: gaii
@@ -25701,7 +25902,9 @@ paths:
       summary: View config
       description: |
         Operator only. Returns every non-hidden config field with its value, type, range,
-        provenance (`source`) and whether it can be edited.
+        provenance (`source`) and whether it can be edited. A string field that takes only a fixed
+        set of values carries `choices`, the list of those values; the value stored and sent back
+        on PUT is one of them as it is.
 
         SEALED FIELDS. On a node one party runs on behalf of another, the party that STARTED the
         node may nominate paths as read-only (`AIMEAT_SEALED_CONFIG_KEYS`). Such a field carries
@@ -34667,7 +34870,9 @@ paths:
         persisted back: `_createdAt`, `_updatedAt`, `_version`, and — when the record has an AI
         provenance record attached — `_aiProvenance` (the `aimeat.provenance/v1` document, projected
         for `AIMEAT_AI_PROVENANCE_DETAIL`) plus `_aiProvenanceUrl`. Absence means UNSTATED, never
-        "a human wrote it".
+        "a human wrote it". An AI shown a warning-classified record (TARGET-082) finds
+        `_classificationWarning` (ClassificationWarning) on it, and `classificationWarnings` lists
+        every such record of the read, the manifest and readme included.
       tags: [Organisms]
       security:
         - BearerAuth: []
@@ -34736,6 +34941,17 @@ paths:
                               type: array
                               items: {}
                             description: Records keyed by the manifest's objectType name
+                          classificationWarnings:
+                            type: array
+                            description: >
+                              Present for an AI reader when the read showed warning-classified records
+                              (TARGET-082): one per record, `{ key, label, name }`.
+                            items:
+                              type: object
+                              properties:
+                                key: { type: string }
+                                label: { type: string }
+                                name: { type: string }
                           schemas:
                             type: object
                             additionalProperties:
@@ -35923,7 +36139,9 @@ paths:
         Exports a workspace as a ZIP (`workspace.json` with the manifest, locked schemas, all object
         versions/drafts, sections, sources + image metadata, and an `images/` folder of the real
         binaries). Workspace creator or org admin. Add `?format=base64` to get a size-capped base64
-        JSON payload instead of the binary (for programmatic/MCP callers).
+        JSON payload instead of the binary (for programmatic/MCP callers). What the classification
+        keeps out of an export (TARGET-082) is named in `workspace.json` `leftOut` and, in base64
+        mode, in `left_out` (ClassificationLeftOut items).
       tags: [Organisms]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -36625,7 +36843,9 @@ paths:
         Exports the organism's settings + every workspace the caller can read (each under
         workspaces/{ws}/) as one ZIP. Any ACTIVE MEMBER may export — the bundle contains only what
         the member can already read live. `?format=base64` returns a size-capped base64 JSON
-        payload instead of the binary. Membership/board are not exported.
+        payload instead of the binary. Membership/board are not exported. What the classification
+        keeps out (TARGET-082) is named per workspace in `workspace.json` `leftOut`, across the bundle
+        in `organism.json` `leftOut`, and in base64 mode in `left_out` (each item adds its `ws`).
       tags: [Organisms]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -43672,6 +43892,10 @@ paths:
     get:
       operationId: genesisMemoryReadPublic
       summary: Read memory from genesis peer (public)
+      description: >-
+        Answers { results, total, withheld? }. Records whose classification does not let them leave
+        their organism are not sent (TARGET-082); `withheld` counts them with one reason
+        ({ count, reason }) and never names their keys, which are logged on this node.
       tags: [Federation]
       parameters:
         - name: gaii
@@ -49807,6 +50031,8 @@ paths:
                           reused:
                             type: boolean
                             description: true = returned from storage, no provider call, no charge.
+                          classification_warnings:
+                            $ref: '#/components/schemas/ClassificationWarnings'
                           usage:
                             type: object
                             properties:

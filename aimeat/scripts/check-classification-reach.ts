@@ -28,6 +28,10 @@
  *   cd aimeat && pnpm check:classification-reach --shrink   # lower counts that fell; nothing else
  *   cd aimeat && pnpm check:classification-reach --seed     # rewrite from the tree, keeping reasons
  * @version-history
+ *   v1.1.0 — 2026-09-29 — TARGET-082 review: counts the reads the seed missed (listMemoryHistory,
+ *     listDeletedMemory, listAllDeletedMemory, listMemoryKeysByPrefix, readStorageFileRange,
+ *     listStorageFilesForOwners) and the download-token mint (generateDownloadToken), and a memory
+ *     service read on `this.memoryDb` / `deps.memoryDb` as well as on a bare `memoryDb`.
  *   v1.0.0 — 2026-09-29 — Initial (TARGET-082 V1).
  */
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
@@ -39,20 +43,29 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = path.join(ROOT, 'src');
 const LIST = path.join(ROOT, 'security', 'classification-reach.json');
 
-/** Storage methods that load content a caller could be shown. */
+/**
+ * Storage methods that load content a caller could be shown. The second group (2026-09-29 review)
+ * are the reads the first seed missed: a record's earlier versions, the bin, the key list under a
+ * prefix, a file's bytes by range, and the files of several owners at once.
+ */
 export const CONTENT_READS = new Set([
   'getMemory', 'getMemoryByKeys', 'getMemoryByKeysAnyOwner', 'listMemory', 'listMemoryMeta',
   'listMemoryForOwners', 'listMemoryMetaForOwners', 'listAllMemory', 'listAllMemoryMeta',
   'searchText', 'searchMemory', 'getStorageFile', 'getStorageFileMeta', 'listStorageFiles',
   'listWorkspaceRows', 'getWorkspaceRow',
+  'listMemoryHistory', 'listDeletedMemory', 'listAllDeletedMemory', 'listMemoryKeysByPrefix',
+  'readStorageFileRange', 'listStorageFilesForOwners',
 ]);
 
 /**
  * The service wrappers that load the same content across an owner's identities. A call to one is a
  * content read just as a storage call is, so a caller cannot step around the gate through them.
  * Free functions by name; the memory service's methods on a receiver named `memoryDb`.
+ *
+ * `generateDownloadToken` is here because a minted download token hands a file's bytes to whoever
+ * holds it, later and without asking again: the mint is the read, so the file passes the reader first.
  */
-export const WRAPPER_READS = new Set(['getOwnerScopeMemory', 'listOwnerScopeMemory']);
+export const WRAPPER_READS = new Set(['getOwnerScopeMemory', 'listOwnerScopeMemory', 'generateDownloadToken']);
 export const MEMORY_DB_READS = new Set(['getOwnerScope', 'listOwnerScope', 'listOwnerScopeMeta', 'searchOwnerScope']);
 
 const SKIP_DIRS = new Set([path.join(SRC, 'storage'), path.join(SRC, 'static'), path.join(SRC, 'generated')]);
@@ -63,11 +76,16 @@ type Counts = Record<string, number>;
 interface Entry { reads: Counts; why: string }
 interface ListFile { about: string; files: Record<string, Entry> }
 
+/** `name.x(`, `deps.name.x(`, `this.name.x(`: the receiver's last name is `name`. */
+function receiverIsNamed(expr: ts.Expression, name: string): boolean {
+  if (ts.isIdentifier(expr)) return expr.text === name;
+  if (ts.isPropertyAccessExpression(expr)) return expr.name.text === name;
+  return false;
+}
+
 /** `storage.x(`, `deps.storage.x(`, `this.storage.x(`: the receiver's last name is `storage`. */
 function receiverIsStorage(expr: ts.Expression): boolean {
-  if (ts.isIdentifier(expr)) return expr.text === 'storage';
-  if (ts.isPropertyAccessExpression(expr)) return expr.name.text === 'storage';
-  return false;
+  return receiverIsNamed(expr, 'storage');
 }
 
 /** The content reads in one file's source, counted by method. */
@@ -81,7 +99,7 @@ export function findingsOf(fileName: string, source: string): Counts {
       if (ts.isPropertyAccessExpression(callee)) {
         const m = callee.name.text;
         if (CONTENT_READS.has(m) && receiverIsStorage(callee.expression)) count(m);
-        else if (MEMORY_DB_READS.has(m) && ts.isIdentifier(callee.expression) && callee.expression.text === 'memoryDb') count(`memoryDb.${m}`);
+        else if (MEMORY_DB_READS.has(m) && receiverIsNamed(callee.expression, 'memoryDb')) count(`memoryDb.${m}`);
       } else if (ts.isIdentifier(callee) && WRAPPER_READS.has(callee.text)) {
         count(callee.text);
       }

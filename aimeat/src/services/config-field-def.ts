@@ -9,6 +9,7 @@
  * @structure ConfigFieldShape<K>
  * @usage import type { ConfigFieldDef } from './config-schema.js';
  * @version-history
+ *   v1.1.0 — 2026-09-29 — `choices`: the fixed values of a string setting, for the Config tab's pick.
  *   v1.0.0 — 2026-09-24 — Moved from config-schema.ts; the key's type became a parameter.
  */
 
@@ -29,6 +30,12 @@ export interface ConfigFieldShape<K extends string> {
   description: string;
   /** Valid range hint for numbers (e.g. '0-10000') */
   range?: string;
+  /**
+   * The only values a string setting takes, when `validate` accepts a fixed set. Served with the
+   * schema (GET /v1/admin/config), so the Config tab offers a pick instead of a free text field.
+   * The stored value stays the raw string; `validate` still decides what is accepted.
+   */
+  choices?: readonly string[];
   /**
    * Admin API display mode:
    * - undefined / 'visible': shown with actual value

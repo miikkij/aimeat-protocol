@@ -3,13 +3,20 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The state and handlers behind the AI page's providers, routing and model policy
- *   sections: the reads (GET /v1/ai/providers, GET /v1/ai/policy) and the writes (add or change a
- *   provider, set or remove its key, test it for one capability, delete it; the ordered providers
- *   per capability and the routing rules; the model policy and whose calls it covers). Every write
- *   is the owner's and applies at once. The render is ai/providers.js.
- * @structure useProviders() → pv (state + handlers) · CAPS · PROVIDER_TYPES · slug
+ *   sections: the reads (GET /v1/ai/providers, GET /v1/ai/policy, and the Content Classifier's state
+ *   from GET /v1/ai/capabilities, the decision providers from GET /v1/ai/decide/providers) and the
+ *   writes (add or change a provider, set or remove its key, test it for one capability, delete it;
+ *   the ordered providers per capability, the routing rules and the Content Classifier's model,
+ *   which is the owner's classification policy; the model policy and whose calls it covers). Every
+ *   write is the owner's and applies at once. The render is ai/providers.js.
+ * @structure useProviders() → pv (state + handlers) · CAPS · PROVIDER_TYPES · slug · classifierValue
  * @usage const pv = useProviders(); … renderProviders(ctx) reads ctx.pv
  * @version-history
+ *   v1.3.0 — 2026-09-29 — The Content Classifier's choice in the routing editor (ccDraft, the decision
+ *     providers from GET /v1/ai/decide/providers): Save stores it in the owner's classification policy
+ *     (the classifier's type and provider) when it changed (Jouni's review, TARGET-082 V5).
+ *   v1.2.0 — 2026-09-29 — pv.classifier: the Content Classifier's state (content_classifier of GET
+ *     /v1/ai/capabilities), for its row among the capabilities (TARGET-082 V5).
  *   v1.1.0 — 2026-09-28 — A capability's editor holds its model and the settings its kind takes: the
  *     speech voice, the transcription language, OpenRouter's PDF engine, and the default fine-tuning
  *     of text, vision and files (AI roles).
@@ -19,7 +26,32 @@
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import { swallowed } from '/js/swallowed.js';
 import { apiGet, apiPut, apiPost, apiDelete } from '/js/api.js';
+import { readPolicy, writePolicy } from '/js/services/classification.js';
 import { x } from './frame.js';
+
+/**
+ * The Content Classifier's choice as the routing editor's select holds it: "<type>:<provider id>",
+ * the id empty for the default (jev: the owner's default decision provider; llm: the text routing).
+ * @param {{ type?: string, provider?: string|null }|null} cc
+ * @returns {string|null}
+ */
+export const classifierValue = (cc) => (cc ? `${cc.type === 'llm' ? 'llm' : 'jev'}:${cc.provider || ''}` : null);
+
+/**
+ * Store the owner's Content Classifier choice in their classification policy: the stored layer is
+ * read, its classifier gets the type and provider, and the whole layer goes back (the server takes a
+ * level whole). What else the layer holds (the switch, labels, rules, kinds judged on write) stays.
+ * @param {string} value "<type>:<provider id>"
+ */
+async function saveClassifierChoice(value) {
+  const at = value.indexOf(':');
+  const type = value.slice(0, at) === 'llm' ? 'llm' : 'jev';
+  const provider = value.slice(at + 1) || null;
+  const cur = await readPolicy('owner');
+  const stored = { ...(cur?.stored || {}) };
+  stored.classifier = { ...(stored.classifier || {}), type, provider };
+  await writePolicy('owner', stored);
+}
 
 /** The capabilities in the order the page lists them (services/ai/providers.ts ALL_CAPABILITIES). */
 export const CAPS = ['text', 'vision', 'files', 'image', 'speech', 'transcription', 'embed'];
@@ -98,6 +130,9 @@ function capsOf(p) {
 export function useProviders({ confirm, toast }) {
   const [view, setView] = useState(null);
   const [policy, setPolicy] = useState(null);
+  const [classifier, setClassifier] = useState(null);
+  const [decideProviders, setDecideProviders] = useState([]);
+  const [ccDraft, setCcDraft] = useState(null);
   const [error, setError] = useState(null);
   const [openId, setOpenId] = useState(null);
   const [adding, setAdding] = useState(false);
@@ -115,6 +150,15 @@ export function useProviders({ confirm, toast }) {
   const [policyMsg, setPolicyMsg] = useState(null);
 
   const load = useCallback(async () => {
+    // The Content Classifier's state is read on its own, so the providers never wait for it.
+    apiGet('/v1/ai/capabilities')
+      .then((c) => { if (c && c.ok !== false && c.data?.content_classifier) setClassifier(c.data.content_classifier); })
+      .catch((e) => swallowed('ai: capabilities', e));
+    // The decision providers name the classifier's choices; none listed (the decision model off, or
+    // no access) leaves the default decision model as its one decision choice.
+    apiGet('/v1/ai/decide/providers')
+      .then((d) => { if (d && d.ok !== false && Array.isArray(d.data?.providers)) setDecideProviders(d.data.providers); })
+      .catch((e) => swallowed('ai: decide providers', e));
     const [v, p] = await Promise.all([
       apiGet('/v1/ai/providers').catch((e) => ({ ok: false, error: { message: e?.message } })),
       apiGet('/v1/ai/policy').catch((e) => { swallowed('ai: policy', e); return null; }),
@@ -261,9 +305,10 @@ export function useProviders({ confirm, toast }) {
 
   /* ── Routing ── */
   const editRouting = (on) => {
-    if (!on) { setRouteDraft(null); setRulesDraft(null); return; }
+    if (!on) { setRouteDraft(null); setRulesDraft(null); setCcDraft(null); return; }
     setRouteDraft(Object.fromEntries(CAPS.map((c) => [c, [...(view?.routing?.defaults?.[c] || [])]])));
     setRulesDraft({ ...(view?.routing?.rules || {}) });
+    setCcDraft(classifierValue(classifier));
   };
   /** Put a provider at a place in one capability's order ('' at a place drops that place and those after it). */
   const setRoute = (c, i, id) => setRouteDraft((d) => {
@@ -286,6 +331,9 @@ export function useProviders({ confirm, toast }) {
       const rules = { ...rulesDraft, maxAttempts: max, maxCostPerCallUsd: cost === '' ? null : Number(cost) };
       const r = await apiPut('/v1/ai/routing', { routing: { defaults, rules } });
       if (r?.ok === false) throw r;
+      // The Content Classifier's choice lives in the owner's classification policy, written only when
+      // it changed.
+      if (ccDraft && ccDraft !== classifierValue(classifier)) await saveClassifierChoice(ccDraft);
       editRouting(false);
       flash(x('rt.saved'));
       await load();
@@ -316,7 +364,7 @@ export function useProviders({ confirm, toast }) {
   };
 
   return {
-    view, policy, error, providers, owned, openId, adding, draft, keyDraft, modelDraft, testCap,
+    view, policy, classifier, decideProviders, ccDraft, setCcDraft, error, providers, owned, openId, adding, draft, keyDraft, modelDraft, testCap,
     routeDraft, rulesDraft, policyDraft, busy, msg, addMsg, routeMsg, policyMsg,
     load, toggle, setAdding, setDraft, toggleDraftCap, add, setKeyDraft, saveKey, removeKey,
     setModelDraft: (c, patch) => setModelDraft((d) => ({ ...d, [c]: { ...(d[c] || capDraftOf(null)), ...patch } })), saveCap, setTestCap, test, remove,

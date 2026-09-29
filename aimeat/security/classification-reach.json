@@ -156,10 +156,12 @@
     "src/routes/admin-memory.ts": {
       "reads": {
         "searchText": 1,
+        "listAllDeletedMemory": 1,
         "listAllMemoryMeta": 3,
-        "getMemory": 1
+        "getMemory": 1,
+        "listMemoryHistory": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
+      "why": "Reviewed 2026-09-29 (TARGET-082 review): the search and the one-record read pass the classification reader. The value-free listing and the bin listing are the operator's key and size lists; the version list gives only the version, time, actor and size of a record the operator was just shown through presentMemory."
     },
     "src/routes/admin-monitoring.ts": {
       "reads": {
@@ -232,9 +234,10 @@
     },
     "src/routes/ai.ts": {
       "reads": {
+        "generateDownloadToken": 1,
         "getMemory": 4
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The owner's AI budget settings."
+      "why": "Reviewed 2026-09-29 (TARGET-082 review), the node's own read: the owner's AI budget settings; the download token is minted for the picture the paying caller has just generated, their own new output."
     },
     "src/routes/app-store.ts": {
       "reads": {
@@ -247,6 +250,12 @@
         "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Checks a record exists only to resolve its owner for an appeal."
+    },
+    "src/routes/apps/catalogue-admin.ts": {
+      "reads": {
+        "listStorageFilesForOwners": 2
+      },
+      "why": "Reviewed 2026-09-29 (TARGET-082 review), the node's own read: which apps have a screenshot (keys under apps/screenshots/ only, as an existence test) for the catalogue pages; no file content and no other key is handed out."
     },
     "src/routes/apps/icon.ts": {
       "reads": {
@@ -368,7 +377,8 @@
     "src/routes/federation-sync/messaging.ts": {
       "reads": {
         "getMemory": 1,
-        "getStorageFile": 1
+        "getStorageFile": 1,
+        "generateDownloadToken": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The attachment passes leave (federation) before a download token is minted; the other read is a replication version compare."
     },
@@ -482,16 +492,23 @@
     },
     "src/routes/memory/key.ts": {
       "reads": {
+        "listDeletedMemory": 1,
         "memoryDb.getOwnerScope": 1,
-        "getMemory": 7
+        "getMemory": 6
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
+      "why": "Reviewed 2026-09-29 (TARGET-082 review): the reads that hand content to a caller pass the classification reader (the bin list included); the other reads here serve a write or the node's own bookkeeping."
     },
     "src/routes/memory/patch.ts": {
       "reads": {
         "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
+    },
+    "src/routes/memory/public-read.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-09-29 (TARGET-082 review), checked: the record passes presentMemory (the classification reader) after the visibility and access decision and before anything is answered."
     },
     "src/routes/notifications.ts": {
       "reads": {
@@ -533,6 +550,7 @@
     "src/routes/organisms/shared.ts": {
       "reads": {
         "listAllMemory": 7,
+        "listMemoryKeysByPrefix": 1,
         "getMemoryByKeysAnyOwner": 3
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The manifest for gate policy, decision-log pruning, the publish state machine, and registry and manifest indexes."
@@ -545,15 +563,17 @@
     },
     "src/routes/organisms/workspace-ops.ts": {
       "reads": {
-        "listAllMemory": 7
+        "listAllMemory": 7,
+        "listMemoryKeysByPrefix": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
+      "why": "Reviewed 2026-09-29 (TARGET-082 review): the reads that hand content to a caller pass the classification reader; the other reads serve a write or the node's own bookkeeping (the key-only scan finds the addresses a delete removes)."
     },
     "src/routes/organisms/workspace-read.ts": {
       "reads": {
-        "listAllMemory": 3
+        "listAllMemory": 3,
+        "listMemoryHistory": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
+      "why": "Reviewed 2026-09-29 (TARGET-082 review): the reads that hand content to a caller pass the classification reader (the structure history and its versions included); the other reads serve a write or the node's own bookkeeping."
     },
     "src/routes/outbound.ts": {
       "reads": {
@@ -586,10 +606,11 @@
       "reads": {
         "getMemory": 3,
         "getStorageFile": 1,
+        "listStorageFilesForOwners": 1,
         "listMemoryForOwners": 1,
         "getStorageFileMeta": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The builder's memory previews pass presentMemories; the published page, its enabled gate, sizes and the config merge are the owner's published page and settings."
+      "why": "Reviewed 2026-09-29 (TARGET-082 review), checked: the builder's memory previews pass presentMemories and its images pass reader.show; the published page, its enabled gate, sizes and the config merge are the owner's published page and settings."
     },
     "src/routes/public-stats.ts": {
       "reads": {
@@ -612,11 +633,13 @@
     },
     "src/routes/storage-files.ts": {
       "reads": {
+        "readStorageFileRange": 1,
         "getStorageFile": 3,
         "getStorageFileMeta": 4,
-        "listStorageFiles": 1
+        "listStorageFiles": 1,
+        "generateDownloadToken": 2
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
+      "why": "Reviewed 2026-09-29 (TARGET-082 review): the reads that hand content to a caller pass the classification reader; a range read and a download-token mint serve only a file whose metadata passed it on the same request (GET /v1/download serves a token minted after it)."
     },
     "src/routes/subdomain-origin-docs.ts": {
       "reads": {
@@ -884,9 +907,10 @@
     },
     "src/services/app-ui/service.ts": {
       "reads": {
-        "getMemory": 2
+        "getMemory": 2,
+        "listMemoryHistory": 2
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The app layout configuration record."
+      "why": "Reviewed 2026-09-29 (TARGET-082 review), the node's own read: the app layout configuration record and its earlier versions."
     },
     "src/services/appdev-kb.ts": {
       "reads": {
@@ -950,15 +974,9 @@
     },
     "src/services/classification/classifier.ts": {
       "reads": {
-        "getMemory": 3
+        "getMemory": 1
       },
       "why": "The node's own read (TARGET-082 V3): the classifier's daily usage counter and its queue under system@<node>, and a record's version before it is rewritten."
-    },
-    "src/services/classification/scan.ts": {
-      "reads": {
-        "getOwnerScopeMemory": 1
-      },
-      "why": "The node's own read (TARGET-082 V3): a record's text feeds the Content Classifier, which checks useForAi before any model sees it; nothing is returned to the caller but the label outcome."
     },
     "src/services/classification/policy-admin.ts": {
       "reads": {
@@ -971,6 +989,12 @@
         "getMemory": 1
       },
       "why": "The node's own read (TARGET-082 V1): the owner's classification switch record, never shown to anyone."
+    },
+    "src/services/classification/scan.ts": {
+      "reads": {
+        "getOwnerScopeMemory": 1
+      },
+      "why": "The node's own read (TARGET-082 V3): a record's text feeds the Content Classifier, which checks useForAi before any model sees it; nothing is returned to the caller but the label outcome."
     },
     "src/services/company/company-portfolio.ts": {
       "reads": {
@@ -1122,6 +1146,13 @@
         "listMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The template and instance records pass presentMemories."
+    },
+    "src/services/db/memory-tab-db-service.ts": {
+      "reads": {
+        "memoryDb.listOwnerScopeMeta": 1,
+        "listStorageFilesForOwners": 1
+      },
+      "why": "Reviewed 2026-09-29 (TARGET-082 review), checked: the Memory tab's keys and files pass the caller's reader.show before they are listed or counted."
     },
     "src/services/db/messages-inbox-db-service.ts": {
       "reads": {
@@ -1330,7 +1361,8 @@
     },
     "src/services/file-refs.ts": {
       "reads": {
-        "getStorageFile": 1
+        "getStorageFile": 1,
+        "generateDownloadToken": 1
       },
       "why": "A classification loader (TARGET-082 V1): it loads and passes the reader it takes; every caller hands it one."
     },
@@ -1480,9 +1512,10 @@
     },
     "src/services/memory-bin.ts": {
       "reads": {
-        "getMemory": 1
+        "getMemory": 1,
+        "listDeletedMemory": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A key existence check before delete."
+      "why": "Reviewed 2026-09-29 (TARGET-082 review), the node's own read: whether a key exists before a delete, and whether it is in the bin before a restore."
     },
     "src/services/memory-ceilings.ts": {
       "reads": {
@@ -1699,10 +1732,9 @@
     },
     "src/services/refinery/pipeline.ts": {
       "reads": {
-        "getMemory": 3,
-        "getStorageFile": 1
+        "getMemory": 3
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
+      "why": "Reviewed 2026-09-29 (TARGET-082 review): an attachment whose text goes to a model is read through readAiFile (useForAi first); the other reads are the owner's own refinery definition, cursor and run log."
     },
     "src/services/refinery/schedule-input.ts": {
       "reads": {
@@ -1795,16 +1827,18 @@
     },
     "src/services/surface-layout/service.ts": {
       "reads": {
-        "getMemory": 3
+        "getMemory": 3,
+        "listMemoryHistory": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's layout records."
+      "why": "Reviewed 2026-09-29 (TARGET-082 review), the node's own read: the node's layout records and their earlier versions."
     },
     "src/services/themes/service.ts": {
       "reads": {
         "listAllMemoryMeta": 1,
-        "getMemory": 5
+        "getMemory": 5,
+        "listMemoryHistory": 2
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: System theme records and each person's theme choice."
+      "why": "Reviewed 2026-09-29 (TARGET-082 review), the node's own read: system theme records, their earlier versions, and each person's theme choice."
     },
     "src/services/track-registry.ts": {
       "reads": {
@@ -1892,6 +1926,7 @@
     },
     "src/services/workspace-change-core.ts": {
       "reads": {
+        "listMemoryKeysByPrefix": 1,
         "listAllMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A key existence scan (keys only)."
@@ -1950,6 +1985,7 @@
     },
     "src/services/workspace-versions.ts": {
       "reads": {
+        "listMemoryKeysByPrefix": 2,
         "listAllMemory": 3
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Version-row key refs and manifest retention config."

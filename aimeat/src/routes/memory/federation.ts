@@ -8,6 +8,8 @@
  *   POST /v1/memory writes: memory:write before the far node is asked, the same key checks at the
  *   door, and then services/memory-write.ts writeMemoryRecord with the caller's own roles and scopes.
  * @version-history
+ *   v1.7.0 — 2026-09-29 — TARGET-082 review: push-home answers 403 CLASSIFIED with the label and why
+ *     when the visitor's record may not leave, instead of NOT_FOUND for a record that is here.
  *   v1.6.0 — 2026-09-29 — push-home asks leaveToPeer before the record leaves (TARGET-082).
  *   v1.5.0 — 2026-09-25 — pull and pull-remote refuse a key only this node writes (`__redirect__`,
  *     `notif.`) before the far node is asked; the shared writer refused it only after the fetch.
@@ -38,7 +40,8 @@ import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
 import { sign } from '../../auth/keypair.js';
 import type { MemoryRouteCtx } from './shared.js';
-import { leaveToPeer } from '../../services/classification/egress.js';
+import { systemReader } from '../../services/classification/reader.js';
+import { memoryTarget } from '../../services/classification/labels.js';
 
 export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): void {
   const { config, storage, peers, resolve, stats, onDirectoryChange } = ctx;
@@ -227,12 +230,19 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
 
     // Read the local entry
     const localGhii = resolve(req);
-    const found = await storage.getMemory(localGhii, key);
-    // The visitor's own record, leaving for their home node: the classification component's leave
-    // for federation decides first (TARGET-082); a record that may not leave reads as not here.
-    const [record] = found ? await leaveToPeer({ storage, config }, [found], homeNode) : [];
+    const record = await storage.getMemory(localGhii, key);
     if (!record) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Memory key "${key}" not found locally`));
+      return;
+    }
+    // The visitor's own record, leaving for their home node: the classification component's leave
+    // for federation decides first (TARGET-082). The visitor named the key, so a record that stays
+    // is said as that, with its label and why, rather than as missing (TARGET-082 review).
+    const { left } = await systemReader({ storage, config }, `system@${config.nodeId}`)
+      .leave([record], r => memoryTarget(r.ownerGaii, r.key), { kind: 'federation', peer: homeNode });
+    if (left.length) {
+      res.status(403).json(error(config.nodeId, 'CLASSIFIED',
+        `"${key}" is ${left[0]!.reason}, so it is not sent to another node.`, 403, { label: left[0]!.label }));
       return;
     }
 

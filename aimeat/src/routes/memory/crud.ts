@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Core memory CRUD routes: POST /v1/memory (write), GET /v1/memory (list), GET /v1/memory/search. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.10.0 -- 2026-09-29 -- TARGET-082 review: every list and search item an AI is shown with a
+ *     warning classification carries `classificationWarning`, as GET /v1/memory/:key does.
  *   v1.9.0 -- 2026-09-29 -- The list (values and meta) and the search pass the classification reader:
  *     values through presentMemories, meta rows through reader.show (TARGET-082).
  *   v1.8.1 -- 2026-09-26 -- The count's cache tag names the owner with localAccountName (utils/gaii.ts),
@@ -61,6 +63,7 @@ import { isVersionKey, searchHitShape, matchesType } from '../../services/memory
 import { presentMemories } from '../../services/classification/present-memory.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
+import { warningField } from '../../services/classification-exits.js';
 
 export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
   //  is no longer destructured here: identity for a write now comes from
@@ -364,6 +367,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
           // Same key under other same-owner identities; those copies are shadowed by this one
           // and appear nowhere else in the response (owner-scope listings only).
           ...((r as { alsoUnder?: string[] }).alsoUnder ? { also_under: (r as { alsoUnder?: string[] }).alsoUnder } : {}),
+          ...warningField(r),
         })),
         total: allMeta.length,
         ...(metaRows.length < allMeta.length
@@ -432,6 +436,8 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
         // Same key under other same-owner identities; those copies are shadowed by this one
         // and appear nowhere else in the response (owner-scope listings only).
         ...((r as { alsoUnder?: string[] }).alsoUnder ? { also_under: (r as { alsoUnder?: string[] }).alsoUnder } : {}),
+        // TARGET-082: an AI shown a warning-classified record is told so, per item.
+        ...warningField(r),
       })),
       total: allRecords.length,
       ...(records.length < allRecords.length
@@ -526,7 +532,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // meaning as the listing door beside it, fixed for the same reason on 2026-09-04 (pitfalls §44).
     if (req.query.include === 'meta') {
       res.json(success(config.nodeId, {
-        results: results.map(r => searchHitShape(r, q)),
+        results: results.map(r => ({ ...searchHitShape(r, q), ...warningField(r) })),
         total: results.length,
         query: q,
         hint: 'Snippets only. Read a full value with GET /v1/memory/{key}.',
@@ -545,6 +551,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
         flagCount: r.flagCount ?? 0,
         created_at: r.createdAt,
         updated_at: r.updatedAt,
+        ...warningField(r),
       })),
       total: results.length,
       query: q,

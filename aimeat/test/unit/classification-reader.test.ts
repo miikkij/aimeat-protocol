@@ -7,13 +7,19 @@
  *   warning; a person outside a label's audience does not see it; an AI call with hidden content is
  *   refused whoever asks; content that may not leave its organism stays out of an export while a
  *   person's own export takes everything; a row takes its row space's label; and nobody sets a label
- *   whose audience leaves them out.
+ *   whose audience leaves them out. The review fixes: the system reader's show() reads nothing, the
+ *   node's policy is read once per call however many scopes, a long list an AI is shown is one audit
+ *   row per label with a count, and warningsNote() says what an AI-call answer carries.
  * @version-history
+ *   v1.1.0 — 2026-09-29 — The review fixes (TARGET-082 review, findings 4, 5 and 7).
+ *   v1.1.0 — 2026-09-29 — The owner of personal content is never locked out by its label's audience
+ *     (TARGET-082 review finding 9); the lockout test moved to organism content.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V4. Initial.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
-import { readerFor, readerForAgent, systemReader } from '../../src/services/classification/reader.js';
+import { readerFor, readerForAgent, systemReader, warningsNote } from '../../src/services/classification/reader.js';
+import { pendingClassificationAudit, resetClassificationAudit } from '../../src/services/classification/audit.js';
 import { memoryTarget, rowTarget, setLabel, type LabelActor } from '../../src/services/classification/labels.js';
 import { writePolicy } from '../../src/services/classification/policy-admin.js';
 
@@ -90,9 +96,49 @@ describe('the check component decides', () => {
     expect(await reader.show([{ id: 'r1' }], () => row)).toEqual([]);
   });
 
-  it('refuses a label whose audience leaves out the person setting it', async () => {
+  it("the system reader's show() reads nothing (finding 5)", async () => {
+    const reads = [vi.spyOn(storage, 'getMemory'), vi.spyOn(storage, 'getContentLabels')];
+    const items = [rec('a'), rec('b')];
+    expect(await systemReader(deps(storage), `alice@${N}`).show(items, t)).toEqual(items);
+    for (const r of reads) expect(r).not.toHaveBeenCalled();
+  });
+
+  it("reads the node's policy once per call, however many scopes (finding 5)", async () => {
+    const read = vi.spyOn(storage, 'getMemory');
+    const items = ['alice', 'bob', 'carol'].map(o => ({ ownerGaii: `${o}@${N}`, key: 'k', value: 'v' }));
+    await readerForAgent(deps(storage), `claude#alice@${N}`).show(items, t);
+    expect(read.mock.calls.filter(([, key]) => key === 'classification.policy.node')).toHaveLength(1);
+  });
+
+  it('records a long audited list an AI is shown as one row per label, with the count (finding 4)', async () => {
+    const d = deps(storage);
+    const items = Array.from({ length: 1000 }, (_, i) => rec(`conf.${i}`));
+    // Only the ten labelled items keep an audit trail (luottamuksellinen: audit true).
+    for (const r of items.slice(0, 10)) await setLabel(d, alice, t(r), { label: 'luottamuksellinen' });
+    resetClassificationAudit();
+    await readerForAgent(d, `claude#alice@${N}`).show(items, t);
+    expect(pendingClassificationAudit({ ownerGaii: `alice@${N}` })).toMatchObject([
+      { action: 'shown', key: '*:luottamuksellinen', count: 10, label: 'luottamuksellinen' },
+    ]);
+    resetClassificationAudit();
+  });
+
+  it('warningsNote says which warning-classified items an AI was given, and nothing when there were none (finding 7)', async () => {
+    const d = deps(storage);
+    await setLabel(d, alice, t(rec('conf')), { label: 'luottamuksellinen' });
+    const ai = readerForAgent(d, `claude#alice@${N}`);
+    expect(warningsNote(ai)).toEqual({});
+    await ai.useForAi([t(rec('conf'))], { capability: 'text' });
+    expect(warningsNote(ai)).toEqual({ classification_warnings: [expect.objectContaining({ key: 'conf', label: 'luottamuksellinen', says: expect.any(String) })] });
+  });
+
+  // TARGET-082 review finding 9: the owner of personal content is always inside its audience, so
+  // this no longer refuses. It asserted the lockout the finding closes; AUDIENCE_LOCKOUT on organism
+  // content is asserted in classification-access.test.ts.
+  it("never locks the owner out of their own content, whatever the label's audience", async () => {
     const d = deps(storage);
     await writePolicy(d, alice, 'owner', null, { labels: [{ id: 'hallitus', rank: 45, name: { en: 'Board' }, audience: { people: ['carol'] } }] });
-    await expect(setLabel(d, alice, t(rec('x')), { label: 'hallitus' })).rejects.toMatchObject({ code: 'AUDIENCE_LOCKOUT' });
+    await expect(setLabel(d, alice, t(rec('x')), { label: 'hallitus' })).resolves.toMatchObject({ applied: true, label: 'hallitus' });
+    expect((await readerFor(d, aliceAuth).show([rec('x')], t)).length).toBe(1);
   });
 });

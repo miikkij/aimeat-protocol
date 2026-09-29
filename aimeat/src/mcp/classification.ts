@@ -15,6 +15,9 @@
  * @structure registerClassificationTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage registerClassificationTools(mcp, storage, config, agentGaii, scopes);
  * @version-history
+ *   v1.4.0 — 2026-09-29 — explorer (services/classification/explorer.ts) and switch_set
+ *     (services/classification/switch.ts): the operator's agent sets the node's switch, holding
+ *     operator:admin, and an AI's loosening of it is refused. get, set and review take `owner`.
  *   v1.3.0 — 2026-09-29 — V5: the same field check and pending hint as the connector and the CLI.
  *   v1.2.0 — 2026-09-29 — V3: the scan action runs the Content Classifier on keys or a prefix.
  *   v1.1.0 — 2026-09-29 — V4: the audit action reads the audit log of a level.
@@ -33,12 +36,14 @@ import {
   ClassificationError, labelActorOf, readContentLabel, reviewLabel, setLabel, targetOf,
 } from '../services/classification/labels.js';
 import { readAuditLog, readPolicy, writePolicy } from '../services/classification/policy-admin.js';
-import { checkClassificationInput, POLICY_PENDING_NEXT } from './catalog/definitions/classification.js';
+import { checkClassificationInput, CLASSIFICATION_ACTIONS, POLICY_PENDING_NEXT } from './catalog/definitions/classification.js';
 import { scanContent } from '../services/classification/scan.js';
+import { explorerQueryOf, listLabels } from '../services/classification/explorer.js';
+import { setClassificationSwitch } from '../services/classification/switch.js';
 
 const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v, null, 2) }] });
 
-const WRITES = new Set(['set', 'review', 'policy_set', 'scan']);
+const WRITES = new Set(['set', 'review', 'policy_set', 'scan', 'switch_set']);
 
 export function registerClassificationTools(
   mcp: McpServer,
@@ -53,25 +58,29 @@ export function registerClassificationTools(
     'aimeat_classification',
     descriptionFor('aimeat_classification'),
     {
-      action: z.enum(['get', 'set', 'review', 'policy_get', 'policy_set', 'audit', 'scan']).describe('What to do.'),
+      action: z.enum(CLASSIFICATION_ACTIONS).describe('What to do.'),
       keys: z.array(z.string()).max(500).optional().describe('scan: memory keys to classify.'),
       prefix: z.string().optional().describe('scan: classify every memory key under this prefix (queued).'),
       since: z.string().optional().describe('audit: only rows from this ISO time on.'),
       audit_action: z.enum(['shown', 'used', 'refused', 'changed']).optional().describe('audit: only this kind of row.'),
-      limit: z.number().int().min(1).max(1000).optional().describe('audit: at most this many rows, default 200.'),
-      kind: z.enum(['memory', 'file', 'row']).optional().describe('get, set, review: what the content is. Default memory.'),
+      limit: z.number().int().min(1).max(1000).optional().describe('audit: at most this many rows, default 200. explorer: items per page, default 50, at most 200.'),
+      pending: z.boolean().optional().describe('explorer: only the items where a suggestion waits for a person.'),
+      cursor: z.string().optional().describe('explorer: the `next` value of the previous page.'),
+      mode: z.enum(['off', 'owner', 'all']).optional().describe("switch_set: the node's switch. off: nothing is classified; owner: each owner decides for their own content; all: on for every owner."),
+      kind: z.enum(['memory', 'file', 'row']).optional().describe('get, set, review: what the content is. Default memory. explorer: only this kind.'),
       key: z.string().optional().describe('get, set, review: the memory key (an organism workspace key included) or the stored file key.'),
       organism_id: z.string().optional().describe('A row: its organism. policy_get, policy_set at level organism: the organism.'),
       ws: z.string().optional().describe('A row: its workspace id.'),
       space: z.string().optional().describe('A row: its row space.'),
       row_id: z.string().optional().describe('A row: its id.'),
-      label: z.string().optional().describe('set: the label id, from policy_get.'),
+      owner: z.string().optional().describe('get, set, review: the identity that holds the key when it is one of your agents or apps (a memory key or a stored file). Absent: your own.'),
+      label: z.string().optional().describe('set: the label id, from policy_get. explorer: only items with this label.'),
       justification: z.string().optional().describe('set: why the content is less sensitive, when lowering from a label that needs a reason.'),
       human_said: z.string().optional().describe("The person's own words, verbatim, when you relay their instruction. Never your own summary."),
       confidence: z.number().min(0).max(1).optional().describe('set: how sure you are, 0 to 1, when the label is your own judgement.'),
       reason: z.string().optional().describe('set: why you chose the label, when it is your own judgement.'),
       decision: z.enum(['accept', 'reject']).optional().describe("review: the person's decision on the waiting suggestion."),
-      level: z.enum(['node', 'owner', 'organism']).optional().describe('policy_get, policy_set: which level. Default owner.'),
+      level: z.enum(['node', 'owner', 'organism']).optional().describe('policy_get, policy_set, audit: which level. Default owner. explorer: owner or organism. switch_set: node, the only one.'),
       policy: z.record(z.string(), z.unknown()).optional().describe('policy_set: the WHOLE level as policy_get returned it in `stored`, changed. It replaces the level.'),
     },
     annotationsFor('aimeat_classification'),
@@ -114,6 +123,18 @@ export function registerClassificationTools(
             return text(out.pending
               ? { ...out, next: POLICY_PENDING_NEXT }
               : out);
+          }
+          case 'explorer':
+            return text(await listLabels(deps, actor, explorerQueryOf({
+              level: args.level, organism_id: args.organism_id, label: args.label, pending: args.pending,
+              kind: args.kind, limit: args.limit, cursor: args.cursor,
+            })));
+          case 'switch_set': {
+            if (args.level && args.level !== 'node') return toolError('INVALID_INPUT', 'switch_set is at level node, the only one.');
+            if (!args.mode) return toolError('INVALID_INPUT', 'mode is off, owner or all.');
+            return text(await setClassificationSwitch({ storage, config }, {
+              sub: principal, owner: localAccountName(principal), roles: ['agent'], scopes,
+            }, args.mode));
           }
         }
       } catch (err) {

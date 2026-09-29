@@ -13,6 +13,8 @@
  *   import { registerCoreAdminTools } from './core-admin.js';
  *   registerCoreAdminTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
  * @version-history
+ *   v1.5.0 — 2026-09-29 — aimeat_admin_config reports the classification switch (classification_mode)
+ *     and names aimeat_classification switch_set, which sets it (TARGET-082). This tool stays read-only.
  *   v1.4.0 — 2026-09-24 — SECURITY (audit A8-1): the operator test asks the word as well as the
  *     account, through services/owner-lifecycle.ts resolveOperatorAgentName(): operator:admin for the
  *     four node tools, operator:organism-repair for the two repair tools. The account role alone had
@@ -159,6 +161,11 @@ export function registerCoreAdminTools(
                         mcp_card_commerce_tools: config.mcpCardCommerceTools,
                         content_signal: config.contentSignal,
                         web_bot_auth_sign: config.webBotAuthSign,
+                        // The classification switch (TARGET-082): read here beside the node's other
+                        // settings, set with aimeat_classification action switch_set, which keeps each
+                        // change in the classification audit log.
+                        classification_mode: config.classificationMode,
+                        classification_mode_note: 'Set it with aimeat_classification { action: "switch_set", mode }. Turning it off, or from all to owner, is the operator\'s to do on the admin Config page.',
                         // Settings whoever runs this node set, which this operator can read and
                         // cannot change. They belong here rather than only on the HTTP door: an
                         // operator who asks their AI what their limits are is asking the same

@@ -21,6 +21,8 @@
  *   - appMayWriteKey: owner passes, app refused, delegated agent refused, reserved grant passes
  * @usage cd aimeat && pnpm exec vitest run test/unit/reserved-keys.test.ts
  * @version-history
+ *   v1.x — 2026-09-29 — `classification.policy.` is refused to the owner session too (TARGET-082
+ *     review finding 2): the classification service is its one writer.
  *   v1.x — 2026-09-29 — `classification.policy.` makes twenty-two: the owner's classification switch.
  *   v1.x — 2026-09-28 — `ai.roles.` makes twenty-one: the owner's AI roles and app role bindings.
  *   v1.x — 2026-09-28 — `ai.providers.`, `ai.apikey.` and `ai.routing.` make twenty: the owner's AI
@@ -103,7 +105,9 @@ describe('the list holds every prefix the server reads and acts on', () => {
         expect(isReservedServerKey('classification.policy.owner')).toBe(true);
         expect(appMayWriteKey(['app'], 'classification.policy.owner')).toBe(false);
         expect(appMayWriteKey(['agent'], 'classification.policy.owner', true)).toBe(false);
-        expect(appMayWriteKey(['owner'], 'classification.policy.owner')).toBe(true);
+        // TARGET-082 review finding 2: the owner session is refused as well. The line said `true`,
+        // which asserted the hole: an owner PAT wrote the policy past the classification service.
+        expect(appMayWriteKey(['owner'], 'classification.policy.owner')).toBe(false);
         expect(isReservedServerKey('classification.results.2026-09')).toBe(false);
     });
 
