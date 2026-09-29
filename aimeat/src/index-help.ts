@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description CLI help text constants (top-level + connector) for the aimeat binary. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.5 — 2026-09-29 — The serve help says that from 3.20.0 the daemon refuses a request without
+ *     the secret.
  *   v1.1.4 — 2026-09-28 — `aimeat init --install-set` and `--install-set-secrets`.
  *   v1.1.3 — 2026-09-26 — The serve help names 3.20.0 as the release that refuses a request without
  *     the secret; until then the daemon lets it in and names its caller once in its log.
@@ -141,9 +143,8 @@ USAGE
       REST proxy (/v1/*), and a long-poll push surface (/local/tasks/next),
       advertised via the discovery file <AIMEAT_HOME>/serve.json. Every request
       sends "Authorization: Bearer <secret>" with the secret from serve.json,
-      which is new at every start; a request from a web page is refused. Until
-      3.20.0 the daemon lets in a request without the secret and names its
-      caller once in its log; 3.20.0 refuses it.
+      which is new at every start; a request from a web page is refused. From
+      aimeat 3.20.0 the daemon refuses a request without the secret (401).
       Prefer this for CrewAI crews / clients that make many calls; the default
       stdio mode stays for one-shot and CI/serverless use.
       e.g. aimeat connect serve --http

@@ -19,11 +19,10 @@
 //   - Admission (secaudit 2026-09, A9-1): every request presents the secret the
 //     daemon wrote into serve.json; a request with a wrong one, one carrying an
 //     Origin and one addressed to a foreign Host are refused, and the daemon
-//     stays up. A request with no secret follows the daemon's version: below
-//     SECRETLESS_CALLER_REFUSED_FROM it is let in and the log names its caller
-//     once, from that release it is refused.
+//     stays up. A request with no secret is refused with 401 as well.
 //
 // Version history:
+//   2026-09-29 — A request with no secret is refused with 401 at four endpoints, shutdown included, whatever the version.
 //   2026-09-27 — A tool that moved into aimeat_app_manage answers TOOL_MOVED on the connector MCP and /local/call.
 //   2026-09-26 — A wrong secret is refused at four endpoints. A request with no
 //     secret, at three endpoints, is let in and its caller named once in the
@@ -42,8 +41,6 @@ import { stringify as yamlStringify } from 'yaml';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { waitForServer } from './helpers/wait-for-server.js';
-import { secretlessCallerAdmitted, SECRETLESS_CALLER_REFUSED_FROM } from '../src/cli/connect/mcp/local-admission.js';
-import { getSoftwareVersion } from '../src/utils/version.js';
 
 ed.hashes.sha512 = (m: Uint8Array) =>
   new Uint8Array(createHash('sha512').update(m).digest());
@@ -216,23 +213,14 @@ await test('A request with a wrong secret is refused with 401: status, proxy, to
   assert(daemon1!.child.exitCode === null, 'the daemon exited on a refused shutdown');
 });
 
-// The daemon spawned here runs this checkout, so its version is the one package.json gives: below
-// SECRETLESS_CALLER_REFUSED_FROM it lets in a request with no secret and names the caller once in
-// its log, from that release it refuses the request.
-const daemonVersion = getSoftwareVersion();
-const secretlessLetIn = secretlessCallerAdmitted(daemonVersion);
-await test(`At ${daemonVersion} a request with no secret is ${secretlessLetIn ? 'let in, and the log names its caller once' : 'refused with 401'}: status, proxy, tool call`, async () => {
-  const program = `e2e-no-secret/${stamp}`;
-  const caller = { host: new URL(loopbackBase).host, 'content-type': 'application/json', 'x-aimeat-agent': agentName, 'user-agent': program };
-  // Not the shutdown endpoint: a request this version lets in would stop the daemon.
-  for (const [method, path] of admissionEndpoints.filter(([, p]) => p !== '/local/shutdown')) {
+await test('A request with no secret is refused with 401: status, proxy, tool call and shutdown', async () => {
+  const caller = { host: new URL(loopbackBase).host, 'content-type': 'application/json', 'x-aimeat-agent': agentName, 'user-agent': `e2e-no-secret/${stamp}` };
+  for (const [method, path] of admissionEndpoints) {
     const status = await rawStatus(loopbackBase, method, path, caller);
-    assert((status === 401) === !secretlessLetIn, `${method} ${path} with no secret: ${status}`);
+    assert(status === 401, `${method} ${path} with no secret: ${status}`);
   }
   await sleep(300);
-  const named = daemon1!.stderr().split('\n').filter(l => l.includes(program));
-  assert(named.length === (secretlessLetIn ? 1 : 0), `the log names the caller ${named.length} times:\n${named.join('\n')}`);
-  assert(named.every(l => l.includes(`"${agentName}"`) && l.includes(SECRETLESS_CALLER_REFUSED_FROM)), `the line: ${named.join('\n')}`);
+  assert(daemon1!.child.exitCode === null, 'the daemon exited on a refused shutdown');
 });
 
 await test('A foreign Host is refused with 403 even with the secret (DNS rebinding)', async () => {

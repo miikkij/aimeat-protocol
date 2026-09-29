@@ -16,6 +16,8 @@
  *   exitIfAnotherDaemonOwns() · buildDiscoveryDoc() · writeDiscoveryFile()
  * @usage import { serveDiscoveryPath, type ServeDiscovery } from './local-discovery.js';
  * @version-history
+ *   v1.3.2 — 2026-09-29 — The note on schema 3 says that from 3.20.0 a request that sends no secret
+ *     gets 401. No code change.
  *   v1.3.1 — 2026-09-26 — The note on schema 3 says from which release the daemon refuses a request
  *     that sends no secret. No code change.
  *   v1.3.0 — 2026-09-24 — `readLiveDiscovery()`: the running daemon, for a local program that calls
@@ -34,9 +36,8 @@ import { getConfigDir } from '../config.js';
 
 /**
  * 3 since 2026-09-24: the file carries `secret`, which every request to the daemon presents. From
- * 3.20.0 the daemon refuses a request that sends none; below that release it lets one in and names
- * its caller in its log (./local-admission.ts, SECRETLESS_CALLER_REFUSED_FROM). Secaudit 2026-09,
- * A9-1.
+ * aimeat 3.20.0 the daemon refuses a request that sends none with 401 (./local-admission.ts).
+ * Secaudit 2026-09, A9-1.
  *
  * 2 since 2026-09-01: `principals[].id` is the GAII it was always documented to be (it carried the
  * bare agent name instead), and every `agents[]` row gained a `gaii`. Two owners with one agent

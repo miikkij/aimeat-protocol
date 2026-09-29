@@ -12,12 +12,12 @@
  *   Raw `node:http` rather than fetch, because fetch will not send a Host header of the caller's
  *   choosing, and the foreign Host is the one request here that a browser really does make.
  *
- *   A request that sends no secret at all follows the daemon's version: let in below
- *   SECRETLESS_CALLER_REFUSED_FROM, refused from it. This file holds the real daemon at the real
- *   version to whichever of the two applies; serve-secretless-caller-follows-the-release.test.ts
- *   holds both, and the day the grace has to go.
+ *   A request that sends no secret, or the placeholder bearer `loopback-trusted` that aimeat-crewai
+ *   sent before 0.29.0, gets 401 at every endpoint, shutdown included.
  * @usage cd aimeat && pnpm exec vitest run test/unit/serve-loopback-admission.test.ts
  * @version-history
+ *   v1.2.0 — 2026-09-29 — A request with no secret, and one with the placeholder bearer, is refused
+ *     with 401 at every endpoint, whatever the version.
  *   v1.1.0 — 2026-09-26 — A wrong secret is refused at every endpoint. A request with no secret, at
  *     every endpoint but shutdown, follows the daemon's version: let in below 3.20.0, refused from it.
  *   v1.0.0 — 2026-09-24 — Initial (secaudit 2026-09, A9-1).
@@ -36,9 +36,7 @@ process.env.AIMEAT_LOG_TIMESTAMPS = '0';
 
 const { runServeDaemon } = await import('../../src/cli/connect/mcp/local-server.js');
 const { AgentRegistry } = await import('../../src/cli/connect/agent-registry.js');
-const { secretlessCallerAdmitted, SECRETLESS_CALLER_REFUSED_FROM } = await import('../../src/cli/connect/mcp/local-admission.js');
-const { getSoftwareVersion } = await import('../../src/utils/version.js');
-const VERSION = getSoftwareVersion();
+const { LOOPBACK_REFUSAL } = await import('../../src/cli/connect/mcp/local-admission.js');
 
 interface Answer { status: number; body: { ok?: boolean; data?: { pid?: number }; error?: { code?: string } } | null }
 
@@ -135,14 +133,18 @@ describe('the serve daemon admits only its own callers (A9-1)', () => {
     expect(exit).not.toHaveBeenCalled();
   });
 
-  const letIn = secretlessCallerAdmitted(VERSION);
-  it(`at ${VERSION}, ${letIn ? 'lets in' : 'refuses with 401'} a request with no secret at every endpoint but shutdown (refused from ${SECRETLESS_CALLER_REFUSED_FROM})`, async () => {
-    // Not the shutdown endpoint: a request this version lets in would stop the daemon. Its refusal
-    // of a request with no secret is held at the refusing release by
-    // serve-secretless-caller-follows-the-release.test.ts, with the same admission.
-    for (const [method, path] of endpoints.filter(([, p]) => p !== '/local/shutdown')) {
-      const none = await call(port, method, path, { host: `127.0.0.1:${port}` });
-      expect(none.status === 401, `${method} ${path} with no secret answered ${none.status}`).toBe(!letIn);
+  it('refuses every endpoint with 401 when there is no secret, or only the placeholder bearer', async () => {
+    const callers: Array<[string, Record<string, string>]> = [
+      ['no Authorization header', { host: `127.0.0.1:${port}`, 'x-aimeat-agent': 'loopbot', 'user-agent': 'python-requests/2.32.3' }],
+      ['Bearer loopback-trusted', { host: `127.0.0.1:${port}`, authorization: 'Bearer loopback-trusted' }],
+      ['an empty Bearer', { host: `127.0.0.1:${port}`, authorization: 'Bearer ' }],
+    ];
+    for (const [label, headers] of callers) {
+      for (const [method, path] of endpoints) {
+        const r = await call(port, method, path, headers);
+        expect(r.status, `${method} ${path} with ${label}`).toBe(401);
+        expect(r.body?.error?.code, `${method} ${path} with ${label}`).toBe(LOOPBACK_REFUSAL.secret);
+      }
     }
     await settle(200);
     expect(exit).not.toHaveBeenCalled();

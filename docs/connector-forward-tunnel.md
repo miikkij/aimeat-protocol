@@ -215,16 +215,12 @@ live. `stdio_params` / `http_params` remain for one-shot / CI use. See
   together with the port. `aimeat connect tui`, `aimeat connect call` (which
   goes through the daemon when it serves the agent) and `aimeat-crewai`
   (0.29.0+) do this.
-- **A request with no secret:** aimeat 3.19.x lets it in, so that a crew
-  runtime that does not send the secret yet keeps working while it is
-  updated. The daemon's log names each such caller once per start: the agent
-  it names in `X-Aimeat-Agent` (or `?agent=`), its User-Agent and its first
-  request. Each of those lines names a program to update. The placeholder
-  `Authorization: Bearer loopback-trusted`, which aimeat-crewai before 0.29.0
-  sends, counts as no secret. From **3.20.0** the daemon refuses such a
-  request with 401. It reads its own version when it starts, so 3.20.0 needs
-  no setting and no code change for this. The Host and Origin checks apply to
-  every request in both releases.
+- **A request with no secret:** from aimeat **3.20.0** the daemon refuses a
+  caller that sends no serve secret with 401. aimeat-crewai sends it from
+  0.29.0. Before 0.29.0 it sends the placeholder
+  `Authorization: Bearer loopback-trusted`, which is not the secret, so the
+  daemon refuses it too: update such a crew runtime to aimeat-crewai 0.29.0 or
+  later.
 - **Local endpoints (loopback only):** `/v1/mcp` (Streamable HTTP MCP),
   `/v1/*` (REST proxy; agent via
   `X-Aimeat-Agent` header or `?agent=`), `POST /local/call/:tool` (deterministic
@@ -256,10 +252,8 @@ live. `stdio_params` / `http_params` remain for one-shot / CI use. See
   allowlist and a header allowlist; the WS frame size is capped.
 - The local `serve` surface binds **127.0.0.1 only** and admits a request only
   with a loopback Host for its port, no `Origin`, and the per-start secret from
-  serve.json. In 3.19.x it also admits a request that sends no secret and names
-  its caller in the log; 3.20.0 refuses that request. The daemon holds the
-  agent tokens, so local clients handle only that secret, never a node
-  credential.
+  serve.json. The daemon holds the agent tokens, so local clients handle only
+  that secret, never a node credential.
 - **One connector folder is one trust domain.** The folder (`AIMEAT_HOME`, else
   `.aimeat` in the folder the command started in) holds the daemon's secret, the
   agent tokens and the agent keys of every owner whose agents it serves. Every

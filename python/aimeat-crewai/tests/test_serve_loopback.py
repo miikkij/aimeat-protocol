@@ -19,9 +19,9 @@ What is asserted (the Phase 5 contract):
   - The example crew wiring still imports/constructs.
   - (0.29.0, 2026-09-24) Every request carries the secret the daemon wrote into
     serve.json, and a request without it is refused (secaudit 2026-09, A9-1).
-  - (2026-09-26) A request with a wrong secret is refused. One with no secret is
-    let in by aimeat 3.19.x, which names its caller in the daemon's log, and
-    refused from 3.20.0; the node's own tests hold that to the node's version.
+  - (2026-09-26) A request with a wrong secret is refused.
+  - (2026-09-29) A request with no secret, and one with the placeholder bearer
+    `loopback-trusted`, is refused as well (aimeat 3.20.0).
 
 Environment: needs the aimeat-protocol repo checkout (the tests live in it)
 plus `node` on PATH -- the node server and the serve daemon are spawned from
@@ -267,13 +267,16 @@ def test_serve_params_auto_starts_daemon(env: Env) -> None:
 
     assert params["url"] == f"{env.loopback_base}/v1/mcp"
     assert params["transport"] == "streamable-http"
-    # The session carries the daemon's own secret, and the daemon refuses a request with a wrong one.
+    # The session carries the daemon's own secret, and the daemon refuses a request without it.
     assert disc.get("secret"), "a schema-3 daemon writes the secret every request must present"
     assert params["headers"]["Authorization"] == f"Bearer {disc['secret']}"
-    refused = requests.get(
-        f"{env.loopback_base}/local/status", headers={"Authorization": "Bearer not-the-secret"}, timeout=10,
-    )
-    assert refused.status_code == 401, f"a request with a wrong secret must be refused, got {refused.status_code}"
+    for label, headers in (
+        ("a wrong secret", {"Authorization": "Bearer not-the-secret"}),
+        ("no secret", {}),
+        ("the placeholder bearer", {"Authorization": "Bearer loopback-trusted"}),
+    ):
+        refused = requests.get(f"{env.loopback_base}/local/status", headers=headers, timeout=10)
+        assert refused.status_code == 401, f"a request with {label} must be refused, got {refused.status_code}"
 
 
 def test_serve_params_reuses_running_daemon(env: Env) -> None:
