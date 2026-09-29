@@ -41,6 +41,8 @@
  *   cd aimeat && pnpm exec node --import tsx test/e2e-email-delivery.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=email-delivery
  * @version-history
+ *   v1.2.0 -- 2026-09-29 -- Password reset: the mail is the reset template, and asked twice only the
+ *     newest code works (SQLite had checked the oldest).
  *   v1.1.0 -- 2026-09-29 -- The magic link in the mail is the browser endpoint /v1/ghii/magic-link/open:
  *     opening it sets the refresh cookie and redirects, and the refreshed session is the account's.
  *   v1.0.0 -- 2026-09-08 -- Initial. Written with the fix for sendWithAttachments dropping opts.headers.
@@ -303,6 +305,7 @@ async function run(): Promise<void> {
         const ask = await json('/v1/ghii/password/reset-request', { method: 'POST', body: JSON.stringify({ username: recName }) });
         assert(ask.status === 200, `reset-request ${ask.status}: ${short(ask.body)}`);
         const mail = await smtp!.waitForMail(recEmail, /\b\d{6}\b/);
+        assert(mail.subject === 'Your AIMEAT password reset code', `the reset mail must say it is a reset code: ${mail.subject}`);
         const newPassword = 'ResetWorked9x';
         const reset = await json('/v1/ghii/password/reset', {
             method: 'POST', body: JSON.stringify({ username: recName, code: sixDigits(mail), newPassword }),
@@ -310,6 +313,29 @@ async function run(): Promise<void> {
         assert(reset.status === 200, `password/reset ${reset.status}: ${short(reset.body)}`);
         const login = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: recName, password: newPassword }) });
         assert(login.status === 200, `the emailed code must produce a working password: ${login.status} ${short(login.body)}`);
+    });
+
+    await test('asked twice, only the newest reset code works, and the username may be typed in capitals', async () => {
+        // Found on a sold customer node (SQLite), 2026-09-29: the second request's mail carried a
+        // code the reset refused, because the lookup returned the OLDEST pending code.
+        smtp!.clear();
+        await json('/v1/ghii/password/reset-request', { method: 'POST', body: JSON.stringify({ username: recName }) });
+        const first = sixDigits(await smtp!.waitForMail(recEmail, /\b\d{6}\b/));
+        smtp!.clear();
+        await json('/v1/ghii/password/reset-request', { method: 'POST', body: JSON.stringify({ username: recName.toUpperCase() }) });
+        const second = sixDigits(await smtp!.waitForMail(recEmail, /\b\d{6}\b/));
+        const newPassword = 'NewestWins9x';
+        const old = await json('/v1/ghii/password/reset', {
+            method: 'POST', body: JSON.stringify({ username: recName, code: first, newPassword }),
+        });
+        assert(first === second || (old.status === 400 && old.body.error?.code === 'INVALID_CODE'),
+            `the earlier code must be refused: ${old.status} ${short(old.body)}`);
+        const reset = await json('/v1/ghii/password/reset', {
+            method: 'POST', body: JSON.stringify({ username: recName, code: second, newPassword }),
+        });
+        assert(reset.status === 200, `the newest mail's code must work: ${reset.status} ${short(reset.body)}`);
+        const login = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: recName, password: newPassword }) });
+        assert(login.status === 200, `the new password must sign in: ${login.status} ${short(login.body)}`);
     });
 
     await test('account recovery mails a notification carrying the username', async () => {

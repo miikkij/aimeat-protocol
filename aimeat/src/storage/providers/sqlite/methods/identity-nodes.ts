@@ -9,6 +9,9 @@
  *   v1.1.0 — 2026-07-16 — listStorageFilesForOwners batch primitive.
  *   v1.3.0 — 2026-09-09 — getGHIIsByGhiis, getGHIIByGoogleSub, getEmailVerificationsByOwner and
  *     deleteExpiredEmailVerifications deleted: no caller.
+ *   v1.4.0 — 2026-09-29 — getActiveEmailVerification returns the NEWEST pending code, as Postgres
+ *     does; it had no ORDER BY and returned the oldest, so a second password-reset request made the
+ *     newest mail's code INVALID_CODE on SQLite only.
  */
 import type {
   PeeringRequestRecord, ChunkedUploadRecord, GHIIRecord, GHIIPatch, PersonalNodeRecord, MailboxItemRecord,
@@ -412,7 +415,7 @@ export const identityNodesMethods = {
   async getActiveEmailVerification(this: SqliteStorage, ownerName: string, purpose: string): Promise<EmailVerificationRecord | null> {
     const now = new Date().toISOString();
     const row = this.db.prepare(
-      `SELECT * FROM email_verifications WHERE ownerName = ? AND purpose = ? AND status = 'pending' AND expiresAt > ? LIMIT 1`
+      `SELECT * FROM email_verifications WHERE ownerName = ? AND purpose = ? AND status = 'pending' AND expiresAt > ? ORDER BY createdAt DESC LIMIT 1`
     ).get(ownerName, purpose, now) as Record<string, unknown> | undefined;
     return row ? this.deserializeEmailVerification(row) : null;
   },
