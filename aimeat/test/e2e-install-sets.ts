@@ -16,7 +16,8 @@
  *   - Phase 4: the second apply: nothing twice, the agent deployed through the runner
  *   - Phase 5: a set whose owner has no account creates the account
  *   - Phase 6: the operator's agent, holding operator:admin, plans and lists over MCP
- *   - Phase 6b: an owner the shop created before the set is welcomed while nobody has signed in to it
+ *   - Phase 6b: an owner the shop created before the set is welcomed once at its verified address,
+ *     even after the shop's crew image signed in as the owner; another address gets nothing
  *   - Phase 7: a new node started with AIMEAT_INSTALL_SET links the repository, is refused until it
  *     is entitled, tries again and applies the set; the shop's agent grants the bundle and registers
  *     the node as a packages-only peer in one call; a key that differs is refused on both sides
@@ -25,6 +26,8 @@
  *     node that is not a seller, an agent without operator:admin and a replayed signature are refused
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-install-sets
  * @version-history
+ *   v1.3.0 — 2026-09-29 — Phase 6b: an owner the crew image already signed in as is still welcomed;
+ *     an owner whose verified address differs from the set's is not.
  *   v1.2.0 — 2026-09-29 — Phase 6b: the welcome for an owner the shop created before the set.
  *   v1.1.0 — 2026-09-29 — The welcome sign-in link for accounts the apply creates, and the browser
  *     endpoint it points at; mail is captured in process.
@@ -499,15 +502,28 @@ await test('An owner the shop created, never signed in to, with the set\'s verif
     assert(again.status === 201 && mailsTo(PRECO).filter(m => m.method === 'sendRaw').length === 1, `welcomed once: ${mailsTo(PRECO).length}`);
 });
 
-await test('An owner someone has already signed in to gets no welcome', async () => {
+await test('An owner the shop\'s crew image already signed in as is still welcomed; another address is not', async () => {
+    // The crew image signs in with the owner's password at boot to get its agent token
+    // (wish-crew-image-kirjautuu-omistajana-sis-n-bootstrapissa-ja-vie-h), which counts a sign-in.
     const made = await provisionOwner(C.storage, C.config, { via: 'provisioning', username: 'usedco', displayName: 'Usedco', verifiedEmail: USEDCO });
     await C.storage.updateGHII(made.ghii.ghii, { loginCount: 1, lastLoginAt: new Date().toISOString() });
     const r = await C.json('/v1/install-sets/apply', {
         method: 'POST', headers: auth(opsToken),
         body: JSON.stringify({ install_set: installSet({ owner: { name: 'usedco', email: USEDCO }, members: [], organism_names: { team: 'Usedco' } }) }),
     });
-    assert(r.status === 201 && !(r.body.data.record.welcomed ?? []).includes(USEDCO) && mailsTo(USEDCO).length === 0,
-        `no mail for a used account: ${JSON.stringify({ welcomed: r.body.data.record.welcomed, mails: mailsTo(USEDCO).length })}`);
+    assert(r.status === 201 && (r.body.data.record.welcomed ?? []).includes(USEDCO) && mailsTo(USEDCO).filter(m => m.method === 'sendRaw').length === 1,
+        `welcomed after the crew image's sign-in: ${JSON.stringify({ welcomed: r.body.data.record.welcomed, mails: mailsTo(USEDCO).length })}`);
+
+    // An account whose verified address is not the one the set names gets nothing.
+    const other = `other${ts}@example.org`;
+    await provisionOwner(C.storage, C.config, { via: 'provisioning', username: 'otherco', displayName: 'Otherco', verifiedEmail: other });
+    const wrong = `wrong${ts}@example.org`;
+    const w = await C.json('/v1/install-sets/apply', {
+        method: 'POST', headers: auth(opsToken),
+        body: JSON.stringify({ install_set: installSet({ owner: { name: 'otherco', email: wrong }, members: [], organism_names: { team: 'Otherco' } }) }),
+    });
+    assert(w.status === 201 && !(w.body.data.record.welcomed ?? []).length && mailsTo(wrong).length === 0 && mailsTo(other).length === 0,
+        `no mail when the verified address differs: ${w.status} ${JSON.stringify({ welcomed: w.body.data?.record?.welcomed, a: mailsTo(wrong).length, b: mailsTo(other).length })}`);
 });
 
 console.log('\nPhase 7 — A new node applies its set at start-up');

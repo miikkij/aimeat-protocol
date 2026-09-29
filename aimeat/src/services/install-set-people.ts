@@ -20,10 +20,15 @@
  *   A CREATED ACCOUNT IS TOLD (2026-09-29). Once the apply has finished, welcomeCreated() mails every
  *   account it created a sign-in link that works for seven days and names the account. Until then
  *   nobody told the person the account existed; the aimeat-apps end-to-end run found it. An owner
- *   the shop created before the set (ownerToWelcome()) is welcomed too, while nobody has signed in to
- *   it and its verified address is the set's.
+ *   the shop created before the set (ownerToWelcome()) is welcomed too, when its verified address is
+ *   the set's; the record's welcomed list keeps it to one mail per set.
  * @structure checkOwner() · ensureOwner() · joinMember() · ownerToWelcome() · welcomeCreated() · MemberOutcome · CreatedOrganisms
  * @version-history
+ *   v1.3.0 — 2026-09-29 — ownerToWelcome() no longer asks whether anyone has signed in to the owner
+ *     account: the shop's crew image signs in with the owner's password when the node boots, to get
+ *     its agent token, so the condition refused the welcome on exactly the nodes the shop sells
+ *     (wish-crew-image-kirjautuu-omistajana-sis-n-bootstrapissa-ja-vie-h). The verified-address
+ *     condition stays, and the set's welcomed list sends the mail once. Jouni approved.
  *   v1.2.0 — 2026-09-29 — ownerToWelcome(): an existing owner account that has never been signed in
  *     to and whose verified address is the set's gets the welcome too.
  *   v1.1.0 — 2026-09-29 — welcomeCreated(): the welcome sign-in link for accounts the install created.
@@ -168,14 +173,16 @@ export async function joinMember(
  * link on. The shop creates the owner before the node applies the set (aimeat-commercial's AFCS),
  * so the owner was the one person on a sold node who got no welcome mail (wish of 2026-09-29).
  *
- * Only an account nobody has signed in to yet (password, passkey, Google or Entra, or a link: each
- * counts the sign-in), and only when its VERIFIED address is the one the set names. The mail goes to
- * an address the account already proved, so it gives nobody more than asking for a sign-in link at
- * that address does. Every condition is read before the one write.
+ * Only when the account's VERIFIED address is the one the set names. The mail goes to an address
+ * the account already proved, so it gives nobody more than asking for a sign-in link at that address
+ * does. Whether someone has signed in is NOT asked: the shop's crew image signs in with the owner's
+ * password when the node boots, so that condition turned the welcome off on every node the shop
+ * sells. The set's welcomed list (install-set-apply.ts) sends it once. Every condition is read
+ * before the one write.
  */
 export async function ownerToWelcome(storage: Storage, config: AimeatConfig, owner: InstallSet['owner']): Promise<boolean> {
     const ghii = await storage.getGHII(`${owner.name}@${config.nodeId}`);
-    if (!ghii || (ghii.loginCount ?? 0) > 0 || ghii.lastLoginAt) return false;
+    if (!ghii) return false;
     if (!ghii.emailVerifiedAt || ghii.emailHash !== emailHashOf(owner.email)) return false;
     const account = await storage.getOwner(owner.name);
     if (!account || account.disabledAt) return false;
