@@ -56,6 +56,7 @@
  *   const r = await decideForOwner(storage, config, { gaii, principal, appId, isOwner }, { state, questions });
  *   const g = await decideForOwner(storage, config, caller, { state, rule: 'send-reply' });
  * @version-history
+ *   v1.4.3 — 2026-09-29 — strictScrub: the Content Classifier's calls scrub everything (TARGET-082 V3).
  *   v1.4.2 — 2026-09-29 — The decision's scrub record names the classes the owner allowed through.
  *   v1.4.1 — 2026-09-26 — A provider answer past the outbound ceiling (JEV_TOO_LARGE) is PROVIDER_ERROR
  *     502 with the client's sentence, which names the provider and the 4 MB limit (secaudit 2026-09, N3).
@@ -148,6 +149,12 @@ export interface DecideInput {
   publicContent?: boolean;
   /** Reuse an identical earlier decision. Default true. */
   cache?: boolean;
+  /**
+   * Scrub every class whatever the owner allows, and never skip the scrub. The Content Classifier
+   * sets it (TARGET-082 V3): content judged for its sensitivity is exactly what must not leave as it
+   * is. No door takes it from a request body.
+   */
+  strictScrub?: boolean;
 }
 
 export interface DecideResult {
@@ -414,10 +421,10 @@ export async function decideForOwner(
 
   // 4 ── scrub
   const policy = await readDecidePolicy(storage, caller.gaii);
-  const skipScrub = input.publicContent === true && (caller.isOwner || policy.allowPublicOptOut);
+  const skipScrub = !inputIn.strictScrub && input.publicContent === true && (caller.isOwner || policy.allowPublicOptOut);
   const scrubber = skipScrub ? null : createScrubber({
     knownNames: [...(await knownNamesFor(storage, caller.gaii)), ...(input.names ?? []).filter(n => typeof n === 'string')],
-    allow: policy.allow,
+    allow: inputIn.strictScrub ? [] : policy.allow,
   });
   const state = scrubber ? scrubber.value(input.state) : input.state;
   const { sent, optionBack } = scrubQuestions(questions, scrubber);

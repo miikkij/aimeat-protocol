@@ -8,6 +8,8 @@
  *   invitation gates, archive handler) that every organism route group shares; the module-level
  *   fresherRec/roleSatisfies are pure utilities the route handlers reference directly.
  * @version-history
+ *   v1.12.0 — 2026-09-29 — publishDraft and publishDraftsBatch schedule write-time classification of
+ *     each published `.latest` (services/classify-on-write.ts, TARGET-082 V3).
  *   v1.11.0 — 2026-09-29 — The share and member-record collectors moved to shared-public.ts
  *     (max-file-lines) and take the classification reader (TARGET-082).
  *   v1.10.2 — 2026-09-26 — The publisher's account and bareOwner come from localAccountName
@@ -69,6 +71,7 @@ import { readPublishSpace, type UndeclaredSpaceRefusal } from '../../services/wo
 import { readWorkspaceMetaRecord, workspaceMetaReader } from '../../services/workspace-meta.js';
 import { createPublicCollectors } from './shared-public.js';
 import { logger } from '../../utils/logger.js';
+import { classifyAfterWrite } from '../../services/classify-on-write.js';
 
 // Moved to ./record-helpers.ts on 2026-08-11 (max-file-lines), and readOrganismConfig on 2026-09-14
 // for the same reason. Re-exported so every existing import of these from ./shared.js keeps
@@ -258,6 +261,8 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     // Memory Contracts (reactive): publishing a watched record fires Tracked Response evaluation
     // (gated O(1) on the track-registry in the subscriber).
     emitMemoryWritten(latestOwner, `${base}.latest`);
+    // Write-time classification of the published record (TARGET-082 V3): scheduled, never awaited.
+    classifyAfterWrite({ storage, config }, latestOwner, `${base}.latest`, draftValue);
     // Consume the draft — it was the proposal-for-publishing; now it's a frozen version + the new
     // .latest. Re-editing the published instance starts a fresh draft. (Without this the workspace
     // shows a stale draft alongside the identical published copy.) EVERY copy: see draftCopies.
@@ -316,7 +321,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     const now = new Date().toISOString();
     const toUpsert: MemoryRecord[] = [];
     const toDelete: { ownerGaii: string; key: string }[] = [];
-    const toEmit: Array<{ owner: string; key: string }> = [];
+    const toEmit: Array<{ owner: string; key: string; value: unknown }> = [];
     // The values of the records that passed every refusal, whose embedded files are opened to the
     // workspace's members once the batch has written (see the loop).
     const toScope: unknown[] = [];
@@ -389,7 +394,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
       for (const r of items) if (r.key === `${base}.latest` && r.ownerGaii !== latestOwner) toDelete.push({ ownerGaii: r.ownerGaii, key: r.key });
       // Consume the draft (none for a direct import) — EVERY copy of it, see draftCopies.
       if (!direct) for (const d of draftCopies(items, base)) toDelete.push({ ownerGaii: d.ownerGaii, key: `${base}.draft` });
-      toEmit.push({ owner: latestOwner, key: `${base}.latest` });
+      toEmit.push({ owner: latestOwner, key: `${base}.latest`, value: draftValue });
       toScope.push(draftValue);
       results.push({ instance, ok: true, version: n });
     }
@@ -410,7 +415,11 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     // members who can read them. A record the batch refused opens nothing.
     if (ws) for (const v of toScope) await scopeDocImagesToWorkspace(storage, config, v, localAccountName(ownerGhii), `${organismId}/${ws}`);
     // Fire Tracked-Response evaluation for each published record (gated O(1) in the subscriber).
-    for (const e of toEmit) emitMemoryWritten(e.owner, e.key);
+    // ...and schedule write-time classification of each (TARGET-082 V3), never awaited.
+    for (const e of toEmit) {
+      emitMemoryWritten(e.owner, e.key);
+      classifyAfterWrite({ storage, config }, e.owner, e.key, e.value);
+    }
     return { results };
   };
 

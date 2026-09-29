@@ -29,6 +29,9 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.11.0 — 2026-09-29 — A landed write is scheduled for write-time classification
+ *     (services/classify-on-write.ts, TARGET-082 V3): off the request path, and nothing while
+ *     classification is off.
  *   v1.10.0 — 2026-09-27 — An app tool manifest is written under the app's filename
  *     (services/app-tools-key.ts), whichever id the caller named it by; the stored record carries the key.
  *   v1.9.1 — 2026-09-26 — The organism rule names the writer with localAccountName, so a visitor from
@@ -99,6 +102,7 @@ import { isSecretRecordKey, secretRecordWriteRefusal } from './secret-records.js
 import { isServerWrittenKey, serverWrittenKeyRefusal } from '../utils/reserved-keys.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { canonicalAppToolsKey } from './app-tools-key.js';
+import { classifyAfterWrite } from './classify-on-write.js';
 
 /** What a caller must supply for the fan-out that a memory write sets off. */
 export interface MemoryWriteFanout {
@@ -485,6 +489,10 @@ export async function writeMemoryRecord(
     //    argument, matching every REST path: an omitted owner is a global broadcast and the SSE
     //    layer's own scope check decides who is entitled to hear it.
     emitChange('memory');
+
+    // 6a. Write-time classification (TARGET-082 V3). Scheduled, never awaited, and nothing at all
+    //     while classification is off (services/classify-on-write.ts).
+    classifyAfterWrite(deps, caller.targetGaii, input.key, input.value);
 
     // 7. And everything else the write sets off. It is part of WRITING, not part of the door, so it
     //    runs here rather than in each caller's tail — which is where it used to live, on one door

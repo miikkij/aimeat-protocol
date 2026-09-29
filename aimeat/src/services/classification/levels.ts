@@ -29,8 +29,8 @@
  *   v1.0.0 — 2026-09-29 — TARGET-082 V2. Initial.
  */
 import {
-  DEFAULT_LIMITS, type AiVisibility, type ClassificationLabel, type ClassificationPolicy,
-  type ClassificationRule, type LabelAudience, type RuleScope,
+  DEFAULT_CLASSIFIER, DEFAULT_LIMITS, type AiVisibility, type ClassificationLabel, type ClassificationPolicy,
+  type ClassificationRule, type ClassifierSettings, type LabelAudience, type RuleScope,
 } from './defaults.js';
 
 /** Thrown for a policy that cannot be stored. `problems` lists every one, so a caller fixes all at once. */
@@ -44,6 +44,8 @@ export class PolicyError extends Error {
 /** What an owner or an organism stores: only what it adds or tightens, plus its own switch. */
 export interface PolicyLayer {
   enabled?: boolean;
+  /** The classifier type and provider this owner or organism uses, and more kinds to judge on write. */
+  classifier?: Partial<Pick<ClassifierSettings, 'type' | 'provider' | 'onWrite'>>;
   labels?: ClassificationLabel[];
   rules?: ClassificationRule[];
   defaultLabel?: string;
@@ -195,6 +197,37 @@ function readThreshold(v: unknown, problems: string[]): number | undefined {
   return undefined;
 }
 
+const KINDS = new Set(['memory', 'file', 'row']);
+
+/**
+ * The classifier settings from input. The node sets every field; a layer picks only its type, its
+ * provider and more kinds to judge on write (`node` false), because the caps are the operator's.
+ */
+function readClassifier(v: unknown, problems: string[], base: ClassifierSettings, node: boolean): Partial<ClassifierSettings> | ClassifierSettings | undefined {
+  if (v === undefined) return node ? { ...base, onWrite: [...base.onWrite] } : undefined;
+  if (!isObj(v)) { problems.push('classifier is an object.'); return node ? { ...base } : undefined; }
+  const out: Partial<ClassifierSettings> = node ? { ...base, onWrite: [...base.onWrite] } : {};
+  if (v.type !== undefined) {
+    if (v.type === 'jev' || v.type === 'llm') out.type = v.type; else problems.push('classifier.type is jev or llm.');
+  }
+  if (v.provider !== undefined) {
+    if (v.provider === null || (typeof v.provider === 'string' && v.provider.length <= 120)) out.provider = v.provider as string | null;
+    else problems.push('classifier.provider is a provider id or null.');
+  }
+  if (v.onWrite !== undefined) {
+    if (Array.isArray(v.onWrite) && v.onWrite.every(k => typeof k === 'string' && KINDS.has(k))) out.onWrite = [...new Set(v.onWrite as ClassifierSettings['onWrite'])];
+    else problems.push('classifier.onWrite lists memory, file and row.');
+  }
+  for (const f of ['dailyPerOwner', 'dailyNode'] as const) {
+    if (v[f] === undefined) continue;
+    if (!node) { problems.push(`classifier.${f} is the operator's, set at the node level.`); continue; }
+    const n = v[f];
+    if (typeof n === 'number' && Number.isInteger(n) && n >= 0 && n <= 1_000_000) out[f] = n;
+    else problems.push(`classifier.${f} is a whole number from 0 to 1000000.`);
+  }
+  return out;
+}
+
 function duplicates(values: Array<string | number>, what: string, problems: string[]): void {
   const seen = new Set<string | number>();
   for (const x of values) {
@@ -231,8 +264,9 @@ export function validateNodePolicy(input: unknown): ClassificationPolicy {
     if (typeof d === 'number' && Number.isInteger(d) && d >= 1 && d <= 36_500) auditRetentionDays = d;
     else problems.push('auditRetentionDays is a whole number of days from 1 to 36500, or null to keep every row.');
   }
+  const classifier = readClassifier(input.classifier, problems, DEFAULT_CLASSIFIER, true) as ClassifierSettings;
   if (problems.length) throw new PolicyError('INVALID_POLICY', problems);
-  return { labels: labels.sort((a, b) => a.rank - b.rank), rules, limits, defaultLabel, aiMode, aiThreshold, auditRetentionDays };
+  return { labels: labels.sort((a, b) => a.rank - b.rank), rules, limits, defaultLabel, aiMode, aiThreshold, auditRetentionDays, classifier };
 }
 
 // ── A lower level ────────────────────────────────────────────────────────────────────────────────
@@ -324,6 +358,7 @@ export function validateLayer(node: ClassificationPolicy, input: unknown): Polic
   }
   layer.aiMode = readAiMode(input.aiMode, problems);
   layer.aiThreshold = readThreshold(input.aiThreshold, problems);
+  layer.classifier = readClassifier(input.classifier, problems, node.classifier, false) as PolicyLayer['classifier'];
   if (problems.length) throw new PolicyError('INVALID_POLICY', problems);
 
   const dilutes: string[] = [];
@@ -390,6 +425,14 @@ export function mergePolicy(node: ClassificationPolicy, layer?: PolicyLayer | nu
     aiMode: stricterMode,
     aiThreshold: Math.max(node.aiThreshold, layer.aiThreshold ?? 0),
     auditRetentionDays: node.auditRetentionDays,
+    // The caps are the node's; the type and provider are the layer's choice; kinds judged on write
+    // only grow, since judging more content is never a loosening.
+    classifier: {
+      ...(node.classifier ?? DEFAULT_CLASSIFIER),
+      ...(layer.classifier?.type ? { type: layer.classifier.type } : {}),
+      ...(layer.classifier?.provider !== undefined ? { provider: layer.classifier.provider } : {}),
+      onWrite: [...new Set([...(node.classifier?.onWrite ?? []), ...(layer.classifier?.onWrite ?? [])])],
+    },
   };
 }
 

@@ -11,6 +11,8 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   v1.9.0 — 2026-09-29 — classification-queue: the Content Classifier's queue, hourly, and the write
+ *     hook's classifier set at boot (TARGET-082 V3).
  *   v1.8.0 — 2026-09-29 — consent-audit-prune also prunes the classification audit log past the
  *     retention in the node's classification policy (TARGET-082 V4).
  *   v1.7.0 — 2026-09-28 — ai-catalog-refresh: the model catalogue from its public sources, when due.
@@ -34,6 +36,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { Scheduler } from './scheduler.js';
 import { logger } from '../utils/logger.js';
+import { installWriteClassifier, runClassificationQueueJob } from './classification-queue-job.js';
 
 /**
  * Register all core job handlers on the scheduler.
@@ -109,6 +112,13 @@ export function registerCoreHandlers(
     const { runAiJobLogPrune } = await import('./ai-jobs/prune-job.js');
     await runAiJobLogPrune(config, storage);
   });
+
+  // The Content Classifier (TARGET-082 V3). The write hook gets its classifier here, at boot, and
+  // not through its own import, which would close an import cycle (services/classify-on-write.ts).
+  // The queue job works through items that waited for the day's caps, or that a scan queued. Both
+  // do nothing while classification is off.
+  installWriteClassifier();
+  scheduler.registerCoreHandler('classification-queue', async () => { await runClassificationQueueJob(config, storage); });
 
   // Decision records past their retention window (TARGET-080). One indexed delete across owners.
   scheduler.registerCoreHandler('ai-decision-prune', async () => {

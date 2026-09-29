@@ -4,7 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description Commit accepted batch rows with their provenance; restores retain source attribution.
  * @structure writeMemoryBatch
- * @version-history 1.0.0 2026-09-27 Share the existing batch storage and provenance services.
+ * @version-history
+ *   1.1.0 2026-09-29 Rows that landed are scheduled for write-time classification
+ *     (services/classify-on-write.ts, TARGET-082 V3).
+ *   1.0.0 2026-09-27 Share the existing batch storage and provenance services.
  */
 import type { Storage, AiProvenanceRecordRow } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -12,6 +15,7 @@ import type { MemoryDbService, BulkWriteItem, BulkWriteOptions } from './db/memo
 import { provenanceForWrite, storeHeldProvenance, contentHashOf } from './ai-provenance.js';
 import { memoryContentBytes } from '../utils/memory-content.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
+import { classifyAfterWrite } from './classify-on-write.js';
 
 export async function writeMemoryBatch(
   deps: { storage: Storage; config: AimeatConfig; memoryDb: MemoryDbService },
@@ -33,7 +37,7 @@ export async function writeMemoryBatch(
     },
   });
   const supplied = new Map(items.map(item => [item.key, item.aiProvenanceId]));
-  return storage.transaction(async () => {
+  const result = await storage.transaction(async () => {
     const result = await memoryDb.writeMany(caller.targetGaii, items, {
       ...opts,
       prepare: async (records, existing) => {
@@ -67,4 +71,15 @@ export async function writeMemoryBatch(
     await storeHeldProvenance(storage, held);
     return result;
   });
+  // Write-time classification of every row that landed (TARGET-082 V3): scheduled after the
+  // transaction committed, never awaited, and nothing while classification is off.
+  if (config.classificationMode !== 'off') {
+    const values = new Map(items.map(item => [item.key, item.value]));
+    for (const row of result.items) {
+      if (row.status === 'created' || row.status === 'updated') {
+        classifyAfterWrite({ storage, config }, caller.targetGaii, row.key, values.get(row.key));
+      }
+    }
+  }
+  return result;
 }

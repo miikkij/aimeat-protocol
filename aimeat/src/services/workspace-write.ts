@@ -37,6 +37,8 @@
  *   const prev = await findWorkspaceRecord(storage, key);
  *   await writeWorkspaceRecord({ storage, config }, { key, value, owner: ownerGhii, prev });
  * @version-history
+ *   v1.3.0 — 2026-09-29 — A landed record is scheduled for write-time classification
+ *     (services/classify-on-write.ts, TARGET-082 V3).
  *   v1.2.0 — 2026-09-24 — `onLanded`: what the caller stores only if the record lands, run after the
  *     store took it and before the collapse and the fan-out. The workspace draft door stores the
  *     draft's provenance record there, so a write that loses its compare-and-swap leaves none.
@@ -53,6 +55,7 @@ import { fresherRec, collapseKeyTo } from '../routes/organisms/record-helpers.js
 import { afterMemoryWrite } from './memory-write.js';
 import { emitChange } from './event-bus.js';
 import { isSameOwner } from '../utils/gaii.js';
+import { classifyAfterWrite } from './classify-on-write.js';
 
 export interface WorkspaceWriteDeps {
     storage: Storage;
@@ -176,6 +179,8 @@ export async function writeWorkspaceRecord(
     // workflow never started, a subscribed ecosystem app was never told, and the record waited for
     // the next scheduled federation sync. Same act, same consequences, whichever door it came in.
     emitChange('memory');
+    // Write-time classification (TARGET-082 V3): scheduled, never awaited, nothing while it is off.
+    classifyAfterWrite(deps, input.owner, input.key, input.value);
     await afterMemoryWrite(deps, input.owner, input.key, !!prev, input.principal);
     return { written: true, version: record.version };
 }

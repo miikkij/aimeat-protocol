@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key, CORS management, and the public GET /v1/memory/:gaii/:key read. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 — 2026-09-29 — PUT schedules write-time classification of a changed value
+ *     (services/classify-on-write.ts, TARGET-082 V3).
  *   v1.8.0 — 2026-09-29 — Both reads show a value through presentMemory (the classification reader
  *     plus the credential mask, TARGET-082); a record the reader may not see answers as absent.
  *   v1.7.0 — 2026-09-26 — GET /v1/memory/:gaii/:key answers a Design Book part with 403
@@ -63,6 +65,7 @@ import { ownerGhiiOf, isForeignPrincipal } from '../../utils/gaii.js';
 import { loadServedProvenance, envelopeMeta, setProvenanceHeaders } from '../../services/ai-provenance-marks.js';
 import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone, memoryContentBytes } from './shared.js';
 import { logger } from '../../utils/logger.js';
+import { classifyAfterWrite } from '../../services/classify-on-write.js';
 
 export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
   const { config, storage, memoryDb, stats, peers, resolve, workspaceAccess } = ctx;
@@ -484,6 +487,8 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     }
     // Landed: the record it names is stored now, before anything below reads or announces it.
     await storeHeldProvenance(storage, held);
+    // Write-time classification (TARGET-082 V3), only when the value changed; scheduled, not awaited.
+    if (value !== undefined) classifyAfterWrite({ storage, config }, effectiveGaii, key, newValue);
 
     // Who has had their hands on this key. `gaii` is the caller, `effectiveGaii` the namespace it
     // lands in — an agent writing into its owner's store is both, and that is the difference the

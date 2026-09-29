@@ -935,6 +935,24 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Threads reach callers through showThread/showThreads; the other reads are append, archive roll-over and version reads."
     },
+    "src/services/classification-queue-job.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "The node's own read (TARGET-082 V3): the hourly queue job loads a queued personal item's current value so the node's own classifier can judge it; the classifier checks useForAi before any model reads the text, and nothing is shown to a caller."
+    },
+    "src/services/classification/classifier.ts": {
+      "reads": {
+        "getMemory": 3
+      },
+      "why": "The node's own read (TARGET-082 V3): the classifier's daily usage counter and its queue under system@<node>, and a record's version before it is rewritten."
+    },
+    "src/services/classification/scan.ts": {
+      "reads": {
+        "getOwnerScopeMemory": 1
+      },
+      "why": "The node's own read (TARGET-082 V3): a record's text feeds the Content Classifier, which checks useForAi before any model sees it; nothing is returned to the caller but the label outcome."
+    },
     "src/services/classification/policy-admin.ts": {
       "reads": {
         "getMemory": 1
