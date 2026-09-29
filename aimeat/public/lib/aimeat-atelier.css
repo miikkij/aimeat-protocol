@@ -49,6 +49,9 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.59.0 — 2026-09-29 — No rule changed. Every layer the kit puts on the body now carries the
+ *     app's data-ak-look (dom.js wearLook), so the [data-ak-look] token blocks below reach a dialog,
+ *     a menu or a toast, which they did not while those layers sat outside the app frame.
  *   v0.58.0 — 2026-09-29 — margins.css joins the imports: the node's eight margin figures on the
  *     empty sides of a wide app frame (html[data-ak-margins], AIMEAT.atelier.margins()).
  *   v0.57.0 — 2026-09-29 — shell.css: .ak-badge tones (ok, warn, err, quiet), which a list row takes
