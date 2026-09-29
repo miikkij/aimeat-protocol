@@ -25,6 +25,8 @@
  * @structure registerPatchRoutes(router, ctx) -> PATCH /v1/memory/:key
  * @usage mounted from src/routes/memory.ts alongside registerCrudRoutes
  * @version-history
+ *   v1.5.0 — 2026-09-29 — The merged value is scheduled for write-time classification
+ *     (services/classify-on-write.ts, TARGET-082 V3).
  *   v1.4.0 — 2026-09-29 — The answer echoes the value through presentMemory (TARGET-082).
  *   v1.3.1 — 2026-09-26 — The provenance record a merge stamps is stored only once its swap lands
  *     (secaudit 2026-09, N2). It was stored on every attempt, so each attempt that lost the swap left
@@ -62,6 +64,7 @@ import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../
 import { isSecretRecordKey, secretRecordWriteRefusal } from '../../services/secret-records.js';
 import { presentMemory } from '../../services/classification/present-memory.js';
 import { readerFor } from '../../services/classification/reader.js';
+import { classifyAfterWrite } from '../../services/classify-on-write.js';
 import { resolveWriteTarget } from './owner-target.js';
 import { isKeyArchived } from '../../services/archive.js';
 import { undeclaredSpaceForKey } from '../../services/workspace-write-items.js';
@@ -298,6 +301,8 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
     }
     // Landed: the record the stored value names is stored now, before anything below announces it.
     await storeHeldProvenance(storage, held);
+    // Write-time classification of the merged value (TARGET-082 V3): scheduled, never awaited.
+    classifyAfterWrite({ storage, config }, gaii, key, record.value);
 
     if (overageMorsels > 0) await chargeOverage(storage, gaii, overageMorsels, 'memory_overage');
 

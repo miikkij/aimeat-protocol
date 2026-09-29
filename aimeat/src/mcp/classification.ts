@@ -15,6 +15,7 @@
  * @structure registerClassificationTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage registerClassificationTools(mcp, storage, config, agentGaii, scopes);
  * @version-history
+ *   v1.2.0 — 2026-09-29 — V3: the scan action runs the Content Classifier on keys or a prefix.
  *   v1.1.0 — 2026-09-29 — V4: the audit action reads the audit log of a level.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V2. Initial.
  */
@@ -31,10 +32,11 @@ import {
   ClassificationError, labelActorOf, readContentLabel, reviewLabel, setLabel, targetOf,
 } from '../services/classification/labels.js';
 import { readAuditLog, readPolicy, writePolicy } from '../services/classification/policy-admin.js';
+import { scanContent } from '../services/classification/scan.js';
 
 const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v, null, 2) }] });
 
-const WRITES = new Set(['set', 'review', 'policy_set']);
+const WRITES = new Set(['set', 'review', 'policy_set', 'scan']);
 
 export function registerClassificationTools(
   mcp: McpServer,
@@ -49,7 +51,9 @@ export function registerClassificationTools(
     'aimeat_classification',
     descriptionFor('aimeat_classification'),
     {
-      action: z.enum(['get', 'set', 'review', 'policy_get', 'policy_set', 'audit']).describe('What to do.'),
+      action: z.enum(['get', 'set', 'review', 'policy_get', 'policy_set', 'audit', 'scan']).describe('What to do.'),
+      keys: z.array(z.string()).max(500).optional().describe('scan: memory keys to classify.'),
+      prefix: z.string().optional().describe('scan: classify every memory key under this prefix (queued).'),
       since: z.string().optional().describe('audit: only rows from this ISO time on.'),
       audit_action: z.enum(['shown', 'used', 'refused', 'changed']).optional().describe('audit: only this kind of row.'),
       limit: z.number().int().min(1).max(1000).optional().describe('audit: at most this many rows, default 200.'),
@@ -94,6 +98,8 @@ export function registerClassificationTools(
           }
           case 'policy_get':
             return text(await readPolicy(deps, actor, args.level ?? 'owner', args.organism_id));
+          case 'scan':
+            return text(await scanContent(deps, actor, { keys: args.keys ?? (args.key ? [args.key] : undefined), prefix: args.prefix }));
           case 'audit':
             return text(await readAuditLog(deps, actor, args.level ?? 'owner', args.organism_id,
               { since: args.since, action: args.audit_action, limit: args.limit }));

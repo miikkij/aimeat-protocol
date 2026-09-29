@@ -89,9 +89,10 @@ export async function readLevel<P = PolicyLayer>(
   };
 }
 
-/** The node's policy: the stored one, or the defaults. */
+/** The node's policy: the stored one over the defaults, so a field added later reads its default. */
 export async function readNodePolicy(storage: Storage, nodeId: string): Promise<ClassificationPolicy> {
-  return (await readLevel<ClassificationPolicy>(storage, nodeId, 'node', nodeId)).policy ?? defaultPolicy();
+  const stored = (await readLevel<ClassificationPolicy>(storage, nodeId, 'node', nodeId)).policy;
+  return stored ? { ...defaultPolicy(), ...stored } : defaultPolicy();
 }
 
 type Cfg = Pick<AimeatConfig, 'classificationMode' | 'nodeId'>;

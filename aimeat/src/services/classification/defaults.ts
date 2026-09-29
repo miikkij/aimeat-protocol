@@ -13,6 +13,7 @@
  *   defaultPolicy() · labelById()
  * @usage import { defaultPolicy } from './defaults.js';
  * @version-history
+ *   v1.3.0 — 2026-09-29 — V3: the Content Classifier's settings (ClassifierSettings).
  *   v1.2.0 — 2026-09-29 — V4: auditRetentionDays on the node's policy.
  *   v1.1.0 — 2026-09-29 — V2: a label's reader audience, a rule's scope and the classifier kind, and
  *     the per-level limits.
@@ -72,6 +73,24 @@ export interface ClassificationRule {
   appliesTo?: RuleScope | null;
 }
 
+/**
+ * The Content Classifier (spec §7, V3): which kind of model judges content, and how much it may do.
+ * jev asks the decision model to pick a label; llm asks the owner's text model for one. The node
+ * sets the daily caps; an owner or an organism picks the type and a provider of their own.
+ */
+export interface ClassifierSettings {
+  type: 'jev' | 'llm';
+  /** A decision provider id (jev) or an AI provider id (llm); absent: the default one. */
+  provider?: string | null;
+  /** Calls per owner (or organism) per day, and per node per day. Past them, content waits in a queue. */
+  dailyPerOwner: number;
+  dailyNode: number;
+  /** Which content kinds the classifier judges when they are written. Rules always run. */
+  onWrite: Array<'memory' | 'file' | 'row'>;
+}
+
+export const DEFAULT_CLASSIFIER: Readonly<ClassifierSettings> = { type: 'jev', provider: null, dailyPerOwner: 200, dailyNode: 2000, onWrite: [] };
+
 /** How many labels and rules one level may hold. A node setting, never a code constant (§4.1). */
 export interface PolicyLimits {
   labels: number;
@@ -91,6 +110,7 @@ export interface ClassificationPolicy {
   /** How many days the audit log keeps its rows; null keeps them. Set by the operator (decided
    *  2026-09-29: optional, default 365). Only the node level carries it. */
   auditRetentionDays: number | null;
+  classifier: ClassifierSettings;
 }
 
 export const DEFAULT_LABELS: readonly ClassificationLabel[] = [
@@ -155,6 +175,7 @@ export function defaultPolicy(): ClassificationPolicy {
     aiMode: 'suggest',
     aiThreshold: 0.85,
     auditRetentionDays: 365,
+    classifier: { ...DEFAULT_CLASSIFIER, onWrite: [] },
   };
 }
 

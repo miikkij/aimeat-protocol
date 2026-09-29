@@ -11,6 +11,8 @@
  *   - seedCoreScheduledJobs(config, storage): builds the job list and createScheduledJob() for missing ones
  *
  * @version-history
+ *   v1.6.0 — 2026-09-29 — Seed core:classification-queue (hourly, :25): the Content Classifier's queue
+ *     (TARGET-082 V3).
  *   v1.5.0 — 2026-09-28 — Seed core:package-upstream-check (daily, 04:41): installed packages brought up
  *     to what their source node serves.
  *   v1.4.0 — 2026-09-28 — Seed core:ai-catalog-refresh (daily, 04:17; refreshes when due, System 2 V4).
@@ -101,6 +103,10 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
   // The privacy notice's thirteen months for a visit record that names an account. Nightly at 03:40,
   // after the archive sweep, so a row it folds is already where it will stay.
   jobs.push({ id: 'core:usage-visit-retention', name: 'Usage Visit Retention', coreHandler: 'usage-visit-retention', cron: '40 3 * * *' });
+  // The Content Classifier's queue (TARGET-082 V3), hourly at :25. Seeded on every node, because
+  // seeding is create-if-absent and an operator may turn classification on later; the handler reads
+  // nothing while AIMEAT_CLASSIFICATION is off.
+  jobs.push({ id: 'core:classification-queue', name: 'Classification Queue', coreHandler: 'classification-queue', cron: '25 * * * *' });
 
   const now = new Date().toISOString();
   for (const def of jobs) {

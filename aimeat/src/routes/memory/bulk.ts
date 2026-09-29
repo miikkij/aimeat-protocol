@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 — 2026-09-29 — copy schedules write-time classification of the copied value (TARGET-082
+ *     V3); bulk and import get it from services/memory-batch-write.ts.
  *   v1.8.0 — 2026-09-29 — Export and bundle pass the classification reader (TARGET-082): memory values
  *     through presentMemories, files through reader.show.
  *   v1.7.0 — 2026-09-26 — copy refuses a Design Book part with 403 DESIGN_BOOK_PART, naming
@@ -50,6 +52,7 @@ import { type MemoryRouteCtx } from './shared.js';
 import { logger } from '../../utils/logger.js';
 import { batchKeyRefusal, storageReferenceRefusal } from './batch-guards.js';
 import { writeMemoryBatch } from '../../services/memory-batch-write.js';
+import { classifyAfterWrite } from '../../services/classify-on-write.js';
 import { isKeyArchived } from '../../services/archive.js';
 import { discoverMemory } from '../../services/memory-discover.js';
 
@@ -586,6 +589,8 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     });
 
     recordMemoryTouch({ ownerGaii: callerGaii, key, writerPrincipal: callerGaii, kind: 'write' });
+    // Write-time classification of the copy (TARGET-082 V3): scheduled, never awaited.
+    classifyAfterWrite({ storage, config }, callerGaii, key, sourceRecord.value);
 
     emitResourceUpdated(callerGaii, `aimeat://memory/${encodeURIComponent(key)}`);
     emitResourceListChanged(callerGaii);

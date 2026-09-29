@@ -14670,6 +14670,31 @@ paths:
         '403': { description: PERSON_REQUIRED, or not allowed to change this level. }
         '404': { description: NO_PROPOSAL, or no such organism. }
 
+  /v1/classification/scan:
+    post:
+      summary: Run the Content Classifier on memory keys
+      description: |
+        Up to 20 named personal keys are judged at once; more keys, a prefix and organism content wait
+        in a queue the server works through hourly within the day's caps. Detection rules run first,
+        then the decision model or the text model the policy names, with personal data removed before
+        anything leaves. The classifier's label follows the AI rules: it never lowers a label and never
+        changes a person's.
+      tags: [Memory]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                keys: { type: array, items: { type: string }, maxItems: 500 }
+                prefix: { type: string }
+      responses:
+        '200': { description: "classified, queued and missing keys." }
+        '400': { description: Neither keys nor a prefix. }
+        '409': { description: CLASSIFICATION_OFF. }
+
   /v1/classification/audit:
     get:
       summary: The classification audit log of one level

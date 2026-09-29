@@ -12,6 +12,7 @@
  * @structure classificationRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.2.0 — 2026-09-29 — V3: POST /v1/classification/scan.
  *   v1.1.0 — 2026-09-29 — V4: GET /v1/classification/audit.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V2. Initial.
  */
@@ -25,6 +26,7 @@ import {
 } from '../services/classification/labels.js';
 import { readAuditLog, readPolicy, reviewPolicy, writePolicy } from '../services/classification/policy-admin.js';
 import type { PolicyLevel } from '../services/classification/policy.js';
+import { scanContent } from '../services/classification/scan.js';
 
 const LEVELS = new Set(['node', 'owner', 'organism']);
 
@@ -66,6 +68,9 @@ export function classificationRouter(config: AimeatConfig, storage: Storage): Ro
     if (decision !== 'accept' && decision !== 'reject') throw new ClassificationError('INVALID_INPUT', 400, 'decision is accept or reject.');
     return reviewPolicy(deps, actor(req), levelOf(body(req).level), orgOf(body(req).organism_id), decision);
   }));
+
+  router.post('/v1/classification/scan', requireAuth(), requireScope('memory:write'), handle(req =>
+    scanContent(deps, actor(req), { keys: body(req).keys, prefix: body(req).prefix })));
 
   router.get('/v1/classification/audit', requireAuth(), requireScope('memory:read'), handle(req =>
     readAuditLog(deps, actor(req), levelOf(req.query.level), orgOf(req.query.organism_id), {

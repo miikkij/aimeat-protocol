@@ -24,6 +24,7 @@
  *   v1.0.1 — 2026-09-28 — The embed howTo says embeddings are rare and the person's decision.
  *   v1.1.0 — 2026-09-28 — `roles`: an app's declared AI roles, each bound or not with the fix; the
  *     owner's roles for the owner and their agents (services/ai/roles.ts).
+ *   v1.2.0 — 2026-09-29 — content_classifier: the Content Classifier's state and fix (TARGET-082 V3).
  *   v1.1.1 — 2026-09-28 — The settings read in aiCapabilitiesView's Promise.all is wrapped in an async
  *     function: a storage that threw synchronously left the sibling reads' rejections unhandled.
  */
@@ -37,6 +38,7 @@ import { catalogMeta, catalogModel } from './catalog/store.js';
 import { readOwnerAiPolicy, appAiMetaOf } from './policy-store.js';
 import type { CallerClass } from './policy.js';
 import { readRoles, rolesWithLegacy, bindingKey } from './roles.js';
+import { classifierState } from '../classification/classifier-state.js';
 
 export const CAPABILITY_ORDER: readonly AiCapability[] = ['text', 'vision', 'files', 'image', 'speech', 'transcription', 'embed'];
 
@@ -223,8 +225,11 @@ export async function aiCapabilitiesView(
   const meta = catalogMeta();
   const textState = states[0];
   const roles = await rolesOf(storage, gaii, ctx, prefs, { node, owner });
+  // TARGET-082 V3: the Content Classifier runs on the decision model or on `text`, so its state is theirs.
+  const contentClassifier = await classifierState(storage, config, gaii, textState);
   return {
     capabilities: Object.fromEntries(CAPABILITY_ORDER.map((cap, i) => [cap, states[i]])),
+    content_classifier: contentClassifier,
     ...(roles ? { roles } : {}),
     policy: { mode: policy.mode, appliesToCaller: policy.mode !== 'open' && !!policy.appliesTo[switchOf[ctx.caller]] },
     budget: {

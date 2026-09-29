@@ -62,6 +62,9 @@ export interface LabelActor {
   ownerGhii: string;
   ownerName: string | null;
   kind: 'human' | 'ai' | 'rule';
+  /** The node's own classifier (classifier.ts): it labels any scope, as a rule does, but an AI's
+   *  label still follows the AI rules. No request can set it. */
+  nodeOwn?: boolean;
 }
 
 /** The actor behind a request. A visitor from another node labels nothing here. */
@@ -94,7 +97,7 @@ export function rowTarget(organismId: string, ws: string, space: string, rowId: 
 }
 
 async function assertMayLabel(deps: ClassificationDeps, actor: LabelActor, target: ContentLabelTarget): Promise<void> {
-  if (actor.kind === 'rule') return;
+  if (actor.kind === 'rule' || actor.nodeOwn) return;
   const owner = scopeOwner(target.scope);
   if (owner) {
     if (isSameOwner(owner, actor.ownerGhii)) return;
