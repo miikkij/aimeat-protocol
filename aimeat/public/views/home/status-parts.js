@@ -17,6 +17,7 @@
  * @structure MailboxRow · YourTurn · FleetLine · Things · FavoriteApps · Playbooks · TrustLine · Achievements
  * @usage import { MailboxRow, FleetLine, Things, FavoriteApps, Achievements } from '/views/home/status-parts.js';
  * @version-history
+ *   2026-09-29: The "App published" badge opens /v1/appcat instead of /app-catalog.html (Jouni).
  *   2026-09-27: The playbook's two ways are the Loud and Action components, the same buttons (page
  *     group G9, a move).
  *   2026-09-24: The playbook's copy button is the underlined action link (Jouni's decision "Panel
@@ -383,7 +384,7 @@ export function Achievements({ state, usage, markers, chatStatus, orgs, packages
     { id: 'chat', done: has('onboarding.first_chat_turn'), key: 'home.ach.chat', fallback: 'First conversation', href: '/v1/chat' },
     { id: 'mcp', done: has('onboarding.first_mcp_call') || has('onboarding.hello_mcp'), key: 'home.ach.mcp', fallback: 'Your own AI connected', href: '/v1/profile?tab=mcp' },
     { id: 'ownkey', done: !!chatStatus?.has_own_key, key: 'home.ach.ownkey', fallback: 'Your own AI key', href: '/v1/profile?tab=generator' },
-    { id: 'app', done: (usage?.counts?.apps?.used ?? 0) > 0, key: 'home.ach.app', fallback: 'App published', href: '/app-catalog.html' },
+    { id: 'app', done: (usage?.counts?.apps?.used ?? 0) > 0, key: 'home.ach.app', fallback: 'App published', href: '/v1/appcat' },
     { id: 'space', done: (orgs?.length ?? 0) > 0, key: 'home.ach.space', fallback: 'In a shared space', href: '/v1/profile?tab=organisms' },
     { id: 'knowledge', done: (packages?.length ?? 0) > 0, key: 'home.ach.knowledge', fallback: 'Knowledge package made', href: '/v1/profile?tab=knowledge' },
     { id: 'experience', done: !!prefs?.tried?.experience, key: 'home.ach.experience', fallback: 'Experience Center visited',

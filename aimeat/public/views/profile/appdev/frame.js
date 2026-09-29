@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: MIT
  * @description What the AppDev page's views share: the words (a), dates, the labels an area, a
  *   severity and a start mode wear, the app behind an "owner/filename" reference and its address,
- *   the launcher address in the profile's language, the crumb and the cross-page rail links.
+ *   the app catalogue's address, the crumb and the cross-page rail links.
  * @structure a · locale · day · areaLabel · sevLabel · modeLabel · appName · appUrl · catalogUrl ·
  *   crumb · pageLinks · goTab
  * @usage import { a, day, areaLabel, crumb, pageLinks } from './frame.js';
  * @version-history
+ *   v1.2.0 — 2026-09-29 — catalogUrl points to /v1/appcat instead of /app-catalog.html (Jouni).
  *   v1.1.0 — 2026-09-26 — The crumb and the rail's page links are data for SettingsPage (Crumb, Rail);
  *     openTab is the Rail's (component plan C9, page group G6).
  *   v1.0.0 — 2026-09-03 — Initial (design canvas "AppDev: tieto ja kiihdytys", direction A).
@@ -37,12 +38,12 @@ export const appName = (ref) => String(ref || '').split('/').pop().replace(/\.ht
 export const appUrl = (owner, filename) => `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}?mode=inline`;
 export const appUrlOf = (ref) => { const [owner, ...rest] = String(ref || '').split('/'); return rest.length ? appUrl(owner, rest.join('/')) : null; };
 
-/** The launcher, in the profile's language (it has Finnish and English). */
+/** The app catalogue (/v1/appcat). It is an SPA route, so it reads the site's language and needs no ?lang=. */
 export function catalogUrl(params = {}) {
   const q = new URLSearchParams();
-  q.set('lang', getLocale() === 'fi' ? 'fi' : 'en');
   for (const [k, v] of Object.entries(params)) if (v) q.set(k, String(v));
-  return '/app-catalog.html?' + q.toString();
+  const s = q.toString();
+  return '/v1/appcat' + (s ? '?' + s : '');
 }
 
 /** The build prompt as a file, in the profile's language; a same-origin link, so no fetch. */

@@ -25,6 +25,7 @@
  *     if (await serveAppAgentFace(res, config, storage, app)) return;
  *   }
  * @version-history
+ *   v1.3.1 — 2026-09-29 — The app catalogue line points to /v1/appcat instead of /app-catalog.html (Jouni).
  *   v1.3.0 — 2026-08-01 — TARGET-058: the face carries AI provenance on both layers — YAML
  *     frontmatter with the whole record and the response headers on the served document, plus ONE
  *     human-readable line in the BODY so an agent that summarises the page carries the statement
@@ -93,7 +94,7 @@ export function buildAgentAffordances(config: AimeatConfig, ownerName: string, f
 
 - Act — WebMCP tool listing for this app: ${b}/v1/apps/${o}/${f}/webmcp
 - Learn — skills bound to this app: ${b}/v1/apps/${o}/${f}/skills
-- App catalog on this node (this app: ${ownerName}/${filename}): ${b}/app-catalog.html
+- App catalog on this node (this app: ${ownerName}/${filename}): ${b}/v1/appcat
 - Register an agent on this node (RFC 8628 device flow): ${b}/auth.md
 `;
 }

@@ -13,6 +13,7 @@
  *     authors never made forkable, and the same apps are already the landing page's wall, so the
  *     developer page was advertising them a second time with the wrong verb. The per-app access-code
  *     manager went with it — it existed only to gate those downloads.
+ *   v2.0.1 — 2026-09-29 — The publish link opens /v1/appcat instead of /app-catalog.html (Jouni).
  */
 import { html, dt } from './portal-dev.shared.js';
 
@@ -32,7 +33,7 @@ function UploadSection({ locale }) {
       <ol class="dv-steps">
         ${steps.map(k => html`<li key=${k}>${dt(k, locale)}</li>`)}
       </ol>
-      <a class="btn-primary" href="/app-catalog.html">${dt('publish.cta', locale)}</a>
+      <a class="btn-primary" href="/v1/appcat">${dt('publish.cta', locale)}</a>
       <p class="dv-hint">${dt('publish.note', locale)}</p>
     </div>
   `;
