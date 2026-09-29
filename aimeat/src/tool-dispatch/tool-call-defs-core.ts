@@ -10,6 +10,8 @@
  * @usage
  *   import { coreTools } from './tool-call-defs-core.js';
  * @version-history
+ *   v1.7.1 -- 2026-09-26 -- The aimeat_admin_incident_resolve comment names the app grants and access
+ *     tokens a decision covers.
  *   v1.7.0 -- 2026-09-26 -- aimeat_admin_incident_resolve forwards `name` and `resolution`, to decide
  *     one name of the incident the move to the full identity opened.
  *   v1.6.0 -- 2026-09-06 -- Nine doors that had been dead repaired (see the commit), and the nine
@@ -477,7 +479,7 @@ export const coreTools: ConnectCliToolDefinition[] = [
         handler: ({ client }) => client.get('/v1/admin/security/overview'),
     },
     {
-        // With `name` and `resolution`: one name of the incident the move to the full identity opened.
+        // With `name` and `resolution`: one name of the held-names incident (rows, installs, app grants, access tokens).
         name: 'aimeat_admin_incident_resolve',
         handler: ({ client }, input) => client.post(`/v1/admin/security/incidents/${encodeURIComponent(requiredString(input, 'id'))}/resolve`,
             input.name !== undefined || input.resolution !== undefined

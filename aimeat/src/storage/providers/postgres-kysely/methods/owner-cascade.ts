@@ -30,11 +30,15 @@
  *   - pseudonymiseProvenanceOwnerDb(db, name, ghiis, pseudonym) — the kept AI provenance, without it
  *   - pseudonymiseLedgerPartyDb, settleLeavingPartyWorkDb, settleErasedPartyWorkDb,
  *     settleDeletedAgentWorkDb — the work and ledger rule, in work-ledger-erasure.ts, exported again here
- *   - cascadeDeleteIdentityData, deleteInstalledCortexesDb, deleteEcosystemAppsDb — what goes with one
- *     identity, and the account's cortexes and ecosystem apps, in identity-erasure.ts, exported again here
+ *   - cascadeDeleteIdentityData, deleteInstalledCortexesDb, deleteEcosystemAppsDb,
+ *     deleteAccountCredentialsDb — what goes with one identity, and the account's cortexes, ecosystem
+ *     apps and credentials, in identity-erasure.ts, exported again here
  *   - deleteOwnerCascade(db, name) — agents + GHIIs through the cascade, then the owner-level tables
  * @usage Called by identityMethods.deleteOwner inside one db.transaction().
  * @version-history
+ *   v1.15.0 — 2026-09-26 — The app grants, the personal access tokens and the sessions go through
+ *     identity-erasure.ts deleteAccountCredentialsDb, which the start step and the operator's decision
+ *     on a held name call too. Exported again here.
  *   v1.14.0 — 2026-09-26 — deleteOwnerCascade deletes the app grants and the personal access tokens
  *     issued in the account name (AppGrant, PersonalAccessToken).
  *   v1.13.0 — 2026-09-26 — cascadeDeleteIdentityData and deleteInstalledCortexesDb move to
@@ -89,12 +93,16 @@ import type { DB } from '../db-types.js';
 import { pseudonymiseTallyWriterDb } from './memory-tally.js';
 import { erasedPartyPseudonym, partyIdentities, erasedAccountParty } from '../../../erased-party.js';
 import { pseudonymiseLedgerPartyDb, settleErasedPartyWorkDb } from './work-ledger-erasure.js';
-import { cascadeDeleteIdentityData, deleteInstalledCortexesDb, deleteEcosystemAppsDb } from './identity-erasure.js';
+import {
+  cascadeDeleteIdentityData, deleteInstalledCortexesDb, deleteEcosystemAppsDb, deleteAccountCredentialsDb,
+} from './identity-erasure.js';
 
 export {
   pseudonymiseLedgerPartyDb, settleLeavingPartyWorkDb, settleErasedPartyWorkDb, settleDeletedAgentWorkDb,
 } from './work-ledger-erasure.js';
-export { cascadeDeleteIdentityData, deleteInstalledCortexesDb, deleteEcosystemAppsDb } from './identity-erasure.js';
+export {
+  cascadeDeleteIdentityData, deleteInstalledCortexesDb, deleteEcosystemAppsDb, deleteAccountCredentialsDb,
+} from './identity-erasure.js';
 
 /** A Kysely handle: the root connection or an open transaction. */
 type Db = Kysely<DB>;
@@ -252,14 +260,11 @@ export async function deleteOwnerCascade(db: Db, name: string): Promise<boolean>
   // one hands the next registrant somebody else's handshake.
   await db.deleteFrom('EcoAuth').where('ownerName', '=', name).execute();
 
-  // The apps the person granted access to and the personal access tokens they made. Both are
-  // credentials issued in the account name, which is released for reuse, so they go with the account
-  // and the next holder of the name starts with none.
-  await db.deleteFrom('AppGrant').where('owner', '=', name).execute();
-  await db.deleteFrom('PersonalAccessToken').where('owner', '=', name).execute();
-
-  // Live sessions: a surviving refresh token for a deleted account is a live credential.
-  await db.deleteFrom('Session').where('owner', '=', name).execute();
+  // The apps the person granted access to, the personal access tokens they made and the sessions.
+  // They are credentials issued in the account name, which is released for reuse, so they go with the
+  // account and the next holder of the name starts with none. identity-erasure.ts
+  // deleteAccountCredentialsDb, which the start step and the operator's decision call too.
+  await deleteAccountCredentialsDb(db, name, { sessions: true });
 
   const r = await db.deleteFrom('Owner').where('name', '=', name).executeTakeFirst();
   return Number(r.numDeletedRows ?? 0) > 0;

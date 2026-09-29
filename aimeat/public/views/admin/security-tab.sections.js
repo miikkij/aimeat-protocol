@@ -9,6 +9,8 @@
  *   button to Settings), and the paste for the operator's own AI.
  * @structure HeldSection · IncidentsSection · AccountsSection · SettingsSection · AskAiSection · isHeldIncident
  * @version-history
+ *   v2.3.0 — 2026-09-26 — A held name counts its app grants and access tokens, each on its own line,
+ *     and says in one sentence that they do not work whatever the decision.
  *   v2.2.0 — 2026-09-26 — The incident the update at start opens has a section of its own (HeldSection),
  *     with its own heading and a lead for while a name is to decide and one for when every name is
  *     decided; its row says how many names are still to decide, or that every name is decided. Under
@@ -95,16 +97,21 @@ function countLines(n) {
   return [
     ['countActions', n.actions], ['countWork', n.work], ['countOwn', n.own_lines], ['countNaming', n.naming_lines],
     ['countCortexes', n.cortexes], ['countApps', n.ecosystem_apps],
+    ['countGrants', n.app_grants], ['countTokens', n.access_tokens],
   ].filter(([, v]) => (v || 0) > 0).map(([key, v]) => S('incidents.held.' + key, { n: num(v) }));
 }
 
-/** The coral line under a held name: its ecosystem apps act for the account until you decide, and its hooks. */
+/**
+ * The coral line under a held name: its ecosystem apps act for the account until you decide, its app
+ * grants and access tokens do not work either way (while they are kept), and its hooks.
+ */
 function nameNote(n) {
   const apps = n.ecosystem_apps || 0;
   const acting = n.status === 'open' && apps > 0
     ? (apps === 1 ? S('incidents.held.appsActOne') : S('incidents.held.appsActMany', { n: num(apps) }))
     : '';
-  return [acting, boundNote(n)].filter(Boolean).join(' ') || undefined;
+  const refused = n.status !== 'previous' && (n.app_grants || 0) + (n.access_tokens || 0) > 0 ? S('incidents.held.credentialsRefused') : '';
+  return [acting, refused, boundNote(n)].filter(Boolean).join(' ') || undefined;
 }
 
 /** The mark of a held name: still to decide, or whose its records were. */

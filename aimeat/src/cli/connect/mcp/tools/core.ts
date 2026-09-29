@@ -8,6 +8,8 @@
  * @structure
  *   - registerCoreTools() -- Registers core REST-backed connector MCP tools
  * @version-history
+ *   v1.17.2 -- 2026-09-26 -- The `resolution` description of aimeat_admin_incident_resolve names the app
+ *     grants and access tokens too.
  *   v1.17.1 -- 2026-09-26 -- The `resolution` description of aimeat_admin_incident_resolve names the
  *     cortexes and ecosystem apps a decision covers.
  *   v1.17.0 -- 2026-09-26 -- aimeat_admin_incident_resolve forwards `name` and `resolution`, to decide
@@ -623,7 +625,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     agent_name: agentNameSchema,
     id: z.string().describe('The incident id, from the overview\'s incidents list.'),
     name: z.string().optional().describe('To decide one name of an incident the move to the full identity opened: the account name, from the incident\'s names.'),
-    resolution: z.string().optional().describe('With `name`: "holder" (its rows, cortexes and ecosystem apps are the account\'s that holds the name now) or "previous" (they were a previous holder\'s).'),
+    resolution: z.string().optional().describe('With `name`: "holder" (its rows, cortexes, ecosystem apps, app grants and access tokens are the account\'s that holds the name now) or "previous" (they were a previous holder\'s).'),
   }, annotationsFor('aimeat_admin_incident_resolve'), async ({ agent_name, id, name, resolution }) => {
     const { client } = pickAgent(registry, agent_name);
     const decide = name !== undefined || resolution !== undefined ? { name, resolution } : undefined;

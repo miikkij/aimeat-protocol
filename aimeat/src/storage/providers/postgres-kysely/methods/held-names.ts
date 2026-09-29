@@ -3,17 +3,20 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description HeldAccountNameRepository on Postgres: the records of what migration 0086 and the start
- *   step for the cortexes and ecosystem apps of deleted accounts left for the operator ("SystemSetting"
- *   keys HELD_NAMES_RECORD_KEY and HELD_INSTALLS_RECORD_KEY), the start step itself, and the
- *   operator's decision on one name, each in one transaction. The rule is written on the repository
- *   interface; the SQLite twin is repos/held-names.ts in that provider. The start step and a decision
- *   settle a deleted or previous holder's rows through the erasure's own functions
- *   (work-ledger-erasure.ts, identity-erasure.ts), so a deletion, the start step and a decision cannot
- *   drift.
+ *   steps for what deleted accounts installed and were issued left for the operator ("SystemSetting"
+ *   keys HELD_NAMES_RECORD_KEY, HELD_INSTALLS_RECORD_KEY and HELD_CREDENTIALS_RECORD_KEY), the start
+ *   steps themselves, and the operator's decision on one name, each in one transaction. The rule is
+ *   written on the repository interface; the SQLite twin is repos/held-names.ts in that provider. The
+ *   start steps and a decision settle a deleted or previous holder's rows through the erasure's own
+ *   functions (work-ledger-erasure.ts, identity-erasure.ts), so a deletion, a start step and a decision
+ *   cannot drift.
  * @structure heldNameMethods — getHeldNamesRecord · saveHeldNamesRecord · settleInstallsOfDeletedAccounts ·
- *   resolveHeldAccountName
+ *   settleCredentialsOfDeletedAccounts · resolveHeldAccountName
  * @usage Object.assign(PostgresKyselyStorage.prototype, heldNameMethods) in providers/postgres-kysely/index.ts
  * @version-history
+ *   v1.2.0 — 2026-09-26 — settleCredentialsOfDeletedAccounts, the start step for the app grants,
+ *     personal access tokens and session rows of deleted accounts, with its own record; a 'previous'
+ *     decision deletes the grants and tokens older than the account that holds the name (`credentials`).
  *   v1.1.0 — 2026-09-26 — settleInstallsOfDeletedAccounts, the start step for the cortexes and
  *     ecosystem apps of deleted accounts; a 'previous' decision deletes the cortexes and apps older
  *     than the account that holds the name, and `rows` / `installs` say which kinds a decision covers.
@@ -22,14 +25,16 @@
 import { sql } from 'kysely';
 import type { Kysely } from 'kysely';
 import type { DB } from '../db-types.js';
-import { HELD_NAMES_RECORD_KEY, HELD_INSTALLS_RECORD_KEY } from '../../../repositories/held-names.repository.js';
+import {
+  HELD_NAMES_RECORD_KEY, HELD_INSTALLS_RECORD_KEY, HELD_CREDENTIALS_RECORD_KEY,
+} from '../../../repositories/held-names.repository.js';
 import {
   emptyHeldNameOutcome, type HeldAccountName, type HeldNamesRecord, type HeldNameOutcome, type HeldNameResolution,
 } from '../../../types/held-names.js';
 import { erasedPartyPseudonym, erasedAccountParty, leavingAppsParty } from '../../../erased-party.js';
 import { validateOwnerName } from '../../../../utils/gaii.js';
 import { settleLeavingPartyWorkDb, pseudonymiseLedgerPartyDb } from './work-ledger-erasure.js';
-import { deleteEcosystemAppsDb, deleteInstalledCortexesDb } from './identity-erasure.js';
+import { deleteEcosystemAppsDb, deleteInstalledCortexesDb, deleteAccountCredentialsDb } from './identity-erasure.js';
 
 /**
  * What these methods use of the provider: its handle and its transaction. Named here rather than
@@ -48,6 +53,11 @@ const isLocalAction = (a: { actionId: string; tags: string[] | null }): boolean 
 
 /** A stored time as the move writes it: the wall-clock time without a zone (0086). */
 const wallClock = (column: string) => sql<string>`to_char(${sql.ref(column)}, 'YYYY-MM-DD"T"HH24:MI:SS.MS')`;
+
+/** Now, in the same form: when a start step ran. */
+async function nowWallClock(db: Db): Promise<string> {
+  return (await sql<{ at: string }>`SELECT to_char(LOCALTIMESTAMP, 'YYYY-MM-DD"T"HH24:MI:SS.MS') AS at`.execute(db)).rows[0].at;
+}
 
 /** The GHII an account named `name` has or had here: one per node id a GHII row carries, and this node's. */
 async function ghiiForms(db: Db, name: string, nodeId?: string): Promise<string[]> {
@@ -134,29 +144,79 @@ export const heldNameMethods = {
         });
       }
 
-      const at = (await sql<{ at: string }>`SELECT to_char(LOCALTIMESTAMP, 'YYYY-MM-DD"T"HH24:MI:SS.MS') AS at`.execute(db)).rows[0].at;
-      const record: HeldNamesRecord = { at, held, untied: [], deleted };
+      const record: HeldNamesRecord = { at: await nowWallClock(db), held, untied: [], deleted };
       await db.insertInto('SystemSetting').values({ key: HELD_INSTALLS_RECORD_KEY, value: JSON.stringify(record) }).execute();
+      return record;
+    });
+  },
+
+  async settleCredentialsOfDeletedAccounts(this: ProviderHandle): Promise<HeldNamesRecord | null> {
+    return this.transaction(async () => {
+      const db = this.db;
+      // Two nodes that start on one database run it one after the other; the second finds the record.
+      await sql`SELECT pg_advisory_xact_lock(hashtext(${HELD_CREDENTIALS_RECORD_KEY}))`.execute(db);
+      if (await db.selectFrom('SystemSetting').select('key').where('key', '=', HELD_CREDENTIALS_RECORD_KEY).executeTakeFirst()) return null;
+
+      // Only a value an account can be registered under names an account, as for the installs.
+      const names = [...new Set([
+        ...(await db.selectFrom('AppGrant').select('owner').distinct().execute()).map(r => r.owner),
+        ...(await db.selectFrom('PersonalAccessToken').select('owner').distinct().execute()).map(r => r.owner),
+        ...(await db.selectFrom('Session').select('owner').distinct().execute()).map(r => r.owner),
+      ])].filter(n => validateOwnerName(n) === null).sort();
+
+      const held: HeldAccountName[] = [];
+      const deleted = { names: 0, app_grants: 0, access_tokens: 0, sessions: 0 };
+      for (const name of names) {
+        const holder = await db.selectFrom('Owner').select(wallClock('createdAt').as('since'))
+          .where('name', '=', name).executeTakeFirst();
+        if (!holder) {
+          // No account holds the name: its grants, tokens and session rows go as the account deletion takes them.
+          const gone = await deleteAccountCredentialsDb(db, name, { sessions: true });
+          if (gone.appGrants || gone.accessTokens || gone.sessions) deleted.names++;
+          deleted.app_grants += gone.appGrants;
+          deleted.access_tokens += gone.accessTokens;
+          deleted.sessions += gone.sessions;
+          continue;
+        }
+        // An account holds the name: a grant or token created before that account may be a previous
+        // holder's. AppGrant.createdAt and PersonalAccessToken.createdAt against Owner.createdAt.
+        const since = db.selectFrom('Owner').select('createdAt').where('name', '=', name);
+        const grants = (await db.selectFrom('AppGrant').select(eb => eb.fn.countAll<string>().as('n'))
+          .where('owner', '=', name).where('createdAt', '<', since).executeTakeFirst())?.n ?? '0';
+        const tokens = (await db.selectFrom('PersonalAccessToken').select(eb => eb.fn.countAll<string>().as('n'))
+          .where('owner', '=', name).where('createdAt', '<', since).executeTakeFirst())?.n ?? '0';
+        if (Number(grants) === 0 && Number(tokens) === 0) continue;
+        const ghii = await db.selectFrom('Ghii').select('ghii').where('ownerName', '=', name).executeTakeFirst();
+        held.push({
+          name, holder_since: holder.since, holder_ghii: ghii?.ghii ?? null,
+          actions: 0, work: 0, own_lines: 0, naming_lines: 0, app_grants: Number(grants), access_tokens: Number(tokens),
+        });
+      }
+
+      const record: HeldNamesRecord = { at: await nowWallClock(db), held, untied: [], deleted };
+      await db.insertInto('SystemSetting').values({ key: HELD_CREDENTIALS_RECORD_KEY, value: JSON.stringify(record) }).execute();
       return record;
     });
   },
 
   async resolveHeldAccountName(this: ProviderHandle, input: {
     name: string; resolution: HeldNameResolution; holderGhii: string | null; namingBefore: string;
-    nodeId?: string; rows?: boolean; installs?: boolean;
+    nodeId?: string; rows?: boolean; installs?: boolean; credentials?: boolean;
   }): Promise<HeldNameOutcome> {
     return this.transaction(async () => {
       const db = this.db;
       const { name } = input;
       const rows = input.rows !== false;
       const installs = input.installs !== false;
+      const credentials = input.credentials !== false;
       const out = emptyHeldNameOutcome();
       const actions = rows
         ? (await db.selectFrom('Action').select(['id', 'actionId', 'tags']).where('providerGaii', '=', name).execute()).filter(isLocalAction)
         : [];
 
       if (input.resolution === 'holder') {
-        // The cortexes and ecosystem apps older than the holder's account are the holder's: they stay.
+        // The cortexes, ecosystem apps, app grants and access tokens older than the holder's account
+        // are the holder's: they stay.
         if (!rows) return out;
         const ghii = input.holderGhii;
         if (!ghii) throw new Error('A held name is moved to its holder only when the holder has a full identity.');
@@ -212,6 +272,12 @@ export const heldNameMethods = {
         const cortexNames = (await db.selectFrom('CortexExtension').select('name')
           .where('installedBy', '=', name).where('installedAt', '<', before).execute()).map(r => r.name);
         out.cortexes_deleted = await deleteInstalledCortexesDb(db, name, forms, { names: cortexNames });
+      }
+      if (credentials) {
+        // The app grants and access tokens created before the holder's account, as the deletion takes them.
+        const gone = await deleteAccountCredentialsDb(db, name, { before });
+        out.app_grants_deleted = gone.appGrants;
+        out.access_tokens_deleted = gone.accessTokens;
       }
       return out;
     });

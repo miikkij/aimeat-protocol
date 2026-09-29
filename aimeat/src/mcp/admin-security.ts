@@ -11,6 +11,7 @@
  * @structure registerAdminSecurityTools(mcp, storage, config, getAgentGaii, scopes) — two operator tools.
  * @usage registerAdminSecurityTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   v1.2.2 — 2026-09-26 — The `resolution` description names the app grants and access tokens too.
  *   v1.2.1 — 2026-09-26 — The `resolution` description names the cortexes and ecosystem apps a
  *     decision covers.
  *   v1.2.0 — 2026-09-26 — aimeat_admin_incident_resolve takes `name` and `resolution` to decide one
@@ -57,7 +58,7 @@ export function registerAdminSecurityTools(
     {
       id: z.string().describe('The incident id, from the overview\'s incidents list.'),
       name: z.string().optional().describe('To decide one name of an incident the move to the full identity opened: the account name, from the incident\'s names.'),
-      resolution: z.string().optional().describe('With `name`: "holder" (its rows, cortexes and ecosystem apps are the account\'s that holds the name now) or "previous" (they were a previous holder\'s).'),
+      resolution: z.string().optional().describe('With `name`: "holder" (its rows, cortexes, ecosystem apps, app grants and access tokens are the account\'s that holds the name now) or "previous" (they were a previous holder\'s).'),
     },
     annotationsFor('aimeat_admin_incident_resolve'),
     async ({ id, name, resolution }) => {

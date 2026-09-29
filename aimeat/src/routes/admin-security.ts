@@ -15,6 +15,8 @@
  *   - POST   /v1/admin/security/incidents/:id/resolve   (with { name, resolution }: decide one name)
  *   - DELETE /v1/admin/security/incidents/:id
  * @version-history
+ *   v1.3.1 -- 2026-09-26 -- The resolve endpoint's comment names the app grants and access tokens a
+ *     decision on a name covers.
  *   v1.3.0 -- 2026-09-26 -- The resolve endpoint takes { name, resolution } to decide one name of the
  *     incident the move to the full identity opened (services/held-account-names.ts). Such an incident
  *     is neither closed nor deleted while a name is undecided (409 CONFLICT).
@@ -79,8 +81,10 @@ export function adminSecurityRouter(config: AimeatConfig, storage: Storage): Rou
 
   /* ── POST /v1/admin/security/incidents/:id/resolve ──
    * Without a body, close the incident. With { name, resolution }, decide one name of the incident
-   * the move to the full identity opened: 'holder' moves its rows to the account that holds the name,
-   * 'previous' settles them as a previous holder's. That incident closes with its last name. */
+   * the move to the full identity and the start steps opened: 'holder' moves its rows to the account
+   * that holds the name and keeps its cortexes, ecosystem apps, app grants and access tokens,
+   * 'previous' settles them as a previous holder's (the older app grants and access tokens deleted).
+   * That incident closes with its last name. */
   router.post('/v1/admin/security/incidents/:id/resolve', requireAuth(), requireRole('operator'), async (req, res) => {
     const id = req.params.id as string;
     const body = (req.body ?? {}) as { name?: unknown; resolution?: unknown };

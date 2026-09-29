@@ -5,6 +5,8 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.10.0 — 2026-09-26 — aimeat_admin_incident_resolve says what a decision does to the app grants and
+ *     access tokens older than the account that holds the name, and that their tokens stay refused.
  *   v1.9.0 — 2026-09-26 — aimeat_admin_incident_resolve says what a decision does to the cortexes and
  *     ecosystem apps older than the account that holds the name, which the start step records.
  *   v1.8.0 — 2026-09-26 — aimeat_admin_incident_resolve takes `name` and `resolution`, to decide one
@@ -365,13 +367,13 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_admin_incident_resolve',
-        description: 'Operator-only. Mark a security incident resolved; the quarantined bytes stay until the incident is deleted. Read aimeat_admin_security_overview first to see the incidents and their ids. The incident the move to the full identity and the settling of deleted accounts\' cortexes and ecosystem apps open at start (type held_account_names) lists account names whose rows are older than the account that holds the name now, left as they were (actions, work, ledger lines, cortexes, ecosystem apps; such an app can still act for that account until the name is decided): decide each with `name` and `resolution` — "holder" moves its rows, its own ledger lines and the hook bindings to its actions to that account\'s full identity, and keeps its cortexes and ecosystem apps; "previous" settles them as a deleted account\'s (actions deleted, open work cancelled with what was held going back only to an account that existed when it was written, finished work and ledger lines under one pseudonym, cortexes and ecosystem apps deleted with what they hold, so the apps\' tokens stop). That incident closes with its last name, and closing it before answers CONFLICT. Returns NOT_FOUND for an unknown id or name, CONFLICT for a name decided the other way, and an operator-role error for non-operators.',
+        description: 'Operator-only. Mark a security incident resolved; the quarantined bytes stay until the incident is deleted. Read aimeat_admin_security_overview first to see the incidents and their ids. The incident the move to the full identity and the settling of what deleted accounts installed and were issued open at start (type held_account_names) lists account names whose rows are older than the account that holds the name now, left as they were (actions, work, ledger lines, cortexes, ecosystem apps, app grants, access tokens; such an app can still act for that account until the name is decided, and the tokens of such an app grant or access token are refused whatever the decision): decide each with `name` and `resolution` — "holder" moves its rows, its own ledger lines and the hook bindings to its actions to that account\'s full identity, and keeps its cortexes, ecosystem apps, app grants and access tokens; "previous" settles them as a deleted account\'s (actions deleted, open work cancelled with what was held going back only to an account that existed when it was written, finished work and ledger lines under one pseudonym, cortexes and ecosystem apps deleted with what they hold, so the apps\' tokens stop, and the older app grants and access tokens deleted). That incident closes with its last name, and closing it before answers CONFLICT. Returns NOT_FOUND for an unknown id or name, CONFLICT for a name decided the other way, and an operator-role error for non-operators.',
         caller: 'operator',
         visibility: agentEverywhere,
         input: {
             id: { type: 'string', required: true, description: 'The incident id, from the overview\'s incidents list.' },
             name: { type: 'string', description: 'To decide one name of an incident the move to the full identity opened: the account name, from the incident\'s names.' },
-            resolution: { type: 'string', description: 'With `name`: "holder" (its rows, cortexes and ecosystem apps are the account\'s that holds the name now) or "previous" (they were a previous holder\'s).' },
+            resolution: { type: 'string', description: 'With `name`: "holder" (its rows, cortexes, ecosystem apps, app grants and access tokens are the account\'s that holds the name now) or "previous" (they were a previous holder\'s).' },
         },
     },
     {
