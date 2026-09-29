@@ -1,0 +1,135 @@
+/*
+ * @file aimeat-atelier/margins.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description THE MARGINS: a quiet repeating figure on the empty sides of an app on a wide screen,
+ *   full at the window's edge and gone before the content, so the eye settles on the middle (wish
+ *   reunakuvio, 2026-09-29). The same eight figures the node's own home, chat and settings pages
+ *   draw (public/css/components/margin-pattern.css, the person's choice in home.prefs), rewritten
+ *   on the --ak-* tokens, so an app can wear the margins its owner chose for the home.
+ *
+ *   `html[data-ak-margins="a".."h"]` turns them on (margins.js sets it; app({ margins }) calls it).
+ *   Two fixed strips are the app frame's pseudo-elements: the frame is a stacking context, so
+ *   z-index -1 paints them over the page ground and under everything on it. Their width is the
+ *   room beside the content: the workbench's side column plus content column, or the capped main
+ *   column of a look with a measure. Below 1280px there is no margin to speak of and they are gone.
+ *
+ *   Figures a to d are shapes drawn in the ink through a mask (the tile and the fade intersect);
+ *   e to h are gradient figures from css-pattern.com (Temani Afif, MIT,
+ *   https://github.com/Afif13/CSS-Pattern, copyright (c) 2022 Temani Afif) with token colours.
+ * @structure the strips · their width per frame · figures a–h
+ * @usage  html[data-ak-margins="b"] (AIMEAT.atelier.margins('b'))
+ * @version-history
+ *   v0.58.0 — 2026-09-29 — Initial: the node's eight margin figures for the kit's app frame.
+ */
+
+/* ── The strips ─────────────────────────────────────────────────────────────────────────────── */
+html[data-ak-margins] .ak-app::before,
+html[data-ak-margins] .ak-app::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  z-index: -1;
+  pointer-events: none;
+  width: var(--ak-margins-w, 0px);
+  opacity: var(--ak-mg-alpha, .12);
+  background-color: var(--ak-mg-ink, var(--ak-ink));
+  background-image: var(--ak-mg-bg, none);
+  background-size: var(--ak-mg-bg-size, auto);
+  background-position: var(--ak-mg-bg-pos, 0 0);
+  -webkit-mask-repeat: repeat, no-repeat; mask-repeat: repeat, no-repeat;
+  -webkit-mask-size: var(--ak-mg-tile-size, 100% 100%), 100% 100%; mask-size: var(--ak-mg-tile-size, 100% 100%), 100% 100%;
+  -webkit-mask-composite: source-in; mask-composite: intersect;
+}
+html[data-ak-margins] .ak-app::before {
+  left: 0;
+  -webkit-mask-image: var(--ak-mg-tile, linear-gradient(#000, #000)), linear-gradient(to right, #000 0%, #000 30%, transparent 92%);
+  mask-image: var(--ak-mg-tile, linear-gradient(#000, #000)), linear-gradient(to right, #000 0%, #000 30%, transparent 92%);
+}
+html[data-ak-margins] .ak-app::after {
+  right: 0;
+  -webkit-mask-image: var(--ak-mg-tile, linear-gradient(#000, #000)), linear-gradient(to left, #000 0%, #000 30%, transparent 92%);
+  mask-image: var(--ak-mg-tile, linear-gradient(#000, #000)), linear-gradient(to left, #000 0%, #000 30%, transparent 92%);
+}
+
+/* ── How wide: the room beside the content ──────────────────────────────────────────────────── */
+/* A look with a measure caps the main column; the default 100% leaves no room, and no strips. */
+.ak-app { --ak-margins-w: max(0px, calc((100vw - min(var(--ak-main-max), 100vw)) / 2)); }
+/* The workbench: the side column, two gaps and the content column, centred in the frame. */
+.ak-app--sidenav { --ak-margins-w: max(0px, calc((100vw - var(--ak-sidenav-w) - var(--ak-gap) * 2 - var(--ak-sidenav-main)) / 2)); }
+@media (max-width: 1279px) {
+  html[data-ak-margins] .ak-app::before, html[data-ak-margins] .ak-app::after { display: none; }
+}
+
+/* ── Figures a–d: a tile as a mask, the ink as the colour ───────────────────────────────────── */
+/* a · the pixel grid: a 5px square on a 24px grid. */
+html[data-ak-margins="a"] .ak-app { --ak-mg-alpha: .16; --ak-mg-tile-size: 24px 24px;
+  --ak-mg-tile: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Crect width='5' height='5'/%3E%3C/svg%3E"); }
+/* b · the hatch: a 2px diagonal line. */
+html[data-ak-margins="b"] .ak-app { --ak-mg-alpha: .12; --ak-mg-tile-size: 16px 16px;
+  --ak-mg-tile: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cpath d='M-4 20L20-4M-4 4L4-4M12 20l8-8' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E"); }
+/* c · registration marks: a printer's cross on a 48px grid. */
+html[data-ak-margins="c"] .ak-app { --ak-mg-alpha: .18; --ak-mg-tile-size: 48px 48px;
+  --ak-mg-tile: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Cpath d='M24 17v14M17 24h14' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E"); }
+/* d · hearts: the wordmark's heart, sparse, in the accent. */
+html[data-ak-margins="d"] .ak-app { --ak-mg-alpha: .14; --ak-mg-tile-size: 56px 56px; --ak-mg-ink: var(--ak-accent);
+  --ak-mg-tile: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56'%3E%3Cpath transform='translate(22 22) scale(.5)' d='M12 21s-7.5-4.6-9.6-9.2C.8 8.2 3 4.5 6.7 4.5c2 0 3.6 1.1 4.5 2.6.9-1.5 2.5-2.6 4.5-2.6 3.7 0 5.9 3.7 4.3 7.3C19.5 16.4 12 21 12 21z'/%3E%3C/svg%3E"); }
+
+/* ── Figures e–h: gradient figures, the ink as their colour ─────────────────────────────────── */
+/* e · cubes: isometric cubes in three strengths of ink. */
+html[data-ak-margins="e"] .ak-app {
+  --ak-mg-alpha: .14; --ak-mg-ink: transparent;
+  --ak-mg-s: 72px;
+  --ak-mg-c1: color-mix(in srgb, var(--ak-ink) 20%, transparent);
+  --ak-mg-c2: color-mix(in srgb, var(--ak-ink) 50%, transparent);
+  --ak-mg-c3: var(--ak-ink);
+  --ak-mg-g: 0 120deg, #0000 0;
+  --ak-mg-bg:
+    conic-gradient(from    0deg at calc(500%/6) calc(100%/3), var(--ak-mg-c3) var(--ak-mg-g)),
+    conic-gradient(from -120deg at calc(100%/6) calc(100%/3), var(--ak-mg-c2) var(--ak-mg-g)),
+    conic-gradient(from  120deg at calc(100%/3) calc(500%/6), var(--ak-mg-c1) var(--ak-mg-g)),
+    conic-gradient(from  120deg at calc(200%/3) calc(500%/6), var(--ak-mg-c1) var(--ak-mg-g)),
+    conic-gradient(from -180deg at calc(100%/3) 50%, var(--ak-mg-c2) 60deg, var(--ak-mg-c1) var(--ak-mg-g)),
+    conic-gradient(from   60deg at calc(200%/3) 50%, var(--ak-mg-c1) 60deg, var(--ak-mg-c3) var(--ak-mg-g)),
+    conic-gradient(from  -60deg at 50% calc(100%/3), var(--ak-mg-c1) 120deg, var(--ak-mg-c2) 0 240deg, var(--ak-mg-c3) 0);
+  --ak-mg-bg-size: calc(var(--ak-mg-s) * 1.732) var(--ak-mg-s);
+}
+/* f · chevron: a wide zigzag. */
+html[data-ak-margins="f"] .ak-app {
+  --ak-mg-alpha: .12; --ak-mg-ink: transparent;
+  --ak-mg-s: 64px;
+  --ak-mg-g: var(--ak-ink) 90deg, #0000 90.5deg;
+  --ak-mg-bg: conic-gradient(from -45deg, var(--ak-mg-g)), conic-gradient(from 135deg, var(--ak-mg-g));
+  --ak-mg-bg-pos: 0 0, calc(var(--ak-mg-s) / 2) 0;
+  --ak-mg-bg-size: var(--ak-mg-s) var(--ak-mg-s);
+}
+/* g · weave: two directions woven. */
+html[data-ak-margins="g"] .ak-app {
+  --ak-mg-alpha: .12; --ak-mg-ink: transparent;
+  --ak-mg-s: 80px;
+  --ak-mg-c: var(--ak-ink);
+  --ak-mg-g: #0000 8%, var(--ak-mg-c) 0 17%, #0000 0 58%;
+  --ak-mg-bg:
+    linear-gradient(135deg, #0000 20.5%, var(--ak-mg-c) 0 29.5%, #0000 0),
+    linear-gradient( 45deg, var(--ak-mg-g)),
+    linear-gradient(135deg, var(--ak-mg-g), var(--ak-mg-c) 0 67%, #0000 0),
+    linear-gradient( 45deg, var(--ak-mg-g), var(--ak-mg-c) 0 67%, #0000 0 83%, var(--ak-mg-c) 0 92%, #0000 0);
+  --ak-mg-bg-pos: 0 calc(var(--ak-mg-s) / 4), calc(var(--ak-mg-s) / 2) 0, 0 0, 0 0;
+  --ak-mg-bg-size: var(--ak-mg-s) var(--ak-mg-s);
+}
+/* h · lattice: the interlocking plus. */
+html[data-ak-margins="h"] .ak-app {
+  --ak-mg-alpha: .12; --ak-mg-ink: transparent;
+  --ak-mg-s: 56px;
+  --ak-mg-cc: #0000 75%, var(--ak-ink) 0;
+  --ak-mg-g1: conic-gradient(at 10% 50%, var(--ak-mg-cc));
+  --ak-mg-g2: conic-gradient(at 50% 10%, var(--ak-mg-cc));
+  --ak-mg-bg:
+    var(--ak-mg-g1), var(--ak-mg-g1), var(--ak-mg-g1), var(--ak-mg-g1), var(--ak-mg-g1),
+    var(--ak-mg-g2), var(--ak-mg-g2), var(--ak-mg-g2), var(--ak-mg-g2), var(--ak-mg-g2);
+  --ak-mg-bg-pos:
+    0 0, calc(1 * var(--ak-mg-s)) calc(3 * var(--ak-mg-s)), calc(2 * var(--ak-mg-s)) calc(1 * var(--ak-mg-s)), calc(3 * var(--ak-mg-s)) calc(4 * var(--ak-mg-s)), calc(4 * var(--ak-mg-s)) calc(2 * var(--ak-mg-s)),
+    0 calc(4 * var(--ak-mg-s)), calc(1 * var(--ak-mg-s)) calc(2 * var(--ak-mg-s)), calc(2 * var(--ak-mg-s)) 0, calc(3 * var(--ak-mg-s)) calc(3 * var(--ak-mg-s)), calc(4 * var(--ak-mg-s)) calc(1 * var(--ak-mg-s));
+  --ak-mg-bg-size: calc(5 * var(--ak-mg-s)) calc(5 * var(--ak-mg-s));
+}

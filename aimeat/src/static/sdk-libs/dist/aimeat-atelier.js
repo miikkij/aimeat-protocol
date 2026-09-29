@@ -4311,6 +4311,24 @@
     };
   }
 
+  // src/static/sdk-libs/atelier/margins.js
+  var MARGINS = ["a", "b", "c", "d", "e", "f", "g", "h"];
+  var DEFAULT_MARGIN = "a";
+  function margins(choice) {
+    const v = typeof choice === "string" ? choice.toLowerCase() : "";
+    const root = document.documentElement;
+    if (MARGINS.indexOf(v) >= 0) {
+      root.setAttribute("data-ak-margins", v);
+      return v;
+    }
+    root.removeAttribute("data-ak-margins");
+    return "";
+  }
+  function marginsOf(prefs) {
+    const v = prefs && typeof prefs.marginPattern === "string" ? prefs.marginPattern : void 0;
+    return v === void 0 ? DEFAULT_MARGIN : v;
+  }
+
   // src/static/sdk-libs/atelier/shell.js
   function logoEl(src) {
     if (typeof src !== "string" || !src.trim()) return null;
@@ -4377,6 +4395,7 @@
   }
   function app(spec) {
     injectStyle();
+    if (spec.margins !== void 0) margins(spec.margins);
     const state = { title: spec.title, look: spec.look || "vivid" };
     const titleId = uid("ak-app-title");
     const heading = el("span", { class: "ak-app__title", id: titleId, text: state.title });
@@ -18776,7 +18795,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.57.0",
+    version: "0.58.0",
     /**
      * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
      * named parts (every one carries `data-ak-part`, so an app's own CSS reaches it), the slots
@@ -18812,6 +18831,10 @@
     promptPanel,
     queueRow,
     parseAnswer,
+    // The empty sides of a wide frame: the node's margin figures (margins.js, margins.css).
+    margins,
+    marginsOf,
+    MARGINS,
     // ── The stored layout, rendered ──
     mosaic,
     appRef,
