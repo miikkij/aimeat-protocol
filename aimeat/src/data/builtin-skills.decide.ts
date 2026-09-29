@@ -24,6 +24,7 @@
  * @structure DECIDE_SKILL_ENTRY
  * @usage import { DECIDE_SKILL_ENTRY } from './builtin-skills.decide.js';
  * @version-history
+ *   v1.3.2 — 2026-09-29 — The scrub covers object keys, and scrub.allowed names what the owner let through.
  *   v1.3.1 — 2026-09-23 — The setup order starts with choosing a provider; the key is the TypeSafe branch.
  *   v1.3.0 — 2026-09-23 — "Providers: who answers": the decision provider, the local decision model,
  *     providers() and sizing a question to the provider.
@@ -105,8 +106,10 @@ when it is false.
   probability.
 - **What you send is your responsibility.** Only the fields the questions need, the people the record
   mentions as \`names\`, TypeSafe declared in the app's data map, the app requests \`ai:use\`.
-  The node removes e-mails, phones, identity codes, IBANs, street addresses and the owner's contacts;
-  the publish check reports departures as \`DECIDE:\` lines in \`ai_hints\`.
+  The node removes e-mails, phones, identity codes, IBANs, street addresses and the owner's contacts,
+  in the keys of an object as well as in its values, except the classes the owner lets through in
+  their decision settings; the decision's \`scrub.allowed\` names those, so a \`total\` of 0 there is not
+  "nothing found". The publish check reports departures as \`DECIDE:\` lines in \`ai_hints\`.
 
 ## 2. Recipes
 

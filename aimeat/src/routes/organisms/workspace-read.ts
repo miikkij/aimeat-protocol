@@ -395,9 +395,9 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     const id = req.params.id as string;
     const organism = await storage.getOrganism(id);
     if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
-    const callerSub = req.auth!.sub;
+    const callerGaii = resolveIdentity(req.auth!, config.nodeId);
     const ownerName = req.auth!.owner;
-    let isMember = !!callerSub && organism.agentGaiis.includes(callerSub);
+    let isMember = !!callerGaii && organism.agentGaiis.includes(callerGaii);
     if (!isMember && ownerName) { const m = await storage.getMembership(id, ownerName); isMember = !!m && m.status === 'active'; }
     if (!isMember) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
 

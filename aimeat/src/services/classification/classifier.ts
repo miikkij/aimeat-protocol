@@ -139,7 +139,7 @@ async function askLlm(deps: Deps, payer: string, policy: ClassificationPolicy, c
     + `Personal data in the content has been replaced by placeholders such as [EMAIL_1]; a placeholder is evidence that such data was there.\n`
     + `Answer with one JSON object and nothing else: {"label": "<id>", "confidence": <0..1>, "reason": "<one sentence>"}.\n\nCONTENT:\n${content}`;
   const out = await completeForOwner(deps.storage, deps.config, payer, {
-    prompt, capability: 'text', appId: 'classification', maxTokens: 300,
+    prompt, capability: 'text', appId: 'classification',
     ...(policy.classifier.provider ? { provider: policy.classifier.provider } : {}),
   });
   const m = out.content.match(/\{[\s\S]*\}/);

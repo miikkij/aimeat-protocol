@@ -17,6 +17,7 @@
  *   deliberately different and checks the unrelated domain does NOT arrive.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-sse-parity
  * @version-history
+ *   v1.1.0 — 2026-09-29 — aimeat_classification (set, with the person's words) reaches 'classification'.
  *   v1.0.0 — 2026-08-11 — Initial (August 2026 audit: the side-effect sweep).
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -234,6 +235,11 @@ async function run() {
 
     await proves('a sharing group an agent creates', 'groups', 'aimeat_group_create',
         { name: `sse-group-${stamp}`, description: 'sse parity' });
+
+    // The person's own words make the label theirs, so it applies at once rather than waiting as a
+    // suggestion; the Data Wallet listens on 'classification'.
+    await proves('a classification an agent sets for its person', 'classification', 'aimeat_classification',
+        { action: 'set', key: `sse.probe.${stamp}`, label: 'luottamuksellinen', human_said: 'Mark that note confidential.' });
 
     // ── The fan-out that used to live in the HTTP route's tail ──────────────────────────────────
     //

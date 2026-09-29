@@ -14,6 +14,8 @@
  *     (show, then leave with kind 'export'). A manifest the requester may not see answers 404; one
  *     that may not leave answers 403 CLASSIFIED. An entry held back is left out of `entry_data` and
  *     of the package's entry list alike.
+ *   v1.2.1 — 2026-09-29 — The export's CLASSIFIED refusal is refuseClassified(): a plain sentence and
+ *     the way forward, the package id and label in details.
  */
 import type { Router } from 'express';
 import { randomUUID } from 'node:crypto';
@@ -21,6 +23,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, KnowledgeManifest, MemoryRecord } from '../../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
+import { refuseClassified } from '../../middleware/refusals.js';
 import { emitChange } from '../../services/event-bus.js';
 import { recordPublicActivity } from '../../services/public-activity.js';
 import type { KnowledgeHelpers } from './helpers.js';
@@ -330,7 +333,10 @@ export function registerSharingRoutes(
     const where = { kind: 'export' as const, organismId: organismOfManifest(sourceManifest) };
     const manifestLeft = (await reader.leave([sourceManifest], targetOfRecord, where)).left[0];
     if (manifestLeft) {
-      res.status(403).json(error(config.nodeId, 'CLASSIFIED', `This package is ${manifestLeft.reason}, so it cannot be exported.`));
+      res.status(403).json(refuseClassified(config, {
+        thing: 'package', done: 'exported',
+        details: { package_id: packageId, label: manifestLeft.label, reason: manifestLeft.reason },
+      }));
       return;
     }
     const sourceOwnerGaii = sourceManifest.ownerGaii;

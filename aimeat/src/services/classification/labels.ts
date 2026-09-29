@@ -26,6 +26,9 @@
  *   const actor = labelActorOf(req.auth!, config.nodeId);
  *   await setLabel({ storage, config }, actor, memoryTarget(owner, key), { label: 'luottamuksellinen' });
  * @version-history
+ *   v1.3.0 — 2026-09-29 — V5: every label write emits the change domain `classification` (the
+ *     owner's own for personal content, every stream for an organism's), so REST, MCP, the connector
+ *     and extensions announce it from this one place.
  *   v1.2.0 — 2026-09-29 — V4: a label change goes to the audit log, and nobody sets a label whose
  *     reader audience leaves them out (AUDIENCE_LOCKOUT).
  *   v1.1.0 — 2026-09-29 — V2: targetOf and readContentLabel, shared by the REST route and the MCP tool.
@@ -41,6 +44,7 @@ import { policyFor, scopeOrganism, scopeOwner } from './policy.js';
 import { readerKindOf } from './reader-kind.js';
 import { audienceCheck } from './audience.js';
 import { recordClassificationAudit } from './audit.js';
+import { emitChange } from '../event-bus.js';
 
 export class ClassificationError extends Error {
   constructor(public code: string, public status: number, message: string) {
@@ -158,6 +162,16 @@ function blankRow(target: ContentLabelTarget, policy: ClassificationPolicy, at: 
   };
 }
 
+/**
+ * Store a label row and say so on the change bus: the Data Wallet and the admin view listen on
+ * `classification`. Personal content tells only its owner's streams; an organism's tells every
+ * stream, as the organism views are told.
+ */
+async function putLabel(storage: Storage, row: ContentLabelRow): Promise<void> {
+  await storage.putContentLabel(row);
+  emitChange('classification', scopeOwner(row.scope) ?? undefined);
+}
+
 /** Set a label, or leave a suggestion when the rules say an AI or a rule may not set it. */
 export async function setLabel(
   deps: ClassificationDeps, actor: LabelActor, target: ContentLabelTarget, input: SetLabelInput,
@@ -200,7 +214,7 @@ export async function setLabel(
     row.label = next.id; row.source = source; row.locked = true; row.suggestion = null;
     row.justification = justification; row.humanSaid = humanSaid; row.setBy = actor.principal; row.updatedAt = at;
     row.history.push({ at, by: actor.principal, source, action: 'set', from: fromId, to: next.id, justification, humanSaid });
-    await deps.storage.putContentLabel(row);
+    await putLabel(deps.storage, row);
     if (next.id !== fromId) changed(source);
     return { applied: true, label: next.id, from: fromId, source, locked: true };
   }
@@ -224,14 +238,14 @@ export async function setLabel(
     row.label = next.id; row.source = source; row.locked = false; row.suggestion = null;
     row.justification = null; row.humanSaid = null; row.setBy = actor.principal; row.updatedAt = at;
     row.history.push({ at, by: actor.principal, source, action: 'set', from: fromId, to: next.id, confidence, reason: reason ?? undefined });
-    await deps.storage.putContentLabel(row);
+    await putLabel(deps.storage, row);
     changed(source);
     return { applied: true, label: next.id, from: fromId, source, locked: false };
   }
   row.suggestion = { label: next.id, by: actor.principal, at, source, confidence, reason: reason ?? undefined, why: pending };
   row.updatedAt = at;
   row.history.push({ at, by: actor.principal, source, action: 'suggest', from: fromId, to: next.id, confidence, reason: reason ?? undefined });
-  await deps.storage.putContentLabel(row);
+  await putLabel(deps.storage, row);
   return { applied: false, label: fromId, from: fromId, source: row.source, locked: row.locked, pending };
 }
 
@@ -254,7 +268,7 @@ export async function reviewLabel(
   const source = actor.kind === 'human' ? 'human' : 'human-via-ai';
   const row: ContentLabelRow = { ...prev, suggestion: null, updatedAt: at, history: [...prev.history,
     { at, by: actor.principal, source, action: 'reject', from: prev.label, to: prev.suggestion.label, humanSaid }] };
-  await deps.storage.putContentLabel(row);
+  await putLabel(deps.storage, row);
   return { applied: false, label: prev.label, from: prev.label, source: prev.source, locked: prev.locked };
 }
 

@@ -2,7 +2,7 @@
   "about": "When each skill was last read against the code it describes, and which files that code is. pnpm check:skill-reviews fails when a watched file changes after the review, so whoever changed the code re-reads the skill. Re-stamp after reading with: pnpm check:skill-reviews --record <name>. Reasoning: aimeat/scripts/check-skill-reviews.ts.",
   "skills": {
     "node:aimeat-decide": {
-      "reviewedOn": "2026-09-26",
+      "reviewedOn": "2026-09-29",
       "watches": [
         "aimeat/src/static/sdk-libs/decide/index.js",
         "aimeat/src/services/decide/service.ts",
@@ -10,7 +10,7 @@
         "aimeat/src/services/decide/settings.ts",
         "aimeat/src/services/app-decide-posture.ts"
       ],
-      "digest": "sha256:9acaa15b2faeb3d83f3afab3"
+      "digest": "sha256:5047162b21bfd7eceeb37827"
     },
     "node:aimeat-refinery": {
       "reviewedOn": "2026-09-29",
@@ -23,11 +23,11 @@
       "digest": "sha256:f41b0acc694cdd5871853e18"
     },
     "node:aimeat-open-items": {
-      "reviewedOn": "2026-09-26",
+      "reviewedOn": "2026-09-29",
       "watches": [
         "aimeat/src/services/open-items.ts"
       ],
-      "digest": "sha256:b37756797be3a65edcdfec3a"
+      "digest": "sha256:90f67577f4bed52222bc7fd5"
     },
     "node:aimeat-recurring-work": {
       "reviewedOn": "2026-09-28",
@@ -224,7 +224,7 @@
         "aimeat/src/mcp/core.ts",
         "aimeat/src/mcp/catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:77a7f2781ac21c07d444effd"
+      "digest": "sha256:ee34d5f6dd96b79ce235ed99"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-09-27",
@@ -234,7 +234,7 @@
       "digest": "sha256:0a1de73486e6f8295b25e4de"
     },
     "node:add-a-crew-agent": {
-      "reviewedOn": "2026-09-28",
+      "reviewedOn": "2026-09-29",
       "watches": [
         "aimeat/src/routes/agents/device-auth.ts",
         "aimeat/src/mcp/catalog/scopes.ts",
@@ -242,7 +242,7 @@
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/data/basic-agents.ts"
       ],
-      "digest": "sha256:05f6bb6e0eb447b7b1fd43fc"
+      "digest": "sha256:6d08990c812702428108e69e"
     },
     "node:set-up-content-pipeline": {
       "reviewedOn": "2026-09-28",
@@ -271,21 +271,21 @@
       "digest": "sha256:c19fae24e71827f66439f18e"
     },
     "node:aimeat-ai-capabilities": {
-      "reviewedOn": "2026-09-28",
+      "reviewedOn": "2026-09-29",
       "watches": [
         "aimeat/src/services/ai/capabilities.ts",
         "aimeat/src/services/ai-embed.ts",
         "aimeat/src/services/app-ai-capability-hints.ts",
         "aimeat/src/static/sdk-libs/ai/index.js"
       ],
-      "digest": "sha256:825a4bcf3d4952bedc1f88cf"
+      "digest": "sha256:6c521bd0ebf401de15349426"
     },
     "node:use-app-bound-skills": {
-      "reviewedOn": "2026-09-26",
+      "reviewedOn": "2026-09-29",
       "watches": [
         "aimeat/src/routes/skills.ts"
       ],
-      "digest": "sha256:ed9b1ce8324f860d6cd1db66"
+      "digest": "sha256:c3710ba860766c69f6b4cfff"
     },
     "node:install-skills-locally": {
       "reviewedOn": "2026-09-19",
@@ -345,13 +345,13 @@
       "digest": "sha256:8c61e7dcccc52219f8bcdd8b"
     },
     "project:aimeat-library-authoring": {
-      "reviewedOn": "2026-09-28",
+      "reviewedOn": "2026-09-29",
       "watches": [
         "aimeat/scripts/build-sdk-libs.ts",
         ".githooks/pre-commit",
         "aimeat/src/services/build-extension-prompt.ts"
       ],
-      "digest": "sha256:cd4e056addba026f9f83338f"
+      "digest": "sha256:e8a1d577a8359a7dce7a2131"
     },
     "project:aimeat-organism-records": {
       "reviewedOn": "2026-09-19",
@@ -383,7 +383,7 @@
   },
   "fileDigests": {
     "node:aimeat-open-items": {
-      "aimeat/src/services/open-items.ts": "90d6c5cd3b219d62"
+      "aimeat/src/services/open-items.ts": "da99aa649ff0dbc6"
     },
     "node:aimeat-first-conversation": {
       "aimeat/src/services/model-recommendation.ts": "bd4bb581e6178a21"
@@ -484,7 +484,7 @@
       "aimeat/src/mcp/core-admin.ts": "17c66f53ecaa3360"
     },
     "node:manage-my-agents": {
-      "aimeat/src/mcp/core.ts": "85683c7ec0d4dec9",
+      "aimeat/src/mcp/core.ts": "f567ac38a047b398",
       "aimeat/src/mcp/catalog/definitions/agent-messaging.ts": "758e870c0323ff11"
     },
     "node:manage-my-profile-data": {
@@ -492,7 +492,7 @@
     },
     "node:add-a-crew-agent": {
       "aimeat/src/routes/agents/device-auth.ts": "adf10232e2b2acac",
-      "aimeat/src/mcp/catalog/scopes.ts": "817c38ffcf6d170b",
+      "aimeat/src/mcp/catalog/scopes.ts": "ce63c2a4190eec32",
       "aimeat/src/mcp/catalog/definitions/crew.ts": "f18f927aad1a04d6",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "1da72b752ee164bc",
       "aimeat/src/data/basic-agents.ts": "aff54b3a43cbd71d"
@@ -507,7 +507,7 @@
       "aimeat/src/services/ai/routing.ts": "af79eb8511cc0ed1"
     },
     "node:use-app-bound-skills": {
-      "aimeat/src/routes/skills.ts": "44bf52891c9f8fcd"
+      "aimeat/src/routes/skills.ts": "065e9d5f03d0d89a"
     },
     "node:install-skills-locally": {
       "aimeat/src/cli/skill-install.ts": "e6ba3efb63c188a5"
@@ -538,7 +538,7 @@
       "scripts/gen_image.py": "e2435908849b31d3"
     },
     "project:aimeat-library-authoring": {
-      "aimeat/scripts/build-sdk-libs.ts": "477e495a9528dca9",
+      "aimeat/scripts/build-sdk-libs.ts": "b845bfe136701331",
       ".githooks/pre-commit": "e8840eb33aa805c0",
       "aimeat/src/services/build-extension-prompt.ts": "3ea304e53b128d76"
     },
@@ -558,7 +558,7 @@
     },
     "node:aimeat-decide": {
       "aimeat/src/static/sdk-libs/decide/index.js": "ce7328b35b4223c6",
-      "aimeat/src/services/decide/service.ts": "926f3d56fd0e2399",
+      "aimeat/src/services/decide/service.ts": "1df758f160c7917f",
       "aimeat/src/services/decide/limits.ts": "65c3e881405e3685",
       "aimeat/src/services/decide/settings.ts": "bb5b771bd7739ac0",
       "aimeat/src/services/app-decide-posture.ts": "65d4966f4b6ff7a8"
@@ -569,7 +569,7 @@
       "aimeat/src/routes/ai-policy.ts": "d33660e83cdac1c9"
     },
     "node:aimeat-ai-capabilities": {
-      "aimeat/src/services/ai/capabilities.ts": "fc1ea3f10ed35264",
+      "aimeat/src/services/ai/capabilities.ts": "3a7e5bc79b79f301",
       "aimeat/src/services/ai-embed.ts": "4b2e3a13ab7796c5",
       "aimeat/src/services/app-ai-capability-hints.ts": "3a684ecb1285421d",
       "aimeat/src/static/sdk-libs/ai/index.js": "241d20196c36fb3f"
