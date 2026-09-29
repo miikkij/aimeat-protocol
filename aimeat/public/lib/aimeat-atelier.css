@@ -49,6 +49,9 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.59.1 — 2026-09-29 — The node's marks moved onto one 46px row at the bottom-left: the
+ *     --ak-chrome-bottom fallback follows (was 56px), and the side column of the workbench frame
+ *     keeps that row free at its foot (workbench.css).
  *   v0.59.0 — 2026-09-29 — No rule changed. Every layer the kit puts on the body now carries the
  *     app's data-ak-look (dom.js wearLook), so the [data-ak-look] token blocks below reach a dialog,
  *     a menu or a toast, which they did not while those layers sat outside the app frame.
@@ -529,7 +532,7 @@
   --ak-ambient-speed: 1;
 
   /* ── The node's injected bottom controls — never draw under them ──────────────────────── */
-  --ak-chrome-bottom: var(--aimeat-chrome-bottom, 56px);
+  --ak-chrome-bottom: var(--aimeat-chrome-bottom, 46px);
 
   /* ── Component sizing (one sizing everywhere — instances never override these) ────────── */
   /* ROOM BY DEFAULT (2026-08-29). This was 68rem, and before that 52rem — a lane down the

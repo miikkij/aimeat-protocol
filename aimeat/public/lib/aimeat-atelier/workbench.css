@@ -16,6 +16,7 @@
  *   entrance are the kit's one-shot JavaScript, and they stand down under reduced motion.
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.3.1 — 2026-09-29 — The side column keeps the node's row of marks free at its foot.
  *   v0.3.0 — 2026-09-29 — promptPanel and queueRow (workbench-parts.js).
  *   v0.2.0 — 2026-09-28 — `.ak-setgroups` (the settings groups in one card, divided by hairlines)
  *     and white inputs on the workbench look: the two things the first app built on it showed
@@ -77,11 +78,15 @@
   /* The column must not step sideways when one page is long enough to scroll and the next is not. */
   scrollbar-gutter: stable;
 }
+/* The node's marks sit on one row at the bottom-left of the window, which on a wide screen is under
+   this column, beside the page rather than over it. The column keeps that row free, so its last
+   item never sits under a mark either. */
 .ak-app__side {
   flex: none;
   width: var(--ak-sidenav-w);
   position: sticky;
   top: 0;
+  padding-bottom: var(--ak-chrome-bottom);
 }
 .ak-app--sidenav .ak-app__main {
   flex: 1 1 auto;

@@ -15,6 +15,12 @@
  *   trap all live ONCE in services/app-serve-marks.ts, which is what actually puts it in the page.
  * @usage import { badgeSnippet } from '../utils/app-badge.js';  // via applyServeMarks({ badge: true })
  * @version-history
+ *   v2.2.0 — 2026-09-29 — ONE COMPACT ROW, BOTTOM-LEFT (the developer's decision of 2026-09-29, after
+ *     the marks covered app content in two corners). The badge is the 34px bolt on every viewport,
+ *     not only below 640px; the pill opens above the bolt on hover, keyboard focus or a tap, and
+ *     the bolt does not move when it does. It sits after the AI label on one row
+ *     (--aimeat-mark-ai-w) and declares its own room (--aimeat-mark-badge-w) for the install
+ *     button after it. The pill lost its own bolt, since the bolt is right under it.
  *   v2.1.0 — 2026-09-05 — THE BOLT IS A DRAWING NOW, and the surface is opaque. Two findings from
  *     the Atelier measuring review, one fix each. (1) The house rule is no emoji in the
  *     interface, and the badge carried a ⚡ in two places; it is an inline SVG bolt, sized in
@@ -60,6 +66,14 @@ const AIMEAT_LABEL = 'aimeat.io';
 export const BADGE_MARK = 'id="aimeat-app-badge"';
 
 /**
+ * The room the bolt takes on the marks' row: its 34px and the 8px gap after it. Declared on `:root`
+ * so the install button (public/js/install-chip.js) sits after the bolt when there is one and in
+ * the bolt's place when the owner turned the badge off.
+ */
+export const BADGE_WIDTH_VAR = '--aimeat-mark-badge-w';
+const BADGE_ROW_PX = 42;
+
+/**
  * Every non-ASCII character as a numeric HTML entity.
  *
  * MEASURED, NOT PARANOIA. A published app is served as `text/html` with NO charset parameter, and
@@ -90,13 +104,13 @@ const BOLT = '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentCol
  * The badge markup. The label + link are the fixed aimeat.io attribution (deliberate, since
  * publishing/hosting is free). Pure static markup + a scoped `<style>` block — no script, so it needs
  * nothing the inline CSP doesn't already allow (style-src 'unsafe-inline' governs `<style>` elements
- * and style attributes alike). On narrow viewports the pill collapses to a small round bolt button so
- * it doesn't cover app UI; tapping toggles the full pill via a hidden-checkbox CSS toggle (the only
- * way to get tap-to-expand without a script).
+ * and style attributes alike). On every viewport the badge is a small round bolt button, so it
+ * doesn't cover app UI; hover or keyboard focus shows the full pill above it, and a tap toggles it
+ * via a hidden-checkbox CSS toggle (the only way to get tap-to-expand without a script).
  */
 export function badgeSnippet(): string {
-    // Shared surface look for both the pill and the collapsed bolt button. Everything is !important
-    // so arbitrary app CSS (resets, `a{...}`, `label{...}`) can't restyle the badge.
+    // Shared surface look for both the pill and the bolt button. Everything is !important so
+    // arbitrary app CSS (resets, `a{...}`, `label{...}`) can't restyle the badge.
     //
     // OPAQUE, ON PURPOSE. At .92 alpha the ground under the words was whatever the app painted
     // behind the badge, so the same coral measured 4.19 on one page and 4.29 on the next and was
@@ -106,40 +120,47 @@ export function badgeSnippet(): string {
     const surface =
         'background:#14141c!important;box-shadow:0 4px 16px rgba(0,0,0,.28)!important;'
         + 'border:1px solid rgba(255,255,255,.14)!important;';
+    // ONE ROW, BOTTOM-LEFT. The node's marks share one row: the AI label first (it declares its own
+    // width as --aimeat-mark-ai-w), this bolt next, the install button last (it reads
+    // --aimeat-mark-badge-w, declared here). Without an AI label the fallback puts the bolt at 12px.
+    const left = 'calc(12px + var(--aimeat-mark-ai-w,0px))';
     const css =
+        ':root{' + BADGE_WIDTH_VAR + ':' + BADGE_ROW_PX + 'px}'
         // display:contents — the wrapper adds no box of its own, children position:fixed themselves.
-        '#aimeat-app-badge{display:contents!important}'
+        + '#aimeat-app-badge{display:contents!important}'
         // The toggle checkbox: visually hidden but focusable (never display:none — keyboard a11y).
-        + '#aimeat-app-badge input{position:fixed!important;right:20px!important;bottom:20px!important;'
+        + '#aimeat-app-badge input{position:fixed!important;left:' + left + '!important;right:auto!important;bottom:20px!important;'
         + 'width:1px!important;height:1px!important;margin:0!important;opacity:0!important;'
         + 'pointer-events:none!important;z-index:2147483647!important}'
         // The drawn bolt: sized off the rule that contains it, never squeezed by an app's own
         // `svg{width:100%}` reset.
         + '#aimeat-app-badge svg{width:1em!important;height:1em!important;display:block!important;'
         + 'flex:none!important;fill:currentColor!important}'
-        // Collapsed bolt button — hidden on wide viewports, shown on narrow ones.
-        + '#aimeat-app-badge label{display:none!important;position:fixed!important;right:12px!important;'
+        // The bolt button, on every viewport: the badge is 34px square until someone asks for more.
+        + '#aimeat-app-badge label{display:flex!important;position:fixed!important;left:' + left + '!important;right:auto!important;'
         + 'bottom:12px!important;z-index:2147483647!important;width:34px!important;height:34px!important;'
+        + 'box-sizing:border-box!important;margin:0!important;padding:0!important;'
         + 'align-items:center!important;justify-content:center!important;border-radius:50%!important;'
         + 'color:var(--color-primary,#E8564A)!important;font:600 16px/1 system-ui,-apple-system,Segoe UI,Roboto,sans-serif!important;'
         + 'cursor:pointer!important;user-select:none!important;-webkit-user-select:none!important;' + surface + '}'
-        // The full pill — the desktop default, unchanged look.
-        + '#aimeat-app-badge a{position:fixed!important;right:12px!important;bottom:12px!important;'
-        + 'z-index:2147483647!important;display:inline-flex!important;align-items:center!important;'
-        + 'gap:8px!important;padding:7px 12px!important;border-radius:9999px!important;color:#fff!important;'
+        // The pill opens ABOVE the bolt, left edge on the bolt's left edge, and the bolt stays where
+        // it is: nothing on the row moves when it opens. It wraps rather than leave the viewport.
+        + '#aimeat-app-badge a{display:none!important;position:fixed!important;left:' + left + '!important;right:auto!important;'
+        + 'bottom:52px!important;top:auto!important;max-width:calc(100vw - 24px - var(--aimeat-mark-ai-w,0px))!important;'
+        + 'box-sizing:border-box!important;margin:0!important;'
+        + 'z-index:2147483647!important;align-items:center!important;flex-wrap:wrap!important;'
+        + 'gap:2px 8px!important;padding:7px 12px!important;border-radius:15px!important;color:#fff!important;'
         + 'font:600 12px/1.2 system-ui,-apple-system,Segoe UI,Roboto,sans-serif!important;'
         + 'text-decoration:none!important;letter-spacing:.1px!important;' + surface + '}'
-        + '#aimeat-app-badge a>span:first-child{color:var(--color-primary,#E8564A)!important}'
+        // The 6px between the pill and the bolt, made hoverable, so the pointer can travel from one
+        // to the other without the pill closing under it.
+        + '#aimeat-app-badge a::after{content:""!important;position:absolute!important;left:0!important;'
+        + 'right:0!important;top:100%!important;height:8px!important}'
+        // Open: while the pointer is on the bolt or the pill, while the keyboard is in either, and
+        // after a tap until the next one (a touch screen has no hover to hold it open).
+        + '#aimeat-app-badge:hover a,#aimeat-app-badge:focus-within a,#aimeat-app-badge input:checked~a{display:inline-flex!important}'
         + '#aimeat-app-badge a>span:last-child{opacity:.7!important;font-weight:500!important}'
-        + '#aimeat-app-badge input:focus-visible~label{outline:2px solid var(--color-primary,#E8564A)!important;outline-offset:2px!important}'
-        // Narrow viewports: only the bolt button by default; checking the toggle reveals the pill
-        // beside it (the button stays visible to collapse again; the pill drops its own bolt).
-        + '@media (max-width:640px){'
-        + '#aimeat-app-badge label{display:flex!important}'
-        + '#aimeat-app-badge a{display:none!important}'
-        + '#aimeat-app-badge input:checked~a{display:inline-flex!important;right:56px!important}'
-        + '#aimeat-app-badge a>span:first-child{display:none!important}'
-        + '}';
+        + '#aimeat-app-badge input:focus-visible~label{outline:2px solid var(--color-primary,#E8564A)!important;outline-offset:2px!important}';
 
     // Every user-visible string goes through entities(): the glyphs here are exactly the ones that
     // were rendering as mojibake in a charset-less document. The bolt no longer needs it — SVG
@@ -150,7 +171,6 @@ export function badgeSnippet(): string {
         + '<label for="aimeat-app-badge-open" aria-label="' + entities('Publish your own app on ' + AIMEAT_LABEL) + '">' + BOLT + '</label>'
         + '<a href="' + AIMEAT_HOME + '" target="_blank" rel="noopener noreferrer" '
         + 'aria-label="' + entities('Publish your own app on ' + AIMEAT_LABEL) + '">'
-        + '<span>' + BOLT + '</span>'
         + '<span>' + entities(AIMEAT_LABEL) + '</span>'
         + '<span>' + entities('· Publish your own app for free') + '</span>'
         + '</a>'

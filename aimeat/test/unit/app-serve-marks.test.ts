@@ -12,6 +12,10 @@
  * @structure one `it` per fixture case, plus the idempotency and never-on-the-way-in guarantees.
  * @usage pnpm exec vitest run test/unit/app-serve-marks.test.ts
  * @version-history
+ *   v1.6.0 — 2026-09-29 — Goldens re-captured for the sixth intentional output change: the marks
+ *     share one row at the bottom-left (app-badge v2.2.0, ai-provenance-marks v1.8.0) and the
+ *     reserved strip is 46px (app-chrome-reserve v1.2.0). 16 of 19 cases changed: every case that
+ *     serves the badge, the visible label or the strip declaration.
  *   v1.5.0 — 2026-09-13 — Goldens re-captured for the fifth intentional output change: the
  *     `#aimeat-app-ref` block moves from the end of the body to the start of the head, and its JSON
  *     is escaped for a script element instead of for HTML (app-serve-marks v1.4.0). 9 of 19 cases
