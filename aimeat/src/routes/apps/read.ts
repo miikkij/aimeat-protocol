@@ -10,6 +10,7 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   v1.14.0 — 2026-09-29 — The badge reads the node's AIMEAT_APP_BADGE switch too (servedBadgeOn).
  *   v1.13.0 — 2026-09-27 — Pure extraction: the version list moved to services/app-versions.ts and
  *     the screenshot POST and DELETE work to services/app-screenshot-store.ts, so the MCP tool calls
  *     the same code. The routes keep the scope check, the `presentation` authorisation (asked after
@@ -77,7 +78,7 @@ import { generateAppAccessToken } from '../../services/app-access-token.js';
 import { setStoredImageHeaders } from '../../utils/file-download-headers.js';
 import { ownerCoordinate, localAccountName } from '../../utils/gaii.js';
 import { applyServeMarks } from '../../services/app-serve-marks.js';
-import { appBadgeOn, appReviewedBy } from '../../services/app-marks.js';
+import { servedBadgeOn, appReviewedBy } from '../../services/app-marks.js';
 import { appToolNames } from '../../services/app-tool-names.js';
 import { wantsWebmcpBridge } from '../../utils/app-agent-discovery.js';
 import { appCsp } from '../../utils/app-csp.js';
@@ -420,7 +421,7 @@ export function registerReadRoutes(
             }
             res.setHeader('Content-Type', appContentType(draft.mimeType));
             const draftIsHtml = /html/i.test(draft.mimeType);
-            let draftBody = draftIsHtml ? applyServeMarks(draft.data, { badge: true }) : draft.data;
+            let draftBody = draftIsHtml ? applyServeMarks(draft.data, { badge: servedBadgeOn(config) }) : draft.data;
             if (draftAnswer === 'sandboxed' && draftIsHtml) draftBody = withFrameShim(draftBody);
             res.setHeader('Content-Length', draftBody.length.toString());
             // Same inline CSP a published app gets, so the draft behaves identically to
@@ -618,8 +619,8 @@ export function registerReadRoutes(
                 // `isHtml` is already true on this branch, so the marks pass does not have to
                 // infer it from a closing tag a single-file app is under no obligation to write.
                 isDocument: true,
-                // The owner's switch (services/app-marks.ts); on unless they turned it off.
-                badge: appBadgeOn(app.manifest),
+                // The node's switch, then the owner's (services/app-marks.ts); on unless one is off.
+                badge: servedBadgeOn(config, app.manifest),
                 provenance: prov,
                 visibleLabel: {
                     config, locale: detectLocale(req.headers['accept-language']),

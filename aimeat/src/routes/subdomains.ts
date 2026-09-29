@@ -14,6 +14,8 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.22.0 — 2026-09-29 — The badge reads the node's AIMEAT_APP_BADGE switch too (servedBadgeOn), on
+ *     the app, the draft preview and the portfolio.
  *   v1.21.2 — 2026-09-26 — Every owner name here (the app target, the draft token, the frame grant,
  *     the path form) comes from localAccountName (utils/gaii.ts), which keeps an identity of another
  *     node whole, so it never names the local namesake (secaudit 2026-09, F-1).
@@ -113,7 +115,7 @@ import {
   loadServedProvenance, setProvenanceHeaders, type ServedProvenance,
 } from '../services/ai-provenance-marks.js';
 import { applyServeMarks } from '../services/app-serve-marks.js';
-import { appBadgeOn, appInstallChipOn, appReviewedBy } from '../services/app-marks.js';
+import { servedBadgeOn, appInstallChipOn, appReviewedBy } from '../services/app-marks.js';
 import { legalLinksFor } from '../services/app-legal.js';
 import { appCsp } from '../utils/app-csp.js';
 import { appContentType } from '../utils/app-content-type.js';
@@ -376,8 +378,8 @@ async function serveApp(res: Response, storage: Storage, app: AppRecord, csp: st
       // This branch is inside a `text/html` test, so the media type is already settled and the
       // marks pass does not have to guess from a closing tag the author never had to write.
       isDocument: true,
-      // The owner's switch (services/app-marks.ts); on unless they turned it off.
-      badge: appBadgeOn(app.manifest),
+      // The node's switch, then the owner's (services/app-marks.ts); on unless one is off.
+      badge: servedBadgeOn(protect.config, app.manifest),
       provenance: prov,
       // Public or not as the publish decides it (services/app-publish.ts): an access code or a
       // park makes the app private, and the reviewer's re-decision of the label reads that.
@@ -488,7 +490,7 @@ async function serveDraftPreview(
     const relaxed = apexOrigin
       ? relaxAppCspMeta(draft.data as Buffer | Uint8Array | string, apexOrigin)
       : (draft.data as Buffer | Uint8Array | string);
-    const buf = applyServeMarks(relaxed, { badge: true });
+    const buf = applyServeMarks(relaxed, { badge: servedBadgeOn(config) });
     res.setHeader('Content-Length', buf.length.toString());
     res.send(buf);
     return;
@@ -511,13 +513,13 @@ function injectHeadSnippet(html: string, snippet: string): string {
  * iframe gets working auth/members bridging here too. The optional aimeat badge
  * follows the per-portfolio `showBadge` flag (default ON).
  */
-function servePortfolio(res: Response, html: string, portfolioConfig: Record<string, unknown>, csp: string): void {
+function servePortfolio(res: Response, html: string, portfolioConfig: Record<string, unknown>, csp: string, config: AimeatConfig): void {
   const bridge =
     '<meta name="aimeat-scopes" content="memory:read">'
     + '<script src="/v1/libs/aimeat-auth.js"></script>'
     + '<script src="/v1/libs/portfolio-standalone.js"></script>';
   let buf: Buffer = Buffer.from(injectHeadSnippet(html, bridge), 'utf-8');
-  if (portfolioConfig.showBadge !== false) buf = applyServeMarks(buf, { badge: true });
+  if (portfolioConfig.showBadge !== false && servedBadgeOn(config)) buf = applyServeMarks(buf, { badge: true });
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Content-Security-Policy', csp);
   res.setHeader('Cache-Control', 'no-cache, must-revalidate');
@@ -565,7 +567,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       if (!portfolioSeoIndexable(resolved.portfolioConfig as PortfolioSeoConfig, config)) {
         res.setHeader('X-Robots-Tag', 'noindex, nofollow');
       }
-      servePortfolio(res, resolved.html, resolved.portfolioConfig, csp);
+      servePortfolio(res, resolved.html, resolved.portfolioConfig, csp, config);
       return;
     }
 
@@ -597,7 +599,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
         // the portfolio origin: same bridge, same CSP, same isolated session-less host.
         const html = await readCompanyPortfolioHtml(storage, company);
         if (!html) return companyNotFound();
-        servePortfolio(res, html, {}, csp);
+        servePortfolio(res, html, {}, csp, config);
         return;
       }
       // 'none' answers exactly like an unmapped address: reserving a name and publishing a

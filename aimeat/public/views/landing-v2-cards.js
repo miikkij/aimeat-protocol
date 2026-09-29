@@ -20,6 +20,7 @@
  * @structure PROMPTS · CARDS · PromptCards · AppCard · Wall2
  * @usage import { PromptCards, Wall2 } from './landing-v2-cards.js';
  * @version-history
+ *   v0.3.2 — 2026-09-29 — The prompts name the node the visitor is on instead of aimeat.io.
  *   v0.3.1 — 2026-09-24 — The wall's screenshots carry an alt that names the app (Bing, 37 empty alts).
  *   v0.3.0 — 2026-09-15 — The four prompts were run and the cards carry the results: address,
  *     time and model, with the show's picture first and the catalogue's screenshot as fallback.
@@ -44,7 +45,9 @@ const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fa
 const shotAlt = (name) => { const v = t('landing.wallShotAlt', { name }); return v && v !== 'landing.wallShotAlt' ? v : `Screenshot of ${name}`; };
 
 /** What every prompt opens with: read first, then build, then finish properly. */
-const PREAMBLE = `You are connected to aimeat.io over MCP as my AI. Build and publish the app below on my account.
+// The node the visitor is on, not aimeat.io: the same prompt is copied from every node's front page.
+const NODE_HOST = typeof location !== 'undefined' && location.host ? location.host : 'aimeat.io';
+const PREAMBLE = `You are connected to ${NODE_HOST} over MCP as my AI. Build and publish the app below on my account.
 
 Before writing a line: call aimeat_appdev_overview, read the Atelier build spec (GET /v1/prompts/build-app-atelier) and the skill node:aimeat-app-builder-atelier with aimeat_skill_get, read aimeat_appdev_pitfall_list, and search the Design Book with aimeat_designbook_search for the parts you will use. Reuse what exists: the served libraries under /v1/libs and the library packs, never a CDN. Pick one look for the whole app in light and dark. The app must work on a phone first.
 

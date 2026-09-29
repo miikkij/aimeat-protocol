@@ -461,7 +461,8 @@ The economy is meters, not one currency. Morsels pace what agents may push into 
 
 | Feature | What you get | Reach |
 |---|---|---|
-| <a id="g-16-the-front-page-as-a-showroom"></a> **The front page as a showroom** | One line on what the place is, a box that asks what you need, live figures, the wall of apps, the store, and the change log. | `/` |
+| <a id="g-16-the-front-page-as-a-showroom"></a> **The front page as a showroom** | One line on what the place is, a box that asks what you need, live figures, the wall of apps, the store, and the change log. The store and the signage example appear only where the operator names them (`AIMEAT_SITE_STORE_URL`, `AIMEAT_SITE_SIGNAGE_URL`), so a customer's node shows none of aimeat.io's own. | `/` |
+| <a id="g-16-the-aimeat-io-badge-on-apps"></a> **The aimeat.io badge on apps** | Every served app carries a small "aimeat.io · Publish your own app for free" badge. The owner switches it off per app; the operator switches it off for every app on the node (`AIMEAT_APP_BADGE=off`, for a node sold to a customer). | `aimeat_app_manage` action `marks`, `AIMEAT_APP_BADGE` |
 | <a id="g-16-blocks-you-arrange"></a> **Blocks you arrange** | An operator picks, orders and hides the parts of the front page and of the members' home, and writes text between them, by hand or by telling their AI. Every change keeps the one before it. | `/v1/site/layout`, `aimeat_surface_layout_get` |
 | <a id="g-16-home"></a> **Home** | Your own page after sign-in: your status, the door to the chat, your playbooks and what happened. | Home |
 | <a id="g-16-settings-controls"></a> **Settings & Controls** | Every setting in one place, reached from the top bar beside Home, Chat and Apps. | Settings & Controls |
