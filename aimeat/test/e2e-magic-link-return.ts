@@ -15,7 +15,8 @@
  *   WHAT IT PROVES. A path lands on that path. An app origin the node serves lands on that app. A
  *   foreign address, asked for or written into the link afterwards, lands on the front page, signed
  *   in, because the token was good and only the address was not. A refused token still goes to the
- *   front page with `auth_error`, whatever address it carries.
+ *   front page with `auth_error`, whatever address it carries. The session a link opens is the
+ *   mailed account's, and the operator's endpoint refuses it with 403.
  *
  *   It runs its own node, with email on (a real SMTP sink) and app origins on, because the shared
  *   E2E server has neither. SQLite whichever backend the runner started with: what is under test is
@@ -271,6 +272,28 @@ async function run() {
             const r = await open(withRedirect(await askLink(email), value));
             assert(r.status === 302 && r.location === `${BASE}/`, `${value}: expected the front page, got ${r.status} ${r.location}`);
         }
+    });
+
+    // ── Whose session it is ──
+
+    await test("the session a link opens is the mailed account's, and it cannot act as another person", async () => {
+        // The return address changes where the browser goes, never whose session it carries. The
+        // operator is a different person here (the first account); the link's session is refused
+        // on the operator's endpoint, whatever address the link returned to.
+        const link = await askLink(email, `${appOrigin}/`);
+        const r = await fetch(link, { redirect: 'manual', headers: asClient() });
+        assert(r.status === 302 && r.headers.get('location') === `${appOrigin}/`, `open: ${r.status} ${r.headers.get('location')}`);
+        const cookie = r.headers.getSetCookie().find(c => c.startsWith('aimeat_rt=') && !/^aimeat_rt=;/.test(c));
+        assert(!!cookie, 'the link must set the refresh cookie');
+        const refresh = await json('/v1/auth/refresh', {
+            method: 'POST', headers: { Cookie: cookie!.split(';')[0], 'X-AIMEAT-Refresh': '1' },
+        });
+        assert(refresh.status === 200, `refresh ${refresh.status}: ${JSON.stringify(refresh.body).slice(0, 300)}`);
+        const token = refresh.body.data.token as string;
+        const me = await json('/v1/ghii/me', { headers: { Authorization: `Bearer ${token}` } });
+        assert(me.status === 200 && me.body.data.ghii === `${userName}@${NODE_ID}`, `me: ${me.status} ${me.body?.data?.ghii}`);
+        const asOperator = await json(`/v1/admin/owners/mrop${stamp}/disable`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+        assert(asOperator.status === 403, `the link's session must be refused on the operator's endpoint, got ${asOperator.status}`);
     });
 
     // ── A refusal is still a refusal ──
