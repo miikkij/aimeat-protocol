@@ -22,6 +22,10 @@
  * @structure PublishRunInput · PublishRunOutcome · runOwnPublish
  * @usage import { runOwnPublish } from './publish-run.js';
  * @version-history
+ *   v1.3.0 — 2026-09-29 — The stored file passes the classification component's leave() before the
+ *     gate opens an attempt (TARGET-082 V4): a file whose label may not leave its organism is
+ *     refused with CLASSIFIED and nothing is published. `reader` is the caller's; the scheduler,
+ *     which has no caller, gets the node's own reader for the publisher.
  *   v1.2.0 — 2026-09-08 — The first publish reports no `url` for an empty externalRef, as the replay
  *     had since v1.1.0; the two answers for one outcome had differed.
  *   v1.1.0 — 2026-08-08 — A replay reports no `url` for an empty externalRef. LinkedIn answers a
@@ -37,6 +41,8 @@ import { openOwnPublish } from './publish-gate.js';
 import { ensureFreshCredential } from './refresh.js';
 import { publishToProvider } from './publish.js';
 import type { ConnectContext } from './oauth.js';
+import { systemReader, type ContentReader } from '../classification/reader.js';
+import { fileTarget } from '../classification/labels.js';
 
 export interface PublishRunInput {
   /** Resolved identity. Never a client-supplied id. */
@@ -46,6 +52,11 @@ export interface PublishRunInput {
   storageKey: string;
   caption: string;
   params: Record<string, unknown>;
+  /**
+   * The classification reader of whoever asked (TARGET-082). Absent on the scheduled path, which has
+   * no caller: the node's own reader for the publisher is used there.
+   */
+  reader?: ContentReader;
 }
 
 export type PublishRunOutcome =
@@ -63,6 +74,8 @@ export type PublishRunOutcome =
     reason: string;
     /** 404 when the connection is not the caller's, 400 otherwise. The route maps it. */
     notFound: boolean;
+    /** Set when the file's classification keeps it on this node (code CLASSIFIED): a 403. */
+    classified?: boolean;
     /** Set when an attempt WAS opened and then failed — so a caller can record which one. */
     attemptId?: string;
   };
@@ -86,6 +99,17 @@ export async function runOwnPublish(
       return {
         ok: false, notFound: true, code: 'NO_SUCH_FILE',
         reason: `you have no stored file named '${input.storageKey}'`,
+      };
+    }
+    // The bytes go to an outside service, so the file passes leave() before the gate writes an
+    // attempt: a refused file leaves no row in flight (TARGET-082).
+    const reader = input.reader ?? systemReader(ctx, input.publisher);
+    const { left } = await reader.leave([input.storageKey], k => fileTarget(input.publisher, k),
+      { kind: 'external', to: `connection:${input.connectionId}` });
+    if (left.length) {
+      return {
+        ok: false, notFound: false, code: 'CLASSIFIED', classified: true,
+        reason: `'${input.storageKey}' is ${left[0]!.reason}, so it is not published`,
       };
     }
     file = {

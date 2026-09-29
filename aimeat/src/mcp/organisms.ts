@@ -11,6 +11,8 @@
  *   import { registerOrganismsTools } from './organisms.js';
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-09-29 — aimeat_workspace_comments passes the agent's classification reader to listComments
+ *     (TARGET-082 V4).
  *   2026-09-29 — aimeat_organism_search passes the agent's classification reader (TARGET-082).
  *   2026-09-28 — aimeat_organism_update takes agent_access; an agent can narrow it, never widen it.
  *     aimeat_organism_members names only the agents the organism admits.
@@ -520,7 +522,7 @@ export function registerOrganismsTools(
             if (!(await canAccessWorkspaceComments(storage, config, organism, agentGaii, ownerName, agentGaii, ws))) {
                 return { content: [{ type: 'text' as const, text: 'You cannot read this workspace' }], isError: true };
             }
-            const comments = await listComments(storage, organism_id, ws, space, instance_id);
+            const comments = await listComments(storage, readerForAgent({ storage, config }, agentGaii), organism_id, ws, space, instance_id);
             return { content: [{ type: 'text' as const, text: JSON.stringify({ comments, total: comments.length }, null, 2) }] };
         },
     );

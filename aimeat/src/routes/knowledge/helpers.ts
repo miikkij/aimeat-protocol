@@ -8,6 +8,9 @@
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/knowledge.ts (max-file-lines)
  *   v1.1.0 — 2026-07-16 — findOwnerScopeMemory batches the agent scan into one listMemoryForOwners
+ *   v1.1.1 — 2026-09-29 — TARGET-082 V4: findOwnerScopeMemory is documented as the unchecked
+ *     lookup for read-to-update; a route that puts its record in a response passes it through
+ *     presentMemory first (packages-core.ts GET /v1/knowledge/:id does).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
@@ -27,6 +30,8 @@ export function makeKnowledgeHelpers(config: AimeatConfig, storage: Storage): Kn
   // Find a memory record across the owner's scope (GHII + all agents).
   // Owner sessions store packages under GHII but agents store under GAII.
   // Returns the record + the actual ownerGaii it was found under.
+  // Unchecked by classification: the sharing routes read it to update it. A route that returns the
+  // record to the caller passes it through presentMemory (services/classification/present-memory.ts).
   async function findOwnerScopeMemory(req: Express.Request, key: string) {
     const callerGaii = resolve(req);
     const record = await storage.getMemory(callerGaii, key);

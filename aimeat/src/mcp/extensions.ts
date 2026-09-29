@@ -11,6 +11,8 @@
  *   import { registerExtensionsTools } from './extensions.js';
  *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v2.5.0 — 2026-09-29 — ctx.files is told the caller is this session's agent, so a file read
+ *     passes the classification check as an AI (TARGET-082 V4).
  *   v2.4.2 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v2.4.1 — 2026-09-13 — An install refusal carries its details (ODPS_FIELD_TOO_LONG names the field,
@@ -321,6 +323,7 @@ export function registerExtensionsTools(
                     config, storage,
                     callerGaii: agentGaii,
                     callerOwner: localAccountName(agentGaii),
+                    callerRoles: ['agent'], callerScopes: sessionScopes,
                     extName: ext.name,
                 }),
                 // Same capability as the REST road, and deliberately the same TARGET: a data package

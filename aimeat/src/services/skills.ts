@@ -32,6 +32,10 @@
  * @usage
  *   import { publishSkill, resolveSkillRef, listSkillLibrary } from '../services/skills.js';
  * @version-history
+ *   v1.4.0 -- 2026-09-29 -- TARGET-082 V4: every user and workspace record a list or a resolve returns
+ *     (manifests, file bodies, version snapshots) passes the accessor's ContentReader through
+ *     showSkillRecords (skill-reader.ts). A manifest the reader may not see reads as not found; a
+ *     hidden file is left out of fileContents. Node skills are the node's own library and pass.
  *   v1.3.1 -- 2026-09-26 -- listSkillsByBinding takes a skill owner's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.3.0 -- 2026-09-03 -- What the Skills page needed the registry to say (design canvas "AIMEAT
  *     Taidot-sivu"): setSkillVisibility() changes who may read a skill without a republish (no
@@ -51,6 +55,8 @@ import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { validateSkillFiles, SkillValidationError, SKILL_NAME_RE } from './skill-md.js';
 import { canReadWorkspace } from './workspace-access.js';
 import { localAccountName } from '../utils/gaii.js';
+import type { ContentReader } from './classification/reader.js';
+import { showSkillRecords } from './skill-reader.js';
 
 // The addresses (ref grammar, scope owner, key conventions) live in skill-refs.ts since 2026-09-03.
 import {
@@ -138,6 +144,8 @@ export interface SkillAccessor {
   sub?: string;
   /** Full GHII/GAII — used by the workspace read gate. Derived from ownerName when absent. */
   gaii?: string;
+  /** The caller's classification reader; made from ownerName/gaii when absent (skill-reader.ts). */
+  reader?: ContentReader;
 }
 
 export class SkillAccessError extends Error {
@@ -445,16 +453,17 @@ export async function listSkills(
     if (!gate) return [];
     const prefix = `organism.${wsTarget.org}.w.${wsTarget.ws}.skills.`;
     const records = (await listAcrossOwners(storage, prefix)).filter(r => WS_MANIFEST_KEY_RE.test(r.key));
-    return [...freshestByKey(records).values()]
+    // The check runs after freshest-wins, so a hidden newest copy never lets an older one through.
+    return (await showSkillRecords({ storage, config }, accessor, [...freshestByKey(records).values()]))
       .map(r => toSummary(r, 'workspace', null, wsTarget.org, wsTarget.ws));
   }
   const skillOwner = scope === 'user' ? (owner ?? accessor.ownerName ?? undefined) : undefined;
   if (scope === 'user' && !skillOwner) return [];
   const ownerGaii = scopeOwnerGhii(config, scope, skillOwner);
   const records = await storage.listMemory(ownerGaii, { prefix: 'skills.', tags: ['skill'] });
-  const summaries = records
+  const summaries = (await showSkillRecords({ storage, config }, accessor, records
     .filter(r => MANIFEST_KEY_RE.test(r.key))
-    .filter(r => mayRead(r, scope, skillOwner ?? null, accessor))
+    .filter(r => mayRead(r, scope, skillOwner ?? null, accessor))))
     .map(r => toSummary(r, scope, skillOwner ?? null));
   if (scope === 'node' && summaries.length > 0) {
     // The seeder leaves a stamp beside every skill it wrote; a stamped skill came with the build.
@@ -477,14 +486,10 @@ export async function listSkillsByBinding(
   const records = (await listAcrossOwners(storage, 'skills.'))
     .filter(r => MANIFEST_KEY_RE.test(r.key))
     .filter(r => (r.value as SkillManifestValue)?.binding === binding);
-  const out: SkillSummary[] = [];
-  for (const r of records) {
-    const isNode = r.ownerGaii === systemGhii;
-    const skillOwner = isNode ? null : localAccountName(r.ownerGaii);
-    if (!mayRead(r, isNode ? 'node' : 'user', skillOwner, accessor)) continue;
-    out.push(toSummary(r, isNode ? 'node' : 'user', skillOwner));
-  }
-  return out;
+  const ownerOf = (r: MemoryRecord) => (r.ownerGaii === systemGhii ? null : localAccountName(r.ownerGaii));
+  const gated = records.filter(r => mayRead(r, r.ownerGaii === systemGhii ? 'node' : 'user', ownerOf(r), accessor));
+  return (await showSkillRecords({ storage, config }, accessor, gated))
+    .map(r => toSummary(r, r.ownerGaii === systemGhii ? 'node' : 'user', ownerOf(r)));
 }
 
 /**
@@ -539,7 +544,7 @@ async function listSkillLibraryPlain(
       for (const [wsId, wsRecords] of byWs) {
         const gate = await mayReadWs(storage, config, m.organismId, wsId, accessor);
         if (!gate) continue;
-        for (const r of freshestByKey(wsRecords).values()) {
+        for (const r of await showSkillRecords({ storage, config }, accessor, [...freshestByKey(wsRecords).values()])) {
           workspace.push(toSummary(r, 'workspace', null, m.organismId, wsId));
         }
       }
@@ -565,46 +570,51 @@ export async function resolveSkillRef(
       throw new SkillAccessError('FORBIDDEN', `Not allowed to read skill: ${refStr}`);
     }
     const copies = await listAcrossOwners(storage, wsManifestKey(org!, ws!, name));
-    const record = freshestByKey(copies).get(wsManifestKey(org!, ws!, name));
+    const freshest = freshestByKey(copies).get(wsManifestKey(org!, ws!, name));
+    const [record] = freshest ? await showSkillRecords({ storage, config }, accessor, [freshest]) : [];
     if (!record) throw new SkillAccessError('NOT_FOUND', `Skill not found: ${refStr}`);
     if (ref.version && ref.version !== (record.value as SkillManifestValue).version) {
-      return resolvePinned(storage, record, wsVersionKey(org!, ws!, name, ref.version), ref, opts);
+      return resolvePinned(storage, config, accessor, record, wsVersionKey(org!, ws!, name, ref.version), ref, opts);
     }
     const summary = toSummary(record, 'workspace', null, org, ws);
-    const fileContents: Record<string, string> = {};
-    if (!opts.manifestOnly) {
-      // Read the file records published alongside THIS manifest copy (same owner).
-      for (const f of summary.files) {
-        const rec = await storage.getMemory(record.ownerGaii, wsFileKey(org!, ws!, name, f.path));
-        if (rec) fileContents[f.path] = String(rec.value);
-      }
-    }
+    // Read the file records published alongside THIS manifest copy (same owner).
+    const fileContents = opts.manifestOnly ? {} : await readFileBodies(storage, config, accessor,
+      record.ownerGaii, summary.files.map(f => [f.path, wsFileKey(org!, ws!, name, f.path)]));
     const versions = retainedVersions(await listAcrossOwners(storage, wsVersionPrefix(org!, ws!, name)), wsVersionPrefix(org!, ws!, name));
     return { ...summary, fileContents, versions };
   }
 
   const skillOwner = ref.scope === 'user' ? ref.owner! : null;
   const ownerGaii = scopeOwnerGhii(config, ref.scope, ref.owner);
-  const record = await storage.getMemory(ownerGaii, manifestKey(ref.name));
-  if (!record) throw new SkillAccessError('NOT_FOUND', `Skill not found: ${refStr}`);
-  if (!mayRead(record, ref.scope, skillOwner, accessor)) {
+  const stored = await storage.getMemory(ownerGaii, manifestKey(ref.name));
+  if (!stored) throw new SkillAccessError('NOT_FOUND', `Skill not found: ${refStr}`);
+  if (!mayRead(stored, ref.scope, skillOwner, accessor)) {
     throw new SkillAccessError('FORBIDDEN', `Not allowed to read skill: ${refStr}`);
   }
+  // A manifest this reader may not see reads as absent, as a missing one does.
+  const [record] = await showSkillRecords({ storage, config }, accessor, [stored]);
+  if (!record) throw new SkillAccessError('NOT_FOUND', `Skill not found: ${refStr}`);
   if (ref.version && ref.version !== (record.value as SkillManifestValue).version) {
-    return resolvePinned(storage, record, versionKey(ref.name, ref.version), ref, opts);
+    return resolvePinned(storage, config, accessor, record, versionKey(ref.name, ref.version), ref, opts);
   }
 
   const summary = toSummary(record, ref.scope, skillOwner);
   if (ref.version) summary.ref = formatSkillRef(ref);
-  const fileContents: Record<string, string> = {};
-  if (!opts.manifestOnly) {
-    for (const f of summary.files) {
-      const rec = await storage.getMemory(ownerGaii, fileKey(ref.name, f.path));
-      if (rec) fileContents[f.path] = String(rec.value);
-    }
-  }
+  const fileContents = opts.manifestOnly ? {} : await readFileBodies(storage, config, accessor,
+    ownerGaii, summary.files.map(f => [f.path, fileKey(ref.name, f.path)]));
   const versions = retainedVersions(await storage.listMemory(ownerGaii, { prefix: versionPrefix(ref.name) }), versionPrefix(ref.name));
   return { ...summary, fileContents, versions };
+}
+
+/** The file bodies of one manifest copy, path -> text, each record through the accessor's reader. */
+async function readFileBodies(
+  storage: Storage, config: AimeatConfig, accessor: SkillAccessor, ownerGaii: string, files: Array<[string, string]>,
+): Promise<Record<string, string>> {
+  const pathOf = new Map(files.map(([path, key]) => [key, path]));
+  const found = (await Promise.all(files.map(([, key]) => storage.getMemory(ownerGaii, key)))).filter((r): r is MemoryRecord => !!r);
+  const out: Record<string, string> = {};
+  for (const r of await showSkillRecords({ storage, config }, accessor, found)) out[pathOf.get(r.key)!] = String(r.value);
+  return out;
 }
 
 /** The retained snapshots under a version prefix as (version, publishedAt), oldest first. */
@@ -619,10 +629,11 @@ function retainedVersions(records: MemoryRecord[], prefix: string): Array<{ vers
 /** Resolve a version pin from its retained snapshot. The live manifest record has already
  *  passed the scope's access gate; the snapshot lives under the same owner. */
 async function resolvePinned(
-  storage: Storage, liveManifest: MemoryRecord, snapshotKey: string, ref: SkillRef,
+  storage: Storage, config: AimeatConfig, accessor: SkillAccessor, liveManifest: MemoryRecord, snapshotKey: string, ref: SkillRef,
   opts: { manifestOnly?: boolean },
 ): Promise<ResolvedSkill> {
-  const snap = await storage.getMemory(liveManifest.ownerGaii, snapshotKey);
+  const stored = await storage.getMemory(liveManifest.ownerGaii, snapshotKey);
+  const [snap] = stored ? await showSkillRecords({ storage, config }, accessor, [stored]) : [];
   if (!snap) {
     throw new SkillAccessError('NOT_FOUND',
       `Version ${ref.version} of ${formatSkillRef({ ...ref, version: undefined })} is not retained (the registry keeps the newest ${VERSION_SNAPSHOTS_KEPT} snapshots)`);

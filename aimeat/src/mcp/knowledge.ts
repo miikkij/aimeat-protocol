@@ -28,10 +28,17 @@
  *     parameters and renders its answer; the work moved to services/knowledge-package-entry.ts,
  *     where the manifest's index line goes through services/memory-write.ts like the entry already
  *     did instead of straight to storage.
+ *   v1.7.0 — 2026-09-29 — TARGET-082 V4: every manifest and entry this surface returns passes the
+ *     session's classification reader (readerForAgent) through presentMemories: the resource list and
+ *     read, aimeat_knowledge_list (appdev-kb.ts listOwnerScopeShown) and aimeat_knowledge_get. A
+ *     manifest the agent may not see reads as not found; an entry it may not see is left out; a
+ *     warning-labelled one carries `classificationWarning`.
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { listOwnerScopeMemory as kbListOwnerScopeMemory } from '../services/appdev-kb.js';
+import { listOwnerScopeShown } from '../services/appdev-kb.js';
+import { readerForAgent } from '../services/classification/reader.js';
+import { presentMemory, presentMemories, classificationWarningOf } from '../services/classification/present-memory.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -55,18 +62,26 @@ export function registerKnowledgeTools(
 ): void {
     const agentGaii = getAgentGaii();
 
+    // Every manifest and entry this surface returns is user content, so what the agent is shown is
+    // the classification reader's decision (TARGET-082). One reader per call: it caches the owner's
+    // memberships, which must not outlive the call.
+    const reader = () => readerForAgent({ storage, config }, agentGaii, sessionScopes);
     // Owner-scope memory aggregation is services/appdev-kb.ts — packages may sit under the owner's
     // GHII (web UI import) or any of their agents, and which duplicate key wins is a priority order
     // that has to be the same answer on both surfaces.
-    const listOwnerScopeMemory = (opts: { prefix?: string; tags?: string[]; visibility?: string }) =>
-        kbListOwnerScopeMemory(storage, config, agentGaii, opts);
+    const listOwnerScopePackages = () =>
+        listOwnerScopeShown(storage, config, reader(), { prefix: 'packages/', tags: ['knowledge-package'] });
+    const warningOf = (record: object) => {
+        const w = classificationWarningOf(record);
+        return w ? { classificationWarning: w } : {};
+    };
 
     // ── Resource: knowledge package ──
     mcp.registerResource(
         'knowledge-package',
         new ResourceTemplate('aimeat://knowledge/{packageId}', {
             list: async () => {
-                const entries = await listOwnerScopeMemory({ prefix: 'packages/', tags: ['knowledge-package'] });
+                const entries = await listOwnerScopePackages();
                 const manifests = entries.filter(e => e.key.endsWith('/manifest'));
                 return {
                     resources: manifests.map(m => {
@@ -86,15 +101,18 @@ export function registerKnowledgeTools(
         async (uri, variables) => {
             const packageId = decodeURIComponent(variables.packageId as string);
             const manifestKey = `packages/${packageId}/manifest`;
-            const manifest = await storage.getMemory(agentGaii, manifestKey);
+            const r = reader();
+            const stored = await storage.getMemory(agentGaii, manifestKey);
+            const manifest = stored ? await presentMemory(r, stored) : null;
             if (!manifest) {
                 return { contents: [{ uri: uri.toString(), text: 'Package not found' }] };
             }
-            const entries = await storage.listMemory(agentGaii, { prefix: `packages/${packageId}/` });
+            const entries = await presentMemories(r, await storage.listMemory(agentGaii, { prefix: `packages/${packageId}/` }));
             const entryList = entries.filter(e => !e.key.endsWith('/manifest')).map(e => ({
                 key: e.key,
                 visibility: e.visibility,
                 tags: e.tags,
+                ...warningOf(e),
             }));
             return {
                 contents: [{
@@ -102,6 +120,7 @@ export function registerKnowledgeTools(
                     text: JSON.stringify({
                         package_id: packageId,
                         manifest: manifest.value,
+                        ...warningOf(manifest),
                         entry_count: entryList.length,
                         entries: entryList,
                     }, null, 2),
@@ -118,7 +137,7 @@ export function registerKnowledgeTools(
         {},
         annotationsFor('aimeat_knowledge_list'),
         async () => {
-            const entries = await listOwnerScopeMemory({ prefix: 'packages/', tags: ['knowledge-package'] });
+            const entries = await listOwnerScopePackages();
             const manifests = entries.filter(e => e.key.endsWith('/manifest'));
             const packages = manifests.map(m => {
                 const pkg = m.value as KnowledgeManifestValue;
@@ -132,6 +151,7 @@ export function registerKnowledgeTools(
                     entry_count: (pkg?.entries ?? []).length,
                     created: pkg?.created ?? m.createdAt,
                     updated: pkg?.updated ?? m.updatedAt,
+                    ...warningOf(m),
                 };
             });
             return {
@@ -153,7 +173,10 @@ export function registerKnowledgeTools(
         annotationsFor('aimeat_knowledge_get'),
         async ({ package_id }) => {
             const manifestKey = `packages/${package_id}/manifest`;
-            const manifest = await storage.getMemory(agentGaii, manifestKey);
+            const r = reader();
+            // A manifest the agent may not see answers the same as one that does not exist.
+            const stored = await storage.getMemory(agentGaii, manifestKey);
+            const manifest = stored ? await presentMemory(r, stored) : null;
             if (!manifest) {
                 return {
                     content: [{ type: 'text' as const, text: `Package not found: ${package_id}` }],
@@ -161,8 +184,9 @@ export function registerKnowledgeTools(
                 };
             }
             // listMemory returns FULL records (SELECT *), so each entry already carries its value —
-            // no getMemory per entry needed (was a redundant re-fetch of data already in hand).
-            const entries = await storage.listMemory(agentGaii, { prefix: `packages/${package_id}/` });
+            // no getMemory per entry needed (was a redundant re-fetch of data already in hand). Each
+            // entry passes the reader on its own label: a package can hold entries of mixed labels.
+            const entries = await presentMemories(r, await storage.listMemory(agentGaii, { prefix: `packages/${package_id}/` }));
             // TARGET-058: how each entry was made, in ONE query for the whole package. A knowledge
             // package is exactly the material an agent later quotes back to a person as if it were
             // established fact, so per-entry origin is the difference between citing a source and
@@ -176,6 +200,7 @@ export function registerKnowledgeTools(
                     value: e.value ?? null,
                     tags: e.tags,
                     ...provFor(e.aiProvenanceId),
+                    ...warningOf(e),
                 }));
             return {
                 content: [{
@@ -183,6 +208,7 @@ export function registerKnowledgeTools(
                     text: JSON.stringify({
                         package_id,
                         manifest: manifest.value,
+                        ...warningOf(manifest),
                         entries: entryDetails,
                     }, null, 2),
                 }],

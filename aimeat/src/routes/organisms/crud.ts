@@ -6,6 +6,8 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   v1.10.0 -- 2026-09-29 -- TARGET-082 V4: GET /v1/organisms/:id reads the README through
+ *     showOrganismReadme with the caller's ContentReader.
  *   2026-09-28 — PUT takes agent_access (which members' agents the organism admits).
  *   v1.9.1 -- 2026-09-26 -- The member filter's account comes from localAccountName (utils/gaii.ts),
  *     which keeps an identity of another node whole, so it never names the local namesake
@@ -43,7 +45,8 @@ import { requireAuth, requireRole, requireScope, optionalAuth } from '../../auth
 import { emitChange } from '../../services/event-bus.js';
 import { expireOverdueApprovals } from '../../services/gate-expiry.js';
 import { canSeeMembers, redactOrganism, rosterCallerFromAuth } from '../../services/organism-privacy.js';
-import { getOrganismReadme } from '../../services/organism-readme.js';
+import { showOrganismReadme } from '../../services/organism-readme.js';
+import { readerFor } from '../../services/classification/reader.js';
 import { createOrganismRecord, updateOrganismRecord, joinOrganism, leaveOrganism } from '../../services/organism-lifecycle.js';
 import { revokeDepartedMemberAccess } from '../../services/invitations.js';
 import type { OrganismHelpers } from './shared.js';
@@ -245,7 +248,7 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
     }
 
     const members = await storage.listMembers(id, { status: 'active' });
-    const readme = await getOrganismReadme(storage, id);
+    const readme = await showOrganismReadme(storage, readerFor({ storage, config }, req.auth), id);
 
     // Roster privacy (memberVisibility): redact members[]/agentGaiis for callers below the tier.
     // your_membership keeps "am I a member / what's my role" answerable for the SPA even when the

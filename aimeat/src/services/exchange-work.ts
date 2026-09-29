@@ -14,6 +14,8 @@
  *   const w = await putWork(storage, { workId: newWorkId(), offeringId, consumerGaii, ... });
  *   // on delivery the exchange route settles via settleMeteredCoordinate against the consumer.
  * @version-history
+ *   v1.1.1 — 2026-09-29 — Says why the work reads pass no classification reader (TARGET-082 V4): the
+ *     records are the node's own ledger of what two parties exchanged. No behaviour change.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 8b: AgentWork carries `aiProvenanceId`, set at delivery, so
  *     the buyer can find out how the answer they paid for was made.
  *   v1.0.0 — 2026-07-21 — Initial agent-work records (start → deliver → settle on delivery); metered per task.
@@ -56,6 +58,16 @@ export interface AgentWork {
 }
 
 export function newWorkId(): string { return `work-${randomUUID().slice(0, 12)}`; }
+
+// CLASSIFICATION (TARGET-082 V4, decided 2026-09-29). The reads below are the node's own ledger and
+// pass no classification reader. A work record lives in the node's own namespace (`exchange-work`),
+// and its input and output are values the two parties handed each other under a contract, through
+// the start and deliver calls, not copies of a stored record. No label can be set on this namespace
+// (setLabel admits only the owner of a scope, and this scope has none), so show() would decide every
+// record by the node's default label alone: a default that hides content from AI would hide an
+// agent's own work from it, with nobody able to correct it. The parties' own records are checked
+// where they read them, before a value is passed in; the callers fence each record to its two
+// parties (consumerOwner, providerOwner, consumerGaii).
 
 export async function putWork(storage: Storage, w: AgentWork): Promise<AgentWork> {
   const now = new Date().toISOString();

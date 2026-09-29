@@ -12,6 +12,8 @@
  *   - GET /v1/agents/:name/statistics    -- Quality tab: recomputed performance + per-context review rollups
  *   - GET /v1/agents/:name/quality/overview -- Quality subtab composite (statistics + done tasks)
  * @version-history
+ *   v1.4.0 -- 2026-09-29 -- TARGET-082 V4: the custom statistics records of /statistics and /quality/overview
+ *     pass the caller's ContentReader (presentMemories) before their values are returned.
  *   v1.3.0 -- 2026-07-16 -- Add GET /quality/overview composite (recomputed statistics + done tasks) folding
  *     the Quality subtab's two mount reads.
  *   v1.2.0 -- 2026-07-16 -- Add GET /activity/overview composite (activity_stats + event log + directives
@@ -33,6 +35,8 @@ import { recomputeAndCacheStatistics } from '../services/agent-statistics.js';
 import { createAgentActivityOverviewService } from '../services/db/agent-activity-overview-db-service.js';
 import { createAgentQualityOverviewService } from '../services/db/agent-quality-overview-db-service.js';
 import { logger } from '../utils/logger.js';
+import { readerFor } from '../services/classification/reader.js';
+import { presentMemories } from '../services/classification/present-memory.js';
 
 export function agentActivityRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -253,7 +257,7 @@ export function agentActivityRouter(config: AimeatConfig, storage: Storage): Rou
     const customPrefix = `agents.${agent.name}.statistics.custom.`;
     let custom: Array<{ key: string; value: unknown; updated_at: string }> = [];
     try {
-      const records = await storage.listMemory(agentGaii, { prefix: customPrefix });
+      const records = await presentMemories(readerFor({ storage, config }, req.auth), await storage.listMemory(agentGaii, { prefix: customPrefix }));
       custom = records.map(r => ({ key: r.key.slice(customPrefix.length), value: r.value, updated_at: r.updatedAt }));
     } catch (err) { logger.warn('GET /v1/agents/:name/statistics: custom metrics are optional', { error: String(err) }); }
 
@@ -285,7 +289,7 @@ export function agentActivityRouter(config: AimeatConfig, storage: Storage): Rou
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent '${agentName}' not found`));
       return;
     }
-    const data = await qualityOverviewDb.overview(agentGaii, agent.name, config.nodeId);
+    const data = await qualityOverviewDb.overview(readerFor({ storage, config }, req.auth), agentGaii, agent.name, config.nodeId);
     res.json(success(config.nodeId, data));
   });
 

@@ -64,8 +64,9 @@ describe('the check component decides', () => {
     expect(out.left.map(l => l.label)).toEqual(['sisainen']);
     const own = await reader.leave([rec('conf')], t, { kind: 'export', organismId: null });
     expect(own.kept.length).toBe(1);
-    const fed = await reader.leave([rec('plain')], t, { kind: 'federation', peer: 'p' });
-    expect(fed.left.length).toBe(1);
+    // A person's own record may go to another node; the organism's may not.
+    expect((await reader.leave([rec('plain')], t, { kind: 'federation', peer: 'p' })).left.length).toBe(0);
+    expect((await reader.leave([org], t, { kind: 'external', to: 'linkedin' })).left.length).toBe(1);
   });
 
   it("gives a row its row space's label and hides it from someone outside the audience", async () => {

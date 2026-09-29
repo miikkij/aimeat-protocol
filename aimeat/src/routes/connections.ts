@@ -28,6 +28,8 @@
  *   GET    /v1/connections/delegations/:did/quota -- allowance left, BEFORE anything is refused
  * @usage app.use(connectionsRouter(config, storage));
  * @version-history
+ *   v1.7.0 — 2026-09-29 — POST /publish passes the stored file through the classification leave()
+ *     on both paths before an attempt opens; a file that may not leave its organism is 403 CLASSIFIED.
  *   v1.6.0 — 2026-09-28 — POST /read/attachment with `store: true` stores the attachment as a private
  *     file of the owner (up to the node's per-file limit) and answers its key; routes/connections-attachment.ts.
  *   v1.5.0 — 2026-09-26 —An agent refused the read door is told the word it lacks and that its owner
@@ -74,6 +76,8 @@ import { quotaStatus, openPublish } from '../services/connections/publish-gate.j
 import { publishToProvider } from '../services/connections/publish.js';
 import { readMetrics, toStoredSample } from '../services/connections/metrics.js';
 import { runOwnPublish } from '../services/connections/publish-run.js';
+import { readerFor } from '../services/classification/reader.js';
+import { fileTarget } from '../services/classification/labels.js';
 import { safeRedirectPath } from '../utils/same-origin-path.js';
 import type { ConnectionMode, ModerationMode } from '../models/connection-schemas.js';
 
@@ -532,6 +536,7 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
     const connectionId = str(req.body?.connection_id);
     const appId = str(req.body?.app_id);
     const action = str(req.body?.action);
+    const reader = readerFor({ storage, config }, req.auth);
 
     if (!connectionId && !(appId && action)) {
       res.status(400).json(error(
@@ -545,11 +550,11 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
     // scheduler takes. Two copies of "open the gate, refresh, call the recipe, record" is how one of
     // them eventually skips the gate, and skipping the gate publishes the same video twice.
     if (connectionId) {
-      const out = await runOwnPublish(c, { publisher: principal, connectionId, storageKey, caption, params });
+      const out = await runOwnPublish(c, { publisher: principal, connectionId, storageKey, caption, params, reader });
       if (!out.ok) {
         // A failure AFTER an attempt was opened is a 502 (the provider's answer); one before it is
         // the caller's own input.
-        const status = out.notFound ? 404 : out.attemptId ? 502 : 400;
+        const status = out.classified ? 403 : out.notFound ? 404 : out.attemptId ? 502 : 400;
         res.status(status).json(error(config.nodeId, out.code, out.reason));
         return;
       }
@@ -568,7 +573,13 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
         res.status(404).json(error(config.nodeId, 'NO_SUCH_FILE', `You have no file saved under "${storageKey}". Check the name, or upload it first.`));
         return;
       }
-      file = { bytes: stored.data, mimeType: stored.mimeType, name: storageKey.split('/').pop() ?? storageKey };
+      // Leaving for an outside service, checked before the gate writes an attempt (TARGET-082).
+      const { left } = await reader.leave([storageKey], k => fileTarget(principal, k), { kind: 'external', to: `app:${appId}/${action}` });
+      if (left.length) {
+        res.status(403).json(error(config.nodeId, 'CLASSIFIED', `"${storageKey}" is ${left[0]!.reason}, so it is not published.`));
+        return;
+      }
+      file ={ bytes: stored.data, mimeType: stored.mimeType, name: storageKey.split('/').pop() ?? storageKey };
     }
 
     const gate = await openPublish(

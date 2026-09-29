@@ -16,16 +16,24 @@
  * @structure
  *   - ChatThread / ChatTurn — the record
  *   - createThread() · appendTurn() · readThread() · listThreads() · archiveOverflow()
+ *   - showThread() · showThreads() — the same reads for a caller, through the classification check
  * @usage
  *   const thread = await createThread(storage, config, gaii, 'Pong');
  *   await appendTurn(storage, config, gaii, thread.id, { role: 'user', text: 'build me pong' });
+ *   const shown = await showThreads(storage, readerFor({ storage, config }, req.auth));
  * @version-history
+ *   v1.1.0 — 2026-09-29 — TARGET-082 V4: showThread and showThreads, which pass the conversation
+ *     records through the caller's ContentReader (presentMemories) before a turn or a title is
+ *     returned. readThread and listThreads stay for the node's own read-to-update (appendTurn,
+ *     setGooseSession, archiveOverflow, the chat session) and for existence checks.
  *   v1.0.0 — 2026-08-16 — Initial.
  */
 import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import type { ContentReader } from './classification/reader.js';
+import { presentMemories, presentMemory } from './classification/present-memory.js';
 
 /** One thing said, by either side, with whatever the agent did while saying it. */
 export interface ChatTurn {
@@ -102,20 +110,42 @@ export async function createThread(
     return thread;
 }
 
+/**
+ * One conversation as stored, for the node's own read-to-update and for an existence check. What is
+ * returned to a caller goes through showThread.
+ */
 export async function readThread(
     storage: Storage, gaii: string, id: string,
 ): Promise<ChatThread | null> {
-    const rec = await storage.getMemory(gaii, liveKey(id));
+    const rec = await threadRecord(storage, gaii, id);
     return (rec?.value as ChatThread | undefined) ?? null;
 }
 
-/** Every live conversation, newest first. */
+/** The stored record of one live conversation; the one read readThread and showThread share. */
+const threadRecord = (storage: Storage, gaii: string, id: string) => storage.getMemory(gaii, liveKey(id));
+/** The stored records of every live conversation; the one read listThreads and showThreads share. */
+const threadRecords = (storage: Storage, gaii: string) => storage.listMemory(gaii, { prefix: LIVE_PREFIX });
+
+const threadsOf = (records: ReadonlyArray<{ value: unknown }>): ChatThread[] => records
+    .map((r) => r.value as ChatThread)
+    .filter((t): t is ChatThread => !!t && typeof t.id === 'string')
+    .sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''));
+
+/** Every live conversation, newest first, as stored: for the node's own archive roll-over. */
 export async function listThreads(storage: Storage, gaii: string): Promise<ChatThread[]> {
-    const records = await storage.listMemory(gaii, { prefix: LIVE_PREFIX });
-    return records
-        .map((r) => r.value as ChatThread)
-        .filter((t): t is ChatThread => !!t && typeof t.id === 'string')
-        .sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''));
+    return threadsOf(await threadRecords(storage, gaii));
+}
+
+/** One conversation of the reader's own, or null when it is absent or the reader may not see it. */
+export async function showThread(storage: Storage, reader: ContentReader, id: string): Promise<ChatThread | null> {
+    const rec = await threadRecord(storage, reader.identity, id);
+    const shown = rec ? await presentMemory(reader, rec) : null;
+    return (shown?.value as ChatThread | undefined) ?? null;
+}
+
+/** The reader's live conversations it may see, newest first. */
+export async function showThreads(storage: Storage, reader: ContentReader): Promise<ChatThread[]> {
+    return threadsOf(await presentMemories(reader, await threadRecords(storage, reader.identity)));
 }
 
 /** Attach (or forget) the goose session a conversation is currently running on. */

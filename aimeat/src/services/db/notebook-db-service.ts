@@ -9,14 +9,19 @@
  *   server-side prefix scan (so a large keyspace no longer loads every value just to find the notes).
  *   Single-master: the Notebook tab mount only.
  *
- * @structure NotebookService.overview(ownerName, ownerGhii) → { inbox, settings, organisms }
- * @usage const nb = await createNotebookService(storage).overview(owner, `${owner}@${nodeId}`);
+ * @structure NotebookService.overview(reader, ownerName, ownerGhii) → { inbox, settings, organisms }
+ * @usage const nb = await createNotebookService(storage).overview(readerFor({ storage, config }, req.auth), owner, `${owner}@${nodeId}`);
  * @version-history
+ *   v1.1.0 — 2026-09-29 — TARGET-082 V4: takes the caller's ContentReader; the inbox records pass
+ *     presentMemories before their values are returned. The settings record is the tab's own
+ *     configuration and is read as it was.
  *   v1.0.0 — 2026-07-16 — Phase 4: fold the Notebook tab's 3 reads into one composite (inbox = prefix scan).
  */
 import type { Storage } from '../../storage/interface.js';
 import { runInReadScope } from '../../storage/read-scope/read-scope.js';
 import { visibilityToZone } from '../../routes/memory/shared.js';
+import type { ContentReader } from '../classification/reader.js';
+import { presentMemories } from '../classification/present-memory.js';
 
 /** Owner-captured notes live under this key prefix (mirrors public/views/profile/notebook-helpers.js). */
 const INBOX_PREFIX = 'notebook.inbox.';
@@ -35,7 +40,7 @@ export class NotebookService {
    * owner's identities (GHII + agents), newest first, in the GET /v1/memory record shape the tab's note
    * cards already consume — but only the `notebook.inbox.` keys are ever loaded.
    */
-  overview(ownerName: string, ownerGhii: string): Promise<NotebookOverview> {
+  overview(reader: ContentReader, ownerName: string, ownerGhii: string): Promise<NotebookOverview> {
     return runInReadScope(async () => {
       const agents = await this.storage.getAgentsByOwner(ownerName);
       const gaiis = [ownerGhii, ...agents.map(a => a.gaii)];
@@ -46,8 +51,7 @@ export class NotebookService {
         this.storage.listOrganisms({ member: ownerName }),
       ]);
 
-      const inbox = inboxRecs
-        .filter(r => r.key.startsWith(INBOX_PREFIX))
+      const inbox = (await presentMemories(reader, inboxRecs.filter(r => r.key.startsWith(INBOX_PREFIX))))
         .map(r => ({
           key: r.key, owner_gaii: r.ownerGaii, value: r.value, visibility: r.visibility,
           zone: visibilityToZone(r.visibility), tags: r.tags, version: r.version,

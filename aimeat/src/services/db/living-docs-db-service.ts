@@ -11,13 +11,17 @@
  *   organism list. Single-master: the Living Docs tab mount only. The individual reads stay for interactive
  *   re-fetch (save/deploy/delete).
  *
- * @structure LivingDocsService.overview(ownerName, ownerGhii) → { templates, instances, organisms }
- * @usage const ov = await createLivingDocsService(storage).overview(ownerName, ownerGhii);
+ * @structure LivingDocsService.overview(reader, ownerName) → { templates, instances, organisms }
+ * @usage const ov = await createLivingDocsService(storage).overview(readerFor({ storage, config }, req.auth), ownerName);
  * @version-history
+ *   v1.1.0 — 2026-09-29 — TARGET-082 V4: takes the caller's ContentReader instead of the owner GHII; the
+ *     template and instance records pass presentMemories before their values are returned.
  *   v1.0.0 — 2026-07-16 — Phase 4: fold the Living Docs tab's 2 duplicate memory scans + organisms into one.
  */
 import type { Storage } from '../../storage/interface.js';
 import { runInReadScope } from '../../storage/read-scope/read-scope.js';
+import type { ContentReader } from '../classification/reader.js';
+import { presentMemories } from '../classification/present-memory.js';
 
 const TEMPLATE_PREFIX = 'living.template.';
 // A deployed living instance's config key: organism.{org}.w.{ws}.living.{docId}.latest (mirrors the
@@ -38,22 +42,25 @@ export class LivingDocsService {
    * instances (newest first) mirror the client's listInstances partition exactly. Organisms come from the
    * owner's memberships (the deploy-target picker).
    */
-  overview(ownerName: string, ownerGhii: string): Promise<LivingDocsOverview> {
+  overview(reader: ContentReader, ownerName: string): Promise<LivingDocsOverview> {
     return runInReadScope(async () => {
-      const [records, organisms] = await Promise.all([
-        this.storage.listMemory(ownerGhii),
+      const [all, organisms] = await Promise.all([
+        this.storage.listMemory(reader.identity),
         this.storage.listOrganisms({ member: ownerName }),
       ]);
+      // Only the records this answer returns pass the check, so the rest of the keyspace is not
+      // looked up (or audited) for nothing.
+      const records = await presentMemories(reader, all.filter(r => typeof r.key === 'string'
+        && (r.key.startsWith(TEMPLATE_PREFIX) || CONFIG_KEY_RE.test(r.key))));
 
       const templates = records
-        .filter(r => typeof r.key === 'string' && r.key.startsWith(TEMPLATE_PREFIX))
+        .filter(r => r.key.startsWith(TEMPLATE_PREFIX))
         .map(r => r.value)
         .filter(v => v && typeof v === 'object')
         .sort((a, b) => String((a as { title?: unknown }).title || '').localeCompare(String((b as { title?: unknown }).title || '')));
 
       const instances: LivingDocsOverview['instances'] = [];
       for (const r of records) {
-        if (typeof r.key !== 'string') continue;
         const m = CONFIG_KEY_RE.exec(r.key);
         if (m && r.value && (r.value as { type?: unknown }).type === 'living-config') {
           instances.push({ loc: { orgId: m[1], wsId: m[2], docId: m[3] }, config: r.value, updatedAt: r.updatedAt || r.createdAt });

@@ -19,6 +19,9 @@
  *   import { skillsRouter } from '../routes/skills.js';
  *   app.use(skillsRouter(config, storage));
  * @version-history
+ *   v1.3.0 -- 2026-09-29 -- TARGET-082 V4: the skill accessor carries the caller's ContentReader, so
+ *     the registry filters user and workspace skills through it; GET /v1/agents/:name/skills passes
+ *     one too.
  *   v1.2.1 -- 2026-09-26 -- The app owner in the app-bound skills read comes from localAccountName
  *     (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local
  *     namesake (secaudit 2026-09, F-1).
@@ -39,6 +42,7 @@ import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
 import { SkillValidationError } from '../services/skill-md.js';
+import { readerFor } from '../services/classification/reader.js';
 import {
   publishSkill, deleteSkill, listSkills, listSkillLibrary, resolveSkillRef,
   getAgentSkillLinks, linkSkillToAgent, unlinkSkillFromAgent, resolveAgentSkills,
@@ -52,12 +56,13 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
    *  the workspace membership gate (canReadWorkspace). */
   function accessorOf(req: Express.Request): SkillAccessor {
     const auth = req.auth as (typeof req.auth & { anonymous?: boolean }) | undefined;
-    if (!auth || auth.anonymous === true) return { ownerName: null };
+    if (!auth || auth.anonymous === true) return { ownerName: null, reader: readerFor({ storage, config }, null) };
     return {
       ownerName: (auth.owner as string) ?? null,
       isOperator: (auth.roles as string[]).includes('operator'),
       sub: auth.sub as string,
       gaii: resolveIdentity(req.auth!, config.nodeId),
+      reader: readerFor({ storage, config }, req.auth),
     };
   }
 
@@ -360,7 +365,8 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
         }
       }
       const manifestOnly = req.query.manifest_only === 'true';
-      const { skills, unresolved } = await resolveAgentSkills(storage, config, owner, agentName, { manifestOnly });
+      const { skills, unresolved } = await resolveAgentSkills(storage, config, owner, agentName,
+        { manifestOnly, accessor: { ownerName: owner, reader: readerFor({ storage, config }, req.auth) } });
       res.json(success(config.nodeId, { agent: agentName, skills, unresolved }));
     } catch (err) {
       sendSkillError(res, err);

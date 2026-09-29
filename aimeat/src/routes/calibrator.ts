@@ -27,6 +27,11 @@
  *   v2.2.0 — 2026-09-04 — The list carries `modelCount` (candidate models with a model id); the list
  *     page had printed "0 models" for a project with three. `latestAvgScore` is the newest batch
  *     that has a score, so an empty batch created after a finished one no longer hides the result.
+ *   v2.3.0 — 2026-09-29 — TARGET-082 V4: every GET passes the records it returns through the caller's
+ *     ContentReader (presentMemories): the project list, a project and its dimensions, the versions,
+ *     one version, the batches and one batch. A project, version or batch the reader may not see answers
+ *     404 like an absent one. The detail composite takes the reader. Reads that only update, check
+ *     existence or delete are unchanged.
  */
 
 import { Router } from 'express';
@@ -38,6 +43,8 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { createCalibratorDetailService } from '../services/db/calibrator-detail-db-service.js';
+import { readerFor } from '../services/classification/reader.js';
+import { presentMemories, presentMemory } from '../services/classification/present-memory.js';
 
 const DEFAULT_ANALYSIS_TEMPLATE = `You are evaluating whether a candidate AI model's output is STRUCTURALLY CORRECT compared to a reference output.
 
@@ -231,6 +238,7 @@ interface CalibratorCandidateModel {
 export function calibratorRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
   const resolve = (req: Request) => resolveIdentity(req.auth!, config.nodeId);
+  const readerOf = (req: Request) => readerFor({ storage, config }, req.auth);
   const detailDb = createCalibratorDetailService(storage);
 
   /** Helper: write a calibrator memory key with required MemoryRecord fields */
@@ -267,7 +275,8 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
     requireAuth(), requireRole('owner'),
     async (req: Request, res: Response) => {
       const gaii = resolve(req);
-      const allMemory = await storage.listMemory(gaii, { prefix: 'calibrator.', tags: ['project'] });
+      const reader = readerOf(req);
+      const allMemory = await presentMemories(reader, await storage.listMemory(gaii, { prefix: 'calibrator.', tags: ['project'] }));
       const projectRecords = allMemory
         .filter(m => m.key.endsWith('.project'))
         .sort((a, b) => new Date((b.value as Record<string, unknown>).createdAt as string).getTime() - new Date((a.value as Record<string, unknown>).createdAt as string).getTime());
@@ -278,7 +287,7 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
         const projectId = project.projectId as string;
 
         // Count batches and compute latestAvgScore
-        const batchMemory = await storage.listMemory(gaii, { prefix: `calibrator.${projectId}.batch.` });
+        const batchMemory = await presentMemories(reader, await storage.listMemory(gaii, { prefix: `calibrator.${projectId}.batch.` }));
         const batchCount = batchMemory.length;
         let latestAvgScore: number | null = null;
 
@@ -344,7 +353,9 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
     async (req: Request, res: Response) => {
       const gaii = resolve(req);
       const id = req.params.id as string;
-      const record = await storage.getMemory(gaii, `calibrator.${id}.project`);
+      const reader = readerOf(req);
+      const stored = await storage.getMemory(gaii, `calibrator.${id}.project`);
+      const record = stored ? await presentMemory(reader, stored) : null;
       if (!record) {
         return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Calibration project not found.'));
       }
@@ -362,7 +373,8 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
       if (needsSave) {
         await setCalMemory(gaii, `calibrator.${id}.project`, project, ['calibrator', 'project']);
       }
-      const dimRecord = await storage.getMemory(gaii, `calibrator.${id}.dimensions`);
+      const dimStored = await storage.getMemory(gaii, `calibrator.${id}.dimensions`);
+      const dimRecord = dimStored ? await presentMemory(reader, dimStored) : null;
       res.json(success(config.nodeId, {
         project,
         dimensions: dimRecord?.value ?? [],
@@ -382,7 +394,7 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
     async (req: Request, res: Response) => {
       const gaii = resolve(req);
       const id = req.params.id as string;
-      const data = await detailDb.overview(gaii, id);
+      const data = await detailDb.overview(readerOf(req), id);
       if (!data) {
         return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Calibration project not found.'));
       }
@@ -484,7 +496,7 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
     async (req: Request, res: Response) => {
       const gaii = resolve(req);
       const id = req.params.id as string;
-      const allMemory = await storage.listMemory(gaii, { prefix: `calibrator.${id}.version.` });
+      const allMemory = await presentMemories(readerOf(req), await storage.listMemory(gaii, { prefix: `calibrator.${id}.version.` }));
       const versions = allMemory
         .map(m => {
           const v = m.value as Record<string, unknown>;
@@ -502,7 +514,8 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
       const gaii = resolve(req);
       const id = req.params.id as string;
       const v = req.params.v as string;
-      const record = await storage.getMemory(gaii, `calibrator.${id}.version.${v}`);
+      const stored = await storage.getMemory(gaii, `calibrator.${id}.version.${v}`);
+      const record = stored ? await presentMemory(readerOf(req), stored) : null;
       if (!record) {
         return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Version not found.'));
       }
@@ -566,7 +579,7 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
     async (req: Request, res: Response) => {
       const gaii = resolve(req);
       const id = req.params.id as string;
-      const allMemory = await storage.listMemory(gaii, { prefix: `calibrator.${id}.batch.` });
+      const allMemory = await presentMemories(readerOf(req), await storage.listMemory(gaii, { prefix: `calibrator.${id}.batch.` }));
 
       let batches = allMemory
         .map(m => {
@@ -604,7 +617,8 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
       const gaii = resolve(req);
       const id = req.params.id as string;
       const batchId = req.params.batchId as string;
-      const record = await storage.getMemory(gaii, `calibrator.${id}.batch.${batchId}`);
+      const stored = await storage.getMemory(gaii, `calibrator.${id}.batch.${batchId}`);
+      const record = stored ? await presentMemory(readerOf(req), stored) : null;
       if (!record) {
         return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Batch not found.'));
       }

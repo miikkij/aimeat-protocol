@@ -10,6 +10,8 @@
  * @structure appdevPitfallsRouter(config, storage) → Router
  * @usage app.use(appdevPitfallsRouter(config, storage)) from the routes loader.
  * @version-history
+ *   v1.4.0 — 2026-09-29 — TARGET-082 V4: GET /learned hands queryLearnedPitfalls() the caller's
+ *     classification reader (readerFor), so an entry the caller may not see is left out.
  *   v1.3.0 — 2026-09-13 — POST /learned reports (upserts) an entry through reportLearnedPitfall(),
  *     the node MCP tool's own function, so the connector doors stop writing raw memory. PATCH
  *     /learned/:category/:slug takes `verified: true`, stamping the entry with now and this node's
@@ -36,6 +38,7 @@ import {
   queryLearnedPitfalls, setPitfallFlags, deletePitfallEntry, reportLearnedPitfall,
 } from '../services/appdev-kb.js';
 import { getSoftwareVersion } from '../utils/version.js';
+import { readerFor } from '../services/classification/reader.js';
 
 const MAX_LIMIT = 100;
 const DEFAULT_LIMIT = 25;
@@ -51,13 +54,13 @@ export function appdevPitfallsRouter(config: AimeatConfig, storage: Storage): Ro
   // entries (full bodies, any visibility) + optionally other owners' public-shared entries, with
   // the facet counts around it. The step is the one the MCP list tool uses (appdev-kb.ts).
   router.get('/v1/appdev/pitfalls/learned', requireAuth(), requireScope('memory:read'), async (req, res) => {
-    const identity = resolveIdentity(req.auth!, config.nodeId);
+    const reader = readerFor({ storage, config }, req.auth);
     const str = (v: unknown, max = 200) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined);
     const bool = (v: unknown) => (v === '1' || v === 'true' ? true : v === '0' || v === 'false' ? false : undefined);
     const num = (v: unknown) => { const n = Number.parseInt(String(v ?? ''), 10); return Number.isFinite(n) ? n : undefined; };
     const status = str(req.query.status);
     const sort = str(req.query.sort);
-    const page = await queryLearnedPitfalls(storage, config, identity, {
+    const page = await queryLearnedPitfalls(storage, config, reader, {
       includeShared: bool(req.query.include_shared) === true,
       // This door defaults to every status: it served the whole scope before it could page, and
       // the page asks for status=active itself when it wants outdated hidden.

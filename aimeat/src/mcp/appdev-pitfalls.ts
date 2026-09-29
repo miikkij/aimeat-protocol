@@ -12,6 +12,10 @@
  * @structure registerAppdevPitfallTools() — aimeat_appdev_pitfall_report / _list / _delete
  * @usage registerAppdevPitfallTools(mcp, storage, config, () => agentGaii, emitResourceUpdated);
  * @version-history
+ *   v1.4.0 -- 2026-09-29 -- TARGET-082 V4: the list reads own and shared learned entries through
+ *     services/appdev-kb.ts ownPitfallRecords() and sharedPitfallRecords() with the session's
+ *     classification reader, so an entry this agent may not see is left out and a warning-labelled
+ *     one carries `classificationWarning`. The tool's own copy of the shared-entry query is gone.
  *   v1.3.1 -- 2026-09-13 -- A shared entry in the list carries its `owner`, and the hint names the
  *     doors that can open one entry instead of aimeat_knowledge_get, which could not. Every report
  *     stamps `verified_at` / `verified_version`, and every row of the list shows them (curated too).
@@ -37,12 +41,14 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { getAppdevPitfalls } from '../data/appdev-pitfalls.js';
 import {
-    PITFALL_PACKAGE_ID, PITFALL_PREFIX, PITFALL_MANIFEST_KEY,
-    listOwnerScopeMemory as kbListOwnerScope, ownIdentitySet as kbOwnIdentitySet,
+    PITFALL_PACKAGE_ID,
+    ownPitfallRecords, sharedPitfallRecords,
     pitfallEntryKey, deletePitfallEntry, filterPitfalls, reportLearnedPitfall,
     type LearnedPitfallValue, type PitfallLike,
 } from '../services/appdev-kb.js';
 import { getSoftwareVersion } from '../utils/version.js';
+import { readerForAgent } from '../services/classification/reader.js';
+import { classificationWarningOf } from '../services/classification/present-memory.js';
 
 export { PITFALL_PACKAGE_ID };
 
@@ -52,6 +58,7 @@ type PitfallEntryValue = LearnedPitfallValue;
 
 function asIndexEntry(source: 'learned' | 'learned-shared', rec: MemoryRecord): Record<string, unknown> {
     const v = rec.value as Partial<PitfallEntryValue> | null;
+    const warning = classificationWarningOf(rec);
     return {
         source,
         key: rec.key,
@@ -68,6 +75,7 @@ function asIndexEntry(source: 'learned' | 'learned-shared', rec: MemoryRecord): 
         shared: rec.visibility === 'public',
         // Another owner's entry is read by naming its holder (aimeat_memory_read_public {gaii, key}).
         ...(source === 'learned-shared' ? { owner: rec.ownerGaii } : {}),
+        ...(warning ? { classificationWarning: warning } : {}),
     };
 }
 
@@ -81,10 +89,6 @@ export function registerAppdevPitfallTools(
     sessionScopes: string[] = [],
 ): void {
     const agentGaii = getAgentGaii();
-
-    const listOwnerScopeMemory = (opts: { prefix?: string; tags?: string[] }) =>
-        kbListOwnerScope(storage, config, agentGaii, opts);
-    const ownIdentitySet = () => kbOwnIdentitySet(storage, config, agentGaii);
 
     // ── aimeat_appdev_pitfall_report — upsert one learned pitfall ──
     mcp.tool(
@@ -152,11 +156,12 @@ export function registerAppdevPitfallTools(
             const wantStatus = status ?? 'active';
             const normModel = model?.trim().toLowerCase();
             const entries: Array<Record<string, unknown>> = [];
+            // Learned entries are user-written memory records, so what this agent is shown is the
+            // classification reader's decision (services/classification/reader.ts, TARGET-082).
+            const reader = readerForAgent({ storage, config }, agentGaii, sessionScopes);
 
             if (effScope === 'own' || effScope === 'all') {
-                const own = await listOwnerScopeMemory({ prefix: PITFALL_PREFIX, tags: ['pitfall'] });
-                for (const rec of own) {
-                    if (rec.key === PITFALL_MANIFEST_KEY) continue;
+                for (const rec of await ownPitfallRecords(storage, config, reader)) {
                     entries.push(asIndexEntry('learned', rec));
                 }
             }
@@ -171,13 +176,8 @@ export function registerAppdevPitfallTools(
                         detail_url: `/v1/appdev/pitfalls/${p.id}`,
                     });
                 }
-                // Other owners' public-shared learned entries.
-                const ownIds = await ownIdentitySet();
-                const { items } = await storage.listAllMemory({ prefix: PITFALL_PREFIX, visibility: 'public', limit: 500 });
-                for (const rec of items) {
-                    if (rec.key === PITFALL_MANIFEST_KEY) continue;
-                    if (ownIds.has(rec.ownerGaii)) continue; // own entries come from the own branch
-                    if (!(rec.tags ?? []).includes('pitfall')) continue;
+                // Other owners' public-shared learned entries (own entries come from the own branch).
+                for (const rec of await sharedPitfallRecords(storage, config, reader)) {
                     entries.push(asIndexEntry('learned-shared', rec));
                 }
             }

@@ -11,6 +11,8 @@
  * @structure POST /v1/living/author — requireAuth + requireRole('owner'); returns { template, model }
  * @usage app.use(livingRouter(config, storage))
  * @version-history
+ *   v1.2.0 — 2026-09-29 — TARGET-082 V4: GET /v1/living-docs hands the caller's ContentReader to the
+ *     Living Docs composite, which filters the templates and instances through it.
  *   v1.1.0 — 2026-07-16 — Add GET /v1/living-docs composite (templates + instances partitioned from one
  *     owner-memory scan + organisms), folding the tab's two duplicate memory scans (LivingDocsService).
  *   v1.0.0 — 2026-06-21 — Phase 1: AI template author.
@@ -25,6 +27,7 @@ import { NotebookAiError } from '../services/notebook-ai.js';
 import { authorLivingTemplate } from '../services/living-author.js';
 import { scanOwnerDue } from '../services/living-pulse.js';
 import { createLivingDocsService } from '../services/db/living-docs-db-service.js';
+import { readerFor } from '../services/classification/reader.js';
 
 export function livingRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -35,7 +38,7 @@ export function livingRouter(config: AimeatConfig, storage: Storage): Router {
   // owner's organisms (deploy-target picker). Owner-scoped read.
   router.get('/v1/living-docs', requireAuth(), requireRole('owner'), async (req, res) => {
     const owner = req.auth!.owner as string;
-    const data = await livingDocsDb.overview(owner, resolveIdentity(req.auth!, config.nodeId));
+    const data = await livingDocsDb.overview(readerFor({ storage, config }, req.auth), owner);
     res.json(success(config.nodeId, data));
   });
 

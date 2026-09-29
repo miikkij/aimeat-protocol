@@ -36,12 +36,22 @@
  *     `write()` also returns the file's OWNER, which the scheduled road needs: it writes into the
  *     installer's namespace rather than its own, so "the URL of what I just wrote" is no longer
  *     derivable from the caller the sandbox can see.
+ *   v1.3.0 — 2026-09-29 — read() passes the file through the classification show() as the caller
+ *     (readerForCaller, TARGET-082 V4): a file the caller may not see is refused with CLASSIFIED, and
+ *     a warning label is returned as `classificationWarning`. `callerRoles` and `callerScopes` say
+ *     who the caller is; without them the caller reads as an unattended run.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { authorizeRead } from './access-guard.js';
 import { parseFileRef } from './file-refs.js';
 import { checkStorageQuota } from './quota.js';
+import { localAccountName } from '../utils/gaii.js';
+import { readerForCaller } from './classification/reader.js';
+import { ClassificationError, fileTarget } from './classification/labels.js';
+
+/** The warning a classified file carries when an AI caller is shown it (reader.show). */
+export interface ExtensionFileWarning { label: string; name: string; says: string }
 
 /** What may cross the sandbox bridge in one call, in decoded bytes. */
 export const MAX_EXT_FILE_BYTES = 8 * 1024 * 1024;
@@ -64,6 +74,12 @@ export function makeExtensionFiles(deps: {
     /** Whose storage is read and written, and whose access rights a read is judged against. */
     callerGaii: string;
     callerOwner?: string;
+    /**
+     * The caller's roles and scopes, for the classification reader (TARGET-082). Without roles the
+     * caller is an unattended run (['operator']), which reads as an AI: the stricter reading.
+     */
+    callerRoles?: string[];
+    callerScopes?: string[];
     extName: string;
     /**
      * The key root every write is forced under. Defaults to `ext/{extName}/`, which is the fence
@@ -72,12 +88,18 @@ export function makeExtensionFiles(deps: {
      */
     keyPrefix?: string;
 }): {
-    read(ref: string): Promise<{ base64: string; mime: string; size: number; key: string } | null>;
+    read(ref: string): Promise<{ base64: string; mime: string; size: number; key: string; classificationWarning?: ExtensionFileWarning } | null>;
     write(key: string, base64: string, opts?: { mime?: string; visibility?: string }):
         Promise<{ key: string; gaii: string; owner: string; url: string; size: number }>;
 } {
     const { config, storage, callerGaii, callerOwner, extName } = deps;
     const keyPrefix = deps.keyPrefix ?? `ext/${extName}/`;
+    const reader = readerForCaller({ storage, config }, {
+        gaii: callerGaii,
+        owner: callerOwner ?? localAccountName(callerGaii),
+        roles: deps.callerRoles ?? ['operator'],
+        scopes: deps.callerScopes ?? [],
+    });
 
     return {
         async read(ref) {
@@ -102,6 +124,13 @@ export function makeExtensionFiles(deps: {
             if (!decision.allowed) {
                 throw new Error(`Access denied for ${gaii}/${key}: ${decision.reason ?? 'not permitted'}`);
             }
+            // And the classification check, as the same caller (TARGET-082): a file this caller may
+            // not see is refused by name, and a warning label rides along on the answer.
+            const [shown] = await reader.show([file], () => fileTarget(gaii, key));
+            if (!shown) {
+                throw new ClassificationError('CLASSIFIED', 403, `${gaii}/${key} is classified, and whoever invoked this action may not read it.`);
+            }
+            const warning = (shown as { classificationWarning?: ExtensionFileWarning }).classificationWarning;
             if (file.size > MAX_EXT_FILE_BYTES) {
                 throw new Error(`File ${key} is ${Math.round(file.size / 1024)} kB, over the ${MAX_EXT_FILE_BYTES / 1024 / 1024} MB sandbox limit`);
             }
@@ -110,6 +139,7 @@ export function makeExtensionFiles(deps: {
                 mime: file.mimeType,
                 size: file.size,
                 key: `${gaii}/${key}`,
+                ...(warning ? { classificationWarning: warning } : {}),
             };
         },
 

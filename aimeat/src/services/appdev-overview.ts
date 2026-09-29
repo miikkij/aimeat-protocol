@@ -9,11 +9,15 @@
  *   learned pitfalls (model-faceted), and the owner's agent-proposed template proposals.
  *   Progressive disclosure by design: indexes only, hard caps per list, drill-down via the
  *   existing endpoints/tools each section names. Scope: app development on the platform only.
- * @structure buildAppdevOverview(storage, config, callerGaii, opts) → AppdevOverview
+ * @structure buildAppdevOverview(storage, config, reader, opts) → AppdevOverview
  * @usage
  *   import { buildAppdevOverview } from '../services/appdev-overview.js';
- *   const overview = await buildAppdevOverview(storage, config, identity, { model, sections });
+ *   const overview = await buildAppdevOverview(storage, config, readerFor({ storage, config }, req.auth), { model, sections });
  * @version-history
+ *   v1.4.0 — 2026-09-29 — TARGET-082 V4: takes the caller's classification reader instead of an
+ *     identity. The learned pitfalls and the template proposals are read through it (appdev-kb.ts
+ *     listLearnedPitfalls, listOwnerScopeShown), so a record the caller may not see is left out and
+ *     a learned entry shown under a warning label carries `classificationWarning`.
  *   v1.3.1 — 2026-09-26 — ownerOf() names the caller's account with localAccountOf, so a visitor from
  *     another node has no owner here instead of the local namesake's (secaudit 2026-09, A3-1).
  *   v1.3.0 — 2026-09-13 — The learned-pitfall section lists every active entry the caller can read,
@@ -41,7 +45,8 @@ import { isGEAI, localAccountOf } from '../utils/gaii.js';
 import { getLibraryPacks } from '../data/library-packs.js';
 import { getAppTemplateIndex } from '../data/app-templates.js';
 import { getAppdevPitfallIndex, getAppdevPitfallFacets } from '../data/appdev-pitfalls.js';
-import { filterPitfalls, listLearnedPitfalls, listOwnerScopeMemory } from './appdev-kb.js';
+import { filterPitfalls, listLearnedPitfalls, listOwnerScopeShown } from './appdev-kb.js';
+import type { ContentReader } from './classification/reader.js';
 import { listSkills, type SkillAccessor } from './skills.js';
 import { dependencyIndex, appRef as depAppRef } from './dependency-map.js';
 import { decideAvailableFor } from './decide/settings.js';
@@ -81,9 +86,11 @@ function ownerOf(callerGaii: string, config: AimeatConfig): { owner: string | nu
 export async function buildAppdevOverview(
     storage: Storage,
     config: AimeatConfig,
-    callerGaii: string,
+    /** The caller's classification reader: its identity is the caller, and it decides what is shown. */
+    reader: ContentReader,
     opts: AppdevOverviewOpts = {},
 ): Promise<Record<string, unknown>> {
+    const callerGaii = reader.identity;
     const model = opts.model?.trim().toLowerCase();
     const wanted = new Set<string>(
         (opts.sections ?? []).length > 0
@@ -223,7 +230,7 @@ export async function buildAppdevOverview(
     // no other owner saw any of the 118 shared ones. An entry is about the platform far more often
     // than about the model that happened to meet it.
     if (wanted.has('pitfalls_learned')) {
-        const entries = await listLearnedPitfalls(storage, config, callerGaii, { includeShared: true });
+        const entries = await listLearnedPitfalls(storage, config, reader, { includeShared: true });
         const page = filterPitfalls(entries, { status: 'active', sort: 'severity', preferModel: model, limit: CAP });
         out.pitfalls_learned = {
             items: page.pitfalls.map(e => ({
@@ -233,6 +240,7 @@ export async function buildAppdevOverview(
                 // A shared entry lives under another identity, and its body is read by naming it.
                 ...(e.source === 'shared' ? { owner: e.owner } : {}),
                 ...(model ? { same_model: e.model === model } : {}),
+                ...(e.classificationWarning ? { classificationWarning: e.classificationWarning } : {}),
             })),
             total: page.total,
             truncated: page.total > CAP,
@@ -246,7 +254,7 @@ export async function buildAppdevOverview(
 
     // ── Agent-proposed template proposals (owner scope) ──
     if (wanted.has('template_proposals')) {
-        const records = (await listOwnerScopeMemory(storage, config, callerGaii, {
+        const records = (await listOwnerScopeShown(storage, config, reader, {
             prefix: 'template.catalog.', tags: ['template'],
         })).filter(r => /\.manifest$/.test(r.key));
         const entries = records.map(r => {

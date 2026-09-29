@@ -41,12 +41,17 @@
  *     tunnel): drain the advisory outbox on automation-task completion, deliver or gate, and (for the
  *     gated path) park the payload on a pending key until the owner approves/rejects.
  *   v1.0.1 — 2026-09-26 — The owner's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
+ *   v1.1.0 — 2026-09-29 — Immediate delivery passes the outbox through the classification leave()
+ *     (external, to the app); a classified advisory stays in the outbox and is logged with the
+ *     reason (TARGET-082 V4).
  */
 import type { Storage, AgentTaskRecord, MemoryRecord, EcoAutomationRecipe } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { buildGEAI, localAccountName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
+import { systemReader } from './classification/reader.js';
+import { memoryTarget } from './classification/labels.js';
 
 /** The discriminator stored on an `advisory-delivery` pending record (so the approve route knows it). */
 export const PENDING_TYPE = 'advisory-delivery' as const;
@@ -178,6 +183,18 @@ export async function processAutomationAdvisories(
       return;
     }
     if (!outbox.length) return;
+
+    // Delivered now, the payloads go to an outside app, so they pass leave() first (TARGET-082). What
+    // stays behind keeps its outbox key and is logged with the reason; the gated path is the owner's
+    // decision and is not narrowed here.
+    if (!requireApproval) {
+      const { kept, left } = await systemReader({ storage, config }, ownerGhii)
+        .leave(outbox, r => memoryTarget(r.ownerGaii, r.key), { kind: 'external', to: buildGEAI(app, ownerName, config.nodeId) });
+      for (const l of left) {
+        logger.warn('advisory not delivered: classified (left in outbox)', { owner: ownerName, app, key: l.item.key, label: l.label, reason: l.reason });
+      }
+      outbox = kept;
+    }
 
     for (const rec of outbox) {
       const advisory = rec.value;

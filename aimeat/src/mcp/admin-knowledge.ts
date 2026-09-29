@@ -25,6 +25,9 @@
  * @structure registerAdminKnowledgeTools(mcp, storage, config, getAgentGaii, scopes) — one read.
  * @usage registerAdminKnowledgeTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   v1.2.0 — 2026-09-29 — TARGET-082 V4: the overview is built with the session's classification
+ *     reader (readerForAgent). The data space stays the operator's GHII; what is shown is decided for
+ *     the agent that asked, so a manifest hidden from AI is not listed here.
  *   v1.1.0 — 2026-09-24 — SECURITY (audit A8-1): the operator test asks the operator:admin word as
  *     well as the account (services/owner-lifecycle.ts resolveOperatorAgentName).
  *   v1.0.0 — 2026-09-12 — Initial, with the Knowledge page's rebuild.
@@ -37,6 +40,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
 import { buildKnowledgeOverview, DEFAULT_PER_PAGE, MAX_PER_PAGE } from '../services/knowledge-overview.js';
+import { readerForAgent } from '../services/classification/reader.js';
 
 const text = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
 const refuse = (message: string) => ({ content: [{ type: 'text' as const, text: message }], isError: true });
@@ -65,7 +69,7 @@ export function registerAdminKnowledgeTools(
       const operator = await resolveOperatorAgentName(storage, agentGaii, scopes);
       if (!operator) return refuse(OPERATOR_AGENT_REFUSAL);
 
-      return text(await buildKnowledgeOverview(config, storage, `${operator}@${config.nodeId}`, {
+      return text(await buildKnowledgeOverview(config, storage, `${operator}@${config.nodeId}`, readerForAgent({ storage, config }, agentGaii, scopes), {
         ...(page !== undefined ? { page } : {}),
         ...(limit !== undefined ? { perPage: limit } : {}),
         ...(q !== undefined ? { q } : {}),

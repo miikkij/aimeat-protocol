@@ -7,6 +7,8 @@
  *   consent/trust/notify/email) and runs the action script. Extracted from src/routes/extensions.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.12.0 — 2026-09-29 — Both handlers give ctx.files the caller's roles and scopes, so a file read
+ *     passes the classification check as this caller (TARGET-082 V4).
  *   v1.11.1 — 2026-09-28 — A sandbox timeout answers EXTENSION_TIMEOUT again: QuickJS reports it as
  *     `interrupted`, which the old match missed, so it came back as EXTENSION_ERROR (found in V6 of
  *     the System 2 plan).
@@ -209,7 +211,7 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
         instance: { id: instanceId, config: decryptSecretFields(instance.config, getInstanceSecretKeys(ext), getEncryptionKey(config)) },
         logPrefix: `[ext:${ext.name}:${instanceId}]`,
         wallet: buildExtensionWallet({ config, storage, callerGaii, extName: ext.name, trackingScope: instanceId }),
-        files: makeExtensionFiles({ config, storage, callerGaii, callerOwner: req.auth!.owner as string, extName: ext.name }),
+        files: makeExtensionFiles({ config, storage, callerGaii, callerOwner: req.auth!.owner as string, callerRoles: req.auth!.roles, callerScopes: req.auth!.scopes ?? [], extName: ext.name }),
         // Data packages land in the OWNER's namespace whichever principal called: the same package
         // produced from the app, by an agent, on a clock or by a workflow step has to sit at ONE
         // permanent address. `producedBy` still records the exact principal, because who owns it and
@@ -391,7 +393,7 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
         extConfig: decryptSecretFields(ext.config, getExtSecretKeys(ext), getEncryptionKey(config)),
         logPrefix: `[ext:${ext.name}]`,
         wallet: buildExtensionWallet({ config, storage, callerGaii, extName: ext.name }),
-        files: makeExtensionFiles({ config, storage, callerGaii, callerOwner: req.auth!.owner as string, extName: ext.name }),
+        files: makeExtensionFiles({ config, storage, callerGaii, callerOwner: req.auth!.owner as string, callerRoles: req.auth!.roles, callerScopes: req.auth!.scopes ?? [], extName: ext.name }),
         // Data packages land in the OWNER's namespace whichever principal called: the same package
         // produced from the app, by an agent, on a clock or by a workflow step has to sit at ONE
         // permanent address. `producedBy` still records the exact principal, because who owns it and

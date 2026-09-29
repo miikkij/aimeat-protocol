@@ -10,6 +10,8 @@
  * @structure registerAppdevResearchTools() — aimeat_appdev_overview
  * @usage registerAppdevResearchTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.0.2 — 2026-09-29 — TARGET-082 V4: the overview is built with the session's classification
+ *     reader (readerForAgent), so a record this agent may not see is left out.
  *   v1.0.1 — 2026-09-13 — The model parameter's description: it orders learned pitfalls, never filters.
  *   v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 5).
  */
@@ -21,6 +23,7 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { buildAppdevOverview, OVERVIEW_SECTIONS } from '../services/appdev-overview.js';
+import { readerForAgent } from '../services/classification/reader.js';
 
 export function registerAppdevResearchTools(
     mcp: McpServer,
@@ -39,7 +42,7 @@ export function registerAppdevResearchTools(
         },
         annotationsFor('aimeat_appdev_overview'),
         async ({ model, sections }) => {
-            const overview = await buildAppdevOverview(storage, config, agentGaii, { model, sections });
+            const overview = await buildAppdevOverview(storage, config, readerForAgent({ storage, config }, agentGaii), { model, sections });
             return { content: [{ type: 'text' as const, text: JSON.stringify(overview, null, 2) }] };
         },
     );

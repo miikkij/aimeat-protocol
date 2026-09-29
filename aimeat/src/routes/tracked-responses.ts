@@ -21,6 +21,8 @@
  * @version-history
  *   v1.0.0 — 2026-06-21 — Initial Tracked Response routes (first Memory Contract instance).
  *   v1.1.0 — 2026-09-29 — The triage passes the caller's classification reader (TARGET-082).
+ *   v1.2.0 — 2026-09-29 — TARGET-082 V4: GET /:id/draft passes the draft record through the caller's
+ *     ContentReader (presentMemory); a draft the reader may not see reads as null.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -38,6 +40,7 @@ import {
 } from '../services/tracked-response.js';
 import { triageMessage, fillRecord } from '../services/tracked-classify.js';
 import { readerFor } from '../services/classification/reader.js';
+import { presentMemory } from '../services/classification/present-memory.js';
 import { NotebookAiError } from '../services/notebook-ai.js';
 
 export function trackedResponsesRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
@@ -185,7 +188,8 @@ export function trackedResponsesRouter(config: AimeatConfig, storage: Storage, p
     const ownerGhii = resolve(req);
     const c = await getTrackedResponse(storage, ownerGhii, req.params.id as string);
     if (!c) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such tracked response')); return; }
-    const draft = c.delivery.draftKey ? await storage.getMemory(ownerGhii, c.delivery.draftKey) : null;
+    const stored = c.delivery.draftKey ? await storage.getMemory(ownerGhii, c.delivery.draftKey) : null;
+    const draft = stored ? await presentMemory(readerFor({ storage, config }, req.auth), stored) : null;
     res.json(success(config.nodeId, { draft: draft?.value ?? null, source: c.source, state: c.state }));
   });
 
