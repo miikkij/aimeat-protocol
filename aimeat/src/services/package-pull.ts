@@ -24,6 +24,9 @@
  *   import { pullPackage } from '../services/package-pull.js';
  *   const out = await pullPackage({ storage, config, peers }, caller, { groupId, nodeId });
  * @version-history
+ *   v1.5.0 — 2026-09-29 — With package federation off, the repository an install set named is still
+ *     reached: the apply's pulls (`installSet`) and later pulls from a repository an applied set names
+ *     (install-set-trust.ts). Everything else stays refused. Approved by Jouni on 2026-09-29.
  *   v1.4.0 — 2026-09-28 — `preview`: fetch and verify, store nothing, and answer with the verified
  *     parts (an install set's plan, install-set-apply.ts).
  *   v1.3.0 — 2026-09-28 — The pull and the upstream check are signed as this node, so a package
@@ -51,6 +54,7 @@ import { gatePeer } from './federation-peer-gate.js';
 import { safeFetch, stripTrailingSlashes } from '../utils/url-validator.js';
 import { readBodyCapped } from '../utils/read-capped.js';
 import { parseZip, ZipValidationError, type ParsedPackage } from './package-zip.js';
+import { installSetRepositories } from './install-set-trust.js';
 import {
     verifyAttestation, verifyComponentDigests, type AttestationDoc,
 } from './package-attestation.js';
@@ -93,6 +97,11 @@ export interface PackagePullInput {
      * (install-set-apply.ts), so a plan writes nothing, not even a copy of the package.
      */
     preview?: boolean;
+    /**
+     * An install set's own pull from the repository it names (install-set-apply.ts): allowed with
+     * package federation off. Set by that service only; no endpoint passes it.
+     */
+    installSet?: boolean;
 }
 
 export type PackagePullResult =
@@ -159,12 +168,19 @@ export async function pullPackage(
     const timeoutMs = config.federationTimeoutMs ?? 10000;
 
     // 1. One switch, both directions. A pulled extension runs code in the sandbox and a pulled app
-    //    gets an address, so an operator needs an inbound off switch and this is it.
-    if (!config.packageFederationEnabled) {
-        return {
-            ok: false, status: 403, code: 'PACKAGE_FEDERATION_DISABLED',
-            message: 'This node does not exchange packages with other nodes. An operator turns it on with AIMEAT_PACKAGE_FEDERATION_ENABLED.',
-        };
+    //    gets an address, so an operator needs an inbound off switch and this is it. With the switch
+    //    off, the one source still allowed is a package repository an install set on this node named
+    //    (install-set-trust.ts): the set is that decision already. Checked once the source is known,
+    //    below; an arbitrary URL is refused here, before anything is fetched.
+    const federationOff = !config.packageFederationEnabled;
+    const federationRefusal: PackagePullResult = {
+        ok: false, status: 403, code: 'PACKAGE_FEDERATION_DISABLED',
+        message: 'This node does not exchange packages with other nodes. An operator turns it on with AIMEAT_PACKAGE_FEDERATION_ENABLED; the repository an install set names is reached without it.',
+    };
+    if (federationOff && !input.nodeId && !input.fromUpstream) return federationRefusal;
+    // A named node is known before anything else is looked up, so it is answered here too.
+    if (federationOff && input.nodeId && !input.installSet && !(await installSetRepositories(storage)).has(input.nodeId)) {
+        return federationRefusal;
     }
 
     // 2. The group id, before anything else is looked up.
@@ -222,6 +238,11 @@ export async function pullPackage(
             ok: false, status: 400, code: 'INVALID_INPUT',
             message: 'Name the peer to pull from (node_id), or an address (source_url) as an operator.',
         };
+    }
+
+    // 3b. With federation off, only the repository an install set named (step 1).
+    if (federationOff && !input.installSet && !(await installSetRepositories(storage)).has(source.nodeId)) {
+        return federationRefusal;
     }
 
     // 4. What is already here, and whether this may be written at all — BEFORE the download.
