@@ -10,6 +10,8 @@
  *   listeners; attach('auth', auth) + version.
  * @usage <script src="/v1/libs/aimeat-auth.js"></script>  const s = await AIMEAT.auth.login();
  * @version-history
+ *   v1.6.0 — 2026-09-29 — A refused sign-in (?auth_error=) opens the sign-in dialog with the reason
+ *     (auth-error.js); the bundle version moves.
  *   v1.5.1 — 2026-09-25 — The bundle version moves: an app in the node's isolated frame signs in
  *     through the page around the frame (app-frame.js, app-origin.js v1.2.0).
  *   v1.5.0 — 2026-09-24 — AIMEAT.auth.getPalettes() answers the styles of the theme the page wears on
@@ -36,6 +38,8 @@
  */
 import { auth, refreshOnFocus } from './session.js';
 import { maybeShowGoogleSignup } from './signup.js';
+import { readAuthError } from './auth-error.js';
+import { showLoginModal } from './modal.js';
 import { attach } from '../_core/namespace.js';
 import { readLocales, aimeatReadLang, aimeatApplyLang } from './locale.js';
 import { paletteRegistry, aimeatReadPalette, aimeatApplyPalette, aimeatRestorePalette } from './palette.js';
@@ -45,6 +49,17 @@ import { aimeatRestoreMode } from './theme.js';
 if (typeof document !== 'undefined' && document.addEventListener) {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', maybeShowGoogleSignup);
   else maybeShowGoogleSignup();
+}
+
+// ── Boot: a refused sign-in (?auth_error=<CODE> from the emailed link or an OAuth/SAML callback)
+//    opens the sign-in dialog with the reason, where the next step is. ──
+function maybeShowAuthError() {
+  var code = readAuthError();
+  if (code) showLoginModal({ authError: code }, function () {});
+}
+if (typeof document !== 'undefined' && document.addEventListener) {
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', maybeShowAuthError);
+  else maybeShowAuthError();
 }
 
 // ── Boot: refresh on focus / visibility (timers don't fire while asleep/frozen) ──
@@ -75,4 +90,4 @@ auth.getPalettes = function () { return paletteRegistry().map(function (p) { ret
 if (typeof document !== 'undefined') { aimeatRestorePalette(); aimeatRestoreMode(); }
 
 const ns = attach('auth', auth);
-ns.version = '2026-09-25-001';
+ns.version = '2026-09-29-001';
