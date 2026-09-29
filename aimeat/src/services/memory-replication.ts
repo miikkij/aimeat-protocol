@@ -13,6 +13,7 @@
  *   - (module) replicationState + tracking-key helpers for per-peer/per-key sync state
  *
  * @version-history
+ *   v1.1.0 — 2026-09-29 — Both replications ask leaveToPeer before a record leaves (TARGET-082).
  *   v1.0.1 — 2026-09-13 — A consent pattern that will not compile now says so and matches nothing.
  *     It fell back to `key === pattern`, which cannot be true — the equal case returns true at the
  *     top of the same function — so it was `false` written in a way that hid a malformed consent
@@ -26,6 +27,7 @@ import type { PeerInfo } from '../services/federation.js';
 import { sign } from '../auth/keypair.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import { logger } from '../utils/logger.js';
+import { leaveToPeer } from './classification/egress.js';
 
 export interface ReplicationResult {
   peer_node_id: string;
@@ -113,8 +115,11 @@ export async function replicateMemoryToPeer(
   config: AimeatConfig,
   storage: Storage,
 ): Promise<{ success: boolean; error?: string }> {
-  const memory = await storage.getMemory(ownerGaii, key);
-  if (!memory) return { success: false, error: 'Memory entry not found' };
+  const found = await storage.getMemory(ownerGaii, key);
+  if (!found) return { success: false, error: 'Memory entry not found' };
+  // Memory leaving for a peer asks the classification component first (TARGET-082).
+  const [memory] = await leaveToPeer({ storage, config }, [found], peer.nodeId);
+  if (!memory) return { success: false, error: 'Entry not eligible for replication' };
 
   // Check eligibility
   const eligibility = await isEligibleForReplication(storage, ownerGaii, key);
@@ -205,7 +210,8 @@ export async function replicateMemoryToAllPeers(
     for (const agent of agents) {
       try {
         const memories = await storage.listMemory(agent.gaii, {});
-        const publicMemories = memories.filter(m => m.visibility === 'public');
+        // Memory leaving for a peer asks the classification component first (TARGET-082).
+        const publicMemories = await leaveToPeer({ storage, config }, memories.filter(m => m.visibility === 'public'), peer.nodeId);
 
         for (const memory of publicMemories) {
           // Skip federation-managed entries

@@ -15,7 +15,8 @@
  *   - scanOwnerDue(storage, config, ownerGaii) — pulse the owner's own due instances (manual trigger)
  *   - pulseInstanceServer(storage, config, ownerGaii, loc, cfg) — one instance, self-fulfilled
  * @version-history
- *   v1.4.0 — 2026-09-29 — The gather step searches with a system classification reader (TARGET-082).
+ *   v1.4.0 — 2026-09-29 — The gather step searches with a system classification reader, and the derive
+ *     step asks useForAi for the sources it sends to the model (TARGET-082).
  *   v1.3.1 — 2026-09-26 — The owner's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.3.0 — 2026-09-08 — A section's dispatched task emits task_assigned. "The running crew picks
  *     it up" was the assumption, and being picked up without polling is what a wake is for.
@@ -36,6 +37,7 @@ import { localAccountName } from '../utils/gaii.js';
 import { completeForOwner, AiCompletionError } from './ai-completion.js';
 import { librarianSearch } from './librarian.js';
 import { systemReader } from './classification/reader.js';
+import { memoryTarget } from './classification/labels.js';
 import type { PushService } from './push.js';
 import type { EmailService } from './email.js';
 import { emitDelivery } from './event-bus.js';
@@ -277,10 +279,14 @@ export async function pulseInstanceServer(
 
     // 2. Re-derive from active sources.
     const { items } = await storage.listAllMemory({ prefix: `${wsRoot(loc)}.living-src.${loc.docId}__`, limit: 500 });
-    const active = items.map(i => i.value as { slot?: string; text?: string; origin?: string; active?: boolean; id?: string })
-      .filter(v => v?.slot === slot && v.active !== false);
+    type Src = { slot?: string; text?: string; origin?: string; active?: boolean; id?: string };
+    const activeRecs = items.filter(i => (i.value as Src)?.slot === slot && (i.value as Src).active !== false);
+    const active = activeRecs.map(i => i.value as Src);
     if (!active.length) continue;
     try {
+      // The sources go to a model: the classification component decides first (TARGET-082). A
+      // refusal fails this derive the way any other failure does, into the ledger.
+      await systemReader({ storage, config }, ownerGaii).useForAi(activeRecs.map(i => memoryTarget(i.ownerGaii, i.key)), { capability: 'text' });
       const srcList = active.map(s => `- ${s.text}${s.origin ? ` 〔${s.origin}〕` : ''}`).join('\n');
       const prompt = `Section: ${sec.section}\nScope: ${sec.desc || ''}\nDocument scope: ${charter.scope || ''}\n\nSources:\n${srcList}\n\nWrite the section.`;
       const r = await completeForOwner(storage, config, ownerGaii, { prompt, systemPrompt: DERIVE_SYSTEM, appId: 'living' });

@@ -43,6 +43,8 @@
  *   const ctx = buildExtensionCtx({ …, workspace: wsCap.workspace });
  *   … catch (err) { const r = workspaceRefusalFor(err, wsCap); if (r) res.status(r.status).json(error(…, r.code, r.message)); }
  * @version-history
+ *   v1.1.0 — 2026-09-29 — index and get pass the caller's classification reader to readWorkspaceOp
+ *     (TARGET-082).
  *   v1.0.0 — 2026-09-05 — Initial: the gap the Coding Central app tools (claim_open, claim_release,
  *     incident_open, board_read, …) could not be built across.
  */
@@ -50,6 +52,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, ExtensionRecord } from '../storage/interface.js';
 import type { ExtensionCtx } from './extension-runtime.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { readerForCaller } from './classification/reader.js';
 import { workspaceDeclarationOf, type WorkspaceDeclaration } from './extension-workspace-declaration.js';
 import {
     workspaceCallerOf, readWorkspaceOp, writeWorkspaceDraftsOp, publishWorkspaceOp,
@@ -103,6 +106,8 @@ export function buildExtensionWorkspace(deps: ExtensionWorkspaceDeps): Extension
     const { config, storage, extName, actionId, declaration, caller } = deps;
     const ops = { storage, config };
     const opsCaller: WorkspaceOpsCaller = workspaceCallerOf({ principal: caller.gaii, ownerName: caller.owner, roles: caller.roles }, config);
+    // The classification reader of the caller who invoked the action (TARGET-082).
+    const reader = readerForCaller({ storage, config }, caller);
     let last: ExtensionWorkspaceRefusal | null = null;
 
     const refuse = (status: number, code: string, message: string): never => {
@@ -140,12 +145,12 @@ export function buildExtensionWorkspace(deps: ExtensionWorkspaceDeps): Extension
     const workspace: NonNullable<ExtensionCtx['workspace']> = {
         index: async (organismId, ws) => {
             allow('read');
-            return settle(await readWorkspaceOp(ops, opsCaller, { organismId, ws }));
+            return settle(await readWorkspaceOp(ops, opsCaller, { organismId, ws, reader }));
         },
         get: async (organismId, ws, ids, opts) => {
             allow('read');
             if (!Array.isArray(ids) || ids.length === 0) refuse(400, 'INVALID_INPUT', 'get() needs a non-empty array of instance ids');
-            return settle(await readWorkspaceOp(ops, opsCaller, { organismId, ws, ids: ids.map(String), space: opts?.space }));
+            return settle(await readWorkspaceOp(ops, opsCaller, { organismId, ws, ids: ids.map(String), space: opts?.space, reader }));
         },
         write: async (organismId, ws, space, id, value, opts) => {
             allow('write');

@@ -16,6 +16,7 @@
  *   - toEntry() — classify + normalize → DiscoveryEntry
  * @usage registry.register(createMemorySource(storage, config));
  * @version-history
+ *   v0.6.0 — 2026-09-29 — Every hit passes the caller's classification reader (ctx.reader, TARGET-082).
  *   v0.5.1 — 2026-09-24 — A workspace's name is read from its creator's copy of the manifest
  *     (readWorkspaceManifest takes the node id; secaudit 2026-09, A6-9).
  *   v0.5.0 — 2026-08-31 — apps.{appId}.tools is left to the `app-tools` source. It used to arrive
@@ -42,6 +43,7 @@
 import type { AimeatConfig } from '../../../config.js';
 import type { Storage, MemoryRecord, OrganismRecord } from '../../../storage/interface.js';
 import { canReadWorkspace } from '../../workspace-access.js';
+import { memoryTarget } from '../../classification/labels.js';
 import type { DiscoveryContext, DiscoveryEntry, DiscoverySource, RawHit } from '../types.js';
 import { classifyMemoryKey } from '../classify.js';
 import { bestTitle, bestDescription, normalizeTags, normalizeVisibility, toFullOwner } from '../normalize.js';
@@ -263,8 +265,9 @@ export function createMemorySource(storage: Storage, config: AimeatConfig): Disc
     gating: 'visibility',
 
     async enumerate(ctx: DiscoveryContext): Promise<RawHit[]> {
+      // Every hit passes the caller's classification reader (TARGET-082), in both branches.
       if (ctx.scope === 'shared') {
-        const shared = await enumerateShared(storage, config, ctx);
+        const shared = await ctx.reader.show(await enumerateShared(storage, config, ctx), h => memoryTarget(h.ownerGaii, h.key));
         return shared.map(h => ({ sourceId: MEMORY_SOURCE_ID, record: h, score: h.score }));
       }
 
@@ -294,7 +297,8 @@ export function createMemorySource(storage: Storage, config: AimeatConfig): Disc
         hits = items.filter(r => (r.flagCount ?? 0) === 0).map(rec => toMemHit(rec, 0));
       }
 
-      const kept = hits.filter(h => !isOwnedElsewhere(h.key) && !isCopyOrMeta(h.key));
+      const kept = await ctx.reader.show(hits.filter(h => !isOwnedElsewhere(h.key) && !isCopyOrMeta(h.key)),
+        h => memoryTarget(h.ownerGaii, h.key));
       await attachPlaces(storage, config.nodeId, kept);
       return kept.map(h => ({ sourceId: MEMORY_SOURCE_ID, record: h, score: h.score }));
     },

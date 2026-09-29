@@ -19,6 +19,7 @@
  * @structure runJobOp(deps, job, prompt, signal) → JobOpOutcome · assertAudioInReach(deps, owner, key)
  * @usage const outcome = await runJobOp({ storage, config }, entry.job, entry.prompt, signal);
  * @version-history
+ *   v1.2.0 — 2026-09-29 — The transcription reads its audio through readAiFile (TARGET-082).
  *   v1.1.0 — 2026-09-28 — Every op passes the job's `role`, the AI role the call runs as.
  *   v1.0.0 — 2026-09-28 — System 2 plan, V5: the text call moved here from service.ts run(), and the
  *     image and transcription calls added beside it.
@@ -26,6 +27,8 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { completeForOwner } from '../ai-completion.js';
+import { readAiFile } from '../ai-inputs.js';
+import { systemReader } from '../classification/reader.js';
 import { generateForOwner } from '../ai-image.js';
 import { transcribeForOwner } from '../ai-transcription.js';
 import { aiPayerOf } from '../agent-ai-keys.js';
@@ -110,7 +113,8 @@ export async function runJobOp(
         const key = job.audio_key ?? '';
         // Read again here, bytes and all: the start checked the metadata only, and the file may have
         // been deleted while the job queued.
-        const file = await storage.getStorageFile(job.owner, key);
+        // The one loader of what a model reads (services/ai-inputs.ts), with the node's own reader.
+        const file = await readAiFile(storage, systemReader({ storage, config }, job.owner), job.owner, key, { capability: 'transcription' });
         if (!file) throw new AiJobError('NOT_FOUND', 404, `No such file in your storage: audio_key "${key}".`);
         const r = await transcribeForOwner(storage, config, payer, {
             ...common,

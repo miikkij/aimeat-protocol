@@ -13,12 +13,17 @@
  * @usage pnpm test -- ai-job-prompt
  * @version-history
  *   v1.0.0 — 2026-08-31 — Written with the feature.
+ *   v1.1.0 — 2026-09-29 — assembleJobPrompt takes a classification reader (TARGET-082).
  */
 import { describe, it, expect } from 'vitest';
 import { assembleJobPrompt } from '../../src/services/ai-jobs/prompt.js';
 import { AiJobError } from '../../src/services/ai-jobs/types.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
+import { systemReader } from '../../src/services/classification/reader.js';
+
+/** The classification reader the assembly takes (TARGET-082). In V1 it reads nothing. */
+const READER = systemReader({ storage: {} as never, config: { classificationMode: 'off', nodeId: 'n' } }, 'owner@n');
 
 const NODE_ID = 'aimeat-local-001-dev';
 const OWNER = `alice@${NODE_ID}`;
@@ -42,7 +47,7 @@ const cfg = (maxBytes = 1_000_000): AimeatConfig =>
 describe('assembleJobPrompt', () => {
     it('states a missing input record instead of leaving a silence the model would fill in', async () => {
         const storage = fakeStorage({ 'notes.present': 'The harbour vote was 7-2.' });
-        const prompt = await assembleJobPrompt({ storage, config: cfg() }, OWNER, {
+        const prompt = await assembleJobPrompt({ storage, config: cfg() }, READER, OWNER,{
             prompt: 'Summarise.',
             input_keys: ['notes.present', 'notes.absent'],
         });
@@ -56,7 +61,7 @@ describe('assembleJobPrompt', () => {
 
     it('tells the model that what it was given is all there is', async () => {
         const storage = fakeStorage({ 'a.key': 'value' });
-        const prompt = await assembleJobPrompt({ storage, config: cfg() }, OWNER, {
+        const prompt = await assembleJobPrompt({ storage, config: cfg() }, READER, OWNER,{
             prompt: 'Do the thing.', input_keys: ['a.key'],
         });
         expect(prompt).toContain('anything not\nstated here is unknown, and unknown is reported, never filled in');
@@ -64,7 +69,7 @@ describe('assembleJobPrompt', () => {
 
     it('serialises a non-string record rather than dropping it', async () => {
         const storage = fakeStorage({ 'a.obj': { votes: { for: 7, against: 2 } } });
-        const prompt = await assembleJobPrompt({ storage, config: cfg() }, OWNER, {
+        const prompt = await assembleJobPrompt({ storage, config: cfg() }, READER, OWNER,{
             prompt: 'Count.', input_keys: ['a.obj'],
         });
         expect(prompt).toContain('"against": 2');
@@ -72,20 +77,20 @@ describe('assembleJobPrompt', () => {
 
     it('takes the prompt from prompt_key, as a string or as a record carrying one', async () => {
         const storage = fakeStorage({ 'p.plain': 'stored prompt', 'p.wrapped': { title: 'x', prompt: 'wrapped prompt' } });
-        expect(await assembleJobPrompt({ storage, config: cfg() }, OWNER, { prompt_key: 'p.plain' }))
+        expect(await assembleJobPrompt({ storage, config: cfg() }, READER, OWNER,{ prompt_key: 'p.plain' }))
             .toContain('stored prompt');
-        expect(await assembleJobPrompt({ storage, config: cfg() }, OWNER, { prompt_key: 'p.wrapped' }))
+        expect(await assembleJobPrompt({ storage, config: cfg() }, READER, OWNER,{ prompt_key: 'p.wrapped' }))
             .toContain('wrapped prompt');
     });
 
     it('refuses a prompt_key that holds no prompt, rather than sending an empty one', async () => {
         const storage = fakeStorage({ 'p.empty': { title: 'no prompt here' } });
-        await expect(assembleJobPrompt({ storage, config: cfg() }, OWNER, { prompt_key: 'p.empty' }))
+        await expect(assembleJobPrompt({ storage, config: cfg() }, READER, OWNER,{ prompt_key: 'p.empty' }))
             .rejects.toMatchObject({ code: 'INVALID_BODY' });
     });
 
     it('refuses a job with neither prompt nor prompt_key', async () => {
-        await expect(assembleJobPrompt({ storage: fakeStorage({}), config: cfg() }, OWNER, {}))
+        await expect(assembleJobPrompt({ storage: fakeStorage({}), config: cfg() }, READER, OWNER,{}))
             .rejects.toMatchObject({ code: 'INVALID_BODY' });
     });
 
@@ -93,7 +98,7 @@ describe('assembleJobPrompt', () => {
         const storage = fakeStorage({ 'big.one': 'x'.repeat(5000) });
         let thrown: AiJobError | null = null;
         try {
-            await assembleJobPrompt({ storage, config: cfg(4096) }, OWNER, {
+            await assembleJobPrompt({ storage, config: cfg(4096) }, READER, OWNER,{
                 prompt: 'short', input_keys: ['big.one'],
             });
         } catch (err) { thrown = err as AiJobError; }
@@ -108,7 +113,7 @@ describe('assembleJobPrompt', () => {
     it('lets a prompt exactly at the cap through', async () => {
         const storage = fakeStorage({});
         const prompt = 'z'.repeat(4096);
-        await expect(assembleJobPrompt({ storage, config: cfg(4096) }, OWNER, { prompt }))
+        await expect(assembleJobPrompt({ storage, config: cfg(4096) }, READER, OWNER,{ prompt }))
             .resolves.toBe(prompt);
     });
 });

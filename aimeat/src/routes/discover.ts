@@ -15,6 +15,7 @@
  *   - GET /v1/discover · GET /v1/discover/facets
  * @usage app.use(discoverRouter(config, storage))
  * @version-history
+ *   v0.4.0 — 2026-09-29 — The context carries the caller's classification reader (TARGET-082).
  *   v0.3.0 — 2026-08-31 — `tool` accepted as a type filter: an app's published tool is a thing to
  *     use, and this is the surface that answers what there is to use.
  *   v0.2.0 — 2026-08-30 — `designbook` accepted as a type filter (the facet named it, the filter dropped
@@ -26,6 +27,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { readerFor } from '../services/classification/reader.js';
 import {
   buildDiscoveryRegistry,
   runDiscovery,
@@ -66,8 +68,9 @@ function parseFilters(query: Record<string, unknown>): DiscoveryFilters {
  * Default scope: authenticated → own; anonymous → public. scope=shared is Phase 3.
  */
 function buildContext(
-  req: { auth?: { sub: string; owner: string; roles: string[]; scopes?: string[] }; query: Record<string, unknown> },
+  req: { auth?: { sub: string; owner: string; roles: string[]; scopes?: string[]; anonymous?: boolean }; query: Record<string, unknown> },
   config: AimeatConfig,
+  storage: Storage,
 ): { ctx: DiscoveryContext } | { errCode: string; errMsg: string; status: number } {
   const requested = typeof req.query.scope === 'string' ? req.query.scope : undefined;
   const scope = requested ?? (req.auth ? 'own' : 'public');
@@ -93,6 +96,7 @@ function buildContext(
     scope,
     filters,
     nodeId: config.nodeId,
+    reader: readerFor({ storage, config }, req.auth),
   };
   return { ctx };
 }
@@ -106,7 +110,7 @@ export function discoverRouter(config: AimeatConfig, storage: Storage): Router {
 
   // GET /v1/discover — ranked, paginated, faceted entries (entry mode).
   router.get('/v1/discover', async (req, res) => {
-    const built = buildContext(req as never, config);
+    const built = buildContext(req as never, config, storage);
     if ('errCode' in built) {
       res.status(built.status).json(error(config.nodeId, built.errCode, built.errMsg));
       return;
@@ -135,7 +139,7 @@ export function discoverRouter(config: AimeatConfig, storage: Storage): Router {
 
   // GET /v1/discover/facets — map mode: catalog-of-catalogs counts, no entries.
   router.get('/v1/discover/facets', async (req, res) => {
-    const built = buildContext(req as never, config);
+    const built = buildContext(req as never, config, storage);
     if ('errCode' in built) {
       res.status(built.status).json(error(config.nodeId, built.errCode, built.errMsg));
       return;

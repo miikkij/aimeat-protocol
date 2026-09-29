@@ -14,6 +14,8 @@
  *   - subscriptions + network-stats + /v1/organisms/:id/reputation
  *
  * @version-history
+ *   v1.5.0 — 2026-09-29 — A peer's memory read passes leaveToPeer, the classification component's
+ *     leave for federation (TARGET-082), before anything is answered.
  *   v1.4.0 — 2026-09-08 — A genesis entry in the cross-catalogue is addressed by its memory key,
  *     with the remote id kept as remote_id; the stored value no longer overwrites the fields set
  *     by the handler.
@@ -46,6 +48,7 @@ import { createGenesisPeeringService } from '../services/genesis-peering.js';
 import { createOrganismReputationService } from '../services/organism-reputation.js';
 import { matchesKeyword, matchesActionKeyword, matchesGenesisKeyword, matchesLocation } from '../services/federation-helpers.js';
 import { cacheGenesisResults, findCachedGenesis } from '../services/genesis-memory-cache.js';
+import { leaveToPeer } from '../services/classification/egress.js';
 import { logger } from '../utils/logger.js';
 
 export function federationGenesisRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>, networkDirectory?: Map<string, ServiceSummary>): Router {
@@ -615,9 +618,13 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
                 }
             }
 
+            // Memory leaving this node for a peer asks the classification component first (TARGET-082).
+            const leaving = await leaveToPeer({ storage, config },
+                results.map(r => ({ ...r, ownerGaii: String(r.gaii), key: String(r.key) })), 'genesis-peer');
+            const sent = leaving.map(({ ownerGaii: _o, ...r }) => r);
             res.json(success(config.nodeId, {
-                results,
-                total: results.length,
+                results: sent,
+                total: sent.length,
             }));
         } catch (err) {
             res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));

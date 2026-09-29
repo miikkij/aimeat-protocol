@@ -28,6 +28,10 @@
  *   v1.7.0 — 2026-09-24 — The workspace read gates on, and answers with, the copies of the manifest,
  *     readme and apps records that count (services/workspace-meta.ts workspaceMetaReader) instead of
  *     the first copy the scan returned for the gate and the last one for the answer.
+ *   v1.9.0 — 2026-09-29 — The workspace read loads through services/workspace-content.ts, the one
+ *     loader readWorkspaceOp uses too: decideWorkspaceRead makes the decision (which adds Gate 0, an
+ *     agent the organism does not list), and the classification reader passes the records (TARGET-082).
+ *     The overviews, the graphs and the instruction block pass the caller's reader too.
  *   v1.8.0 — 2026-09-25 — The workspace read carries `rules` (how the workspace takes a member's
  *     change) and `sections` (each document space's section index, the copy that counts) to a caller
  *     who can read the workspace.
@@ -37,10 +41,8 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
-import { resolveIdentity, isSameOwner, isGEAI } from '../../utils/gaii.js';
-import { authorizeRead } from '../../services/access-guard.js';
-import { ecoMayReadKey } from '../../services/ecosystem-access.js';
-import { isMemoryBackedSpace, readWorkspaceSchemas, workspaceMetaReader, normalizeMemberChangeRule, DEFAULT_MEMBER_CHANGE_RULE } from '../../services/workspace-meta.js';
+import { resolveIdentity } from '../../utils/gaii.js';
+import { isMemoryBackedSpace, readWorkspaceSchemas, normalizeMemberChangeRule, DEFAULT_MEMBER_CHANGE_RULE } from '../../services/workspace-meta.js';
 import { readStoredSections } from '../../services/workspace-sections.js';
 import { workspaceRowIndex } from '../../services/workspace-rows/row-service.js';
 import { emitChange } from '../../services/event-bus.js';
@@ -53,6 +55,8 @@ import { collectOrganismGraph, collectWorkspaceGraph } from '../../services/stru
 import { updateOrganismStructure } from '../../services/structure-snapshot.js';
 import { loadServedProvenanceMany } from '../../services/ai-provenance-marks.js';
 import { fresherRec } from './shared.js';
+import { loadWorkspaceContent } from '../../services/workspace-content.js';
+import { readerFor } from '../../services/classification/reader.js';
 import { logger } from '../../utils/logger.js';
 import { isOrganismOwner } from '../../services/organism-ownership.js';
 
@@ -71,90 +75,34 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
    */
   router.get('/v1/organisms/:id/workspace', requireAuth(), requireScope('organism:read'), async (req, res) => {
     const id = req.params.id as string;
-    const organism = await storage.getOrganism(id);
-    if (!organism) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
-      return;
-    }
-
-    // Membership gate — an organism agent, or an active member. Memberships are keyed by the
-    // BARE owner name (matches organisms.ts join/leave + consent.ts organism resolution). The same
-    // lookup yields org-manager status (creator/admin), which passes the workspace read gate below.
-    const callerSub = req.auth!.sub;
-    const ownerName = req.auth!.owner;
-    let isMember = !!callerSub && organism.agentGaiis.includes(callerSub);
-    let isOrgManager = false;
-    if (ownerName) {
-      const membership = await storage.getMembership(id, ownerName);
-      if (membership && membership.status === 'active') {
-        isMember = true;
-        isOrgManager = membership.role === 'creator' || membership.role === 'admin';
-      }
-    }
-    if (!isMember) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism'));
-      return;
-    }
-
-    const callerGaii = resolveIdentity(req.auth!, config.nodeId);
     // A workspace is scoped under organism.{id}.w.{ws}. — one organism holds many workspaces.
     // (No ws → legacy organism-level root, kept only so an un-scoped call still reads something.)
     const ws = typeof req.query.ws === 'string' ? req.query.ws : undefined;
-    const nsRoot = ws ? `organism.${id}.w.${ws}.` : `organism.${id}.`;
     // Archived content is excluded by default (the AI working set); ?includeArchived=true surfaces it
     // — the explicit "look in archive" escape hatch. ?archived=only reads ONLY archived content.
     const archived = req.query.archived === 'only' ? 'only' : (req.query.includeArchived === 'true' ? 'include' : undefined);
 
     // A workspace is SHARED: authorization is at the workspace level, not per record. If the caller can
-    // read the manifest (they created it, are a same-owner agent, or hold a viewer/contributor grant —
-    // see authorizeRead/the workspace-role consents), they see ALL of the workspace's content, whoever
-    // wrote it — so a contributor's writes are visible to the creator + other members. If not, they see
-    // nothing (org membership alone is discovery-only). The manifest is the single gate record.
-    // For the archived views we must still surface the (active) manifest/readme so the workspace can
-    // render — otherwise `archived=only` would drop the manifest and the whole workspace reads empty.
-    // So: include everything, then filter CONTENT by the requested view using each record's own flag
-    // while always keeping the workspace's own meta.* (manifest/readme). Default (active) keeps the
-    // efficient storage-level exclude.
-    // excludeVersionRows: this read collapses each instance to `.latest`/`.draft`/bare and never
-    // surfaces `.version.N` history — dropping those rows in SQL avoids loading every historic
-    // full-copy value only to skip it in the role loop below.
-    let items: MemoryRecord[];
-    if (archived === 'only' || archived === 'include') {
-      const all = (await storage.listAllMemory({ prefix: nsRoot, limit: 5000, archived: 'include', excludeVersionRows: true })).items;
-      // Keep ONLY the manifest + readme (so the workspace shell renders) plus the archived content.
-      // NB: must match the manifest/readme EXACTLY, not a `meta.` prefix — an objectType namespace can
-      // itself start with `meta.` (e.g. `meta.goals`), and a prefix filter would leak ACTIVE content
-      // from those spaces into the archived-only view.
-      items = archived === 'only'
-        ? all.filter(r => r.archived || r.key === `${nsRoot}meta.manifest` || r.key === `${nsRoot}meta.readme`)
-        : all;
-    } else {
-      items = (await storage.listAllMemory({ prefix: nsRoot, limit: 5000, excludeVersionRows: true })).items;
+    // read the manifest (they created it, are a same-owner agent, hold a viewer/contributor grant, or
+    // manage the organism), they see ALL of the workspace's content, whoever wrote it. If not, they see
+    // nothing (org membership alone is discovery-only). The one loader (services/workspace-content.ts)
+    // loads, decides (decideWorkspaceRead) and passes the classification reader; this route shapes.
+    const got = await loadWorkspaceContent({ storage, config }, readerFor({ storage, config }, req.auth), {
+      sub: req.auth!.sub, ownerName: req.auth!.owner, accessorGaii: resolveIdentity(req.auth!, config.nodeId),
+    }, { organismId: id, ws, archived });
+    if (!got.ok) {
+      res.status(got.status).json(error(config.nodeId, got.code, got.message));
+      return;
     }
+    const nsRoot = got.root;
     // A workspace's meta records are the copies that count (services/workspace-meta.ts), not the
     // first or the last the scan holds; the organism root keeps its own manifest as before.
-    const reader = ws ? workspaceMetaReader(storage, id, config.nodeId) : null;
+    const reader = got.meta;
     const metaOf = async (rel: string, from: MemoryRecord[]): Promise<MemoryRecord | undefined> =>
       (reader ? await reader.pick(ws!, rel, from) : null) ?? undefined;
-    const manRec = reader ? await metaOf('meta.manifest', items) : items.find(r => r.key === `${nsRoot}meta.manifest`);
-    let canReadWorkspace = false;
-    if (manRec) {
-      canReadWorkspace = isOrgManager || manRec.ownerGaii === callerGaii || isSameOwner(manRec.ownerGaii, callerGaii);
-      if (!canReadWorkspace) {
-        const decision = await authorizeRead(storage, config, {
-          ownerGaii: manRec.ownerGaii, accessorGaii: callerGaii, resourceKey: manRec.key,
-          visibility: manRec.visibility, groupId: manRec.groupId, action: 'read',
-        });
-        canReadWorkspace = decision.allowed;
-      }
-    }
-    // Ecosystem (GEAI) data-area allowlist (model A / strict): a GEAI rides its owner's membership, so
-    // require a matching owner-granted 'read' area for this workspace's organism — same allowlist the
-    // write path enforces. Flat/own-namespace access is unaffected (the key here is always organism.*).
-    if (canReadWorkspace && manRec && isGEAI(req.auth!.sub) && !(await ecoMayReadKey(storage, req.auth!.sub, manRec.key))) {
-      canReadWorkspace = false;
-    }
-    const readable: MemoryRecord[] = canReadWorkspace ? items : [];
+    const manRec = got.manRec ?? undefined;
+    const canReadWorkspace = got.canRead;
+    const readable: MemoryRecord[] = got.items;
     const byKey = new Map(readable.map(r => [r.key, r]));
 
     // TARGET-058: the provenance records attached to anything in this workspace, in ONE query for
@@ -256,7 +204,7 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     // organismId on tasks). Best-effort: empty if none match.
     let todos: unknown[] = [];
     try {
-      const { tasks } = await storage.listAgentTasksByOwner(callerGaii, { perPage: 200 });
+      const { tasks } = await storage.listAgentTasksByOwner(resolveIdentity(req.auth!, config.nodeId), { perPage: 200 });
       todos = tasks
         .filter(t => (t.resources?.memoryPrefixes ?? []).some(p => p.startsWith(`organism.${id}`)))
         .map(t => ({ id: t.id, title: t.title, status: t.status, todos: t.todos }));
@@ -306,7 +254,7 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
 
     const viewerGaii = resolveIdentity(req.auth!, config.nodeId);
     const includeArchived = req.query.includeArchived === 'true';
-    const { markdown, workspaces, archivedWorkspaces } = await buildOrganismOverview(storage, config, { orgId: id, viewerGaii, includeArchived });
+    const { markdown, workspaces, archivedWorkspaces } = await buildOrganismOverview(storage, config, { orgId: id, viewerGaii, includeArchived, reader: readerFor({ storage, config }, req.auth) });
     if (req.query.format === 'md') { res.type('text/markdown').send(markdown); return; }
     res.json(success(config.nodeId, { markdown, workspaces, archivedWorkspaces }, [
       { description: 'Drill into one workspace', method: 'GET', url: `/v1/organisms/${id}/workspace/overview?ws=<ws>` },
@@ -338,7 +286,7 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     for (const w of wss) {
       // Per-workspace summary rather than the registry name alone, so the block carries the
       // spaces an agent will actually write into. Unreadable workspaces are listed by name only.
-      const s = await collectWorkspaceSummary(storage, config, { orgId: id, ws: w.id, name: w.name, viewerGaii });
+      const s = await collectWorkspaceSummary(storage, config, { orgId: id, ws: w.id, name: w.name, viewerGaii, reader: readerFor({ storage, config }, req.auth) });
       workspaces.push({
         id: w.id,
         name: s.name,
@@ -382,7 +330,7 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     if (!isMember) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
 
     const viewerGaii = resolveIdentity(req.auth!, config.nodeId);
-    const { markdown, readable, summary } = await buildWorkspaceOverview(storage, config, { orgId: id, ws, viewerGaii });
+    const { markdown, readable, summary } = await buildWorkspaceOverview(storage, config, { orgId: id, ws, viewerGaii, reader: readerFor({ storage, config }, req.auth) });
     if (req.query.format === 'md') { res.type('text/markdown').send(markdown); return; }
     // `objectives` carries the measurability KPIs with their resolved `current` (computed from records
     // where source:from='records', else declared) so a consumer can check targets without parsing markdown.
@@ -406,7 +354,7 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     if (!isMember) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
 
     const viewerGaii = resolveIdentity(req.auth!, config.nodeId);
-    const graph = await collectOrganismGraph(storage, config, { orgId: id, viewerGaii });
+    const graph = await collectOrganismGraph(storage, config, { orgId: id, viewerGaii, reader: readerFor({ storage, config }, req.auth) });
     res.json(success(config.nodeId, { graph }, [
       { description: 'Graph one workspace', method: 'GET', url: `/v1/organisms/${id}/workspace/graph?ws=<ws>` },
     ]));
@@ -428,7 +376,7 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     if (!isMember) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
 
     const viewerGaii = resolveIdentity(req.auth!, config.nodeId);
-    const node = await collectWorkspaceGraph(storage, config, { orgId: id, ws, viewerGaii });
+    const node = await collectWorkspaceGraph(storage, config, { orgId: id, ws, viewerGaii, reader: readerFor({ storage, config }, req.auth) });
     res.json(success(config.nodeId, { graph: node }));
   });
 
@@ -520,7 +468,8 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     const callerGaii = resolveIdentity(req.auth!, config.nodeId);
     // Default excludes archived; ?archived=only is "archive search"; ?includeArchived=true searches both.
     const archived = req.query.archived === 'only' ? 'only' : (req.query.includeArchived === 'true' ? 'include' : undefined);
-    const { results, truncated } = await searchOrganismContent(storage, config, organism, callerGaii, q, onlyWs, { archived });
+    const { results, truncated } = await searchOrganismContent(storage, config, organism, callerGaii, q, onlyWs,
+      { archived, reader: readerFor({ storage, config }, req.auth) });
     res.json(success(config.nodeId, { query: q, results, total: results.length, truncated, archived: archived ?? 'exclude' }));
   });
 

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Agent-task lifecycle routes (update, delete, queue, start, propose-todos, request-changes, pause). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-09-29 — Attachments resolve with the caller's classification reader (TARGET-082).
  *   v1.3.0 — 2026-08-16 — POST .../queue: the exit a draft never had. Reported by crewaimeat-dev,
  *     who created a task over REST, got 'draft' from the body-schema default, and found nothing
  *     anywhere that could move it out again.
@@ -23,6 +24,7 @@ import { applyProposedPlan, type ProposedTodoInput } from '../../services/agent-
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AgentTaskRecord, AgentTaskTodo, AgentMessageRecord } from '../../storage/interface.js';
+import { readerFor } from '../../services/classification/reader.js';
 import { success, error } from '../../middleware/envelope.js';
 import { refuseNotYours, refuseNeedsPermission } from '../../middleware/refusals.js';
 import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
@@ -95,7 +97,7 @@ export function registerTaskLifecycleRoutes(
     if (body.resources !== undefined) {
       // Same create-time rule for attachments: the caller must be able to read what it attaches.
       const fileResult = await resolveTaskFileInputs(storage, config, body.resources.files, {
-        gaii: resolve(req), sub: req.auth!.sub, owner: req.auth!.owner as string | undefined,
+        gaii: resolve(req), sub: req.auth!.sub, owner: req.auth!.owner as string | undefined, reader: readerFor({ storage, config }, req.auth),
       });
       if ('error' in fileResult) {
         res.status(fileResult.error.status).json(error(config.nodeId, fileResult.error.code, fileResult.error.message));

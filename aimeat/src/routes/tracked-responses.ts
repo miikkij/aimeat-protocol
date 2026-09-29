@@ -20,6 +20,7 @@
  * @usage app.use(trackedResponsesRouter(config, storage, peers));
  * @version-history
  *   v1.0.0 — 2026-06-21 — Initial Tracked Response routes (first Memory Contract instance).
+ *   v1.1.0 — 2026-09-29 — The triage passes the caller's classification reader (TARGET-082).
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -36,6 +37,7 @@ import {
   type TrackedResponseState, type CreateTrackedResponseInput,
 } from '../services/tracked-response.js';
 import { triageMessage, fillRecord } from '../services/tracked-classify.js';
+import { readerFor } from '../services/classification/reader.js';
 import { NotebookAiError } from '../services/notebook-ai.js';
 
 export function trackedResponsesRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
@@ -61,7 +63,7 @@ export function trackedResponsesRouter(config: AimeatConfig, storage: Storage, p
     res.setTimeout(600_000);
     try {
       const viewerGaii = resolve(req);
-      const result = await triageMessage(storage, config, { gaii: viewerGaii, ownerName: req.auth!.owner as string, viewerGaii, text });
+      const result = await triageMessage(storage, config, { gaii: viewerGaii, ownerName: req.auth!.owner as string, viewerGaii, text, reader: readerFor({ storage, config }, req.auth) });
       res.json(success(config.nodeId, result));
     } catch (e) {
       if (e instanceof NotebookAiError) { res.status(e.status).json(error(config.nodeId, e.code, e.message)); return; }

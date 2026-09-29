@@ -10,13 +10,17 @@
  *   A storage key is resolved in the CALLER's own namespace, as /v1/ai/transcribe does, and a key
  *   that is not there answers 404: whether someone else's file exists is not something this says.
  *   An https URL is not accepted: the provider would fetch an address a caller chose, from outside.
- * @structure CALL_FILE_LIMITS · readCallFiles(storage, callerGaii, files) · readCallerAudio(storage, callerGaii, key)
+ * @structure CALL_FILE_LIMITS · readCallFiles(storage, reader, callerGaii, files) · readCallerAudio(storage, reader, callerGaii, key)
  * @version-history
+ *   v1.1.0 — 2026-09-29 — Both read through readAiFile (services/ai-inputs.ts) with the caller's
+ *     classification reader, so a file a model may not read is refused before the call (TARGET-082).
  *   v1.0.0 — 2026-09-28 — Initial (V5 of the System 2 plan).
  */
 import type { Storage } from '../storage/interface.js';
 import { AiCompletionError } from './ai/errors.js';
 import type { TextFile } from './ai/gateway.js';
+import { readAiFile } from './ai-inputs.js';
+import type { ContentReader } from './classification/reader.js';
 
 /** At most this many files, and this many bytes in all: a few documents, inside one request. */
 export const CALL_FILE_LIMITS = { maxFiles: 5, maxTotalBytes: 20 * 1024 * 1024 } as const;
@@ -38,9 +42,10 @@ const DATA_URL = /^data:([\w.+-]+\/[\w.+-]+);base64,([A-Za-z0-9+/=\s]+)$/;
  * which the caller answers as 404: whether someone else's file exists is not something it says.
  */
 export async function readCallerAudio(
-  storage: Storage, callerGaii: string, storageKey: string, opts: { mime?: string; filename?: string } = {},
+  storage: Storage, reader: ContentReader, callerGaii: string, storageKey: string, opts: { mime?: string; filename?: string } = {},
 ): Promise<{ data: Buffer; mime: string; filename: string } | null> {
-  const file = await storage.getStorageFile(callerGaii, storageKey);
+  // The one loader of content a model reads (services/ai-inputs.ts): classification first.
+  const file = await readAiFile(storage, reader, callerGaii, storageKey, { capability: 'transcription' });
   if (!file) return null;
   return {
     data: file.data,
@@ -49,7 +54,7 @@ export async function readCallerAudio(
   };
 }
 
-export async function readCallFiles(storage: Storage, callerGaii: string, files: unknown): Promise<TextFile[]> {
+export async function readCallFiles(storage: Storage, reader: ContentReader, callerGaii: string, files: unknown): Promise<TextFile[]> {
   if (!Array.isArray(files) || files.length === 0) {
     throw new AiCompletionError('INVALID_BODY', 400, 'files must be a list of { storage_key } or { data_url } objects.');
   }
@@ -64,7 +69,7 @@ export async function readCallFiles(storage: Storage, callerGaii: string, files:
     let mediaType: string;
     let filename = typeof raw.filename === 'string' && raw.filename ? raw.filename.slice(0, 200) : undefined;
     if (typeof raw.storage_key === 'string' && raw.storage_key) {
-      const file = await storage.getStorageFile(callerGaii, raw.storage_key);
+      const file = await readAiFile(storage, reader, callerGaii, raw.storage_key, { capability: 'text' });
       if (!file) throw new AiCompletionError('NOT_FOUND', 404, `No such file in your storage: ${raw.storage_key}.`);
       data = file.data;
       mediaType = (typeof raw.mime === 'string' && raw.mime) || file.mimeType || 'application/octet-stream';

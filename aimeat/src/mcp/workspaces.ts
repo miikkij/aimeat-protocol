@@ -17,6 +17,8 @@
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   v1.26.0 -- 2026-09-29 -- aimeat_workspace_read and the two overviews pass the agent's classification
+ *     reader (TARGET-082).
  *   v1.25.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.25.0 -- 2026-09-25 -- A member's change to a workspace: aimeat_workspace_space_add,
@@ -157,6 +159,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { checkDeleteGuard } from '../services/write-guards.js';
 import { canReadWorkspace } from '../services/workspace-access.js';
+import { readerForAgent } from '../services/classification/reader.js';
 import { buildOrganismOverview, buildWorkspaceOverview } from '../services/structure-overview.js';
 import { updateWorkspaceMeta, WorkspaceMetaError, listOrganismWorkspaceEntries } from '../services/workspace-meta.js';
 import { emitChange } from '../services/event-bus.js';
@@ -327,7 +330,10 @@ export function registerWorkspaceTools(
             // ctx.workspace calls as well: a workspace is SHARED, authorization is at the workspace
             // level (whoever may read the manifest sees all of its content), version history is
             // never surfaced, and row spaces answer with a count.
-            const r = await readWorkspaceOp({ storage, config }, opsCaller, { organismId: organism_id, ws, ids, space, includeArchived: include_archived });
+            const r = await readWorkspaceOp({ storage, config }, opsCaller, {
+                organismId: organism_id, ws, ids, space, includeArchived: include_archived,
+                reader: readerForAgent({ storage, config }, agentGaii),
+            });
             return r.ok ? ok(r.data) : fail(r.message);
         });
 
@@ -338,7 +344,7 @@ export function registerWorkspaceTools(
         annotationsFor('aimeat_organism_overview'),
         async ({ organism_id, include_archived }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
-            const { markdown } = await buildOrganismOverview(storage, config, { orgId: organism_id, viewerGaii: ownerGhii, includeArchived: include_archived });
+            const { markdown } = await buildOrganismOverview(storage, config, { orgId: organism_id, viewerGaii: ownerGhii, includeArchived: include_archived, reader: readerForAgent({ storage, config }, agentGaii) });
             return { content: [{ type: 'text', text: markdown }] };
         });
 
@@ -348,7 +354,7 @@ export function registerWorkspaceTools(
         annotationsFor('aimeat_workspace_overview'),
         async ({ organism_id, ws }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
-            const { markdown } = await buildWorkspaceOverview(storage, config, { orgId: organism_id, ws, viewerGaii: ownerGhii });
+            const { markdown } = await buildWorkspaceOverview(storage, config, { orgId: organism_id, ws, viewerGaii: ownerGhii, reader: readerForAgent({ storage, config }, agentGaii) });
             return { content: [{ type: 'text', text: markdown }] };
         });
 
@@ -529,5 +535,5 @@ export function registerWorkspaceTools(
 
     // ── aimeat_workspace_transfer ── (workspace export/import as a base64 ZIP)
     // Extracted to workspace-transfer.ts; registered here to preserve tool order.
-    registerWorkspaceTransferTool(mcp, storage, config, { ownerName, ownerGhii, ok, fail, denyReason, findWsEntry, roleOf });
+    registerWorkspaceTransferTool(mcp, storage, config, { ownerName, ownerGhii, agentGaii, ok, fail, denyReason, findWsEntry, roleOf });
 }

@@ -29,6 +29,7 @@
  * @usage
  *   for await (const u of runChatTurn({ storage, config }, ownerName, threadId, text)) { … }
  * @version-history
+ *   v1.7.0 — 2026-09-29 — Attachments are read through the classification reader (TARGET-082).
  *   v1.6.0 — 2026-09-28 — System 2 plan, V5: without the shared key each person's turns run in a
  *     process of their own whose model calls go through /v1/llm with their chat token, so the model
  *     policy, the budget and the metering apply to the chat (Jouni's ruling J6). chatPayer() answers
@@ -65,6 +66,7 @@ import { prepareAiCall } from './ai-completion.js';
 import { appendTurn, readThread, setGooseSession, type ChatTurn } from './chat-threads.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
 import { readAttachments, MAX_ATTACHMENTS_PER_TURN } from './chat-attachments.js';
+import { systemReader } from './classification/reader.js';
 import { logger } from '../utils/logger.js';
 
 export interface ChatDeps { storage: Storage; config: AimeatConfig }
@@ -226,7 +228,8 @@ export async function* runChatTurn(
     // which makes a CSV, a log or a piece of code work today rather than after somebody adds a
     // format negotiation nobody asked for. Anything else is left out of the prompt and said out
     // loud — a file the model never saw is worse than one it was told about.
-    const { images, quoted, notes, skipped } = await readAttachments(storage, gaii, attachmentKeys);
+    // The attached files go to the chat's model: the classification reader's useForAi decides (TARGET-082).
+    const { images, quoted, notes, skipped } = await readAttachments(storage, systemReader({ storage, config }, gaii), gaii, attachmentKeys);
 
     const prompt = [
         text,

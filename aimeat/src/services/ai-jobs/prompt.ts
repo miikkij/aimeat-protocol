@@ -21,9 +21,12 @@
  *   `prompt_key` or an `input_keys` entry naming a credential record or a key the node acts on is
  *   refused before the first read (services/ai-job-keys.ts). The start refuses it too; this is the
  *   read itself, which a restart reaches without passing the start.
- * @structure assembleJobPrompt(deps, ownerGhii, spec) → string (throws RESERVED_KEY, AI_JOB_PROMPT_TOO_LARGE)
- * @usage const prompt = await assembleJobPrompt({ storage, config }, ownerGhii, job);
+ * @structure assembleJobPrompt(deps, reader, ownerGhii, spec) → string (throws RESERVED_KEY, AI_JOB_PROMPT_TOO_LARGE)
+ * @usage const prompt = await assembleJobPrompt({ storage, config }, reader, ownerGhii, job);
  * @version-history
+ *   v1.2.0 — 2026-09-29 — The records are read through readAiRecords (services/ai-inputs.ts) with a
+ *     classification reader: the owner scope as before, plus the credential mask and useForAi
+ *     (TARGET-082). assembleJobPrompt takes the reader.
  *   v1.1.1 — 2026-09-26 — The owner's account name comes from localAccountName (utils/gaii.ts), which
  *     keeps an identity of another node whole, so it never names the local namesake
  *     (secaudit 2026-09, F-1).
@@ -33,9 +36,9 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { getOwnerScopeMemory } from '../owner-memory.js';
 import { aiJobKeyRefusal } from '../ai-job-keys.js';
-import { localAccountName } from '../../utils/gaii.js';
+import { readAiRecords } from '../ai-inputs.js';
+import type { ContentReader } from '../classification/reader.js';
 import { AiJobError } from './types.js';
 
 export interface PromptSpec {
@@ -48,18 +51,6 @@ const asText = (value: unknown): string =>
     typeof value === 'string' ? value : JSON.stringify(value, null, 2);
 
 /**
- * Read a record the way the rest of the owner's own tools read one: owner scope, so a key an agent
- * of theirs wrote is found as readily as one they wrote themselves.
- */
-async function readOwnerRecord(
-    storage: Storage, nodeId: string, ownerGhii: string, key: string,
-): Promise<unknown | undefined> {
-    const ownerName = localAccountName(ownerGhii);
-    const rec = await getOwnerScopeMemory(storage, nodeId, ownerName, key);
-    return rec?.value;
-}
-
-/**
  * Build the whole prompt, and refuse it if the result is over the node's cap.
  *
  * `prompt_key` names a record holding the prompt text, so changing a prompt is a memory write rather
@@ -68,18 +59,24 @@ async function readOwnerRecord(
  */
 export async function assembleJobPrompt(
     deps: { storage: Storage; config: AimeatConfig },
+    reader: ContentReader,
     ownerGhii: string,
     spec: PromptSpec,
 ): Promise<string> {
-    const { storage, config } = deps;
+    const { config } = deps;
 
     const kept = aiJobKeyRefusal({ promptKey: spec.prompt_key, inputKeys: spec.input_keys });
     if (kept) throw new AiJobError(kept.code, kept.status, kept.message);
 
+    // The one loader of what a model reads (services/ai-inputs.ts): owner scope, the credential mask
+    // and the classification check, before the model is called.
+    const readOwnerRecord = async (key: string): Promise<unknown | undefined> =>
+        (await readAiRecords(deps, reader, ownerGhii, [{ key }], { capability: 'text' }))[0]?.value;
+
     let prompt = typeof spec.prompt === 'string' ? spec.prompt : '';
 
     if (spec.prompt_key) {
-        const value = await readOwnerRecord(storage, config.nodeId, ownerGhii, spec.prompt_key);
+        const value = await readOwnerRecord(spec.prompt_key);
         const fromRecord = typeof value === 'string'
             ? value
             : (value && typeof value === 'object' && typeof (value as { prompt?: unknown }).prompt === 'string'
@@ -98,7 +95,7 @@ export async function assembleJobPrompt(
     if (spec.input_keys?.length) {
         const parts: string[] = [];
         for (const key of spec.input_keys) {
-            const value = await readOwnerRecord(storage, config.nodeId, ownerGhii, key);
+            const value = await readOwnerRecord(key);
             // The missing case, stated. Copied deliberately, wording and all, from the workflow ai
             // step: a model asked to use a record it cannot see will make one up, and every field of
             // the invention will look right.

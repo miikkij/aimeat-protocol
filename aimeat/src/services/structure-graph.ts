@@ -18,11 +18,13 @@
  * @version-history
  *   v1.0.0 — 2026-06-22 — Initial: organism + workspace graph for the interactive mindmap (Osa C).
  *   v1.0.1 — 2026-09-26 — bareOwner takes the account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
+ *   v1.1.0 — 2026-09-29 — Both graphs take the caller's classification reader (TARGET-082).
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { localAccountName } from '../utils/gaii.js';
 import { collectWorkspaceSummary, listWorkspaces, type WorkspaceSummary } from './structure-overview.js';
+import type { ContentReader } from './classification/reader.js';
 
 export interface SpaceNode {
   name: string;
@@ -81,14 +83,14 @@ function toWorkspaceNode(s: WorkspaceSummary): WorkspaceNode {
 export async function collectOrganismGraph(
   storage: Storage,
   config: AimeatConfig,
-  opts: { orgId: string; viewerGaii: string },
+  opts: { orgId: string; viewerGaii: string; reader: ContentReader },
 ): Promise<OrganismGraph> {
   const { orgId, viewerGaii } = opts;
   const org = await storage.getOrganism(orgId);
   const wss = await listWorkspaces(storage, orgId);
   const workspaces: WorkspaceNode[] = [];
   for (const w of wss) {
-    const s = await collectWorkspaceSummary(storage, config, { orgId, ws: w.id, name: w.name, viewerGaii });
+    const s = await collectWorkspaceSummary(storage, config, { orgId, ws: w.id, name: w.name, viewerGaii, reader: opts.reader });
     workspaces.push(toWorkspaceNode(s));
   }
   // Deterministic order: most content first, then by name (matches the overview's intent).
@@ -112,7 +114,7 @@ export async function collectOrganismGraph(
 export async function collectWorkspaceGraph(
   storage: Storage,
   config: AimeatConfig,
-  opts: { orgId: string; ws: string; name?: string; viewerGaii: string },
+  opts: { orgId: string; ws: string; name?: string; viewerGaii: string; reader: ContentReader },
 ): Promise<WorkspaceNode> {
   const s = await collectWorkspaceSummary(storage, config, opts);
   return toWorkspaceNode(s);

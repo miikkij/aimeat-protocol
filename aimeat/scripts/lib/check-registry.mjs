@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 1.12.0 (2026-09-29): check:classification-reach, stored content reaches a caller through the classification reader.
  *  - 1.11.0 (2026-09-28): check:skill-evals, a changed skill with an eval suite waits for the developer's run-or-skip.
  *  - 1.10.0 (2026-09-26): check:migration-hashes, a migration file on main never changes.
  *  - 1.9.0 (2026-09-26): check:identity-shortening, an identity is cut to an account name only in utils/gaii.ts.
@@ -59,6 +60,9 @@ export const FAST_CHECKS = [
     // From the September 2026 audit's check of the fixes: a visitor from another node is named
     // `alice@their-node`, and a cut at the '@' anywhere in src/ made it the local account `alice`.
     { script: 'check:identity-shortening', label: 'An identity is cut to an account name only by localAccountName or localAccountOf' },
+    // TARGET-082: stored content reaches a caller only through a loader that takes a classification
+    // reader, or through a listed read that says why it is the node's own.
+    { script: 'check:classification-reach', label: 'Every content read passes the classification reader or is listed with its reason' },
     { script: 'check:storage-parity', label: 'Owner-scoped tables are in both deletion cascades' },
     // From round 6 of the September 2026 security work: the runner records only a migration file's
     // name, so a file changed after main had it left databases with two results under one name.

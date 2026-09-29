@@ -89,6 +89,9 @@
  *     same ETag). GET /v1/pub keeps max-age=300 and exposes ETag and Last-Modified to scripts. POST
  *     /v1/storage answers with versioned_url, the /v1/pub address plus ?v=<this write>, which the
  *     route ignores and every cache treats as new (appdev pitfall pub-file-cache-stale-assets).
+ *   v1.17.0 -- 2026-09-29 -- The list, GET /v1/pub, HEAD and GET /v1/storage pass the classification
+ *     reader on the metadata, before any access decision or byte read (TARGET-082). A file the
+ *     caller may not see answers as absent; a download handle is minted only after it.
  */
 import { Router } from 'express';
 import type { Request } from 'express';
@@ -109,6 +112,9 @@ import { writeStorageFile, mintStorageUploadUrl, removeStorageFile } from '../se
 import { generateDownloadToken, verifyDownloadToken, DownloadTokenError } from '../services/download-token.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
 import { FOREIGN_HANDLE_TTL_SECONDS, OWN_HANDLE_TTL_SECONDS } from '../services/file-refs.js';
+// Named apart from this file's own byte `readerFor` below: this one is the classification reader.
+import { readerFor as contentReaderFor } from '../services/classification/reader.js';
+import { fileTarget } from '../services/classification/labels.js';
 
 /** F11: max bytes returned inline (base64) from handle/inline download mode — keeps big binaries out of the model context. */
 const INLINE_MAX_BYTES = 32 * 1024;
@@ -307,7 +313,9 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
     // GET /v1/storage — list storage items (agent auth)
     router.get('/v1/storage', requireAuth(), requireExternalPrincipal(), requireScope('storage:read'), async (req, res) => {
         const gaii = resolve(req);
-        const files = await storage.listStorageFiles(gaii);
+        // The classification reader (TARGET-082): a file this caller may not see is not listed.
+        const files = await contentReaderFor({ storage, config }, req.auth)
+            .show(await storage.listStorageFiles(gaii), f => fileTarget(gaii, f.key));
 
         res.json(success(config.nodeId, {
             files: files.map(f => ({
@@ -367,7 +375,9 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         // Metadata first, and the bytes only after the access decision below. The authorization
         // inputs — visibility, groupId, workspaceRef — all live in the metadata, so a request that
         // ends in 403 or 404 no longer reads a 25 MB file on its way there.
-        const file = await storage.getStorageFileMeta(gaii, key);
+        // The classification reader (TARGET-082) first: a file this caller may not see answers as absent.
+        const meta = await storage.getStorageFileMeta(gaii, key);
+        const [file] = meta ? await contentReaderFor({ storage, config }, req.auth).show([meta], () => fileTarget(gaii, key)) : [];
         if (!file) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));
             return;
@@ -513,7 +523,8 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         //
         // Metadata only: a HEAD answers entirely out of it, and reading the bytes to send none of
         // them is what made a range reader's first probe cost a full download.
-        const file = await storage.getStorageFileMeta(gaii, key);
+        const meta = await storage.getStorageFileMeta(gaii, key);
+        const [file] = meta ? await contentReaderFor({ storage, config }, req.auth).show([meta], () => fileTarget(gaii, key)) : [];
         if (!file) {
             // ASCII only: a header value with a non-ASCII character (an em dash, say) makes Node throw
             // ERR_INVALID_CHAR and turns this 404 into a 500.
@@ -549,7 +560,9 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         // Namespaced to the caller (see the HEAD handler above): a file owned by anyone else is not
         // reachable here at all. The named alternative in the 404 is the whole point — an agent asked
         // for its OWNER's file by bare key and got a blank "not found" that read as data loss.
-        const file = await storage.getStorageFileMeta(gaii, key);
+        // The classification reader (TARGET-082): a file this caller may not see answers as absent.
+        const meta = await storage.getStorageFileMeta(gaii, key);
+        const [file] = meta ? await contentReaderFor({ storage, config }, req.auth).show([meta], () => fileTarget(gaii, key)) : [];
         if (!file) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND',
                 `File not found in your namespace: ${key}. This route reads only your own files - for a file owned by someone else (e.g. your owner's upload or a DM attachment) use GET /v1/pub/{owner}/{key}.`));

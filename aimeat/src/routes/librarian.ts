@@ -12,7 +12,8 @@
  *   carrying `memory:read`; otherwise it is scoped to the caller's own identity.
  * @usage app.use(librarianRouter(config, storage))
  * @version-history
- *   v1.3.0 — 2026-09-29 — The search passes the caller's classification reader (TARGET-082).
+ *   v1.3.0 — 2026-09-29 — The search, classify, plan and distribute pass the caller's classification
+ *     reader (TARGET-082).
  *   v1.0.0 — 2026-06-19 — Initial: Tier-1 fan-across librarian search.
  *   v1.1.0 — 2026-07-04 — classify/plan/distribute accept an `ai:use`-scoped token (H-2 app-grant)
  *     in addition to an owner session — the same capability boundary as /v1/ai/complete, so a
@@ -130,6 +131,7 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
         ownerName: req.auth!.owner as string,
         viewerGaii,
         text,
+        reader: readerFor({ storage, config }, req.auth),
       });
       res.json(success(config.nodeId, result));
     } catch (e) {
@@ -162,6 +164,7 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
         viewerGaii,
         text,
         catalogue,
+        reader: readerFor({ storage, config }, req.auth),
       });
       res.json(success(config.nodeId, result));
     } catch (e) {
@@ -192,6 +195,7 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
         ownerName: req.auth!.owner as string,
         viewerGaii,
         text,
+        reader: readerFor({ storage, config }, req.auth),
       });
       res.json(success(config.nodeId, result));
     } catch (e) {

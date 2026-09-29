@@ -11,8 +11,8 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
- *   v1.29.0 — 2026-09-29 — aimeat_memory_read and aimeat_memory_list pass the classification reader
- *     (TARGET-082); values through presentMemory. The memory and storage resource templates moved
+ *   v1.29.0 — 2026-09-29 — aimeat_memory_read, aimeat_memory_list and aimeat_discover pass the
+ *     classification reader (TARGET-082); values through presentMemory. The memory and storage resource templates moved
  *     to mcp/core-resources.ts unchanged but for the same reader (max-file-lines).
  *   v1.28.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
@@ -291,6 +291,7 @@ export function registerCoreTools(
                     scopes: agent?.defaultScopes ?? [],
                 },
                 scope: (scope ?? 'own') as 'own' | 'public' | 'shared',
+                reader: readerForAgent({ storage, config }, agentGaii),
                 filters: {
                     q: q?.trim() || undefined,
                     types: types.length ? types : undefined,

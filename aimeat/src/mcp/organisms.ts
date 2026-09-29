@@ -11,6 +11,7 @@
  *   import { registerOrganismsTools } from './organisms.js';
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-09-29 — aimeat_organism_search passes the agent's classification reader (TARGET-082).
  *   2026-09-28 — aimeat_organism_update takes agent_access; an agent can narrow it, never widen it.
  *     aimeat_organism_members names only the agents the organism admits.
  *   v1.8.2 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
@@ -64,6 +65,7 @@ import { ZipSecurityError } from '../services/safe-zip.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
 import { isOrganismOwner, organismOwners } from '../services/organism-ownership.js';
 import { agentBarred } from '../services/organism-agent-access.js';
+import { readerForAgent } from '../services/classification/reader.js';
 
 export function registerOrganismsTools(
     mcp: McpServer,
@@ -402,7 +404,8 @@ export function registerOrganismsTools(
             }
             if (!isMember) return { content: [{ type: 'text' as const, text: 'Not an active member of this organism' }], isError: true };
             // Caller identity for the workspace read gate: the full GAII (agent) resolves via same-owner.
-            const { results, truncated } = await searchOrganismContent(storage, config, organism, agentGaii, query, ws, { archived });
+            const { results, truncated } = await searchOrganismContent(storage, config, organism, agentGaii, query, ws,
+                { archived, reader: readerForAgent({ storage, config }, agentGaii) });
             return { content: [{ type: 'text' as const, text: JSON.stringify({ query, results, total: results.length, truncated, archived: archived ?? 'exclude' }, null, 2) }] };
         },
     );
@@ -612,7 +615,10 @@ export function registerOrganismsTools(
             // Any active member: the bundle holds only what the member reads live (gate matches the
             // read model — the REST route applies the same policy).
             if (!m || m.status !== 'active') return { content: [{ type: 'text' as const, text: 'Only an active member of the organism can export it.' }], isError: true };
-            const { buffer, filename, workspaces } = await exportOrganism(storage, config, { orgId: organism_id, exporterGaii: `${ownerName}@${config.nodeId}`, exportedAt: new Date().toISOString() });
+            const { buffer, filename, workspaces } = await exportOrganism(storage, config, {
+                orgId: organism_id, exporterGaii: `${ownerName}@${config.nodeId}`, exportedAt: new Date().toISOString(),
+                reader: readerForAgent({ storage, config }, agentGaii),
+            });
             if (buffer.length > 1_500_000) return { content: [{ type: 'text' as const, text: `Organism too large for inline export (${buffer.length} bytes) — download it from the UI/REST instead.` }], isError: true };
             return { content: [{ type: 'text' as const, text: JSON.stringify({ filename, size_bytes: buffer.length, workspaces, zip_base64: buffer.toString('base64') }, null, 2) }] };
         });

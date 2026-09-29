@@ -5,6 +5,7 @@
  * @description File-storage routes under /v1/memory/files: upload (presigned or inline base64),
  *   visibility/tags PATCH, list, download, delete. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 -- 2026-09-29 -- The download passes the classification reader (TARGET-082).
  *   v1.5.0 -- 2026-09-24 -- POST refuses an app's icon and screenshot keys with 403, through the
  *     same appOwnedKeyRefusal() as POST /v1/storage, before the mint and the inline write (A7-2).
  *   v1.4.1 -- 2026-09-24 -- The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
@@ -40,6 +41,8 @@ import { sniffedContentType } from '../../utils/app-content-type.js';
 import { generateUploadToken, buildUploadMeta } from '../../services/upload-token.js';
 import { removeStorageFile, appOwnedKeyRefusal } from '../../services/storage-file-write.js';
 import type { MemoryRouteCtx } from './shared.js';
+import { readerFor } from '../../services/classification/reader.js';
+import { fileTarget } from '../../services/classification/labels.js';
 
 export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
   const { config, storage, resolve } = ctx;
@@ -286,7 +289,9 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
   router.get('/v1/memory/files/:key', requireAuth(), requireExternalPrincipal(), requireScope('storage:read'), async (req, res) => {
     const gaii = resolve(req);
     const key = req.params.key as string;
-    const file = await storage.getStorageFile(gaii, key);
+    // The classification reader (TARGET-082): a file this caller may not see answers as absent.
+    const stored = await storage.getStorageFile(gaii, key);
+    const [file] = stored ? await readerFor({ storage, config }, req.auth).show([stored], () => fileTarget(gaii, key)) : [];
 
     if (!file) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `File not found: ${key}`));

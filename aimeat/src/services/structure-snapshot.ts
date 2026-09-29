@@ -17,12 +17,14 @@
  *   void updateOrganismStructure(storage, config, orgId, { event: 'workspace created', actor }).catch(()=>{});
  * @version-history
  *   v1.0.0 — 2026-06-22 — Initial: structural fingerprint as a trackable key (Osa D2), timeline via D1.
+ *   v1.1.0 — 2026-09-29 — The graph is collected with a system classification reader (TARGET-082).
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { collectOrganismGraph, type OrganismGraph } from './structure-graph.js';
 import { stableStringify } from '../utils/stable-json.js';
 import { logger } from '../utils/logger.js';
+import { systemReader } from './classification/reader.js';
 
 export function structureKey(orgId: string): string {
   return `organism.${orgId}.meta.structure`;
@@ -118,7 +120,8 @@ async function updateOrganismStructureInner(
   const org = await storage.getOrganism(orgId);
   if (!org) return;
   const creatorGhii = org.creatorGhii.includes('@') ? org.creatorGhii : `${org.creatorGhii}@${config.nodeId}`;
-  const graph = await collectOrganismGraph(storage, config, { orgId, viewerGaii: creatorGhii });
+  // The node's own bookkeeping, with no caller: a system classification reader (TARGET-082).
+  const graph = await collectOrganismGraph(storage, config, { orgId, viewerGaii: creatorGhii, reader: systemReader({ storage, config }, creatorGhii) });
   const fp = fingerprint(graph);
 
   const key = structureKey(orgId);

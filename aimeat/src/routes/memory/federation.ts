@@ -8,6 +8,7 @@
  *   POST /v1/memory writes: memory:write before the far node is asked, the same key checks at the
  *   door, and then services/memory-write.ts writeMemoryRecord with the caller's own roles and scopes.
  * @version-history
+ *   v1.6.0 — 2026-09-29 — push-home asks leaveToPeer before the record leaves (TARGET-082).
  *   v1.5.0 — 2026-09-25 — pull and pull-remote refuse a key only this node writes (`__redirect__`,
  *     `notif.`) before the far node is asked; the shared writer refused it only after the fetch.
  *   v1.4.0 — 2026-09-24 — pull and pull-remote store what the far node answered through
@@ -37,6 +38,7 @@ import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
 import { sign } from '../../auth/keypair.js';
 import type { MemoryRouteCtx } from './shared.js';
+import { leaveToPeer } from '../../services/classification/egress.js';
 
 export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): void {
   const { config, storage, peers, resolve, stats, onDirectoryChange } = ctx;
@@ -225,7 +227,10 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
 
     // Read the local entry
     const localGhii = resolve(req);
-    const record = await storage.getMemory(localGhii, key);
+    const found = await storage.getMemory(localGhii, key);
+    // The visitor's own record, leaving for their home node: the classification component's leave
+    // for federation decides first (TARGET-082); a record that may not leave reads as not here.
+    const [record] = found ? await leaveToPeer({ storage, config }, [found], homeNode) : [];
     if (!record) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Memory key "${key}" not found locally`));
       return;

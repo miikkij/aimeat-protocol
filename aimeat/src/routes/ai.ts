@@ -21,6 +21,8 @@
  *   import { aiRouter } from './routes/ai.js';
  *   app.use(aiRouter(config, storage));
  * @version-history
+ *   v1.x — 2026-09-29 — /complete's files and /transcribe's audio are read with the caller's
+ *     classification reader (TARGET-082).
  *   v1.x — 2026-09-28 — AI roles: /complete, /transcribe and /image take `role` (1 to 300 characters,
  *     readCallRole), the AI role the call runs as; a named model or provider wins over it.
  *   v1.x — 2026-09-28 — Capabilities (System 2, V5): /complete takes `files` (services/ai-call-files.ts);
@@ -96,6 +98,7 @@ const IMAGE_DOWNLOAD_TTL_SECONDS = 3600;
 import { servedProvenanceOf, envelopeMeta, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
 import { upsertPrivateRecord } from '../services/private-record.js';
 import { legacyAiSettingsRoute } from './openrouter.js';
+import { readerFor } from '../services/classification/reader.js';
 
 /** ~6 MB of audio once decoded. Inline base64 is the fallback path, so it is bounded well below the
  *  JSON body limit; anything real goes through storage. */
@@ -163,7 +166,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
         const role = readCallRole(roleField);
         // Files for a model that reads them itself (the files capability), from the caller's own
         // storage or a data: URL (services/ai-call-files.ts).
-        const fileList = files !== undefined ? await readCallFiles(storage, resolve(req), files) : undefined;
+        const fileList = files !== undefined ? await readCallFiles(storage, readerFor({ storage, config }, req.auth), resolve(req), files) : undefined;
         const r = await completeForOwner(storage, config, gaii, {
           prompt: prompt as string, systemPrompt, model: modelOverride, modelRole,
           temperature, topP: top_p, maxTokens: max_tokens, appId: app_id, images: imageList,
@@ -252,7 +255,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
       let audio: { data: Buffer; mime: string; filename: string };
 
       if (typeof storage_key === 'string' && storage_key) {
-        const found = await readCallerAudio(storage, gaii, storage_key, { mime, filename });
+        const found = await readCallerAudio(storage, readerFor({ storage, config }, req.auth), gaii, storage_key, { mime, filename });
         if (!found) {
           return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such file in your storage.'));
         }

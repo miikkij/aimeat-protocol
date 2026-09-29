@@ -5,12 +5,17 @@
  * @usage pnpm test -- ai-capabilities
  * @version-history
  *   v1.0.0 — 2026-09-28 — Initial (V5 of the System 2 plan).
+ *   v1.1.0 — 2026-09-29 — readCallFiles takes a classification reader (TARGET-082).
  */
 import { describe, it, expect } from 'vitest';
 import { parseAiPosture, lintAppAiDisclosure } from '../../src/services/app-ai-posture.js';
 import { lintAppAiCapabilityUse } from '../../src/services/app-ai-capability-hints.js';
 import { readCallFiles, CALL_FILE_LIMITS } from '../../src/services/ai-call-files.js';
 import type { Storage } from '../../src/storage/interface.js';
+import { systemReader } from '../../src/services/classification/reader.js';
+
+/** The classification reader these reads take (TARGET-082). In V1 it reads nothing. */
+const READER = systemReader({ storage: {} as never, config: { classificationMode: 'off', nodeId: 'n' } }, 'me@n');
 
 const meta = (content: string) => `<html><head><meta name="aimeat-ai" content="${content}"></head></html>`;
 
@@ -61,15 +66,15 @@ describe('the files of a text call', () => {
   const storage = { getStorageFile: async (gaii: string, key: string) => (gaii === 'me@n' && key === 'docs/a.pdf' ? file : null) } as unknown as Storage;
 
   it('reads a key in the caller\'s own storage and a data: URL', async () => {
-    const out = await readCallFiles(storage, 'me@n', [{ storage_key: 'docs/a.pdf' }, { data_url: 'data:text/plain;base64,aGVp', filename: 'b.txt' }]);
+    const out = await readCallFiles(storage, READER,'me@n', [{ storage_key: 'docs/a.pdf' }, { data_url: 'data:text/plain;base64,aGVp', filename: 'b.txt' }]);
     expect(out.map(f => [f.mediaType, f.filename])).toEqual([['application/pdf', 'a.pdf'], ['text/plain', 'b.txt']]);
     expect(Buffer.from(out[1].data as Uint8Array).toString()).toBe('hei');
   });
 
   it('answers 404 for a key that is not the caller\'s, and refuses an https URL and too many files', async () => {
-    await expect(readCallFiles(storage, 'someone@n', [{ storage_key: 'docs/a.pdf' }])).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
-    await expect(readCallFiles(storage, 'me@n', [{ data_url: 'https://example.com/a.pdf' }])).rejects.toMatchObject({ code: 'INVALID_BODY' });
+    await expect(readCallFiles(storage, READER,'someone@n', [{ storage_key: 'docs/a.pdf' }])).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
+    await expect(readCallFiles(storage, READER,'me@n', [{ data_url: 'https://example.com/a.pdf' }])).rejects.toMatchObject({ code: 'INVALID_BODY' });
     const many = Array.from({ length: CALL_FILE_LIMITS.maxFiles + 1 }, () => ({ data_url: 'data:text/plain;base64,aA==' }));
-    await expect(readCallFiles(storage, 'me@n', many)).rejects.toMatchObject({ code: 'INVALID_BODY' });
+    await expect(readCallFiles(storage, READER,'me@n', many)).rejects.toMatchObject({ code: 'INVALID_BODY' });
   });
 });

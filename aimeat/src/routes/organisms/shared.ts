@@ -8,6 +8,8 @@
  *   invitation gates, archive handler) that every organism route group shares; the module-level
  *   fresherRec/roleSatisfies are pure utilities the route handlers reference directly.
  * @version-history
+ *   v1.11.0 — 2026-09-29 — The share and member-record collectors moved to shared-public.ts
+ *     (max-file-lines) and take the classification reader (TARGET-082).
  *   v1.10.2 — 2026-09-26 — The publisher's account and bareOwner come from localAccountName
  *     (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local
  *     namesake (secaudit 2026-09, F-1).
@@ -65,6 +67,7 @@ import { listVersionRefs, versionRefsByBase, maxVersionOf, pruneVersionsAfterPub
 import { updateOrganismStructure } from '../../services/structure-snapshot.js';
 import { readPublishSpace, type UndeclaredSpaceRefusal } from '../../services/workspace-write-items.js';
 import { readWorkspaceMetaRecord, workspaceMetaReader } from '../../services/workspace-meta.js';
+import { createPublicCollectors } from './shared-public.js';
 import { logger } from '../../utils/logger.js';
 
 // Moved to ./record-helpers.ts on 2026-08-11 (max-file-lines), and readOrganismConfig on 2026-09-14
@@ -74,17 +77,9 @@ export { canWriteNamespaceRule, roleSatisfies, fresherRec, ownerGhiiOf, collapse
 import { fresherRec, ownerGhiiOf, collapseKeyTo, canWriteNamespaceRule, revertRecordToDraft, readOrganismConfig } from './record-helpers.js';
 import { isOrganismOwner } from '../../services/organism-ownership.js';
 
-export type ShareAccess = 'open' | 'password' | 'account';
-export type ShareMeta = {
-  public?: boolean; spaces?: Record<string, boolean>; docs?: Record<string, boolean>;
-  access?: ShareAccess; passwordHash?: string | null;
-};
-export type ResolvedShare = {
-  public: boolean; spaces: Record<string, boolean>; docs: Record<string, boolean>;
-  access: ShareAccess; passwordHash: string | null;
-};
-export type PublicDoc = { type: string; id: string; title: string; markdown: string };
-export type PublicRecord = { type: string; id: string; value: unknown };
+// The share shapes live in share-types.ts (shared-public.ts names them without a cycle).
+export type { ShareAccess, ShareMeta, ResolvedShare, PublicDoc, PublicRecord } from './share-types.js';
+import type { ShareAccess, ShareMeta, ResolvedShare } from './share-types.js';
 
 export type OrganismHelpers = ReturnType<typeof createOrganismHelpers>;
 
@@ -600,98 +595,8 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     return { code: 'SHARE_PASSWORD_REQUIRED', message: 'This share is password-protected' };
   };
 
-  const isDocPublic = (share: ResolvedShare, typeName: string, docId: string): boolean => {
-    const docKey = `${typeName}/${docId}`;
-    if (docKey in share.docs) return !!share.docs[docKey];
-    if (typeName in share.spaces) return !!share.spaces[typeName];
-    return !!share.public;
-  };
-
-  /** Read a workspace's manifest value, the copy that counts whoever holds it (public path — no auth). */
-  const readWsManifestValue = async (id: string, ws: string): Promise<Record<string, unknown> | null> =>
-    ((await readWorkspaceMetaRecord(storage, id, ws, 'meta.manifest', config.nodeId))?.value as Record<string, unknown> | undefined) ?? null;
-
-  /** Collect the PUBLISHED (.latest) document-space pages that the share meta marks public. An optional
-   *  filter narrows to one {type,id}. Drafts/versions are never included. */
-  const collectPublicDocs = async (
-    id: string, ws: string, share: ResolvedShare, filter?: { type: string; id: string },
-  ): Promise<PublicDoc[]> => {
-    const manifest = await readWsManifestValue(id, ws);
-    if (!manifest) return [];
-    const objectTypes = (manifest.objectTypes as Array<Record<string, unknown>> | undefined) ?? [];
-    const root = `organism.${id}.w.${ws}`;
-    const out: PublicDoc[] = [];
-    for (const ot of objectTypes) {
-      const name = typeof ot.name === 'string' ? ot.name : undefined;
-      const namespace = typeof ot.namespace === 'string' ? ot.namespace : undefined;
-      if (!name || !namespace || ot.mode !== 'document') continue;
-      if (filter && filter.type !== name) continue;
-      const nsPrefix = `${root}.${namespace}.`;
-      const { items } = await storage.listAllMemory({ prefix: nsPrefix, limit: 5000 });
-      for (const r of items) {
-        if (!r.key.startsWith(nsPrefix)) continue;
-        const parts = r.key.slice(nsPrefix.length).split('.');
-        const docId = parts[0];
-        if (parts.slice(1).join('.') !== 'latest') continue;   // only published
-        if (filter && filter.id !== docId) continue;
-        if (!isDocPublic(share, name, docId)) continue;
-        const v = r.value as Record<string, unknown> | null;
-        out.push({
-          type: name, id: docId,
-          title: (v && typeof v.title === 'string') ? v.title : docId,
-          markdown: (v && typeof v.markdown === 'string') ? v.markdown : '',
-        });
-      }
-    }
-    return out;
-  };
-
-  /** Collect the PUBLISHED (.latest) records-space entries that the share meta marks public. An optional
-   *  filter narrows to one space (objectType name). Drafts/versions are never included; each entry's full
-   *  value is returned. Mirrors collectPublicDocs for records-mode spaces, gated by the same share meta
-   *  (docs[type/id] > spaces[type] > public), so a workspace opts a records space into anonymous read the
-   *  same way it opts a document space in. */
-  /** EVERY published (.latest) record of the workspace's record spaces — NO share gating. The caller
-   *  is responsible for authorization (the member route gates on canReadWs; the public route filters
-   *  this through the share meta via {@link collectPublicRecords}). */
-  const collectWsRecords = async (
-    id: string, ws: string, filter?: { space?: string },
-  ): Promise<PublicRecord[]> => {
-    const manifest = await readWsManifestValue(id, ws);
-    if (!manifest) return [];
-    const objectTypes = (manifest.objectTypes as Array<Record<string, unknown>> | undefined) ?? [];
-    const root = `organism.${id}.w.${ws}`;
-    const out: PublicRecord[] = [];
-    for (const ot of objectTypes) {
-      const name = typeof ot.name === 'string' ? ot.name : undefined;
-      const namespace = typeof ot.namespace === 'string' ? ot.namespace : undefined;
-      if (!name || !namespace || ot.mode !== 'records') continue;
-      if (filter?.space && filter.space !== name) continue;
-      const nsPrefix = `${root}.${namespace}.`;
-      const { items } = await storage.listAllMemory({ prefix: nsPrefix, limit: 5000 });
-      for (const r of items) {
-        if (!r.key.startsWith(nsPrefix)) continue;
-        const parts = r.key.slice(nsPrefix.length).split('.');
-        const recId = parts[0];
-        if (parts.slice(1).join('.') !== 'latest') continue;   // only published
-        out.push({ type: name, id: recId, value: r.value ?? null });
-      }
-    }
-    return out;
-  };
-
-  const collectPublicRecords = async (
-    id: string, ws: string, share: ResolvedShare, filter?: { space?: string },
-  ): Promise<PublicRecord[]> =>
-    (await collectWsRecords(id, ws, filter)).filter(r => isDocPublic(share, r.type, r.id));
-
-  /** Render a list of public docs as a single markdown document (for ?format=md). */
-  const docsToMarkdown = (wsName: string | undefined, docs: PublicDoc[]): string => {
-    const parts: string[] = [];
-    if (wsName) parts.push(`# ${wsName}\n`);
-    for (const d of docs) { parts.push(`## ${d.title}\n`); parts.push(d.markdown.trim()); parts.push('\n---\n'); }
-    return parts.join('\n');
-  };
+  // The published content a share hands out, and the member read of records (shared-public.ts).
+  const { isDocPublic, readWsManifestValue, collectPublicDocs, collectWsRecords, collectPublicRecords, docsToMarkdown } = createPublicCollectors(storage, config);
 
   /** Shared gate for the grant/revoke routes — returns the workspace creator's name, or sends the
    *  error response and returns null. Only the workspace creator or an org admin may manage access. */

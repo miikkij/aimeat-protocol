@@ -23,11 +23,14 @@
  *   v1.2.0 — 2026-07-05 — B2/B3: buildPlacementContext now attaches up to 3 recent doc titles per
  *     document space as `examples` (placement bias — file beside same-type docs); MAX_CHUNKS 6→12 to
  *     match the raised distribute split ceiling.
+ *   v1.4.0 — 2026-09-29 — classify and distribute take the caller's classification reader, which the
+ *     placement context's workspace summaries pass (TARGET-082).
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { stripCodeblock } from './llm-strip.js';
 import { collectWorkspaceSummary } from './structure-overview.js';
+import type { ContentReader } from './classification/reader.js';
 import { NotebookAiError, resolveOwnerModel, completeOwner } from './notebook-ai.js';
 import { NOTEBOOK_CLASSIFY_SYSTEM, NOTEBOOK_CLASSIFY_TEMPLATE } from './notebook-classify-prompt.js';
 import { NOTEBOOK_DISTRIBUTE_SYSTEM, NOTEBOOK_DISTRIBUTE_TEMPLATE } from './notebook-distribute-prompt.js';
@@ -71,7 +74,7 @@ const MAX_WS_PER_ORG = 25;
 export async function buildPlacementContext(
   storage: Storage,
   config: AimeatConfig,
-  opts: { ownerName: string; viewerGaii: string },
+  opts: { ownerName: string; viewerGaii: string; reader: ContentReader },
 ): Promise<PlacementOrganism[]> {
   const orgItems = await storage.listOrganisms({ member: opts.ownerName, page: 1, perPage: MAX_ORGS });
   const organisms: PlacementOrganism[] = [];
@@ -88,7 +91,7 @@ export async function buildPlacementContext(
 
     const workspaces: PlacementWorkspace[] = [];
     for (const w of [...wsSeen.values()].slice(0, MAX_WS_PER_ORG)) {
-      const summary = await collectWorkspaceSummary(storage, config, { orgId: org.id, ws: w.id, name: w.name, viewerGaii: opts.viewerGaii });
+      const summary = await collectWorkspaceSummary(storage, config, { orgId: org.id, ws: w.id, name: w.name, viewerGaii: opts.viewerGaii, reader: opts.reader });
       if (!summary.readable) continue;
       // B2 (placement bias): carry a few recent document titles per space as "examples" so the
       // classifier can prefer the space where the SAME TYPE of material already lives, rather than
@@ -145,7 +148,7 @@ function resolveTarget(context: PlacementOrganism[], raw: RawSuggestion): Placem
 export async function classifyNote(
   storage: Storage,
   config: AimeatConfig,
-  opts: { gaii: string; ownerName: string; viewerGaii: string; text: string },
+  opts: { gaii: string; ownerName: string; viewerGaii: string; text: string; reader: ContentReader },
 ): Promise<ClassifyResult> {
   const text = opts.text.trim();
   if (!text) throw new ClassifyError('INVALID_INPUT', 'text is required');
@@ -153,7 +156,7 @@ export async function classifyNote(
   // Owner's own model (shared resolution; throws NO_OPENROUTER_KEY when no key is configured).
   const owner = await resolveOwnerModel(storage, config, opts.gaii, 'notebook:classify');
 
-  const context = await buildPlacementContext(storage, config, { ownerName: opts.ownerName, viewerGaii: opts.viewerGaii });
+  const context = await buildPlacementContext(storage, config, { ownerName: opts.ownerName, viewerGaii: opts.viewerGaii, reader: opts.reader });
   const prompt = fillPrompt(await loadClassifyTemplate(storage), context, text);
 
   const result = await completeOwner(owner, prompt, NOTEBOOK_CLASSIFY_SYSTEM, { temperature: 0.2 });
@@ -221,13 +224,13 @@ interface RawChunk extends RawSuggestion { createNew?: { suggest?: unknown; orga
 export async function distributeNote(
   storage: Storage,
   config: AimeatConfig,
-  opts: { gaii: string; ownerName: string; viewerGaii: string; text: string },
+  opts: { gaii: string; ownerName: string; viewerGaii: string; text: string; reader: ContentReader },
 ): Promise<DistributeResult> {
   const text = opts.text.trim();
   if (!text) throw new ClassifyError('INVALID_INPUT', 'text is required');
 
   const owner = await resolveOwnerModel(storage, config, opts.gaii, 'notebook:distribute');
-  const context = await buildPlacementContext(storage, config, { ownerName: opts.ownerName, viewerGaii: opts.viewerGaii });
+  const context = await buildPlacementContext(storage, config, { ownerName: opts.ownerName, viewerGaii: opts.viewerGaii, reader: opts.reader });
   const prompt = (await loadDistributeTemplate(storage))
     .split('{{structure}}').join(JSON.stringify({ organisms: context }, null, 2))
     .split('{{note}}').join(text);

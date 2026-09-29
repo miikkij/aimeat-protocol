@@ -12,6 +12,7 @@
  *   registerOrganismWorkspaceTransferRoutes(router, config, storage, H);
  * @version-history
  *   v1.0.0 -- 2026-09-06 -- Extracted from workspace-ops.ts (max-file-lines).
+ *   v1.1.0 -- 2026-09-29 -- Both exports pass the caller's classification reader (TARGET-082).
  */
 import { raw, type Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -21,6 +22,7 @@ import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js
 import { resolveIdentity } from '../../utils/gaii.js';
 import { emitChange } from '../../services/event-bus.js';
 import { exportWorkspace } from '../../services/workspace-export.js';
+import { readerFor } from '../../services/classification/reader.js';
 import { importWorkspace } from '../../services/workspace-import.js';
 import { exportOrganism } from '../../services/organism-export.js';
 import { importOrganism } from '../../services/organism-import.js';
@@ -50,6 +52,7 @@ export function registerOrganismWorkspaceTransferRoutes(router: Router, config: 
     const { buffer, filename } = await exportWorkspace(storage, config, {
       orgId: id, ws, exporterGaii: resolveIdentity(req.auth!, config.nodeId), exportedAt: new Date().toISOString(),
       isOrgManager: role === 'creator' || role === 'admin',
+      reader: readerFor({ storage, config }, req.auth),
     });
     // Programmatic/MCP callers can request the ZIP as base64 JSON (size-capped to keep it out of an
     // agent's context); the UI downloads the binary directly.
@@ -108,7 +111,10 @@ export function registerOrganismWorkspaceTransferRoutes(router: Router, config: 
     if (!m || m.status !== 'active') { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only an active member of the organism can export it')); return; }
     // Export as the member's owner GHII — a member reads the whole organism live, and the per-creator
     // registry + records are GHII-owned (an agent-session GAII used to yield a near-empty bundle).
-    const { buffer, filename } = await exportOrganism(storage, config, { orgId: id, exporterGaii: `${ownerName}@${config.nodeId}`, exportedAt: new Date().toISOString() });
+    const { buffer, filename } = await exportOrganism(storage, config, {
+      orgId: id, exporterGaii: `${ownerName}@${config.nodeId}`, exportedAt: new Date().toISOString(),
+      reader: readerFor({ storage, config }, req.auth),
+    });
     if (req.query.format === 'base64') {
       if (buffer.length > 1_500_000) { res.status(413).json(error(config.nodeId, 'TOO_LARGE', 'This organism is too big to send in one piece. Download it from the page instead.')); return; }
       res.json(success(config.nodeId, { filename, size_bytes: buffer.length, zip_base64: buffer.toString('base64') }));

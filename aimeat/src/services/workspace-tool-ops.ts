@@ -28,6 +28,10 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   v1.6.0 — 2026-09-29 — readWorkspaceOp takes a classification reader and loads through
+ *     services/workspace-content.ts, the loader the REST read uses (TARGET-082). The read is decided
+ *     by decideWorkspaceRead, so this operation now also refuses an agent the organism does not list
+ *     and lets an organism manager read every workspace, as the REST read always did.
  *   v1.5.2 — 2026-09-26 — workspaceCallerOf takes the owner name from the door, always; it no longer
  *     cuts one from the principal itself (secaudit 2026-09, F-1).
  *   v1.5.1 — 2026-09-26 — The held provenance record is stored through storeHeldProvenance, the one
@@ -72,11 +76,12 @@ import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
 import { workspaceRowIndex } from './workspace-rows/row-service.js';
 import type { RowObjectType } from './workspace-rows/row-space.js';
 import { archivedRefusal, checkWorkspaceWriteLimits } from './workspace-write-guards.js';
-import { parseGAII, isSameOwner } from '../utils/gaii.js';
+import { parseGAII } from '../utils/gaii.js';
 import { validateMemoryWrite } from './schema-validator.js';
-import { authorizeRead } from './access-guard.js';
 import { entryTitle } from './structure-overview.js';
-import { isMemoryBackedSpace, readWorkspaceSchemas, workspaceMetaReader, normalizeMemberChangeRule, DEFAULT_MEMBER_CHANGE_RULE } from './workspace-meta.js';
+import { isMemoryBackedSpace, readWorkspaceSchemas, normalizeMemberChangeRule, DEFAULT_MEMBER_CHANGE_RULE, type WorkspaceMetaReader } from './workspace-meta.js';
+import { loadWorkspaceContent } from './workspace-content.js';
+import type { ContentReader } from './classification/reader.js';
 import { readStoredSections } from './workspace-sections.js';
 import { emitChange } from './event-bus.js';
 import { updateOrganismStructure } from './structure-snapshot.js';
@@ -184,6 +189,8 @@ export interface ReadWorkspaceArgs {
     /** With `ids`: restrict to this space (name or namespace). */
     space?: string;
     includeArchived?: boolean;
+    /** The classification reader (TARGET-082): the loader takes one, so no read skips the check. */
+    reader: ContentReader;
 }
 
 /**
@@ -216,21 +223,19 @@ export async function readWorkspaceOp(
 ): Promise<WorkspaceOpResult<Record<string, unknown>>> {
     const { storage, config } = deps;
     const { organismId, ws, ids, space } = args;
-    const deny = await denyReason(storage, caller, organismId); if (deny) return deny;
     const root = wsRoot(organismId, ws);
-    const { items } = await storage.listAllMemory({ prefix: `${root}.`, limit: 5000, archived: args.includeArchived ? 'include' : undefined, excludeVersionRows: true });
+    // The one loader (services/workspace-content.ts): it loads, decides the read with
+    // decideWorkspaceRead, and passes the classification reader. The manifest decision is made with
+    // the owner GHII, as this operation always has, so a grant naming the owner works for their agent.
+    const got = await loadWorkspaceContent(deps, args.reader,
+        { sub: caller.principal, ownerName: caller.ownerName, accessorGaii: caller.ownerGhii },
+        { organismId, ws, archived: args.includeArchived ? 'include' : undefined });
+    if (!got.ok) return refuse(got.status, got.code, got.message);
+    const { items } = got;
     // The meta records are the copies that count (services/workspace-meta.ts), for the gate and the answer.
-    const metaReader = workspaceMetaReader(storage, organismId, config.nodeId);
-    const manRec = await metaReader.pick(ws, 'meta.manifest', items);
-    let canRead = false;
-    if (manRec) {
-        canRead = manRec.ownerGaii === caller.ownerGhii || isSameOwner(manRec.ownerGaii, caller.ownerGhii);
-        if (!canRead) {
-            const d = await authorizeRead(storage, config, { ownerGaii: manRec.ownerGaii, accessorGaii: caller.ownerGhii, resourceKey: manRec.key, visibility: manRec.visibility, groupId: manRec.groupId, action: 'read' });
-            canRead = d.allowed;
-        }
-    }
-    if (!manRec || !canRead) return refuse(404, 'NOT_FOUND', `No manifest at ${root}.meta.manifest — empty workspace, wrong ws id, or no access (request access with aimeat_workspace_access).`);
+    const metaReader = got.meta as WorkspaceMetaReader;
+    const manRec = got.manRec;
+    if (!manRec) return refuse(404, 'NOT_FOUND', `No manifest at ${root}.meta.manifest — empty workspace, wrong ws id, or no access (request access with aimeat_workspace_access).`);
     const manifest = manRec.value as Manifest;
 
     type Slot = { latest?: MemoryRecord; draft?: MemoryRecord };

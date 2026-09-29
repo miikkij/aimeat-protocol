@@ -12,10 +12,12 @@
  * @usage cd aimeat && pnpm exec vitest run test/unit/ai-job-keys.test.ts
  * @version-history
  *   v1.0.0 — 2026-09-26 — Initial (secaudit 2026-09: A6-1, 573704db10ed).
+ *   v1.1.0 — 2026-09-29 — assembleJobPrompt takes a classification reader (TARGET-082).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage, MemoryRecord, ScheduledJobRecord } from '../../src/storage/interface.js';
+import { systemReader } from '../../src/services/classification/reader.js';
 
 /** Every prompt a completion was asked for: what would have left the node. */
 const sentToProvider: string[] = [];
@@ -149,7 +151,7 @@ describe('an AI job and the records the node keeps', () => {
 
     it('asks again where the prompt is assembled, so a job stored before the rule reads nothing kept', async () => {
         const w = watchedStorage();
-        await expect(assembleJobPrompt({ storage: w.storage, config }, OWNER, { prompt: 'x', input_keys: ['notes.today', 'commerce.psp'] }))
+        await expect(assembleJobPrompt({ storage: w.storage, config }, systemReader({ storage: w.storage, config }, OWNER), OWNER, { prompt: 'x', input_keys: ['notes.today', 'commerce.psp'] }))
             .rejects.toMatchObject({ code: 'RESERVED_KEY', status: 403 });
         expect(touchedKept(w)).toEqual([]);
     });
