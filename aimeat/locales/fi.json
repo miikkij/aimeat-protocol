@@ -15344,7 +15344,17 @@
         "askedNamed": "Kun agentti viimeksi hyväksyttiin, se pyysi näitä oikeuksia: {asked}.",
         "askedNothing": "Kun agentti viimeksi hyväksyttiin, se ei pyytänyt mitään oikeutta nimeltä, joten se sai oletusoikeudet.",
         "notGranted": "Et antanut: {missing}.",
-        "taskEvent": "AIMEATisi esti agentin: agentti tarvitsee oikeuden {permission}. Anna oikeus agentin oikeuksista, niin tehtävä voi jatkua."
+        "taskEvent": "AIMEATisi esti agentin: agentti tarvitsee oikeuden {permission}. Anna oikeus agentin oikeuksista, niin tehtävä voi jatkua.",
+        "dialogTitle": "Puuttuvat oikeudet: {name}",
+        "dialogLead": "AIMEATisi esti agentilta nämä oikeudet. Valitse ne, jotka annat. Valitsematta jätetyt hylkäät, ja ne poistuvat kortilta.",
+        "dialogAfter": "Agentti saa oikeudet, kun se seuraavan kerran yhdistää. Hylättyä estoa ei näytetä enää, mutta agentti saa yhä tiedon, että sen ajo estettiin.",
+        "giveSelected": "Anna valitut ({n})",
+        "declineAll": "Hylkää kaikki",
+        "editAll": "Muokkaa kaikkia oikeuksia",
+        "granted": "Oikeudet annettu.",
+        "grantedSome": "Valitut oikeudet annettu, muut hylätty.",
+        "declined": "Hylätty. Agentti ei saa näitä oikeuksia.",
+        "grantError": "Oikeuksia ei voitu tallentaa."
       },
       "page": {
         "allTags": "Kaikki {n} tagia",

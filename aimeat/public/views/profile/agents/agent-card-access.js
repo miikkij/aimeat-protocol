@@ -19,11 +19,14 @@
  *   leaves the method alone at the end of a line.
  * @usage
  *   import { RefusalNote, AccessLine, hasRefusals } from './agent-card-access.js';
- *   html`<${RefusalNote} agent=${agent} onScopesClick=${onScopesClick} />`
+ *   html`<${RefusalNote} agent=${agent} onScopesClick=${onScopesClick} showToast=${showToast} />`
  * @version-history
+ *   v1.1.0 — 2026-09-30 — "Give the permission" opens the list of every needed permission
+ *     (agent-refusal-grant.js): give all, some, or decline. The full dialog is one step further.
  *   v1.0.0 — 2026-09-30 — Initial.
  */
 import { h } from 'preact';
+import { useState } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
@@ -32,6 +35,7 @@ import { CardLine } from '/components/OpenCard.js';
 import { Action, Actions } from '/components/Action.js';
 import { Note } from '/components/Note.js';
 import { SubHeading } from '/components/SubHeading.js';
+import { RefusalGrantModal } from './agent-refusal-grant.js';
 
 const html = htm.bind(h);
 
@@ -60,7 +64,10 @@ export function permissionWords(scopes, anyOf = false) {
  * The attention note on the open card. One line per refused call: the permission it needed, how
  * many times, and when last; the call itself follows in small letters as the evidence.
  */
-export function RefusalNote({ agent, onScopesClick }) {
+export function RefusalNote({ agent, onScopesClick, showToast }) {
+  // The answer is a list of every permission the refusals needed (agent-refusal-grant.js), opened
+  // here rather than by the page, so the card carries its own question and its own answer.
+  const [answering, setAnswering] = useState(false);
   if (!hasRefusals(agent)) return null;
   const shown = agent.refusals.slice(0, SHOWN);
   const more = agent.refusals.length - shown.length;
@@ -78,8 +85,10 @@ export function RefusalNote({ agent, onScopesClick }) {
       ${more > 0 ? html`<div>${t('profile.agents.refusals.more', { n: more })}</div>` : null}
       ${onScopesClick ? html`
         <${Actions}>
-          <${Action} small onClick=${(e) => { e.stopPropagation(); onScopesClick(agent); }}>${t('profile.agents.refusals.grant')} →<//>
+          <${Action} small onClick=${(e) => { e.stopPropagation(); setAnswering(true); }}>${t('profile.agents.refusals.grant')} →<//>
         <//>` : null}
+      ${answering ? html`<${RefusalGrantModal} agent=${agent} showToast=${showToast}
+        onClose=${() => setAnswering(false)} onEditAll=${onScopesClick} />` : null}
     <//>`;
 }
 

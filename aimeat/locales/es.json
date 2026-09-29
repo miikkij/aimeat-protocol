@@ -13571,7 +13571,17 @@
         "askedNamed": "En su última aprobación pidió {asked}.",
         "askedNothing": "En su última aprobación no pidió ningún permiso concreto, así que recibió los permisos por defecto.",
         "notGranted": "No concedido: {missing}.",
-        "taskEvent": "Tu AIMEAT rechazó al agente: necesita el permiso {permission}. Dáselo en los permisos del agente y la tarea podrá seguir."
+        "taskEvent": "Tu AIMEAT rechazó al agente: necesita el permiso {permission}. Dáselo en los permisos del agente y la tarea podrá seguir.",
+        "dialogTitle": "Permisos que faltan: {name}",
+        "dialogLead": "Tu AIMEAT le negó estos permisos a este agente. Marca los que le das. Los que dejes sin marcar los rechazas y desaparecen de la tarjeta.",
+        "dialogAfter": "El agente recibe los permisos en su próxima conexión. Un rechazo no se vuelve a mostrar, pero el agente sigue sabiendo que su ejecución fue rechazada.",
+        "giveSelected": "Dar los marcados ({n})",
+        "declineAll": "Rechazar todos",
+        "editAll": "Editar todos los permisos",
+        "granted": "Permisos concedidos.",
+        "grantedSome": "Los permisos marcados están concedidos y el resto rechazados.",
+        "declined": "Rechazado. El agente no recibe estos permisos.",
+        "grantError": "No se pudieron guardar los permisos."
       },
       "page": {
         "allTags": "Las {n} etiquetas",
