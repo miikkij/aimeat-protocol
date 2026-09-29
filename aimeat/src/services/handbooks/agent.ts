@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/mcp/catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.19.0 -- 2026-09-29 -- Classified content: the warning, what is hidden, aimeat_classification (TARGET-082 V5).
  *   v1.18.0 -- 2026-09-29 -- Mail refinery: aimeat_refinery_classes, _run, _status and the schedule kind.
  *   v1.17.0 -- 2026-09-28 -- AI roles: aimeat_ai_roles and aimeat_ai_role_set, one line each beside aimeat_ai_routing_set.
  *   v1.16.0 -- 2026-09-28 -- AI capabilities: aimeat_ai_capabilities first, aimeat_ai_models, aimeat_ai_transcribe, aimeat_ai_embed.
@@ -58,6 +59,19 @@ Model your own structures by writing JSON under hierarchical keys (e.g. \`projec
 
 **Storage — files/binaries.** \`aimeat_storage_upload\` / \`aimeat_storage_download\`. Storage returns
 a handle/URL, not bytes — never read large binaries into context.
+
+**Classified content — read the warning, respect what is hidden.** Every memory record, stored file
+and workspace row has a classification (public, internal, confidential, highly confidential, or a
+level your owner or an organism added) that decides which people and which AI may read it. A record
+with a warning classification reaches you with \`classification_warning\`: use it only for the task
+you were given, and copy it nowhere else. A record hidden from AI is not in your lists and reads as
+absent, and a call that names it is refused with \`CLASSIFIED\`: tell your owner it is classified, and
+do not retry or reach for it another way. \`aimeat_classification\` reads and changes classifications,
+with the actions \`get\`, \`set\`, \`review\`, \`policy_get\`, \`policy_set\`, \`audit\` and \`scan\`. Your
+own judgement never lowers a classification and never changes one a person set: it becomes a
+suggestion your owner accepts or rejects. When your owner tells you what to set, pass their own
+words, verbatim, in \`human_said\`. A policy change that gives anything away waits until your owner
+accepts it, signed in themselves.
 
 **Tasks — structured work for the owner.** \`aimeat_task_create\` · \`aimeat_task_list\` ·
 \`aimeat_task_get\` · \`aimeat_task_propose_todos\` · \`aimeat_task_event\` · \`aimeat_task_todo\` ·

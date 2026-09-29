@@ -15,6 +15,7 @@
  * @structure registerClassificationTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage registerClassificationTools(mcp, storage, config, agentGaii, scopes);
  * @version-history
+ *   v1.3.0 — 2026-09-29 — V5: the same field check and pending hint as the connector and the CLI.
  *   v1.2.0 — 2026-09-29 — V3: the scan action runs the Content Classifier on keys or a prefix.
  *   v1.1.0 — 2026-09-29 — V4: the audit action reads the audit log of a level.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V2. Initial.
@@ -32,6 +33,7 @@ import {
   ClassificationError, labelActorOf, readContentLabel, reviewLabel, setLabel, targetOf,
 } from '../services/classification/labels.js';
 import { readAuditLog, readPolicy, writePolicy } from '../services/classification/policy-admin.js';
+import { checkClassificationInput, POLICY_PENDING_NEXT } from './catalog/definitions/classification.js';
 import { scanContent } from '../services/classification/scan.js';
 
 const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v, null, 2) }] });
@@ -74,6 +76,9 @@ export function registerClassificationTools(
     },
     annotationsFor('aimeat_classification'),
     async (args) => {
+      // The same field check the connector and the CLI make (catalog/definitions/classification.ts).
+      const checked = checkClassificationInput(args as Record<string, unknown>);
+      if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
       if (WRITES.has(args.action) && !scopeIsCovered(scopes, 'memory:write')) {
         return toolError('SCOPE_DENIED', `action "${args.action}" needs the "memory:write" permission, which the owner grants this agent in its settings.`);
       }
@@ -107,7 +112,7 @@ export function registerClassificationTools(
             if (!args.policy) return toolError('INVALID_INPUT', 'policy is the whole level: read it with policy_get and send `stored` back changed.');
             const out = await writePolicy(deps, actor, args.level ?? 'owner', args.organism_id, args.policy, { humanSaid: args.human_said });
             return text(out.pending
-              ? { ...out, next: 'This gives something away, so it waits. Ask the person to accept or reject it signed in themselves (POST /v1/classification/policy/review); an AI cannot accept it.' }
+              ? { ...out, next: POLICY_PENDING_NEXT }
               : out);
           }
         }

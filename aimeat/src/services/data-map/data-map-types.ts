@@ -23,6 +23,8 @@
  * @structure DataMap · DataMapRow · ElsewhereRow · DataMapStamp · publicDataMap()
  * @usage import type { DataMap } from './data-map-types.js';
  * @version-history
+ *   v2.2.0 — 2026-09-29 — A `held` row may carry `classification`, the label id the app expects for
+ *     that key family by default (TARGET-082 V5). Optional and additive, so the spec stays /2.
  *   v2.1.0 — 2026-08-26 — `organism-rows` joins the location vocabulary. A workspace's row store is
  *     a DIFFERENT answer from the workspace it sits in — appended rather than edited, no version
  *     history, charged to the organism instead of to whoever wrote the row — and a reader told only
@@ -134,6 +136,15 @@ export interface DataMapRow {
    * for the nearest wrong type.
    */
   isA?: string;
+  /**
+   * The classification the app expects for this key family by default: a label id such as
+   * `luottamuksellinen` (the levels and their ids: services/classification/levels.ts).
+   *
+   * OPTIONAL, AND A STATEMENT RATHER THAN A SETTING. It says what level the builder meant this data
+   * to carry, so an owner or a reviewer can compare it with the level the content actually has. It
+   * never labels a record and never refuses a map; an id that cannot be a label is a finding.
+   */
+  classification?: string;
 }
 
 /** The second table: what is unresolved, or is not ours. */

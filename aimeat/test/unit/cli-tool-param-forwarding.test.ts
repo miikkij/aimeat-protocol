@@ -26,6 +26,8 @@
  *   on the fleet door with this suite green.
  * @usage pnpm test -- cli-tool-param-forwarding
  * @version-history
+ *   2026-09-29 — aimeat_classification: every field of every action reaches its /v1/classification
+ *     route under its REST name, on the CLI dispatch and on the connector MCP (TARGET-082 V5).
  *   2026-09-28 — aimeat_mail_read probes with an attachment_id, beside which store, filename, mime_type and key travel.
  *   2026-09-27 — aimeat_cortex_list probes with a name, beside which include_source travels; the stale aimeat_app_legal_set entry is gone.
  *   v1.5.0 — 2026-09-25 — aimeat_workspace_suggestions: the decide branch is probed with a suggestion,
@@ -475,6 +477,47 @@ describe('the redeploy, source and board-rules parameters reach the route that r
         expect(sent.map(s => `${s.method} ${s.path}`)).toEqual(['POST /v1/memory/notes.one/restore']);
         const viaCli = await record(cli('aimeat_memory_restore'), { key: 'notes.one', owner_scope: true } as never);
         expect(viaCli.sent.map(s => `${s.method} ${s.path}`)).toEqual(['POST /v1/memory/notes.one/restore?owner_scope=true']);
+    });
+
+    // aimeat_classification refuses a field its action does not read, so the generic probe above
+    // (which holds `action` at its last enum value, scan) measures only keys, prefix and key. Every
+    // other field is measured here, action by action, on the CLI dispatch and on the connector MCP,
+    // with the REST name each one must arrive under.
+    it('aimeat_classification sends every field of every action to its /v1/classification route, on both connector interfaces', async () => {
+        const target = { kind: 'row', key: 'k1', organism_id: 'org-1', ws: 'ws-1', space: 'sp', row_id: 'r1' };
+        const cases: [JsonObject, Sent][] = [
+            [{ action: 'get', ...target }, { method: 'GET', path: '/v1/classification/label?kind=row&key=k1&organism_id=org-1&ws=ws-1&space=sp&row_id=r1' }],
+            [{ action: 'set', ...target, label: 'confidential', justification: 'j', human_said: 'h', confidence: 0.5, reason: 'r' },
+                { method: 'PUT', path: '/v1/classification/label', body: { ...target, label: 'confidential', justification: 'j', confidence: 0.5, reason: 'r', humanSaid: 'h' } }],
+            [{ action: 'review', ...target, decision: 'accept', justification: 'j', human_said: 'h' },
+                { method: 'POST', path: '/v1/classification/label/review', body: { ...target, decision: 'accept', justification: 'j', humanSaid: 'h' } }],
+            [{ action: 'policy_get', level: 'organism', organism_id: 'org-1' }, { method: 'GET', path: '/v1/classification/policy?level=organism&organism_id=org-1' }],
+            [{ action: 'policy_set', level: 'organism', organism_id: 'org-1', policy: { enabled: true }, human_said: 'h' },
+                { method: 'PUT', path: '/v1/classification/policy', body: { level: 'organism', organism_id: 'org-1', policy: { enabled: true }, humanSaid: 'h' } }],
+            [{ action: 'audit', level: 'organism', organism_id: 'org-1', since: '2026-09-01T00:00:00Z', audit_action: 'refused', limit: 7 },
+                { method: 'GET', path: '/v1/classification/audit?level=organism&organism_id=org-1&since=2026-09-01T00%3A00%3A00Z&action=refused&limit=7' }],
+            [{ action: 'scan', keys: ['a', 'b'], prefix: 'notes.' }, { method: 'POST', path: '/v1/classification/scan', body: { keys: ['a', 'b'], prefix: 'notes.' } }],
+            [{ action: 'scan', key: 'a' }, { method: 'POST', path: '/v1/classification/scan', body: { keys: ['a'] } }],
+        ];
+        const { registerClassificationTools } = await import('../../src/cli/connect/mcp/tools/classification.js');
+        const sent: Sent[] = [];
+        const tool = connectorTools(registerClassificationTools as never, sent).get('aimeat_classification')!;
+        for (const [input, expected] of cases) {
+            const viaCli = await record(cli('aimeat_classification'), input);
+            expect(viaCli.sent, `CLI ${JSON.stringify(input)}`).toEqual([expected]);
+            sent.length = 0;
+            await tool.handler(input);
+            expect(sent, `connector ${JSON.stringify(input)}`).toEqual([expected]);
+        }
+
+        // A field its action does not read is refused before anything is sent, on both.
+        const foreign = await record(cli('aimeat_classification'), { action: 'scan', keys: ['a'], label: 'public' } as never);
+        expect(foreign.refused).toBe(true);
+        expect(foreign.sent).toEqual([]);
+        sent.length = 0;
+        const refused = await tool.handler({ action: 'get', key: 'a', level: 'owner' });
+        expect(refused.isError).toBe(true);
+        expect(sent).toEqual([]);
     });
 
     it('connector MCP aimeat_board_create declares rules, and aimeat_board_rules_set exists', async () => {

@@ -10,6 +10,7 @@
  * @structure SDK_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.18.0 — 2026-09-29 — aimeat-labels joins after aimeat-organism, from library-packs/sdk-labels.ts (TARGET-082 V5).
  *   v1.17.0 — 2026-09-29 — aimeat-refinery joins after aimeat-decide, from library-packs/sdk-refinery.ts.
  *   v1.16.3 — 2026-09-28 — aimeat-data's aiDoc names the aimeat-config block and AIMEAT.data.appConfig().
  *   v1.16.2 — 2026-09-28 — aimeat-ai moved to library-packs/sdk-ai.ts (max-file-lines) and is spread
@@ -106,6 +107,7 @@ import { REFINERY_PACKS } from './sdk-refinery.js';
 import { WORKFLOWS_PACKS } from './sdk-workflows.js';
 import { WEBHOOK_PACKS } from './sdk-webhook.js';
 import { AI_PACKS } from './sdk-ai.js';
+import { LABELS_PACKS } from './sdk-labels.js';
 
 export const SDK_PACKS: LibraryPack[] = [
   ...CALENDAR_PRINT_PACKS,
@@ -272,6 +274,7 @@ export const SDK_PACKS: LibraryPack[] = [
     promptGroup: 'core',
     promptLine: '- aimeat-organism.js — organisms & workspaces: list, normalized workspace read (published + drafts merged per item), write drafts, publish, README, search (`AIMEAT.organism`). Requires aimeat-auth.',
   },
+  ...LABELS_PACKS,
   ...AI_PACKS,
   ...DECIDE_PACKS,
   ...REFINERY_PACKS,

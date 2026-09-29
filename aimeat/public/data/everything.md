@@ -42,6 +42,7 @@ The API contract is [openapi.yaml](https://github.com/miikkij/aimeat-protocol/bl
 21. [Standards the node speaks](#g-21)
 22. [Companion projects](#g-22)
 23. [Removed, and what replaced it](#g-23)
+24. [Data classification](#g-24)
 
 ---
 
@@ -162,7 +163,7 @@ Memory is the knowledge a person brought and owns. A value is a record: one key 
 | <a id="g-5-librarian"></a> **Librarian** | One ranked natural-language search across your personal memory and every organism you belong to. | `/v1/librarian` |
 | <a id="g-5-files"></a> **Files** | Upload up to 10 MB in one go or 5 GB in chunks (both set by the operator), resume downloads, set visibility per file. A file you download cannot run as a page on the node's address. | `/v1/storage`, `aimeat_storage_*` |
 | <a id="g-5-presigned-uploads"></a> **Presigned uploads** | An MCP tool hands back an upload address; the client PUTs the file there instead of pasting it into the conversation. | `aimeat_app_publish`, `aimeat_storage_upload`, `aimeat_extension_install`, `aimeat_cortex_install` |
-| <a id="g-5-data-map"></a> **Data map** | Read what an app stores, why it stores it, the exact location, who can read it, how long it is kept and what could be lost. The map identifies personal data and missing explanations. | `/v1/datamap/apps/:owner/:filename`, `aimeat_datamap_get`, `aimeat_datamap_set` |
+| <a id="g-5-data-map"></a> **Data map** | Read what an app stores, why it stores it, the exact location, who can read it, how long it is kept and what could be lost. The map identifies personal data and missing explanations. A row can also name the classification the app expects for that data by default, such as confidential (see section 24). | `/v1/datamap/apps/:owner/:filename`, `aimeat_datamap_get`, `aimeat_datamap_set` |
 | <a id="g-5-open-items"></a> **Open items** | Your own to-do list, kept as one record. | `/v1/open-items` |
 
 ---
@@ -619,6 +620,34 @@ The operator dashboard is the one place with server-built screens. Everything on
 | <a id="g-23-knowledge-contributor-reputation"></a> **Knowledge contributor reputation** | Not in the code | Reputation per knowledge package. |
 | <a id="g-23-boards"></a> **Boards** | Deprecated, then reinstated 2026-08-30 | Current, see section 13. |
 | <a id="g-23-legacy-ed25519-challenge-response"></a> **Legacy Ed25519 challenge-response** | Deprecated, still mounted | Device authorization and agent keys; the keypair still serves federation and node signing. |
+
+---
+
+<a id="g-24"></a>
+
+## 24. Data classification
+
+Every piece of content you keep can carry a classification: how sensitive it is. The node comes with four: public, internal, confidential and highly confidential. You or an organism can add your own, such as top secret. The classification decides which people and which AI can read the content, and whether it can leave its organism. You classify content yourself, or the Content Classifier suggests a classification and you accept or reject it.
+
+**Availability.** Off by default, and while it is off nothing changes. The operator turns it on for every owner, or lets each owner turn it on for their own content and each organism for its content. The setting is `AIMEAT_CLASSIFICATION` (`off`, `owner` or `all`).
+
+**Limitations.**
+
+- The node cannot check text that an agent writes into its own prompt. After an AI has read content, what it does with that text on its own side is outside the node.
+- When an AI client drives your own signed-in REST session, the node cannot tell it apart from you, so it gets what you get.
+- A published data package is not yet classified file by file.
+- The classification pages in the Data Wallet and on the Security page are not yet on the node. Today you use the MCP tool or the REST endpoints below.
+
+| Feature | What you get | Reach |
+|---|---|---|
+| <a id="g-24-classification-levels"></a> **Classification levels** `[off]` | The four levels that come with the node, and the levels you or an organism add between them. An owner or an organism can only make the node's rules stricter: a change that would loosen a node rule is refused and names that rule. | `aimeat_classification` (`policy_get`, `policy_set`), `GET /v1/classification/policy`, `PUT /v1/classification/policy` |
+| <a id="g-24-classify-content"></a> **Classify content** `[off]` | Give a memory record, a workspace record or document, a stored file or a workspace row its classification. See its classification now, a waiting suggestion, and its last changes. An AI never lowers a classification and never changes one a person set: its choice becomes a suggestion that you accept or reject. | `aimeat_classification` (`get`, `set`, `review`), `GET /v1/classification/label`, `PUT /v1/classification/label`, `POST /v1/classification/label/review` |
+| <a id="g-24-what-an-ai-sees"></a> **What an AI sees** `[off]` | AI never sees content whose classification hides it: it is not in the AI's lists, and a call that names it is refused with `CLASSIFIED`. Content with a warning classification reaches the AI with a warning, and the AI uses it only for the task it was given. By default highly confidential content is hidden and confidential content carries a warning. | every MCP tool and REST read an AI uses |
+| <a id="g-24-content-that-stays-in-its-organism"></a> **Content that stays in its organism** `[off]` | An organism's content whose classification must not leave stays out of exports and out of federation to other nodes. By default only public content leaves. | exports, federation |
+| <a id="g-24-content-classifier"></a> **Content Classifier** `[off]` | Suggests or sets the classification of memory records. Detection rules run first (identity codes, API keys, email addresses and the rules you add), then the decision model or the text model that the policy names. Personal data is removed before any text goes to a model. New content is checked with the detection rules when it is written. One key, or up to 20 keys, is classified at once; more keys or a key prefix wait in a queue that the node works through within its daily limits. | `aimeat_classification` (`scan`), `POST /v1/classification/scan` |
+| <a id="g-24-changes-that-loosen-the-policy-wait-for-you"></a> **Changes that loosen the policy wait for you** `[off]` | A policy change that only makes rules stricter applies at once. A change that loosens them (turns classification off, lets an AI see more, removes an audit log or a rule, lowers the default) waits until you accept it signed in yourself. An AI cannot accept it. | `POST /v1/classification/policy/review` |
+| <a id="g-24-audit-log"></a> **Audit log** `[off]` | For each level: which classified items an AI was shown or used, which were refused, and which classifications changed. One row per reader, item and action per minute, with a count. | `aimeat_classification` (`audit`), `GET /v1/classification/audit` |
+| <a id="g-24-apps-state-the-classification-they-expect"></a> **Apps state the classification they expect** | An app's data map can name, for each group of keys, the classification the app expects that data to have by default. It classifies nothing: it lets you compare what the builder meant with what the content has. | `aimeat_datamap_set`, `PUT /v1/datamap/apps/:owner/:filename` |
 
 ---
 
