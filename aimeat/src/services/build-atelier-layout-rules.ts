@@ -19,6 +19,7 @@
  * @usage body += atelierLayoutRules();
  *        export const ATELIER_COMPONENTS = [ ..., ...ATELIER_WORKBENCH_COMPONENTS ];
  * @version-history
+ *   v1.4.0 — 2026-09-29 — `margins`: the person's home margin figure on the empty sides (wish reunakuvio).
  *   v1.3.0 — 2026-09-29 — The build order when the owner approved a drawing: drawing → genre on
  *     sample data → owner approves → app forked from the genre (wish rakennusohjeen-jarjestys).
  *   v1.2.0 — 2026-09-28 — Rule 5 adds the one settings card (`.ak-setgroups`) and saving on change,
@@ -75,6 +76,11 @@ export const ATELIER_WORKBENCH_COMPONENTS: ReadonlyArray<{ id: string; summary: 
     id: 'callout',
     summary: 'A tinted note with a tone (info, ok, warn, err) that says why: why an item is unclear, what failed, what to do.',
     example: "AIMEAT.atelier.callout({ target: detail, tone: 'warn', title: 'Why this is unclear', text: reason });",
+  },
+  {
+    id: 'margins',
+    summary: 'Wide screens: the sides wear the home margin figure.',
+    example: "AIMEAT.atelier.margins(AIMEAT.atelier.marginsOf(prefs));",
   },
 ];
 

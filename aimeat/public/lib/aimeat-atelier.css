@@ -49,6 +49,8 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.58.0 — 2026-09-29 — margins.css joins the imports: the node's eight margin figures on the
+ *     empty sides of a wide app frame (html[data-ak-margins], AIMEAT.atelier.margins()).
  *   v0.57.0 — 2026-09-29 — shell.css: .ak-badge tones (ok, warn, err, quiet), which a list row takes
  *     as `badgeTone`; the refinery console's batch rows use them.
  *   v0.56.0 — 2026-09-29 — workbench.css: promptPanel (two columns, the preview, the white paste box,
@@ -366,6 +368,7 @@
 @import url('./aimeat-atelier/controls.css');
 @import url('./aimeat-atelier/menu.css');
 @import url('./aimeat-atelier/island.css');
+@import url('./aimeat-atelier/margins.css');
 /* LAST on purpose: the generated look blocks (tokens + structure recipes) override the parts. */
 @import url('./aimeat-atelier/looks.css');
 

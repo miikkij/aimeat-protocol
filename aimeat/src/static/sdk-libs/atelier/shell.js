@@ -41,6 +41,7 @@
  * @tokens bottomNav --ak-chrome-bottom
  * @fork bottomNav Copy .ak-bottomnav* out of shell.css; the chrome reserve is the shell's.
  * @version-history
+ *   v0.65.0 — 2026-09-29 — `margins` puts one of the node's margin figures on at start (margins.js).
  *   v0.64.0 — 2026-09-28 — The tab row's chosen fill is the ink (ink.js): one marker that travels
  *     to the next tab on two edge springs, kept live through the view transition.
  *   v0.63.0 — 2026-09-28 — THE WORKBENCH FRAME: `logo` draws the app's own mark before the title
@@ -88,6 +89,7 @@ import { weather } from './ambient-parts.js';
 import { partEl, slotInto, applyVariant, hasPart, partValue } from './parts-model.js';
 import { sideNav } from './workbench.js';
 import { ink } from './ink.js';
+import { margins } from './margins.js';
 
 /**
  * The app's own mark beside its name: an https URL (or a same-origin path) to a square image.
@@ -229,9 +231,11 @@ function ambientSpec(want) {
  *   navItems?: Array<{ id: string, label: string, count?: number|string, tone?: string,
  *     group?: string, bottom?: boolean, onPick?: (item: any) => void }>,
  *   nav?: 'bottom'|'side', navValue?: string, navLabel?: string,
- *   requireLogin?: boolean, ambient?: AmbientWish, motion?: boolean,
+ *   requireLogin?: boolean, ambient?: AmbientWish, motion?: boolean, margins?: string|false,
  *   onReady?: (session: any) => void, onLogout?: () => void,
  * }} spec
+ *   `margins` puts one of the node's margin figures ('a'..'h', margins.js) on the empty sides of a
+ *   wide frame; the person's own home choice is the app's to read and hand to margins().
  *   `logo` is the app's own square mark (an https or storage URL, never data:), drawn at 32 px
  *   before the title. `nav: 'side'` puts `navItems` in a left column beside a capped content
  *   column (the workbench layout); an entry may carry a `count`, a `tone` dot and a `group`
@@ -246,6 +250,7 @@ function ambientSpec(want) {
  */
 export function app(spec) {
   injectStyle();
+  if (spec.margins !== undefined) margins(spec.margins);
 
   const state = { title: spec.title, look: spec.look || 'vivid' };
   const titleId = uid('ak-app-title');
