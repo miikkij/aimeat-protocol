@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description Who must sign a relay claim, peer by peer, and which peers are ready for it.
  *
- *   THE MIGRATION THIS SERVES. `federation.relay_claim` is `optional` today, which lets a relayed
- *   request with no claim through because a peer on older software sends none. That is a migration
+ *   THE MIGRATION THIS SERVES. `federation.relay_claim` set to `optional` lets a relayed request
+ *   with no claim through because a peer on older software sends none. That is a migration
  *   position and not protection (src/middleware/relay-gate.ts says why), so it has an end: the
- *   default becomes `required` in 3.20.0, and `optional` is removed in 4.0.0. Two things make that
+ *   default is `required` from 3.20.0, and `optional` is removed in 4.0.0. Two things make that
  *   survivable for an operator whose peers update at their own pace:
  *     - a peer can carry its OWN answer (`relayClaim`), which the gate reads before the node's. An
  *       operator keeps one slow peer on `optional` after the node turns `required`, or holds one
@@ -35,6 +35,8 @@
  * @usage
  *   const view = peerRelayClaimView(config, peer);
  * @version-history
+ *   v1.0.1 — 2026-09-29 — The header says `required` is the default from 3.20.0 (config-federation.ts
+ *     applies it). No code change.
  *   v1.0.0 — 2026-09-25 — Initial: the peer's own setting, the two relay times, and the versions.
  */
 import type { AimeatConfig } from '../config.js';

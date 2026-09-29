@@ -12,6 +12,8 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   v1.16.1 — 2026-09-29 — federation.relay_claim: the description says the default is 'required'
+ *     from 3.20.0 and that 'optional' is still taken when set, until 4.0.0.
  *   v1.15.3 — 2026-09-28 — The search-engine presence rows moved to config-schema-seo.ts unchanged
  *     (max-file-lines), spread where they stood.
  *   v1.15.2 — 2026-09-28 — packages.install_set and packages.install_set_secrets (AIMEAT_INSTALL_SET,
@@ -223,7 +225,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
 
   // ── Federation (mutable) ──
   { key: 'maxRelayHops', dotPath: 'federation.max_relay_hops', envVar: 'AIMEAT_MAX_RELAY_HOPS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max relay hops for federated requests', range: '1-10' },
-  { key: 'federationRelayClaim', dotPath: 'federation.relay_claim', envVar: 'AIMEAT_FEDERATION_RELAY_CLAIM', type: 'string', validate: v => v === 'optional' || v === 'required', immutable: false, description: "Must an inbound relayed request carry a signed relay claim? 'required' refuses one without; 'optional' lets an older peer through and is a migration position rather than protection. The default is 'optional' until 3.20.0, when it becomes 'required', and 'optional' is removed in 4.0.0. Until then one peer can keep its own answer (relay_claim on the peer), and the federation overview names the peers that still relay without a claim", range: 'optional | required' },
+  { key: 'federationRelayClaim', dotPath: 'federation.relay_claim', envVar: 'AIMEAT_FEDERATION_RELAY_CLAIM', type: 'string', validate: v => v === 'optional' || v === 'required', immutable: false, description: "Must an inbound relayed request carry a signed relay claim? 'required' refuses one without; 'optional' lets an older peer through and is a migration position rather than protection. The default is 'required' from 3.20.0; 'optional' is still taken when set, and is removed in 4.0.0. Until then one peer can keep its own answer (relay_claim on the peer), and the federation overview names the peers that still relay without a claim", range: 'optional | required' },
 
   // ── Rate Limits (mutable, per-endpoint with global fallback) ──
   { key: 'rlGlobal', dotPath: 'rate_limits.global', envVar: 'AIMEAT_RL_GLOBAL', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Global rate limit (requests/second)', range: '1-10000' },

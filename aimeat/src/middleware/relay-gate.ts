@@ -20,18 +20,19 @@
  *   is this node willing to be relayed to by that peer.
  *
  *   THE MISSING-CLAIM CASE IS A SETTING, AND THE SETTING'S OWN WORDS SAY WHAT IT IS WORTH.
- *   `optional` (the shipped default) lets a request through when it carries no claim at all, because
- *   a peer running older software sends none and refusing would break the relay the day this node
- *   updates. That is a migration position and not protection: a peer that does not want to be
- *   refused can simply omit the header. `required` is the protection. Between them sits the one
+ *   `optional` (an explicit setting; the default is `required` from 3.20.0) lets a request through
+ *   when it carries no claim at all, because a peer running older software sends none and refusing
+ *   would break its relays. That is a migration position and not protection: a peer that does not
+ *   want to be refused can simply omit the header. `required` is the protection. Between them sits the one
  *   thing `optional` CAN promise honestly — a peer that has ever presented a valid claim is
  *   remembered as able to sign one, and an unclaimed relay from that peer is refused from then on.
  *   So the downgrade is closed for every peer that has updated, and only genuinely old peers pass.
- *   The default becomes `required` in 3.20.0 and `optional` goes in 4.0.0; until then a peer can
- *   carry its own answer, read here before the node's (services/relay-claim-policy.ts).
+ *   `optional` goes in 4.0.0; until then a peer can carry its own answer, read here before the
+ *   node's (services/relay-claim-policy.ts).
  * @structure relayGate(config, storage, peers) -> express.RequestHandler
  * @usage app.use(relayGate(config, storage, services.peers));
  * @version-history
+ *   v1.2.1 — 2026-09-29 — The header says `required` is the default from 3.20.0. No code change.
  *   v1.2.0 — 2026-09-25 — An unclaimed relay is judged by the named peer's own relay-claim setting
  *     when it has one, and both kinds of relay are written down on the peer they name.
  *   v1.1.0 — 2026-09-17 — A claim that verifies is left on the request as `req.relay` (peer and

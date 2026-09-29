@@ -32,8 +32,9 @@
  *   called Resources, so nobody could tell it from a broken counter. The totals ride along, so the
  *   page can say nought of fifty-seven rather than nought.
  *
- *   WHO IS NOT READY FOR REQUIRED RELAY CLAIMS. The default becomes `required` in 3.20.0, so an
- *   operator needs to know which peers still relay without a claim before then. Each roster row
+ *   WHO IS NOT READY FOR REQUIRED RELAY CLAIMS. The default is `required` from 3.20.0, so an
+ *   operator needs to know which peers still relay without a claim: the node refuses them unless it
+ *   or the peer is kept on `optional`. Each roster row
  *   carries the peer's own setting and when it last relayed with and without one, and
  *   `relay_claims` sorts the peers by it (services/relay-claim-policy.ts).
  * @structure
@@ -43,6 +44,8 @@
  * @usage
  *   import { buildFederationOverview } from '../services/federation-overview.js';
  * @version-history
+ *   v1.1.1 — 2026-09-29 — The header says `required` is the relay-claim default from 3.20.0. No code
+ *     change.
  *   v1.1.0 — 2026-09-25 — Relay claims: each roster row carries the peer's own setting and its last
  *     claimed and unclaimed relay, and `relay_claims` names who is not ready and the two versions.
  *   v1.0.0 — 2026-09-12 — Initial, with the Federation page's rebuild.

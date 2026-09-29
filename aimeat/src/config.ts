@@ -15,6 +15,8 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.17.0 — 2026-09-29 — federationDefaults(): the four federation settings, config-federation.ts.
+ *     The relay-claim default is `required` from 3.20.0; an explicit `optional` is still taken.
  *   v1.16.2 — 2026-09-28 — installSetPath and installSetSecretsPath from AIMEAT_INSTALL_SET and
  *     AIMEAT_INSTALL_SET_SECRETS (default none).
  *   v1.16.1 — 2026-09-28 — packageRepository from AIMEAT_PACKAGE_REPOSITORY (default off).
@@ -72,6 +74,7 @@ import { aiJobDefaults } from './config-ai-jobs.js';
 import { aiModelDefaults } from './config-ai-models.js';
 import { decideDefaults } from './config-decide.js';
 import { themesDefaults } from './config-themes.js';
+import { federationDefaults } from './config-federation.js';
 import { accountSecurityDefaults } from './config-types-account-security.js';
 import { seoDefaults } from './config-site-presence.js';
 import { loadFileSource } from './services/config-loader.js';
@@ -307,10 +310,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     dailyAllowanceCap: parseInt(process.env.AIMEAT_DAILY_ALLOWANCE_CAP ?? '500', 10),
     burnRate: parseFloat(process.env.AIMEAT_BURN_RATE ?? '0.10'),
     extendedFeaturesEnabled: process.env.AIMEAT_EXTENDED_FEATURES !== 'false',
-    maxRelayHops: parseInt(process.env.AIMEAT_MAX_RELAY_HOPS ?? '3', 10),
-    federationRelayClaim: process.env.AIMEAT_FEDERATION_RELAY_CLAIM === 'required' ? 'required' : 'optional',
-    depeeringGracePeriodHours: parseInt(process.env.AIMEAT_DEPEERING_GRACE_HOURS ?? '72', 10),
-    keyCacheRefreshMinutes: parseInt(process.env.AIMEAT_KEY_CACHE_REFRESH_MINUTES ?? '5', 10),
+    ...federationDefaults(),
     memoryQuotaMb: parseInt(process.env.AIMEAT_MEMORY_QUOTA_MB ?? '10', 10),
     memoryMaxValueSizeKb: parseInt(process.env.AIMEAT_MEMORY_MAX_VALUE_SIZE_KB ?? '1024', 10),
     memoryMaxKeysPerAgent: parseInt(process.env.AIMEAT_MEMORY_MAX_KEYS ?? '1000', 10),

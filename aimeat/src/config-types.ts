@@ -7,6 +7,7 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.10.1 — 2026-09-29 — federationRelayClaim: `required` is the default from 3.20.0.
  *   v1.10.0 — 2026-09-28 — The packages and templates fields moved to config-types-packages.ts
  *     unchanged (PackagesConfig mixed in), to stay under the line ceiling.
  *   v1.9.0 — 2026-09-28 — packageRepository: the package repository role.
@@ -317,13 +318,13 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
    * Does an inbound RELAYED request have to carry a signed relay claim?
    *
    * `required` is the protection: a relayed request with no claim is refused, so this node
-   * decides which peers may relay to it. `optional` (the default) lets an unclaimed relay through,
-   * because a peer running older software sends none — a migration position, not protection, since
-   * a peer that does not want to be refused can simply omit the header. In BOTH modes a claim that
-   * is present is fully checked, and a peer that has ever presented a valid one may not go back to
-   * sending none. See src/middleware/relay-gate.ts.
-   * The default becomes `required` in 3.20.0 and `optional` is removed in 4.0.0; until then one peer
-   * can keep its own answer (`relay_claim`, services/relay-claim-policy.ts).
+   * decides which peers may relay to it; it is the default from 3.20.0. `optional`, set explicitly,
+   * lets an unclaimed relay through, because a peer running older software sends none — a migration
+   * position, not protection, since a peer that does not want to be refused can simply omit the
+   * header. In BOTH modes a claim that is present is fully checked, and a peer that has ever
+   * presented a valid one may not go back to sending none. See src/middleware/relay-gate.ts.
+   * `optional` is removed in 4.0.0; until then one peer can keep its own answer (`relay_claim`,
+   * services/relay-claim-policy.ts).
    */
   federationRelayClaim: 'optional' | 'required';
   depeeringGracePeriodHours: number;

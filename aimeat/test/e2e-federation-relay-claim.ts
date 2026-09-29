@@ -18,6 +18,8 @@
  *
  *   Node R (receiver) 40293. Peers: relay-ok (permitted), relay-demoted (allowRouting false).
  * @version-history
+ *   v1.4.0 — 2026-09-29 — The shipped setting is `required` (3.20.0): an unclaimed relay from a peer
+ *     that has never signed is refused on it, and let through once `optional` is set explicitly.
  *   v1.3.0 — 2026-09-25 — One peer on its own setting, both ways round; the words the setting takes;
  *     and the federation answer naming who relays with a claim and who without, and when.
  *   v1.2.0 — 2026-09-24 — A re-spelled copy of a spent claim is refused as the same claim
@@ -340,12 +342,22 @@ await test('demoting a peer takes effect on the receiver, which is what Stage B 
 
 // ── A relay with no claim at all ─────────────────────────────────────────────
 
-await test('a peer that has NEVER signed a claim still relays through, on the shipped setting', async () => {
-    // This is the migration position, and it is the reason decision 3 is a question rather than an
-    // answer: an old peer sends no claim, and refusing it would break the relay the day this node
-    // updates. It is not protection, and the setting's own text says so.
+await test('on the shipped setting (required from 3.20.0), an unclaimed relay from a peer that has NEVER signed is refused', async () => {
     const res = await fetch(`${BASE}/v1/health`, { headers: { 'X-Forwarded-From': DEMOTED_NODE } });
-    assert(res.status === 200, `unclaimed relay from a never-signed peer: ${res.status}`);
+    assert(res.status === 403, `unclaimed relay from a never-signed peer on the default: ${res.status}`);
+    assert(((await res.json()) as any).error.code === 'RELAY_CLAIM_REQUIRED', 'refused for the missing claim');
+});
+
+await test('on optional, set explicitly, a peer that has NEVER signed a claim still relays through', async () => {
+    // This is the migration position: an old peer sends no claim, and the operator who is not ready
+    // to refuse it sets `optional` until 4.0.0. It is not protection, and the setting's own text says so.
+    const off = await json('/v1/admin/config', {
+        method: 'PUT', headers: auth(),
+        body: JSON.stringify({ changes: [{ path: 'federation.relay_claim', value: 'optional' }] }),
+    });
+    assert(off.status === 200, `set optional: ${off.status} ${JSON.stringify(off.body)}`);
+    const res = await fetch(`${BASE}/v1/health`, { headers: { 'X-Forwarded-From': DEMOTED_NODE } });
+    assert(res.status === 200, `unclaimed relay from a never-signed peer on optional: ${res.status}`);
 });
 
 await test('a peer that HAS signed a claim may not go back to sending none', async () => {
@@ -388,7 +400,7 @@ await test('on the strict setting, an unclaimed relay from ANY peer is refused',
 
 // ── One peer on its own setting ──────────────────────────────────────────────
 //
-// The node-wide default turns `required` in 3.20.0 and `optional` goes in 4.0.0. Until then an
+// The node-wide default is `required` from 3.20.0 and `optional` goes in 4.0.0. Until then an
 // operator can keep one peer on its own answer, and the gate reads that peer's answer first.
 
 const THIRD_NODE = 'aimeat-test-001-relaythird';
