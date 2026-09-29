@@ -961,6 +961,12 @@
       },
       "why": "The node's own read (TARGET-082 V1): the owner's classification switch record, never shown to anyone."
     },
+    "src/services/classification/policy-admin.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "The node's own read (TARGET-082 V2): the stored policy record's version before it is rewritten; its content is never shown from here."
+    },
     "src/services/company/company-portfolio.ts": {
       "reads": {
         "getStorageFile": 2

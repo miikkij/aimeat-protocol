@@ -194,6 +194,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_decide_rules', 'aimeat_decide_rule_propose',
         'aimeat_memory_read', 'aimeat_memory_write', 'aimeat_memory_list', 'aimeat_memory_search', 'aimeat_memory_read_public',
         'aimeat_datamap_get', 'aimeat_datamap_set', 'aimeat_memory_hands',
+        'aimeat_classification',
         'aimeat_app_manage',
         'aimeat_designbook_search', 'aimeat_designbook_get', 'aimeat_designbook_propose', 'aimeat_designbook_adopt',
         'aimeat_designbook_keep',

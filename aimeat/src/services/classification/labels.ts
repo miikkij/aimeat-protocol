@@ -21,11 +21,12 @@
  *   organism content only by an active member (an agent the organism does not admit is not one).
  *   V5 narrows organism content to the members who may write the workspace, when the surfaces land.
  * @structure ClassificationError · LabelActor · labelActorOf() · memoryTarget() · fileTarget() ·
- *   rowTarget() · setLabel() · reviewLabel() · labelsFor()
+ *   rowTarget() · setLabel() · reviewLabel() · labelsFor() · targetOf() · readContentLabel()
  * @usage
  *   const actor = labelActorOf(req.auth!, config.nodeId);
  *   await setLabel({ storage, config }, actor, memoryTarget(owner, key), { label: 'luottamuksellinen' });
  * @version-history
+ *   v1.1.0 — 2026-09-29 — V2: targetOf and readContentLabel, shared by the REST route and the MCP tool.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V1. Initial.
  */
 import { randomUUID } from 'node:crypto';
@@ -258,6 +259,52 @@ export async function labelsFor(
     }
   }
   return out;
+}
+
+/** What a caller names as the content: a memory key, a stored file, or a row of a row space. */
+export interface TargetInput {
+  kind?: unknown;
+  key?: unknown;
+  organism_id?: unknown;
+  ws?: unknown;
+  space?: unknown;
+  row_id?: unknown;
+}
+
+/** The label address of what the caller named. Personal content is always the caller's own. */
+export function targetOf(actor: LabelActor, input: TargetInput): ContentLabelTarget {
+  const s = (v: unknown, f: string) => {
+    if (typeof v !== 'string' || !v.trim() || v.length > 512) throw new ClassificationError('INVALID_INPUT', 400, `${f} is required.`);
+    return v.trim();
+  };
+  const kind = input.kind ?? 'memory';
+  if (kind === 'memory') return memoryTarget(actor.ownerGhii, s(input.key, 'key'));
+  if (kind === 'file') return fileTarget(actor.ownerGhii, s(input.key, 'key'));
+  if (kind === 'row') return rowTarget(s(input.organism_id, 'organism_id'), s(input.ws, 'ws'), s(input.space, 'space'), s(input.row_id, 'row_id'));
+  throw new ClassificationError('INVALID_INPUT', 400, 'kind is memory, file or row.');
+}
+
+export interface LabelView {
+  target: ContentLabelTarget;
+  label: string;
+  /** The label's own fields, from the policy that applies to this content. */
+  labelDetail: ClassificationLabel | null;
+  source: ContentLabelRow['source'];
+  locked: boolean;
+  suggestion: ContentLabelRow['suggestion'];
+  history: ContentLabelRow['history'];
+}
+
+/** The label a piece of content carries, with its waiting suggestion and its last changes. */
+export async function readContentLabel(deps: ClassificationDeps, actor: LabelActor, target: ContentLabelTarget): Promise<LabelView> {
+  await assertMayLabel(deps, actor, target);
+  const policy = await policyFor(deps.storage, deps.config, target.scope);
+  const row = await deps.storage.getContentLabel(target);
+  const label = row?.label ?? policy.defaultLabel;
+  return {
+    target, label, labelDetail: labelById(policy, label) ?? null, source: row?.source ?? 'default',
+    locked: !!row?.locked, suggestion: row?.suggestion ?? null, history: (row?.history ?? []).slice(-10),
+  };
 }
 
 /** The map key labelsFor answers under. */

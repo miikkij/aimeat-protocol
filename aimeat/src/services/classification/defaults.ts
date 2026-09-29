@@ -8,15 +8,29 @@
  *   knows: an operator adds, renames and retires labels and rules, and an owner or an organism adds
  *   their own (spec §4.1). Nothing in the node decides by a label's id; every behaviour comes from a
  *   label's fields.
- * @structure AiVisibility · ClassificationLabel · ClassificationRule · ClassificationPolicy ·
- *   DEFAULT_LABELS · DEFAULT_RULES · defaultPolicy() · labelById()
+ * @structure AiVisibility · LabelAudience · ClassificationLabel · RuleScope · ClassificationRule ·
+ *   PolicyLimits · ClassificationPolicy · DEFAULT_LABELS · DEFAULT_RULES · DEFAULT_LIMITS ·
+ *   defaultPolicy() · labelById()
  * @usage import { defaultPolicy } from './defaults.js';
  * @version-history
+ *   v1.1.0 — 2026-09-29 — V2: a label's reader audience, a rule's scope and the classifier kind, and
+ *     the per-level limits.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V1. Initial.
  */
 
 /** What an AI reader sees of content with this label (spec §5, decided 2026-09-29: three states). */
 export type AiVisibility = 'hidden' | 'warning' | 'allowed';
+
+/**
+ * Who may read content with this label at all (spec §4.1, decided 2026-09-29): an organism role, a
+ * group, or named people. A reader in any one list may read. Empty or absent means everyone who has
+ * access anyway. It only narrows access, for people and AI alike; V4 enforces it.
+ */
+export interface LabelAudience {
+  roles?: string[];
+  groups?: string[];
+  people?: string[];
+}
 
 export interface ClassificationLabel {
   id: string;
@@ -32,22 +46,41 @@ export interface ClassificationLabel {
   mayLeaveOrganism: boolean;
   /** Moving content from this label to a lower one needs a written reason. */
   lowerNeedsJustification: boolean;
+  audience?: LabelAudience | null;
+}
+
+/** Where a rule applies. Absent fields mean everywhere. */
+export interface RuleScope {
+  kinds?: Array<'memory' | 'file' | 'row'>;
+  organismId?: string;
+  ws?: string;
+  keyPrefix?: string;
 }
 
 export interface ClassificationRule {
   id: string;
   name: string;
-  kind: 'keyword' | 'regex';
+  /** keyword: comma-separated words. regex: a pattern. classifier: a description the Content
+   *  Classifier judges (V3); until then the rule is kept and never matches. */
+  kind: 'keyword' | 'regex' | 'classifier';
   pattern: string;
   flags: string;
   /** Content the rule matches gets at least this label. A rule never lowers a label. */
   minLabel: string;
   enabled: boolean;
+  appliesTo?: RuleScope | null;
+}
+
+/** How many labels and rules one level may hold. A node setting, never a code constant (§4.1). */
+export interface PolicyLimits {
+  labels: number;
+  rules: number;
 }
 
 export interface ClassificationPolicy {
   labels: ClassificationLabel[];
   rules: ClassificationRule[];
+  limits: PolicyLimits;
   /** What unlabelled content reads as. Existing content is never rewritten to carry it. */
   defaultLabel: string;
   /** off: an AI may not label. suggest: an AI's label waits for a person. auto: an AI's raise at or
@@ -105,11 +138,15 @@ export const DEFAULT_RULES: readonly ClassificationRule[] = [
   },
 ];
 
+/** Spec §4.1: 100 labels and 500 rules per level unless the operator sets other numbers. */
+export const DEFAULT_LIMITS: Readonly<PolicyLimits> = { labels: 100, rules: 500 };
+
 /** A fresh copy of the node's default policy, safe for the caller to change. */
 export function defaultPolicy(): ClassificationPolicy {
   return {
     labels: DEFAULT_LABELS.map(l => ({ ...l, name: { ...l.name } })),
     rules: DEFAULT_RULES.map(r => ({ ...r })),
+    limits: { ...DEFAULT_LIMITS },
     defaultLabel: 'sisainen',
     aiMode: 'suggest',
     aiThreshold: 0.85,

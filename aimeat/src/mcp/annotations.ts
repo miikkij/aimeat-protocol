@@ -601,6 +601,8 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_admin_install_set: { title: 'Admin: Apply an Install Set', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     aimeat_datamap_get: { title: 'Data map: read', readOnlyHint: true },
     aimeat_datamap_set: { title: 'Data map: state it', destructiveHint: true, idempotentHint: true },
+    // policy_set replaces a level; set and review change one item's classification.
+    aimeat_classification: { title: 'Classification: content and policy', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     aimeat_designbook_search: { title: 'Design Book: browse the parts', readOnlyHint: true },
     aimeat_designbook_get: { title: 'Design Book: one part, whole', readOnlyHint: true },
     aimeat_designbook_propose: { title: 'Design Book: propose (benched first)', idempotentHint: true },

@@ -13,6 +13,7 @@
  * @usage
  *   import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../../mcp/catalog/definitions.js';
  * @version-history
+ *   v1.x -- 2026-09-29 -- definitions/classification.ts: aimeat_classification (TARGET-082 V2).
  *   v1.x -- 2026-09-29 -- definitions/refinery.ts: aimeat_refinery_classes, _run and _status (wish aimeat-refinery).
  *   v1.x -- 2026-09-28 -- definitions/install-sets.ts: aimeat_admin_install_set (install packages, phase 4).
  *   v1.x -- 2026-09-28 -- definitions/ai-models.ts: aimeat_ai_policy_set (System 2 plan, V2).
@@ -67,6 +68,7 @@ import { exchangeTools } from './definitions/exchange.js';
 import { complianceTools } from './definitions/compliance.js';
 import { installSetTools } from './definitions/install-sets.js';
 import { dataMapTools } from './definitions/data-map.js';
+import { classificationTools } from './definitions/classification.js';
 import { surfaceLayoutTools } from './definitions/surface-layout.js';
 import { designbookTools } from './definitions/designbook.js';
 import { uiLibraryTools } from './definitions/ui-library.js';
@@ -100,6 +102,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     ...complianceTools,
     ...installSetTools,
     ...dataMapTools,
+    ...classificationTools,
     ...surfaceLayoutTools,
     ...designbookTools,
     ...uiLibraryTools,
