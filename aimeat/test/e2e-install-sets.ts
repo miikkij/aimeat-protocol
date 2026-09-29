@@ -355,6 +355,25 @@ await test('The install is managed, its updates do not apply by themselves, and 
     assert(cfg.status === 200 && cfg.body.data.values?.shop_name === 'Acme Shop', `config: ${cfg.status} ${JSON.stringify(cfg.body)}`);
 });
 
+await test('The node\'s AIMEAT_APP_BADGE=off takes the aimeat.io badge off the installed app; the default keeps it', async () => {
+    // A node the shop sells: every app a package installs would otherwise carry the badge, and
+    // on LATTICE it covered the Sheets bar (aimeat-apps wish, 2026-09-29). C.config is the object
+    // the routes read, so switching it here is switching the node's setting.
+    const served = async () => {
+        const r = await fetch(`${C.baseUrl}/v1/apps/acme/${encodeURIComponent(appFile)}?mode=inline`, { headers: auth(acmeToken) });
+        return { status: r.status, html: await r.text() };
+    };
+    const on = await served();
+    assert(on.status === 200 && on.html.includes('id="aimeat-app-badge"'), `badge by default: ${on.status} ${on.html.slice(0, 200)}`);
+    C.config.appBadge = 'off';
+    try {
+        const off = await served();
+        assert(off.status === 200 && !off.html.includes('id="aimeat-app-badge"'), `no badge with the node switch off: ${off.status}`);
+    } finally {
+        C.config.appBadge = 'aimeat';
+    }
+});
+
 await test('The organism is private and invite-only, ann is an active member, and bob holds an email invitation', async () => {
     const org = await C.json(`/v1/organisms/${record.organisms.team.id}`, { headers: auth(acmeToken) });
     const o = org.body.data?.organism;

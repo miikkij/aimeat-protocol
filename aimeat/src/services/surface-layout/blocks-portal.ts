@@ -24,6 +24,8 @@
  *   and falls back to this one. A new block, or a rewritten sentence, moves both: the locale key is
  *   what a Finnish operator actually reads.
  * @version-history
+ *   2026-09-29 - portal.frame-signage shows only when the node names a signage screen
+ *     (signageEnabled); its addresses default to the node's own settings, not aimeat.io's.
  *   2026-09-17 - TARGET-078: describe the expanded ownership block.
  *   v1.3.0 — 2026-09-14 — Seven portal.frame-* blocks: the front page as the message frame says it
  *     (TARGET-075). The showroom blocks are untouched.
@@ -362,21 +364,23 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
     {
         id: 'portal.frame-signage',
         surfaces: ['portal'],
-        presence: { kind: 'always' },
+        // Only where the operator names a screen (AIMEAT_SITE_SIGNAGE_URL). It was 'always' with
+        // aimeat.io's own screen as the default, so every node's front page showed aimeat.io's example.
+        presence: { kind: 'config', configKey: 'signageEnabled' },
         localeStem: 'landing2.signage',
         liveDomains: [],
         props: {
             url: {
                 type: 'string',
-                default: 'https://signage-kiosk.apps.aimeat.io/?org=cd750579-99a2-44fe-a996-88ab502a679a&ws=ws-mrgbxgh294h&screen=aimeat-launch',
+                default: '',
                 maxLength: 400,
-                description: 'The address of the signage screen the frame shows. A public screen, so a visitor sees it without signing in.',
+                description: 'The address of the signage screen the frame shows. A public screen, so a visitor sees it without signing in. Empty uses the node\'s AIMEAT_SITE_SIGNAGE_URL.',
             },
             admin: {
                 type: 'string',
-                default: 'https://signage-admin.apps.aimeat.io/',
+                default: '',
                 maxLength: 400,
-                description: 'The address of the admin panel the screen was made in, behind the second door.',
+                description: 'The address of the admin panel the screen was made in, behind the second door. Empty uses the node\'s AIMEAT_SITE_SIGNAGE_ADMIN_URL.',
             },
         },
         maxPerSurface: 1,

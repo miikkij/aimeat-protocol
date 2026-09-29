@@ -5,12 +5,16 @@
  * @description parseSiteContacts(): the people printed on the public pages, read from
  *   AIMEAT_SITE_CONTACTS. Moved out of config.ts by pure extraction when that file reached the
  *   800-line limit; the code is unchanged and config.ts calls it exactly where it used to.
- * @structure parseSiteContacts() — the only export
- * @usage import { parseSiteContacts } from './config-site-contacts.js';
+ * @structure parseSiteContacts() · siteLinksFromEnv()
+ * @usage import { siteLinksFromEnv } from './config-site-contacts.js';
  * @version-history
+ *   v1.1.0 — 2026-09-29 — siteLinksFromEnv(): config.ts's siteLinks object, moved here unchanged
+ *     when config.ts reached 800 lines, plus the signage screen and its admin panel
+ *     (AIMEAT_SITE_SIGNAGE_URL, AIMEAT_SITE_SIGNAGE_ADMIN_URL): the front page showed aimeat.io's own
+ *     signage example on every node.
  *   v1.0.0 — 2026-08-11 — Pure extraction from config.ts (max-file-lines). No behaviour change.
  */
-import type { SiteContact } from './config-types.js';
+import type { SiteContact, SiteLinksConfig } from './config-types.js';
 import { logger } from './utils/logger.js';
 
 /**
@@ -50,4 +54,30 @@ export function parseSiteContacts(): SiteContact[] {
     linkedin: process.env.AIMEAT_SITE_CONTACT_LINKEDIN,
   });
   return single.email ? [single] : [];
+}
+
+/**
+ * Links the public pages point at, from the AIMEAT_SITE_* variables. Empty by design: the marketing
+ * pages point at apps that belong to whoever runs the node, and a fresh clone must not advertise
+ * aimeat.io's apps or Jouni's phone number. Each empty value hides its link, nav item or section.
+ */
+export function siteLinksFromEnv(): SiteLinksConfig {
+  return {
+    learn: process.env.AIMEAT_SITE_LEARN_URL ?? '',
+    exchange: process.env.AIMEAT_SITE_EXCHANGE_URL ?? '',
+    assessment: process.env.AIMEAT_SITE_ASSESSMENT_URL ?? '',
+    roadmap: process.env.AIMEAT_SITE_ROADMAP_URL ?? '',
+    paper: process.env.AIMEAT_SITE_PAPER_URL ?? '',
+    crm: process.env.AIMEAT_SITE_CRM_URL ?? '',
+    radar: process.env.AIMEAT_SITE_RADAR_URL ?? '',
+    briefing: process.env.AIMEAT_SITE_BRIEFING_URL ?? '',
+    apiAccelerator: process.env.AIMEAT_SITE_API_ACCELERATOR_URL ?? '',
+    playbooks: process.env.AIMEAT_SITE_PLAYBOOKS_URL ?? '',
+    showcase: process.env.AIMEAT_SITE_SHOWCASE_URL ?? '',
+    store: (process.env.AIMEAT_SITE_STORE_URL ?? '').trim(),
+    incubator: (process.env.AIMEAT_SITE_INCUBATOR_URL ?? '').trim(),
+    signage: (process.env.AIMEAT_SITE_SIGNAGE_URL ?? '').trim(),
+    signageAdmin: (process.env.AIMEAT_SITE_SIGNAGE_ADMIN_URL ?? '').trim(),
+    contacts: parseSiteContacts(),
+  };
 }

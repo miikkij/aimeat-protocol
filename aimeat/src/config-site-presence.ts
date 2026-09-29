@@ -15,6 +15,7 @@
  * @usage interface AimeatConfig extends SitePresenceConfig { … }
  *   return { ...seoDefaults(), … };
  * @version-history
+ *   2026-09-29 — appBadge (AIMEAT_APP_BADGE): the served apps' aimeat.io badge, on or off node-wide.
  *   2026-09-17 - TARGET-078: ownership and useful work lead the default description.
  *   v1.1.0 — 2026-08-25 — The `seo*` block: who this node says it is, and whether it says it at
  *     all. Every one of these values was a hardcoded string in public/spa.html naming aimeat.io
@@ -47,6 +48,12 @@ export interface SitePresenceConfig extends SeoConfig {
    * stay directly reachable at their own paths either way.
    */
   frontPage: 'classic' | 'demo' | 'os';
+  /**
+   * The "aimeat.io · Publish your own app for free" badge on every served app: 'aimeat' keeps it (the
+   * default, a deliberate attribution mark), 'off' removes it node-wide. The owner's per-app switch
+   * still turns it off app by app. Jouni's decision of 2026-09-29, for the nodes the shop sells.
+   */
+  appBadge: 'aimeat' | 'off';
 }
 
 /** Who this node says it is to a search engine or an unfurler, and whether it says it at all. */

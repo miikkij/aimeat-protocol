@@ -36,6 +36,7 @@
  *   const out = await applyOwnerMarksUpdate(storage, { ownerGaii, filename },
  *     { marks: body.marks, author: body.author, actor: { ghii, ownerPrincipal } });
  * @version-history
+ *   v1.3.0 — 2026-09-29 — servedBadgeOn(): the node's AIMEAT_APP_BADGE switch, then the per-app one.
  *   v1.2.0 — 2026-09-26 — `labelPolicy`: the declaration's note says the visible label stays on a
  *     public app under the node's strict policy, and now names the reviewer, instead of saying it
  *     comes off on every node.
@@ -59,6 +60,14 @@ export const AUTHOR_NAME_MAX = 120;
 /** The attribution badge. Absent = on, which is what every app served before the switch got. */
 export function appBadgeOn(m: AppManifest | undefined | null): boolean {
   return m?.marks?.badge !== false;
+}
+
+/**
+ * Whether a served page carries the badge: the node's switch first (AIMEAT_APP_BADGE, 'off' takes it
+ * off every app, for a node the shop sells), then the owner's per-app switch.
+ */
+export function servedBadgeOn(config: Pick<AimeatConfig, 'appBadge'>, m?: AppManifest | null): boolean {
+  return config.appBadge !== 'off' && appBadgeOn(m);
 }
 
 /** The browser "Install this app" chip on the app origin. Absent = on. */

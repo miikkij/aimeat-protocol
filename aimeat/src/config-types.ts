@@ -7,6 +7,7 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   2026-09-29 — signageEnabled, derived from siteLinks.signage like storeEnabled.
  *   v1.11.0 — 2026-09-29 — ClassificationConfig mixed in (config-data-access.ts, TARGET-082).
  *   v1.10.1 — 2026-09-29 — federationRelayClaim: `required` is the default from 3.20.0.
  *   v1.10.0 — 2026-09-28 — The packages and templates fields moved to config-types-packages.ts
@@ -727,6 +728,8 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
    * (BlockPresence 'config'), and a block that gated on a string would silently never appear.
    */
   storeEnabled: boolean;
+  /** Whether the front page shows the signage example: true exactly when `siteLinks.signage` is set. */
+  signageEnabled: boolean;
 
   // Portfolio
   portfolioEnabled: boolean;

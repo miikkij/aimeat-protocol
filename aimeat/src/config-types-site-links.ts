@@ -9,6 +9,7 @@
  * @structure SiteContact · SiteLinksConfig
  * @usage import type { SiteLinksConfig, SiteContact } from './config-types-site-links.js';
  * @version-history
+ *   v1.1.0 — 2026-09-29 — signage and signageAdmin: the front page's signage example.
  *   v1.0.0 — 2026-08-28 — Pure extraction from config-types.ts v1.6.0. No field changed.
  */
 
@@ -74,6 +75,12 @@ export interface SiteLinksConfig {
   store: string;
   /** The agent incubator: where a visitor adopts a ready-made helper. Empty hides its card's door. */
   incubator: string;
+  /**
+   * The signage screen the front page frames as its "built by asking" example, and the admin panel
+   * it was made in. Empty hides the whole example: until 2026-09-29 every node showed aimeat.io's.
+   */
+  signage: string;
+  signageAdmin: string;
   /**
    * People shown on the public pages, in the order they should be approached. Empty means the
    * node prints no contact card and no "talk to us" control at all, which is a valid state.

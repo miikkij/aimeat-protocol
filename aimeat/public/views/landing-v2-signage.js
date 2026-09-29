@@ -16,24 +16,30 @@
  * @structure SignageShowcase
  * @usage import { SignageShowcase } from '/views/landing-v2-signage.js';
  * @version-history
+ *   v1.1.0 — 2026-09-29 — The screen and the admin panel come from the node's site links, and with
+ *     no screen the showcase renders nothing; aimeat.io's addresses are no longer written here.
  *   v1.0.0 — 2026-09-15 — Initial. Jouni: the signage example before the four prompts, as one app.
  */
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { siteLink } from '/js/site.js';
 
 // t() echoes the key when a translation is missing — fall back to readable English.
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
-export const SIGNAGE_SCREEN_URL = 'https://signage-kiosk.apps.aimeat.io/?org=cd750579-99a2-44fe-a996-88ab502a679a&ws=ws-mrgbxgh294h&screen=aimeat-launch';
-export const SIGNAGE_ADMIN_URL = 'https://signage-admin.apps.aimeat.io/';
+// The screen and its admin panel are this node's settings (AIMEAT_SITE_SIGNAGE_URL and
+// AIMEAT_SITE_SIGNAGE_ADMIN_URL). They were aimeat.io's own addresses, written here, so every node's
+// front page showed aimeat.io's example.
 
 /**
  * The showcase: the claim, the live screen, the two doors. `url` is the screen the frame shows and
  * `admin` the panel it was made in; both are the block's settings.
  */
-export function SignageShowcase({ url = SIGNAGE_SCREEN_URL, admin = SIGNAGE_ADMIN_URL }) {
+export function SignageShowcase({ url = siteLink('signage'), admin = siteLink('signageAdmin') }) {
+  // No screen named: no example at all, rather than an empty frame.
+  if (!url) return null;
   return html`
     <section class="ld-v2-signage">
       <h2 class="ld-sh-h2 ld-v2-h2-row">

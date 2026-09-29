@@ -15,6 +15,8 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   2026-09-29 — siteLinks moves to siteLinksFromEnv() (config-site-contacts.ts) by pure extraction
+ *     to stay under 800 lines; appBadge (AIMEAT_APP_BADGE) and the signageEnabled getter join.
  *   v1.18.0 — 2026-09-29 — dataAccessDefaults(): consent settings (a pure move) and classificationMode.
  *   v1.17.0 — 2026-09-29 — federationDefaults(): the four federation settings, config-federation.ts.
  *     The relay-claim default is `required` from 3.20.0; an explicit `optional` is still taken.
@@ -68,7 +70,7 @@
  *     for the MCP Server Card commerce_tools block (TARGET-034 phase D).
  */
 import { deriveAppHost, derivePortfolioHost, deriveCoHost } from './config-hosts.js';
-import { parseSiteContacts } from './config-site-contacts.js';
+import { siteLinksFromEnv } from './config-site-contacts.js';
 import { loadConnectionsConfig } from './config-load-connections.js';
 import { securityDoorDefaults } from './config-security.js';
 import { aiJobDefaults } from './config-ai-jobs.js';
@@ -484,6 +486,9 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     frontPage: (['demo', 'os'].includes(process.env.AIMEAT_FRONT_PAGE?.trim().toLowerCase() ?? '')
       ? process.env.AIMEAT_FRONT_PAGE!.trim().toLowerCase()
       : 'classic') as 'classic' | 'demo' | 'os',
+    // The "aimeat.io · publish your own app" badge on served apps. 'off' removes it node-wide;
+    // anything else keeps it, so a typo cannot take the attribution off aimeat.io.
+    appBadge: (process.env.AIMEAT_APP_BADGE?.trim().toLowerCase() === 'off' ? 'off' : 'aimeat') as 'aimeat' | 'off',
     // Content Signals Policy directive served in robots.txt (contentsignals.org). Left empty, it
     // pairs itself to AIMEAT_AI_TRAINING so the directive and the per-bot rules cannot contradict
     // each other; set it explicitly to override both. 'off' removes the directive.
@@ -719,27 +724,14 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // Public-page links. Empty by design: the marketing pages point at apps that belong to
     // whoever runs the node, and a fresh clone must not advertise aimeat.io's apps or Jouni's
     // phone number. Each empty value hides its link, nav item or section.
-    siteLinks: {
-      learn: process.env.AIMEAT_SITE_LEARN_URL ?? '',
-      exchange: process.env.AIMEAT_SITE_EXCHANGE_URL ?? '',
-      assessment: process.env.AIMEAT_SITE_ASSESSMENT_URL ?? '',
-      roadmap: process.env.AIMEAT_SITE_ROADMAP_URL ?? '',
-      paper: process.env.AIMEAT_SITE_PAPER_URL ?? '',
-      crm: process.env.AIMEAT_SITE_CRM_URL ?? '',
-      radar: process.env.AIMEAT_SITE_RADAR_URL ?? '',
-      briefing: process.env.AIMEAT_SITE_BRIEFING_URL ?? '',
-      apiAccelerator: process.env.AIMEAT_SITE_API_ACCELERATOR_URL ?? '',
-      playbooks: process.env.AIMEAT_SITE_PLAYBOOKS_URL ?? '',
-      showcase: process.env.AIMEAT_SITE_SHOWCASE_URL ?? '',
-      store: (process.env.AIMEAT_SITE_STORE_URL ?? '').trim(),
-      incubator: (process.env.AIMEAT_SITE_INCUBATOR_URL ?? '').trim(),
-      contacts: parseSiteContacts(),
-    },
+    siteLinks: siteLinksFromEnv(),
     // The store section and every "get your own" door exist only when there is a store to reach.
     // A getter, not a value: the store address is editable at runtime from the admin Config tab,
     // and a boolean copied at boot would say "no store" for the rest of the process after an
     // operator typed one in.
     get storeEnabled(): boolean { return (this.siteLinks?.store ?? '').trim() !== ''; },
+    // The front page's signage example exists only where the operator names a screen to show.
+    get signageEnabled(): boolean { return (this.siteLinks?.signage ?? '').trim() !== ''; },
 
     // Consul
     consulEnabled: process.env.AIMEAT_CONSUL_ENABLED === 'true',
