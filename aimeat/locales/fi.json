@@ -15045,6 +15045,22 @@
       }
     },
     "agents": {
+      "refusals": {
+        "title": "Agentilta puuttuu oikeus",
+        "lead": "Agentti yritti tehdä jotain, mihin et ole antanut sille oikeutta, ja AIMEATisi esti sen. Agentin tehtävät voivat odottaa, kunnes annat oikeuden.",
+        "lineOne": "{permission}: estetty kerran, {when}.",
+        "lineMany": "{permission}: estetty {count} kertaa, viimeksi {when}.",
+        "more": "Lisäksi {n} muuta.",
+        "grant": "Anna oikeus",
+        "and": "ja",
+        "or": "tai",
+        "mark": "Oikeus puuttuu",
+        "askedLabel": "Pyysi",
+        "askedNamed": "Kun agentti viimeksi hyväksyttiin, se pyysi näitä oikeuksia: {asked}.",
+        "askedNothing": "Kun agentti viimeksi hyväksyttiin, se ei pyytänyt mitään oikeutta nimeltä, joten se sai oletusoikeudet.",
+        "notGranted": "Et antanut: {missing}.",
+        "taskEvent": "AIMEATisi esti agentin: agentti tarvitsee oikeuden {permission}. Anna oikeus agentin oikeuksista, niin tehtävä voi jatkua."
+      },
       "page": {
         "allTags": "Kaikki {n} tagia",
         "fewerTags": "Vähemmän tageja",

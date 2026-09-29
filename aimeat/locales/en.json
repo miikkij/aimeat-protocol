@@ -15058,6 +15058,22 @@
       }
     },
     "agents": {
+      "refusals": {
+        "title": "A permission is missing",
+        "lead": "This agent tried to do something you have not given it permission for, and your AIMEAT refused. Its tasks can wait until you give the permission.",
+        "lineOne": "{permission}: refused once, {when}.",
+        "lineMany": "{permission}: refused {count} times, last {when}.",
+        "more": "And {n} more.",
+        "grant": "Give the permission",
+        "and": "and",
+        "or": "or",
+        "mark": "Permission missing",
+        "askedLabel": "Asked for",
+        "askedNamed": "At its last approval it asked for {asked}.",
+        "askedNothing": "At its last approval it asked for no permission by name, so it got the default permissions.",
+        "notGranted": "Not given: {missing}.",
+        "taskEvent": "Your AIMEAT refused the agent: it needs the permission {permission}. Give it in the agent's access rights, and the task can go on."
+      },
       "page": {
         "allTags": "All {n} tags",
         "fewerTags": "Fewer tags",

@@ -5,6 +5,9 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v2.22.0 -- 2026-09-30 -- What your AIMEAT refused the agent for a missing permission, and what it asked
+ *     for beside what it got (agent-card-access.js): the note on the open card, the line under how it
+ *     runs, and a danger mark with the attention name on the closed row.
  *   v2.21.0 -- 2026-09-26 -- Every part is a component that takes data (page group G1a): the closed
  *     row is the List row (components/List.js, drag and its grip in the gutter included); the open card
  *     is the OpenCard (components/OpenCard.js: the headline that closes, the words and the side, the
@@ -137,6 +140,7 @@ import { agentState, getDefaultTab } from './state-detector.js';
 import { GaiiChip } from './gaii-chip.js';
 import { deliveryLabel, renderPlatformBadge, renderModelBadge, renderReadinessBadge, stepTone } from './agent-card-badges.js';
 import { RunModeSwitch } from './agent-card-run-mode.js';
+import { RefusalNote, AccessLine, hasRefusals } from './agent-card-access.js';
 import { templateLabel } from './scope-config.js';
 import { detectTemplate } from './scope-model.js';
 import { agentGaii } from './tab-helpers.js';
@@ -331,8 +335,9 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
         <${Row} onToggle=${() => onToggle(agent.name)}
           draggable=${!!drag} grip=${drag?.grip} dragging=${drag?.dragging}
           onDragStart=${drag?.onDragStart} onDragOver=${drag?.onDragOver} onDrop=${drag?.onDrop} onDragEnd=${drag?.onDragEnd}>
-          <${Name} attention=${state === 'problem'} dot=${change?.dot} dotTitle=${change?.title} meta=${agentGaii(agent)}
+          <${Name} attention=${state === 'problem' || hasRefusals(agent)} dot=${change?.dot} dotTitle=${change?.title} meta=${agentGaii(agent)}
             tag=${[
+              hasRefusals(agent) ? html`<${Mark} kind="status" tone="danger">${t('profile.agents.refusals.mark')}<//>` : null,
               agent.mode && agent.mode !== 'interactive' ? html`<${Mark} tone="dim">${t(`profile.agents.mode.${agent.mode}`) || agent.mode}<//>` : null,
               platform ? html`<${Mark} tone="dim">${platform}<//>` : null,
               agent.federate ? html`<${Mark} tone="dim">${t('profile.federated')}<//>` : null,
@@ -413,6 +418,10 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
           ${runsOpen ? t('profile.agents.page.close') : (agent.run_mode ? t('profile.agents.page.runsChange') : t('profile.agents.page.runsDecide'))} →
         <//>
       <//>
+      <${AccessLine} agent=${agent} />
+
+      ${/* What your AIMEAT refused this agent for a missing permission, with the way to grant it. */''}
+      <${RefusalNote} agent=${agent} onScopesClick=${onScopesClick} />
 
       ${/* The status banner while the agent is new, onboarding or in trouble. */''}
       ${renderZone2(state, agent, onboarding, setActiveTab, showToast, soloMode)}

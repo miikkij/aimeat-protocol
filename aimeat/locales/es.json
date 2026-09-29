@@ -13272,6 +13272,22 @@
       }
     },
     "agents": {
+      "refusals": {
+        "title": "Falta un permiso",
+        "lead": "Este agente intentó hacer algo para lo que no le has dado permiso, y tu AIMEAT lo rechazó. Sus tareas pueden quedar en espera hasta que le des el permiso.",
+        "lineOne": "{permission}: rechazado una vez, {when}.",
+        "lineMany": "{permission}: rechazado {count} veces, la última {when}.",
+        "more": "Y {n} más.",
+        "grant": "Dar el permiso",
+        "and": "y",
+        "or": "o",
+        "mark": "Falta un permiso",
+        "askedLabel": "Pidió",
+        "askedNamed": "En su última aprobación pidió {asked}.",
+        "askedNothing": "En su última aprobación no pidió ningún permiso concreto, así que recibió los permisos por defecto.",
+        "notGranted": "No concedido: {missing}.",
+        "taskEvent": "Tu AIMEAT rechazó al agente: necesita el permiso {permission}. Dáselo en los permisos del agente y la tarea podrá seguir."
+      },
       "page": {
         "allTags": "Las {n} etiquetas",
         "fewerTags": "Menos etiquetas",
