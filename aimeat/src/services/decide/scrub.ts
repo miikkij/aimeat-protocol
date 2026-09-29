@@ -25,6 +25,8 @@
  *   const state = sc.value(record);            // send this
  *   const option = sc.restore(answer.choice);  // real option name back
  * @version-history
+ *   v1.1.0 — 2026-09-29 — Object keys are scrubbed like values, and the report names the classes the
+ *     owner allowed through (incident: a decision reported 0 removed while an address left).
  *   v1.0.0 — 2026-09-19 — TARGET-080 Module A, initial.
  */
 import {
@@ -44,8 +46,9 @@ export interface ScrubOptions {
   allow?: PiiClass[];
 }
 
-/** Distinct values replaced, per class, and their sum. */
-export interface ScrubReport { removed: Record<PiiClass, number>; total: number }
+/** Distinct values replaced, per class, and their sum. `allowed` names the classes the owner let
+ *  through unscrubbed, so "0 removed" is never read as "none found" when the owner allowed them. */
+export interface ScrubReport { removed: Record<PiiClass, number>; total: number; allowed: PiiClass[] }
 
 /** A scrubber bound to one decision. */
 export interface Scrubber {
@@ -180,7 +183,10 @@ export function createScrubber(opts: ScrubOptions = {}): Scrubber {
     const out: Record<string, unknown> = {};
     for (const [k, x] of Object.entries(v)) {
       const cls = hintClassForKey(k);
-      out[k] = walk(x, cls && !allow.has(cls) ? cls : null, depth + 1);
+      // A key is text that leaves too: an object keyed by e-mail address or by name sent its keys
+      // out unscrubbed until 2026-09-29. Two keys that scrub to one placeholder keep the original.
+      const sk = run(k);
+      out[sk !== k && sk in out ? k : sk] = walk(x, cls && !allow.has(cls) ? cls : null, depth + 1);
     }
     return out;
   };
@@ -194,7 +200,7 @@ export function createScrubber(opts: ScrubOptions = {}): Scrubber {
     restore: (s) => s.replace(PLACEHOLDER_GLOBAL, (ph) => originals.get(ph) ?? ph),
     report: () => {
       const removed = { ...counters };
-      return { removed, total: PII_CLASSES.reduce((n, c) => n + removed[c], 0) };
+      return { removed, total: PII_CLASSES.reduce((n, c) => n + removed[c], 0), allowed: [...allow] };
     },
     mapping: () => new Map(originals),
   };
