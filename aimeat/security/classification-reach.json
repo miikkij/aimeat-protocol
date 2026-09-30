@@ -570,7 +570,7 @@
     },
     "src/routes/organisms/workspace-read.ts": {
       "reads": {
-        "listAllMemory": 3,
+        "listAllMemory": 2,
         "listMemoryHistory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 review): the reads that hand content to a caller pass the classification reader (the structure history and its versions included); the other reads serve a write or the node's own bookkeeping."
@@ -1635,9 +1635,9 @@
     },
     "src/services/organism-comments.ts": {
       "reads": {
-        "listAllMemory": 1
+        "listAllMemory": 2
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Comments pass reader.show."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Comments pass reader.show. 2026-09-30: deleteComment() reads one comment row to check its author before a soft delete; it hands no content to the caller (moved here unchanged from the DELETE route in routes/organisms/workspace-read.ts)."
     },
     "src/services/organism-readme.ts": {
       "reads": {
