@@ -12,6 +12,7 @@
  * @structure instanceRow · offerRow · ownRow · loadingRow
  * @usage import { instanceRow, offerRow, ownRow } from './rows.js';
  * @version-history
+ *   v1.19.0 — 2026-09-30 — The opened install shows its automatic update, on or off, with the switch.
  *   v1.18.0 — 2026-09-26 — On the component kit (page group G7): the rows, their cells and the opened
  *     panel are List (Row, Name with its dot and version tag, Desc keeping four lines with the part
  *     tags under them, Who, Doors, Panel), the part tables dense Lists, the facts Facts, the install
@@ -145,6 +146,12 @@ function instanceOpen(ctx, inst, comps, app, source) {
           // and knowing that beforehand is the difference between pressing a button and being
           // surprised by it.
           sub: html`${customized ? x('updateKeepsYours', { n: customized }) : x('updateSub')}${upd?.updateAvailable ? html` <${Action} tone="link" disabled=${ctx.busy} onClick=${apply}>${x('applyUpdate')}<//>` : null}`,
+        },
+        {
+          // The update service's promise, in the owner's hands: updates arrive by themselves, or wait for them.
+          k: x('autoUpdateK'),
+          v: inst.autoUpdate ? x('autoUpdateOn') : x('autoUpdateOff'),
+          sub: html`${x('autoUpdateSub')} <${Action} tone="link" disabled=${ctx.busy} onClick=${() => ctx.setAutoUpdate(inst, !inst.autoUpdate)}>${inst.autoUpdate ? x('autoUpdateTurnOff') : x('autoUpdateTurnOn')}<//>`,
         },
         { k: x('forAgentK'), v: x('forAgentInstance'), sub: x('forAgentInstanceSub') },
       ]} />

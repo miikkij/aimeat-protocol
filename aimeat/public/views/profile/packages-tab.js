@@ -13,6 +13,8 @@
  * @structure PackagesTab() — state (data, remote, expanded, versions, updates, installForm, filter) + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'packages'
  * @version-history
+ *   v2.2.0 — 2026-09-30 — setAutoUpdate: the owner turns an installed copy's automatic update on or off
+ *     here; it was reachable only through an AI or the install set.
  *   v2.1.0 — 2026-09-05 — A third road to a new package: pick your own apps and this node reads what
  *     each one loads. Update calls POST /v1/instances/:id/update instead of mapping every component
  *     to `replace` — the old shape overwrote whatever the owner had edited, and could not have known
@@ -126,6 +128,17 @@ export default function PackagesTab({ session, showToast }) {
         load();
       } catch (e) { fail(e); } finally { setBusy(false); }
     }, { title: x('applyUpdate') });
+  };
+  // The owner's own choice, the same one the install set or aimeat_package_instance_set makes:
+  // on, the daily check updates this copy by itself; off, it tells the owner and waits.
+  const setAutoUpdate = async (inst, on) => {
+    setBusy(true);
+    try {
+      const r = await pkgService.setInstance(inst.id, { auto_update: on });
+      if (!r?.ok) { fail(r); return; }
+      showToast?.(x(on ? 'autoUpdateToastOn' : 'autoUpdateToastOff', { name: inst.label || inst.packageGroupId }));
+      load();
+    } catch (e) { fail(e); } finally { setBusy(false); }
   };
   const removeInstance = (inst) => {
     confirm(x('confirmRemove', { name: inst.label || inst.packageGroupId, n: (inst.installedComponents || []).length }), async () => {
@@ -283,7 +296,7 @@ export default function PackagesTab({ session, showToast }) {
     setFilter: (patch) => { setFilterState((f) => ({ ...f, ...patch })); setShown(20); },
     setQuery: (q) => { setQuery(q); setShown(20); },
     setShown,
-    toggle, jumpTo, checkUpdate, applyUpdate, removeInstance, setInstallLabel, install, download, setVisibility, propose, archive,
+    toggle, jumpTo, checkUpdate, applyUpdate, setAutoUpdate, removeInstance, setInstallLabel, install, download, setVisibility, propose, archive,
     copyPrompt, pickZip, importZip, syncRemote,
   };
   return renderPage(ctx);
