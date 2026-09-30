@@ -2628,10 +2628,10 @@
      "slug": "g-16-search-engine-setup",
      "cells": [
       "<strong>Search engine setup</strong>",
-      "A Discovery page reports what the node actually serves to Google and Bing, walks five steps, sets the site's name and preview picture, and can turn the whole site away from search engines.",
+      "A Discovery page reports what the node actually serves to Google and Bing, walks five steps, sets the site's name and preview picture, and can turn the whole site away from search engines. Only the public pages are offered for indexing: signed-in views, tool pages and machine documents such as llms.txt and the API answers tell search engines not to index them, and AI agents can still read them.",
       "Admin › Discovery, <code>aimeat_seo_*</code>"
      ],
-     "plain": "Search engine setup A Discovery page reports what the node actually serves to Google and Bing, walks five steps, sets the site's name and preview picture, and can turn the whole site away from search engines. Admin › Discovery, aimeat_seo_*"
+     "plain": "Search engine setup A Discovery page reports what the node actually serves to Google and Bing, walks five steps, sets the site's name and preview picture, and can turn the whole site away from search engines. Only the public pages are offered for indexing: signed-in views, tool pages and machine documents such as llms.txt and the API answers tell search engines not to index them, and AI agents can still read them. Admin › Discovery, aimeat_seo_*"
     },
     {
      "slug": "g-16-sitemaps",

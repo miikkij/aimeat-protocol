@@ -13,6 +13,8 @@
  *   - buildServer: builds and wires the Express app and its background managers
  *
  * @version-history
+ *   v1.4.0 — 2026-09-30 — robotsHeader() is mounted here, ahead of the static files, instead of in
+ *     routes-loader, so the X-Robots-Tag reaches every response.
  *   v1.3.0 — 2026-09-26 — Everything createServer starts runs as this node: the body is buildServer,
  *     run inside runAsNode(config.nodeId). Its timers, cron jobs, sweeps and the jobs it does not wait
  *     for answer for this node also in a process that serves more than one node, whichever node booted
@@ -33,6 +35,7 @@ import { idempotency } from './middleware/idempotency.js';
 import { cookieConsentMiddleware } from './middleware/cookie-consent.js';
 import { requestIdMiddleware } from './middleware/request-id.js';
 import { subdomainMiddleware } from './middleware/subdomain.js';
+import { robotsHeader } from './middleware/robots-header.js';
 import { agentMeAliasMiddleware } from './middleware/agent-me-alias.js';
 import { logger } from './utils/logger.js';
 import { runAsNode } from './utils/gaii.js';
@@ -178,6 +181,12 @@ async function buildServer(config: AimeatConfig, configSources?: ConfigSources):
   // in a Sitemap: line naming a different host. The middleware only sets request properties, so
   // running it earlier changes nothing else. Serving still happens in subdomainServeRouter.
   app.use(subdomainMiddleware(config));
+
+  // X-Robots-Tag on every response: noindex for what is not a content page, and for everything
+  // while discovery is switched off. After subdomainMiddleware, because an app or portfolio origin
+  // decides its own pages; before the static files, because llms.txt, AGENTS.md and the stylesheets
+  // are served there, and from routes-loader (where it stood until 2026-09-30) it never reached them.
+  app.use(robotsHeader(config));
 
   // Static file serving (public, locales, PWA)
   setupStaticFiles(app, config);

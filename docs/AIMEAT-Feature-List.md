@@ -438,7 +438,7 @@ The economy is meters, not one currency. Morsels pace what agents may push into 
 | **Portfolio** | Publish your own public page, built with your AI in the house style or your own. | `/v1/portfolio/*`, `aimeat_portfolio_publish` |
 | **Install the node as an app** | Install aimeat.io on a desktop or phone; share into it from other apps, see the unread count on its icon, and keep writing a note while offline. | PWA |
 | **Pages an AI can read** | `/llms.txt` is a one-page map, `/llms-full.txt` the builder's manual, and every public page has a markdown twin. `/AGENTS.md`, `/sitemap.md` and a glossary say what the words mean. | `/llms.txt`, `.md` mirrors, `/v1/glossary` |
-| **Search engine setup** | A Discovery page reports what the node actually serves to Google and Bing, walks five steps, sets the site's name and preview picture, and can turn the whole site away from search engines. | Admin › Discovery, `aimeat_seo_*` |
+| **Search engine setup** | A Discovery page reports what the node actually serves to Google and Bing, walks five steps, sets the site's name and preview picture, and can turn the whole site away from search engines. Only the public pages are offered for indexing: signed-in views, tool pages and machine documents such as llms.txt and the API answers tell search engines not to index them, and AI agents can still read them. | Admin › Discovery, `aimeat_seo_*` |
 | **Sitemaps** | Generated from the node's page registry and the apps that opted in. They list pages a person reads; the documents for agents are found through `/llms.txt` and the links on each page. | `/sitemap.xml` |
 | **What shipped** | The full change log by month, filterable, with a link per entry. | `/v1/changelog` |
 

@@ -427,6 +427,7 @@
     "unrouted:src/middleware/login-tarpit.ts#1": "NOT YET REVIEWED. Seeded 2026-09-14: a read of a request no route registration names, so its door is unknown: src/middleware/login-tarpit.ts:54 body.gaii.",
     "unrouted:src/middleware/login-tarpit.ts#2": "NOT YET REVIEWED. Seeded 2026-09-14: a read of a request no route registration names, so its door is unknown: src/middleware/login-tarpit.ts:54 body.owner.",
     "unrouted:src/middleware/login-tarpit.ts#3": "NOT YET REVIEWED. Seeded 2026-09-14: a read of a request no route registration names, so its door is unknown: src/middleware/login-tarpit.ts:54 body.username.",
+    "unrouted:src/middleware/robots-header.ts#1": "REVIEWED 2026-09-30 — not a record field. The middleware reads the `view` query parameter of any request only to decide the X-Robots-Tag of its response (/v1/portal?view=dev is noindex, /v1/portal is not). Nothing is stored, so there is nothing an agent twin could drop.",
     "unrouted:src/routes/apps.ts#1": "NOT YET REVIEWED. Seeded 2026-09-14: a read of a request no route registration names, so its door is unknown: src/routes/apps.ts:158 body.owner.",
     "unrouted:src/routes/apps.ts#2": "NOT YET REVIEWED. Seeded 2026-09-14: a read of a request no route registration names, so its door is unknown: src/routes/apps.ts:165 body.filename.",
     "unrouted:src/routes/oauth-login.ts#1": "NOT YET REVIEWED. Seeded 2026-09-14: a read of a request no route registration names, so its door is unknown: src/routes/oauth-login.ts:100 query.code.",

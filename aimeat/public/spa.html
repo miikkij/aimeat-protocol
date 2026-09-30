@@ -1254,11 +1254,13 @@
           // Only intercept internal /v1/ links
           if (!href || !href.startsWith('/v1/')) return;
           if (e.ctrlKey || e.metaKey || e.shiftKey) return;
-          // Respect explicit new-tab / new-window targets — without this, an
-          // <a href="/v1/apps/.../launch?mode=inline" target="_blank"> from a
-          // child component would be hijacked, navigated in the same tab via
-          // matchRoute (which doesn't know /v1/apps/...), and dump the user
-          // back on the landing page.
+          // Respect explicit new-tab / new-window targets — without this, a
+          // target=_blank link to an app's launch address from a child
+          // component would be hijacked, navigated in the same tab via
+          // matchRoute (which does not know the apps paths), and dump the
+          // user back on the landing page. (No example address in this
+          // comment: a crawler reads URLs out of inline scripts, and the one
+          // written here was requested from the front page and answered 403.)
           const target = a.getAttribute('target');
           if (target && target !== '_self' && target !== '') return;
           if (a.hasAttribute('download')) return;
@@ -1539,11 +1541,11 @@
                    building"), and the landing itself is the brand link. -->
               ${visibleLinks.map(link => (link.external
                 ? html`
-                  <a href="${link.path}" key=${link.id} target="_blank" rel="noopener"
+                  <a href=${link.path} key=${link.id} target="_blank" rel="noopener"
                     onClick=${() => setMenuOpen(false)}>${t(link.key) || link.fallback || link.key}</a>
                 `
                 : html`
-                  <a href="${link.path}" key=${link.id}
+                  <a href=${link.path} key=${link.id}
                     onClick=${(e) => { handleNav(e, link.path); setMenuOpen(false); }}
                     class="${link.matchActive !== false && currentPath === link.path ? 'active' : ''}">${t(link.key) || link.fallback || link.key}</a>
                 `))}

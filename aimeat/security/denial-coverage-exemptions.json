@@ -1,6 +1,10 @@
 {
   "note": "Registered E2E suites with no assertion about a 401 or 403. Seeded from the state on 2026-08-15 so the gate can only ratchet down. The `sha` pins the reason to the file it was written about: EDIT THE SUITE AND ITS EXEMPTION EXPIRES, because the person editing it is the one person who has the context to add the missing case. Re-stamping the sha without adding a denial is available and is a decision someone has to write down.",
   "exempt": {
+    "test/e2e-seo-noindex.ts": {
+      "reason": "REVIEWED 2026-09-30 — the suite has no principal. It reads the node the way an anonymous crawler does (HEAD and GET with the bingbot user agent, no credentials) and asserts the X-Robots-Tag and the robots meta each response carries. The header is the same for every caller by design, so there is no second principal whose answer could differ, and no refusal to assert.",
+      "sha": "b777eca41dd1362b"
+    },
     "test/e2e-boot-port-in-use.ts": {
       "reason": "REVIEWED 2026-09-17 — the suite has no principal at all. It starts a node on a port another listener already holds and asserts the process exits with the port and the cause named, instead of printing its start banner over the failed listen (docs/pitfalls.md §93). No request ever reaches the node, so there is no door to refuse anyone at.",
       "sha": "fa3fd32da42b4f14"
