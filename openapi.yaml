@@ -8136,10 +8136,12 @@ paths:
         person. Each agent carries its own `work_provided` and `work_requested` beside them, and
         `disputes` covers the work in both.
 
-        Memory passes the classification check for an export (TARGET-082): an organism's record held
-        under the person's or an agent's name whose label does not let it leave its organism is not in
-        `memories`; `left_out` names it ({ key, label, reason }, ClassificationLeftOut). The person's
-        own records are theirs to export and always come out.
+        This is the person's legal right to their own data (GDPR Articles 15 and 20), so every memory
+        record they or their agents hold comes out, an organism's record held under their name
+        included, whatever its classification (TARGET-082, decided 2026-09-30). When the export holds
+        organism records, `classified_organism_content` { count, keys, note } names them and says the
+        file carries content an organism classified. The ordinary export (GET /v1/memory/export and the
+        bundle) keeps such a record behind and names it in `left_out`.
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -14935,8 +14937,12 @@ paths:
       description: |
         A person's label locks. An AI's own judgement never lowers a label and never changes a
         person's; it is kept as a suggestion (`pending`). With `humanSaid`, the person's own words,
-        the label counts as the person's. Lowering from a label that needs a reason needs
-        `justification`.
+        a label at least as strict counts as the person's and applies at once. From an AI credential,
+        `humanSaid` that lowers the label or changes one a person set is kept as a suggestion with
+        `pending` PERSON_APPROVES and the words on it, which the person accepts signed in themselves
+        (decided 2026-09-30). Lowering from a label that needs a reason needs `justification`.
+        A workspace document or an organism record has one classification: its `.draft`, `.latest`
+        and `.version.N` keys all name the document's.
       tags: [Memory]
       security: [{ bearerAuth: [] }]
       requestBody:
@@ -14968,6 +14974,11 @@ paths:
   /v1/classification/label/review:
     post:
       summary: Accept or reject a waiting classification suggestion
+      description: |
+        A person accepts or rejects; an AI relays their decision with their words in `humanSaid`. A
+        suggestion waiting with PERSON_APPROVES (an AI relayed words that lower the label or change a
+        person's) is accepted only by the person signed in themselves: an AI credential gets
+        PERSON_REQUIRED even with `humanSaid`.
       tags: [Memory]
       security: [{ bearerAuth: [] }]
       requestBody:

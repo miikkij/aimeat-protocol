@@ -15,7 +15,8 @@
  *   - memory in a personal scope: the record at (scope, key);
  *   - memory in an organism scope `organism:<id>`: the freshest record at the exact key, whichever
  *     member identity holds it (services/workspace-write.ts findWorkspaceRecord), and only when the
- *     key is under `organism.<id>.`;
+ *     key is under `organism.<id>.`; for a document address, the text of each of its current copies
+ *     (the bare key, `.latest`, `.draft`), once each;
  *   - a stored file or a workspace row: not loaded yet. The loader answers null, and drainQueue
  *     drops such an item from the queue. File and row text comes with V5.
  *   A record that is gone also answers null and leaves the queue.
@@ -28,6 +29,8 @@
  *   installWriteClassifier();
  *   scheduler.registerCoreHandler('classification-queue', () => runClassificationQueueJob(config, storage));
  * @version-history
+ *   v1.2.0 — 2026-09-30 — A queued organism document is read from its current copies (bare,
+ *     `.latest`, `.draft`), because its one label covers them all (TARGET-082, one label per document).
  *   v1.1.0 — 2026-09-29 — The write hook also gets enqueue, for the writes past its in-process limit.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V3. Initial.
  */
@@ -36,6 +39,7 @@ import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { classifyText, drainQueue, enqueue, type QueuedItem } from './classification/classifier.js';
 import { scopeOrganism } from './classification/policy.js';
+import { documentContentKeys } from './classification/labels.js';
 import { contentText, setWriteClassifier } from './classify-on-write.js';
 import { findWorkspaceRecord } from './workspace-write.js';
 
@@ -56,8 +60,15 @@ export async function queuedItemText(storage: Storage, item: QueuedItem): Promis
   const orgId = scopeOrganism(item.scope);
   if (orgId) {
     if (!item.key.startsWith(`organism.${orgId}.`)) return null;
-    const rec = await findWorkspaceRecord(storage, item.key);
-    return rec ? contentText(rec.value) : null;
+    // A document's label covers all its copies (labels.ts documentKeyOf), so the classifier reads
+    // the current ones: the bare key, `.latest` and `.draft`, each once when they hold the same text.
+    const texts: string[] = [];
+    for (const key of documentContentKeys(item.key)) {
+      const rec = await findWorkspaceRecord(storage, key);
+      const text = rec ? contentText(rec.value) : null;
+      if (text && !texts.includes(text)) texts.push(text);
+    }
+    return texts.length ? contentText(texts.join('\n\n')) : null;
   }
   const rec = await storage.getMemory(item.scope, item.key);
   return rec ? contentText(rec.value) : null;

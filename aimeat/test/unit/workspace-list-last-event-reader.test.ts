@@ -8,6 +8,8 @@
  *   and the last event comes from what show() kept, while the counts stay as they were.
  * @usage cd aimeat && pnpm exec vitest run test/unit/workspace-list-last-event-reader.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-30 — A published record's label address is its document's key without
+ *     `.latest` (one label per document, decided 2026-09-30).
  *   v1.0.0 — 2026-09-29 — TARGET-082 V4. Initial.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -89,13 +91,14 @@ describe('the workspace list passes its last event through show()', () => {
     const e = await call();
     expect(shown).toHaveLength(1);
     const keys = shown[0].targets.map(t => t?.key);
-    expect(keys).toEqual(expect.arrayContaining([`${ROOT}.notes.plan.latest`, `${ROOT}.notes.layoffs.latest`]));
+    // The label address of a published record is its document's (one label per document, 2026-09-30).
+    expect(keys).toEqual(expect.arrayContaining([`${ROOT}.notes.plan`, `${ROOT}.notes.layoffs`]));
     expect(shown[0].targets.every(t => t?.kind === 'memory' && t.scope === `organism:${ORG}`)).toBe(true);
     expect(e.lastEvent).toMatchObject({ type: 'note', instance: 'layoffs' });
   });
 
   it('an item show() drops is not the last event; the counts are unchanged', async () => {
-    hide = `${ROOT}.notes.layoffs.latest`;
+    hide = `${ROOT}.notes.layoffs`;
     const e = await call();
     expect(e.lastEvent).toMatchObject({ type: 'note', instance: 'plan' });
     expect(e.recs).toBe(2);

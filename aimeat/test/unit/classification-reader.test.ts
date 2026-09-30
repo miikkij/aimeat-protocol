@@ -11,6 +11,7 @@
  *   node's policy is read once per call however many scopes, a long list an AI is shown is one audit
  *   row per label with a count, and warningsNote() says what an AI-call answer carries.
  * @version-history
+ *   v1.2.0 — 2026-09-30 — An anonymous reader is read as an AI: hidden content is absent to it.
  *   v1.1.0 — 2026-09-29 — The review fixes (TARGET-082 review, findings 4, 5 and 7).
  *   v1.1.0 — 2026-09-29 — The owner of personal content is never locked out by its label's audience
  *     (TARGET-082 review finding 9); the lockout test moved to organism content.
@@ -50,6 +51,24 @@ describe('the check component decides', () => {
 
     expect((await readerFor(d, aliceAuth).show(items, t)).map(r => r.key)).toEqual(['secret', 'conf', 'plain']);
     expect((await systemReader(d, `alice@${N}`).show(items, t)).length).toBe(3);
+  });
+
+  it('reads an anonymous reader the strictest way: hidden content is absent to it (decided 2026-09-30)', async () => {
+    const d = deps(storage);
+    await setLabel(d, alice, t(rec('secret')), { label: 'erittain-luottamuksellinen' });
+    await setLabel(d, alice, t(rec('conf')), { label: 'luottamuksellinen' });
+    const items = [rec('secret'), rec('conf'), rec('plain')];
+    for (const anon of [readerFor(d, null), readerFor(d, { sub: '', owner: '', roles: [], anonymous: true })]) {
+      expect(anon.kind).toBe('anonymous');
+      const seen = await anon.show(items, t);
+      expect(seen.map(r => r.key)).toEqual(['conf', 'plain']);
+      expect((seen[0] as unknown as { classificationWarning?: { label: string } }).classificationWarning?.label).toBe('luottamuksellinen');
+      await expect(anon.useForAi([t(rec('secret'))], { capability: 'text' })).rejects.toMatchObject({ code: 'CLASSIFIED' });
+    }
+    // The audience rule applies as before: an anonymous reader is inside no audience.
+    await writePolicy(d, alice, 'owner', null, { labels: [{ id: 'johto', rank: 40, name: { en: 'Management only' }, audience: { people: ['alice'] } }] });
+    await setLabel(d, alice, t(rec('minutes')), { label: 'johto' });
+    expect(await readerFor(d, null).show([rec('minutes')], t)).toEqual([]);
   });
 
   it('refuses an AI call that names hidden content, whoever asks', async () => {

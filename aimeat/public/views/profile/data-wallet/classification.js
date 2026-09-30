@@ -316,7 +316,7 @@ function auditRow(policy, r) {
 }
 
 /** The locale key of each reason a suggestion could not apply (services/classification/labels.ts). */
-const WHY = { HUMAN_LABEL: 'human', CANNOT_LOWER: 'lower', AI_SUGGESTS: 'suggest', BELOW_THRESHOLD: 'threshold' };
+const WHY = { HUMAN_LABEL: 'human', CANNOT_LOWER: 'lower', AI_SUGGESTS: 'suggest', BELOW_THRESHOLD: 'threshold', PERSON_APPROVES: 'relayed' };
 
 /** A classification an explorer item carries, as a word: its name in the reader's language, or its id. */
 const nameOf = (detail, id) => (detail ? labelName(detail) : id);

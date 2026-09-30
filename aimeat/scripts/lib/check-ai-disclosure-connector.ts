@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Connector provenance checks extracted unchanged from the disclosure gate.
  * @version-history
+ *   v1.1.0 -- 2026-09-30 -- aimeat_memory_read_public joins CONNECTOR_META_READS: the connector
+ *     tool folds meta.provenance now, and the check holds it to that.
  *   v1.0.1 -- 2026-09-30 -- ENVELOPE_PROVENANCE_ROUTES names src/routes/memory/public-read.ts, the
  *     public read moved out of routes/memory/key.ts (TARGET-082 review).
  *   v1.0.0 -- 2026-09-27 -- Keep the gate below its file-size ceiling while moving shared dispatch.
@@ -168,8 +170,7 @@ const ENVELOPE_PROVENANCE_ROUTES: Record<string, string> = {
   'src/routes/memory/public-read.ts':
     'GET /v1/memory/:gaii/:key, the public read, moved out of key.ts on 2026-09-29 — shell path: '
     + 'aimeat_memory_read_public, folded inside withProvenanceCarrying; connector MCP: '
-    + 'aimeat_memory_read_public unwraps with envelopeResult(), so it hands on ai_provenance_id from '
-    + 'the body and not the statement, as it did while this route was in key.ts.',
+    + 'aimeat_memory_read_public, folded (CONNECTOR_META_READS).',
   'src/routes/apps/read.ts':
     'the app detail read — connector: aimeat_app_get, folded.',
   'src/routes/knowledge/packages-core.ts':
@@ -182,7 +183,7 @@ const ENVELOPE_PROVENANCE_ROUTES: Record<string, string> = {
 };
 
 /** Connector MCP read tools that MUST fold the envelope carrier onto their payload. */
-const CONNECTOR_META_READS = ['aimeat_memory_read', 'aimeat_app_get', 'aimeat_knowledge_get'];
+const CONNECTOR_META_READS = ['aimeat_memory_read', 'aimeat_memory_read_public', 'aimeat_app_get', 'aimeat_knowledge_get'];
 
 const READ_FOLD = 'readPayloadWithProvenance';
 

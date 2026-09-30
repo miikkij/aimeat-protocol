@@ -11,11 +11,20 @@
  *     becomes a suggestion the person accepts or rejects.
  *   - An AI never lowers a label, and a rule never lowers a label.
  *   - Lowering from a label marked lowerNeedsJustification needs a written reason.
- *   - An AI relaying a person's own words passes them in `humanSaid`, verbatim; the label then counts
- *     as the person's (source human-via-ai, locked) and the words stay on the record.
+ *   - An AI relaying a person's own words passes them in `humanSaid`, verbatim. A raise (a label at
+ *     least as strict on every field) then counts as the person's (source human-via-ai, locked) and
+ *     the words stay on the record, whatever the AI mode, also over a label a person set. A lowering
+ *     waits as a suggestion with why PERSON_APPROVES and the words on it, and only the person in
+ *     their own session accepts it (decided 2026-09-30).
  *   - Who is an AI is decided from the credential (reader-kind.ts), never from what the caller says.
  *   - The policy's AI mode decides the rest: off refuses an AI's label, suggest keeps it waiting for
  *     a person, auto applies a raise at or above the confidence threshold.
+ *
+ *   ONE LABEL PER DOCUMENT (decided 2026-09-30). A workspace document or an organism record is
+ *   stored under several keys (bare, `.draft`, `.latest`, `.version.N`); memoryTarget gives them all
+ *   the document's address (documentKeyOf), so a label on any copy is the document's. A label a copy
+ *   carried under its own key before this reads into the document's label, the strictest one wins,
+ *   and the next write folds those rows into the document's row (currentRow).
  *
  *   WHO MAY LABEL WHAT: personal content only by its owner or the owner's own agents and apps, and
  *   the owner names an agent's or app's namespace to label what it holds (targetOf `owner`).
@@ -23,12 +32,17 @@
  *   write it (to set or review one): a workspace's content needs the workspace read decision, the
  *   organism's meta namespace its creator or an admin, an ecosystem app its data-area grant. And
  *   nobody outside the reader audience of the label content carries now reads or moves it.
- * @structure ClassificationError · LabelActor · labelActorOf() · memoryTarget() · fileTarget() ·
- *   rowTarget() · setLabel() · reviewLabel() · labelsFor() · targetOf() · readContentLabel()
+ * @structure ClassificationError · LabelActor · labelActorOf() · documentKeyOf() · memoryTarget() ·
+ *   labelAddressOf() · documentContentKeys() · fileTarget() · rowTarget() · setLabel() ·
+ *   reviewLabel() · labelsFor() · targetOf() · readContentLabel()
  * @usage
  *   const actor = labelActorOf(req.auth!, config.nodeId);
  *   await setLabel({ storage, config }, actor, memoryTarget(owner, key), { label: 'luottamuksellinen' });
  * @version-history
+ *   v1.5.0 — 2026-09-30 — Decided by Jouni 2026-09-30. humanSaid from an AI raises at once and
+ *     otherwise waits for the person (PERSON_APPROVES), which an AI cannot accept even with the
+ *     person's words. One label per document: every copy's key maps to the document's address, a
+ *     copy's own older label reads into it (strictest wins) and is folded away on the next write.
  *   v1.4.0 — 2026-09-29 — TARGET-082 review. A row, its audit row and its change event name the
  *     owner GHII even for content an agent or an app holds, and targetOf takes `owner` for such a
  *     namespace (finding 1). "Lower" compares what the labels do, field by field, not the rank alone
@@ -101,13 +115,93 @@ export function labelActorOf(
   return { principal: callerPrincipal(auth, nodeId), ownerGhii, ownerName: localAccountOf(ownerGhii), kind, roles: [...auth.roles] };
 }
 
-/** A memory key's label address: an organism key belongs to the organism, whoever wrote it. */
+/** The suffixes a workspace document or an organism record is stored under besides its bare key. */
+const COPY_SUFFIX = /^(organism\.[^.]+\.(.+))\.(?:draft|latest|version\.\d+)$/;
+const COPY_ROLE = /^(?:draft|latest|version\.\d+)$/;
+
+/**
+ * The one label address of a workspace document or an organism record (decided 2026-09-30): its key
+ * without the `.draft`, `.latest` or `.version.N` suffix the workspace stores its copies under
+ * (services/workspace-write.ts deleteWorkspaceInstance names the same family). A label set on any
+ * copy is the document's, so publishing never makes an unlabelled copy. The address needs a
+ * namespace and an instance before the suffix: `organism.<id>.w.<ws>.<ns>.<instance>` in a
+ * workspace, `organism.<id>.<ns>.<instance>` outside one. Any other key is its own address.
+ */
+export function documentKeyOf(key: string): string {
+  const m = COPY_SUFFIX.exec(key);
+  if (!m) return key;
+  const rest = m[2]!.split('.');
+  return rest.length >= (rest[0] === 'w' ? 4 : 2) ? m[1]! : key;
+}
+
+/** A memory key's label address: an organism key belongs to the organism, whoever wrote it, and a
+ *  document's copies share the document's address (documentKeyOf). */
 export function memoryTarget(ownerGaii: string, key: string): ContentLabelTarget {
   if (key.startsWith('organism.')) {
     const id = key.split('.')[1];
-    if (id) return { kind: 'memory', scope: `organism:${id}`, key };
+    if (id) return { kind: 'memory', scope: `organism:${id}`, key: documentKeyOf(key) };
   }
   return { kind: 'memory', scope: ownerGaii, key };
+}
+
+/**
+ * A target as its label address: an organism memory key named by one of its copies' keys (a queued
+ * item or a caller that built the target itself) is moved to the document's address.
+ */
+export function labelAddressOf(t: ContentLabelTarget): ContentLabelTarget {
+  if (t.kind !== 'memory' || !scopeOrganism(t.scope)) return t;
+  const key = documentKeyOf(t.key);
+  return key === t.key ? t : { ...t, key };
+}
+
+/**
+ * The memory keys a document's current content is stored under (the bare key, `.latest`, `.draft`),
+ * for a reader of its text such as the classifier's queue; any other key is only itself.
+ */
+export function documentContentKeys(key: string): string[] {
+  const doc = documentKeyOf(key);
+  if (!doc.startsWith('organism.') || documentKeyOf(`${doc}.latest`) !== doc) return [key];
+  return [doc, `${doc}.latest`, `${doc}.draft`];
+}
+
+/**
+ * The key prefix under which a document address's copies carried labels of their own before a
+ * document had one address, or null when the target is not a document address.
+ */
+function copyPrefixOf(t: ContentLabelTarget): string | null {
+  if (t.kind !== 'memory' || !scopeOrganism(t.scope)) return null;
+  return documentKeyOf(`${t.key}.latest`) === t.key ? `${t.key}.` : null;
+}
+
+/** Is this stored row a label a copy of the document at `prefix` carried under its own key? */
+const isCopyRow = (row: ContentLabelRow, prefix: string) => row.key.startsWith(prefix) && COPY_ROLE.test(row.key.slice(prefix.length));
+
+/** The strictest of a document's rows: the highest rank in the policy, a person's label on a tie. */
+function strictestRow(policy: ClassificationPolicy, rows: ContentLabelRow[]): ContentLabelRow | null {
+  let best: ContentLabelRow | null = null;
+  const rank = (r: ContentLabelRow) => labelById(policy, r.label)?.rank ?? -1;
+  for (const r of rows) {
+    if (!best || rank(r) > rank(best) || (rank(r) === rank(best) && r.locked && !best.locked)) best = r;
+  }
+  return best;
+}
+
+/**
+ * The row a target's label is read from and written over. For a document address it is the
+ * strictest of the document's own row and the rows its copies carried under their own keys before
+ * (so nothing already labelled reads weaker), moved to the document address; `stale` names the copy
+ * rows, which the next write folds away so the document keeps one row.
+ */
+async function currentRow(storage: Storage, policy: ClassificationPolicy, target: ContentLabelTarget): Promise<{ row: ContentLabelRow | undefined; stale: ContentLabelTarget[] }> {
+  const own = await storage.getContentLabel(target);
+  const prefix = copyPrefixOf(target);
+  if (!prefix) return { row: own, stale: [] };
+  const copies = (await storage.getContentLabelsUnder(target.kind, target.scope, [prefix])).filter(r => isCopyRow(r, prefix));
+  if (!copies.length) return { row: own, stale: [] };
+  const best = strictestRow(policy, own ? [own, ...copies] : copies)!;
+  const suggestion = best.suggestion ?? [own, ...copies].find(r => r?.suggestion)?.suggestion ?? null;
+  const row: ContentLabelRow = { ...best, id: own?.id ?? randomUUID(), key: target.key, suggestion, history: [...best.history] };
+  return { row, stale: copies.map(r => ({ kind: r.kind, scope: r.scope, key: r.key })) };
 }
 
 export function fileTarget(ownerGaii: string, storageKey: string): ContentLabelTarget {
@@ -246,7 +340,8 @@ export interface SetLabelResult {
   from: string;
   source: ContentLabelRow['source'];
   locked: boolean;
-  /** Set when the change waits for a person: HUMAN_LABEL, CANNOT_LOWER, AI_SUGGESTS, BELOW_THRESHOLD. */
+  /** Set when the change waits for a person: HUMAN_LABEL, CANNOT_LOWER, AI_SUGGESTS, BELOW_THRESHOLD,
+   *  PERSON_APPROVES (an AI relayed a person's words that lower the label or change a person's). */
   pending?: string;
 }
 
@@ -262,15 +357,19 @@ function blankRow(target: ContentLabelTarget, policy: ClassificationPolicy, at: 
  * `classification`. Personal content tells only its owner's streams; an organism's tells every
  * stream, as the organism views are told.
  */
-async function putLabel(storage: Storage, row: ContentLabelRow): Promise<void> {
+async function putLabel(storage: Storage, row: ContentLabelRow, stale: readonly ContentLabelTarget[] = []): Promise<void> {
   await storage.putContentLabel(row);
+  // The rows a document's copies carried under their own keys are folded into the document's row
+  // (currentRow), so they go once it is stored: the document keeps one row, and its label.
+  for (const t of stale) await storage.deleteContentLabel(t);
   emitChange('classification', ownerOfScope(row.scope) ?? undefined);
 }
 
 /** Set a label, or leave a suggestion when the rules say an AI or a rule may not set it. */
 export async function setLabel(
-  deps: ClassificationDeps, actor: LabelActor, target: ContentLabelTarget, input: SetLabelInput,
+  deps: ClassificationDeps, actor: LabelActor, named: ContentLabelTarget, input: SetLabelInput,
 ): Promise<SetLabelResult> {
+  const target = labelAddressOf(named);
   const justification = trimmed(input.justification, 'justification', 2000);
   const humanSaid = trimmed(input.humanSaid, 'humanSaid', 2000);
   const reason = trimmed(input.reason, 'reason', 1000);
@@ -281,7 +380,7 @@ export async function setLabel(
   await assertMayLabel(deps, actor, target, 'write');
   const policy = await policyFor(deps.storage, deps.config, target.scope);
   const next = activeLabel(policy, input.label);
-  const prev = await deps.storage.getContentLabel(target);
+  const { row: prev, stale } = await currentRow(deps.storage, policy, target);
   const fromId = prev?.label ?? policy.defaultLabel;
   const from = labelById(policy, fromId);
   await assertInsideCurrent(deps, actor, target, from);
@@ -304,6 +403,28 @@ export async function setLabel(
     reader: actor.principal, readerKind: actor.kind === 'rule' ? 'system' : actor.kind, action: 'changed', purpose: `${fromId} → ${next.id} (${source})`,
   });
 
+  // An AI relaying a person's words (decided 2026-09-30, "humanSaid saa nostaa luokitusta"): a raise
+  // applies as theirs, also over a label a person set, since tightening gives nothing away; a
+  // lowering waits for the person in their own session (PERSON_APPROVES).
+  if (actor.kind === 'ai' && humanSaid && lowering) {
+    if (next.id === fromId) {
+      return { applied: false, label: fromId, from: fromId, source: prev?.source ?? 'default', locked: !!prev?.locked };
+    }
+    const pending = 'PERSON_APPROVES';
+    const s = prev?.suggestion;
+    if (s && s.why === pending && s.label === next.id && s.humanSaid === humanSaid && (s.justification ?? null) === justification) {
+      return { applied: false, label: fromId, from: fromId, source: prev!.source, locked: prev!.locked, pending };
+    }
+    row.suggestion = {
+      label: next.id, by: actor.principal, at, source: 'ai', reason: humanSaid, why: pending, humanSaid,
+      ...(justification ? { justification } : {}),
+    };
+    row.updatedAt = at;
+    pushHistory(row, { at, by: actor.principal, source: 'human-via-ai', action: 'suggest', from: fromId, to: next.id, justification, humanSaid });
+    await putLabel(deps.storage, row, stale);
+    return { applied: false, label: fromId, from: fromId, source: row.source, locked: row.locked, pending };
+  }
+
   const asPerson = actor.kind === 'human' || (actor.kind === 'ai' && !!humanSaid);
   if (asPerson) {
     if (lowering && from?.lowerNeedsJustification && !justification) {
@@ -314,7 +435,7 @@ export async function setLabel(
     row.label = next.id; row.source = source; row.locked = true; row.suggestion = null;
     row.justification = justification; row.humanSaid = humanSaid; row.setBy = actor.principal; row.updatedAt = at;
     pushHistory(row, { at, by: actor.principal, source, action: 'set', from: fromId, to: next.id, justification, humanSaid });
-    await putLabel(deps.storage, row);
+    await putLabel(deps.storage, row, stale);
     if (next.id !== fromId) changed(source);
     return { applied: true, label: next.id, from: fromId, source, locked: true };
   }
@@ -338,7 +459,7 @@ export async function setLabel(
     row.label = next.id; row.source = source; row.locked = false; row.suggestion = null;
     row.justification = null; row.humanSaid = null; row.setBy = actor.principal; row.updatedAt = at;
     pushHistory(row, { at, by: actor.principal, source, action: 'set', from: fromId, to: next.id, confidence, reason: reason ?? undefined });
-    await putLabel(deps.storage, row);
+    await putLabel(deps.storage, row, stale);
     changed(source);
     return { applied: true, label: next.id, from: fromId, source, locked: false };
   }
@@ -351,38 +472,54 @@ export async function setLabel(
   row.suggestion = { label: next.id, by: actor.principal, at, source, confidence, reason: reason ?? undefined, why: pending };
   row.updatedAt = at;
   pushHistory(row, { at, by: actor.principal, source, action: 'suggest', from: fromId, to: next.id, confidence, reason: reason ?? undefined });
-  await putLabel(deps.storage, row);
+  await putLabel(deps.storage, row, stale);
   return { applied: false, label: fromId, from: fromId, source: row.source, locked: row.locked, pending };
 }
 
 /** A person accepts or rejects the waiting suggestion. Accepting is the person setting the label. */
 export async function reviewLabel(
-  deps: ClassificationDeps, actor: LabelActor, target: ContentLabelTarget,
+  deps: ClassificationDeps, actor: LabelActor, named: ContentLabelTarget,
   input: { decision: 'accept' | 'reject'; justification?: string | null; humanSaid?: string | null },
 ): Promise<SetLabelResult> {
+  const target = labelAddressOf(named);
   const humanSaid = trimmed(input.humanSaid, 'humanSaid', 2000);
   if (actor.kind === 'rule' || (actor.kind === 'ai' && !humanSaid)) {
     throw new ClassificationError('PERSON_REQUIRED', 403, 'A person reviews a suggestion. An AI relays their decision with their own words in humanSaid.');
   }
   await assertMayLabel(deps, actor, target, 'write');
-  const prev = await deps.storage.getContentLabel(target);
-  if (prev) await assertInsideCurrent(deps, actor, target, labelById(await policyFor(deps.storage, deps.config, target.scope), prev.label));
+  const policy = await policyFor(deps.storage, deps.config, target.scope);
+  const { row: prev, stale } = await currentRow(deps.storage, policy, target);
+  if (prev) await assertInsideCurrent(deps, actor, target, labelById(policy, prev.label));
   if (!prev?.suggestion) throw new ClassificationError('NO_SUGGESTION', 404, 'Nothing is waiting for a review on this content.');
   if (input.decision === 'accept') {
-    return setLabel(deps, actor, target, { label: prev.suggestion.label, justification: input.justification, humanSaid });
+    // A lowering or a change of a person's label that an AI relayed waits for the person in their
+    // own session: an AI accepting it, even with their words, is the same relay again.
+    if (prev.suggestion.why === 'PERSON_APPROVES' && actor.kind !== 'human') {
+      throw new ClassificationError('PERSON_REQUIRED', 403,
+        'This change lowers the classification or changes one a person set, so the person accepts it signed in themselves. Ask them to open it.');
+    }
+    return setLabel(deps, actor, target, {
+      label: prev.suggestion.label, justification: input.justification ?? prev.suggestion.justification ?? null, humanSaid,
+    });
   }
   const at = (deps.now ?? (() => new Date().toISOString()))();
   const source = actor.kind === 'human' ? 'human' : 'human-via-ai';
   const row: ContentLabelRow = { ...prev, suggestion: null, updatedAt: at, history: [...prev.history] };
   pushHistory(row, { at, by: actor.principal, source, action: 'reject', from: prev.label, to: prev.suggestion.label, humanSaid });
-  await putLabel(deps.storage, row);
+  await putLabel(deps.storage, row, stale);
   return { applied: false, label: prev.label, from: prev.label, source: prev.source, locked: prev.locked };
 }
 
-/** The effective label of each target: its row, or the policy's default. One query per kind+scope. */
+/**
+ * The effective label of each target: its row, or the policy's default. One query per kind+scope,
+ * and one more for an organism's document addresses: a document reads as the strictest of its own
+ * row and the rows its copies carried under their own keys before (currentRow).
+ */
 export async function labelsFor(
   storage: Storage, policy: ClassificationPolicy, targets: ContentLabelTarget[],
 ): Promise<Map<string, { label: string; row: ContentLabelRow | null }>> {
+  // `keys` are the caller's keys; each is read at its label address (labelAddressOf) and answered
+  // under the caller's own target id.
   const groups = new Map<string, { kind: ContentLabelKind; scope: string; keys: string[] }>();
   for (const t of targets) {
     const g = `${t.kind}\u0000${t.scope}`;
@@ -392,10 +529,20 @@ export async function labelsFor(
   }
   const out = new Map<string, { label: string; row: ContentLabelRow | null }>();
   for (const g of groups.values()) {
-    const rows = await storage.getContentLabels(g.kind, g.scope, g.keys);
+    const addr = (k: string) => labelAddressOf({ kind: g.kind, scope: g.scope, key: k });
+    const rows = await storage.getContentLabels(g.kind, g.scope, g.keys.map(k => addr(k).key));
     const byKey = new Map(rows.map(r => [r.key, r]));
+    const prefixes = new Map<string, string>();
     for (const k of g.keys) {
-      const row = byKey.get(k) ?? null;
+      const p = copyPrefixOf(addr(k));
+      if (p) prefixes.set(k, p);
+    }
+    const copyRows = prefixes.size ? await storage.getContentLabelsUnder(g.kind, g.scope, [...new Set(prefixes.values())]) : [];
+    for (const k of g.keys) {
+      const own = byKey.get(addr(k).key) ?? null;
+      const p = prefixes.get(k);
+      const copies = p ? copyRows.filter(r => isCopyRow(r, p)) : [];
+      const row = copies.length ? strictestRow(policy, own ? [own, ...copies] : copies) : own;
       out.set(targetId({ kind: g.kind, scope: g.scope, key: k }), { label: row?.label ?? policy.defaultLabel, row });
     }
   }
@@ -458,10 +605,11 @@ export interface LabelView {
 }
 
 /** The label a piece of content carries, with its waiting suggestion and its last changes. */
-export async function readContentLabel(deps: ClassificationDeps, actor: LabelActor, target: ContentLabelTarget): Promise<LabelView> {
+export async function readContentLabel(deps: ClassificationDeps, actor: LabelActor, named: ContentLabelTarget): Promise<LabelView> {
+  const target = labelAddressOf(named);
   await assertMayLabel(deps, actor, target, 'read');
   const policy = await policyFor(deps.storage, deps.config, target.scope);
-  const row = await deps.storage.getContentLabel(target);
+  const { row } = await currentRow(deps.storage, policy, target);
   const label = row?.label ?? policy.defaultLabel;
   await assertInsideCurrent(deps, actor, target, labelById(policy, label));
   return {

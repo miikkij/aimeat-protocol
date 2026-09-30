@@ -5,10 +5,11 @@
  * @description SQLite implementation of the classification label store (TARGET-082). One row per
  *   labelled thing, addressed by (kind, scope, key); the batch read is one IN query per 500 keys.
  *   Mirrors ../../postgres-kysely/methods/content-labels.ts. Schema: ../schema-tables-4.ts.
- * @structure contentLabelMethods — getContentLabels · getContentLabel · putContentLabel ·
- *   deleteContentLabel · listContentLabels · deleteContentLabelsByScope
+ * @structure contentLabelMethods — getContentLabels · getContentLabel · getContentLabelsUnder ·
+ *   putContentLabel · deleteContentLabel · listContentLabels · deleteContentLabelsByScope
  * @usage merged onto SqliteStorage.prototype in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-09-30 — getContentLabelsUnder: the labels under key prefixes, one key range each.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V1. Initial.
  */
 import type {
@@ -22,6 +23,8 @@ type SqliteStorage = { db: Database.Database };
 
 /** Keys per IN list, under SQLite's default parameter limit. */
 const CHUNK = 500;
+/** Key prefixes per query (two parameters each). */
+const PREFIX_CHUNK = 200;
 
 function deserialize(r: Record<string, unknown>): ContentLabelRow {
   return {
@@ -60,6 +63,22 @@ export const contentLabelMethods = {
     const r = this.db.prepare('SELECT * FROM content_labels WHERE kind = ? AND scope = ? AND key = ?')
       .get(target.kind, target.scope, target.key) as Record<string, unknown> | undefined;
     return r ? deserialize(r) : undefined;
+  },
+
+  async getContentLabelsUnder(this: SqliteStorage, kind: ContentLabelKind, scope: string, prefixes: string[]): Promise<ContentLabelRow[]> {
+    const unique = [...new Set(prefixes)].filter(Boolean);
+    const out: ContentLabelRow[] = [];
+    for (let i = 0; i < unique.length; i += PREFIX_CHUNK) {
+      const part = unique.slice(i, i + PREFIX_CHUNK);
+      // A key range per prefix, [prefix, prefix with its last character raised), read on the
+      // (kind, scope, key) index; the column compares bytes (BINARY), and startsWith below is exact.
+      const ranges = part.map(() => '(key >= ? AND key < ?)').join(' OR ');
+      const args = part.flatMap(p => [p, p.slice(0, -1) + String.fromCharCode(p.charCodeAt(p.length - 1) + 1)]);
+      const rows = this.db.prepare(`SELECT * FROM content_labels WHERE kind = ? AND scope = ? AND (${ranges})`)
+        .all(kind, scope, ...args) as Record<string, unknown>[];
+      for (const r of rows) if (part.some(p => (r.key as string).startsWith(p))) out.push(deserialize(r));
+    }
+    return out;
   },
 
   async putContentLabel(this: SqliteStorage, row: ContentLabelRow): Promise<void> {

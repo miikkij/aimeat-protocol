@@ -9,6 +9,7 @@
  * @structure
  *   - getContentLabels(kind, scope, keys)  -- the labels of many keys of one scope, one IN query
  *   - getContentLabel(target)              -- one label
+ *   - getContentLabelsUnder(kind, scope, prefixes) -- the labels under many key prefixes of one scope
  *   - putContentLabel(row)                 -- insert or replace the row of (kind, scope, key)
  *   - deleteContentLabel(target)           -- remove one label (the target falls back to the default)
  *   - listContentLabels(query)             -- a page of one scope's labels, in key order
@@ -16,6 +17,8 @@
  * @usage
  *   import type { ContentLabelRepository } from './repositories/content-labels.repository.js';
  * @version-history
+ *   v1.1.0 — 2026-09-30 — getContentLabelsUnder: the labels under key prefixes, for the labels a
+ *     workspace document's copies carried before a document had one label address.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V1. Initial.
  */
 import type { ContentLabelKind, ContentLabelRow, ContentLabelTarget, ContentLabelListQuery } from '../types/content-labels.js';
@@ -28,6 +31,13 @@ export interface ContentLabelRepository {
   getContentLabels(kind: ContentLabelKind, scope: string, keys: string[]): Promise<ContentLabelRow[]>;
 
   getContentLabel(target: ContentLabelTarget): Promise<ContentLabelRow | undefined>;
+
+  /**
+   * The stored labels in one scope whose key starts with one of `prefixes` (each ends with `.`), a
+   * few queries for a whole page. It finds the labels a workspace document's copies carried under
+   * their own keys before a document had one address (services/classification/labels.ts).
+   */
+  getContentLabelsUnder(kind: ContentLabelKind, scope: string, prefixes: string[]): Promise<ContentLabelRow[]>;
 
   /** Insert, or replace the row with the same (kind, scope, key). The row's `id` is kept on replace. */
   putContentLabel(row: ContentLabelRow): Promise<void>;

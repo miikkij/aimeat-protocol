@@ -5,13 +5,14 @@
  * @description Postgres+Kysely implementation of the classification label store (TARGET-082). One
  *   row per labelled thing, addressed by (kind, scope, key); the batch read is one IN query per 500
  *   keys. Mirrors ../../sqlite/methods/content-labels.ts. Schema: migrations/0090_content_labels.sql.
- * @structure contentLabelMethods — getContentLabels · getContentLabel · putContentLabel ·
- *   deleteContentLabel · listContentLabels · deleteContentLabelsByScope
+ * @structure contentLabelMethods — getContentLabels · getContentLabel · getContentLabelsUnder ·
+ *   putContentLabel · deleteContentLabel · listContentLabels · deleteContentLabelsByScope
  * @usage merged onto PostgresKyselyStorage.prototype in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-09-30 — getContentLabelsUnder: the labels under key prefixes (starts_with).
  *   v1.0.0 — 2026-09-29 — TARGET-082 V1. Initial.
  */
-import type { Kysely, Selectable } from 'kysely';
+import { sql, type Kysely, type Selectable, type SqlBool } from 'kysely';
 import type {
   ContentLabelKind, ContentLabelRow, ContentLabelTarget, ContentLabelListQuery, ContentLabelSuggestion,
   ContentLabelEvent,
@@ -25,6 +26,8 @@ type PostgresKyselyStorage = { db: Kysely<DB> };
 
 /** Keys per IN list. Well under the Postgres parameter limit, and a page is rarely larger. */
 const CHUNK = 500;
+/** Key prefixes per query. */
+const PREFIX_CHUNK = 200;
 
 function toRow(r: Selectable<ContentLabelTable>): ContentLabelRow {
   return {
@@ -64,6 +67,22 @@ export const contentLabelMethods = {
       .where('kind', '=', target.kind).where('scope', '=', target.scope).where('key', '=', target.key)
       .executeTakeFirst();
     return r ? toRow(r) : undefined;
+  },
+
+  async getContentLabelsUnder(this: PostgresKyselyStorage, kind: ContentLabelKind, scope: string, prefixes: string[]): Promise<ContentLabelRow[]> {
+    const unique = [...new Set(prefixes)].filter(Boolean);
+    const out: ContentLabelRow[] = [];
+    for (let i = 0; i < unique.length; i += PREFIX_CHUNK) {
+      const part = unique.slice(i, i + PREFIX_CHUNK);
+      // starts_with, not a key range: a range compares under the database collation, which need not
+      // be byte order. The (kind, scope) part of the unique index narrows the scan.
+      const rows = await this.db.selectFrom('ContentLabel').selectAll()
+        .where('kind', '=', kind).where('scope', '=', scope)
+        .where(eb => eb.or(part.map(p => sql<SqlBool>`starts_with(${sql.ref('key')}, ${p})`)))
+        .execute();
+      for (const r of rows) out.push(toRow(r));
+    }
+    return out;
   },
 
   async putContentLabel(this: PostgresKyselyStorage, row: ContentLabelRow): Promise<void> {

@@ -7,6 +7,8 @@
  *   ai-provenance-marks.ts that names the forbidden vocabulary in order to forbid it.
  * @usage pnpm test -- check-ai-disclosure
  * @version-history
+ *   v1.3.0 — 2026-09-30 — [connector-provenance]: the connector's aimeat_memory_read_public going
+ *     back to the plain unwrap fails the gate (TARGET-082 review).
  *   v1.2.0 — 2026-09-05 — The gate runs in-process: the module is re-imported fresh per test with
  *     console and process.exit captured, instead of a `node --import tsx` child per test. The
  *     child cost 28.9 s for 12 tests (61 % of the unit suite's slowest fifteen was two files of this
@@ -127,6 +129,16 @@ describe('drop a label on purpose and the build fails', () => {
     const { code, out } = await runGate();
     expect(code).toBe(1);
     expect(out).toContain('no longer declares the ai_provenance input');
+  });
+
+  it('[connector-provenance] the connector public read back to the plain unwrap', async () => {
+    // The connector's aimeat_memory_read_public handed on the provenance id and dropped the
+    // statement until 2026-09-30; CONNECTOR_META_READS now names it, so the unwrap fails the gate.
+    breakFile('src/cli/connect/mcp/tools/memory-ext.ts', (src) =>
+      src.replace('return payloadResult(readPayloadWithProvenance(resp), resp);', 'return payloadResult(resp.data ?? resp, resp);'));
+    const { code, out } = await runGate();
+    expect(code).toBe(1);
+    expect(out).toContain('connector MCP tool aimeat_memory_read_public unwraps the envelope without folding meta.provenance');
   });
 
   it('[derived-visibility] a provider predicate that stops covering apps', async () => {

@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/mcp/catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.20.0 -- 2026-09-30 -- human_said: a stricter classification applies at once; a lowering or a change to a person's waits for the owner (PERSON_APPROVES).
  *   v1.19.0 -- 2026-09-29 -- Classified content: the warning, what is hidden, aimeat_classification (TARGET-082 V5).
  *   v1.18.0 -- 2026-09-29 -- Mail refinery: aimeat_refinery_classes, _run, _status and the schedule kind.
  *   v1.17.0 -- 2026-09-28 -- AI roles: aimeat_ai_roles and aimeat_ai_role_set, one line each beside aimeat_ai_routing_set.
@@ -70,8 +71,11 @@ do not retry or reach for it another way. \`aimeat_classification\` reads and ch
 with the actions \`get\`, \`set\`, \`review\`, \`policy_get\`, \`policy_set\`, \`audit\` and \`scan\`. Your
 own judgement never lowers a classification and never changes one a person set: it becomes a
 suggestion your owner accepts or rejects. When your owner tells you what to set, pass their own
-words, verbatim, in \`human_said\`. A policy change that gives anything away waits until your owner
-accepts it, signed in themselves.
+words, verbatim, in \`human_said\`. A classification at least as strict then applies at once as
+theirs. One that lowers it, or changes one a person set, waits as a suggestion (\`PERSON_APPROVES\`)
+with their words on it: your owner accepts it signed in themselves, and you cannot accept it for them
+(\`PERSON_REQUIRED\`). A policy change that gives anything away waits until your owner accepts it,
+signed in themselves.
 
 **Tasks — structured work for the owner.** \`aimeat_task_create\` · \`aimeat_task_list\` ·
 \`aimeat_task_get\` · \`aimeat_task_propose_todos\` · \`aimeat_task_event\` · \`aimeat_task_todo\` ·

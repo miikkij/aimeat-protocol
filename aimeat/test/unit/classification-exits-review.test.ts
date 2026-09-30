@@ -5,13 +5,16 @@
  * @description The exits of the TARGET-082 review, on a real SQLite store with classification on
  *   for everyone. Each block names its review item:
  *   1. a group share of `organism.<id>.**` hands a non-member nothing an organism label keeps inside;
- *   2. the personal exports (GET /v1/memory/export, the bundle, GET /v1/owners/:name/export) leave an
- *      organism's record behind and say so;
+ *   2. the personal exports (GET /v1/memory/export, the bundle) leave an organism's record behind and
+ *      say so; the GDPR export (GET /v1/owners/:name/export) takes it and says it carries classified
+ *      organism content (decided 2026-09-30);
  *   3. a workspace export, a share link and federation say what stayed behind;
  *   5. POST /v1/memory/copy reads its source through the reader and carries the label, never lower;
  *   6. the reach gate counts the reads it missed.
  * @usage cd aimeat && pnpm exec vitest run test/unit/classification-exits-review.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-30 — The GDPR export takes the person's organism records and names them in
+ *     classified_organism_content; the ordinary export still leaves them out (decided 2026-09-30).
  *   v1.0.0 — 2026-09-29 — TARGET-082 review, items 1, 2, 3, 5 and 6. Initial.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -145,10 +148,27 @@ describe('TARGET-082 review: what leaves, and what the answer says stayed', () =
         expect(body.data.left_out).toEqual([{ key: ORG_KEY, label: 'sisainen', reason: expect.stringContaining('may not leave its organism') }]);
       });
 
-      it('GET /v1/owners/:name/export does the same for the GDPR export', async () => {
-        const body = await (await call('GET', '/v1/owners/alice/export', 'owner')).json() as { data: { memories: Array<{ key: string }>; left_out?: Array<{ key: string }> } };
+      // Decided by Jouni 2026-09-30: the GDPR export is the person's legal right to their own data,
+      // so their organism records come out, and the answer says it carries classified organism content.
+      it('GET /v1/owners/:name/export, the GDPR export, takes the organism record too and says so', async () => {
+        await setLabel(deps(), alice, memoryTarget(ALICE, ORG_KEY), { label: 'erittain-luottamuksellinen' });
+        const body = await (await call('GET', '/v1/owners/alice/export', 'owner')).json() as {
+          data: { memories: Array<{ key: string }>; left_out?: unknown[]; classified_organism_content?: { count: number; keys: string[]; note: string } };
+        };
+        expect(body.data.memories.map(m => m.key).sort()).toEqual([ORG_KEY, 'notes.mine'].sort());
+        expect(body.data.left_out).toBeUndefined();
+        expect(body.data.classified_organism_content).toMatchObject({ count: 1, keys: [ORG_KEY], note: expect.stringContaining('classified') });
+        // The ordinary export still keeps the same record behind.
+        const ordinary = await (await call('GET', '/v1/memory/export', 'owner')).json() as { data: { entries: Array<{ key: string }>; left_out?: Array<{ key: string }> } };
+        expect(ordinary.data.entries.map(e => e.key)).toEqual(['notes.mine']);
+        expect(ordinary.data.left_out?.map(l => l.key)).toEqual([ORG_KEY]);
+      });
+
+      it('GET /v1/owners/:name/export says nothing about organism content when it holds none', async () => {
+        await storage.deleteMemory(ALICE, ORG_KEY);
+        const body = await (await call('GET', '/v1/owners/alice/export', 'owner')).json() as { data: { memories: Array<{ key: string }>; classified_organism_content?: unknown } };
         expect(body.data.memories.map(m => m.key)).toEqual(['notes.mine']);
-        expect(body.data.left_out?.map(l => l.key)).toEqual([ORG_KEY]);
+        expect(body.data.classified_organism_content).toBeUndefined();
       });
 
       it('the bundle leaves it out and its manifest says classified', async () => {
