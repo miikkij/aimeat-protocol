@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/mcp/catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.21.1 -- 2026-09-30 -- The classification action list names explorer.
  *   v1.21.0 -- 2026-09-30 -- An AI sees everything by default; what an AI's send-out leaves behind; the owner's exception with a reason (exception_list, exception_set refused).
  *   v1.20.0 -- 2026-09-30 -- human_said: a stricter classification applies at once; a lowering or a change to a person's waits for the owner (PERSON_APPROVES).
  *   v1.19.0 -- 2026-09-29 -- Classified content: the warning, what is hidden, aimeat_classification (TARGET-082 V5).
@@ -76,12 +77,13 @@ may not leave it; the answer names each item. Only your owner can make an except
 themselves in their Data Wallet with a written reason, so tell them what you wanted to send and why;
 \`exception_set\` answers \`PERSON_REQUIRED\` for you, and \`exception_list\` shows the exceptions and
 their reasons. \`aimeat_classification\` reads and changes classifications,
-with the actions \`get\`, \`set\`, \`review\`, \`policy_get\`, \`policy_set\`, \`audit\`, \`scan\` and
-\`exception_list\`. Your
+with the actions \`get\`, \`set\`, \`review\`, \`policy_get\`, \`policy_set\`, \`audit\`, \`scan\`,
+\`explorer\` (a page of your owner's classified items, or with \`pending: true\` the suggestions that
+wait for them) and \`exception_list\`. Your
 own judgement never lowers a classification and never changes one a person set: it becomes a
 suggestion your owner accepts or rejects. When your owner tells you what to set, pass their own
 words, verbatim, in \`human_said\`. A classification at least as strict then applies at once as
-theirs. One that lowers it, or changes one a person set, waits as a suggestion (\`PERSON_APPROVES\`)
+theirs, also over one a person set. One that lowers it waits as a suggestion (\`PERSON_APPROVES\`)
 with their words on it: your owner accepts it signed in themselves, and you cannot accept it for them
 (\`PERSON_REQUIRED\`). A policy change that gives anything away waits until your owner accepts it,
 signed in themselves.

@@ -21,6 +21,16 @@
  *   review a label suggestion or a policy proposal, a non-operator does not move the switch.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-classification
  * @version-history
+ *   v1.5.0 — 2026-09-30 — TARGET-082 test gaps: the operator's agent without operator:admin and the
+ *     operator's personal access token do not loosen the switch on PUT /v1/admin/config; another owner
+ *     reviews no suggestion on this owner's item; an outsider reads and writes no organism policy and
+ *     reads no organism audit log; the organism DENIAL case names a real workspace and has a positive
+ *     control (its key named a workspace that did not exist, so its 404 proved nothing about
+ *     membership); a hidden read answers what an absent key answers on node MCP, connector MCP and
+ *     /local/call, code or text included; deleting an organism takes its exceptions and its waiting
+ *     audit rows.
+ *   v1.4.0 — 2026-09-30 — AGENT EXPORT: POST /v1/agents/:gaii/export keeps an organism record behind
+ *     and names it (TARGET-082 second review, S3).
  *   v1.3.0 — 2026-09-30 — AI-SEND: an agent's export takes its record hidden from AI once the person
  *     makes an ai-send exception with a reason (the AI cannot send what it cannot see), audited as
  *     shown and as exported, and leaves it out again once withdrawn.
@@ -197,6 +207,9 @@ let orgId = '';
 const OWN = { hidden: 'cls.hidden', warning: 'cls.warning', allowed: 'cls.allowed' };
 const AGT = { hidden: 'clsa.hidden', warning: 'clsa.warning', allowed: 'clsa.allowed' };
 const WORD = `zebrafrost${stamp}`;
+/** A key nobody wrote: a hidden record must answer exactly as this one does. */
+const ABSENT = 'cls.nosuchrecord';
+const firstLine = (s: string) => s.split('\n')[0]!.trim();
 
 const setSwitchInPerson = (token: string, mode: string) => json('/v1/admin/config', {
   method: 'PUT', headers: auth(token), body: JSON.stringify({ changes: [{ path: 'classification.mode', value: mode }] }),
@@ -242,6 +255,26 @@ await test('NODE MCP: the operator\'s agent may not turn it off or back to owner
     assert(r.isError && r.text.startsWith('PERSON_REQUIRED') && /admin Config page/.test(r.text), `${mode}: ${r.text.slice(0, 200)}`);
   }
   assert(await modeNow(op.token) === 'all', 'the switch stayed at all');
+});
+
+await test('DENIAL: on the Config endpoint, the operator\'s agent without operator:admin and the operator\'s access token do not loosen the switch; the operator in person does', async () => {
+  const plain = await agent(op, 'clsopplain', ['*']);
+  const byAgent = await setSwitchInPerson(plain.token, 'off');
+  assert(byAgent.status === 403, `the agent without operator:admin: ${byAgent.status} ${JSON.stringify(byAgent.body?.error)}`);
+  // An operator-level personal access token carries the operator role (services/access-token.ts)
+  // and passes requireRole('operator'), so the switch guard itself is what refuses it.
+  const pat = await json('/v1/access/tokens', { method: 'POST', headers: auth(op.token), body: JSON.stringify({ label: `cls switch ${stamp}`, grant_operator: true }) });
+  assert(pat.status === 201 && typeof pat.body?.data?.token === 'string', `mint the operator's token: ${pat.status} ${JSON.stringify(pat.body?.error)}`);
+  for (const mode of ['off', 'owner']) {
+    const r = await setSwitchInPerson(pat.body.data.token, mode);
+    assert(r.status === 403 && r.body?.error?.code === 'PERSON_REQUIRED' && /Nothing in this request was applied/.test(r.body.error.message ?? ''),
+      `the operator's token, ${mode}: ${r.status} ${JSON.stringify(r.body?.error)}`);
+  }
+  assert(await modeNow(op.token) === 'all', 'the switch stayed at all');
+  const down = await setSwitchInPerson(op.token, 'owner');
+  assert(down.status === 200 && await modeNow(op.token) === 'owner', `POSITIVE CONTROL, the operator in person: ${down.status} ${JSON.stringify(down.body?.error)}`);
+  const up = await setSwitchInPerson(op.token, 'all');
+  assert(up.status === 200 && await modeNow(op.token) === 'all', `and back to all: ${up.status}`);
 });
 
 await test('REST: the operator in person moves it both ways on the Config endpoint and on /v1/classification/switch', async () => {
@@ -373,6 +406,10 @@ console.log('\nPath 2: the node\'s MCP endpoint, the agent\'s session');
 await test('NODE MCP: hidden reads as absent, warning carries classification_warning, allowed is plain', async () => {
   const h = await nodeTool(bot.mcp, 'aimeat_memory_read', { key: OWN.hidden, owner_scope: true });
   assert(h.isError && !h.text.includes('the cls.hidden record'), `hidden: ${h.text.slice(0, 200)}`);
+  // The tool answers a missing record with the plain text "Memory not found" (no code): the hidden
+  // record gets that answer, the one a key that does not exist gets.
+  const none = await nodeTool(bot.mcp, 'aimeat_memory_read', { key: ABSENT, owner_scope: true });
+  assert(/^Memory not found/.test(h.text) && firstLine(h.text) === firstLine(none.text), `hidden answers as absent: ${h.text.slice(0, 200)} | absent: ${none.text.slice(0, 200)}`);
   const w = await nodeTool(bot.mcp, 'aimeat_memory_read', { key: OWN.warning, owner_scope: true });
   assert(!w.isError && !!warningOf(w.payload), `warning: ${w.text.slice(0, 300)}`);
   const a = await nodeTool(bot.mcp, 'aimeat_memory_read', { key: OWN.allowed, owner_scope: true });
@@ -412,6 +449,10 @@ await test('CONNECTOR MCP: hidden reads as absent, warning carries its warning, 
   assert(!!connector, 'the daemon is up');
   const h = await connectorTool(connector!, 'aimeat_memory_read', { key: OWN.hidden, owner_scope: true });
   assert(h.isError && !h.raw.includes('the cls.hidden record'), `hidden: ${h.raw.slice(0, 200)}`);
+  const none = await connectorTool(connector!, 'aimeat_memory_read', { key: ABSENT, owner_scope: true });
+  // The connector hands back the REST envelope as JSON: the code is on its error.
+  const codeOf = (r: { payload: any }) => r.payload?.error?.code ?? r.payload?.code ?? null;
+  assert(codeOf(h) === 'NOT_FOUND' && codeOf(none) === 'NOT_FOUND' && none.isError, `hidden answers as absent, NOT_FOUND: ${h.raw.slice(0, 200)} | absent: ${none.raw.slice(0, 200)}`);
   const w = await connectorTool(connector!, 'aimeat_memory_read', { key: OWN.warning, owner_scope: true });
   assert(!w.isError && !!warningOf(w.payload), `warning: ${w.raw.slice(0, 300)}`);
   const a = await connectorTool(connector!, 'aimeat_memory_read', { key: OWN.allowed, owner_scope: true });
@@ -431,6 +472,9 @@ await test('CONNECTOR MCP: hidden is in no list and no search', async () => {
 await test('CONNECTOR /local/call: the shell-callable read answers hidden as absent too', async () => {
   const h = await json('/local/call/aimeat_memory_read', { method: 'POST', body: JSON.stringify({ key: OWN.hidden, owner_scope: true }) }, loopback);
   assert(h.body?.ok === false, `hidden: ${JSON.stringify(h.body).slice(0, 200)}`);
+  const none = await json('/local/call/aimeat_memory_read', { method: 'POST', body: JSON.stringify({ key: ABSENT, owner_scope: true }) }, loopback);
+  assert(h.body?.error?.code === 'NOT_FOUND' && none.body?.error?.code === 'NOT_FOUND' && h.status === none.status,
+    `hidden answers as absent, NOT_FOUND: ${h.status} ${JSON.stringify(h.body?.error)} | absent: ${none.status} ${JSON.stringify(none.body?.error)}`);
   const w = await json('/local/call/aimeat_memory_read', { method: 'POST', body: JSON.stringify({ key: OWN.warning, owner_scope: true }) }, loopback);
   assert(w.body?.ok === true && !!warningOf(w.body.data), `warning: ${JSON.stringify(w.body).slice(0, 300)}`);
 });
@@ -546,6 +590,16 @@ await test('DENIAL: the agent does not review the suggestion without the person\
   assert(r.status === 403 && r.body?.error?.code === 'PERSON_REQUIRED', `agent review: ${r.status} ${JSON.stringify(r.body?.error)}`);
 });
 
+await test('DENIAL: another owner neither rejects nor accepts the suggestion on this owner\'s item (404), and it still waits', async () => {
+  for (const decision of ['reject', 'accept']) {
+    const r = await json('/v1/classification/label/review', { method: 'POST', headers: auth(bob.token), body: JSON.stringify({ key: OWN.allowed, owner: alice.ghii, decision }) });
+    assert(r.status === 404 && r.body?.error?.code === 'NOT_FOUND', `bob ${decision}s: ${r.status} ${JSON.stringify(r.body?.error)}`);
+  }
+  const p = await json('/v1/classification/labels?pending=true', { headers: auth(alice.token) });
+  const items = (p.body?.data?.items ?? []) as any[];
+  assert(items.length === 1 && items[0].key === OWN.allowed && items[0].suggestion?.label === 'luottamuksellinen', `still waiting: ${JSON.stringify(items.map(x => [x.key, x.suggestion?.label]))}`);
+});
+
 await test('The person rejects it; the label stays, and nothing waits any more', async () => {
   const r = await json('/v1/classification/label/review', { method: 'POST', headers: auth(alice.token), body: JSON.stringify({ key: OWN.allowed, decision: 'reject' }) });
   assert(r.status === 200 && r.body.data.label === 'julkinen', `reject: ${r.status} ${JSON.stringify(r.body)}`);
@@ -571,17 +625,46 @@ await test('DENIAL: another owner neither reads nor sets a label on this owner\'
   const o = await json('/v1/organisms', { method: 'POST', headers: auth(alice.token), body: JSON.stringify({ name: `Cls Org ${stamp}`, type: 'project', join_policy: 'invite_only', visibility: 'private' }) });
   assert(o.status === 201, `organism: ${o.status} ${JSON.stringify(o.body?.error)}`);
   orgId = o.body.data.organism.id;
-  const key = `organism.${orgId}.w.notes.plan`;
+  // A workspace that exists, so a 404 below comes from bob not being a member and not from a
+  // workspace nobody made.
+  const ws = await json(`/v1/organisms/${orgId}/workspaces`, { method: 'POST', headers: auth(alice.token), body: JSON.stringify({ name: 'Cls Notes', manifest: {
+    manifestVersion: '1.0', name: 'Cls Notes', kind: 'project', status: 'active',
+    objectTypes: [{ name: 'note', schemaRef: 'schema:note@1', namespace: 'notes', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true, mode: 'records' }],
+  } }) });
+  assert(ws.status === 201 && typeof ws.body?.data?.ws === 'string', `workspace: ${ws.status} ${JSON.stringify(ws.body?.error)}`);
+  const key = `organism.${orgId}.w.${ws.body.data.ws}.notes.plan`;
   const read = await json(`/v1/classification/label?key=${encodeURIComponent(key)}`, { headers: auth(bob.token) });
-  assert(read.status === 404, `bob reads: ${read.status}`);
+  assert(read.status === 404 && read.body?.error?.code === 'NOT_FOUND', `bob reads: ${read.status} ${JSON.stringify(read.body?.error)}`);
   const set = await json('/v1/classification/label', { method: 'PUT', headers: auth(bob.token), body: JSON.stringify({ key, label: 'julkinen' }) });
-  assert(set.status === 404, `bob sets: ${set.status}`);
+  assert(set.status === 404 && set.body?.error?.code === 'NOT_FOUND', `bob sets: ${set.status} ${JSON.stringify(set.body?.error)}`);
+  const aliceSets = await json('/v1/classification/label', { method: 'PUT', headers: auth(alice.token), body: JSON.stringify({ key, label: 'luottamuksellinen' }) });
+  assert(aliceSets.status === 200 && aliceSets.body.data.applied === true, `POSITIVE CONTROL, the creator sets it: ${aliceSets.status} ${JSON.stringify(aliceSets.body?.error)}`);
+  const aliceReads = await json(`/v1/classification/label?key=${encodeURIComponent(key)}`, { headers: auth(alice.token) });
+  assert(aliceReads.status === 200 && aliceReads.body.data.label === 'luottamuksellinen', `POSITIVE CONTROL, the creator reads it: ${aliceReads.status} ${JSON.stringify(aliceReads.body?.data?.label)}`);
+  const still = await json(`/v1/classification/label?key=${encodeURIComponent(key)}`, { headers: auth(bob.token) });
+  assert(still.status === 404, `bob still reads nothing once it is labelled: ${still.status}`);
   const list = await json(`/v1/classification/labels?level=organism&organism_id=${orgId}`, { headers: auth(bob.token) });
   assert(list.status === 404, `bob lists: ${list.status}`);
   const mcp = await nodeTool(bobBot.mcp, 'aimeat_classification', { action: 'explorer', level: 'organism', organism_id: orgId });
   assert(mcp.isError && mcp.text.startsWith('NOT_FOUND'), `bob's agent lists: ${mcp.text.slice(0, 200)}`);
   const mine = await json(`/v1/classification/labels?level=organism&organism_id=${orgId}`, { headers: auth(alice.token) });
   assert(mine.status === 200 && mine.body.data.subject === orgId, `POSITIVE CONTROL, the creator lists it: ${mine.status}`);
+});
+
+await test('DENIAL: another owner neither reads nor writes the organism\'s policy, nor reads its audit log; the creator does', async () => {
+  const q = `level=organism&organism_id=${encodeURIComponent(orgId)}`;
+  const read = await json(`/v1/classification/policy?${q}`, { headers: auth(bob.token) });
+  assert(read.status === 404 && read.body?.error?.code === 'NOT_FOUND', `bob reads the policy: ${read.status} ${JSON.stringify(read.body?.error)}`);
+  const write = await json('/v1/classification/policy', { method: 'PUT', headers: auth(bob.token), body: JSON.stringify({ level: 'organism', organism_id: orgId, policy: { enabled: false } }) });
+  assert(write.status === 404 && write.body?.error?.code === 'NOT_FOUND', `bob writes the policy: ${write.status} ${JSON.stringify(write.body?.error)}`);
+  const audit = await json(`/v1/classification/audit?${q}`, { headers: auth(bob.token) });
+  assert(audit.status === 404 && audit.body?.error?.code === 'NOT_FOUND', `bob reads the audit log: ${audit.status} ${JSON.stringify(audit.body?.error)}`);
+  const mine = await json(`/v1/classification/policy?${q}`, { headers: auth(alice.token) });
+  assert(mine.status === 200 && mine.body.data.subject === orgId && mine.body.data.stored === null, `POSITIVE CONTROL, the creator reads it, and bob wrote nothing: ${mine.status} ${JSON.stringify(mine.body?.data?.stored)}`);
+  const set = await json('/v1/classification/policy', { method: 'PUT', headers: auth(alice.token), body: JSON.stringify({ level: 'organism', organism_id: orgId, policy: { enabled: true } }) });
+  assert(set.status === 200 && set.body.data.applied === true, `POSITIVE CONTROL, the creator writes it: ${set.status} ${JSON.stringify(set.body?.error)}`);
+  const log = await json(`/v1/classification/audit?${q}`, { headers: auth(alice.token) });
+  assert(log.status === 200 && log.body.data.subject === orgId, `POSITIVE CONTROL, the creator reads the log: ${log.status}`);
 });
 
 await test('DENIAL: an agent\'s loosening of the owner policy waits, and the agent cannot accept it (PERSON_REQUIRED)', async () => {
@@ -740,6 +823,17 @@ await test('WITHDRAW: the person withdraws the exception; it stays listed, and t
   assert(((exp.body.data.left_out ?? []) as any[]).some(l => l.key === KEPT()), `export after: ${JSON.stringify(exp.body.data.left_out)}`);
 });
 
+await test('AGENT EXPORT: the portability export of an agent keeps an organism record behind and names it, as the ordinary export does', async () => {
+  const key = `organism.${orgId}.notes.agentkept`;
+  const w = await json('/v1/memory', { method: 'POST', headers: auth(bot.token), body: JSON.stringify({ key, value: { note: 'written by the agent' } }) });
+  assert(w.status === 201, `the agent writes the organism record: ${w.status} ${JSON.stringify(w.body?.error)}`);
+  const exp = await json(`/v1/agents/${encodeURIComponent(bot.gaii)}/export`, { method: 'POST', headers: auth(alice.token) });
+  assert(exp.status === 200, `export: ${exp.status} ${JSON.stringify(exp.body?.error)}`);
+  assert(!(exp.body.data.memory as any[]).some(m => m.key === key), `the record stayed behind: ${JSON.stringify((exp.body.data.memory as any[]).map(m => m.key))}`);
+  assert(((exp.body.data.left_out ?? []) as any[]).some(l => l.key === key), `and is named: ${JSON.stringify(exp.body.data.left_out)}`);
+  assert((exp.body.data.memory as any[]).some(m => m.key === AGT.allowed), 'POSITIVE CONTROL: the agent\'s own record comes out');
+});
+
 await test('AI-SEND: the agent\'s export has no record hidden from AI until the person makes an ai-send exception with a reason; then the agent sees it, exports it, and both uses are audited', async () => {
   const has = (r: { body: any }) => ((r.body?.data?.entries ?? []) as any[]).some(e => e.key === AGT.hidden);
   const before = await json('/v1/memory/export', { headers: auth(bot.token) });
@@ -794,6 +888,33 @@ await test('APP: an app lowers a classification without a justification, and the
   assert(!!e && e.auto === true && e.byKind === 'app' && /lowered luottamuksellinen → sisainen/.test(e.reason), `the exception: ${JSON.stringify(list.body?.data)}`);
   const agentLow = await nodeTool(bot.mcp, 'aimeat_classification', { action: 'set', key: AGT.warning, owner: bot.gaii, label: 'sisainen' });
   assert(!agentLow.isError && agentLow.payload?.applied === false, `an agent still only suggests: ${agentLow.text.slice(0, 200)}`);
+});
+
+await test('ORGANISM DELETE: deleting an organism takes its exceptions and its audit rows still waiting to be written', async () => {
+  const o = await json('/v1/organisms', { method: 'POST', headers: auth(alice.token), body: JSON.stringify({ name: `Cls Gone ${stamp}`, type: 'project', join_policy: 'invite_only', visibility: 'private' }) });
+  assert(o.status === 201, `organism: ${o.status} ${JSON.stringify(o.body?.error)}`);
+  const gone = o.body.data.organism.id as string;
+  const key = `organism.${gone}.notes.leaving`;
+  const w = await json('/v1/memory', { method: 'POST', headers: auth(alice.token), body: JSON.stringify({ key, value: { note: 'minutes' } }) });
+  assert(w.status === 201, `write: ${w.status} ${JSON.stringify(w.body?.error)}`);
+  const made = await json('/v1/classification/exceptions', { method: 'POST', headers: auth(alice.token), body: JSON.stringify({ key, action: 'leave', reason: 'The board approved it.' }) });
+  assert(made.status === 201, `make: ${made.status} ${JSON.stringify(made.body?.error)}`);
+  const inScope = (rows: any[]) => rows.filter(r => r.scope === `organism:${gone}` || r.organismId === gone);
+  // Before: the operator's node views hold the exception and its "made" row (flushed every 60 s,
+  // so it still waits in memory here).
+  const before = await json('/v1/classification/exceptions?level=node', { headers: auth(op.token) });
+  assert(inScope(before.body?.data?.exceptions ?? []).length === 1, `exception before: ${JSON.stringify(before.body?.data?.exceptions?.length)}`);
+  const auditBefore = await json('/v1/classification/audit?level=node&action=exception&limit=1000', { headers: auth(op.token) });
+  assert(inScope(auditBefore.body?.data?.rows ?? []).length > 0, `audit before: ${auditBefore.status}`);
+
+  const del = await json(`/v1/organisms/${gone}`, { method: 'DELETE', headers: auth(alice.token) });
+  assert(del.status === 200 && del.body?.data?.deleted === true, `delete: ${del.status} ${JSON.stringify(del.body?.error)}`);
+
+  const after = await json('/v1/classification/exceptions?level=node', { headers: auth(op.token) });
+  assert(after.status === 200 && inScope(after.body.data.exceptions).length === 0, `exceptions after: ${JSON.stringify(inScope(after.body?.data?.exceptions ?? []))}`);
+  const auditAfter = await json('/v1/classification/audit?level=node&action=exception&limit=1000', { headers: auth(op.token) });
+  assert(auditAfter.status === 200 && inScope(auditAfter.body.data.rows).length === 0, `audit after: ${JSON.stringify(inScope(auditAfter.body?.data?.rows ?? []))}`);
+  assert((after.body.data.exceptions as any[]).some(e => e.id === orgException), 'POSITIVE CONTROL: the other organism\'s exception stays');
 });
 
 // ─── Cleanup ───

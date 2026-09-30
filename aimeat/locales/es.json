@@ -343,7 +343,7 @@
       "cls": {
         "title": "Clasificación",
         "lead": "La política de clasificación de este servidor: las clasificaciones que puede llevar el contenido, qué deja ver cada una a una IA y si el contenido puede salir de un organismo, las reglas que clasifican el contenido cuando se escribe y el registro de lo que se mostró, se usó, se rechazó o se reclasificó. Un propietario o un organismo puede agregarle lo suyo y hacerla más estricta, pero nunca relajarla.",
-        "loadFailed": "No se pudo leer la política de clasificación en este momento. Se sirve en /v1/classification/policy.",
+        "loadFailed": "No se pudo leer la política de clasificación en este momento.",
         "mode": {
           "off": "Clasificación: desactivada",
           "offWhy": "No se clasifica ni se comprueba nada. La política de abajo espera hasta que la actives. El ajuste se llama Clasificación, en {config}.",

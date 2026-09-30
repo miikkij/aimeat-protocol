@@ -11,6 +11,7 @@
  *   past the in-process limit a write goes to the persistent queue instead of being dropped, and the
  *   write hook hands the classifier the policy it read.
  * @version-history
+ *   v1.2.0 — 2026-09-30 — One owner holds at most 50 writes in process (TARGET-082 second review, S4).
  *   v1.1.0 — 2026-09-29 — The review fixes (TARGET-082 review, findings 5 and 6).
  *   v1.0.0 — 2026-09-29 — TARGET-082 V3. Initial.
  */
@@ -101,11 +102,27 @@ describe('write-time classification', () => {
     let judged = 0;
     const { enqueue } = await import('../../src/services/classification/classifier.js');
     setWriteClassifier(async () => { judged++; }, enqueue);
-    // All scheduled in one tick, so the worker has not started: the 2001st is past the limit.
-    for (let i = 0; i <= 2000; i++) classifyAfterWrite(deps(), ALICE, `bulk.${i}`, 'text');
+    // All scheduled in one tick, so the worker has not started: forty owners fill the 2000 places
+    // (50 each, the per-owner limit), and the 2001st write is past the limit.
+    for (let o = 0; o < 40; o++) {
+      for (let i = 0; i < 50; i++) classifyAfterWrite(deps(), `o${o}@${NODE}`, `bulk.${i}`, 'text');
+    }
+    classifyAfterWrite(deps(), ALICE, 'bulk.2000', 'text');
     await flushWriteClassification();
     expect(judged).toBe(2000);
     expect(await readQueue(storage, NODE)).toMatchObject([{ key: 'bulk.2000', scope: ALICE, origin: 'write' }]);
+  });
+
+  it('one owner holds at most 50 writes in process; the rest wait in the persistent queue by address', async () => {
+    let judged = 0;
+    const { enqueue } = await import('../../src/services/classification/classifier.js');
+    setWriteClassifier(async () => { judged++; }, enqueue);
+    for (let i = 0; i < 60; i++) classifyAfterWrite(deps(), ALICE, `big.${i}`, 'x'.repeat(10_000));
+    // POSITIVE CONTROL: another owner's write is still judged in process.
+    classifyAfterWrite(deps(), `bob@${NODE}`, 'notes.one', 'text');
+    await flushWriteClassification();
+    expect(judged).toBe(51);
+    expect((await readQueue(storage, NODE)).map(q => q.key)).toEqual(Array.from({ length: 10 }, (_, i) => `big.${50 + i}`));
   });
 
   it('with the switch off nothing is scheduled and nothing is read', async () => {

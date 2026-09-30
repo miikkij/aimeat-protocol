@@ -40,6 +40,8 @@
  *   classifyAfterWrite() · flushWriteClassification() · pendingWriteClassifications()
  * @usage classifyAfterWrite({ storage, config }, record.ownerGaii, record.key, record.value);
  * @version-history
+ *   v1.2.0 — 2026-09-30 — At most MAX_PENDING_PER_OWNER writes of one owner are held with their
+ *     values; the rest go to the persistent queue by address (TARGET-082 second review, S4).
  *   v1.1.0 — 2026-09-29 — Review fixes: past MAX_PENDING a write goes to the persistent queue in
  *     batches instead of being dropped; the policy is read once and passed to the classifier.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V3. Initial.
@@ -64,6 +66,13 @@ export type WriteQueue = (deps: Deps, targets: readonly ContentLabelTarget[], op
 /** The most text the classifier is given from one value. */
 export const MAX_TEXT = 200_000;
 const MAX_PENDING = 2000;
+/**
+ * The most writes of one owner the list holds, with their values. Past it the owner's writes go to
+ * the persistent queue by address, so one owner writing large values in a loop cannot fill the
+ * process with them (TARGET-082 second review, S4).
+ */
+const MAX_PENDING_PER_OWNER = 50;
+const pendingByOwner = new Map<string, number>();
 /** Writes past MAX_PENDING wait here for the persistent queue, at most this many per enqueue. */
 const OVERFLOW_BATCH = 500;
 const MAX_OVERFLOW = 20_000;
@@ -148,6 +157,8 @@ function startOverflowFlush(): void {
 
 async function drain(): Promise<void> {
   for (let item = pending.shift(); item; item = pending.shift()) {
+    const n = (pendingByOwner.get(item.ownerGaii) ?? 1) - 1;
+    if (n > 0) pendingByOwner.set(item.ownerGaii, n); else pendingByOwner.delete(item.ownerGaii);
     if (classifier) await classifyOne(classifier, item);
   }
 }
@@ -176,8 +187,9 @@ export function classifyAfterWrite(deps: Deps, ownerGaii: string, key: string, v
     }
     return;
   }
-  if (pending.length >= MAX_PENDING) {
-    // Past the in-process limit the write waits in the persistent queue, which reads the value again.
+  if (pending.length >= MAX_PENDING || (pendingByOwner.get(ownerGaii) ?? 0) >= MAX_PENDING_PER_OWNER) {
+    // Past the in-process limit, the whole list's or this owner's, the write waits in the persistent
+    // queue, which reads the value again.
     if (writeQueue && overflow.length < MAX_OVERFLOW) {
       overflow.push({ deps, target: memoryTarget(ownerGaii, key) });
       startOverflowFlush();
@@ -190,6 +202,7 @@ export function classifyAfterWrite(deps: Deps, ownerGaii: string, key: string, v
     return;
   }
   pending.push({ deps, ownerGaii, key, value });
+  pendingByOwner.set(ownerGaii, (pendingByOwner.get(ownerGaii) ?? 0) + 1);
   if (!worker) startWorker();
 }
 

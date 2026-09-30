@@ -8,6 +8,8 @@
  *   one; humanSaid makes an AI's call the person's; the AI mode (suggest, auto, off); a review; who
  *   may label what; who is an AI, decided from the credential.
  * @version-history
+ *   v1.2.0 — 2026-09-30 — An AI does not reject a suggestion that would protect the content more
+ *     (TARGET-082 second review, S6).
  *   v1.1.0 — 2026-09-30 — humanSaid from an AI: a raise applies (AI mode off too); a lowering or a
  *     change to a person's label waits as PERSON_APPROVES, which only the person accepts.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V1. Initial.
@@ -144,6 +146,15 @@ describe('classification labels', () => {
       const acc = await reviewLabel(deps(), person, T, { decision: 'accept' });
       expect(acc).toMatchObject({ applied: true, label: 'julkinen', source: 'human', locked: true });
       expect((await storage.getContentLabel(T))?.justification).toBe('Published on the web site.');
+    });
+
+    it('an AI does not reject a suggestion that would protect the content more, even with words; the person does', async () => {
+      await setLabel(deps(), person, T, { label: 'julkinen' });
+      // An AI's raise over a person's label waits for the person.
+      expect((await setLabel(deps(), agent, T, { label: 'luottamuksellinen', confidence: 0.9 })).applied).toBe(false);
+      expect(await code(reviewLabel(deps(), agent, T, { decision: 'reject', humanSaid: 'Ei tarvitse.' }))).toBe('PERSON_REQUIRED');
+      expect((await storage.getContentLabel(T))?.suggestion?.label).toBe('luottamuksellinen');
+      expect((await reviewLabel(deps(), person, T, { decision: 'reject' })).label).toBe('julkinen');
     });
 
     it('an AI may relay the person\'s rejection of it', async () => {

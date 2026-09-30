@@ -46,6 +46,9 @@
  *   await recordAutoException(deps, { by, byKind: 'app', app, scope, target, label, action: 'lower', reason });
  *   const active = await activeExceptionsFor(deps, scope, targets);
  * @version-history
+ *   v1.1.0 — 2026-09-30 — activeExceptionsFor() reads every month with no cap (past 1000 in force the
+ *     oldest stopped working without a word); MAX_PER_MONTH 500, which a record of full-length
+ *     reasons holds below the value limit (TARGET-082 second review).
  *   v1.0.0 — 2026-09-30 — Initial (Jouni's decisions of 2026-09-30).
  */
 import { randomUUID } from 'node:crypto';
@@ -120,8 +123,11 @@ export class ExceptionError extends Error {
 
 const PREFIX = 'classification.exceptions.';
 const MONTH = /^\d{4}-\d{2}$/;
-/** Entries per month record. A record stays far below the 1024 kB value limit. */
-export const MAX_PER_MONTH = 1000;
+/**
+ * Entries per month record. A person's entry with a full 1000-character reason is about 1.4 kB as
+ * JSON, so 500 of them stay near 700 kB, below the 1024 kB value limit (1000 did not: 2026-09-30).
+ */
+export const MAX_PER_MONTH = 500;
 const TAG = 'classification-exceptions';
 
 /** The scope an act on the node's own policy is recorded under. */
@@ -314,12 +320,19 @@ export async function activeExceptionsFor(
   if (!targets.length) return out;
   const wanted = new Set(targets.map(t => `${t.kind}\u0000${t.key}`));
   const { level, subject } = levelOfScope(scope);
-  for (const e of await listExceptions(deps, { level, subject, activeOnly: true, limit: 1000 })) {
-    // The same key in the owner's and in their agent's namespace is two items.
-    if (e.scope !== scope) continue;
-    const id = e.target ? `${e.target.kind}\u0000${e.target.key}` : '';
-    if (!wanted.has(id)) continue;
-    out.set(id, [...(out.get(id) ?? []), e]);
+  // Every month of the level, with no cap: listExceptions() stops at 1000 entries for a reader, and
+  // an exception in force past that number would stop working with nothing to say so.
+  const prefix = monthPrefix(level, subject);
+  const at = nowOf(deps);
+  for (const key of await monthKeys(deps.storage, deps.config.nodeId, prefix)) {
+    if (key !== `${prefix}${key.slice(-7)}`) continue;
+    for (const e of parseMonth((await readSystem(deps.storage, deps.config.nodeId, key))?.value).exceptions) {
+      // The same key in the owner's and in their agent's namespace is two items.
+      if (e.scope !== scope || !isActive(e, at)) continue;
+      const id = e.target ? `${e.target.kind}\u0000${e.target.key}` : '';
+      if (!wanted.has(id)) continue;
+      out.set(id, [...(out.get(id) ?? []), e]);
+    }
   }
   return out;
 }

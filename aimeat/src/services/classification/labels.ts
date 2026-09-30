@@ -44,6 +44,9 @@
  *   const actor = labelActorOf(req.auth!, config.nodeId);
  *   await setLabel({ storage, config }, actor, memoryTarget(owner, key), { label: 'luottamuksellinen' });
  * @version-history
+ *   v1.7.0 — 2026-09-30 — TARGET-082 second review. An AI does not reject a suggestion that would
+ *     protect the content more, even with relayed words (S6); the accept refusal names the Data
+ *     Wallet; LabelActor carries the credential's scopes for the node level (S1).
  *   v1.6.0 — 2026-09-30 — Decided by Jouni 2026-09-30. An app's lowering (set or an accepted
  *     suggestion) is not refused for a missing justification and is recorded as an automatic
  *     exception; LabelActor carries the app id; labelForException() for a person's exception.
@@ -112,11 +115,14 @@ export interface LabelActor {
   roles?: string[];
   /** An app credential's app id (`owner/file.html`), named in the exceptions it records. */
   app?: string;
+  /** The credential's granted words, for the node level: something acting for the operator passes
+   *  only on "operator:admin" (askOperator in services/operator-principal.ts). */
+  scopes?: string[];
 }
 
 /** The actor behind a request. A visitor from another node labels nothing here. */
 export function labelActorOf(
-  auth: { sub: string; owner: string; roles: string[]; federated?: boolean; anonymous?: boolean; app_grant?: string; app?: string },
+  auth: { sub: string; owner: string; roles: string[]; scopes?: string[]; federated?: boolean; anonymous?: boolean; app_grant?: string; app?: string },
   nodeId: string,
 ): LabelActor {
   if (isForeignPrincipal(auth)) throw new ClassificationError('FOREIGN_VISITOR', 403, 'A visitor from another node labels nothing here.');
@@ -125,6 +131,7 @@ export function labelActorOf(
   const ownerGhii = auth.owner.includes('@') ? auth.owner : `${auth.owner}@${nodeId}`;
   return {
     principal: callerPrincipal(auth, nodeId), ownerGhii, ownerName: localAccountOf(ownerGhii), kind, roles: [...auth.roles],
+    scopes: [...(auth.scopes ?? [])],
     ...(auth.roles.includes('app') && auth.app ? { app: auth.app } : {}),
   };
 }
@@ -532,15 +539,25 @@ export async function reviewLabel(
   if (prev) await assertInsideCurrent(deps, actor, target, labelById(policy, prev.label));
   if (!prev?.suggestion) throw new ClassificationError('NO_SUGGESTION', 404, 'Nothing is waiting for a review on this content.');
   if (input.decision === 'accept') {
-    // A lowering or a change of a person's label that an AI relayed waits for the person in their
-    // own session: an AI accepting it, even with their words, is the same relay again.
+    // A lowering that an AI relayed waits for the person in their own session: an AI accepting it,
+    // even with their words, is the same relay again.
     if (prev.suggestion.why === 'PERSON_APPROVES' && actor.kind !== 'human') {
       throw new ClassificationError('PERSON_REQUIRED', 403,
-        'This change lowers the classification or changes one a person set, so the person accepts it signed in themselves. Ask them to open it.');
+        'This change lowers the classification, so the person accepts it signed in themselves. Ask them to accept it in their Data Wallet, under the suggestions that wait for them.');
     }
     return setLabel(deps, actor, target, {
       label: prev.suggestion.label, justification: input.justification ?? prev.suggestion.justification ?? null, humanSaid,
     }, { via: 'review' });
+  }
+  // Rejecting a suggestion that would protect the content more gives that protection away, so an AI
+  // does not do it with relayed words; the person rejects it signed in themselves (TARGET-082 second
+  // review, S6). A suggestion to lower may be rejected through an AI: that gives nothing away.
+  const now = labelById(policy, prev.label);
+  const suggested = labelById(policy, prev.suggestion.label);
+  const raises = !!now && !!suggested && (suggested.rank > now.rank || weakerFields(now, suggested).length > 0);
+  if (raises && actor.kind !== 'human') {
+    throw new ClassificationError('PERSON_REQUIRED', 403,
+      'This suggestion would protect the content more, so the person rejects it signed in themselves. Ask them to review it in their Data Wallet, under the suggestions that wait for them.');
   }
   const at = (deps.now ?? (() => new Date().toISOString()))();
   const source = actor.kind === 'human' ? 'human' : 'human-via-ai';

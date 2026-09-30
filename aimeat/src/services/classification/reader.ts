@@ -54,6 +54,11 @@
  *   const shown = await reader.show(records, r => memoryTarget(r.ownerGaii, r.key));
  *   res.json(success(nodeId, { answer, ...warningsNote(reader) }));
  * @version-history
+ *   v2.5.0 — 2026-09-30 — An exception covers its item only while the item's label is no stricter
+ *     than the label it was made for (stillCovers): a later raise lapses it (TARGET-082 second
+ *     review, finding S2). useForAi(): an app's AI call takes content hidden from AI and records the
+ *     act as an automatic 'ai-send' exception, as leave() does, instead of refusing it (the ruling
+ *     of 2026-09-30 on apps).
  *   v2.4.0 — 2026-09-30 — show(): a person's 'ai-send' exception in force shows an item hidden from
  *     AI to an AI reader, and the use is audited ("tekoälyn täytyy nähdä kaikki" with the exception
  *     Jouni approved: the AI cannot send what it cannot see). exceptionsFor() is shared with leave().
@@ -76,7 +81,7 @@ import { resolveIdentity, callerPrincipal, localAccountName, localAccountOf, isF
 import { readerKindOf, type ReaderKind } from './reader-kind.js';
 import { labelById, type ClassificationLabel, type ClassificationPolicy } from './defaults.js';
 import { ownerOfScope, readLevel, readNodePolicy, scopeOrganism } from './policy.js';
-import { mergePolicy, type PolicyLayer } from './levels.js';
+import { mergePolicy, weakerFields, type PolicyLayer } from './levels.js';
 import { ClassificationError, labelsFor, targetId } from './labels.js';
 import { audienceCheck } from './audience.js';
 import { recordClassificationAudit, type ClassificationAuditEvent } from './audit.js';
@@ -129,6 +134,8 @@ interface ReaderDeps {
 interface Decided {
   target: ContentLabelTarget;
   label: ClassificationLabel;
+  /** The merged policy the label came from, for comparing it with an exception's label. */
+  policy: ClassificationPolicy;
 }
 
 /**
@@ -173,7 +180,7 @@ async function decideAll(deps: ReaderDeps, targets: ReadonlyArray<ContentLabelTa
       const mine = own.get(targetId(t));
       const id = mine?.row ? mine.label : t.kind === 'row' ? (spaces.get(targetId(spaceOf(t)))?.label ?? policy.defaultLabel) : (mine?.label ?? policy.defaultLabel);
       const label = labelById(policy, id) ?? labelById(policy, policy.defaultLabel);
-      if (label) out[i] = { target: t, label };
+      if (label) out[i] = { target: t, label, policy };
     }
   }));
   return out;
@@ -183,16 +190,39 @@ async function decideAll(deps: ReaderDeps, targets: ReadonlyArray<ContentLabelTa
 const exceptionKey = (t: ContentLabelTarget) => `${t.scope}\u0000${t.kind}\u0000${t.key}`;
 
 /**
+ * An exception covers its item only while the item's label is no stricter than the label it was
+ * made for: a later raise, by rank or by any field (weakerFields), lapses it, and so does a label
+ * the policy no longer has. A person who raises an item's label is not overridden by an older
+ * exception made for the weaker one (TARGET-082 second review, finding S2).
+ */
+function stillCovers(e: ClassificationException, d: Decided): boolean {
+  if (!e.label || e.label === d.label.id) return true;
+  const was = labelById(d.policy, e.label);
+  if (!was) return false;
+  return d.label.rank <= was.rank && weakerFields(was, d.label).length === 0;
+}
+
+/**
  * The person's exceptions in force for these decided items, by exceptionKey(), one list read per
- * scope. No items reads nothing.
+ * scope, each kept only while it still covers the item's current label (stillCovers). No items
+ * reads nothing.
  */
 async function exceptionsFor(deps: ReaderDeps, decided: readonly Decided[]): Promise<Map<string, ClassificationException[]>> {
   const out = new Map<string, ClassificationException[]>();
   if (!decided.length) return out;
   const byScope = new Map<string, Array<{ kind: ContentLabelTarget['kind']; key: string }>>();
-  for (const d of decided) byScope.set(d.target.scope, [...(byScope.get(d.target.scope) ?? []), d.target]);
+  const byKey = new Map<string, Decided>();
+  for (const d of decided) {
+    byScope.set(d.target.scope, [...(byScope.get(d.target.scope) ?? []), d.target]);
+    byKey.set(exceptionKey(d.target), d);
+  }
   await Promise.all([...byScope].map(async ([scope, targets]) => {
-    for (const [id, list] of await activeExceptionsFor(deps, scope, targets)) out.set(`${scope}\u0000${id}`, list);
+    for (const [id, list] of await activeExceptionsFor(deps, scope, targets)) {
+      const key = `${scope}\u0000${id}`;
+      const d = byKey.get(key);
+      const live = d ? list.filter(e => stillCovers(e, d)) : list;
+      if (live.length) out.set(key, live);
+    }
   }));
   return out;
 }
@@ -289,13 +319,31 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
     async useForAi(targets, use) {
       const decided = await decideAll(deps, targets);
       const refused: Decided[] = [];
+      // An app does what it is built for (decided 2026-09-30): content hidden from AI goes into the
+      // app's AI call, and the act is recorded as an automatic exception, one per scope and label.
+      const app = who.kind === 'human' && !!who.auth?.roles.includes('app');
+      const appActs = new Map<string, { d: Decided; n: number }>();
       for (const d of decided) {
         if (!d) continue;
         const outside = who.kind !== 'system' && !(await inside(d.label.audience, d.target.scope));
-        if (outside || d.label.aiVisibility === 'hidden') { refused.push(d); continue; }
+        if (outside) { refused.push(d); continue; }
+        if (d.label.aiVisibility === 'hidden') {
+          if (!app) { refused.push(d); continue; }
+          const g = `${d.target.scope}\u0000${d.label.id}`;
+          appActs.set(g, { d: appActs.get(g)?.d ?? d, n: (appActs.get(g)?.n ?? 0) + 1 });
+          continue;
+        }
         if (d.label.aiVisibility === 'warning') warn(d);
       }
       const purpose = [use.capability, use.model].filter(Boolean).join(' ');
+      for (const { d, n } of appActs.values()) {
+        const appId = who.auth?.app ?? who.principal;
+        await recordAutoException(deps, {
+          by: who.principal, app: who.auth?.app ?? null, scope: d.target.scope, target: { kind: d.target.kind, key: d.target.key },
+          label: d.label.id, action: 'ai-send', destination: `ai:${purpose || 'call'}`, count: n,
+          reason: `app ${appId} gave ${n === 1 ? 'an item' : `${n} items`} classified ${d.label.name.en}, which no AI may read, to an AI (${purpose || 'call'})`,
+        });
+      }
       if (refused.length) {
         for (const d of refused) audit(d, 'refused', purpose);
         const names = [...new Set(refused.map(d => d.label.name.en))].join(', ');

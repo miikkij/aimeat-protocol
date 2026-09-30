@@ -11658,6 +11658,16 @@ paths:
                                 type: number
                               morsel_balance:
                                 type: number
+                          left_out:
+                            type: array
+                            description: >
+                              Present only when something stayed behind: an organism's record held
+                              under the agent's name whose classification does not let it leave its
+                              organism is not in `memory`; it is named here with its label and why
+                              (TARGET-082). The person's own export (GET /v1/owners/{name}/export)
+                              carries such records.
+                            items:
+                              $ref: '#/components/schemas/ClassificationLeftOut'
                           memory:
                             type: array
                             items:
@@ -14798,7 +14808,12 @@ paths:
   /v1/classification/policy/review:
     post:
       summary: Accept or reject an AI's proposal to loosen a policy
-      description: A person, signed in themselves, decides on the waiting proposal. Refused (PERSON_REQUIRED) from an agent or app credential.
+      description: |
+        A person, signed in themselves, decides on the waiting proposal. Refused (PERSON_REQUIRED)
+        from an AI credential. An app credential passes, because it acts as the person's screen; when
+        the proposal it accepts gives something away, the acceptance is recorded as an exception on
+        the exceptions list, with the app and what it gave away as the reason. The node level needs
+        the operator in person, or an operator's agent or app with the "operator:admin" permission.
       tags: [Memory]
       security: [{ bearerAuth: [] }]
       requestBody:
@@ -14814,14 +14829,14 @@ paths:
                 decision: { type: string, enum: [accept, reject] }
       responses:
         '200': { description: Applied or rejected. }
-        '403': { description: PERSON_REQUIRED, or not allowed to change this level. }
-        '404': { description: NO_PROPOSAL, or no such organism. }
+        '403': { description: 'PERSON_REQUIRED from an AI credential, or OPERATOR_REQUIRED at the node level.' }
+        '404': { description: NO_PROPOSAL, or no such organism, or not its creator or an admin. }
 
   /v1/classification/scan:
     post:
       summary: Run the Content Classifier on memory keys
       description: |
-        Up to 20 named personal keys are judged at once; more keys, a prefix and organism content wait
+        Up to 3 named personal keys are judged at once; more keys, a prefix and organism content wait
         in a queue the server works through hourly within the day's caps. Detection rules run first,
         then the decision model or the text model the policy names, with personal data removed before
         anything leaves. The classifier's label follows the AI rules: it never lowers a label and never
@@ -14849,7 +14864,8 @@ paths:
         Which classified items were shown to or used by an AI, which were refused and which
         classifications changed. One row per reader, item and action per minute, with a count;
         newest first. Level owner is the caller's own content, organism needs its creator or an
-        admin, node needs an operator.
+        admin, node needs the operator in person or an operator's agent or app with the
+        "operator:admin" permission.
       tags: [Memory]
       security: [{ bearerAuth: [] }]
       parameters:
@@ -14873,7 +14889,8 @@ paths:
         classification; an app's act against a classification is not refused but recorded here
         automatically (auto true: `lower`, `policy`, `review`, `leave`). The same authorization as the
         audit log: level owner is the caller's owner's content, organism needs its creator or an
-        admin, node needs an operator and lists the whole node.
+        admin, node needs the operator in person or an operator's agent or app with the
+        "operator:admin" permission, and lists the whole node.
       tags: [Memory]
       security: [{ bearerAuth: [] }]
       parameters:
@@ -15013,8 +15030,8 @@ paths:
       description: |
         A person's label locks. An AI's own judgement never lowers a label and never changes a
         person's; it is kept as a suggestion (`pending`). With `humanSaid`, the person's own words,
-        a label at least as strict counts as the person's and applies at once. From an AI credential,
-        `humanSaid` that lowers the label or changes one a person set is kept as a suggestion with
+        a label at least as strict counts as the person's and applies at once, also over a label a
+        person set. From an AI credential, `humanSaid` that lowers the label is kept as a suggestion with
         `pending` PERSON_APPROVES and the words on it, which the person accepts signed in themselves
         (decided 2026-09-30). Lowering from a label that needs a reason needs `justification`,
         except from an app, whose lowering is recorded on the exceptions list instead.

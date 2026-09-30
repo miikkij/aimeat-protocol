@@ -9,6 +9,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.69.0 -- 2026-09-30 -- e2e-classification.ts joins GUARD_SUITES (139 → 140), measured alone on
+ *            a freshly deleted database, three consecutive 55-of-55 runs on both backends.
  *   v1.68.0 -- 2026-09-30 -- e2e-node-update.ts joins the suites (not the guard tier): the npm version
  *            check behind the operator's header notice, against a stub registry.
  *   v1.67.0 -- 2026-09-29 -- e2e-classification.ts joins the suites (not the guard tier): content
@@ -1193,6 +1195,12 @@ const GUARD_SUITES = [
     // ran it on a push, only the nightly sweep. It boots its own nodes on 40270, 40271 and 40405, in
     // one process, so it sits in lane 0.
     'test/federation-messages.ts',          // a message crosses to the right mailbox on the other node; a stranger is held
+    // Earned 2026-09-30 the way the rule says: alone, on a freshly deleted database, three
+    // consecutive 55-of-55 runs on BOTH backends, counts identical. About twenty of its assertions
+    // are a refusal or an isolation boundary: what an AI may read and send out on four paths,
+    // another owner's labels, policy, audit and exceptions, the operator's word on the switch, and
+    // what an export keeps behind (TARGET-082).
+    'test/e2e-classification.ts',           // who may see, change and send out classified content
 ];
 
 // Every other .ts file in test/, with the reason it is not a suite. The reason is the point: someone

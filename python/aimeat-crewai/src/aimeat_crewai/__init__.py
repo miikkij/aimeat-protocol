@@ -26,6 +26,10 @@ Typical use:
 See the package README and `examples/` for full recipes.
 
 Changelog:
+  0.31.1 -- 2026-09-30 -- The liaison's backstory (slim and full) says what to do with classified
+    content: a `classification_warning` is said to the person and the content is not repeated
+    outward, a CLASSIFIED refusal is not retried, and an exception is the person's own step in their
+    Data Wallet, not the crew's.
   0.31.0 -- 2026-09-30 -- A task run the node refused is no longer reported as a success. After each
     kickoff the daemon asks the node for this agent's refusals since the run started; a refusal
     raises `NodeRefusedDuringRun` (exported), which reaches `on_error` and fails an EXECUTE task with
@@ -181,7 +185,7 @@ from .workflow_spec import (
 
 # Kept in step with pyproject BY HAND, which is why it was wrong: 0.20.0 shipped announcing
 # itself as 0.19.0, and the first crew to install it reported the mismatch before we saw it.
-__version__ = "0.31.0"
+__version__ = "0.31.1"
 
 __all__ = [  # noqa: RUF022 -- grouped by topic with the version each group arrived in; alphabetical order would scatter those comments away from what they name
     "__version__",

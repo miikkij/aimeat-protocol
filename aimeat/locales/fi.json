@@ -1245,12 +1245,12 @@
       "cls": {
         "title": "Luokittelu",
         "lead": "Tämän palvelimen luokittelukäytäntö kertoo, mitä luokituksia sisällöllä voi olla, mitä kukin luokitus näyttää tekoälylle ja saako sisältö lähteä organismista. Säännöt luokittelevat sisällön, kun se kirjoitetaan, ja loki kertoo, mitä näytettiin, käytettiin, estettiin tai luokiteltiin uudelleen. Omistaja ja organismi voivat lisätä käytäntöön omiaan ja tiukentaa sitä, mutta eivät löysentää.",
-        "loadFailed": "Luokittelukäytäntöä ei juuri nyt saatu luettua. Se on osoitteessa /v1/classification/policy.",
+        "loadFailed": "Luokittelukäytäntöä ei juuri nyt saatu luettua.",
         "mode": {
           "off": "Luokittelu: pois päältä",
           "offWhy": "Mitään ei luokitella eikä tarkisteta. Alla oleva käytäntö odottaa, kunnes otat luokittelun käyttöön. Asetus on sivulla {config}, kohdassa Luokittelu.",
           "owner": "Luokittelu: jokainen omistaja päättää itse",
-          "ownerWhy": "Omistaja ottaa luokittelun käyttöön omalle sisällölleen Tietolompakko-sivullaan. Organismin sisällölle sen ottaa käyttöön organismin luoja tai ylläpitäjä.",
+          "ownerWhy": "Omistaja ottaa luokittelun käyttöön omalle sisällölleen Tietolompakko-sivullaan. Organismin sisällölle sen ottaa käyttöön organismin luoja tai joku organismin ylläpitäjistä.",
           "all": "Luokittelu: päällä kaikelle sisällölle",
           "allWhy": "Jokaisen omistajan ja jokaisen organismin sisältö tarkistetaan, eikä kukaan omistaja voi kytkeä luokittelua pois."
         },
@@ -1304,7 +1304,7 @@
           "saved": "Sisällön luokittelijan asetukset tallennettu."
         },
         "proposalTitle": "Tekoäly ehdottaa, että palvelimen luokittelukäytäntöä löysennetään.",
-        "proposalBody": "Ehdotuksen teki {by} {date}. Se odottaa, että operaattori hyväksyy sen omalla kirjautumisellaan: tekoäly ei voi hyväksyä sitä.",
+        "proposalBody": "Ehdotuksen teki {by} {date}. Se odottaa, että hyväksyt sen itse kirjautuneena. Tekoäly ei voi hyväksyä sitä.",
         "proposalSaid": "Perusteluksi se lainaa ihmistä: ”{said}”.",
         "proposalGives": "Mitä ehdotus löysentäisi",
         "dropped": "Nämä tallennetut muutokset eivät enää ole voimassa, koska palvelimen käytäntö kattaa ne:",
@@ -7866,7 +7866,7 @@
   "classification.exc.emptyNode": "Tällä palvelimella ei ole poikkeuksia.",
   "classification.exc.emptyPeople": "Kukaan ei ole tehnyt poikkeusta.",
   "classification.exc.emptyApps": "Sovellukset eivät ole tehneet poikkeuksia.",
-  "classification.exc.hint": "Poikkeus antaa yhden kohteen lähteä luokituksesta huolimatta, ja perustelusi kirjataan sen mukana. Peru poikkeus, kun et enää tarvitse sitä: se jää listaan perutuksi. Sovellus tekee sen, mitä varten se on tehty. Kun sovellus toimii luokitusta vastaan, palvelin kirjaa teon tähän automaattisena poikkeuksena.",
+  "classification.exc.hint": "Poikkeus antaa yhden kohteen lähteä luokituksesta huolimatta, ja perustelusi kirjataan sen mukana. Peru poikkeus, kun et enää tarvitse sitä: se jää listaan perutuksi. Sovellus saa hoitaa tehtävänsä, vaikka se toimisi luokituksen vastaisesti. Silloin palvelin kirjaa teon tähän automaattisena poikkeuksena.",
   "classification.exc.hintNode": "Tässä ovat tämän palvelimen kaikki poikkeukset perusteluineen: ihmisten tekemät poikkeukset ja sovellusten teot luokitusta vastaan, jotka palvelin kirjaa automaattisesti. Voit perua ihmisen tekemän poikkeuksen, joka on voimassa. Sovelluksen kirjaus ei anna lupaa mihinkään, joten sitä ei tarvitse perua.",
   "classification.exc.wholePolicy": "koko käytäntö",
   "classification.exc.scope.organism": "organismi {id}",

@@ -210,7 +210,7 @@
       "reads": {
         "listMemory": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The owner's portability export of their own agent's data; a person's own export is theirs."
+      "why": "Reviewed 2026-09-30 (TARGET-082 second review, S3): the portability export of an agent's data. The records pass presentMemories and leaveMemories (destination export) before they leave, as in GET /v1/memory/export, and what stayed behind is named in left_out."
     },
     "src/routes/agents/offers.ts": {
       "reads": {
@@ -971,6 +971,12 @@
         "getMemory": 1
       },
       "why": "The node's own read (TARGET-082 V3): the hourly queue job loads a queued personal item's current value so the node's own classifier can judge it; the classifier checks useForAi before any model reads the text, and nothing is shown to a caller."
+    },
+    "src/services/classification/explorer.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "The node's own read (TARGET-082 second review, 2026-09-30): whether a record with a waiting suggestion still exists, so a deleted one is left out of the list; the value is never returned or used."
     },
     "src/services/classification/exceptions.ts": {
       "reads": {

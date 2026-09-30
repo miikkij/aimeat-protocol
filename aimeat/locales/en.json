@@ -1245,7 +1245,7 @@
       "cls": {
         "title": "Classification",
         "lead": "This server's classification policy: the classifications content can carry, what each one lets an AI see and whether content may leave an organism, the rules that classify content when it is written, and the log of what was shown, used, refused or reclassified. An owner or an organism may add to it and tighten it, never loosen it.",
-        "loadFailed": "The classification policy could not be read just now. It is served at /v1/classification/policy.",
+        "loadFailed": "The classification policy could not be read just now.",
         "mode": {
           "off": "Classification: off",
           "offWhy": "Nothing is classified and nothing is checked; the policy below waits until you turn it on. The setting is Classification under {config}.",

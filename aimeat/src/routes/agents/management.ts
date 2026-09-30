@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, read-through, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.0 -- 2026-09-30 -- POST /v1/agents/:gaii/export: memory passes the classification reader
+ *     and leave() like GET /v1/memory/export, and names what stayed behind in `left_out` (TARGET-082
+ *     second review, finding S3).
  *   v1.10.0 -- 2026-09-30 -- Deleting an agent removes its refusal notes and approval record
  *     (services/agent-refusals.ts).
  *   v1.9.0 -- 2026-09-26 -- POST and DELETE /v1/agents/:name/read-through: the owner, signed in
@@ -52,6 +55,9 @@ import { evictAgentTelemetry } from '../../services/telemetry-buffer.js';
 import { emitToolListChanged } from '../../mcp/index.js';
 import { getActiveConnectTunnelManager } from '../../services/connect-tunnel.js';
 import { logger } from '../../utils/logger.js';
+import { presentMemories } from '../../services/classification/present-memory.js';
+import { readerFor } from '../../services/classification/reader.js';
+import { leaveMemories } from '../../services/classification-exits.js';
 
 /** Why the read-through doors are the owner's in person: letting an agent read mail is consent. */
 const READ_IN_PERSON = 'Letting an agent read your mail is your own decision, so only you, signed in yourself, can make it here.';
@@ -88,7 +94,12 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
       return;
     }
 
-    const memories = await storage.listMemory(gaii);
+    // The one presentation of memory values (classification reader plus credential mask), then what
+    // may leave: this file moves the agent to another node, so an organism's record held under the
+    // agent's name stays behind as in GET /v1/memory/export, and what stayed is named. The person's
+    // legal-right export (GET /v1/owners/me/export) is the one that carries it (TARGET-082).
+    const reader = readerFor({ storage, config }, req.auth);
+    const { kept: memories, leftOut } = await leaveMemories(reader, await presentMemories(reader, await storage.listMemory(gaii)), { kind: 'export', organismId: null });
     const transactions = await storage.getTransactions(gaii, 100_000);
     const actions = await storage.listActionsByProvider(gaii);
     const trust = await calculateTrustScore(gaii, storage);
@@ -111,6 +122,7 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
         tags: agent.tags ?? [],
         created_at: agent.createdAt,
       },
+      ...(leftOut.length ? { left_out: leftOut } : {}),
       memory: memories.map(m => ({
         key: m.key,
         value: m.value,
