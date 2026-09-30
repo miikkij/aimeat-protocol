@@ -11,6 +11,9 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   v1.11.0 — 2026-09-30 — classification-audit-prune is its own handler, registered on every node.
+ *     It ran inside consent-audit-prune, which exists only with consent on, so a node with consent
+ *     off never pruned the classification audit log or the exceptions list.
  *   v1.10.0 — 2026-09-30 — The classification audit prune also prunes the exceptions list's month
  *     records past the same retention, keeping any month with a person's exception in force.
  *   v1.9.0 — 2026-09-29 — classification-queue: the Content Classifier's queue, hourly, and the write
@@ -71,13 +74,10 @@ export function registerCoreHandlers(
   });
   if (config.consentEnabled) {
     scheduler.registerCoreHandler('consent-expiry', () => runConsentExpiryJob(storage));
-    // The same nightly job prunes the classification audit log, each by its own retention. The
-    // second runs even when the first throws.
-    scheduler.registerCoreHandler('consent-audit-prune', async () => {
-      try { await runConsentAuditPruneJob(config, storage); }
-      finally { await runClassificationAuditPruneJob(config, storage); }
-    });
+    scheduler.registerCoreHandler('consent-audit-prune', () => runConsentAuditPruneJob(config, storage));
   }
+  // The classification audit log and the exceptions list age on every node, consent on or off.
+  scheduler.registerCoreHandler('classification-audit-prune', () => runClassificationAuditPruneJob(config, storage));
   if (config.personalNodesEnabled) {
     scheduler.registerCoreHandler('mailbox-cleanup', () => runMailboxCleanupJob(storage));
   }

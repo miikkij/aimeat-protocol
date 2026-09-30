@@ -45,6 +45,7 @@
  * @usage
  *   cd aimeat && pnpm exec node --import tsx test/e2e-core-jobs.ts
  * @version-history
+ *   v1.2.0 -- 2026-09-30 -- core:classification-audit-prune: seeded and fired as its own job.
  *   v1.1.0 -- 2026-09-25 -- core:usage-visit-retention: seeded, fired, and a visit made today keeps
  *     its account.
  *   v1.0.0 -- 2026-09-08 -- Initial.
@@ -299,7 +300,7 @@ async function run(): Promise<void> {
         const ids = new Set((jobs.body.data.jobs as Array<{ id: string }>).map(j => j.id));
         const wanted = [
             'core:daily-allowance', 'core:usage-rollup', 'core:usage-archive', 'core:usage-visit-retention', 'core:ai-job-log-prune',
-            'core:execution-log-prune', 'core:consent-audit-prune', 'core:invitation-expiry',
+            'core:execution-log-prune', 'core:consent-audit-prune', 'core:classification-audit-prune', 'core:invitation-expiry',
             'core:mailbox-cleanup', 'core:consent-expiry', 'core:nonce-cleanup',
             'core:designbook-aging', 'core:capability-aggregation', 'core:dispute-timeout',
             'core:mcp-onboarding-rescue', 'core:inactivity-nudge',
@@ -478,6 +479,13 @@ async function run(): Promise<void> {
         const after = await json('/v1/consent/audit?days=30', { headers: bearer(opToken) });
         assert(after.body.data.total === before.body.data.total,
             `a ${CONSENT_AUDIT_RETENTION_DAYS}-day window must keep a seconds-old entry: ${before.body.data.total} → ${after.body.data.total}`);
+    });
+
+    await test('core:classification-audit-prune runs as its own job', async () => {
+        // Seeded on every node, consent on or off (TARGET-082). The retention comes from the node's
+        // classification policy and a fresh node's rows are seconds old, so what is pinned is that
+        // the job exists and completes.
+        await fire('core:classification-audit-prune');
     });
 
     let organismId = '';
