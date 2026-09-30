@@ -25,6 +25,8 @@
  * @usage
  *   const outcomes = await refreshInstalledPackages({ storage, config, peers }, { owner }, { notify: false });
  * @version-history
+ *   v1.1.0 — 2026-09-30 — The end of updates is said for the owner (UPDATES_ENDED_SENTENCE) and, from
+ *     the daily check, notified once (package_updates_ended); the owner read the repository's words.
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 3).
  */
 import type { AimeatConfig } from '../config.js';
@@ -39,6 +41,11 @@ import { logger } from '../utils/logger.js';
 
 /** Where the owner was last told about a version, per install: one record per install, system namespace. */
 const NS_UPDATE_NOTICES = 'package-update-notices';
+
+/** What the owner reads when the update service has ended. */
+export const UPDATES_ENDED_SENTENCE = 'The update service for this package has ended. The app keeps working as it is. Renew the update service to get new versions.';
+/** The notice slot for the end of updates, so the owner is told once, not every night. */
+const UPDATES_ENDED_NOTICE = 'updates-ended';
 
 export interface RefreshOutcome {
     instance_id: string;
@@ -90,7 +97,20 @@ async function refreshOne(
 
     const pulled = await pullPackage(deps, { owner: inst.owner, isOperator: false }, { groupId: upstreamGroupId, fromUpstream: true });
     if (!pulled.ok && pulled.code === 'UPDATES_ENDED') {
-        return { ...base, pulled: false, version: inst.packageVersion, latest: inst.packageVersion, result: 'updates_ended', detail: pulled.message };
+        // Said for the owner, not in the repository's words: the moment the update service ends is
+        // the moment they decide whether to renew it, and "answered 403" told them nothing.
+        if (opts.notify && await firstNoticeFor(storage, inst.id, UPDATES_ENDED_NOTICE)) {
+            const ownerGhii = await resolveGhii(storage, inst.owner, config);
+            await notify(storage, ownerGhii, {
+                type: 'package_updates_ended',
+                title: `The update service for ${inst.label} has ended`,
+                body: `${inst.label} keeps working as it is. New versions come again when you renew the update service.`,
+                link: '/v1/profile?tab=packages',
+                i18n: { key: 'package_updates_ended', vars: { label: inst.label } },
+            });
+            emitChange('notifications', ownerGhii);
+        }
+        return { ...base, pulled: false, version: inst.packageVersion, latest: inst.packageVersion, result: 'updates_ended', detail: UPDATES_ENDED_SENTENCE };
     }
     if (!pulled.ok) {
         return { ...base, pulled: false, version: inst.packageVersion, latest: inst.packageVersion, result: 'error', detail: `${pulled.code}: ${pulled.message}` };
