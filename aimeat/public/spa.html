@@ -690,6 +690,7 @@
       "/components/Mermaid.js": "/components/Mermaid.js",
       "/components/NotificationBell.js": "/components/NotificationBell.js",
       "/components/OpenItemsButton.js": "/components/OpenItemsButton.js",
+      "/components/NodeUpdateNotice.js": "/components/NodeUpdateNotice.js",
       "/components/CardMenu.js": "/components/CardMenu.js",
       "/components/OpenItemsList.js": "/components/OpenItemsList.js",
       "/js/services/open-items.js": "/js/services/open-items.js",
@@ -1002,6 +1003,7 @@
     import { NotificationBell, openNotificationLink } from '/components/NotificationBell.js';
     import { isRunnableActionEndpoint } from '/js/services/notifications.js';
     import { OpenItemsButton } from '/components/OpenItemsButton.js';
+    import { NodeUpdateNotice } from '/components/NodeUpdateNotice.js';
     import { useSession } from '/js/use-session.js';
     import { CommandPalette } from '/views/command-palette.js';
     import { openAppSandboxed, isAppHtmlUrl } from '/js/app-sandbox.js';
@@ -1419,6 +1421,8 @@
       // notification bell and the "Me" menu rendered next to a "Sign In" button after a logout.
       const session = useSession();
       const [morsels, setMorsels] = useState(null);
+      // Whether the operator's new-version tag is on the bar: it arrives after a read and widens the bar.
+      const [updateShown, setUpdateShown] = useState(false);
       const [menuOpen, setMenuOpen] = useState(false);
       const navRef = useRef(null);
       // Node feature flags from /v1/site/header-nav. Empty until the fetch resolves,
@@ -1458,7 +1462,7 @@
         return () => { ro.disconnect(); window.removeEventListener('resize', schedule); if (raf) cancelAnimationFrame(raf); };
         // Re-measures whenever the bar's contents change: signing in, the operator's Admin
         // link appearing, a different nav config arriving, or the language switching.
-      }, [session, locale, navConfig, morsels]);
+      }, [session, locale, navConfig, morsels, updateShown]);
 
       // Load operator-configured header nav (public endpoint, no auth needed).
       useEffect(() => {
@@ -1575,6 +1579,7 @@
             </div>
             ${session && html`<${OpenItemsButton} t=${t} onNavigate=${(p) => navigate(p)} />`}
             ${session && html`<${NotificationBell} t=${t} onNavigate=${(p) => navigate(p)} />`}
+            <${NodeUpdateNotice} session=${session} onNavigate=${(p) => navigate(p)} onShown=${setUpdateShown} />
             <span class="header-auth-slot" id="headerAuth"></span>
           </div>
         </nav>

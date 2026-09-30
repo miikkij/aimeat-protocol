@@ -12,6 +12,7 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   v1.19.0 — 2026-09-30 — node.update_check and node.update_check_source (AIMEAT_UPDATE_CHECK*).
  *   v1.18.0 — 2026-09-29 — The mutable fixed-set string rows take oneOf(): the same check, and
  *     `choices` served to the Config tab, which offers a pick instead of a text field.
  *   v1.17.0 — 2026-09-29 — classification.mode (AIMEAT_CLASSIFICATION): off, owner or all (TARGET-082).
@@ -384,6 +385,8 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'baseUrl', dotPath: 'node.base_url', envVar: 'AIMEAT_BASE_URL', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: true, description: 'Public base URL of this node' },
   { key: 'devMode', dotPath: 'node.dev_mode', envVar: 'AIMEAT_DEV_MODE', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'Development mode (localhost webhooks, credential reset preserves data)', adminDisplay: 'visible' },
   { key: 'testMode', dotPath: 'node.test_mode', envVar: 'AIMEAT_TEST_MODE', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'Test mode (re-registration wipes account for E2E test isolation)', adminDisplay: 'visible' },
+  { key: 'updateCheck', dotPath: 'node.update_check', envVar: 'AIMEAT_UPDATE_CHECK', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Ask npm for a newer AIMEAT (at most every six hours, when an operator opens a page) and show operators a notice in the header when there is one. Off: no request leaves this node and no notice appears' },
+  { key: 'updateCheckSource', dotPath: 'node.update_check_source', envVar: 'AIMEAT_UPDATE_CHECK_SOURCE', type: 'string', validate: v => typeof v === 'string' && (v.trim() === '' || /^https?:\/\/\S+$/.test(v.trim())), immutable: false, description: 'Where the version check asks. Empty uses registry.npmjs.org and unpkg.com. A base URL replaces both, for a node behind a package mirror' },
   { key: 'anonymousMode', dotPath: 'node.anonymous_mode', envVar: 'AIMEAT_ANONYMOUS', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Allow anonymous access without authentication' },
 
   // ── Federation (mutable, additional) ──

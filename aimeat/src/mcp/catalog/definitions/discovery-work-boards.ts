@@ -5,6 +5,7 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.12.0 — 2026-09-30 — aimeat_admin_node_update: a newer AIMEAT on npm, and the update prompt.
  *   v1.11.0 — 2026-09-29 — aimeat_storage_upload: visibility 'workspace' and workspace_refs.
  *   v1.10.0 — 2026-09-26 — aimeat_admin_incident_resolve says what a decision does to the app grants and
  *     access tokens older than the account that holds the name, and that their tokens stay refused.
@@ -435,6 +436,15 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
         input: {
             from: { type: 'string', required: false, description: 'First day of the period, inclusive, as YYYY-MM-DD. Give `to` as well or neither is used.' },
             to: { type: 'string', required: false, description: 'Last day of the period, inclusive, as YYYY-MM-DD. Give `from` as well or neither is used.' },
+        },
+    },
+    {
+        name: 'aimeat_admin_node_update',
+        description: 'Operator-only. Is a newer AIMEAT out on npm than the version this node runs? Answers the running version (`current`), the newest on npm (`latest`), `updateAvailable`, when the newer one was released, `whatsNew` (the change-log entries it has and this node does not, newest first; each title and body is a string or an object by language), how the node looks to be installed (`install.method`: npm, npx, source, docker, desktop or unknown, a guess from its own paths), and `prompt`: a ready prompt that updates the node, for an AI with a shell on the machine the node runs on (Claude Code, Codex). Show the person the version, the date and what is new in their own words, and offer the prompt; the update restarts the node, so it is theirs to start. After an update, call again with refresh: true and check that `current` is the new version. The node asks npm at most once every six hours; with the node.update_check setting off it asks nothing and answers enabled: false. The same data as GET /v1/admin/node-update. Returns an operator-role error for non-operators.',
+        caller: 'operator',
+        visibility: agentEverywhere,
+        input: {
+            refresh: { type: 'boolean', required: false, description: 'Ask the registry now instead of answering from the six-hour cache.' },
         },
     },
     {

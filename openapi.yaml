@@ -25984,6 +25984,69 @@ paths:
                       data:
                         $ref: '#/components/schemas/Dashboard'
 
+  /v1/admin/node-update:
+    get:
+      operationId: getNodeUpdate
+      summary: Is a newer AIMEAT out
+      description: |
+        Operator only. Whether npm has a newer `aimeat` than the version this node runs, when it was
+        released, which change-log entries it has that this node does not, and a prompt for Claude
+        Code or Codex that updates the node. The site header asks this for an operator and shows a
+        notice when `updateAvailable` is true. The same data as the `aimeat_admin_node_update` MCP
+        tool.
+
+        The node asks the registry at most once every six hours (a failure is retried after thirty
+        minutes) and only when this endpoint is called. With the `node.update_check` setting off it
+        asks nothing and answers `enabled: false`. `node.update_check_source` replaces
+        registry.npmjs.org and unpkg.com with one base URL.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: refresh
+          in: query
+          required: false
+          description: '`true` asks the registry now instead of answering from the six-hour cache.'
+          schema: { type: string, enum: ['true', 'false'] }
+      responses:
+        '200':
+          description: The check's result.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [enabled, current, updateAvailable, install, setting]
+                        properties:
+                          enabled: { type: boolean, description: 'False when the operator switched the check off.' }
+                          current: { type: string, description: 'The version this node runs.' }
+                          latest: { type: string, nullable: true, description: 'The newest version on npm.' }
+                          updateAvailable: { type: boolean }
+                          releasedAt: { type: string, format: date-time, nullable: true }
+                          whatsNew:
+                            type: array
+                            nullable: true
+                            description: Change-log entries the newer version has and this node does not, newest first, at most 40. Null when the newer change log could not be read.
+                            items: { type: object, additionalProperties: true }
+                          checkedAt: { type: string, format: date-time, nullable: true }
+                          error: { type: string, nullable: true, description: 'Why the check could not answer.' }
+                          install:
+                            type: object
+                            properties:
+                              method: { type: string, enum: [npm, npx, source, docker, desktop, unknown] }
+                              packageDir: { type: string, nullable: true }
+                              workingDir: { type: string }
+                          prompt: { type: string, nullable: true, description: 'The update prompt, present when an update is available.' }
+                          setting: { type: string, enum: [node.update_check] }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
   /v1/admin/config:
     get:
       operationId: getConfig

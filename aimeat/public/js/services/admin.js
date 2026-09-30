@@ -13,6 +13,7 @@
  *   - federation/peering helpers: cross-node peer management
  *
  * @version-history
+ *   v1.13.0 — 2026-09-30 — getNodeUpdate: GET /v1/admin/node-update, for the header's new-version notice.
  *   v1.12.0 — 2026-09-26 — resolveHeldName: one name of the incident the update at start opens,
  *     decided through the incident resolve endpoint with { name, resolution }.
  *   v1.11.0 — 2026-09-12 — searchAdminMemory (the node-wide content search the FTS primitive has
@@ -41,6 +42,8 @@ export const getDashboard    = ()       => apiGet('/v1/admin/dashboard');
 export const getConfig       = ()       => apiGet('/v1/admin/config');
 export const saveConfig      = (changes)=> apiPut('/v1/admin/config', { changes });
 export const deleteConfig    = (path)   => apiDelete(`/v1/admin/config/${encodeURIComponent(path)}`);
+// Is a newer AIMEAT on npm; `refresh` skips the node's six-hour cache.
+export const getNodeUpdate   = (refresh = false) => apiGet(`/v1/admin/node-update${refresh ? '?refresh=true' : ''}`);
 
 // ── Consul ──
 export const getStorageStats       = (limit = 168) => apiGet(`/v1/admin/storage-stats?limit=${limit}`);

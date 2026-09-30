@@ -23,6 +23,7 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   2026-09-30 — aimeat_admin_node_update: read only, open world (it reads npm).
  *   2026-09-29 — aimeat_refinery_classes and _status (read only), aimeat_refinery_run (writes rows,
  *     reads an outside mailbox, spends the model allowance).
  *   2026-09-29 — aimeat_package_sellers and aimeat_package_sale (a revoke is destructive; the sale reaches the repository).
@@ -586,6 +587,8 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_admin_statistics: { title: 'Admin: Statistics', readOnlyHint: true },
     aimeat_admin_knowledge: { title: 'Admin: Knowledge', readOnlyHint: true },
     aimeat_admin_federation: { title: 'Admin: Federation', readOnlyHint: true },
+    // Reads npm, an outside service, but changes nothing anywhere.
+    aimeat_admin_node_update: { title: 'Admin: Newer AIMEAT Version', readOnlyHint: true, openWorldHint: true },
     // Setting the same word twice leaves the same peer; the previous word was a setting, not data.
     aimeat_admin_federation_relay_claim_set: { title: 'Admin: Keep a Peer on Its Own Relay-Claim Setting', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     // Read-only about this node, but `ask_provider` reaches a third party, so it is not closed-world.

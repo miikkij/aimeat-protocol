@@ -15,6 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.19.0 — 2026-09-30 — updateCheckDefaults(): the npm version check (config-update-check.ts).
  *   2026-09-29 — siteLinks moves to siteLinksFromEnv() (config-site-contacts.ts) by pure extraction
  *     to stay under 800 lines; appBadge (AIMEAT_APP_BADGE) and the signageEnabled getter join.
  *   v1.18.0 — 2026-09-29 — dataAccessDefaults(): consent settings (a pure move) and classificationMode.
@@ -77,6 +78,7 @@ import { aiJobDefaults } from './config-ai-jobs.js';
 import { aiModelDefaults } from './config-ai-models.js';
 import { decideDefaults } from './config-decide.js';
 import { dataAccessDefaults } from './config-data-access.js';
+import { updateCheckDefaults } from './config-update-check.js';
 import { themesDefaults } from './config-themes.js';
 import { federationDefaults } from './config-federation.js';
 import { accountSecurityDefaults } from './config-types-account-security.js';
@@ -400,6 +402,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     jsonBodyLimitLargeMb: parseInt(process.env.AIMEAT_JSON_BODY_LIMIT_LARGE_MB ?? '15', 10),
     genesisUrl: process.env.AIMEAT_GENESIS_URL ?? null,
     ...dataAccessDefaults(),
+    ...updateCheckDefaults(),
     // Two-step sign-in, passkeys, and the key that encrypts what they store at rest. The relying
     // party id is derived from the address this node believes it has, which is why baseUrl goes in.
     ...accountSecurityDefaults(resolvedBaseUrl, (process.env.AIMEAT_SEO_SITE_NAME ?? 'AIMEAT').trim()),

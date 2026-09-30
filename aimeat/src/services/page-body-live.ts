@@ -32,6 +32,8 @@
  * @usage
  *   const live = await livePageMarkdown('/', config, storage);
  * @version-history
+ *   v1.0.1 — 2026-09-30 — readChangelog() and ChangelogEntry exported: node-update-check.ts compares
+ *     the running node's change log with the newer version's.
  *   v1.0.0 — 2026-09-24 — Initial: front page, app store, change log, members, help.
  */
 import { readFileSync, existsSync } from 'node:fs';
@@ -50,7 +52,7 @@ export function mdText(s: unknown, max = 300): string {
   return flat.length > max ? `${flat.slice(0, max - 1).trimEnd()}…` : flat;
 }
 
-interface ChangelogEntry {
+export interface ChangelogEntry {
   date: string;
   kind?: string;
   title: Record<string, string>;
@@ -61,7 +63,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 
 /** The change log ships with the build and does not change while the process runs: read once. */
 let changelog: ChangelogEntry[] | null = null;
-function readChangelog(): ChangelogEntry[] {
+export function readChangelog(): ChangelogEntry[] {
   if (changelog) return changelog;
   changelog = [];
   for (const p of [join(here, '..', '..', 'public', 'changelog.json'), join(here, '..', '..', '..', 'public', 'changelog.json')]) {

@@ -2986,6 +2986,15 @@
      "plain": "Backup and restore Back the node up and restore it. /v1/admin/backup, /v1/admin/restore"
     },
     {
+     "slug": "g-19-new-version-notice",
+     "cells": [
+      "<strong>New-version notice</strong>",
+      "When npm has a newer AIMEAT, an operator sees it in the header. The dialog says when it was released and what is new in it since this node's version, and gives a prompt that Claude Code or Codex runs to back the node up, update it the way it was installed and check the result. The node asks npm at most every six hours and only when an operator opens a page; one setting switches the check off.",
+      "<code>/v1/admin/node-update</code>, <code>aimeat_admin_node_update</code>, setting <code>node.update_check</code>"
+     ],
+     "plain": "New-version notice When npm has a newer AIMEAT, an operator sees it in the header. The dialog says when it was released and what is new in it since this node's version, and gives a prompt that Claude Code or Codex runs to back the node up, update it the way it was installed and check the result. The node asks npm at most every six hours and only when an operator opens a page; one setting switches the check off. /v1/admin/node-update, aimeat_admin_node_update, setting node.update_check"
+    },
+    {
      "slug": "g-19-metrics",
      "cells": [
       "<strong>Metrics</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
@@ -3609,6 +3618,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-09-15 against node 3.15.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 358
+  "rows": 359
  }
 }
