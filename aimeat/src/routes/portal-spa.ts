@@ -21,6 +21,7 @@
  *   const spaPath = resolvePublicFile('spa.html');
  *   if (spaPath) serveSpa(res, spaPath, config, '/v1/glossary');
  * @version-history
+ *   v1.6.0 — 2026-09-30 — A route with no registry page gets <meta name="robots" content="noindex, follow">.
  *   v1.5.0 — 2026-09-24 — The shell carries window.__AIMEAT_THEMES (Themes & Styles) before its first
  *     paint: the offered themes, their styles and each theme's own stamped sheet.
  *   v1.4.0 — 2026-09-24 — serveSpa() takes the page's live markdown (apps, change log, members, help)
@@ -166,6 +167,13 @@ export function serveSpa(
   // itself wins over the node-wide fallback just written. Shared with the static info pages.
   const page = builtPage ?? (routePath ? findPublicPage(routePath) : undefined);
   if (page) html = injectPageHead(html, page, config, nonceAttr);
+  // A route the registry does not name is a signed-in view or a tool, not a content page: its
+  // document is the bare shell titled "AIMEAT". The X-Robots-Tag header (middleware/robots-header.ts)
+  // already says noindex; the meta tag says it to a reader that has the HTML without the headers.
+  // "follow", so a crawler still follows the links in it.
+  else if (config.seoIndexing !== 'off') {
+    html = html.replace('</head>', `<meta name="robots" content="noindex, follow">\n</head>`);
+  }
 
   // The page's own words, in the document as SENT rather than only in the one a browser builds.
   // The head above says what the page is; without this the body said nothing, identically, on

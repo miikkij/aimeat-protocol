@@ -9,6 +9,7 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   v1.21.1 — 2026-09-30 — robotsHeader() moved to server.ts, ahead of the static files.
  *   v1.21.0 — 2026-09-29 — Mounts refineryRouter (/v1/refinery/classes, /v1/refinery/runs). The
  *     connections, refinery and mcp-servers mounts moved to routes-loader-outbound.ts in their order (a pure move, max-file-lines).
  *   v1.20.0 — 2026-09-28 — Mounts aiProvidersRouter (/v1/ai/providers, /v1/ai/routing), System 2 plan V3.
@@ -95,7 +96,6 @@ import { agentConventionsRouter } from '../routes/agent-conventions.js';
 import { nodeRobotsTxt } from './static-files.js';
 import { mountNodeRobots } from './robots-mount.js';
 import { wellknownRouter, discoveryLinkHeaders } from '../routes/wellknown.js';
-import { robotsHeader } from '../middleware/robots-header.js';
 import { agentSkillsDiscoveryRouter } from '../routes/agent-skills-discovery.js';
 import { authRouter } from '../routes/auth.js';
 import { accessTokensRouter } from '../routes/access-tokens.js';
@@ -342,10 +342,7 @@ export async function mountRoutes(
   // RFC 8288 discovery Link headers (api-catalog + service-desc) on every GET/HEAD —
   // must precede bootstrapRouter so the root response carries them too.
   app.use(discoveryLinkHeaders());
-  // X-Robots-Tag while discovery is switched off. Mounted here, ahead of every router, because
-  // the point is that NOTHING answers without it — including the app origins served below, whose
-  // own per-app rules are a separate and narrower decision.
-  app.use(robotsHeader(config));
+  // The X-Robots-Tag middleware is mounted in server.ts, ahead of the static files (2026-09-30).
   app.use(setupRouter(config, storage, invalidateHasOwnersCache));
   // Subdomain root serving MUST come before bootstrapRouter — its GET / handles
   // mapped `<sub>.<apex>` requests; apex requests fall through untouched.
