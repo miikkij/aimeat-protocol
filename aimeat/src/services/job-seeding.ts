@@ -11,6 +11,8 @@
  *   - seedCoreScheduledJobs(config, storage): builds the job list and createScheduledJob() for missing ones
  *
  * @version-history
+ *   v1.7.0 — 2026-09-30 — Seed core:classification-audit-prune (nightly, 03:35) on every node; the
+ *     prune had run inside core:consent-audit-prune, which exists only with consent on.
  *   v1.6.0 — 2026-09-29 — Seed core:classification-queue (hourly, :25): the Content Classifier's queue
  *     (TARGET-082 V3).
  *   v1.5.0 — 2026-09-28 — Seed core:package-upstream-check (daily, 04:41): installed packages brought up
@@ -107,6 +109,10 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
   // seeding is create-if-absent and an operator may turn classification on later; the handler reads
   // nothing while AIMEAT_CLASSIFICATION is off.
   jobs.push({ id: 'core:classification-queue', name: 'Classification Queue', coreHandler: 'classification-queue', cron: '25 * * * *' });
+  // The classification audit log and the exceptions list past the retention in the node's
+  // classification policy. Nightly at 03:35, on every node: until 2026-09-30 it ran inside
+  // core:consent-audit-prune, which is seeded only with consent on.
+  jobs.push({ id: 'core:classification-audit-prune', name: 'Classification Audit Prune', coreHandler: 'classification-audit-prune', cron: '35 3 * * *' });
 
   const now = new Date().toISOString();
   for (const def of jobs) {
