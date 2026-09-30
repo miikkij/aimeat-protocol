@@ -7780,6 +7780,7 @@
   "dwpage.cls.why.lower": "tekoäly tai sääntö ei laske luokitusta",
   "dwpage.cls.why.suggest": "luokittelukäytäntösi mukaan tekoäly vain ehdottaa",
   "dwpage.cls.why.threshold": "tekoäly ei ollut tarpeeksi varma",
+  "dwpage.cls.why.relayed": "tekoäly välitti sanasi, mutta luokituksen laskun hyväksyt sinä itse",
   "dwpage.cls.confirmLower": "Hyväksytäänkö ehdotus? Se laskee luokitusta: {from} → {to}.",
   "dwpage.cls.reasonTitle": "Miksi lasket luokitusta?",
   "dwpage.cls.reasonBody": "Kun lasket luokituksen tasolta {from} tasolle {to}, kirjoita perustelu. Kerro, miksi kohde on vähemmän arkaluonteinen kuin sen luokitus sanoo.",

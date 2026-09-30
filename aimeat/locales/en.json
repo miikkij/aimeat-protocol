@@ -7781,6 +7781,7 @@
   "dwpage.cls.why.lower": "an AI or a rule does not lower a classification",
   "dwpage.cls.why.suggest": "your policy lets an AI only suggest",
   "dwpage.cls.why.threshold": "the AI was not sure enough",
+  "dwpage.cls.why.relayed": "the AI relayed your words, but you approve a lower classification yourself",
   "dwpage.cls.confirmLower": "Accept the suggestion? It lowers the classification: {from} → {to}.",
   "dwpage.cls.reasonTitle": "Why lower the classification?",
   "dwpage.cls.reasonBody": "When you lower the classification from {from} to {to}, write a reason. Say why the item is less sensitive than its classification says.",

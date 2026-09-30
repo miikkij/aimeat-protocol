@@ -20,6 +20,7 @@
  *   - Chat instance + device-auth user-code helpers
  * @usage import { resolveIdentity, parseGEAI, isGEAI } from '../utils/gaii.js';
  * @version-history
+ *   v1.9.1 — 2026-09-30 — 'classifier' is a reserved name (the Content Classifier's identity).
  *   v1.9.0 — 2026-09-26 — currentNodeId is exported, so the auth layer reads the storage, config and
  *     anonymous identity of the node the code runs as (auth/node-auth.ts).
  *   v1.8.1 — 2026-09-26 — The comments name every place a node's code runs as that node: its
@@ -95,6 +96,8 @@ export const RESERVED_NAMES = new Set([
   'registry', 'anonymous', 'null', 'undefined', 'test', 'debug', 'internal',
   'public', 'private', 'shared', 'all', 'none', 'any', 'self', 'global',
   'security-system', 'scheduler',
+  // The node's own Content Classifier labels content as classifier@<node> (TARGET-082).
+  'classifier',
 ]);
 
 export interface ParsedGAII {

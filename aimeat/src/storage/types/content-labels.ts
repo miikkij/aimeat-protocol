@@ -18,6 +18,8 @@
  *   ContentLabelRow · ContentLabelTarget · ContentLabelListQuery
  * @usage import type { ContentLabelRow } from '../storage/interface.js';
  * @version-history
+ *   v1.1.0 — 2026-09-30 — A suggestion carries the person's words an AI relayed (humanSaid) and the
+ *     justification that came with them, for the PERSON_APPROVES suggestion (TARGET-082).
  *   v1.0.0 — 2026-09-29 — TARGET-082 V1. Initial.
  */
 
@@ -40,8 +42,17 @@ export interface ContentLabelSuggestion {
   source: 'ai' | 'rule';
   confidence?: number;
   reason?: string;
-  /** Why it did not apply: the label is a person's (HUMAN_LABEL), or it would lower (CANNOT_LOWER). */
+  /**
+   * Why it did not apply: the label is a person's (HUMAN_LABEL), it would lower (CANNOT_LOWER), the
+   * policy lets an AI only suggest (AI_SUGGESTS, BELOW_THRESHOLD), or an AI relayed a person's words
+   * that lower the label or change one a person set, which the person accepts in their own session
+   * (PERSON_APPROVES).
+   */
   why: string;
+  /** With PERSON_APPROVES: the person's own words the AI relayed, verbatim. */
+  humanSaid?: string;
+  /** With PERSON_APPROVES: the justification the AI relayed with them, used when the person accepts. */
+  justification?: string;
 }
 
 /** One entry of a label's history, newest last, at most 50 kept. */

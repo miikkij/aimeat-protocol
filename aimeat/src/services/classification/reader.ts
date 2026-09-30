@@ -19,6 +19,8 @@
  *   - show: a reader outside a label's audience does not see the item, person or AI. An AI does not
  *     see an item whose label hides it from AI; an item with a warning label is shown with
  *     `classificationWarning` on it and in `warnings`. The node's own work (system) sees everything.
+ *     An anonymous reader is read as an AI (decided 2026-09-30): what a label hides from AI reads
+ *     as absent to it, and the audience rule applies as to everyone.
  *   - useForAi: refuses the whole call (CLASSIFIED, naming the labels and the first keys) when any
  *     item is hidden from AI or outside its audience, whoever asked, because what reaches a model
  *     is decided by the content's label.
@@ -45,6 +47,9 @@
  *   const shown = await reader.show(records, r => memoryTarget(r.ownerGaii, r.key));
  *   res.json(success(nodeId, { answer, ...warningsNote(reader) }));
  * @version-history
+ *   v2.2.0 — 2026-09-30 — An anonymous reader is the strictest kind: show() treats it as an AI, so
+ *     content whose label hides it from AI does not reach it (decided by Jouni 2026-09-30). useForAi
+ *     already refused hidden content and content outside its audience for every reader.
  *   v2.1.0 — 2026-09-29 — Review fixes: the node policy once per call, the system reader's show()
  *     reads nothing, labels per scope concurrently, a long shown list is one audit row per label,
  *     warningsNote(), and activePolicies() for the classifier and the write hook.
@@ -217,7 +222,9 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
         const d = decided[i];
         if (!d) { out.push(items[i]); continue; }
         if (!(await inside(d.label.audience, d.target.scope))) { audit(d, 'refused', 'audience'); continue; }
-        if (who.kind === 'ai') {
+        // An anonymous reader is read the strictest way, as an AI (decided 2026-09-30): nothing
+        // tells who is behind it, so what the label hides from an AI does not reach it either.
+        if (who.kind === 'ai' || who.kind === 'anonymous') {
           if (d.label.aiVisibility === 'hidden') { audit(d, 'refused', 'hidden from AI'); continue; }
           if (d.label.audit) shown.push(d);
           if (d.label.aiVisibility === 'warning') {

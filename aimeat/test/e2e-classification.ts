@@ -21,6 +21,10 @@
  *   review a label suggestion or a policy proposal, a non-operator does not move the switch.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-classification
  * @version-history
+ *   v1.1.0 — 2026-09-30 — Section 9, the decisions of 2026-09-30: an anonymous reader does not get
+ *     what is hidden from AI; humanSaid from an agent raises at once and a lowering waits for the
+ *     person (PERSON_APPROVES, PERSON_REQUIRED for the agent); one label per document with the
+ *     lowering in the audit log; the GDPR export takes the organism record, the ordinary one does not.
  *   v1.0.0 — 2026-09-29 — Initial (TARGET-082 review: four-path parity, the switch, the explorer).
  */
 import * as ed from '@noble/ed25519';
@@ -579,6 +583,61 @@ await test('SEARCH: a hit on a warning-classified record carries its warning, on
   const s = await nodeTool(bot.mcp, 'aimeat_memory_search', { query: WORD });
   const hit = (s.payload?.hits ?? []).find((x: any) => x.key === AGT.warning);
   assert(!!hit && !!warningOf(hit), `node MCP search hit: ${JSON.stringify(hit)}`);
+});
+
+// ─── 9. Decided 2026-09-30 ───
+console.log('\nDecided 2026-09-30: an anonymous reader, humanSaid from an AI, one label per document, the GDPR export');
+
+await test('ANONYMOUS: a public record classified hidden from AI reads as absent to nobody signed in; an allowed one is read', async () => {
+  const h = await json(`/v1/memory/${encodeURIComponent(alice.ghii)}/${OWN.hidden}`);
+  assert(h.status === 404, `anonymous reads the hidden record: ${h.status} ${JSON.stringify(h.body).slice(0, 200)}`);
+  const a = await json(`/v1/memory/${encodeURIComponent(alice.ghii)}/${OWN.allowed}`);
+  assert(a.status === 200 && a.body?.data?.key === OWN.allowed, `POSITIVE CONTROL, the allowed one: ${a.status}`);
+});
+
+await test('HUMAN_SAID: the agent relays a raise and it applies; a lowering waits for the person, who alone accepts it', async () => {
+  const key = `clsrelay.${stamp}`;
+  const w = await json('/v1/memory', { method: 'POST', headers: auth(bot.token), body: JSON.stringify({ key, value: { note: 'minutes' } }) });
+  assert(w.status === 201, `agent writes: ${w.status} ${JSON.stringify(w.body?.error)}`);
+  // The record is in the agent's own namespace, so the agent names it as `owner`, as the owner does.
+  const up = await nodeTool(bot.mcp, 'aimeat_classification', { action: 'set', key, owner: bot.gaii, label: 'luottamuksellinen', human_said: 'Merkitse muistio luottamukselliseksi.' });
+  assert(!up.isError && up.payload?.applied === true && up.payload?.source === 'human-via-ai', `raise: ${up.text.slice(0, 200)}`);
+  const down = await json('/v1/classification/label', { method: 'PUT', headers: auth(bot.token), body: JSON.stringify({ key, owner: bot.gaii, label: 'julkinen', humanSaid: 'Tämä voi olla julkinen.', justification: 'The minutes were published.' }) });
+  assert(down.status === 200 && down.body.data.applied === false && down.body.data.pending === 'PERSON_APPROVES', `lowering: ${down.status} ${JSON.stringify(down.body)}`);
+  const agentAccept = await json('/v1/classification/label/review', { method: 'POST', headers: auth(bot.token), body: JSON.stringify({ key, owner: bot.gaii, decision: 'accept', humanSaid: 'Hyväksyn.' }) });
+  assert(agentAccept.status === 403 && agentAccept.body?.error?.code === 'PERSON_REQUIRED', `agent accepts: ${agentAccept.status} ${JSON.stringify(agentAccept.body?.error)}`);
+  const view = await json(`/v1/classification/label?key=${key}&owner=${encodeURIComponent(bot.gaii)}`, { headers: auth(alice.token) });
+  assert(view.body?.data?.label === 'luottamuksellinen' && view.body.data.suggestion?.why === 'PERSON_APPROVES'
+    && view.body.data.suggestion?.humanSaid === 'Tämä voi olla julkinen.', `the owner sees it waiting: ${JSON.stringify(view.body?.data)}`);
+  const accept = await json('/v1/classification/label/review', { method: 'POST', headers: auth(alice.token), body: JSON.stringify({ key, owner: bot.gaii, decision: 'accept' }) });
+  assert(accept.status === 200 && accept.body.data.applied === true && accept.body.data.label === 'julkinen', `the owner accepts: ${accept.status} ${JSON.stringify(accept.body)}`);
+});
+
+await test('ONE LABEL PER DOCUMENT: a label on the draft is the label of the published copy, and the owner lowering it leaves an audit row', async () => {
+  const doc = `organism.${orgId}.w.ws1.notes.plan`;
+  const set = await json('/v1/classification/label', { method: 'PUT', headers: auth(alice.token), body: JSON.stringify({ key: `${doc}.draft`, label: 'luottamuksellinen' }) });
+  assert(set.status === 200 && set.body.data.applied === true, `label the draft: ${set.status} ${JSON.stringify(set.body?.error)}`);
+  for (const suffix of ['.latest', '.version.3', '']) {
+    const r = await json(`/v1/classification/label?key=${encodeURIComponent(doc + suffix)}`, { headers: auth(alice.token) });
+    assert(r.status === 200 && r.body.data.label === 'luottamuksellinen' && r.body.data.target.key === doc, `${suffix || 'bare'}: ${r.status} ${JSON.stringify(r.body?.data?.target)} ${r.body?.data?.label}`);
+  }
+  const low = await json('/v1/classification/label', { method: 'PUT', headers: auth(alice.token), body: JSON.stringify({ key: `${doc}.latest`, label: 'sisainen', justification: 'The plan is shared inside the organism now.' }) });
+  assert(low.status === 200 && low.body.data.applied === true && low.body.data.from === 'luottamuksellinen', `lower: ${low.status} ${JSON.stringify(low.body)}`);
+  const audit = await json(`/v1/classification/audit?level=organism&organism_id=${orgId}&action=changed`, { headers: auth(alice.token) });
+  const rows = ((audit.body?.data?.rows ?? []) as any[]).filter(x => x.key === doc);
+  assert(rows.some(x => x.purpose === 'luottamuksellinen → sisainen (human)'), `audit: ${audit.status} ${JSON.stringify(rows)}`);
+});
+
+await test('GDPR EXPORT: the person\'s organism record comes out and the answer says so; the ordinary export keeps it behind', async () => {
+  const key = `organism.${orgId}.notes.kept`;
+  const w = await json('/v1/memory', { method: 'POST', headers: auth(alice.token), body: JSON.stringify({ key, value: { note: 'organism note' } }) });
+  assert(w.status === 201, `write the organism record: ${w.status} ${JSON.stringify(w.body?.error)}`);
+  const gdpr = await json(`/v1/owners/${alice.name}/export`, { headers: auth(alice.token) });
+  assert(gdpr.status === 200 && (gdpr.body.data.memories as any[]).some(m => m.key === key), `GDPR export: ${gdpr.status}`);
+  assert(gdpr.body.data.classified_organism_content?.keys?.includes(key), `says so: ${JSON.stringify(gdpr.body.data.classified_organism_content)}`);
+  const ordinary = await json('/v1/memory/export', { headers: auth(alice.token) });
+  assert(ordinary.status === 200 && !(ordinary.body.data.entries as any[]).some(e => e.key === key)
+    && (ordinary.body.data.left_out as any[] | undefined)?.some(l => l.key === key), `ordinary export: ${ordinary.status} ${JSON.stringify(ordinary.body.data.left_out)}`);
 });
 
 // ─── Cleanup ───

@@ -8,6 +8,8 @@
  *   one; humanSaid makes an AI's call the person's; the AI mode (suggest, auto, off); a review; who
  *   may label what; who is an AI, decided from the credential.
  * @version-history
+ *   v1.1.0 — 2026-09-30 — humanSaid from an AI: a raise applies (AI mode off too); a lowering or a
+ *     change to a person's label waits as PERSON_APPROVES, which only the person accepts.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V1. Initial.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -96,6 +98,61 @@ describe('classification labels', () => {
     const row = await storage.getContentLabel(T);
     expect(row?.humanSaid).toBe('Merkitse tämä luottamukselliseksi.');
     expect(row?.history.at(-1)?.humanSaid).toBe('Merkitse tämä luottamukselliseksi.');
+  });
+
+  describe('humanSaid from an AI (decided 2026-09-30)', () => {
+    const SAID_LOWER = 'Tämä voi olla julkinen, sopimus julkaistiin.';
+
+    it('a raise applies as the person\'s and locks, also with the AI mode off', async () => {
+      vi.spyOn(policyModule, 'policyFor').mockResolvedValue({ ...defaultPolicy(), aiMode: 'off' });
+      expect(await code(setLabel(deps(), agent, T, { label: 'luottamuksellinen', confidence: 1 }))).toBe('AI_LABELLING_OFF');
+      const r = await setLabel(deps(), agent, T, { label: 'luottamuksellinen', humanSaid: 'Merkitse luottamukselliseksi.' });
+      expect(r).toMatchObject({ applied: true, label: 'luottamuksellinen', source: 'human-via-ai', locked: true });
+    });
+
+    it('a lowering waits for the person as PERSON_APPROVES, with their words as the reason', async () => {
+      await setLabel(deps(), rule, T, { label: 'luottamuksellinen' });
+      const r = await setLabel(deps(), agent, T, { label: 'julkinen', humanSaid: SAID_LOWER, justification: 'Published on the web site.' });
+      expect(r).toMatchObject({ applied: false, label: 'luottamuksellinen', pending: 'PERSON_APPROVES' });
+      const row = await storage.getContentLabel(T);
+      expect(row?.label).toBe('luottamuksellinen');
+      expect(row?.suggestion).toMatchObject({ label: 'julkinen', why: 'PERSON_APPROVES', humanSaid: SAID_LOWER, reason: SAID_LOWER, source: 'ai' });
+      expect(row?.history.at(-1)).toMatchObject({ action: 'suggest', source: 'human-via-ai', humanSaid: SAID_LOWER, to: 'julkinen' });
+    });
+
+    // Jouni 2026-09-30, "humanSaid saa nostaa luokitusta": a raise gives nothing away, so it applies
+    // over a label a person set as well; only a lowering waits for the person.
+    it("a raise relayed over a label a person set applies as the person's", async () => {
+      await setLabel(deps(), person, T, { label: 'sisainen' });
+      const r = await setLabel(deps(), agent, T, { label: 'erittain-luottamuksellinen', humanSaid: 'Tee tästä erittäin luottamuksellinen.' });
+      expect(r).toMatchObject({ applied: true, label: 'erittain-luottamuksellinen', source: 'human-via-ai', locked: true });
+      expect((await storage.getContentLabel(T))?.label).toBe('erittain-luottamuksellinen');
+    });
+
+    it('a lowering relayed while the AI mode is off still waits for the person instead of failing', async () => {
+      await setLabel(deps(), rule, T, { label: 'luottamuksellinen' });
+      vi.spyOn(policyModule, 'policyFor').mockResolvedValue({ ...defaultPolicy(), aiMode: 'off' });
+      expect((await setLabel(deps(), agent, T, { label: 'sisainen', humanSaid: SAID_LOWER })).pending).toBe('PERSON_APPROVES');
+    });
+
+    it('an AI cannot accept it even with the person\'s words; the person accepts it in their own session', async () => {
+      await setLabel(deps(), rule, T, { label: 'luottamuksellinen' });
+      await setLabel(deps(), agent, T, { label: 'julkinen', humanSaid: SAID_LOWER, justification: 'Published on the web site.' });
+      expect(await code(reviewLabel(deps(), agent, T, { decision: 'accept', humanSaid: 'Hyväksyn.' }))).toBe('PERSON_REQUIRED');
+      expect((await storage.getContentLabel(T))?.label).toBe('luottamuksellinen');
+      // The justification relayed with the words is used when the person accepts without one.
+      const acc = await reviewLabel(deps(), person, T, { decision: 'accept' });
+      expect(acc).toMatchObject({ applied: true, label: 'julkinen', source: 'human', locked: true });
+      expect((await storage.getContentLabel(T))?.justification).toBe('Published on the web site.');
+    });
+
+    it('an AI may relay the person\'s rejection of it', async () => {
+      await setLabel(deps(), rule, T, { label: 'luottamuksellinen' });
+      await setLabel(deps(), agent, T, { label: 'julkinen', humanSaid: SAID_LOWER });
+      const rej = await reviewLabel(deps(), agent, T, { decision: 'reject', humanSaid: 'Ei sittenkään.' });
+      expect(rej.label).toBe('luottamuksellinen');
+      expect((await storage.getContentLabel(T))?.suggestion).toBeNull();
+    });
   });
 
   it('a person accepts or rejects a suggestion; an AI without the words cannot', async () => {

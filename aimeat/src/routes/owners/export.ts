@@ -13,6 +13,10 @@
  *   import { registerOwnerExportRoute } from './owners/export.js';
  *   registerOwnerExportRoute(router, config, storage);
  * @version-history
+ *   v2.0.0 — 2026-09-30 — Decided by Jouni 2026-09-30: this GDPR export takes the person's own
+ *     organism records again (no leave(): the legal right to their own data), and names them in
+ *     `classified_organism_content` { count, keys, note }. `left_out` is gone from this route; the
+ *     ordinary export (GET /v1/memory/export, the bundle) keeps it.
  *   v1.9.0 — 2026-09-29 — TARGET-082 review: memory passes leave() with the destination `export`
  *     after show(), so an organism's record held under the person's or an agent's name stays
  *     behind; the answer names it in `left_out` ({ key, label, reason }).
@@ -59,7 +63,8 @@ import { calculateTrustScore } from '../../services/trust.js';
 import { getPendingConsentAudit } from '../../services/consent-audit-buffer.js';
 import { presentMemories } from '../../services/classification/present-memory.js';
 import { readerFor } from '../../services/classification/reader.js';
-import { leaveMemories, type LeftOut } from '../../services/classification-exits.js';
+import { memoryTarget } from '../../services/classification/labels.js';
+import { scopeOrganism } from '../../services/classification/policy.js';
 
 /** One work item this identity was to do, as the export shows it: the other side is the requester. */
 function workProvidedView(w: WorkRecord) {
@@ -142,16 +147,18 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
     }
     const allFlags = await storage.listFlags();
 
-    // The one presentation of memory values (classification reader + credential mask, TARGET-082),
-    // then what may leave: the export file leaves the node, and an organism's record held under this
-    // person's or an agent's name is the organism's. leave() binds only organism content, so the
-    // person's own records all go; what stayed behind is named in `left_out`.
+    // The one presentation of memory values (classification reader + credential mask, TARGET-082).
+    // NO leave() here (decided by Jouni 2026-09-30): this is the person's legal right to their own
+    // data (GDPR Articles 15 and 20), so an organism's record held under their name or an agent's
+    // comes out whatever its classification, and the answer says so in
+    // `classified_organism_content`. The ordinary export (GET /v1/memory/export, the bundle) still
+    // keeps what may not leave its organism behind.
     const reader = readerFor({ storage, config }, req.auth);
-    const leftOut: LeftOut[] = [];
+    const organismKeys: string[] = [];
     const exportable = async (records: MemoryRecord[]): Promise<MemoryRecord[]> => {
-      const out = await leaveMemories(reader, await presentMemories(reader, records), { kind: 'export', organismId: null });
-      leftOut.push(...out.leftOut);
-      return out.kept;
+      const shown = await presentMemories(reader, records);
+      for (const r of shown) if (scopeOrganism(memoryTarget(r.ownerGaii, r.key).scope)) organismKeys.push(r.key);
+      return shown;
     };
     for (const agent of agents) {
       const memories = await exportable(await storage.listMemory(agent.gaii));
@@ -489,8 +496,15 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
       organism_memberships: organismMemberships,
       chat_instances: chatInstancesExport,
       ghii_flags_filed: ghiiFlags,
-      // What the export left behind, by key, with its label and why (TARGET-082 review).
-      ...(leftOut.length ? { left_out: leftOut } : {}),
+      // Organism content is in this export because it is the person's own data; the file carries
+      // content an organism classified, so it says which keys (decided 2026-09-30).
+      ...(organismKeys.length ? {
+        classified_organism_content: {
+          count: organismKeys.length,
+          keys: organismKeys,
+          note: 'This export includes records of organisms you belong to that you or your agents hold, whatever their classification, because they are your own data. Organism content may be classified: keep the file as carefully as the organism asks.',
+        },
+      } : {}),
       exported_at: new Date().toISOString(),
     }));
   });

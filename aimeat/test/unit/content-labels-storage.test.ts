@@ -7,6 +7,7 @@
  *   replace-by-address keeping the id, the page cursor, the deletes, and the two erasure paths (an
  *   owner's cascade, an organism's delete). Postgres mirrors these expectations.
  * @version-history
+ *   v1.1.0 — 2026-09-30 — getContentLabelsUnder: the keys under each prefix of one scope.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V1. Initial.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -65,6 +66,19 @@ describe('content_labels storage (sqlite)', () => {
     for (const k of keys.filter((_, i) => i % 100 === 0)) await storage.putContentLabel(row({ key: k }));
     const got = await storage.getContentLabels('memory', ALICE, keys);
     expect(got).toHaveLength(13);
+  });
+
+  it('getContentLabelsUnder answers the keys under each prefix of one scope, and nothing beside them', async () => {
+    for (const key of ['doc.a', 'doc.a.draft', 'doc.a.version.2', 'doc.ab.latest', 'doc.a-x.latest', 'doc.b.latest', 'Doc.a.latest']) {
+      await storage.putContentLabel(row({ key }));
+    }
+    await storage.putContentLabel(row({ key: 'doc.a.latest', scope: BOB, ownerGaii: BOB }));
+    const got = await storage.getContentLabelsUnder('memory', ALICE, ['doc.a.', 'doc.b.', 'doc.a.']);
+    expect(got.map(g => g.key).sort()).toEqual(['doc.a.draft', 'doc.a.version.2', 'doc.b.latest']);
+    expect(await storage.getContentLabelsUnder('memory', ALICE, [])).toEqual([]);
+    expect(await storage.getContentLabelsUnder('file', ALICE, ['doc.a.'])).toEqual([]);
+    const many = Array.from({ length: 450 }, (_, i) => `p${i}.`);
+    expect((await storage.getContentLabelsUnder('memory', ALICE, [...many, 'doc.b.'])).map(g => g.key)).toEqual(['doc.b.latest']);
   });
 
   it('a put on an existing address replaces it and keeps the id; history is capped at 50', async () => {

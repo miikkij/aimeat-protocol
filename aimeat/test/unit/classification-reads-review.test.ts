@@ -14,6 +14,8 @@
  *      structure history) pass the reader.
  * @usage cd aimeat && pnpm exec vitest run test/unit/classification-reads-review.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-30 — A warning names the document's address (one label per document, decided
+ *     2026-09-30), so the two warning lists expect `notes.a` where they expected `notes.a.latest`.
  *   v1.0.0 — 2026-09-29 — TARGET-082 review, items 3, 4, 6, 7, 8 and 9. Initial.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -131,7 +133,8 @@ describe('TARGET-082 review: what a read hands out, and in which order it asks',
       const data = (r as { data: { index: { note: Array<Record<string, unknown>> }; classification_warnings?: unknown[] } }).data;
       expect(data.index.note.find(e => e.id === 'a')?.classification_warning).toEqual(W);
       expect(data.index.note.find(e => e.id === 'b')?.classification_warning).toBeUndefined();
-      expect(data.classification_warnings).toEqual([{ key: `${ROOT}.notes.a.latest`, label: WARN, name: 'Confidential' }]);
+      // One label per document (2026-09-30): the warning names the document, not the copy read.
+      expect(data.classification_warnings).toEqual([{ key: `${ROOT}.notes.a`, label: WARN, name: 'Confidential' }]);
       const opened = await readWorkspaceOp(deps(), { principal: AGENT, ownerName: 'alice', ownerGhii: ALICE, writerGaii: AGENT, roles: ['agent'] },
         { organismId: ORG, ws: 'ws1', ids: ['a'], reader: readerForAgent(deps(), AGENT) });
       expect((opened as { data: { items: Array<Record<string, unknown>> } }).data.items[0]?.classification_warning).toEqual(W);
@@ -190,7 +193,7 @@ describe('TARGET-082 review: what a read hands out, and in which order it asks',
         const { body } = await get('/v1/organisms/o1/workspace?ws=ws1', 'agent');
         const notes = (body.data.objects as { note: Array<Record<string, unknown>> }).note;
         expect(notes.find(n => n.title === 'Warned note')?._classificationWarning).toEqual(W);
-        expect(body.data.classificationWarnings).toEqual([{ key: `${ROOT}.notes.a.latest`, label: WARN, name: 'Confidential' }]);
+        expect(body.data.classificationWarnings).toEqual([{ key: `${ROOT}.notes.a`, label: WARN, name: 'Confidential' }]);
       });
 
       it('item 9: an outsider refused by the visibility gate writes no classification audit row', async () => {

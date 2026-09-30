@@ -6695,6 +6695,7 @@
   "dwpage.cls.why.lower": "una IA o una regla no baja una clasificación",
   "dwpage.cls.why.suggest": "tu política deja que una IA solo sugiera",
   "dwpage.cls.why.threshold": "la IA no estaba lo bastante segura",
+  "dwpage.cls.why.relayed": "la IA transmitió tus palabras, pero bajar la clasificación lo apruebas tú",
   "dwpage.cls.confirmLower": "¿Aceptar la sugerencia? Baja la clasificación: {from} → {to}.",
   "dwpage.cls.reasonTitle": "¿Por qué bajas la clasificación?",
   "dwpage.cls.reasonBody": "Cuando bajas la clasificación de {from} a {to}, escribe un motivo. Di por qué el elemento es menos sensible de lo que dice su clasificación.",
