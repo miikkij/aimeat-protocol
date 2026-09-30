@@ -23,6 +23,7 @@
  * @structure eraseOwner(storage, nodeId, name) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name);
  * @version-history
+ *   v1.5.0 — 2026-09-30 — The person's classification exceptions (records of system@<node>) are erased.
  *   v1.4.0 — 2026-09-30 — Unflushed classification audit rows of the owner are purged first.
  *   v1.3.0 — 2026-09-26 — Work is settled inside storage.deleteOwner() on both backends, for every
  *     door that deletes an account: open work cancelled, the held morsels back with a ledger line,
@@ -45,6 +46,7 @@ import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { evictAgentTelemetry } from './telemetry-buffer.js';
 import { purgeClassificationAudit } from './classification/audit.js';
+import { purgeExceptions } from './classification/exceptions.js';
 
 export interface OwnerErasureResult {
   agentsDeleted: number;
@@ -84,6 +86,11 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
 
     // 2. GHII-level data the per-identity cascade does not reach.
     await step('ghii_memory', async () => { await storage.deleteAllMemory(ghii); return 'ghii_memory'; }, deletionLog);
+    // The person's classification exceptions are records of system@<node>, keyed by their GHII.
+    await step('classification_exceptions', async () => {
+      await purgeExceptions(storage, nodeId, { owner: ghii });
+      return 'classification_exceptions';
+    }, deletionLog);
 
     await step('consents', async () => {
       const consents = await storage.listConsents(ghii, {});

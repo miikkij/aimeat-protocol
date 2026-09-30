@@ -11,6 +11,8 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   v1.10.0 — 2026-09-30 — The classification audit prune also prunes the exceptions list's month
+ *     records past the same retention, keeping any month with a person's exception in force.
  *   v1.9.0 — 2026-09-29 — classification-queue: the Content Classifier's queue, hourly, and the write
  *     hook's classifier set at boot (TARGET-082 V3).
  *   v1.8.0 — 2026-09-29 — consent-audit-prune also prunes the classification audit log past the
@@ -386,4 +388,8 @@ async function runClassificationAuditPruneJob(config: AimeatConfig, storage: Sto
   const days = stored === undefined ? 365 : stored;
   const pruned = await pruneClassificationAuditOlderThan(storage, days);
   if (pruned > 0) logger.info(`Pruned ${pruned} classification-audit rows older than ${days} days`);
+  // The exceptions list ages with the log, except a month that still holds a person's exception in force.
+  const { pruneExceptions } = await import('./classification/exceptions.js');
+  const months = await pruneExceptions(storage, config.nodeId, days);
+  if (months > 0) logger.info(`Pruned ${months} classification exception month records older than ${days} days`);
 }

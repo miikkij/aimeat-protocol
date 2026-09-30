@@ -21,6 +21,14 @@
  *   review a label suggestion or a policy proposal, a non-operator does not move the switch.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-classification
  * @version-history
+ *   v1.3.0 — 2026-09-30 — AI-SEND: an agent's export takes its record hidden from AI once the person
+ *     makes an ai-send exception with a reason (the AI cannot send what it cannot see), audited as
+ *     shown and as exported, and leaves it out again once withdrawn.
+ *   v1.2.0 — 2026-09-30 — Jouni's decisions of 2026-09-30: no default classification hides content
+ *     from AI (the suite shows it, then the operator hides highly confidential for the parity tests);
+ *     section 10, the exceptions list on REST, node MCP and the connector (a person makes one with a
+ *     reason, the export honours it and the audit shows it, an agent makes none, another owner sees
+ *     and withdraws none, a withdrawn one stops) and an app's lowering recorded as an exception.
  *   v1.1.0 — 2026-09-30 — Section 9, the decisions of 2026-09-30: an anonymous reader does not get
  *     what is hidden from AI; humanSaid from an agent raises at once and a lowering waits for the
  *     person (PERSON_APPROVES, PERSON_REQUIRED for the agent); one label per document with the
@@ -305,6 +313,28 @@ await test('The agent writes three records; the detection rules classify two of 
   assert(got[AGT.hidden] === 'erittain-luottamuksellinen', `the password record: ${JSON.stringify(got)}`);
   assert(got[AGT.warning] === 'luottamuksellinen', `the IBAN record: ${JSON.stringify(got)}`);
   assert(!got[AGT.allowed], 'the plain record has no stored classification');
+});
+
+/** The node policy with highly confidential set to `ai`, written by the operator in person. */
+async function setHighlyConfidential(ai: 'hidden' | 'warning') {
+  const cur = await json('/v1/classification/policy?level=node', { headers: auth(op.token) });
+  assert(cur.status === 200, `read the node policy: ${cur.status} ${JSON.stringify(cur.body?.error)}`);
+  const policy = cur.body.data.stored ?? cur.body.data.effective;
+  policy.labels = (policy.labels as any[]).map(l => (l.id === 'erittain-luottamuksellinen' ? { ...l, aiVisibility: ai } : l));
+  return json('/v1/classification/policy', { method: 'PUT', headers: auth(op.token), body: JSON.stringify({ level: 'node', policy }) });
+}
+
+await test('DEFAULT: no default classification hides content from AI; the agent reads the highly confidential record with a warning (decided 2026-09-30)', async () => {
+  const node = await json('/v1/classification/policy?level=node', { headers: auth(op.token) });
+  const labels = node.body?.data?.effective?.labels as any[];
+  assert(Array.isArray(labels) && labels.every(l => l.aiVisibility !== 'hidden'), `a default label hides: ${JSON.stringify(labels?.map(l => [l.id, l.aiVisibility]))}`);
+  const r = await json(`/v1/memory/${encodeURIComponent(OWN.hidden)}?owner_scope=true`, { headers: auth(bot.token) });
+  assert(r.status === 200 && warningOf(r.body.data)?.label === 'erittain-luottamuksellinen', `the agent's read: ${r.status} ${JSON.stringify(r.body?.data).slice(0, 300)}`);
+});
+
+await test('The operator chooses to hide highly confidential content from AI on this node; the rest of the suite reads that', async () => {
+  const r = await setHighlyConfidential('hidden');
+  assert(r.status === 200 && r.body.data.applied === true, `hide: ${r.status} ${JSON.stringify(r.body?.error ?? r.body?.data)}`);
 });
 
 // ─── 3. REST ───
@@ -640,6 +670,132 @@ await test('GDPR EXPORT: the person\'s organism record comes out and the answer 
     && (ordinary.body.data.left_out as any[] | undefined)?.some(l => l.key === key), `ordinary export: ${ordinary.status} ${JSON.stringify(ordinary.body.data.left_out)}`);
 });
 
+// ─── 10. The exceptions list and apps, decided 2026-09-30 ───
+console.log('\nDecided 2026-09-30: a person\'s exception with a reason, an AI makes none, an app\'s act is an exception');
+
+const KEPT = () => `organism.${orgId}.notes.kept`;
+let orgException = '';
+let ownException = '';
+
+await test('EXCEPTION: the ordinary export names the Data Wallet; with the person\'s exception the record leaves, and the use is audited', async () => {
+  const before = await json('/v1/memory/export', { headers: auth(alice.token) });
+  const left = ((before.body?.data?.left_out ?? []) as any[]).find(l => l.key === KEPT());
+  assert(!!left && /exception with a written reason in their Data Wallet/.test(left.reason), `left_out: ${JSON.stringify(before.body?.data?.left_out)}`);
+  const made = await json('/v1/classification/exceptions', {
+    method: 'POST', headers: auth(alice.token), body: JSON.stringify({ key: KEPT(), action: 'leave', reason: 'The board approved sending the note to the auditor.' }),
+  });
+  assert(made.status === 201 && made.body.data.auto === false && made.body.data.byKind === 'human' && made.body.data.target?.key === KEPT(), `make: ${made.status} ${JSON.stringify(made.body)}`);
+  orgException = made.body.data.id;
+  const after = await json('/v1/memory/export', { headers: auth(alice.token) });
+  assert((after.body.data.entries as any[]).some(e => e.key === KEPT()) && !((after.body.data.left_out ?? []) as any[]).some(l => l.key === KEPT()), `export with the exception: ${JSON.stringify(after.body.data.left_out)}`);
+  const audit = await json(`/v1/classification/audit?level=organism&organism_id=${orgId}&action=exception`, { headers: auth(alice.token) });
+  const purposes = ((audit.body?.data?.rows ?? []) as any[]).map(r => r.purpose as string);
+  assert(purposes.some(p => p.startsWith(`made ${orgException} (leave)`)) && purposes.some(p => p.startsWith(`used ${orgException} (leave) → export`)), `audit: ${JSON.stringify(purposes)}`);
+  const list = await json(`/v1/classification/exceptions?level=organism&organism_id=${orgId}`, { headers: auth(alice.token) });
+  assert(list.status === 200 && (list.body.data.exceptions as any[]).some(e => e.id === orgException && e.reason === 'The board approved sending the note to the auditor.'), `list: ${JSON.stringify(list.body?.data)}`);
+});
+
+await test('DENIAL: an agent makes no exception over REST, the node MCP or the connector (PERSON_REQUIRED)', async () => {
+  const rest = await json('/v1/classification/exceptions', { method: 'POST', headers: auth(bot.token), body: JSON.stringify({ key: OWN.hidden, action: 'ai-send', reason: 'I need it.' }) });
+  assert(rest.status === 403 && rest.body?.error?.code === 'PERSON_REQUIRED', `REST: ${rest.status} ${JSON.stringify(rest.body?.error)}`);
+  const mcp = await nodeTool(bot.mcp, 'aimeat_classification', { action: 'exception_set', key: OWN.hidden, exception_action: 'ai-send', reason: 'I need it.' });
+  assert(mcp.isError && mcp.text.startsWith('PERSON_REQUIRED') && /Data Wallet/.test(mcp.text), `node MCP: ${mcp.text.slice(0, 200)}`);
+  const cli = await json('/local/call/aimeat_classification', { method: 'POST', body: JSON.stringify({ action: 'exception_set', key: OWN.hidden, exception_action: 'ai-send', reason: 'I need it.' }) }, loopback);
+  assert(cli.body?.ok === false && cli.body?.error?.code === 'PERSON_REQUIRED', `connector: ${JSON.stringify(cli.body).slice(0, 200)}`);
+  const own = await json('/v1/classification/exceptions', { headers: auth(alice.token) });
+  assert(!(own.body.data.exceptions as any[]).some(e => e.by === bot.gaii), 'nothing was stored for the agent');
+});
+
+await test('LIST: the owner\'s exception reads the same on REST, the node MCP and the connector', async () => {
+  const made = await json('/v1/classification/exceptions', {
+    method: 'POST', headers: auth(alice.token), body: JSON.stringify({ key: OWN.hidden, action: 'ai-send', reason: 'My assistant mails the file to my accountant.', until: new Date(Date.now() + 86_400_000).toISOString() }),
+  });
+  assert(made.status === 201 && made.body.data.scope === alice.ghii && !!made.body.data.until, `make: ${made.status} ${JSON.stringify(made.body)}`);
+  ownException = made.body.data.id;
+  const mcp = await nodeTool(bot.mcp, 'aimeat_classification', { action: 'exception_list', exception_action: 'ai-send' });
+  assert(!mcp.isError && (mcp.payload?.exceptions as any[]).some(e => e.id === ownException), `node MCP: ${mcp.text.slice(0, 300)}`);
+  const cli = await json('/local/call/aimeat_classification', { method: 'POST', body: JSON.stringify({ action: 'exception_list' }) }, loopback);
+  assert(cli.body?.ok === true && (cli.body.data.exceptions as any[]).some((e: any) => e.id === ownException), `connector: ${JSON.stringify(cli.body).slice(0, 300)}`);
+});
+
+await test('DENIAL: another owner neither sees nor withdraws the exceptions', async () => {
+  const org = await json(`/v1/classification/exceptions?level=organism&organism_id=${orgId}`, { headers: auth(bob.token) });
+  assert(org.status === 404, `bob lists the organism's: ${org.status}`);
+  const mine = await json('/v1/classification/exceptions', { headers: auth(bob.token) });
+  assert(mine.status === 200 && (mine.body.data.exceptions as any[]).length === 0, `bob's own list: ${JSON.stringify(mine.body?.data)}`);
+  for (const id of [orgException, ownException]) {
+    const del = await json(`/v1/classification/exceptions/${encodeURIComponent(id)}`, { method: 'DELETE', headers: auth(bob.token) });
+    assert(del.status === 404, `bob withdraws ${id}: ${del.status}`);
+  }
+  const node = await json('/v1/classification/exceptions?level=node', { headers: auth(alice.token) });
+  assert(node.status === 403, `a non-operator lists the node: ${node.status}`);
+  const all = await json('/v1/classification/exceptions?level=node', { headers: auth(op.token) });
+  assert(all.status === 200 && (all.body.data.exceptions as any[]).some(e => e.id === orgException), `POSITIVE CONTROL, the operator lists the node: ${all.status}`);
+});
+
+await test('WITHDRAW: the person withdraws the exception; it stays listed, and the export leaves the record behind again', async () => {
+  const del = await json(`/v1/classification/exceptions/${encodeURIComponent(orgException)}`, { method: 'DELETE', headers: auth(alice.token) });
+  assert(del.status === 200 && !!del.body.data.withdrawnAt, `withdraw: ${del.status} ${JSON.stringify(del.body)}`);
+  const exp = await json('/v1/memory/export', { headers: auth(alice.token) });
+  assert(((exp.body.data.left_out ?? []) as any[]).some(l => l.key === KEPT()), `export after: ${JSON.stringify(exp.body.data.left_out)}`);
+});
+
+await test('AI-SEND: the agent\'s export has no record hidden from AI until the person makes an ai-send exception with a reason; then the agent sees it, exports it, and both uses are audited', async () => {
+  const has = (r: { body: any }) => ((r.body?.data?.entries ?? []) as any[]).some(e => e.key === AGT.hidden);
+  const before = await json('/v1/memory/export', { headers: auth(bot.token) });
+  assert(before.status === 200 && !has(before) && (before.body.data.entries as any[]).some(e => e.key === AGT.allowed), `export before: ${before.status} ${JSON.stringify(before.body?.data?.entries?.map((e: any) => e.key))}`);
+  const reason = 'My assistant sends the login note to IT support.';
+  const made = await json('/v1/classification/exceptions', {
+    method: 'POST', headers: auth(alice.token), body: JSON.stringify({ key: AGT.hidden, owner: bot.gaii, action: 'ai-send', reason }),
+  });
+  assert(made.status === 201 && made.body.data.scope === bot.gaii && made.body.data.action === 'ai-send', `make: ${made.status} ${JSON.stringify(made.body)}`);
+  const id = made.body.data.id as string;
+  const read = await json(`/v1/memory/${encodeURIComponent(AGT.hidden)}`, { headers: auth(bot.token) });
+  assert(read.status === 200, `the agent reads it: ${read.status}`);
+  const after = await json('/v1/memory/export', { headers: auth(bot.token) });
+  assert(after.status === 200 && has(after) && !((after.body.data.left_out ?? []) as any[]).some(l => l.key === AGT.hidden), `export after: ${JSON.stringify(after.body?.data?.left_out)}`);
+  const audit = await json('/v1/classification/audit?level=owner&action=exception', { headers: auth(alice.token) });
+  const purposes = ((audit.body?.data?.rows ?? []) as any[]).filter(r => r.reader === bot.gaii).map(r => r.purpose as string);
+  assert(purposes.some(p => p === `used ${id} (ai-send) → shown: ${reason}`) && purposes.some(p => p === `used ${id} (ai-send) → export: ${reason}`), `audit: ${JSON.stringify(purposes)}`);
+  const del = await json(`/v1/classification/exceptions/${encodeURIComponent(id)}`, { method: 'DELETE', headers: auth(alice.token) });
+  assert(del.status === 200, `withdraw: ${del.status}`);
+  assert(!has(await json('/v1/memory/export', { headers: auth(bot.token) })), 'withdrawn, the record is out of the agent\'s export again');
+});
+
+/** An app of alice's with an app grant holding memory read and write, through the consent flow. */
+async function appToken(): Promise<string> {
+  const filename = `clsapp${stamp}.html`;
+  const pub = await json('/v1/apps', {
+    method: 'POST', headers: auth(alice.token),
+    body: JSON.stringify({ filename, content: Buffer.from('<!DOCTYPE html><html><body>cls</body></html>').toString('base64'), name: 'Cls App', description: 'classification e2e app', category: 'utility' }),
+  });
+  assert(pub.status === 201, `publish: ${pub.status} ${JSON.stringify(pub.body?.error)}`);
+  const verifier = createHash('sha256').update(`v${stamp}`).digest('base64url');
+  const challenge = createHash('sha256').update(verifier).digest('base64url');
+  const redirect = 'http://localhost:9911/callback';
+  const q = new URLSearchParams({ app: `${alice.name}/${filename}`, response_type: 'code', scope: 'memory:read memory:write', redirect_uri: redirect, code_challenge: challenge, code_challenge_method: 'S256' });
+  const res = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
+  const rid = decodeURIComponent(/req=([^&]+)/.exec(res.headers.get('location') ?? '')?.[1] ?? '');
+  const con = await json('/v1/app-grants/authorize-consent', { method: 'POST', headers: auth(alice.token), body: JSON.stringify({ request_id: rid }) });
+  const code = new URL(con.body?.data?.redirect_url ?? 'http://x/').searchParams.get('code') ?? '';
+  const tok = await json('/v1/app-grants/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: redirect }) });
+  assert(!!tok.body?.data?.access_token, `app token: ${tok.status} ${JSON.stringify(tok.body).slice(0, 300)}`);
+  return tok.body.data.access_token as string;
+}
+
+await test('APP: an app lowers a classification without a justification, and the node records it as an exception', async () => {
+  const token = await appToken();
+  const person = await json('/v1/classification/label', { method: 'PUT', headers: auth(alice.token), body: JSON.stringify({ key: AGT.warning, owner: bot.gaii, label: 'sisainen' }) });
+  assert(person.status === 400 && person.body?.error?.code === 'JUSTIFICATION_REQUIRED', `POSITIVE CONTROL, the person needs a reason: ${person.status} ${JSON.stringify(person.body?.error)}`);
+  const low = await json('/v1/classification/label', { method: 'PUT', headers: auth(token), body: JSON.stringify({ key: OWN.warning, label: 'sisainen' }) });
+  assert(low.status === 200 && low.body.data.applied === true && low.body.data.label === 'sisainen', `app lowers: ${low.status} ${JSON.stringify(low.body)}`);
+  const list = await json('/v1/classification/exceptions?action=lower', { headers: auth(alice.token) });
+  const e = ((list.body?.data?.exceptions ?? []) as any[]).find(x => x.target?.key === OWN.warning);
+  assert(!!e && e.auto === true && e.byKind === 'app' && /lowered luottamuksellinen → sisainen/.test(e.reason), `the exception: ${JSON.stringify(list.body?.data)}`);
+  const agentLow = await nodeTool(bot.mcp, 'aimeat_classification', { action: 'set', key: AGT.warning, owner: bot.gaii, label: 'sisainen' });
+  assert(!agentLow.isError && agentLow.payload?.applied === false, `an agent still only suggests: ${agentLow.text.slice(0, 200)}`);
+});
+
 // ─── Cleanup ───
 
 await test('Cleanup: the daemon stops, its home is removed, the operator turns classification off', async () => {
@@ -649,6 +805,8 @@ await test('Cleanup: the daemon stops, its home is removed, the operator turns c
     await new Promise<void>(r => { const t = setTimeout(r, 5000); daemon!.once('exit', () => { clearTimeout(t); r(); }); });
   }
   rmSync(home, { recursive: true, force: true });
+  const back = await setHighlyConfidential('warning');
+  assert(back.status === 200, `node policy back to the default: ${back.status} ${JSON.stringify(back.body?.error)}`);
   const r = await setSwitchInPerson(op.token, 'off');
   assert(r.status === 200, `switch off: ${r.status}`);
 });

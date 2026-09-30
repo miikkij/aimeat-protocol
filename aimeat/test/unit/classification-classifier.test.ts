@@ -13,6 +13,8 @@
  *   the queue, a refused model label is an outcome, and the drain survives a bad item, retries it
  *   three times, and stops at the node's cap.
  * @version-history
+ *   v1.3.0 — 2026-09-30 — No default label hides from AI (option B): the hidden test sets the node
+ *     policy to hide the highest label first.
  *   v1.2.0 — 2026-09-29 — The review fixes (TARGET-082 review, findings 2, 3 and 6).
  *   v1.1.0 — 2026-09-29 — A null daily cap never queues, and the call is still counted.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V3. Initial.
@@ -85,6 +87,8 @@ describe('the Content Classifier', () => {
   });
 
   it('never sends content hidden from AI to a model', async () => {
+    // No default label hides from AI since 2026-09-30: the operator hides this one on the node.
+    await setNodePolicy(storage, p => { p.labels.find(l => l.id === 'erittain-luottamuksellinen')!.aiVisibility = 'hidden'; });
     await setLabel(deps, alice, t('secret'), { label: 'erittain-luottamuksellinen' });
     const out = await classifyText(deps, t('secret'), 'anything');
     expect(out.skipped).toBe('HIDDEN_FROM_AI');

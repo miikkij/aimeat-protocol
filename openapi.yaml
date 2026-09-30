@@ -14856,12 +14856,88 @@ paths:
         - { name: level, in: query, schema: { type: string, enum: [node, owner, organism], default: owner } }
         - { name: organism_id, in: query, schema: { type: string } }
         - { name: since, in: query, schema: { type: string, format: date-time } }
-        - { name: action, in: query, schema: { type: string, enum: [shown, used, refused, changed] } }
+        - { name: action, in: query, schema: { type: string, enum: [shown, used, refused, changed, exception] }, description: 'exception: an entry of the exceptions list made, used or withdrawn; its purpose names the exception, the act and the reason.' }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 1000, default: 200 } }
       responses:
         '200': { description: The rows. }
         '403': { description: Not an operator (node level). }
         '404': { description: No such organism, or not its creator or an admin. }
+
+  /v1/classification/exceptions:
+    get:
+      summary: The classification exceptions list of one level
+      description: |
+        Every act against a classification, with who did it, the item, the classification and the
+        reason, newest first (decided 2026-09-30). A person's exception (auto false) lets one item
+        leave (`leave`, any destination) or lets an AI send it out (`ai-send`) despite its
+        classification; an app's act against a classification is not refused but recorded here
+        automatically (auto true: `lower`, `policy`, `review`, `leave`). The same authorization as the
+        audit log: level owner is the caller's owner's content, organism needs its creator or an
+        admin, node needs an operator and lists the whole node.
+      tags: [Memory]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: level, in: query, schema: { type: string, enum: [node, owner, organism], default: owner } }
+        - { name: organism_id, in: query, schema: { type: string } }
+        - { name: action, in: query, schema: { type: string, enum: [leave, ai-send, lower, policy, review] } }
+        - { name: since, in: query, schema: { type: string, format: date-time } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 1000, default: 200 } }
+      responses:
+        '200': { description: '{ level, subject, exceptions }. Each: id, at, by, byKind (human|app|ai), scope, ownerGaii, organismId, target { kind, key } or null, label, action, reason, auto, until, count, lastAt, destination, app, withdrawnAt, withdrawnBy.' }
+        '400': { description: action or since is not valid. }
+        '403': { description: Not an operator (node level). }
+        '404': { description: No such organism, or not its creator or an admin. }
+    post:
+      summary: Make an exception for one item
+      description: |
+        The person, signed in themselves, lets one item leave (`leave`, any destination: an export, a
+        share link, another node, an outside service) or lets an AI send it out (`ai-send`) despite its
+        classification, with a written reason and an optional expiry. An app may make one too. An AI
+        credential (an agent, an ecosystem app, a personal access token) is refused with
+        PERSON_REQUIRED. The caller must be allowed to change the item's classification. The
+        exception, its reason and every use of it are kept on the list and in the audit log.
+      tags: [Memory]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action, reason]
+              properties:
+                kind: { type: string, enum: [memory, file, row] }
+                key: { type: string }
+                organism_id: { type: string }
+                ws: { type: string }
+                space: { type: string }
+                row_id: { type: string }
+                owner: { type: string, description: "A memory key or a stored file held by one of the caller's owner's agents or apps: that identity. Absent: the owner's own." }
+                action: { type: string, enum: [leave, ai-send] }
+                reason: { type: string, maxLength: 1000 }
+                until: { type: string, format: date-time, description: When the exception ends. Absent, until it is withdrawn. }
+      responses:
+        '201': { description: The exception. }
+        '400': { description: 'INVALID_INPUT: no reason, an unknown action, or until not in the future.' }
+        '403': { description: PERSON_REQUIRED for an AI credential. }
+        '404': { description: No such content, or not the caller's to change. }
+        '409': { description: EXCEPTION_LIMIT, the month's list is full. }
+
+  /v1/classification/exceptions/{id}:
+    delete:
+      summary: Withdraw an exception
+      description: |
+        By whoever made it, the owner of the content (level owner), an organism's creator or admin,
+        or an operator. The exception stays on the list with withdrawnAt and withdrawnBy, so the audit
+        still shows it and why.
+      tags: [Memory]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: The exception, withdrawn. }
+        '403': { description: PERSON_REQUIRED for an AI credential. }
+        '404': { description: No such exception, or not the caller's to withdraw. }
 
   /v1/classification/labels:
     get:
@@ -14940,7 +15016,8 @@ paths:
         a label at least as strict counts as the person's and applies at once. From an AI credential,
         `humanSaid` that lowers the label or changes one a person set is kept as a suggestion with
         `pending` PERSON_APPROVES and the words on it, which the person accepts signed in themselves
-        (decided 2026-09-30). Lowering from a label that needs a reason needs `justification`.
+        (decided 2026-09-30). Lowering from a label that needs a reason needs `justification`,
+        except from an app, whose lowering is recorded on the exceptions list instead.
         A workspace document or an organism record has one classification: its `.draft`, `.latest`
         and `.version.N` keys all name the document's.
       tags: [Memory]

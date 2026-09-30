@@ -8,13 +8,19 @@
  *   turned it on), the labels that apply (what an AI sees, whether content may leave the organism,
  *   who may read it), an AI's waiting proposal to loosen the person's policy with Accept and Reject
  *   (the person's own session is the only place it can be accepted), the items where an AI's or a
- *   rule's suggestion waits for the person, the person's classified items, and the person's audit
+ *   rule's suggestion waits for the person, the person's classified items (each with "Make an
+ *   exception"), the person's exceptions list (classification-exceptions.js), and the person's audit
  *   log, newest first, filtered by what happened, with how long it keeps its rows. useClassification holds the reads and the handlers;
  *   secClassification is the render, on the page's own components (the trail's list cut for the
  *   log, the Settings list for the labels, the aside for the proposal).
  * @structure acceptStep(policy, item, decision) · useClassification() → cls · secClassification(ctx, num)
  * @usage const cls = useClassification({ federated, confirm, toast }); … secClassification({ ...ctx, cls }, '05')
  * @version-history
+ *   v1.6.0 — 2026-09-30 — The exceptions list (Jouni's decisions of 2026-09-30): the group
+ *     "Exceptions" under the classified items (classification-exceptions.js), and "Make an exception"
+ *     on each classified item, which opens the dialog with what it lets happen, the reason and an
+ *     optional last day. The log's filter has "exception", and an exception row says its event, act
+ *     and reason in words.
  *   v1.5.0 — 2026-09-30 — Browser check fixes: the waiting suggestions take the cut whose item column
  *     keeps 10rem (name-score-desc-doors), so the proposer's reason no longer squeezes the item to
  *     nothing; the classification the item has now is the line under the suggested one, and the
@@ -64,6 +70,7 @@ import { Fields } from '/components/Field.js';
 import { TextArea } from '/components/TextField.js';
 import { t } from '/js/i18n.js';
 import { x, n, dateWord, timeWord, accessorWords, whoOf } from './frame.js';
+import { useExceptions, exceptionsGroup, exceptionDialog } from './classification-exceptions.js';
 
 const PAGE = 50;
 const MAX_ROWS = 1000;
@@ -215,10 +222,14 @@ export function useClassification({ federated, confirm, toast }) {
     }
   };
 
+  // The person's exceptions list, and the dialog that makes one from a classified item.
+  const exceptions = useExceptions({ level: 'owner', off: federated, confirm, ok: (m) => toast(m), fail: (m) => toast(m, true) });
+
   return {
     view, failed, rows, action, limit, busy, setAction, more, toggle, review,
     pending, items, itemsNext, moreItems, reviewItem,
     lowering, reason, setReason, cancelLowering: () => setLowering(null),
+    exceptions,
   };
 }
 
@@ -360,15 +371,20 @@ function pendingRow(cls, it, me) {
     <//>`;
 }
 
-/** One classified item: the item, its classification, who gave it, and when it last changed. */
-function itemRow(it) {
+/**
+ * One classified item: the item, its classification, who gave it, when it last changed, and "Make
+ * an exception", which opens the dialog for it.
+ */
+function itemRow(cls, it) {
   return html`
     <${Row} key=${`${it.kind}|${it.scope}|${it.key}`}>
       <${Name} meta=${t('classification.kind.' + it.kind)}>${it.key}<//>
       <${Cell} line><${Mark} kind="status" tone=${aiTone(it.labelDetail?.aiVisibility)}>${nameOf(it.labelDetail, it.label)}<//><//>
       <${Cell} meta>${sourceWord(it.source)}<//>
       <${Cell} meta>${dateWord(it.updatedAt)}<//>
-      <${Doors} />
+      <${Doors}>
+        <${Action} small soft disabled=${!!cls.exceptions.busy} onClick=${() => cls.exceptions.open(it)}>${x('cls.makeException')}<//>
+      <//>
     <//>`;
 }
 
@@ -388,9 +404,10 @@ function itemSections(cls, me) {
       <${Label} block>${x('cls.itemsTitle')}<//>
       <${List} cols="name-state-meta-meta-doors" labels loading=${!items}
         head=${[x('cls.col.item'), x('cls.col.label'), x('cls.col.givenBy'), x('cls.col.changed'), '']}
-        empty=${x('cls.itemsEmpty')} rows=${items || []} render=${itemRow} />
+        empty=${x('cls.itemsEmpty')} rows=${items || []} render=${(it) => itemRow(cls, it)} />
       ${cls.itemsNext ? html`<${More} label=${x('cls.moreRows')} onMore=${() => cls.moreItems()} />` : null}
-    <//>`;
+    <//>
+    ${exceptionsGroup(cls.exceptions)}`;
 }
 
 /**
@@ -432,6 +449,7 @@ export function secClassification(ctx, num) {
       <${Note} kind="lead">${x('cls.lead')}<//>
       ${body}
       ${reasonDialog(cls)}
+      ${exceptionDialog(cls.exceptions)}
     <//>`;
 }
 

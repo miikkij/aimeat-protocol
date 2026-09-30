@@ -11,6 +11,8 @@
  *   audit `changed` row naming the document and from → to.
  * @usage cd aimeat && pnpm exec vitest run test/unit/classification-documents.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-30 — No default label hides from AI (option B): the node policy hides the
+ *     highest label explicitly, so the strictest-copy test still proves an AI does not see it.
  *   v1.0.0 — 2026-09-30 — Initial.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -24,6 +26,7 @@ import { readerForAgent } from '../../src/services/classification/reader.js';
 import { defaultPolicy } from '../../src/services/classification/defaults.js';
 import { pendingClassificationAudit, resetClassificationAudit } from '../../src/services/classification/audit.js';
 import { queuedItemText } from '../../src/services/classification-queue-job.js';
+import { hideFromAiOnNode } from './classification-fixtures.js';
 
 const N = 'test-node';
 const ALICE = `alice@${N}`;
@@ -64,7 +67,8 @@ describe('one classification per document', () => {
     await put(`organism.${ORG}.w.ws1.meta.manifest`, { manifestVersion: '1', name: 'Board', kind: 'project', objectTypes: [] });
   }
 
-  beforeEach(async () => { storage = new SqliteStorage(':memory:'); resetClassificationAudit(); await organism(); });
+  // No default label hides from AI since 2026-09-30: the operator hides the highest label here.
+  beforeEach(async () => { storage = new SqliteStorage(':memory:'); resetClassificationAudit(); await hideFromAiOnNode(storage, N); await organism(); });
   afterEach(() => { storage.close(); resetClassificationAudit(); });
 
   it('maps every copy of a document to one address, and leaves every other key alone', () => {

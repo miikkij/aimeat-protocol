@@ -6,6 +6,7 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   v1.12.0 -- 2026-09-30 -- DELETE removes the organism's classification exceptions too.
  *   v1.11.0 -- 2026-09-30 -- DELETE purges the organism's unflushed classification audit rows.
  *   v1.10.0 -- 2026-09-29 -- TARGET-082 V4: GET /v1/organisms/:id reads the README through
  *     showOrganismReadme with the caller's ContentReader.
@@ -55,6 +56,7 @@ import { isOrganismOwner } from '../../services/organism-ownership.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { isOwnerPrincipal } from '../../auth/account-security.js';
 import { purgeClassificationAudit } from '../../services/classification/audit.js';
+import { purgeExceptions } from '../../services/classification/exceptions.js';
 
 export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const { workspaceCountsByOrg, workspaceNamesByOrg } = H;
@@ -326,6 +328,8 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
     await storage.deleteOrganism(id);
     // Unflushed classification audit rows of the organism would come back after the delete.
     purgeClassificationAudit({ scope: `organism:${id}` });
+    // Its classification exceptions are records of system@<node>, which the cascade does not reach.
+    await purgeExceptions(storage, config.nodeId, { organism: id });
     res.json(success(config.nodeId, { deleted: true }));
     emitChange('organisms');
   });

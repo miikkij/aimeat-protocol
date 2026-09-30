@@ -9,6 +9,8 @@
  *   (own and shared learned entries), the MCP pitfall list and knowledge get/list tools, the
  *   operator's overview, the Knowledge tab service, and the REST get, export and clone routes.
  * @version-history
+ *   v1.1.0 — 2026-09-30 — No default label hides from AI (option B): the node policy hides the
+ *     highest label explicitly, so each test still proves what a hiding label does.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V4. Initial.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -27,6 +29,7 @@ import { createKnowledgeTabService } from '../../src/services/db/knowledge-tab-d
 import { registerAppdevPitfallTools } from '../../src/mcp/appdev-pitfalls.js';
 import { registerKnowledgeTools } from '../../src/mcp/knowledge.js';
 import { knowledgeRouter } from '../../src/routes/knowledge.js';
+import { hideFromAiOnNode } from './classification-fixtures.js';
 
 const N = 'n';
 const HIDDEN = 'erittain-luottamuksellinen';
@@ -60,6 +63,8 @@ describe('knowledge and learned pitfalls pass the classification reader', () => 
   beforeEach(async () => {
     storage = new SqliteStorage(':memory:');
     config = { ...loadConfig().config, nodeId: N, classificationMode: 'all' };
+    // No default label hides from AI since 2026-09-30: the operator hides HIDDEN on this node.
+    await hideFromAiOnNode(storage, N, [HIDDEN]);
     const now = new Date().toISOString();
     for (const name of ['alice', 'bob']) {
       await storage.createOwner({ name, displayName: name, publicKey: 'pk', roles: ['owner'], createdAt: now });

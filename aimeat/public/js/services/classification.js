@@ -13,13 +13,18 @@
  *   or an app (routes/classification.ts), which is why the two pages carry the Accept and Reject
  *   buttons.
  * @structure readPolicy · writePolicy · reviewPolicy · readAudit · listLabels · reviewLabel ·
+ *   targetBody · readExceptions · makeException · withdrawException ·
  *   labelName · labelById · aiWord · aiTone · leaveWord · audienceWord · actionWord · actionTone ·
- *   readerKindWord · readerName · sourceWord · purposeWords · isSwitchRow · modeWord ·
- *   rowActionWord · itemKindWord · sentence · ACTIONS
+ *   readerKindWord · readerName · sourceWord · purposeWords · exceptionActWord · exceptionState ·
+ *   exceptionPurposeWords · isSwitchRow · modeWord · rowActionWord · itemKindWord · sentence · ACTIONS
  * @usage
  *   import { readPolicy, reviewPolicy, labelName } from '/js/services/classification.js';
  *   const view = await readPolicy('owner');
  * @version-history
+ *   v1.6.0 — 2026-09-30 — The exceptions list (Jouni's decisions of 2026-09-30): readExceptions,
+ *     makeException and withdrawException, the words for an exception (exceptionActWord,
+ *     exceptionState), and the log's filter and words for an exception row (ACTIONS 'exception',
+ *     exceptionPurposeWords). reviewLabel's target is targetBody, shared with makeException.
  *   v1.5.0 — 2026-09-30 — rowActionWord: a change of the node's switch in the log says "setting
  *     changed", not the word of a label that changed ("reclassified").
  *   v1.4.0 — 2026-09-30 — reviewLabel takes the person's reason (`justification`) for an accepted
@@ -34,11 +39,11 @@
  *     bot of sandbox proposed it…") starts with a capital letter, in the reader's language.
  *   v1.0.0 — 2026-09-29 — Initial (TARGET-082 V5).
  */
-import { apiGet, apiPut, apiPost } from '/js/api.js';
+import { apiGet, apiPut, apiPost, apiDelete } from '/js/api.js';
 import { t, getLocale } from '/js/i18n.js';
 
 /** The actions an audit row records, in the order the filters show them. */
-export const ACTIONS = ['shown', 'used', 'refused', 'changed'];
+export const ACTIONS = ['shown', 'used', 'refused', 'changed', 'exception'];
 
 /**
  * The policy of one level: { level, subject, mode, active, stored, effective, proposal, history }.
@@ -105,12 +110,63 @@ export async function listLabels(opts = {}) {
  * @returns {Promise<any>} { applied, label, from, source, locked }
  */
 export async function reviewLabel(item, decision, opts = {}) {
-  const [ws, space, rowId] = item.kind === 'row' ? String(item.key).split('/') : [];
-  const target = item.kind === 'row'
-    ? { kind: 'row', organism_id: item.organismId, ws, space, row_id: rowId }
-    : { kind: item.kind, key: item.key, ...(item.owner ? { owner: item.owner } : {}) };
   const said = typeof opts.justification === 'string' ?opts.justification.trim() : '';
-  const r = await apiPost('/v1/classification/label/review', { ...target, decision, ...(said ? { justification: said } : {}) });
+  const r = await apiPost('/v1/classification/label/review', { ...targetBody(item), decision, ...(said ? { justification: said } : {}) });
+  return r?.data ?? null;
+}
+
+/**
+ * An explorer item's address as the label and exception endpoints read it: a row by its organism,
+ * workspace, space and row id; anything else by kind, key and whose namespace holds it.
+ * @param {{ kind: string, key: string, owner?: string|null, organismId?: string|null }} item
+ * @returns {Record<string, string>}
+ */
+function targetBody(item) {
+  if (item.kind === 'row') {
+    const [ws, space, rowId] = String(item.key).split('/');
+    return { kind: 'row', organism_id: item.organismId, ws, space, row_id: rowId };
+  }
+  return { kind: item.kind, key: item.key, ...(item.owner ? { owner: item.owner } : {}) };
+}
+
+/**
+ * The exceptions list of one level, newest first (GET /v1/classification/exceptions). Level node is
+ * the whole server's, for an operator.
+ * @param {'owner'|'organism'|'node'} level
+ * @param {{ organismId?: string, action?: string, limit?: number }} [opts]
+ * @returns {Promise<Array<any>>} the exceptions
+ */
+export async function readExceptions(level, opts = {}) {
+  const q = new URLSearchParams({ level });
+  if (opts.organismId) q.set('organism_id', opts.organismId);
+  if (opts.action) q.set('action', opts.action);
+  if (opts.limit) q.set('limit', String(opts.limit));
+  const r = await apiGet(`/v1/classification/exceptions?${q}`);
+  return r?.data?.exceptions ?? [];
+}
+
+/**
+ * A person makes an exception for one explorer item (POST /v1/classification/exceptions): the item
+ * may leave ('leave'), or an AI may see it and send it out ('ai-send'), despite its classification.
+ * `until` is an ISO time, or empty for no end.
+ * @param {{ kind: string, key: string, owner?: string|null, organismId?: string|null }} item
+ * @param {{ action: 'leave'|'ai-send', reason: string, until?: string|null }} what
+ * @returns {Promise<any>} the exception
+ */
+export async function makeException(item, what) {
+  const r = await apiPost('/v1/classification/exceptions', {
+    ...targetBody(item), action: what.action, reason: String(what.reason || '').trim(), ...(what.until ? { until: what.until } : {}),
+  });
+  return r?.data ?? null;
+}
+
+/**
+ * Withdraw an exception (DELETE /v1/classification/exceptions/:id). It stays on the list, withdrawn.
+ * @param {string} id
+ * @returns {Promise<any>} the exception
+ */
+export async function withdrawException(id) {
+  const r = await apiDelete(`/v1/classification/exceptions/${encodeURIComponent(id)}`);
   return r?.data ?? null;
 }
 
@@ -166,7 +222,7 @@ export function audienceWord(aud) {
 /** What an audit row says happened. */
 export const actionWord = (a) => W('action.' + (ACTIONS.includes(a) ? a : 'changed'));
 /** The status tone of an audit row's action. */
-export const actionTone = (a) => (a === 'refused' ? 'danger' : a === 'changed' ? 'attention' : 'fine');
+export const actionTone = (a) => (a === 'refused' ? 'danger' : a === 'changed' || a === 'exception' ? 'attention' : 'fine');
 /** Who the reader of an audit row was: a person, an AI, the system, or someone not signed in. */
 export const readerKindWord = (k) => W('reader.' + (['human', 'ai', 'system', 'anonymous'].includes(k) ? k : 'system'));
 
@@ -197,6 +253,7 @@ export const sourceWord = (s) => (SOURCES[s] ? W('source.' + SOURCES[s]) : Strin
  */
 export function purposeWords(policy, row) {
   const p = String(row?.purpose ?? '');
+  if (row?.action === 'exception') return exceptionPurposeWords(p);
   if (isSwitchRow(row)) {
     const s = /^(\S+) → (\S+)$/.exec(p);
     return s ? W('switchPurpose', { from: modeWord(s[1]), to: modeWord(s[2]) }) : p;
@@ -205,6 +262,57 @@ export function purposeWords(policy, row) {
   if (!m) return p;
   const name = (id) => labelName(labelById(policy, id)) || id;
   return W('changedPurpose', { from: name(m[1]), to: name(m[2]), source: sourceWord(m[3]) });
+}
+
+/* ── The exceptions list ──────────────────────────────────────────────────────────────────────── */
+
+/** The locale key of each act an exception records (services/classification/exceptions.ts). */
+const EXCEPTION_ACTS = { leave: 'leave', 'ai-send': 'aiSend', lower: 'lower', policy: 'policy', review: 'review' };
+
+/**
+ * What an exception let happen, in words: a person's "may leave" or "an AI may send it", or an app's
+ * act ("app lowered the classification"). An app's own exception of a person's kind reads as the
+ * person's does.
+ * @param {{ action: string, auto?: boolean }} e
+ * @returns {string}
+ */
+export function exceptionActWord(e) {
+  const act = EXCEPTION_ACTS[e?.action];
+  if (!act) return String(e?.action ?? '');
+  return W((e.auto || (act !== 'leave' && act !== 'aiSend') ? 'exc.auto.' : 'exc.act.') + act);
+}
+
+/**
+ * Where an exception stands at `now`: 'active' (a person's, in force), 'withdrawn', 'expired', or
+ * 'recorded' (an app's act, which grants nothing).
+ * @param {{ auto?: boolean, withdrawnAt?: string|null, until?: string|null }} e
+ * @param {string} [now] ISO
+ * @returns {'active'|'withdrawn'|'expired'|'recorded'}
+ */
+export function exceptionState(e, now = new Date().toISOString()) {
+  if (e?.withdrawnAt) return 'withdrawn';
+  if (e?.auto) return 'recorded';
+  return e?.until && e.until <= now ? 'expired' : 'active';
+}
+
+/** The locale key of each place an exception's use sent the item (reader.ts destinationOf). */
+const WHERE = { shown: 'shown', export: 'export', share: 'share', federation: 'federation', external: 'external' };
+
+/**
+ * An exception row of the audit log in words. The server writes "<event> <id> (<act>[, automatic]):
+ * <reason>", and for a use "used <id> (<act>) → <where>: <reason>" (exceptions.ts); the page says
+ * the event, the act and the reason, and where the item went, instead of the ids.
+ * @param {string} p
+ * @returns {string}
+ */
+function exceptionPurposeWords(p) {
+  const m = /^(made|added to|used|withdrawn)(?: \S+)? \(([a-z-]+)((?:, [a-z ]+)*)\)(?: → (\S+?))?: ([\s\S]*)$/.exec(p);
+  if (!m) return p;
+  const event = W('exc.event.' + (m[1] === 'added to' ? 'addedTo' : m[1]));
+  const act = exceptionActWord({ action: m[2], auto: /automatic/.test(m[3]) });
+  const kind = m[4] ? m[4].split(':')[0] : '';
+  if (!kind) return W('exc.purpose', { event, act, reason: m[5] });
+  return W('exc.purposeUsed', { event, act, reason: m[5], where: WHERE[kind] ? W('exc.where.' + WHERE[kind]) : m[4] });
 }
 
 /**

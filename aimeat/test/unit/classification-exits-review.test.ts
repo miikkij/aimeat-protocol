@@ -13,6 +13,8 @@
  *   6. the reach gate counts the reads it missed.
  * @usage cd aimeat && pnpm exec vitest run test/unit/classification-exits-review.test.ts
  * @version-history
+ *   v1.2.0 — 2026-09-30 — No default label hides from AI (option B): the node policy hides the
+ *     highest label explicitly, so each test still proves what a hiding label does.
  *   v1.1.0 — 2026-09-30 — The GDPR export takes the person's organism records and names them in
  *     classified_organism_content; the ordinary export still leaves them out (decided 2026-09-30).
  *   v1.0.0 — 2026-09-29 — TARGET-082 review, items 1, 2, 3, 5 and 6. Initial.
@@ -34,6 +36,7 @@ import { memoryRouter } from '../../src/routes/memory.js';
 import { registerOwnerExportRoute } from '../../src/routes/owners/export.js';
 import { findingsOf } from '../../scripts/check-classification-reach.js';
 import { logger } from '../../src/utils/logger.js';
+import { hideFromAiOnNode } from './classification-fixtures.js';
 
 const N = 'n';
 const ALICE = `alice@${N}`;
@@ -61,6 +64,8 @@ describe('TARGET-082 review: what leaves, and what the answer says stayed', () =
     storage = new SqliteStorage(':memory:');
     config = { ...loadConfig().config, nodeId: N, classificationMode: 'all', consentEnabled: true };
     resetClassificationAudit();
+    // No default label hides from AI since 2026-09-30: the operator hides the highest label here.
+    await hideFromAiOnNode(storage, N);
     for (const name of ['alice', 'bob', 'carol']) {
       await storage.createOwner({ name, displayName: name, publicKey: 'pk', roles: ['owner'], createdAt: stamp });
       await storage.createGHII({ username: name, nodeId: N, ghii: `${name}@${N}`, displayName: name, ownerName: name, verificationLevel: 0, totpEnabled: false, createdAt: stamp, updatedAt: stamp } as never);

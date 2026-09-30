@@ -10,6 +10,8 @@
  *   what is hidden from AI; the owner in their own session does.
  * @usage cd aimeat && pnpm exec vitest run test/unit/classification-owner-loaders.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-30 — No default label hides from AI (option B): the node policy hides the
+ *     highest label explicitly, so each test still proves what a hiding label does.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V4. Initial.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -27,10 +29,11 @@ import { manifestKey, fileKey } from '../../src/services/skill-refs.js';
 import { fetchComponentContent, fetchComponentContentForAi } from '../../src/services/component-content.js';
 import { createNotebookService } from '../../src/services/db/notebook-db-service.js';
 import { createCalibratorDetailService } from '../../src/services/db/calibrator-detail-db-service.js';
+import { hideFromAiOnNode } from './classification-fixtures.js';
 
 const N = 'n';
 const ALICE = `alice@${N}`;
-const HIDDEN = 'erittain-luottamuksellinen';   // hidden from AI
+const HIDDEN = 'erittain-luottamuksellinen';   // hidden from AI on this node (hideFromAiOnNode)
 const WARNING = 'luottamuksellinen';            // shown to AI with a warning
 const config = { nodeId: N, classificationMode: 'all', chatMaxLiveThreads: 50 } as unknown as AimeatConfig;
 const ownerAuth: ReaderAuth = { sub: 'alice', owner: 'alice', roles: ['owner'] };
@@ -56,7 +59,8 @@ describe('owner-content loaders pass the classification check', () => {
     await storage.setMemory({ key, ownerGaii: owner, value: value as Record<string, unknown>, visibility: 'private', tags: [], ttlHours: null, version: 1, createdAt: now, updatedAt: now });
   }
 
-  beforeEach(() => { storage = new SqliteStorage(':memory:'); });
+  // No default label hides from AI since 2026-09-30: the operator hides HIDDEN on this node.
+  beforeEach(async () => { storage = new SqliteStorage(':memory:'); await hideFromAiOnNode(storage, N, [HIDDEN]); });
   afterEach(() => storage.close());
 
   it('chat threads: a hidden conversation is not listed or read for an AI, and stays for the node', async () => {

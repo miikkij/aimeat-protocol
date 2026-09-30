@@ -7,6 +7,8 @@
  *   it, the merge takes the stricter value even from a stale layer, and an AI's loosening waits for
  *   a person while its tightening applies at once.
  * @version-history
+ *   v1.2.0 — 2026-09-30 — The node's highest default label is a warning to an AI (option B), so the
+ *     loosening refusal names "warning" and the inheriting label inherits a warning.
  *   v1.1.0 — 2026-09-29 — null as no classifier cap: taken at the node level, refused at the owner's.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V2. Initial.
  */
@@ -26,7 +28,8 @@ const dilutes = (input: unknown) => {
 describe('a lower level only tightens the node', () => {
   it('refuses loosening a node label and names it', () => {
     const p = dilutes({ labels: [{ id: 'erittain-luottamuksellinen', aiVisibility: 'allowed' }] });
-    expect(p.join(' ')).toMatch(/Node label erittain-luottamuksellinen shows an AI "hidden"/);
+    // The node's default is a warning since 2026-09-30 (option B); allowed is still looser.
+    expect(p.join(' ')).toMatch(/Node label erittain-luottamuksellinen shows an AI "warning"/);
   });
 
   it('refuses turning off a node rule, a lower default and a looser AI mode', () => {
@@ -41,7 +44,7 @@ describe('a lower level only tightens the node', () => {
   it('adds an own label that inherits from the node label below it, and refuses one looser than that', () => {
     const layer = validateLayer(node, { labels: [{ id: 'top-secret', rank: 40, name: { en: 'Top secret' }, audience: { people: ['alice@n'] } }] });
     const top = mergePolicy(node, layer).labels.find(l => l.id === 'top-secret')!;
-    expect(top).toMatchObject({ aiVisibility: 'hidden', audit: true, mayLeaveOrganism: false, lowerNeedsJustification: true, audience: { people: ['alice@n'] } });
+    expect(top).toMatchObject({ aiVisibility: 'warning', audit: true, mayLeaveOrganism: false, lowerNeedsJustification: true, audience: { people: ['alice@n'] } });
     expect(top.name.en).toBe('Top secret');
     expect(dilutes({ labels: [{ id: 'johto', rank: 25, audit: false }] }).join(' ')).toMatch(/inherits from node label luottamuksellinen/);
     expect(dilutes({ labels: [{ id: 'x', rank: 20 }] }).join(' ')).toMatch(/Rank 20 of label x is taken by node label luottamuksellinen/);

@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/mcp/catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.21.0 -- 2026-09-30 -- An AI sees everything by default; what an AI's send-out leaves behind; the owner's exception with a reason (exception_list, exception_set refused).
  *   v1.20.0 -- 2026-09-30 -- human_said: a stricter classification applies at once; a lowering or a change to a person's waits for the owner (PERSON_APPROVES).
  *   v1.19.0 -- 2026-09-29 -- Classified content: the warning, what is hidden, aimeat_classification (TARGET-082 V5).
  *   v1.18.0 -- 2026-09-29 -- Mail refinery: aimeat_refinery_classes, _run, _status and the schedule kind.
@@ -63,12 +64,20 @@ a handle/URL, not bytes — never read large binaries into context.
 
 **Classified content — read the warning, respect what is hidden.** Every memory record, stored file
 and workspace row has a classification (public, internal, confidential, highly confidential, or a
-level your owner or an organism added) that decides which people and which AI may read it. A record
-with a warning classification reaches you with \`classification_warning\`: use it only for the task
-you were given, and copy it nowhere else. A record hidden from AI is not in your lists and reads as
-absent, and a call that names it is refused with \`CLASSIFIED\`: tell your owner it is classified, and
-do not retry or reach for it another way. \`aimeat_classification\` reads and changes classifications,
-with the actions \`get\`, \`set\`, \`review\`, \`policy_get\`, \`policy_set\`, \`audit\` and \`scan\`. Your
+level your owner or an organism added) that decides which people and which AI may read it. By
+default you see everything: no default classification hides content from you, and confidential and
+highly confidential records reach you with \`classification_warning\`: use them only for the task
+you were given, and copy them nowhere else. Your owner or an organism may choose a classification
+that hides content from AI. Such a record is not in your lists and reads as absent, and a call that
+names it is refused with \`CLASSIFIED\`: tell your owner it is classified, and do not retry or reach
+for it another way. When you send content out (an export, a share link, another node, an outside
+service), what a classification hides from AI stays behind, and so does an organism's content that
+may not leave it; the answer names each item. Only your owner can make an exception, signed in
+themselves in their Data Wallet with a written reason, so tell them what you wanted to send and why;
+\`exception_set\` answers \`PERSON_REQUIRED\` for you, and \`exception_list\` shows the exceptions and
+their reasons. \`aimeat_classification\` reads and changes classifications,
+with the actions \`get\`, \`set\`, \`review\`, \`policy_get\`, \`policy_set\`, \`audit\`, \`scan\` and
+\`exception_list\`. Your
 own judgement never lowers a classification and never changes one a person set: it becomes a
 suggestion your owner accepts or rejects. When your owner tells you what to set, pass their own
 words, verbatim, in \`human_said\`. A classification at least as strict then applies at once as

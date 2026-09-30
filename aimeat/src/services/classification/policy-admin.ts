@@ -15,10 +15,17 @@
  *   proposal, and a person accepts or rejects it in their own session; an AI cannot accept it, even
  *   with the person's words, which are kept on the proposal as its reason. Every change is kept in
  *   the level's history (the last 50). A person's own change supersedes a waiting proposal.
- * @structure PolicyView · readPolicy() · writePolicy() · reviewPolicy() · readAuditLog()
+ *
+ *   AN APP (decided 2026-09-30). An app credential reads as the person's screen, so its change and its
+ *   accept apply as a person's. When either gives something away, it is recorded in the exceptions
+ *   list (exceptions.ts) with the app and what it gave away as the reason.
+ * @structure PolicyView · readPolicy() · writePolicy() · auditSubjectFor() · reviewPolicy() ·
+ *   readAuditLog()
  * @usage
  *   const out = await writePolicy(deps, actor, 'owner', null, { enabled: true });
  * @version-history
+ *   v1.4.0 — 2026-09-30 — An app's loosening change or accept is recorded as an automatic exception;
+ *     auditSubjectFor(), the audit log's authorization, which the exceptions list shares.
  *   v1.3.0 — 2026-09-29 — TARGET-082 review. The view carries `dropped`, what reading the stored
  *     layer against the current node took away, and `stored` is that normalised layer (finding 4). A
  *     person's change drops the AI's waiting proposal and says so in the history (`supersede`), and
@@ -35,7 +42,8 @@ import { listClassificationAuditMerged } from './audit.js';
 import { agentBarred } from '../organism-agent-access.js';
 import { isOrgManager } from '../workspace-access.js';
 import type { ClassificationPolicy } from './defaults.js';
-import { ClassificationError, type ClassificationDeps, type LabelActor } from './labels.js';
+import { appNameOf, ClassificationError, isAppActor, type ClassificationDeps, type LabelActor } from './labels.js';
+import { levelScope, recordAutoException } from './exceptions.js';
 import { loosenings, mergePolicy, PolicyError, validateLayer, validateNodePolicy, type PolicyLayer } from './levels.js';
 import {
   policyHome, readLevel, readNodePolicy, type PolicyChange, type PolicyLevel, type StoredLevel,
@@ -191,7 +199,38 @@ export async function writePolicy(
     ? [{ at, by: actor.principal, source: 'human' as const, action: 'supersede' as const, loosens: rec.proposal.loosens }] : [];
   const history = [...rec.history, ...superseded, { at, by: actor.principal, source, action: 'set' as const, humanSaid, loosens: loosens.length ? loosens : undefined }].slice(-HISTORY);
   await store(deps.storage, level, home.owner, home.key, { policy: next, history, proposal: superseded.length ? null : rec.proposal }, at);
+  // An app's change that gives something away applies (an app does what it is built for) and is
+  // recorded as an exception (decided 2026-09-30).
+  if (isAppActor(actor) && loosens.length) {
+    await recordPolicyException(deps, actor, level, subject, 'policy', `app ${appNameOf(actor)} changed the ${level} policy, which gives away: ${loosens.join(' ')}`);
+  }
   return { applied: true, loosens, view: await view(deps, level, subject) };
+}
+
+/** An app's act on a whole policy, in the exceptions list: no item, no label. */
+async function recordPolicyException(
+  deps: ClassificationDeps, actor: LabelActor, level: PolicyLevel, subject: string, action: 'policy' | 'review', reason: string,
+): Promise<void> {
+  await recordAutoException(deps, {
+    by: actor.principal, app: actor.app ?? null, scope: levelScope(level, subject), target: null, label: null, action, reason,
+  });
+}
+
+/**
+ * Who may read a level's audit log and exceptions list, and whose it is: an owner's own (anyone
+ * acting for them but a rule), an organism's (its creator or an admin), the node's (an operator).
+ * Answers the level's subject.
+ */
+export async function auditSubjectFor(
+  deps: ClassificationDeps, actor: LabelActor, level: PolicyLevel, organismId: string | null | undefined,
+): Promise<string> {
+  const subject = subjectOf(level, actor, organismId, deps.config.nodeId);
+  if (level === 'owner') {
+    if (actor.kind === 'rule') throw new ClassificationError('PERSON_REQUIRED', 403, 'A detection rule reads no log.');
+  } else {
+    await mayWrite(deps, actor, level, subject);
+  }
+  return subject;
 }
 
 /**
@@ -202,12 +241,7 @@ export async function readAuditLog(
   deps: ClassificationDeps, actor: LabelActor, level: PolicyLevel, organismId: string | null | undefined,
   filter: { since?: string; action?: string; limit?: number } = {},
 ): Promise<{ level: PolicyLevel; subject: string; rows: ClassificationAuditRow[] }> {
-  const subject = subjectOf(level, actor, organismId, deps.config.nodeId);
-  if (level === 'owner') {
-    if (actor.kind === 'rule') throw new ClassificationError('PERSON_REQUIRED', 403, 'A detection rule reads no log.');
-  } else {
-    await mayWrite(deps, actor, level, subject);
-  }
+  const subject = await auditSubjectFor(deps, actor, level, organismId);
   const limit = Math.min(Math.max(Number(filter.limit) || 200, 1), 1000);
   const common = { since: filter.since, action: filter.action, limit };
   if (level !== 'owner') {
@@ -256,5 +290,10 @@ export async function reviewPolicy(
   const { next, loosens } = await prepare(deps, level, subject, rec.proposal.policy);
   const history = [...rec.history, { at, by: actor.principal, source: 'human' as const, action: 'accept' as const, humanSaid: rec.proposal.humanSaid, loosens }].slice(-HISTORY);
   await store(deps.storage, level, home.owner, home.key, { policy: next, history, proposal: null }, at);
+  // An app credential reads as the person's screen (reader-kind.ts), so it passes the check above;
+  // accepting a loosening from it is recorded as an exception (decided 2026-09-30).
+  if (isAppActor(actor) && loosens.length) {
+    await recordPolicyException(deps, actor, level, subject, 'review', `app ${appNameOf(actor)} accepted ${rec.proposal.by}'s proposal for the ${level} policy, which gives away: ${loosens.join(' ')}`);
+  }
   return { applied: true, loosens, view: await view(deps, level, subject) };
 }

@@ -10,6 +10,8 @@
  *   stays behind; a tracked response leaves an organism's value out of the reply and says so in its
  *   ledger; a datapackage step publishes nothing from an organism's record.
  * @version-history
+ *   v1.1.0 — 2026-09-30 — No default label hides from AI (option B): the node policy hides the
+ *     highest label explicitly, so each test still proves what a hiding label does.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V4. Initial.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -26,6 +28,7 @@ import { createTrackedResponse, getTrackedResponse } from '../../src/services/tr
 import { dispatchDataPackageStep } from '../../src/services/workflow/engine-steps.js';
 import type { WorkflowRun } from '../../src/models/workflow-schemas.js';
 import { logger } from '../../src/utils/logger.js';
+import { hideFromAiOnNode } from './classification-fixtures.js';
 
 const N = 'n';
 const ALICE = `alice@${N}`;
@@ -66,7 +69,8 @@ function recordingReader(leaveOut: (t: ContentLabelTarget) => boolean = () => fa
 
 describe('the classification check at the exit sites', () => {
   let storage: SqliteStorage;
-  beforeEach(() => { storage = new SqliteStorage(':memory:'); });
+  // No default label hides from AI since 2026-09-30: the operator hides the highest label here.
+  beforeEach(async () => { storage = new SqliteStorage(':memory:'); await hideFromAiOnNode(storage, N); });
   afterEach(() => storage.close());
   const d = () => ({ storage, config });
 

@@ -6,6 +6,7 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.12.0 -- 2026-09-30 -- Classification: an AI sees everything by default; exception_list at level node.
  *   v1.11.0 -- 2026-09-29 -- Classification (TARGET-082): the node's switch and switch_set, the node
  *     policy at level node, the audit log, and the Content Classifier's daily caps.
  *   v1.10.1 -- 2026-09-29 -- The federation paragraph says the relay-claim default is required from
@@ -88,7 +89,12 @@ whole node (past a cap, content keeps its label and waits in a queue; null is no
 change \`stored\`, and send the whole level back. A change that only tightens applies at once; one
 that gives anything away waits until the operator accepts it on the admin Security page. \`audit\` at
 \`level: "node"\` reads the whole node's log: what was shown to or used by an AI, what was refused,
-and which classifications and switch settings changed. If this surface does not list
+and which classifications and switch settings changed. By default an AI sees everything: no default
+label hides content from AI (highly confidential is a warning), and hiding is a choice an owner, an
+organism or the operator makes for a label. \`exception_list\` at \`level: "node"\` is the whole node's
+exceptions list: each act against a classification with its reason, a person's own exception (an
+item that may leave, or that an AI may send out) and an app's act the node recorded instead of
+refusing it. Only a person makes an exception, in their own session. If this surface does not list
 \`aimeat_classification\`, it is on the agent surface and the full MCP endpoint.
 
 **Install sets (operator).** \`aimeat_admin_install_set\` sets this node up for a customer from an

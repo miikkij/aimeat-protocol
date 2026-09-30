@@ -20,13 +20,20 @@
  *     see an item whose label hides it from AI; an item with a warning label is shown with
  *     `classificationWarning` on it and in `warnings`. The node's own work (system) sees everything.
  *     An anonymous reader is read as an AI (decided 2026-09-30): what a label hides from AI reads
- *     as absent to it, and the audience rule applies as to everyone.
+ *     as absent to it, and the audience rule applies as to everyone. A person's 'ai-send' exception
+ *     in force for an item shows it to an AI reader ("the AI cannot send what it cannot see",
+ *     decided 2026-09-30), and each such showing is audited as the exception's use; the audience
+ *     rule still applies, and an anonymous reader gets nothing from it.
  *   - useForAi: refuses the whole call (CLASSIFIED, naming the labels and the first keys) when any
  *     item is hidden from AI or outside its audience, whoever asked, because what reaches a model
  *     is decided by the content's label.
  *   - leave: an organism's item whose label may not leave the organism stays behind, wherever it
  *     was going (an export, a share link, another node, an outside service); a person's own content
- *     is theirs to send. What stayed behind is returned with the reason.
+ *     is theirs to send. What stayed behind is returned with the reason, which says the person can
+ *     make an exception. Decided 2026-09-30: when an AI sends content out, what a label hides from AI
+ *     stays behind too, the person's own included; a person's exception in force for the item lets
+ *     it through ('leave' for anyone, 'ai-send' for an AI) and the use is audited; an app's credential
+ *     keeps nothing behind, and what went out against a label is recorded as its exception.
  *   A refusal is always written to the audit log, and showing or using an item whose label keeps an
  *   audit trail is written too (audit.ts buffers it off the request path). One show() that reveals
  *   more than AUDIT_SHOWN_ITEMS items of one audited label writes ONE row for them, key `*:<label>`
@@ -39,14 +46,21 @@
  *
  *   WARNINGS. warningsNote(reader) is what an AI-call answer spreads into itself, so the caller is
  *   told which warning-classified items it was given.
- * @structure ReaderAuth · EgressDestination · ContentReader · activePolicies() · decideAll() ·
+ * @structure ReaderAuth · EgressDestination · ContentReader · activePolicies() · decideAll() · exceptionsFor() ·
  *   readerFor() · readerForCaller() · readerForAgent() · systemReader() · warningsNote() ·
- *   CLASSIFIED_WARNING
+ *   CLASSIFIED_WARNING · EXCEPTION_HINT
  * @usage
  *   const reader = readerFor({ storage, config }, req.auth);
  *   const shown = await reader.show(records, r => memoryTarget(r.ownerGaii, r.key));
  *   res.json(success(nodeId, { answer, ...warningsNote(reader) }));
  * @version-history
+ *   v2.4.0 — 2026-09-30 — show(): a person's 'ai-send' exception in force shows an item hidden from
+ *     AI to an AI reader, and the use is audited ("tekoälyn täytyy nähdä kaikki" with the exception
+ *     Jouni approved: the AI cannot send what it cannot see). exceptionsFor() is shared with leave().
+ *   v2.3.0 — 2026-09-30 — Decided by Jouni 2026-09-30. leave(): an AI (or anonymous) reader leaves
+ *     behind what a label hides from AI; a person's exception in force lets an item through and is
+ *     audited as used; an app keeps everything and each act is an automatic exception; the reason
+ *     names the Data Wallet exception (EXCEPTION_HINT).
  *   v2.2.0 — 2026-09-30 — An anonymous reader is the strictest kind: show() treats it as an AI, so
  *     content whose label hides it from AI does not reach it (decided by Jouni 2026-09-30). useForAi
  *     already refused hidden content and content outside its audience for every reader.
@@ -66,6 +80,7 @@ import { mergePolicy, type PolicyLayer } from './levels.js';
 import { ClassificationError, labelsFor, targetId } from './labels.js';
 import { audienceCheck } from './audience.js';
 import { recordClassificationAudit, type ClassificationAuditEvent } from './audit.js';
+import { activeExceptionsFor, recordAutoException, recordExceptionUse, type ClassificationException } from './exceptions.js';
 
 /** The credential fields a reader is made from. `req.auth` fits. */
 export interface ReaderAuth {
@@ -164,6 +179,24 @@ async function decideAll(deps: ReaderDeps, targets: ReadonlyArray<ContentLabelTa
   return out;
 }
 
+/** An item's address in the map exceptionsFor() answers: scope, kind and key. */
+const exceptionKey = (t: ContentLabelTarget) => `${t.scope}\u0000${t.kind}\u0000${t.key}`;
+
+/**
+ * The person's exceptions in force for these decided items, by exceptionKey(), one list read per
+ * scope. No items reads nothing.
+ */
+async function exceptionsFor(deps: ReaderDeps, decided: readonly Decided[]): Promise<Map<string, ClassificationException[]>> {
+  const out = new Map<string, ClassificationException[]>();
+  if (!decided.length) return out;
+  const byScope = new Map<string, Array<{ kind: ContentLabelTarget['kind']; key: string }>>();
+  for (const d of decided) byScope.set(d.target.scope, [...(byScope.get(d.target.scope) ?? []), d.target]);
+  await Promise.all([...byScope].map(async ([scope, targets]) => {
+    for (const [id, list] of await activeExceptionsFor(deps, scope, targets)) out.set(`${scope}\u0000${id}`, list);
+  }));
+  return out;
+}
+
 /** One show() that reveals more items than this of one audited label writes one row for them. */
 const AUDIT_SHOWN_ITEMS = 3;
 
@@ -216,6 +249,11 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
       // it reads nothing; what it sends to a model still passes useForAi.
       if (who.kind === 'system') return [...items];
       const decided = await decideAll(deps, items.map(targetOf));
+      // "The AI cannot send what it cannot see" (decided 2026-09-30): a person's 'ai-send' exception
+      // in force for an item hidden from AI shows it to an AI reader. Read only when such an item is here.
+      const excepted = who.kind === 'ai'
+        ? await exceptionsFor(deps, decided.filter((d): d is Decided => !!d && d.label.aiVisibility === 'hidden'))
+        : new Map<string, ClassificationException[]>();
       const out: typeof items[number][] = [];
       const shown: Decided[] = [];
       for (let i = 0; i < items.length; i++) {
@@ -225,7 +263,13 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
         // An anonymous reader is read the strictest way, as an AI (decided 2026-09-30): nothing
         // tells who is behind it, so what the label hides from an AI does not reach it either.
         if (who.kind === 'ai' || who.kind === 'anonymous') {
-          if (d.label.aiVisibility === 'hidden') { audit(d, 'refused', 'hidden from AI'); continue; }
+          if (d.label.aiVisibility === 'hidden') {
+            const aiSend = (excepted.get(exceptionKey(d.target)) ?? []).find(e => e.action === 'ai-send');
+            if (!aiSend) { audit(d, 'refused', 'hidden from AI'); continue; }
+            recordExceptionUse(aiSend, who.principal, who.kind, 'shown');
+            out.push(items[i]);
+            continue;
+          }
           if (d.label.audit) shown.push(d);
           if (d.label.aiVisibility === 'warning') {
             warn(d);
@@ -263,21 +307,78 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
 
     async leave(items, targetOf, where) {
       const decided = await decideAll(deps, items.map(targetOf));
-      const kept: typeof items[number][] = [];
-      const left: Array<{ item: typeof items[number]; label: string; reason: string }> = [];
-      for (let i = 0; i < items.length; i++) {
-        const d = decided[i];
+      const destination = destinationOf(where);
+      // What stays behind, per item: the organism rule, or (for an AI) a label that hides it from AI.
+      const why: Array<'organism' | 'ai' | null> = decided.map(d => {
+        if (!d) return null;
         // The rule is about leaving an ORGANISM, wherever the copy goes. A person's own content is
         // theirs to send: the default label (internal) may not leave an organism, and binding
         // personal content to it would stop every person's own public records at the border.
-        const bound = !!d && !d.label.mayLeaveOrganism && !!scopeOrganism(d.target.scope);
-        if (!bound) { kept.push(items[i]); continue; }
-        audit(d!, 'refused', where.kind);
-        left.push({ item: items[i], label: d!.label.id, reason: `classified ${d!.label.name.en}, which may not leave its organism` });
+        if (!d.label.mayLeaveOrganism && scopeOrganism(d.target.scope)) return 'organism';
+        // An AI sending content out (decided 2026-09-30): "jos ... tekoäly tekee päätöksen lähettää
+        // tietoa jonnekin ulospäin muualle kuin itselleen niin sitten tämä sääntö on validi". What a
+        // label hides from AI stays behind, the person's own content included. Anonymous as an AI.
+        if ((who.kind === 'ai' || who.kind === 'anonymous') && d.label.aiVisibility === 'hidden') return 'ai';
+        return null;
+      });
+      // An app does what it is built for: nothing stays behind, and the act is an exception.
+      const app = who.kind === 'human' && !!who.auth?.roles.includes('app');
+      // A person's exception in force lets an item through: 'leave' for any reader and destination,
+      // 'ai-send' when the reader is an AI. Read only when something would stay behind.
+      const active = app ? new Map<string, ClassificationException[]>()
+        : await exceptionsFor(deps, decided.filter((d, i): d is Decided => !!d && !!why[i]));
+      const kept: typeof items[number][] = [];
+      const left: Array<{ item: typeof items[number]; label: string; reason: string }> = [];
+      const appActs = new Map<string, { d: Decided; n: number }>();
+      for (let i = 0; i < items.length; i++) {
+        const d = decided[i];
+        const rule = why[i];
+        if (!d || !rule) { kept.push(items[i]); continue; }
+        if (app) {
+          const g = `${d.target.scope}\u0000${d.label.id}`;
+          appActs.set(g, { d: appActs.get(g)?.d ?? d, n: (appActs.get(g)?.n ?? 0) + 1 });
+          kept.push(items[i]);
+          continue;
+        }
+        const matching = (active.get(exceptionKey(d.target)) ?? [])
+          .find(e => e.action === 'leave' || (e.action === 'ai-send' && who.kind === 'ai'));
+        if (matching) {
+          recordExceptionUse(matching, who.principal || 'anonymous', who.kind, destination);
+          kept.push(items[i]);
+          continue;
+        }
+        audit(d, 'refused', where.kind);
+        left.push({
+          item: items[i], label: d.label.id,
+          reason: rule === 'organism'
+            ? `classified ${d.label.name.en}, which may not leave its organism. ${EXCEPTION_HINT}`
+            : `classified ${d.label.name.en}, which no AI may send out. ${EXCEPTION_HINT}`,
+        });
+      }
+      for (const { d, n } of appActs.values()) {
+        const appId = who.auth?.app ?? who.principal;
+        await recordAutoException(deps, {
+          by: who.principal, app: who.auth?.app ?? null, scope: d.target.scope, target: { kind: d.target.kind, key: d.target.key },
+          label: d.label.id, action: 'leave', destination, count: n,
+          reason: `app ${appId} sent ${n === 1 ? 'an item' : `${n} items`} classified ${d.label.name.en} out (${destination})`,
+        });
       }
       return { kept, left };
     },
   };
+}
+
+/** What a refusal to let content leave says the person can do about it. */
+export const EXCEPTION_HINT = 'The person can make an exception with a written reason in their Data Wallet.';
+
+/** A destination as the exceptions list and the audit name it. */
+function destinationOf(where: EgressDestination): string {
+  switch (where.kind) {
+    case 'export': return where.organismId ? `export:${where.organismId}` : 'export';
+    case 'share': return `share:${where.organismId}/${where.ws}`;
+    case 'federation': return `federation:${where.peer}`;
+    case 'external': return `external:${where.to}`;
+  }
 }
 
 /** What the answer says about a warning-classified item an AI was shown. */
