@@ -22,6 +22,8 @@
  *     it — which for a living document's hooks means the feature did not exist on a fresh node.
  *   v1.4.0 — 2026-09-16 — sealStoredPspRecords(): encrypts the Stripe secrets of seller records
  *     written before they were stored sealed (commerce/psp-secrets.ts).
+ *   v1.14.0 — 2026-09-30 — migrateScopeVocabulary gets the node id: its agent half runs once per node
+ *     and widens only agents approved before the words had names.
  *   v1.7.0 — 2026-09-25 — migrateOperatorAdminOnce(), chained after the scope vocabulary: once per
  *     node, the operator's full-access agents get operator:admin (services/operator-admin-migration.ts).
  *   v1.6.0 — 2026-09-26 — migrateMailReadConsent(): once per node, the owners whose apps held
@@ -260,7 +262,7 @@ export async function initializeServices(
   // Then, once per node, the operator's full-access agents get operator:admin and keep the admin
   // tools (services/operator-admin-migration.ts). Chained AFTER the vocabulary, never beside it: both
   // rewrite an agent's whole scope list, and side by side one could write over the other.
-  migrateScopeVocabulary(storage)
+  migrateScopeVocabulary(storage, config.nodeId)
     .then(({ agents, appGrants }) => {
       if (agents > 0 || appGrants > 0) {
         logger.info(`Scope vocabulary: grandfathered ${agents} agent(s) and ${appGrants} app grant(s)`);

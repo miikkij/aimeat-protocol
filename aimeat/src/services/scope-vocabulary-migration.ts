@@ -28,12 +28,19 @@
  *   worked example: it gates the password, the recovery address, the second factor and account
  *   deletion, no agent could reach those before it existed, so it appears in NEITHER list and no
  *   wildcard carries it. An owner ticks it per agent or no agent has it.
- * @structure GRANDFATHERED_SCOPES · CONDITIONAL_SCOPES · migrateAgentScopeVocabulary(storage) →
- *   how many agents changed
+ * @structure GRANDFATHERED_SCOPES · CONDITIONAL_SCOPES · agentPredatesVocabulary(agent, namedAt?) ·
+ *   migrateAgentScopeVocabulary(storage, namedAt?) → how many agents changed ·
+ *   migrateScopeVocabulary(storage, nodeId?) → both families, the agent half once per node
  * @usage
  *   // fire-and-forget at boot, after storage is ready
  *   migrateAgentScopeVocabulary(storage).catch(err => logger.error(…));
  * @version-history
+ *   v1.5.0 — 2026-09-30 — SECURITY: the agent half widens only agents approved before 2026-08-10
+ *     (agentPredatesVocabulary, the cutoff app grants already had), and runs once per node
+ *     (AGENT_VOCABULARY_MIGRATION_KEY). It ran on every boot over every agent, so an agent approved
+ *     later with the default scopes held agent:write and seven more words after one restart, and an
+ *     owner who took a word away saw it come back at the next one (incident
+ *     incident-boot-migration-hands-agent-write-and-seven-other-permissions-mun93x4r).
  *   v1.4.0 — 2026-08-14 — SECURITY: a conditional grant is decided from the OWNER-granted scopes, not
  *     from a set this migration had already widened. agent:permissions is conditional on agent:write,
  *     which is itself grandfathered, so the second boot handed every agent on the node the one word
@@ -120,15 +127,33 @@ export const CONDITIONAL_SCOPES: ReadonlyArray<{ grant: string; when: string; wh
 ];
 
 /**
- * Add the new words to every agent that does not already hold them. Idempotent: a second run finds
- * nothing to do. Returns the number of agents actually updated, for the boot log.
+ * Is this an agent the migration may widen: approved before the words had names? An agent approved
+ * on or after `namedAt` went through a consent screen that listed them, so the owner's answer stands
+ * as given, exactly as for an app grant (appGrantPredatesVocabulary below). An agent with no creation
+ * time is a legacy record and counts as older.
  */
-export async function migrateAgentScopeVocabulary(storage: Storage): Promise<number> {
+export function agentPredatesVocabulary(agent: { createdAt?: string | null }, namedAt: string = VOCABULARY_NAMED_AT): boolean {
+    if (!agent.createdAt) return true;
+    const created = new Date(agent.createdAt).getTime();
+    return Number.isNaN(created) || created < new Date(namedAt).getTime();
+}
+
+/**
+ * Add the new words to every agent approved before they had names that does not already hold them.
+ * Idempotent: a second run finds nothing to do. Returns the number of agents actually updated, for
+ * the boot log. `namedAt` is the cutoff, a parameter so a test can treat the agents it just made as
+ * older than the vocabulary; the boot passes nothing.
+ */
+export async function migrateAgentScopeVocabulary(storage: Storage, namedAt: string = VOCABULARY_NAMED_AT): Promise<number> {
     const agents = await storage.listAgents();
     let changed = 0;
     let noScopeList = 0;
 
     for (const agent of agents) {
+        // Approved after the words had names: the owner chose from a screen that listed them, and a
+        // word this adds would be a permission nobody gave. Measured 2026-09-30: an agent approved with
+        // the four default scopes held all eight words after one restart, agent:write among them.
+        if (!agentPredatesVocabulary(agent, namedAt)) continue;
         const held = agent.defaultScopes;
         // No recorded scopes at all: nothing to grandfather. An agent with none is minted from
         // config.defaultAgentScopes, which is a separate decision — and writing a list here would
@@ -249,10 +274,40 @@ export async function migrateAppGrantScopeVocabulary(storage: Storage): Promise<
  * Both families, one call. The boot path takes this rather than either half, so a word added to
  * GRANDFATHERED_SCOPES cannot reach one principal family and miss the other — which is the failure
  * this pair exists to prevent, and which it had itself.
+ *
+ * THE AGENT HALF RUNS ONCE PER NODE, and AGENT_VOCABULARY_MIGRATION_KEY under the node's system
+ * identity says it has. Run on every boot, it handed the words back to an older agent whose owner
+ * took one away, so "take this away" lasted until the next restart. The record is written after the
+ * agents, so a boot that stops half way runs it again. The app-grant half needs no record: an owner's
+ * narrowing stamps the grant (scopesFixedAt), and the migration leaves a stamped grant alone.
  */
-export async function migrateScopeVocabulary(storage: Storage): Promise<{ agents: number; appGrants: number }> {
+export async function migrateScopeVocabulary(storage: Storage, nodeId?: string): Promise<{ agents: number; appGrants: number }> {
     return {
-        agents: await migrateAgentScopeVocabulary(storage),
+        agents: nodeId ? await migrateAgentScopeVocabularyOnce(storage, nodeId) : await migrateAgentScopeVocabulary(storage),
         appGrants: await migrateAppGrantScopeVocabulary(storage),
     };
 }
+
+/** The agent half, unless this node's record says it has run; then the record. */
+async function migrateAgentScopeVocabularyOnce(storage: Storage, nodeId: string): Promise<number> {
+    const system = `system@${nodeId}`;
+    if (await storage.getMemory(system, AGENT_VOCABULARY_MIGRATION_KEY)) return 0;
+    const agents = await migrateAgentScopeVocabulary(storage);
+    const now = new Date().toISOString();
+    await storage.setMemory({
+        key: AGENT_VOCABULARY_MIGRATION_KEY,
+        ownerGaii: system,
+        value: { at: now, agents },
+        visibility: 'private',
+        tags: ['migration'],
+        // Never swept: a record that expired would run the migration again at the next boot.
+        ttlHours: null,
+        version: 1,
+        createdAt: now,
+        updatedAt: now,
+    });
+    return agents;
+}
+
+/** The record that says this node has run the agent half, under `system@<nodeId>`. */
+export const AGENT_VOCABULARY_MIGRATION_KEY = 'migrations.scope-vocabulary-agents';
