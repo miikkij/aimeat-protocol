@@ -10,6 +10,8 @@
  * @structure renderDocSpace
  * @usage import { renderDocSpace } from '/views/profile/organisms/workspace/doc-space.js';
  * @version-history
+ *   v1.12.0 -- 2026-09-30 -- The comment thread is told whether the viewer is the organism's creator or
+ *     an admin (canModerate), so it offers Delete on every comment for them.
  *   v1.11.0 -- 2026-09-26 -- The tree is the library's DocTree (components/DocTree.js), given as data: its
  *     drag to a section, rename in place, colours, series and doors are the component's; the open
  *     document sits in its main column. The space's own head (name, "+ Section", "+ New document")
@@ -57,7 +59,7 @@ export function renderDocSpace(ctx, ot) {
     showArchived, busy, setRecordArchived, removeObject, moveDocToSection, expandedSeries,
     setExpandedSeries, editingSec, setEditingSec, setSecName, commitSecName, setSectionColor,
     addSection, removeSection, orgId, savePage, publish, popOut, showToast, wsId,
-    commentsByKey, cKey, reloadComments,
+    commentsByKey, cKey, reloadComments, wsCanEdit,
   } = ctx;
   const secs = sectionsByType[ot.name] || [];
   const docs = mergedDocs(ot);
@@ -132,7 +134,7 @@ export function renderDocSpace(ctx, ot) {
                   else showToast((t('organisms.docNotFound') || 'No document titled “{title}”').replace('{title}', title));
                 }} />
               <${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${livePage.id} showToast=${showToast}
-                batched=${true} initialComments=${commentsByKey[cKey(wsId, ot.name, livePage.id)]} onReload=${reloadComments} />`;
+                batched=${true} initialComments=${commentsByKey[cKey(wsId, ot.name, livePage.id)]} onReload=${reloadComments} canModerate=${wsCanEdit} />`;
           })()}
     <//>`;
 }

@@ -6,6 +6,8 @@
  *   email invitations, provisioned-code ("key") invitations, and the PUBLIC invitation token flow.
  *   Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.13.0 — 2026-09-30 — POST /:id/invitations/email takes `locale` (en | fi | es) for the email's
+ *     language and answers `email_locale`, the language it went out in.
  *   v1.12.0 — 2026-09-29 — The workspace list's lastEvent passes the caller's classification reader
  *     (show) after its per-record read check, as GET /workspace/activity does since V1: an event
  *     about an item the caller may not see is not the list's last event (TARGET-082 V4).
@@ -414,14 +416,14 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     const organism = await requireOrgAdmin(req, res, id);
     if (!organism) return;
 
-    const { email, orgRole, workspaces, message, expiresInDays, return_url } = req.body ?? {};
+    const { email, orgRole, workspaces, message, expiresInDays, return_url, locale } = req.body ?? {};
 
     // Normalize + authorize each selected workspace grant (the inviter must be able to manage it).
     const wsGrants = await authorizeWorkspaceGrants(req, res, id, workspaces);
     if (!wsGrants) return;
 
     try {
-      const { invitation, acceptUrl, emailSent } = await createEmailInvitation(storage, config, {
+      const { invitation, acceptUrl, emailSent, emailLocale } = await createEmailInvitation(storage, config, {
         organism,
         inviterGhii: callerGhii,
         email,
@@ -430,10 +432,12 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
         message,
         expiresInDays,
         returnUrl: return_url, // allowlisted in createEmailInvitation (node origin / app subdomains only)
+        locale, // en | fi | es; validated in createEmailInvitation
       });
       res.status(201).json(success(config.nodeId, {
         invitation: invitePublic(invitation),
         email_sent: emailSent,
+        email_locale: emailLocale,
         // Returned to the authorized inviter so they can share the link manually (essential when SMTP is off).
         accept_url: acceptUrl,
       }));

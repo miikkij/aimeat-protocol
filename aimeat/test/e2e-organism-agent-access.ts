@@ -15,6 +15,8 @@
  *   itself. The last part checks return_url on aimeat_organism_invite_email.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=organism-agent-access
  * @version-history
+ *   v1.1.0 — 2026-09-30 — aimeat_workspace_comment_delete: a listed agent deletes its own comment and,
+ *     acting for the creator, the creator's; an unlisted agent is refused on DELETE /comments.
  *   v1.0.0 — 2026-09-28 — Initial.
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -252,6 +254,37 @@ async function run() {
         assert(!ov.isError, `the listed agent was refused: ${ov.text.slice(0, 300)}`);
         const w = await callTool(A, 'aimeat_memory_write', { key: `organism.${orgId}.w.${wsId}.doc.listed`, value: { title: 'by a listed agent' } });
         assert(!w.isError, `a listed agent of the workspace creator could not write its workspace: ${w.text.slice(0, 300)}`);
+    });
+
+    await test('aimeat_workspace_comment_delete: an agent takes back its own comment, and an admin\'s agent removes the admin\'s', async () => {
+        // There was no MCP tool for this, so an agent could write a comment it could not take back
+        // (reported by omnituinen, 2026-09-29). A is the organism's creator; its listed agent acts
+        // with A's rights, so it may also clean up A's own comment.
+        const target = { organism_id: orgId, ws: wsId, space: 'doc', instance_id: 'listed' };
+        const mine = await callTool(A, 'aimeat_workspace_comment', { ...target, body: 'a comment the agent will take back' });
+        assert(!mine.isError, `comment failed: ${mine.text.slice(0, 300)}`);
+        const mineId = JSON.parse(mine.text).comment.id as string;
+        const byOwner = await json(`/v1/organisms/${orgId}/comments`, {
+            method: 'POST', headers: bearer(A.ownerToken),
+            body: JSON.stringify({ ws: wsId, space: 'doc', instance_id: 'listed', body: 'a test trace by the owner' }),
+        });
+        assert(byOwner.status === 201, `owner comment ${byOwner.status}: ${JSON.stringify(byOwner.body?.error)}`);
+        const ownerCommentId = byOwner.body.data.comment.id as string;
+
+        const barred = await json(`/v1/organisms/${orgId}/comments/${ownerCommentId}?ws=${wsId}&space=doc&instance_id=listed`, {
+            method: 'DELETE', headers: bearer(a2.token),
+        });
+        assert(barred.status === 403, `an unlisted agent deleted a comment: ${barred.status} ${JSON.stringify(barred.body?.error)}`);
+
+        const d1 = await callTool(A, 'aimeat_workspace_comment_delete', { ...target, comment_id: mineId });
+        assert(!d1.isError && JSON.parse(d1.text).deleted === mineId, `the agent could not delete its own comment: ${d1.text.slice(0, 300)}`);
+        const d2 = await callTool(A, 'aimeat_workspace_comment_delete', { ...target, comment_id: ownerCommentId });
+        assert(!d2.isError, `the admin's agent could not delete the admin's comment: ${d2.text.slice(0, 300)}`);
+        const gone = await callTool(A, 'aimeat_workspace_comment_delete', { ...target, comment_id: mineId });
+        assert(gone.isError && gone.text.startsWith('NOT_FOUND'), `a deleted comment was found again: ${gone.text.slice(0, 300)}`);
+
+        const list = await callTool(A, 'aimeat_workspace_comments', target);
+        assert(!list.isError && !list.text.includes(mineId) && !list.text.includes(ownerCommentId), `a deleted comment is still listed: ${list.text.slice(0, 300)}`);
     });
 
     await test('a listed agent may not put another agent on the list', async () => {

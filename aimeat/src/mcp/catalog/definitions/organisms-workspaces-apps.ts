@@ -5,6 +5,7 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-09-30 — aimeat_workspace_comment_delete; aimeat_organism_invite_email takes `locale`.
  *   2026-09-28 — aimeat_organism_invite_email takes `return_url`, where the invitee lands after accepting;
  *     aimeat_organism_update takes `agent_access`.
  *   2026-09-28 — aimeat_image_generate takes `role`, the AI role the call runs as.
@@ -215,6 +216,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
             message: { type: 'string', description: 'Optional personal note included in the invitation email.' },
             expires_in_days: { type: 'number', description: 'Days until the invitation expires (1–30, default 7).' },
             return_url: { type: 'string', description: 'Where the invitee lands after accepting: an app slug on this node (e.g. "my-app") or a full URL on this node or its app subdomains. Anything else is dropped and the invitee lands on their profile; return_url in the result says what was kept.' },
+            locale: { type: 'string', description: 'Language of the invitation email: en, fi or es. Without it the email uses the recipient\'s account language when the address already has an account here, else yours. email_locale in the result says which one went out.' },
         },
     },
     {
@@ -274,6 +276,19 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
             ws: { type: 'string', required: true, description: 'Workspace id.' },
             space: { type: 'string', required: true, description: 'The objectType (space) name.' },
             instance_id: { type: 'string', required: true, description: 'The record/document id.' },
+        },
+    },
+    {
+        name: 'aimeat_workspace_comment_delete',
+        description: 'Delete one comment from a workspace object\'s thread. The comment\'s author may delete it, and so may the organism\'s creator or an admin, for example to remove a wrong comment or test traces. Take the comment id from aimeat_workspace_comments. Replies to the deleted comment stay.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
+            ws: { type: 'string', required: true, description: 'Workspace id.' },
+            space: { type: 'string', required: true, description: 'The objectType (space) name.' },
+            instance_id: { type: 'string', required: true, description: 'The record/document id the comment is on.' },
+            comment_id: { type: 'string', required: true, description: 'The comment id (from aimeat_workspace_comments).' },
         },
     },
     {

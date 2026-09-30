@@ -211,6 +211,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_organism_search: { title: 'Search Organism Content', readOnlyHint: true },
     aimeat_workspace_comment: { title: 'Comment on Workspace Object', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     aimeat_workspace_comments: { title: 'List Workspace Comments', readOnlyHint: true },
+    aimeat_workspace_comment_delete: { title: 'Delete Workspace Comment', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     aimeat_workspace_create: { title: 'Create Workspace', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     aimeat_workspace_access: { title: 'Manage Workspace Access', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_workspace_member_grant: { title: 'Grant Workspace Role', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },

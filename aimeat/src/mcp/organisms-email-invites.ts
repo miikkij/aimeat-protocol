@@ -9,6 +9,8 @@
  *   aimeat_organism_invitations_email, aimeat_organism_invitation_email_cancel.
  * @usage registerOrganismEmailInviteTools(mcp, storage, config, getOwnerName);
  * @version-history
+ *   v1.3.0 — 2026-09-30 — aimeat_organism_invite_email takes `locale` for the email's language and
+ *     answers `email_locale`, as the REST route does.
  *   v1.2.0 — 2026-09-28 — aimeat_organism_invite_email takes return_url, as the REST route does, and
  *     answers with the return target it kept. Without it an invitation sent over MCP always landed the
  *     invitee on the profile page instead of in the app they were invited to work in.
@@ -59,16 +61,17 @@ export function registerOrganismEmailInviteTools(
             message: z.string().optional().describe('Optional personal note included in the email'),
             expires_in_days: z.number().optional().describe('Days until the invitation expires (1–30, default 7)'),
             return_url: z.string().optional().describe('Where the invitee lands after accepting: an app slug on this node (e.g. "my-app") or a full URL on this node or its app subdomains. Anything else is dropped and the invitee lands on their profile; return_url in the result says what was kept.'),
+            locale: z.string().optional().describe('Language of the invitation email: en, fi or es. Without it the email uses the recipient\'s account language when the address already has an account here, else yours. email_locale in the result says which one went out.'),
         },
         annotationsFor('aimeat_organism_invite_email'),
-        async ({ organism_id, email, org_role, workspaces, message, expires_in_days, return_url }) => {
+        async ({ organism_id, email, org_role, workspaces, message, expires_in_days, return_url, locale }) => {
             const gate = await orgForAdmin(organism_id);
             if ('error' in gate) return { content: [{ type: 'text' as const, text: gate.error }], isError: true };
             try {
                 // Its sibling _cancel emits; this one did not, so an invitation an agent sent did
                 // not show in the organism's pending list until a reload.
                 emitChange('organisms');
-                const { invitation, acceptUrl, emailSent } = await createEmailInvitation(storage, config, {
+                const { invitation, acceptUrl, emailSent, emailLocale } = await createEmailInvitation(storage, config, {
                     organism: gate.organism!,
                     inviterGhii: getOwnerName(),
                     email,
@@ -77,8 +80,9 @@ export function registerOrganismEmailInviteTools(
                     message,
                     expiresInDays: expires_in_days,
                     returnUrl: return_url, // allowlisted in createEmailInvitation, as on the REST route
+                    locale, // validated in createEmailInvitation, as on the REST route
                 });
-                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'invited', invitation: invitePublic(invitation), email_sent: emailSent, accept_url: acceptUrl, return_url: invitation.returnUrl ?? null }, null, 2) }] };
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'invited', invitation: invitePublic(invitation), email_sent: emailSent, email_locale: emailLocale, accept_url: acceptUrl, return_url: invitation.returnUrl ?? null }, null, 2) }] };
             } catch (e) {
                 if (e instanceof InvitationError) return { content: [{ type: 'text' as const, text: e.message }], isError: true };
                 throw e;

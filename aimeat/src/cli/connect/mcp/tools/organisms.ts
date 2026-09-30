@@ -5,6 +5,8 @@
  * @description MCP tool registrations for organism (collective) management --
  *   listing, viewing, joining, leaving, and member listing.
  * @version-history
+ *   v1.8.0 -- 2026-09-30 -- aimeat_workspace_comment_delete (DELETE /v1/organisms/:id/comments/:commentId);
+ *     aimeat_organism_invite_email takes `locale`, the email's language.
  *   v1.7.2 -- 2026-09-28 -- aimeat_organism_invite_email takes return_url and passes it to the REST route;
  *     aimeat_organism_update takes agent_access.
  *   v1.7.1 -- 2026-08-29 -- aimeat_organism_create's `type` is described as free text with five presets.
@@ -301,6 +303,18 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
     return envelopeResult(resp);
   });
 
+  mcp.tool('aimeat_workspace_comment_delete', descriptionFor('aimeat_workspace_comment_delete'), {
+    organism_id: z.string().describe('Organism identifier'),
+    ws: z.string().describe('Workspace id'),
+    space: z.string().describe('The objectType (space) name'),
+    instance_id: z.string().describe('The record/document id the comment is on'),
+    comment_id: z.string().describe('The comment id (from aimeat_workspace_comments)'),
+  }, annotationsFor('aimeat_workspace_comment_delete'), async ({ organism_id, ws, space, instance_id, comment_id }) => {
+    const params = new URLSearchParams({ ws, space, instance_id });
+    const resp = await client.delete(`/v1/organisms/${encodeURIComponent(organism_id)}/comments/${encodeURIComponent(comment_id)}?${params.toString()}`);
+    return envelopeResult(resp);
+  });
+
   const out = (resp: { data?: unknown; ok?: boolean }) =>
     ({ content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) });
 
@@ -431,13 +445,15 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
     message: z.string().optional().describe('Optional personal note included in the email.'),
     expires_in_days: z.number().int().positive().optional().describe('Days until the invitation expires (1-30, default 7).'),
     return_url: z.string().optional().describe('Where the invitee lands after accepting: an app slug on this node (e.g. "my-app") or a full URL on this node or its app subdomains. Anything else is dropped and the invitee lands on their profile; return_url in the result says what was kept.'),
-  }, annotationsFor('aimeat_organism_invite_email'), async ({ organism_id, email, org_role, workspaces, message, expires_in_days, return_url }) => {
+    locale: z.string().optional().describe('Language of the invitation email: en, fi or es. Without it the email uses the recipient\'s account language when the address already has an account here, else yours. email_locale in the result says which one went out.'),
+  }, annotationsFor('aimeat_organism_invite_email'), async ({ organism_id, email, org_role, workspaces, message, expires_in_days, return_url, locale }) => {
     const body: Record<string, unknown> = { email };
     if (org_role) body.orgRole = org_role;
     if (workspaces) body.workspaces = workspaces;
     if (message) body.message = message;
     if (expires_in_days !== undefined) body.expiresInDays = expires_in_days;
     if (return_url) body.return_url = return_url;
+    if (locale) body.locale = locale;
     return out(await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/invitations/email`, body));
   });
 

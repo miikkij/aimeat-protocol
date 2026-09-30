@@ -9,6 +9,8 @@
  * @structure recordAiLabel (internal), recordFields (internal), renderRecordSpace
  * @usage import { renderRecordSpace } from '/views/profile/organisms/workspace/record-space.js';
  * @version-history
+ *   v1.13.0 -- 2026-09-30 -- The comment thread is told whether the viewer is the organism's creator or
+ *     an admin (canModerate), so it offers Delete on every comment for them.
  *   v1.12.0 -- 2026-09-26 -- The records are the List (mark-name-doors): the colour picker as the row's
  *     mark and the colour's rail on the row, a draft's warn rail and its status before the name, the
  *     name as the door that opens the record, the AI label after it, the status as a tag, and the doors
@@ -87,11 +89,11 @@ export function renderRecordSpace(ctx, ot) {
     wsT, adding, addingId, addingSchema, busy, addingInitial, saveDraft,
     cancelForm, draftsFor, itemColor, setItemColor, toggleExpand, startEdit, publish, removeObject,
     expandedRec, orgId, wsId, showToast, commentsByKey, cKey, reloadComments, objectsFor,
-    showArchived, reopen, setRecordArchived,
+    showArchived, reopen, setRecordArchived, wsCanEdit,
   } = ctx;
   const drafts = draftsFor(ot.name);
   const objects = objectsFor(ot.name);
-  const comments = (id) => html`<${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${id} showToast=${showToast} batched=${true} initialComments=${commentsByKey[cKey(wsId, ot.name, id)]} onReload=${reloadComments} />`;
+  const comments = (id) => html`<${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${id} showToast=${showToast} batched=${true} initialComments=${commentsByKey[cKey(wsId, ot.name, id)]} onReload=${reloadComments} canModerate=${wsCanEdit} />`;
   const opened = (rec) => html`${recordAiLabel(rec, 'block')}${recordFields(ctx, ot, rec)}${comments(rec.id)}`;
   const colour = (id) => html`<${Lead}><${ColorPicker} value=${itemColor(ot.name, id)} onPick=${(c) => setItemColor(ot.name, id, c)} /><//>`;
   const del = (id, name) => html`<${Icon} small label=${t('organisms.delete') || 'Delete'} disabled=${busy} onClick=${() => removeObject(ot.namespace, id, name)}>🗑<//>`;

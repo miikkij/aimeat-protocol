@@ -8,6 +8,9 @@
  * @structure WorkspaceComments
  * @usage import { WorkspaceComments } from '/views/profile/organisms/workspace-comments.js';
  * @version-history
+ *   v1.11.0 — 2026-09-30 — `canModerate` (the viewer is the organism's creator or an admin) shows
+ *     Delete on every comment, not only on the viewer's own: the route always let an admin delete any
+ *     comment, and the page gave them no way to.
  *   v1.10.0 — 2026-09-26 — No class written: the heading is the Group heading, the empty and loading lines HeadDesc, the replying-to line the meta Note, the fields TextField and TextArea.
  *   v1.9.0 — 2026-09-26 — A comment is the Message component's comment tone and the thread its Thread
  *     (components/Message.js, css/components/message.css): the same frame, head line, reply edge and
@@ -53,7 +56,7 @@ import { TextField, TextArea } from '/components/TextField.js';
  * (comment on a specific passage) and threaded replies (parentId). Backend: /v1/organisms/:id/comments.
  * Agents use the same endpoints via aimeat_workspace_comment(s).
  */
-export function WorkspaceComments({ orgId, ws, space, instanceId, showToast, batched, initialComments, onReload }) {
+export function WorkspaceComments({ orgId, ws, space, instanceId, showToast, batched, initialComments, onReload, canModerate }) {
   // BATCHED mode (parent owns the fetch): the container fetches every visible thread in one
   // /comments/batch request and passes this thread's slice via `initialComments`; we don't self-fetch
   // or self-subscribe (that per-thread fan-out was the comments request storm). STANDALONE mode
@@ -116,7 +119,7 @@ export function WorkspaceComments({ orgId, ws, space, instanceId, showToast, bat
         time=${c.createdAt ? dt(c.createdAt) : ''} body=${c.body || ''} plain
         actions=${html`
           <${Action} small disabled=${busy} onClick=${() => setReplyTo({ id: c.id, body: c.body })}>${t('organisms.reply') || 'Reply'}<//>
-          ${mine(c.author) ? html`<${Action} small disabled=${busy} onClick=${() => remove(c)}>${t('organisms.delete') || 'Delete'}<//>` : null}`} />`)}
+          ${mine(c.author) || canModerate ? html`<${Action} small disabled=${busy} onClick=${() => remove(c)}>${t('organisms.delete') || 'Delete'}<//>` : null}`} />`)}
       <${ThreadForm}>
         ${replyTo ? html`<${Note} kind="meta">${t('organisms.replyingTo') || 'Replying to'}: “${(String(replyTo.body || '').slice(0, 60))}” <${Action} small onClick=${() => setReplyTo(null)}>${t('organisms.cancel') || 'Cancel'}<//><//>` : null}
         <${TextField} placeholder=${t('organisms.anchorQuotePlaceholder') || 'Optional: quote a passage to anchor the comment'} value=${anchorQuote} onInput=${setAnchorQuote} />

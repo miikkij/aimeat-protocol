@@ -43152,6 +43152,16 @@ paths:
                     (an app slug like "experience-center" or a full URL). ALLOWLISTED server-side to the
                     node's own origin and app-origin subdomains (apps.<apex> / *.apps.<apex>); any other
                     target is silently dropped (stored as null → default profile redirect). Open-redirect guard.
+                locale:
+                  type: string
+                  enum: [en, fi, es]
+                  description: >-
+                    Language of the invitation email. A region tag such as fi-FI is read as its
+                    language; any other value is refused with 400 INVALID_INPUT before anything is
+                    stored. Without it the email uses the recipient's account language when the
+                    address already has an account on this node, else the inviter's own language,
+                    else English. The response's email_locale says which language went out. The
+                    email names the inviter by display name when one is set.
       responses:
         '201': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -43586,7 +43596,12 @@ paths:
     delete:
       operationId: deleteOrganismComment
       summary: Delete a workspace comment
-      description: The comment's author, or a creator/admin, deletes it. Locate it with the ws/space/instance_id query params.
+      description: >-
+        The comment's author, or the organism's creator or an admin, deletes it. Locate it with the
+        ws/space/instance_id query params. Needs organism:write, the same permission as adding a
+        comment, so an app grant holding it can delete as well as write; an owner session needs no
+        scope. The caller must also be able to read the workspace, as for adding a comment. MCP twin:
+        aimeat_workspace_comment_delete.
       tags: [Organisms]
       security:
         - BearerAuth: []
