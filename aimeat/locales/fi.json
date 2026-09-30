@@ -14113,7 +14113,7 @@
     "pollingHintCode": "POST /v1/agents/device-token",
     "pollingHintSuffix": "laitteen koodilla."
   },
-  "nodeUpdate.pill": "{version} on julkaistu",
+  "nodeUpdate.pill": "Uusi: {version}",
   "nodeUpdate.pillTitle": "AIMEATista on uudempi versio. Avaa, niin näet, mitä siinä on uutta ja miten päivität.",
   "nodeUpdate.title": "AIMEAT {version} on julkaistu",
   "nodeUpdate.running": "Tämän palvelimen versio",
@@ -14133,6 +14133,7 @@
   "nodeUpdate.howTo": "Päivitä tekoälyn avulla",
   "nodeUpdate.howToText": "Kopioi tämä kehote Claude Codeen tai Codexiin sillä koneella, jolla tämä palvelin toimii. Tekoäly selvittää, miten AIMEAT on asennettu, ottaa varmuuskopion, kysyy sinulta ennen kuin käynnistää palvelimen uudelleen, päivittää sen ja tarkistaa uuden version. Jos tekoälyllä on myös MCP-yhteys tähän palvelimeen, se tarkistaa tuloksen myös sen kautta. Päivitys toimii ilman tätä yhteyttäkin.",
   "nodeUpdate.copy": "Kopioi kehote",
+  "nodeUpdate.showPrompt": "Näytä kehote",
   "nodeUpdate.copied": "Kopioitu. Liitä se tekoälyllesi.",
   "nodeUpdate.stopText": "Voit poistaa tämän ilmoituksen: kytke ylläpidon asetuksista pois ”Tarkista uusi versio”. Silloin tämä palvelin ei enää kysy npm:ltä.",
   "nodeUpdate.openConfig": "Avaa asetus",

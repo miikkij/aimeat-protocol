@@ -234,7 +234,7 @@ function main() {
         .then(function (d) {
           var s = d && d.ok && d.data;
           if (!s || !s.enabled || !s.updateAvailable) return;
-          updateEl.textContent = (t['nodeUpdate.pill'] || '{version} is out').replace('{version}', s.latest);
+          updateEl.textContent = (t['nodeUpdate.pill'] || 'New: {version}').replace('{version}', s.latest);
           updateEl.title = t['nodeUpdate.pillTitle'] || '';
           updateEl.style.display = 'inline-block';
         })

@@ -18,6 +18,9 @@
  * @structure NodeUpdateNotice({ session, onNavigate, onShown }) · entryText(value)
  * @usage html`<${NodeUpdateNotice} session=${session} onNavigate=${(p) => navigate(p)} onShown=${setShown} />`
  * @version-history
+ *   v1.1.0 — 2026-09-30 — After the browser check: the dialog's parts stand apart (Stack), the prompt
+ *     is folded (one scroll area on a phone), the tag keeps one line, and closing takes ?nodeUpdate=1
+ *     out of the address.
  *   v1.0.0 — 2026-09-30 — Initial.
  */
 import { h } from 'preact';
@@ -33,6 +36,8 @@ import { Facts } from '/components/Facts.js';
 import { ChangeLog } from '/components/ChangeLog.js';
 import { Note } from '/components/Note.js';
 import { Action, Loud } from '/components/Action.js';
+import { Stack } from '/components/Layout.js';
+import { Collapsible } from '/components/Collapsible.js';
 
 const html = htm.bind(h);
 
@@ -52,6 +57,7 @@ export function NodeUpdateNotice({ session, onNavigate, onShown }) {
   const [status, setStatus] = useState(null);
   const [open, setOpen] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [promptOpen, setPromptOpen] = useState(false);
   const operator = isOperator(session);
   const shown = !!(operator && status && status.enabled && status.updateAvailable);
 
@@ -74,44 +80,62 @@ export function NodeUpdateNotice({ session, onNavigate, onShown }) {
   if (!shown) return null;
 
   const again = async () => { setChecking(true); await load(true); setChecking(false); };
-  const go = (e, path) => { e?.preventDefault?.(); setOpen(false); onNavigate?.(path); };
+  // Closing takes ?nodeUpdate=1 out of the address, so a reload does not open the dialog again.
+  const close = () => {
+    setOpen(false);
+    const url = new URL(location.href);
+    if (url.searchParams.has('nodeUpdate')) { url.searchParams.delete('nodeUpdate'); history.replaceState(history.state, '', url); }
+  };
+  const go = (e, path) => { e?.preventDefault?.(); close(); onNavigate?.(path); };
   const news = Array.isArray(status.whatsNew) ? status.whatsNew : null;
 
   const footer = html`
-    <${Action} onClick=${() => setOpen(false)}>${t('common.close')}<//>
+    <${Action} onClick=${close}>${t('common.close')}<//>
     <${Loud} control copy=${status.prompt} copiedLabel=${t('nodeUpdate.copied')}>${t('nodeUpdate.copy')}<//>`;
 
   return html`
     <${Mark} tone="sun" title=${t('nodeUpdate.pillTitle')} onClick=${() => setOpen(true)}>${t('nodeUpdate.pill', { version: status.latest })}<//>
-    <${Modal} open=${open} onClose=${() => setOpen(false)} size="lg" title=${t('nodeUpdate.title', { version: status.latest })} footer=${footer}>
-      <${Facts} rows=${[
-        { k: t('nodeUpdate.running'), v: status.current, mono: true },
-        { k: t('nodeUpdate.newest'), v: status.latest, mono: true },
-        { k: t('nodeUpdate.released'), v: status.releasedAt ? date(status.releasedAt) : t('nodeUpdate.releasedUnknown') },
-        { k: t('nodeUpdate.installed'), v: t(`nodeUpdate.method.${status.install?.method || 'unknown'}`) },
-      ]} />
+    <${Modal} open=${open} onClose=${close} size="lg" title=${t('nodeUpdate.title', { version: status.latest })} footer=${footer}>
+      <${Stack} gap="large">
+        <${Facts} rows=${[
+          { k: t('nodeUpdate.running'), v: status.current, mono: true },
+          { k: t('nodeUpdate.newest'), v: status.latest, mono: true },
+          { k: t('nodeUpdate.released'), v: status.releasedAt ? date(status.releasedAt) : t('nodeUpdate.releasedUnknown') },
+          { k: t('nodeUpdate.installed'), v: t(`nodeUpdate.method.${status.install?.method || 'unknown'}`) },
+        ]} />
 
-      <${Label} ruled>${t('nodeUpdate.whatsNew')}<//>
-      ${news === null
-        ? html`<${Note} kind="quiet">${t('nodeUpdate.whatsNewUnknown', { version: status.latest })}<//>`
-        : news.length === 0
-          ? html`<${Note} kind="quiet">${t('nodeUpdate.whatsNewNone', { version: status.latest })}<//>`
-          : html`<${ChangeLog} entries=${news.map((e, i) => ({
-              key: i,
-              version: e.version || '',
-              date: e.date,
-              summary: html`<strong>${entryText(e.title)}</strong>${e.body ? html`<br />${entryText(e.body)}` : null}`,
-            }))} />`}
+        <${Stack}>
+          <${Label} ruled>${t('nodeUpdate.whatsNew')}<//>
+          ${news === null
+            ? html`<${Note} kind="quiet">${t('nodeUpdate.whatsNewUnknown', { version: status.latest })}<//>`
+            : news.length === 0
+              ? html`<${Note} kind="quiet">${t('nodeUpdate.whatsNewNone', { version: status.latest })}<//>`
+              : html`<${ChangeLog} entries=${news.map((e, i) => ({
+                  key: i,
+                  version: e.version || '',
+                  date: e.date,
+                  summary: html`<strong>${entryText(e.title)}</strong>${e.body ? html`<br />${entryText(e.body)}` : null}`,
+                }))} />`}
+        <//>
 
-      <${Label} ruled>${t('nodeUpdate.howTo')}<//>
-      <${Note} kind="caption" size="body">${t('nodeUpdate.howToText')}<//>
-      <${Code} block scroll="medium">${status.prompt}<//>
+        <${Stack}>
+          <${Label} ruled>${t('nodeUpdate.howTo')}<//>
+          <${Note} kind="caption" size="body">${t('nodeUpdate.howToText')}<//>
+          <!-- Folded: the loud action copies it, and an open block of forty lines inside a
+               scrolling dialog is a scroll area inside a scroll area on a phone. -->
+          <${Collapsible} title=${t('nodeUpdate.showPrompt')} open=${promptOpen} onToggle=${() => setPromptOpen((o) => !o)}>
+            <${Code} block>${status.prompt}<//>
+          <//>
+        <//>
 
-      <${Note} kind="aside" size="small">
-        ${t('nodeUpdate.stopText')}${' '}
-        <${Action} tone="link" href=${CONFIG_PATH} onClick=${(e) => go(e, CONFIG_PATH)}>${t('nodeUpdate.openConfig')}<//>
+        <${Stack}>
+          <${Note} kind="aside" size="small">
+            ${t('nodeUpdate.stopText')}${' '}
+            <${Action} tone="link" href=${CONFIG_PATH} onClick=${(e) => go(e, CONFIG_PATH)}>${t('nodeUpdate.openConfig')}<//>
+          <//>
+          <div><${Action} small disabled=${checking} onClick=${again}>${checking ? t('nodeUpdate.checking') : t('nodeUpdate.checkAgain')}<//></div>
+        <//>
       <//>
-      <${Action} small disabled=${checking} onClick=${again}>${checking ? t('nodeUpdate.checking') : t('nodeUpdate.checkAgain')}<//>
     <//>`;
 }
 

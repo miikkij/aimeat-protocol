@@ -12345,7 +12345,7 @@
     "pollingHintCode": "POST /v1/agents/device-token",
     "pollingHintSuffix": "con el código de dispositivo."
   },
-  "nodeUpdate.pill": "{version} ya está disponible",
+  "nodeUpdate.pill": "Nueva: {version}",
   "nodeUpdate.pillTitle": "Hay una versión más nueva de AIMEAT. Ábrelo para ver qué trae y cómo actualizar.",
   "nodeUpdate.title": "AIMEAT {version} ya está disponible",
   "nodeUpdate.running": "Versión de este servidor",
@@ -12365,6 +12365,7 @@
   "nodeUpdate.howTo": "Actualiza con tu IA",
   "nodeUpdate.howToText": "Copia este prompt en Claude Code o Codex, en la máquina donde funciona este servidor. La IA averigua cómo está instalado AIMEAT, hace una copia de seguridad, te pregunta antes de reiniciar el servidor, lo actualiza y comprueba la versión nueva. Si la IA también tiene una conexión MCP con este servidor, comprueba el resultado también por ahí. La actualización funciona sin esa conexión.",
   "nodeUpdate.copy": "Copiar el prompt",
+  "nodeUpdate.showPrompt": "Mostrar el prompt",
   "nodeUpdate.copied": "Copiado. Pégalo en tu IA.",
   "nodeUpdate.stopText": "Puedes quitar este aviso: desactiva «Buscar una versión nueva» en la configuración de administración. Así este servidor deja de consultar npm.",
   "nodeUpdate.openConfig": "Abrir el ajuste",
