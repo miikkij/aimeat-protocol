@@ -5862,6 +5862,7 @@
   "pkpage.updateNone": "The package has no newer version.",
   "pkpage.updateAvailable": "A newer version is out: {version}.",
   "pkpage.updateFailed": "The check failed.",
+  "pkpage.updatesEnded": "Your update service for this package has ended. It keeps working as it is; renew the update service to get new versions.",
   "pkpage.updateSub": "An update replaces the app, the extension and the browser library and leaves memory and translations alone. An edited part is asked about first.",
   "pkpage.applyUpdate": "Apply the update",
   "pkpage.checkUpdate": "Check for an update",

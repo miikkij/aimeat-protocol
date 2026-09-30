@@ -12,6 +12,7 @@
  * @structure instanceRow · offerRow · ownRow · loadingRow
  * @usage import { instanceRow, offerRow, ownRow } from './rows.js';
  * @version-history
+ *   v1.20.0 — 2026-09-30 — The Check button asks the source; an ended update service is said in words.
  *   v1.19.0 — 2026-09-30 — The opened install shows its automatic update, on or off, with the switch.
  *   v1.18.0 — 2026-09-26 — On the component kit (page group G7): the rows, their cells and the opened
  *     panel are List (Row, Name with its dot and version tag, Desc keeping four lines with the part
@@ -119,7 +120,7 @@ function instanceOpen(ctx, inst, comps, app, source) {
   const close = () => ctx.toggle('i:' + inst.id, inst);
   const doors = html`
     ${app ? html`<${Action} small href=${appHref(ctx, app.registeredAs)} newTab>${x('openApp')}<//>` : null}
-    <${Action} small soft disabled=${ctx.busy} onClick=${() => ctx.checkUpdate(inst)}>${x('checkUpdate')}<//>
+    <${Action} small soft disabled=${ctx.busy} onClick=${() => ctx.checkUpdate(inst, true)}>${x('checkUpdate')}<//>
     <${Action} small soft copy=${comps.map((c) => `${c.type} ${c.registeredAs}`).join('\n')} copiedLabel=${x('copied')}>${x('copyNames')}<//>
     <${Action} small soft tone="danger" onClick=${() => ctx.removeInstance(inst)}>${x('removeInstance')}<//>
     <${Action} small soft onClick=${close}>${x('close')}<//>`;
@@ -141,7 +142,7 @@ function instanceOpen(ctx, inst, comps, app, source) {
       <${Facts} rows=${[
         {
           k: x('updateK'),
-          v: !upd ? x('updateUnknown') : upd.checking ? x('updateChecking') : upd.error ? upd.error : upd.updateAvailable ? x('updateAvailable', { version: versionDate(upd.latestVersion) }) : x('updateNone'),
+          v: !upd ? x('updateUnknown') : upd.checking ? x('updateChecking') : upd.ended ? x('updatesEnded') : upd.error ? upd.error : upd.updateAvailable ? x('updateAvailable', { version: versionDate(upd.latestVersion) }) : x('updateNone'),
           // Said before the button rather than after: a part this owner has edited is NOT updated,
           // and knowing that beforehand is the difference between pressing a button and being
           // surprised by it.
