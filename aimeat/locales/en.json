@@ -14126,7 +14126,7 @@
     "pollingHintCode": "POST /v1/agents/device-token",
     "pollingHintSuffix": "with the device code."
   },
-  "nodeUpdate.pill": "{version} is out",
+  "nodeUpdate.pill": "New: {version}",
   "nodeUpdate.pillTitle": "A newer AIMEAT is out. Open to see what is new and how to update.",
   "nodeUpdate.title": "AIMEAT {version} is out",
   "nodeUpdate.running": "This server runs",
@@ -14146,6 +14146,7 @@
   "nodeUpdate.howTo": "Update with your AI",
   "nodeUpdate.howToText": "Copy this prompt into Claude Code or Codex on the machine that runs this server. The AI finds out how AIMEAT is installed there, makes a backup, asks you before it restarts the server, updates it and checks the new version. When the AI also has an MCP connection to this server, it checks the result there too. The update works without that connection.",
   "nodeUpdate.copy": "Copy the prompt",
+  "nodeUpdate.showPrompt": "Show the prompt",
   "nodeUpdate.copied": "Copied. Paste it into your AI.",
   "nodeUpdate.stopText": "You can switch this notice off: turn off “Check for a new version” in the admin settings. Then this server stops asking npm.",
   "nodeUpdate.openConfig": "Open the setting",

@@ -7,6 +7,7 @@
  * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
  *   (the shell block), and from every standalone page that links theme.css.
  * @version-history
+ *   v1.4.0 — 2026-09-30 — A tag in the bar keeps one line (.topnav-right > .mark-button): the new-version notice.
  *   v1.3.0 — 2026-09-24 — The rule, the corners and the menu's frame and shadow read the theme's shape
  *     values (a move).
  *   v1.2.0 — 2026-09-24 — The look on a phone: the menu carries light/dark, the themes and the styles.
@@ -92,6 +93,9 @@
   align-items: center;
   gap: 0.75rem;
 }
+/* A tag in the bar (the operator's new-version notice) keeps its one line: squeezed by the flex row
+   it broke into two at 1280 px and pushed the bar taller. Placement only; the look is the tag's. */
+.topnav-right > .mark-button { flex: none; white-space: nowrap; }
 
 /* Header notification bell + dropdown */
 .notif-bell { position: relative; display: inline-flex; }

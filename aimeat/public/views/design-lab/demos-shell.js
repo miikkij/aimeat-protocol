@@ -122,7 +122,7 @@ export const SHELL_DEMOS = {
   'notification-bell': one('with a count', () => html`<div class="notif-bell"><button type="button" class="notif-bell-btn">🔔<span class="poster-count poster-count--waiting poster-count--small notif-badge">7</span></button></div>`),
   'open-items-button': one('default', () => html`<button type="button" class="open-items-btn"><span class="open-items-btn-mark">○</span><span class="open-items-btn-count">3</span></button>`),
   // The tag only: the component reads GET /v1/admin/node-update, and a demo shows no live data.
-  'node-update-notice': one('tag', () => html`<${Mark} tone="sun" onClick=${noop}>3.22.0 is out<//>`),
+  'node-update-notice': one('tag', () => html`<${Mark} tone="sun" onClick=${noop}>New: 3.22.0<//>`),
   'agent-consent': one('frame', () => html`<${AgentConsent} requests=${[{ user_code: 'WDJB-MJHT', agent_name: 'claude', expires_in: 540 }]} onApprove=${noop} onDeny=${noop} />`),
   'contact-card': one('frame', () => html`<aside class="contact-card poster-aside poster-aside--large"><p class="contact-card-title">Who runs this node</p><p>Its people come from the node's settings.</p></aside>`),
   'display-prefs-fields': one('frame', () => html`<${DisplayPrefsFields} region="fi-FI" timezone="Europe/Helsinki" onChange=${noop} />`),
