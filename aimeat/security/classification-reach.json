@@ -1754,6 +1754,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
     },
+    "src/services/scope-vocabulary-migration.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-09-30, the node's own read: a migration marker under the node's system identity (migrations.scope-vocabulary-agents)."
+    },
     "src/services/screenshot-capture.ts": {
       "reads": {
         "getStorageFile": 1

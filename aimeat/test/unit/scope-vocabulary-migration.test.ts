@@ -11,11 +11,14 @@
  *   money-moving permission to an agent that never had one.
  * @usage pnpm test -- scope-vocabulary-migration
  * @version-history
+ *   v1.1.0 — 2026-09-30 — An agent approved after 2026-08-10 is left alone, and the agent half runs
+ *     once per node.
  *   v1.0.0 — 2026-08-11 — Initial, with the conditional grant it was written to hold in place.
  */
 import { describe, it, expect } from 'vitest';
 import {
-    migrateAgentScopeVocabulary, GRANDFATHERED_SCOPES, CONDITIONAL_SCOPES,
+    migrateAgentScopeVocabulary, migrateScopeVocabulary, agentPredatesVocabulary, GRANDFATHERED_SCOPES,
+    CONDITIONAL_SCOPES, VOCABULARY_NAMED_AT, AGENT_VOCABULARY_MIGRATION_KEY,
 } from '../../src/services/scope-vocabulary-migration.js';
 import type { Storage } from '../../src/storage/interface.js';
 
@@ -87,5 +90,49 @@ describe('migrateAgentScopeVocabulary', () => {
 
         expect(changed).toBe(0);
         expect(written.size).toBe(0);
+    });
+
+    /**
+     * The defect of 2026-09-30: an agent approved with the four default scopes on 2026-09-29 held all
+     * eight words, agent:write among them, after one restart. It chose from a screen that listed them.
+     */
+    it('leaves an agent approved after the words had names exactly as its owner approved it', async () => {
+        const { storage, written } = stubStorage([
+            { gaii: 'concierge#a@node', defaultScopes: ['memory:read'], createdAt: '2026-09-29T21:00:00.000Z' } as never,
+            { gaii: 'old#a@node', defaultScopes: ['memory:read'], createdAt: '2026-08-01T00:00:00.000Z' } as never,
+        ]);
+        await migrateAgentScopeVocabulary(storage);
+
+        expect(written.has('concierge#a@node')).toBe(false);
+        expect(written.get('old#a@node')).toContain('agent:write');
+        expect(agentPredatesVocabulary({ createdAt: VOCABULARY_NAMED_AT })).toBe(false);
+    });
+});
+
+describe('migrateScopeVocabulary', () => {
+    /** An agent the owner narrowed must stay narrowed: the agent half runs once per node. */
+    it('runs the agent half once per node, so a word the owner took away stays away', async () => {
+        const memory = new Map<string, unknown>();
+        const agent = { gaii: 'old#a@node', defaultScopes: ['memory:read'], createdAt: '2026-08-01T00:00:00.000Z' };
+        const storage = {
+            listAgents: async () => [agent],
+            updateAgent: async (_gaii: string, patch: { defaultScopes?: string[] }) => {
+                if (patch.defaultScopes) agent.defaultScopes = patch.defaultScopes;
+                return undefined;
+            },
+            listAppGrants: async () => [],
+            getMemory: async (owner: string, key: string) => memory.get(`${owner}|${key}`) ?? null,
+            setMemory: async (rec: { ownerGaii: string; key: string }) => { memory.set(`${rec.ownerGaii}|${rec.key}`, rec); },
+        } as unknown as Storage;
+
+        const first = await migrateScopeVocabulary(storage, 'node');
+        expect(first.agents).toBe(1);
+        expect(memory.has(`system@node|${AGENT_VOCABULARY_MIGRATION_KEY}`)).toBe(true);
+
+        // The owner takes agent:write away; the next boot must not hand it back.
+        agent.defaultScopes = agent.defaultScopes.filter(s => s !== 'agent:write');
+        const second = await migrateScopeVocabulary(storage, 'node');
+        expect(second.agents).toBe(0);
+        expect(agent.defaultScopes).not.toContain('agent:write');
     });
 });

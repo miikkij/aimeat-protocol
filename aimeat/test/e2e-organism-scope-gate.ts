@@ -17,6 +17,9 @@
  * @usage cd aimeat && rm -f test/.orgscope.db* && AIMEAT_PORT=40431 AIMEAT_DB_PATH=test/.orgscope.db \
  *   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-organism-scope-gate
  * @version-history
+ *   v1.1.0 — 2026-09-30 — Phase 5: an agent approved after 2026-08-10 is left alone; the old reach is
+ *     proved with the cutoff moved past the agents made here (it asserted the migration widened a
+ *     brand-new agent, which was the defect, not the rule).
  *   v1.0.0 — 2026-08-14 — Initial (August 2026 audit: the organism scope gate).
  */
 import * as ed from '@noble/ed25519';
@@ -372,8 +375,22 @@ async function main() {
                 `expected no organism:write, record holds [${(rec!.defaultScopes ?? []).join(', ')}]`);
         });
 
-        await test('the migration writes organism:write onto it', async () => {
+        // The migration widens only agents approved before the words had names (2026-08-10); an agent
+        // approved later chose from a screen that listed them. These agents were made a moment ago, so
+        // first: the migration leaves them alone. Then, with the cutoff moved past them, it treats
+        // them as the older agents it exists for.
+        await test('an agent approved after the words had names is left as its owner approved it', async () => {
             const changed = await migrateAgentScopeVocabulary(storage);
+            assert(changed === 0, `the migration widened ${changed} agent(s) approved after the cutoff`);
+            const rec = await storage.getAgent(narrow.gaii);
+            assert(!(rec!.defaultScopes ?? []).includes('organism:write'),
+                `a new agent was handed organism:write: [${(rec!.defaultScopes ?? []).join(', ')}]`);
+        });
+
+        const afterEveryAgent = new Date(Date.now() + 60_000).toISOString();
+
+        await test('the migration writes organism:write onto an agent that predates the words', async () => {
+            const changed = await migrateAgentScopeVocabulary(storage, afterEveryAgent);
             assert(changed > 0, 'the migration reported no agent changed');
             const rec = await storage.getAgent(narrow.gaii);
             assert((rec!.defaultScopes ?? []).includes('organism:write'),
@@ -408,7 +425,7 @@ async function main() {
         // which the same run grandfathers in — reached every agent on the node on boot two. That word
         // is outside every wildcard precisely because it lets an agent rewrite its own permissions.
         await test('running it a second time changes nothing, and hands out no new permission', async () => {
-            const again = await migrateAgentScopeVocabulary(storage);
+            const again = await migrateAgentScopeVocabulary(storage, afterEveryAgent);
             assert(again === 0, `expected 0 agents changed on the second run, got ${again}`);
             for (const gaii of [narrow.gaii, scoped.gaii]) {
                 const rec = await storage.getAgent(gaii);
