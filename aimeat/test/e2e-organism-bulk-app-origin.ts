@@ -10,6 +10,8 @@
  *   deleteRecords step fail here — the guard-parity net (pitfalls §6).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=organism-bulk-app-origin
  * @version-history
+ *   v1.1.0 — 2026-09-30 — DELETE /comments under an app-origin token: the app deletes its own comment
+ *     and, acting for the creator, the creator's; a read-only grant is refused.
  *   v1.0.0 — 2026-07-15 — Initial: publishRecords + deleteRecords work under an H-2 app-origin token.
  */
 import * as ed from '@noble/ed25519';
@@ -132,6 +134,33 @@ await test('APP deleteRecords (batch) succeeds — the regression: app-origin mu
     // Gone.
     const chk = await json(`/v1/memory/${encodeURIComponent(`${root()}.${NS}.a1.latest`)}?owner_scope=true&soft=1`, { headers: ownerAuth() });
     assert(chk.body.data.value === null, 'a1 record removed');
+});
+
+// The same defect on the comment endpoints (reported by omnituinen, 2026-09-29): POST /comments took
+// organism:write and let the app write a comment, DELETE took requireRole('agent') and answered
+// 'Role "agent" required', so an app's admin view could not remove a wrong comment or a test trace.
+const commentsQ = `ws=${WS}&space=task&instance_id=c1`;
+await test('APP deletes its own comment AND the owner\'s (the owner is the creator) — no role-agent gate', async () => {
+    const own = await json(`/v1/organisms/${orgId}/comments`, { method: 'POST', headers: appAuth(), body: JSON.stringify({ ws: WS, space: 'task', instance_id: 'c1', body: 'written by the app' }) });
+    assert(own.status === 201, `app comment ${own.status} ${JSON.stringify(own.body?.error)}`);
+    const byOwner = await json(`/v1/organisms/${orgId}/comments`, { method: 'POST', headers: ownerAuth(), body: JSON.stringify({ ws: WS, space: 'task', instance_id: 'c1', body: 'test trace by the owner' }) });
+    assert(byOwner.status === 201, `owner comment ${byOwner.status}`);
+    const d1 = await json(`/v1/organisms/${orgId}/comments/${own.body.data.comment.id}?${commentsQ}`, { method: 'DELETE', headers: appAuth() });
+    assert(d1.status === 200, `app could not delete its own comment: ${d1.status} ${JSON.stringify(d1.body?.error)}`);
+    const d2 = await json(`/v1/organisms/${orgId}/comments/${byOwner.body.data.comment.id}?${commentsQ}`, { method: 'DELETE', headers: appAuth() });
+    assert(d2.status === 200, `app acting for the creator could not delete the creator's comment: ${d2.status} ${JSON.stringify(d2.body?.error)}`);
+    const list = await json(`/v1/organisms/${orgId}/comments?${commentsQ}`, { headers: ownerAuth() });
+    assert((list.body.data.comments || []).length === 0, `comments survived: ${JSON.stringify(list.body.data.comments)}`);
+});
+
+await test('A READ-ONLY app grant cannot delete a comment → 403, and the comment survives', async () => {
+    const c = await json(`/v1/organisms/${orgId}/comments`, { method: 'POST', headers: ownerAuth(), body: JSON.stringify({ ws: WS, space: 'task', instance_id: 'c1', body: 'keep me' }) });
+    assert(c.status === 201, `owner comment ${c.status}`);
+    const readOnly = await grantAppToken('memory:read');
+    const r = await json(`/v1/organisms/${orgId}/comments/${c.body.data.comment.id}?${commentsQ}`, { method: 'DELETE', headers: { Authorization: `Bearer ${readOnly}` } });
+    assert(r.status === 403, `a read-only app deleted a comment: ${r.status}`);
+    const list = await json(`/v1/organisms/${orgId}/comments?${commentsQ}`, { headers: ownerAuth() });
+    assert((list.body.data.comments || []).some((x: any) => x.id === c.body.data.comment.id), 'the comment did not survive the 403');
 });
 
 await test('Cleanup owner', async () => { await json(`/v1/owners/${owner}`, { method: 'DELETE', headers: ownerAuth() }); });

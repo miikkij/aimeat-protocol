@@ -12,7 +12,11 @@
  * @structure
  *   - canAccessWorkspaceComments(...) -- membership + workspace-read gate
  *   - addComment(...) / listComments(storage, reader, ...) -- create + read a target's thread
+ *   - deleteComment(...) -- author or creator/admin removes one comment
  * @version-history
+ *   v1.3.0 -- 2026-09-30 -- deleteComment(): moved out of the DELETE route so the new MCP tool
+ *     aimeat_workspace_comment_delete runs the same checks. It also requires the workspace gate that
+ *     reading and writing a comment require, so deleting one takes no less than writing one.
  *   v1.2.0 -- 2026-09-29 -- TARGET-082 V4: listComments takes the caller's ContentReader and returns
  *     only the comments it may see (reader.show on each comment record); a warning an AI reader was
  *     shown under rides on the comment as `classificationWarning`.
@@ -28,6 +32,7 @@ import { canReadWorkspace } from './workspace-access.js';
 import { memoryTarget } from './classification/labels.js';
 import type { ContentReader } from './classification/reader.js';
 import { classificationWarningOf } from './classification/present-memory.js';
+import { isOrganismOwner } from './organism-ownership.js';
 
 export interface CommentAnchor { section?: string; quote?: string }
 export interface WorkspaceComment {
@@ -84,6 +89,39 @@ export async function addComment(
     ttlHours: null, version: 1, createdAt: now, updatedAt: now,
   });
   return comment;
+}
+
+export type DeleteCommentResult =
+  | { ok: true }
+  | { ok: false; status: 403 | 404; code: 'ACCESS_DENIED' | 'NOT_FOUND'; message: string };
+
+/**
+ * Delete one comment. The caller must reach the workspace (the same gate as reading and writing a
+ * comment), and must be the comment's
+ * author or the organism's creator or an admin. The admin test reads the caller's owner name, so an
+ * admin's app or agent acting in their name may clean up a thread too; the permission word it needs
+ * (organism:write) is enforced by the caller's route or MCP tool. The row is soft-deleted
+ * (deleteMemory), as it always was.
+ */
+export async function deleteComment(
+  storage: Storage, config: AimeatConfig, organism: OrganismRecord,
+  caller: { sub: string | undefined; owner: string | undefined; gaii: string },
+  target: { ws: string; space: string; instanceId: string; commentId: string },
+): Promise<DeleteCommentResult> {
+  if (!(await canAccessWorkspaceComments(storage, config, organism, caller.sub, caller.owner, caller.gaii, target.ws))) {
+    return { ok: false, status: 403, code: 'ACCESS_DENIED', message: 'You cannot reach this workspace' };
+  }
+  const key = `${commentPrefix(organism.id, target.ws, target.space, target.instanceId)}${target.commentId}`;
+  const scan = await storage.listAllMemory({ prefix: key, limit: 5 });
+  const rec = scan.items.find(r => r.key === key);
+  if (!rec) return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Comment not found' };
+  const isAuthor = rec.ownerGaii === caller.gaii;
+  const isAdmin = !!caller.owner && (isOrganismOwner(organism, caller.owner) || organism.admins.includes(caller.owner));
+  if (!isAuthor && !isAdmin) {
+    return { ok: false, status: 403, code: 'ACCESS_DENIED', message: 'Only the comment author or an organism admin can delete it' };
+  }
+  await storage.deleteMemory(rec.ownerGaii, key);
+  return { ok: true };
 }
 
 export async function listComments(

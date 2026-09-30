@@ -355,6 +355,7 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_organism_leave:                    'organism:write',
     aimeat_organism_update:                   'organism:write',
     aimeat_workspace_comment:                 'organism:write',
+    aimeat_workspace_comment_delete:          'organism:write',
     aimeat_workspace_create:                  'organism:write',
     aimeat_workspace_transfer:                'organism:write',
     aimeat_workspace_update:                  'organism:write',

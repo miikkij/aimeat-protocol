@@ -38,6 +38,10 @@
  *   v1.11.0 — 2026-09-29 — TARGET-082 review: the workspace read tells an AI which records carry a
  *     warning classification (`_classificationWarning` on each, `classificationWarnings` over the
  *     read), and GET /structure/history passes the current record and its versions through the reader.
+ *   v1.12.0 — 2026-09-30 — DELETE /comments/:commentId takes organism:write, as POST does, instead of
+ *     role 'agent', which refused an app grant; its checks move to deleteComment() in
+ *     services/organism-comments.ts, which adds the workspace read gate POST has. Reported by
+ *     omnituinen, 2026-09-29.
  *   v1.8.0 — 2026-09-25 — The workspace read carries `rules` (how the workspace takes a member's
  *     change) and `sections` (each document space's section index, the copy that counts) to a caller
  *     who can read the workspace.
@@ -46,7 +50,7 @@ import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
-import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
+import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { isMemoryBackedSpace, readWorkspaceSchemas, normalizeMemberChangeRule, DEFAULT_MEMBER_CHANGE_RULE } from '../../services/workspace-meta.js';
 import { readStoredSections } from '../../services/workspace-sections.js';
@@ -54,7 +58,7 @@ import { workspaceRowIndex } from '../../services/workspace-rows/row-service.js'
 import { emitChange } from '../../services/event-bus.js';
 import { searchOrganismContent } from '../../services/organism-search.js';
 import { scanOrganismDanglingRefs } from '../../services/dangling-refs.js';
-import { canAccessWorkspaceComments, addComment, listComments, commentPrefix, type WorkspaceComment } from '../../services/organism-comments.js';
+import { canAccessWorkspaceComments, addComment, listComments, deleteComment, type WorkspaceComment } from '../../services/organism-comments.js';
 import { buildOrganismOverview, buildWorkspaceOverview, listWorkspaces, collectWorkspaceSummary } from '../../services/structure-overview.js';
 import { buildInstructionBlocks } from '../../services/hello-mcp.js';
 import { collectOrganismGraph, collectWorkspaceGraph } from '../../services/structure-graph.js';
@@ -66,7 +70,6 @@ import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
 import { classificationWarningOf } from '../../services/classification/present-memory.js';
 import { logger } from '../../utils/logger.js';
-import { isOrganismOwner } from '../../services/organism-ownership.js';
 
 export function registerOrganismWorkspaceReadRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   /* ── GET /v1/organisms/:id/workspace — Manifest-driven workspace read ──
@@ -600,8 +603,11 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     res.json(success(config.nodeId, { comments: out }));
   });
 
-  /* DELETE /v1/organisms/:id/comments/:commentId?ws=&space=&instance_id= — delete (author or creator/admin) */
-  router.delete('/v1/organisms/:id/comments/:commentId', requireAuth(), requireRole('agent'), async (req, res) => {
+  /* DELETE /v1/organisms/:id/comments/:commentId?ws=&space=&instance_id= — delete (author or creator/admin)
+   * The same permission word as POST: an app grant (role 'app') could write a comment and was refused
+   * deleting it by requireRole('agent'), so an app's admin view had no way to remove one. The author
+   * and creator/admin test and the workspace gate are in deleteComment(), shared with the MCP tool. */
+  router.delete('/v1/organisms/:id/comments/:commentId', requireAuth(), requireScope('organism:write'), async (req, res) => {
     const id = req.params.id as string;
     const commentId = req.params.commentId as string;
     const ws = req.query.ws as string;
@@ -613,18 +619,10 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     }
     const organism = await storage.getOrganism(id);
     if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
-    const callerGaii = resolveIdentity(req.auth!, config.nodeId);
-    const callerOwner = req.auth!.owner as string;
-    const key = `${commentPrefix(id, ws, space, instanceId)}${commentId}`;
-    const scan = await storage.listAllMemory({ prefix: key, limit: 5 });
-    const rec = scan.items.find(r => r.key === key);
-    if (!rec) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Comment not found')); return; }
-    const isAuthor = rec.ownerGaii === callerGaii;
-    const isAdmin = isOrganismOwner(organism, callerOwner) || organism.admins.includes(callerOwner);
-    if (!isAuthor && !isAdmin) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the comment author or an organism admin can delete it')); return;
-    }
-    await storage.deleteMemory(rec.ownerGaii, key);
+    const result = await deleteComment(storage, config, organism,
+      { sub: req.auth!.sub, owner: req.auth!.owner, gaii: resolveIdentity(req.auth!, config.nodeId) },
+      { ws, space, instanceId, commentId });
+    if (!result.ok) { res.status(result.status).json(error(config.nodeId, result.code, result.message)); return; }
     emitChange('organisms');
     res.json(success(config.nodeId, { deleted: commentId }));
   });

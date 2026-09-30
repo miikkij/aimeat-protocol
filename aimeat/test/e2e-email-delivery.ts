@@ -41,6 +41,9 @@
  *   cd aimeat && pnpm exec node --import tsx test/e2e-email-delivery.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=email-delivery
  * @version-history
+ *   v1.3.0 -- 2026-09-30 -- The organism invitation names the inviter by display name, is written in
+ *     the language the inviter asks for (`locale`), and refuses a language it has no template for
+ *     before storing or sending anything.
  *   v1.2.0 -- 2026-09-29 -- Password reset: the mail is the reset template, and asked twice only the
  *     newest code works (SQLite had checked the oldest).
  *   v1.1.0 -- 2026-09-29 -- The magic link in the mail is the browser endpoint /v1/ghii/magic-link/open:
@@ -374,6 +377,43 @@ async function run(): Promise<void> {
         assert(lookup.status === 200, `the emailed invitation link must resolve: ${lookup.status} ${short(lookup.body)}`);
         assert(lookup.body.data.invitation.organism.name === ORG_NAME,
             `the invitation must be for ${ORG_NAME}: ${short(lookup.body)}`);
+        // The recipient knows the inviter by name. The email said the account name until 2026-09-30.
+        assert(mail.text.includes(`Email Delivery Operator invited you to join ${ORG_NAME}`),
+            `the mail must name the inviter by display name: ${mail.text.slice(0, 400)}`);
+        assert(!mail.text.includes(`${opName} invited you`), 'the mail must not name the inviter by account name');
+    });
+
+    await test('an organism email invitation is written in the language the inviter asks for', async () => {
+        // An address with no account had no language, so the email was always English although the
+        // Finnish template existed (reported by omnituinen, 2026-09-29).
+        const fiEmail = `edinvfi${STAMP}@aimeat.test`;
+        smtp!.clear();
+        const invite = await json(`/v1/organisms/${organismId}/invitations/email`, {
+            method: 'POST', headers: bearer(opToken),
+            body: JSON.stringify({ email: fiEmail, orgRole: 'member', locale: 'fi-FI' }),
+        });
+        assert(invite.status === 201, `email invitation ${invite.status}: ${short(invite.body)}`);
+        assert(invite.body.data.email_locale === 'fi', `email_locale must say fi: ${short(invite.body.data)}`);
+        const mail = await smtp!.waitForMail(fiEmail, /v1\/invite\?token=/);
+        assert(mail.subject === `Sinut on kutsuttu liittymään: ${ORG_NAME}`, `the subject must be Finnish, got: ${mail.subject}`);
+        assert(mail.text.includes(`Email Delivery Operator kutsui sinut liittymään: ${ORG_NAME}.`),
+            `the body must be Finnish and name the inviter: ${mail.text.slice(0, 400)}`);
+    });
+
+    await test('an organism email invitation refuses a language it has no template for, and stores nothing', async () => {
+        const xxEmail = `edinvxx${STAMP}@aimeat.test`;
+        smtp!.clear();
+        const invite = await json(`/v1/organisms/${organismId}/invitations/email`, {
+            method: 'POST', headers: bearer(opToken),
+            body: JSON.stringify({ email: xxEmail, orgRole: 'member', locale: 'xx' }),
+        });
+        assert(invite.status === 400 && invite.body.error?.code === 'INVALID_INPUT', `expected 400 INVALID_INPUT: ${invite.status} ${short(invite.body)}`);
+        const pending = await json(`/v1/organisms/${organismId}/invitations/email`, { headers: bearer(opToken) });
+        assert(pending.status === 200, `pending list ${pending.status}`);
+        assert(!(pending.body.data.invitations as Array<{ email?: string }>).some(i => i.email === xxEmail),
+            'a refused invitation must not be stored');
+        await sleep(300);
+        assert(smtp!.mailTo(xxEmail).length === 0, 'a refused invitation must not send mail');
     });
 
     await test('an access key mails a code that is the password the account signs in with', async () => {

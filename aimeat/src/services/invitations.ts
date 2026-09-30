@@ -21,6 +21,11 @@
  *   const membership = await createNameInvitation(storage, config, { organism, inviterGhii, inviteeRaw, role, workspaces });
  *   await revokeDepartedMemberAccess(storage, config, { organism, departing });
  * @version-history
+ *   2026-09-30 — The invitation email is written in the language the inviter asks for (`locale`),
+ *     else the recipient's account language, else the inviter's own; before, an address with no
+ *     account always got English although the Finnish and Spanish templates existed. It names the
+ *     inviter by display name, as the in-app notice does, not by account name. Reported by
+ *     omnituinen, 2026-09-29.
  *   2026-09-28 — The invitation email carries each workspace's name; it showed the id (ws-...).
  *   v1.8.1 — 2026-09-26 — A workspace creator's and a departing member's account names come from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.8.0 — 2026-08-25 — Withdraw and edit find a pending invitation through
@@ -62,6 +67,8 @@ import { grantWorkspaceRole, revokeWorkspaceRole } from './workspace-roles.js';
 import { findPendingInvitation, membershipOwner } from './invitation-lookup.js';
 import { localAccountName } from '../utils/gaii.js';
 import { isValidEmail } from '../utils/email-validator.js';
+import { LOCALES } from '../i18n.js';
+import { emailTemplateLang } from './email-templates.js';
 
 export const INVITE_DEFAULT_EXPIRY_DAYS = 7;
 export const INVITE_MAX_EXPIRY_DAYS = 30;
@@ -202,6 +209,29 @@ export interface CreateEmailInvitationInput {
   message?: string | null;
   expiresInDays?: number;
   returnUrl?: string | null; // raw inviter-supplied return target (app slug or URL); allowlisted here
+  /** The email's language as the inviter chose it (en | fi | es, or a tag such as fi-FI). Raw: validated here. */
+  locale?: unknown;
+}
+
+/**
+ * The language an invitation email is written in. The inviter's explicit choice wins, because only
+ * the inviter knows the person they are inviting. Then the recipient's own account, when the address
+ * has one here. Then the inviter's own language: an address with no account has told us nothing, and
+ * the person inviting them is the best guess the node has. English is the template's own fallback.
+ * An explicit value the node has no template for is refused rather than dropped, so the caller never
+ * believes a Finnish invitation went out when an English one did.
+ */
+export function inviteEmailLocale(
+  explicit: unknown, recipientLocale: string | null | undefined, inviterLocale: string | null | undefined,
+): string | undefined {
+  if (explicit != null && explicit !== '') {
+    const tag = typeof explicit === 'string' ? explicit.trim().slice(0, 2).toLowerCase() : '';
+    if (!(LOCALES as readonly string[]).includes(tag)) {
+      throw new InvitationError(400, 'INVALID_INPUT', `locale must be one of: ${LOCALES.join(', ')}`);
+    }
+    return tag;
+  }
+  return recipientLocale || inviterLocale || undefined;
 }
 
 export interface CreateEmailInvitationResult {
@@ -210,6 +240,8 @@ export interface CreateEmailInvitationResult {
   acceptUrl: string;
   emailSent: boolean;
   existingUser: boolean;
+  /** The language the email was written in (en | fi | es). */
+  emailLocale: string;
 }
 
 /**
@@ -227,6 +259,14 @@ export async function createEmailInvitation(
   }
   const id = input.organism.id;
   const emailHash = inviteEmailHash(cleanEmail);
+
+  // Read before anything is written: the language is validated here, so a refused locale leaves no
+  // invitation behind. `existing` is the recipient's account when the address already has one.
+  const existing = await storage.getGHIIByEmailHash(emailHash);
+  const inviter = await storage.getGHII(input.inviterGhii.includes('@') ? input.inviterGhii : `${input.inviterGhii}@${config.nodeId}`);
+  const locale = inviteEmailLocale(input.locale, existing?.locale, inviter?.locale);
+  // The recipient knows the inviter by name, not by account name.
+  const inviterName = inviter?.displayName || input.inviterGhii;
 
   const pending = await storage.listInvitationsByOrganism(id, { status: 'pending' });
   if (pending.length >= INVITE_MAX_PENDING_PER_ORG) {
@@ -269,11 +309,10 @@ export async function createEmailInvitation(
   const acceptUrl = `${config.baseUrl}/v1/invite?token=${rawToken}`;
 
   // If the email already maps to a registered user, also ping them in-app (email still sent below).
-  const existing = await storage.getGHIIByEmailHash(emailHash);
   if (existing) {
     await notify(storage, existing.ghii, {
       type: 'organism_invitation',
-      title: `${input.inviterGhii} invited you to join "${input.organism.name}"`,
+      title: `${inviterName} invited you to join "${input.organism.name}"`,
       link: `/v1/invite?token=${rawToken}`,
     });
     emitChange('notifications');
@@ -285,7 +324,7 @@ export async function createEmailInvitation(
   if (emailSvc?.enabled) {
     emailSent = await emailSvc.sendInvite(cleanEmail, {
       orgName: input.organism.name,
-      inviterName: input.inviterGhii,
+      inviterName,
       acceptUrl,
       // By name: the id (ws-...) means nothing to the person reading the email.
       workspaces: await Promise.all(invitation.workspaces.map(async g => ({
@@ -302,11 +341,11 @@ export async function createEmailInvitation(
           invitation.expiresAt, { dateStyle: 'long' },
         )
         : invitation.expiresAt.slice(0, 10),
-    }, existing?.locale);
+    }, locale);
   }
 
   emitChange('organisms');
-  return { invitation, rawToken, acceptUrl, emailSent, existingUser: !!existing };
+  return { invitation, rawToken, acceptUrl, emailSent, existingUser: !!existing, emailLocale: emailTemplateLang(locale) };
 }
 
 /* ══ NODE-level invitation — the agent door (12-ai-rekisteroi.md) ══

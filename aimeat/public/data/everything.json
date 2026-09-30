@@ -766,10 +766,10 @@
      "slug": "g-6-invitations",
      "cells": [
       "<strong>Invitations</strong>",
-      "Invite by account or by email; the invitee accepts, declines or ignores. An email invitation can say where the invitee lands after joining: an app on this node (for example the app the organism works in) or their profile page.",
-      "<code>aimeat_organism_invite</code>, <code>aimeat_organism_invite_email</code> (<code>return_url</code>), <code>POST /v1/organisms/:id/invitations/email</code>"
+      "Invite by account or by email; the invitee accepts, declines or ignores. An email invitation can say where the invitee lands after joining: an app on this node (for example the app the organism works in) or their profile page. It is written in the language the inviter chooses (English, Finnish or Spanish), else the recipient's own or the inviter's, and names the inviter by display name.",
+      "<code>aimeat_organism_invite</code>, <code>aimeat_organism_invite_email</code> (<code>return_url</code>, <code>locale</code>), <code>POST /v1/organisms/:id/invitations/email</code>"
      ],
-     "plain": "Invitations Invite by account or by email; the invitee accepts, declines or ignores. An email invitation can say where the invitee lands after joining: an app on this node (for example the app the organism works in) or their profile page. aimeat_organism_invite, aimeat_organism_invite_email (return_url), POST /v1/organisms/:id/invitations/email"
+     "plain": "Invitations Invite by account or by email; the invitee accepts, declines or ignores. An email invitation can say where the invitee lands after joining: an app on this node (for example the app the organism works in) or their profile page. It is written in the language the inviter chooses (English, Finnish or Spanish), else the recipient's own or the inviter's, and names the inviter by display name. aimeat_organism_invite, aimeat_organism_invite_email (return_url, locale), POST /v1/organisms/:id/invitations/email"
     },
     {
      "slug": "g-6-which-agents-an-organism-admits",

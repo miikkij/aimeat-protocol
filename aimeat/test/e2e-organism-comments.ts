@@ -3,8 +3,10 @@
  * @description E2E for comments/threads on workspace objects (records + documents). Covers: adding
  *   a general comment, an anchored comment (anchor.quote/section), a threaded reply (parent_id),
  *   listing a target's thread (sorted, with anchor + parent), the membership gate (non-member 403),
- *   and author-only / admin delete.
+ *   and author-only / admin delete: a plain member cannot delete another's comment, the creator can.
  * @version-history
+ *   v1.1.0 — 2026-09-30 — Admin moderation: the creator deletes a member's comment, and a member who is
+ *     neither author nor admin is refused. Until now no admin delete ran (see 7b).
  *   v1.0.0 — 2026-06-09 — Initial: workspace comments + threads + anchoring.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=organism-comments
@@ -111,13 +113,10 @@ await test('7. Author deletes their comment → thread shrinks to 2', async () =
     assert((g.body.data.comments || []).length === 2, `expected 2 after delete, got ${(g.body.data.comments || []).length}`);
 });
 
-await test('7b. delete is author-or-admin, and the route has NO membership gate of its own', async () => {
-    // The header claims "author-only / admin delete", and only the author-deletes-their-own case runs:
-    // no non-author ever deletes and no admin delete is exercised. DELETE carries requireAuth plus
-    // requireRole('agent') and nothing else, so removing `if (!isAuthor && !isAdmin) return 403` lets
-    // ANY authenticated caller who knows the organism, workspace, space, instance and comment ids
-    // delete anyone's comment. B is not even a member here, which is what makes the missing
-    // membership gate visible: without the author check there is nothing else to stop them.
+await test('7b. a non-member cannot delete a comment', async () => {
+    // Written when DELETE carried requireAuth plus requireRole('agent') and nothing else, so the
+    // author check was all that stopped a stranger. Since 2026-09-30 deleteComment() also requires the
+    // workspace read gate, so B, not even a member, is refused by two checks.
     const before = await json(`/v1/organisms/${orgId}/comments?ws=${WS}&space=task&instance_id=t1`, { headers: auth(A.token) });
     const countBefore = (before.body.data.comments || []).length;
     const target = (before.body.data.comments || [])[0];
@@ -136,6 +135,39 @@ await test('7b. delete is author-or-admin, and the route has NO membership gate 
 await test('8. Deleting a missing comment returns 404', async () => {
     const r = await json(`/v1/organisms/${orgId}/comments/nope-id?ws=${WS}&space=task&instance_id=t1`, { method: 'DELETE', headers: auth(A.token) });
     assert(r.status === 404, `expected 404, got ${r.status}`);
+});
+
+// Admin moderation (reported by omnituinen, 2026-09-29: the organism's admin needs to remove wrong
+// comments and test traces). C is an ordinary member who can read and comment in the workspace.
+let C: Awaited<ReturnType<typeof setupOwner>>;
+const thread = async () => ((await json(`/v1/organisms/${orgId}/comments?ws=${WS}&space=task&instance_id=t1`, { headers: auth(A.token) })).body.data.comments || []) as Array<{ id: string; author: string }>;
+const del = (token: string, id: string) => json(`/v1/organisms/${orgId}/comments/${id}?ws=${WS}&space=task&instance_id=t1`, { method: 'DELETE', headers: auth(token) });
+
+await test('9. Setup: C joins as a member with contributor access to the workspace, and comments', async () => {
+    C = await setupOwner('c');
+    const add = await json(`/v1/organisms/${orgId}/members`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ ghii: C.name, role: 'member', workspaces: [{ ws: WS, role: 'contributor' }] }) });
+    assert(add.status === 201, `member add ${add.status}: ${JSON.stringify(add.body.error)}`);
+    const r = await json(`/v1/organisms/${orgId}/comments`, { method: 'POST', headers: auth(C.token), body: JSON.stringify({ ws: WS, space: 'task', instance_id: 't1', body: 'A wrong comment by a member.' }) });
+    assert(r.status === 201, `C comment ${r.status}: ${JSON.stringify(r.body.error)}`);
+});
+
+await test('10. A member who is not the author and not an admin cannot delete someone else\'s comment (403)', async () => {
+    const before = await thread();
+    const ofA = before.find(c => c.author.startsWith(`${A.name}@`));
+    assert(!!ofA, 'there is a comment by A');
+    const r = await del(C.token, ofA!.id);
+    assert(r.status === 403, `a plain member deleted another's comment: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    assert((await thread()).length === before.length, 'the thread shrank despite the 403');
+});
+
+await test('11. The organism\'s creator deletes a member\'s comment', async () => {
+    const before = await thread();
+    const ofC = before.find(c => c.author.startsWith(`${C.name}@`));
+    assert(!!ofC, 'there is a comment by C');
+    const r = await del(A.token, ofC!.id);
+    assert(r.status === 200 && r.body.data.deleted === ofC!.id, `the creator could not delete a member's comment: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    const after = await thread();
+    assert(after.length === before.length - 1 && !after.some(c => c.id === ofC!.id), 'the member\'s comment is still in the thread');
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);

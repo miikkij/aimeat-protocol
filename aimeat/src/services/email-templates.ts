@@ -9,6 +9,8 @@
  * @structure i18n string table + wrapHtml() layout + per-template builder functions.
  * @usage import { inviteEmailHtml, inviteEmailSubject } from './email-templates.js';
  * @version-history
+ *   2026-09-30 — Export emailTemplateLang, so the organism invitation can answer which language its
+ *     email went out in.
  *   2026-09-28 — The invitation email names each workspace by its name, not its id.
  *   v1.6.0 — 2026-09-08 — Remove matchSuggestionEmailHtml, the MatchSuggestion type, the six `match*`
  *     strings in all three languages and the five `.match-*` CSS rules. Nothing in src/ has ever
@@ -251,6 +253,8 @@ function emailLang(locale: string | undefined): string {
   const tag = (locale ?? '').slice(0, 2).toLowerCase();
   return Object.prototype.hasOwnProperty.call(i18n, tag) ? tag : 'en';
 }
+/** The language a template renders for `locale`, so a caller can say which one went out. */
+export const emailTemplateLang = emailLang;
 
 function t(locale: string | undefined, key: string): string {
   return i18n[emailLang(locale)][key] ?? i18n['en'][key] ?? key;

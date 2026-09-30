@@ -11,6 +11,9 @@
  *   import { registerOrganismsTools } from './organisms.js';
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-09-30 — aimeat_workspace_comment_delete: the comment's author or the organism's creator or an
+ *     admin removes a comment, through deleteComment() as the REST route does. There was no MCP tool
+ *     for it, so an agent could write a comment it had no way to take back.
  *   2026-09-29 — aimeat_organism_export answers `left_out`, what the classification kept out of the
  *     bundle (TARGET-082 review).
  *   2026-09-29 — aimeat_workspace_comments passes the agent's classification reader to listComments
@@ -58,7 +61,8 @@ import { registerOrganismNameInviteTools } from './organisms-name-invites.js';
 import { registerOrganismEmailInviteTools } from './organisms-email-invites.js';
 import { searchOrganismContent } from '../services/organism-search.js';
 import { archiveTarget, unarchiveTarget, type ArchiveLevel } from '../services/archive.js';
-import { canAccessWorkspaceComments, addComment, listComments } from '../services/organism-comments.js';
+import { canAccessWorkspaceComments, addComment, listComments, deleteComment } from '../services/organism-comments.js';
+import { toolError } from './tool-error.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
 import { provenanceForWrite } from '../services/ai-provenance.js';
@@ -526,6 +530,31 @@ export function registerOrganismsTools(
             }
             const comments = await listComments(storage, readerForAgent({ storage, config }, agentGaii), organism_id, ws, space, instance_id);
             return { content: [{ type: 'text' as const, text: JSON.stringify({ comments, total: comments.length }, null, 2) }] };
+        },
+    );
+
+    // ── Tool: aimeat_workspace_comment_delete ── (author or creator/admin removes one comment)
+    // Mirrors DELETE /v1/organisms/:id/comments/:commentId; both call deleteComment().
+    mcp.tool(
+        'aimeat_workspace_comment_delete',
+        descriptionFor('aimeat_workspace_comment_delete'),
+        {
+            organism_id: z.string().describe('The organism ID'),
+            ws: z.string().describe('Workspace id'),
+            space: z.string().describe('The objectType (space) name'),
+            instance_id: z.string().describe('The record/document id the comment is on'),
+            comment_id: z.string().describe('The comment id (from aimeat_workspace_comments)'),
+        },
+        annotationsFor('aimeat_workspace_comment_delete'),
+        async ({ organism_id, ws, space, instance_id, comment_id }) => {
+            const organism = await storage.getOrganism(organism_id);
+            if (!organism) return { ...toolError('NOT_FOUND', 'Organism not found') };
+            const result = await deleteComment(storage, config, organism,
+                { sub: agentGaii, owner: getOwnerName(), gaii: agentGaii },
+                { ws, space, instanceId: instance_id, commentId: comment_id });
+            if (!result.ok) return { ...toolError(result.code, result.message) };
+            emitChange('organisms');
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ deleted: comment_id }, null, 2) }] };
         },
     );
 

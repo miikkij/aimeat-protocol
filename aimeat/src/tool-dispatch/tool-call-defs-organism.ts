@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Public-memory, organism, workspace and schedule connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-09-30 — aimeat_workspace_comment_delete handler (DELETE /v1/organisms/:id/comments/:commentId).
  *   2026-09-28 — aimeat_organism_update passes agent_access.
  *   2026-09-27 -- aimeat_schedule_list forwards detail (GET /v1/schedules?detail=true); aimeat_schedule_update forwards prompt with the rest.
  *   v1.6.0 -- 2026-09-25 -- aimeat_workspace_space_add, _sections_set and _suggestions reach the node's
@@ -192,6 +193,10 @@ export const organismTools: ConnectCliToolDefinition[] = [
     {
         name: 'aimeat_workspace_comments',
         handler: ({ client }, input) => client.get(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/comments${query({ ws: requiredString(input, 'ws'), space: requiredString(input, 'space'), instance_id: requiredString(input, 'instance_id') })}`),
+    },
+    {
+        name: 'aimeat_workspace_comment_delete',
+        handler: ({ client }, input) => client.delete(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/comments/${encodeURIComponent(requiredString(input, 'comment_id'))}${query({ ws: requiredString(input, 'ws'), space: requiredString(input, 'space'), instance_id: requiredString(input, 'instance_id') })}`),
     },
     // ── Workspace ROW spaces. This is the door a fleet daemon actually calls, and it is the one a
     //    parameter added to the other two has historically failed to reach. ──
