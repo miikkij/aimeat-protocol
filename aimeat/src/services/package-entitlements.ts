@@ -27,6 +27,8 @@
  * @usage
  *   const pkg = await entitledVersion(storage, groupId, nodeId, versionParam);
  * @version-history
+ *   2026-09-30 — A package bought inside a bundle whose update period is over answers UPDATES_ENDED
+ *     (after the node's signature is checked) instead of a bare 403 (updatesEndedInBundle).
  *   v1.1.0 — 2026-09-28 — Release channels (Jouni, 2026-09-28): an entitlement follows `stable` (published
  *     versions) or `beta` (beta versions too); the listing names the channel. UPDATES_ENDED only when a
  *     version on the node's channel was made after its cutoff; anything else a held node cannot have is
@@ -225,6 +227,25 @@ async function channelVersions(
  * its channel exists and was made after `updatesUntil`. A beta version asked for on the stable
  * channel is not that case, and the endpoint answers it as not found.
  */
+/**
+ * Whether `nodeId` bought `groupId` inside a bundle whose update period is over, with no bundle
+ * version from before the end that lists it. entitlementOf() answers null then, so the node used to
+ * get a bare 403 for a package it had paid for, and its owner read `SOURCE_REFUSED ... 403`
+ * (the shop's test, 2026-09-30). The node is still a customer whose updates ended.
+ */
+async function updatesEndedInBundle(storage: Storage, groupId: string, nodeId: string): Promise<boolean> {
+    const author = groupId.split('::')[1];
+    for (const { groupId: held, entitlement } of await entitledGroupsOf(storage, nodeId)) {
+        if (held === groupId || held.split('::')[1] !== author || !entitlement.updatesUntil) continue;
+        if (Date.parse(entitlement.updatesUntil) > Date.now()) continue;
+        for (const v of await channelVersions(storage, held, entitlement)) {
+            const bundle = bundleOfPackage(v);
+            if (bundle?.ok && bundle.value.packages.some(p => p.groupId === groupId)) return true;
+        }
+    }
+    return false;
+}
+
 async function updatesEndedFor(storage: Storage, groupId: string, nodeId: string, version?: string): Promise<boolean> {
     const ent = await entitlementOf(storage, groupId, nodeId);
     if (!ent?.updatesUntil) return false;
@@ -248,14 +269,16 @@ export async function resolveNodeRead(
 ): Promise<NodeRead> {
     if (!config.packageRepository) return { kind: 'unsigned' };
     const who = await verifyPackageNode(headers, peers, groupId, Date.now(),
-        async nodeId => (await entitlementOf(storage, groupId, nodeId)) !== null);
+        // A node whose bundle's updates ended is let through the peer gate too, so its signature is
+        // checked before it hears anything about its purchase; it is served nothing.
+        async nodeId => (await entitlementOf(storage, groupId, nodeId)) !== null || await updatesEndedInBundle(storage, groupId, nodeId));
     if (!who) return { kind: 'unsigned' };
     if (!who.ok) return { kind: 'refused', status: who.status, code: who.code, message: who.message };
     const latest = (await storage.listVersions(groupId, 1, 0)).versions[0];
     if (!latest || latest.visibility === 'public') return { kind: 'unsigned' };
     const pkg = await entitledVersion(storage, groupId, who.nodeId, version);
     if (!pkg) {
-        return await updatesEndedFor(storage, groupId, who.nodeId, version)
+        return (await updatesEndedFor(storage, groupId, who.nodeId, version) || await updatesEndedInBundle(storage, groupId, who.nodeId))
             ? { kind: 'refused', status: 403, code: 'UPDATES_ENDED', message: `${who.nodeId}'s updates for ${groupId} ended before that version was published. Buying the package again brings them back.` }
             : { kind: 'refused', status: 404, code: 'NOT_FOUND', message: `Package not found: ${groupId}` };
     }

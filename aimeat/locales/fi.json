@@ -8540,6 +8540,8 @@
   "notiftext.package_install_request.body": "Paketti kirjoittaa merkintöjä muistiisi. {who} ei saa tehdä sitä ilman lupaasi. Kun hyväksyt, paketti asennetaan sinulle.",
   "notiftext.package_update_available.title": "Asennukselle {label} on päivitys",
   "notiftext.package_update_available.body": "Paketista {name} on saatavilla versio {version}. Asennuksesi on versiossa {current}. Päivitys ei koske osiin, joita olet itse muokannut.",
+  "notiftext.package_updates_ended.title": "Asennuksen {label} päivityspalvelu on päättynyt",
+  "notiftext.package_updates_ended.body": "{label} toimii edelleen sellaisenaan. Uudet versiot tulevat taas, kun uusit päivityspalvelun.",
   "notiftext.package_update_request.title": "{who} pyytää lupaa päivittää paketin {name}",
   "notiftext.package_update_request.body": "Uusi versio kirjoittaa merkintöjä muistiisi. {who} ei saa tehdä sitä ilman lupaasi. Kun hyväksyt, kopiosi päivitetään.",
   "notiftext.package_request_approved_by_agent.title": "{by} hyväksyi pyynnön, joka koskee pakettia {name}",

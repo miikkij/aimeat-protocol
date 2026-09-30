@@ -47,6 +47,8 @@ import type { Server } from 'node:http';
 import { setActiveEmailService, type EmailService } from '../src/services/email.js';
 import { provisionOwner } from '../src/services/owner-provisioning.js';
 import { publishSkill } from '../src/services/skills.js';
+import { signedPackageHeaders } from '../src/services/package-node-auth.js';
+import { refreshInstalledPackages, UPDATES_ENDED_SENTENCE } from '../src/services/package-upstream-refresh.js';
 import type { Storage } from '../src/storage/interface.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
@@ -612,6 +614,35 @@ await test('A new node started with an install set links the repository, waits f
         method: 'POST', headers: auth(dToken), body: JSON.stringify({ group_id: 'x::y', source_url: C.baseUrl, trust: 'tofu' }),
     });
     assert(other.status === 403 && other.body.error?.code === 'PACKAGE_FEDERATION_DISABLED', `another source is refused: ${other.status} ${JSON.stringify(other.body)}`);
+});
+
+await test('When D\'s bundle update period is over, the repository says so, and D\'s owner is told once in plain words', async () => {
+    // A sold node holds the bundle's entitlement, and reaches the packages in it through that. With the
+    // period over, the repository answered a bare 403 and the owner read "SOURCE_REFUSED ... 403"
+    // (the shop's test, 2026-09-30).
+    const end = await R.json(`/v1/packages/${encodeURIComponent(setupOnR)}/entitlements/${D!.nodeId}`, {
+        method: 'PUT', headers: auth(vendorToken), body: JSON.stringify({ updates_until: '2020-01-01T00:00:00.000Z', note: 'fee ended' }),
+    });
+    assert(end.status === 200, `end D's updates: ${end.status} ${JSON.stringify(end.body)}`);
+    try {
+        const headers = await signedPackageHeaders(D!.storage, D!.config, shopOnR);
+        const read = await fetch(`${R.baseUrl}/v1/federation/packages/${encodeURIComponent(shopOnR)}/attestation`, { headers });
+        const body = await read.json() as any;
+        assert(read.status === 403 && body.error?.code === 'UPDATES_ENDED', `the repository says the updates ended: ${read.status} ${JSON.stringify(body.error)}`);
+
+        const deps = { storage: D!.storage, config: D!.config, peers: new Map() };
+        const first = await refreshInstalledPackages(deps, { owner: 'dco' }, { notify: true });
+        const shop = first.find(o => o.package.startsWith(`${SHOP}::`));
+        assert(shop?.result === 'updates_ended' && shop.detail === UPDATES_ENDED_SENTENCE, `plain words for the owner: ${JSON.stringify(first)}`);
+        await refreshInstalledPackages(deps, { owner: 'dco' }, { notify: true });
+        const notes = (await D!.storage.listMemory(`dco@${D!.nodeId}`, { prefix: 'notif.' }))
+            .filter(r => (r.value as { type?: string } | undefined)?.type === 'package_updates_ended');
+        assert(notes.length === 1, `told once, not every night: ${notes.length}`);
+    } finally {
+        await R.json(`/v1/packages/${encodeURIComponent(setupOnR)}/entitlements/${D!.nodeId}`, {
+            method: 'PUT', headers: auth(vendorToken), body: JSON.stringify({ updates_until: null }),
+        });
+    }
 });
 
 await test('A grant naming a known peer under another key is refused, and grants nothing', async () => {
