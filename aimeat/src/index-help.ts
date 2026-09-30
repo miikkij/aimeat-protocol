@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description CLI help text constants (top-level + connector) for the aimeat binary. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.7 — 2026-09-30 — `--scopes` on the plain `aimeat connect` usage too, and what it does on a
+ *     re-approval.
  *   v1.1.6 — 2026-09-30 — `aimeat connect add --scopes`.
  *   v1.1.5 — 2026-09-29 — The serve help says that from 3.20.0 the daemon refuses a request without
  *     the secret.
@@ -127,8 +129,13 @@ USAGE
       Claude Desktop is the exception: its config file cannot carry a remote URL,
       so it is wired through the local connector over stdio.
 
-  aimeat connect --url <node-url> --owner <owner> [--agent <name>]
-      Authenticate an AI agent with OAuth device authorization.
+  aimeat connect --url <node-url> --owner <owner> [--agent <name>] [--mode <mode>] [--scopes <list>]
+      Authenticate an AI agent with OAuth device authorization. --scopes names
+      the permissions the agent asks for, comma-separated; the owner sees them
+      on the consent screen. Without it a new agent gets the default set,
+      which cannot take work. On a re-approval of an existing agent the
+      consent screen starts from this list, so name every permission the
+      agent should keep.
 
   aimeat connect serve [--surface <appdev|agent|service|admin>] [--http]
       Start the local MCP server for the connected agent. Configure your AI

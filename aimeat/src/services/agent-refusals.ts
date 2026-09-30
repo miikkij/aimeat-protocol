@@ -49,6 +49,9 @@
  *   noteAgentRefusal(req.auth, ['agent:write'], false, 'PATCH /v1/agents/:name/tags');
  *   const { refusals, request } = await readAgentAccess(storage, ownerGhii, 'concierge', agent.defaultScopes ?? ['*']);
  * @version-history
+ *   v1.2.0 — 2026-09-30 — A read waits for the agent's writes in flight and lays the refusals still
+ *     waiting in their one-minute window over the record (settledEntries). A second run refused
+ *     within a minute of the first read the first run's time and completed (crewaimeat-dev).
  *   v1.1.0 — 2026-09-30 — The owner can decline: a declined refusal leaves the owner's views and is
  *     still told to the agent (`declined` on the wire). Jouni: accept some or all, or decline.
  *   v1.0.0 — 2026-09-30 — Initial.
@@ -363,6 +366,36 @@ export interface AgentAccess {
   request: AgentScopeRequest | null;
 }
 
+/**
+ * What a read must see that the stored record does not hold yet. A refusal inside the one-minute
+ * write window waits in its slot for the timer, and the first write of a refusal is still in flight
+ * when the 403 reaches the caller. A run that asks right after it ended, with its own start as
+ * `since`, would read the previous run's time and complete. Found by crewaimeat-dev on 2026-09-30:
+ * two runs refused within a minute, the second completed. So a read waits for this agent's writes in
+ * flight, then lays the refusals still waiting in memory over what the record holds.
+ */
+async function settledEntries(gaii: string, stored: AgentRefusalEntry[]): Promise<AgentRefusalEntry[]> {
+  // A chain never rejects: writeSlot catches a failed note, and a decline stores a tail that cannot.
+  await chains.get(gaii);
+  const out = stored.map((e) => ({ ...e }));
+  for (const slot of slots.values()) {
+    if (slot.gaii !== gaii || slot.pending === 0) continue;
+    const at = out.find((e) => sameEntry(e, slot.needed, slot.call));
+    if (at) {
+      at.count += slot.pending;
+      if (slot.lastPendingAt > at.lastAt) at.lastAt = slot.lastPendingAt;
+    } else {
+      // A permission the owner declined stays declined on a new route here too, as it will be once written.
+      const declinedAt = out.find((e) => e.declinedAt && sameEntry(e, slot.needed, e.call))?.declinedAt;
+      out.push({
+        needed: slot.needed, anyOf: slot.anyOf, call: slot.call, count: slot.pending, firstAt: slot.firstPendingAt, lastAt: slot.lastPendingAt,
+        ...(declinedAt ? { declinedAt } : {}),
+      });
+    }
+  }
+  return out;
+}
+
 export async function readAgentAccess(
   storage: Storage,
   ownerGhii: string,
@@ -370,12 +403,16 @@ export async function readAgentAccess(
   heldScopes: readonly string[],
   since?: string,
 ): Promise<AgentAccess> {
+  const gaii = `${agentName}#${ownerGhii}`;
+  // A write in flight lands before the record is read (a chain never rejects, see settledEntries).
+  await chains.get(gaii);
   const [refusals, request] = await Promise.all([
     storage.getMemory(ownerGhii, agentRefusalsKey(agentName)),
     storage.getMemory(ownerGhii, agentScopeRequestKey(agentName)),
   ]);
+  const stored = refusals ? asRefusals(refusals.value, agentName).entries : [];
   return {
-    refusals: refusals ? openRefusals(asRefusals(refusals.value, agentName).entries, heldScopes, Date.now(), since) : [],
+    refusals: openRefusals(await settledEntries(gaii, stored), heldScopes, Date.now(), since),
     request: request ? asRequest(request.value) : null,
   };
 }
@@ -397,6 +434,16 @@ export async function readOwnerAgentAccess(
     if (m[2] === 'refusals') slot.entries = asRefusals(row.value, m[1]).entries;
     else slot.request = asRequest(row.value);
     out.set(m[1], slot);
+  }
+  // The refusals still waiting in memory, as readAgentAccess does, for every agent of this owner
+  // that has one (an agent with no record yet gets its entry from the slot alone).
+  const waiting = new Set([...slots.values()].filter((s) => s.pending > 0 && ownerGhiiOf(s.gaii) === ownerGhii).map((s) => s.gaii));
+  for (const gaii of waiting) {
+    const name = parseGAII(gaii)?.agent;
+    if (!name) continue;
+    const slot = out.get(name) ?? { entries: [], request: null };
+    slot.entries = await settledEntries(gaii, slot.entries);
+    out.set(name, slot);
   }
   return out;
 }

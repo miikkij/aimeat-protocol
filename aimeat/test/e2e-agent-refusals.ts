@@ -183,6 +183,20 @@ await test('The agent reads the same refusal itself, and a later `since` hides i
     assert(r2.status === 200 && r2.body.data.refusals.length === 0, `since after the refusal: ${JSON.stringify(r2.body.data)}`);
 });
 
+await test('A second run refused within a minute of the first sees its own refusal', async () => {
+    // The note for one (call, permission) is written at most once a minute; a refusal inside that
+    // window used to wait for the timer, so a run that asked with its own start as `since` read the
+    // first run's time and completed. Found by crewaimeat-dev on 2026-09-30.
+    const run2 = new Date().toISOString();
+    await new Promise(r => setTimeout(r, 20));
+    const p = await json(`/v1/agents/${AGENT}/tags`, auth(agentToken, { method: 'PATCH', body: JSON.stringify({ tags: ['y'] }) }));
+    assert(p.status === 403, `expected 403, got ${p.status}`);
+    const r = await json(`/v1/agents/${AGENT}/refusals?since=${encodeURIComponent(run2)}`, auth(agentToken));
+    const f = (r.body.data.refusals as any[]).find(x => x.needed[0] === 'agent:write');
+    assert(!!f, `the second run's refusal is missing: ${JSON.stringify(r.body.data.refusals)}`);
+    assert(f.count === 2 && f.last_at >= run2, `count/last_at: ${JSON.stringify(f)}`);
+});
+
 await test('The agent\'s open task carries a scope_denied event naming the permission', async () => {
     const events = await eventually(async () => {
         const r = await json(`/v1/agents/${AGENT}/tasks/${taskId}/events`, auth(ownerToken));
