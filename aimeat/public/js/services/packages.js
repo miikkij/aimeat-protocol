@@ -15,6 +15,7 @@
  *   import * as pkgService from '/js/services/packages.js';
  *   const res = await pkgService.listPackages({ status: 'published' });
  * @version-history
+ *   v1.4.0 — 2026-09-30 — setInstance: PATCH /v1/instances/:id (label, auto_update) for the page's switch.
  *   v1.0.0 — 2026-03-15 — initial implementation (Phase 6)
  *   v1.1.0 — 2026-03-20 — add exportPackageZip, importPackageZip, proposeAsTemplate
  *   v1.2.0 — 2026-03-20 — add syncFederationTemplates, listFederationTemplates
@@ -57,6 +58,8 @@ export const applyMigration = (id, data) => apiPost(`/v1/instances/${enc(id)}/ap
  * comes back in `needsYou` untouched, which the hand-rolled version could not tell.
  */
 export const updateInstance = (id, data) => apiPost(`/v1/instances/${enc(id)}/update`, data ?? {});
+/** Change one installed copy: its label, or whether the daily check updates it by itself (auto_update). */
+export const setInstance = (id, data) => apiPatch(`/v1/instances/${enc(id)}`, data);
 export const removeInstance = (id, removeComponents) => apiDelete(`/v1/instances/${enc(id)}` + buildQuery({ removeComponents }));
 
 // ── Templates ──
