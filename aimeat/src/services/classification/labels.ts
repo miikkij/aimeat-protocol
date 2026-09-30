@@ -32,13 +32,21 @@
  *   write it (to set or review one): a workspace's content needs the workspace read decision, the
  *   organism's meta namespace its creator or an admin, an ecosystem app its data-area grant. And
  *   nobody outside the reader audience of the label content carries now reads or moves it.
- * @structure ClassificationError · LabelActor · labelActorOf() · documentKeyOf() · memoryTarget() ·
- *   labelAddressOf() · documentContentKeys() · fileTarget() · rowTarget() · setLabel() ·
- *   reviewLabel() · labelsFor() · targetOf() · readContentLabel()
+ *   AN APP DOES WHAT IT IS BUILT FOR (decided 2026-09-30). An app credential lowers a label without a
+ *   justification being demanded, and accepts a suggestion that lowers one; each such lowering is
+ *   recorded in the exceptions list (exceptions.ts) with the app and the act as its reason. An AI
+ *   credential keeps every refusal it had.
+ * @structure ClassificationError · LabelActor · labelActorOf() · isOwnerPerson() · isAppActor() ·
+ *   appNameOf() · documentKeyOf() · memoryTarget() · labelAddressOf() · documentContentKeys() ·
+ *   fileTarget() · rowTarget() · setLabel() · reviewLabel() · labelsFor() · targetOf() ·
+ *   readContentLabel() · labelForException()
  * @usage
  *   const actor = labelActorOf(req.auth!, config.nodeId);
  *   await setLabel({ storage, config }, actor, memoryTarget(owner, key), { label: 'luottamuksellinen' });
  * @version-history
+ *   v1.6.0 — 2026-09-30 — Decided by Jouni 2026-09-30. An app's lowering (set or an accepted
+ *     suggestion) is not refused for a missing justification and is recorded as an automatic
+ *     exception; LabelActor carries the app id; labelForException() for a person's exception.
  *   v1.5.0 — 2026-09-30 — Decided by Jouni 2026-09-30. humanSaid from an AI raises at once and
  *     otherwise waits for the person (PERSON_APPROVES), which an AI cannot accept even with the
  *     person's words. One label per document: every copy's key maps to the document's address, a
@@ -72,6 +80,7 @@ import { readerKindOf } from './reader-kind.js';
 import { audienceCheck } from './audience.js';
 import { recordClassificationAudit } from './audit.js';
 import { emitChange } from '../event-bus.js';
+import { recordAutoException } from './exceptions.js';
 
 /** How many changes a label row keeps; the oldest go first (TARGET-082 review finding 7). */
 const HISTORY_MAX = 50;
@@ -101,6 +110,8 @@ export interface LabelActor {
   nodeOwn?: boolean;
   /** The credential's roles, for the organism namespace rule. Absent: read from `kind`. */
   roles?: string[];
+  /** An app credential's app id (`owner/file.html`), named in the exceptions it records. */
+  app?: string;
 }
 
 /** The actor behind a request. A visitor from another node labels nothing here. */
@@ -112,7 +123,10 @@ export function labelActorOf(
   const kind = readerKindOf(auth);
   if (kind === 'anonymous') throw new ClassificationError('AUTH_REQUIRED', 401, 'Sign in to label content.');
   const ownerGhii = auth.owner.includes('@') ? auth.owner : `${auth.owner}@${nodeId}`;
-  return { principal: callerPrincipal(auth, nodeId), ownerGhii, ownerName: localAccountOf(ownerGhii), kind, roles: [...auth.roles] };
+  return {
+    principal: callerPrincipal(auth, nodeId), ownerGhii, ownerName: localAccountOf(ownerGhii), kind, roles: [...auth.roles],
+    ...(auth.roles.includes('app') && auth.app ? { app: auth.app } : {}),
+  };
 }
 
 /** The suffixes a workspace document or an organism record is stored under besides its bare key. */
@@ -218,10 +232,22 @@ function rolesOf(actor: LabelActor): string[] {
 }
 
 /** Is this the account holder in their own session (not an agent, an app or an ecosystem app)? */
-function isOwnerPerson(actor: LabelActor): boolean {
+export function isOwnerPerson(actor: LabelActor): boolean {
   const roles = rolesOf(actor);
   return actor.kind === 'human' && roles.includes('owner') && !roles.some(r => r === 'agent' || r === 'ecosystem' || r === 'app');
 }
+
+/**
+ * Is this an app credential (a hosted app's grant, read as the person's screen)? An app does what it
+ * is built for, and an act against a label is recorded as an exception rather than refused (decided
+ * 2026-09-30). An AI credential (agent, ecosystem app, PAT, unattended run) never is one.
+ */
+export function isAppActor(actor: LabelActor): boolean {
+  return actor.kind === 'human' && rolesOf(actor).includes('app');
+}
+
+/** How an app is named in the exceptions it records. */
+export const appNameOf = (actor: LabelActor): string => actor.app ?? actor.principal;
 
 /**
  * The memory key the organism namespace rule reads for a target, and its workspace. A row lives in
@@ -365,9 +391,13 @@ async function putLabel(storage: Storage, row: ContentLabelRow, stale: readonly 
   emitChange('classification', ownerOfScope(row.scope) ?? undefined);
 }
 
-/** Set a label, or leave a suggestion when the rules say an AI or a rule may not set it. */
+/**
+ * Set a label, or leave a suggestion when the rules say an AI or a rule may not set it. `opts.via`
+ * says the call is reviewLabel accepting a suggestion, which an app's exception names as a review.
+ */
 export async function setLabel(
   deps: ClassificationDeps, actor: LabelActor, named: ContentLabelTarget, input: SetLabelInput,
+  opts: { via?: 'review' } = {},
 ): Promise<SetLabelResult> {
   const target = labelAddressOf(named);
   const justification = trimmed(input.justification, 'justification', 2000);
@@ -426,8 +456,11 @@ export async function setLabel(
   }
 
   const asPerson = actor.kind === 'human' || (actor.kind === 'ai' && !!humanSaid);
+  // An app lowers without being refused, and the lowering is recorded as an exception (decided
+  // 2026-09-30: "jos se tekee jotain classificationin 'vastaisesti' niin siitä vain merkataan exception").
+  const app = isAppActor(actor);
   if (asPerson) {
-    if (lowering && from?.lowerNeedsJustification && !justification) {
+    if (lowering && from?.lowerNeedsJustification && !justification && !app) {
       throw new ClassificationError('JUSTIFICATION_REQUIRED', 400,
         `Lowering from "${from.name.en}" to "${next.name.en}" needs a justification: why this content is less sensitive than its label says.`);
     }
@@ -437,6 +470,13 @@ export async function setLabel(
     pushHistory(row, { at, by: actor.principal, source, action: 'set', from: fromId, to: next.id, justification, humanSaid });
     await putLabel(deps.storage, row, stale);
     if (next.id !== fromId) changed(source);
+    if (app && lowering && next.id !== fromId) {
+      const act = opts.via === 'review' ? `accepted the suggestion lowering ${fromId} → ${next.id}` : `lowered ${fromId} → ${next.id}`;
+      await recordAutoException(deps, {
+        by: actor.principal, app: actor.app ?? null, scope: target.scope, target: { kind: target.kind, key: target.key }, label: next.id,
+        action: opts.via === 'review' ? 'review' : 'lower', reason: `app ${appNameOf(actor)} ${act}${justification ? `: ${justification}` : ''}`,
+      });
+    }
     return { applied: true, label: next.id, from: fromId, source, locked: true };
   }
 
@@ -500,7 +540,7 @@ export async function reviewLabel(
     }
     return setLabel(deps, actor, target, {
       label: prev.suggestion.label, justification: input.justification ?? prev.suggestion.justification ?? null, humanSaid,
-    });
+    }, { via: 'review' });
   }
   const at = (deps.now ?? (() => new Date().toISOString()))();
   const source = actor.kind === 'human' ? 'human' : 'human-via-ai';
@@ -616,6 +656,24 @@ export async function readContentLabel(deps: ClassificationDeps, actor: LabelAct
     target, label, labelDetail: labelById(policy, label) ?? null, source: row?.source ?? 'default',
     locked: !!row?.locked, suggestion: row?.suggestion ?? null, history: (row?.history ?? []).slice(-10),
   };
+}
+
+/**
+ * The label address and current label of content an exception is made for. Whoever makes one must be
+ * allowed to change the label (the same test as setLabel) and inside the reader audience of the label
+ * the content carries now: an exception moves content past its label, as a lowering would.
+ */
+export async function labelForException(
+  deps: ClassificationDeps, actor: LabelActor, named: ContentLabelTarget,
+): Promise<{ target: ContentLabelTarget; label: string; labelDetail: ClassificationLabel | null }> {
+  const target = labelAddressOf(named);
+  await assertMayLabel(deps, actor, target, 'write');
+  const policy = await policyFor(deps.storage, deps.config, target.scope);
+  const { row } = await currentRow(deps.storage, policy, target);
+  const label = row?.label ?? policy.defaultLabel;
+  const labelDetail = labelById(policy, label) ?? null;
+  await assertInsideCurrent(deps, actor, target, labelDetail ?? undefined);
+  return { target, label, labelDetail };
 }
 
 /** The map key labelsFor answers under. */

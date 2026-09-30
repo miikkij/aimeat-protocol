@@ -9,6 +9,8 @@
  * @structure registerClassificationTools(mcp, registry)
  * @usage registered from cli/connect/mcp/tools/index.ts
  * @version-history
+ *   v1.2.0 — 2026-09-30 — exception_list and exception_set with exception_action and until;
+ *     audit_action takes exception.
  *   v1.1.0 — 2026-09-29 — The explorer and switch_set actions, with pending, cursor and mode; owner
  *     on get, set and review.
  *   v1.0.0 — 2026-09-29 — Initial (TARGET-082 V5).
@@ -19,7 +21,9 @@ import type { AgentRegistry } from '../../agent-registry.js';
 import { agentNameSchema, envelopeResult, pickAgent } from './_registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
-import { CLASSIFICATION_ACTIONS, classificationTools } from '../../../../mcp/catalog/definitions/classification.js';
+import {
+  AUDIT_ACTIONS, CLASSIFICATION_ACTIONS, classificationTools, EXCEPTION_ACTION_VALUES,
+} from '../../../../mcp/catalog/definitions/classification.js';
 import { classificationCall } from '../../../../tool-dispatch/classification-call.js';
 
 /** A parameter's description, from the catalog entry every surface publishes. */
@@ -32,7 +36,9 @@ export function registerClassificationTools(mcp: McpServer, registry: AgentRegis
     keys: z.array(z.string()).max(500).optional().describe(d('keys')),
     prefix: z.string().optional().describe(d('prefix')),
     since: z.string().optional().describe(d('since')),
-    audit_action: z.enum(['shown', 'used', 'refused', 'changed']).optional().describe(d('audit_action')),
+    audit_action: z.enum(AUDIT_ACTIONS).optional().describe(d('audit_action')),
+    exception_action: z.enum(EXCEPTION_ACTION_VALUES).optional().describe(d('exception_action')),
+    until: z.string().optional().describe(d('until')),
     limit: z.number().int().min(1).max(1000).optional().describe(d('limit')),
     pending: z.boolean().optional().describe(d('pending')),
     cursor: z.string().optional().describe(d('cursor')),

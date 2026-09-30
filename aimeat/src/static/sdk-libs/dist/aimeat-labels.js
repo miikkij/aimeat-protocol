@@ -96,7 +96,8 @@
     NOT_FOUND: "No such content, or it is not yours to label.",
     FOREIGN_VISITOR: "A visitor from another node labels nothing here.",
     AUTH_REQUIRED: "Sign in to see or change a classification.",
-    INVALID_INPUT: "The request does not name the content the way the node expects."
+    INVALID_INPUT: "The request does not name the content the way the node expects.",
+    EXCEPTION_LIMIT: "This month already holds as many exceptions as it may. Withdraw ones that are no longer needed."
   };
   function labelsError(r) {
     const e = r && r.error;
@@ -203,9 +204,50 @@
     if (!keys || keys.length === 0) throw new Error("scan needs key, keys or prefix");
     return send("POST", "/v1/classification/scan", { keys });
   }
+  function exceptions(opts) {
+    const o = opts || {};
+    return call("/v1/classification/exceptions" + query({
+      level: o.level,
+      organism_id: o.organismId,
+      action: o.action,
+      since: o.since,
+      limit: o.limit
+    }));
+  }
+  async function except(input) {
+    const o = (
+      /** @type {any} */
+      input || {}
+    );
+    if (o.action !== "leave" && o.action !== "ai-send") throw new Error("action is leave or ai-send");
+    if (typeof o.reason !== "string" || !o.reason.trim()) throw new Error("reason is required: why the item may go out");
+    return send("POST", "/v1/classification/exceptions", {
+      ...targetParams(o),
+      action: o.action,
+      reason: o.reason,
+      until: o.until
+    });
+  }
+  function withdrawException(id) {
+    return call("/v1/classification/exceptions/" + encodeURIComponent(id), { method: "DELETE" });
+  }
   function isClassified(err) {
     return !!err && err.code === "CLASSIFIED";
   }
-  var labels = { get, set, review, policy, audit, list, scan, warningOf, renderWarning, isClassified };
+  var labels = {
+    get,
+    set,
+    review,
+    policy,
+    audit,
+    list,
+    scan,
+    exceptions,
+    except,
+    withdrawException,
+    warningOf,
+    renderWarning,
+    isClassified
+  };
   attach("labels", labels);
 })();

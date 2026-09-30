@@ -18,6 +18,8 @@
  * @structure classificationRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.5.0 — 2026-09-30 — The exceptions list: POST, GET and DELETE /v1/classification/exceptions
+ *     (services/classification/exception-admin.ts), decided by Jouni 2026-09-30.
  *   v1.4.0 — 2026-09-29 — GET /v1/classification/labels (the explorer: the classifications on the
  *     caller's own content and the items where a suggestion waits) and PUT /v1/classification/switch
  *     (the node's switch, set by an operator and kept in the audit log). The label routes pass
@@ -42,6 +44,7 @@ import type { PolicyLevel } from '../services/classification/policy.js';
 import { scanContent } from '../services/classification/scan.js';
 import { explorerQueryOf, listLabels } from '../services/classification/explorer.js';
 import { setClassificationSwitch } from '../services/classification/switch.js';
+import { makeException, readExceptions, removeException } from '../services/classification/exception-admin.js';
 
 const LEVELS = new Set(['node', 'owner', 'organism']);
 
@@ -133,6 +136,39 @@ export function classificationRouter(config: AimeatConfig, storage: Storage): Ro
       // The whole credential goes to the service, which names the caller itself.
       const out = await setClassificationSwitch({ storage, config }, req.auth!, body.mode);
       res.json(success(config.nodeId, out));
+    } catch (err) { fail(res, err); }
+  });
+
+  // The exceptions list (decided 2026-09-30): a person's own exception with its reason, made in
+  // their own session or by an app; the service refuses an AI credential with PERSON_REQUIRED.
+  router.post('/v1/classification/exceptions', requireAuth(), requireScope('memory:write'), async (req, res) => {
+    try {
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const actor = labelActorOf(req.auth!, config.nodeId);
+      const out = await makeException(deps, actor, {
+        kind: body.kind, key: body.key, owner: body.owner, organism_id: body.organism_id,
+        ws: body.ws, space: body.space, row_id: body.row_id, action: body.action, reason: body.reason, until: body.until,
+      });
+      res.status(201).json(success(config.nodeId, out));
+    } catch (err) { fail(res, err); }
+  });
+
+  router.get('/v1/classification/exceptions', requireAuth(), requireScope('memory:read'), async (req, res) => {
+    try {
+      const actor = labelActorOf(req.auth!, config.nodeId);
+      const out = await readExceptions(deps, actor, levelOf(req.query.level), orgOf(req.query.organism_id), {
+        action: textOf(req.query.action),
+        since: textOf(req.query.since),
+        limit: Number(req.query.limit) || undefined,
+      });
+      res.json(success(config.nodeId, out));
+    } catch (err) { fail(res, err); }
+  });
+
+  router.delete('/v1/classification/exceptions/:id', requireAuth(), requireScope('memory:write'), async (req, res) => {
+    try {
+      const actor = labelActorOf(req.auth!, config.nodeId);
+      res.json(success(config.nodeId, await removeException(deps, actor, req.params.id as string)));
     } catch (err) { fail(res, err); }
   });
 

@@ -17,14 +17,23 @@
  *   WARNINGS. Content with a warning classification carries classificationWarning when it reaches
  *   an AI reader; warningOf() and renderWarning() read it (warning.js). Content hidden from AI reads
  *   as absent to an AI, and an AI call that names it by key fails with the code CLASSIFIED.
+ *   AN AI SEES EVERYTHING BY DEFAULT (decided 2026-09-30): no default label hides content from AI;
+ *   the sensitive ones reach it with a warning, and an owner or an organism may choose a label that
+ *   hides content. An act against a label is kept on the exceptions list with its reason:
+ *   exceptions() reads it, except() is the person's own exception for one item, and an app's act
+ *   against a label (a lowering, a policy that gives something away, content sent out) is recorded
+ *   there by the node rather than refused.
  * @structure labelsError · call · targetParams · get · set · review · policy · audit · list · scan ·
- *   isClassified · warningOf / renderWarning (warning.js) · attach('labels', …)
+ *   exceptions · except · withdrawException · isClassified · warningOf / renderWarning (warning.js) ·
+ *   attach('labels', …)
  * @usage
  *   <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-labels.js"></script>
  *   const v = await AIMEAT.labels.get('notes.2026-09');       // { label, labelDetail, source, locked, suggestion, history }
  *   await AIMEAT.labels.set({ key: 'notes.2026-09', label: picked });   // from the person's own pick
  *   AIMEAT.labels.renderWarning(item, cardEl);
  * @version-history
+ *   v1.2.0 - 2026-09-30 - exceptions(), except() and withdrawException(): the exceptions list
+ *     (GET, POST and DELETE /v1/classification/exceptions); audit() takes action 'exception'.
  *   v1.1.0 - 2026-09-29 - list(): the classifications on the person's content, and the items where a
  *     suggestion waits (GET /v1/classification/labels). A target takes owner: the agent or app of
  *     the person that holds the key.
@@ -57,6 +66,7 @@ const HUMAN = {
   FOREIGN_VISITOR: 'A visitor from another node labels nothing here.',
   AUTH_REQUIRED: 'Sign in to see or change a classification.',
   INVALID_INPUT: 'The request does not name the content the way the node expects.',
+  EXCEPTION_LIMIT: 'This month already holds as many exceptions as it may. Withdraw ones that are no longer needed.',
 };
 
 /**
@@ -182,7 +192,7 @@ function policy(opts) {
 /**
  * The audit log of a level: which classified items were shown to or used by an AI, which were
  * refused and which labels changed, one row per reader, item and action per minute, with a count.
- * @param {{ level?: 'node'|'owner'|'organism', organismId?: string, since?: string, action?: 'shown'|'used'|'refused'|'changed', limit?: number }} [opts]
+ * @param {{ level?: 'node'|'owner'|'organism', organismId?: string, since?: string, action?: 'shown'|'used'|'refused'|'changed'|'exception', limit?: number }} [opts]
  */
 function audit(opts) {
   const o = opts || {};
@@ -224,6 +234,49 @@ async function scan(input) {
 }
 
 /**
+ * The exceptions list of a level, newest first: each act against a classification, with who did it,
+ * the item, the classification and the reason. A person's exception (auto false) lets one item leave
+ * (action 'leave') or lets an AI send it out ('ai-send'); an app's act against a classification is
+ * recorded by the node (auto true: 'lower', 'policy', 'review', 'leave'). level is owner (the
+ * default: the person's own content), organism (its creator or an admin, with organismId) or node
+ * (an operator: the whole node). Resolves with { level, subject, exceptions }; each exception is
+ * { id, at, by, byKind, scope, ownerGaii, organismId, target: { kind, key } | null, label, action,
+ * reason, auto, until, count?, lastAt?, destination?, app?, withdrawnAt?, withdrawnBy? }.
+ * @param {{ level?: 'node'|'owner'|'organism', organismId?: string, action?: 'leave'|'ai-send'|'lower'|'policy'|'review', since?: string, limit?: number }} [opts]
+ */
+function exceptions(opts) {
+  const o = opts || {};
+  return call('/v1/classification/exceptions' + query({
+    level: o.level, organism_id: o.organismId, action: o.action, since: o.since, limit: o.limit,
+  }));
+}
+
+/**
+ * The person makes an exception for one item: it may leave despite its classification (action
+ * 'leave', any destination), or an AI may send it out ('ai-send'). reason is required and is kept on
+ * the exceptions list for the audit; until (ISO) ends it, otherwise it lasts until withdrawn. Call it
+ * only with what the person chose and wrote on the screen. Resolves with the exception.
+ * @param {LabelTarget & { action: 'leave'|'ai-send', reason: string, until?: string }} input
+ */
+async function except(input) {
+  const o = /** @type {any} */ (input || {});
+  if (o.action !== 'leave' && o.action !== 'ai-send') throw new Error('action is leave or ai-send');
+  if (typeof o.reason !== 'string' || !o.reason.trim()) throw new Error('reason is required: why the item may go out');
+  return send('POST', '/v1/classification/exceptions', {
+    ...targetParams(o), action: o.action, reason: o.reason, until: o.until,
+  });
+}
+
+/**
+ * Withdraw an exception by its id. It stays on the list, marked withdrawn, so the audit still shows
+ * it and why. Resolves with the exception.
+ * @param {string} id
+ */
+function withdrawException(id) {
+  return call('/v1/classification/exceptions/' + encodeURIComponent(id), { method: 'DELETE' });
+}
+
+/**
  * True when an error is the node refusing to give classified content to an AI. Show the person the
  * message and do not retry: the same call is refused again until the label changes.
  * @param {any} err
@@ -233,6 +286,8 @@ function isClassified(err) {
   return !!err && err.code === 'CLASSIFIED';
 }
 
-export const labels = { get, set, review, policy, audit, list, scan, warningOf, renderWarning, isClassified };
+export const labels = {
+  get, set, review, policy, audit, list, scan, exceptions, except, withdrawException, warningOf, renderWarning, isClassified,
+};
 
 attach('labels', labels);

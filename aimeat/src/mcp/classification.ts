@@ -15,6 +15,9 @@
  * @structure registerClassificationTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage registerClassificationTools(mcp, storage, config, agentGaii, scopes);
  * @version-history
+ *   v1.5.0 — 2026-09-30 — exception_list (the exceptions list of a level) and exception_set, which
+ *     the service refuses for an AI with PERSON_REQUIRED (decided 2026-09-30); audit_action takes
+ *     exception. The new fields' descriptions come from the catalog.
  *   v1.4.0 — 2026-09-29 — explorer (services/classification/explorer.ts) and switch_set
  *     (services/classification/switch.ts): the operator's agent sets the node's switch, holding
  *     operator:admin, and an AI's loosening of it is refused. get, set and review take `owner`.
@@ -36,14 +39,20 @@ import {
   ClassificationError, labelActorOf, readContentLabel, reviewLabel, setLabel, targetOf,
 } from '../services/classification/labels.js';
 import { readAuditLog, readPolicy, writePolicy } from '../services/classification/policy-admin.js';
-import { checkClassificationInput, CLASSIFICATION_ACTIONS, POLICY_PENDING_NEXT } from './catalog/definitions/classification.js';
+import {
+  AUDIT_ACTIONS, checkClassificationInput, CLASSIFICATION_ACTIONS, classificationTools, EXCEPTION_ACTION_VALUES, POLICY_PENDING_NEXT,
+} from './catalog/definitions/classification.js';
 import { scanContent } from '../services/classification/scan.js';
 import { explorerQueryOf, listLabels } from '../services/classification/explorer.js';
 import { setClassificationSwitch } from '../services/classification/switch.js';
+import { makeException, readExceptions } from '../services/classification/exception-admin.js';
 
 const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v, null, 2) }] });
 
-const WRITES = new Set(['set', 'review', 'policy_set', 'scan', 'switch_set']);
+/** A parameter's description, from the catalog entry every surface publishes. */
+const d = (field: string): string => classificationTools[0]?.input?.[field]?.description ?? field;
+
+const WRITES = new Set(['set', 'review', 'policy_set', 'scan', 'switch_set', 'exception_set']);
 
 export function registerClassificationTools(
   mcp: McpServer,
@@ -61,9 +70,11 @@ export function registerClassificationTools(
       action: z.enum(CLASSIFICATION_ACTIONS).describe('What to do.'),
       keys: z.array(z.string()).max(500).optional().describe('scan: memory keys to classify.'),
       prefix: z.string().optional().describe('scan: classify every memory key under this prefix (queued).'),
-      since: z.string().optional().describe('audit: only rows from this ISO time on.'),
-      audit_action: z.enum(['shown', 'used', 'refused', 'changed']).optional().describe('audit: only this kind of row.'),
-      limit: z.number().int().min(1).max(1000).optional().describe('audit: at most this many rows, default 200. explorer: items per page, default 50, at most 200.'),
+      since: z.string().optional().describe(d('since')),
+      audit_action: z.enum(AUDIT_ACTIONS).optional().describe(d('audit_action')),
+      exception_action: z.enum(EXCEPTION_ACTION_VALUES).optional().describe(d('exception_action')),
+      until: z.string().optional().describe(d('until')),
+      limit: z.number().int().min(1).max(1000).optional().describe(d('limit')),
       pending: z.boolean().optional().describe('explorer: only the items where a suggestion waits for a person.'),
       cursor: z.string().optional().describe('explorer: the `next` value of the previous page.'),
       mode: z.enum(['off', 'owner', 'all']).optional().describe("switch_set: the node's switch. off: nothing is classified; owner: each owner decides for their own content; all: on for every owner."),
@@ -78,9 +89,9 @@ export function registerClassificationTools(
       justification: z.string().optional().describe('set: why the content is less sensitive, when lowering from a label that needs a reason.'),
       human_said: z.string().optional().describe("The person's own words, verbatim, when you relay their instruction. Never your own summary."),
       confidence: z.number().min(0).max(1).optional().describe('set: how sure you are, 0 to 1, when the label is your own judgement.'),
-      reason: z.string().optional().describe('set: why you chose the label, when it is your own judgement.'),
+      reason: z.string().optional().describe(d('reason')),
       decision: z.enum(['accept', 'reject']).optional().describe("review: the person's decision on the waiting suggestion."),
-      level: z.enum(['node', 'owner', 'organism']).optional().describe('policy_get, policy_set, audit: which level. Default owner. explorer: owner or organism. switch_set: node, the only one.'),
+      level: z.enum(['node', 'owner', 'organism']).optional().describe(d('level')),
       policy: z.record(z.string(), z.unknown()).optional().describe('policy_set: the WHOLE level as policy_get returned it in `stored`, changed. It replaces the level.'),
     },
     annotationsFor('aimeat_classification'),
@@ -136,6 +147,16 @@ export function registerClassificationTools(
               sub: principal, owner: localAccountName(principal), roles: ['agent'], scopes,
             }, args.mode));
           }
+          case 'exception_list':
+            return text(await readExceptions(deps, actor, args.level ?? 'owner', args.organism_id,
+              { action: args.exception_action, since: args.since, limit: args.limit }));
+          case 'exception_set':
+            // The same service as POST /v1/classification/exceptions, which refuses an AI with
+            // PERSON_REQUIRED: the exception is the person's to make, in their Data Wallet.
+            return text(await makeException(deps, actor, {
+              kind: args.kind, key: args.key, owner: args.owner, organism_id: args.organism_id, ws: args.ws,
+              space: args.space, row_id: args.row_id, action: args.exception_action, reason: args.reason, until: args.until,
+            }));
         }
       } catch (err) {
         if (err instanceof ClassificationError) return toolError(err.code, err.message);

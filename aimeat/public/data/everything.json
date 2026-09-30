@@ -3498,13 +3498,13 @@
    "title": "Data classification",
    "slug": "g-24",
    "lead": [
-    "Every piece of content you keep can carry a classification: how sensitive it is. The node comes with four: public, internal, confidential and highly confidential. You or an organism can add your own, such as top secret. The classification decides which people and which AI can read the content, and whether it can leave its organism. You classify content yourself, or the Content Classifier suggests a classification and you accept or reject it.",
+    "Every piece of content you keep can carry a classification: how sensitive it is. The node comes with four: public, internal, confidential and highly confidential. You or an organism can add your own, such as top secret. The classification decides which people and which AI can read the content, and whether it can leave its organism. You classify content yourself, or the Content Classifier suggests a classification and you accept or reject it. By default your AI sees everything: confidential and highly confidential content reaches it with a warning, and a level hides content from AI only when you, an organism or the operator set it to. When you decide to do something a classification says not to, you make an exception with your reason, and the audit shows every exception and its reason in one place.",
     "<strong>Availability.</strong> Off by default, and while it is off nothing changes. The operator turns it on for every owner, or lets each owner turn it on for their own content and each organism for its content. The setting is <code>AIMEAT_CLASSIFICATION</code> (<code>off</code>, <code>owner</code> or <code>all</code>).",
     "<strong>Limitations.</strong>",
     "- The node cannot check text that an agent writes into its own prompt. After an AI has read content, what it does with that text on its own side is outside the node.",
     "- When an AI client drives your own signed-in REST session, the node cannot tell it apart from you, so it gets what you get.",
     "- A published data package is not yet classified file by file.",
-    "- The classification pages in the Data Wallet and on the Security page are not yet on the node. Today you use the MCP tool or the REST endpoints below."
+    "- The classification pages in the Data Wallet and on the Security page, the exceptions list among them, are not yet on the node. Today you use the MCP tool, the <code>AIMEAT.labels</code> library or the REST endpoints below."
    ],
    "columns": [
     "Feature",
@@ -3535,19 +3535,37 @@
      "slug": "g-24-what-an-ai-sees",
      "cells": [
       "<strong>What an AI sees</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
-      "AI never sees content whose classification hides it: it is not in the AI's lists, and a call that names it is refused with <code>CLASSIFIED</code>. Content with a warning classification reaches the AI with a warning, and the AI uses it only for the task it was given. By default highly confidential content is hidden and confidential content carries a warning.",
+      "By default an AI sees everything: no level that comes with the node hides content from it. Confidential and highly confidential content reaches the AI with a warning, and the AI uses it only for the task it was given. You, an organism or the operator can set a level to hide content from AI: then it is not in the AI's lists, and a call that names it is refused with <code>CLASSIFIED</code>.",
       "every MCP tool and REST read an AI uses"
      ],
-     "plain": "What an AI sees off AI never sees content whose classification hides it: it is not in the AI's lists, and a call that names it is refused with CLASSIFIED. Content with a warning classification reaches the AI with a warning, and the AI uses it only for the task it was given. By default highly confidential content is hidden and confidential content carries a warning. every MCP tool and REST read an AI uses"
+     "plain": "What an AI sees off By default an AI sees everything: no level that comes with the node hides content from it. Confidential and highly confidential content reaches the AI with a warning, and the AI uses it only for the task it was given. You, an organism or the operator can set a level to hide content from AI: then it is not in the AI's lists, and a call that names it is refused with CLASSIFIED. every MCP tool and REST read an AI uses"
     },
     {
      "slug": "g-24-content-that-stays-in-its-organism",
      "cells": [
       "<strong>Content that stays in its organism</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
-      "An organism's content whose classification must not leave stays out of exports and out of federation to other nodes. By default only public content leaves.",
-      "exports, federation"
+      "An organism's content whose classification must not leave stays out of exports, share links and federation to other nodes. By default only public content leaves. When an AI sends content out, content whose level hides it from AI stays behind too, your own included. The answer names each item and says you can make an exception.",
+      "exports, share links, federation, outside services"
      ],
-     "plain": "Content that stays in its organism off An organism's content whose classification must not leave stays out of exports and out of federation to other nodes. By default only public content leaves. exports, federation"
+     "plain": "Content that stays in its organism off An organism's content whose classification must not leave stays out of exports, share links and federation to other nodes. By default only public content leaves. When an AI sends content out, content whose level hides it from AI stays behind too, your own included. The answer names each item and says you can make an exception. exports, share links, federation, outside services"
+    },
+    {
+     "slug": "g-24-exceptions-list",
+     "cells": [
+      "<strong>Exceptions list</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
+      "In your own session you let one item leave, or let an AI send it out, despite its classification, with a written reason and an end date if you want one. The exception, its reason and each use of it are kept, and the list shows them per owner, per organism and for the whole node. You or the maker withdraws an exception, and it stays on the list as withdrawn. An AI cannot make one.",
+      "<code>aimeat_classification</code> (<code>exception_list</code>), <code>GET /v1/classification/exceptions</code>, <code>POST /v1/classification/exceptions</code>, <code>DELETE /v1/classification/exceptions/:id</code>, <code>AIMEAT.labels.except()</code>"
+     ],
+     "plain": "Exceptions list off In your own session you let one item leave, or let an AI send it out, despite its classification, with a written reason and an end date if you want one. The exception, its reason and each use of it are kept, and the list shows them per owner, per organism and for the whole node. You or the maker withdraws an exception, and it stays on the list as withdrawn. An AI cannot make one. aimeat_classification (exception_list), GET /v1/classification/exceptions, POST /v1/classification/exceptions, DELETE /v1/classification/exceptions/:id, AIMEAT.labels.except()"
+    },
+    {
+     "slug": "g-24-apps-do-what-they-are-built-for",
+     "cells": [
+      "<strong>Apps do what they are built for</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
+      "An app is not refused when it lowers a classification, changes a policy in a way that gives something away, accepts such a change, or sends out content its classification would keep in. The node records each such act on the exceptions list, with the app and what it did as the reason. An AI keeps every refusal.",
+      "the same routes, from an app's credential"
+     ],
+     "plain": "Apps do what they are built for off An app is not refused when it lowers a classification, changes a policy in a way that gives something away, accepts such a change, or sends out content its classification would keep in. The node records each such act on the exceptions list, with the app and what it did as the reason. An AI keeps every refusal. the same routes, from an app's credential"
     },
     {
      "slug": "g-24-content-classifier",
@@ -3571,10 +3589,10 @@
      "slug": "g-24-audit-log",
      "cells": [
       "<strong>Audit log</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
-      "For each level: which classified items an AI was shown or used, which were refused, and which classifications changed. One row per reader, item and action per minute, with a count.",
+      "For each level: which classified items an AI was shown or used, which were refused, which classifications changed, and each exception made, used or withdrawn with its reason. One row per reader, item and action per minute, with a count.",
       "<code>aimeat_classification</code> (<code>audit</code>), <code>GET /v1/classification/audit</code>"
      ],
-     "plain": "Audit log off For each level: which classified items an AI was shown or used, which were refused, and which classifications changed. One row per reader, item and action per minute, with a count. aimeat_classification (audit), GET /v1/classification/audit"
+     "plain": "Audit log off For each level: which classified items an AI was shown or used, which were refused, which classifications changed, and each exception made, used or withdrawn with its reason. One row per reader, item and action per minute, with a count. aimeat_classification (audit), GET /v1/classification/audit"
     },
     {
      "slug": "g-24-apps-state-the-classification-they-expect",
@@ -3591,6 +3609,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-09-15 against node 3.15.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 356
+  "rows": 358
  }
 }

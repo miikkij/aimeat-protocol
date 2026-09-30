@@ -11,6 +11,9 @@
  *   node's policy is read once per call however many scopes, a long list an AI is shown is one audit
  *   row per label with a count, and warningsNote() says what an AI-call answer carries.
  * @version-history
+ *   v1.3.0 — 2026-09-30 — No default label hides content from AI (option B): the hidden cases run on
+ *     a node policy where the operator hid the highest label, and a new test proves the default
+ *     shows it to an AI with a warning.
  *   v1.2.0 — 2026-09-30 — An anonymous reader is read as an AI: hidden content is absent to it.
  *   v1.1.0 — 2026-09-29 — The review fixes (TARGET-082 review, findings 4, 5 and 7).
  *   v1.1.0 — 2026-09-29 — The owner of personal content is never locked out by its label's audience
@@ -23,15 +26,38 @@ import { readerFor, readerForAgent, systemReader, warningsNote } from '../../src
 import { pendingClassificationAudit, resetClassificationAudit } from '../../src/services/classification/audit.js';
 import { memoryTarget, rowTarget, setLabel, type LabelActor } from '../../src/services/classification/labels.js';
 import { writePolicy } from '../../src/services/classification/policy-admin.js';
+import { DEFAULT_LABELS } from '../../src/services/classification/defaults.js';
+import { hideFromAiOnNode, HIDDEN_LABEL } from './classification-fixtures.js';
 
 const N = 'n';
 const deps = (storage: SqliteStorage) => ({ storage, config: { classificationMode: 'all' as const, nodeId: N } });
 const alice: LabelActor = { principal: `alice@${N}`, ownerGhii: `alice@${N}`, ownerName: 'alice', kind: 'human' };
 const aliceAuth = { sub: 'alice', owner: 'alice', roles: ['owner'] };
 
-describe('the check component decides', () => {
+describe('the default policy hides nothing from AI (option B, decided 2026-09-30)', () => {
   let storage: SqliteStorage;
   beforeEach(() => { storage = new SqliteStorage(':memory:'); });
+  afterEach(() => storage.close());
+  const rec = (key: string) => ({ ownerGaii: `alice@${N}`, key, value: key });
+  const t = (r: { ownerGaii: string; key: string }) => memoryTarget(r.ownerGaii, r.key);
+
+  it('no default label is hidden, and an AI sees highly confidential content with a warning', async () => {
+    expect(DEFAULT_LABELS.filter(l => l.aiVisibility === 'hidden')).toEqual([]);
+    expect(DEFAULT_LABELS.find(l => l.id === HIDDEN_LABEL)?.aiVisibility).toBe('warning');
+    const d = deps(storage);
+    await setLabel(d, alice, t(rec('secret')), { label: HIDDEN_LABEL });
+    const ai = readerForAgent(d, `claude#alice@${N}`);
+    const seen = await ai.show([rec('secret')], t);
+    expect(seen.map(r => r.key)).toEqual(['secret']);
+    expect((seen[0] as unknown as { classificationWarning: { label: string } }).classificationWarning.label).toBe(HIDDEN_LABEL);
+    await expect(ai.useForAi([t(rec('secret'))], { capability: 'text' })).resolves.toBeUndefined();
+  });
+});
+
+describe('the check component decides', () => {
+  let storage: SqliteStorage;
+  // Hidden content needs a label an operator set to hide it: no default label does (2026-09-30).
+  beforeEach(async () => { storage = new SqliteStorage(':memory:'); await hideFromAiOnNode(storage, N); });
   afterEach(() => storage.close());
 
   const rec = (key: string) => ({ ownerGaii: `alice@${N}`, key, value: key });

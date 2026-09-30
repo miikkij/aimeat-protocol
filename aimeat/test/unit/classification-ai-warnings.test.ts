@@ -11,6 +11,8 @@
  *   403 CLASSIFIED on /v1/ai/complete rather than 502 PROVIDER_ERROR.
  * @usage cd aimeat && pnpm exec vitest run test/unit/classification-ai-warnings.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-30 — No default label hides from AI (option B): the node policy hides the
+ *     highest label explicitly, so the CLASSIFIED test still proves what a hiding label does.
  *   v1.0.0 — 2026-09-30 — TARGET-082 review, item 2. Initial.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -27,6 +29,7 @@ import { messagesRouter } from '../../src/routes/messages.js';
 import { registerAiCapabilityTools } from '../../src/mcp/ai-capabilities.js';
 import { AiJobService } from '../../src/services/ai-jobs/service.js';
 import { startDecideRun, getDecideRun } from '../../src/services/decide/runs.js';
+import { hideFromAiOnNode } from './classification-fixtures.js';
 
 const usage = { promptTokens: 1, completionTokens: 1, totalTokens: 2, costUsd: 0.001, costExact: true };
 const budget = { dailyBudgetUsd: 1, spentTodayUsd: 0, remainingUsd: 1 };
@@ -79,6 +82,8 @@ describe('TARGET-082 review, item 2: an AI call names the warning-classified con
     storage = new SqliteStorage(':memory:');
     config = { ...loadConfig().config, nodeId: N, classificationMode: 'all', decideEnabled: true };
     resetClassificationAudit();
+    // No default label hides from AI since 2026-09-30: the operator hides HIDDEN on this node.
+    await hideFromAiOnNode(storage, N, [HIDDEN]);
     await storage.createOwner({ name: 'alice', displayName: 'alice', publicKey: 'pk', roles: ['owner'], createdAt: stamp });
     await storage.createGHII({ username: 'alice', nodeId: N, ghii: ALICE, displayName: 'alice', ownerName: 'alice', verificationLevel: 0, totpEnabled: false, createdAt: stamp, updatedAt: stamp } as never);
     await storage.createAgent({ name: 'claude', owner: 'alice', gaii: AGENT, capabilities: [], publicKey: 'pk', trustScore: 50, morselBalance: 0, createdAt: stamp, lastSeen: stamp } as never);

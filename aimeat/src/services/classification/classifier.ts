@@ -44,6 +44,8 @@
  *   firstJsonObject()
  * @usage const out = await classifyText(deps, target, text);
  * @version-history
+ *   v2.0.1 — 2026-09-30 — readSystem, UNCHANGED and updateSystem moved unchanged to system-record.ts,
+ *     which the exceptions list writes through too.
  *   v2.0.0 — 2026-09-29 — Review fixes: a queue per owner with an index, compare-and-swap writes for
  *     the queues and the counter, batch enqueue, per-item failure handling with a try count, the
  *     node's cap stops a drain, LABEL_REFUSED, an optional policy from the caller, the jev confidence
@@ -51,7 +53,7 @@
  *   v1.1.0 — 2026-09-29 — A null daily cap is no cap: the call is counted and never queued for it.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V3. Initial.
  */
-import type { Storage, ContentLabelTarget, MemoryRecord } from '../../storage/interface.js';
+import type { Storage, ContentLabelTarget } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import { logger } from '../../utils/logger.js';
 import { localAccountOf } from '../../utils/gaii.js';
@@ -64,6 +66,7 @@ import { matchRules } from './detect.js';
 import { ownerOfScope, scopeOrganism } from './policy.js';
 import { ClassificationError, setLabel, type LabelActor, type SetLabelResult } from './labels.js';
 import { activePolicies, systemReader } from './reader.js';
+import { readSystem, UNCHANGED, updateSystem } from './system-record.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
 
@@ -102,7 +105,6 @@ const queueKey = (owner: string) => `classification.queue.of.${owner}`;
 /** Items per owner's queue. */
 export const QUEUE_MAX = 2000;
 const MAX_TRIES = 3;
-const CAS_ATTEMPTS = 10;
 const MAX_CONTENT = 6000;
 const usageKey = (day: string) => `classification.classifier.usage.${day}`;
 const today = () => new Date().toISOString().slice(0, 10);
@@ -126,45 +128,7 @@ async function payerOf(deps: Deps, scope: string): Promise<string | null> {
   return first ? `${first}@${deps.config.nodeId}` : null;
 }
 
-// ─── The node's own records, written by compare-and-swap ────────────────────────────────────────
-
-/** The one read of the classifier's own records under system@<node>: the counter, the queues, the index. */
-async function readSystem(storage: Storage, nodeId: string, key: string): Promise<MemoryRecord | null> {
-  return storage.getMemory(`system@${nodeId}`, key);
-}
-
-const UNCHANGED = Symbol('unchanged');
-
-/**
- * Read a record of system@<node>, change it, and write it only if nobody wrote it meanwhile; on a
- * conflict read again and re-apply. `mutate` may run more than once, so it depends only on what it
- * is given. It answers UNCHANGED to write nothing. Answers the value as stored.
- */
-async function updateSystem<T>(
-  storage: Storage, nodeId: string, key: string, parse: (v: unknown) => T,
-  mutate: (cur: T) => T | typeof UNCHANGED | Promise<T | typeof UNCHANGED>, ttlHours: number | null = null,
-): Promise<T> {
-  const owner = `system@${nodeId}`;
-  for (let attempt = 0; attempt < CAS_ATTEMPTS; attempt++) {
-    const rec = await readSystem(storage, nodeId, key);
-    const cur = parse(rec?.value);
-    const next = await mutate(cur);
-    if (next === UNCHANGED) return cur;
-    const now = new Date().toISOString();
-    const record: MemoryRecord = {
-      key, ownerGaii: owner, value: next, visibility: 'private', tags: ['classification-classifier'], ttlHours,
-      version: (rec?.version ?? 0) + 1, createdAt: rec?.createdAt ?? now, updatedAt: now,
-    };
-    if (!rec) {
-      if (!storage.createMemoryIfAbsent) { await storage.setMemory(record); return next; }
-      if (await storage.createMemoryIfAbsent(record)) return next;
-    } else {
-      if (!storage.setMemoryIfVersion) { await storage.setMemory(record); return next; }
-      if (await storage.setMemoryIfVersion(record, rec.version)) return next;
-    }
-  }
-  throw new Error(`classification: ${key} changed under every one of ${CAS_ATTEMPTS} attempts; try again`);
-}
+// ─── The node's own records, written by compare-and-swap (system-record.ts) ─────────────────────
 
 type Usage = { node: number; by: Record<string, number> };
 const parseUsage = (v: unknown): Usage => {

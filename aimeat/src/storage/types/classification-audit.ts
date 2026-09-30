@@ -16,6 +16,8 @@
  *   ClassificationAuditFilter
  * @usage import type { ClassificationAuditRow } from '../storage/interface.js';
  * @version-history
+ *   v1.1.0 — 2026-09-30 — The action `exception`: the exceptions list in the audit (a text column,
+ *     so neither provider needs a migration).
  *   v1.0.0 — 2026-09-29 — TARGET-082 V4. Initial.
  */
 import type { ContentLabelKind } from './content-labels.js';
@@ -26,8 +28,10 @@ export type ClassificationAuditReaderKind = 'human' | 'ai' | 'system' | 'anonymo
 /**
  * What happened. `shown` and `used` are recorded only for a label with `audit: true`; `refused`
  * (hidden from or refused to a reader) and `changed` (a label set or moved) are always recorded.
+ * `exception` is an entry of the exceptions list being made, used or withdrawn (decided 2026-09-30);
+ * `purpose` names the exception, the act and its reason.
  */
-export type ClassificationAuditAction = 'shown' | 'used' | 'refused' | 'changed';
+export type ClassificationAuditAction = 'shown' | 'used' | 'refused' | 'changed' | 'exception';
 
 /** One stored audit row. */
 export interface ClassificationAuditRow {

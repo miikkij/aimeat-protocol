@@ -8,7 +8,9 @@
  *   Content Classifier's kind, provider and daily caps, what it judges on write, how long the audit
  *   log keeps its rows, how many labels and rules a level may hold); an AI's waiting proposal to
  *   loosen the node policy, with Accept and Reject for an operator in their own session; the labels
- *   and the detection rules as read-only lists; and the node-wide audit log, newest first, with a
+ *   and the detection rules as read-only lists; the node-wide exceptions list (every person's
+ *   exception with its reason and every app's automatic one, Withdraw for a person's exception in
+ *   force); and the node-wide audit log, newest first, with a
  *   filter by what happened. The Content Classifier's settings (its kind of model, the two daily caps,
  *   what it judges on write) and the log's days are changed here in a form (ClassifierForm), saved as
  *   the whole node policy with PUT /v1/classification/policy. Editing the labels and rules is not on
@@ -17,6 +19,10 @@
  * @structure ClassificationSection({ number, switchPage, confirm, onOk, onError }) · ClassifierForm ·
  *   policyRows · capWords · auditList · readerParts · Proposal · Dropped · draftOf · whole
  * @version-history
+ *   v1.5.0 — 2026-09-30 — The whole server's exceptions list (Jouni's decisions of 2026-09-30),
+ *     before the log: every person's exception and every app's automatic one, filtered by all, made
+ *     by people and automatic by apps, with Withdraw on a person's exception in force (the list and
+ *     its row are the Data Wallet's, classification-exceptions.js). The log's filter has "exception".
  *   v1.4.0 — 2026-09-30 — Browser check fixes: a change of the node's switch in the log says "setting
  *     changed" instead of "reclassified"; the reader is its account name with its node on the grey
  *     line under it (the whole identity on its title), so "alice@node" no longer breaks mid-word.
@@ -60,6 +66,7 @@ import { Field, Fields, FormActions } from '/components/Field.js';
 import { TextField } from '/components/TextField.js';
 import { Check } from '/components/Check.js';
 import { Choice } from '/components/Choice.js';
+import { useExceptions, exceptionsGroup } from '../profile/data-wallet/classification-exceptions.js';
 
 const html = htm.bind(h);
 const S = (key, params) => t('admin.security.cls.' + key, params);
@@ -282,6 +289,9 @@ export function ClassificationSection({ number, switchPage, confirm, onOk, onErr
   again.current = () => { load(); loadRows(action, limit); };
   useEffect(() => onLiveUpdate(['classification', 'config'], () => again.current()), []);
 
+  // The whole server's exceptions list: read-only, but an operator withdraws a person's exception in force.
+  const exceptions = useExceptions({ level: 'node', confirm: (msg, run) => confirm(msg, run, { title: S('title') }), ok: onOk, fail: onError });
+
   const pick = (a) => { setRows(null); setLimit(PAGE); setAction(a); };
   // Accepting gives something away for every person on this server, so it asks first.
   const review = (decision) => {
@@ -369,6 +379,8 @@ export function ClassificationSection({ number, switchPage, confirm, onOk, onErr
               <//>`} />
           <${Note} kind="hint">${S('editNote')}<//>
         <//>
+
+        ${exceptionsGroup(exceptions, { admin: true })}
 
         <${Space} above="section">
           <${Label} block>${S('audit')}<//>

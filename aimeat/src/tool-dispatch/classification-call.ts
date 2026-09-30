@@ -17,6 +17,9 @@
  * @structure classificationCall
  * @usage return envelopeResult(await classificationCall(client, args));
  * @version-history
+ *   v1.2.0 — 2026-09-30 — exception_list → GET /v1/classification/exceptions (exception_action as
+ *     the `action` query parameter), exception_set → POST /v1/classification/exceptions
+ *     (exception_action as `action` in the body).
  *   v1.1.0 — 2026-09-29 — explorer → GET /v1/classification/labels (pending as the query text
  *     "true"), switch_set → PUT /v1/classification/switch; get, set and review pass `owner`.
  *   v1.0.0 — 2026-09-29 — Initial (TARGET-082 V5).
@@ -104,6 +107,17 @@ export async function classificationCall(client: Pick<AimeatClient, 'get' | 'pos
                 return { ok: false, error: { code: 'INVALID_INPUT', message: 'switch_set is at level node, the only one.' } };
             }
             return client.put('/v1/classification/switch', pick(input, ['mode']));
+        case 'exception_list':
+            return client.get(`/v1/classification/exceptions${query({
+                level: q(input.level), organism_id: q(input.organism_id), since: q(input.since),
+                action: q(input.exception_action), limit: q(input.limit),
+            })}`);
+        case 'exception_set':
+            // The node refuses an AI credential with PERSON_REQUIRED; the same answer as the node MCP.
+            return client.post('/v1/classification/exceptions', {
+                ...pick(input, [...TARGET, 'reason', 'until']),
+                ...(input.exception_action !== undefined && input.exception_action !== null ? { action: input.exception_action } : {}),
+            });
         default:
             return { ok: false, error: { code: 'INVALID_INPUT', message: `action "${checked.action}" has no endpoint.` } };
     }

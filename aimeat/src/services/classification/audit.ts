@@ -24,7 +24,7 @@
  *   loses at most one window.
  *
  *   EVIDENCE IS NEVER EVICTED (review of 2026-09-29). The buffer keeps two lists: routine rows
- *   (shown, used) and evidence (refused, changed). Past the cap the oldest ROUTINE row goes; evidence
+ *   (shown, used) and evidence (refused, changed, exception). Past the cap the oldest ROUTINE row goes; evidence
  *   is kept up to a larger cap of its own, and past that a new evidence row is refused and logged
  *   rather than an older one dropped. Evidence is flushed first. A CHANGE is recorded to the
  *   millisecond (its `minute` is the exact time), so two changes of one item in one minute are two
@@ -43,6 +43,8 @@
  *   recordClassificationAudit({ scope, ownerGaii, kind: 'memory', key, label: 'luottamuksellinen',
  *     reader: 'claude#alice@node', readerKind: 'ai', action: 'used', purpose: 'chat:anthropic/claude' });
  * @version-history
+ *   v1.2.0 — 2026-09-30 — The action `exception` (an entry of the exceptions list made, used or
+ *     withdrawn): evidence, never evicted, and to the millisecond like a change.
  *   v1.1.0 — 2026-09-29 — Review fixes: evidence (refused, changed) is never evicted and flushes
  *     first; a change is its own row to the millisecond; an event may carry a count; ownerGaii is
  *     collapsed to the owner; purgeClassificationAudit for erasure and organism delete.
@@ -91,7 +93,9 @@ let evidence = new Map<string, ClassificationAuditRow>();
 let dropped = 0;
 let refusedEvidence = 0;
 
-const isEvidence = (a: ClassificationAuditAction) => a === 'refused' || a === 'changed';
+const isEvidence = (a: ClassificationAuditAction) => a === 'refused' || a === 'changed' || a === 'exception';
+/** An event recorded to the millisecond and never merged into another (a change, an exception). */
+const isEvent = (a: ClassificationAuditAction) => a === 'changed' || a === 'exception';
 const waitingRows = (): ClassificationAuditRow[] => [...evidence.values(), ...routine.values()];
 
 /** The ISO timestamp of the minute `at` falls in, in UTC. An unreadable `at` counts as now. */
@@ -162,8 +166,9 @@ export function recordClassificationAudit(e: ClassificationAuditEvent): void {
     const count = typeof e.count === 'number' && Number.isFinite(e.count) && e.count >= 1 ? Math.floor(e.count) : 1;
     enqueue({
       id: randomUUID(),
-      // A change is an event, not a count: to the millisecond, so a second change is a second row.
-      minute: e.action === 'changed' ? at : minuteOf(at),
+      // A change or an exception is an event, not a count: to the millisecond, so a second one is a
+      // second row.
+      minute: isEvent(e.action) ? at : minuteOf(at),
       scope: e.scope,
       // The person, never their agent or app: the owner's log and erasure read this column.
       ownerGaii: e.ownerGaii ? ownerGhiiOf(e.ownerGaii) : null,

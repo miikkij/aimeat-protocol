@@ -13,6 +13,9 @@
  *   defaultPolicy() · labelById()
  * @usage import { defaultPolicy } from './defaults.js';
  * @version-history
+ *   v1.4.0 — 2026-09-30 — Option B, decided by Jouni: no default label hides content from AI. Highly
+ *     confidential is a warning to an AI (and audited); 'hidden' stays a label an owner, an organism
+ *     or the operator may choose.
  *   v1.3.2 — 2026-09-30 — The e-mail rule starts a match only where a local part starts (17 s → under 1 ms on 200 kB).
  *   v1.3.1 — 2026-09-29 — The classifier's two daily caps may be null, for no cap.
  *   v1.3.0 — 2026-09-29 — V3: the Content Classifier's settings (ClassifierSettings).
@@ -22,7 +25,12 @@
  *   v1.0.0 — 2026-09-29 — TARGET-082 V1. Initial.
  */
 
-/** What an AI reader sees of content with this label (spec §5, decided 2026-09-29: three states). */
+/**
+ * What an AI reader sees of content with this label (spec §5, decided 2026-09-29: three states).
+ * 'hidden' is an owner's, an organism's or the operator's own choice and no default label uses it
+ * (decided 2026-09-30): "tekoälyn täytyy nähdä kaikki ... jos siltä piilottaa jotain niin sen jälkeen
+ * järjestelmä ei ole enää täysin tekoälyllä hallitavissa".
+ */
 export type AiVisibility = 'hidden' | 'warning' | 'allowed';
 
 /**
@@ -136,8 +144,11 @@ export const DEFAULT_LABELS: readonly ClassificationLabel[] = [
   },
   {
     id: 'erittain-luottamuksellinen', name: { fi: 'Erittäin luottamuksellinen', en: 'Highly confidential', es: 'Altamente confidencial' }, rank: 30, color: '#c8453b', status: 'active',
-    description: 'Credentials, keys, identity codes and anything whose leak causes harm. No AI processes the content.',
-    aiVisibility: 'hidden', audit: true, mayLeaveOrganism: false, lowerNeedsJustification: true,
+    description: 'Credentials, keys, identity codes and anything whose leak causes harm. An AI sees it with a warning, and every use is audited.',
+    // Decided by Jouni 2026-09-30, option B: "Säilytetään tila 'piilotettu' omistajan valintana, mutta
+    // mikään oletusluokitus ei käytä sitä. Tekoäly näkee oletuksena kaiken." No default label hides
+    // content from AI; an owner, an organism or the operator may still set 'hidden' on a label.
+    aiVisibility: 'warning', audit: true, mayLeaveOrganism: false, lowerNeedsJustification: true,
   },
 ];
 

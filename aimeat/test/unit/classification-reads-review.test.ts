@@ -14,6 +14,8 @@
  *      structure history) pass the reader.
  * @usage cd aimeat && pnpm exec vitest run test/unit/classification-reads-review.test.ts
  * @version-history
+ *   v1.2.0 — 2026-09-30 — No default label hides from AI (option B): the node policy hides the
+ *     highest label explicitly, so each test still proves what a hiding label does.
  *   v1.1.0 — 2026-09-30 — A warning names the document's address (one label per document, decided
  *     2026-09-30), so the two warning lists expect `notes.a` where they expected `notes.a.latest`.
  *   v1.0.0 — 2026-09-29 — TARGET-082 review, items 3, 4, 6, 7, 8 and 9. Initial.
@@ -41,6 +43,7 @@ import { createOrganismHelpers } from '../../src/routes/organisms/shared.js';
 import { registerOrganismWorkspaceOpsRoutes } from '../../src/routes/organisms/workspace-ops.js';
 import { registerOrganismWorkspaceReadRoutes } from '../../src/routes/organisms/workspace-read.js';
 import { logger } from '../../src/utils/logger.js';
+import { hideFromAiOnNode } from './classification-fixtures.js';
 
 vi.mock('../../src/services/connections/attachment-store.js', () => ({
   storeMailAttachment: vi.fn(async () => ({ ok: true, provider: 'gmail', key: 'mail/r.pdf', filename: 'r.pdf', mime_type: 'application/pdf', size: 10 })),
@@ -77,6 +80,8 @@ describe('TARGET-082 review: what a read hands out, and in which order it asks',
     storage = new SqliteStorage(':memory:');
     config = { ...loadConfig().config, nodeId: N, classificationMode: 'all', consentEnabled: true };
     resetClassificationAudit();
+    // No default label hides from AI since 2026-09-30: the operator hides HIDDEN on this node.
+    await hideFromAiOnNode(storage, N, [HIDDEN]);
     for (const name of ['alice', 'bob']) {
       await storage.createOwner({ name, displayName: name, publicKey: 'pk', roles: ['owner'], createdAt: stamp });
       await storage.createGHII({ username: name, nodeId: N, ghii: `${name}@${N}`, displayName: name, ownerName: name, verificationLevel: 0, totpEnabled: false, createdAt: stamp, updatedAt: stamp } as never);
