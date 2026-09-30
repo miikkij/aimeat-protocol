@@ -16,6 +16,9 @@
  * @structure ScanResult · scanContent()
  * @usage const out = await scanContent(deps, actor, { keys: ['notes.2026-09'] });
  * @version-history
+ *   v1.2.0 — 2026-09-30 — An organism item is authorized one by one, not once per scope: a member
+ *     named a key of a workspace they cannot read after one they can, and it was queued for the
+ *     classifier (TARGET-082 second review, S5).
  *   v1.1.0 — 2026-09-29 — Review fixes: at most 3 keys judged inside the request, the rest queued in
  *     one batch; authorization once per scope; a prefix queues each key under its holder.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V3. Initial.
@@ -68,12 +71,14 @@ export async function scanContent(
     throw new ClassificationError('INVALID_INPUT', 400, 'Name keys (a list of memory keys) or a prefix.');
   }
 
-  // Authorized once per scope: whether this actor may label content depends on its scope alone.
+  // Authorized once per personal scope, and once per item in an organism: there the answer depends
+  // on the workspace and the item, so a key a member cannot read is refused rather than queued for
+  // the classifier to read (TARGET-082 second review, S5).
   const checked = new Set<string>();
   for (const t of targets) {
     if (checked.has(t.scope)) continue;
     await readContentLabel(deps, actor, t);
-    checked.add(t.scope);
+    if (!scopeOrganism(t.scope)) checked.add(t.scope);
   }
 
   const toQueue: ContentLabelTarget[] = [];

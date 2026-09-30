@@ -6,8 +6,9 @@
  *   own screen, or an AI. Decided from the credential, never from what the caller declares, because
  *   an AI that could say "I am a person" would read what it is not allowed to.
  *
- *   A person: the owner's own session, and an app grant, which is the person's own screen (an app's
- *   AI calls are checked where the content goes to the model, not here). A visitor from another node
+ *   A person: the owner's own session, and an app grant, which is the person's own screen. Where an app's
+ *   content goes to a model (reader.useForAi), what is hidden from AI goes too and the act is
+ *   recorded as an automatic exception (decided 2026-09-30: an app does what it is built for). A visitor from another node
  *   signed in as a person is a person too.
  *   An AI: an agent token (every MCP session is one), an ecosystem app, an unattended run (role
  *   operator on an extension's scheduled run, a workflow step, a scheduled or unattributed AI job),

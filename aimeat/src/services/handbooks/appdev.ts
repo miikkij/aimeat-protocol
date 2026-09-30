@@ -5,6 +5,7 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-09-30 — Classified content in an app: one paragraph pointing at aimeat-labels.js (TARGET-082).
  *   2026-09-30 — The package line says a composed package carries your skills bound to its apps.
  *   2026-09-29 — aimeat_package_sellers: a shop's node sells your packages with no token.
  *   2026-09-28 — aimeat_package_config_needs: the settings a shop asks before the sale.
@@ -109,6 +110,12 @@ in one \`AIMEAT.decide.ask(state, questions, { subject, gates, thresholds, names
 app sends is the app's responsibility: send only the fields each question needs and pass the people
 the record mentions as \`names\`. The publish response lists departures as \`ai_hints\` starting
 \`DECIDE:\`. Never call TypeSafe or put its key in an app. Skill: typesafe-jev.
+
+**Classified content in an app (\`aimeat-labels.js\`, \`AIMEAT.labels\`).** Read a record's
+classification, set or review one only from the person's own choice on the screen (never lower one
+on an AI's judgement; a person's words go in \`humanSaid\`), show \`renderWarning(item)\` on an item
+that carries a warning, and on \`err.code === "CLASSIFIED"\` from an AI call tell the person instead
+of retrying. Requires aimeat-auth; \`GET /v1/library-packs/aimeat-labels\` has the full usage.
 
 **AI models in an app.** Ask for the work, not a model: \`AIMEAT.ai.complete\` without \`model\` uses
 what the owner allows. The owner's model policy may refuse a named model with 403

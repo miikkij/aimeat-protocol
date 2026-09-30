@@ -3513,7 +3513,8 @@
     "- The node cannot check text that an agent writes into its own prompt. After an AI has read content, what it does with that text on its own side is outside the node.",
     "- When an AI client drives your own signed-in REST session, the node cannot tell it apart from you, so it gets what you get.",
     "- A published data package is not yet classified file by file.",
-    "- The classification pages in the Data Wallet and on the Security page, the exceptions list among them, are not yet on the node. Today you use the MCP tool, the <code>AIMEAT.labels</code> library or the REST endpoints below."
+    "- An organism's classification (its policy, audit log and exceptions list) has no web page yet. Its creator or an admin uses the MCP tool or the REST endpoints below.",
+    "- The MCP tool cannot withdraw an exception. You withdraw one in the Data Wallet, and the operator on the Security page; an app uses <code>AIMEAT.labels.withdrawException()</code>."
    ],
    "columns": [
     "Feature",
@@ -3526,46 +3527,46 @@
      "slug": "g-24-classification-levels",
      "cells": [
       "<strong>Classification levels</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
-      "The four levels that come with the node, and the levels you or an organism add between them. An owner or an organism can only make the node's rules stricter: a change that would loosen a node rule is refused and names that rule.",
-      "<code>aimeat_classification</code> (<code>policy_get</code>, <code>policy_set</code>), <code>GET /v1/classification/policy</code>, <code>PUT /v1/classification/policy</code>"
+      "The four levels that come with the node, and the levels you or an organism add between them. An owner or an organism can only make the node's rules stricter: a change that would loosen a node rule is refused and names that rule. Changing the node's policy, and reading its audit log and exceptions list, needs the operator in person, or the operator's agent or app with the <code>operator:admin</code> permission.",
+      "Data Wallet (your policy), Security page (the node's), <code>aimeat_classification</code> (<code>policy_get</code>, <code>policy_set</code>), <code>GET /v1/classification/policy</code>, <code>PUT /v1/classification/policy</code>"
      ],
-     "plain": "Classification levels off The four levels that come with the node, and the levels you or an organism add between them. An owner or an organism can only make the node's rules stricter: a change that would loosen a node rule is refused and names that rule. aimeat_classification (policy_get, policy_set), GET /v1/classification/policy, PUT /v1/classification/policy"
+     "plain": "Classification levels off The four levels that come with the node, and the levels you or an organism add between them. An owner or an organism can only make the node's rules stricter: a change that would loosen a node rule is refused and names that rule. Changing the node's policy, and reading its audit log and exceptions list, needs the operator in person, or the operator's agent or app with the operator:admin permission. Data Wallet (your policy), Security page (the node's), aimeat_classification (policy_get, policy_set), GET /v1/classification/policy, PUT /v1/classification/policy"
     },
     {
      "slug": "g-24-classify-content",
      "cells": [
       "<strong>Classify content</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
-      "Give a memory record, a workspace record or document, a stored file or a workspace row its classification. See its classification now, a waiting suggestion, and its last changes. An AI never lowers a classification and never changes one a person set: its choice becomes a suggestion that you accept or reject.",
-      "<code>aimeat_classification</code> (<code>get</code>, <code>set</code>, <code>review</code>), <code>GET /v1/classification/label</code>, <code>PUT /v1/classification/label</code>, <code>POST /v1/classification/label/review</code>"
+      "Give a memory record, a workspace record or document, a stored file or a workspace row its classification. See its classification now, a waiting suggestion, and its last changes. A workspace document has one classification for all its copies (draft, latest and each saved version), so publishing never makes an unclassified copy. An AI never lowers a classification and never changes one a person set: its choice becomes a suggestion that you accept or reject.",
+      "Data Wallet, <code>aimeat_classification</code> (<code>get</code>, <code>set</code>, <code>review</code>, <code>explorer</code>), <code>GET /v1/classification/label</code>, <code>PUT /v1/classification/label</code>, <code>POST /v1/classification/label/review</code>"
      ],
-     "plain": "Classify content off Give a memory record, a workspace record or document, a stored file or a workspace row its classification. See its classification now, a waiting suggestion, and its last changes. An AI never lowers a classification and never changes one a person set: its choice becomes a suggestion that you accept or reject. aimeat_classification (get, set, review), GET /v1/classification/label, PUT /v1/classification/label, POST /v1/classification/label/review"
+     "plain": "Classify content off Give a memory record, a workspace record or document, a stored file or a workspace row its classification. See its classification now, a waiting suggestion, and its last changes. A workspace document has one classification for all its copies (draft, latest and each saved version), so publishing never makes an unclassified copy. An AI never lowers a classification and never changes one a person set: its choice becomes a suggestion that you accept or reject. Data Wallet, aimeat_classification (get, set, review, explorer), GET /v1/classification/label, PUT /v1/classification/label, POST /v1/classification/label/review"
     },
     {
      "slug": "g-24-what-an-ai-sees",
      "cells": [
       "<strong>What an AI sees</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
-      "By default an AI sees everything: no level that comes with the node hides content from it. Confidential and highly confidential content reaches the AI with a warning, and the AI uses it only for the task it was given. You, an organism or the operator can set a level to hide content from AI: then it is not in the AI's lists, and a call that names it is refused with <code>CLASSIFIED</code>.",
+      "By default an AI sees everything: no level that comes with the node hides content from it. Confidential and highly confidential content reaches the AI with a warning, and the AI uses it only for the task it was given. You, an organism or the operator can set a level to hide content from AI: then it is not in the AI's lists, and a call that names it is refused with <code>CLASSIFIED</code>. A reader who is not signed in gets the strictest treatment, the same as an AI.",
       "every MCP tool and REST read an AI uses"
      ],
-     "plain": "What an AI sees off By default an AI sees everything: no level that comes with the node hides content from it. Confidential and highly confidential content reaches the AI with a warning, and the AI uses it only for the task it was given. You, an organism or the operator can set a level to hide content from AI: then it is not in the AI's lists, and a call that names it is refused with CLASSIFIED. every MCP tool and REST read an AI uses"
+     "plain": "What an AI sees off By default an AI sees everything: no level that comes with the node hides content from it. Confidential and highly confidential content reaches the AI with a warning, and the AI uses it only for the task it was given. You, an organism or the operator can set a level to hide content from AI: then it is not in the AI's lists, and a call that names it is refused with CLASSIFIED. A reader who is not signed in gets the strictest treatment, the same as an AI. every MCP tool and REST read an AI uses"
     },
     {
      "slug": "g-24-content-that-stays-in-its-organism",
      "cells": [
       "<strong>Content that stays in its organism</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
-      "An organism's content whose classification must not leave stays out of exports, share links and federation to other nodes. By default only public content leaves. When an AI sends content out, content whose level hides it from AI stays behind too, your own included. The answer names each item and says you can make an exception.",
-      "exports, share links, federation, outside services"
+      "An organism's content whose classification must not leave stays out of exports, share links and federation to other nodes. By default only public content leaves. When an AI sends content out, content whose level hides it from AI stays behind too, your own included. The answer names each item and says you can make an exception. Your own data export under the GDPR is the one exit that keeps such content: it includes the organism records held under your name and names them in <code>classified_organism_content</code>.",
+      "exports, share links, federation, outside services, <code>GET /v1/owners/:name/export</code>"
      ],
-     "plain": "Content that stays in its organism off An organism's content whose classification must not leave stays out of exports, share links and federation to other nodes. By default only public content leaves. When an AI sends content out, content whose level hides it from AI stays behind too, your own included. The answer names each item and says you can make an exception. exports, share links, federation, outside services"
+     "plain": "Content that stays in its organism off An organism's content whose classification must not leave stays out of exports, share links and federation to other nodes. By default only public content leaves. When an AI sends content out, content whose level hides it from AI stays behind too, your own included. The answer names each item and says you can make an exception. Your own data export under the GDPR is the one exit that keeps such content: it includes the organism records held under your name and names them in classified_organism_content. exports, share links, federation, outside services, GET /v1/owners/:name/export"
     },
     {
      "slug": "g-24-exceptions-list",
      "cells": [
       "<strong>Exceptions list</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
-      "In your own session you let one item leave, or let an AI send it out, despite its classification, with a written reason and an end date if you want one. The exception, its reason and each use of it are kept, and the list shows them per owner, per organism and for the whole node. You or the maker withdraws an exception, and it stays on the list as withdrawn. An AI cannot make one.",
-      "<code>aimeat_classification</code> (<code>exception_list</code>), <code>GET /v1/classification/exceptions</code>, <code>POST /v1/classification/exceptions</code>, <code>DELETE /v1/classification/exceptions/:id</code>, <code>AIMEAT.labels.except()</code>"
+      "In your own session you let one item leave, or let an AI send it out, despite its classification, with a written reason and an end date if you want one. The exception, its reason and each use of it are kept, and the list shows them per owner, per organism and for the whole node. An exception covers its item only while the item's classification is no stricter than the one it was made for: raise the classification and the exception no longer applies. You or the maker withdraws an exception, and it stays on the list as withdrawn. An AI cannot make one.",
+      "Data Wallet, Security page (the whole node), <code>aimeat_classification</code> (<code>exception_list</code>), <code>GET /v1/classification/exceptions</code>, <code>POST /v1/classification/exceptions</code>, <code>DELETE /v1/classification/exceptions/:id</code>, <code>AIMEAT.labels.except()</code>"
      ],
-     "plain": "Exceptions list off In your own session you let one item leave, or let an AI send it out, despite its classification, with a written reason and an end date if you want one. The exception, its reason and each use of it are kept, and the list shows them per owner, per organism and for the whole node. You or the maker withdraws an exception, and it stays on the list as withdrawn. An AI cannot make one. aimeat_classification (exception_list), GET /v1/classification/exceptions, POST /v1/classification/exceptions, DELETE /v1/classification/exceptions/:id, AIMEAT.labels.except()"
+     "plain": "Exceptions list off In your own session you let one item leave, or let an AI send it out, despite its classification, with a written reason and an end date if you want one. The exception, its reason and each use of it are kept, and the list shows them per owner, per organism and for the whole node. An exception covers its item only while the item's classification is no stricter than the one it was made for: raise the classification and the exception no longer applies. You or the maker withdraws an exception, and it stays on the list as withdrawn. An AI cannot make one. Data Wallet, Security page (the whole node), aimeat_classification (exception_list), GET /v1/classification/exceptions, POST /v1/classification/exceptions, DELETE /v1/classification/exceptions/:id, AIMEAT.labels.except()"
     },
     {
      "slug": "g-24-apps-do-what-they-are-built-for",
@@ -3580,28 +3581,28 @@
      "slug": "g-24-content-classifier",
      "cells": [
       "<strong>Content Classifier</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
-      "Suggests or sets the classification of memory records. Detection rules run first (identity codes, API keys, email addresses and the rules you add), then the decision model or the text model that the policy names. Personal data is removed before any text goes to a model. New content is checked with the detection rules when it is written. One key, or up to 20 keys, is classified at once; more keys or a key prefix wait in a queue that the node works through within its daily limits.",
-      "<code>aimeat_classification</code> (<code>scan</code>), <code>POST /v1/classification/scan</code>"
+      "Suggests or sets the classification of memory records. Detection rules run first (identity codes, API keys, email addresses and the rules you add), then the decision model or the text model that the policy names. Personal data is removed before any text goes to a model. New content is checked with the detection rules when it is written. One key, or up to 3 keys, is classified at once; more keys or a key prefix wait in a queue that the node works through within its daily limits.",
+      "Security page (the operator's settings), <code>aimeat_classification</code> (<code>scan</code>), <code>POST /v1/classification/scan</code>"
      ],
-     "plain": "Content Classifier off Suggests or sets the classification of memory records. Detection rules run first (identity codes, API keys, email addresses and the rules you add), then the decision model or the text model that the policy names. Personal data is removed before any text goes to a model. New content is checked with the detection rules when it is written. One key, or up to 20 keys, is classified at once; more keys or a key prefix wait in a queue that the node works through within its daily limits. aimeat_classification (scan), POST /v1/classification/scan"
+     "plain": "Content Classifier off Suggests or sets the classification of memory records. Detection rules run first (identity codes, API keys, email addresses and the rules you add), then the decision model or the text model that the policy names. Personal data is removed before any text goes to a model. New content is checked with the detection rules when it is written. One key, or up to 3 keys, is classified at once; more keys or a key prefix wait in a queue that the node works through within its daily limits. Security page (the operator's settings), aimeat_classification (scan), POST /v1/classification/scan"
     },
     {
      "slug": "g-24-changes-that-loosen-the-policy-wait-for-you",
      "cells": [
       "<strong>Changes that loosen the policy wait for you</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
       "A policy change that only makes rules stricter applies at once. A change that loosens them (turns classification off, lets an AI see more, removes an audit log or a rule, lowers the default) waits until you accept it signed in yourself. An AI cannot accept it.",
-      "<code>POST /v1/classification/policy/review</code>"
+      "Data Wallet (your policy), Security page (the node's), <code>POST /v1/classification/policy/review</code>"
      ],
-     "plain": "Changes that loosen the policy wait for you off A policy change that only makes rules stricter applies at once. A change that loosens them (turns classification off, lets an AI see more, removes an audit log or a rule, lowers the default) waits until you accept it signed in yourself. An AI cannot accept it. POST /v1/classification/policy/review"
+     "plain": "Changes that loosen the policy wait for you off A policy change that only makes rules stricter applies at once. A change that loosens them (turns classification off, lets an AI see more, removes an audit log or a rule, lowers the default) waits until you accept it signed in yourself. An AI cannot accept it. Data Wallet (your policy), Security page (the node's), POST /v1/classification/policy/review"
     },
     {
      "slug": "g-24-audit-log",
      "cells": [
       "<strong>Audit log</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
       "For each level: which classified items an AI was shown or used, which were refused, which classifications changed, and each exception made, used or withdrawn with its reason. One row per reader, item and action per minute, with a count.",
-      "<code>aimeat_classification</code> (<code>audit</code>), <code>GET /v1/classification/audit</code>"
+      "Data Wallet, Security page (the whole node), <code>aimeat_classification</code> (<code>audit</code>), <code>GET /v1/classification/audit</code>"
      ],
-     "plain": "Audit log off For each level: which classified items an AI was shown or used, which were refused, which classifications changed, and each exception made, used or withdrawn with its reason. One row per reader, item and action per minute, with a count. aimeat_classification (audit), GET /v1/classification/audit"
+     "plain": "Audit log off For each level: which classified items an AI was shown or used, which were refused, which classifications changed, and each exception made, used or withdrawn with its reason. One row per reader, item and action per minute, with a count. Data Wallet, Security page (the whole node), aimeat_classification (audit), GET /v1/classification/audit"
     },
     {
      "slug": "g-24-apps-state-the-classification-they-expect",

@@ -17,6 +17,8 @@
  *      remove records, and a month with a person's exception in force stays.
  * @usage cd aimeat && pnpm exec vitest run test/unit/classification-exceptions.test.ts
  * @version-history
+ *   v1.2.0 — 2026-09-30 — An exception lapses when the item's label is raised after it (TARGET-082
+ *     second review, finding S2). An app's AI call takes content hidden from AI, as an exception.
  *   v1.1.0 — 2026-09-30 — An 'ai-send' exception shows the item to an AI reader (reader.show()).
  *   v1.0.0 — 2026-09-30 — Initial (Jouni's decisions of 2026-09-30).
  */
@@ -27,7 +29,7 @@ import { labelActorOf, memoryTarget, setLabel, reviewLabel, type LabelActor } fr
 import { readerFor, readerForAgent, EXCEPTION_HINT } from '../../src/services/classification/reader.js';
 import { writePolicy, reviewPolicy } from '../../src/services/classification/policy-admin.js';
 import { makeException, readExceptions, removeException } from '../../src/services/classification/exception-admin.js';
-import { addException, listExceptions, purgeExceptions, pruneExceptions } from '../../src/services/classification/exceptions.js';
+import { activeExceptionsFor, addException, listExceptions, purgeExceptions, pruneExceptions } from '../../src/services/classification/exceptions.js';
 import { pendingClassificationAudit, resetClassificationAudit } from '../../src/services/classification/audit.js';
 
 const N = 'test-node';
@@ -108,6 +110,24 @@ describe('classification exceptions and apps (decided 2026-09-30)', () => {
       expect((await reader.leave([orgDoc], t, where)).left).toHaveLength(1);
       // Withdrawn, it stays on the list for the audit.
       expect((await readExceptions(deps(), alice, 'organism', ORG)).exceptions[0]).toMatchObject({ id: e.id, withdrawnAt: expect.any(String) });
+    });
+
+    it("lapses when the item's label is raised after it was made, by rank or by a field", async () => {
+      const reader = readerFor(deps(), { sub: 'alice', owner: 'alice', roles: ['owner'] });
+      const where = { kind: 'export' as const, organismId: null };
+      await makeException(deps(), alice, { key: DOC, action: 'leave', reason: 'The board approved sharing the minutes.' });
+      expect((await reader.leave([orgDoc], t, where)).kept).toEqual([orgDoc]);
+
+      // Raised by rank and by fields (audited, warning to AI): the exception was made for Internal.
+      await setLabel(deps(), alice, t(orgDoc), { label: 'luottamuksellinen' });
+      expect((await reader.leave([orgDoc], t, where)).left).toHaveLength(1);
+
+      // A label of LOWER rank that hides content from AI is stricter by a field: the exception lapses too.
+      await writePolicy(deps(), alice, 'owner', null, { labels: [{ id: 'salainen', rank: 40, name: { en: 'Secret' }, aiVisibility: 'hidden' }, { id: 'piilo', rank: 5, name: { en: 'Low but hidden' }, aiVisibility: 'hidden' }] });
+      await makeException(deps(), alice, { key: 'notes.plan', action: 'ai-send', reason: 'The assistant mails the plan.' });
+      await setLabel(deps(), alice, t(own('notes.plan')), { label: 'piilo' });
+      const agentReader = readerForAgent(deps(), AGENT);
+      expect(await agentReader.show([own('notes.plan')], t)).toEqual([]);
     });
 
     it('an ai-send exception serves an AI reader only; an expired exception serves nobody', async () => {
@@ -231,6 +251,19 @@ describe('classification exceptions and apps (decided 2026-09-30)', () => {
       await expect(reviewPolicy(deps(), agent, 'owner', null, 'accept')).rejects.toMatchObject({ code: 'PERSON_REQUIRED' });
     });
 
+    it("gives content hidden from AI to its AI call, as an exception; a person's own session is still refused", async () => {
+      await setLabel(deps(), alice, t(own('secret')), { label: 'salainen' });
+      const use = { capability: 'chat', model: 'test-model' };
+      await expect(readerFor(deps(), appAuth).useForAi([t(own('secret'))], use)).resolves.toBeUndefined();
+      expect(await appExceptions('ai-send')).toEqual([expect.objectContaining({
+        auto: true, label: 'salainen', destination: 'ai:chat test-model',
+        reason: `app ${APP} gave an item classified Secret, which no AI may read, to an AI (chat test-model)`,
+      })]);
+      await expect(readerFor(deps(), { sub: 'alice', owner: 'alice', roles: ['owner'] }).useForAi([t(own('secret'))], use))
+        .rejects.toMatchObject({ code: 'CLASSIFIED' });
+      await expect(readerForAgent(deps(), AGENT).useForAi([t(own('secret'))], use)).rejects.toMatchObject({ code: 'CLASSIFIED' });
+    });
+
     it('sends out what its label keeps in, as one exception per act with the count', async () => {
       const reader = readerFor(deps(), appAuth);
       const docs = [orgDoc, { ownerGaii: ALICE, key: `organism.${ORG}.w.ws1.notes.b` }];
@@ -241,6 +274,28 @@ describe('classification exceptions and apps (decided 2026-09-30)', () => {
       await reader.leave([orgDoc], t, { kind: 'share', organismId: ORG, ws: 'ws1' });
       expect(await appExceptions('leave')).toEqual([expect.objectContaining({ count: 3, lastAt: expect.any(String) })]);
     });
+  });
+
+  describe('the list at a realistic size', () => {
+    it('an exception in force still works when more than 1000 are in force, and a month of full reasons fits one record', async () => {
+      const reason = 'r'.repeat(1000);
+      for (const [month, n] of [['2026-07', 500], ['2026-08', 500], ['2026-09', 100]] as const) {
+        for (let i = 0; i < n; i++) {
+          // One minute apart, so the first of July is the oldest of all.
+          const at = { ...deps(), now: () => new Date(Date.parse(`${month}-01T00:00:00.000Z`) + i * 60_000).toISOString() };
+          await addException(at, { by: ALICE, byKind: 'human', scope: ALICE, target: { kind: 'memory', key: `k.${month}.${i}` }, label: 'salainen', action: 'leave', reason, auto: false });
+        }
+      }
+      // The oldest of 1100 in force.
+      const found = await activeExceptionsFor(deps(), ALICE, [{ kind: 'memory', key: 'k.2026-07.0' }]);
+      expect([...found.keys()]).toEqual(['memory\u0000k.2026-07.0']);
+      // A full month of 1000-character reasons stays below the 1024 kB value limit, and the next is refused.
+      const july = await storage.getMemory(`system@${N}`, 'classification.exceptions.owner.' + ALICE + '.2026-07');
+      expect(JSON.stringify(july?.value ?? '').length).toBeLessThan(1024 * 1024);
+      const at = { ...deps(), now: () => '2026-07-20T00:00:00.000Z' };
+      await expect(addException(at, { by: ALICE, byKind: 'human', scope: ALICE, target: { kind: 'memory', key: 'one.more' }, label: 'salainen', action: 'leave', reason, auto: false }))
+        .rejects.toMatchObject({ code: 'EXCEPTION_LIMIT' });
+    }, 60_000);
   });
 
   describe('the list is kept and removed with its subject', () => {

@@ -31,6 +31,8 @@
  *   const q = explorerQueryOf({ level: 'owner', pending: true });
  *   const page = await listLabels({ storage, config }, actor, q);
  * @version-history
+ *   v1.1.0 — 2026-09-30 — A waiting suggestion on personal content that was deleted since is left
+ *     out of the list (TARGET-082 second review).
  *   v1.0.0 — 2026-09-29 — Initial (TARGET-082 review: the explorer).
  */
 import type { ContentLabelKind, ContentLabelRow, ContentLabelSuggestion } from '../../storage/interface.js';
@@ -247,6 +249,10 @@ export async function listLabels(deps: ClassificationDeps, actor: LabelActor, q:
         if (q.label && row.label !== q.label) continue;
         if (q.pending && !row.suggestion) continue;
         if (!(await visible(row, policy, active))) continue;
+        // A suggestion on personal content that was deleted since waits for nobody: leave it out.
+        // An organism document is stored under its copies' keys by any member, so it is not looked up.
+        if (row.suggestion && row.kind === 'memory' && !scopeOrganism(row.scope)
+          && !(await deps.storage.getMemory(row.scope, row.key))) continue;
         items.push({
           kind: row.kind, key: row.key, scope: row.scope, organismId: scopeOrganism(row.scope), owner: row.ownerGaii,
           label: row.label, labelDetail: brief(policy, row.label), source: row.source, locked: row.locked,

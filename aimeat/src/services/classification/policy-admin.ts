@@ -24,6 +24,10 @@
  * @usage
  *   const out = await writePolicy(deps, actor, 'owner', null, { enabled: true });
  * @version-history
+ *   v1.5.0 — 2026-09-30 — The node level asks askOperator() about the PRINCIPAL: an operator's agent,
+ *     app or ecosystem app passes only with "operator:admin". It asked whether the account behind the
+ *     credential was an operator, so any of them read every owner's audit and exceptions and could
+ *     rewrite the node policy (TARGET-082 second review, finding S1).
  *   v1.4.0 — 2026-09-30 — An app's loosening change or accept is recorded as an automatic exception;
  *     auditSubjectFor(), the audit log's authorization, which the exceptions list shares.
  *   v1.3.0 — 2026-09-29 — TARGET-082 review. The view carries `dropped`, what reading the stored
@@ -41,6 +45,7 @@ import { emitChange } from '../event-bus.js';
 import { listClassificationAuditMerged } from './audit.js';
 import { agentBarred } from '../organism-agent-access.js';
 import { isOrgManager } from '../workspace-access.js';
+import { askOperator } from '../operator-principal.js';
 import type { ClassificationPolicy } from './defaults.js';
 import { appNameOf, ClassificationError, isAppActor, type ClassificationDeps, type LabelActor } from './labels.js';
 import { levelScope, recordAutoException } from './exceptions.js';
@@ -91,9 +96,15 @@ async function mayWrite(deps: ClassificationDeps, actor: LabelActor, level: Poli
   if (actor.kind === 'rule') throw new ClassificationError('PERSON_REQUIRED', 403, 'A detection rule changes no policy.');
   if (level === 'owner') return;
   if (level === 'node') {
-    const owner = actor.ownerName ? await deps.storage.getOwner(actor.ownerName) : null;
-    if (owner?.roles.includes('operator')) return;
-    throw new ClassificationError('OPERATOR_REQUIRED', 403, "Only an operator of this server changes the node's classification policy.");
+    // The principal, not the account behind it: an operator's agent, app or ecosystem app passes
+    // only with "operator:admin", the same question the switch asks (switch.ts).
+    const answer = await askOperator(deps.storage, {
+      sub: actor.principal, owner: actor.ownerName ?? undefined, roles: actor.roles, scopes: actor.scopes ?? [],
+    });
+    if (answer.ok) return;
+    throw new ClassificationError('OPERATOR_REQUIRED', 403, answer.why === 'needs-word'
+      ? "Only an operator of this server sets the node's classification policy, reads its log and its exceptions. An operator's agent or app needs the \"operator:admin\" permission, which the operator ticks for it; \"Full access\" does not include it."
+      : "Only an operator of this server sets the node's classification policy, reads its log and its exceptions.");
   }
   const organism = await deps.storage.getOrganism(subject);
   if (organism && !agentBarred(organism, actor.principal) && await isOrgManager(deps.storage, subject, actor.ownerName ?? undefined)) return;
@@ -271,7 +282,7 @@ export async function reviewPolicy(
   decision: 'accept' | 'reject',
 ): Promise<PolicyWriteResult> {
   if (actor.kind !== 'human') {
-    throw new ClassificationError('PERSON_REQUIRED', 403, 'A person accepts or rejects a proposal to loosen the policy, signed in themselves. Ask them to open it.');
+    throw new ClassificationError('PERSON_REQUIRED', 403, 'A person accepts or rejects a proposal to loosen the policy, signed in themselves. Ask them to open it in their Data Wallet, or on the Security page for the node\'s policy.');
   }
   const subject = subjectOf(level, actor, organismId, deps.config.nodeId);
   await mayWrite(deps, actor, level, subject);

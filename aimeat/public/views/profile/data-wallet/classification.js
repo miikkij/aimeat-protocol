@@ -16,6 +16,9 @@
  * @structure acceptStep(policy, item, decision) · useClassification() → cls · secClassification(ctx, num)
  * @usage const cls = useClassification({ federated, confirm, toast }); … secClassification({ ...ctx, cls }, '05')
  * @version-history
+ *   v1.7.0 — 2026-09-30 — acceptStep counts a label of higher rank that protects less as a lowering,
+ *     as the server does (protectsLess, a copy of levels.ts weakerFields), so the reason is asked for
+ *     before the server refuses the accept with JUSTIFICATION_REQUIRED (TARGET-082 second review).
  *   v1.6.0 — 2026-09-30 — The exceptions list (Jouni's decisions of 2026-09-30): the group
  *     "Exceptions" under the classified items (classification-exceptions.js), and "Make an exception"
  *     on each classified item, which opens the dialog with what it lets happen, the reason and an
@@ -78,9 +81,34 @@ const MAX_ROWS = 1000;
 const PENDING_MAX = 100;
 const errText = (e, fallback) => e?.error?.message || e?.response?.error?.message || e?.message || fallback || t('profile.error');
 
+const VIS = { allowed: 0, warning: 1, hidden: 2 };
+const audienceEmpty = (a) => !a || (!a.roles?.length && !a.groups?.length && !a.people?.length);
+function audienceWithin(inner, outer) {
+  if (audienceEmpty(outer)) return true;
+  if (audienceEmpty(inner)) return false;
+  const sub = (a, b) => (a ?? []).every(x => (b ?? []).includes(x));
+  return sub(inner.roles, outer.roles) && sub(inner.groups, outer.groups) && sub(inner.people, outer.people);
+}
+
+/**
+ * Whether label `next` protects content less than `base` on any field. A copy of
+ * src/services/classification/levels.ts weakerFields(...).length > 0, which the server uses to call a
+ * change a lowering: the page cannot import server code, and test/unit/classification-wallet-reason
+ * feeds both the same labels.
+ * @param {any} next @param {any} base @returns {boolean}
+ */
+export function protectsLess(next, base) {
+  return (VIS[next.aiVisibility] ?? 0) < (VIS[base.aiVisibility] ?? 0)
+    || (!!base.audit && !next.audit)
+    || (!base.mayLeaveOrganism && !!next.mayLeaveOrganism)
+    || (!!base.lowerNeedsJustification && !next.lowerNeedsJustification)
+    || !audienceWithin(next.audience, base.audience);
+}
+
 /**
  * What answering a waiting suggestion asks of the person first. Accepting one that lowers the
- * classification (by rank, from the policy; the item's own brief when the policy lacks the label)
+ * classification (by rank, or to a label that protects less on any field, as the server counts it;
+ * from the policy, or the item's own brief when the policy lacks the label)
  * asks for a confirmation, and for a written reason when the current classification needs one to be
  * lowered (lowerNeedsJustification). A reject, a raise and a same-rank change ask nothing.
  * @param {any} policy the person's effective policy ({ labels })
@@ -93,7 +121,7 @@ export function acceptStep(policy, item, decision) {
   if (decision !== 'accept' || !s) return { kind: 'none' };
   const now = labelById(policy, item.label) || item.labelDetail;
   const next = labelById(policy, s.label) || s.labelDetail;
-  if (!now || !next || !(next.rank < now.rank)) return { kind: 'none' };
+  if (!now || !next || !(next.rank < now.rank || protectsLess(next, now))) return { kind: 'none' };
   const words = { from: labelName(now), to: labelName(next) };
   return { kind: labelById(policy, item.label)?.lowerNeedsJustification ? 'reason' : 'confirm', words };
 }

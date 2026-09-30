@@ -9,11 +9,13 @@
  *   policy on a long base64-like value in well under a second, and skips a rule whose label was
  *   retired.
  * @version-history
+ *   v1.1.0 — 2026-09-30 — One scope's slow rules stop costing the node once the scope has used its
+ *     minute of regex time (TARGET-082 second review, S4).
  *   v1.0.0 — 2026-09-29 — Initial (TARGET-082 review).
  */
 import { describe, it, expect } from 'vitest';
 import { unsafeRegexReason, testWithin } from '../../src/services/classification/regex-safety.js';
-import { matchRules, REGEX_TEXT } from '../../src/services/classification/detect.js';
+import { matchRules, REGEX_TEXT, resetRegexBudgets } from '../../src/services/classification/detect.js';
 import { defaultPolicy } from '../../src/services/classification/defaults.js';
 import { memoryTarget } from '../../src/services/classification/labels.js';
 
@@ -64,6 +66,29 @@ describe('matchRules with regex rules', () => {
     expect(matchRules(defaultPolicy(), t('img'), blob)).toBeNull();
     expect(performance.now() - t0).toBeLessThan(1000);
     expect(REGEX_TEXT).toBe(20_000);
+  });
+
+  it('stops charging the node for one scope\'s slow rules once the scope has used its minute', () => {
+    resetRegexBudgets();
+    // Passes the static check, yet reaches the per-rule limit on a long run with no x.
+    const slow = defaultPolicy();
+    slow.rules = [{ id: 'slow', name: 'Slow', kind: 'regex', pattern: '[a-z]*x', flags: '', minLabel: 'luottamuksellinen', enabled: true }];
+    const text = 'a'.repeat(REGEX_TEXT);
+    const attacker = memoryTarget('mallory@n', 'notes.loop');
+    const t0 = performance.now();
+    // Each write costs this pattern 150 to 500 ms, so thirty would block the node 5 to 15 seconds;
+    // the scope's budget is three seconds a minute.
+    for (let i = 0; i < 30; i++) matchRules(slow, attacker, text);
+    expect(performance.now() - t0).toBeLessThan(4500);
+    // Past its budget the scope's writes cost nothing.
+    const t1 = performance.now();
+    matchRules(slow, attacker, text);
+    expect(performance.now() - t1).toBeLessThan(50);
+    // POSITIVE CONTROL: another owner's regex rule still runs and matches.
+    const iban = defaultPolicy();
+    iban.rules = [{ id: 'fi', name: 'FI', kind: 'regex', pattern: '\\bFI\\d{16}\\b', flags: '', minLabel: 'luottamuksellinen', enabled: true }];
+    expect(matchRules(iban, memoryTarget('alice@n', 'notes.bank'), 'pay to FI2112345600000785')?.label).toBe('luottamuksellinen');
+    resetRegexBudgets();
   });
 
   it("skips a rule whose label is retired, so setLabel never sees it", () => {

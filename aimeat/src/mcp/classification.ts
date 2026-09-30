@@ -104,7 +104,7 @@ export function registerClassificationTools(
       }
       try {
         const principal = getAgentGaii();
-        const actor = labelActorOf({ sub: principal, owner: localAccountName(principal), roles: ['agent'] }, config.nodeId);
+        const actor = labelActorOf({ sub: principal, owner: localAccountName(principal), roles: ['agent'], scopes }, config.nodeId);
         switch (args.action) {
           case 'get':
             return text(await readContentLabel(deps, actor, targetOf(actor, args)));

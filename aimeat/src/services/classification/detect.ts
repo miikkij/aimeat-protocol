@@ -18,9 +18,16 @@
  *   ITEM_MS for all of one item's regex rules. A rule that reaches its limit counts as no match and
  *   is logged once per rule; past ITEM_MS the item's remaining regex rules are skipped. Keyword rules
  *   are built here from escaped words, so they read the whole text (MAX_TEXT) without a limit.
- * @structure RuleHit · REGEX_TEXT · ruleApplies() · matchRules()
+ *   ONE SCOPE CANNOT HOLD THE NODE EITHER (2026-09-30). The item limits bound one write, not a loop
+ *   of them: rules that reach their limit on every write, written in an owner's own layer, blocked
+ *   the event loop about a second per write. Each scope (an owner or an organism) has
+ *   SCOPE_MS_PER_MINUTE of regex time per minute; past it, its regex rules are skipped until the
+ *   minute is over, logged once per scope.
+ * @structure RuleHit · REGEX_TEXT · ruleApplies() · matchRules() · resetRegexBudgets()
  * @usage const hit = matchRules(policy, target, text); if (hit) await setLabel(deps, ruleActor, target, { label: hit.label });
  * @version-history
+ *   v1.2.0 — 2026-09-30 — A regex time budget per scope per minute (SCOPE_MS_PER_MINUTE), so one
+ *     owner's slow rules cannot block the node write after write (TARGET-082 second review, S4).
  *   v1.1.1 — 2026-09-30 — Time limits 500 ms per rule and 1000 ms per item: a loaded CPU reached 100 ms on a safe rule.
  *   v1.1.0 — 2026-09-29 — Review fixes: regex rules see 20 000 characters, an unsafe pattern is not
  *     compiled, each match has a time limit, a rule for a retired label is skipped, and the g and y
@@ -53,6 +60,36 @@ export const REGEX_TEXT = 20_000;
 // an IBAN stayed unlabelled. The static check refuses the patterns that blow up; this is the backstop.
 const RULE_MS = 500;
 const ITEM_MS = 1000;
+/**
+ * The regex time one scope (an owner, or an organism) may spend per minute across all its items. A
+ * safe pattern costs a fraction of a millisecond, so ordinary writes never come near it; a pattern
+ * that reaches its time limit on every write stops blocking every other request on the node once
+ * its scope has spent this, and the scope's items are matched by their keyword rules alone until
+ * the minute is over (TARGET-082 second review, S4).
+ */
+const SCOPE_MS_PER_MINUTE = 3000;
+const scopeSpent = new Map<string, { since: number; ms: number }>();
+
+function scopeLeft(scope: string, now: number): number {
+  const s = scopeSpent.get(scope);
+  if (!s || now - s.since >= 60_000) return SCOPE_MS_PER_MINUTE;
+  return SCOPE_MS_PER_MINUTE - s.ms;
+}
+
+function chargeScope(scope: string, ms: number, now: number): void {
+  const s = scopeSpent.get(scope);
+  if (!s || now - s.since >= 60_000) {
+    if (scopeSpent.size > 10_000) scopeSpent.clear();
+    scopeSpent.set(scope, { since: now, ms });
+  } else {
+    s.ms += ms;
+  }
+}
+
+/** Forget what each scope spent. For tests. */
+export function resetRegexBudgets(): void {
+  scopeSpent.clear();
+}
 
 /** Whether `rule` applies to `target` at all, before its pattern is tried. */
 export function ruleApplies(rule: ClassificationRule, target: ContentLabelTarget): boolean {
@@ -125,8 +162,15 @@ export function matchRules(policy: ClassificationPolicy, target: ContentLabelTar
         continue;
       }
       const t0 = performance.now();
-      hit = testWithin(re, regexBody, Math.min(RULE_MS, ITEM_MS - spent));
-      spent += performance.now() - t0;
+      const left = scopeLeft(target.scope, t0);
+      if (left <= 0) {
+        sayOnce(`${target.scope}\u0000budget`, 'was skipped: the regex rules of this scope used up their time for this minute', { scope: target.scope, key: target.key });
+        continue;
+      }
+      hit = testWithin(re, regexBody, Math.min(RULE_MS, ITEM_MS - spent, left));
+      const took = performance.now() - t0;
+      spent += took;
+      chargeScope(target.scope, took, t0);
       if (hit === null) sayOnce(rule.id, `reached its time limit (${RULE_MS} ms) and counts as no match`, { key: target.key, chars: regexBody.length });
     } else {
       hit = re.test(body);
