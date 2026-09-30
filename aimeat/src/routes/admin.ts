@@ -11,6 +11,7 @@
  *   - imports adminConfig/Monitoring/Agents/Maintenance/Economy/Memory sub-routers
  *
  * @version-history
+ *   v1.8.0 — 2026-09-30 — Mounts adminNodeUpdateRouter: GET /v1/admin/node-update, the npm version check.
  *   v1.7.0 — 2026-09-15 — POST /v1/admin/seed-examples runs the boot's package sync: only a package
  *     whose bundled content changed gets a new version, and the listing keeps its counts.
  *   v1.6.0 — 2026-09-12 — GET /v1/admin/owners answers display_name as null rather than dropping
@@ -50,6 +51,7 @@ import { fileURLToPath } from 'node:url';
 
 // Sub-routers (domain-split from admin.ts)
 import { adminConfigRouter } from './admin-config.js';
+import { adminNodeUpdateRouter } from './admin-node-update.js';
 import { adminMonitoringRouter } from './admin-monitoring.js';
 import { adminAgentsRouter } from './admin-agents.js';
 import { adminMaintenanceRouter } from './admin-maintenance.js';
@@ -674,6 +676,7 @@ export function adminRouter(
 
     // ── Mount domain sub-routers ──
     router.use(adminConfigRouter(config, storage, provenance, consulService));
+    router.use(adminNodeUpdateRouter(config));
     router.use(adminMonitoringRouter(config, storage, peers));
     router.use(adminAgentsRouter(config, storage));
     router.use(adminMaintenanceRouter(config, storage, maintenanceCache));

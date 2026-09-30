@@ -10,6 +10,7 @@
  * @structure SHELL_ENTRIES
  * @usage import { SHELL_ENTRIES } from './entries-shell.js';
  * @version-history
+ *   v1.7.0 — 2026-09-30 — NodeUpdateNotice: the operator's new-version tag and its dialog.
  *   v1.6.0 — 2026-09-27 — StartPageSetting's dialog (and its footer, named) and ToastBox's hold and role: the
  *     home and the pop-out windows pass meanings, not classes.
  *   v1.5.1 — 2026-09-27 — AgentConsent and DisplayPrefsFields draw their own names from sheets of their
@@ -380,6 +381,15 @@ export const SHELL_ENTRIES: UiEntryWritten[] = [
         data: { shape: 'OpenItemsButton({ t, onNavigate })', fields: { t: 'the translator', onNavigate: 'how the list opens' } },
         useFor: ['In the top bar of every signed-in page.'],
         variants: [], example: {},
+    },
+    {
+        id: 'node-update-notice', name: 'NodeUpdateNotice', kind: 'component', status: 'active',
+        summary: 'The operator\'s new-version tag in the top bar, and the dialog it opens: the version, the release date, what is new, the update prompt and where the check is switched off.',
+        module: '/components/NodeUpdateNotice.js', sheet: '/css/poster.css', classes: ['poster-chip', 'poster-chip--sun'],
+        data: { shape: 'NodeUpdateNotice({ session, onNavigate, onShown })', fields: { session: 'the signed-in session; only an operator sees it', onNavigate: 'how the link to the setting opens', onShown: 'told whether the tag is on the bar' } },
+        useFor: ['Notify an operator in the top bar while npm has a newer AIMEAT than the node runs, and open the dialog that explains it.'],
+        variants: [], example: {},
+        note: 'Draws no class of its own: the tag is Mark tone sun, the dialog is Modal with Facts, ChangeLog, Note, Code and Action. The data is GET /v1/admin/node-update.',
     },
     {
         id: 'agent-consent', name: 'AgentConsent', kind: 'component', status: 'active',

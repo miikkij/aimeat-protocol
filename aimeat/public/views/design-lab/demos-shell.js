@@ -10,6 +10,7 @@
  * @structure SHELL_DEMOS — { [id]: { variants: [{ name, render(ex) }], height?, emptyNote? } }
  * @usage import { SHELL_DEMOS } from './demos-shell.js';
  * @version-history
+ *   v1.4.0 — 2026-09-30 — NodeUpdateNotice's tag.
  *   v1.3.0 — 2026-09-27 — The start page setting's dialog and footer drawn by the component (live: they
  *     read this account's choice), beside its markup; the toast drawn by ToastBox, with hold and role.
  *   v1.2.2 — 2026-09-27 — The contact card's, the link preview's and the Mermaid fallback's frames
@@ -120,6 +121,8 @@ export const SHELL_DEMOS = {
   'margin-pattern': one('default', () => html`<p>The pattern sits in the page margins of the home, the chat and the settings (set in the home's settings).</p>`),
   'notification-bell': one('with a count', () => html`<div class="notif-bell"><button type="button" class="notif-bell-btn">🔔<span class="poster-count poster-count--waiting poster-count--small notif-badge">7</span></button></div>`),
   'open-items-button': one('default', () => html`<button type="button" class="open-items-btn"><span class="open-items-btn-mark">○</span><span class="open-items-btn-count">3</span></button>`),
+  // The tag only: the component reads GET /v1/admin/node-update, and a demo shows no live data.
+  'node-update-notice': one('tag', () => html`<${Mark} tone="sun" onClick=${noop}>3.22.0 is out<//>`),
   'agent-consent': one('frame', () => html`<${AgentConsent} requests=${[{ user_code: 'WDJB-MJHT', agent_name: 'claude', expires_in: 540 }]} onApprove=${noop} onDeny=${noop} />`),
   'contact-card': one('frame', () => html`<aside class="contact-card poster-aside poster-aside--large"><p class="contact-card-title">Who runs this node</p><p>Its people come from the node's settings.</p></aside>`),
   'display-prefs-fields': one('frame', () => html`<${DisplayPrefsFields} region="fi-FI" timezone="Europe/Helsinki" onChange=${noop} />`),

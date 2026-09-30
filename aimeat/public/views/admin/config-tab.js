@@ -29,6 +29,8 @@
  *   - fieldEditor — one field's editor by its type (a Select when the field has choices)
  *   - ConfigTab (default)
  * @version-history
+ *   v3.2.0 -- 2026-09-30 -- `?q=` in the address opens the page with that search, so a link names one
+ *     setting (the header's new-version notice links to node.update_check).
  *   v3.1.0 -- 2026-09-29 -- A string setting with `choices` (the API names its fixed values) is a Select:
  *     each value in words (dashboard.cfgOpt_<path>_<value>, the raw value otherwise), the raw value
  *     stored; the read-only value and the old → new list use the same words.
@@ -223,7 +225,9 @@ export default function ConfigTab({ data, reload }) {
   const [pending, setPending] = useState({});
   const [result, setResult] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [q, setQ] = useState('');
+  // `?q=` opens the page already searched: a link to one setting (the new-version notice's
+  // "Open the setting") lands on that setting rather than on the whole index.
+  const [q, setQ] = useState(() => new URLSearchParams(location.search).get('q') || '');
   const [onlyChanged, setOnlyChanged] = useState(false);
   const [showChanges, setShowChanges] = useState(false);
 

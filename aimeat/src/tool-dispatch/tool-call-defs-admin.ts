@@ -9,6 +9,7 @@
  * @structure adminCliTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { adminCliTools } from './tool-call-defs-admin.js';
  * @version-history
+ *   v1.8.0 -- 2026-09-30 -- aimeat_admin_node_update (GET /v1/admin/node-update, refresh forwarded).
  *   v1.7.0 -- 2026-09-29 -- aimeat_package_sale (GET, PUT, DELETE /v1/package-sales/...), every field forwarded.
  *   v1.6.0 -- 2026-09-28 -- aimeat_admin_install_set (POST /v1/install-sets/apply, GET /v1/install-sets):
  *     action, install_set and secrets forwarded.
@@ -92,6 +93,13 @@ export const adminCliTools: ConnectCliToolDefinition[] = [
         name: 'aimeat_admin_statistics',
         handler: ({ client }, input) => client.get(
             `/v1/stats${query({ from: optionalString(input, 'from'), to: optionalString(input, 'to') })}`),
+    },
+    {
+        // THE THIRD SURFACE forwards `refresh`: without it a caller checking right after an update
+        // reads the six-hour cache and is told the old version is still the newest.
+        name: 'aimeat_admin_node_update',
+        handler: ({ client }, input) => client.get(
+            `/v1/admin/node-update${query({ refresh: optionalBoolean(input, 'refresh') })}`),
     },
     {
         // THE THIRD SURFACE forwards both parameters: `hook` picks the moment and `actions` is the

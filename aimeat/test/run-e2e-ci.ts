@@ -9,6 +9,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.68.0 -- 2026-09-30 -- e2e-node-update.ts joins the suites (not the guard tier): the npm version
+ *            check behind the operator's header notice, against a stub registry.
  *   v1.67.0 -- 2026-09-29 -- e2e-classification.ts joins the suites (not the guard tier): content
  *            classification's four-path parity, the node switch and the explorer (TARGET-082).
  *   v1.66.0 -- 2026-09-26 -- The node starts per suite with that suite's anonymous-mode setting
@@ -716,6 +718,9 @@ const ALL_SUITES = [
     // The one read the Realtime page is folded from: all eight counters, the documents living per
     // room rather than under a key nothing sends, and the switched-off answer on a node of its own.
     'test/e2e-admin-realtime-page.ts',
+    // The new-version check behind the operator's header notice: against a stub registry, the
+    // diff of the change logs, the registry failing, and the switch that stops the requests.
+    'test/e2e-node-update.ts',
     // The one read the Owners page is folded from: the field set every figure, chip and filter is
     // counted from, and the two lifecycle writes moving the two fields the page draws.
     'test/e2e-admin-owners-page.ts',

@@ -22,6 +22,7 @@
  *   import { toolsForSurface } from '../catalog/surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
+ *   2026-09-30 — aimeat_admin_node_update on the admin surface.
  *   2026-09-29 — aimeat_refinery_classes, _run and _status on `agent`, beside the mail tools.
  *   2026-09-29 — aimeat_package_sellers on `appdev` and `agent`; aimeat_package_sale on the operator surface.
  *   2026-09-28 — aimeat_package_config_needs on `appdev` and `agent`, beside the entitlements.
@@ -350,6 +351,8 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_admin_hooks', 'aimeat_admin_hook_set',
         // The Statistics page in one read: the counters, their day tallies, and the live gauges.
         'aimeat_admin_statistics',
+        // Is a newer AIMEAT on npm, what is new in it, and the prompt that updates the node.
+        'aimeat_admin_node_update',
         // The Usage page in one read: whose money paid for the AI, and the key nothing here meters.
         'aimeat_admin_usage',
         // The Knowledge page in one read: the whole collection, its shape, and who has already looked.

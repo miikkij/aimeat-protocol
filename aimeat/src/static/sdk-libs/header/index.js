@@ -13,6 +13,8 @@
  *   modalI18n/buildMarkup/wire/refreshSession/init — runs init() on DOM ready.
  * @usage <div id="aimeat-header"></div><script src="/v1/libs/aimeat-header.js"></script>
  * @version-history
+ *   v1.3.0 — 2026-09-30 — An operator sees the new-version tag (GET /v1/admin/node-update) beside the
+ *     pill; it links to /v1/admin?nodeUpdate=1, where the SPA opens the dialog.
  *   v1.2.0 — 2026-08-12 — Spanish added. The language switch and readLang() come off one LANGS list
  *     instead of naming the languages in five places.
  *   v1.1.0 — 2026-08-09 — Same anon/auth split as the SPA header: "How it works" and "For your
@@ -178,6 +180,12 @@ function main() {
             }).join('') +
           '</div>' +
         '</div>' +
+        // The operator's new-version notice (components/NodeUpdateNotice.js in the SPA). This page
+        // has no dialog, so the tag links to the SPA, which opens it (?nodeUpdate=1). The look is
+        // the sun tag (.poster-chip--sun), inline because this page links theme.css and not poster.css.
+        '<a data-node-update href="' + nodeHref('/v1/admin?nodeUpdate=1') + '" style="display:none;' +
+          'padding:.1rem .45rem;border:1px solid var(--text);background:var(--sun);color:var(--on-sun);' +
+          'font-family:var(--font-mono);font-size:.68rem;font-weight:500;letter-spacing:.04em;text-decoration:none"></a>' +
         '<span class="header-auth-slot" id="headerAuth"></span>' +
       '</div>';
     return nav;
@@ -205,7 +213,7 @@ function main() {
     });
   }
 
-  function refreshSession(nav) {
+  function refreshSession(nav, t) {
     var hasSession = !!(window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.hasSession);
     var session = hasSession && window.AIMEAT.auth.getSession ? window.AIMEAT.auth.getSession() : null;
     nav.querySelectorAll('[data-auth-only]').forEach(function (el) {
@@ -218,6 +226,20 @@ function main() {
     nav.querySelectorAll('[data-operator-only]').forEach(function (el) {
       /** @type {HTMLElement} */ (el).style.display = isOp ? '' : 'none';
     });
+    var updateEl = /** @type {HTMLElement} */ (nav.querySelector('[data-node-update]'));
+    updateEl.style.display = 'none';
+    if (isOp && session.jwt) {
+      fetch('/v1/admin/node-update', { headers: { 'Authorization': 'Bearer ' + session.jwt } })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          var s = d && d.ok && d.data;
+          if (!s || !s.enabled || !s.updateAvailable) return;
+          updateEl.textContent = (t['nodeUpdate.pill'] || '{version} is out').replace('{version}', s.latest);
+          updateEl.title = t['nodeUpdate.pillTitle'] || '';
+          updateEl.style.display = 'inline-block';
+        })
+        .catch(function () { updateEl.style.display = 'none'; });
+    }
     var morselEl = /** @type {HTMLElement} */ (nav.querySelector('[data-morsels]'));
     if (session && session.jwt) {
       fetch('/v1/wallet', { headers: { 'Authorization': 'Bearer ' + session.jwt } })
@@ -270,8 +292,8 @@ function main() {
       } catch (e) { console.error('AIMEAT header: auth mount failed', e); }
     }
     mountPill();
-    refreshSession(nav);
-    window.addEventListener('aimeat-auth-change', function () { refreshSession(nav); });
+    refreshSession(nav, t);
+    window.addEventListener('aimeat-auth-change', function () { refreshSession(nav, t); });
   }
 
   if (document.readyState === 'loading') {

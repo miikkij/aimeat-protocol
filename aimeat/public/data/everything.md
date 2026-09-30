@@ -536,6 +536,7 @@ The operator dashboard is the one place with server-built screens. Everything on
 | <a id="g-19-operator-agents"></a> **Operator agents** | Configure the node's own agents and its AI provider. | `aimeat_operator_agent_configure`, `aimeat_operator_ai_config` |
 | <a id="g-19-email-and-push-templates"></a> **Email and push templates** | Edit the templates the node sends, per language. | `/v1/admin/email/*`, `/v1/admin/push*` |
 | <a id="g-19-backup-and-restore"></a> **Backup and restore** | Back the node up and restore it. | `/v1/admin/backup`, `/v1/admin/restore` |
+| <a id="g-19-new-version-notice"></a> **New-version notice** | When npm has a newer AIMEAT, an operator sees it in the header. The dialog says when it was released and what is new in it since this node's version, and gives a prompt that Claude Code or Codex runs to back the node up, update it the way it was installed and check the result. The node asks npm at most every six hours and only when an operator opens a page; one setting switches the check off. | `/v1/admin/node-update`, `aimeat_admin_node_update`, setting `node.update_check` |
 | <a id="g-19-metrics"></a> **Metrics** `[off]` | A Prometheus endpoint. | `/v1/metrics` |
 | <a id="g-19-consul"></a> **Consul** `[off]` | Export, import and watch configuration for a fleet of nodes. | `/v1/admin/consul*` |
 | <a id="g-19-languages"></a> **Languages** | English, Finnish and Spanish (Latin American), with missing keys falling back to English. | `aimeat/locales/` |

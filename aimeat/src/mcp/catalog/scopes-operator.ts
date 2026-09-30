@@ -7,6 +7,7 @@
  *   where they stood, so the table reads the same.
  * @structure OPERATOR_TOOL_SCOPES
  * @version-history
+ *   v1.1.0 — 2026-09-30 — aimeat_admin_node_update: operator:admin.
  *   v1.0.0 — 2026-09-29 — Moved from scopes.ts, unchanged.
  */
 
@@ -46,6 +47,7 @@ export const OPERATOR_TOOL_SCOPES: Record<string, string> = {
     aimeat_admin_usage:                       'operator:admin',
     aimeat_admin_knowledge:                   'operator:admin',
     aimeat_admin_federation:                  'operator:admin',
+    aimeat_admin_node_update:                 'operator:admin',
     aimeat_admin_federation_relay_claim_set:  'operator:admin',
     aimeat_admin_install_set:                 'operator:admin',
     aimeat_package_sale:                      'operator:admin',

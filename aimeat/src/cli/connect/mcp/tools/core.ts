@@ -8,6 +8,7 @@
  * @structure
  *   - registerCoreTools() -- Registers core REST-backed connector MCP tools
  * @version-history
+ *   v1.19.0 -- 2026-09-30 -- aimeat_admin_node_update, thin over GET /v1/admin/node-update.
  *   v1.18.0 -- 2026-09-29 -- aimeat_storage_upload forwards workspace_refs for a 'workspace' file.
  *   v1.17.2 -- 2026-09-26 -- The `resolution` description of aimeat_admin_incident_resolve names the app
  *     grants and access tokens too.
@@ -686,6 +687,14 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     // node's whole life wearing a period's label.
     const qs = from && to ? `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}` : '';
     return asText(await client.get(`/v1/stats${qs}`));
+  });
+
+  mcp.tool('aimeat_admin_node_update', descriptionFor('aimeat_admin_node_update'), {
+    agent_name: agentNameSchema,
+    refresh: z.boolean().optional().describe('Ask the registry now instead of answering from the six-hour cache.'),
+  }, annotationsFor('aimeat_admin_node_update'), async ({ agent_name, refresh }) => {
+    const { client } = pickAgent(registry, agent_name);
+    return asText(await client.get(`/v1/admin/node-update${refresh === true ? '?refresh=true' : ''}`));
   });
 
   mcp.tool('aimeat_admin_federation', descriptionFor('aimeat_admin_federation'), {

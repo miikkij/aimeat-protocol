@@ -10,6 +10,7 @@
  * @structure USE_OF — { [entryId]: UiUse[] }
  * @usage import { USE_OF } from './entries-use.js';
  * @version-history
+ *   v1.72.0 — 2026-09-30 — NodeUpdateNotice: notify, explain, copy.
  *   v1.71.0 — 2026-09-27 — The catalogue family's words (appcat): IndexFrame, Overlay, Stops, SlotBars, WorldMap and
  *     its model, DataMap, DayWindow, the List's tones and the Modal's options; the data table picks (compact), the
  *     empty state waits (loading), the crumb trail's sheet holds Action's dashed, inline and file doors (act), and a step card's question
@@ -128,7 +129,7 @@ export const USE_OF: Record<string, UiUse[]> = {
     'search-bar': ['search'], spinner: ['wait'], 'empty-state': ['explain', 'act', 'wait'], 'text-utility': ['explain'],
     'toggle-switch': ['edit'], 'site-footer': ['navigate'], alert: ['status', 'notify'], toast: ['notify'],
     'section-header': ['explain'], dialog: ['confirm', 'edit'], 'margin-pattern': ['layout'], 'notification-bell': ['notify', 'act'],
-    'open-items-button': ['count', 'navigate'], 'agent-consent': ['confirm'], 'contact-card': ['explain', 'navigate'],
+    'open-items-button': ['count', 'navigate'], 'node-update-notice': ['notify', 'explain', 'copy'], 'agent-consent': ['confirm'], 'contact-card': ['explain', 'navigate'],
     'display-prefs-fields': ['edit'], 'inbox-link': ['navigate'], 'json-view': ['view'], 'link-preview': ['view', 'open'],
     'memory-embed': ['view'], mermaid: ['view'], 'offer-card-view': ['view', 'explain'],
     // Settings & Controls (phase 5)

@@ -6,6 +6,7 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.13.0 -- 2026-09-30 -- Updates: aimeat_admin_node_update, a newer AIMEAT on npm and the update prompt.
  *   v1.12.0 -- 2026-09-30 -- Classification: an AI sees everything by default; exception_list at level node.
  *   v1.11.0 -- 2026-09-29 -- Classification (TARGET-082): the node's switch and switch_set, the node
  *     policy at level node, the audit log, and the Content Classifier's daily caps.
@@ -61,6 +62,13 @@ counter nothing writes) · \`aimeat_admin_stats\` (a different question: how man
 boards and work items the node HOLDS, and the morsels in circulation) · \`aimeat_admin_agents\`
 (all agents) · \`aimeat_admin_config\` (node config) · \`aimeat_admin_mint\` (mint morsels —
 irreversible ledger credit, daily cap enforced; a financial action, use sparingly).
+
+**Updates (operator).** \`aimeat_admin_node_update\` — is a newer AIMEAT out on npm than this node
+runs, when it was released, and what is new in it (\`whatsNew\`, the change-log entries the node does
+not have yet). Tell the operator the version, the date and the new things in plain words. Its
+\`prompt\` is a ready update prompt for an AI with a shell on the node's machine (Claude Code, Codex):
+offer it, and let the operator decide when, because the update restarts the node. After an update,
+call it with \`refresh: true\` and check that \`current\` is the new version.
 
 **Federation (operator).** \`aimeat_admin_federation\` — where this node stands with the other nodes
 it talks to. Lead with \`needs\`, not with the peer count: approving a peering request does NOT
@@ -161,6 +169,7 @@ the manual offboarding door; a connected directory does the same automatically o
 
 ## Typical uses
 - Audit the node: \`aimeat_admin_statistics\` / \`aimeat_admin_stats\` / \`aimeat_admin_agents\` / \`aimeat_admin_config\`.
+- Answer "is my node up to date": \`aimeat_admin_node_update\`, and offer its prompt when it is not.
 - Answer "what is this costing me": \`aimeat_admin_usage\` for the period and the one before it, and
   lead with whose money each figure is rather than with the largest number in the payload.
 - Answer "is anything happening to us": \`aimeat_admin_statistics\` for the period and the week before

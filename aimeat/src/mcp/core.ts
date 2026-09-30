@@ -11,6 +11,7 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.32.0 — 2026-09-30 — registerAdminNodeUpdateTools: is a newer AIMEAT on npm, and the update prompt.
  *   v1.31.0 — 2026-09-30 — aimeat_agents_list carries default_scopes, refusals and scope_request, as
  *     GET /v1/agents does (services/agent-refusals.ts).
  *   v1.30.0 — 2026-09-29 — aimeat_memory_read carries classification_warning for a warning-classified value (TARGET-082 V4).
@@ -148,6 +149,7 @@ import { registerAdminHooksTools } from './admin-hooks.js';
 import { registerAdminStatisticsTools } from './admin-statistics.js';
 import { registerAdminKnowledgeTools } from './admin-knowledge.js';
 import { registerAdminFederationTools } from './admin-federation.js';
+import { registerAdminNodeUpdateTools } from './admin-node-update.js';
 import { registerCoreStorageTools } from './core-storage.js';
 import { registerCoreDataPackageTools } from './core-datapackage.js';
 import { logger } from '../utils/logger.js';
@@ -762,4 +764,6 @@ export function registerCoreTools(
     registerAdminKnowledgeTools(mcp, storage, config, getAgentGaii, sessionScopes);
     // The Federation page in one read: where this node stands, and what is waiting on a person.
     registerAdminFederationTools(mcp, storage, config, peers, getAgentGaii, sessionScopes);
+    // Is a newer AIMEAT on npm: the operator's header notice, and the prompt that updates the node.
+    registerAdminNodeUpdateTools(mcp, storage, config, getAgentGaii, sessionScopes);
 }

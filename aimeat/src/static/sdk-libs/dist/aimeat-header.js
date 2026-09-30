@@ -183,7 +183,7 @@
       nav.innerHTML = '<div style="display:flex;align-items:center;gap:20px"><a href="' + nodeHref("/v1/portal") + '" class="topnav-brand">AIME<span class="heart">♥</span><span class="brand-at">AT</span></a><span class="brand-morsels" data-morsels style="display:none"></span></div><div class="topnav-right"><button class="topnav-burger" aria-label="Menu" data-burger>☰</button><div class="topnav-menu" data-menu><a href="' + nodeHref("/v1/how-it-works") + '" data-anon-only>' + label("nav.howItWorks") + '</a><a href="' + nodeHref("/v1/business") + '" data-anon-only>' + label("nav.business") + '</a><a href="' + nodeHref("/v1/help") + '">' + label("nav.help") + '</a><a href="' + nodeHref("/app-catalog.html") + '" target="_blank" data-auth-only style="display:none">' + label("nav.apps") + '</a><a href="' + nodeHref("/v1/profile") + '" class="profile-link visible" data-auth-only style="display:none">' + label("nav.profile") + '</a><a href="' + nodeHref("/v1/admin") + '" data-operator-only style="display:none">' + label("nav.admin") + '</a><div class="topnav-center">' + // Theme toggle now lives inside the login pill (mountLoginButton) — see init().
       LANGS.map(function(l) {
         return '<button class="lang-btn" data-lang="' + l + '">' + l.toUpperCase() + "</button>";
-      }).join("") + '</div></div><span class="header-auth-slot" id="headerAuth"></span></div>';
+      }).join("") + '</div></div><a data-node-update href="' + nodeHref("/v1/admin?nodeUpdate=1") + '" style="display:none;padding:.1rem .45rem;border:1px solid var(--text);background:var(--sun);color:var(--on-sun);font-family:var(--font-mono);font-size:.68rem;font-weight:500;letter-spacing:.04em;text-decoration:none"></a><span class="header-auth-slot" id="headerAuth"></span></div>';
       return nav;
     }
     function wire(nav, t, lang) {
@@ -205,7 +205,7 @@
         });
       });
     }
-    function refreshSession(nav) {
+    function refreshSession(nav, t) {
       var hasSession = !!(window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.hasSession);
       var session = hasSession && window.AIMEAT.auth.getSession ? window.AIMEAT.auth.getSession() : null;
       nav.querySelectorAll("[data-auth-only]").forEach(function(el) {
@@ -218,6 +218,24 @@
       nav.querySelectorAll("[data-operator-only]").forEach(function(el) {
         el.style.display = isOp ? "" : "none";
       });
+      var updateEl = (
+        /** @type {HTMLElement} */
+        nav.querySelector("[data-node-update]")
+      );
+      updateEl.style.display = "none";
+      if (isOp && session.jwt) {
+        fetch("/v1/admin/node-update", { headers: { "Authorization": "Bearer " + session.jwt } }).then(function(r) {
+          return r.json();
+        }).then(function(d) {
+          var s = d && d.ok && d.data;
+          if (!s || !s.enabled || !s.updateAvailable) return;
+          updateEl.textContent = (t["nodeUpdate.pill"] || "{version} is out").replace("{version}", s.latest);
+          updateEl.title = t["nodeUpdate.pillTitle"] || "";
+          updateEl.style.display = "inline-block";
+        }).catch(function() {
+          updateEl.style.display = "none";
+        });
+      }
       var morselEl = (
         /** @type {HTMLElement} */
         nav.querySelector("[data-morsels]")
@@ -281,9 +299,9 @@
         }
       }
       mountPill();
-      refreshSession(nav);
+      refreshSession(nav, t);
       window.addEventListener("aimeat-auth-change", function() {
-        refreshSession(nav);
+        refreshSession(nav, t);
       });
     }
     if (document.readyState === "loading") {
