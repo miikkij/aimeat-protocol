@@ -4804,6 +4804,7 @@
   "pkpage.updateNone": "El paquete no tiene una versión más nueva.",
   "pkpage.updateAvailable": "Hay una versión más nueva: {version}.",
   "pkpage.updateFailed": "La comprobación falló.",
+  "pkpage.updatesEnded": "Terminó tu servicio de actualizaciones de este paquete. Sigue funcionando tal como está; renueva el servicio para recibir versiones nuevas.",
   "pkpage.updateSub": "Una actualización reemplaza la app, la extensión y la biblioteca de navegador y deja en paz la memoria y las traducciones. Por una parte editada pregunta primero.",
   "pkpage.applyUpdate": "Aplicar la actualización",
   "pkpage.checkUpdate": "Comprobar actualización",

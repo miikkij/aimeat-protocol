@@ -13,6 +13,8 @@
  * @structure PackagesTab() — state (data, remote, expanded, versions, updates, installForm, filter) + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'packages'
  * @version-history
+ *   v2.3.0 — 2026-09-30 — The Check button asks the package's source first, and says when the update
+ *     service has ended.
  *   v2.2.0 — 2026-09-30 — setAutoUpdate: the owner turns an installed copy's automatic update on or off
  *     here; it was reachable only through an AI or the install set.
  *   v2.1.0 — 2026-09-05 — A third road to a new package: pick your own apps and this node reads what
@@ -100,9 +102,19 @@ export default function PackagesTab({ session, showToast }) {
   };
 
   /* ── Installed packages ──────────────────────────────────────────────────────────────────── */
-  const checkUpdate = async (inst) => {
+  // `fromSource`: the button asks the package's source first (the repository a sold node bought it
+  // from), as the daily check does. The comparison below reads only versions already on this node,
+  // so without it the button said "no newer version" until the night's check had pulled one
+  // (the shop's test, 2026-09-30). Opening a row compares locally and asks nobody.
+  const checkUpdate = async (inst, fromSource = false) => {
     setUpdates((m) => ({ ...m, [inst.id]: { checking: true } }));
     try {
+      if (fromSource) {
+        const fresh = await pkgService.refreshFromSources();
+        const mine = (fresh?.data?.outcomes ?? []).find((o) => o.instance_id === inst.id);
+        if (mine?.result === 'updates_ended') { setUpdates((m) => ({ ...m, [inst.id]: { ended: true } })); return; }
+        if (mine?.result === 'updated') { setUpdates((m) => ({ ...m, [inst.id]: undefined })); load(); return; }
+      }
       const r = await pkgService.checkUpdate(inst.id);
       if (!r?.ok) { setUpdates((m) => ({ ...m, [inst.id]: { error: r?.error?.message || x('updateFailed') } })); return; }
       setUpdates((m) => ({ ...m, [inst.id]: { updateAvailable: !!r.data?.updateAvailable, latestVersion: r.data?.latestVersion } }));

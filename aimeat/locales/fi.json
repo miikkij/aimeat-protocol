@@ -5861,6 +5861,7 @@
   "pkpage.updateNone": "Paketista ei ole uudempaa versiota.",
   "pkpage.updateAvailable": "Uudempi versio on tarjolla: {version}.",
   "pkpage.updateFailed": "Tarkistus ei onnistunut.",
+  "pkpage.updatesEnded": "Tämän paketin päivityspalvelu on päättynyt. Se toimii edelleen sellaisenaan. Uudet versiot tulevat, kun uusit päivityspalvelun.",
   "pkpage.updateSub": "Päivitys korvaa sovelluksen, laajennuksen ja selainkirjaston mutta jättää muistin ja käännökset rauhaan. Muokatun osan kohdalla päivitys kysyy ensin.",
   "pkpage.applyUpdate": "Päivitä",
   "pkpage.checkUpdate": "Tarkista päivitys",
