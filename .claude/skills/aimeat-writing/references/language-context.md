@@ -73,6 +73,10 @@ everywhere at once, and say so in the Changes section.
 | an organism, said to a newcomer | the home's first task and the guided path name an organism by what it does for them before the word organism appears: one place every AI they connect and every person they invite reads and writes | shared place | yhteinen paikka | lugar compartido |
 | the person's progress on the home | seven stages from a good AI to something shared; each is ticked when the account holds it | your path / stage | polkusi / vaihe | tu camino / etapa |
 | which agents an organism lets in | the organism's setting: every member's agents, or only the agents listed in its Agents section; any other agent is treated as a non-member | admit (an agent) | päästää sisään (agentin) | admitir (un agente) |
+| who may only read a workspace | a member given read access to one workspace; never *katselija* or *espectador* | viewer | lukija | lector |
+| who may read and write a workspace | a member given write access to one workspace; never *osallistuja* or *contribuidor* | contributor | kirjoittaja | colaborador |
+| who made a workspace | the person who created it; always has access, and approves members' changes with the admins | creator | luoja | quien lo creó |
+| the owner's contacts | the people (and their agents and apps) the owner saved or messaged, read with `contacts:read`; pickers everywhere suggest from it | address book | osoitekirja | libreta de direcciones (libreta when it is clear) |
 | one part of a workspace | a list of records or a set of document pages, declared in the workspace's structure | space | tila | espacio |
 | a heading pages are filed under | one entry of a document space's tree of sections; a page sits in one section or in none | section | osio | sección |
 | a member's change that waits | a change a member who is neither the workspace's creator nor an admin made to its structure (a space, the sections), waiting until the creator or an admin approves or declines it | suggestion / suggest | ehdotus / ehdottaa | sugerencia / sugerir |
@@ -266,6 +270,15 @@ service, the directory, the token, the identifier and the username: the test nam
 
 ## Changes
 
+- **2026-10-01** — viewer, contributor, creator and address book (IAM round 2 leftovers). The role
+  words are what the organisms page and the kit's workspaceTeam already ship: *lukija*,
+  *kirjoittaja*, *luoja*; *lector*, *colaborador*, *quien lo creó*. The data wallet page
+  (`dwpage.role.*`) said *reader* / *writer* in English and *escritor* in Spanish for the same two
+  roles; Jouni ruled on 2026-10-02 that it takes the organisms page's words, and it now says
+  *viewer* / *contributor* and *colaborador*. Spanish had three names for the address book:
+  *libreta de direcciones* (the permission screen and the contacts cover), *agenda* (the contacts
+  tab) and *libreta de contactos* (the kit's members block). The first was the most used, and the
+  other two strings now say it.
 - **2026-09-29** — Content Classifier and classification policy, with the classification pages
   (TARGET-082 V5). *Sisällön luokittelija* says what it does to what; *luokittelukäytäntö* over the
   spec's *politiikka*, because *käytäntö* is the plain Finnish word for a set of rules one follows.
