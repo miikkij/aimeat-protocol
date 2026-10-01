@@ -46,6 +46,16 @@
       "digest": "sha256:fb3efbd03a7eb4cdaed29026",
       "note": "It names the recommended models; the rest is how to talk, which no file decides."
     },
+    "node:aimeat-guided-journey": {
+      "reviewedOn": "2026-10-01",
+      "watches": [
+        "aimeat/src/services/journey-state.ts",
+        "aimeat/public/views/home/journey-roads.js",
+        "aimeat/public/views/home/journey-prompts.js"
+      ],
+      "digest": "sha256:560c4fa8e2c7183618493449",
+      "note": "The stages, the roads and the record journey.state are defined in journey-state.ts; the home's road question and the first note's key are in the two home files."
+    },
     "node:aimeat-welcome-pages": {
       "reviewedOn": "2026-09-26",
       "watches": [
@@ -579,6 +589,11 @@
       "aimeat/src/services/refinery/message.ts": "049996a45f32b89a",
       "aimeat/src/services/refinery/schedule-input.ts": "4c85272fafdfb026",
       "aimeat/src/data/refinery-classes.ts": "ab723c0852c19267"
+    },
+    "node:aimeat-guided-journey": {
+      "aimeat/src/services/journey-state.ts": "b7eeb1ff42a1544b",
+      "aimeat/public/views/home/journey-roads.js": "80cfef93d8ed162a",
+      "aimeat/public/views/home/journey-prompts.js": "8371112d01308e9b"
     }
   }
 }

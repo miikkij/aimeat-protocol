@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.20.0 -- 2026-10-01 -- aimeat-guided-journey (builtin-skills.guided-journey.ts): the path in seven
+ *     stages, walked by the person's own AI one stage per conversation.
  *   v1.19.0 -- 2026-09-30 -- aimeat-node-guide and add-a-crew-agent: name the scopes in device-authorize
  *     (none gives the default set, which cannot take work), and a refused call is kept on the card, the
  *     open tasks, aimeat_agents_list `refusals` and GET /v1/agents/{name}/refusals.
@@ -126,6 +128,7 @@
 import { OPEN_ITEMS_SKILL_ENTRY } from './builtin-skills.open-items.js';
 import { RECURRING_WORK_SKILL_ENTRIES } from './builtin-skills.recurring-work.js';
 import { CONVERSATION_SKILL_ENTRIES } from './builtin-skills.conversation.js';
+import { GUIDED_JOURNEY_SKILL_ENTRY } from './builtin-skills.guided-journey.js';
 import { WORKSTATION_SKILL_ENTRY } from './builtin-skills.workstation.js';
 import { APP_BUILDER_SKILL_ENTRY } from './builtin-skills.app-builder.js';
 import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
@@ -148,6 +151,7 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
   OPEN_ITEMS_SKILL_ENTRY,
   ...RECURRING_WORK_SKILL_ENTRIES,
   ...CONVERSATION_SKILL_ENTRIES,
+  GUIDED_JOURNEY_SKILL_ENTRY,
   WORKSTATION_SKILL_ENTRY,
   APP_BUILDER_SKILL_ENTRY,
   APP_BUILDER_ATELIER_SKILL_ENTRY,

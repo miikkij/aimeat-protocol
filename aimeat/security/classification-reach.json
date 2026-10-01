@@ -1424,6 +1424,13 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Onboarding markers and existence checks."
     },
+    "src/services/journey-state.ts": {
+      "reads": {
+        "getMemory": 1,
+        "getOwnerScopeMemory": 2
+      },
+      "why": "Reviewed 2026-10-01, the node's own read: the first-MCP-call marker and the first note are existence checks, and journey.state is the owner's own path record shown back to the same owner and their own AI; no content goes to a model or another principal."
+    },
     "src/services/hook-log.ts": {
       "reads": {
         "getMemory": 1

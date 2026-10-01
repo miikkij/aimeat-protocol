@@ -13278,6 +13278,30 @@ paths:
                               helloMcp: { type: boolean }
                               initialized: { type: boolean }
                               room: { type: string, enum: [create, organise, monetise, company, messages], nullable: true }
+                          journey:
+                            type: object
+                            description: >-
+                              The seven stages of the path from having a good AI to sharing what the
+                              person built. Whether a stage is done is derived from what the account
+                              holds; `want`, `road` and the declined stages are the person's own words,
+                              kept in the owner-scope memory record `journey.state`, which their AI
+                              writes with aimeat_memory_write and the home page writes for the road.
+                            properties:
+                              stages:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id: { type: string, enum: [ai, connect, first-result, organise, apps, agents, share] }
+                                    done: { type: boolean }
+                                    declined: { type: boolean }
+                              next:
+                                type: string
+                                nullable: true
+                                enum: [ai, connect, first-result, organise, apps, agents, share]
+                                description: The first stage neither done nor declined. Null once the path is walked.
+                              want: { type: string, nullable: true }
+                              road: { type: string, enum: [subscription, free, prompt], nullable: true }
                           steps:
                             type: array
                             items: { type: string }

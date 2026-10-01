@@ -10,6 +10,7 @@
  * @structure useHomeState
  * @usage const { state, playbooks, ready } = useHomeState();
  * @version-history
+ *   v1.1.0 — 2026-10-01 — Carries `journey`, the seven stages of the person's path.
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 import { useShared } from '/views/surface/shared-read.js';
@@ -20,6 +21,7 @@ const DOMAINS = ['home', 'agents', 'portfolio', 'agent-onboarding', 'ghii'];
 export function useHomeState() {
   const { data, ready } = useShared('home-state', '/v1/home/state', DOMAINS, (d) => ({
     state: d?.state ?? null,
+    journey: d?.journey ?? null,
     playbooks: Array.isArray(d?.playbooks) ? d.playbooks : [],
     steps: Array.isArray(d?.steps) ? d.steps : [],
     question: d?.question ?? null,
@@ -27,6 +29,7 @@ export function useHomeState() {
   }));
   return {
     state: data?.state ?? null,
+    journey: data?.journey ?? null,
     playbooks: data?.playbooks ?? [],
     steps: data?.steps ?? [],
     question: data?.question ?? null,

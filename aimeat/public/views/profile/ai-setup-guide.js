@@ -14,6 +14,7 @@
  * @structure McpSetupGuide({ poster, asideInstall, facts, stepRows }) · InstructionsDialog({ open, onClose })
  * @usage import { McpSetupGuide, InstructionsDialog } from '/views/profile/ai-setup-guide.js';
  * @version-history
+ *   v2.8.0 -- 2026-10-01 -- Passes `claudeNote` through to SetupGuide (the home's free road).
  *   v2.7.0 -- 2026-09-26 -- The guide and the dialog moved to components/SetupGuide.js with their markup
  *     (the tool tabs, the copy doors and the field table are the library's Tabs, Action and Facts);
  *     this module keeps the names its callers import and maps the old class props to named options
@@ -51,11 +52,11 @@ const html = htm.bind(h);
  * and installClassName (any value: the install row in the attention note's frame) read as the
  * component's named options.
  * @param {{ poster?: boolean, asideInstall?: boolean, facts?: boolean, stepRows?: boolean,
- *   tabClass?: string, activeClass?: string, installClassName?: string }} [props]
+ *   tabClass?: string, activeClass?: string, installClassName?: string, claudeNote?: string|null }} [props]
  */
-export function McpSetupGuide({ poster, asideInstall, facts = false, stepRows = false, tabClass, installClassName } = {}) {
+export function McpSetupGuide({ poster, asideInstall, facts = false, stepRows = false, tabClass, installClassName, claudeNote = null } = {}) {
   return html`<${SetupGuide} poster=${!!(poster || tabClass)} asideInstall=${!!(asideInstall || installClassName)}
-    facts=${facts} stepRows=${stepRows} />`;
+    facts=${facts} stepRows=${stepRows} claudeNote=${claudeNote} />`;
 }
 
 export { InstructionsDialog };

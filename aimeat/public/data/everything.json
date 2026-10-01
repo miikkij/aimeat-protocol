@@ -75,6 +75,15 @@
      "plain": "Handbook The first thing a connected AI reads: what this node is and which few tools matter for the job in front of it. aimeat_handbook_get"
     },
     {
+     "slug": "g-1-your-path-from-your-ai-to-what-others-use",
+     "cells": [
+      "<strong>Your path, from your AI to what others use</strong>",
+      "Your home shows where you are on seven stages: a good AI, connected here, a first result, a place for your work, apps, agents at work, and shared with others. A stage is ticked when the account really holds it. Until your AI has connected, the home asks which AI you use and opens one of three roads: a paid AI over MCP, the free Claude plan or your own OpenRouter credit, or a prompt to copy into an AI that cannot connect, with its answer pasted back as a note every AI you connect later reads. The first task offered is a shared place: an organism with a workspace that every AI you connect, from any vendor, and the people you invite read and write. Your own AI reads the same path at the end of its handbook and walks you along it one stage per conversation; what you want and the stages you decline are kept in one memory record your AI writes.",
+      "Home · <code>GET /v1/home/state</code> (<code>journey</code>) · <code>journey.state</code> · skill <code>aimeat-guided-journey</code>"
+     ],
+     "plain": "Your path, from your AI to what others use Your home shows where you are on seven stages: a good AI, connected here, a first result, a place for your work, apps, agents at work, and shared with others. A stage is ticked when the account really holds it. Until your AI has connected, the home asks which AI you use and opens one of three roads: a paid AI over MCP, the free Claude plan or your own OpenRouter credit, or a prompt to copy into an AI that cannot connect, with its answer pasted back as a note every AI you connect later reads. The first task offered is a shared place: an organism with a workspace that every AI you connect, from any vendor, and the people you invite read and write. Your own AI reads the same path at the end of its handbook and walks you along it one stage per conversation; what you want and the stages you decline are kept in one memory record your AI writes. Home · GET /v1/home/state (journey) · journey.state · skill aimeat-guided-journey"
+    },
+    {
      "slug": "g-1-capability-hints",
      "cells": [
       "<strong>Capability hints</strong>",
@@ -114,10 +123,10 @@
      "slug": "g-1-prompt-driven-road",
      "cells": [
       "<strong>Prompt-driven road</strong>",
-      "For AIs that cannot connect over MCP (a consumer Gemini app, Copilot without Copilot Studio), the pages compose a ready prompt, you run it in your chat and paste the result back. Free and vendor-neutral. A name two apps share (Gemini, Microsoft Copilot) raises one question, which of the two you use, and your answer picks the road.",
+      "For AIs that cannot connect over MCP (a consumer Gemini app, Copilot without Copilot Studio), the pages compose a ready prompt, you run it in your chat and paste the result back. Free and vendor-neutral. A name two apps share (Gemini, Microsoft Copilot) raises one question, which of the two you use, and your answer picks the road. On the home, &quot;My AI can't connect&quot; gives the first note as a prompt and saves the pasted answer.",
       "Contacts, Email, Workflows, Portfolio, front page and home layout pages"
      ],
-     "plain": "Prompt-driven road For AIs that cannot connect over MCP (a consumer Gemini app, Copilot without Copilot Studio), the pages compose a ready prompt, you run it in your chat and paste the result back. Free and vendor-neutral. A name two apps share (Gemini, Microsoft Copilot) raises one question, which of the two you use, and your answer picks the road. Contacts, Email, Workflows, Portfolio, front page and home layout pages"
+     "plain": "Prompt-driven road For AIs that cannot connect over MCP (a consumer Gemini app, Copilot without Copilot Studio), the pages compose a ready prompt, you run it in your chat and paste the result back. Free and vendor-neutral. A name two apps share (Gemini, Microsoft Copilot) raises one question, which of the two you use, and your answer picks the road. On the home, \"My AI can't connect\" gives the first note as a prompt and saves the pasted answer. Contacts, Email, Workflows, Portfolio, front page and home layout pages"
     },
     {
      "slug": "g-1-attach-another-mcp-server",
@@ -3619,6 +3628,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-09-15 against node 3.15.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 359
+  "rows": 360
  }
 }

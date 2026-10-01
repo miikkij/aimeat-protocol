@@ -1,0 +1,166 @@
+/**
+ * @file src/data/builtin-skills.guided-journey.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The `aimeat-guided-journey` built-in skill: how a person's own AI walks them along the
+ *   path from "I have an AI" to "others use what I built", one stage per conversation, saying at
+ *   each stage what they get (wish-ohjattu-k-ytt-j-polku-..., brief doc-mupor242l3cq, P1).
+ *
+ *   WHY A NODE SKILL. The path is the same on every node, and the AI that walks it is the person's
+ *   own, connected over MCP. The handbook names this skill while the path is not walked
+ *   (services/journey-state.ts journeyHandbookSection), so an AI that read only the handbook finds
+ *   it. The stages and the record `journey.state` are defined in services/journey-state.ts; this
+ *   text must agree with JOURNEY_STAGES and JOURNEY_ROADS there.
+ * @structure GUIDED_JOURNEY_SKILL_ENTRY
+ * @usage import { GUIDED_JOURNEY_SKILL_ENTRY } from './builtin-skills.guided-journey.js';
+ * @version-history
+ *   v1.1.0 — 2026-10-01 — The first result offered first is a shared place, not a note: a person's
+ *     chat app already remembers things (Jouni, 2026-10-01).
+ *   v1.0.0 — 2026-10-01 — Initial.
+ */
+/** The shape of a BuiltinSkill, named here rather than imported so this file closes no import cycle
+ *  with builtin-skills.ts, which imports it; the compiler checks the two agree where it is listed. */
+type BuiltinSkillEntry = { name: string; skillMd: string; visibility?: 'members' | 'public' };
+
+export const GUIDED_JOURNEY_SKILL_ENTRY: BuiltinSkillEntry = {
+  name: 'aimeat-guided-journey',
+  visibility: 'public',
+  skillMd: `---
+name: aimeat-guided-journey
+description: How to walk a person along their path on an AIMEAT node, one stage per conversation — a good AI of their own, that AI connected, a first real result, an organism where their work lives, apps, agents that work while they are away, and sharing — saying at each stage what they get and where it leads. Use when the handbook says the person has not walked the path, when they ask what this place is for, what to do next or how something here works, and when a piece of work has just finished.
+license: MIT
+metadata:
+  audience: agent
+---
+
+# Walking a person along their path
+
+## Where the path ends
+
+Say this in your own words, once, early, in the person's language:
+
+> Your own AI does your work here. It remembers what you know, uses apps built for it, runs agents
+> that keep working while you are away, and shares with the people you choose. You own all of it,
+> and you come to the page only to approve, to pay, or to look.
+
+Everything below is a step toward that sentence. When you offer a stage, say what changes for the
+person when it is done, not what the feature is called.
+
+## Read where they are first
+
+The end of your handbook (\`aimeat_handbook_get\`) lists the seven stages as done, open or declined,
+and what the person said they want. Their own words live in one memory record, \`journey.state\`,
+in their own scope: read it with \`aimeat_memory_read { key: "journey.state", owner_scope: true }\`.
+
+The record holds three things, all optional:
+
+\`\`\`json
+{ "want": "what they said they want to get done, in their words",
+  "road": "subscription | free | prompt",
+  "declined": [{ "stage": "organise", "at": "2026-10-01" }] }
+\`\`\`
+
+When they tell you what they want, or decline a stage, read the record, change that field, and write
+the whole record back with \`aimeat_memory_write { key: "journey.state", owner_scope: true,
+visibility: "owner" }\`. Whether a stage is done is never written: the node works it out from what
+the account holds, so it cannot drift.
+
+## How to walk it
+
+- **What they asked for comes first.** Do the thing. Offer a stage only when the work is finished,
+  when they ask what is next, or when they ask what this place is for.
+- **One stage per conversation.** Offer the next one that fits what they said they want. After the
+  first result the order is theirs: a shop owner goes to apps, a team lead to an organism.
+- **Say it once.** If they say no or not now, write the stage into \`declined\` with today's date and
+  do not offer it again. They can ask for it any time.
+- **Do the stage with them.** A stage is finished when something exists that they can open: a link,
+  a record, a member, an agent that ran. Hand over the address.
+- **The page is for approving, paying and looking.** Signing-in security, payments, giving an agent
+  or an app its permissions, reading their mail, API keys, and deleting or exporting the account
+  happen on their page, signed in themselves. Give the exact link and one sentence on why it is
+  theirs to do. Everything else happens here, in the chat.
+
+## The stages
+
+### 1. A good AI of their own
+
+You are reading this, so they have one. What matters is how good it is. Three roads, and the person
+says which is theirs (write it as \`road\`):
+
+- **subscription**: a paid Claude, ChatGPT or Grok, or an AI coding tool, connected over MCP.
+  The best results come from Claude Opus or Fable, ChatGPT on a high-end GPT-6 model such as Astra,
+  or DeepSeek V4 and models of that class.
+- **free**: the free Claude plan with this node as a connector. It runs a lighter model that handles
+  everyday work well: saving and finding, sharing, asking. Apps and long builds turn out noticeably
+  better on Claude Opus or Fable. The other free road is their own OpenRouter credit, about ten
+  dollars, used on DeepSeek V4 Pro or a model of that class; it lasts a long time at those prices.
+  Free models make many mistakes here, so do not recommend them.
+- **prompt**: an AI that cannot connect (the Gemini app, Copilot, free ChatGPT). The home page gives
+  them prompts to copy and a place to paste the answer back. They will not be reading this skill;
+  if you meet such a person through someone else, point them to their home page.
+
+### 2. That AI connected
+
+Done if you can call this node. If they use a second AI, the connection steps are on their home
+page under "Which AI do you use?".
+
+### 3. A first real result
+
+Something of theirs that exists and can be opened. Their chat app already remembers things on its
+own, so the first result here is what it cannot do alone: **a shared place**, an organism with one
+workspace that every AI they connect, from any vendor, and every person they invite reads and writes.
+Offer it first; how is stage 4 below. If they want something smaller, a small app (skill
+\`aimeat-app-builder\`) or their own welcome page (skill \`aimeat-welcome-pages\`) also counts. A note
+at \`home.first-note\` (value \`{ "title", "text" }\`) counts too, and is what the home page saves for a
+person whose AI cannot connect.
+
+### 4. An organism, where their work lives between conversations
+
+What they get: one place where they, the people they invite and all their AIs read and write the
+same notes, documents and decisions, and nothing goes out without a person. They need one when more
+than one person, or more than one AI, works on the same material. For their own notes they do not.
+
+Ask what it is for, propose a name and one or two workspaces in their words, then create them
+(\`aimeat_organism_create\`, \`aimeat_workspace_create\`) and write one document that says what the
+place is for and what is current. That document is how the place ages well: when something stops
+mattering, it says so there, or the material is archived.
+
+### 5. Apps
+
+What they get: ready tools for a job, which you can also use for them from the chat. Look at what
+they have (\`aimeat_app_list\`) and what can be installed (\`aimeat_package_list\`, and a repository's
+offer with \`aimeat_package_repository\`). Before installing, tell them what the package does, what
+data it handles, whether it brings an agent, and what it needs from them; read an app's bound skills
+(\`aimeat_skill_list\` with \`binding\`) before you drive it. Buying happens on the page. The stage is
+done when they have used one app once.
+
+### 6. Agents that work while they are away
+
+What they get: work that continues without them in the conversation. First ask what the agent
+should do, because that decides what it is:
+
+- answer when they ask: that is you, already;
+- the same thing on a timetable: a schedule (skill \`aimeat-recurring-work\`);
+- work on its own while they are away: a worker agent, on their own machine through the connector
+  or on this node; say where it runs, which model it uses and who pays, in one sentence each;
+- work for an app: the app's own agent, if it brings one.
+
+Propose the agent (skill \`add-a-crew-agent\`, or \`aimeat_agent_propose\`); the person approves it and
+its permissions on their page. The stage is done when it has run one task on its own.
+
+### 7. Shared with someone
+
+What they get: other people, and other people's AIs, use what they built. Invite someone to the
+organism, publish a document or a knowledge package, or put a price on an app's tool. Each of these
+is their decision; offer the one that fits what they built.
+
+## Words
+
+Use the person's words. A word from this system carries its meaning in the same sentence the first
+time: "an organism, a shared place where you and the people you invite keep your work", never just
+"an organism". Ids, keys and tool names stay in what you do, not in what you say.
+
+The guided tour for people who like to read is the Experience Center:
+https://experience-center.apps.aimeat.io. Mention it once, if they ask how things work in general.
+`,
+};

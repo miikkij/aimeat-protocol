@@ -12,6 +12,8 @@
  * @structure registerHomeStateRoutes(router, ctx): GET /v1/home/state
  * @usage Registered from src/routes/home.ts.
  * @version-history
+ *   v1.4.0 — 2026-10-01 — The response carries `journey`: the seven stages of the path and what the
+ *     person said they want (services/journey-state.ts), for every account, initialized or not.
  *   v1.3.0 — 2026-09-18 — `client_options` carries the two apps behind a shared name when the
  *     pending question is which-variant.
  *   v1.2.0 — 2026-09-09 — Next actions lead to connection instructions and useful work.
@@ -27,6 +29,7 @@ import { readHomeState, HOME_STEPS } from '../../services/home-state.js';
 import { aiClientQuestionOptions, aiClientVariantOptions, resolveAiClient, decideBranch } from '../../services/ai-tool-setup.js';
 import { openRooms } from '../../services/home-rooms.js';
 import { openPlaybooks } from '../../services/home-playbooks.js';
+import { readJourney } from '../../services/journey-state.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { requireOwnerSession, type HomeRouteCtx } from './welcome-mat.js';
 
@@ -64,8 +67,13 @@ export function registerHomeStateRoutes(router: Router, ctx: HomeRouteCtx): void
         // The playbooks this node can actually deliver, once the AI connection is verified.
         const playbooks = state.initialized ? await openPlaybooks(storage, config) : [];
 
+        // The seven stages and the person's own words, so the page draws the same path their AI
+        // reads in its handbook (services/journey-state.ts).
+        const journey = await readJourney(storage, config, owner, state);
+
         res.json(success(config.nodeId, {
             state,
+            journey,
             rooms,
             playbooks,
             /** The connection prerequisite shared by every surface. */

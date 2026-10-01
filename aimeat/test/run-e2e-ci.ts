@@ -520,6 +520,8 @@ const ALL_SUITES = [
     'test/e2e-onboarding-funnel.ts',
     'test/e2e-remake-funnel.ts',
     'test/e2e-remake-home.ts',
+    // The seven stages of the person's path, and their own words written by their AI.
+    'test/e2e-home-journey.ts',
     // The account's own record, and the mount-order collision that made its window unreadable.
     'test/e2e-account-events.ts',
     'test/e2e-operator-welcome.ts',
