@@ -12,6 +12,7 @@
  * @structure handbookTierPath(tier)
  * @usage client.get(handbookTierPath('build-app'))   // → /v1/prompts/build-app/sections/start
  * @version-history
+ *   2026-10-01 — "features" and "features/<id>" map to the feature map's parts route.
  *   2026-09-19 — "build-app-atelier" and "build-app-atelier/<id>" map to the Atelier parts route,
  *     as the Classic tiers map to theirs.
  *   v1.0.0 — 2026-09-18 — Initial.
@@ -23,6 +24,10 @@ export function handbookTierPath(tier: string): string {
   if (tier === 'build-app-atelier') return '/v1/prompts/build-app-atelier/sections/start';
   if (tier.startsWith('build-app-atelier/')) {
     return '/v1/prompts/build-app-atelier/sections/' + encodeURIComponent(tier.slice('build-app-atelier/'.length));
+  }
+  if (tier === 'features') return '/v1/prompts/features/sections/start';
+  if (tier.startsWith('features/')) {
+    return '/v1/prompts/features/sections/' + encodeURIComponent(tier.slice('features/'.length));
   }
   if (tier === 'build-app') return '/v1/prompts/build-app/sections/start';
   if (tier.startsWith('build-app/')) {

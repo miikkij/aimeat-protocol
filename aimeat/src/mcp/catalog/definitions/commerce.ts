@@ -10,6 +10,7 @@
  *   6-decimal MICRO-UNITS (1 EUR = 1_000_000), morsels are plain integers; the two never mix.
  * @usage import { commerceTools } from './definitions/commerce.js';
  * @version-history
+ *   2026-10-01 — aimeat_commerce_psp_set is screen-only: it refuses and returns the Wallet page link (decision D5).
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v1.3.1 — 2026-09-27 — aimeat_app_tools_publish: app_id without its extension lands under the app's filename.
  *   v1.3.0 — 2026-09-13 — aimeat_app_tools_publish states the developer's two decisions: a tool and the
@@ -113,7 +114,7 @@ export const commerceTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_commerce_psp_set',
-        description: 'Store YOUR OWNER\'s payment-provider credentials for selling in money currencies (the commerce.psp record the checkout payment handlers read — e.g. a Stripe secret key). Money sales always settle on the SELLER\'s own PSP account, never the node\'s. The secret is stored server-side and NEVER returned by any tool — reads show a masked hint only. Morsel-only selling needs no PSP.',
+        description: 'SCREEN ONLY: refuses for an agent, and returns the link to the Wallet page where the owner enters their payment-provider secret themselves (a key that moves money never passes through a chat). Call it only to get that link; do not ask the owner for the key. Money sales always settle on the SELLER\'s own PSP account, never the node\'s. aimeat_commerce_psp_status shows whether one is set, as a masked hint. Morsel-only selling needs no PSP.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {

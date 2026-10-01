@@ -36,6 +36,8 @@
  *   import { composePackageFromApps } from '../services/package-compose.js';
  *   const out = await composePackageFromApps({ storage, config }, caller, { name, apps });
  * @version-history
+ *   v1.3.0 — 2026-10-01 — `outcome` and `prompts` go into the manifest as `sheet`, the author's words
+ *     at the head of the package's "what you get" sheet (services/package-sheet.ts).
  *   v1.2.0 — 2026-09-30 — The composer's own skills bound to each app travel as `skill` components
  *     (`includeSkills`, default true), and the notes name them instead of saying they stay behind.
  *   v1.1.0 — 2026-09-12 — PackageComposeCaller loses `sub`: it was forwarded to createPackageGroup
@@ -91,6 +93,10 @@ export interface PackageComposeInput {
     includeSkills?: boolean;
     /** Compose even when an app calls an extension this package cannot carry. Default false. */
     allowExpectations?: boolean;
+    /** What the package gives a person, in one sentence: the head of its sheet (package-sheet.ts). */
+    outcome?: string;
+    /** Up to three things to ask one's AI once it is installed. */
+    prompts?: string[];
 }
 
 /** The last path segment of a dependency name, since a cortex ref may carry a namespace. */
@@ -150,6 +156,16 @@ async function cortexComponentContent(storage: Storage, name: string): Promise<s
  * PACKAGE: their own apps, and nobody else's, because packaging another person's app is a copy of
  * their work under the copier's name.
  */
+/** The author's sheet fields, when they gave any: `{ sheet: { outcome, prompts } }`, else nothing. */
+function composeSheet(input: PackageComposeInput): { sheet?: { outcome?: string; prompts?: string[] } } {
+    const outcome = typeof input.outcome === 'string' ? input.outcome.trim().slice(0, 300) : '';
+    const prompts = Array.isArray(input.prompts)
+        ? input.prompts.filter((p): p is string => typeof p === 'string' && !!p.trim()).map(p => p.trim().slice(0, 300)).slice(0, 3)
+        : [];
+    if (!outcome && !prompts.length) return {};
+    return { sheet: { ...(outcome ? { outcome } : {}), ...(prompts.length ? { prompts } : {}) } };
+}
+
 export async function composePackageFromApps(
     deps: PackageComposeDeps,
     caller: PackageComposeCaller,
@@ -316,7 +332,8 @@ export async function composePackageFromApps(
             visibility: input.visibility,
             status: input.status,
             changelog: `Made from ${appComponents.length === 1 ? 'the app' : 'the apps'} ${appComponents.map(c => c.id).join(', ')}`,
-            manifest: JSON.stringify({ expects }),
+            // The author's own words for the sheet travel in the manifest beside `expects`.
+            manifest: JSON.stringify({ expects, ...composeSheet(input) }),
         },
     );
 

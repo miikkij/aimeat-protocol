@@ -8,6 +8,8 @@
  * @structure FULL_HANDBOOK — markdown, served by GET /v1/agents/me/handbook?surface=full
  * @usage import { FULL_HANDBOOK } from './full.js';
  * @version-history
+ *   v1.5.0 — 2026-10-01 — Ends with where the feature map is, and the actions a person does on the
+ *     screen and why (data/screen-only.ts), so the AI gives the link before it meets a refusal.
  *   v1.4.0 — 2026-10-01 — The Apps line says, for any model but Claude Opus or Fable, to tell the
  *     person once before building that those build the better app. Cold-agent build-app: Sonnet 5.5
  *     skipped the specification's interview in 2 of 3 runs, and read this page first in all three.
@@ -23,6 +25,8 @@
  *     longer states a tool count: it said twelve, and the surface carries thirteen.
  *   v1.0.0 — 2026-09-03 — Initial, with the `full` surface.
  */
+import { SCREEN_ONLY_MD } from '../../data/screen-only.js';
+
 export const FULL_HANDBOOK = `# Working here with everything
 
 This surface carries every tool the node offers to a v2 client. Nothing has been narrowed for you,
@@ -83,4 +87,9 @@ says so and a client that follows the spec re-reads the list on its own.
 
 **Say what you did in the person's words.** Ids, keys, scopes and tool names belong in what you do,
 not in what you tell them.
-`;
+
+**What this node can do**, once you know what the person needs: \`aimeat_handbook_get { tier:
+"features" }\` lists the areas, and \`"features/<id>"\` is one of them. Offer the one thing that
+fits; do not recite the list.
+
+${SCREEN_ONLY_MD}`;

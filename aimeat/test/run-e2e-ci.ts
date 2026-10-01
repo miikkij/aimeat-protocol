@@ -524,6 +524,8 @@ const ALL_SUITES = [
     'test/e2e-home-journey.ts',
     // The organism starting shapes on REST and MCP, and the project template through the workspace route.
     'test/e2e-organism-shapes.ts',
+    // A package's "what you get" sheet, its questions for an installer, and its agents as proposals.
+    'test/e2e-package-sheet.ts',
     // The account's own record, and the mount-order collision that made its window unreadable.
     'test/e2e-account-events.ts',
     'test/e2e-operator-welcome.ts',

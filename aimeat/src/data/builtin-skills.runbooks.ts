@@ -12,6 +12,8 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   v1.5.0 — 2026-10-01 — manage-my-agents: which agent the owner needs, asked by what it should do, with
+ *     where each kind runs and who pays, and the picture of the four places (guided journey P4).
  *   v1.4.2 — 2026-10-01 — manage-my-agents: reading the address book needs contacts:read, and an
  *     agent approved before it existed is refused until the owner gives it.
  *   v1.4.1 — 2026-09-30 — aimeat-node-operations: aimeat_admin_config reports the classification
@@ -108,6 +110,48 @@ metadata:
 # Manage my agents
 
 You are assisting an OWNER with their own agents (never another owner's).
+
+## Which agent the owner needs
+Ask what the agent should do, then name the kind, where it runs and who pays:
+- **Answer when they ask:** their chat AI, connected over MCP (as you are). It works while they talk
+  to it, and they pay with their subscription to that AI.
+- **Work while they are away:** a worker. Ask where it should run.
+  - On their computer: it needs the connector, a small program that keeps one connection open to
+    this AIMEAT (\`npx aimeat connect --url <this node> --owner <them>\`, then
+    \`npx aimeat connect serve\`), and the computer stays on while it works. Propose the agent with
+    \`aimeat_agent_propose\` (a name, its purpose, a crew definition); the owner approves it on the
+    Agents page or in their open items, and approving creates it. It thinks with the model in their
+    settings and they pay with their own AI key.
+  - On this AIMEAT: a scheduled AI job (\`aimeat_schedule_create\`). Nothing to install, it runs
+    with their own AI key, and the computer can be off.
+- **The same thing on a timetable:** a schedule (\`aimeat_schedule_create\`).
+- **Work for an app:** the app's own agent. Installing the app's package proposes it, and it waits
+  for the owner's approval in their open items. Nothing runs before they approve it.
+- **Starts work by itself** is the mode \`task-runner\` (\`aimeat_agent_mode_set\`): work sent to the
+  agent starts without asking the owner. Say that in those words before you set it.
+
+Where agents run, for the owner:
+
+\`\`\`mermaid
+flowchart LR
+  subgraph V["The AI vendor's cloud"]
+    V1["Your chat AI<br/>acts while you talk to it<br/>paid by your subscription"]
+  end
+  subgraph N["This AIMEAT"]
+    N1["Schedules and the chat here<br/>paid by your own AI key"]
+  end
+  subgraph Y["Your computer"]
+    Y1["Connector"]
+    Y2["Your agents: the two basic agents,<br/>agents of your own, CrewAI crews<br/>paid by your own AI key"]
+    Y1 --- Y2
+  end
+  subgraph X["Someone else's service"]
+    X1["A service's agent<br/>paid at the price you agreed"]
+  end
+  V1 -- "MCP" --> N
+  Y1 -- "one outgoing connection" --> N
+  N -- "contract, paid work" --> X1
+\`\`\`
 
 ## Common tasks
 - **List agents:** \`aimeat_agents_list\` — name, GAII, tags, mode, last-seen, and its permissions

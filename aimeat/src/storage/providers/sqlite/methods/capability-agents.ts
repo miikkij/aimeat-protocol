@@ -417,7 +417,7 @@ export const capabilityAgentsMethods = {
     return agentTaskRepo.countTasksByAgent(this.db, agentGaii);
   },
 
-  async countTasksByOwner(this: SqliteStorage, ownerGaii: string): Promise<Record<string, { queued: number; active: number; done: number; failed: number; doneToday: number; lastTaskUpdateAt: string | null; lastFailedAt: string | null }>> {
+  async countTasksByOwner(this: SqliteStorage, ownerGaii: string): Promise<Record<string, { queued: number; active: number; done: number; failed: number; doneToday: number; doneWeek: number; lastTaskUpdateAt: string | null; lastFailedAt: string | null }>> {
     return agentTaskRepo.countTasksByOwner(this.db, ownerGaii);
   },
 

@@ -20,6 +20,8 @@
  *   import { registerCommerceTools } from './commerce.js';
  *   registerCommerceTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.8.0 — 2026-10-01 — aimeat_commerce_psp_set refuses and gives the Wallet page link: the payment
+ *     secret is screen-only (decision D5), as PUT /v1/commerce/payout/stripe already was for agents.
  *   v1.7.0 — 2026-09-27 — aimeat_app_tools_publish names the app by its filename when the caller left
  *     the extension off (services/app-tools-key.ts), so the answer's app and skus match the stored key.
  *   v1.6.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
@@ -190,30 +192,13 @@ export function registerCommerceTools(
             webhook_secret: z.string().max(500).optional(),
         },
         annotationsFor('aimeat_commerce_psp_set'),
-        async ({ provider, secret_key, webhook_secret }) => {
-            // Same bound the route applies (routes/commerce.ts:210-214). This tool stored whatever
-            // arrived, so a blank or truncated key became the seller's configured PSP credential
-            // and every money sale failed at settlement instead of at configuration.
-            const key = String(secret_key ?? '').trim();
-            if (key.length < 8 || key.length > 200) {
-                return fail('INVALID_PSP: secret_key must be your PSP secret (8-200 characters). It is stored server-side and never returned.');
-            }
-            // The same optional signing secret PUT /v1/commerce/payout/stripe takes, with its bound.
-            const hook = String(webhook_secret ?? '').trim();
-            if (hook && (hook.length < 8 || hook.length > 200)) {
-                return fail('INVALID_PSP: webhook_secret must be the Stripe endpoint signing secret (8-200 characters).');
-            }
-            // MERGE: the same record also holds the seller's x402 USDC payout address. Replacing it
-            // wholesale would silently delete the other rail's setting (and vice versa).
-            // Stored encrypted, so the generic memory doors carry only ciphertext and a hint
-            // (commerce/psp-secrets.ts). A node that cannot encrypt refuses rather than storing it plain.
-            const encKey = getEncryptionKey(config);
-            if (!encKey) return fail('ENCRYPTION_NOT_CONFIGURED: this node has no encryption key, so it cannot store a payment secret safely. Ask whoever runs it to set AIMEAT_ENCRYPTION_KEY.');
-            const existing = (await storage.getMemory(ownerGhii, PSP_KEY))?.value as Record<string, unknown> | undefined;
-            const { record: sealed } = sealPspRecord(encKey, { ...(existing ?? {}), provider, secretKey: key, ...(hook ? { webhookSecret: hook } : {}) });
-            const { refusal: pspRefusal } = await putOwnerRecord(PSP_KEY, sealed, 'private', ['commerce'], 'commerce:psp');
-            if (pspRefusal) return { content: [{ type: 'text' as const, text: pspRefusal }], isError: true };
-            return ok({ configured: true, provider, key_hint: pspSecretHint(key), ...(hook ? { webhook_configured: true } : {}), note: 'Stored server-side; money sales settle on this PSP account. The secret is never returned by any tool.' });
+        async () => {
+            // SCREEN ONLY (decision D5 of the user-journey review, 2026-10-01). A session here is
+            // always an agent record, and PUT /v1/commerce/payout/stripe, which the connector and CLI
+            // tools call, has refused agents all along (requireRole('owner')); this tool alone stored
+            // the secret for one. A key that moves money is set by its owner on the Wallet page, so
+            // the tool refuses before anything is read or written and says where that page is.
+            return fail(`SCREEN_ONLY: your payment provider's secret key is set by you, signed in yourself, on the Wallet page: ${config.baseUrl.replace(/\/+$/, '')}/v1/profile?tab=wallet . It moves money, so no agent stores it, and it should not pass through a chat.`);
         },
     );
 

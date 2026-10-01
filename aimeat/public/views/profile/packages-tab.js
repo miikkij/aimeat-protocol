@@ -13,6 +13,9 @@
  * @structure PackagesTab() — state (data, remote, expanded, versions, updates, installForm, filter) + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'packages'
  * @version-history
+ *   v2.4.0 — 2026-10-01 — An opened offer reads the package's "what you get" sheet (GET
+ *     /v1/packages/:group `sheet`), the install sends the settings typed on the row as `config`, and
+ *     the toast says how many of the package's agents now wait for approval (guided journey P3).
  *   v2.3.0 — 2026-09-30 — The Check button asks the package's source first, and says when the update
  *     service has ended.
  *   v2.2.0 — 2026-09-30 — setAutoUpdate: the owner turns an installed copy's automatic update on or off
@@ -43,6 +46,7 @@ import { apiGet } from '/js/api.js';
 import * as pkgService from '/js/services/packages.js';
 import { renderPage } from './packages/page.js';
 import { x, joinOffers } from './packages/frame.js';
+import { missingAsks } from './packages/sheet.js';
 
 export default function PackagesTab({ session, showToast }) {
   const sess = session || getSession();
@@ -56,6 +60,10 @@ export default function PackagesTab({ session, showToast }) {
   const [versions, setVersions] = useState({});
   const [updates, setUpdates] = useState({});
   const [installForm, setInstallForm] = useState(null);
+  // group → the package's "what you get" sheet (GET /v1/packages/:group `sheet`), read when its row opens.
+  const [sheets, setSheets] = useState({});
+  // key → { componentId: { field: value } }: the settings the install asks, typed on the opened row.
+  const [installConfig, setInstallConfig] = useState({});
   const [filter, setFilterState] = useState({ who: '', cat: '' });
   const [query, setQuery] = useState('');
   const [shown, setShown] = useState(20);
@@ -94,6 +102,12 @@ export default function PackagesTab({ session, showToast }) {
       pkgService.getPackageVersions(item.packageGroupId).then((r) => setVersions((m) => ({ ...m, [item.packageGroupId]: r?.data?.versions ?? [] }))).catch((e) => swallowed('packages: versions', e));
     }
     if (key.startsWith('i:') && !updates[item.id]) checkUpdate(item);
+    if (key.startsWith('o:') && item.group && !item.remote && sheets[item.group] === undefined) {
+      setSheets((m) => ({ ...m, [item.group]: null }));
+      pkgService.getPackage(item.group)
+        .then((r) => setSheets((m) => ({ ...m, [item.group]: r?.data?.sheet ?? false })))
+        .catch((e) => { swallowed('packages: sheet', e); setSheets((m) => ({ ...m, [item.group]: false })); });
+    }
   };
   const jumpTo = (group) => {
     const key = ownByGroup[group] ? 'p:' + group : 'o:' + group;
@@ -168,13 +182,23 @@ export default function PackagesTab({ session, showToast }) {
   const setInstallLabel = (key, label) => setInstallForm({ key, label });
   const install = async (o, label) => {
     const key = ownByGroup[o.group] ? 'p:' + o.group : 'o:' + o.group;
+    // A required setting left empty is said on the page, by its name, before anything is sent: the
+    // node's refusal is written for an AI ("install again with config: …") and read wrong by a person.
+    const missing = missingAsks({ sheets, installConfig }, o, key);
+    if (missing.length) { showToast?.(x('asksMissing', { list: missing.join(', ') }), 'error'); return; }
     setBusy(key);
     try {
-      const r = await pkgService.installPackage(o.group, { label: (label || '').trim() });
+      // An empty optional field is left out, so the app's own default applies.
+      const config = Object.fromEntries(Object.entries(installConfig[key] || {}).map(([c, fields]) =>
+        [c, Object.fromEntries(Object.entries(fields).filter(([, v]) => String(v ?? '').trim() !== ''))]));
+      const r = await pkgService.installPackage(o.group, { label: (label || '').trim(), ...(Object.keys(config).length ? { config } : {}) });
       if (!r?.ok) { fail(r); return; }
       const n = (r.data?.instance?.installedComponents || r.data?.installedComponents || []).length;
-      showToast?.(x('installedToast', { name: (label || '').trim() || o.title, n }));
+      const agents = (r.data?.agents_proposed ?? []).length;
+      showToast?.(x('installedToast', { name: (label || '').trim() || o.title, n })
+        + (agents ? ' ' + x('agentsWaitToast', { n: agents }) : ''));
       setInstallForm(null);
+      setInstallConfig((m) => ({ ...m, [key]: undefined }));
       setExpanded(null);
       load();
       setTimeout(() => document.getElementById('pk-installed')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
@@ -301,7 +325,10 @@ export default function PackagesTab({ session, showToast }) {
     nodeUrl: getNodeUrl(), ownerName, isOperator, showToast, ConfirmUI, fileRef,
     data, instances, own, offers, offerByGroup, ownByGroup, listingByGroup,
     expanded, versions, updates, installForm, filter, query, shown, busy,
-    compose, myApps,
+    compose, myApps, sheets, installConfig,
+    setConfigValue: (key, componentId, field, value) => setInstallConfig((m) => ({
+      ...m, [key]: { ...(m[key] || {}), [componentId]: { ...((m[key] || {})[componentId] || {}), [field]: value } },
+    })),
     setComposeName: (name) => setCompose((c) => ({ ...c, name })),
     closeCompose: () => setCompose({ open: false, name: '', picked: [] }),
     openCompose, togglePick, doCompose, publishOwn,

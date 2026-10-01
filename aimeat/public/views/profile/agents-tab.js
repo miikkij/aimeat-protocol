@@ -7,6 +7,9 @@
  *   the agents as a table that opens into a card), the ink rail, the device-auth approvals, the
  *   scope modal.
  * @version-history
+ *   v4.17.0 -- 2026-10-01 -- "What should an agent do?" is section 01 (agents/agent-guide.js); the others
+ *     move to 02-05. No agents yet shows three examples that fill the form; the CrewAI fold tells
+ *     crewaimeat and aimeat-crewai apart (guided journey P4).
  *   v4.16.0 -- 2026-09-30 -- "With a problem" counts an agent your AIMEAT refused a permission it still
  *     lacks (Jouni: the summary said 0 while concierge could not work).
  *   v4.15.0 -- 2026-09-26 -- Every part is a component that takes data (page group G1a): the frame is
@@ -155,6 +158,7 @@ import ScopesModal from './agents/scopes-modal.js';
 import { hasRefusals } from './agents/agent-card-access.js';
 import BasicAgentsPanel from './agents/basic-agents-panel.js';
 import NewAgentPanel from './agents/new-agent-panel.js';
+import { AgentGuide, NoAgentsYet } from './agents/agent-guide.js';
 import { swallowed } from '/js/swallowed.js';
 
 const p = (key, vars) => t('profile.agents.page.' + key, vars);
@@ -178,6 +182,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
   // open, because connecting an AI is the first thing to do here.
   const [connectOpen, setConnectOpen] = useState(() => loadFold(session?.owner, 'connect', true));
   const [newOpen, setNewOpen] = useState(false);
+  const [newDraft, setNewDraft] = useState(null);
   const [waitingCount, setWaitingCount] = useState(0);
   const [cliExpanded, setCliExpanded] = useState(false);
   const [pasteExpanded, setPasteExpanded] = useState(false);
@@ -611,11 +616,13 @@ export default function AgentsTab({ session, showToast, onStats }) {
       : { key: 'seen', n: '·', label: p('stripSeen'), sub: p('stripSeenNone') },
     { key: 'problems', n: problems.length, label: p('stripProblems'), sub: problems.length ? problems.slice(0, 3).map(a => a.display_name || a.name).join(' · ') : p('stripProblemsSub') },
   ];
+  const pickExample = (draft) => { setNewDraft(draft); openNew(); };
   const sections = [
-    { id: 'agp-basic', num: '01', label: t('profile.agents.basic.title'), count: null },
-    { id: 'agp-new', num: '02', label: t('profile.agents.new.title'), count: waitingCount || null },
-    { id: 'agp-connect', num: '03', label: p('secConnect'), count: null },
-    { id: 'agp-list', num: '04', label: p('secAgents'), count: agents.length },
+    { id: 'agp-guide', num: '01', label: t('profile.agents.guide.title'), count: null },
+    { id: 'agp-basic', num: '02', label: t('profile.agents.basic.title'), count: null },
+    { id: 'agp-new', num: '03', label: t('profile.agents.new.title'), count: waitingCount || null },
+    { id: 'agp-connect', num: '04', label: p('secConnect'), count: null },
+    { id: 'agp-list', num: '05', label: p('secAgents'), count: agents.length },
   ];
 
   return html`
@@ -646,15 +653,18 @@ export default function AgentsTab({ session, showToast, onStats }) {
         <${ConfirmUI} />`}>
           ${/* The one-press road in. Above the connect guide on purpose: for somebody whose connector
                 is already running, this is the whole job, and the guide below is the long way round. */''}
-          <${BasicAgentsPanel} session=${session} showToast=${showToast} onCreated=${loadData} first=${true} />
+          ${/* What should an agent do: the question first, so the sections below are reached by an
+                answer rather than compared by the person (agents/agent-guide.js). */''}
+          <${AgentGuide} session=${session} onConnect=${openConnect} onNew=${openNew} first=${true} />
+          <${BasicAgentsPanel} session=${session} showToast=${showToast} onCreated=${loadData} num="02" />
 
           ${/* An agent of the person's own, and what their agents have proposed. Below the two fixed
                 names on purpose: those are what a new account should take first, and this is the door
                 for the job they do not cover. */''}
           <${NewAgentPanel} session=${session} showToast=${showToast} onCreated=${loadData} agents=${agents}
-            open=${newOpen} setOpen=${setNewOpen} onWaiting=${setWaitingCount} />
+            open=${newOpen} setOpen=${setNewOpen} onWaiting=${setWaitingCount} draft=${newDraft} />
 
-          <${Section} id="agp-connect" num="03" title=${p('secConnect')} count=${p('secConnectSub')} doors=${connectDoor}>
+          <${Section} id="agp-connect" num="04" title=${p('secConnect')} count=${p('secConnectSub')} doors=${connectDoor}>
             ${!connectOpen ? html`<${Note} kind="lead">${p('connectLede')}<//>` : html`
               <${Note} kind="lead">${p('connectLede')}<//>
               ${/* The recommended road comes first and OPEN: the tool the person already pays for,
@@ -707,6 +717,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
 
                 <${Section} fold inner id="agp-connect-crew" num="" title=${t('profile.agents.taskRunner.title')} open=${taskRunnerExpanded} onToggle=${() => setTaskRunnerExpanded(v => !v)}>
                   <${Stack} gap="small">
+                    <${Note}>${t('profile.agents.taskRunner.names')}<//>
                     <${Note}>${t('profile.agents.taskRunner.whatIs')}<//>
                     <${Note}>${t('profile.agents.taskRunner.whenToUse')}<//>
                     <${Actions}>
@@ -725,9 +736,9 @@ export default function AgentsTab({ session, showToast, onStats }) {
             `}
           <//>
 
-          <${Section} id="agp-list" num="04" title=${p('secAgents')} count=${agents.length}>
+          <${Section} id="agp-list" num="05" title=${p('secAgents')} count=${agents.length}>
             ${agents.length === 0
-              ? html`<${Note} kind="lead">${t('profile.agents.empty')}<//>`
+              ? html`<${NoAgentsYet} onPick=${pickExample} />`
               : html`
                 <${AgentSearch}
                   query=${query}

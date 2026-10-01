@@ -25,6 +25,8 @@
  * @structure registerAppManageTool
  * @usage registerAppManageTool(mcp, storage, config, agentGaii, scopes, getToken)
  * @version-history
+ *   v1.3.1 — 2026-10-01 — agent_deploy passes the caller's principal: with no runner, the agent
+ *     becomes a proposal the owner approves.
  *   v1.3.0 — 2026-10-01 — audit answers the archived years and the limit, and reads a year; the new
  *     audit_archive and audit_keep go over their routes with the member actions.
  *   v1.2.0 — 2026-10-01 — The member actions (members, member_set, member_remove, member_decline,
@@ -294,6 +296,8 @@ export function registerAppManageTool(
                 const out = await deployAppAgent(storage, config, {
                     callerOwner, appOwner, filename, agentName: String(args.bundled_agent),
                     runnerAgent: str(args.runner_agent), organismId: str(args.organism_id), undeploy: action === 'agent_undeploy',
+                    // A deploy with no runner becomes a proposal for the owner (services/app-agent-propose.ts).
+                    principal: { sub: callerGaii, owner: callerOwner, roles: callerGaii.includes('#') ? ['agent'] : ['owner'], scopes },
                 });
                 return out.ok ? answer(out.view) : refusalText(out);
             }

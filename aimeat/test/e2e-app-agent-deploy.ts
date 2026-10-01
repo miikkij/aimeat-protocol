@@ -9,6 +9,9 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-app-agent-deploy
  * @version-history
+ *   v1.3.0 — 2026-10-01 — A deploy with no crew-forge becomes an agent proposal on the deployer's
+ *     own open items (201 kind 'proposed'), no longer 404 RUNNER_NOT_FOUND. The source changed on
+ *     purpose (crew-forge left the basic agents on 2026-09-02); the cross-owner assertion stays.
  *   v1.2.0 — 2026-09-13 — The presigned road carries cortex.agents: a valid crew-def survives mint
  *     and PUT, a malformed one is refused at the mint with no upload URL.
  *   v1.1.0 — 2026-07-17 — Slice 2: hosted-instance discovery (instances endpoint, public-offer
@@ -238,11 +241,18 @@ async function main() {
     });
 
     await test('owner2 deploying owner1\'s public app lands on owner2\'s OWN fleet (never the author\'s)', async () => {
-        // owner2 has no crew-forge yet → the deploy cannot reach ANY fleet.
+        // owner2 has no crew-forge yet → since 2026-10-01 the deploy becomes an agent proposal on
+        // owner2's OWN open items (services/app-agent-propose.ts), never anything of owner1's. It
+        // answered 404 RUNNER_NOT_FOUND before, which is what every new account met: crew-forge left
+        // the basic agents on 2026-09-02. The source changed on purpose; the cross-owner guard holds.
         const r1 = await json(`/v1/apps/${owner1}/${FILENAME}/agents/demo-joker/deploy`, {
             method: 'POST', headers: { Authorization: `Bearer ${owner2Token}` }, body: JSON.stringify({}),
         });
-        assert(r1.status === 404 && r1.body.error?.code === 'RUNNER_NOT_FOUND', `no-runner: ${r1.status} ${r1.body.error?.code}`);
+        assert(r1.status === 201 && r1.body.data?.kind === 'proposed', `no-runner becomes a proposal: ${r1.status} ${JSON.stringify(r1.body.data ?? r1.body.error)}`);
+        const mine = (await json('/v1/agents/v2/agent-proposals', { headers: { Authorization: `Bearer ${owner2Token}` } })).body.data?.proposals ?? [];
+        const theirs = (await json('/v1/agents/v2/agent-proposals', { headers: { Authorization: `Bearer ${owner1Token}` } })).body.data?.proposals ?? [];
+        assert(mine.some((p: any) => p.id === r1.body.data.proposal_id), 'the proposal is owner2\'s');
+        assert(!theirs.some((p: any) => p.id === r1.body.data.proposal_id), 'and never owner1\'s');
         // With a runner, the task is created under owner2 — and stays invisible to owner1.
         await registerAgent(owner2Token, owner2, RUNNER, 'interactive', ['task:read', 'task:write']);
         const r2 = await json(`/v1/apps/${owner1}/${FILENAME}/agents/demo-joker/deploy`, {

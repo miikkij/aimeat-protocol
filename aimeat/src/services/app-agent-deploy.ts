@@ -22,6 +22,9 @@
  *   const r = await deployAppAgent(storage, config, { callerOwner, appOwner, filename, agentName, undeploy: false });
  *   if (!r.ok) return res.status(r.status).json(error(config.nodeId, r.code, r.message));
  * @version-history
+ *   v1.2.0 — 2026-10-01 — A deploy that names no runner, from a caller who has no crew-forge, becomes
+ *     an agent proposal the owner approves (kind `proposed`), when the caller passed its principal.
+ *     An install set passes none and keeps its pending state.
  *   v1.1.0 — 2026-09-27 — deployAppAgent(), appAgentInstances() and appAgentStatus(): the app
  *     lookup, the declared-agent check, the runner lookup and the two reads, moved unchanged out of
  *     routes/apps/agents-deploy.ts so the MCP tool calls the same code the REST routes call.
@@ -39,6 +42,8 @@ import { deployedAgentName } from '../models/crew-def-schemas.js';
 import type { Offer } from '../models/offer-schemas.js';
 import { buildGAII, validateAgentName, localAccountName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
+import { proposeBundledAgent } from './app-agent-propose.js';
+import type { ProposerPrincipal } from './agent-proposals.js';
 
 /** Default runner-agent name: crewaimeat's crew-forge daemon registers under this name. */
 export const DEFAULT_APP_AGENT_RUNNER = 'crew-forge';
@@ -50,8 +55,9 @@ export const DEFAULT_APP_AGENT_RUNNER = 'crew-forge';
  */
 export interface AppAgentRefusal {
   ok: false;
-  status: 400 | 404;
-  code: 'NOT_FOUND' | 'AGENT_NOT_DECLARED' | 'INVALID_INPUT' | 'RUNNER_NOT_FOUND';
+  /** 403 and 409 come from the proposal service (an app may not propose; the name is taken). */
+  status: 400 | 403 | 404 | 409;
+  code: 'NOT_FOUND' | 'AGENT_NOT_DECLARED' | 'INVALID_INPUT' | 'RUNNER_NOT_FOUND' | 'ACCESS_DENIED' | 'NAME_TAKEN';
   message: string;
 }
 
@@ -181,6 +187,16 @@ async function resolveDeclaredAppAgent(
   return { ok: true, app, appId: `${app.ownerName}/${app.filename}` };
 }
 
+/** What a deploy answers when it became a proposal for the owner (no runner to give it to). */
+export interface AppAgentProposalView {
+  kind: 'proposed';
+  app_id: string;
+  agent_name: string;
+  proposed_name: string;
+  proposal_id: string;
+  note: string;
+}
+
 /** What a deploy or undeploy answers: the body of POST .../agents/:agentName/deploy|undeploy. */
 export interface AppAgentDeployView {
   task_id: string;
@@ -215,8 +231,14 @@ export async function deployAppAgent(
     runnerAgent?: string;
     organismId?: string;
     undeploy: boolean;
+    /**
+     * Who is asking, as the proposal service needs it. Given by the route and the MCP tool: a deploy
+     * that names no runner, for an owner who has no crew-forge runner, becomes a proposal the owner
+     * approves (app-agent-propose.ts). An install set gives none and keeps waiting for a runner.
+     */
+    principal?: ProposerPrincipal;
   },
-): Promise<{ ok: true; view: AppAgentDeployView; links: AppAgentLink[] } | AppAgentRefusal> {
+): Promise<{ ok: true; view: AppAgentDeployView | AppAgentProposalView; links: AppAgentLink[] } | AppAgentRefusal> {
   const kind = args.undeploy ? 'undeploy-app-agent' as const : 'deploy-app-agent' as const;
   const ctx = await resolveDeclaredAppAgent(storage, {
     viewer: args.callerOwner, appOwner: args.appOwner, filename: args.filename, agentName: args.agentName,
@@ -232,6 +254,23 @@ export async function deployAppAgent(
   // The runner is looked up under the REQUESTER's owner only — a foreign fleet is
   // unreachable by construction (there is no way to name another owner's agent here).
   const runner = await storage.getAgent(buildGAII(runnerName, args.callerOwner, config.nodeId));
+  // No runner named and none to fall back on: the agent reaches the owner as a proposal instead.
+  // crew-forge left the basic agents on 2026-09-02, so this is what a new account meets.
+  if (!runner && !args.undeploy && !args.runnerAgent && args.principal) {
+    const proposed = await proposeBundledAgent({ storage, config }, args.principal, ctx.app, args.agentName);
+    if (!proposed.ok) return proposed as AppAgentRefusal;
+    return {
+      ok: true,
+      view: {
+        kind: 'proposed', app_id: ctx.appId, agent_name: args.agentName,
+        proposed_name: proposed.proposal.proposed_name, proposal_id: proposed.proposal.proposal_id,
+        note: proposed.proposal.already_waiting
+          ? 'This agent already waits for your approval on your open items.'
+          : 'This agent now waits for your approval on your open items. Approving it creates the agent with its definition.',
+      },
+      links: [{ description: 'Waiting proposals', method: 'GET', url: '/v1/agents/v2/agent-proposals' }],
+    };
+  }
   if (!runner) {
     return {
       ok: false, status: 404, code: 'RUNNER_NOT_FOUND',

@@ -5762,7 +5762,7 @@
   "pkpage.chipOffers": "on offer {n}",
   "pkpage.chipOwn": "your publications {n}",
   "pkpage.chipRemote": "from other servers {n}",
-  "pkpage.desc": "A package is a whole that installs in one go: an app, its server extension and browser library, memory defaults and translations. Installing makes you your own copy of every part, and the copies are yours to edit from then on. A new package comes from asking your AI to build one.",
+  "pkpage.desc": "A package is a whole that installs in one go: apps, their server extension and browser library, memory defaults, translations, the guides your AI gets and the agents that come with it. Open one to see what it gives, what data it keeps and what it asks. Installing from here makes you your own copy to edit; a package bought from a repository stays kept by its maker, and you make your own copy when you want to change it. A new package comes from asking your AI to build one.",
   "pkpage.descEmpty": "You have not installed a package yet. {n} are on offer, and each installs in one go as your own. Your own package comes from asking your AI to build one.",
   "pkpage.copyRequest": "Copy the request for your AI",
   "pkpage.importZip": "Import a .zip",
@@ -5897,7 +5897,25 @@
   "pkpage.labelPlaceholder": "A name for your copy, for example the company's name",
   "pkpage.installSub": "Installing takes a moment and then says what was made. Every part is yours afterwards.",
   "pkpage.installOwnSub": "You can install your own package as many times as you like; each copy gets its own name.",
-  "pkpage.installedToast": "{name} is installed: {n} parts in your name.",
+  "pkpage.installedToast": "{name} is installed. Parts now in your name: {n}.",
+  "pkpage.agentsWaitToast": "Its agents waiting for your approval in your open items: {n}.",
+  "pkpage.asksMissing": "Fill in before installing: {list}.",
+  "pkpage.sheetAsksDefault": "If you leave it empty: {value}.",
+  "pkpage.sheetLoading": "Reading what this package gives…",
+  "pkpage.sheetAskK": "Ask your AI",
+  "pkpage.sheetAskSub": "Once it is installed, these work in the chat you already use.",
+  "pkpage.sheetDataK": "Your data",
+  "pkpage.sheetDataNoWhat": "no description",
+  "pkpage.sheetDataLeaves": "Leaves this server: {list}.",
+  "pkpage.sheetDataUnmapped": "{app}: nobody has written down what it keeps or where it goes.",
+  "pkpage.sheetAgentsK": "Agents that come with it",
+  "pkpage.sheetAgentsSub": "Each one waits for your approval on your open items after the install. Nothing runs before you approve it.",
+  "pkpage.sheetRunsK": "Runs on its own",
+  "pkpage.sheetRunsSub": "Jobs that start by themselves once it is installed.",
+  "pkpage.sheetGuidesK": "Guides for your AI",
+  "pkpage.sheetGuidesSub": "Your AI gets these operating guides with the apps, so it can use them for you.",
+  "pkpage.sheetAsksK": "It asks",
+  "pkpage.sheetAsksSub": "Settings the install needs. * marks the ones it cannot do without.",
   "pkpage.needs": "needs {list}",
   "pkpage.makerK": "Maker",
   "pkpage.makerSystem": "An example that came with the server, kept current by the operator.",
@@ -5961,7 +5979,7 @@
   "pkpage.composeNamePlaceholder": "for example: shop-and-till",
   "pkpage.loadingApps": "Reading your apps…",
   "pkpage.noAppsYet": "You have not published an app yet. Build one first and it will be here.",
-  "pkpage.composeCarries": "The name, description, icon and category of each app travel with it. Screenshots, saved layouts and bound skills stay behind: each is addressed by a filename that only exists once the package is installed.",
+  "pkpage.composeCarries": "The name, description, icon, category and data map of each app travel with it, and so do the skills bound to it, so the installer's AI gets the operating guides. Screenshots and saved layouts stay behind: each is addressed by a filename that only exists once the package is installed.",
   "pkpage.composeN": "Make the package from {n}",
   "pkpage.composing": "Making it…",
   "pkpage.cancel": "Cancel",
@@ -12009,7 +12027,15 @@
     "daysOne": "1 day left",
     "daysToday": "runs out today",
     "hidden": "{n} healthy agents hidden",
-    "hiddenOne": "1 healthy agent hidden"
+    "hiddenOne": "1 healthy agent hidden",
+    "week": {
+      "title": "This week",
+      "total": "Tasks your agents finished in the last 7 days: {n}.",
+      "agentDone": "{name}: {n} done",
+      "last": "last {when}",
+      "none": "Your agents finished no tasks in the last 7 days.",
+      "more": "Other agents that worked: {n}."
+    }
   },
   "footer": {
     "ownNode": "Run your own node",
@@ -15125,6 +15151,7 @@
       "notifications": "Notifications",
       "organisms": "Organisms",
       "packages": "Packages",
+      "getApps": "Get apps",
       "inbox": "Messages",
       "appDev": "AppDev",
       "pnl": "P&L",
@@ -15525,7 +15552,7 @@
       "page": {
         "allTags": "All {n} tags",
         "fewerTags": "Fewer tags",
-        "lede": "An agent is an AI that works in your name: it has its own identity, its own permissions and its own tasks and memory. Two are ready the moment you arrive; the rest you make here, or connect from the AI you already use.",
+        "lede": "An agent is an AI that works for you. It can be a chat service such as Claude or ChatGPT, an assistant such as OpenClaw or Goose, a model you use through OpenRouter, a coding tool, or a program of your own.",
         "chipAgents": "{n} agents",
         "chipReady": "{n} ready",
         "chipWaiting": "{n} waiting for you",
@@ -15567,7 +15594,7 @@
           "unset": "Nobody has decided yet, so nothing starts this agent on its own."
         },
         "runsChange": "Change",
-        "runsDecide": "Decide: on demand or always on",
+        "runsDecide": "Decide: starts when work arrives, or always on",
         "tabGroups": {
           "work": "Work",
           "knowledge": "Knowledge",
@@ -15904,9 +15931,9 @@
         "tooltip": "Operational mode. Affects how the agent is onboarded and how it consumes work."
       },
       "runMode": {
-        "spawn": "On demand",
+        "spawn": "Starts when work arrives",
         "resident": "Always on",
-        "tooltip": "How this agent is run. On demand: it waits here and starts up when work arrives. Always on: your connector keeps it running. Not decided: nobody has said, so nothing starts it on its own. You can move between all three at any time.",
+        "tooltip": "How this agent is run. Starts when work arrives: it waits here until work comes. Always on: your connector keeps it running. Not decided: nobody has said, so nothing starts it on its own. You can move between all three at any time.",
         "label": "How it runs",
         "saved": "Set to {mode}.",
         "failed": "That could not be saved. Try again.",
@@ -15954,7 +15981,7 @@
       },
       "basic": {
         "title": "Start with two agents",
-        "desc": "A front door that answers what arrives, and one that orders work from your other agents. You do not have to set anything up.",
+        "desc": "A front door that answers what arrives, and one that orders work from your other agents. Both run on your computer, inside the connector.",
         "button": "Create them",
         "working": "Creating…",
         "done": "{count} agents are ready.",
@@ -15964,7 +15991,7 @@
         "have": "Already yours",
         "connected": "Your connector is running, so they can start straight away",
         "notConnected": "Your connector is not running",
-        "notConnectedHint": "These agents run on your own machine. Start your connector with \"aimeat connect serve\" and this button will work.",
+        "notConnectedHint": "Install the connector in two minutes. Then this button works:",
         "whatYouGet": "What you get",
         "reaches": "Reaches:",
         "actsAlone": "starts on its own",
@@ -15980,7 +16007,8 @@
         "exampleDesc": "A CrewAI \"marketing-crew\" with a researcher + writer + AIMEAT Liaison. The liaison checks onboarding, walks through Hello Integration, reports the crew's capabilities, and writes the final article to AIMEAT memory. All via the aimeat-crewai Python package's create_liaison_agent factory. No subprocess scripts, no config.yaml editing.",
         "nameLabel": "Agent name (used in the paste below):",
         "copyButton": "Copy CrewAI connection instruction",
-        "repoLink": "View the crewaimeat fleet on GitHub"
+        "repoLink": "View the crewaimeat fleet on GitHub",
+        "names": "Two names that look alike: crewaimeat runs the agents on your computer, and aimeat-crewai connects a CrewAI crew you wrote yourself."
       },
       "filter": {
         "byTag": "Filter by tag:",
@@ -16880,6 +16908,110 @@
         "issuer": "Issued by",
         "manageHint": "Open to manage",
         "never": "never"
+      },
+      "guide": {
+        "title": "What should an agent do?",
+        "lead": "Pick what you need. The answer says which kind of agent does it, where it runs, what it needs from you and who pays.",
+        "ask": "Answer when I ask",
+        "askHint": "You talk to it, and it works while you talk.",
+        "away": "Work while I am away",
+        "awayHint": "It takes work and does it without you watching.",
+        "timetable": "Do the same thing on a timetable",
+        "timetableHint": "Every morning, every Monday, every hour.",
+        "app": "Work for an app",
+        "appHint": "Some apps bring their own agent.",
+        "askResult": "Your chat AI does this: Claude, ChatGPT, Copilot or another AI you already use, connected to your AIMEAT. It works while you talk to it, and you pay with your own subscription to that AI.",
+        "askDoor": "Connect your AI",
+        "timetableResult": "A schedule does this. It runs a prompt, an agent's task or an app's action at the times you set, here on your AIMEAT, with your own AI key.",
+        "scheduleDoor": "Open the scheduler",
+        "appResult": "An app can bring its own agent. When you install the app, the agent waits for your approval in your open items, and nothing runs before you approve it.",
+        "appDoor": "Get apps",
+        "whereTitle": "Where should it run?",
+        "where": {
+          "machine": "On my computer",
+          "machineHint": "Needs the connector. The computer stays on while the agent works.",
+          "node": "On this AIMEAT",
+          "nodeHint": "Nothing to install. Uses your own AI key."
+        },
+        "machineResult": "A worker on your computer. The connector is a small program that keeps one connection open from your computer to your AIMEAT, and your agents run inside it. Install it once with these two commands, then keep the computer on while the agents work.",
+        "machineDoor": "Make an agent",
+        "nodeResult": "A scheduled AI job on this AIMEAT. It runs here with your own AI key, so you install nothing and your computer can be off. Each run does one prompt, at the times you set.",
+        "placesDoor": "Where agents run",
+        "places": {
+          "chat": {
+            "title": "Your chat AI",
+            "what": "Claude, ChatGPT, Copilot or Cursor, connected over MCP. It acts while you talk to it.",
+            "sub": "Thinks with that AI's model. You pay with your subscription to it."
+          },
+          "machine": {
+            "title": "Your computer",
+            "what": "The connector and the agents in it: the two basic agents, agents of your own, CrewAI crews. They take work from your AIMEAT and send back the results.",
+            "sub": "Thinks with the model in your settings. You pay with your own AI key."
+          },
+          "node": {
+            "title": "This AIMEAT",
+            "what": "Schedules and the chat on this site. Nothing to install.",
+            "sub": "Thinks with the model in your AI settings. You pay with your own AI key."
+          },
+          "service": {
+            "title": "Another service",
+            "what": "An agent that someone else runs. You give it work under a contract.",
+            "sub": "Thinks with its own model. You pay the price you agreed."
+          }
+        },
+        "empty": {
+          "lead": "You have no agents yet. Here are three things an agent can do for you. Pick one, and the form above is filled in for you to check.",
+          "button": "Use this",
+          "watcher": {
+            "title": "Page watcher",
+            "purpose": "Watch a web page and tell me when it changes."
+          },
+          "inbox": {
+            "title": "Inbox helper",
+            "purpose": "Answer what arrives in my inbox, and ask me before anything is sent."
+          },
+          "receipts": {
+            "title": "Receipt sorter",
+            "purpose": "Sort my receipts every Monday and list what is missing."
+          }
+        }
+      },
+      "facts": {
+        "label": "Where it runs",
+        "line": "{runsOn} · thinks with {thinksWith} · paid by {paidBy}",
+        "yourChat": "your chat AI",
+        "runsOn": {
+          "chat": "{client}",
+          "machine": "your computer, through the connector",
+          "node": "this AIMEAT",
+          "service": "another service's server",
+          "unknown": "not known yet, because it has not connected"
+        },
+        "thinksWith": {
+          "chat": "that AI's own model",
+          "machine": "the model in your connector's settings",
+          "node": "the model in your AI settings",
+          "service": "the service's own model",
+          "unknown": "not known yet"
+        },
+        "paidBy": {
+          "chat": "your subscription to {client}",
+          "machine": "your own AI key",
+          "node": "your own AI key",
+          "service": "the price you agreed with the service",
+          "unknown": "not known yet"
+        },
+        "weekLabel": "This week",
+        "weekDone": "Tasks done in the last 7 days: {n}",
+        "weekNone": "No tasks done in the last 7 days.",
+        "selfStart": "Starts work by itself",
+        "yes": "on",
+        "no": "off",
+        "selfStartOn": "Work sent to it starts at once, without asking you.",
+        "selfStartOff": "Work sent to it waits until you start it.",
+        "selfStartOnSaved": "It now starts work by itself.",
+        "selfStartOffSaved": "Its work now waits for you to start it.",
+        "selfStartFailed": "That could not be saved. Try again."
       }
     },
     "scopes": {

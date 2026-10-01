@@ -4704,7 +4704,7 @@
   "pkpage.chipOffers": "en oferta {n}",
   "pkpage.chipOwn": "tus publicaciones {n}",
   "pkpage.chipRemote": "de otros servidores {n}",
-  "pkpage.desc": "Un paquete es un conjunto que se instala de una vez: una app, su extensión de servidor y su biblioteca de navegador, valores iniciales de memoria y traducciones. Instalarlo te hace una copia propia de cada parte, y desde entonces las copias son tuyas para editarlas. Un paquete nuevo sale de pedirle a tu IA que lo construya.",
+  "pkpage.desc": "Un paquete es un conjunto que se instala de una vez: aplicaciones, su extensión de servidor y su biblioteca de navegador, valores iniciales de memoria, traducciones, las guías que recibe tu IA y los agentes que vienen con él. Ábrelo para ver qué te da, qué datos guarda y qué pregunta. Si lo instalas desde aquí, recibes una copia propia que puedes editar; un paquete comprado en un repositorio lo mantiene quien lo hizo, y haces tu propia copia cuando quieras cambiarlo. Un paquete nuevo sale de pedirle a tu IA que lo construya.",
   "pkpage.descEmpty": "Todavía no has instalado un paquete. Hay {n} en oferta, y cada uno se instala de una vez como tuyo. Tu propio paquete sale de pedirle a tu IA que lo construya.",
   "pkpage.copyRequest": "Copiar la petición para tu IA",
   "pkpage.importZip": "Importar un .zip",
@@ -4839,7 +4839,25 @@
   "pkpage.labelPlaceholder": "Un nombre para tu copia, por ejemplo el de la empresa",
   "pkpage.installSub": "Instalar tarda un momento y luego dice qué se creó. Después, cada parte es tuya.",
   "pkpage.installOwnSub": "Puedes instalar tu propio paquete tantas veces como quieras; cada copia recibe su propio nombre.",
-  "pkpage.installedToast": "{name} queda instalado: {n} partes a tu nombre.",
+  "pkpage.installedToast": "{name} queda instalado. Partes a tu nombre: {n}.",
+  "pkpage.agentsWaitToast": "Agentes que esperan tu aprobación en tus pendientes: {n}.",
+  "pkpage.asksMissing": "Completa antes de instalar: {list}.",
+  "pkpage.sheetAsksDefault": "Si lo dejas vacío: {value}.",
+  "pkpage.sheetLoading": "Leyendo lo que te da este paquete…",
+  "pkpage.sheetAskK": "Pídele a tu IA",
+  "pkpage.sheetAskSub": "Una vez instalado, esto funciona en el chat que ya usas.",
+  "pkpage.sheetDataK": "Tus datos",
+  "pkpage.sheetDataNoWhat": "sin descripción",
+  "pkpage.sheetDataLeaves": "Sale de este servidor: {list}.",
+  "pkpage.sheetDataUnmapped": "{app}: nadie ha anotado qué guarda ni adónde van los datos.",
+  "pkpage.sheetAgentsK": "Agentes que vienen con él",
+  "pkpage.sheetAgentsSub": "Cada uno espera tu aprobación en tus pendientes después de instalar. Nada se ejecuta antes de que lo apruebes.",
+  "pkpage.sheetRunsK": "Funciona solo",
+  "pkpage.sheetRunsSub": "Tareas que se inician solas una vez instalado.",
+  "pkpage.sheetGuidesK": "Guías para tu IA",
+  "pkpage.sheetGuidesSub": "Tu IA recibe estas guías de uso con las aplicaciones, para poder usarlas por ti.",
+  "pkpage.sheetAsksK": "Pregunta",
+  "pkpage.sheetAsksSub": "Ajustes que necesita la instalación. * marca los que no puede omitir.",
   "pkpage.needs": "necesita {list}",
   "pkpage.makerK": "Autor",
   "pkpage.makerSystem": "Un ejemplo que vino con el servidor, mantenido al día por el operador.",
@@ -10302,7 +10320,15 @@
     "daysOne": "queda 1 día",
     "daysToday": "caduca hoy",
     "hidden": "{n} agentes sanos ocultos",
-    "hiddenOne": "1 agente sano oculto"
+    "hiddenOne": "1 agente sano oculto",
+    "week": {
+      "title": "Esta semana",
+      "total": "Tareas que tus agentes terminaron en los últimos 7 días: {n}.",
+      "agentDone": "{name}: {n} hechas",
+      "last": "la última {when}",
+      "none": "Tus agentes no terminaron tareas en los últimos 7 días.",
+      "more": "Otros agentes que trabajaron: {n}."
+    }
   },
   "footer": {
     "ownNode": "Monta tu propio nodo",
@@ -13339,6 +13365,7 @@
       "notifications": "Avisos",
       "organisms": "Organismos",
       "packages": "Paquetes",
+      "getApps": "Obtener aplicaciones",
       "inbox": "Mensajes",
       "appDev": "AppDev",
       "pnl": "Resultados",
@@ -13739,7 +13766,7 @@
       "page": {
         "allTags": "Las {n} etiquetas",
         "fewerTags": "Menos etiquetas",
-        "lede": "Un agente es una IA que trabaja en tu nombre: tiene su propia identidad, sus propios permisos y sus propias tareas y memoria. Dos están listos desde el primer momento; el resto los creas aquí o los conectas desde la IA que ya usas.",
+        "lede": "Un agente es una IA que trabaja para ti. Puede ser un servicio de chat como Claude o ChatGPT, un asistente como OpenClaw o Goose, un modelo que usas a través de OpenRouter, una herramienta de programación o un programa tuyo.",
         "chipAgents": "{n} agentes",
         "chipReady": "{n} listos",
         "chipWaiting": "{n} esperan tu decisión",
@@ -13781,7 +13808,7 @@
           "unset": "Nadie lo ha decidido todavía, así que nada pone en marcha este agente por sí solo."
         },
         "runsChange": "Cambiar",
-        "runsDecide": "Decidir: bajo demanda o siempre activo",
+        "runsDecide": "Decidir: cuando llega trabajo o siempre activo",
         "tabGroups": {
           "work": "Trabajo",
           "knowledge": "Conocimiento",
@@ -14118,9 +14145,9 @@
         "tooltip": "Modo de funcionamiento. Cambia cómo se da de alta el agente y cómo consume trabajo."
       },
       "runMode": {
-        "spawn": "Bajo demanda",
+        "spawn": "Cuando llega trabajo",
         "resident": "Siempre activo",
-        "tooltip": "Cómo se ejecuta este agente. Bajo demanda: espera aquí y arranca cuando llega trabajo. Siempre activo: tu conector lo mantiene en marcha. Sin decidir: nadie lo ha dicho, así que nada lo inicia por su cuenta. Puedes cambiar entre los tres cuando quieras.",
+        "tooltip": "Cómo se ejecuta este agente. Cuando llega trabajo: espera aquí hasta que llega trabajo. Siempre activo: tu conector lo mantiene en marcha. Sin decidir: nadie lo ha dicho, así que nada lo inicia por su cuenta. Puedes cambiar entre los tres cuando quieras.",
         "label": "Cómo se ejecuta",
         "saved": "Puesto en {mode}.",
         "failed": "No se ha podido guardar. Inténtalo otra vez.",
@@ -14168,7 +14195,7 @@
       },
       "basic": {
         "title": "Empieza con dos agentes",
-        "desc": "Una puerta de entrada que responde a lo que llega, y otro que encarga trabajo a tus demás agentes. No tienes que configurar nada.",
+        "desc": "Una puerta de entrada que responde a lo que llega, y otro que encarga trabajo a tus demás agentes. Los dos funcionan en tu computadora, dentro del conector.",
         "button": "Créalos",
         "working": "Creando…",
         "done": "Ya tienes {count} agentes listos.",
@@ -14178,7 +14205,7 @@
         "have": "Ya es tuyo",
         "connected": "Tu conector está en marcha, así que pueden ponerse a trabajar enseguida",
         "notConnected": "Tu conector no está en marcha",
-        "notConnectedHint": "Estos agentes se ejecutan en tu propio ordenador. Arranca el conector con \"aimeat connect serve\" y este botón funcionará.",
+        "notConnectedHint": "Instala el conector en dos minutos. Después, este botón funciona:",
         "whatYouGet": "Lo que recibes",
         "actsAloneNoticeOne": "{names} empieza a trabajar en cuanto llega algo, sin preguntarte cada vez. Puedes cambiarlo para cualquier agente más adelante."
       },
@@ -14190,7 +14217,8 @@
         "exampleDesc": "Un \"marketing-crew\" de CrewAI con quien investiga, quien redacta y el enlace de AIMEAT. El enlace comprueba el alta, recorre Hello Integration, declara las capacidades del equipo y escribe el artículo final en la memoria de AIMEAT. Todo con la fábrica create_liaison_agent del paquete de Python aimeat-crewai. Sin guiones en subprocesos y sin tocar config.yaml.",
         "nameLabel": "Nombre del agente (se usa en el texto de abajo):",
         "copyButton": "Copiar la instrucción de conexión de CrewAI",
-        "repoLink": "Ver la flota crewaimeat en GitHub"
+        "repoLink": "Ver la flota crewaimeat en GitHub",
+        "names": "Dos nombres que se parecen: crewaimeat ejecuta los agentes en tu computadora, y aimeat-crewai conecta un equipo de CrewAI que escribiste tú."
       },
       "filter": {
         "byTag": "Filtrar por etiqueta:",
@@ -14914,6 +14942,110 @@
         "issuer": "Emitida por",
         "manageHint": "Ábrelo para gestionarlo",
         "never": "nunca"
+      },
+      "guide": {
+        "title": "¿Qué debe hacer un agente?",
+        "lead": "Elige lo que necesitas. La respuesta dice qué tipo de agente lo hace, dónde funciona, qué necesita de ti y quién paga.",
+        "ask": "Responder cuando pregunto",
+        "askHint": "Le hablas, y trabaja mientras conversan.",
+        "away": "Trabajar mientras no estoy",
+        "awayHint": "Recibe el trabajo y lo hace sin que estés mirando.",
+        "timetable": "Hacer lo mismo según un horario",
+        "timetableHint": "Cada mañana, cada lunes, cada hora.",
+        "app": "Trabajar para una aplicación",
+        "appHint": "Algunas aplicaciones traen su propio agente.",
+        "askResult": "Esto lo hace tu IA de chat: Claude, ChatGPT, Copilot u otra IA que ya usas, conectada a tu AIMEAT. Trabaja mientras le hablas, y la pagas con tu propia suscripción.",
+        "askDoor": "Conecta tu IA",
+        "timetableResult": "Esto lo hace una programación. Ejecuta un prompt, la tarea de un agente o una acción de una aplicación en los horarios que defines, aquí en tu AIMEAT, con tu propia clave de IA.",
+        "scheduleDoor": "Abrir el programador",
+        "appResult": "Una aplicación puede traer su propio agente. Cuando instalas la aplicación, el agente espera tu aprobación en tus pendientes, y nada se ejecuta antes de que lo apruebes.",
+        "appDoor": "Obtener aplicaciones",
+        "whereTitle": "¿Dónde debe funcionar?",
+        "where": {
+          "machine": "En mi computadora",
+          "machineHint": "Necesita el conector. La computadora queda encendida mientras el agente trabaja.",
+          "node": "En este AIMEAT",
+          "nodeHint": "No hay nada que instalar. Usa tu propia clave de IA."
+        },
+        "machineResult": "Un agente en tu computadora. El conector es un programa pequeño que mantiene una conexión abierta entre tu computadora y tu AIMEAT, y tus agentes funcionan dentro de él. Instálalo una vez con estos dos comandos y deja la computadora encendida mientras los agentes trabajan.",
+        "machineDoor": "Crear un agente",
+        "nodeResult": "Un trabajo de IA programado en este AIMEAT. Funciona aquí con tu propia clave de IA, así que no instalas nada y tu computadora puede estar apagada. Cada ejecución hace un prompt, en los horarios que defines.",
+        "placesDoor": "Dónde funcionan los agentes",
+        "places": {
+          "chat": {
+            "title": "Tu IA de chat",
+            "what": "Claude, ChatGPT, Copilot o Cursor, conectados por MCP. Actúa mientras le hablas.",
+            "sub": "Usa el modelo de esa IA. Pagas con tu suscripción."
+          },
+          "machine": {
+            "title": "Tu computadora",
+            "what": "El conector y los agentes dentro de él: los dos agentes básicos, tus propios agentes y los equipos de CrewAI. Toman el trabajo de tu AIMEAT y devuelven los resultados.",
+            "sub": "Usa el modelo de tu configuración. Pagas con tu propia clave de IA."
+          },
+          "node": {
+            "title": "Este AIMEAT",
+            "what": "Las programaciones y el chat de este sitio. No hay nada que instalar.",
+            "sub": "Usa el modelo de tu configuración de IA. Pagas con tu propia clave de IA."
+          },
+          "service": {
+            "title": "Otro servicio",
+            "what": "Un agente que administra otra persona. Le das trabajo con un contrato.",
+            "sub": "Usa su propio modelo. Pagas el precio acordado."
+          }
+        },
+        "empty": {
+          "lead": "Todavía no tienes agentes. Aquí hay tres cosas que un agente puede hacer por ti. Elige una y el formulario de arriba se llena para que lo revises.",
+          "button": "Usar este",
+          "watcher": {
+            "title": "Vigía de páginas",
+            "purpose": "Vigila una página web y avísame cuando cambie."
+          },
+          "inbox": {
+            "title": "Ayudante de correo",
+            "purpose": "Responde lo que llega a mi bandeja de entrada y pregúntame antes de enviar algo."
+          },
+          "receipts": {
+            "title": "Clasificador de recibos",
+            "purpose": "Clasifica mis recibos cada lunes y haz una lista de lo que falta."
+          }
+        }
+      },
+      "facts": {
+        "label": "Dónde funciona",
+        "line": "{runsOn} · modelo: {thinksWith} · pago: {paidBy}",
+        "yourChat": "tu IA de chat",
+        "runsOn": {
+          "chat": "{client}",
+          "machine": "tu computadora, a través del conector",
+          "node": "este AIMEAT",
+          "service": "el servidor de otro servicio",
+          "unknown": "todavía no se sabe, porque no se ha conectado"
+        },
+        "thinksWith": {
+          "chat": "el modelo propio de esa IA",
+          "machine": "el modelo de la configuración de tu conector",
+          "node": "el modelo de tu configuración de IA",
+          "service": "el modelo propio del servicio",
+          "unknown": "todavía no se sabe"
+        },
+        "paidBy": {
+          "chat": "tu suscripción ({client})",
+          "machine": "tu propia clave de IA",
+          "node": "tu propia clave de IA",
+          "service": "el precio acordado con el servicio",
+          "unknown": "todavía no se sabe"
+        },
+        "weekLabel": "Esta semana",
+        "weekDone": "Tareas hechas en los últimos 7 días: {n}",
+        "weekNone": "Ninguna tarea hecha en los últimos 7 días.",
+        "selfStart": "Empieza el trabajo por sí solo",
+        "yes": "sí",
+        "no": "no",
+        "selfStartOn": "El trabajo que le envían empieza de inmediato, sin preguntarte.",
+        "selfStartOff": "El trabajo que le envían espera hasta que lo inicies.",
+        "selfStartOnSaved": "Ahora empieza el trabajo por sí solo.",
+        "selfStartOffSaved": "Ahora su trabajo espera a que lo inicies.",
+        "selfStartFailed": "No se pudo guardar. Inténtalo de nuevo."
       }
     },
     "scopes": {

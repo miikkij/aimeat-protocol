@@ -11004,6 +11004,7 @@ paths:
                                             done: { type: integer }
                                             failed: { type: integer }
                                             doneToday: { type: integer }
+                                            doneWeek: { type: integer, description: Done tasks completed in the last 7 days. }
                                             lastTaskUpdateAt: { type: string, format: date-time, nullable: true }
                                             lastFailedAt: { type: string, format: date-time, nullable: true }
                                         messages:
@@ -12796,6 +12797,79 @@ paths:
                           spec_token: { type: string }
         '404':
           description: The specification has no part by that id; the message lists the ids it has
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
+  /v1/prompts/features/sections:
+    get:
+      operationId: listFeatureMapParts
+      summary: The parts of the feature map
+      description: >-
+        What this node can do, cut from the Everything page (/v1/everything) into parts: `start` names the
+        areas, and `g-<n>` is one area with every feature, what it gives and where it is reached. For an AI
+        that knows what the person needs and looks for the one thing to offer. The MCP tool
+        aimeat_handbook_get serves the same parts for tier "features" and "features/{id}". Public.
+      tags:
+        - Discovery
+      responses:
+        '200':
+          description: The parts, with their size
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          parts:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string, example: g-10 }
+                                what: { type: string }
+                                chars: { type: integer }
+
+  /v1/prompts/features/sections/{id}:
+    get:
+      operationId: getFeatureMapPart
+      summary: One part of the feature map
+      description: >-
+        `start` (the areas, each with its part id) or `g-<n>` (one area). Plain text with ?format=txt. Public.
+      tags:
+        - Discovery
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, example: start }
+        - name: format
+          in: query
+          schema: { type: string, enum: [txt] }
+          description: txt returns the part as text/plain instead of the JSON envelope
+      responses:
+        '200':
+          description: The part
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          id: { type: string, example: features/g-10 }
+                          kind: { type: string, enum: [part] }
+                          prompt: { type: string }
+        '404':
+          description: The map has no part by that id; the message lists the ids it has
           content:
             application/json:
               schema:
@@ -30951,6 +31025,12 @@ paths:
         a crew-def. HARD GUARD: the target owner is ALWAYS the requester; a supplied
         owner/target_owner naming anyone else is 403 CROSS_OWNER_FORBIDDEN. If the runner is
         in task-runner mode the task auto-activates (one-click deploy).
+
+        With no `runner_agent` given and no `crew-forge` agent of the owner's, the agent becomes an
+        agent proposal instead (POST /v1/agents/v2/agent-proposals): the answer has `kind: proposed`,
+        `proposal_id` and `proposed_name`, and the owner approves it on their open items, which creates
+        the agent and seeds its definition. crew-forge is no longer one of the basic agents, so this is
+        what a new account gets.
       tags: [Apps]
       security:
         - BearerAuth: []
@@ -44563,6 +44643,16 @@ paths:
                   type: boolean
                   default: false
                   description: Compose even when an app calls an extension, recording it as a requirement.
+                outcome:
+                  type: string
+                  description: >-
+                    What the package gives a person, in one sentence: the head of its "what you get"
+                    sheet (GET /v1/packages/{groupId} `sheet`). The description stands in when missing.
+                prompts:
+                  type: array
+                  maxItems: 3
+                  items: { type: string }
+                  description: Up to three things a person can ask their AI once it is installed.
       responses:
         '201':
           description: The package, plus what the installing node must supply itself
@@ -44868,7 +44958,8 @@ paths:
         whether it is secret, and for an app field its JSON Schema. Answers go in the install set:
         `config.<package>.<component>.<field>`; a secret goes in the secrets file under the same path.
         A listed package this node does not hold is named in `problems`. The package's author or an
-        operator; requires packages:write.
+        operator, or anyone on this node when the package is public, so an installer answers the
+        questions before installing; requires packages:write.
       tags: [Packages]
       security:
         - BearerAuth: []
@@ -45251,7 +45342,14 @@ paths:
     get:
       operationId: getLatestPackage
       summary: Get latest published package
-      description: Retrieve the latest published version of a package group.
+      description: >-
+        Retrieve the latest published version of a package group, with `sheet`: what it gives the
+        person (the author's outcome sentence, or the description), up to three things to ask their AI
+        once installed, what data its apps keep and where it goes (from each app's data map; an app
+        without one is named in `dataUnmapped`), the agents its apps bring (each waits for the
+        installer's approval), the jobs its extensions run on their own, the operating guides it
+        carries for the installer's AI, the settings the install asks, and what this node must already
+        have. Derived from the package's own components on every read.
       tags: [Packages]
       parameters:
         - name: groupId
@@ -45269,7 +45367,36 @@ paths:
                   - type: object
                     properties:
                       data:
-                        $ref: '#/components/schemas/PackageRecord'
+                        allOf:
+                          - $ref: '#/components/schemas/PackageRecord'
+                          - type: object
+                            properties:
+                              sheet:
+                                type: object
+                                properties:
+                                  outcome: { type: string }
+                                  prompts: { type: array, items: { type: string } }
+                                  apps: { type: array, items: { type: object } }
+                                  data: { type: array, items: { type: object } }
+                                  dataUnmapped: { type: array, items: { type: string } }
+                                  agents: { type: array, items: { type: object } }
+                                  runsOnItsOwn: { type: array, items: { type: object } }
+                                  guides: { type: array, items: { type: string } }
+                                  asks:
+                                    type: array
+                                    description: The settings the install asks. `title` is the field's own name for a person, `field` the key the install's `config` takes.
+                                    items:
+                                      type: object
+                                      properties:
+                                        componentId: { type: string }
+                                        component: { type: string }
+                                        field: { type: string }
+                                        title: { type: string }
+                                        description: { type: string }
+                                        default: { type: string, description: The field's default, as text; empty when it has none. }
+                                        required: { type: boolean }
+                                        secret: { type: boolean }
+                                  expects: { type: object }
         '404':
           description: Package not found
     patch:
@@ -45545,6 +45672,9 @@ paths:
         /v1/package-install-requests/{id}/decision. A dry run by such a caller answers the preview
         with `status: would_await_owner` and `missing`. A translation component writes only the
         installed copy's own `i18n.<registered name>` record and costs nothing beyond packages:write.
+        The agents the package's apps bring are proposed to the owner after the install and named in
+        `agents_proposed` ({ agent_name, proposed_name, proposal_id, already_waiting }); each waits on
+        the owner's open items, and approving it creates the agent with its definition.
         An ecosystem app is refused. The owner in person passes. With `mode: managed` the package owns
         the code and layout of every component: a local change to them is refused with 409
         MANAGED_BY_PACKAGE, an update replaces them, and the owner changes only the settings (name,

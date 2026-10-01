@@ -14,6 +14,8 @@
  * @version-history
  *   v1.10.0 -- 2026-09-30 -- aimeat_package_compose: `include_skills`, the composer's own skills bound to the apps.
  *   v1.9.0 -- 2026-09-29 -- aimeat_package_sellers: the nodes that sell your packages with no token.
+ *   v1.9.0 -- 2026-10-01 -- aimeat_package_config_needs answers anyone for a public package;
+ *     aimeat_package_get returns the "what you get" sheet; compose takes `outcome` and `prompts`.
  *   v1.8.0 -- 2026-09-28 -- aimeat_package_config_needs: the questions a shop asks before payment.
  *   v1.7.0 -- 2026-09-28 -- aimeat_package_entitlements: `node`, the packages-only peer registered with a grant.
  *   v1.6.0 -- 2026-09-28 -- aimeat_package_instance_set, aimeat_package_check_updates,
@@ -115,6 +117,8 @@ export const packagesTools: AimeatToolDefinition[] = [
             include_cortex: { type: 'boolean', description: 'Package the cortexes you installed yourself. Default true. Node-shipped cortexes are never packaged.' },
             include_skills: { type: 'boolean', description: 'Package your own skills bound to these apps, so the installer\'s AI has their operating guides. Default true. Installing publishes each in the installer\'s skills, bound to their copy of the app, and never overwrites a skill of theirs.' },
             allow_expectations: { type: 'boolean', description: 'Compose even when an app calls an extension the package cannot carry, recording it as a requirement instead.' },
+            outcome: { type: 'string', description: 'What the package gives a person, in one sentence: the head of its "what you get" sheet. The description stands in when it is missing.' },
+            prompts: { type: 'array', description: 'Up to three things a person can ask their AI once it is installed, in their words.' },
         },
     },
     {
@@ -250,7 +254,7 @@ export const packagesTools: AimeatToolDefinition[] = [
     {
         // What a shop asks before payment, before the customer's node exists.
         name: 'aimeat_package_config_needs',
-        description: 'The settings a package of yours, or every package of an install bundle of yours, needs the customer to give before it works: the questions to ask before a sale. Each question names its package, component and field, whether it is required, whether it is secret, and for an app field its JSON Schema (type, title, description, enum). A field the bundle already fills is not asked; its value is in `defaults`. Put the answers in the install set: `config.<package>.<component>.<field>`, and a secret in the secrets file with the same path, never in the set. A listed package this node does not hold is named in `problems`. For the author or an operator. The same as GET /v1/packages/:groupId/config-needs.',
+        description: 'The settings a package of yours, or every package of an install bundle of yours, needs the customer to give before it works: the questions to ask before a sale. Each question names its package, component and field, whether it is required, whether it is secret, and for an app field its JSON Schema (type, title, description, enum). A field the bundle already fills is not asked; its value is in `defaults`. Put the answers in the install set: `config.<package>.<component>.<field>`, and a secret in the secrets file with the same path, never in the set. A listed package this node does not hold is named in `problems`. For the author or an operator, and for anyone on this node when the package is public, so an installer answers the questions before installing. The same as GET /v1/packages/:groupId/config-needs.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {

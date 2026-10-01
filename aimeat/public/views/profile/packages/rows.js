@@ -12,6 +12,9 @@
  * @structure instanceRow · offerRow · ownRow · loadingRow
  * @usage import { instanceRow, offerRow, ownRow } from './rows.js';
  * @version-history
+ *   v1.21.0 — 2026-10-01 — An opened offer shows the package's "what you get" sheet and the settings
+ *     its install asks (sheet.js), above the install field (guided journey P3). An opened offer row
+ *     shows one Close, not two.
  *   v1.20.0 — 2026-09-30 — The Check button asks the source; an ended update service is said in words.
  *   v1.19.0 — 2026-09-30 — The opened install shows its automatic update, on or off, with the switch.
  *   v1.18.0 — 2026-09-26 — On the component kit (page group G7): the rows, their cells and the opened
@@ -61,6 +64,7 @@ import { Tabs } from '/components/Tabs.js';
 import { TextField } from '/components/TextField.js';
 import { List, Row, Name, Desc, Who, Cell, Doors, Panel } from '/components/List.js';
 import { x, partWord, partTab, partCounts, categoryWord, listingWord, dateWord, versionDate, agentTextFor, openTab } from './frame.js';
+import { sheetBlock, asksBlock } from './sheet.js';
 
 /** The kinds of part a package carries, as tags under its description ("app", "extension ×2"). */
 const partTags = (list) => partCounts(list).map(([type, n]) => `${partWord(type)}${n > 1 ? ` ×${n}` : ''}`);
@@ -175,7 +179,8 @@ export function offerRow(ctx, o) {
         ${installed ? (installed === 1 ? x('installedOnce') : x('installedN', { n: installed })) : x('installYours')}
       <//>
       <${Doors}>
-        ${o.group ? html`<${Action} small row expanded=${open} onClick=${toggle}>${open ? x('close') : x('install')}<//>` : null}
+        ${/* Opened, the row has one Close: both doors turned into the same word side by side. */''}
+        ${o.group && !open ? html`<${Action} small row onClick=${toggle}>${x('install')}<//>` : null}
         <${Action} small row soft expanded=${open} onClick=${toggle}>${open ? x('close') : x('open')}<//>
       <//>
       ${open ? offerOpen(ctx, o, key) : null}
@@ -220,12 +225,14 @@ function offerOpen(ctx, o, key) {
     <${Action} small soft onClick=${close}>${x('close')}<//>`;
   return html`
     <${Panel} doors=${doors}>
-      <${Note} kind="lead">${o.description}<//>
+      ${ctx.sheets?.[o.group] ? null : html`<${Note} kind="lead">${o.description}<//>`}
+      ${sheetBlock(ctx, o)}
       ${o.components.length ? partList(o.components) : null}
       ${expectsOf(o)}
       <${Facts} rows=${[
         { k: x('makerK'), v: o.remote ? x('makerRemote', { node: o.sourceNode }) : o.system ? x('makerSystem') : x('makerAuthor', { author: o.author }), sub: [o.version ? x('versionOf', { date: versionDate(o.version) }) : '', categoryWord(o.category) ? x('categoryOf', { c: categoryWord(o.category) }) : '', o.tags.length ? x('tagsOf', { tags: o.tags.join(', ') }) : ''].filter(Boolean).join(' · ') },
         l && (l.installCount || l.reviewCount) && { k: x('galleryK'), v: [l.installCount ? x('installsN', { n: l.installCount }) : '', l.reviewCount ? x('reviewsN', { n: l.reviewCount, rating: Number(l.rating || 0).toFixed(1) }) : ''].filter(Boolean).join(' · ') },
+        o.group && asksBlock(ctx, o, key),
         o.group && { k: x('installK'), v: installField(ctx, key, inst.label, () => ctx.install(o, inst.label)), sub: x('installSub') },
       ]} />
     <//>`;

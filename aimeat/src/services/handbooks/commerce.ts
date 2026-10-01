@@ -7,6 +7,7 @@
  *   checkout, and the memory/storage a listing lives in. Self-contained; the tool list mirrors
  *   MCP_SURFACES.commerce.
  * @version-history
+ *   v2.1.0 — 2026-10-01 — The payment-provider secret is entered by the owner on the Wallet page; aimeat_commerce_psp_set refuses (decision D5).
  *   v2.0.0 — 2026-07-28 — Renamed from the `enterprise` surface handbook when the edition seam was
  *     removed: no company objects, no KYB gate, every seller carries their own credentials.
  *   v1.0.0 — 2026-07-14 — Initial surface handbook
@@ -20,9 +21,10 @@ never floats. Morsels are plain integers and never mix with money.
 
 ## Your tools
 
-**Sell (scope commerce:sell).** \`aimeat_commerce_psp_set\` / \`_status\` / \`_delete\` — your
-owner's OWN payment credentials; the secret is stored server-side and NEVER returned (status shows
-a masked hint). \`aimeat_app_tools_publish\` / \`aimeat_app_tools_get\` — declare priced,
+**Sell (scope commerce:sell).** \`aimeat_commerce_psp_status\` / \`_delete\` — your owner's OWN
+payment credentials; the secret is stored server-side and NEVER returned (status shows a masked
+hint). The owner enters the secret themselves on the Wallet page (/v1/profile?tab=wallet), never
+through a chat: \`aimeat_commerce_psp_set\` refuses and gives that link. \`aimeat_app_tools_publish\` / \`aimeat_app_tools_get\` — declare priced,
 agent-callable tools on the owner's published apps (per-call morsel and/or money prices; action_id
 = instant capability call, agent = order becomes that agent's task). \`aimeat_offer_price_set\` —
 price an offer on one of the owner's agents (morsels and/or priceMoney micro-units + visibility).

@@ -5,6 +5,9 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v2.23.0 -- 2026-10-01 -- The opened card says where the agent runs, what it thinks with, who pays,
+ *     what it did this week, and has the "Starts work by itself" switch (agent-card-autonomy.js,
+ *     guided journey P4).
  *   v2.22.0 -- 2026-09-30 -- What your AIMEAT refused the agent for a missing permission, and what it asked
  *     for beside what it got (agent-card-access.js): the note on the open card, the line under how it
  *     runs, and a danger mark with the attention name on the closed row.
@@ -140,6 +143,7 @@ import { agentState, getDefaultTab } from './state-detector.js';
 import { GaiiChip } from './gaii-chip.js';
 import { deliveryLabel, renderPlatformBadge, renderModelBadge, renderReadinessBadge, stepTone } from './agent-card-badges.js';
 import { RunModeSwitch } from './agent-card-run-mode.js';
+import { FactsLine, AutonomyLine } from './agent-card-autonomy.js';
 import { RefusalNote, AccessLine, hasRefusals } from './agent-card-access.js';
 import { templateLabel } from './scope-config.js';
 import { detectTemplate } from './scope-model.js';
@@ -418,6 +422,9 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
           ${runsOpen ? t('profile.agents.page.close') : (agent.run_mode ? t('profile.agents.page.runsChange') : t('profile.agents.page.runsDecide'))} →
         <//>
       <//>
+      ${/* Where it runs, what it thinks with, who pays, and whether it starts work by itself. */''}
+      <${FactsLine} agent=${agent} />
+      <${AutonomyLine} agent=${agent} showToast=${showToast} />
       <${AccessLine} agent=${agent} />
 
       ${/* What your AIMEAT refused this agent for a missing permission, with the way to grant it. */''}

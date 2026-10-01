@@ -7,6 +7,8 @@
  *   end-to-end over the MCP surface (task-path fulfillment + fee arithmetic on the wallets).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-commerce
  * @version-history
+ *   v1.3.0 — 2026-10-01 — psp_set is screen-only (decision D5): test 3 asserts its refusal, and the
+ *     tests that need card credentials set them through the owner's Wallet route.
  *   v1.2.0 — 2026-09-16 — Test 4b: psp_set takes webhook_secret, and both secrets are stored encrypted.
  *   v1.1.0 — 2026-08-11 — Test 5b: psp_delete clears the card credentials and leaves the seller's
  *     x402 payout address in the same record standing, which is what the REST delete has always done.
@@ -195,12 +197,21 @@ console.log('\nPhase 2 — PSP credentials');
 
 const SECRET = 'sk_test_mcp_secret_9x8y7z_TAIL';
 
-await test('3. psp_set stores + returns only a masked hint', async () => {
+/** The owner sets the card credentials on the Wallet page; this is the route that page calls. */
+const setPsp = (body: Record<string, string>) => json('/v1/commerce/payout/stripe', {
+    method: 'PUT', headers: auth(buyerOwner.token), body: JSON.stringify(body),
+});
+
+await test('3. FAILURE: psp_set is screen-only: it refuses an agent, stores nothing, and gives the Wallet link', async () => {
+    // Since 2026-10-01 (decision D5): a key that moves money is entered by the owner on the screen,
+    // as PUT /v1/commerce/payout/stripe already required. This tool stored it for an agent before.
     const r = await mcp.call('aimeat_commerce_psp_set', { provider: 'stripe', secret_key: SECRET });
-    assert(!r.isError, `psp_set: ${r.text}`);
-    assert(r.data.configured === true && r.data.provider === 'stripe', `ack: ${r.text}`);
-    assert(r.data.key_hint === '…TAIL', `masked hint: ${r.data.key_hint}`);
+    assert(r.isError && /^SCREEN_ONLY/.test(r.text) && /tab=wallet/.test(r.text), `refusal: ${r.text}`);
     assert(!r.text.includes(SECRET), 'the secret must never appear in the response');
+    const st = await mcp.call('aimeat_commerce_psp_status', {});
+    assert(st.data.configured === false, `nothing was stored: ${st.text}`);
+    const set = await setPsp({ provider: 'stripe', secret_key: SECRET });
+    assert(set.status === 200, `owner sets it on the Wallet route: ${set.status} ${JSON.stringify(set.body.error)}`);
 });
 
 await test('4. psp_status is masked; the raw record is private to the owner', async () => {
@@ -212,13 +223,12 @@ await test('4. psp_status is masked; the raw record is private to the owner', as
     assert(pub.status !== 200 || !(JSON.stringify(pub.body).includes(SECRET)), 'commerce.psp must not be publicly readable');
 });
 
-await test('4b. psp_set takes the webhook signing secret too, and stores both encrypted', async () => {
-    // PUT /v1/commerce/payout/stripe took webhook_secret and this tool did not, so an agent setting
-    // up a seller's webhook had the field dropped in silence (check:field-reach).
+await test('4b. The webhook signing secret is stored encrypted beside the key, and psp_status never shows it', async () => {
     const HOOK = 'whsec_mcp_hook_secret_5c3e';
-    const r = await mcp.call('aimeat_commerce_psp_set', { provider: 'stripe', secret_key: SECRET, webhook_secret: HOOK });
-    assert(!r.isError && r.data.webhook_configured === true, `psp_set with webhook: ${r.text}`);
-    assert(!r.text.includes(HOOK), 'the webhook secret must never appear in the response');
+    const r = await setPsp({ provider: 'stripe', secret_key: SECRET, webhook_secret: HOOK });
+    assert(r.status === 200, `owner sets both: ${r.status} ${JSON.stringify(r.body.error)}`);
+    const st = await mcp.call('aimeat_commerce_psp_status', {});
+    assert(!st.text.includes(HOOK) && !st.text.includes(SECRET), 'status must not leak either secret');
     const raw = await json('/v1/memory/commerce.psp', { headers: auth(buyerOwner.token) });
     const text = JSON.stringify(raw.body);
     assert(raw.status === 200 && !text.includes(HOOK) && !text.includes(SECRET), `stored in the clear: ${text.slice(0, 200)}`);
@@ -245,8 +255,8 @@ await test('5b. psp_delete leaves the stablecoin payout address standing', async
     });
     assert(put.status === 200, `x402 address ${put.status}: ${JSON.stringify(put.body.error)}`);
 
-    const set = await mcp.call('aimeat_commerce_psp_set', { provider: 'stripe', secret_key: SECRET });
-    assert(!set.isError, `psp_set: ${set.text}`);
+    const set = await setPsp({ provider: 'stripe', secret_key: SECRET });
+    assert(set.status === 200, `owner sets the key: ${set.status}`);
     const del = await mcp.call('aimeat_commerce_psp_delete', {});
     assert(!del.isError && del.data.deleted === true, `delete: ${del.text}`);
 

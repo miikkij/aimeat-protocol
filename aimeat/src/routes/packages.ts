@@ -21,6 +21,7 @@
  *   import { packagesRouter } from '../routes/packages.js';
  *   app.use(packagesRouter(config, storage));
  * @version-history
+ *   2026-10-01 — GET /v1/packages/:groupId carries `sheet`, the "what you get" sheet (guided journey P3).
  *   v1.0.0 — 2026-03-15 — initial implementation (Phase 2)
  *   v1.1.0 — 2026-03-15 — rename routes from /v1/packages to /v1/bundles to avoid collision with knowledge system
  *   v1.5.0 — 2026-03-18 — rename routes back from /v1/bundles to /v1/packages (knowledge moved to /v1/knowledge)
@@ -64,6 +65,7 @@ import {
   listPackagesFor, getPackageFor, getPackageVersionFor, listPackageVersionsFor,
 } from '../services/package-read.js';
 import { composePackageFromApps } from '../services/package-compose.js';
+import { packageSheet } from '../services/package-sheet.js';
 import { importParsedPackage, upstreamFromZip } from '../services/package-import.js';
 import type { PeerInfo } from '../services/federation.js';
 import { attestationFor } from '../services/package-attest-serve.js';
@@ -118,12 +120,13 @@ export function packagesRouter(
     const {
       name, apps, description, category, tags, visibility, status,
       include_cortex: includeCortex, include_skills: includeSkills, allow_expectations: allowExpectations,
+      outcome, prompts,
     } = req.body ?? {};
 
     const ownerGhii = await resolveGhii(storage, owner, config);
     const out = await composePackageFromApps({ storage, config }, { owner, ownerGhii }, {
       name, apps, description, category, tags, visibility, status,
-      includeCortex, includeSkills, allowExpectations,
+      includeCortex, includeSkills, allowExpectations, outcome, prompts,
     });
     if (!out.ok) {
       res.status(out.status).json(error(config.nodeId, out.code, out.message));
@@ -503,7 +506,9 @@ export function packagesRouter(
       return;
     }
 
-    res.json(success(config.nodeId, pkg, [
+    // The "what you get" sheet travels with the record, so the page and an AI read the same thing
+    // before installing (services/package-sheet.ts).
+    res.json(success(config.nodeId, { ...pkg, sheet: packageSheet(pkg, config) }, [
       { description: 'List all versions', method: 'GET', url: `/v1/packages/${encodeURIComponent(groupId)}/versions` },
       { description: 'Export as ZIP', method: 'GET', url: `/v1/packages/${encodeURIComponent(groupId)}/export` },
     ]));
