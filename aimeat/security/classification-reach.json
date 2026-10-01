@@ -824,9 +824,17 @@
     },
     "src/services/app-audit.ts": {
       "reads": {
-        "getMemory": 2
+        "getMemory": 4,
+        "listMemory": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The app audit-trail record."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The app audit-trail record. 2026-10-01: the archive-before and keep paths read the same record, and the owner-wide limit lists the owner's own audit.apps.* records to apply it; all of them are the node's system records under the reserved audit. prefix, never content."
+    },
+    "src/services/app-audit-archive.ts": {
+      "reads": {
+        "getMemory": 2,
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-10-01, the node's own read: the owner's audit.settings record and the yearly archive records of an app's audit trail (audit.apps.<file>.archive.<year>), the node's system records under the reserved audit. prefix, never content."
     },
     "src/services/app-config.ts": {
       "reads": {
