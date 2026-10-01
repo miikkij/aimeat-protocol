@@ -21,6 +21,8 @@
  *   const checked = checkAppManageInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
+ *   2026-10-01 — `email` says the invitation lives 7 days and carries a sign-up link, and that the
+ *     answer gives acceptUrl when no email left.
  *   2026-10-01 — IAM round 2 on the member actions: member_set takes `email` and `locale` (a verified account's
  *     address approves it, any other address is invited by email), members takes `q`, `limit` and
  *     `offset`, member_plan_set takes `manage_roles`, and member_audit and member_invite_cancel are
@@ -112,7 +114,7 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     access: { type: 'string', enum: ['members-free', 'free', 'members-only'], description: 'For member_plan_set: who pays for the app\'s paid calls. members-free (default): members pay nothing, everybody else pays. free: nobody pays. members-only: only members get in at all.' },
     roster_visibility: { type: 'string', enum: ['owner', 'members'], description: 'For member_plan_set: who reads the roster. owner (default) or members, who then see names, roles and join dates only.' },
     manage_roles: { type: 'array', description: 'For member_plan_set: the roles whose holders manage the roster beside the owner: they approve, decline, change and remove roles that do not manage, invite by email and read the history. They never change the plan, run the sweep, or give or take away a managing role. Empty: the owner alone.' },
-    email: { type: 'string', description: 'For member_set, instead of account: an email address. When it belongs to a verified account on this server, that person is approved; any other address gets an invitation by email, which makes them a member when they sign up with it. Open invitations are listed by members and cancelled with member_invite_cancel.' },
+    email: { type: 'string', description: 'For member_set, instead of account: an email address. When it belongs to a verified account on this server, that person is approved; any other address gets an invitation by email, valid 7 days, with a sign-up link: opening it makes the account with that address and a member at once. When no email could leave, the answer carries acceptUrl, the link to pass on yourself. Open invitations are listed by members and cancelled with member_invite_cancel, which also stops the link.' },
     locale: { type: 'string', enum: ['en', 'fi', 'es'], description: 'For member_set with email: the language of the invitation email. Omit it to use your own language.' },
     q: { type: 'string', description: 'For members: show only people whose account name, display name, email or note contains this text.' },
     offset: { type: 'number', description: 'For members: how many people to skip on each list, for the next page. Default 0.' },

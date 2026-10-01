@@ -10,7 +10,10 @@
  *     - an ORGANISM invitation (organismId set) also joins the organism and applies the workspace
  *       grants the inviter chose;
  *     - a NODE invitation (organismId null — the agent door, 12-ai-rekisteroi.md) stops at the
- *       account and sends the person to their home.
+ *       account and sends the person to their home;
+ *     - an APP invitation (type 'app', services/app-invite-link.ts) makes the person a member of
+ *       the app in the invited role and sends them back to the app. It answers only while the app
+ *       invitation it was sent for is open, checked before any account is made.
  *
  *   Everything up to the account is identical between them: the token, the expiry, the single-use
  *   check, the recipient binding, and provisionOwner with the invited address already verified —
@@ -21,6 +24,9 @@
  * @structure inviteAcceptRouter(config, storage, deps): the two public routes
  * @usage app.use(inviteAcceptRouter(config, storage, { findWsEntry }));
  * @version-history
+ *   v1.3.0 — 2026-10-01 — The APP invitation joins the shared flow: GET answers kind 'app' with the
+ *     app and the role, POST makes the member (or says no place is free and keeps the link usable)
+ *     and returns the person to the app.
  *   v1.2.0 — 2026-09-04 — The SIGNED-IN branch is the person's own, asked through isOwnerPrincipal()
  *     rather than through a middleware, because the anonymous branch must stay open. `req.auth.owner`
  *     is the account name, so an agent, an ecosystem token or an app grant approved for one unrelated
@@ -48,6 +54,9 @@ import { validatePasswordStrength } from '../utils/password-validation.js';
 import { provisionOwner, ProvisionEmailTakenError, registrationRefusal } from '../services/owner-provisioning.js';
 import { establishOwnerSession } from '../services/owner-session.js';
 import { hashInviteToken, applyInvitationWorkspaceGrants, resolveInvitationReturnTarget } from '../services/invitations.js';
+import { appInviteMeta, type AppInviteMeta } from '../services/app-invite-link.js';
+import { findInvite, applyAppInvitesForVerifiedEmail } from '../services/app-member-invites.js';
+import type { InvitationRecord } from '../storage/repositories/invitation.repository.js';
 import { logger } from '../utils/logger.js';
 
 /** The one organism helper this flow needs: resolve a workspace's registry entry for display. */
@@ -55,9 +64,26 @@ export interface InviteAcceptDeps {
   findWsEntry(orgId: string, ws: string): Promise<{ id: string; name?: string; createdBy?: string; ownerGaii: string } | null>;
 }
 
+/** The invitation types a token redeems. A 'code' invite provisions its account at mint and is never one. */
+const TOKEN_TYPES = new Set<InvitationRecord['type']>(['link', 'registration', 'app']);
+
 export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps: InviteAcceptDeps): Router {
   const router = Router();
   const { findWsEntry } = deps;
+
+  /**
+   * The app invitation an 'app' link was sent for, while it is open; null otherwise, and then the
+   * link is cancelled, because the invitation behind it was cancelled, used or has lapsed.
+   */
+  async function openAppInvitation(inv: InvitationRecord): Promise<{ meta: AppInviteMeta; role: string } | null> {
+    const meta = appInviteMeta(inv);
+    const live = meta ? await findInvite(storage, meta.appId, meta.appInviteId) : null;
+    if (meta && live && live.emailHash === inv.emailHash && Date.parse(live.expiresAt) > Date.now()) {
+      return { meta, role: live.role };
+    }
+    if (inv.status === 'pending') await storage.updateInvitation(inv.id, { status: 'cancelled' });
+    return null;
+  }
 
   /* GET /v1/invitations/:token — PUBLIC: invite details for the accept page (token carried in the URL).
    * optionalAuth so a signed-in visitor gets a `viewer` verdict (does MY verified email match the
@@ -65,13 +91,16 @@ export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps:
   router.get('/v1/invitations/:token', optionalAuth(), rateLimit({ max: 30, windowMs: 60_000 }), async (req, res) => {
     const token = req.params.token as string;
     const inv = await storage.getInvitationByHash(hashInviteToken(token));
-    if (!inv || inv.status === 'cancelled' || (inv.type !== 'link' && inv.type !== 'registration')) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Invitation not found')); return; }
+    if (!inv || inv.status === 'cancelled' || !TOKEN_TYPES.has(inv.type)) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Invitation not found')); return; }
     if (inv.status === 'accepted') { res.status(410).json(error(config.nodeId, 'INVITE_USED', 'This invitation has already been accepted')); return; }
     if (inv.status === 'expired' || new Date(inv.expiresAt) <= new Date()) {
       if (inv.status === 'pending') await storage.updateInvitation(inv.id, { status: 'expired' });
       res.status(410).json(error(config.nodeId, 'INVITE_EXPIRED', 'This invitation has expired'));
       return;
     }
+    // An APP invitation's link answers only while the app invitation it was sent for is open.
+    const appInvite = inv.type === 'app' ? await openAppInvitation(inv) : null;
+    if (inv.type === 'app' && !appInvite) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Invitation not found')); return; }
     // A NODE-level invitation (the agent door) has no organism and no workspaces. Everything else
     // on this page — the address it was sent to, whether that address already has an account, the
     // expiry — is identical, which is why the two share this endpoint instead of forking it.
@@ -96,7 +125,9 @@ export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps:
     }
     res.json(success(config.nodeId, {
       invitation: {
-        kind: inv.organismId ? 'organism' : 'node',
+        kind: appInvite ? 'app' : inv.organismId ? 'organism' : 'node',
+        // An app invitation: which app, as what. The page names it and returns the person there.
+        app: appInvite ? { id: appInvite.meta.appId, name: appInvite.meta.app, role: appInvite.role } : null,
         email: inv.email,
         org_role: inv.orgRole,
         workspaces: wsDisplay,
@@ -110,7 +141,7 @@ export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps:
         // What caused this email, for a NODE invitation: what the AI said about itself, and what
         // the server saw. Shown to the recipient so an unrequested email is judgeable rather than
         // mysterious. Never used to decide anything.
-        requested_by: inv.organismId ? null : (inv.meta ?? null),
+        requested_by: inv.organismId || appInvite ? null : (inv.meta ?? null),
       },
       viewer,
     }));
@@ -124,13 +155,17 @@ export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps:
     // Only magic-link invites are redeemable via a token. A 'code' invite provisions its account at
     // mint time and its uuid tokenHash is never surfaced anywhere — defence in depth: refuse to run the
     // grant-applying accept path against a code invite even if its token were somehow presented.
-    if (inv.type !== 'link' && inv.type !== 'registration') { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Invitation not found')); return; }
+    if (!TOKEN_TYPES.has(inv.type)) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Invitation not found')); return; }
     if (inv.status === 'accepted') { res.status(410).json(error(config.nodeId, 'INVITE_USED', 'This invitation has already been accepted')); return; }
     if (inv.status === 'expired' || new Date(inv.expiresAt) <= new Date()) {
       if (inv.status === 'pending') await storage.updateInvitation(inv.id, { status: 'expired' });
       res.status(410).json(error(config.nodeId, 'INVITE_EXPIRED', 'This invitation has expired'));
       return;
     }
+    // REFUSE BEFORE ANY ACCOUNT IS MADE: an app invitation that was cancelled, used up or expired
+    // must not leave a fresh account behind.
+    const appInvite = inv.type === 'app' ? await openAppInvitation(inv) : null;
+    if (inv.type === 'app' && !appInvite) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Invitation not found')); return; }
     // A NODE-level invitation (the agent door) has no organism. Everything up to here — the token,
     // the expiry, the single-use check, the recipient binding and the account creation below — is
     // shared verbatim; only the joining is skipped. That sharing is the point: there is ONE place
@@ -218,6 +253,34 @@ export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps:
     }
 
     const nowIso = new Date().toISOString();
+
+    // ── APP invitation: the membership comes from the app invitation itself. A new account was made
+    //    with the address confirmed, and provisionOwner applied the address's app invitations; a
+    //    signed-in account whose confirmed address matched is applied here. When the approval could
+    //    not run (every seat taken), the link stays usable and the person is told. ──
+    if (appInvite) {
+      const ghii = `${ownerName}@${config.nodeId}`;
+      if (!createdAccount) await applyAppInvitesForVerifiedEmail(storage, config.nodeId, inv.emailHash, ghii);
+      const still = await openAppInvitation(inv);
+      const joined = !still;
+      if (joined) await storage.updateInvitation(inv.id, { status: 'accepted', acceptedAt: nowIso, acceptedBy: ownerName });
+      const appOwner = await storage.getOwner(ownerName);
+      const appSession = await establishOwnerSession(storage, config, req, res, { owner: ownerName, roles: appOwner?.roles ?? ['owner'] });
+      const back = inv.returnUrl ? resolveInvitationReturnTarget(inv.returnUrl, config) : null;
+      res.set('Cache-Control', 'no-store');
+      res.json(success(config.nodeId, {
+        status: joined ? 'joined_app' : 'app_waiting',
+        organism_id: null,
+        app_id: appInvite.meta.appId,
+        created_account: createdAccount,
+        workspaces: [],
+        token: appSession.token,
+        expires_in: appSession.expiresIn,
+        ...(joined ? {} : { reason: 'The app has no free place for a member right now. The invitation stays open; open the link again later.' }),
+        redirect: back ?? '/v1/home',
+      }));
+      return;
+    }
 
     // ── NODE-level invitation: the account IS the whole outcome. ──
     if (!organismId || !organism) {

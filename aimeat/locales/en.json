@@ -13149,6 +13149,7 @@
   "invite.acceptCta": "Accept & join",
   "invite.acceptFailed": "Could not accept the invitation.",
   "invite.acceptTitle": "You're invited",
+  "invite.appWaiting": "Your account is ready, but the app has no free place for a member right now. The invitation stays open: press Accept & join again later.",
   "invite.asRole": "as",
   "invite.badge": "Invitation",
   "invite.continueWith": "Continue with {label}",

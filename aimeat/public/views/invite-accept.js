@@ -35,6 +35,8 @@
  *   v1.3.1 — 2026-09-28 — No escHtml() on text: preact escapes every text child and attribute itself,
  *     so the page showed `&quot;` and `&amp;` in the organism's name, description, workspace names and
  *     the invitation message (reported from a live invitation on originalmiskate.com).
+ *   v1.4.0 — 2026-10-01 — An APP invitation (kind 'app'): the box names the app and the role, and
+ *     "no free place" (status app_waiting) is shown on the page instead of leaving it.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -110,6 +112,13 @@ export default function InviteAccept() {
       const res = await api('/v1/invitations/' + encodeURIComponent(token) + '/accept', {
         method: 'POST', body: JSON.stringify(body || {}),
       });
+      // An app with no free place: the account exists and is signed in, the invitation stays open.
+      // Say so here, where Accept can be pressed again later, instead of leaving for the app.
+      if (res && res.data && res.data.status === 'app_waiting') {
+        setFormError(tr('invite.appWaiting', res.data.reason || 'The app has no free place for a member right now. Open the invitation again later.'));
+        setSubmitting(false);
+        return;
+      }
       // Fallback mirrors the server default: land INSIDE the organism, flagged as a fresh join.
       const orgId = res && res.data && res.data.organism_id;
       window.location.href = (res && res.data && res.data.redirect)
@@ -153,13 +162,14 @@ export default function InviteAccept() {
   const inv = state.inv;
   const viewer = state.viewer;
   const org = inv.organism || {};
+  const app = inv.kind === 'app' && inv.app ? inv.app : null;
   const workspaces = inv.workspaces || [];
   const tag = html`<${Mark} tone="coral">${tr('invite.badge', 'Invitation')}<//>`;
-  // What the invitation is to, by whom and as what, in the dim box: the organism by name.
+  // What the invitation is to, by whom and as what, in the dim box: the organism, or the app, by name.
   const summary = html`
-    <${Box} tone="dim" name=${org.name || ''}>
-      ${org.description ? html`<${Note}>${org.description}<//>` : null}
-      <${Note} kind="lead">${tr('invite.invitedBy', 'Invited by')} <strong>${inv.invited_by || ''}</strong> ${tr('invite.asRole', 'as')} <strong>${inv.org_role || 'member'}</strong>.<//>
+    <${Box} tone="dim" name=${app ? app.name : (org.name || '')}>
+      ${!app && org.description ? html`<${Note}>${org.description}<//>` : null}
+      <${Note} kind="lead">${tr('invite.invitedBy', 'Invited by')} <strong>${inv.invited_by || ''}</strong> ${tr('invite.asRole', 'as')} <strong>${app ? app.role : (inv.org_role || 'member')}</strong>.<//>
       ${workspaces.length ? html`
         <${Label} block>${tr('invite.workspacesLabel', "You'll get access to:")}<//>
         <${Stack} list gap="tight">

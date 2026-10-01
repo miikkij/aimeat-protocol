@@ -26,6 +26,8 @@
  *   (across all of them). The audit read and the invitation cancel are in routes/app-members-extra.ts.
  * @usage app.use(appMembersRouter(config, storage))
  * @version-history
+ *   v1.4.0 — 2026-10-01 — An invitation by email carries a sign-up link (services/app-invite-link.ts)
+ *     and lives 7 days; the answer gives the inviter `acceptUrl` only when no email left.
  *   v1.3.2 — 2026-10-01 — The owner's roster names each person's address from the owner's own address book.
  *   v1.3.1 — 2026-10-01 — The invitation's audit row names the address, so the history can say whom.
  *   v1.3.0 — 2026-10-01 — IAM round 2. The roster answers display names (A1) and is searched and
@@ -90,7 +92,7 @@ import { approveMember, memberAddress, appDeepLink, appStem } from '../services/
 import { ROLE_RE, RESERVED_ROLES, roleShapeError, isManagerRole, reaskRetryAt, suggestRole, parseRosterPaging } from '../services/app-member-rules.js';
 import { rosterView, memberRosterView, displayNamesOf, sampleRoles } from '../services/app-member-roster.js';
 import { sendMemberNotice, memberActionLabel, noticeLang } from '../services/app-member-notices.js';
-import { listInvites, sendAppInvite, inviteView, MAX_OPEN_INVITES_PER_APP } from '../services/app-member-invites.js';
+import { listInvites, sendAppInvite, inviteView, MAX_OPEN_INVITES_PER_APP, INVITE_DAYS } from '../services/app-member-invites.js';
 import { resolveContactEmail, ContactsError } from '../services/contacts.js';
 import { inviteEmailLocale, inviteEmailHash, InvitationError } from '../services/invitations.js';
 import { displayPrefsFor } from '../services/display-prefs.js';
@@ -308,10 +310,10 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
     const hash = inviteEmailHash(args.email);
     if (open.length >= MAX_OPEN_INVITES_PER_APP && !open.some(i => i.emailHash === hash)) {
       return res.status(429).json(error(config.nodeId, 'TOO_MANY_INVITES',
-        `This app has ${open.length} open invitations, the most one app may hold. Cancel some, or wait for them to expire after 30 days.`));
+        `This app has ${open.length} open invitations, the most one app may hold. Cancel some, or wait for them to expire after ${INVITE_DAYS} days.`));
     }
     const urls = await resolveAppUrls(config, storage, [{ owner: c.owner, filename: c.filename }]);
-    const { invite: inv, emailSent } = await sendAppInvite(storage, {
+    const { invite: inv, emailSent, acceptUrl } = await sendAppInvite(storage, config, {
       appId: c.appId, filename: c.filename, email: args.email, role: args.role, note: args.note, invitedBy: c.callerGaii,
       inviterName: (await displayNamesOf(storage, [c.callerAccount])).get(c.callerAccount) || c.callerAccount,
       appUrl: Object.values(urls)[0] ?? `${config.baseUrl}${appLink(c.appId)}`, lang: noticeLang(args.lang),
@@ -319,7 +321,11 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
     // The address, as the owner's and the managers' invitation list shows it: the history is read
     // by the same people, and an invitation has no account to name.
     await audit(c, 'invite.sent', { account: null, to: args.role, invite: inv.id, email: inv.emailShown, emailSent });
-    return res.status(201).json(success(config.nodeId, { invited: true, invite: inviteView(inv), emailSent }));
+    // The sign-up link goes back to the inviter only when no email left, so they can pass it on.
+    // When the email left, the link exists only in the invited person's mailbox.
+    return res.status(201).json(success(config.nodeId, {
+      invited: true, invite: inviteView(inv), emailSent, ...(emailSent ? {} : { acceptUrl }),
+    }));
   }
 
   // ── POST .../members — approve someone, or change their role. Owner and managers. ──
