@@ -1,6 +1,8 @@
 # The Semgrep version the semgrep-taint job runs. requirements-semgrep.txt is this file with a hash
 # for every package (and every package it needs), on every platform:
-#   uv pip compile requirements-semgrep.in -o requirements-semgrep.txt --generate-hashes --universal --python-version 3.12
-# The workflow installs it with --require-hashes. To move the version, change it here, run the line
-# above from this folder, and commit both files.
+#   uv pip compile requirements-semgrep.in -o requirements-semgrep.txt --generate-hashes --universal --python-version 3.12 --override requirements-semgrep-overrides.txt
+# The workflow installs it with --require-hashes --no-deps: the file already names every package,
+# and --no-deps keeps pip from refusing an override (requirements-semgrep-overrides.txt says which
+# and why). To move the version, change it here, run the line above from this folder, and commit
+# the files.
 semgrep==1.178.0
