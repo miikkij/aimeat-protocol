@@ -4,7 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
- *   v1.11.0 — 2026-09-29 — TARGET-082 review: export and bundle pass leave() with the destination
+ *   v1.11.1 — 2026-10-02 — export takes the caller's identity from resolve(req), as bulk, import and
+ *     bulk-delete do, instead of the raw `sub` (Semgrep owner-data-must-resolve-identity, alert 1683).
+ *   v1.11.0 — 2026-09-29 —TARGET-082 review: export and bundle pass leave() with the destination
  *     `export` after show(), so an organism's record held under the person's name stays behind; the
  *     export answers `left_out` and the bundle's manifest says `classified` per item. copy reads the
  *     source through presentMemory (hidden answers 404 like a read) and carries the source's label
@@ -189,7 +191,8 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
   // sessions export their own keyspace. Optional ?prefix= scopes the export to one namespace.
   router.get('/v1/memory/export', requireAuth(), requireLocalSession(), requireExternalPrincipal(), requireScope('memory:read'), async (req, res) => {
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
-    let gaii = req.auth!.sub;
+    // Resolved like bulk, import and bulk-delete: an owner session's sub is the bare account name.
+    let gaii = resolve(req);
     const agentParam = req.query.agent as string | undefined;
     if (agentParam && agentParam !== gaii) {
       // The same rule as bulk, import and bulk-delete: naming a target agent is an owner-session

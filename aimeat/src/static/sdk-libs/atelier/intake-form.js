@@ -47,7 +47,10 @@
  *   AIMEAT.atelier.intakeForm({ target: '#contact', org, ws, formId: 'contact-us' });
  *   AIMEAT.atelier.intakeAdmin({ target: '#forms', org, ws, namespace: 'leads' });
  * @version-history
- *   v0.62.1 — 2026-10-01 — Copy link goes through the kit's copy() (the platform's clipboard code,
+ *   v0.62.2 — 2026-10-02 — The link shown for Ctrl+C is set as the span's text rather than passed as
+ *     a child, so the address taken from the page's URL reaches the page only through textContent
+ *     (CodeQL js/xss, alert 1694).
+ *   v0.62.1 — 2026-10-01 —Copy link goes through the kit's copy() (the platform's clipboard code,
  *     with its fallback). When the browser refuses, the notice shows the link selected for Ctrl+C.
  *   v0.62.0 — 2026-10-01 — `app` without org and ws follows the app's chosen workspace; the copied
  *     link carries org and ws, and intakeForm reads them.
@@ -525,8 +528,10 @@ export function intakeAdmin(spec) {
       const whole = ti('intake.copyByHand', { url: url });
       const at = whole.lastIndexOf(url);
       clear(noticeEl);
-      const link = el('span', {}, url);
-      if (at < 0) noticeEl.appendChild(el('span', {}, whole + ' '));
+      // `text` sets textContent. The link is built from the page's own address, so it goes in as
+      // text and never as a child a caller could take for markup (CodeQL js/xss, alert 1694).
+      const link = el('span', { text: url });
+      if (at < 0) noticeEl.appendChild(el('span', { text: whole + ' ' }));
       else if (at > 0) noticeEl.appendChild(document.createTextNode(whole.slice(0, at)));
       noticeEl.appendChild(link);
       if (at >= 0 && at + url.length < whole.length) noticeEl.appendChild(document.createTextNode(whole.slice(at + url.length)));

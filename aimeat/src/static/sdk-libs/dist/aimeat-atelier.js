@@ -16297,8 +16297,8 @@
         const whole = ti("intake.copyByHand", { url });
         const at = whole.lastIndexOf(url);
         clear(noticeEl);
-        const link = el("span", {}, url);
-        if (at < 0) noticeEl.appendChild(el("span", {}, whole + " "));
+        const link = el("span", { text: url });
+        if (at < 0) noticeEl.appendChild(el("span", { text: whole + " " }));
         else if (at > 0) noticeEl.appendChild(document.createTextNode(whole.slice(0, at)));
         noticeEl.appendChild(link);
         if (at >= 0 && at + url.length < whole.length) noticeEl.appendChild(document.createTextNode(whole.slice(at + url.length)));

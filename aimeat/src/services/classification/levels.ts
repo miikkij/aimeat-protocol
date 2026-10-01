@@ -28,7 +28,9 @@
  *   const effective = mergePolicy(node, layer);
  *   const given = loosenings(before, after);         // [] when the change only tightens
  * @version-history
- *   v1.2.0 — 2026-09-29 — TARGET-082 review. loosenings() compares what content effectively gets: a
+ *   v1.2.1 — 2026-10-02 — readRule() leaves the syntax check to unsafeRegexReason(), which already
+ *     refuses an invalid pattern with the engine's message; an invalid pattern was reported twice.
+ *   v1.2.0 — 2026-09-29 —TARGET-082 review. loosenings() compares what content effectively gets: a
  *     rule's and the default's target label field by field (weakerFields), and a change of the
  *     classifier's type, provider, caps or kinds judged on write (finding 3). normaliseLayer() brings
  *     a stored layer up to the current node and lists what it dropped; mergePolicy matches a rule
@@ -181,9 +183,8 @@ function readRule(v: unknown, i: number, problems: string[]): ClassificationRule
   const flags = typeof v.flags === 'string' ? v.flags : '';
   if (!/^[imsu]*$/.test(flags)) problems.push(`${where} (${id}).flags uses only i, m, s and u.`);
   if (kind === 'regex') {
-    // eslint-disable-next-line aimeat/no-silent-catch -- the failure is the answer: it becomes a problem the caller is told
-    try { new RegExp(pattern, flags); } catch { problems.push(`${where} (${id}).pattern is not a valid regular expression.`); }
-    // A pattern that can take exponential time would stop the node on every write (review H6).
+    // One check for both: a pattern that is not valid, with the engine's own words, and a pattern that
+    // can take exponential time and would stop the node on every write (review H6).
     const why = unsafeRegexReason(pattern, flags);
     if (why) problems.push(`${where} (${id}).pattern ${why}`);
   }
