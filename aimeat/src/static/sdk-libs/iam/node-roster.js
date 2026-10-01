@@ -13,6 +13,8 @@
  * @structure nodeMe · nodeState · nodeAssign · nodeRevoke · nodeRequest
  * @usage AIMEAT.iam.init({ app: 'alice/app.html' })
  * @version-history
+ *   v1.2.1 — 2026-10-01 — nodeAudit reads `entries`, the field GET .../members/audit answers with;
+ *     it read `events`, so the history was always empty.
  *   v1.2.0 — 2026-10-01 — Approve by email, invitations, the audit, the owner's address book
  *     (people), and canManage and displayName on the standing.
  *   v1.1.0 — 2026-10-01 — nodeState carries each role's capabilities (the app's own map, or the role
@@ -182,7 +184,7 @@ export async function nodeAudit(call, appId, opts) {
   if (o.before) q.push('before=' + encodeURIComponent(String(o.before)));
   const d = await un(call(base(appId) + '/audit' + (q.length ? '?' + q.join('&') : '')));
   if (d && d.ok === false) return d;
-  return (d && d.events) || [];
+  return (d && d.entries) || [];
 }
 
 /**

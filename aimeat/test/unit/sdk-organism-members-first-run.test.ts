@@ -188,6 +188,9 @@ describe('first run', () => {
     expect(post.body.manifest).toMatchObject({ name: 'CRM', kind: 'cadence-crm', summary: 'Customers and follow-ups.' });
     expect(post.body.manifest.objectTypes[0].schemaRef).toBeTruthy();
     expect(post.body.readme).toBe('# CRM\n\nCustomers and follow-ups.');
+    // A workspace locks strict, which closes an object to every property it does not list, so the
+    // filled schema must name its fields by a pattern: `additionalProperties: true` admitted none.
+    expect(post.body.schemas['crm.contact']).toEqual({ type: 'object', patternProperties: { '^.*$': {} } });
   });
 
   it('with a kind and anyName, finds a renamed workspace by its marker', async () => {

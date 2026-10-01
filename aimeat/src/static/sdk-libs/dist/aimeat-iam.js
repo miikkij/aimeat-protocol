@@ -814,7 +814,7 @@
     if (o.before) q.push("before=" + encodeURIComponent(String(o.before)));
     const d = await un(call(base(appId) + "/audit" + (q.length ? "?" + q.join("&") : "")));
     if (d && d.ok === false) return d;
-    return d && d.events || [];
+    return d && d.entries || [];
   }
   async function nodePeople(call, q) {
     const d = await un(call("/v1/contacts" + (q ? "?q=" + encodeURIComponent(q) : "")));
