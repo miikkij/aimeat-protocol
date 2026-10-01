@@ -798,19 +798,19 @@
     const k = kid.getAttribute(attr);
     return k == null ? kid : k;
   }
-  function fadeIn(kid, pace2, index) {
+  function fadeIn(kid, pace3, index) {
     if (still(kid)) return;
-    if (!pace2.dist && !pace2.step) return;
-    const delay = Math.min((index || 0) * pace2.step, ARRIVE_SPAN_CAP);
+    if (!pace3.dist && !pace3.step) return;
+    const delay = Math.min((index || 0) * pace3.step, ARRIVE_SPAN_CAP);
     kid.animate(
       [
-        { opacity: 0, transform: "translateY(" + pace2.dist + "px)" },
+        { opacity: 0, transform: "translateY(" + pace3.dist + "px)" },
         { opacity: 1, transform: "translateY(0)" }
       ],
-      { duration: pace2.span, delay, easing: pace2.ease, fill: "backwards" }
+      { duration: pace3.span, delay, easing: pace3.ease, fill: "backwards" }
     );
   }
-  function fadeOut(kid, box, pace2) {
+  function fadeOut(kid, box, pace3) {
     const ghost = (
       /** @type {HTMLElement} */
       kid.cloneNode(true)
@@ -835,18 +835,18 @@
         { opacity: 1, transform: "scale(1)" },
         { opacity: 0, transform: "scale(" + EXIT_SCALE + ")" }
       ],
-      { duration: pace2.span, easing: "ease-in" }
+      { duration: pace3.span, easing: "ease-in" }
     );
     anim.onfinish = drop;
     anim.oncancel = drop;
   }
-  function glide(kid, dx, dy, pace2) {
+  function glide(kid, dx, dy, pace3) {
     kid.animate(
       [
         { transform: "translate(" + dx + "px, " + dy + "px)" },
         { transform: "translate(0, 0)" }
       ],
-      { duration: pace2.span * 1.4, easing: pace2.ease }
+      { duration: pace3.span * 1.4, easing: pace3.ease }
     );
   }
   function settle(container, run, opts) {
@@ -861,7 +861,7 @@
     }
     const o = opts || {};
     const attr = o.keyed || "data-ak-id";
-    const pace2 = paceOf(node);
+    const pace3 = paceOf(node);
     const before = /* @__PURE__ */ new Map();
     kidsOf(node, o.rows).forEach(function(kid) {
       before.set(keyOf(kid, attr), { el: kid, box: kid.getBoundingClientRect() });
@@ -874,7 +874,7 @@
       seen.add(key);
       const was = before.get(key);
       if (!was) {
-        if (o.enter !== false) fadeIn(kid, pace2, arrivals++);
+        if (o.enter !== false) fadeIn(kid, pace3, arrivals++);
         return;
       }
       if (o.move === false) return;
@@ -882,13 +882,13 @@
       const dx = was.box.left - now2.left;
       const dy = was.box.top - now2.top;
       if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
-      glide(kid, dx, dy, pace2);
+      glide(kid, dx, dy, pace3);
     });
     if (o.exit === false) return;
     before.forEach(function(was, key) {
       if (seen.has(key)) return;
       if (was.el.parentNode === node) return;
-      fadeOut(was.el, was.box, pace2);
+      fadeOut(was.el, was.box, pace3);
     });
   }
   var KEPT = /* @__PURE__ */ new WeakMap();
@@ -1040,7 +1040,73 @@
       promptCopied: "Copied",
       promptNoJson: "The answer has no JSON object in it. Paste the whole answer.",
       working: "Working…",
-      done: "Done"
+      done: "Done",
+      morsels: "{n} morsels",
+      morsel1: "1 morsel",
+      yesterday: "Yesterday",
+      earlier: "Earlier",
+      wd0: "Sun",
+      wd1: "Mon",
+      wd2: "Tue",
+      wd3: "Wed",
+      wd4: "Thu",
+      wd5: "Fri",
+      wd6: "Sat",
+      priceMonth: "Month",
+      priceYear: "Year",
+      pricePerMonth: "/month",
+      pricePerYear: "/year",
+      priceChoose: "Choose",
+      priceMostChosen: "Most chosen",
+      pricePeriods: "Billing period",
+      sortMove: "Move {label}",
+      sortEmpty: "Nothing to put in order",
+      cartRemove: "Remove",
+      cartCheckout: "Checkout",
+      cartFewer: "One fewer",
+      cartMore: "One more",
+      cartEmpty: "Your cart is empty",
+      cartEmptyHint: "Anything you add shows up here.",
+      noticesMarkAll: "Mark all read",
+      noticesEmpty: "Nothing new",
+      noticesEmptyHint: "Notices land here as they arrive.",
+      facetsClear: "Clear",
+      facetsNone: "No filters",
+      facets1: "1 filter",
+      facetsN: "{n} filters",
+      facetsEmpty: "Nothing to filter by",
+      threadSent: "Sent",
+      threadRead: "Read",
+      threadFailed: "Not sent",
+      threadLabel: "Discussion",
+      threadEmpty: "No messages yet",
+      threadEmptyHint: "Write the first one.",
+      threadPlaceholder: "Write a message…",
+      coOrder: "Your order",
+      coDetails: "Details",
+      coDelivery: "Delivery",
+      coReview: "Review",
+      coSteps: "Order steps",
+      coName: "Full name",
+      coEmail: "Email",
+      coEmailHint: "Where the receipt goes.",
+      coAddress: "Street address",
+      coPostcode: "Postcode",
+      coCity: "City",
+      coCountry: "Country",
+      coContinue: "Continue to delivery",
+      coItems: "Items",
+      coNoShipping: "Delivery is agreed after the order is in.",
+      coShipLater: "Chosen after the order",
+      coNote: "A note with the order",
+      coNotePlaceholder: "Anything we should know?",
+      coPlace: "Place order",
+      coPlaced: "Order placed. The receipt is on its way to your email.",
+      coNeeded: "{field} is needed before the order can go.",
+      coEmailAt: "An email address has an @ in it.",
+      coFailed: "The order did not go through. Try once more.",
+      coEmpty: "Nothing in the order",
+      coEmptyHint: "Add something and it appears here."
     },
     fi: {
       loading: "Ladataan…",
@@ -1136,7 +1202,73 @@
       promptCopied: "Kopioitu",
       promptNoJson: "Vastauksessa ei ole JSON-oliota. Liitä koko vastaus.",
       working: "Käsitellään…",
-      done: "Valmis"
+      done: "Valmis",
+      morsels: "{n} murusta",
+      morsel1: "1 murunen",
+      yesterday: "Eilen",
+      earlier: "Aiemmin",
+      wd0: "Su",
+      wd1: "Ma",
+      wd2: "Ti",
+      wd3: "Ke",
+      wd4: "To",
+      wd5: "Pe",
+      wd6: "La",
+      priceMonth: "Kuukausi",
+      priceYear: "Vuosi",
+      pricePerMonth: "/kk",
+      pricePerYear: "/vuosi",
+      priceChoose: "Valitse",
+      priceMostChosen: "Suosituin",
+      pricePeriods: "Laskutusjakso",
+      sortMove: "Siirrä: {label}",
+      sortEmpty: "Ei mitään järjestettävää",
+      cartRemove: "Poista",
+      cartCheckout: "Kassalle",
+      cartFewer: "Yksi vähemmän",
+      cartMore: "Yksi lisää",
+      cartEmpty: "Ostoskori on tyhjä",
+      cartEmptyHint: "Lisäämäsi tuotteet näkyvät tässä.",
+      noticesMarkAll: "Merkitse kaikki luetuiksi",
+      noticesEmpty: "Ei uusia ilmoituksia",
+      noticesEmptyHint: "Uudet ilmoitukset näkyvät tässä.",
+      facetsClear: "Tyhjennä",
+      facetsNone: "Ei suodattimia",
+      facets1: "1 suodatin",
+      facetsN: "{n} suodatinta",
+      facetsEmpty: "Ei mitään suodatettavaa",
+      threadSent: "Lähetetty",
+      threadRead: "Luettu",
+      threadFailed: "Ei lähetetty",
+      threadLabel: "Keskustelu",
+      threadEmpty: "Ei vielä viestejä",
+      threadEmptyHint: "Kirjoita ensimmäinen viesti.",
+      threadPlaceholder: "Kirjoita viesti…",
+      coOrder: "Tilauksesi",
+      coDetails: "Yhteystiedot",
+      coDelivery: "Toimitus",
+      coReview: "Yhteenveto",
+      coSteps: "Tilauksen vaiheet",
+      coName: "Koko nimi",
+      coEmail: "Sähköposti",
+      coEmailHint: "Lähetämme kuitin tähän osoitteeseen.",
+      coAddress: "Katuosoite",
+      coPostcode: "Postinumero",
+      coCity: "Postitoimipaikka",
+      coCountry: "Maa",
+      coContinue: "Jatka toimitukseen",
+      coItems: "Tuotteet",
+      coNoShipping: "Toimituksesta sovitaan, kun tilaus on tehty.",
+      coShipLater: "Valitaan tilauksen jälkeen",
+      coNote: "Lisätietoja tilaukseen",
+      coNotePlaceholder: "Onko jotain, mitä meidän pitää tietää?",
+      coPlace: "Tilaa",
+      coPlaced: "Tilaus on tehty. Kuitti tulee sähköpostiisi.",
+      coNeeded: "Täytä tämä ennen kuin tilaat.",
+      coEmailAt: "Sähköpostiosoitteessa on @-merkki.",
+      coFailed: "Tilaus ei mennyt läpi. Yritä uudelleen.",
+      coEmpty: "Tilauksessa ei ole tuotteita",
+      coEmptyHint: "Lisää tuote, niin se näkyy tässä."
     },
     es: {
       loading: "Cargando…",
@@ -1232,8 +1364,79 @@
       promptCopied: "Copiado",
       promptNoJson: "La respuesta no contiene ningún objeto JSON. Pega la respuesta entera.",
       working: "Procesando…",
-      done: "Hecho"
+      done: "Hecho",
+      morsels: "{n} morsels",
+      morsel1: "1 morsel",
+      yesterday: "Ayer",
+      earlier: "Antes",
+      wd0: "Dom",
+      wd1: "Lun",
+      wd2: "Mar",
+      wd3: "Mié",
+      wd4: "Jue",
+      wd5: "Vie",
+      wd6: "Sáb",
+      priceMonth: "Mensual",
+      priceYear: "Anual",
+      pricePerMonth: "/mes",
+      pricePerYear: "/año",
+      priceChoose: "Elegir",
+      priceMostChosen: "El más elegido",
+      pricePeriods: "Periodo de facturación",
+      sortMove: "Mover {label}",
+      sortEmpty: "No hay nada que ordenar",
+      cartRemove: "Quitar",
+      cartCheckout: "Ir a pagar",
+      cartFewer: "Uno menos",
+      cartMore: "Uno más",
+      cartEmpty: "Tu carrito está vacío",
+      cartEmptyHint: "Lo que agregues aparece aquí.",
+      noticesMarkAll: "Marcar todo como leído",
+      noticesEmpty: "Nada nuevo",
+      noticesEmptyHint: "Los avisos aparecen aquí cuando llegan.",
+      facetsClear: "Borrar",
+      facetsNone: "Sin filtros",
+      facets1: "1 filtro",
+      facetsN: "{n} filtros",
+      facetsEmpty: "No hay nada para filtrar",
+      threadSent: "Enviado",
+      threadRead: "Leído",
+      threadFailed: "No enviado",
+      threadLabel: "Conversación",
+      threadEmpty: "Todavía no hay mensajes",
+      threadEmptyHint: "Escribe el primero.",
+      threadPlaceholder: "Escribe un mensaje…",
+      coOrder: "Tu pedido",
+      coDetails: "Tus datos",
+      coDelivery: "Envío",
+      coReview: "Resumen",
+      coSteps: "Pasos del pedido",
+      coName: "Nombre completo",
+      coEmail: "Correo electrónico",
+      coEmailHint: "Aquí te llega el recibo.",
+      coAddress: "Dirección",
+      coPostcode: "Código postal",
+      coCity: "Ciudad",
+      coCountry: "País",
+      coContinue: "Continuar al envío",
+      coItems: "Productos",
+      coNoShipping: "El envío se acuerda cuando el pedido está hecho.",
+      coShipLater: "Se elige después del pedido",
+      coNote: "Una nota para el pedido",
+      coNotePlaceholder: "¿Hay algo que debamos saber?",
+      coPlace: "Realizar pedido",
+      coPlaced: "Pedido realizado. El recibo va en camino a tu correo.",
+      coNeeded: "Completa este dato antes de hacer el pedido.",
+      coEmailAt: "Un correo electrónico lleva una @.",
+      coFailed: "El pedido no se pudo enviar. Inténtalo otra vez.",
+      coEmpty: "El pedido está vacío",
+      coEmptyHint: "Agrega algo y aparece aquí."
     }
+  };
+  var KIT_KEYS = {
+    en: Object.keys(BASE.en),
+    fi: Object.keys(BASE.fi),
+    es: Object.keys(BASE.es)
   };
   var HOST = { en: {}, fi: {}, es: {} };
   var listeners = [];
@@ -1452,11 +1655,11 @@
     node.textContent = "";
     const max = Math.max(...values, 1);
     values.forEach((v, i) => {
-      const bar = document.createElement("i");
-      bar.style.height = Math.round(v / max * 100) + "%";
-      node.appendChild(bar);
-      if (!reducedMotion() && bar.animate) {
-        bar.animate(
+      const bar2 = document.createElement("i");
+      bar2.style.height = Math.round(v / max * 100) + "%";
+      node.appendChild(bar2);
+      if (!reducedMotion() && bar2.animate) {
+        bar2.animate(
           [{ transform: "scaleY(0)" }, { transform: "scaleY(1)" }],
           { duration: 260, delay: i * 18, easing: easeOf2(node), fill: "backwards" }
         );
@@ -3743,8 +3946,8 @@
       slotInto(actions, s, "actions", null, { cls: "ak-band__own", tag: "span" });
       if (actions.firstChild) head.appendChild(actions);
       root.appendChild(head);
-      const bar = progressBar("ak-band", s.progress);
-      if (bar) root.appendChild(bar);
+      const bar2 = progressBar("ak-band", s.progress);
+      if (bar2) root.appendChild(bar2);
       root.appendChild(body);
       slotInto(root, s, "after", null, { cls: "ak-band__after", tag: "div" });
     }
@@ -4467,7 +4670,7 @@
     window.addEventListener("ak-motion", syncMotion);
     const logo = logoEl(spec.logo);
     const brand = logo ? el("span", { class: "ak-app__brand" }, [logo, heading]) : heading;
-    const bar = el("header", { class: "ak-app__bar" }, [brand, motionBtn, pill]);
+    const bar2 = el("header", { class: "ak-app__bar" }, [brand, motionBtn, pill]);
     let replaying = false;
     const onBarClick = function(ev) {
       if (replaying) return;
@@ -4480,7 +4683,7 @@
         /** @type {HTMLElement|null} */
         start.closest(MODE_BUTTON)
       );
-      if (!btn || !bar.contains(btn) || btn.getAttribute("aria-pressed") === "true") return;
+      if (!btn || !bar2.contains(btn) || btn.getAttribute("aria-pressed") === "true") return;
       ev.preventDefault();
       ev.stopImmediatePropagation();
       btn.setAttribute("data-ak-noguard", "");
@@ -4494,7 +4697,7 @@
         }
       }, { from: { x: box.left + box.width / 2, y: box.top + box.height / 2 } });
     };
-    bar.addEventListener("click", onBarClick, true);
+    bar2.addEventListener("click", onBarClick, true);
     const statusHost = el("div", { class: "ak-app__status" });
     const sideMode = spec.nav === "side" && !!(spec.navItems && spec.navItems.length);
     const main = el("main", { class: "ak-app__main" + (sideMode ? "" : " ak-scroll") });
@@ -4505,7 +4708,7 @@
       class: "ak-root ak-app" + (sideMode ? " ak-app--sidenav" : ""),
       "data-ak-look": state.look,
       "aria-labelledby": titleId
-    }, [bar, statusHost, frame2 || main, footer]);
+    }, [bar2, statusHost, frame2 || main, footer]);
     if (spec.motion === false) setMotionDefaults(root, false);
     let nav = null;
     let side = null;
@@ -4544,7 +4747,7 @@
         sky = ambient(Object.assign({ target: root }, ambientSpec(want)));
         weatherCtl = weather({ kind: "cycle" });
         weatherCtl.el.classList.add("ak-app__weather");
-        bar.insertBefore(weatherCtl.el, motionBtn);
+        bar2.insertBefore(weatherCtl.el, motionBtn);
       } else {
         sky.set(Object.assign({ preset: null, alpha: null, speed: null, post: null }, ambientSpec(want)));
       }
@@ -4748,7 +4951,7 @@
         root.removeEventListener("ak-ambient-preset", syncWeather);
         if (sky) sky.destroy();
         if (weatherCtl) weatherCtl.destroy();
-        bar.removeEventListener("click", onBarClick, true);
+        bar2.removeEventListener("click", onBarClick, true);
         if (pollTimer) {
           clearInterval(pollTimer);
           pollTimer = null;
@@ -5291,10 +5494,10 @@
       done();
       return;
     }
-    const pace2 = paceOf(box);
+    const pace3 = paceOf(box);
     const anim = box.animate(
       [{ opacity: 1, transform: "scale(1)" }, { opacity: 0, transform: "scale(0.95)" }],
-      { duration: Math.max(90, pace2.span * 0.6), easing: "ease-in", fill: "forwards" }
+      { duration: Math.max(90, pace3.span * 0.6), easing: "ease-in", fill: "forwards" }
     );
     anim.onfinish = done;
     anim.oncancel = done;
@@ -5436,12 +5639,12 @@
       mark = ink2(box, { axis: "y", active: ".ak-menu__item--on", className: "ak-menu__ink" });
       openMotion(box, origin);
       if (!motionOff(box)) {
-        const pace2 = paceOf(box);
+        const pace3 = paceOf(box);
         rows().forEach(function(row, i) {
           if (typeof row.animate === "function") {
             row.animate(
               [{ opacity: 0, transform: "translateY(-4px)" }, { opacity: 1, transform: "none" }],
-              { duration: pace2.span, delay: 20 + i * 18, easing: pace2.ease, fill: "backwards" }
+              { duration: pace3.span, delay: 20 + i * 18, easing: pace3.ease, fill: "backwards" }
             );
           }
         });
@@ -5678,7 +5881,7 @@
         }
       } }, spec.action.label) : null
     ].filter(Boolean));
-    const pace2 = paceOf(node);
+    const pace3 = paceOf(node);
     function close() {
       if (timer) clearTimeout(timer);
       const drop = function() {
@@ -5689,14 +5892,14 @@
         return;
       }
       const anim = node.animate(
-        [{ opacity: 1, transform: "translateY(0)" }, { opacity: 0, transform: "translateY(" + (pace2.dist || 8) + "px)" }],
-        { duration: pace2.span, easing: "ease-in" }
+        [{ opacity: 1, transform: "translateY(0)" }, { opacity: 0, transform: "translateY(" + (pace3.dist || 8) + "px)" }],
+        { duration: pace3.span, easing: "ease-in" }
       );
       anim.onfinish = drop;
       anim.oncancel = drop;
     }
     toastHost.appendChild(node);
-    fadeIn(node, pace2, 0);
+    fadeIn(node, pace3, 0);
     enter(node);
     const ttl = spec.ttl == null ? 6e3 : spec.ttl;
     if (ttl > 0) timer = setTimeout(close, ttl);
@@ -5711,7 +5914,7 @@
     let cursor = 0;
     let shown = [];
     let opener = null;
-    function keyOf2(it, i) {
+    function keyOf3(it, i) {
       return it.id || it.label || String(i);
     }
     function close(after) {
@@ -5802,7 +6005,7 @@
           return;
         }
         shown.forEach(function(it, i) {
-          host.appendChild(el("li", { class: "ak-palette__item", role: "option", "data-ak-id": keyOf2(it, i), "aria-selected": "false", on: {
+          host.appendChild(el("li", { class: "ak-palette__item", role: "option", "data-ak-id": keyOf3(it, i), "aria-selected": "false", on: {
             click: function() {
               runItem(it);
             },
@@ -6048,6 +6251,118 @@
     return { start, end };
   }
 
+  // src/static/sdk-libs/_core/clipboard.js
+  async function copyText(text) {
+    const value = String(text == null ? "" : text);
+    if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(value);
+        return true;
+      } catch {
+      }
+    }
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = value;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return !!ok;
+    } catch {
+      return false;
+    }
+  }
+
+  // src/static/sdk-libs/atelier/copy.js
+  function copy(text) {
+    const af = typeof window !== "undefined" && window.AIMEAT && window.AIMEAT.agentface;
+    if (af && typeof af.copyText === "function") {
+      return Promise.resolve().then(function() {
+        return af.copyText(text);
+      }).then(function(ok) {
+        return !!ok;
+      }, function() {
+        return false;
+      });
+    }
+    return copyText(text);
+  }
+  function selectForHand(node) {
+    if (!node || typeof document === "undefined" || typeof window === "undefined") return false;
+    try {
+      const sel = window.getSelection && window.getSelection();
+      if (!sel || typeof document.createRange !== "function" || typeof sel.addRange !== "function") return false;
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // src/static/sdk-libs/atelier/copy-upload-i18n.js
+  var STRINGS = {
+    en: {
+      "drop.label": "Drop the file, or press to pick",
+      "drop.tooBig": "{name} is over {mb} MB.",
+      "drop.wrongKind": "{name} is not a kind this takes.",
+      "upload.waiting": "Waiting",
+      "upload.sending": "Uploading…",
+      "upload.percent": "Uploading… {n}%",
+      "upload.saved": "Saved as {key}",
+      "upload.open": "Open",
+      "upload.failed": "Did not upload: {why}",
+      "copy.promptByHand": "The browser did not allow copying. The whole prompt is selected: press Ctrl+C, or Cmd+C on a Mac."
+    },
+    fi: {
+      "drop.label": "Pudota tiedosto tähän tai valitse se painamalla",
+      "drop.tooBig": "{name} on yli {mb} Mt.",
+      "drop.wrongKind": "Tämä ei ota vastaan tiedostoa {name}: tiedostotyyppi ei käy.",
+      "upload.waiting": "Odottaa vuoroaan",
+      "upload.sending": "Lähetetään…",
+      "upload.percent": "Lähetetään… {n} %",
+      "upload.saved": "Tallennettu nimellä {key}",
+      "upload.open": "Avaa",
+      "upload.failed": "Lähetys ei onnistunut: {why}",
+      "copy.promptByHand": "Selain ei sallinut kopiointia. Koko kehote on valittu: paina Ctrl+C tai Macissa Cmd+C."
+    },
+    es: {
+      "drop.label": "Suelta el archivo o presiona para elegirlo",
+      "drop.tooBig": "{name} pesa más de {mb} MB.",
+      "drop.wrongKind": "{name} no es de un tipo que se acepte aquí.",
+      "upload.waiting": "En espera",
+      "upload.sending": "Subiendo…",
+      "upload.percent": "Subiendo… {n} %",
+      "upload.saved": "Guardado como {key}",
+      "upload.open": "Abrir",
+      "upload.failed": "No se subió: {why}",
+      "copy.promptByHand": "El navegador no permitió copiar. La instrucción completa está seleccionada: pulsa Ctrl+C, o Cmd+C en un Mac."
+    }
+  };
+  function tu(key, vars) {
+    const hosted = i18n.t(key, vars);
+    if (hosted !== key) return hosted;
+    const lang = i18n.lang();
+    const table2 = (
+      /** @type {Record<string, string>} */
+      STRINGS[
+        /** @type {'en'|'fi'|'es'} */
+        lang
+      ] || STRINGS.en
+    );
+    const text = table2[key] || STRINGS.en[key] || key;
+    if (!vars) return text;
+    return text.replace(/\{(\w+)\}/g, function(whole, name) {
+      return vars[name] == null ? whole : String(vars[name]);
+    });
+  }
+
   // src/static/sdk-libs/atelier/workbench-parts.js
   function parseAnswer(text) {
     const s = String(text || "").replace(/```(?:json)?/gi, "");
@@ -6084,17 +6399,26 @@
     const preview = el("div", { class: "ak-promptpanel__preview", "data-ak-part": "preview", text: shortText() });
     one.appendChild(preview);
     const row = el("div", { class: "ak-promptpanel__row" });
-    row.appendChild(button(spec.copyLabel || t("promptCopy"), "ak-btn--primary", "copy", function() {
-      return navigator.clipboard.writeText(promptText()).then(function() {
-        toast({ title: t("promptCopied"), tone: "ok" });
-      });
-    }));
     let full = false;
-    const toggle2 = button(t("promptShowAll"), "", "toggle", function() {
-      full = !full;
+    function showFull(on) {
+      full = on;
       preview.textContent = full ? promptText() : shortText();
       preview.classList.toggle("ak-promptpanel__preview--full", full);
       toggle2.textContent = full ? t("promptHide") : t("promptShowAll");
+    }
+    row.appendChild(button(spec.copyLabel || t("promptCopy"), "ak-btn--primary", "copy", function() {
+      return copy(promptText()).then(function(ok) {
+        if (ok) {
+          toast({ title: t("promptCopied"), tone: "ok" });
+          return;
+        }
+        showFull(true);
+        selectForHand(preview);
+        toast({ title: tu("copy.promptByHand"), tone: "warn", ttl: 8e3 });
+      });
+    }));
+    const toggle2 = button(t("promptShowAll"), "", "toggle", function() {
+      showFull(!full);
     });
     row.appendChild(toggle2);
     one.appendChild(row);
@@ -6149,11 +6473,11 @@
     if (chips.firstChild) root.appendChild(chips);
     return root;
   }
-  function whenText(when) {
-    if (when == null || when === "") return "";
-    if (typeof when === "string" && !/^\d{4}-\d{2}-\d{2}/.test(when)) return when;
-    const d = when instanceof Date ? when : new Date(when);
-    if (isNaN(d.getTime())) return String(when);
+  function whenText(when2) {
+    if (when2 == null || when2 === "") return "";
+    if (typeof when2 === "string" && !/^\d{4}-\d{2}-\d{2}/.test(when2)) return when2;
+    const d = when2 instanceof Date ? when2 : new Date(when2);
+    if (isNaN(d.getTime())) return String(when2);
     const pad = function(n) {
       return String(n).padStart(2, "0");
     };
@@ -7778,8 +8102,217 @@
     };
   }
 
+  // src/static/sdk-libs/atelier/ai-task-i18n.js
+  var STRINGS2 = {
+    en: {
+      "aiTask.title": "Ask the AI",
+      "aiTask.inputLabel": "Your text",
+      "aiTask.run": "Ask the AI",
+      "aiTask.checking": "Checking whether your AI is ready…",
+      "aiTask.running": "The AI is working on the answer…",
+      "aiTask.ready": "The answer is ready.",
+      "aiTask.needText": "Write something first.",
+      "aiTask.needChars": "Write at least {n} characters. You have {m} now.",
+      "aiTask.noLib": "This block needs aimeat-ai.js on the page.",
+      "aiTask.noLibCopy": "AI is not connected on this page. Copy the prompt to your own AI chat, and paste the answer back here.",
+      "aiTask.signIn": "Sign in to ask your AI.",
+      "aiTask.signInBtn": "Sign in",
+      "aiTask.off": "Your AI is not ready for this app.",
+      "aiTask.copyTitle": "Or use your own AI chat",
+      "aiTask.answer": "The AI answer",
+      "aiTask.model": "Model: {model}",
+      "aiTask.cost": "AI use today: {spent} of {budget}",
+      "aiTask.costNoCap": "AI use today: {spent}",
+      "aiTask.truncated": "The answer stopped at the length limit, so it can be unfinished.",
+      "aiTask.pasted": "Pasted from your own AI chat.",
+      "aiTask.sampleNote": "A sample. Nothing is sent to an AI.",
+      "aiTask.sampleAnswer": "**A sample answer.** When this block runs for real, the answer of the AI comes here. Above it is the label that says an AI made it. Under it are the model and what AI use cost today.",
+      "aiTask.err.NO_API_KEY": "No AI is set up for your account yet. Add one on the AI page of your AIMEAT profile.",
+      "aiTask.err.INVALID_API_KEY": "Your AI provider did not accept the key. Check the key on the AI page of your AIMEAT profile.",
+      "aiTask.err.QUOTA_EXHAUSTED": "You used all of today's AI budget. It starts again tomorrow, or you can make it larger on the AI page.",
+      "aiTask.err.APP_QUOTA_EXHAUSTED": "This app used all of its AI share for today. It starts again tomorrow, or you can make it larger on the AI page.",
+      "aiTask.err.RATE_LIMITED": "Your AI provider is busy now. Wait a moment and try again.",
+      "aiTask.err.JSON_SCHEMA_MISMATCH": "The AI answered, but not in the form this app needs. Try again.",
+      "aiTask.err.generic": "The AI request did not go through: {why}",
+      "aiTask.err.noReason": "The AI request did not go through.",
+      "modelField.default": "The default model",
+      "modelField.loading": "Reading the models…",
+      "modelField.failed": "The model list could not be read",
+      "modelField.notListed": "{model} (not in your list)"
+    },
+    fi: {
+      "aiTask.title": "Kysy tekoälyltä",
+      "aiTask.inputLabel": "Tekstisi",
+      "aiTask.run": "Kysy tekoälyltä",
+      "aiTask.checking": "Tarkistan, onko tekoälysi käytettävissä…",
+      "aiTask.running": "Tekoäly kirjoittaa vastausta…",
+      "aiTask.ready": "Vastaus on valmis.",
+      "aiTask.needText": "Kirjoita ensin jotain.",
+      "aiTask.needChars": "Kirjoita vähintään {n} merkkiä. Nyt merkkejä on {m}.",
+      "aiTask.noLib": "Tämä lohko tarvitsee sivulle kirjaston aimeat-ai.js.",
+      "aiTask.noLibCopy": "Tekoäly ei ole käytössä tällä sivulla. Kopioi kehote omaan tekoälykeskusteluusi ja liitä vastaus tähän.",
+      "aiTask.signIn": "Kirjaudu sisään, niin voit kysyä tekoälyltäsi.",
+      "aiTask.signInBtn": "Kirjaudu sisään",
+      "aiTask.off": "Tekoälysi ei ole valmis tätä sovellusta varten.",
+      "aiTask.copyTitle": "Tai käytä omaa tekoälykeskusteluasi",
+      "aiTask.answer": "Tekoälyn vastaus",
+      "aiTask.model": "Malli: {model}",
+      "aiTask.cost": "Tekoälyn käyttö tänään: {spent}, päiväraja {budget}",
+      "aiTask.costNoCap": "Tekoälyn käyttö tänään: {spent}",
+      "aiTask.truncated": "Vastaus katkesi pituusrajaan, joten se voi olla kesken.",
+      "aiTask.pasted": "Liitetty omasta tekoälykeskustelustasi.",
+      "aiTask.sampleNote": "Esimerkki. Mitään ei lähetetä tekoälylle.",
+      "aiTask.sampleAnswer": "**Esimerkkivastaus.** Kun lohko on oikeasti käytössä, tähän tulee tekoälyn vastaus. Sen yläpuolella on merkintä, joka kertoo, että vastauksen teki tekoäly. Alla näkyvät malli ja päivän tekoälykulut.",
+      "aiTask.err.NO_API_KEY": "Tilillesi ei ole vielä asetettu tekoälyä. Lisää se AIMEAT-profiilisi tekoälysivulla.",
+      "aiTask.err.INVALID_API_KEY": "Tekoälyn tarjoaja ei hyväksynyt avaintasi. Tarkista avain AIMEAT-profiilisi tekoälysivulla.",
+      "aiTask.err.QUOTA_EXHAUSTED": "Olet käyttänyt koko tämän päivän tekoälybudjetin. Budjetti alkaa huomenna alusta, tai voit suurentaa sitä tekoälysivulla.",
+      "aiTask.err.APP_QUOTA_EXHAUSTED": "Tämä sovellus on käyttänyt koko tämän päivän tekoälyosuutensa. Osuus alkaa huomenna alusta, tai voit suurentaa sitä tekoälysivulla.",
+      "aiTask.err.RATE_LIMITED": "Tekoälyn tarjoaja on nyt kiireinen. Odota hetki ja yritä uudelleen.",
+      "aiTask.err.JSON_SCHEMA_MISMATCH": "Tekoäly vastasi, mutta ei siinä muodossa, jota sovellus tarvitsee. Yritä uudelleen.",
+      "aiTask.err.generic": "Tekoälypyyntö ei onnistunut: {why}",
+      "aiTask.err.noReason": "Tekoälypyyntö ei onnistunut.",
+      "modelField.default": "Oletusmalli",
+      "modelField.loading": "Haen malleja…",
+      "modelField.failed": "Malliluetteloa ei saatu luettua",
+      "modelField.notListed": "{model} (ei listallasi)"
+    },
+    es: {
+      "aiTask.title": "Pregúntale a la IA",
+      "aiTask.inputLabel": "Tu texto",
+      "aiTask.run": "Preguntar a la IA",
+      "aiTask.checking": "Revisando si tu IA está lista…",
+      "aiTask.running": "La IA está escribiendo la respuesta…",
+      "aiTask.ready": "La respuesta está lista.",
+      "aiTask.needText": "Primero escribe algo.",
+      "aiTask.needChars": "Escribe al menos {n} caracteres. Llevas {m}.",
+      "aiTask.noLib": "Este bloque necesita aimeat-ai.js en la página.",
+      "aiTask.noLibCopy": "La IA no está conectada en esta página. Copia la instrucción en tu propio chat de IA y pega aquí la respuesta.",
+      "aiTask.signIn": "Inicia sesión para preguntarle a tu IA.",
+      "aiTask.signInBtn": "Iniciar sesión",
+      "aiTask.off": "Tu IA no está lista para esta app.",
+      "aiTask.copyTitle": "O usa tu propio chat de IA",
+      "aiTask.answer": "Respuesta de la IA",
+      "aiTask.model": "Modelo: {model}",
+      "aiTask.cost": "Uso de IA hoy: {spent} de {budget}",
+      "aiTask.costNoCap": "Uso de IA hoy: {spent}",
+      "aiTask.truncated": "La respuesta se cortó en el límite de longitud, así que puede estar incompleta.",
+      "aiTask.pasted": "Pegada desde tu propio chat de IA.",
+      "aiTask.sampleNote": "Un ejemplo. No se envía nada a una IA.",
+      "aiTask.sampleAnswer": "**Una respuesta de ejemplo.** Cuando este bloque funcione de verdad, aquí aparece la respuesta de la IA. Arriba va la etiqueta que dice que la hizo una IA. Abajo van el modelo y lo que costó hoy el uso de IA.",
+      "aiTask.err.NO_API_KEY": "Tu cuenta todavía no tiene una IA configurada. Agrégala en la página de IA de tu perfil de AIMEAT.",
+      "aiTask.err.INVALID_API_KEY": "Tu proveedor de IA no aceptó la clave. Revísala en la página de IA de tu perfil de AIMEAT.",
+      "aiTask.err.QUOTA_EXHAUSTED": "Ya usaste todo el presupuesto de IA de hoy. Vuelve a empezar mañana, o puedes subirlo en la página de IA.",
+      "aiTask.err.APP_QUOTA_EXHAUSTED": "Esta app ya usó toda su parte de IA de hoy. Vuelve a empezar mañana, o puedes subirla en la página de IA.",
+      "aiTask.err.RATE_LIMITED": "Tu proveedor de IA está ocupado ahora. Espera un momento y vuelve a intentarlo.",
+      "aiTask.err.JSON_SCHEMA_MISMATCH": "La IA respondió, pero no en la forma que esta app necesita. Vuelve a intentarlo.",
+      "aiTask.err.generic": "La solicitud a la IA no se completó: {why}",
+      "aiTask.err.noReason": "La solicitud a la IA no se completó.",
+      "modelField.default": "El modelo predeterminado",
+      "modelField.loading": "Cargando los modelos…",
+      "modelField.failed": "No se pudo leer la lista de modelos",
+      "modelField.notListed": "{model} (no está en tu lista)"
+    }
+  };
+  function tai(key, vars) {
+    const hosted = i18n.t(key, vars);
+    if (hosted !== key) return hosted;
+    const lang = i18n.lang();
+    const table2 = (
+      /** @type {Record<string, string>} */
+      STRINGS2[
+        /** @type {'en'|'fi'|'es'} */
+        lang
+      ] || STRINGS2.en
+    );
+    const text = table2[key] || STRINGS2.en[key] || key;
+    if (!vars) return text;
+    return text.replace(/\{(\w+)\}/g, function(whole, name) {
+      return vars[name] == null ? whole : String(vars[name]);
+    });
+  }
+
   // src/static/sdk-libs/atelier/form.js
   var NUMERIC = ["number", "range"];
+  function modelControl(field, id, describedBy) {
+    const ns = (
+      /** @type {any} */
+      window.AIMEAT
+    );
+    const lib = ns && ns.ai && typeof ns.ai.models === "function" ? ns.ai : null;
+    const current2 = field.value != null ? String(field.value) : "";
+    if (!lib) {
+      const text = (
+        /** @type {HTMLInputElement} */
+        el("input", {
+          id,
+          type: "text",
+          class: "ak-input",
+          "data-ak-part": "input",
+          "data-ak-model": "text",
+          autocomplete: "off",
+          spellcheck: "false",
+          maxlength: field.maxLength || null,
+          "aria-describedby": describedBy
+        })
+      );
+      text.value = current2;
+      return { input: text, ensure: null };
+    }
+    const select = (
+      /** @type {HTMLSelectElement} */
+      el("select", {
+        id,
+        class: "ak-input",
+        "data-ak-part": "input",
+        "data-ak-model": "select",
+        "aria-describedby": describedBy,
+        "aria-busy": "true"
+      })
+    );
+    let rows = null;
+    let failed = false;
+    const has = function(v) {
+      return Array.prototype.some.call(select.options, function(o) {
+        return o.value === v;
+      });
+    };
+    const extra = function(v) {
+      return el("option", { value: v }, rows ? tai("modelField.notListed", { model: v }) : v);
+    };
+    function fill(keep) {
+      clear(select);
+      select.appendChild(el("option", { value: "" }, tai("modelField.default")));
+      for (const r of rows || []) {
+        const v = keep && keep === r.id ? r.id : String(r.ref || r.id || "");
+        if (!v || has(v)) continue;
+        select.appendChild(el("option", { value: v }, String(r.name || r.id || v)));
+      }
+      if (keep && !has(keep)) select.appendChild(extra(keep));
+      if (!rows) select.appendChild(el("option", { value: "", disabled: true }, tai(failed ? "modelField.failed" : "modelField.loading")));
+      select.value = keep || "";
+    }
+    fill(current2);
+    Promise.resolve().then(function() {
+      return lib.models({ capability: field.capability || "text" });
+    }).then(
+      function(list2) {
+        rows = Array.isArray(list2) ? list2 : [];
+      },
+      function(e) {
+        failed = true;
+        console.debug("aimeat-atelier: model list not read", e);
+      }
+    ).then(function() {
+      select.removeAttribute("aria-busy");
+      fill(select.value);
+    });
+    return {
+      input: select,
+      ensure: function(v) {
+        if (v && !has(v)) select.appendChild(extra(v));
+      }
+    };
+  }
   function form(spec) {
     const controls = /* @__PURE__ */ new Map();
     const root = el("form", { class: "ak-root ak-form", "data-ak-part": "root", novalidate: true });
@@ -7819,7 +8352,12 @@
       const describedBy = (field.hint ? hintId + " " : "") + errId;
       let input;
       let readout = null;
-      if (type === "textarea") {
+      let ensure = null;
+      if (type === "model") {
+        const m = modelControl(field, id, describedBy);
+        input = m.input;
+        ensure = m.ensure;
+      } else if (type === "textarea") {
         input = el("textarea", { id, class: "ak-input ak-input--area", "data-ak-part": "input", rows: 3, maxlength: field.maxLength || null, "aria-describedby": describedBy });
         input.value = field.value != null ? String(field.value) : "";
       } else if (type === "select") {
@@ -7888,6 +8426,7 @@
         /** @type {HTMLInputElement} */
         input
       );
+      if (ensure) controls.get(field.name).ensure = ensure;
       return wrap2;
     }
     function setError(name, message) {
@@ -7938,7 +8477,7 @@
       { type: "submit", class: "ak-btn ak-btn--primary", "data-ak-part": "submit", "data-ak-noguard": true },
       spec.submitLabel || t("save")
     );
-    const bar = wantsBar ? el("div", { class: "ak-form__bar", "data-ak-part": "bar" }, [
+    const bar2 = wantsBar ? el("div", { class: "ak-form__bar", "data-ak-part": "bar" }, [
       spec.cancel ? el("button", {
         type: "button",
         class: "ak-btn ak-btn--ghost",
@@ -7954,7 +8493,7 @@
       controls.clear();
       clear(root);
       for (const field of fields) root.appendChild(buildControl(field));
-      if (bar) root.appendChild(bar);
+      if (bar2) root.appendChild(bar2);
       enter(root);
     }
     render(spec.fields || []);
@@ -7989,6 +8528,7 @@
           const c = controls.get(name);
           if (!c) continue;
           const type = c.field.type || "text";
+          if (c.ensure) c.ensure(next[name] == null ? "" : String(next[name]));
           if (type === "checkbox" || type === "toggle") c.input.checked = !!next[name];
           else c.input.value = next[name] == null ? "" : String(next[name]);
           refreshReadout(name);
@@ -8013,7 +8553,7 @@
   function table(spec) {
     const columns = spec.columns || [];
     let rows = spec.rows || [];
-    const keyOf2 = spec.key || function(row, i) {
+    const keyOf3 = spec.key || function(row, i) {
       if (row && row.id != null) return String(row.id);
       const first = columns[0] && row ? row[columns[0].key] : null;
       return first == null ? "row-" + i : String(first);
@@ -8093,13 +8633,13 @@
         const raw = row[col.key];
         const given = partValue(spec, "cell", raw, row, col);
         const own = col.format ? col.format(raw, row) : raw == null ? "" : String(raw);
-        const td = el("td", {
+        const td2 = el("td", {
           class: col.align === "right" ? "ak-table__num" : null,
           "data-ak-part": "cell",
           "data-ak-key": col.key
         });
-        fillPart(td, given === void 0 ? own : given);
-        tr.appendChild(td);
+        fillPart(td2, given === void 0 ? own : given);
+        tr.appendChild(td2);
       }
     }
     function renderBody() {
@@ -8121,7 +8661,7 @@
       }
       const pickable = typeof spec.onPick === "function";
       keyedRows(tbody, sortedRows(), {
-        key: keyOf2,
+        key: keyOf3,
         build: function(row) {
           const tr = el("tr", {
             class: pickable ? "ak-table__row--pick" : null,
@@ -8672,9 +9212,9 @@
       node.appendChild(ribbon);
     }
     for (const m of byId.values()) {
-      const bar = svg("rect", { x: m.x, y: m.y, width: NODE_W, height: m.h, rx: 4, class: "ak-chart__flownode" });
-      bar.style.fill = m.colour;
-      node.appendChild(bar);
+      const bar2 = svg("rect", { x: m.x, y: m.y, width: NODE_W, height: m.h, rx: 4, class: "ak-chart__flownode" });
+      bar2.style.fill = m.colour;
+      node.appendChild(bar2);
       const last = m.depth === maxDepth;
       const name = svg("text", {
         x: last ? m.x - 6 : m.x + NODE_W + 6,
@@ -11129,7 +11669,7 @@
           type: "button",
           class: "ak-sortable__grip",
           "data-ak-noguard": true,
-          "aria-label": "Move " + String(item.label || item.id),
+          "aria-label": t("sortMove", { label: String(item.label || item.id) }),
           on: { keydown: onGripKey }
         }, [el("span", { class: "ak-sortable__gripmark", "aria-hidden": "true" })]));
       }
@@ -11162,7 +11702,7 @@
         emptyCard = emptyState({
           target: root,
           tone: "quiet",
-          title: e.title || s.title || "Nothing to put in order",
+          title: e.title || s.title || t("sortEmpty"),
           hint: e.hint
         });
         return;
@@ -11192,239 +11732,22 @@
       }
     };
   }
-  function pictureOf(url) {
-    if (!url) return null;
-    const v = String(url);
-    if (/^data:/i.test(v)) {
-      console.warn("aimeat-atelier: cart line image data: URIs are refused. Upload the image and pass its URL.");
-      return null;
-    }
-    return 'url("' + v.replace(/"/g, "%22") + '")';
-  }
-  function money2(amount2, currency) {
-    const unit = currency || "€";
-    const n = Number(amount2) || 0;
-    const hasIntl = typeof Intl === "object" && Intl && typeof Intl.NumberFormat === "function";
-    if (hasIntl && /^[A-Za-z]{3}$/.test(unit)) {
-      return money(n, unit, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    }
-    if (hasIntl) {
-      return num(n, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " " + unit;
-    }
-    return n.toFixed(2) + " " + unit;
-  }
-  function cart(spec) {
-    const s = spec || /** @type {any} */
-    {};
-    const root = el("div", { class: "ak-root ak-cart" });
-    if (s.target) resolve(s.target).appendChild(root);
-    const lines = el("div", { class: "ak-cart__lines" });
-    const totalValue = el("span", { class: "ak-cart__totalvalue" });
-    const note = el("div", { class: "ak-cart__note" });
-    const foot = el("div", { class: "ak-cart__foot" }, [
-      el("div", { class: "ak-cart__total" }, [
-        el("span", { class: "ak-cart__totallabel", text: "Total" }),
-        totalValue
-      ]),
-      el("button", {
-        type: "button",
-        class: "ak-btn ak-btn--primary ak-cart__checkout",
-        text: "Checkout",
-        on: { click: function() {
-          if (s.onCheckout) s.onCheckout(current2.slice());
-        } }
-      }, null)
-    ]);
-    const shown = /* @__PURE__ */ new Map();
-    let current2 = [];
-    let unit = "€";
-    let emptyCard = null;
-    function totalOf() {
-      return current2.reduce(function(n, l) {
-        return n + (Number(l.price) || 0) * (Number(l.qty) || 0);
-      }, 0);
-    }
-    function rollTotal() {
-      odometer(totalValue, money2(totalOf(), unit));
-    }
-    function setQty(line, next) {
-      const q = Math.max(1, Math.round(Number(next) || 1));
-      if (q === Number(line.qty)) return;
-      line.qty = q;
-      const rec = shown.get(String(line.id));
-      if (rec) {
-        rec.count.textContent = String(q);
-        rec.price.textContent = money2((Number(line.price) || 0) * q, unit);
-      }
-      rollTotal();
-      if (s.onChange) s.onChange(line.id, q);
-    }
-    function collapse(node, after) {
-      const done = function() {
-        if (node.parentNode) node.parentNode.removeChild(node);
-        if (after) after();
-      };
-      if (reducedMotion() || typeof node.animate !== "function") {
-        done();
-        return;
-      }
-      const box = node.getBoundingClientRect();
-      const seen = getComputedStyle(node);
-      const anim = node.animate([
-        { height: box.height + "px", opacity: 1, paddingTop: seen.paddingTop, paddingBottom: seen.paddingBottom },
-        { height: "0px", opacity: 0, paddingTop: "0px", paddingBottom: "0px" }
-      ], { duration: pace(node, 1.4), easing: "cubic-bezier(0.2, 0.7, 0.3, 1)", fill: "forwards" });
-      anim.addEventListener("finish", done);
-      anim.addEventListener("cancel", done);
-    }
-    function remove(line) {
-      const id = String(line.id);
-      const rec = shown.get(id);
-      current2 = current2.filter(function(l) {
-        return String(l.id) !== id;
-      });
-      shown.delete(id);
-      if (rec) collapse(rec.node, current2.length ? null : function() {
-        render({ lines: [], currency: unit, note: "" });
-      });
-      rollTotal();
-      if (s.onRemove) s.onRemove(line.id);
-    }
-    function buildLine(line) {
-      const picture = pictureOf(line.image);
-      const rec = (
-        /** @type {any} */
-        {
-          node: null,
-          line,
-          art: el("span", {
-            class: "ak-cart__art" + (picture ? " ak-cart__art--image" : ""),
-            "aria-hidden": "true",
-            vars: picture ? { "--ak-cart-image": picture } : null
-          }, picture ? null : el("span", { class: "ak-cart__monogram" })),
-          title: el("span", { class: "ak-cart__linetitle" }),
-          sub: el("span", { class: "ak-cart__linesub" }),
-          count: el("span", { class: "ak-cart__count", "aria-live": "polite" }),
-          price: el("span", { class: "ak-cart__price" })
-        }
-      );
-      const step = function(by) {
-        return function() {
-          setQty(rec.line, (Number(rec.line.qty) || 1) + by);
-        };
-      };
-      rec.node = el("div", { class: "ak-cart__line", "data-id": String(line.id) }, [
-        rec.art,
-        el("span", { class: "ak-cart__body" }, [rec.title, rec.sub]),
-        el("span", { class: "ak-cart__qty" }, [
-          el("button", { type: "button", class: "ak-cart__step", "aria-label": "One fewer", on: { click: step(-1) } }, "-"),
-          rec.count,
-          el("button", { type: "button", class: "ak-cart__step", "aria-label": "One more", on: { click: step(1) } }, "+")
-        ]),
-        rec.price,
-        el("button", {
-          type: "button",
-          class: "ak-btn ak-cart__remove",
-          text: "Remove",
-          on: { click: function() {
-            remove(rec.line);
-          } }
-        }, null)
-      ]);
-      fillLine(rec, line);
-      return rec;
-    }
-    function fillLine(rec, line) {
-      rec.line = line;
-      const qty = Math.max(1, Math.round(Number(line.qty) || 1));
-      rec.title.textContent = String(line.title || line.id);
-      rec.sub.textContent = line.sub != null ? String(line.sub) : "";
-      rec.sub.hidden = line.sub == null || line.sub === "";
-      rec.count.textContent = String(qty);
-      rec.price.textContent = money2((Number(line.price) || 0) * qty, unit);
-      const mono = rec.art.querySelector(".ak-cart__monogram");
-      if (mono) mono.textContent = (Array.from(String(line.title || "?"))[0] || "?").toUpperCase();
-    }
-    function render(data) {
-      const list2 = (data && Array.isArray(data.lines) ? data.lines : []).filter(function(l) {
-        return l && l.id != null;
-      });
-      unit = data && data.currency || "€";
-      current2 = list2;
-      if (emptyCard) {
-        emptyCard.destroy();
-        emptyCard = null;
-      }
-      if (!list2.length) {
-        clear(root);
-        clear(lines);
-        shown.clear();
-        emptyCard = emptyState({
-          target: root,
-          tone: "quiet",
-          title: "Your cart is empty",
-          hint: "Anything you add shows up here."
-        });
-        return;
-      }
-      clear(root);
-      if (s.title) root.appendChild(el("div", { class: "ak-cart__title", text: s.title }));
-      root.appendChild(lines);
-      note.textContent = data && data.note ? String(data.note) : "";
-      note.hidden = !note.textContent;
-      root.appendChild(foot);
-      root.appendChild(note);
-      const live = {};
-      list2.forEach(function(l) {
-        live[String(l.id)] = 1;
-      });
-      Array.from(shown.keys()).forEach(function(id) {
-        if (live[id]) return;
-        const rec = shown.get(id);
-        shown.delete(id);
-        if (rec.node.parentNode) rec.node.parentNode.removeChild(rec.node);
-      });
-      list2.forEach(function(line) {
-        const id = String(line.id);
-        let rec = shown.get(id);
-        if (!rec) {
-          rec = buildLine(line);
-          shown.set(id, rec);
-        } else {
-          fillLine(rec, line);
-        }
-        lines.appendChild(rec.node);
-      });
-      rollTotal();
-    }
-    render(s.data);
-    return {
-      el: root,
-      set(patch) {
-        if (patch && "data" in patch) render(patch.data);
-      },
-      destroy() {
-        if (emptyCard) emptyCard.destroy();
-        if (root.parentNode) root.parentNode.removeChild(root);
-      }
-    };
-  }
   function startOfDay(d) {
     return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   }
-  function dayLabel(when) {
-    if (!when) return "Earlier";
-    const days = Math.round((startOfDay(/* @__PURE__ */ new Date()) - startOfDay(when)) / 864e5);
-    if (days === 0) return "Today";
-    if (days === 1) return "Yesterday";
-    if (typeof when.toLocaleDateString !== "function") return when.toISOString().slice(0, 10);
-    const sameYear = when.getFullYear() === (/* @__PURE__ */ new Date()).getFullYear();
-    return date(when, sameYear ? { day: "numeric", month: "short" } : { day: "numeric", month: "short", year: "numeric" });
+  function dayLabel(when2) {
+    if (!when2) return t("earlier");
+    const days = Math.round((startOfDay(/* @__PURE__ */ new Date()) - startOfDay(when2)) / 864e5);
+    if (days === 0) return t("today");
+    if (days === 1) return t("yesterday");
+    if (typeof when2.toLocaleDateString !== "function") return when2.toISOString().slice(0, 10);
+    const sameYear = when2.getFullYear() === (/* @__PURE__ */ new Date()).getFullYear();
+    return date(when2, sameYear ? { day: "numeric", month: "short" } : { day: "numeric", month: "short", year: "numeric" });
   }
-  function clockOf(when) {
-    if (!when) return "";
-    if (typeof when.toLocaleTimeString !== "function") return when.toISOString().slice(11, 16);
-    return time(when, { hour: "2-digit", minute: "2-digit" });
+  function clockOf(when2) {
+    if (!when2) return "";
+    if (typeof when2.toLocaleTimeString !== "function") return when2.toISOString().slice(11, 16);
+    return time(when2, { hour: "2-digit", minute: "2-digit" });
   }
   function notices(spec) {
     const s = spec || {};
@@ -11435,7 +11758,7 @@
     const markAll = el("button", {
       type: "button",
       class: "ak-btn ak-notices__markall",
-      text: "Mark all read",
+      text: t("noticesMarkAll"),
       on: { click: function() {
         markRead();
       } }
@@ -11521,8 +11844,8 @@
       dated = rowsOf(data).filter(function(it) {
         return it && it.id != null;
       }).map(function(it) {
-        const when = new Date(it.at);
-        return { item: it, when: isNaN(when.getTime()) ? null : when };
+        const when2 = new Date(it.at);
+        return { item: it, when: isNaN(when2.getTime()) ? null : when2 };
       }).sort(function(a, b) {
         return (b.when ? b.when.getTime() : 0) - (a.when ? a.when.getTime() : 0);
       });
@@ -11539,8 +11862,8 @@
         emptyCard = emptyState({
           target: root,
           tone: "quiet",
-          title: e.title || "Nothing new",
-          hint: e.hint || "Notices land here as they arrive."
+          title: e.title || t("noticesEmpty"),
+          hint: e.hint || t("noticesEmptyHint")
         });
         return;
       }
@@ -11602,7 +11925,7 @@
     const clearAll = el("button", {
       type: "button",
       class: "ak-btn ak-facets__clear",
-      text: "Clear",
+      text: t("facetsClear"),
       on: { click: function() {
         reset();
       } }
@@ -11635,7 +11958,7 @@
         return sum + picked[key].length;
       }, 0);
       clear(summary);
-      tally.textContent = n === 0 ? "No filters" : n === 1 ? "1 filter" : n + " filters";
+      tally.textContent = n === 0 ? t("facetsNone") : n === 1 ? t("facets1") : t("facetsN", { n });
       summary.appendChild(tally);
       if (n) {
         summary.appendChild(el("span", { class: "ak-facets__sep", "aria-hidden": "true" }, "·"));
@@ -11704,7 +12027,7 @@
         emptyCard = emptyState({
           target: root,
           tone: "quiet",
-          title: e.title || "Nothing to filter by",
+          title: e.title || t("facetsEmpty"),
           hint: e.hint
         });
         return;
@@ -11950,17 +12273,17 @@
         r.spans.forEach((s, si) => {
           const left = X(s.from);
           const width = Math.max(X(new Date(s.to.getTime() + DAY_MS)) - left, 1.2);
-          const bar = el("span", {
+          const bar2 = el("span", {
             class: "ak-plan__span ak-plan__span--" + toneOf3(s.tone, "accent"),
             title: (s.label ? s.label + " · " : "") + `${s.from.toISOString().slice(0, 10)} → ${s.to.toISOString().slice(0, 10)}`
           }, s.label && width > 8 ? [el("span", { class: "ak-plan__spanlabel", text: s.label })] : []);
-          bar.style.left = left + "%";
-          bar.style.width = width + "%";
+          bar2.style.left = left + "%";
+          bar2.style.width = width + "%";
           if (!reducedMotion()) {
-            bar.classList.add("ak-plan__span--enter");
-            bar.style.animationDelay = `${(ri * 2 + si) * 60}ms`;
+            bar2.classList.add("ak-plan__span--enter");
+            bar2.style.animationDelay = `${(ri * 2 + si) * 60}ms`;
           }
-          track.appendChild(bar);
+          track.appendChild(bar2);
         });
         lane.appendChild(track);
         body.appendChild(lane);
@@ -12165,7 +12488,7 @@
   }
 
   // src/static/sdk-libs/atelier/commercial-i18n.js
-  var STRINGS = {
+  var STRINGS3 = {
     en: {
       "legal.title": "The pages this app answers with",
       "legal.intro": "These pages are the app’s own, written by its owner. The app answers for what it does; the node it runs on has its own terms, which cover the node and not this app.",
@@ -12350,12 +12673,12 @@
     const lang = i18n.lang();
     const table2 = (
       /** @type {Record<string, string>} */
-      STRINGS[
+      STRINGS3[
         /** @type {'en'|'fi'|'es'} */
         lang
-      ] || STRINGS.en
+      ] || STRINGS3.en
     );
-    const text = table2[key] || STRINGS.en[key] || key;
+    const text = table2[key] || STRINGS3.en[key] || key;
     if (!vars) return text;
     return text.replace(/\{(\w+)\}/g, function(whole, name) {
       return vars[name] == null ? whole : String(vars[name]);
@@ -12826,7 +13149,7 @@
   }
 
   // src/static/sdk-libs/atelier/members-i18n.js
-  var STRINGS2 = {
+  var STRINGS4 = {
     en: {
       "members.title": "Members",
       "members.intro": "Who may use this app, and with which role. A role belongs to the person, so their agents have it too.",
@@ -13122,12 +13445,12 @@
     const lang = i18n.lang();
     const table2 = (
       /** @type {Record<string, string>} */
-      STRINGS2[
+      STRINGS4[
         /** @type {'en'|'fi'|'es'} */
         lang
-      ] || STRINGS2.en
+      ] || STRINGS4.en
     );
-    const text = table2[key] || STRINGS2.en[key] || key;
+    const text = table2[key] || STRINGS4.en[key] || key;
     if (!vars) return text;
     return text.replace(/\{(\w+)\}/g, function(whole, name) {
       return vars[name] == null ? whole : String(vars[name]);
@@ -13966,7 +14289,7 @@
   }
 
   // src/static/sdk-libs/atelier/workspace-i18n.js
-  var STRINGS3 = {
+  var STRINGS5 = {
     en: {
       "sample.note": "A sample. Nothing here is sent or changed.",
       "failed": "That did not go through: {why}",
@@ -14151,12 +14474,12 @@
     const lang = i18n.lang();
     const table2 = (
       /** @type {Record<string, string>} */
-      STRINGS3[
+      STRINGS5[
         /** @type {'en'|'fi'|'es'} */
         lang
-      ] || STRINGS3.en
+      ] || STRINGS5.en
     );
-    const text = table2[key] || STRINGS3.en[key] || key;
+    const text = table2[key] || STRINGS5.en[key] || key;
     if (!vars) return text;
     return text.replace(/\{(\w+)\}/g, function(whole, name) {
       return vars[name] == null ? whole : String(vars[name]);
@@ -14965,7 +15288,7 @@
   }
 
   // src/static/sdk-libs/atelier/intake-connect-i18n.js
-  var STRINGS4 = {
+  var STRINGS6 = {
     en: {
       "intake.title": "Send us a message",
       "intake.send": "Send",
@@ -15297,12 +15620,12 @@
     const lang = i18n.lang();
     const table2 = (
       /** @type {Record<string, string>} */
-      STRINGS4[
+      STRINGS6[
         /** @type {'en'|'fi'|'es'} */
         lang
-      ] || STRINGS4.en
+      ] || STRINGS6.en
     );
-    const text = table2[key] || STRINGS4.en[key] || key;
+    const text = table2[key] || STRINGS6.en[key] || key;
     if (!vars) return text;
     return text.replace(/\{(\w+)\}/g, function(whole, name) {
       return vars[name] == null ? whole : String(vars[name]);
@@ -15780,6 +16103,18 @@
         noticeEl.textContent = text2;
         noticeEl.hidden = false;
       }
+      function tellByHand(url) {
+        const whole = ti("intake.copyByHand", { url });
+        const at = whole.lastIndexOf(url);
+        clear(noticeEl);
+        const link = el("span", {}, url);
+        if (at < 0) noticeEl.appendChild(el("span", {}, whole + " "));
+        else if (at > 0) noticeEl.appendChild(document.createTextNode(whole.slice(0, at)));
+        noticeEl.appendChild(link);
+        if (at >= 0 && at + url.length < whole.length) noticeEl.appendChild(document.createTextNode(whole.slice(at + url.length)));
+        noticeEl.hidden = false;
+        selectForHand(link);
+      }
       const rows = (Array.isArray(forms) ? forms : []).map(function(f) {
         const name = f.title || f.form_id;
         const meta = [
@@ -15795,19 +16130,10 @@
           el("span", { class: "ak-intake__acts", "data-ak-part": "acts" }, [
             button2(ti("intake.copy"), "ghost", "copy", function() {
               const url = linkOf(f);
-              const clip = navigator.clipboard;
-              if (!clip || typeof clip.writeText !== "function") {
-                tell(ti("intake.copyByHand", { url }));
-                return;
-              }
-              clip.writeText(url).then(
-                function() {
-                  tell(ti("intake.copied", { url }));
-                },
-                function() {
-                  tell(ti("intake.copyByHand", { url }));
-                }
-              );
+              copy(url).then(function(ok) {
+                if (ok) tell(ti("intake.copied", { url }));
+                else tellByHand(url);
+              });
             }),
             button2(ti("intake.delete"), "ghost", "delete", function() {
               ask({
@@ -15833,7 +16159,7 @@
       root.appendChild(createHost);
       drawCreate(lib);
     }
-    function local(text2) {
+    function local2(text2) {
       if (!failureEl) return;
       failureEl.textContent = text2;
       failureEl.hidden = false;
@@ -15917,15 +16243,15 @@
           return r.label.trim();
         });
         if (!rows.length) {
-          local(ti("intake.needField"));
+          local2(ti("intake.needField"));
           return;
         }
         if (!namespace2) {
-          local(ti("intake.needNamespace"));
+          local2(ti("intake.needNamespace"));
           return;
         }
         if (id && !FORM_ID_RE.test(id)) {
-          local(ti("intake.badId"));
+          local2(ti("intake.badId"));
           return;
         }
         const taken = {};
@@ -16348,6 +16674,2083 @@
     };
   }
 
+  // src/static/sdk-libs/atelier/workflow-i18n.js
+  var STRINGS7 = {
+    en: {
+      "wf.title": "Waiting for your answer",
+      "wf.intro": "A workflow stops at each of these steps until you answer. When you answer, the run goes on.",
+      "wf.noLib": "This block needs aimeat-workflows.js on the page.",
+      "wf.signIn": "Sign in to see the steps that wait for your answer.",
+      "wf.loading": "Loading…",
+      "wf.none": "Nothing is waiting for your answer.",
+      "wf.noneRun": "Nothing in this run is waiting for your answer.",
+      "wf.untitled": "A workflow",
+      "wf.run": "run {id}",
+      "wf.testRun": "test run",
+      "wf.asked": "Asked {when}",
+      "wf.deadline": "Answer by {when}",
+      "wf.late": "The time to answer ended {when}",
+      "wf.pickOne": "Choose one.",
+      "wf.pickMany": "Choose one or more.",
+      "wf.other": "Something else, in your words",
+      "wf.otherOnly": "Your answer",
+      "wf.answer": "Answer",
+      "wf.needPick": "Choose an answer first.",
+      "wf.needPickOrText": "Choose an answer or write your own first.",
+      "wf.answered": "{workflow} has your answer. The run goes on.",
+      "wf.gone": "This step no longer waits for an answer: somebody answered it already, or its time ran out. The list is now up to date.",
+      "wf.failed": "Your answer did not go through: {why}",
+      "wf.loadFailed": "The waiting steps could not be read: {why}",
+      "wf.sampleNote": "A sample. Nothing is sent from here.",
+      "wf.sample.wf1": "Weekly newsletter",
+      "wf.sample.header1": "Review",
+      "wf.sample.q1": "The draft for this week is ready. Can it go out?",
+      "wf.sample.send": "Send it",
+      "wf.sample.hold": "Hold it for a week",
+      "wf.sample.stop": "Do not send",
+      "wf.sample.wf2": "Supplier check",
+      "wf.sample.q2": "Which suppliers get the new price list?",
+      "wf.sample.s1": "Northern Mill",
+      "wf.sample.s2": "Lake Bakery",
+      "wf.sample.s3": "Harbour Foods"
+    },
+    fi: {
+      "wf.title": "Odottaa vastaustasi",
+      "wf.intro": "Työnkulku pysähtyy näihin vaiheisiin ja odottaa, että vastaat. Kun vastaat, ajo jatkuu.",
+      "wf.noLib": "Tämä lohko tarvitsee sivulle aimeat-workflows.js-kirjaston.",
+      "wf.signIn": "Kirjaudu sisään, niin näet vaiheet, jotka odottavat vastaustasi.",
+      "wf.loading": "Ladataan…",
+      "wf.none": "Mikään ei odota vastaustasi.",
+      "wf.noneRun": "Mikään tämän ajon vaihe ei odota vastaustasi.",
+      "wf.untitled": "Työnkulku",
+      "wf.run": "ajo {id}",
+      "wf.testRun": "koeajo",
+      "wf.asked": "Kysytty {when}",
+      "wf.deadline": "Vastaa viimeistään {when}",
+      "wf.late": "Vastausaika päättyi {when}",
+      "wf.pickOne": "Valitse yksi.",
+      "wf.pickMany": "Valitse yksi tai useampi.",
+      "wf.other": "Jotain muuta, omin sanoin",
+      "wf.otherOnly": "Vastauksesi",
+      "wf.answer": "Vastaa",
+      "wf.needPick": "Valitse ensin vastaus.",
+      "wf.needPickOrText": "Valitse ensin vastaus tai kirjoita oma.",
+      "wf.answered": "{workflow} sai vastauksesi. Ajo jatkuu.",
+      "wf.gone": "Tämä vaihe ei enää odota vastausta: joku vastasi siihen jo, tai vastausaika päättyi. Lista on nyt ajan tasalla.",
+      "wf.failed": "Vastauksesi ei mennyt perille: {why}",
+      "wf.loadFailed": "Odottavia vaiheita ei saatu luettua: {why}",
+      "wf.sampleNote": "Esimerkki. Täältä ei lähetetä mitään.",
+      "wf.sample.wf1": "Viikkokirje",
+      "wf.sample.header1": "Tarkistus",
+      "wf.sample.q1": "Tämän viikon luonnos on valmis. Voiko sen lähettää?",
+      "wf.sample.send": "Lähetä",
+      "wf.sample.hold": "Siirrä ensi viikkoon",
+      "wf.sample.stop": "Älä lähetä",
+      "wf.sample.wf2": "Toimittajien tarkistus",
+      "wf.sample.q2": "Kenelle toimittajille uusi hinnasto lähtee?",
+      "wf.sample.s1": "Pohjolan Mylly",
+      "wf.sample.s2": "Järvileipomo",
+      "wf.sample.s3": "Satamaruoka"
+    },
+    es: {
+      "wf.title": "Espera tu respuesta",
+      "wf.intro": "Un flujo de trabajo se detiene en cada uno de estos pasos hasta que respondes. Cuando respondes, la ejecución sigue.",
+      "wf.noLib": "Este bloque necesita aimeat-workflows.js en la página.",
+      "wf.signIn": "Inicia sesión para ver los pasos que esperan tu respuesta.",
+      "wf.loading": "Cargando…",
+      "wf.none": "Nada espera tu respuesta.",
+      "wf.noneRun": "Nada en esta ejecución espera tu respuesta.",
+      "wf.untitled": "Un flujo de trabajo",
+      "wf.run": "ejecución {id}",
+      "wf.testRun": "ejecución de prueba",
+      "wf.asked": "Preguntado {when}",
+      "wf.deadline": "Responde a más tardar {when}",
+      "wf.late": "El plazo para responder terminó {when}",
+      "wf.pickOne": "Elige una opción.",
+      "wf.pickMany": "Elige una o más opciones.",
+      "wf.other": "Otra cosa, con tus palabras",
+      "wf.otherOnly": "Tu respuesta",
+      "wf.answer": "Responder",
+      "wf.needPick": "Primero elige una respuesta.",
+      "wf.needPickOrText": "Primero elige una respuesta o escribe la tuya.",
+      "wf.answered": "{workflow} recibió tu respuesta. La ejecución sigue.",
+      "wf.gone": "Este paso ya no espera respuesta: alguien ya respondió o se acabó el plazo. La lista ya está al día.",
+      "wf.failed": "Tu respuesta no se envió: {why}",
+      "wf.loadFailed": "No se pudieron leer los pasos en espera: {why}",
+      "wf.sampleNote": "Una muestra. Desde aquí no se envía nada.",
+      "wf.sample.wf1": "Boletín semanal",
+      "wf.sample.header1": "Revisión",
+      "wf.sample.q1": "El borrador de esta semana está listo. ¿Se puede enviar?",
+      "wf.sample.send": "Envíalo",
+      "wf.sample.hold": "Déjalo para la próxima semana",
+      "wf.sample.stop": "No lo envíes",
+      "wf.sample.wf2": "Revisión de proveedores",
+      "wf.sample.q2": "¿Qué proveedores reciben la nueva lista de precios?",
+      "wf.sample.s1": "Molino del Norte",
+      "wf.sample.s2": "Panadería del Lago",
+      "wf.sample.s3": "Alimentos del Puerto"
+    }
+  };
+  function twf(key, vars) {
+    const hosted = i18n.t(key, vars);
+    if (hosted !== key) return hosted;
+    const lang = i18n.lang();
+    const table2 = (
+      /** @type {Record<string, string>} */
+      STRINGS7[
+        /** @type {'en'|'fi'|'es'} */
+        lang
+      ] || STRINGS7.en
+    );
+    const text = table2[key] || STRINGS7.en[key] || key;
+    if (!vars) return text;
+    return text.replace(/\{(\w+)\}/g, function(whole, name) {
+      return vars[name] == null ? whole : String(vars[name]);
+    });
+  }
+
+  // src/static/sdk-libs/atelier/workflow-input.js
+  var NOT_WAITING = "WORKFLOW_STEP_NOT_WAITING";
+  function workflowsOf() {
+    const ns = (
+      /** @type {any} */
+      window.AIMEAT
+    );
+    const wf = ns && ns.workflows;
+    return wf && typeof wf.pendingInputs === "function" && typeof wf.answer === "function" ? wf : null;
+  }
+  function signedOut3() {
+    const ns = (
+      /** @type {any} */
+      window.AIMEAT
+    );
+    const auth = ns && ns.auth;
+    return !!(auth && typeof auth.getSession === "function" && !auth.getSession());
+  }
+  function listOf(r) {
+    if (Array.isArray(r)) return r;
+    const list2 = r && (r.inputs || r.items);
+    return Array.isArray(list2) ? list2 : [];
+  }
+  function local(v) {
+    if (v == null) return "";
+    if (typeof v !== "object") return String(v);
+    const keys2 = Object.keys(v);
+    const base = function(k) {
+      return k.toLowerCase().split(/[-_]/)[0];
+    };
+    const lang = i18n.lang();
+    const hit = keys2.find(function(k) {
+      return base(k) === lang;
+    }) || keys2.find(function(k) {
+      return base(k) === "en";
+    }) || keys2[0];
+    return hit ? String(v[hit]) : "";
+  }
+  function when(iso) {
+    if (!iso) return "";
+    return dateTime(iso, { dateStyle: "medium", timeStyle: "short" });
+  }
+  function keyOf2(p) {
+    return p.workflowId + "/" + p.runId + "/" + p.stepId;
+  }
+  function isGone(e) {
+    return !!e && (e.code === NOT_WAITING || e.status === 409);
+  }
+  function sampleInputs() {
+    const now2 = Date.now();
+    const at = function(hours) {
+      return new Date(now2 + hours * 36e5).toISOString();
+    };
+    return [
+      {
+        workflowId: "sample-newsletter",
+        runId: "run-7f3a91c2",
+        stepId: "review",
+        mode: "full-live",
+        workflowTitle: twf("wf.sample.wf1"),
+        askedAt: at(-2),
+        deadline: at(22),
+        question: {
+          header: twf("wf.sample.header1"),
+          prompt: twf("wf.sample.q1"),
+          allowOther: false,
+          options: [
+            { id: "send", label: twf("wf.sample.send") },
+            { id: "hold", label: twf("wf.sample.hold") },
+            { id: "stop", label: twf("wf.sample.stop") }
+          ]
+        }
+      },
+      {
+        workflowId: "sample-suppliers",
+        runId: "run-0b6d44e8",
+        stepId: "pick-suppliers",
+        mode: "full-sandbox",
+        workflowTitle: twf("wf.sample.wf2"),
+        askedAt: at(-20),
+        deadline: at(52),
+        question: {
+          prompt: twf("wf.sample.q2"),
+          multiSelect: true,
+          options: [
+            { id: "mill", label: twf("wf.sample.s1") },
+            { id: "bakery", label: twf("wf.sample.s2") },
+            { id: "harbour", label: twf("wf.sample.s3") }
+          ]
+        }
+      }
+    ];
+  }
+  function workflowInput(spec) {
+    const s = spec || {};
+    const sample = s.sample === true || s.run != null && isPlaceholder2(s.run);
+    const variant = s.variant === "dense" ? "dense" : "default";
+    const root = el("section", {
+      class: "ak-root ak-wf" + (variant === "dense" ? " ak-wf--dense" : ""),
+      "data-ak-part": "root",
+      "data-ak-variant": variant
+    });
+    if (s.target) resolve(s.target).appendChild(root);
+    const titleEl = el("h3", { class: "ak-wf__title", "data-ak-part": "title" });
+    const introEl = el("p", { class: "ak-wf__intro", "data-ak-part": "intro" });
+    const failureEl = el("p", { class: "ak-wf__failure", role: "alert", tabindex: "-1", "data-ak-part": "failure" });
+    const noticeEl = el("p", { class: "ak-wf__notice", role: "status", tabindex: "-1", "data-ak-part": "notice" });
+    const body = el("div", { class: "ak-wf__body", "data-ak-part": "body" });
+    root.appendChild(titleEl);
+    root.appendChild(introEl);
+    root.appendChild(failureEl);
+    root.appendChild(noticeEl);
+    root.appendChild(body);
+    let items = [];
+    let loaded3 = false;
+    let stop = "";
+    let failure = "";
+    let notice = "";
+    let drawn = "";
+    let seq2 = 0;
+    let destroyed = false;
+    const drafts = /* @__PURE__ */ new Map();
+    const stepErrors = /* @__PURE__ */ new Map();
+    const answered = /* @__PURE__ */ new Set();
+    const sending = /* @__PURE__ */ new Set();
+    function draftOf(key) {
+      let d = drafts.get(key);
+      if (!d) {
+        d = { picks: [], other: "" };
+        drafts.set(key, d);
+      }
+      return d;
+    }
+    async function load() {
+      const mine = ++seq2;
+      let next = [];
+      let nextStop = "";
+      let readFailure = "";
+      if (sample) {
+        next = sampleInputs();
+      } else {
+        const wf = workflowsOf();
+        if (!wf) nextStop = twf("wf.noLib");
+        else if (signedOut3()) nextStop = twf("wf.signIn");
+        else {
+          try {
+            next = listOf(await wf.pendingInputs());
+          } catch (e) {
+            readFailure = refusal(e) || String(e);
+          }
+        }
+      }
+      if (mine !== seq2 || destroyed) return false;
+      stop = nextStop;
+      loaded3 = true;
+      if (readFailure) failure = twf("wf.loadFailed", { why: readFailure });
+      items = next.filter(function(p) {
+        return p && p.question && (sample || !s.run || p.runId === s.run) && !answered.has(keyOf2(p));
+      });
+      const live2 = new Set(items.map(keyOf2));
+      drafts.forEach(function(_v, k) {
+        if (!live2.has(k)) drafts.delete(k);
+      });
+      stepErrors.forEach(function(_v, k) {
+        if (!live2.has(k)) stepErrors.delete(k);
+      });
+      return true;
+    }
+    function focusMark() {
+      const a = (
+        /** @type {any} */
+        document.activeElement
+      );
+      if (!a || !root.contains(a) || typeof a.getAttribute !== "function") return null;
+      const id = a.getAttribute("data-ak-wf-focus");
+      return id ? { id, start: a.selectionStart, end: a.selectionEnd } : null;
+    }
+    function restoreFocus(mark) {
+      if (!mark) return;
+      const twin = (
+        /** @type {any} */
+        root.querySelector('[data-ak-wf-focus="' + mark.id.replace(/"/g, "") + '"]')
+      );
+      if (!twin || typeof twin.focus !== "function") return;
+      twin.focus();
+      if (typeof mark.start === "number" && typeof twin.setSelectionRange === "function") {
+        try {
+          twin.setSelectionRange(mark.start, mark.end);
+        } catch {
+        }
+      }
+    }
+    function draw(force) {
+      const sig = JSON.stringify([
+        i18n.lang(),
+        stop,
+        loaded3,
+        failure,
+        notice,
+        Array.from(stepErrors),
+        Array.from(sending),
+        items.map(function(p) {
+          return [keyOf2(p), p.deadline, p.question, p.workflowTitle, p.mode];
+        })
+      ]);
+      if (!force && sig === drawn) return;
+      drawn = sig;
+      const mark = focusMark();
+      clear(titleEl);
+      titleEl.appendChild(document.createTextNode(s.title || twf("wf.title")));
+      if (sample) titleEl.appendChild(sampleBadge2());
+      introEl.textContent = sample ? twf("wf.sampleNote") : twf("wf.intro");
+      failureEl.textContent = failure;
+      noticeEl.textContent = notice;
+      clear(body);
+      if (stop) {
+        body.appendChild(el("p", { class: "ak-wf__none", "data-ak-part": "none" }, stop));
+        return;
+      }
+      if (!loaded3) {
+        body.appendChild(el("p", { class: "ak-wf__none", "data-ak-part": "none" }, twf("wf.loading")));
+        return;
+      }
+      if (!items.length) {
+        body.appendChild(el("p", { class: "ak-wf__none", "data-ak-part": "none" }, s.run && !sample ? twf("wf.noneRun") : twf("wf.none")));
+        return;
+      }
+      body.appendChild(el("ul", { class: "ak-wf__list", "data-ak-part": "list" }, items.map(step)));
+      restoreFocus(mark);
+    }
+    function titleOf(p) {
+      return local(p.workflowTitle) || p.workflowId || twf("wf.untitled");
+    }
+    function step(p) {
+      const key = keyOf2(p);
+      const q = p.question || { prompt: "", options: [] };
+      const options = Array.isArray(q.options) ? q.options : [];
+      const many = !!q.multiSelect;
+      const allowOther = q.allowOther !== false;
+      const d = draftOf(key);
+      const busyNow = sending.has(key);
+      const group = uid("ak-wf-g");
+      const howId = uid("ak-wf-how");
+      const errId = uid("ak-wf-err");
+      const errorEl = el("p", { class: "ak-wf__error", id: errId, role: "alert", "data-ak-part": "error" }, stepErrors.get(key) || "");
+      const choices = options.map(function(o) {
+        const id = uid("ak-wf-o");
+        const input = (
+          /** @type {HTMLInputElement} */
+          el("input", {
+            type: many ? "checkbox" : "radio",
+            id,
+            name: group,
+            value: o.id,
+            class: "ak-wf__mark",
+            "data-ak-part": "mark",
+            "data-ak-wf-focus": key + "|o|" + o.id,
+            checked: d.picks.indexOf(o.id) !== -1 ? true : null,
+            disabled: busyNow ? true : null
+          })
+        );
+        input.addEventListener("change", function() {
+          if (many) {
+            d.picks = d.picks.filter(function(x) {
+              return x !== o.id;
+            });
+            if (input.checked) d.picks.push(o.id);
+          } else if (input.checked) {
+            d.picks = [o.id];
+          }
+          if (stepErrors.has(key)) {
+            stepErrors.delete(key);
+            errorEl.textContent = "";
+          }
+        });
+        return el("label", { class: "ak-wf__choice", "data-ak-part": "choice", for: id }, [input, el("span", {}, o.label || o.id)]);
+      });
+      let otherField = null;
+      if (allowOther) {
+        const otherId = uid("ak-wf-x");
+        const area = (
+          /** @type {HTMLTextAreaElement} */
+          el("textarea", {
+            id: otherId,
+            class: "ak-input ak-wf__text",
+            rows: 2,
+            maxlength: 2e3,
+            "data-ak-wf-focus": key + "|other",
+            disabled: busyNow ? true : null
+          })
+        );
+        area.value = d.other;
+        area.addEventListener("input", function() {
+          d.other = area.value;
+          if (stepErrors.has(key)) {
+            stepErrors.delete(key);
+            errorEl.textContent = "";
+          }
+        });
+        otherField = el("div", { class: "ak-wf__other", "data-ak-part": "other" }, [
+          el("label", { class: "ak-wf__other-label", for: otherId }, options.length ? twf("wf.other") : twf("wf.otherOnly")),
+          area
+        ]);
+      }
+      const fieldset = el("fieldset", {
+        class: "ak-wf__choices",
+        "data-ak-part": "choices",
+        "aria-describedby": (options.length ? howId + " " : "") + errId
+      }, [
+        el("legend", { class: "ak-wf__question", "data-ak-part": "question" }, q.prompt || ""),
+        options.length ? el("p", { class: "ak-wf__how", id: howId, "data-ak-part": "how" }, many ? twf("wf.pickMany") : twf("wf.pickOne")) : null,
+        options.length ? el("div", { class: "ak-wf__options" }, choices) : null,
+        otherField
+      ]);
+      const late = p.deadline && new Date(p.deadline).getTime() < Date.now();
+      const due = [
+        p.askedAt ? twf("wf.asked", { when: when(p.askedAt) }) : "",
+        p.deadline ? twf(late ? "wf.late" : "wf.deadline", { when: when(p.deadline) }) : ""
+      ].filter(Boolean).join(" · ");
+      const answerBtn = el("button", {
+        type: "submit",
+        class: "ak-btn ak-btn--primary ak-wf__answer",
+        "data-ak-part": "answer",
+        "data-ak-wf-focus": key + "|answer",
+        disabled: sample || busyNow ? true : null,
+        "aria-busy": busyNow ? "true" : null
+      }, twf("wf.answer"));
+      const form2 = el("form", { class: "ak-wf__form", "data-ak-part": "form", novalidate: true }, [
+        fieldset,
+        errorEl,
+        el("div", { class: "ak-wf__bar", "data-ak-part": "bar" }, [
+          due ? el("p", { class: "ak-wf__deadline" + (late ? " is-late" : ""), "data-ak-part": "deadline" }, due) : null,
+          answerBtn
+        ])
+      ]);
+      form2.addEventListener("submit", function(e) {
+        if (e && typeof e.preventDefault === "function") e.preventDefault();
+        send(p, errorEl, fieldset);
+      });
+      const runWords = [twf("wf.run", { id: String(p.runId || "").slice(0, 8) })];
+      if (p.mode === "full-sandbox") runWords.push(twf("wf.testRun"));
+      return el("li", { class: "ak-wf__step", "data-ak-part": "step", "data-ak-wf-step": key }, [
+        el("div", { class: "ak-wf__head", "data-ak-part": "head" }, [
+          q.header ? el("span", { class: "ak-wf__header", "data-ak-part": "header" }, q.header) : null,
+          el("span", { class: "ak-wf__workflow", "data-ak-part": "workflow" }, titleOf(p)),
+          el("span", { class: "ak-wf__run", "data-ak-part": "run", title: p.runId || null }, runWords.join(" · "))
+        ]),
+        form2
+      ]);
+    }
+    async function send(p, errorEl, fieldset) {
+      const key = keyOf2(p);
+      if (sample || sending.has(key)) return;
+      const wf = workflowsOf();
+      if (!wf) return;
+      const q = p.question || { prompt: "", options: [] };
+      const ids = (Array.isArray(q.options) ? q.options : []).map(function(o) {
+        return o.id;
+      });
+      const allowOther = q.allowOther !== false;
+      const d = draftOf(key);
+      const picks = d.picks.filter(function(id) {
+        return ids.indexOf(id) !== -1;
+      });
+      const other = allowOther ? d.other.trim() : "";
+      if (!picks.length && !other) {
+        const why = allowOther ? twf("wf.needPickOrText") : twf("wf.needPick");
+        stepErrors.set(key, why);
+        errorEl.textContent = why;
+        const first = (
+          /** @type {any} */
+          fieldset.querySelector("input, textarea")
+        );
+        if (first && typeof first.focus === "function") first.focus();
+        return;
+      }
+      const answer = { picks: q.multiSelect ? picks : picks.slice(0, 1) };
+      if (other) answer.other = other;
+      failure = "";
+      notice = "";
+      stepErrors.delete(key);
+      sending.add(key);
+      draw();
+      let gone = false;
+      try {
+        await wf.answer(p.workflowId, p.runId, p.stepId, answer);
+        answered.add(key);
+        drafts.delete(key);
+        notice = twf("wf.answered", { workflow: titleOf(p) });
+        if (typeof s.onAnswered === "function") {
+          try {
+            s.onAnswered(p, answer);
+          } catch (e) {
+            console.debug("aimeat-atelier: onAnswered threw", e);
+          }
+        }
+      } catch (e) {
+        if (isGone(e)) {
+          gone = true;
+          failure = twf("wf.gone");
+          drafts.delete(key);
+        } else stepErrors.set(key, twf("wf.failed", { why: refusal(e) || String(e) }));
+      }
+      sending.delete(key);
+      if (destroyed) return;
+      const focusWasHere = !document.activeElement || document.activeElement === document.body || root.contains(document.activeElement);
+      if (answered.has(key) || gone) items = items.filter(function(x) {
+        return keyOf2(x) !== key;
+      });
+      draw();
+      if (focusWasHere) {
+        const twin = (
+          /** @type {any} */
+          root.querySelector('[data-ak-wf-focus="' + key + '|answer"]')
+        );
+        const target = twin || (gone ? failureEl : noticeEl);
+        if (typeof target.focus === "function") target.focus();
+      }
+      await render();
+    }
+    async function render(force) {
+      if (destroyed) return;
+      if (!loaded3) draw(true);
+      if (await load()) draw(force);
+    }
+    let unsubLive = null;
+    const live = (
+      /** @type {any} */
+      window.AIMEAT && /** @type {any} */
+      window.AIMEAT.live
+    );
+    if (!sample && live && typeof live.subscribe === "function") {
+      unsubLive = live.subscribe(["workflows"], function() {
+        if (destroyed) return;
+        if (!root.isConnected) {
+          stopAll();
+          return;
+        }
+        render();
+      });
+    }
+    const ready0 = render(true).then(function() {
+      enter(root);
+    });
+    const stopWatch = watch(function() {
+      failure = "";
+      notice = "";
+      render(true);
+    }, root);
+    function stopAll() {
+      stopWatch();
+      if (typeof unsubLive === "function") {
+        try {
+          unsubLive();
+        } catch {
+        }
+      }
+      unsubLive = null;
+    }
+    return {
+      el: root,
+      refresh: function() {
+        return ready0.then(function() {
+          return render();
+        });
+      },
+      destroy: function() {
+        destroyed = true;
+        stopAll();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/ai-task.js
+  function aiOf() {
+    const ns = (
+      /** @type {any} */
+      window.AIMEAT
+    );
+    return ns && ns.ai ? ns.ai : null;
+  }
+  function authOf() {
+    const ns = (
+      /** @type {any} */
+      window.AIMEAT
+    );
+    return ns && ns.auth ? ns.auth : null;
+  }
+  function signedOut4() {
+    const auth = authOf();
+    return !!(auth && typeof auth.getSession === "function" && !auth.getSession());
+  }
+  function unset3(v) {
+    return !v || isPlaceholder2(v);
+  }
+  function money2(v, currency) {
+    if (typeof v !== "number" || !isFinite(v)) return "";
+    const code = /^[A-Za-z]{3}$/.test(String(currency || "")) ? String(currency).toUpperCase() : "USD";
+    return money(v, code);
+  }
+  var CODES = ["NO_API_KEY", "INVALID_API_KEY", "QUOTA_EXHAUSTED", "APP_QUOTA_EXHAUSTED", "RATE_LIMITED", "JSON_SCHEMA_MISMATCH"];
+  function errorWords(e) {
+    const code = e && e.code === "JSON_PARSE_FAILED" ? "JSON_SCHEMA_MISMATCH" : e && e.code;
+    if (code && CODES.indexOf(code) >= 0) return tai("aiTask.err." + code);
+    const why = e && e.message ? String(e.message) : "";
+    return why ? tai("aiTask.err.generic", { why }) : tai("aiTask.err.noReason");
+  }
+  function aiTask(spec) {
+    const s = Object.assign({}, spec);
+    const root = el("section", { class: "ak-root ak-aitask", "data-ak-part": "root" });
+    applyVariant(root, s, ["compact"]);
+    if (s.target) resolve(s.target).appendChild(root);
+    const state = {
+      avail: "checking",
+      fix: "",
+      text: "",
+      busy: false,
+      /** @type {any} */
+      answer: null,
+      /** @type {any} */
+      error: null,
+      session: !signedOut4()
+    };
+    let gen = 0;
+    let dead = false;
+    let inFlight = null;
+    let panel = null;
+    let parts = {};
+    const isSample = function() {
+      return s.sample === true || unset3(s.appId);
+    };
+    const hasBox = function() {
+      return s.input !== null;
+    };
+    const minChars = function() {
+      const n = s.input && typeof s.input.minChars === "number" ? s.input.minChars : 1;
+      return Math.max(1, Math.floor(n));
+    };
+    const promptText = function() {
+      return typeof s.prompt === "function" ? String(s.prompt(hasBox() ? state.text : "") || "") : "";
+    };
+    async function probe() {
+      if (isSample()) return { avail: "sample", fix: "" };
+      const lib = aiOf();
+      if (!lib) return { avail: "nolib", fix: "" };
+      if (signedOut4()) return { avail: "signedout", fix: "" };
+      if (typeof lib.capabilities === "function") {
+        try {
+          const caps = await lib.capabilities({ app_id: s.appId });
+          const text = caps && caps.capabilities && caps.capabilities.text;
+          if (text && text.on === false) return { avail: "off", fix: String(text.fix || text.message || text.reason || "") };
+          if (text && text.on === true) return { avail: "on", fix: "" };
+        } catch (e) {
+          console.debug("aimeat-atelier: aiTask capabilities not read", e);
+        }
+      }
+      if (typeof lib.isAvailable === "function") {
+        const ok = await Promise.resolve(lib.isAvailable()).catch(function() {
+          return false;
+        });
+        return ok ? { avail: "on", fix: "" } : { avail: "off", fix: "" };
+      }
+      return { avail: "on", fix: "" };
+    }
+    async function refresh() {
+      const mine = ++gen;
+      state.avail = "checking";
+      build();
+      const r = await probe();
+      if (mine !== gen || dead) return;
+      state.avail = r.avail;
+      state.fix = r.fix;
+      build();
+    }
+    function sampleAnswer() {
+      return { content: tai("aiTask.sampleAnswer"), model: "sample-model", budget: { spent_today_usd: 0.02, daily_budget_usd: 1 }, sample: true };
+    }
+    function reason() {
+      if (!hasBox()) return "";
+      const n = state.text.trim().length;
+      if (n === 0) return tai("aiTask.needText");
+      if (n < minChars()) return tai("aiTask.needChars", { n: minChars(), m: n });
+      return "";
+    }
+    const canAsk = function() {
+      return state.avail === "on" || state.avail === "sample";
+    };
+    function build() {
+      if (panel) {
+        panel.destroy();
+        panel = null;
+      }
+      clear(root);
+      parts = {};
+      if (state.avail === "sample") state.answer = sampleAnswer();
+      root.appendChild(el(
+        "h3",
+        { class: "ak-aitask__title", "data-ak-part": "title" },
+        [s.title || tai("aiTask.title"), state.avail === "sample" ? sampleBadge2() : null].filter(Boolean)
+      ));
+      if (s.hint) root.appendChild(el("p", { class: "ak-aitask__hint", "data-ak-part": "hint" }, s.hint));
+      notice();
+      const live = canAsk() || state.avail === "checking";
+      if (live || s.copyPrompt) ask2(live);
+      parts.failure = el("p", { class: "ak-aitask__failure", role: "alert", "data-ak-part": "failure", hidden: true });
+      root.appendChild(parts.failure);
+      parts.answer = el("div", { class: "ak-aitask__answer", "data-ak-part": "result", role: "region", "aria-label": tai("aiTask.answer"), hidden: true });
+      root.appendChild(parts.answer);
+      if (s.copyPrompt) copyRoute();
+      paint();
+      drawAnswer2(parts.answer);
+    }
+    function notice() {
+      let words = "";
+      if (state.avail === "sample") words = tai("aiTask.sampleNote");
+      else if (state.avail === "nolib") words = s.copyPrompt ? tai("aiTask.noLibCopy") : tai("aiTask.noLib");
+      else if (state.avail === "signedout") words = tai("aiTask.signIn");
+      else if (state.avail === "off") words = state.fix || tai("aiTask.off");
+      if (!words) return;
+      const line = el("p", { class: "ak-aitask__notice", "data-ak-part": "notice" }, words);
+      root.appendChild(line);
+      const auth = authOf();
+      if (state.avail === "signedout" && auth && typeof auth.signIn === "function") {
+        const b = el("button", { type: "button", class: "ak-btn ak-btn--primary", "data-ak-part": "signIn", "data-ak-noguard": true }, tai("aiTask.signInBtn"));
+        b.addEventListener("click", function() {
+          Promise.resolve(auth.signIn()).catch(function(e) {
+            console.debug("aimeat-atelier: sign-in closed", e);
+          });
+        });
+        root.appendChild(el("div", { class: "ak-aitask__bar" }, [b]));
+      }
+    }
+    function ask2(live) {
+      const id = uid("ak-aitask");
+      const reasonId = id + "-why";
+      if (hasBox()) {
+        const cfg2 = s.input || {};
+        const multi = cfg2.multiline !== false;
+        const box = (
+          /** @type {HTMLTextAreaElement} */
+          el(multi ? "textarea" : "input", {
+            id,
+            class: "ak-input" + (multi ? " ak-input--area" : ""),
+            "data-ak-part": "input",
+            type: multi ? null : "text",
+            rows: multi ? s.variant === "compact" ? 2 : 4 : null,
+            placeholder: cfg2.placeholder || null,
+            "aria-describedby": reasonId,
+            autocomplete: "off"
+          })
+        );
+        box.value = state.text;
+        box.addEventListener("input", function() {
+          state.text = box.value;
+          paint();
+        });
+        root.appendChild(el("div", { class: "ak-form__field ak-aitask__field" }, [
+          el("label", { class: "ak-form__label", "data-ak-part": "label", for: id }, cfg2.label || tai("aiTask.inputLabel")),
+          box
+        ]));
+        parts.box = box;
+      }
+      parts.reason = el("p", { class: "ak-aitask__reason", "data-ak-part": "reason", id: reasonId, hidden: true });
+      root.appendChild(parts.reason);
+      if (!live) return;
+      const run = el("button", {
+        type: "button",
+        class: "ak-btn ak-btn--primary",
+        "data-ak-part": "run",
+        "data-ak-noguard": true,
+        "aria-describedby": reasonId
+      }, s.runLabel || tai("aiTask.run"));
+      run.addEventListener("click", function() {
+        go();
+      });
+      parts.run = run;
+      parts.status = el("p", { class: "ak-aitask__status", role: "status", "data-ak-part": "status" });
+      root.appendChild(el("div", { class: "ak-aitask__bar", "data-ak-part": "bar" }, [run, parts.status]));
+    }
+    function copyRoute() {
+      const host = el("div", { class: "ak-aitask__copy", "data-ak-part": "copyRoute" }, [
+        el("h4", { class: "ak-aitask__copy-title" }, tai("aiTask.copyTitle"))
+      ]);
+      root.appendChild(host);
+      panel = promptPanel({
+        target: host,
+        prompt: promptText,
+        expect: s.schema ? "json" : "text",
+        onResult: function(value, raw) {
+          const r = { content: raw, pasted: true, provenance: null };
+          if (s.schema) r.parsed = value;
+          state.answer = r;
+          state.error = null;
+          paint();
+          drawAnswer2(parts.answer);
+          if (typeof s.onResult === "function") s.onResult(r);
+        }
+      });
+    }
+    function paint() {
+      const why = reason();
+      if (parts.reason) {
+        parts.reason.textContent = state.avail === "checking" ? tai("aiTask.checking") : why;
+        parts.reason.hidden = !(why || state.avail === "checking");
+      }
+      const run = (
+        /** @type {HTMLButtonElement|undefined} */
+        parts.run
+      );
+      if (run) {
+        run.disabled = state.busy || !!why || !canAsk();
+        run.classList.toggle("ak-busy", state.busy);
+        if (state.busy) run.setAttribute("aria-busy", "true");
+        else run.removeAttribute("aria-busy");
+      }
+      if (parts.status) {
+        parts.status.textContent = state.busy ? tai("aiTask.running") : state.answer && !state.answer.sample ? tai("aiTask.ready") : "";
+        parts.status.classList.toggle("ak-sr-only", !state.busy);
+      }
+      paintCopy(why);
+      if (parts.failure) {
+        parts.failure.textContent = state.error ? errorWords(state.error) : "";
+        parts.failure.hidden = !state.error;
+      }
+    }
+    function paintCopy(why) {
+      const host = panel ? (
+        /** @type {any} */
+        panel.el
+      ) : null;
+      if (!host) return;
+      const preview = host.querySelector('[data-ak-part="preview"]');
+      if (preview && !preview.classList.contains("ak-promptpanel__preview--full")) {
+        const lines = promptText().split("\n");
+        preview.textContent = lines[0].slice(0, 120) + "… (" + (lines.length === 1 ? t("promptLine1") : t("promptLines", { n: lines.length })) + ")";
+      }
+      const copy2 = host.querySelector('[data-ak-part="copy"]');
+      if (copy2) copy2.disabled = !!why;
+    }
+    function drawAnswer2(host) {
+      if (!host) return;
+      clear(host);
+      const r = state.answer;
+      host.hidden = !r;
+      if (!r) return;
+      const label = el("div", { class: "ak-aitask__label", "data-ak-part": "aiLabel" });
+      host.appendChild(label);
+      const lib = aiOf();
+      if (r.provenance && lib && typeof lib.disclose === "function") {
+        try {
+          lib.disclose(r.provenance, { target: label });
+        } catch (e) {
+          console.debug("aimeat-atelier: AI label not drawn", e);
+        }
+      }
+      const body = el("div", { class: "ak-aitask__body", "data-ak-part": "body" });
+      host.appendChild(body);
+      drawBody(r, body);
+      const meta = [];
+      if (r.pasted) meta.push(el("span", { class: "ak-aitask__model", "data-ak-part": "model" }, tai("aiTask.pasted")));
+      if (r.model) meta.push(el("span", { class: "ak-aitask__model", "data-ak-part": "model" }, tai("aiTask.model", { model: r.model })));
+      const b = r.budget;
+      if (b && typeof b.spent_today_usd === "number") {
+        const cap = typeof b.daily_budget_usd === "number" && b.daily_budget_usd > 0;
+        meta.push(el("span", { class: "ak-aitask__cost", "data-ak-part": "cost" }, cap ? tai("aiTask.cost", { spent: money2(b.spent_today_usd, b.currency), budget: money2(b.daily_budget_usd, b.currency) }) : tai("aiTask.costNoCap", { spent: money2(b.spent_today_usd, b.currency) })));
+      }
+      if (meta.length) host.appendChild(el("p", { class: "ak-aitask__meta", "data-ak-part": "meta" }, meta));
+      if (r.truncated) host.appendChild(el("p", { class: "ak-aitask__truncated", "data-ak-part": "truncated" }, tai("aiTask.truncated")));
+    }
+    function drawBody(r, body) {
+      if (typeof s.render === "function") {
+        try {
+          s.render(r, body);
+        } catch (e) {
+          body.textContent = String(r.content || "");
+          console.debug("aimeat-atelier: aiTask render failed", e);
+        }
+        return;
+      }
+      const text = s.schema && r.parsed !== void 0 && !r.pasted ? JSON.stringify(r.parsed, null, 2) : String(r.content == null ? "" : r.content);
+      if (s.schema) {
+        body.appendChild(el("pre", { class: "ak-aitask__json" }, text));
+        return;
+      }
+      const ns = (
+        /** @type {any} */
+        window.AIMEAT
+      );
+      const md = ns && ns.md;
+      if (s.render !== "text" && md && typeof md.render === "function") {
+        try {
+          md.render(text, body);
+          return;
+        } catch (e) {
+          console.debug("aimeat-atelier: markdown not drawn", e);
+        }
+      }
+      body.appendChild(el("div", { class: "ak-aitask__text" }, text));
+    }
+    function go() {
+      if (inFlight) return inFlight;
+      if (!canAsk() || reason()) return Promise.resolve(null);
+      state.error = null;
+      if (state.avail === "sample") {
+        state.answer = sampleAnswer();
+        paint();
+        drawAnswer2(parts.answer);
+        return Promise.resolve(null);
+      }
+      const lib = aiOf();
+      if (!lib) return Promise.resolve(null);
+      const opts = Object.assign({}, s.options || {}, { app_id: s.appId, prompt: promptText() });
+      if (s.systemPrompt) opts.systemPrompt = s.systemPrompt;
+      if (s.schema) opts.schema = s.schema;
+      state.busy = true;
+      state.answer = null;
+      paint();
+      drawAnswer2(parts.answer);
+      const call = new Promise(function(ok) {
+        ok(s.schema ? lib.completeJson(opts) : lib.complete(opts));
+      });
+      inFlight = call.then(function(r) {
+        state.answer = r;
+        return r;
+      }, function(e) {
+        if (!(e && e.code === "SPEND_CANCELLED")) state.error = { code: e && e.code, message: e && e.message ? e.message : String(e || "") };
+        return null;
+      }).then(function(r) {
+        state.busy = false;
+        inFlight = null;
+        if (dead) return r;
+        paint();
+        drawAnswer2(parts.answer);
+        if (state.error && parts.failure) attention(parts.failure, "shake");
+        if (r && typeof s.onResult === "function") s.onResult(r);
+        return r;
+      });
+      return inFlight;
+    }
+    const stopWatch = watch(function() {
+      const now2 = !signedOut4();
+      if (now2 !== state.session) {
+        state.session = now2;
+        state.answer = null;
+        state.error = null;
+        const lib = aiOf();
+        if (lib && typeof lib.invalidateCache === "function") lib.invalidateCache();
+        refresh();
+        return;
+      }
+      build();
+    }, root);
+    const ready2 = refresh().then(function() {
+      enter(root);
+    });
+    return {
+      el: root,
+      /** Run once, with `text` put in the box first when it is given. */
+      run: function(text) {
+        if (typeof text === "string") {
+          state.text = text;
+          if (parts.box) parts.box.value = text;
+          paint();
+        }
+        return ready2.then(go);
+      },
+      /** Change any part of the spec; a new appId or sample flag reads the route again. */
+      set: function(patch) {
+        if (!patch) return;
+        const reprobe = "appId" in patch && patch.appId !== s.appId || "sample" in patch && patch.sample !== s.sample;
+        Object.assign(s, patch);
+        if ("variant" in patch) {
+          root.removeAttribute("data-ak-variant");
+          applyVariant(root, s, ["compact"]);
+        }
+        if (reprobe) {
+          state.answer = null;
+          state.error = null;
+          refresh();
+        } else build();
+      },
+      destroy: function() {
+        dead = true;
+        gen += 1;
+        stopWatch();
+        if (panel) {
+          panel.destroy();
+          panel = null;
+        }
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/decision-i18n.js
+  var STRINGS8 = {
+    en: {
+      "doc.empty.title": "Nothing written here yet",
+      "doc.empty.hint": "The text appears here when there is some.",
+      "doc.sources": "Sources",
+      "doc.shortened": "shortened link, the address does not show where it goes",
+      "doc.sampleNote": "A sample document.",
+      "doc.sample": "## Weekly summary\n\nThree orders arrived and **two** went out. The supplier list is in [the shared workspace](https://example.com).\n\n- Check the invoice from Kim\n- Answer the bakery by Friday\n\n> The delivery van is free on Thursday.\n\n| Item | Count |\n| --- | --- |\n| Orders in | 3 |\n| Orders out | 2 |\n\n```\ntotal = in - out\n```",
+      "decision.title": "Decision",
+      "decision.sampleNote": "A sample. Nothing is asked and nothing is recorded from here.",
+      "decision.sampleReview": "A sample. Nothing was recorded.",
+      "decision.signIn": "Sign in to ask the decision model.",
+      "decision.noLib": "This block needs aimeat-decide.js on the page.",
+      "decision.noQuestions": "This block needs questions or a decision rule.",
+      "decision.unavailable": "The decision model is not available on this account.",
+      "decision.settings": "Open AI settings",
+      "decision.empty.title": "Nothing to judge yet",
+      "decision.empty.hint": "The answer appears here when there is something to ask about.",
+      "decision.ready": "Ready to ask. Each question uses your AI budget.",
+      "decision.ask": "Ask the decision model",
+      "decision.again": "Ask again",
+      "decision.asking": "Asking the decision model…",
+      "decision.answered": "The decision model answered.",
+      "decision.provider": "Decision model",
+      "decision.providerDefault": "{title} (your default)",
+      "decision.providersFailed": "The list of decision models did not load: {why}",
+      "decision.probability": "Probability",
+      "decision.confidence": "Confidence",
+      "decision.threshold": "threshold {t}",
+      "decision.passed": "reaches the threshold",
+      "decision.under": "under the threshold",
+      "decision.outcome.act": "The answer is sure enough to act on.",
+      "decision.outcome.ask": "The answer is not sure enough. A person decides.",
+      "decision.outcome.stop": "The rule says stop: what it tests for is not there.",
+      "decision.removedLead": "Taken out of the text before sending: ",
+      "decision.removedTail": ". The text on your screen did not change.",
+      "decision.removedNone": "No personal data was found, so nothing was taken out of the text before sending.",
+      "decision.scrubSkipped": "The text was marked public, so nothing was taken out of it before sending.",
+      "decision.kind.person.1": "name",
+      "decision.kind.person.n": "names",
+      "decision.kind.email.1": "e-mail address",
+      "decision.kind.email.n": "e-mail addresses",
+      "decision.kind.phone.1": "phone number",
+      "decision.kind.phone.n": "phone numbers",
+      "decision.kind.hetu.1": "identity code",
+      "decision.kind.hetu.n": "identity codes",
+      "decision.kind.iban.1": "account number",
+      "decision.kind.iban.n": "account numbers",
+      "decision.kind.address.1": "street address",
+      "decision.kind.address.n": "street addresses",
+      "decision.cost": "Cost {cost}, {paid}.",
+      "decision.costOnly": "Cost {cost}.",
+      "decision.model": "Model: {model}.",
+      "decision.cached": "Answered from earlier answers, at no cost.",
+      "decision.key.own": "paid with your own key",
+      "decision.key.node": "paid from the AI allowance of this service",
+      "decision.key.agent": "paid with the agent's own key",
+      "decision.key.none": "no key was needed",
+      "decision.who": "Answered by {provider} ({where}, {chosen}).",
+      "decision.where.hosted": "an outside service",
+      "decision.where.local": "your own machine",
+      "decision.chosen.call": "chosen by this app",
+      "decision.chosen.rule": "chosen by the rule",
+      "decision.chosen.agent": "set for this agent",
+      "decision.chosen.owner": "your default",
+      "decision.chosen.node": "the default of this service",
+      "decision.youDecide": "The model is not sure enough. You decide.",
+      "decision.personDecides": "The model is not sure enough. A person decides.",
+      "decision.confirm": "Confirm",
+      "decision.override": "Override",
+      "decision.overrideWith": "Your answer for {q}",
+      "decision.yes": "Yes",
+      "decision.no": "No",
+      "decision.note": "Note (you can leave this empty)",
+      "decision.record": "Save my answer",
+      "decision.cancel": "Cancel",
+      "decision.recorded.confirmed": "Saved: you confirmed the answer.",
+      "decision.recorded.overridden": "Saved: you changed the answer to {v}.",
+      "decision.reviewFailed": "Your answer was not saved: {why}",
+      "decision.failed": "The question did not go through: {why}",
+      "decision.retry": "Try again",
+      "decision.err.DECIDE_DISABLED": "The decision model is turned off on this service.",
+      "decision.err.NO_API_KEY": "No key for the decision model is set. Add one in AI settings.",
+      "decision.err.QUOTA_EXHAUSTED": "Your AI budget is used up for now.",
+      "decision.err.APP_QUOTA_EXHAUSTED": "This app has used its AI budget for today.",
+      "decision.err.DATAMAP_REQUIRED": "This app must say in its data map that text goes to the decision model before it can ask.",
+      "decision.err.RATE_LIMITED": "Too many questions at once. Try again in a moment.",
+      "decision.err.INVALID_REQUEST": "The questions do not fit the limits of the decision model.",
+      "decision.err.PROVIDER_CANNOT_CARRY": "This decision model cannot take these questions. Choose another one, or ask fewer options.",
+      "decision.err.UNKNOWN_PROVIDER": "That decision model is not available on this service.",
+      "decision.err.PRIVATE_EGRESS_REQUIRED": "This decision model runs on your own machine, and the service is not allowed to reach it.",
+      "decision.err.NOT_FOUND": "That decision rule was not found, or it is for agents only."
+    },
+    fi: {
+      "doc.empty.title": "Täällä ei ole vielä tekstiä",
+      "doc.empty.hint": "Teksti näkyy tässä, kun sitä on.",
+      "doc.sources": "Lähteet",
+      "doc.shortened": "lyhennetty linkki, osoitteesta ei näe, minne se vie",
+      "doc.sampleNote": "Esimerkkiasiakirja.",
+      "doc.sample": "## Viikon yhteenveto\n\nTilauksia tuli kolme, ja **kaksi** lähti eteenpäin. Toimittajien lista on [yhteisessä työtilassa](https://example.com).\n\n- Tarkista Kimin lasku\n- Vastaa leipomolle perjantaihin mennessä\n\n> Pakettiauto on vapaana torstaina.\n\n| Asia | Määrä |\n| --- | --- |\n| Tilauksia sisään | 3 |\n| Tilauksia ulos | 2 |\n\n```\nyhteensä = sisään - ulos\n```",
+      "decision.title": "Päätös",
+      "decision.sampleNote": "Tämä on esimerkki. Täältä ei kysytä mitään eikä mitään tallenneta.",
+      "decision.sampleReview": "Tämä on esimerkki. Mitään ei tallennettu.",
+      "decision.signIn": "Kirjaudu sisään, niin voit kysyä päätösmallilta.",
+      "decision.noLib": "Tämä osa tarvitsee sivulle kirjaston aimeat-decide.js.",
+      "decision.noQuestions": "Tämä osa tarvitsee kysymykset tai päätössäännön.",
+      "decision.unavailable": "Päätösmalli ei ole käytettävissä tällä tilillä.",
+      "decision.settings": "Avaa tekoälyn asetukset",
+      "decision.empty.title": "Arvioitavaa ei vielä ole",
+      "decision.empty.hint": "Vastaus näkyy tässä, kun on jotain kysyttävää.",
+      "decision.ready": "Voit kysyä. Jokainen kysymys käyttää tekoälybudjettiasi.",
+      "decision.ask": "Kysy päätösmallilta",
+      "decision.again": "Kysy uudelleen",
+      "decision.asking": "Odotetaan päätösmallin vastausta…",
+      "decision.answered": "Päätösmalli vastasi.",
+      "decision.provider": "Päätösmalli",
+      "decision.providerDefault": "{title} (oletuksesi)",
+      "decision.providersFailed": "Päätösmallien lista ei latautunut: {why}",
+      "decision.probability": "Todennäköisyys",
+      "decision.confidence": "Varmuus",
+      "decision.threshold": "kynnys {t}",
+      "decision.passed": "ylittää kynnyksen",
+      "decision.under": "jää alle kynnyksen",
+      "decision.outcome.act": "Vastaus on niin varma, että sen mukaan voi toimia.",
+      "decision.outcome.ask": "Vastaus ei ole tarpeeksi varma. Ihminen päättää.",
+      "decision.outcome.stop": "Sääntö pysäyttää: sitä, mitä se etsii, ei ole.",
+      "decision.removedLead": "Tekstistä poistettiin ennen lähetystä: ",
+      "decision.removedTail": ". Ruudullasi teksti on ennallaan.",
+      "decision.removedNone": "Henkilötietoja ei löytynyt, joten tekstistä ei poistettu mitään ennen lähetystä.",
+      "decision.scrubSkipped": "Teksti oli merkitty julkiseksi, joten siitä ei poistettu mitään ennen lähetystä.",
+      "decision.kind.person.1": "nimi",
+      "decision.kind.person.n": "nimeä",
+      "decision.kind.email.1": "sähköpostiosoite",
+      "decision.kind.email.n": "sähköpostiosoitetta",
+      "decision.kind.phone.1": "puhelinnumero",
+      "decision.kind.phone.n": "puhelinnumeroa",
+      "decision.kind.hetu.1": "henkilötunnus",
+      "decision.kind.hetu.n": "henkilötunnusta",
+      "decision.kind.iban.1": "tilinumero",
+      "decision.kind.iban.n": "tilinumeroa",
+      "decision.kind.address.1": "katuosoite",
+      "decision.kind.address.n": "katuosoitetta",
+      "decision.cost": "Hinta {cost}, {paid}.",
+      "decision.costOnly": "Hinta {cost}.",
+      "decision.model": "Malli: {model}.",
+      "decision.cached": "Vastaus tuli aiemmista vastauksista, eikä se maksanut mitään.",
+      "decision.key.own": "maksettu omalla avaimellasi",
+      "decision.key.node": "maksettu tämän palvelun tekoälykiintiöstä",
+      "decision.key.agent": "maksettu agentin omalla avaimella",
+      "decision.key.none": "avainta ei tarvittu",
+      "decision.who": "Vastasi {provider} ({where}, {chosen}).",
+      "decision.where.hosted": "ulkoinen palvelu",
+      "decision.where.local": "oma koneesi",
+      "decision.chosen.call": "tämä sovellus valitsi",
+      "decision.chosen.rule": "sääntö valitsi",
+      "decision.chosen.agent": "asetettu tälle agentille",
+      "decision.chosen.owner": "oletuksesi",
+      "decision.chosen.node": "tämän palvelun oletus",
+      "decision.youDecide": "Malli ei ole tarpeeksi varma. Sinä päätät.",
+      "decision.personDecides": "Malli ei ole tarpeeksi varma. Ihminen päättää.",
+      "decision.confirm": "Hyväksy",
+      "decision.override": "Muuta vastausta",
+      "decision.overrideWith": "Vastauksesi kysymykseen {q}",
+      "decision.yes": "Kyllä",
+      "decision.no": "Ei",
+      "decision.note": "Huomautus (voit jättää tyhjäksi)",
+      "decision.record": "Tallenna vastaukseni",
+      "decision.cancel": "Peruuta",
+      "decision.recorded.confirmed": "Tallennettu: hyväksyit vastauksen.",
+      "decision.recorded.overridden": "Tallennettu: muutit vastaukseksi {v}.",
+      "decision.reviewFailed": "Vastaustasi ei tallennettu: {why}",
+      "decision.failed": "Kysymys ei mennyt perille: {why}",
+      "decision.retry": "Yritä uudelleen",
+      "decision.err.DECIDE_DISABLED": "Päätösmalli on poistettu käytöstä tässä palvelussa.",
+      "decision.err.NO_API_KEY": "Päätösmallin avainta ei ole asetettu. Lisää avain tekoälyn asetuksissa.",
+      "decision.err.QUOTA_EXHAUSTED": "Tekoälybudjettisi on nyt käytetty.",
+      "decision.err.APP_QUOTA_EXHAUSTED": "Tämä sovellus on käyttänyt tämän päivän tekoälybudjettinsa.",
+      "decision.err.DATAMAP_REQUIRED": "Sovelluksen tietokartassa pitää lukea, että tekstiä lähtee päätösmallille. Vasta sitten se voi kysyä.",
+      "decision.err.RATE_LIMITED": "Liian monta kysymystä kerralla. Yritä hetken päästä uudelleen.",
+      "decision.err.INVALID_REQUEST": "Kysymykset eivät mahdu päätösmallin rajoihin.",
+      "decision.err.PROVIDER_CANNOT_CARRY": "Tämä päätösmalli ei pysty käsittelemään näitä kysymyksiä. Valitse toinen malli tai anna vähemmän vaihtoehtoja.",
+      "decision.err.UNKNOWN_PROVIDER": "Tämä päätösmalli ei ole käytettävissä tässä palvelussa.",
+      "decision.err.PRIVATE_EGRESS_REQUIRED": "Tämä päätösmalli toimii omalla koneellasi, eikä palvelu saa ottaa siihen yhteyttä.",
+      "decision.err.NOT_FOUND": "Päätössääntöä ei löytynyt, tai se on vain agenttien käyttöön."
+    },
+    es: {
+      "doc.empty.title": "Aquí todavía no hay texto",
+      "doc.empty.hint": "El texto aparece aquí cuando lo haya.",
+      "doc.sources": "Fuentes",
+      "doc.shortened": "enlace acortado, la dirección no muestra adónde lleva",
+      "doc.sampleNote": "Un documento de muestra.",
+      "doc.sample": "## Resumen de la semana\n\nLlegaron tres pedidos y salieron **dos**. La lista de proveedores está en [el espacio de trabajo compartido](https://example.com).\n\n- Revisa la factura de Kim\n- Contesta a la panadería antes del viernes\n\n> La camioneta de reparto está libre el jueves.\n\n| Concepto | Cantidad |\n| --- | --- |\n| Pedidos recibidos | 3 |\n| Pedidos enviados | 2 |\n\n```\ntotal = recibidos - enviados\n```",
+      "decision.title": "Decisión",
+      "decision.sampleNote": "Es una muestra. Desde aquí no se pregunta nada ni se guarda nada.",
+      "decision.sampleReview": "Es una muestra. No se guardó nada.",
+      "decision.signIn": "Inicia sesión para preguntar al modelo de decisión.",
+      "decision.noLib": "Este bloque necesita aimeat-decide.js en la página.",
+      "decision.noQuestions": "Este bloque necesita preguntas o una regla de decisión.",
+      "decision.unavailable": "El modelo de decisión no está disponible en esta cuenta.",
+      "decision.settings": "Abrir la configuración de IA",
+      "decision.empty.title": "Todavía no hay nada que evaluar",
+      "decision.empty.hint": "La respuesta aparece aquí cuando haya algo que preguntar.",
+      "decision.ready": "Puedes preguntar. Cada pregunta usa tu presupuesto de IA.",
+      "decision.ask": "Preguntar al modelo de decisión",
+      "decision.again": "Preguntar otra vez",
+      "decision.asking": "Preguntando al modelo de decisión…",
+      "decision.answered": "El modelo de decisión respondió.",
+      "decision.provider": "Modelo de decisión",
+      "decision.providerDefault": "{title} (tu opción predeterminada)",
+      "decision.providersFailed": "La lista de modelos de decisión no se cargó: {why}",
+      "decision.probability": "Probabilidad",
+      "decision.confidence": "Confianza",
+      "decision.threshold": "umbral {t}",
+      "decision.passed": "alcanza el umbral",
+      "decision.under": "no alcanza el umbral",
+      "decision.outcome.act": "La respuesta es lo bastante segura para actuar.",
+      "decision.outcome.ask": "La respuesta no es lo bastante segura. Decide una persona.",
+      "decision.outcome.stop": "La regla dice que se detenga: lo que busca no está.",
+      "decision.removedLead": "Se quitó del texto antes de enviarlo: ",
+      "decision.removedTail": ". El texto en tu pantalla no cambió.",
+      "decision.removedNone": "No se encontraron datos personales, así que no se quitó nada del texto antes de enviarlo.",
+      "decision.scrubSkipped": "El texto estaba marcado como público, así que no se quitó nada antes de enviarlo.",
+      "decision.kind.person.1": "nombre",
+      "decision.kind.person.n": "nombres",
+      "decision.kind.email.1": "correo electrónico",
+      "decision.kind.email.n": "correos electrónicos",
+      "decision.kind.phone.1": "número de teléfono",
+      "decision.kind.phone.n": "números de teléfono",
+      "decision.kind.hetu.1": "número de identidad",
+      "decision.kind.hetu.n": "números de identidad",
+      "decision.kind.iban.1": "número de cuenta",
+      "decision.kind.iban.n": "números de cuenta",
+      "decision.kind.address.1": "dirección postal",
+      "decision.kind.address.n": "direcciones postales",
+      "decision.cost": "Costo {cost}, {paid}.",
+      "decision.costOnly": "Costo {cost}.",
+      "decision.model": "Modelo: {model}.",
+      "decision.cached": "Se respondió con respuestas anteriores, sin costo.",
+      "decision.key.own": "pagado con tu propia clave",
+      "decision.key.node": "pagado con la asignación de IA de este servicio",
+      "decision.key.agent": "pagado con la clave del agente",
+      "decision.key.none": "no se necesitó clave",
+      "decision.who": "Respondió {provider} ({where}, {chosen}).",
+      "decision.where.hosted": "un servicio externo",
+      "decision.where.local": "tu propia computadora",
+      "decision.chosen.call": "elegido por esta app",
+      "decision.chosen.rule": "elegido por la regla",
+      "decision.chosen.agent": "configurado para este agente",
+      "decision.chosen.owner": "tu opción predeterminada",
+      "decision.chosen.node": "la opción predeterminada de este servicio",
+      "decision.youDecide": "El modelo no está lo bastante seguro. Decides tú.",
+      "decision.personDecides": "El modelo no está lo bastante seguro. Decide una persona.",
+      "decision.confirm": "Confirmar",
+      "decision.override": "Cambiar la respuesta",
+      "decision.overrideWith": "Tu respuesta para {q}",
+      "decision.yes": "Sí",
+      "decision.no": "No",
+      "decision.note": "Nota (puedes dejarla vacía)",
+      "decision.record": "Guardar mi respuesta",
+      "decision.cancel": "Cancelar",
+      "decision.recorded.confirmed": "Guardado: confirmaste la respuesta.",
+      "decision.recorded.overridden": "Guardado: cambiaste la respuesta a {v}.",
+      "decision.reviewFailed": "Tu respuesta no se guardó: {why}",
+      "decision.failed": "La pregunta no se completó: {why}",
+      "decision.retry": "Intentar de nuevo",
+      "decision.err.DECIDE_DISABLED": "El modelo de decisión está desactivado en este servicio.",
+      "decision.err.NO_API_KEY": "No hay una clave para el modelo de decisión. Agrégala en la configuración de IA.",
+      "decision.err.QUOTA_EXHAUSTED": "Tu presupuesto de IA se agotó por ahora.",
+      "decision.err.APP_QUOTA_EXHAUSTED": "Esta app ya usó su presupuesto de IA de hoy.",
+      "decision.err.DATAMAP_REQUIRED": "Esta app debe indicar en su mapa de datos que el texto va al modelo de decisión antes de poder preguntar.",
+      "decision.err.RATE_LIMITED": "Demasiadas preguntas a la vez. Inténtalo de nuevo en un momento.",
+      "decision.err.INVALID_REQUEST": "Las preguntas no caben en los límites del modelo de decisión.",
+      "decision.err.PROVIDER_CANNOT_CARRY": "Este modelo de decisión no puede con estas preguntas. Elige otro o da menos opciones.",
+      "decision.err.UNKNOWN_PROVIDER": "Ese modelo de decisión no está disponible en este servicio.",
+      "decision.err.PRIVATE_EGRESS_REQUIRED": "Este modelo de decisión funciona en tu propia computadora, y el servicio no tiene permiso para conectarse a ella.",
+      "decision.err.NOT_FOUND": "No se encontró esa regla de decisión, o es solo para agentes."
+    }
+  };
+  function td(key, vars) {
+    const hosted = i18n.t(key, vars);
+    if (hosted !== key) return hosted;
+    const lang = i18n.lang();
+    const table2 = (
+      /** @type {Record<string, string>} */
+      STRINGS8[
+        /** @type {'en'|'fi'|'es'} */
+        lang
+      ] || STRINGS8.en
+    );
+    const text = table2[key] || STRINGS8.en[key] || key;
+    if (!vars) return text;
+    return text.replace(/\{(\w+)\}/g, function(whole, name) {
+      return vars[name] == null ? whole : String(vars[name]);
+    });
+  }
+  function hasWords(key) {
+    return td(key) !== key;
+  }
+  var DECISION_KEYS = {
+    en: Object.keys(STRINGS8.en),
+    fi: Object.keys(STRINGS8.fi),
+    es: Object.keys(STRINGS8.es)
+  };
+
+  // src/static/sdk-libs/atelier/doc.js
+  function mdOf() {
+    const ns = (
+      /** @type {any} */
+      window.AIMEAT
+    );
+    return ns && ns.md && typeof ns.md.render === "function" ? ns.md : null;
+  }
+  function blank(v) {
+    return v == null || String(v).trim() === "";
+  }
+  function doc(spec) {
+    const s = spec || {};
+    let markdown = s.markdown == null ? "" : String(s.markdown);
+    let title = s.title || "";
+    const root = el("section", { class: "ak-root ak-doc", "data-ak-part": "root" });
+    const head = el("h3", { class: "ak-doc__title", "data-ak-part": "title", hidden: true });
+    const body = el("div", { class: "ak-doc__body", "data-ak-part": "body" });
+    const sources = el("div", { class: "ak-doc__sources", "data-ak-part": "sources", hidden: true });
+    root.appendChild(head);
+    root.appendChild(body);
+    root.appendChild(sources);
+    if (s.target) resolve(s.target).appendChild(root);
+    let gen = 0;
+    let destroyed = false;
+    function sample() {
+      return s.sample === true || isPlaceholder2(markdown);
+    }
+    function heading() {
+      clear(head);
+      const isSample = sample();
+      if (title) head.appendChild(document.createTextNode(title));
+      if (isSample) head.appendChild(sampleBadge2());
+      head.hidden = !title && !isSample;
+    }
+    function asText(text, state) {
+      clear(body);
+      body.appendChild(el("div", { class: "ak-doc__text", "data-ak-part": "text" }, text));
+      root.setAttribute("data-ak-state", state);
+    }
+    function place2(node, state) {
+      clear(body);
+      node.setAttribute("data-ak-part", "md");
+      body.appendChild(node);
+      root.setAttribute("data-ak-state", state);
+    }
+    function drawSources(list2) {
+      clear(sources);
+      const md = mdOf();
+      const items = el("ul", { class: "ak-doc__source-list" });
+      for (const c of list2 || []) {
+        const href = md && typeof md.sanitizeHref === "function" ? md.sanitizeHref(c.url) : c.url;
+        if (!href) continue;
+        items.appendChild(el("li", { class: "ak-doc__source", "data-ak-part": "source" }, [
+          el("a", { href, target: "_blank", rel: "noopener noreferrer nofollow", title: c.url }, c.host || c.url),
+          c.shortened ? el("span", { class: "ak-doc__shortened" }, " (" + td("doc.shortened") + ")") : null
+        ]));
+      }
+      sources.hidden = !items.firstChild;
+      if (sources.hidden) return;
+      const id = uid("ak-doc-src");
+      sources.appendChild(el("p", { class: "ak-doc__sources-title", id }, td("doc.sources")));
+      items.setAttribute("aria-labelledby", id);
+      sources.appendChild(items);
+    }
+    function draw() {
+      const mine = ++gen;
+      heading();
+      drawSources([]);
+      const isSample = sample();
+      const text = isSample ? td("doc.sample") : markdown;
+      if (blank(text)) {
+        clear(body);
+        const e = s.empty || {};
+        const card = emptyState({ title: e.title || td("doc.empty.title"), hint: e.hint || td("doc.empty.hint") });
+        card.el.setAttribute("data-ak-part", "empty");
+        body.appendChild(card.el);
+        root.setAttribute("data-ak-state", "empty");
+        return;
+      }
+      const md = mdOf();
+      if (!md) {
+        asText(text, isSample ? "sample" : "text");
+        return;
+      }
+      let shown = text;
+      if (s.citations && !isSample && typeof md.citations === "function") {
+        try {
+          const c = md.citations(text);
+          shown = c && typeof c.body === "string" ? c.body : text;
+          drawSources(c && c.sources);
+        } catch (e) {
+          console.debug("aimeat-atelier: doc citations not read", e);
+        }
+      }
+      const done = isSample ? "sample" : "rendered";
+      try {
+        place2(md.render(shown), s.rich ? "rendering" : done);
+      } catch (e) {
+        console.warn("aimeat-atelier: doc render failed, showing the text", e);
+        asText(text, isSample ? "sample" : "error");
+        return;
+      }
+      if (!s.rich || typeof md.renderRich !== "function") {
+        root.setAttribute("data-ak-state", done);
+        return;
+      }
+      Promise.resolve().then(function() {
+        return md.renderRich(shown);
+      }).then(function(node) {
+        if (mine !== gen || destroyed) return;
+        if (node && node.nodeType === 1) place2(node, done);
+        else root.setAttribute("data-ak-state", done);
+      }, function(e) {
+        if (mine !== gen || destroyed) return;
+        console.warn("aimeat-atelier: doc rich render failed, keeping the plain render", e);
+        root.setAttribute("data-ak-state", done);
+      });
+    }
+    draw();
+    const stop = watch(function() {
+      const state = root.getAttribute("data-ak-state");
+      if (state === "sample" || state === "empty") draw();
+    }, root);
+    return {
+      el: root,
+      set(patch) {
+        if (!patch || destroyed) return;
+        if (patch.markdown !== void 0) markdown = patch.markdown == null ? "" : String(patch.markdown);
+        if (patch.title !== void 0) title = patch.title || "";
+        draw();
+      },
+      destroy() {
+        destroyed = true;
+        gen++;
+        stop();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
+  // src/static/sdk-libs/decide/removed-line.js
+  var SCRUB_KINDS = ["person", "email", "phone", "hetu", "iban", "address"];
+  function removedLine(countOf, say) {
+    const parts = [];
+    for (const kind of SCRUB_KINDS) {
+      const n = Number(countOf(kind)) || 0;
+      if (n > 0) parts.push(n + " " + say("kind." + kind + (n === 1 ? ".1" : ".n")));
+    }
+    return parts.length ? say("removedLead") + parts.join(", ") + say("removedTail") : say("removedNone");
+  }
+  function twoDecimals(v) {
+    return typeof v === "number" && Number.isFinite(v) ? v.toFixed(2) : "";
+  }
+
+  // src/static/sdk-libs/atelier/decision.js
+  var OPTIONS_SHOWN = 6;
+  var SAMPLE4 = {
+    decision_id: "sample",
+    model: "jev-1",
+    cached: false,
+    answers: {
+      urgent: { type: "noul", value: 0.86 },
+      topic: { type: "choice", value: "invoice", probabilities: { invoice: 0.58, meeting: 0.31, other: 0.11 }, confidence: 0.58 }
+    },
+    passed: { urgent: true, topic: false },
+    scrub: { removed: { person: 1, email: 1 }, total: 2, skipped: false },
+    usage: { input_tokens: 412, cost_usd: 4e-4 },
+    key_source: "own",
+    provider: { id: "typesafe", kind: "hosted", chosen_by: "owner" }
+  };
+  var SAMPLE_THRESHOLDS = { urgent: 0.8, topic: 0.7 };
+  function decideOf() {
+    const ns = (
+      /** @type {any} */
+      window.AIMEAT
+    );
+    return ns && ns.decide && typeof ns.decide.ask === "function" ? ns.decide : null;
+  }
+  function signedOut5() {
+    const ns = (
+      /** @type {any} */
+      window.AIMEAT
+    );
+    const auth = ns && ns.auth;
+    return !!(auth && typeof auth.getSession === "function" && !auth.getSession());
+  }
+  function settingsHref(lib) {
+    return lib && typeof lib.settingsUrl === "function" ? lib.settingsUrl() : null;
+  }
+  function noState(v) {
+    if (v == null) return true;
+    if (typeof v === "string") return v.trim() === "";
+    if (Array.isArray(v)) return v.length === 0;
+    if (typeof v === "object") return Object.keys(v).length === 0;
+    return false;
+  }
+  function errorWords2(e) {
+    const code = e && /** @type {any} */
+    e.code;
+    if (code && hasWords("decision.err." + code)) return td("decision.err." + code);
+    return refusal(e) || String(e);
+  }
+  function needsPerson(r) {
+    if (!r) return false;
+    if (r.outcome) return r.outcome === "ask";
+    const passed = r.passed || {};
+    return Object.keys(passed).some(function(q) {
+      return passed[q] === false;
+    });
+  }
+  function money3(usd) {
+    const n = Number(usd) || 0;
+    return "$" + (n > 0 && n < 0.01 ? n.toFixed(4) : n.toFixed(2));
+  }
+  function levelWords(a, level) {
+    const words = a.legend && a.legend[String(level)];
+    return typeof words === "string" ? words : String(level);
+  }
+  function answerText(a) {
+    if (a.type === "noul") return twoDecimals(Number(a.value));
+    if (a.type === "score") {
+      const words = a.legend && a.legend[String(Math.round(Number(a.value)))];
+      return typeof words === "string" ? words : Number(a.value).toFixed(1);
+    }
+    return String(a.value == null ? "" : a.value);
+  }
+  function bar(label, v, t2, extra) {
+    const val = Math.max(0, Math.min(1, Number(v) || 0));
+    const text = twoDecimals(Number(v)) || "0.00";
+    const vars = { "--ak-dec-v": String(val) };
+    if (t2 != null) vars["--ak-dec-t"] = String(Math.max(0, Math.min(1, t2)));
+    return el("div", {
+      class: "ak-dec__meter" + (extra ? " " + extra : ""),
+      "data-ak-part": "bar",
+      role: "meter",
+      "aria-label": label,
+      "aria-valuemin": "0",
+      "aria-valuemax": "1",
+      "aria-valuenow": String(val),
+      "aria-valuetext": text + (t2 != null ? ", " + td("decision.threshold", { t: twoDecimals(t2) }) : ""),
+      vars
+    }, [
+      el("span", { class: "ak-dec__meter-label", "aria-hidden": "true" }, label),
+      el("span", { class: "ak-dec__track", "aria-hidden": "true" }, [
+        el("span", { class: "ak-dec__fill" }),
+        t2 != null ? el("span", { class: "ak-dec__mark" }) : null
+      ]),
+      el("span", { class: "ak-dec__num", "aria-hidden": "true" }, text)
+    ]);
+  }
+  function drawAnswer(q, a, t2, passed, label) {
+    const hasT = typeof t2 === "number" && Number.isFinite(t2);
+    const li = el("li", {
+      class: "ak-dec__answer" + (passed === false ? " ak-dec__answer--under" : ""),
+      "data-ak-part": "answer",
+      "data-question": q
+    });
+    li.appendChild(el("div", { class: "ak-dec__qhead" }, [
+      el("span", { class: "ak-dec__q", "data-ak-part": "question" }, label),
+      el("span", { class: "ak-dec__value", "data-ak-part": "value" }, answerText(a)),
+      passed === void 0 ? null : el("span", { class: "ak-dec__verdict", "data-ak-part": "verdict" }, td(passed ? "decision.passed" : "decision.under"))
+    ]));
+    if (a.type === "noul") li.appendChild(bar(td("decision.probability"), Number(a.value), hasT ? t2 : null));
+    else if (typeof a.confidence === "number") li.appendChild(bar(td("decision.confidence"), a.confidence, hasT && a.type === "choice" ? t2 : null));
+    if (hasT) li.appendChild(el("p", { class: "ak-dec__fine", "data-ak-part": "threshold" }, td("decision.threshold", { t: twoDecimals(t2) })));
+    const probs = a.type !== "noul" && a.probabilities && typeof a.probabilities === "object" ? a.probabilities : null;
+    if (probs) {
+      const rows = Object.keys(probs).sort(function(x, y) {
+        return Number(probs[y]) - Number(probs[x]);
+      }).slice(0, OPTIONS_SHOWN);
+      const list2 = el("div", { class: "ak-dec__options", "data-ak-part": "options" });
+      for (const k of rows) list2.appendChild(bar(a.type === "score" ? levelWords(a, k) : k, Number(probs[k]), null, "ak-dec__meter--option"));
+      li.appendChild(list2);
+    }
+    return li;
+  }
+  function firstUnder(r) {
+    const answers = r && r.answers || {};
+    const passed = r && r.passed || {};
+    const ids = Object.keys(answers);
+    for (const q of ids) if (passed[q] === false) return q;
+    return ids[0] || "";
+  }
+  function overrideChoices(r, q) {
+    const a = r && r.answers && r.answers[q];
+    if (!a) return [];
+    if (a.type === "noul") return [{ value: "true", label: td("decision.yes") }, { value: "false", label: td("decision.no") }];
+    return Object.keys(a.probabilities || {}).map(function(k) {
+      return { value: k, label: a.type === "score" ? levelWords(a, k) : k };
+    });
+  }
+  function decision(spec) {
+    const s = spec || /** @type {any} */
+    {};
+    const sample = s.sample === true || !s.appId || isPlaceholder2(s.appId);
+    const root = el("section", { class: "ak-root ak-dec", "data-ak-part": "root" });
+    const head = el("h3", { class: "ak-dec__title", "data-ak-part": "title" });
+    const status = el("p", { class: "ak-dec__status", "data-ak-part": "status", role: "status", "aria-live": "polite" });
+    const body = el("div", { class: "ak-dec__body", "data-ak-part": "body" });
+    root.appendChild(head);
+    root.appendChild(status);
+    root.appendChild(body);
+    if (s.target) resolve(s.target).appendChild(root);
+    let state = s.state;
+    let phase = "idle";
+    let result = null;
+    let ruleThresholds = {};
+    let failure = "";
+    let verdict = null;
+    let providerList = null;
+    let providerError = "";
+    let pick = "";
+    let ruleHandle = null;
+    let drawn = 0;
+    let asked = 0;
+    let destroyed = false;
+    function say(words) {
+      if (status.textContent !== words) status.textContent = words;
+    }
+    function heading() {
+      clear(head);
+      head.appendChild(document.createTextNode(s.title || td("decision.title")));
+      if (sample) head.appendChild(sampleBadge2());
+    }
+    function failLine(words) {
+      return el("p", { class: "ak-dec__failure", "data-ak-part": "failure", role: "alert" }, words);
+    }
+    function fine(part, words) {
+      return el("p", { class: "ak-dec__fine", "data-ak-part": part }, words);
+    }
+    function labelOf2(q) {
+      return s.labels && s.labels[q] || q || "";
+    }
+    function thresholdsNow() {
+      if (sample) return SAMPLE_THRESHOLDS;
+      return s.rule ? ruleThresholds : s.thresholds || {};
+    }
+    function providerName(id) {
+      const list2 = providerList && providerList.providers || [];
+      const p = list2.find(function(x) {
+        return x.id === id;
+      });
+      return p && p.title || id;
+    }
+    function facts(r) {
+      const out = [];
+      if (r.scrub && typeof r.scrub === "object") {
+        const removed = r.scrub.removed || {};
+        out.push(fine("removed", r.scrub.skipped ? td("decision.scrubSkipped") : removedLine(function(kind) {
+          return removed[kind];
+        }, function(key) {
+          return td("decision." + key);
+        })));
+      }
+      if (r.cached) out.push(fine("cost", td("decision.cached")));
+      else if (r.usage && typeof r.usage.cost_usd === "number") {
+        const key = "decision.key." + String(r.key_source || "");
+        out.push(fine("cost", hasWords(key) ? td("decision.cost", { cost: money3(r.usage.cost_usd), paid: td(key) }) : td("decision.costOnly", { cost: money3(r.usage.cost_usd) })));
+      }
+      if (r.provider && r.provider.id) {
+        const chosen2 = "decision.chosen." + String(r.provider.chosen_by || "");
+        const who = td("decision.who", {
+          provider: providerName(r.provider.id),
+          where: td(r.provider.kind === "local" ? "decision.where.local" : "decision.where.hosted"),
+          chosen: hasWords(chosen2) ? td(chosen2) : String(r.provider.chosen_by || "")
+        });
+        out.push(fine("who", r.model ? who + " " + td("decision.model", { model: r.model }) : who));
+      }
+      return out;
+    }
+    function drawPerson() {
+      const lib = decideOf();
+      const canRecord = s.review !== false && !!(result && result.decision_id) && (sample || !!(lib && typeof lib.review === "function"));
+      const box = el("div", { class: "ak-dec__person", "data-ak-part": "person" });
+      if (verdict) {
+        box.appendChild(el("p", { class: "ak-dec__recorded", "data-ak-part": "recorded" }, verdict.outcome === "confirmed" ? td("decision.recorded.confirmed") : td("decision.recorded.overridden", { v: verdict.shown })));
+        return box;
+      }
+      box.appendChild(el("p", { class: "ak-dec__ask-person" }, td(canRecord ? "decision.youDecide" : "decision.personDecides")));
+      if (!canRecord) return box;
+      const under = firstUnder(result);
+      const choices = overrideChoices(result, under);
+      const noteId = uid("ak-dec-note");
+      const pickId = uid("ak-dec-pick");
+      const note = (
+        /** @type {HTMLInputElement} */
+        el("input", {
+          type: "text",
+          id: noteId,
+          class: "ak-input ak-dec__note",
+          "data-ak-part": "note",
+          maxlength: 500
+        })
+      );
+      const select = (
+        /** @type {HTMLSelectElement} */
+        el(
+          "select",
+          { id: pickId, class: "ak-input ak-dec__pick", "data-ak-part": "overridePick" },
+          choices.map(function(c) {
+            return el("option", { value: c.value }, c.label);
+          })
+        )
+      );
+      const failSlot = el("div", { class: "ak-dec__fail-slot" });
+      const confirm2 = el("button", { type: "button", class: "ak-btn ak-btn--primary", "data-ak-part": "confirm" }, td("decision.confirm"));
+      const override = el("button", { type: "button", class: "ak-btn", "data-ak-part": "override", "aria-expanded": "false" }, td("decision.override"));
+      const save = el("button", { type: "button", class: "ak-btn ak-btn--primary", "data-ak-part": "record" }, td("decision.record"));
+      const cancel = el("button", { type: "button", class: "ak-btn ak-btn--ghost", "data-ak-part": "cancel" }, td("decision.cancel"));
+      const panel = el("div", { class: "ak-dec__override", "data-ak-part": "overridePanel", hidden: true }, [
+        el("label", { class: "ak-form__label", for: pickId }, td("decision.overrideWith", { q: labelOf2(under) })),
+        select,
+        el("div", { class: "ak-dec__acts" }, [save, cancel])
+      ]);
+      function record(btn, outcome, extra, shown) {
+        clear(failSlot);
+        if (sample) {
+          say(td("decision.sampleReview"));
+          return Promise.resolve();
+        }
+        const n = note.value.trim();
+        if (n) extra.note = n;
+        return whileBusy(btn, decideOf().review(result.decision_id, outcome, extra)).then(function() {
+          if (destroyed) return;
+          verdict = { outcome, shown };
+          say(outcome === "confirmed" ? td("decision.recorded.confirmed") : td("decision.recorded.overridden", { v: shown }));
+          if (typeof s.onOutcome === "function") {
+            try {
+              s.onOutcome(Object.assign({}, result, { needsPerson: true, review: Object.assign({ outcome }, extra) }));
+            } catch (e) {
+              console.warn("aimeat-atelier: decision onOutcome threw", e);
+            }
+          }
+          draw();
+        }, function(e) {
+          if (!destroyed) failSlot.appendChild(failLine(td("decision.reviewFailed", { why: errorWords2(e) })));
+        });
+      }
+      confirm2.addEventListener("click", function() {
+        record(confirm2, "confirmed", {}, "");
+      });
+      override.addEventListener("click", function() {
+        panel.hidden = false;
+        override.setAttribute("aria-expanded", "true");
+        select.focus();
+      });
+      cancel.addEventListener("click", function() {
+        panel.hidden = true;
+        override.setAttribute("aria-expanded", "false");
+        override.focus();
+      });
+      save.addEventListener("click", function() {
+        const a = result.answers && result.answers[under];
+        const value = a && a.type === "noul" ? select.value === "true" : select.value;
+        const opt = choices.find(function(c) {
+          return c.value === select.value;
+        });
+        record(save, "overridden", { override: value }, opt ? opt.label : select.value);
+      });
+      box.appendChild(el("div", { class: "ak-form__field ak-dec__field" }, [
+        el("label", { class: "ak-form__label", for: noteId }, td("decision.note")),
+        note
+      ]));
+      box.appendChild(el("div", { class: "ak-dec__acts" }, [confirm2, override]));
+      box.appendChild(panel);
+      box.appendChild(failSlot);
+      return box;
+    }
+    function drawAnswered() {
+      if (result.outcome && hasWords("decision.outcome." + result.outcome)) {
+        body.appendChild(el(
+          "p",
+          { class: "ak-dec__outcome", "data-ak-part": "outcome", "data-outcome": result.outcome },
+          td("decision.outcome." + result.outcome)
+        ));
+      }
+      const list2 = el("ul", { class: "ak-dec__answers", "data-ak-part": "answers" });
+      const ts = thresholdsNow();
+      for (const q of Object.keys(result.answers || {})) {
+        list2.appendChild(drawAnswer(q, result.answers[q], ts[q], result.passed ? result.passed[q] : void 0, labelOf2(q)));
+      }
+      body.appendChild(list2);
+      if (needsPerson(result)) body.appendChild(drawPerson());
+      for (const line of facts(result)) body.appendChild(line);
+      if (!sample && !noState(state)) {
+        const again = el("button", { type: "button", class: "ak-btn ak-btn--ghost", "data-ak-part": "again" }, td("decision.again"));
+        again.addEventListener("click", function() {
+          whileBusy(again, api.ask());
+        });
+        body.appendChild(el("div", { class: "ak-dec__acts" }, [again]));
+      }
+    }
+    function drawPicker() {
+      if (providerError) {
+        body.appendChild(failLine(td("decision.providersFailed", { why: providerError })));
+        return;
+      }
+      const list2 = providerList && providerList.providers || [];
+      if (!list2.length) return;
+      if (!pick) pick = String(providerList.default || providerList.node_default || list2[0].id);
+      const id = uid("ak-dec-prov");
+      const note = el("p", { class: "ak-dec__fine", "data-ak-part": "providerNote" });
+      const select = (
+        /** @type {HTMLSelectElement} */
+        el(
+          "select",
+          { id, class: "ak-input ak-dec__provider", "data-ak-part": "provider" },
+          list2.map(function(p) {
+            const words = String(p.title || p.id) + (p.kind === "local" ? " · " + td("decision.where.local") : "");
+            return el(
+              "option",
+              { value: p.id, selected: p.id === pick ? true : null },
+              p.id === providerList.default ? td("decision.providerDefault", { title: words }) : words
+            );
+          })
+        )
+      );
+      select.value = pick;
+      function statement() {
+        const p = list2.find(function(x) {
+          return x.id === pick;
+        });
+        note.textContent = p && p.data_statement || "";
+        note.hidden = !note.textContent;
+      }
+      select.addEventListener("change", function() {
+        pick = select.value;
+        statement();
+      });
+      statement();
+      body.appendChild(el("div", { class: "ak-form__field ak-dec__field" }, [
+        el("label", { class: "ak-form__label", for: id }, td("decision.provider")),
+        select,
+        note
+      ]));
+    }
+    async function draw() {
+      const mine = ++drawn;
+      heading();
+      clear(body);
+      if (sample) {
+        root.setAttribute("data-ak-state", "sample");
+        body.appendChild(fine("intro", td("decision.sampleNote")));
+        result = result || Object.assign({}, SAMPLE4);
+        drawAnswered();
+        return;
+      }
+      const lib = decideOf();
+      if (!lib) {
+        root.setAttribute("data-ak-state", "no-library");
+        body.appendChild(failLine(td("decision.noLib")));
+        return;
+      }
+      if (signedOut5()) {
+        root.setAttribute("data-ak-state", "signed-out");
+        body.appendChild(fine("signIn", td("decision.signIn")));
+        return;
+      }
+      if (!s.rule && !s.questions) {
+        root.setAttribute("data-ak-state", "failed");
+        body.appendChild(failLine(td("decision.noQuestions")));
+        return;
+      }
+      let available = true;
+      if (typeof lib.isAvailable === "function") {
+        try {
+          available = !!await lib.isAvailable();
+        } catch {
+          available = false;
+        }
+      }
+      if (mine !== drawn || destroyed) return;
+      if (!available) {
+        root.setAttribute("data-ak-state", "unavailable");
+        const why = typeof lib.unavailableReason === "function" ? lib.unavailableReason() : null;
+        body.appendChild(el("p", { class: "ak-dec__failure", "data-ak-part": "failure", role: "status" }, [
+          td("decision.unavailable"),
+          why ? el("span", { class: "ak-dec__why" }, " " + String(why)) : null
+        ]));
+        const href = settingsHref(lib);
+        if (href) body.appendChild(el("a", { class: "ak-btn", "data-ak-part": "settings", href, target: "_blank", rel: "noopener" }, td("decision.settings")));
+        return;
+      }
+      if (s.provider === "pick" && phase !== "asking") {
+        if (!providerList && !providerError && typeof lib.providers === "function") {
+          try {
+            providerList = await lib.providers();
+          } catch (e) {
+            providerError = errorWords2(e);
+          }
+          if (mine !== drawn || destroyed) return;
+        }
+        drawPicker();
+      }
+      root.setAttribute("data-ak-state", phase === "idle" ? noState(state) ? "empty" : "ready" : phase);
+      if (phase === "asking") return;
+      if (phase === "failed") {
+        body.appendChild(failLine(td("decision.failed", { why: failure })));
+        if (!noState(state)) {
+          const retry = el("button", { type: "button", class: "ak-btn", "data-ak-part": "retry" }, td("decision.retry"));
+          retry.addEventListener("click", function() {
+            whileBusy(retry, api.ask());
+          });
+          body.appendChild(el("div", { class: "ak-dec__acts" }, [retry]));
+        }
+        return;
+      }
+      if (phase === "answered" && result) {
+        drawAnswered();
+        return;
+      }
+      if (noState(state)) {
+        const card = emptyState({ title: td("decision.empty.title"), hint: td("decision.empty.hint") });
+        card.el.setAttribute("data-ak-part", "empty");
+        body.appendChild(card.el);
+        return;
+      }
+      const go = el("button", { type: "button", class: "ak-btn ak-btn--primary", "data-ak-part": "ask" }, td("decision.ask"));
+      go.addEventListener("click", function() {
+        whileBusy(go, api.ask());
+      });
+      body.appendChild(el("div", { class: "ak-dec__ready", "data-ak-part": "ready" }, [
+        el("p", { class: "ak-dec__fine" }, td("decision.ready")),
+        el("div", { class: "ak-dec__acts" }, [go])
+      ]));
+    }
+    function ruleOf(lib) {
+      if (!ruleHandle) {
+        ruleHandle = Promise.resolve(lib.rule(s.rule));
+        ruleHandle.catch(function() {
+          ruleHandle = null;
+        });
+      }
+      return ruleHandle;
+    }
+    async function put(lib) {
+      const opts = { app_id: s.appId };
+      if (s.subject) opts.subject = s.subject;
+      const chosen2 = s.provider === "pick" ? pick : s.provider;
+      if (chosen2) opts.provider = chosen2;
+      if (s.rule) {
+        const handle2 = await ruleOf(lib);
+        ruleThresholds = handle2 && handle2.thresholds || {};
+        return handle2.ask(state, opts);
+      }
+      if (s.gates) opts.gates = s.gates;
+      if (s.thresholds && typeof lib.gate === "function") return lib.gate(state, s.questions, s.thresholds, opts);
+      return lib.ask(state, s.questions, opts);
+    }
+    const api = {
+      el: root,
+      /**
+       * Ask about `state` (or the state already given). Resolves with the decide result, or null when
+       * nothing was asked or the question failed; the block shows why.
+       * @param {any} [next]
+       * @returns {Promise<any>}
+       */
+      async ask(next) {
+        if (destroyed) return null;
+        if (next !== void 0) state = next;
+        if (sample) {
+          result = Object.assign({}, SAMPLE4);
+          await draw();
+          return result;
+        }
+        const lib = decideOf();
+        if (!lib || signedOut5() || !s.rule && !s.questions || noState(state)) {
+          phase = "idle";
+          result = null;
+          await draw();
+          return null;
+        }
+        if (typeof lib.isAvailable === "function") {
+          let ok;
+          try {
+            ok = !!await lib.isAvailable();
+          } catch {
+            ok = false;
+          }
+          if (!ok) {
+            await draw();
+            return null;
+          }
+        }
+        const mine = ++asked;
+        phase = "asking";
+        verdict = null;
+        root.setAttribute("aria-busy", "true");
+        say(td("decision.asking"));
+        await draw();
+        let r = null;
+        let err = null;
+        try {
+          r = await put(lib);
+        } catch (e) {
+          err = e;
+        }
+        if (destroyed || mine !== asked) return err ? null : r;
+        root.removeAttribute("aria-busy");
+        if (err) {
+          phase = "failed";
+          failure = errorWords2(err);
+          result = null;
+          say("");
+          await draw();
+          return null;
+        }
+        phase = "answered";
+        result = r;
+        say(td("decision.answered"));
+        if (typeof s.onOutcome === "function") {
+          try {
+            s.onOutcome(Object.assign({}, r, { needsPerson: needsPerson(r) }));
+          } catch (e) {
+            console.warn("aimeat-atelier: decision onOutcome threw", e);
+          }
+        }
+        await draw();
+        return r;
+      },
+      /** Read availability and the providers again, and draw. */
+      async refresh() {
+        providerList = null;
+        providerError = "";
+        await draw();
+      },
+      destroy() {
+        destroyed = true;
+        drawn++;
+        asked++;
+        stop();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+    draw();
+    const stop = watch(function() {
+      draw();
+    }, root);
+    return api;
+  }
+
   // src/static/sdk-libs/atelier/mosaic-self.js
   function renderSelfSourced(block, into, handles) {
     const p = block.props || {};
@@ -16437,6 +18840,42 @@
         return true;
       }
       // ── The owner's outside accounts, over AIMEAT.connect.
+      // ── A workflow step waiting for a person, over AIMEAT.workflows.
+      case "workflowInput": {
+        handles.push(workflowInput({ target: into, run: p.run, title: p.title, variant: p.variant }));
+        return true;
+      }
+      // ── Ask the person's own AI once, over AIMEAT.ai. `prompt` is a template: {input} is what the
+      //    person wrote; input "none" draws a run button with no box.
+      case "aiTask": {
+        const tpl = String(p.prompt || "{input}");
+        const min = parseInt(p.minChars, 10);
+        handles.push(aiTask({
+          target: into,
+          appId: p.appId,
+          title: p.title,
+          hint: p.hint,
+          input: p.input === "none" ? null : { placeholder: p.placeholder, minChars: isNaN(min) ? void 0 : min },
+          prompt: function(text) {
+            return tpl.split("{input}").join(text);
+          },
+          systemPrompt: p.systemPrompt,
+          runLabel: p.runLabel,
+          render: p.render === "text" ? "text" : "markdown",
+          copyPrompt: p.copyPrompt === "true",
+          variant: p.variant
+        }));
+        return true;
+      }
+      // ── A markdown document, over AIMEAT.md, and one decision rule, over AIMEAT.decide.
+      case "doc": {
+        handles.push(doc({ target: into, markdown: p.markdown, title: p.title, rich: p.rich === "true" }));
+        return true;
+      }
+      case "decision": {
+        handles.push(decision({ target: into, appId: p.appId, rule: p.rule, state: p.state, title: p.title }));
+        return true;
+      }
       case "connections": {
         handles.push(connections({ target: into, title: p.title, need: p.need }));
         return true;
@@ -16559,6 +18998,141 @@
     return { el: root, destroy() {
       if (root.parentNode) root.parentNode.removeChild(root);
     } };
+  }
+
+  // src/static/sdk-libs/atelier/dropzone-upload.js
+  function storageLib() {
+    const ns = typeof window !== "undefined" ? window.AIMEAT : null;
+    const lib = ns && ns.storage;
+    return lib && typeof lib.upload === "function" ? lib : null;
+  }
+  function uploader(o) {
+    const up = o.upload || {};
+    const list2 = el("ul", { class: "ak-root ak-dropzone__files", "data-ak-part": "files", "aria-live": "polite" });
+    let queue2 = [];
+    let running = 0;
+    let gone = false;
+    function place2() {
+      if (list2.parentNode) return;
+      if (up.target) {
+        resolve(up.target).appendChild(list2);
+        return;
+      }
+      if (o.zone.parentNode) o.zone.parentNode.insertBefore(list2, o.zone.nextSibling);
+    }
+    function row(file) {
+      const state = el("span", { class: "ak-dropzone__hint", "data-ak-part": "state" }, tu("upload.waiting"));
+      const bar2 = (
+        /** @type {HTMLProgressElement} */
+        el("progress", { class: "ak-dropzone__bar", "data-ak-part": "bar", max: "100", hidden: true })
+      );
+      const li = el("li", { class: "ak-dropzone__file", "data-ak-part": "file", "data-ak-state": "waiting" }, [
+        el("span", { class: "ak-dropzone__name", "data-ak-part": "name" }, String(file.name || "")),
+        " ",
+        state,
+        bar2
+      ]);
+      list2.appendChild(li);
+      return { li, state, bar: bar2 };
+    }
+    function optsFor(file) {
+      const opts = {};
+      if (typeof up.key === "function") {
+        const k = up.key(file);
+        if (k) opts.key = String(k);
+      }
+      if (up.visibility) opts.visibility = up.visibility;
+      if (up.workspaceRef) opts.workspace_ref = up.workspaceRef;
+      return opts;
+    }
+    function saved(r, answer) {
+      r.li.setAttribute("data-ak-state", "done");
+      r.state.textContent = tu("upload.saved", { key: answer && answer.key });
+      if (!answer || answer.visibility !== "public" || typeof o.lib.viewUrl !== "function") return;
+      const ref = answer.owner_gaii ? answer.owner_gaii + "/" + answer.key : answer.key;
+      Promise.resolve().then(function() {
+        return o.lib.viewUrl(ref);
+      }).then(function(url) {
+        if (!url || gone) return;
+        r.li.appendChild(document.createTextNode(" "));
+        r.li.appendChild(el("a", { class: "ak-dropzone__open", "data-ak-part": "open", href: String(url), target: "_blank", rel: "noopener" }, tu("upload.open")));
+      }, function() {
+      });
+    }
+    function failed(r, err) {
+      r.li.setAttribute("data-ak-state", "failed");
+      r.state.className = "ak-dropzone__err";
+      r.state.textContent = tu("upload.failed", { why: String(err && err.message || err || "?") });
+    }
+    async function send(job) {
+      const r = job.row;
+      const file = job.file;
+      r.li.setAttribute("data-ak-state", "uploading");
+      r.state.textContent = tu("upload.sending");
+      r.bar.hidden = false;
+      const opts = optsFor(file);
+      try {
+        const chunked = Number(up.chunkedOver) > 0 && file.size > Number(up.chunkedOver) && typeof o.lib.uploadChunked === "function";
+        let answer;
+        if (chunked) {
+          opts.onProgress = function(p) {
+            const n = Math.max(0, Math.min(100, Math.round(p && p.percent || 0)));
+            r.bar.value = n;
+            r.state.textContent = tu("upload.percent", { n });
+          };
+          answer = await o.lib.uploadChunked(file, opts);
+        } else {
+          answer = await o.lib.upload(file, opts);
+        }
+        r.bar.hidden = true;
+        saved(r, answer);
+        if (o.onUploaded) {
+          try {
+            o.onUploaded(file, answer);
+          } catch (e) {
+            console.warn("[atelier] dropzone onUploaded threw:", e);
+          }
+        }
+      } catch (err) {
+        r.bar.hidden = true;
+        failed(r, err);
+        if (o.onUploadError) {
+          try {
+            o.onUploadError(file, err);
+          } catch (e) {
+            console.warn("[atelier] dropzone onUploadError threw:", e);
+          }
+        }
+      }
+    }
+    function pump() {
+      if (running || gone) return;
+      const job = queue2.shift();
+      if (!job) return;
+      running = 1;
+      send(job).then(function() {
+        running = 0;
+        pump();
+      });
+    }
+    return {
+      add(files) {
+        if (gone) return;
+        place2();
+        (files || []).forEach(function(f) {
+          queue2.push({ file: f, row: row(f) });
+        });
+        pump();
+      },
+      pending() {
+        return queue2.length + running;
+      },
+      destroy() {
+        gone = true;
+        queue2 = [];
+        if (list2.parentNode) list2.parentNode.removeChild(list2);
+      }
+    };
   }
 
   // src/static/sdk-libs/atelier/parts.js
@@ -16725,14 +19299,16 @@
       /** @type {HTMLInputElement} */
       el("input", { type: "file", multiple: s.multiple ? true : null, accept: accept.length ? accept.join(",") : null })
     );
-    const err = el("div", { class: "ak-dropzone__err", hidden: true });
+    const err = el("div", { class: "ak-dropzone__err", role: "alert", hidden: true });
     const root = el("div", { class: "ak-root ak-dropzone", role: "button", tabindex: "0" }, [
-      el("div", { class: "ak-dropzone__label" }, s.label || "Drop the file, or press to pick"),
+      el("div", { class: "ak-dropzone__label" }, s.label || tu("drop.label")),
       s.hint ? el("div", { class: "ak-dropzone__hint" }, s.hint) : null,
       err,
       input
     ].filter(Boolean));
     if (s.target) resolve(s.target).appendChild(root);
+    let up = null;
+    let warned = false;
     function take(list2) {
       const files = Array.prototype.slice.call(list2 || []);
       const bad = files.find(function(f) {
@@ -16741,12 +19317,25 @@
         return s.maxBytes ? f.size > s.maxBytes : false;
       });
       if (bad) {
-        err.textContent = s.maxBytes && bad.size > s.maxBytes ? bad.name + " is over " + Math.round(s.maxBytes / 1e6) + " MB." : bad.name + " is not a kind this takes.";
+        err.textContent = s.maxBytes && bad.size > s.maxBytes ? tu("drop.tooBig", { name: bad.name, mb: Math.round(s.maxBytes / 1e6) }) : tu("drop.wrongKind", { name: bad.name });
         err.hidden = false;
         return;
       }
       err.hidden = true;
-      if (files.length && s.onFiles) s.onFiles(s.multiple ? files : files.slice(0, 1));
+      if (!files.length) return;
+      const picked = s.multiple ? files : files.slice(0, 1);
+      if (s.onFiles) s.onFiles(picked);
+      if (s.upload) {
+        if (!up) {
+          const lib = storageLib();
+          if (lib) up = uploader({ zone: root, upload: s.upload, lib, onUploaded: s.onUploaded, onUploadError: s.onUploadError });
+          else if (!warned) {
+            warned = true;
+            console.warn("[atelier] dropzone: upload needs aimeat-storage.js on the page; the files went to onFiles only.");
+          }
+        }
+        if (up) up.add(picked);
+      }
     }
     root.addEventListener("click", function(e) {
       if (e.target !== input) input.click();
@@ -16774,9 +19363,57 @@
       take(e.dataTransfer ? e.dataTransfer.files : null);
     });
     enter(root);
-    return { el: root, destroy() {
-      if (root.parentNode) root.parentNode.removeChild(root);
-    } };
+    return {
+      el: root,
+      pending() {
+        return up ? up.pending() : 0;
+      },
+      destroy() {
+        if (up) up.destroy();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/money-units.js
+  var MONEY_UNIT = 1e6;
+  function isMorsels(currency) {
+    return /^morsels?$/i.test(String(currency == null ? "" : currency).trim());
+  }
+  function speaksMicros(data, items, fields) {
+    if (data && isMorsels(data.currency)) return false;
+    if (data && data.unit === "micros") return true;
+    return (Array.isArray(items) ? items : []).some(function(item) {
+      return !!item && fields.some(function(f) {
+        return typeof item[f + "Micros"] === "number";
+      });
+    });
+  }
+  function hasAmount(item, field) {
+    return !!item && (typeof item[field] === "number" || typeof item[field + "Micros"] === "number");
+  }
+  function readAmount(item, field, data) {
+    if (!item) return 0;
+    const morsels = !!data && isMorsels(data.currency);
+    const micros = item[field + "Micros"];
+    if (typeof micros === "number" && Number.isFinite(micros)) {
+      return morsels ? micros : micros / MONEY_UNIT;
+    }
+    const plain = Number(item[field]) || 0;
+    return !morsels && data && data.unit === "micros" ? plain / MONEY_UNIT : plain;
+  }
+  function roundMicros(value) {
+    return Math.round((Number(value) || 0) * MONEY_UNIT) / MONEY_UNIT;
+  }
+  function fractionDigits(value) {
+    const s = (Number(value) || 0).toFixed(6).replace(/(\.\d{2}\d*?)0+$/, "$1");
+    const dot = s.indexOf(".");
+    return dot < 0 ? 2 : s.length - dot - 1;
+  }
+  function morselText(n) {
+    const v = Math.round(Number(n) || 0);
+    if (v === 1) return t("morsel1");
+    return t("morsels", { n: num(v, { maximumFractionDigits: 0 }) });
   }
 
   // src/static/sdk-libs/atelier/lenis-parts.js
@@ -16854,7 +19491,7 @@
       }
     };
   }
-  var STATUS_WORDS = { sent: "Sent", read: "Read", failed: "Not sent" };
+  var STATUS_KEYS = { sent: "threadSent", read: "threadRead", failed: "threadFailed" };
   function dateOf(at) {
     if (!at) return null;
     const d = new Date(at);
@@ -16867,12 +19504,12 @@
   }
   function dayLabelOf(at) {
     const d = dateOf(at);
-    if (!d) return "Earlier";
+    if (!d) return t("earlier");
     const now2 = /* @__PURE__ */ new Date();
     const key = dayKeyOf(at);
-    if (key === dayKeyOf(now2)) return "Today";
+    if (key === dayKeyOf(now2)) return t("today");
     const back = new Date(now2.getTime() - 864e5);
-    if (key === dayKeyOf(back)) return "Yesterday";
+    if (key === dayKeyOf(back)) return t("yesterday");
     if (typeof Intl === "object" && Intl.DateTimeFormat) {
       return date(d, { weekday: "short", day: "numeric", month: "short" });
     }
@@ -16904,7 +19541,7 @@
       role: "log",
       "aria-live": "polite",
       tabindex: "0",
-      "aria-label": s.title || "Discussion"
+      "aria-label": s.title || t("threadLabel")
     }, [stream]);
     const root = el("section", { class: "ak-root ak-thread" }, [
       s.title ? el("h2", { class: "ak-section__title ak-thread__title" }, String(s.title)) : null,
@@ -16914,10 +19551,10 @@
     const view = wellScroller(well, stream);
     const shown = /* @__PURE__ */ new Map();
     const dayRows = /* @__PURE__ */ new Map();
-    let blank = null;
+    let blank2 = null;
     function bubbleFor(m) {
       const who = String(m.label || m.who || "");
-      const word = STATUS_WORDS[m.status];
+      const word = STATUS_KEYS[m.status] ? t(STATUS_KEYS[m.status]) : "";
       const meta = el("div", { class: "ak-thread__meta" }, [
         el("time", { class: "ak-thread__time", datetime: m.at || null }, timeLabelOf(m.at)),
         word ? el("span", { class: "ak-thread__status ak-thread__status--" + m.status }, word) : null
@@ -16942,17 +19579,17 @@
         dayRows.clear();
         clear(stream);
         const e = s.empty || {};
-        blank = emptyState({
+        blank2 = emptyState({
           target: stream,
           tone: "quiet",
-          title: e.title || "No messages yet",
-          hint: e.hint || (s.onSend ? "Write the first one." : void 0)
+          title: e.title || t("threadEmpty"),
+          hint: e.hint || (s.onSend ? t("threadEmptyHint") : void 0)
         });
         return;
       }
-      if (blank) {
-        blank.destroy();
-        blank = null;
+      if (blank2) {
+        blank2.destroy();
+        blank2 = null;
       }
       const seen = /* @__PURE__ */ new Set();
       const liveDays = /* @__PURE__ */ new Set();
@@ -16994,7 +19631,7 @@
       else view.toBottom(last);
     }
     if (s.onSend) {
-      const hint = s.placeholder || "Write a message…";
+      const hint = s.placeholder || t("threadPlaceholder");
       const input = (
         /** @type {HTMLTextAreaElement} */
         el("textarea", {
@@ -17021,7 +19658,7 @@
       });
       root.appendChild(el("div", { class: "ak-thread__composer" }, [
         input,
-        el("button", { type: "button", class: "ak-btn ak-btn--primary", on: { click: send } }, "Send")
+        el("button", { type: "button", class: "ak-btn ak-btn--primary", on: { click: send } }, t("send"))
       ]));
     }
     render(messagesOf(s.data));
@@ -17037,28 +19674,34 @@
       }
     };
   }
-  var STEP_NAMES = ["Your order", "Details", "Delivery", "Review"];
-  var DETAIL_FIELDS = [
-    { name: "name", label: "Full name", type: "text", required: true },
-    { name: "email", label: "Email", type: "text", required: true, hint: "Where the receipt goes." },
-    { name: "address", label: "Street address", type: "text", required: true },
-    { name: "postcode", label: "Postcode", type: "text", required: true },
-    { name: "city", label: "City", type: "text", required: true },
-    { name: "country", label: "Country", type: "text" }
-  ];
-  function money3(value, currency) {
-    const v = Math.round((Number(value) || 0) * 100) / 100;
+  function stepNames() {
+    return [t("coOrder"), t("coDetails"), t("coDelivery"), t("coReview")];
+  }
+  function detailFields() {
+    return [
+      { name: "name", label: t("coName"), type: "text", required: true },
+      { name: "email", label: t("coEmail"), type: "text", required: true, hint: t("coEmailHint") },
+      { name: "address", label: t("coAddress"), type: "text", required: true },
+      { name: "postcode", label: t("coPostcode"), type: "text", required: true },
+      { name: "city", label: t("coCity"), type: "text", required: true },
+      { name: "country", label: t("coCountry"), type: "text" }
+    ];
+  }
+  function money4(value, currency, micros) {
+    if (isMorsels(currency)) return morselText(value);
+    const v = micros ? roundMicros(value) : Math.round((Number(value) || 0) * 100) / 100;
+    const d = micros ? fractionDigits(v) : 2;
     const cur = currency || "€";
     if (typeof Intl === "object" && Intl.NumberFormat) {
       if (/^[A-Za-z]{3}$/.test(cur)) {
         try {
-          return money(v, cur, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          return money(v, cur, { minimumFractionDigits: d, maximumFractionDigits: d });
         } catch {
         }
       }
-      return num(v, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " " + cur;
+      return num(v, { minimumFractionDigits: d, maximumFractionDigits: d }) + " " + cur;
     }
-    return v.toFixed(2) + " " + cur;
+    return v.toFixed(d) + " " + cur;
   }
   function checkout(spec) {
     const s = spec || /** @type {any} */
@@ -17066,7 +19709,8 @@
     let data = s.data || { lines: [] };
     let shipId = null;
     let placed = false;
-    const names = data.steps && data.steps.length === 4 ? data.steps : STEP_NAMES;
+    const names = data.steps && data.steps.length === 4 ? data.steps : stepNames();
+    const fields = detailFields();
     const ids = names.map(function() {
       return uid("ak-co");
     });
@@ -17080,20 +19724,20 @@
         id: uid("ak-note"),
         class: "ak-input ak-input--area",
         rows: 2,
-        placeholder: "Anything we should know?",
-        "aria-label": "A note with the order"
+        placeholder: t("coNotePlaceholder"),
+        "aria-label": t("coNote")
       })
     );
     const refusal2 = el("p", { class: "ak-checkout__refusal", role: "alert", hidden: true });
     const settled = el(
       "p",
       { class: "ak-checkout__settled", role: "status", hidden: true },
-      "✓ Order placed. The receipt is on its way to your email."
+      "✓ " + t("coPlaced")
     );
-    const placeBtn = el("button", { type: "button", class: "ak-btn ak-btn--primary ak-checkout__place" }, "Place order");
+    const placeBtn = el("button", { type: "button", class: "ak-btn ak-btn--primary ak-checkout__place" }, t("coPlace"));
     const details = form({
-      fields: DETAIL_FIELDS,
-      submitLabel: "Continue to delivery",
+      fields,
+      submitLabel: t("coContinue"),
       onSubmit() {
         goTo(2);
       }
@@ -17109,7 +19753,7 @@
       section2(2, [shipList]),
       section2(3, [
         totals,
-        el("label", { class: "ak-form__label", for: noteInput.id }, "A note with the order"),
+        el("label", { class: "ak-form__label", for: noteInput.id }, t("coNote")),
         noteInput,
         refusal2,
         placeBtn,
@@ -17127,14 +19771,14 @@
         } }
       }, [el("span", { class: "ak-checkout__step-n" }, String(i + 1)), el("span", {}, name)]);
     });
-    const rail = el("nav", { class: "ak-checkout__rail", "aria-label": "Order steps" }, [
+    const rail = el("nav", { class: "ak-checkout__rail", "aria-label": t("coSteps") }, [
       s.onBack ? el("button", {
         type: "button",
         class: "ak-btn ak-btn--ghost ak-checkout__back",
         on: { click: function() {
           if (s.onBack) s.onBack();
         } }
-      }, "↩ Back") : null
+      }, "↩ " + t("back")) : null
     ].filter(Boolean).concat(railBtns));
     const root = el("section", { class: "ak-root ak-checkout" }, [rail, well]);
     if (s.target) resolve(s.target).appendChild(root);
@@ -17179,24 +19823,33 @@
         return o.id === shipId;
       }) || null;
     }
+    function inMicros() {
+      const lines = Array.isArray(data.lines) ? data.lines : [];
+      const options = Array.isArray(data.shipping) ? data.shipping : [];
+      return speaksMicros(data, lines.concat(options), ["price"]);
+    }
+    function lineSum(l) {
+      return readAmount(l, "price", data) * (Number(l.qty) || 0);
+    }
     function itemsTotal() {
       return (Array.isArray(data.lines) ? data.lines : []).reduce(function(n, l) {
-        return n + (Number(l.price) || 0) * (Number(l.qty) || 0);
+        return n + lineSum(l);
       }, 0);
     }
     function renderTotals() {
       const cur = data.currency;
+      const mu = inMicros();
       const ship = chosenShip();
       const items = itemsTotal();
-      const carriage = ship ? Number(ship.price) || 0 : 0;
+      const carriage = ship ? readAmount(ship, "price", data) : 0;
       clear(itemsSum);
-      itemsSum.appendChild(el("span", {}, "Items"));
-      itemsSum.appendChild(el("span", { class: "ak-checkout__figure" }, money3(items, cur)));
+      itemsSum.appendChild(el("span", {}, t("coItems")));
+      itemsSum.appendChild(el("span", { class: "ak-checkout__figure" }, money4(items, cur, mu)));
       clear(totals);
       [
-        ["Items", money3(items, cur), ""],
-        ["Delivery", ship ? money3(carriage, cur) : "Chosen after the order", ""],
-        ["Total", money3(items + carriage, cur), " ak-checkout__total--grand"]
+        [t("coItems"), money4(items, cur, mu), ""],
+        [t("coDelivery"), ship ? money4(carriage, cur, mu) : t("coShipLater"), ""],
+        [t("total"), money4(items + carriage, cur, mu), " ak-checkout__total--grand"]
       ].forEach(function(row) {
         totals.appendChild(el("div", { class: "ak-checkout__total" + row[2] }, [
           el("span", {}, row[0]),
@@ -17206,10 +19859,11 @@
     }
     function renderLines() {
       const cur = data.currency;
+      const mu = inMicros();
       const lines = Array.isArray(data.lines) ? data.lines : [];
       clear(lineList);
       if (!lines.length) {
-        emptyState({ target: lineList, tone: "quiet", title: "Nothing in the order", hint: "Add something and it appears here." });
+        emptyState({ target: lineList, tone: "quiet", title: t("coEmpty"), hint: t("coEmptyHint") });
         return;
       }
       lines.forEach(function(l) {
@@ -17219,19 +19873,20 @@
             l.sub ? el("span", { class: "ak-checkout__line-sub" }, String(l.sub)) : null
           ].filter(Boolean)),
           el("span", { class: "ak-checkout__qty" }, String(Number(l.qty) || 0) + " ×"),
-          el("span", { class: "ak-checkout__figure" }, money3((Number(l.price) || 0) * (Number(l.qty) || 0), cur))
+          el("span", { class: "ak-checkout__figure" }, money4(lineSum(l), cur, mu))
         ]));
       });
       stagger(Array.prototype.slice.call(lineList.children), { from: "up" });
     }
     function renderShipping() {
       const cur = data.currency;
+      const mu = inMicros();
       const options = Array.isArray(data.shipping) ? data.shipping : [];
       const group = uid("ak-ship");
       clear(shipList);
       if (!options.length) {
         shipId = null;
-        shipList.appendChild(el("p", { class: "ak-checkout__quiet" }, "Delivery is agreed after the order is in."));
+        shipList.appendChild(el("p", { class: "ak-checkout__quiet" }, t("coNoShipping")));
         return;
       }
       if (!options.some(function(o) {
@@ -17255,7 +19910,7 @@
         shipList.appendChild(el("label", { class: "ak-checkout__ship" }, [
           radio,
           el("span", { class: "ak-checkout__ship-label" }, String(o.label || o.id)),
-          el("span", { class: "ak-checkout__figure" }, money3(o.price, cur))
+          el("span", { class: "ak-checkout__figure" }, money4(readAmount(o, "price", data), cur, mu))
         ]));
       });
     }
@@ -17263,18 +19918,18 @@
       if (placed) return;
       const contact = details.values();
       details.clearErrors();
-      const missing = DETAIL_FIELDS.filter(function(f) {
+      const missing = fields.filter(function(f) {
         return f.required && !String(contact[f.name] == null ? "" : contact[f.name]).trim();
       });
       if (missing.length) {
         missing.forEach(function(f) {
-          details.setError(f.name, f.label + " is needed before the order can go.");
+          details.setError(f.name, t("coNeeded", { field: f.label }));
         });
         goTo(1);
         return;
       }
       if (String(contact.email).indexOf("@") < 0) {
-        details.setError("email", "An email address has an @ in it.");
+        details.setError("email", t("coEmailAt"));
         goTo(1);
         return;
       }
@@ -17289,7 +19944,7 @@
         try {
           s.onSubmit(order);
         } catch (err) {
-          refusal2.textContent = err && err.message || "The order did not go through. Try once more.";
+          refusal2.textContent = err && err.message || t("coFailed");
           refusal2.hidden = false;
           attention(refusal2, "shake");
           return;
@@ -17366,7 +20021,6 @@
   function toneOf4(value) {
     return TONES8.indexOf(value) >= 0 ? value : "accent";
   }
-  var WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   function pad2(n) {
     return (n < 10 ? "0" : "") + n;
   }
@@ -17462,7 +20116,7 @@
       const today = isoDay(/* @__PURE__ */ new Date());
       const names = el("div", { class: "ak-calendar__row ak-calendar__row--head", role: "row" });
       for (let i = 0; i < 7; i++) {
-        names.appendChild(el("span", { class: "ak-calendar__wd", role: "columnheader" }, WEEKDAYS[(weekStart + i) % 7]));
+        names.appendChild(el("span", { class: "ak-calendar__wd", role: "columnheader" }, t("wd" + (weekStart + i) % 7)));
       }
       grid2.appendChild(names);
       const lead = (new Date(year, mon, 1).getDay() - weekStart + 7) % 7;
@@ -17546,28 +20200,34 @@
     };
   }
   var PERIODS = ["month", "year"];
+  function perWord(period) {
+    return t(period === "year" ? "pricePerYear" : "pricePerMonth");
+  }
   function currencyCode(value) {
     return /^[A-Z]{3}$/.test(String(value == null ? "" : value)) ? String(value) : null;
   }
-  function money4(value, currency) {
-    const whole = Math.round(Number(value) || 0);
+  function money5(value, currency, digits) {
+    if (isMorsels(currency)) return morselText(value);
+    const d = digits || 0;
+    const whole = d ? roundMicros(value) : Math.round(Number(value) || 0);
     const code = currencyCode(currency);
     if (typeof Intl !== "undefined" && typeof Intl.NumberFormat === "function") {
       if (code) {
-        return money(whole, code, { maximumFractionDigits: 0, minimumFractionDigits: 0 });
+        return money(whole, code, { maximumFractionDigits: d, minimumFractionDigits: d });
       }
-      return String(currency) + num(whole, { maximumFractionDigits: 0 });
+      return String(currency) + num(whole, d ? { minimumFractionDigits: d, maximumFractionDigits: d } : { maximumFractionDigits: 0 });
     }
-    return String(currency) + whole;
+    return String(currency) + (d ? whole.toFixed(d) : whole);
   }
-  function priceFor(plan2, period) {
-    const base = Number(plan2.price) || 0;
+  function priceFor(plan2, period, data, micros) {
+    const base = readAmount(plan2, "price", data);
     const own = plan2.period === "year" ? "year" : "month";
     if (period === "year") {
-      if (typeof plan2.priceYearly === "number") return plan2.priceYearly;
+      if (hasAmount(plan2, "priceYearly")) return readAmount(plan2, "priceYearly", data);
       return own === "year" ? base : base * 12;
     }
-    return own === "year" ? base / 12 : base;
+    if (own !== "year") return base;
+    return micros ? Math.round(base / 12 * 100) / 100 : base / 12;
   }
   function priceTable(spec) {
     const s = spec || {};
@@ -17576,6 +20236,7 @@
     let data = s.data === void 0 ? null : s.data;
     let period = "month";
     let currency = "€";
+    let micros = false;
     let emptyCard = null;
     let figures = [];
     let periodButtons = [];
@@ -17585,19 +20246,27 @@
       }) : [];
       if (declared2.length) return declared2;
       const yearly = plans.some(function(p) {
-        return typeof p.priceYearly === "number";
+        return hasAmount(p, "priceYearly");
       });
       return yearly ? ["month", "year"] : ["month"];
+    }
+    function figureOf(plan2) {
+      const v = priceFor(plan2, period, data, micros);
+      return micros ? roundMicros(v) : Math.round(v * 100) / 100;
+    }
+    function digitsOf(v) {
+      return micros || !Number.isInteger(Number(v) || 0) ? fractionDigits(v) : 0;
     }
     function roll() {
       const engine = !reducedMotion() && W4.anime && W4.anime.animate ? W4.anime : null;
       figures.forEach(function(f) {
-        f.per.textContent = "/" + period;
-        const to = Math.round(priceFor(f.plan, period));
+        f.per.textContent = perWord(period);
+        const to = figureOf(f.plan);
         const from = f.shown;
         f.shown = to;
+        const d = digitsOf(to);
         if (!engine || from === to) {
-          f.amount.textContent = money4(to, currency);
+          f.amount.textContent = money5(to, currency, d);
           return;
         }
         const box = { v: from };
@@ -17606,10 +20275,10 @@
           duration: 520,
           ease: "outQuad",
           onUpdate: function() {
-            f.amount.textContent = money4(box.v, currency);
+            f.amount.textContent = money5(box.v, currency, d);
           },
           onComplete: function() {
-            f.amount.textContent = money4(to, currency);
+            f.amount.textContent = money5(to, currency, d);
           }
         });
       });
@@ -17625,7 +20294,7 @@
     }
     function segments(periods) {
       periodButtons = [];
-      const bar = el("div", { class: "ak-price__periods", role: "group", "aria-label": "Billing period" });
+      const bar2 = el("div", { class: "ak-price__periods", role: "group", "aria-label": t("pricePeriods") });
       periods.forEach(function(p) {
         const node = el("button", {
           type: "button",
@@ -17634,16 +20303,16 @@
           on: { click: function() {
             pick(p);
           } }
-        }, p === "year" ? "Year" : "Month");
+        }, t(p === "year" ? "priceYear" : "priceMonth"));
         periodButtons.push({ id: p, node });
-        bar.appendChild(node);
+        bar2.appendChild(node);
       });
-      return bar;
+      return bar2;
     }
     function card(plan2) {
-      const value = Math.round(priceFor(plan2, period));
-      const amount2 = el("span", { class: "ak-price__amount" }, money4(value, currency));
-      const per = el("span", { class: "ak-price__per" }, "/" + period);
+      const value = figureOf(plan2);
+      const amount2 = el("span", { class: "ak-price__amount" }, money5(value, currency, digitsOf(value)));
+      const per = el("span", { class: "ak-price__per" }, perWord(period));
       figures.push({ plan: plan2, amount: amount2, per, shown: value });
       const features = el("ul", { class: "ak-price__features" });
       (Array.isArray(plan2.features) ? plan2.features : []).forEach(function(f) {
@@ -17655,7 +20324,7 @@
       return el("article", {
         class: "ak-price__card" + (plan2.highlight ? " ak-price__card--lift" : "")
       }, [
-        plan2.highlight ? el("span", { class: "ak-price__chip" }, "Most chosen") : null,
+        plan2.highlight ? el("span", { class: "ak-price__chip" }, t("priceMostChosen")) : null,
         el("h3", { class: "ak-price__name" }, String(plan2.name || plan2.id)),
         el("div", { class: "ak-price__figure" }, [amount2, per]),
         features,
@@ -17666,7 +20335,7 @@
           on: s.onPick ? { click: function() {
             s.onPick(plan2, period);
           } } : void 0
-        }, String(plan2.cta || "Choose"))
+        }, String(plan2.cta || t("priceChoose")))
       ].filter(Boolean));
     }
     function render() {
@@ -17691,6 +20360,7 @@
         return;
       }
       currency = data && data.currency || "€";
+      micros = speaksMicros(data, plans, ["price", "priceYearly"]);
       const periods = periodsOf(plans);
       if (periods.indexOf(period) < 0) period = periods[0];
       if (s.title) root.appendChild(el("div", { class: "ak-price__title" }, String(s.title)));
@@ -19380,7 +22050,7 @@
       if (tone) root.setAttribute("data-ak-tone", TONES13.indexOf(tone) >= 0 ? tone : "ink");
       else if (!root.hasAttribute("data-ak-tone")) root.setAttribute("data-ak-tone", "ink");
     }
-    function leave(node, pace2) {
+    function leave(node, pace3) {
       const top = node.offsetTop;
       const left = node.offsetLeft;
       const width = node.offsetWidth;
@@ -19399,30 +22069,30 @@
       const anim = node.animate([
         { opacity: 1, filter: "blur(0px)", transform: "scale(1)" },
         { opacity: 0, filter: "blur(4px)", transform: "scale(0.96)" }
-      ], { duration: Math.max(100, pace2.span * 0.7), easing: "ease-in", fill: "forwards" });
+      ], { duration: Math.max(100, pace3.span * 0.7), easing: "ease-in", fill: "forwards" });
       anim.onfinish = drop;
       anim.oncancel = drop;
     }
-    function arrive(node, pace2) {
+    function arrive(node, pace3) {
       if (typeof node.animate !== "function") return;
       node.animate([
         { opacity: 0, filter: "blur(4px)", transform: "scale(0.96)" },
         { opacity: 1, filter: "blur(0px)", transform: "scale(1)" }
-      ], { duration: Math.max(140, pace2.span * 1.1), delay: Math.max(60, pace2.span * 0.4), easing: pace2.ease, fill: "backwards" });
+      ], { duration: Math.max(140, pace3.span * 1.1), delay: Math.max(60, pace3.span * 0.4), easing: pace3.ease, fill: "backwards" });
     }
     function set(patch) {
       const p = patch || {};
       const still2 = motionOff(root) || !root.isConnected;
       const from = still2 ? null : { w: root.offsetWidth, h: root.offsetHeight, r: radiusFor(root, root.offsetHeight) };
-      const pace2 = paceOf(root);
+      const pace3 = paceOf(root);
       if (Object.prototype.hasOwnProperty.call(p, "content")) {
         const next = wrap(p.content);
         if (still2) {
           root.replaceChild(next, current2);
         } else {
-          leave(current2, pace2);
+          leave(current2, pace3);
           root.appendChild(next);
-          arrive(next, pace2);
+          arrive(next, pace3);
         }
         current2 = next;
       }
@@ -19550,6 +22220,247 @@
       destroy() {
         clearTimeout(timer);
         isl.destroy();
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/cart.js
+  function pace2(node, multiple) {
+    return (parseFloat(getComputedStyle(node).getPropertyValue("--ak-motion")) || 200) * multiple;
+  }
+  function pictureOf(url) {
+    if (!url) return null;
+    const v = String(url);
+    if (/^data:/i.test(v)) {
+      console.warn("aimeat-atelier: cart line image data: URIs are refused. Upload the image and pass its URL.");
+      return null;
+    }
+    return 'url("' + v.replace(/"/g, "%22") + '")';
+  }
+  function money6(amount2, currency, micros) {
+    if (isMorsels(currency)) return morselText(amount2);
+    const unit = currency || "€";
+    const n = micros ? roundMicros(amount2) : Number(amount2) || 0;
+    const d = micros ? fractionDigits(n) : 2;
+    const hasIntl = typeof Intl === "object" && Intl && typeof Intl.NumberFormat === "function";
+    if (hasIntl && /^[A-Za-z]{3}$/.test(unit)) {
+      return money(n, unit, { minimumFractionDigits: d, maximumFractionDigits: d });
+    }
+    if (hasIntl) {
+      return num(n, { minimumFractionDigits: d, maximumFractionDigits: d }) + " " + unit;
+    }
+    return n.toFixed(d) + " " + unit;
+  }
+  function cart(spec) {
+    const s = spec || /** @type {any} */
+    {};
+    const root = el("div", { class: "ak-root ak-cart" });
+    if (s.target) resolve(s.target).appendChild(root);
+    const lines = el("div", { class: "ak-cart__lines" });
+    const totalValue = el("span", { class: "ak-cart__totalvalue" });
+    const note = el("div", { class: "ak-cart__note" });
+    const foot = el("div", { class: "ak-cart__foot" }, [
+      el("div", { class: "ak-cart__total" }, [
+        el("span", { class: "ak-cart__totallabel", text: t("total") }),
+        totalValue
+      ]),
+      el("button", {
+        type: "button",
+        class: "ak-btn ak-btn--primary ak-cart__checkout",
+        text: t("cartCheckout"),
+        on: { click: function() {
+          if (s.onCheckout) s.onCheckout(current2.slice());
+        } }
+      }, null)
+    ]);
+    const shown = /* @__PURE__ */ new Map();
+    let current2 = [];
+    let unit = "€";
+    let shape = null;
+    let mu = false;
+    let emptyCard = null;
+    function each(line) {
+      return readAmount(line, "price", shape);
+    }
+    function totalOf() {
+      return current2.reduce(function(n, l) {
+        return n + each(l) * (Number(l.qty) || 0);
+      }, 0);
+    }
+    function rollTotal() {
+      odometer(totalValue, money6(totalOf(), unit, mu));
+    }
+    function subOf(line, qty) {
+      const own = line.sub != null && line.sub !== "" ? String(line.sub) : "";
+      const unitPrice = qty > 1 ? qty + " × " + money6(each(line), unit, mu) : "";
+      return own && unitPrice ? own + " · " + unitPrice : own || unitPrice;
+    }
+    function paintSub(rec, line, qty) {
+      const text = subOf(line, qty);
+      rec.sub.textContent = text;
+      rec.sub.hidden = !text;
+    }
+    function setQty(line, next) {
+      const q = Math.max(1, Math.round(Number(next) || 1));
+      if (q === Number(line.qty)) return;
+      line.qty = q;
+      const rec = shown.get(String(line.id));
+      if (rec) {
+        rec.count.textContent = String(q);
+        rec.price.textContent = money6(each(line) * q, unit, mu);
+        paintSub(rec, line, q);
+      }
+      rollTotal();
+      if (s.onChange) s.onChange(line.id, q);
+    }
+    function collapse(node, after) {
+      const done = function() {
+        if (node.parentNode) node.parentNode.removeChild(node);
+        if (after) after();
+      };
+      if (reducedMotion() || typeof node.animate !== "function") {
+        done();
+        return;
+      }
+      const box = node.getBoundingClientRect();
+      const seen = getComputedStyle(node);
+      const anim = node.animate([
+        { height: box.height + "px", opacity: 1, paddingTop: seen.paddingTop, paddingBottom: seen.paddingBottom },
+        { height: "0px", opacity: 0, paddingTop: "0px", paddingBottom: "0px" }
+      ], { duration: pace2(node, 1.4), easing: "cubic-bezier(0.2, 0.7, 0.3, 1)", fill: "forwards" });
+      anim.addEventListener("finish", done);
+      anim.addEventListener("cancel", done);
+    }
+    function remove(line) {
+      const id = String(line.id);
+      const rec = shown.get(id);
+      current2 = current2.filter(function(l) {
+        return String(l.id) !== id;
+      });
+      shown.delete(id);
+      if (rec) collapse(rec.node, current2.length ? null : function() {
+        render({ lines: [], currency: unit, note: "" });
+      });
+      rollTotal();
+      if (s.onRemove) s.onRemove(line.id);
+    }
+    function buildLine(line) {
+      const picture = pictureOf(line.image);
+      const rec = (
+        /** @type {any} */
+        {
+          node: null,
+          line,
+          art: el("span", {
+            class: "ak-cart__art" + (picture ? " ak-cart__art--image" : ""),
+            "aria-hidden": "true",
+            vars: picture ? { "--ak-cart-image": picture } : null
+          }, picture ? null : el("span", { class: "ak-cart__monogram" })),
+          title: el("span", { class: "ak-cart__linetitle" }),
+          sub: el("span", { class: "ak-cart__linesub" }),
+          count: el("span", { class: "ak-cart__count", "aria-live": "polite" }),
+          price: el("span", { class: "ak-cart__price" })
+        }
+      );
+      const step = function(by) {
+        return function() {
+          setQty(rec.line, (Number(rec.line.qty) || 1) + by);
+        };
+      };
+      rec.node = el("div", { class: "ak-cart__line", "data-id": String(line.id) }, [
+        rec.art,
+        el("span", { class: "ak-cart__body" }, [rec.title, rec.sub]),
+        el("span", { class: "ak-cart__qty" }, [
+          el("button", { type: "button", class: "ak-cart__step", "aria-label": t("cartFewer"), on: { click: step(-1) } }, "-"),
+          rec.count,
+          el("button", { type: "button", class: "ak-cart__step", "aria-label": t("cartMore"), on: { click: step(1) } }, "+")
+        ]),
+        rec.price,
+        el("button", {
+          type: "button",
+          class: "ak-btn ak-cart__remove",
+          text: t("cartRemove"),
+          on: { click: function() {
+            remove(rec.line);
+          } }
+        }, null)
+      ]);
+      fillLine(rec, line);
+      return rec;
+    }
+    function fillLine(rec, line) {
+      rec.line = line;
+      const qty = Math.max(1, Math.round(Number(line.qty) || 1));
+      rec.title.textContent = String(line.title || line.id);
+      paintSub(rec, line, qty);
+      rec.count.textContent = String(qty);
+      rec.price.textContent = money6(each(line) * qty, unit, mu);
+      const mono = rec.art.querySelector(".ak-cart__monogram");
+      if (mono) mono.textContent = (Array.from(String(line.title || "?"))[0] || "?").toUpperCase();
+    }
+    function render(data) {
+      const list2 = (data && Array.isArray(data.lines) ? data.lines : []).filter(function(l) {
+        return l && l.id != null;
+      });
+      unit = data && data.currency || "€";
+      shape = data || null;
+      mu = speaksMicros(shape, list2, ["price"]);
+      current2 = list2;
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      if (!list2.length) {
+        clear(root);
+        clear(lines);
+        shown.clear();
+        emptyCard = emptyState({
+          target: root,
+          tone: "quiet",
+          title: t("cartEmpty"),
+          hint: t("cartEmptyHint")
+        });
+        return;
+      }
+      clear(root);
+      if (s.title) root.appendChild(el("div", { class: "ak-cart__title", text: s.title }));
+      root.appendChild(lines);
+      note.textContent = data && data.note ? String(data.note) : "";
+      note.hidden = !note.textContent;
+      root.appendChild(foot);
+      root.appendChild(note);
+      const live = {};
+      list2.forEach(function(l) {
+        live[String(l.id)] = 1;
+      });
+      Array.from(shown.keys()).forEach(function(id) {
+        if (live[id]) return;
+        const rec = shown.get(id);
+        shown.delete(id);
+        if (rec.node.parentNode) rec.node.parentNode.removeChild(rec.node);
+      });
+      list2.forEach(function(line) {
+        const id = String(line.id);
+        let rec = shown.get(id);
+        if (!rec) {
+          rec = buildLine(line);
+          shown.set(id, rec);
+        } else {
+          fillLine(rec, line);
+        }
+        lines.appendChild(rec.node);
+      });
+      rollTotal();
+    }
+    render(s.data);
+    return {
+      el: root,
+      set(patch) {
+        if (patch && "data" in patch) render(patch.data);
+      },
+      destroy() {
+        if (emptyCard) emptyCard.destroy();
+        if (root.parentNode) root.parentNode.removeChild(root);
       }
     };
   }
@@ -20411,8 +23322,8 @@
       run(a);
     });
   }
-  function cue(node, when, play, once) {
-    if (when === "now") {
+  function cue(node, when2, play, once) {
+    if (when2 === "now") {
       play();
       return null;
     }
@@ -20553,7 +23464,7 @@
   function drawPath(target, opts) {
     const o = opts || {};
     const node = resolve(target);
-    const when = o.when === "now" || o.when === "scroll" ? o.when : "inView";
+    const when2 = o.when === "now" || o.when === "scroll" ? o.when : "inView";
     const duration = o.duration || 1100;
     const each = typeof o.each === "number" ? o.each : 140;
     node.classList.add("ak-draw");
@@ -20627,8 +23538,8 @@
         };
       });
     }
-    if (when === "scroll") bindScroll();
-    else watcher = cue(node, when, play, o.once);
+    if (when2 === "scroll") bindScroll();
+    else watcher = cue(node, when2, play, o.once);
     return {
       el: node,
       play,
@@ -21644,7 +24555,7 @@
         })
       );
     }
-    function keyOf2(kid) {
+    function keyOf3(kid) {
       const k = kid.getAttribute(keyed);
       return k == null ? kid : k;
     }
@@ -21697,13 +24608,13 @@
       try {
         const before = /* @__PURE__ */ new Map();
         kids().forEach(function(kid) {
-          before.set(keyOf2(kid), { el: kid, box: kid.getBoundingClientRect() });
+          before.set(keyOf3(kid), { el: kid, box: kid.getBoundingClientRect() });
         });
         run();
         const M = travel2();
         const seen = /* @__PURE__ */ new Set();
         kids().forEach(function(kid) {
-          const key = keyOf2(kid);
+          const key = keyOf3(kid);
           seen.add(key);
           const was = before.get(key);
           if (!was) {
@@ -22151,6 +25062,14 @@
       fork: "Copying it out means asking AIMEAT.iam.can(cap) after init and drawing both sides yourself.",
       file: "members.js"
     },
+    "aiTask": {
+      parts: ["root", "title", "hint", "notice", "signIn", "label", "input", "reason", "bar", "run", "status", "failure", "result", "aiLabel", "body", "meta", "model", "cost", "truncated", "copyRoute"],
+      slots: [],
+      variants: ["compact"],
+      tokens: ["--ak-ai-width"],
+      fork: "Copying it out means calling AIMEAT.ai.capabilities(), complete() or completeJson(), disclose() and AIMEAT.md.render() yourself, writing the no-AI, signed-out and error words in three languages, and holding the button busy.",
+      file: "ai-task.js"
+    },
     "bottomNav": {
       parts: ["root", "item"],
       slots: ["item(entry)"],
@@ -22199,6 +25118,14 @@
       fork: "Copying it out means calling AIMEAT.connect's list(), providers(), capabilities(), start(), attach() and revoke() yourself, starting start() inside the click, and keeping the confirm before a disconnect and the words for each status.",
       file: "connections.js"
     },
+    "decision": {
+      parts: ["root", "title", "status", "body", "intro", "signIn", "failure", "settings", "empty", "ready", "ask", "provider", "providerNote", "outcome", "answers", "answer", "question", "value", "verdict", "bar", "threshold", "options", "removed", "cost", "who", "person", "note", "confirm", "override", "overridePanel", "overridePick", "record", "cancel", "recorded", "again", "retry"],
+      slots: ["onOutcome(result)", "labels{ questionId: words }"],
+      variants: [],
+      tokens: ["--ak-decision-width"],
+      fork: "Copying it out means calling AIMEAT.decide's isAvailable(), unavailableReason(), providers(), ask() or gate() or rule(id).ask(), and review() yourself, drawing every answer with its number, threshold, removed data, cost and provider, and recording the person's verdict only when they press.",
+      file: "decision.js"
+    },
     "dialog": {
       parts: ["root", "panel", "head", "title", "close", "body", "text", "before", "after", "actions", "action"],
       slots: ["before()", "after()", "actions()", "aside()"],
@@ -22206,6 +25133,22 @@
       tokens: [],
       fork: "Do not: the focus trap, Escape and focus return are the browser's through native <dialog>, and a hand-rolled overlay loses all three. Put your own markup in body(host) instead.",
       file: "dialog.js"
+    },
+    "doc": {
+      parts: ["root", "title", "body", "md", "text", "empty", "sources", "source"],
+      slots: [],
+      variants: [],
+      tokens: ["--ak-doc-width"],
+      fork: "Copying it out means calling AIMEAT.md.render() or renderRich() yourself, catching a failure into pre-wrapped text, and colouring .md-body's headings, lists, code, tables, quotes and links with the --ak-* tokens.",
+      file: "doc.js"
+    },
+    "dropzone": {
+      parts: ["files", "file", "name", "state", "bar", "open"],
+      slots: [],
+      variants: [],
+      tokens: [],
+      fork: "",
+      file: "dropzone-upload.js"
     },
     "figure": {
       parts: ["root", "label", "row", "value", "unit", "delta", "sub", "aside"],
@@ -22479,6 +25422,14 @@
       fork: "",
       file: "menu.js"
     },
+    "workflowInput": {
+      parts: ["root", "title", "intro", "failure", "notice", "body", "none", "list", "step", "head", "header", "workflow", "run", "form", "choices", "question", "how", "choice", "mark", "other", "error", "bar", "deadline", "answer"],
+      slots: ["onAnswered(input, answer)"],
+      variants: ["dense"],
+      tokens: ["--ak-wf-width"],
+      fork: "Copying it out means calling AIMEAT.workflows.pendingInputs() and answer() yourself, sending picks as option ids with other only when the step accepts it, treating WORKFLOW_STEP_NOT_WAITING as a step that is gone, and reading the list again when the live 'workflows' domain changes.",
+      file: "workflow-input.js"
+    },
     "workspacePicker": {
       parts: ["root", "title", "intro", "failure", "using", "change", "orgs", "row", "who", "chip", "use", "create", "createGo", "cancel", "working"],
       slots: ["onReady(choice)"],
@@ -22504,7 +25455,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.61.0",
+    version: "0.62.0",
     /**
      * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
      * named parts (every one carries `data-ak-part`, so an app's own CSS reaches it), the slots
@@ -22540,6 +25491,8 @@
     promptPanel,
     queueRow,
     parseAnswer,
+    // The kit's one clipboard helper: AIMEAT.agentface.copyText when loaded, the same code otherwise.
+    copy,
     // The empty sides of a wide frame: the node's margin figures (margins.js, margins.css).
     margins,
     marginsOf,
@@ -22623,6 +25576,12 @@
     intakeForm,
     intakeAdmin,
     connections,
+    // ── A workflow step waiting for a person (AIMEAT.workflows), and one question to the person's own AI (AIMEAT.ai) ──
+    workflowInput,
+    aiTask,
+    // ── One markdown document (AIMEAT.md), and one decision rule with its review (AIMEAT.decide) ──
+    doc,
+    decision,
     // ── The broadcast family (the Music Television genre's parts as components) ──
     crt,
     countdown,

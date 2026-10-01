@@ -13,6 +13,32 @@
     return ns;
   }
 
+  // src/static/sdk-libs/_core/clipboard.js
+  async function copyText(text) {
+    const value = String(text == null ? "" : text);
+    if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(value);
+        return true;
+      } catch {
+      }
+    }
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = value;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return !!ok;
+    } catch {
+      return false;
+    }
+  }
+
   // src/static/sdk-libs/agentface/index.js
   var MAX_BYTES = 256 * 1024;
   function getSession() {
@@ -50,6 +76,53 @@
     if (m) return decodeURIComponent(m[1]);
     return null;
   }
+  function sessionOrNull() {
+    const auth = window.AIMEAT && window.AIMEAT.auth;
+    if (!auth || typeof auth.getSession !== "function") return null;
+    try {
+      return auth.getSession() || null;
+    } catch {
+      return null;
+    }
+  }
+  var quiet = /* @__PURE__ */ new Map();
+  function quietState(filename) {
+    let st = quiet.get(filename);
+    if (!st) {
+      st = { last: null, chain: Promise.resolve(), timer: null, input: null, waiters: [] };
+      quiet.set(filename, st);
+    }
+    return st;
+  }
+  function quietWarn(filename, err) {
+    console.warn("[aimeat-agentface] publishQuietly(" + (filename || "?") + ") wrote nothing: " + String(err && err.message || err));
+  }
+  function quietRun(filename, input) {
+    const st = quietState(filename);
+    const run = st.chain.then(async function() {
+      if (!sessionOrNull()) return false;
+      let markdown;
+      try {
+        const value = typeof input === "function" ? input() : input;
+        markdown = typeof value === "string" ? value : compose(value);
+      } catch (e) {
+        quietWarn(filename, e);
+        return false;
+      }
+      if (markdown === st.last) return false;
+      st.last = markdown;
+      try {
+        await agentface.publish(markdown, { app: filename });
+        return true;
+      } catch (e) {
+        st.last = null;
+        quietWarn(filename, e);
+        return false;
+      }
+    });
+    st.chain = run;
+    return run;
+  }
   var agentface = {
     /** The convention memory key the face lives under. */
     key(filename) {
@@ -61,31 +134,13 @@
      * Copy text to the clipboard the way every "Copy prompt" button should: async clipboard API
      * first, hidden-offscreen-textarea execCommand fallback — never a visible selection painted
      * over the page. Resolves to true/false; never throws. This is THE shared implementation for
-     * the platform's copy-a-prompt-to-your-AI pattern — stop hand-rolling it per app.
+     * the platform's copy-a-prompt-to-your-AI pattern — stop hand-rolling it per app. The code
+     * lives in _core/clipboard.js, shared with the Atelier kit's copy().
+     * @param {unknown} text
+     * @returns {Promise<boolean>}
      */
-    async copyText(text) {
-      const value = String(text == null ? "" : text);
-      if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
-        try {
-          await navigator.clipboard.writeText(value);
-          return true;
-        } catch {
-        }
-      }
-      try {
-        const ta = document.createElement("textarea");
-        ta.value = value;
-        ta.setAttribute("readonly", "");
-        ta.style.position = "fixed";
-        ta.style.left = "-9999px";
-        document.body.appendChild(ta);
-        ta.select();
-        const ok = document.execCommand("copy");
-        document.body.removeChild(ta);
-        return !!ok;
-      } catch {
-        return false;
-      }
+    copyText(text) {
+      return copyText(text);
     },
     /**
      * Publish this app's agent face: a markdown string, or { title, sections: [{ heading, body }] }.
@@ -114,6 +169,46 @@
         throw new Error(res.error && res.error.message || "Failed to publish the agent face");
       }
       return { key, app: filename, version: res.data && res.data.version, visibility: "public" };
+    },
+    /**
+     * publish() for an app that updates its face as it runs and must never break because of it.
+     * `input` is what publish() takes (markdown or { title, sections }) or a function that returns
+     * it, called when the write happens, so a debounced burst composes the latest state once.
+     * Resolves true when the face was written; false when nothing was written: signed out or no
+     * aimeat-auth on the page, the same markdown as the last write for this app, a burst member
+     * that a later call replaced, or a failure (then one console.warn line). Never rejects.
+     * @param {string|object|(() => string|object)} input
+     * @param {{ app?: string, debounceMs?: number }} [opts]
+     * @returns {Promise<boolean>}
+     */
+    publishQuietly(input, opts) {
+      const o = opts || {};
+      if (!sessionOrNull()) return Promise.resolve(false);
+      const filename = typeof o.app === "string" && o.app.trim() ? o.app.trim() : inferFilename();
+      if (!filename) {
+        quietWarn(null, new Error('no app filename on this origin; pass { app: "your-file.html" }'));
+        return Promise.resolve(false);
+      }
+      const wait = Number(o.debounceMs) > 0 ? Number(o.debounceMs) : 0;
+      if (!wait) return quietRun(filename, input);
+      const st = quietState(filename);
+      st.input = input;
+      if (st.timer) clearTimeout(st.timer);
+      return new Promise(function(resolveOk) {
+        st.waiters.push(resolveOk);
+        st.timer = setTimeout(function() {
+          const waiters = st.waiters;
+          const latest = st.input;
+          st.waiters = [];
+          st.input = null;
+          st.timer = null;
+          quietRun(filename, latest).then(function(ok) {
+            waiters.forEach(function(w, i) {
+              w(i === waiters.length - 1 ? ok : false);
+            });
+          });
+        }, wait);
+      });
     }
   };
   attach("agentface", agentface);

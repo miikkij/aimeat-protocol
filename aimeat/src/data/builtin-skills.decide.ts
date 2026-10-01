@@ -24,6 +24,7 @@
  * @structure DECIDE_SKILL_ENTRY
  * @usage import { DECIDE_SKILL_ENTRY } from './builtin-skills.decide.js';
  * @version-history
+ *   v1.4.0 — 2026-10-01 — settingsUrl() for the unavailable state, and the kit's decision block.
  *   v1.3.2 — 2026-09-29 — The scrub covers object keys, and scrub.allowed names what the owner let through.
  *   v1.3.1 — 2026-09-23 — The setup order starts with choosing a provider; the key is the TypeSafe branch.
  *   v1.3.0 — 2026-09-23 — "Providers: who answers": the decision provider, the local decision model,
@@ -85,7 +86,9 @@ turned it off, or no TypeSafe key is set (the owner's own, or the server's) and 
 owner gets is not one that needs no key (a local decision model). **When it is false, do not
 build a feature on it.** Tell the owner the reason, or design the feature without it. In the app, gate
 the feature on \`await AIMEAT.decide.isAvailable()\` and show \`AIMEAT.decide.unavailableReason()\`
-when it is false.
+when it is false, with a link to \`AIMEAT.decide.settingsUrl()\` (the owner's AI settings at the
+decision model card). An Atelier app gets all of this, and the answers with their review, from
+\`AIMEAT.atelier.decision({ target, appId, rule, state })\`.
 
 ## 1. Rules every recipe follows
 

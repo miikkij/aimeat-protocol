@@ -1,0 +1,231 @@
+/*
+ * @file aimeat-atelier/doc-decision.css
+ * @description The clothes of the doc block (atelier/doc.js) and the decision block
+ *   (atelier/decision.js). Everything rides the --ak-* token contract, so both blocks wear the
+ *   app's look and mode with no colour of their own.
+ *
+ *   THE DOCUMENT'S TYPOGRAPHY TAKES THE KIT'S COLOURS ONCE. AIMEAT.md injects its own .md-body
+ *   sheet, inked with the portal's --color-* tokens and dark literals; inside an app on the kit's
+ *   light look that read as an empty pane (lifecycle-central re-inked it by hand). The rules below
+ *   sit one class deeper than the markdown sheet's own (.ak-doc .ak-doc__body .md-body ...), so
+ *   they win whatever order the two sheets load in, and they name only --ak-* tokens, which the
+ *   kit already re-declares for dark. The syntax colours of highlighted code stay the markdown
+ *   library's.
+ *
+ *   THE DECISION'S BARS CARRY THEIR NUMBER. A bar's length comes from --ak-dec-v (0 to 1) and a
+ *   threshold's mark from --ak-dec-t, both set on the element by the block; the number is always
+ *   printed beside the bar, so nothing rests on colour or length alone. An answer under its
+ *   threshold takes the warning tone on its fill and says so in words.
+ *
+ *   Each block keeps to a readable width (--ak-doc-width, --ak-decision-width), long words and
+ *   addresses wrap, a wide table or code block scrolls inside its own box, and every control keeps
+ *   the kit's touch floor, so nothing pushes the page sideways at 390px.
+ * @structure .ak-doc (box, plain text, sources) · .ak-doc .md-body (headings, lists, links, code,
+ *   quotes, tables, rules, images, memory embeds) · .ak-dec (lines, answers, bars, the person's
+ *   verdict, the provider field)
+ * @version-history
+ *   v0.62.0 — 2026-10-01 — Initial.
+ */
+
+/* ── The document ──────────────────────────────────────────────────────────────────────────── */
+.ak-doc { display: block; max-width: var(--ak-doc-width, 48rem); min-width: 0; color: var(--ak-ink); }
+.ak-doc__title { margin: 0 0 8px; font-size: 1.05rem; color: var(--ak-ink); }
+.ak-doc__body {
+  min-width: 0;
+  padding: var(--ak-card-pad, 16px 20px);
+  border: var(--ak-line-w, 1px) solid var(--ak-line);
+  border-radius: var(--ak-radius);
+  background: var(--ak-surface);
+  color: var(--ak-ink);
+  overflow-wrap: anywhere;
+}
+/* The empty card brings its own box; the document box does not draw a second one around it. */
+.ak-doc[data-ak-state='empty'] .ak-doc__body { padding: 0; border: 0; background: none; }
+.ak-doc__text {
+  white-space: pre-wrap;
+  font-family: var(--ak-font);
+  font-size: var(--ak-text-body, 1rem);
+  line-height: 1.6;
+  color: var(--ak-ink);
+}
+.ak-doc__sources { margin: 10px 0 0; font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); }
+.ak-doc__sources-title { margin: 0 0 4px; font-weight: 700; color: var(--ak-ink-dim); }
+.ak-doc__source-list { margin: 0; padding-left: 1.2em; }
+.ak-doc__source { margin: 2px 0; overflow-wrap: anywhere; }
+.ak-doc__source a { color: var(--ak-accent-text); text-decoration: underline; text-underline-offset: 2px; }
+.ak-doc__shortened { color: var(--ak-ink-dim); }
+
+/* ── The document's typography, on the kit's colours ───────────────────────────────────────── */
+.ak-doc .ak-doc__body .md-body {
+  color: var(--ak-ink);
+  font-family: var(--ak-font);
+  font-size: var(--ak-text-body, 1rem);
+  line-height: 1.6;
+  max-width: 100%;
+}
+.ak-doc .ak-doc__body .md-body h1,
+.ak-doc .ak-doc__body .md-body h2,
+.ak-doc .ak-doc__body .md-body h3,
+.ak-doc .ak-doc__body .md-body h4,
+.ak-doc .ak-doc__body .md-body h5,
+.ak-doc .ak-doc__body .md-body h6 {
+  color: var(--ak-ink);
+  font-family: var(--ak-font-display, var(--ak-font));
+  border-color: var(--ak-line);
+}
+.ak-doc .ak-doc__body .md-body h6 { color: var(--ak-ink-dim); opacity: 1; }
+.ak-doc .ak-doc__body .md-body li::marker { color: var(--ak-ink-dim); }
+.ak-doc .ak-doc__body .md-body a { color: var(--ak-accent-text); text-decoration: underline; text-underline-offset: 2px; }
+.ak-doc .ak-doc__body .md-body strong { color: var(--ak-ink); }
+.ak-doc .ak-doc__body .md-body code,
+.ak-doc .ak-doc__body .md-body .md-code {
+  font-family: var(--ak-font-mono, ui-monospace, monospace);
+  background: var(--ak-surface-2);
+  border: 1px solid var(--ak-line);
+  border-radius: var(--ak-radius-sm);
+  color: var(--ak-ink);
+}
+.ak-doc .ak-doc__body .md-body pre,
+.ak-doc .ak-doc__body .md-body .md-pre {
+  max-width: 100%;
+  overflow-x: auto;
+  background: var(--ak-surface-2);
+  border: 1px solid var(--ak-line);
+  border-radius: var(--ak-radius-sm);
+  color: var(--ak-ink);
+}
+.ak-doc .ak-doc__body .md-body pre code,
+.ak-doc .ak-doc__body .md-body .md-pre .md-code { background: none; border: 0; padding: 0; }
+.ak-doc .ak-doc__body .md-body blockquote {
+  border-left-color: var(--ak-accent);
+  background: var(--ak-surface-2);
+  color: var(--ak-ink-dim);
+  opacity: 1;
+}
+.ak-doc .ak-doc__body .md-body table { display: block; max-width: 100%; overflow-x: auto; color: var(--ak-ink); }
+.ak-doc .ak-doc__body .md-body th,
+.ak-doc .ak-doc__body .md-body td { border-color: var(--ak-line); overflow-wrap: normal; }
+.ak-doc .ak-doc__body .md-body th { background: var(--ak-surface-2); color: var(--ak-ink); }
+.ak-doc .ak-doc__body .md-body tbody tr:nth-child(even) { background: color-mix(in oklab, var(--ak-surface-2) 55%, var(--ak-surface)); }
+.ak-doc .ak-doc__body .md-body hr,
+.ak-doc .ak-doc__body .md-body .md-hr { border-top-color: var(--ak-line); }
+.ak-doc .ak-doc__body .md-body img,
+.ak-doc .ak-doc__body .md-body .md-img { max-width: 100%; height: auto; }
+.ak-doc .ak-doc__body .md-body .md-mem { border-color: var(--ak-line); background: var(--ak-surface-2); color: var(--ak-ink); }
+.ak-doc .ak-doc__body .md-body .md-mem-err { color: var(--ak-err-text, var(--ak-err)); }
+
+/* ── The decision: lines ───────────────────────────────────────────────────────────────────── */
+.ak-dec { display: block; max-width: var(--ak-decision-width, 40rem); min-width: 0; color: var(--ak-ink); }
+.ak-dec .ak-input:not(.ak-input--range) { background: var(--ak-surface); }
+.ak-dec__title { margin: 0 0 4px; font-size: 1.05rem; color: var(--ak-ink); }
+.ak-dec__status { margin: 0 0 8px; font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); }
+.ak-dec__status:empty { margin: 0; }
+.ak-dec__body { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.ak-dec__fine, .ak-dec__outcome {
+  margin: 0;
+  font-size: var(--ak-text-fine, 0.85rem);
+  color: var(--ak-ink-dim);
+  max-width: 70ch;
+  overflow-wrap: anywhere;
+}
+.ak-dec__fine[hidden] { display: none; }
+.ak-dec__outcome { font-weight: 650; color: var(--ak-ink); }
+.ak-dec__failure {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in oklab, var(--ak-err, var(--ak-warn)) 55%, var(--ak-line));
+  border-radius: var(--ak-radius-sm);
+  background: color-mix(in oklab, var(--ak-err, var(--ak-warn)) 10%, var(--ak-surface));
+  font-size: var(--ak-text-fine, 0.85rem);
+  color: var(--ak-ink);
+  max-width: 70ch;
+  overflow-wrap: anywhere;
+}
+.ak-dec__why { color: var(--ak-ink-dim); }
+.ak-dec__acts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ak-dec .ak-btn { min-height: var(--ak-touch-min, var(--ak-touch, 40px)); }
+.ak-dec a.ak-btn { display: inline-flex; align-items: center; align-self: flex-start; text-decoration: none; }
+.ak-dec__field { display: flex; flex-direction: column; gap: 4px; max-width: 32rem; }
+.ak-dec__field .ak-input { min-height: var(--ak-touch-min, var(--ak-touch, 40px)); width: 100%; }
+
+/* ── The answers and their bars ────────────────────────────────────────────────────────────── */
+.ak-dec__answers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.ak-dec__answer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--ak-line);
+  border-radius: var(--ak-radius-sm);
+  background: var(--ak-surface);
+  min-width: 0;
+}
+.ak-dec__qhead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.ak-dec__q { font-weight: 700; color: var(--ak-ink); overflow-wrap: anywhere; }
+.ak-dec__value { color: var(--ak-ink); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.ak-dec__verdict {
+  margin-left: auto;
+  padding: 1px 8px;
+  border: 1px solid color-mix(in oklab, var(--ak-ok, var(--ak-accent)) 45%, var(--ak-line));
+  border-radius: var(--ak-radius-pill, 999px);
+  font-size: var(--ak-text-micro, 0.75rem);
+  color: var(--ak-ink);
+}
+.ak-dec__answer--under .ak-dec__verdict { border-color: color-mix(in oklab, var(--ak-warn) 60%, var(--ak-line)); }
+.ak-dec__meter {
+  display: grid;
+  grid-template-columns: minmax(0, 8rem) minmax(3rem, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--ak-text-fine, 0.85rem);
+  color: var(--ak-ink-dim);
+}
+.ak-dec__meter-label { min-width: 0; overflow-wrap: anywhere; }
+.ak-dec__track {
+  position: relative;
+  height: 10px;
+  border-radius: var(--ak-radius-pill, 999px);
+  background: color-mix(in oklab, var(--ak-line) 70%, var(--ak-surface));
+}
+.ak-dec__fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: calc(var(--ak-dec-v, 0) * 100%);
+  border-radius: inherit;
+  background: var(--ak-accent);
+  transition: width var(--ak-motion, 200ms) var(--ak-ease, ease);
+}
+.ak-dec__answer--under .ak-dec__fill { background: var(--ak-warn); }
+.ak-dec__meter--option .ak-dec__fill { background: color-mix(in oklab, var(--ak-accent) 55%, var(--ak-surface)); }
+.ak-dec__mark {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  left: calc(var(--ak-dec-t, 0) * 100%);
+  width: 2px;
+  margin-left: -1px;
+  background: var(--ak-ink);
+}
+.ak-dec__num { color: var(--ak-ink); font-variant-numeric: tabular-nums; }
+.ak-dec__options { display: flex; flex-direction: column; gap: 4px; padding-top: 2px; }
+
+/* ── The person's verdict ──────────────────────────────────────────────────────────────────── */
+.ak-dec__person {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in oklab, var(--ak-warn) 50%, var(--ak-line));
+  border-radius: var(--ak-radius-sm);
+  background: color-mix(in oklab, var(--ak-warn) 8%, var(--ak-surface));
+}
+.ak-dec__ask-person, .ak-dec__recorded { margin: 0; font-weight: 650; color: var(--ak-ink); }
+.ak-dec__override { display: flex; flex-direction: column; gap: 6px; max-width: 32rem; }
+.ak-dec__override .ak-input { min-height: var(--ak-touch-min, var(--ak-touch, 40px)); width: 100%; }
+.ak-dec__ready { display: flex; flex-direction: column; gap: 8px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ak-dec__fill { transition: none; }
+}

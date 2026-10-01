@@ -33,6 +33,9 @@
  * @tokens form --ak-range-track · --ak-range-thumb
  * @fork form Copy .ak-form* and .ak-input* out of data.css and build the fields yourself; you keep the tokens, and you give up the label/hint/error wiring, the announced refusal with focus on the first problem, the submit guard and the range's reading.
  * @version-history
+ *   v0.62.0 — 2026-10-01 — `type: 'model'`: a select of the models a `capability` can use, read from
+ *     AIMEAT.ai.models() when the library is on the page, and a text field without it. Two apps
+ *     wrote a free-text model field by hand (postinjalostamo, puhe). The other kinds are unchanged.
  *   v0.55.0 — 2026-09-28 — A `toggle` field is the kit's switch (role="switch", the knob stretches
  *     when pressed and travels on two edge springs) and a `range` field shows its filled share
  *     and stretches when pulled past an end (controls.js switchMotion and rangeMotion).
@@ -48,12 +51,15 @@
 import { el, clear, resolve, uid, enter, whileBusy, attention } from './dom.js';
 import { t } from './i18n.js';
 import { switchMotion, rangeMotion } from './controls.js';
+import { tai } from './ai-task-i18n.js';
 
 /**
  * @typedef {object} FormField
  * @property {string} name
  * @property {string} label
- * @property {'text'|'number'|'range'|'date'|'textarea'|'select'|'checkbox'|'toggle'} [type]
+ * @property {'text'|'number'|'range'|'date'|'textarea'|'select'|'checkbox'|'toggle'|'model'} [type]
+ * @property {string} [capability]  a model field's capability: which models it lists ('text' by
+ *   default, or 'vision', 'files', 'image', 'speech', 'transcription', 'embed')
  * @property {boolean} [required]
  * @property {string} [hint]
  * @property {any} [value]
@@ -75,6 +81,66 @@ import { switchMotion, rangeMotion } from './controls.js';
 const NUMERIC = ['number', 'range'];
 
 /**
+ * The control of a `model` field. With AIMEAT.ai on the page it is a select of the models the
+ * capability can use (AIMEAT.ai.models), with "the default model" (an empty value) first; the value
+ * the field holds stays chosen while the list loads, and a value the list does not have is kept as
+ * its own option rather than dropped. Without the library it is a text field. A row's value is its
+ * `ref` ("type:id"), or its bare `id` when the field already holds that id, so a value an app saved
+ * before this field existed still matches its row.
+ * @param {FormField} field
+ * @param {string} id
+ * @param {string} describedBy
+ * @returns {{ input: HTMLElement, ensure: ((value: string) => void)|null }}
+ */
+function modelControl(field, id, describedBy) {
+  const ns = /** @type {any} */ (window).AIMEAT;
+  const lib = ns && ns.ai && typeof ns.ai.models === 'function' ? ns.ai : null;
+  const current = field.value != null ? String(field.value) : '';
+  if (!lib) {
+    const text = /** @type {HTMLInputElement} */ (el('input', {
+      id: id, type: 'text', class: 'ak-input', 'data-ak-part': 'input', 'data-ak-model': 'text',
+      autocomplete: 'off', spellcheck: 'false', maxlength: field.maxLength || null, 'aria-describedby': describedBy,
+    }));
+    text.value = current;
+    return { input: text, ensure: null };
+  }
+  const select = /** @type {HTMLSelectElement} */ (el('select', {
+    id: id, class: 'ak-input', 'data-ak-part': 'input', 'data-ak-model': 'select', 'aria-describedby': describedBy, 'aria-busy': 'true',
+  }));
+  /** @type {any[]|null} */
+  let rows = null;
+  let failed = false;
+  const has = function (v) { return Array.prototype.some.call(select.options, function (o) { return o.value === v; }); };
+  const extra = function (v) { return el('option', { value: v }, rows ? tai('modelField.notListed', { model: v }) : v); };
+  /** @param {string} keep the value to keep chosen */
+  function fill(keep) {
+    clear(select);
+    select.appendChild(el('option', { value: '' }, tai('modelField.default')));
+    for (const r of rows || []) {
+      const v = keep && keep === r.id ? r.id : String(r.ref || r.id || '');
+      if (!v || has(v)) continue;
+      select.appendChild(el('option', { value: v }, String(r.name || r.id || v)));
+    }
+    if (keep && !has(keep)) select.appendChild(extra(keep));
+    if (!rows) select.appendChild(el('option', { value: '', disabled: true }, tai(failed ? 'modelField.failed' : 'modelField.loading')));
+    select.value = keep || '';
+  }
+  fill(current);
+  Promise.resolve().then(function () { return lib.models({ capability: field.capability || 'text' }); }).then(
+    function (list) { rows = Array.isArray(list) ? list : []; },
+    function (e) { failed = true; console.debug('aimeat-atelier: model list not read', e); },
+  ).then(function () {
+    select.removeAttribute('aria-busy');
+    // The list could not be read: keep the default and the held value, and say so in the list.
+    fill(select.value);
+  });
+  return {
+    input: select,
+    ensure: function (v) { if (v && !has(v)) select.appendChild(extra(v)); },
+  };
+}
+
+/**
  * The declared form.
  * @param {{
  *   target?: string|Element, fields: FormField[],
@@ -89,7 +155,7 @@ const NUMERIC = ['number', 'range'];
  * }}
  */
 export function form(spec) {
-  /** @type {Map<string, { field: FormField, input: HTMLElement, error: HTMLElement, wrap: HTMLElement, readout: HTMLElement|null, motion?: { sync: () => void } }>} */
+  /** @type {Map<string, { field: FormField, input: HTMLElement, error: HTMLElement, wrap: HTMLElement, readout: HTMLElement|null, motion?: { sync: () => void }, ensure?: (value: string) => void }>} */
   const controls = new Map();
   const root = el('form', { class: 'ak-root ak-form', 'data-ak-part': 'root', novalidate: true });
   if (spec.target) resolve(spec.target).appendChild(root);
@@ -132,7 +198,13 @@ export function form(spec) {
 
     let input;
     let readout = null;
-    if (type === 'textarea') {
+    /** @type {((value: string) => void)|null} */
+    let ensure = null;
+    if (type === 'model') {
+      const m = modelControl(field, id, describedBy);
+      input = m.input;
+      ensure = m.ensure;
+    } else if (type === 'textarea') {
       input = el('textarea', { id: id, class: 'ak-input ak-input--area', 'data-ak-part': 'input', rows: 3, maxlength: field.maxLength || null, 'aria-describedby': describedBy });
       /** @type {HTMLTextAreaElement} */ (input).value = field.value != null ? String(field.value) : '';
     } else if (type === 'select') {
@@ -205,6 +277,7 @@ export function form(spec) {
     // controls' (controls.js), so a declared field and a hand-placed control move alike.
     if (type === 'toggle') controls.get(field.name).motion = switchMotion(/** @type {HTMLInputElement} */ (input));
     if (type === 'range') controls.get(field.name).motion = rangeMotion(/** @type {HTMLInputElement} */ (input));
+    if (ensure) controls.get(field.name).ensure = ensure;
     return wrap;
   }
 
@@ -311,6 +384,7 @@ export function form(spec) {
         const c = controls.get(name);
         if (!c) continue;
         const type = c.field.type || 'text';
+        if (c.ensure) c.ensure(next[name] == null ? '' : String(next[name]));
         if (type === 'checkbox' || type === 'toggle') /** @type {HTMLInputElement} */ (c.input).checked = !!next[name];
         else /** @type {HTMLInputElement} */ (c.input).value = next[name] == null ? '' : String(next[name]);
         refreshReadout(name);

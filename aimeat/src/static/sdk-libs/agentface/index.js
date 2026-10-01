@@ -9,18 +9,27 @@
  *   source esbuild bundles to the IIFE served, unchanged, at /v1/libs/aimeat-agentface.js. Ported
  *   verbatim from lib-agentface.ts — the bespoke auth-guard messages are preserved (they teach the
  *   app-owner-only serving rule), so getSession stays inline rather than using _core/session.
- * @structure imports attach (namespace); getSession/compose/inferFilename; the `agentface` object
- *   (key/compose/copyText/publish); attach('agentface', …) + window.AIMEATAgentFace.
+ * @structure imports attach (namespace) + copyText (clipboard); getSession/compose/inferFilename;
+ *   the quiet publisher (sessionOrNull/quietState/quietRun); the `agentface` object
+ *   (key/compose/copyText/publish/publishQuietly); attach('agentface', …) + window.AIMEATAgentFace.
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-agentface.js"></script>
  *   await AIMEATAgentFace.publish('# My app\n\n…', { app: 'my-app.html' });
+ *   AIMEATAgentFace.publishQuietly(() => ({ title, sections }), { app: 'my-app.html', debounceMs: 800 });
  *   await AIMEAT.agentface.copyText(promptText);  // the shared "Copy prompt" implementation
  * @version-history
+ *   v1.2.0 — 2026-10-01 — publishQuietly(input, { app, debounceMs }): the guard ten apps wrote by
+ *     hand around publish(). Resolves false and writes nothing when signed out, never throws (one
+ *     console.warn line instead), skips a face identical to the last one written for that app,
+ *     writes one app's faces in call order, and with debounceMs writes only the last of a burst.
+ *     The input may be a function, read when the write happens. copyText() moved to
+ *     _core/clipboard.js unchanged, so the Atelier kit shares it. publish() is unchanged.
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-agentface.ts (SDK-libs migration Phase 1).
  *   v1.1.0 — 2026-08-05 — copyText(): the ONE shared clipboard implementation for the platform's
  *     copy-a-prompt-to-your-AI pattern (async API + hidden-textarea fallback, no visible
  *     selection) — every app was hand-rolling its own, several of them badly.
  */
 import { attach } from '../_core/namespace.js';
+import { copyText } from '../_core/clipboard.js';
 
 const MAX_BYTES = 256 * 1024; // the convention cap — the node treats an oversize face as absent
 
@@ -64,6 +73,67 @@ function inferFilename() {
   return null;
 }
 
+// ── The quiet publisher ──
+// Ten apps wrapped publish() in the same guard: stop when the library or the session is missing,
+// try, swallow the error. Some debounced it and one skipped an unchanged face. This is that guard.
+
+/** The signed-in session, or null when aimeat-auth is missing or nobody is signed in. */
+function sessionOrNull() {
+  const auth = window.AIMEAT && window.AIMEAT.auth;
+  if (!auth || typeof auth.getSession !== 'function') return null;
+  try { return auth.getSession() || null; } catch { return null; }
+}
+
+/**
+ * Per app filename: the markdown last written (or being written), the chain that keeps one app's
+ * writes in call order, and the burst a debounce is collecting.
+ * @type {Map<string, { last: string|null, chain: Promise<any>, timer: any, input: any, waiters: Array<(ok: boolean) => void> }>}
+ */
+const quiet = new Map();
+
+function quietState(filename) {
+  let st = quiet.get(filename);
+  if (!st) {
+    st = { last: null, chain: Promise.resolve(), timer: null, input: null, waiters: [] };
+    quiet.set(filename, st);
+  }
+  return st;
+}
+
+/** One line in the console, never an exception. */
+function quietWarn(filename, err) {
+  console.warn('[aimeat-agentface] publishQuietly(' + (filename || '?') + ') wrote nothing: ' + String((err && err.message) || err));
+}
+
+/**
+ * Write one face if it differs from the last one written for this app. Queued behind the app's
+ * earlier writes, so two calls never land out of order.
+ * @returns {Promise<boolean>}
+ */
+function quietRun(filename, input) {
+  const st = quietState(filename);
+  const run = st.chain.then(async function () {
+    if (!sessionOrNull()) return false;
+    let markdown;
+    try {
+      const value = typeof input === 'function' ? input() : input;
+      markdown = typeof value === 'string' ? value : compose(value);
+    } catch (e) { quietWarn(filename, e); return false; }
+    if (markdown === st.last) return false;
+    st.last = markdown;
+    try {
+      await agentface.publish(markdown, { app: filename });
+      return true;
+    } catch (e) {
+      st.last = null; // the next call tries again
+      quietWarn(filename, e);
+      return false;
+    }
+  });
+  st.chain = run;
+  return run;
+}
+
 const agentface = {
   /** The convention memory key the face lives under. */
   key(filename) { return 'apps.' + filename + '.agentface'; },
@@ -75,31 +145,12 @@ const agentface = {
    * Copy text to the clipboard the way every "Copy prompt" button should: async clipboard API
    * first, hidden-offscreen-textarea execCommand fallback — never a visible selection painted
    * over the page. Resolves to true/false; never throws. This is THE shared implementation for
-   * the platform's copy-a-prompt-to-your-AI pattern — stop hand-rolling it per app.
+   * the platform's copy-a-prompt-to-your-AI pattern — stop hand-rolling it per app. The code
+   * lives in _core/clipboard.js, shared with the Atelier kit's copy().
+   * @param {unknown} text
+   * @returns {Promise<boolean>}
    */
-  async copyText(text) {
-    const value = String(text == null ? '' : text);
-    if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
-      try {
-        await navigator.clipboard.writeText(value);
-        return true;
-      } catch { /* fall through to the textarea fallback */ }
-    }
-    try {
-      const ta = document.createElement('textarea');
-      ta.value = value;
-      ta.setAttribute('readonly', '');
-      ta.style.position = 'fixed';
-      ta.style.left = '-9999px';
-      document.body.appendChild(ta);
-      ta.select();
-      const ok = document.execCommand('copy');
-      document.body.removeChild(ta);
-      return !!ok;
-    } catch {
-      return false;
-    }
-  },
+  copyText(text) { return copyText(text); },
 
   /**
    * Publish this app's agent face: a markdown string, or { title, sections: [{ heading, body }] }.
@@ -128,6 +179,46 @@ const agentface = {
       throw new Error((res.error && res.error.message) || 'Failed to publish the agent face');
     }
     return { key: key, app: filename, version: res.data && res.data.version, visibility: 'public' };
+  },
+
+  /**
+   * publish() for an app that updates its face as it runs and must never break because of it.
+   * `input` is what publish() takes (markdown or { title, sections }) or a function that returns
+   * it, called when the write happens, so a debounced burst composes the latest state once.
+   * Resolves true when the face was written; false when nothing was written: signed out or no
+   * aimeat-auth on the page, the same markdown as the last write for this app, a burst member
+   * that a later call replaced, or a failure (then one console.warn line). Never rejects.
+   * @param {string|object|(() => string|object)} input
+   * @param {{ app?: string, debounceMs?: number }} [opts]
+   * @returns {Promise<boolean>}
+   */
+  publishQuietly(input, opts) {
+    const o = opts || {};
+    if (!sessionOrNull()) return Promise.resolve(false);
+    const filename = typeof o.app === 'string' && o.app.trim() ? o.app.trim() : inferFilename();
+    if (!filename) {
+      quietWarn(null, new Error('no app filename on this origin; pass { app: "your-file.html" }'));
+      return Promise.resolve(false);
+    }
+    const wait = Number(o.debounceMs) > 0 ? Number(o.debounceMs) : 0;
+    if (!wait) return quietRun(filename, input);
+    const st = quietState(filename);
+    st.input = input;
+    if (st.timer) clearTimeout(st.timer);
+    return new Promise(function (resolveOk) {
+      st.waiters.push(resolveOk);
+      st.timer = setTimeout(function () {
+        const waiters = st.waiters;
+        const latest = st.input;
+        st.waiters = [];
+        st.input = null;
+        st.timer = null;
+        quietRun(filename, latest).then(function (ok) {
+          // The call that carried the written face answers true; the ones it replaced answer false.
+          waiters.forEach(function (w, i) { w(i === waiters.length - 1 ? ok : false); });
+        });
+      }, wait);
+    });
   },
 };
 

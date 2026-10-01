@@ -49,6 +49,9 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.62.0 — 2026-10-01 — workflow.css (a workflow step waiting for a person) and ai-task.css (one
+ *     question to the person's own AI) join the imports, and doc-decision.css (one markdown
+ *     document, one decision with its review).
  *   v0.61.0 — 2026-10-01 — members.css joins the imports: the members components (the owner's
  *     member screen, the visitor's ask, a members-only area), and workspace.css (a workspace's
  *     people, the first-run choice of organism and workspace), and intake-connect.css (a Public
@@ -360,6 +363,9 @@
 @import url('./aimeat-atelier/members.css');
 @import url('./aimeat-atelier/workspace.css');
 @import url('./aimeat-atelier/intake-connect.css');
+@import url('./aimeat-atelier/workflow.css');
+@import url('./aimeat-atelier/ai-task.css');
+@import url('./aimeat-atelier/doc-decision.css');
 @import url('./aimeat-atelier/mtv.css');
 @import url('./aimeat-atelier/materials.css');
 @import url('./aimeat-atelier/parts.css');

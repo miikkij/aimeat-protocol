@@ -1,0 +1,122 @@
+/*
+ * @file aimeat-atelier/workflow.css
+ * @description The clothes of the workflow answer component (atelier/workflow-input.js:
+ *   workflowInput): the waiting steps, each with its workflow and run, the question as a fieldset,
+ *   the options as radio buttons or checkboxes, the field for an own answer, the due time and the
+ *   Answer button; the notice and the refusal lines. Everything rides the --ak-* token contract, so
+ *   the block wears the app's look and mode; no colour of its own. The block keeps to a readable
+ *   width (--ak-wf-width), every line wraps instead of scrolling sideways at 390 px, and every
+ *   choice is a 40 px target (the whole label, not only the mark).
+ * @structure .ak-wf (shared lines) · the step and its head · the question and its choices · the
+ *   own answer · the bar with the due time and Answer · dense
+ * @version-history
+ *   v0.61.0 — 2026-10-01 — Initial (the workflowInput block).
+ */
+
+/* ── Shared lines: title, intro, refusal, notice, an empty list ────────────────────────────── */
+.ak-wf { display: block; max-width: var(--ak-wf-width, 48rem); min-width: 0; }
+/* A field stands on the block's own surface. The kit's .ak-input takes the page colour (--ak-bg) so
+   it reads as sunk inside a card; the steps stand on --ak-surface, as members.css does. */
+.ak-wf .ak-input:not(.ak-input--range) { background: var(--ak-surface); }
+.ak-wf__title { margin: 0 0 4px; font-size: 1.05rem; color: var(--ak-ink); overflow-wrap: anywhere; }
+.ak-wf__intro, .ak-wf__none {
+  margin: 0 0 10px; font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); max-width: 70ch;
+}
+/* The notice and the refusal stay in the page empty, so a screen reader hears what lands in them;
+   they take a box only when they hold a sentence. */
+.ak-wf__failure, .ak-wf__notice {
+  margin: 0;
+  font-size: var(--ak-text-fine, 0.85rem);
+  color: var(--ak-ink);
+  max-width: 70ch;
+  overflow-wrap: anywhere;
+}
+.ak-wf__failure:not(:empty), .ak-wf__notice:not(:empty) {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: var(--ak-radius-sm);
+}
+.ak-wf__failure:not(:empty) {
+  border: 1px solid color-mix(in oklab, var(--ak-err, var(--ak-warn)) 55%, var(--ak-line));
+  background: color-mix(in oklab, var(--ak-err, var(--ak-warn)) 10%, var(--ak-surface));
+}
+.ak-wf__notice:not(:empty) {
+  border: 1px solid color-mix(in oklab, var(--ak-ok, var(--ak-accent)) 45%, var(--ak-line));
+  background: color-mix(in oklab, var(--ak-ok, var(--ak-accent)) 10%, var(--ak-surface));
+}
+.ak-wf__failure:focus, .ak-wf__notice:focus { outline: none; }
+.ak-wf__failure:focus-visible, .ak-wf__notice:focus-visible { outline: 2px solid var(--ak-focus, var(--ak-accent)); outline-offset: 2px; }
+
+/* ── The step and its head ────────────────────────────────────────────────────────────────── */
+.ak-wf__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.ak-wf__step {
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--ak-line);
+  border-radius: var(--ak-radius-sm);
+  background: var(--ak-surface);
+}
+.ak-wf__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; margin: 0 0 8px; min-width: 0; }
+.ak-wf__header {
+  flex: 0 0 auto;
+  padding: 1px 8px;
+  border: 1px solid var(--ak-line);
+  border-radius: var(--ak-radius-pill, 999px);
+  font-size: var(--ak-text-fine, 0.85rem);
+  font-weight: 700;
+  color: var(--ak-ink-dim);
+}
+.ak-wf__workflow { font-weight: 700; color: var(--ak-ink); overflow-wrap: anywhere; min-width: 0; }
+.ak-wf__run { font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); overflow-wrap: anywhere; }
+
+/* ── The question and its choices ─────────────────────────────────────────────────────────── */
+.ak-wf__form { margin: 0; min-width: 0; }
+.ak-wf__choices { margin: 0; padding: 0; border: 0; min-width: 0; }
+.ak-wf__question {
+  padding: 0;
+  margin: 0 0 2px;
+  font-size: var(--ak-text-body, 1rem);
+  font-weight: 650;
+  color: var(--ak-ink);
+  overflow-wrap: anywhere;
+  white-space: normal;
+  max-width: 100%;
+}
+.ak-wf__how { margin: 0 0 4px; font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); }
+.ak-wf__options { display: flex; flex-direction: column; }
+.ak-wf__choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--ak-touch-min, 40px);
+  padding: 0 6px;
+  margin: 0 -6px;
+  border-radius: var(--ak-radius-sm);
+  color: var(--ak-ink);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.ak-wf__choice:hover { background: color-mix(in oklab, var(--ak-accent) 8%, var(--ak-surface)); }
+.ak-wf__mark { flex: none; width: 20px; height: 20px; margin: 0; accent-color: var(--ak-accent); cursor: pointer; }
+.ak-wf__mark:focus-visible { outline: 2px solid var(--ak-focus, var(--ak-accent)); outline-offset: 2px; }
+.ak-wf__mark[disabled], .ak-wf__mark[disabled] + span { cursor: not-allowed; opacity: 0.7; }
+
+/* ── The own answer ───────────────────────────────────────────────────────────────────────── */
+.ak-wf__other { display: flex; flex-direction: column; gap: 4px; margin: 8px 0 0; min-width: 0; }
+.ak-wf__other-label { font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); }
+.ak-wf__text { width: 100%; min-height: var(--ak-touch-min, 40px); box-sizing: border-box; resize: vertical; }
+
+/* ── The step's refusal, and the bar with the due time and Answer ─────────────────────────── */
+.ak-wf__error { margin: 6px 0 0; font-size: var(--ak-text-fine, 0.85rem); color: color-mix(in oklab, var(--ak-err) 74%, var(--ak-ink)); overflow-wrap: anywhere; }
+.ak-wf__error:empty { display: none; }
+.ak-wf__bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px 12px; margin: 10px 0 0; }
+.ak-wf__deadline { flex: 1 1 12rem; min-width: 0; margin: 0; font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); overflow-wrap: anywhere; }
+.ak-wf__deadline.is-late { color: color-mix(in oklab, var(--ak-warn) 74%, var(--ak-ink)); font-weight: 650; }
+.ak-wf__answer { flex: 0 0 auto; min-height: max(var(--ak-touch-min, 40px), var(--ak-touch, 40px)); }
+
+/* ── dense: for a side panel ──────────────────────────────────────────────────────────────── */
+.ak-wf--dense .ak-wf__list { gap: 6px; }
+.ak-wf--dense .ak-wf__step { padding: 8px 10px; }
+.ak-wf--dense .ak-wf__head { margin-bottom: 4px; }
+.ak-wf--dense .ak-wf__how { display: none; }
+.ak-wf--dense .ak-wf__bar { margin-top: 6px; }

@@ -13,7 +13,7 @@
  *   showing both shows them as two rows, because a sum of morsels and euros means nothing.
  * @structure MONEY_UNIT · money(micros, currency) · morsels(n) · isMoneyCurrency(c)
  * @usage  AIMEAT.game.money(1500000, 'EUR')  // "1.50 EUR"
- *         AIMEAT.game.morsels(12)            // "12 morsels" / "12 morselia"
+ *         AIMEAT.game.morsels(12)            // "12 morsels" / "12 murusta"
  * @version-history
  *   v1.0.0 — 2026-07-28 — Initial (NOSTE prompt 01).
  */

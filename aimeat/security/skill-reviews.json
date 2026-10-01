@@ -2,7 +2,7 @@
   "about": "When each skill was last read against the code it describes, and which files that code is. pnpm check:skill-reviews fails when a watched file changes after the review, so whoever changed the code re-reads the skill. Re-stamp after reading with: pnpm check:skill-reviews --record <name>. Reasoning: aimeat/scripts/check-skill-reviews.ts.",
   "skills": {
     "node:aimeat-decide": {
-      "reviewedOn": "2026-09-29",
+      "reviewedOn": "2026-10-01",
       "watches": [
         "aimeat/src/static/sdk-libs/decide/index.js",
         "aimeat/src/services/decide/service.ts",
@@ -10,7 +10,7 @@
         "aimeat/src/services/decide/settings.ts",
         "aimeat/src/services/app-decide-posture.ts"
       ],
-      "digest": "sha256:5047162b21bfd7eceeb37827"
+      "digest": "sha256:5a87ec6f0700e184f09c53a2"
     },
     "node:aimeat-refinery": {
       "reviewedOn": "2026-09-29",
@@ -118,7 +118,7 @@
         "aimeat/src/static/sdk-libs/atelier/describe-data.js",
         "aimeat/src/services/design-book/component.ts"
       ],
-      "digest": "sha256:7e0860ab6e97dd99d232c36f"
+      "digest": "sha256:139105ca5775fc6f9a56920a"
     },
     "node:aimeat-phaser": {
       "reviewedOn": "2026-09-19",
@@ -424,7 +424,7 @@
     "node:aimeat-app-builder-atelier": {
       "aimeat/src/services/build-atelier-prompt.ts": "049cbf4731dbfd00",
       "aimeat/src/services/build-atelier-layers.ts": "1493a01bd84cc021",
-      "aimeat/src/static/sdk-libs/atelier/describe-data.js": "bae7005b055160b8",
+      "aimeat/src/static/sdk-libs/atelier/describe-data.js": "e84d0b250ee63601",
       "aimeat/src/services/design-book/component.ts": "71091551c9319c7e"
     },
     "node:aimeat-phaser": {
@@ -567,7 +567,7 @@
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "1da72b752ee164bc"
     },
     "node:aimeat-decide": {
-      "aimeat/src/static/sdk-libs/decide/index.js": "ce7328b35b4223c6",
+      "aimeat/src/static/sdk-libs/decide/index.js": "70648a36df720ca1",
       "aimeat/src/services/decide/service.ts": "1df758f160c7917f",
       "aimeat/src/services/decide/limits.ts": "65c3e881405e3685",
       "aimeat/src/services/decide/settings.ts": "bb5b771bd7739ac0",

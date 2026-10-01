@@ -6,19 +6,30 @@
  *     crew      who is on this: people AND agents as one stack, with the live dot
  *     poll      one question, live shares — the hearts-and-votes pattern made a part
  *     keys      declared shortcuts, rendered — the sheet, the hints and the handlers agree
- *     dropzone  bring-a-file as a first-class part; the APP does the upload
+ *     dropzone  bring-a-file as a first-class part; the app uploads, or passes `upload` and the
+ *               kit uploads through AIMEAT.storage (dropzone-upload.js)
  *   The behaviour-shaped four (toast, palette, compare, tour) live in parts-ui.js. Nothing here
- *   fetches; every component renders what it is given and reports what happens.
+ *   fetches itself; every component renders what it is given and reports what happens.
  * @structure ring · crew · poll · keys · dropzone
  * @usage
  *   AIMEAT.atelier.ring({ target, data: { value: 5, total: 7, label: 'Pages written' } });
  *   AIMEAT.atelier.dropzone({ target, accept: ['.html', '.png'], maxBytes: 5e6, onFiles(files) {} });
+ *   const zone = AIMEAT.atelier.dropzone({ target, upload: { visibility: 'public' }, onUploaded(f, a) {} });
+ *   if (zone.pending()) return;  // hold the app's own submit while files are still going up
  * @version-history
+ *   v0.62.1 — 2026-10-01 — dropzone: the refusal line carries role="alert", so a screen reader
+ *     announces "is not a kind this takes" and "is over N MB" when they appear.
+ *   v0.62.0 — 2026-10-01 — dropzone takes `upload` (key, visibility, workspaceRef, chunkedOver,
+ *     target), `onUploaded` and `onUploadError`, and its handle has `pending()`. Without `upload`, or
+ *     without aimeat-storage.js on the page, it draws and behaves as before. Its own label and
+ *     refusals are in the kit's three languages (the English text is unchanged).
  *   v0.42.0 — 2026-09-01 — Initial (wish-atelier-night-gallery, stage 3).
  */
 import { el, clear, resolve, enter } from './dom.js';
 import { svg } from './chart-core.js';
 import { emptyState } from './state.js';
+import { storageLib, uploader } from './dropzone-upload.js';
+import { tu } from './copy-upload-i18n.js';
 
 function rowsOf(data) {
   if (Array.isArray(data)) return data;
@@ -170,23 +181,33 @@ export function keys(spec) {
 
 /**
  * The drop zone: drag a file onto it or press to pick; the accepted files reach the app through
- * `onFiles`, and a refused one (wrong kind, too big) is said on the zone in words. The kit never
- * uploads — the app owns that door.
+ * `onFiles`, and a refused one (wrong kind, too big) is said on the zone in words. Without
+ * `upload` the kit never uploads and the app owns that. With `upload` and aimeat-storage.js on the
+ * page, the kit uploads each accepted file through AIMEAT.storage (dropzone-upload.js), shows its
+ * state under the zone, and calls `onUploaded`; `pending()` says how many are still waiting or
+ * running, so the app can hold its own submit.
  * @param {{ target?: string|Element, accept?: string[], maxBytes?: number, multiple?: boolean,
- *   label?: string, hint?: string, onFiles: (files: File[]) => void }} spec
- * @returns {{ el: HTMLElement, destroy: () => void }}
+ *   label?: string, hint?: string, onFiles?: (files: File[]) => void,
+ *   upload?: import('./dropzone-upload.js').DropzoneUpload,
+ *   onUploaded?: (file: File, answer: import('./dropzone-upload.js').UploadAnswer) => void,
+ *   onUploadError?: (file: File, err: any) => void }} spec
+ * @returns {{ el: HTMLElement, pending: () => number, destroy: () => void }}
  */
 export function dropzone(spec) {
   const s = spec || /** @type {any} */ ({});
   const accept = (s.accept || []).map(function (a) { return String(a).toLowerCase(); });
   const input = /** @type {HTMLInputElement} */ (el('input', { type: 'file', multiple: s.multiple ? true : null, accept: accept.length ? accept.join(',') : null }));
-  const err = el('div', { class: 'ak-dropzone__err', hidden: true });
+  // role="alert" from the start, so a screen reader announces the refusal when its text changes.
+  const err = el('div', { class: 'ak-dropzone__err', role: 'alert', hidden: true });
   const root = el('div', { class: 'ak-root ak-dropzone', role: 'button', tabindex: '0' }, [
-    el('div', { class: 'ak-dropzone__label' }, s.label || 'Drop the file, or press to pick'),
+    el('div', { class: 'ak-dropzone__label' }, s.label || tu('drop.label')),
     s.hint ? el('div', { class: 'ak-dropzone__hint' }, s.hint) : null,
     err, input,
   ].filter(Boolean));
   if (s.target) resolve(s.target).appendChild(root);
+  /** The upload queue, made at the first accepted file when `upload` is set. @type {ReturnType<typeof uploader>|null} */
+  let up = null;
+  let warned = false;
 
   function take(list) {
     const files = Array.prototype.slice.call(list || []);
@@ -197,13 +218,23 @@ export function dropzone(spec) {
     });
     if (bad) {
       err.textContent = s.maxBytes && bad.size > s.maxBytes
-        ? bad.name + ' is over ' + Math.round(s.maxBytes / 1e6) + ' MB.'
-        : bad.name + ' is not a kind this takes.';
+        ? tu('drop.tooBig', { name: bad.name, mb: Math.round(s.maxBytes / 1e6) })
+        : tu('drop.wrongKind', { name: bad.name });
       err.hidden = false;
       return;
     }
     err.hidden = true;
-    if (files.length && s.onFiles) s.onFiles(s.multiple ? files : files.slice(0, 1));
+    if (!files.length) return;
+    const picked = s.multiple ? files : files.slice(0, 1);
+    if (s.onFiles) s.onFiles(picked);
+    if (s.upload) {
+      if (!up) {
+        const lib = storageLib();
+        if (lib) up = uploader({ zone: root, upload: s.upload, lib: lib, onUploaded: s.onUploaded, onUploadError: s.onUploadError });
+        else if (!warned) { warned = true; console.warn('[atelier] dropzone: upload needs aimeat-storage.js on the page; the files went to onFiles only.'); }
+      }
+      if (up) up.add(picked);
+    }
   }
   root.addEventListener('click', function (e) { if (e.target !== input) input.click(); });
   root.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
@@ -212,5 +243,9 @@ export function dropzone(spec) {
   root.addEventListener('dragleave', function () { root.classList.remove('is-over'); });
   root.addEventListener('drop', function (e) { e.preventDefault(); root.classList.remove('is-over'); take(e.dataTransfer ? e.dataTransfer.files : null); });
   enter(root);
-  return { el: root, destroy() { if (root.parentNode) root.parentNode.removeChild(root); } };
+  return {
+    el: root,
+    pending() { return up ? up.pending() : 0; },
+    destroy() { if (up) up.destroy(); if (root.parentNode) root.parentNode.removeChild(root); },
+  };
 }

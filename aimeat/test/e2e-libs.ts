@@ -1060,7 +1060,7 @@ await test('GET /v1/libs/aimeat-game.js — ships English and Finnish for its ow
     const res = await fetch(`${BASE}/v1/libs/aimeat-game.js`);
     const text = await res.text();
     // The kit's own strings, in both languages. Finnish written as Finnish, ä/ö intact.
-    for (const word of ['Coming soon', 'Tulossa', 'Locked', 'Lukossa', 'morsels', 'morselia', 'Myöhemmin']) {
+    for (const word of ['Coming soon', 'Tulossa', 'Locked', 'Lukossa', 'morsels', 'murusta', 'Myöhemmin']) {
         assert(text.includes(word), `should ship the string "${word}"`);
     }
     // It follows the platform language control instead of inventing a second one.
