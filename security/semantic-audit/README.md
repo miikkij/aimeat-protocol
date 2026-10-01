@@ -27,7 +27,7 @@ under 1214 alerts on tests and vendored libs), scoped with paths-ignore to the c
 npx -p @ast-grep/cli ast-grep scan -c security/semantic-audit/sgconfig.yml aimeat/src
 
 # The deeper taint pass for resolve-identity (Linux/macOS), with the Semgrep version CI runs:
-pip install --require-hashes --only-binary :all: -r security/semantic-audit/requirements-semgrep.txt
+pip install --require-hashes --only-binary :all: --no-deps -r security/semantic-audit/requirements-semgrep.txt
 semgrep --config security/semantic-audit/semgrep aimeat/src/routes
 ```
 

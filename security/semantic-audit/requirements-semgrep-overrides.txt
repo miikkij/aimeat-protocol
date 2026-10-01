@@ -1,0 +1,9 @@
+# Versions forced over what Semgrep itself asks for, read by the compile line in
+# requirements-semgrep.in through --override. Each line says why, and goes when Semgrep's own pin
+# moves past it.
+#
+# semgrep 1.178.0 pins pyjwt~=2.13.0, and every 2.13.x carries the advisories fixed in 2.15.0
+# (Dependabot #49, #70-#78, #84, #85, #88). The taint job never signs in to Semgrep and never
+# verifies a token, so the newer minor release is safe for what it runs. An override replaces the
+# whole requirement, so the [crypto] extra Semgrep asks for is repeated here.
+pyjwt[crypto]>=2.15.0

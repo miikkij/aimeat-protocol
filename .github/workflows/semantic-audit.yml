@@ -95,9 +95,11 @@ jobs:
 
       # Semgrep and every package it needs come from requirements-semgrep.txt, which names a sha256
       # for each, as wheels only (pip checks no hash inside a source build's own environment).
+      # --no-deps because the file already names every package, and pip would otherwise refuse the
+      # versions requirements-semgrep-overrides.txt forces over Semgrep's own pins.
       - name: Install Semgrep
         run: |
-          pip install --require-hashes --only-binary :all: -r security/semantic-audit/requirements-semgrep.txt
+          pip install --require-hashes --only-binary :all: --no-deps -r security/semantic-audit/requirements-semgrep.txt
 
       - name: Run taint rules
         continue-on-error: true

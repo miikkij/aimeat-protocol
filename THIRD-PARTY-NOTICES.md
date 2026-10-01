@@ -223,8 +223,8 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [bl](https://github.com/rvagg/bl) | 4.1.0 | MIT |
 | [bn.js](https://github.com/indutny/bn.js) | 4.12.5 | MIT |
 | [body-parser](https://github.com/expressjs/body-parser#readme) | 2.3.0 | MIT |
-| [brace-expansion](https://github.com/juliangruber/brace-expansion#readme) | 1.1.18 | MIT |
-| [brace-expansion](https://github.com/juliangruber/brace-expansion#readme) | 5.0.9 | MIT |
+| [brace-expansion](https://github.com/juliangruber/brace-expansion#readme) | 1.1.21 | MIT |
+| [brace-expansion](https://github.com/juliangruber/brace-expansion#readme) | 5.0.12 | MIT |
 | [brotli](https://github.com/devongovett/brotli.js) | 1.3.3 | MIT |
 | [browserify-zlib](https://github.com/devongovett/browserify-zlib) | 0.2.0 | MIT |
 | [buffer-crc32](https://github.com/brianloveswords/buffer-crc32) | 1.0.0 | MIT |
@@ -341,7 +341,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [has-symbols](https://github.com/ljharb/has-symbols#readme) | 1.1.0 | MIT |
 | [has-tostringtag](https://github.com/inspect-js/has-tostringtag#readme) | 1.0.2 | MIT |
 | [hasown](https://github.com/inspect-js/hasOwn#readme) | 2.0.4 | MIT |
-| [hono](https://hono.dev) | 4.13.5 | MIT |
+| [hono](https://hono.dev) | 4.13.12 | MIT |
 | [http-errors](https://github.com/jshttp/http-errors#readme) | 2.0.1 | MIT |
 | [http_ece](https://github.com/martinthomson/encrypted-content-encoding) | 1.2.0 | MIT |
 | [https-proxy-agent](https://github.com/TooTallNate/proxy-agents#readme) | 7.0.6 | MIT |
@@ -352,7 +352,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [ini](https://github.com/npm/ini#readme) | 1.3.8 | ISC |
 | [ini](https://github.com/npm/ini#readme) | 7.0.0 | ISC |
 | [inversify](https://inversify.io) | 7.11.0 | MIT |
-| [ip-address](https://github.com/beaugunderson/ip-address#readme) | 10.7.0 | MIT |
+| [ip-address](https://github.com/beaugunderson/ip-address#readme) | 10.7.2 | MIT |
 | [ipaddr.js](https://github.com/whitequark/ipaddr.js#readme) | 1.9.1 | MIT |
 | [is-arguments](https://github.com/inspect-js/is-arguments) | 1.2.0 | MIT |
 | [is-buffer](https://github.com/feross/is-buffer#readme) | 1.1.6 | MIT |
@@ -3467,7 +3467,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### brace-expansion 1.1.18
+### brace-expansion 1.1.21
 
 ```text
 MIT License
@@ -3493,7 +3493,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### brace-expansion 5.0.9
+### brace-expansion 5.0.12
 
 ```text
 MIT License
@@ -7003,7 +7003,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### hono 4.13.5
+### hono 4.13.12
 
 ```text
 MIT License
@@ -7555,7 +7555,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### ip-address 10.7.0
+### ip-address 10.7.2
 
 ```text
 Copyright (C) 2011 by Beau Gunderson
