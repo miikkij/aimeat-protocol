@@ -1106,13 +1106,15 @@
         },
         "type": {
           "zip_import": "ZIP import refused",
-          "held_account_names": "Records the update left as they were"
+          "held_account_names": "Records the update left as they were",
+          "workspace_schema_closed": "Workspace spaces that refuse every record"
         },
         "source": {
           "workspace_import": "workspace import",
           "organism_import": "organism import",
           "app_backup": "app backup",
-          "full_identity_move": "update at start"
+          "full_identity_move": "update at start",
+          "workspace_schema_relock": "check of workspace locks at start"
         },
         "kept": "{size} kept",
         "notKept": "not kept, too large",

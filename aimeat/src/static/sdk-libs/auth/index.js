@@ -10,6 +10,8 @@
  *   listeners; attach('auth', auth) + version.
  * @usage <script src="/v1/libs/aimeat-auth.js"></script>  const s = await AIMEAT.auth.login();
  * @version-history
+ *   v1.6.1 — 2026-10-01 — <html lang> names the stored language at load (aimeatRestoreLang), beside
+ *     the mode and palette restores; the bundle version moves.
  *   v1.6.0 — 2026-09-29 — A refused sign-in (?auth_error=) opens the sign-in dialog with the reason
  *     (auth-error.js); the bundle version moves.
  *   v1.5.1 — 2026-09-25 — The bundle version moves: an app in the node's isolated frame signs in
@@ -41,7 +43,7 @@ import { maybeShowGoogleSignup } from './signup.js';
 import { readAuthError } from './auth-error.js';
 import { showLoginModal } from './modal.js';
 import { attach } from '../_core/namespace.js';
-import { readLocales, aimeatReadLang, aimeatApplyLang } from './locale.js';
+import { readLocales, aimeatReadLang, aimeatApplyLang, aimeatRestoreLang } from './locale.js';
 import { paletteRegistry, aimeatReadPalette, aimeatApplyPalette, aimeatRestorePalette } from './palette.js';
 import { aimeatRestoreMode } from './theme.js';
 
@@ -87,7 +89,12 @@ auth.getPalettes = function () { return paletteRegistry().map(function (p) { ret
 
 // Apply the stored palette at parse time (before any UI mounts), so a published app follows the
 // user's chosen look with zero app code — the same free ride the mode snippet gives light/dark.
-if (typeof document !== 'undefined') { aimeatRestorePalette(); aimeatRestoreMode(); }
+if (typeof document !== 'undefined') { aimeatRestorePalette(); aimeatRestoreMode(); aimeatRestoreLang(); }
+// The language comes from the aimeat-locales meta, which a script placed above it in <head> cannot
+// see yet: mark it again once the document is parsed.
+if (typeof document !== 'undefined' && document.readyState === 'loading' && document.addEventListener) {
+  document.addEventListener('DOMContentLoaded', function () { aimeatRestoreLang(); });
+}
 
 const ns = attach('auth', auth);
-ns.version = '2026-09-29-001';
+ns.version = '2026-10-01-001';

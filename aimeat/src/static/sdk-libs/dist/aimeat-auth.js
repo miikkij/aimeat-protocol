@@ -534,6 +534,14 @@
     } catch {
     }
   }
+  function aimeatRestoreLang(opts) {
+    var locales = readLocales(opts);
+    if (!locales.length) return;
+    try {
+      document.documentElement.setAttribute("lang", aimeatReadLang(locales));
+    } catch {
+    }
+  }
   function langName(code) {
     try {
       var dn = new Intl.DisplayNames([code], { type: "language" });
@@ -980,6 +988,7 @@
       }
     }
     const locales = readLocales(opts);
+    if (locales.length) aimeatRestoreLang({ locales });
     let i = Object.assign({}, pillStrings(aimeatReadLang(locales.length ? locales : ["en"])), opts.i18n);
     const useCompact = opts.compact !== void 0 ? !!opts.compact : true;
     function wireCompactTrigger() {
@@ -3480,7 +3489,13 @@
   if (typeof document !== "undefined") {
     aimeatRestorePalette();
     aimeatRestoreMode();
+    aimeatRestoreLang();
+  }
+  if (typeof document !== "undefined" && document.readyState === "loading" && document.addEventListener) {
+    document.addEventListener("DOMContentLoaded", function() {
+      aimeatRestoreLang();
+    });
   }
   var ns = attach("auth", auth);
-  ns.version = "2026-09-29-001";
+  ns.version = "2026-10-01-001";
 })();

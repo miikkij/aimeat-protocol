@@ -8,6 +8,8 @@
  *   import { tm } from './members-i18n.js';
  *   tm('members.title');
  * @version-history
+ *   v0.61.1 — 2026-10-01 — Spanish addHint says "libreta de direcciones", the address book's settled
+ *     word (aimeat-writing language context); it said "libreta de contactos".
  *   v0.61.0 — 2026-10-01 — Initial; with the words of the tabs, the history, the plan, adding by
  *     address book or email, invitations and the confirm on a raise (wish-library-blocks-in-the-kit-and-the-design-book-iam-members-fi).
  */
@@ -245,7 +247,7 @@ const STRINGS = {
     'access.intro': 'Puedes pedirle acceso al propietario.',
     'sample.badge': 'Contenido de muestra',
     'sample.note': 'Una muestra. Desde aquí no se envía ni se cambia nada.',
-    'members.addHint': 'Elige de tu libreta de contactos, escribe un nombre de cuenta o un correo. Una dirección que todavía no tiene cuenta recibe una invitación.',
+    'members.addHint': 'Elige de tu libreta de direcciones, escribe un nombre de cuenta o un correo. Una dirección que todavía no tiene cuenta recibe una invitación.',
     'members.invite': 'Invitar',
     'members.inviteSent': 'La invitación se envió a {email}.',
     'members.addedFound': '{who} ahora es miembro.',

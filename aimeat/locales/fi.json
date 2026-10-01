@@ -1106,13 +1106,15 @@
         },
         "type": {
           "zip_import": "ZIP-tuonti hylätty",
-          "held_account_names": "Tietueet, jotka päivitys jätti ennalleen"
+          "held_account_names": "Tietueet, jotka päivitys jätti ennalleen",
+          "workspace_schema_closed": "Työtilan tilat, jotka hylkäävät jokaisen tietueen"
         },
         "source": {
           "workspace_import": "työtilan tuonti",
           "organism_import": "organismin tuonti",
           "app_backup": "sovelluksen varmuuskopio",
-          "full_identity_move": "päivitys käynnistyksessä"
+          "full_identity_move": "päivitys käynnistyksessä",
+          "workspace_schema_relock": "työtilojen lukitusten tarkistus käynnistyksessä"
         },
         "kept": "{size} säilytetty",
         "notKept": "ei säilytetty, liian suuri",

@@ -15,6 +15,8 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-10-01 — Public Intake: the link to share is the app page with ?form=<form id>. The code
+ *     comment called defineForm's answer "a shareable link", and its submit_url is an API address.
  *   2026-10-01 — Own users/roles: init({ app, roles }) with what each role may do, and a gate from
  *     aimeat_iam_define when the server must refuse.
  *   2026-09-29 — The bottom-chrome paragraph says where the marks are now (one row at the bottom-left,
@@ -387,7 +389,8 @@ function composeAppPrompt(
   body += '### Collecting input from anonymous visitors (Public Intake)\n';
   body += 'Published apps render for logged-OUT visitors, but every write path requires auth — so a stranger cannot save anything directly. For public **lead forms, contact forms, feedback, questionnaires, quizzes, RSVP, waitlists, support intake**, use the Public Intake capability (`AIMEAT.intake`, load `/v1/libs/aimeat-intake.js`). The OWNER defines a form once (server-side, pinned to a destination + an allow-list of fields); anyone then submits with NO login. The node honeypot-screens, per-IP rate-limits, resolves the owner server-side, allow-lists fields, validates against the destination schema, and writes ONE owner-owned record — never exposing other data. Submissions are normal records, so the app reads/aggregates them (stats, dashboards) and agents can triage them.\n';
   body += '```javascript\n';
-  body += '// OWNER (once, logged in): define a form → get a shareable link\n';
+  body += '// OWNER (once, logged in): define a form. submit_url is the API address, not a page:\n';
+  body += '// the link to share is your app page + "?form=" + form_id, and that page draws the form\n';
   body += 'const { form_id, submit_url } = await AIMEAT.intake.defineForm({\n';
   body += '  organism_id, ws, namespace: "crm.contacts",       // destination (a schema-locked workspace namespace)\n';
   body += '  form_id: "contact-us",                             // omit to get an unguessable frm_ token (private link)\n';
