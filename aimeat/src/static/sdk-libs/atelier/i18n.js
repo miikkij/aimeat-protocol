@@ -17,6 +17,10 @@
  * @usage  AIMEAT.atelier.i18n.use({ fi: { addTask: 'Lisää tehtävä' }, en: { addTask: 'Add task' } });
  *         AIMEAT.atelier.i18n.t('addTask');
  * @version-history
+ *   v0.12.0 — 2026-10-01 — The words of crew, palette, compare and tour (en/fi/es): crewLive (the
+ *     count of who is here now), paletteLabel, palettePlaceholder, paletteEmpty, compareLabel and
+ *     tourSkip; the tour's Next and Done use the existing next and done. English is the text those
+ *     parts drew before.
  *   v0.11.0 — 2026-10-01 — The shop and flow parts' words (en/fi/es): priceTable (price*), cart
  *     (cart*), checkout (co*), thread (thread*), sortable, notices, facets, the calendar's weekday
  *     names (wd0 to wd6), yesterday and earlier. English is the text those parts drew before.
@@ -180,6 +184,12 @@ const BASE = {
     coFailed: 'The order did not go through. Try once more.',
     coEmpty: 'Nothing in the order',
     coEmptyHint: 'Add something and it appears here.',
+    crewLive: '{n} here now',
+    paletteLabel: 'Commands',
+    palettePlaceholder: 'go to, run, adopt…',
+    paletteEmpty: 'Nothing matches.',
+    compareLabel: 'Compare',
+    tourSkip: 'Skip',
   },
   fi: {
     loading: 'Ladataan…',
@@ -315,6 +325,12 @@ const BASE = {
     coFailed: 'Tilaus ei mennyt läpi. Yritä uudelleen.',
     coEmpty: 'Tilauksessa ei ole tuotteita',
     coEmptyHint: 'Lisää tuote, niin se näkyy tässä.',
+    crewLive: '{n} paikalla nyt',
+    paletteLabel: 'Komennot',
+    palettePlaceholder: 'siirry, suorita, ota käyttöön…',
+    paletteEmpty: 'Ei osumia.',
+    compareLabel: 'Vertaa',
+    tourSkip: 'Ohita',
   },
   es: {
     loading: 'Cargando…',
@@ -450,6 +466,12 @@ const BASE = {
     coFailed: 'El pedido no se pudo enviar. Inténtalo otra vez.',
     coEmpty: 'El pedido está vacío',
     coEmptyHint: 'Agrega algo y aparece aquí.',
+    crewLive: 'Aquí ahora: {n}',
+    paletteLabel: 'Comandos',
+    palettePlaceholder: 'ir a, ejecutar, adoptar…',
+    paletteEmpty: 'Sin coincidencias.',
+    compareLabel: 'Comparar',
+    tourSkip: 'Omitir',
   },
 };
 

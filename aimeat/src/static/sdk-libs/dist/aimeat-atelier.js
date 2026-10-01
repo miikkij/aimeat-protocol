@@ -1106,7 +1106,13 @@
       coEmailAt: "An email address has an @ in it.",
       coFailed: "The order did not go through. Try once more.",
       coEmpty: "Nothing in the order",
-      coEmptyHint: "Add something and it appears here."
+      coEmptyHint: "Add something and it appears here.",
+      crewLive: "{n} here now",
+      paletteLabel: "Commands",
+      palettePlaceholder: "go to, run, adopt…",
+      paletteEmpty: "Nothing matches.",
+      compareLabel: "Compare",
+      tourSkip: "Skip"
     },
     fi: {
       loading: "Ladataan…",
@@ -1268,7 +1274,13 @@
       coEmailAt: "Sähköpostiosoitteessa on @-merkki.",
       coFailed: "Tilaus ei mennyt läpi. Yritä uudelleen.",
       coEmpty: "Tilauksessa ei ole tuotteita",
-      coEmptyHint: "Lisää tuote, niin se näkyy tässä."
+      coEmptyHint: "Lisää tuote, niin se näkyy tässä.",
+      crewLive: "{n} paikalla nyt",
+      paletteLabel: "Komennot",
+      palettePlaceholder: "siirry, suorita, ota käyttöön…",
+      paletteEmpty: "Ei osumia.",
+      compareLabel: "Vertaa",
+      tourSkip: "Ohita"
     },
     es: {
       loading: "Cargando…",
@@ -1430,7 +1442,13 @@
       coEmailAt: "Un correo electrónico lleva una @.",
       coFailed: "El pedido no se pudo enviar. Inténtalo otra vez.",
       coEmpty: "El pedido está vacío",
-      coEmptyHint: "Agrega algo y aparece aquí."
+      coEmptyHint: "Agrega algo y aparece aquí.",
+      crewLive: "Aquí ahora: {n}",
+      paletteLabel: "Comandos",
+      palettePlaceholder: "ir a, ejecutar, adoptar…",
+      paletteEmpty: "Sin coincidencias.",
+      compareLabel: "Comparar",
+      tourSkip: "Omitir"
     }
   };
   var KIT_KEYS = {
@@ -4579,30 +4597,9 @@
     return v === void 0 ? DEFAULT_MARGIN : v;
   }
 
-  // src/static/sdk-libs/atelier/shell.js
-  var LOGO_INLINE_MAX = 8192;
-  function logoEl(src) {
-    if (typeof src !== "string" || !src.trim()) return null;
-    if (/^\s*data:/i.test(src) && (!/^\s*data:image\//i.test(src) || src.length > LOGO_INLINE_MAX)) {
-      console.warn("[atelier] app({ logo }) refuses this data: URI; an inline logo is a data:image of at most " + LOGO_INLINE_MAX + " characters, anything larger goes to storage as a URL.");
-      return null;
-    }
-    return el("img", { class: "ak-app__logo", src, alt: "", width: "32", height: "32", decoding: "async" });
-  }
-  function bottomEntries(items) {
-    return items.filter(function(it) {
-      return it.bottom === true || it.bottom !== false && !it.group;
-    });
-  }
-  function tabLabel(spec, name, item) {
-    const given = partValue(spec, name, item);
-    return given === void 0 ? item.label : given;
-  }
-  var BOOT_POLL_MS = 300;
-  var SIGNIN_GRACE_MS = 2500;
+  // src/static/sdk-libs/atelier/shell-motion.js
   var SVG_NS4 = "http://www.w3.org/2000/svg";
   var MOTION_ATTR2 = "data-ak-motion";
-  var MODE_BUTTON = "#aimeat-mode-switch button[data-mode]";
   function motionLabel() {
     const said = t("lessMotion");
     return said === "lessMotion" ? "Less motion" : said;
@@ -4630,6 +4627,196 @@
   function motionIsLess() {
     return document.documentElement.getAttribute(MOTION_ATTR2) === "less";
   }
+
+  // src/static/sdk-libs/atelier/scroll-edge.js
+  var SCROLLERS = [
+    ".ak-tabs",
+    ".ak-table",
+    ".ak-matrix__scroll",
+    ".ak-mosaic__deck",
+    ".ak-mosaic__rail",
+    ".ak-carousel__viewport",
+    ".ak-checkout__rail",
+    ".ak-kanban",
+    ".ak-reading__list",
+    "[data-ak-scroll-edge]"
+  ].join(", ");
+  var SLACK = 2;
+  var known2 = /* @__PURE__ */ new Set();
+  var sizes = null;
+  var tree = null;
+  var frame = 0;
+  var started = false;
+  function stamp(node) {
+    const el2 = (
+      /** @type {HTMLElement} */
+      node
+    );
+    const hidden = el2.scrollWidth - el2.clientWidth;
+    let state;
+    if (hidden <= SLACK) {
+      state = "none";
+    } else {
+      const left = Math.abs(el2.scrollLeft);
+      const atStart = left <= SLACK;
+      const atEnd = left >= hidden - SLACK;
+      state = atStart ? "start" : atEnd ? "end" : "middle";
+    }
+    if (el2.dataset.akScroll !== state) el2.dataset.akScroll = state;
+  }
+  function stampAll() {
+    if (frame) return;
+    frame = requestAnimationFrame(() => {
+      frame = 0;
+      for (const node of known2) {
+        if (node.isConnected) stamp(node);
+        else unwatch(node);
+      }
+    });
+  }
+  function scrollEdge(node) {
+    if (!node || node.nodeType !== 1 || known2.has(node)) return !!(node && known2.has(node));
+    known2.add(node);
+    if (sizes) sizes.observe(node);
+    stamp(node);
+    return true;
+  }
+  function unwatch(node) {
+    if (!known2.delete(node)) return;
+    if (sizes) sizes.unobserve(node);
+    delete /** @type {HTMLElement} */
+    node.dataset.akScroll;
+  }
+  function sweep(root) {
+    const scope = root && root.nodeType === 1 ? root : document;
+    if (scope !== document && /** @type {Element} */
+    scope.matches(SCROLLERS)) scrollEdge(scope);
+    for (const node of scope.querySelectorAll(SCROLLERS)) scrollEdge(node);
+  }
+  function watch() {
+    if (started) return true;
+    if (typeof document === "undefined" || typeof ResizeObserver === "undefined") return false;
+    started = true;
+    sizes = new ResizeObserver(stampAll);
+    tree = new MutationObserver((records) => {
+      for (const r of records) for (const n of r.addedNodes) if (n.nodeType === 1) sweep(n);
+      stampAll();
+    });
+    tree.observe(document.documentElement, { childList: true, subtree: true });
+    document.addEventListener("scroll", (e) => {
+      const t2 = (
+        /** @type {Element|null} */
+        /** @type {unknown} */
+        e.target
+      );
+      if (t2 && t2.nodeType === 1 && known2.has(t2)) stamp(t2);
+    }, { capture: true, passive: true });
+    window.addEventListener("resize", stampAll, { passive: true });
+    sweep(document);
+    return true;
+  }
+  function fadeInset(strip) {
+    let raw;
+    try {
+      raw = String(getComputedStyle(strip).getPropertyValue("--ak-scroll-fade") || "").trim();
+    } catch {
+      return 0;
+    }
+    const v = parseFloat(raw);
+    return /px$/.test(raw) && v > 0 ? v : 0;
+  }
+  function revealInStrip(strip, child, opts) {
+    if (!strip || !child || !strip.contains(child)) return null;
+    const s = (
+      /** @type {HTMLElement} */
+      strip
+    );
+    const box = s.getBoundingClientRect();
+    const r = child.getBoundingClientRect();
+    if (!(box.width > 0) || !(r.width > 0)) return null;
+    const inset = Math.min(fadeInset(s), Math.max(0, (box.width - r.width) / 2));
+    let delta = 0;
+    if (r.width >= box.width || r.left < box.left + inset) delta = r.left - (box.left + inset);
+    else if (r.right > box.right - inset) delta = r.right - (box.right - inset);
+    if (Math.abs(delta) < 1) return null;
+    const room = Math.max(0, s.scrollWidth - s.clientWidth);
+    let rtl = false;
+    try {
+      rtl = getComputedStyle(s).direction === "rtl";
+    } catch {
+    }
+    const left = Math.round(Math.max(rtl ? -room : 0, Math.min(rtl ? 0 : room, s.scrollLeft + delta)));
+    if (left === Math.round(s.scrollLeft)) return null;
+    if (opts && opts.smooth && !reducedMotion() && typeof s.scrollTo === "function") s.scrollTo({ left, behavior: "smooth" });
+    else s.scrollLeft = left;
+    return left;
+  }
+  function keepInView(strip, selector) {
+    let frame2 = 0;
+    let smooth = false;
+    let dead = false;
+    let box = null;
+    function run() {
+      frame2 = 0;
+      if (dead) return;
+      const glide2 = smooth;
+      smooth = false;
+      revealInStrip(strip, strip.querySelector(selector), { smooth: glide2 });
+    }
+    function request(wantSmooth) {
+      if (dead) return;
+      if (wantSmooth) smooth = true;
+      if (frame2) return;
+      if (typeof requestAnimationFrame !== "function") {
+        run();
+        return;
+      }
+      frame2 = requestAnimationFrame(run);
+    }
+    if (typeof ResizeObserver === "function") {
+      box = new ResizeObserver(function() {
+        request(false);
+      });
+      box.observe(strip);
+    }
+    return {
+      request,
+      destroy() {
+        dead = true;
+        if (frame2 && typeof cancelAnimationFrame === "function") cancelAnimationFrame(frame2);
+        frame2 = 0;
+        if (box) box.disconnect();
+        box = null;
+      }
+    };
+  }
+  if (typeof document !== "undefined") {
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", watch, { once: true });
+    else watch();
+  }
+
+  // src/static/sdk-libs/atelier/shell.js
+  var LOGO_INLINE_MAX = 8192;
+  function logoEl(src) {
+    if (typeof src !== "string" || !src.trim()) return null;
+    if (/^\s*data:/i.test(src) && (!/^\s*data:image\//i.test(src) || src.length > LOGO_INLINE_MAX)) {
+      console.warn("[atelier] app({ logo }) refuses this data: URI; an inline logo is a data:image of at most " + LOGO_INLINE_MAX + " characters, anything larger goes to storage as a URL.");
+      return null;
+    }
+    return el("img", { class: "ak-app__logo", src, alt: "", width: "32", height: "32", decoding: "async" });
+  }
+  function bottomEntries(items) {
+    return items.filter(function(it) {
+      return it.bottom === true || it.bottom !== false && !it.group;
+    });
+  }
+  function tabLabel(spec, name, item) {
+    const given = partValue(spec, name, item);
+    return given === void 0 ? item.label : given;
+  }
+  var BOOT_POLL_MS = 300;
+  var SIGNIN_GRACE_MS = 2500;
+  var MODE_BUTTON = "#aimeat-mode-switch button[data-mode]";
   function ambientSpec(want) {
     if (typeof want === "string") return { preset: want };
     if (want && typeof want === "object") {
@@ -5020,7 +5207,8 @@
     applyVariant(root, spec, ["dense", "pill"]);
     if (spec.target) resolve(spec.target).appendChild(root);
     const mark = ink2(root, { active: ".ak-tab--active" });
-    function render() {
+    const follow = keepInView(root, ".ak-tab--active");
+    function render(moved) {
       clear(root);
       for (const item of state.items) {
         const active = item.id === state.value;
@@ -5038,7 +5226,7 @@
               const release = mark.pin();
               viewSwap(function() {
                 state.value = item.id;
-                render();
+                render(true);
                 if (spec.onChange) spec.onChange(item.id);
               }, { kind: spec.transition, node: root }).then(release, release);
             }
@@ -5046,6 +5234,7 @@
         }, tabLabel(spec, "tab", item)));
       }
       mark.sync();
+      follow.request(moved);
     }
     render();
     return {
@@ -5055,9 +5244,10 @@
         if (!patch) return;
         if (patch.items) state.items = patch.items;
         if (patch.value != null) state.value = patch.value;
-        render();
+        render(true);
       },
       destroy() {
+        follow.destroy();
         mark.destroy();
         if (root.parentNode) root.parentNode.removeChild(root);
       }
@@ -6001,7 +6191,7 @@
           host.removeChild(n);
         });
         if (!shown.length) {
-          host.appendChild(el("li", { class: "ak-palette__empty", "data-ak-id": "__empty" }, s.empty || "Nothing matches."));
+          host.appendChild(el("li", { class: "ak-palette__empty", "data-ak-id": "__empty" }, s.empty || t("paletteEmpty")));
           return;
         }
         shown.forEach(function(it, i) {
@@ -6026,7 +6216,7 @@
       cursor = 0;
       shown = s.items.slice();
       list2 = el("ul", { class: "ak-palette__list", role: "listbox" });
-      const input = el("input", { class: "ak-palette__input", type: "text", placeholder: s.placeholder || "go to, run, adopt…", autocomplete: "off", on: {
+      const input = el("input", { class: "ak-palette__input", type: "text", placeholder: s.placeholder || t("palettePlaceholder"), autocomplete: "off", on: {
         input: function() {
           const q = (
             /** @type {HTMLInputElement} */
@@ -6059,7 +6249,7 @@
           }
         }
       } });
-      box = el("div", { class: "ak-palette__box", role: "dialog", "aria-modal": "true", "aria-label": s.placeholder || "Commands" }, [input, list2]);
+      box = el("div", { class: "ak-palette__box", role: "dialog", "aria-modal": "true", "aria-label": s.placeholder || t("paletteLabel") }, [input, list2]);
       root = el("div", { class: "ak-root ak-palette", on: { click: function(e) {
         if (e.target === root) close();
       } } }, [box]);
@@ -6130,7 +6320,7 @@
       const body = side.el ? side.el : side.image ? el("img", { src: side.image, alt: side.label || "" }) : el("span", {}, side.label || "");
       return el("div", { class: "ak-compare__layer " + cls }, [body]);
     }
-    const handle2 = el("button", { type: "button", class: "ak-compare__handle", "aria-label": "Compare", role: "slider", "aria-valuemin": "0", "aria-valuemax": "100" }, "⇄");
+    const handle2 = el("button", { type: "button", class: "ak-compare__handle", "aria-label": t("compareLabel"), role: "slider", "aria-valuemin": "0", "aria-valuemax": "100" }, "⇄");
     const root = el("div", { class: "ak-root ak-compare" }, [
       layer(s.before || {}, "ak-compare__before"),
       layer(s.after || {}, "ak-compare__after"),
@@ -6183,7 +6373,6 @@
   }
   function tour(spec) {
     const s = spec || { steps: [] };
-    const L = Object.assign({ next: "Next", done: "Done", skip: "Skip" }, s.labels || {});
     let i = -1;
     let note = null;
     let marked = null;
@@ -6214,6 +6403,7 @@
       marked.classList.add("ak-tour__mark");
       if (!reducedMotion()) marked.scrollIntoView({ block: "center", behavior: "smooth" });
       const last = n === s.steps.length - 1;
+      const L = Object.assign({ next: t("next"), done: t("done"), skip: t("tourSkip") }, s.labels || {});
       note = el("div", { class: "ak-root ak-tour__note", role: "dialog", "aria-live": "polite" }, [
         el("div", {}, [el("span", { class: "ak-tour__step" }, n + 1 + "/" + s.steps.length), el("span", {}, step.text)]),
         el("div", { class: "ak-tour__nav" }, [
@@ -12419,7 +12609,7 @@
   // src/static/sdk-libs/atelier/konsole.js
   var CAP_DEFAULT = 400;
   var TONES7 = ["ok", "warn", "err", "plain"];
-  function stamp(ts) {
+  function stamp2(ts) {
     if (ts == null) return "";
     const d = ts instanceof Date ? ts : new Date(ts);
     if (isNaN(d.getTime())) return String(ts);
@@ -12438,7 +12628,7 @@
     function lineNode(line, entering) {
       const tone = TONES7.indexOf(line.tone) >= 0 ? line.tone : "plain";
       const node = el("div", { class: "ak-console__line ak-console__line--" + tone }, [
-        line.ts != null ? el("span", { class: "ak-console__ts", text: stamp(line.ts) }) : null,
+        line.ts != null ? el("span", { class: "ak-console__ts", text: stamp2(line.ts) }) : null,
         el("span", { class: "ak-console__text", text: String(line.text == null ? "" : line.text) })
       ]);
       if (entering && !reducedMotion()) node.classList.add("ak-console__line--enter");
@@ -13467,7 +13657,7 @@
   function sampleBadge2() {
     return el("span", { class: "ak-mem-sample" }, tm("sample.badge"));
   }
-  function watch(again, root) {
+  function watch2(again, root) {
     let stopped = false;
     const auth = (
       /** @type {any} */
@@ -14126,7 +14316,7 @@
     const ready0 = render().then(function() {
       enter(root);
     });
-    const stop = watch(function() {
+    const stop = watch2(function() {
       failure = "";
       notice = "";
       render();
@@ -14228,7 +14418,7 @@
     run().then(function() {
       enter(root);
     });
-    const stop = watch(run, root);
+    const stop = watch2(run, root);
     return { el: root, destroy: function() {
       stop();
       if (root.parentNode) root.parentNode.removeChild(root);
@@ -14280,7 +14470,7 @@
       });
     }
     run();
-    const stop = watch(run, root);
+    const stop = watch2(run, root);
     return { el: root, destroy: function() {
       stop();
       if (ask2) ask2.destroy();
@@ -14573,7 +14763,7 @@
       waiting();
       recall();
     }
-    const stopWatch = watch(function() {
+    const stopWatch = watch2(function() {
       if (at) return;
       waiting();
       recall();
@@ -14917,7 +15107,7 @@
     const ready0 = run().then(function() {
       enter(root);
     });
-    const stop = watch(function() {
+    const stop = watch2(function() {
       failure = "";
       notice = "";
       run();
@@ -15263,7 +15453,7 @@
       mode = "choose";
       draw();
     });
-    const stop = watch(function() {
+    const stop = watch2(function() {
       if (!sample && identity() !== who) start();
       else draw();
     }, root);
@@ -15999,7 +16189,7 @@
     const ready2 = render().then(function() {
       enter(root);
     });
-    const stopWatch = watch(function() {
+    const stopWatch = watch2(function() {
       render();
     }, root);
     return {
@@ -16317,7 +16507,7 @@
     const ready2 = render().then(function() {
       enter(root);
     });
-    const stopWatch = watch(function() {
+    const stopWatch = watch2(function() {
       failure = "";
       notice = "";
       render();
@@ -16643,7 +16833,7 @@
     const ready2 = render().then(function() {
       enter(root);
     });
-    const stopWatch = watch(function() {
+    const stopWatch = watch2(function() {
       failure = "";
       notice = "";
       render();
@@ -17253,7 +17443,7 @@
     const ready0 = render(true).then(function() {
       enter(root);
     });
-    const stopWatch = watch(function() {
+    const stopWatch = watch2(function() {
       failure = "";
       notice = "";
       render(true);
@@ -17649,7 +17839,7 @@
       });
       return inFlight;
     }
-    const stopWatch = watch(function() {
+    const stopWatch = watch2(function() {
       const now2 = !signedOut4();
       if (now2 !== state.session) {
         state.session = now2;
@@ -18129,7 +18319,7 @@
       });
     }
     draw();
-    const stop = watch(function() {
+    const stop = watch2(function() {
       const state = root.getAttribute("data-ak-state");
       if (state === "sample" || state === "empty") draw();
     }, root);
@@ -18745,7 +18935,7 @@
       }
     };
     draw();
-    const stop = watch(function() {
+    const stop = watch2(function() {
       draw();
     }, root);
     return api;
@@ -19218,7 +19408,10 @@
       if (people.length > max) stack.appendChild(el("span", { class: "ak-crew__face ak-crew__more" }, "+" + (people.length - max)));
       root.appendChild(stack);
       if (d && typeof d.live === "number" && d.live > 0) {
-        root.appendChild(el("span", { class: "ak-crew__live" }, [el("span", { class: "ak-crew__dot" }), String(d.live) + " " + (d.liveLabel || "here now")]));
+        root.appendChild(el("span", { class: "ak-crew__live" }, [
+          el("span", { class: "ak-crew__dot" }),
+          d.liveLabel ? String(d.live) + " " + d.liveLabel : t("crewLive", { n: d.live })
+        ]));
       }
       enter(root);
     }
@@ -24958,98 +25151,6 @@
         });
       }
     };
-  }
-
-  // src/static/sdk-libs/atelier/scroll-edge.js
-  var SCROLLERS = [
-    ".ak-tabs",
-    ".ak-table",
-    ".ak-matrix__scroll",
-    ".ak-mosaic__deck",
-    ".ak-mosaic__rail",
-    ".ak-carousel__viewport",
-    ".ak-checkout__rail",
-    ".ak-kanban",
-    ".ak-reading__list",
-    "[data-ak-scroll-edge]"
-  ].join(", ");
-  var SLACK = 2;
-  var known2 = /* @__PURE__ */ new Set();
-  var sizes = null;
-  var tree = null;
-  var frame = 0;
-  var started = false;
-  function stamp2(node) {
-    const el2 = (
-      /** @type {HTMLElement} */
-      node
-    );
-    const hidden = el2.scrollWidth - el2.clientWidth;
-    let state;
-    if (hidden <= SLACK) {
-      state = "none";
-    } else {
-      const left = Math.abs(el2.scrollLeft);
-      const atStart = left <= SLACK;
-      const atEnd = left >= hidden - SLACK;
-      state = atStart ? "start" : atEnd ? "end" : "middle";
-    }
-    if (el2.dataset.akScroll !== state) el2.dataset.akScroll = state;
-  }
-  function stampAll() {
-    if (frame) return;
-    frame = requestAnimationFrame(() => {
-      frame = 0;
-      for (const node of known2) {
-        if (node.isConnected) stamp2(node);
-        else unwatch(node);
-      }
-    });
-  }
-  function scrollEdge(node) {
-    if (!node || node.nodeType !== 1 || known2.has(node)) return !!(node && known2.has(node));
-    known2.add(node);
-    if (sizes) sizes.observe(node);
-    stamp2(node);
-    return true;
-  }
-  function unwatch(node) {
-    if (!known2.delete(node)) return;
-    if (sizes) sizes.unobserve(node);
-    delete /** @type {HTMLElement} */
-    node.dataset.akScroll;
-  }
-  function sweep(root) {
-    const scope = root && root.nodeType === 1 ? root : document;
-    if (scope !== document && /** @type {Element} */
-    scope.matches(SCROLLERS)) scrollEdge(scope);
-    for (const node of scope.querySelectorAll(SCROLLERS)) scrollEdge(node);
-  }
-  function watch2() {
-    if (started) return true;
-    if (typeof document === "undefined" || typeof ResizeObserver === "undefined") return false;
-    started = true;
-    sizes = new ResizeObserver(stampAll);
-    tree = new MutationObserver((records) => {
-      for (const r of records) for (const n of r.addedNodes) if (n.nodeType === 1) sweep(n);
-      stampAll();
-    });
-    tree.observe(document.documentElement, { childList: true, subtree: true });
-    document.addEventListener("scroll", (e) => {
-      const t2 = (
-        /** @type {Element|null} */
-        /** @type {unknown} */
-        e.target
-      );
-      if (t2 && t2.nodeType === 1 && known2.has(t2)) stamp2(t2);
-    }, { capture: true, passive: true });
-    window.addEventListener("resize", stampAll, { passive: true });
-    sweep(document);
-    return true;
-  }
-  if (typeof document !== "undefined") {
-    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", watch2, { once: true });
-    else watch2();
   }
 
   // src/static/sdk-libs/atelier/describe-data.js

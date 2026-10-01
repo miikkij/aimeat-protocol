@@ -6,6 +6,8 @@
  *   what each part leaves behind. The travel itself is springs.js, tested on its own.
  * @usage cd aimeat && pnpm exec vitest run test/unit/atelier-motion-parts.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-01 — The tab row scrolls its chosen tab into view (first draw, set, a pick),
+ *     moves only its own scrollLeft, glides only when motion is allowed, and stops on destroy.
  *   v1.0.0 — 2026-09-28 — Initial (atelier 0.55.0, the ten motion parts).
  */
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -243,6 +245,121 @@ describe('the tab row wears the ink', () => {
     expect(tb.el.querySelectorAll('.ak-tab').length).toBe(2);
     tb.destroy();
     expect(tb.el.querySelectorAll('.ak-ink').length).toBe(0);
+  });
+});
+
+describe('the tab row keeps the chosen tab in view', () => {
+  /** A 200px strip of five 100px tabs at a phone width, with the kit's 28px edge fade. */
+  function strip(value: string) {
+    const page = host();
+    const tb = shell.tabs({ target: page, value,
+      items: ['a', 'b', 'c', 'd', 'e'].map((id) => ({ id, label: id.toUpperCase() })) });
+    const root = tb.el;
+    Object.defineProperty(root, 'clientWidth', { value: 200, configurable: true });
+    Object.defineProperty(root, 'scrollWidth', { value: 500, configurable: true });
+    root.getBoundingClientRect = () => ({ left: 0, right: 200, width: 200, top: 0, bottom: 40, height: 40, x: 0, y: 0 });
+    root.style.setProperty('--ak-scroll-fade', '28px');
+    return { tb, root, page };
+  }
+  /** The boxes a browser would report: each tab 100px wide, moved by the strip's scrollLeft. */
+  function lay(root: any) {
+    Array.from(root.querySelectorAll('.ak-tab')).forEach((b: any, i: number) => {
+      b.getBoundingClientRect = () => {
+        const left = i * 100 - root.scrollLeft;
+        return { left, right: left + 100, width: 100, top: 0, bottom: 40, height: 40, x: left, y: 0 };
+      };
+    });
+  }
+  const shown = (root: any) => {
+    const r = root.querySelector('.ak-tab--active').getBoundingClientRect();
+    return r.left >= 0 && r.right <= 200;
+  };
+
+  it('scrolls to the chosen tab at the first draw', async () => {
+    const { tb, root } = strip('e');
+    lay(root);
+    await tick();
+    expect(root.scrollLeft).toBe(300);
+    expect(shown(root)).toBe(true);
+    tb.destroy();
+  });
+
+  it('scrolls on set({ value }), clear of the edge fade, and back on a pick', async () => {
+    const { tb, root } = strip('a');
+    lay(root);
+    await tick();
+    expect(root.scrollLeft).toBe(0);
+    tb.set({ value: 'c' });
+    lay(root);
+    await tick();
+    // Tab c spans 200..300; its right edge lands 28px in from the strip's right edge.
+    expect(root.scrollLeft).toBe(128);
+    expect(shown(root)).toBe(true);
+    tb.set({ value: 'e' });
+    lay(root);
+    await tick();
+    expect(root.scrollLeft).toBe(300);
+    root.querySelector('[data-ak-id="b"]').click();
+    lay(root);
+    await tick();
+    await tick();
+    expect(tb.el.querySelector('.ak-tab--active').getAttribute('data-ak-id')).toBe('b');
+    expect(root.scrollLeft).toBe(72);
+    expect(shown(root)).toBe(true);
+    tb.destroy();
+  });
+
+  it('moves only the strip, never the page', async () => {
+    const calls: any[] = [];
+    const was = (globalThis as any).scrollTo;
+    (globalThis as any).scrollTo = (...a: any[]) => calls.push(a);
+    try {
+      const { tb, root, page } = strip('a');
+      page.scrollTop = 0;
+      doc.documentElement.scrollTop = 0;
+      tb.set({ value: 'd' });
+      Array.from(root.querySelectorAll('.ak-tab')).forEach((b: any) => { b.scrollIntoView = () => calls.push('scrollIntoView'); });
+      lay(root);
+      await tick();
+      expect(root.scrollLeft).toBeGreaterThan(0);
+      expect(calls).toEqual([]);
+      expect(page.scrollTop).toBe(0);
+      expect(doc.documentElement.scrollTop).toBe(0);
+      tb.destroy();
+    } finally {
+      (globalThis as any).scrollTo = was;
+    }
+  });
+
+  it('glides when motion is allowed, and jumps under reduced motion', async () => {
+    const { tb, root } = strip('a');
+    lay(root);
+    const glides: any[] = [];
+    root.scrollTo = (o: any) => glides.push(o);
+    tb.set({ value: 'd' });
+    lay(root);
+    await tick();
+    expect(glides).toEqual([]);
+    expect(root.scrollLeft).toBe(228);
+    restore.setMotion(null);
+    try {
+      tb.set({ value: 'a' });
+      lay(root);
+      await tick();
+      expect(glides).toEqual([{ left: 0, behavior: 'smooth' }]);
+    } finally {
+      restore.setMotion('less');
+    }
+    tb.destroy();
+  });
+
+  it('stops after destroy', async () => {
+    const { tb, root } = strip('a');
+    tb.set({ value: 'e' });
+    lay(root);
+    tb.destroy();
+    await tick();
+    expect(root.scrollLeft).toBe(0);
   });
 });
 
