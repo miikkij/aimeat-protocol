@@ -21,6 +21,8 @@
  *   - Phase 7: a new node started with AIMEAT_INSTALL_SET links the repository, is refused until it
  *     is entitled, tries again and applies the set; the shop's agent grants the bundle and registers
  *     the node as a packages-only peer in one call; a key that differs is refused on both sides
+ *   - Phase 8 also: a seller cannot revoke, reset or shorten a grant it did not sell, and may extend
+ *     one to a later date (2026-10-02, package sale design phase 1).
  *   - Phase 8: selling node to node with no token: R's author names C a seller; C's operator asks C,
  *     which signs with its own key, for the questions, a grant, an end of updates and a revoke; a
  *     node that is not a seller, an agent without operator:admin and a replayed signature are refused
@@ -708,6 +710,36 @@ await test('R\'s author names C a seller; C then reads the bundle\'s questions a
     const list = await R.json(`/v1/packages/${encodeURIComponent(setupOnR)}/entitlements`, { headers: auth(vendorToken) });
     const e = (list.body.data.entitlements as any[]).find((x) => x.nodeId === newNode);
     assert(e?.updatesUntil === null && String(e?.note).startsWith(`sold by ${C.nodeId}`), `the grant on R: ${JSON.stringify(e)}`);
+});
+
+await test('A seller cannot revoke, reset or shorten a grant the author made, and may extend it to a later date as a new sale', async () => {
+    // C.nodeId holds the author's own grant ("order 1"). Before 2026-10-02 any seller of the author
+    // could end or revoke it (package sale design, phase 1; incident a-seller-node-can-change-or-revoke).
+    const sale = (body: Record<string, unknown>) => C.json('/v1/package-sales/entitlements', {
+        method: 'PUT', headers: auth(opsToken), body: JSON.stringify({ repository: R.nodeId, group_id: setupOnR, node_id: C.nodeId, ...body }),
+    });
+    const del = await C.json(`/v1/package-sales/entitlements?repository=${encodeURIComponent(R.nodeId)}&group_id=${encodeURIComponent(setupOnR)}&node_id=${encodeURIComponent(C.nodeId)}`, {
+        method: 'DELETE', headers: auth(opsToken),
+    });
+    assert(del.status === 403 && del.body.error?.code === 'NOT_YOUR_GRANT', `revoke refused: ${del.status} ${JSON.stringify(del.body)}`);
+    const channel = await sale({ channel: 'beta' });
+    assert(channel.status === 403 && channel.body.error?.code === 'NOT_YOUR_GRANT', `a change without a later date refused: ${channel.status} ${JSON.stringify(channel.body)}`);
+    const later = new Date(Date.now() + 30 * 86400_000).toISOString();
+    const set = await R.json(`/v1/packages/${encodeURIComponent(setupOnR)}/entitlements/${C.nodeId}`, {
+        method: 'PUT', headers: auth(vendorToken), body: JSON.stringify({ updates_until: later }),
+    });
+    assert(set.status === 200 && set.body.data.entitlement.updatesUntil === later, `the author sets a date: ${set.status} ${JSON.stringify(set.body)}`);
+    const shorter = await sale({ updates_until: new Date(Date.now() + 86400_000).toISOString() });
+    assert(shorter.status === 403 && shorter.body.error?.code === 'NOT_YOUR_GRANT', `an earlier date refused: ${shorter.status} ${JSON.stringify(shorter.body)}`);
+    const longer = new Date(Date.now() + 60 * 86400_000).toISOString();
+    const extend = await sale({ updates_until: longer });
+    assert(extend.status === 200 && extend.body.data.entitlement.updatesUntil === longer && extend.body.data.entitlement.soldBy === C.nodeId,
+        `a later date is a new sale by C: ${extend.status} ${JSON.stringify(extend.body)}`);
+    // The author changes any grant: back to updates that run on, for the phases that follow.
+    const back = await R.json(`/v1/packages/${encodeURIComponent(setupOnR)}/entitlements/${C.nodeId}`, {
+        method: 'PUT', headers: auth(vendorToken), body: JSON.stringify({ updates_until: null, note: 'order 1' }),
+    });
+    assert(back.status === 200 && back.body.data.entitlement.updatesUntil === null, `the author decides: ${back.status} ${JSON.stringify(back.body)}`);
 });
 
 await test('C ends the new node\'s updates and then revokes it, both signed', async () => {

@@ -14,6 +14,8 @@
  *   - Phase 5: auto-update off reports instead of updating; the updates end
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=package-repository
  * @version-history
+ *   v1.1.0 — 2026-10-02 — A note-only grant keeps the date; Phase 7: the author quota counts package
+ *     groups that are not archived (package sale design, phase 1).
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 3).
  */
 
@@ -268,6 +270,12 @@ await test('When the updates end, a version made after it is not served, and the
         method: 'PUT', headers: auth(R.ownerToken), body: JSON.stringify({ updates_until: until }),
     });
     assert(g.status === 200 && g.body.data.entitlement.updatesUntil === until, `end: ${g.status} ${JSON.stringify(g.body)}`);
+    // A grant that changes only its note keeps the date. It used to reset it to null, which turned an
+    // ending subscription into updates forever (package sale design, D).
+    const noteOnly = await R.json(`/v1/packages/${encodeURIComponent(groupOnR)}/entitlements/${C.nodeId}`, {
+        method: 'PUT', headers: auth(R.ownerToken), body: JSON.stringify({ note: 'order 1, renamed' }),
+    });
+    assert(noteOnly.status === 200 && noteOnly.body.data.entitlement.updatesUntil === until, `the date stays: ${noteOnly.status} ${JSON.stringify(noteOnly.body)}`);
     await publishVersion('v4');
     const on = await C.json(`/v1/instances/${instanceId}`, { method: 'PATCH', headers: auth(C.ownerToken), body: JSON.stringify({ auto_update: true }) });
     assert(on.status === 200, `patch: ${on.status}`);
@@ -292,7 +300,7 @@ let v4 = '';
 let v5 = '';
 await test('A new grant runs the updates again; the stable channel takes the newest published version', async () => {
     const g = await R.json(`/v1/packages/${encodeURIComponent(groupOnR)}/entitlements/${C.nodeId}`, {
-        method: 'PUT', headers: auth(R.ownerToken), body: JSON.stringify({ note: 'order 2' }),
+        method: 'PUT', headers: auth(R.ownerToken), body: JSON.stringify({ note: 'order 2', updates_until: null }),
     });
     assert(g.status === 200 && g.body.data.entitlement.updatesUntil === null && g.body.data.entitlement.channel === 'stable', `regrant: ${g.status} ${JSON.stringify(g.body)}`);
     const versions = await R.json(`/v1/packages/${encodeURIComponent(groupOnR)}/versions`, { headers: auth(R.ownerToken) });
@@ -343,6 +351,36 @@ await test('Revoking the entitlement stops the listing and the pull', async () =
     assert(o?.result === 'error' && String(o?.detail).startsWith('NOT_FOUND'), `a revoked node gets nothing: ${JSON.stringify(o)}`);
     const inst = await C.json(`/v1/instances/${instanceId}`, { headers: auth(C.ownerToken) });
     assert(inst.status === 200 && inst.body.data.status === 'installed', 'and the install stays');
+});
+
+console.log('\nPhase 7 — The author quota counts packages, not versions');
+
+await test('An author with one package of many versions may make a second package, and the limit counts packages', async () => {
+    // R's author holds one package group with five versions. With a limit of two packages, the old
+    // count of version rows refused the second package (package sale design, phase 1).
+    const before = R.config.packageMaxPerAuthor;
+    R.config.packageMaxPerAuthor = 2;
+    try {
+        const second = await R.json('/v1/packages', {
+            method: 'POST', headers: auth(R.ownerToken),
+            body: JSON.stringify({ name: `${PKG}b`, description: 'A second package', category: 'utility', visibility: 'private', components: [component('b1')] }),
+        });
+        assert(second.status === 201, `the second package: ${second.status} ${JSON.stringify(second.body)}`);
+        const third = await R.json('/v1/packages', {
+            method: 'POST', headers: auth(R.ownerToken),
+            body: JSON.stringify({ name: `${PKG}c`, description: 'A third package', category: 'utility', visibility: 'private', components: [component('c1')] }),
+        });
+        assert(third.status === 413 && third.body.error?.code === 'QUOTA_EXCEEDED', `the third is over the limit: ${third.status} ${JSON.stringify(third.body)}`);
+        const archive = await R.json(`/v1/packages/${encodeURIComponent(`${PKG}b::${R.ownerName}`)}`, { method: 'DELETE', headers: auth(R.ownerToken) });
+        assert(archive.status === 200, `archive the second: ${archive.status} ${JSON.stringify(archive.body)}`);
+        const again = await R.json('/v1/packages', {
+            method: 'POST', headers: auth(R.ownerToken),
+            body: JSON.stringify({ name: `${PKG}c`, description: 'A third package', category: 'utility', visibility: 'private', components: [component('c1')] }),
+        });
+        assert(again.status === 201, `an archived package frees its place: ${again.status} ${JSON.stringify(again.body)}`);
+    } finally {
+        R.config.packageMaxPerAuthor = before;
+    }
 });
 
 console.log('\nCleanup');

@@ -23,6 +23,8 @@
  *   const out = await createPackageGroup({ storage, config }, caller, { name, components });
  *   if (!out.ok) return res.status(out.status).json(error(nodeId, out.code, out.message));
  * @version-history
+ *   v1.3.0 — 2026-10-02 — The per-author quota counts package groups that are not archived
+ *     (storage.countPackageGroups), not version rows.
  *   v1.2.0 — 2026-09-28 — The `beta` status: a version on a repository's beta channel only.
  *   v1.1.0 — 2026-09-12 — PackageCreateCaller loses `sub`. Its own comment said the field existed
  *     only as the fallback resolveGhii took, and that fallback was the bare account name on an owner
@@ -191,13 +193,17 @@ function checkCeilings(config: AimeatConfig, components: PackageComponent[]): Pa
     return null;
 }
 
-/** How many package groups this author already holds, against the per-author ceiling. */
+/**
+ * How many package groups this author already holds, against the per-author ceiling. A group counts
+ * once however many versions it has, and an archived group does not count, which is what the refusal
+ * tells the author to do. It used to read `listPackages(...).total`, a count of version rows.
+ */
 export async function checkAuthorQuota(
     deps: PackageCreateDeps, owner: string,
 ): Promise<PackageWriteResult | null> {
     const maxPerAuthor = deps.config.packageMaxPerAuthor ?? MAX_PACKAGES_PER_AUTHOR;
-    const existing = await deps.storage.listPackages({ author: owner, limit: 1, offset: 0 });
-    if (existing.total >= maxPerAuthor) {
+    const groups = await deps.storage.countPackageGroups(owner);
+    if (groups >= maxPerAuthor) {
         return {
             ok: false, status: 413, code: 'QUOTA_EXCEEDED',
             message: `Maximum ${maxPerAuthor} packages per author. Archive unused packages first.`,

@@ -9,6 +9,7 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.70.0 -- 2026-10-02 -- e2e-package-guards.ts joins the list (package sale design, phase 1).
  *   v1.69.0 -- 2026-09-30 -- e2e-classification.ts joins GUARD_SUITES (139 → 140), measured alone on
  *            a freshly deleted database, three consecutive 55-of-55 runs on both backends.
  *   v1.68.0 -- 2026-09-30 -- e2e-node-update.ts joins the suites (not the guard tier): the npm version
@@ -848,6 +849,9 @@ const ALL_SUITES = [
     // An agent's install that needs words it lacks becomes a request the owner (or an agent of theirs
     // holding the words) answers: the door, the MCP twin, expiry, decline, and the reserved prefix.
     'test/e2e-package-install-requests.ts',
+    // A package does not take over what belongs to somebody else: the installer's own records, another
+    // person's structure lock, another author's gallery listing; and compose names a cortex's extensions.
+    'test/e2e-package-guards.ts',
     'test/e2e-federation-packages.ts',
     // A package repository and a customer node: a private package served only on an entitlement,
     // the update check that applies a newer version, and the end of updates.

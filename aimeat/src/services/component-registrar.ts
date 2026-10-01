@@ -15,6 +15,11 @@
  * @usage
  *   import { registerComponent, deleteComponent, fetchComponentContent, computeHash } from '../services/component-registrar.js';
  * @version-history
+ *   v1.12.0 — 2026-10-02 — A memory component refuses a key the owner already has (KEY_EXISTS) unless
+ *     this component or an install of the same package wrote it, and tags what it writes with the
+ *     package; a cortex schema part refuses another principal's lock (SCHEMA_LOCKED_BY_OTHER) and no
+ *     longer swallows a failed lock write. Both are asked before the first write, on a dry run too
+ *     (package-component-collisions.ts; package sale design T3, T4).
  *   v1.11.0 — 2026-09-30 — A `skill` component (package-skill-component.ts): published in the owner's
  *     registry bound to this install's app, `skipped` when the owner has a skill of that name of their
  *     own; deleteComponent removes a skill only with the package install that published it.
@@ -79,6 +84,7 @@ import { memoryComponentEntries, reservedKeysInComponent, reservedComponentMessa
 import { writeAppConfigValues, type AppConfigValues } from './app-config.js';
 import { mergeExtensionConfig } from './package-config.js';
 import { registerSkillComponent, deleteSkillComponent } from './package-skill-component.js';
+import { componentCollision, cortexComponentsOf, packageTag, isOwnersLock, schemaOfPart } from './package-component-collisions.js';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -362,25 +368,13 @@ export async function registerComponent(
       }
 
       case 'cortex': {
-        // Content: JSON { manifest: "YAML", libs: { "file.js": "code" } } or raw string
-        let parsed: { manifest?: string; libs?: Record<string, string> };
-        try { parsed = JSON.parse(content); }
-        // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
-        catch { parsed = { manifest: content }; }
-
-        const manifestStr = parsed.manifest ?? content;
-        const libs = parsed.libs ?? {};
-
-        let meta: Record<string, unknown> = {};
-        try { meta = (YAML.parse(manifestStr) as Record<string, unknown>) ?? {}; }
-        catch (err) { logger.warn('config: use defaults', { error: String(err) }); }
+        // Content: JSON { manifest: "YAML", libs: { "file.js": "code" } } or raw string. The standard
+        // manifest lists its components under `spec`; the flat form the bundled packages use lists
+        // them at the top, and is read when `spec` has none (package-component-collisions.ts).
+        const { manifestStr, meta, libs, components: componentsRaw } = cortexComponentsOf(content);
 
         const metadata = (meta.metadata ?? meta) as Record<string, unknown>;
         originalShortName = (metadata.name as string) || undefined;
-        // The standard manifest lists its components under `spec`; the flat form the bundled packages
-        // use lists them at the top, and is read when `spec` has none.
-        const spec = (meta.spec ?? {}) as Record<string, unknown>;
-        const componentsRaw = (Array.isArray(spec.components) ? spec.components : meta.components ?? []) as Array<Record<string, unknown>>;
 
         // Each component keeps what its author wrote (a schema's JSON Schema, a prompt's variables),
         // with `content` kept as the string it has always been stored as.
@@ -395,6 +389,13 @@ export async function registerComponent(
         const artifacts: CortexActivationArtifacts = {
           schemaKeys: [], promptKeys: [], actionIds: [], boardIds: [], seedDataKeys: [], ontologyKeys: [], libFiles: Object.keys(libs),
         };
+
+        // A schema part may not replace another principal's lock: a lock governs every owner on the
+        // node, and the uninstall deletes what the activation recorded. Asked before the first write.
+        const lockRefusal = await componentCollision(storage, {
+          type, content, registeredAs, componentId, owner, ownerGaii, groupId: input.packageContext?.groupId,
+        });
+        if (lockRefusal) return { success: false, componentId, registeredAs, error: lockRefusal.error };
 
         if (input.dryRun) break;
         await storage.createCortexExtension({
@@ -437,19 +438,23 @@ export async function registerComponent(
         for (const comp of cortexComponents) {
           const compType = comp.type as string;
           if (compType === 'schema' && comp.key_pattern) {
-            try {
-              await storage.setSchema({
-                keyPattern: comp.key_pattern as string,
-                applyTo: ((comp.apply_to as string) ?? 'prefix') as 'exact' | 'prefix',
-                schemaJson: (comp.schema ?? comp.content ?? {}) as Record<string, unknown>,
-                schemaMode: 'strict',
-                lockedBy: ownerGaii,
-                setAt: now,
-                updatedAt: now,
-              });
-              artifacts.schemaKeys.push(comp.key_pattern as string);
-            // eslint-disable-next-line aimeat/no-silent-catch -- schema may already exist
-            } catch { /* schema may already exist */ }
+            const applyTo = comp.apply_to === 'exact' ? 'exact' : 'prefix';
+            // Another person's lock reaching here is the same structure (componentCollision refused
+            // any other): shared, so it is left as it is and not recorded for this uninstall to remove.
+            const held = await storage.getSchema(comp.key_pattern as string, applyTo);
+            if (held && !isOwnersLock(held.lockedBy, owner, ownerGaii)) continue;
+            // No catch: a failure here is storage failing, and the registration has to say so instead
+            // of reporting a cortex whose structure lock was never set.
+            await storage.setSchema({
+              keyPattern: comp.key_pattern as string,
+              applyTo,
+              schemaJson: schemaOfPart(comp) as Record<string, unknown>,
+              schemaMode: 'strict',
+              lockedBy: ownerGaii,
+              setAt: now,
+              updatedAt: now,
+            });
+            artifacts.schemaKeys.push(comp.key_pattern as string);
           } else if (compType === 'prompt' && comp.name) {
             const promptKey = `__cortex__/${registeredAs}/prompts/${comp.name}`;
             await storage.setMemory({
@@ -622,6 +627,11 @@ export async function registerComponent(
         if (reserved.length > 0) {
           return { success: false, componentId, registeredAs, error: `RESERVED_KEY: ${reservedComponentMessage(componentId, reserved)}` };
         }
+        // Nor a key the owner already has, unless this component or another install of the same
+        // package wrote it (package-component-collisions.ts). Asked before the first write.
+        const groupId = input.packageContext?.groupId;
+        const taken = await componentCollision(storage, { type, content, registeredAs, componentId, owner, ownerGaii, groupId });
+        if (taken) return { success: false, componentId, registeredAs, error: taken.error };
         if (input.dryRun) break;
         const storedKeys: string[] = [];
         for (const entry of entries) {
@@ -633,7 +643,9 @@ export async function registerComponent(
             ownerGaii,
             value: entry.value,
             visibility: (entry.visibility as 'private' | 'owner' | 'public') ?? 'private',
-            tags: entry.tags ?? ['package-installed'],
+            // The package's tag marks the record as this package's, so another install of it may
+            // rewrite it and nothing else may (package-component-collisions.ts).
+            tags: [...(entry.tags ?? ['package-installed']), ...(groupId ? [packageTag(groupId)] : [])],
             ttlHours: null,
             version: 1,
             createdAt: now,

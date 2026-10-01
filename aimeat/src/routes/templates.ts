@@ -21,6 +21,9 @@
  *   import { templatesRouter } from '../routes/templates.js';
  *   app.use(templatesRouter(config, storage));
  * @version-history
+ *   v1.6.0 — 2026-10-02 — POST /v1/templates asks packages:write, lists only the caller's own package
+ *     (an operator any), and a listing by anyone but an operator starts at pending_review. The suspend
+ *     route also reads `reason`, the field the admin page sends.
  *   v1.5.0 — 2026-09-12 — Suspending stops being one-way. GET /v1/templates takes a `status`
  *     parameter, refused with 403 for anything but `listed` unless the caller is an operator, so a
  *     suspended or rejected listing can be seen at all; and POST /v1/templates/:id/relist puts a
@@ -59,7 +62,11 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
   const router = Router();
 
   // ── POST /v1/templates — Create listing ─────────────────────────────
-  router.post('/v1/templates', requireAuth(), async (req, res) => {
+  // A listing puts a package in the gallery, so it is a package write: packages:write, the author's own
+  // package only, and a listing made by anyone but an operator waits for review, as one proposed with
+  // POST /v1/packages/:groupId/propose does. It used to need only a sign-in, list any package of anyone,
+  // and appear at once (package sale design, T8).
+  router.post('/v1/templates', requireAuth(), requireScope('packages:write'), async (req, res) => {
     const owner = req.auth!.owner;
     const roles = req.auth!.roles;
 
@@ -92,6 +99,11 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Package group not found or has no published version'));
         return;
       }
+      const isOperator = roles.includes('operator');
+      if (pkg.author !== owner && !isOperator) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the package\'s author lists it in the gallery.'));
+        return;
+      }
 
       // Check for duplicate listing
       const existing = await storage.getListingByPackage(packageGroupId);
@@ -119,7 +131,9 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
         installCount: 0,
         rating: 0,
         reviewCount: 0,
-        status: 'listed',
+        // An operator's listing is the operator's review; everyone else's waits for one.
+        status: isOperator ? 'listed' : 'pending_review',
+        ...(isOperator ? {} : { proposedAt: now, proposedBy: owner }),
         createdAt: now,
         updatedAt: now,
       };
@@ -318,13 +332,16 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
 
       const reviewedBy = await resolveGhii(storage, req.auth!.owner, config);
       const now = new Date().toISOString();
-      const { comment } = req.body ?? {};
+      // openapi.yaml names the field `reason`, and the admin page sends it; the route read only
+      // `comment`, so every suspension lost its reason. `comment` stays readable for older callers.
+      const { reason, comment } = req.body ?? {};
+      const why = typeof reason === 'string' && reason ? reason : typeof comment === 'string' && comment ? comment : undefined;
 
       const updated = await storage.updateTemplateListing(id, {
         status: 'suspended',
         reviewedBy,
         reviewedAt: now,
-        reviewComment: comment ?? undefined,
+        reviewComment: why,
         updatedAt: now,
       });
 

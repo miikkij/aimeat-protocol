@@ -10,6 +10,8 @@
  *   Mongo backend), a unique-version clash surfaces as PACKAGE_EXISTS, and archivePackageGroup flips every
  *   still-live version to archived.
  * @version-history
+ *   v1.3.0 — 2026-10-02 — countPackageGroups: the author's package groups with a version not archived,
+ *     which the per-author quota counts (it counted version rows).
  *   v1.2.0 — 2026-09-28 — An instance carries `mode` (managed | editable) and `forkedAt` (migration 0087),
  *     and `autoUpdate` (migration 0088).
  *   v1.1.0 — 2026-09-09 — listInstancesByPackage deleted: no caller (listInstances filters by package).
@@ -167,6 +169,13 @@ export const packageMethods = {
       .set({ status: 'archived', updatedAt: new Date() })
       .where('packageGroupId', '=', groupId).where('status', '!=', 'archived').executeTakeFirst();
     return Number(r.numUpdatedRows ?? 0);
+  },
+
+  async countPackageGroups(this: PostgresKyselyStorage, author: string): Promise<number> {
+    const row = await this.db.selectFrom('Package')
+      .select(sql<number>`count(distinct "packageGroupId")`.as('c'))
+      .where('author', '=', author).where('status', '!=', 'archived').executeTakeFirst();
+    return Number(row?.c ?? 0);
   },
 
   // ── Package Instance Repository ──
