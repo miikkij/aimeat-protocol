@@ -114,6 +114,16 @@ describe('member capabilities on the node roster', () => {
   });
 });
 
+describe('the roster history', () => {
+  it('reads the entries GET .../members/audit answers with', async () => {
+    routes['GET ' + BASE + '/me'] = () => ({ ok: true, data: { isOwner: true, member: null } });
+    await iam.init({ app: APP, roles: { member: ['use'] } });
+    const entries = [{ action: 'invite.sent', at: '2026-10-01T10:00:00Z' }, { action: 'invite.cancelled', at: '2026-10-01T10:05:00Z' }];
+    routes['GET ' + BASE + '/audit?limit=20'] = () => ({ ok: true, data: { entries, total: 2, nextBefore: null } });
+    expect(await iam.audit({ limit: 20 })).toEqual(entries);
+  });
+});
+
 describe('the owner panel', () => {
   function ownerWithOneRequest() {
     routes['GET ' + BASE + '/me'] = () => ({ ok: true, data: { isOwner: true, member: null } });

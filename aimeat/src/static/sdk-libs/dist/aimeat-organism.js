@@ -652,7 +652,7 @@
             ot.schemaRef = "schema:" + name + "-" + slug + "@1";
           }
           if (ot && ot.namespace && sc[ot.namespace] === void 0 && (ot.backing || "memory") === "memory" && (ot.mode || "records") === "records") {
-            sc[ot.namespace] = { type: "object", additionalProperties: true };
+            sc[ot.namespace] = { type: "object", patternProperties: { "^.*$": {} } };
           }
         }
       }

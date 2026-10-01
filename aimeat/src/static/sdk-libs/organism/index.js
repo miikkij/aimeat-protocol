@@ -13,6 +13,9 @@
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-organism.js"></script>
  *   const ws = await AIMEAT.organism.read(orgId, wsId); ws.spaces[0].items[0].value
  * @version-history
+ *   v1.4.1 — 2026-10-01 — The schema createWorkspace fills for a records space admits every field:
+ *     `patternProperties: { '^.*$': {} }` instead of `additionalProperties: true`, which the
+ *     workspace's strict lock closed to every property. A space created before keeps its old lock.
  *   v1.4.0 — 2026-10-01 — Workspace members (access, members, requests, grant, revoke, decide,
  *     inviteByEmail) from members.js, and the first run (organisms, findOrCreateWorkspace, remember,
  *     recall) from first-run.js, over the existing workspace-access, invitation, workspace and memory
@@ -264,7 +267,11 @@ var organism = {
         // 'records', so a row space landed in here whether or not its mode was ever set.
         if (ot && ot.namespace && sc[ot.namespace] === undefined
             && (ot.backing || 'memory') === 'memory' && (ot.mode || 'records') === 'records') {
-          sc[ot.namespace] = { type: 'object', additionalProperties: true };
+          // A workspace locks every schema strict, and strict closes an object to every property
+          // it does not list, so `additionalProperties: true` admitted nothing at all: every record
+          // and every intake form into the space was refused. A pattern that matches every name is
+          // what strict leaves open.
+          sc[ot.namespace] = { type: 'object', patternProperties: { '^.*$': {} } };
         }
       }
     }
