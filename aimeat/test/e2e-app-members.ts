@@ -1805,6 +1805,67 @@ await test('the app\'s own token sets the plan but cannot add an offering; anoth
     assert(plan.body.data.plan.seats.member === 50 && (plan.body.data.plan.roles.member ?? []).length === 0, 'and the refused writes changed nothing');
 });
 
+// ── 2026-10-01: the invitation carries a sign-up link. It opens the invitation page with the address
+// filled in; the account it creates starts with that address confirmed and is a member at once. The
+// link lives 7 days, is used once, dies with a cancel, and a new invitation replaces it. ─────────────
+
+/** The token out of an accept address `<base>/v1/invite?token=<raw>`. */
+const tokenOf = (url: string) => new URL(url).searchParams.get('token') ?? '';
+
+await test('A2 link: an invitation answers a sign-up link when no email left, valid 7 days, describing the app', async () => {
+    const email = `r2link.${Date.now()}@example.com`;
+    const inv = await json(r2(), { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ email, role: 'writer' }) });
+    assert(inv.status === 201 && inv.body.data.invited === true, `invite ${inv.status}: ${JSON.stringify(inv.body?.error)}`);
+    assert(inv.body.data.emailSent === false, 'this node sends no mail in E2E');
+    const url = inv.body.data.acceptUrl as string;
+    assert(typeof url === 'string' && url.includes('/v1/invite?token='), `the link to pass on: ${url}`);
+    const days = (Date.parse(inv.body.data.invite.expiresAt) - Date.now()) / 86_400_000;
+    assert(days > 6.9 && days <= 7.01, `valid 7 days: ${days}`);
+    const card = await json(`/v1/invitations/${tokenOf(url)}`);
+    assert(card.status === 200 && card.body.data.invitation.kind === 'app', `the link describes an app invitation: ${card.status} ${JSON.stringify(card.body?.error ?? card.body.data)}`);
+    assert(card.body.data.invitation.email === email && card.body.data.invitation.app?.name === 'roster-r2' && card.body.data.invitation.app?.role === 'writer',
+        `the address, the app and the role: ${JSON.stringify(card.body.data.invitation)}`);
+});
+
+await test('A2 link: opening it makes the account with the address confirmed, a member at once, and back in the app; used once', async () => {
+    const email = `r2acc.${Date.now()}@example.com`;
+    const inv = await json(r2(), { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ email, role: 'writer' }) });
+    const token = tokenOf(inv.body.data.acceptUrl);
+    const name = `amr2lnk${Date.now().toString(36)}`;
+    const ok = await json(`/v1/invitations/${token}/accept`, { method: 'POST', body: JSON.stringify({ username: name, password: 'Sup3r-Secret-Pw!42' }) });
+    assert(ok.status === 200 && ok.body.data.status === 'joined_app' && ok.body.data.created_account === true, `accept ${ok.status}: ${JSON.stringify(ok.body?.error ?? ok.body.data)}`);
+    assert(String(ok.body.data.redirect).includes('roster-r2'), `back to the app: ${ok.body.data.redirect}`);
+    assert(typeof ok.body.data.token === 'string', 'signed in');
+    const roster = await json(r2(), { headers: auth(owner.token) });
+    const row = (roster.body.data.members as any[]).find(m => m.owner === name);
+    assert(row?.role === 'writer', `a writer at once: ${JSON.stringify(row)}`);
+    assert(!(roster.body.data.invites as any[]).some(i => i.id === inv.body.data.invite.id), 'and the invitation is used up');
+    const me = await json('/v1/ghii/me', { headers: auth(ok.body.data.token) });
+    assert(me.status === 200 && !!me.body.data.email_verified_at && me.body.data.notification_email === email, `the address is confirmed: ${me.status} ${JSON.stringify(me.body?.data ?? me.body?.error).slice(0, 300)}`);
+    const twice = await json(`/v1/invitations/${token}/accept`, { method: 'POST', body: JSON.stringify({ username: `${name}b`, password: 'Sup3r-Secret-Pw!42' }) });
+    assert(twice.status === 410 && twice.body.error.code === 'INVITE_USED', `a second use: ${twice.status} ${JSON.stringify(twice.body?.error)}`);
+});
+
+await test('A2 link: a cancel kills the link, a new invitation to the same address replaces it, a different account is refused', async () => {
+    const email = `r2re.${Date.now()}@example.com`;
+    const first = await json(r2(), { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ email, role: 'member' }) });
+    const old = tokenOf(first.body.data.acceptUrl);
+    const again = await json(r2(), { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ email, role: 'member' }) });
+    assert(again.status === 201 && again.body.data.invite.id === first.body.data.invite.id, `renewed, same invitation: ${JSON.stringify(again.body.data.invite)}`);
+    const fresh = tokenOf(again.body.data.acceptUrl);
+    assert(fresh && fresh !== old, 'a new link');
+    const dead = await json(`/v1/invitations/${old}`);
+    assert(dead.status === 404, `the old link: ${dead.status}`);
+    const wrong = await json(`/v1/invitations/${fresh}/accept`, { method: 'POST', headers: auth(stranger.token) });
+    assert(wrong.status === 403 && wrong.body.error.code === 'EMAIL_MISMATCH', `another account took it: ${wrong.status} ${JSON.stringify(wrong.body?.error)}`);
+    const cancel = await json(`${r2()}/invites/${again.body.data.invite.id}`, { method: 'DELETE', headers: auth(owner.token) });
+    assert(cancel.status === 200, `cancel ${cancel.status}`);
+    const gone = await json(`/v1/invitations/${fresh}`);
+    assert(gone.status === 404, `the cancelled link: ${gone.status}`);
+    const take = await json(`/v1/invitations/${fresh}/accept`, { method: 'POST', body: JSON.stringify({ username: `amr2c${Date.now().toString(36)}`, password: 'Sup3r-Secret-Pw!42' }) });
+    assert(take.status === 404, `the cancelled link made an account: ${take.status} ${JSON.stringify(take.body?.error ?? take.body.data)}`);
+});
+
 console.log(`\napp member roster E2E: ${passed} passed, ${failed} failed (${passed + failed} total)\n`);
 if (failed > 0) process.exit(1);
 

@@ -18,6 +18,8 @@
  *   sendMemberNotice · appMemberInviteEmail
  * @usage await sendMemberNotice(storage, 'bob@node', 'approved', { app: 'club', by: 'alice', role: 'member' }, { link });
  * @version-history
+ *   v1.1.0 — 2026-10-01 — The invitation email's button accepts the invitation through its sign-up
+ *     link, and the text says what happens there (en, fi, es).
  *   v1.0.0 — 2026-10-01 — Initial (IAM round 2, B4): the roster's notifications in en, fi and es,
  *     and the app invitation email (A2).
  */
@@ -129,13 +131,15 @@ export async function sendMemberNotice(
   }
 }
 
-const INVITE_EMAIL: Record<NoticeLang, Record<'subject' | 'heading' | 'sentence' | 'howTo' | 'button' | 'expiry' | 'ignore', string>> = {
+const INVITE_EMAIL: Record<NoticeLang, Record<'subject' | 'heading' | 'sentence' | 'howTo' | 'howToLink' | 'button' | 'buttonAccept' | 'expiry' | 'ignore', string>> = {
   en: {
     subject: '{inviter} invites you to {app}',
     heading: 'You are invited',
     sentence: '{inviter} invites you to use {app} as {role}.',
     howTo: 'Create an account with this email address, or add the address to your account and confirm it. Then you are a member of {app} right away.',
+    howToLink: 'Open the invitation and choose a username and a password. Your account uses this email address, and you are a member of {app} at once. If you already have an account with this address, sign in first and then open the invitation.',
     button: 'Open the app',
+    buttonAccept: 'Accept the invitation',
     expiry: 'The invitation is valid until {date}.',
     ignore: 'If you did not expect this email, you can ignore it.',
   },
@@ -144,7 +148,9 @@ const INVITE_EMAIL: Record<NoticeLang, Record<'subject' | 'heading' | 'sentence'
     heading: 'Sinut on kutsuttu',
     sentence: '{inviter} kutsuu sinut käyttämään sovellusta {app} roolissa {role}.',
     howTo: 'Luo tili tällä sähköpostiosoitteella tai lisää osoite tiliisi ja vahvista se. Sen jälkeen olet heti sovelluksen {app} jäsen.',
+    howToLink: 'Avaa kutsu ja valitse käyttäjänimi ja salasana. Tilisi käyttää tätä sähköpostiosoitetta, ja olet heti sovelluksen {app} jäsen. Jos sinulla on jo tili tällä osoitteella, kirjaudu ensin sisään ja avaa sitten kutsu.',
     button: 'Avaa sovellus',
+    buttonAccept: 'Hyväksy kutsu',
     expiry: 'Kutsu on voimassa {date} asti.',
     ignore: 'Jos et odottanut tätä viestiä, voit jättää sen huomiotta.',
   },
@@ -153,7 +159,9 @@ const INVITE_EMAIL: Record<NoticeLang, Record<'subject' | 'heading' | 'sentence'
     heading: 'Tienes una invitación',
     sentence: '{inviter} te invita a usar {app} con el rol {role}.',
     howTo: 'Crea una cuenta con esta dirección de correo, o agrega la dirección a tu cuenta y confírmala. Así serás miembro de {app} de inmediato.',
+    howToLink: 'Abre la invitación y elige un nombre de usuario y una contraseña. Tu cuenta usa esta dirección de correo y quedas como miembro de {app} de inmediato. Si ya tienes una cuenta con esta dirección, inicia sesión primero y luego abre la invitación.',
     button: 'Abrir la aplicación',
+    buttonAccept: 'Aceptar la invitación',
     expiry: 'La invitación es válida hasta el {date}.',
     ignore: 'Si no esperabas este correo, puedes ignorarlo.',
   },
@@ -161,30 +169,34 @@ const INVITE_EMAIL: Record<NoticeLang, Record<'subject' | 'heading' | 'sentence'
 
 /**
  * The email that invites an address with no account here to an app. Says who invites, to which app
- * and as what, how the invitation is taken up (an account with this address, confirmed), and links
- * to the app. `date` is the expiry as the reader should see it.
+ * and as what, and how the invitation is taken up. With `acceptUrl` (the sign-up link,
+ * services/app-invite-link.ts) the button accepts the invitation; without it the button opens the
+ * app and the text asks for an account with this address, confirmed. `date` is the expiry as the
+ * reader should see it.
  */
 export function appMemberInviteEmail(
-  lang: NoticeLang, args: { inviter: string; app: string; role: string; appUrl: string; date: string },
+  lang: NoticeLang, args: { inviter: string; app: string; role: string; appUrl: string; acceptUrl?: string | null; date: string },
 ): { subject: string; html: string; text: string } {
   const s = INVITE_EMAIL[lang];
   const plain = { inviter: args.inviter, app: args.app, role: args.role, date: args.date };
   const safe = { inviter: `<strong>${esc(args.inviter)}</strong>`, app: esc(args.app), role: esc(args.role), date: esc(args.date) };
+  const link = args.acceptUrl || args.appUrl;
+  const howTo = args.acceptUrl ? s.howToLink : s.howTo;
   const html = wrapHtml(s.heading, `
     <p>${fill(s.sentence, safe)}</p>
-    <p>${fill(s.howTo, safe)}</p>
+    <p>${fill(howTo, safe)}</p>
     <p style="text-align: center;">
-      <a href="${esc(args.appUrl)}" class="btn">${s.button}</a>
+      <a href="${esc(link)}" class="btn">${args.acceptUrl ? s.buttonAccept : s.button}</a>
     </p>
-    <p class="url-fallback">${esc(args.appUrl)}</p>
+    <p class="url-fallback">${esc(link)}</p>
     <p style="font-size: 13px; color: #999;">${fill(s.expiry, safe)}</p>
     <p style="color: #999; font-size: 13px;">${s.ignore}</p>
   `, lang);
   const text = [
     s.heading, '',
     fill(s.sentence, plain), '',
-    fill(s.howTo, plain), '',
-    args.appUrl, '',
+    fill(howTo, plain), '',
+    link, '',
     fill(s.expiry, plain), '',
     s.ignore,
   ].join('\n');

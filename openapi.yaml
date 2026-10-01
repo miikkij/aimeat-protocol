@@ -29444,13 +29444,17 @@ paths:
         BY EMAIL. `email` is looked up by exact match through the same lookup and per-account limit
         as `POST /v1/contacts/resolve` (429 RATE_LIMITED with `retry_after_sec` past it). An address
         of a VERIFIED account here approves that account and the answer adds
-        `found: { account, displayName }`. Any other address stores an INVITATION, valid 30 days,
-        and emails it (in `locale`, else the inviter's own language); the answer is 201
-        `{ invited: true, invite, emailSent }`. When a person verifies that address (signing up,
-        confirming it on their account, or an account created with it already proven), every open
-        invitation for it becomes a membership in the invited role, and they are notified as on
-        approval. An app holds at most 200 open invitations (429 TOO_MANY_INVITES); inviting the
-        same address again renews its invitation.
+        `found: { account, displayName }`. Any other address stores an INVITATION, valid 7 days,
+        and emails it (in `locale`, else the inviter's own language) with a single-use sign-up link
+        (`/v1/invite?token=…`, see GET /v1/invitations/{token}, kind `app`): it opens the invitation
+        page with the address filled in, and the account made there starts with the address
+        confirmed and is a member at once. The answer is 201 `{ invited: true, invite, emailSent }`,
+        plus `acceptUrl` only when no email left, so the inviter can pass the link on. When a person
+        verifies that address another way (signing up, confirming it on their account, or an account
+        created with it already proven), every open invitation for it becomes a membership in the
+        invited role, and they are notified as on approval. An app holds at most 200 open
+        invitations (429 TOO_MANY_INVITES); inviting the same address again renews its invitation
+        and replaces its link, and cancelling it stops the link.
 
 
         MANAGERS. A member whose role the carry plan lists in `manageRoles` may call this too, but
@@ -43574,7 +43578,9 @@ paths:
         `organism` (the inviter's organism summary, org role, workspace grants with names) and
         `node` (the agent door — `organism` is null, `workspaces` empty, and `requested_by` carries
         what the AI claimed about itself alongside what the server observed, so the recipient of an
-        unrequested message can judge and trace it).
+        unrequested message can judge and trace it), and `app` (the sign-up link of an app member
+        invitation — `app` is { id, name, role }; it answers 404 once the app invitation behind it was
+        cancelled, used or has lapsed).
 
         Either way it returns the invited email and whether that address already maps to a
         registered account. Returns 410 when the invitation is expired/used.
@@ -43603,6 +43609,11 @@ paths:
         workspace grants, marks the invitation accepted (single-use), and establishes a login session
         (refresh cookie). The success response `redirect` is the inviter's allowlisted return target
         (an app the invitee lands in signed-in) when one was pinned, else the profile organisms view.
+        An `app` invitation makes the person a member of the app in the invited role instead and
+        answers status `joined_app` with `app_id` and the app as `redirect`; when the app has no free
+        place it answers `app_waiting` with a `reason`, the account stays signed in and the link stays
+        usable. An `app` link whose app invitation is no longer open answers 404 before any account
+        is made.
       tags: [Organisms]
       security: []
       parameters:

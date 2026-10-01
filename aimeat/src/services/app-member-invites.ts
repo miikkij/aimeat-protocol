@@ -16,13 +16,19 @@
  *   (`emailShown`) for the owner's and the managers' list, and is never shown to anybody else.
  *
  *   COST. Applying invitations reads the namespace once per verified address. The namespace holds
- *   at most MAX_OPEN_INVITES_PER_APP open invitations per app, each lives 30 days, and an expired
+ *   at most MAX_OPEN_INVITES_PER_APP open invitations per app, each lives 7 days, and an expired
  *   one met on that read is deleted, so the read does not grow with the age of the node.
+ *
+ *   THE LINK. Each invitation also holds a sign-up link (services/app-invite-link.ts): the email
+ *   opens the invitation page with the address filled in, and the account made there is a member at
+ *   once. Sending again replaces the link; cancelling stops it.
  * @structure NS_INVITE · inviteKey · AppMemberInvite · INVITE_DAYS · MAX_OPEN_INVITES_PER_APP ·
  *   listInvites · findInvite · putInvite · removeInvite · sendAppInvite · inviteView ·
  *   applyAppInvitesForVerifiedEmail
  * @usage await applyAppInvitesForVerifiedEmail(storage, config.nodeId, emailHash, ghii);
  * @version-history
+ *   v1.1.0 — 2026-10-01 — The invitation carries a sign-up link and lives 7 days (was 30); a cancel
+ *     stops the link too. sendAppInvite takes the config and answers the link.
  *   v1.0.0 — 2026-10-01 — Initial (IAM round 2, A2).
  */
 import { randomUUID } from 'node:crypto';
@@ -33,6 +39,8 @@ import { approveMember, appStem } from './app-member-approve.js';
 import { appMemberInviteEmail, type NoticeLang } from './app-member-notices.js';
 import { inviteEmailHash } from './invitations.js';
 import { getActiveEmailService } from './email.js';
+import { mintAppInviteLink, cancelAppInviteLinks } from './app-invite-link.js';
+import type { AimeatConfig } from '../config.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
 import { localAccountName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
@@ -40,8 +48,9 @@ import { logger } from '../utils/logger.js';
 /** Platform-owned and private, like the roster. Never an `ext:` namespace. */
 export const NS_INVITE = 'app-member-invite';
 export const INVITE_PREFIX = 'appmeminv.';
-/** How long an invitation stays open. */
-export const INVITE_DAYS = 30;
+/** How long an invitation and its sign-up link stay open. The developer's choice of 2026-10-01: a
+ *  week is enough, and an inviter whose invitation lapsed sends it again. */
+export const INVITE_DAYS = 7;
 /** How many open invitations one app may hold, so the roster cannot be used to mail a list. */
 export const MAX_OPEN_INVITES_PER_APP = 200;
 
@@ -111,6 +120,8 @@ export async function putInvite(
 export async function removeInvite(storage: Storage, appId: string, emailHash: string): Promise<void> {
   await readAppRecord(storage, NS_INVITE, inviteKey(appId, emailHash), appId);
   await storage.deleteMemory(NS_INVITE, inviteKey(appId, emailHash));
+  // The emailed sign-up link stops with the invitation.
+  await cancelAppInviteLinks(storage, appId, emailHash);
 }
 
 /**
@@ -125,20 +136,32 @@ export async function removeInvite(storage: Storage, appId: string, emailHash: s
  */
 export async function sendAppInvite(
   storage: Storage,
+  config: AimeatConfig,
   input: {
     appId: string; filename: string; email: string; role: string; note?: string; invitedBy: string;
     inviterName: string; appUrl: string; lang: NoticeLang;
   },
-): Promise<{ invite: AppMemberInvite; emailSent: boolean }> {
+): Promise<{ invite: AppMemberInvite; emailSent: boolean; acceptUrl: string | null }> {
   const invite = await putInvite(storage, {
     appId: input.appId, emailHash: inviteEmailHash(input.email), emailShown: input.email,
     role: input.role, note: input.note, invitedBy: input.invitedBy,
   });
+  // The sign-up link (services/app-invite-link.ts). Without it the email still links to the app and
+  // the invitation still applies on a confirmed address, as before the link existed.
+  let acceptUrl: string | null = null;
+  try {
+    acceptUrl = await mintAppInviteLink(storage, config, {
+      appId: input.appId, appInviteId: invite.id, app: appStem(input.filename), email: input.email,
+      role: input.role, note: input.note, invitedBy: input.invitedBy, appUrl: input.appUrl, expiresAt: invite.expiresAt,
+    });
+  } catch (err) {
+    logger.warn('app-member-invites: the sign-up link was not made, the email links to the app', { error: String(err) });
+  }
   let emailSent = false;
   const mail = getActiveEmailService();
   if (mail?.enabled) {
     const { subject, html, text } = appMemberInviteEmail(input.lang, {
-      inviter: input.inviterName, app: appStem(input.filename), role: input.role, appUrl: input.appUrl,
+      inviter: input.inviterName, app: appStem(input.filename), role: input.role, appUrl: input.appUrl, acceptUrl,
       // An ISO date: the address has no account here, so nothing says how its reader writes dates.
       date: invite.expiresAt.slice(0, 10),
     });
@@ -148,7 +171,7 @@ export async function sendAppInvite(
       logger.warn('app-member-invites: the invitation email failed, the invitation stands', { error: String(err) });
     }
   }
-  return { invite, emailSent };
+  return { invite, emailSent, acceptUrl };
 }
 
 /** The invitation as the owner's and the managers' list shows it: without the address hash. */

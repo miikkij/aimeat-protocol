@@ -23,6 +23,8 @@
  *   v1.2.0 — 2026-07-07 — Add getCodeInvitationByProvisionedOwner (first-login credential issuance, TARGET-011).
  *   v1.3.0 — 2026-07-18 — Add returnUrl: an allowlisted app/node URL the inviter can pin so a link
  *     invitee lands back in the inviting app (e.g. the Experience Center) already signed in after accept.
+ *   v1.4.0 — 2026-10-01 — type 'app': the sign-up link of an app invitation. The column is plain
+ *     text on both backends, so no migration.
  */
 
 /** One selected workspace + the role the invitee should receive there. */
@@ -46,9 +48,10 @@ export interface InvitationRecord {
   /**
    * 'link' = magic-link self-register (default); 'code' = account provisioned at mint, code is its
    * password; 'registration' = the agent door (12-ai-rekisteroi.md) — no organism, no inviter, and
-   * the "inviter" is an AI that supplied only an email address.
+   * the "inviter" is an AI that supplied only an email address; 'app' = the sign-up link of an app
+   * invitation (services/app-invite-link.ts), no organism, the app named in `meta`.
    */
-  type: 'link' | 'code' | 'registration';
+  type: 'link' | 'code' | 'registration' | 'app';
   workspaces: InvitationWorkspaceGrant[]; // per-workspace roles to grant on accept
   email: string; // invited address (plaintext — shown to inviter, pre-filled + locked on accept)
   emailHash: string; // SHA-256 of the lowercased email — existing-user detection + lookup

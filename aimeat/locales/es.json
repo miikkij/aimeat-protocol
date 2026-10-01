@@ -11437,6 +11437,7 @@
   "invite.acceptCta": "Aceptar y unirme",
   "invite.acceptFailed": "No se pudo aceptar la invitación.",
   "invite.acceptTitle": "Tienes una invitación",
+  "invite.appWaiting": "Tu cuenta está lista, pero la aplicación no tiene lugar libre para un miembro en este momento. La invitación sigue abierta: más tarde vuelve a presionar Aceptar y unirme.",
   "invite.asRole": "como",
   "invite.badge": "Invitación",
   "invite.continueWith": "Continuar con {label}",

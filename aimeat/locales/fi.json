@@ -13136,6 +13136,7 @@
   "invite.acceptCta": "Hyväksy ja liity",
   "invite.acceptFailed": "Kutsua ei voitu hyväksyä.",
   "invite.acceptTitle": "Sinut on kutsuttu",
+  "invite.appWaiting": "Tilisi on valmis, mutta sovelluksessa ei juuri nyt ole vapaata paikkaa jäsenelle. Kutsu pysyy voimassa: paina myöhemmin uudelleen Hyväksy ja liity.",
   "invite.asRole": "roolilla",
   "invite.badge": "Kutsu",
   "invite.continueWith": "Jatka palvelulla {label}",
