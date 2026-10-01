@@ -1,6 +1,12 @@
 {
   "about": "Every file under src/ that calls a storage method loading content (memory, files, workspace rows), how many calls of each, and why. The reads either pass the classification reader (services/classification/, TARGET-082) or are the node's own. pnpm check:classification-reach fails on a new file, a count that grew, and a line that is stale; --shrink lowers the counts that fell. Reasoning: aimeat/scripts/check-classification-reach.ts.",
   "files": {
+    "src/commerce/agent-purchase-limit.ts": {
+      "reads": {
+        "getMemory": 3
+      },
+      "why": "Reviewed 2026-10-02, the node's own read: the owner's purchase-limit settings (commerce.agent-limits) and today's spending counter (commerce.agent-spend), read to allow or refuse an agent's checkout. No content is shown to anyone."
+    },
     "src/commerce/app-tool-catalog.ts": {
       "reads": {
         "listAllMemory": 1
@@ -32,12 +38,6 @@
         "listAllMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's revenue-split configuration (bensplit.*)."
-    },
-    "src/commerce/agent-purchase-limit.ts": {
-      "reads": {
-        "getMemory": 3
-      },
-      "why": "Reviewed 2026-10-02, the node's own read: the owner's purchase-limit settings (commerce.agent-limits) and today's spending counter (commerce.agent-spend), read to allow or refuse an agent's checkout. No content is shown to anyone."
     },
     "src/commerce/hold-book.ts": {
       "reads": {
@@ -87,7 +87,7 @@
     "src/mcp/commerce.ts": {
       "reads": {
         "listMemory": 1,
-        "getMemory": 5
+        "getMemory": 4
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Payment settings (the secret is never returned), a manifest read-to-update, app-id key names, and a tool manifest returned only when it is the caller's own or public."
     },
@@ -828,19 +828,19 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Public offer declarations and the deploy state record."
     },
-    "src/services/app-audit.ts": {
-      "reads": {
-        "getMemory": 4,
-        "listMemory": 1
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The app audit-trail record. 2026-10-01: the archive-before and keep paths read the same record, and the owner-wide limit lists the owner's own audit.apps.* records to apply it; all of them are the node's system records under the reserved audit. prefix, never content."
-    },
     "src/services/app-audit-archive.ts": {
       "reads": {
         "getMemory": 2,
         "listMemory": 1
       },
       "why": "Reviewed 2026-10-01, the node's own read: the owner's audit.settings record and the yearly archive records of an app's audit trail (audit.apps.<file>.archive.<year>), the node's system records under the reserved audit. prefix, never content."
+    },
+    "src/services/app-audit.ts": {
+      "reads": {
+        "getMemory": 4,
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The app audit-trail record. 2026-10-01: the archive-before and keep paths read the same record, and the owner-wide limit lists the owner's own audit.apps.* records to apply it; all of them are the node's system records under the reserved audit. prefix, never content."
     },
     "src/services/app-config.ts": {
       "reads": {
@@ -1438,13 +1438,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Onboarding markers and existence checks."
     },
-    "src/services/journey-state.ts": {
-      "reads": {
-        "getMemory": 1,
-        "getOwnerScopeMemory": 2
-      },
-      "why": "Reviewed 2026-10-01, the node's own read: the first-MCP-call marker and the first note are existence checks, and journey.state is the owner's own path record shown back to the same owner and their own AI; no content goes to a model or another principal."
-    },
     "src/services/hook-log.ts": {
       "reads": {
         "getMemory": 1
@@ -1493,6 +1486,13 @@
         "listAllMemory": 3
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The workspace registry index and access-request records, read to update."
+    },
+    "src/services/journey-state.ts": {
+      "reads": {
+        "getMemory": 1,
+        "getOwnerScopeMemory": 2
+      },
+      "why": "Reviewed 2026-10-01, the node's own read: the first-MCP-call marker and the first note are existence checks, and journey.state is the owner's own path record shown back to the same owner and their own AI; no content goes to a model or another principal."
     },
     "src/services/knowledge-overview.ts": {
       "reads": {
@@ -1734,8 +1734,8 @@
     },
     "src/services/package-skill-component.ts": {
       "reads": {
-        "getMemory": 6,
-        "listMemory": 1
+        "listMemory": 1,
+        "getMemory": 6
       },
       "why": "Reviewed 2026-09-30, the node's own read: compose copies the composer's OWN skills bound to their own app into their own package, by their own act, as it copies the app's bytes and the cortex's libs; install, update and uninstall read the installer's own skill manifest to decide overwrite or delete, and hash its files. Nothing goes into a model prompt unless through fetchComponentContentForAi (component-content.ts), which asks useForAi for skillFileTargets first."
     },
