@@ -237,6 +237,37 @@ describe('members, the browser round', () => {
     document.body.removeChild(host);
   });
 
+  it('names a person once when the name is the account, and shows the address the owner holds under the name', async () => {
+    state.members = [
+      { owner: 'second', displayName: 'second', role: 'member' },
+      { owner: 'jouni', displayName: 'Jouni Miikki', email: 'jouni.miikki@aimeat.io', role: 'member' },
+    ];
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    kit.members({ target: host, app: 'me/club.html' });
+    await settle();
+    tab(host, 'Members').dispatchEvent({ type: 'click', bubbles: true });
+    await settle();
+    const people = part(part(host, 'roster')[0], 'who');
+    const lines = (p: any) => all(p).filter((n) => n.classList && (n.classList.contains('ak-mem__name') || n.classList.contains('ak-mem__account'))).map((n) => String(n.textContent));
+    expect(lines(people[0])).toEqual(['second']);
+    expect(lines(people[1])).toEqual(['Jouni Miikki', 'jouni.miikki@aimeat.io']);
+    document.body.removeChild(host);
+  });
+
+  it('says an address was not recorded when an old history line has none', async () => {
+    (window as any).AIMEAT.iam.audit = async () => [{ at: '2026-10-01T10:00:00Z', by: 'sandbox', action: 'invite.sent', account: null, to: 'member' }];
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    kit.members({ target: host, app: 'me/club.html' });
+    await settle();
+    tab(host, 'History').dispatchEvent({ type: 'click', bubbles: true });
+    await settle();
+    expect(host.textContent).toContain('sandbox invited (address not recorded) as member');
+    expect(host.textContent).not.toContain('{who}');
+    document.body.removeChild(host);
+  });
+
   it('drops a refusal when another tab is opened, and the table cell carries the date alone', async () => {
     (window as any).AIMEAT.iam.admin = async (op: string) => (op === 'state' ? state : { ok: false, error: { message: 'Scope "exchange:grant" required.' } });
     const host = document.createElement('div');

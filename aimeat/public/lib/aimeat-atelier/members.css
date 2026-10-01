@@ -112,6 +112,8 @@
 
 /* ── Adding somebody, with suggestions from the address book ──────────────────────────────── */
 .ak-mem__add, .ak-mem__ask { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }
+/* The help line under the add row stands apart from the field it explains. */
+.ak-mem__add + .ak-mem__hint { margin-top: 10px; }
 .ak-mem__field { position: relative; flex: 1 1 14rem; min-width: 0; }
 .ak-mem__name.ak-input, .ak-mem__field .ak-input { width: 100%; }
 .ak-mem__suggest {
