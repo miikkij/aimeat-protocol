@@ -30,6 +30,8 @@
  * @usage routed at /v1/fleet by spa.html and routes/portal.ts, and embedded as the "Your agents"
  *   section of Settings & Controls via views/profile/fleet-tab.js, which passes `embedded`.
  * @version-history
+ *   v2.1.0 -- 2026-10-01 -- What the agents did in the last 7 days comes before their sign-in health
+ *     (fleet-week.js, guided journey P4).
  *   v2.0.0 -- 2026-09-27 -- Drawn from library components and writing no class (page group G9): the
  *     standalone page is the PageFrame with its PageIntro; the move box the Attention note (its ready
  *     or blocked line Tinted green or coral, its press the Loud control); the count, the attention
@@ -91,6 +93,7 @@ import { Tab } from '/components/Tabs.js';
 import { Row as Line, Stack, Space } from '/components/Layout.js';
 import { List, Row, Name, Doors, Group } from '/components/List.js';
 import { swallowed } from '/js/swallowed.js';
+import { WeekBlock } from './fleet-week.js';
 
 /** The states that mean a person has something to do. The heading counts these. */
 const NEEDS_ATTENTION = new Set(['dead', 'expiring', 'never', 'unreadable']);
@@ -446,6 +449,8 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
                   whole diagnosis, in one line. */''}
             <${MigrateBanner} migration=${migration} migrating=${migrating} outcome=${outcome} onPress=${() => migrate()} />
           `}
+          ${/* What the agents did this week, before their sign-in health: the work is why they exist. */''}
+          <${Space} below="large"><${WeekBlock} agents=${agents} /><//>
           ${starter}
           ${!(migration && (migration.would_move ?? []).length > 0) && outcome && html`
             <${Space} below="large"><${Note} kind="message" error=${!outcome.ok}>${outcome.text}<//><//>

@@ -6,6 +6,7 @@
  *   openclaw, package-builder) and prompt packages. Each tier provides progressively
  *   more context to AI agents based on their authentication level.
  * @version-history
+ *   v1.12.0 -- 2026-10-01 -- Mounts the feature map in parts (prompts-features.ts).
  *   v1.11.0 -- 2026-09-18 -- Mounts the layered build specification (prompts-build-app-layers.ts).
  *     GET /v1/ai-tools carries `model_recommendation` (services/model-recommendation.ts).
  *   v1.0.0 -- 2026-03-01 -- Initial tiered prompts (0, 1, 2, anonymous)
@@ -50,6 +51,7 @@ import { HELLO_MCP_KEY, buildHelloMcpPrompt, buildOrganismSetupPrompt } from '..
 import { registerIntentPoolPrompt } from './prompts-intent-pool.js';
 import { registerOpenItemsPrompt } from './prompts-open-items.js';
 import { registerAtelierPrompt } from './prompts-atelier.js';
+import { registerFeaturesPrompt } from './prompts-features.js';
 import { registerHelloIntegrationPrompt } from './prompts-hello-integration.js';
 import { registerBuildAppLayerPrompts } from './prompts-build-app-layers.js';
 import { buildAgentConnectPrompt, buildAgentConnectSteps } from '../services/agent-connect-prompt.js';
@@ -299,6 +301,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
   // The Atelier track's build spec (TARGET-074) — its own module and route so the two tracks'
   // guides never mix. MUST be registered before /v1/prompts/:tier.
   registerAtelierPrompt(router, config, storage);
+  registerFeaturesPrompt(router, config);
 
   router.get('/v1/prompts/build-extension', (req, res) => {
     const lang = typeof req.query.lang === 'string' ? req.query.lang : 'en';

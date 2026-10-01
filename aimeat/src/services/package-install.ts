@@ -20,6 +20,9 @@
  *   import { installPackage } from '../services/package-install.js';
  *   const out = await installPackage({ storage, config, scheduler }, caller, { groupId });
  * @version-history
+ *   v1.8.0 — 2026-10-01 — After an install, the agents the package's apps bring are proposed to the
+ *     owner (services/app-agent-propose.ts) and named in `agentsProposed`; approving one creates it
+ *     with its definition. They used to wait for a crew-forge runner new accounts no longer have.
  *   v1.7.0 — 2026-09-30 — A `skill` component keeps its own name and binds to the name this install
  *     gives its app (package-skill-component.ts). One the owner already has of their own is left out
  *     and named in `warnings`, on the result and the dry run. The instance id is chosen before
@@ -66,6 +69,8 @@ import { planPackageConfig, missingConfigMessage, configPreview } from './packag
 import { expectsOf, missingExpects, expectsMissingMessage, type PackageExpects } from './package-expects.js';
 import { emitChange } from './event-bus.js';
 import { skillComponentName } from './package-skill-component.js';
+import { proposeBundledAgentsOfApps, type BundledAgentProposal } from './app-agent-propose.js';
+import type { AppRecord } from '../storage/types/apps.js';
 import type { Scheduler } from './scheduler.js';
 import { logger } from '../utils/logger.js';
 
@@ -143,7 +148,7 @@ export interface PackageInstallRefusal {
 
 export type PackageInstallResult =
     | { ok: true; kind: 'dry-run'; preview: PackageInstallPreview }
-    | { ok: true; kind: 'installed'; instance: PackageInstanceRecord; warnings: string[] }
+    | { ok: true; kind: 'installed'; instance: PackageInstanceRecord; warnings: string[]; agentsProposed: BundledAgentProposal[] }
     | PackageInstallRefusal;
 
 /**
@@ -511,7 +516,20 @@ export async function installPackage(
 
         emitChange('instances');
         if (registeredComponents.some(r => r.type === 'skill')) emitChange('skills');
-        return { ok: true, kind: 'installed', instance: created, warnings };
+
+        // The agents the apps bring reach the owner as proposals on their open items: approving one
+        // creates the agent with its definition, and nothing runs before that (app-agent-propose.ts).
+        // The install has succeeded either way, so a proposal that cannot be made is a warning.
+        const agentsProposed: BundledAgentProposal[] = [];
+        const apps = (await Promise.all(registeredComponents.filter(r => r.type === 'app')
+            .map(r => storage.getAppByOwnerName(owner, r.registeredAs)))).filter((a): a is AppRecord => !!a);
+        if (apps.some(a => (a.manifest?.cortex?.agents ?? []).length)) {
+            const { proposed, skipped } = await proposeBundledAgentsOfApps({ storage, config },
+                { sub: caller.sub, owner, roles: caller.roles, scopes: caller.scopes }, apps);
+            agentsProposed.push(...proposed);
+            for (const s of skipped) warnings.push(`An agent of the package was not proposed: ${s}`);
+        }
+        return { ok: true, kind: 'installed', instance: created, warnings, agentsProposed };
     } catch (e) {
         // Instance record creation failed — rollback all registered components
         for (const reg of [...registeredComponents].reverse()) {

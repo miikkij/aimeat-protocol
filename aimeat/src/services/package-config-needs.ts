@@ -20,6 +20,8 @@
  * @usage
  *   const out = await packageConfigNeeds(storage, config, { owner, isOperator }, groupId);
  * @version-history
+ *   v1.1.0 — 2026-10-01 — A public package's questions are readable by anyone on this node, so its
+ *     installer can answer them first; `questionsOf` is exported for the package sheet.
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 5).
  */
 import type { AimeatConfig } from '../config.js';
@@ -45,8 +47,8 @@ export type ConfigNeedsResult =
 
 const notFound = (groupId: string): ConfigNeedsResult => ({ ok: false, status: 404, code: 'NOT_FOUND', message: `Package not found: ${groupId}` });
 
-/** The questions for one package, with `defaults` already given. */
-function questionsOf(
+/** The questions for one package, with `defaults` already given. Also read by services/package-sheet.ts. */
+export function questionsOf(
     pkg: PackageRecord, defaults: Record<string, Record<string, unknown>>, config: AimeatConfig,
 ): { ok: true; questions: ConfigQuestion[] } | { ok: false; problem: string } {
     const planned: InstalledComponent[] = pkg.components.map(c => ({ componentId: c.id, type: c.type, registeredAs: c.id, originalHash: '', customized: false }));
@@ -78,7 +80,8 @@ function questionsOf(
 }
 
 /**
- * The questions a package or a bundle asks, for its author or an operator (the packages are private,
+ * The questions a package or a bundle asks, for its author or an operator, and for anyone when the
+ * package is public (a private package is the author's, as for the shop's sale flow; the packages are private,
  * and the shop's agent is the author's). For a bundle, every package it lists, with the bundle's
  * defaults; a listed package this node does not hold is named in `problems`.
  */
@@ -88,7 +91,11 @@ export async function packageConfigNeeds(
     const readable = async (g: string): Promise<PackageRecord | null> => {
         const pkg = await storage.getLatestPublished(g);
         if (!pkg) return null;
-        return pkg.author === caller.owner || caller.isOperator ? pkg : null;
+        // A public package is installable by anyone here, so anyone here may ask what it asks:
+        // the questions are the install's own, and a person or their AI answers them before
+        // pressing install rather than after a refusal (guided journey P3). A private package stays
+        // with its author and the operator, as the shop's sale flow needs.
+        return pkg.author === caller.owner || caller.isOperator || pkg.visibility === 'public' ? pkg : null;
     };
     const root = await readable(groupId);
     if (!root) return notFound(groupId);

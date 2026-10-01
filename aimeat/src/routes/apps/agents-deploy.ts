@@ -15,6 +15,8 @@
  *     GET .../instances (hosted instances of the agent + their PUBLIC offers/prices)
  * @usage registered from appsRouter() in src/routes/apps.ts
  * @version-history
+ *   v1.4.0 — 2026-10-01 — Passes the caller's principal, so a deploy with no runner becomes a proposal
+ *     the owner approves instead of RUNNER_NOT_FOUND (services/app-agent-propose.ts).
  *   v1.3.0 — 2026-09-27 — The app lookup, the declared-agent check, the runner lookup and the
  *     instances and status reads moved unchanged to deployAppAgent(), appAgentInstances() and
  *     appAgentStatus() in services/app-agent-deploy.ts, so the MCP tool calls the same code. The
@@ -112,6 +114,8 @@ export function registerAppAgentRoutes(router: Router, config: AimeatConfig, sto
             runnerAgent: typeof req.body?.runner_agent === 'string' ? req.body.runner_agent : undefined,
             organismId: typeof req.body?.organism_id === 'string' ? req.body.organism_id : undefined,
             undeploy: kind === 'undeploy-app-agent',
+            // Lets a deploy with no runner become a proposal for the owner (app-agent-propose.ts).
+            principal: { sub: req.auth!.sub, owner, roles: req.auth!.roles, scopes: req.auth!.scopes ?? [] },
         });
         if (!result.ok) { sendRefusal(res, config, result); return; }
         res.status(201).json(success(config.nodeId, result.view, result.links));

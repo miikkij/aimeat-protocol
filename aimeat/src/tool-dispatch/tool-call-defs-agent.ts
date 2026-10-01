@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-01 -- `tier` names "features" and "features/<id>", the feature map in parts.
  *   2026-09-27 -- Agent-facing texts use industry terms: door and surface became tool and interface (docs/coding-guidelines/shell-and-git.md).
  *   2026-09-19 — The `tier` description of aimeat_handbook_get names the Atelier specification
  *     first.
@@ -45,7 +46,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
         input: {
             module: { type: 'string', description: 'Optional handbook module name, such as tasks or messages.' },
             surface: { type: 'string', description: 'Which interface the handbook is for. The catalog has published this since the interfaces split; this tool read only `module`, so asking for one was the same as asking for none.' },
-            tier: { type: 'string', description: 'A prompt by id. "build-app-atelier" is the first part of the Atelier build specification, the track an app is built on unless there is a reason not to, and "build-app-atelier/<id>" is one of the parts it lists. "build-app" and "build-app/<id>" do the same for the Classic specification.' },
+            tier: { type: 'string', description: 'A prompt by id. "build-app-atelier" is the first part of the Atelier build specification, the track an app is built on unless there is a reason not to, and "build-app-atelier/<id>" is one of the parts it lists. "build-app" and "build-app/<id>" do the same for the Classic specification. "features" lists what this node can do, by area, and "features/<id>" is one area: read it once you know what the person needs, to offer the one thing that fits.' },
         },
         handler: ({ client }, input) => {
             const tier = optionalString(input, 'tier');

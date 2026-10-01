@@ -23,6 +23,8 @@
  *   aimeat_package_check_updates, aimeat_package_repository, aimeat_package_entitlements.
  * @usage import { registerPackageTools } from './packages.js';
  * @version-history
+ *   v1.11.0 — 2026-10-01 — aimeat_package_get answers `sheet` (what the package gives, its data, agents,
+ *     schedules, guides and questions); aimeat_package_install answers `agents_proposed`.
  *   v1.10.0 — 2026-09-30 — aimeat_package_compose takes `include_skills` (the composer's own skills
  *     bound to the apps travel, default true); aimeat_package_install answers `warnings`, naming a
  *     skill left out because the owner has one of that name of their own.
@@ -64,6 +66,7 @@ import { forkPackageInstance, setPackageInstance } from '../services/package-man
 import { refreshInstalledPackages } from '../services/package-upstream-refresh.js';
 import { listEntitlements, grantEntitlement, revokeEntitlement } from '../services/package-entitlements.js';
 import { packageConfigNeeds } from '../services/package-config-needs.js';
+import { packageSheet } from '../services/package-sheet.js';
 import { listSellers, addSeller, removeSeller } from '../services/package-sellers.js';
 import { installSetRepositories } from '../services/install-set-trust.js';
 import { toolError } from './tool-error.js';
@@ -135,7 +138,8 @@ export function registerPackageTools(
                 isError: true,
             };
         }
-        return { content: [{ type: 'text' as const, text: JSON.stringify(packageSummary(pkg), null, 2) }] };
+        // The "what you get" sheet, the same one GET /v1/packages/:groupId answers (services/package-sheet.ts).
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ ...packageSummary(pkg), sheet: packageSheet(pkg, config) }, null, 2) }] };
     });
 
     mcp.tool('aimeat_package_compose', descriptionFor('aimeat_package_compose'), {
@@ -149,6 +153,8 @@ export function registerPackageTools(
         include_cortex: z.boolean().optional().describe('Package the cortexes you installed yourself. Default true.'),
         include_skills: z.boolean().optional().describe('Package your own skills bound to these apps, so the installer\'s AI gets the operating guides. Default true.'),
         allow_expectations: z.boolean().optional().describe('Compose even when an app calls an extension the package cannot carry.'),
+        outcome: z.string().optional().describe('What the package gives a person, in one sentence. The head of its "what you get" sheet; the description stands in when it is missing.'),
+        prompts: z.array(z.string()).optional().describe('Up to three things a person can ask their AI once it is installed, in their words.'),
     }, annotationsFor('aimeat_package_compose'), async (args) => {
         const owner = ownerOf();
         const out = await composePackageFromApps({ storage, config },
@@ -157,7 +163,7 @@ export function registerPackageTools(
                 name: args.name, apps: args.apps, description: args.description, category: args.category,
                 tags: args.tags, visibility: args.visibility, status: args.status,
                 includeCortex: args.include_cortex, includeSkills: args.include_skills,
-                allowExpectations: args.allow_expectations,
+                allowExpectations: args.allow_expectations, outcome: args.outcome, prompts: args.prompts,
             });
         if (!out.ok) {
             return {
@@ -304,6 +310,8 @@ export function registerPackageTools(
                         component_id: c.componentId, type: c.type, registered_as: c.registeredAs,
                     })),
                     ...(out.warnings.length ? { warnings: out.warnings } : {}),
+                    // Each waits on the owner's open items; approving it creates the agent.
+                    ...(out.agentsProposed?.length ? { agents_proposed: out.agentsProposed } : {}),
                 }, null, 2),
             }],
         };

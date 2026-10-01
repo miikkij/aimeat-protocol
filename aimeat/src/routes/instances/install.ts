@@ -6,6 +6,8 @@
  *   itself (dry_run validation, component registration, @activate-cron firing, rollback on failure)
  *   lives in the service, so this door and the MCP tool run the same code.
  * @version-history
+ *   v1.10.0 — 2026-10-01 — The 201 answer carries `agents_proposed`: the package's agents, each waiting
+ *     for the owner's approval (services/app-agent-propose.ts).
  *   v1.9.0 — 2026-09-30 — The 201 answer carries `warnings` when the install left out a skill because
  *     the owner has one of that name of their own (services/package-skill-component.ts).
  *   v1.8.0 — 2026-09-28 — The body takes `mode` (managed | editable) and `config` (each part's config),
@@ -91,7 +93,12 @@ export function registerInstallRoutes(
     }
 
     // `warnings` names a skill the install left out because the owner has one of that name of their own.
-    res.status(201).json(success(config.nodeId, { ...out.instance, ...(out.warnings.length ? { warnings: out.warnings } : {}) }, [
+    // `agents_proposed`: the agents the package's apps bring, each now waiting on the owner's open items.
+    res.status(201).json(success(config.nodeId, {
+      ...out.instance,
+      ...(out.warnings.length ? { warnings: out.warnings } : {}),
+      ...(out.agentsProposed?.length ? { agents_proposed: out.agentsProposed } : {}),
+    }, [
       { description: 'View instance', method: 'GET', url: `/v1/instances/${out.instance.id}` },
       { description: 'Check component status', method: 'GET', url: `/v1/instances/${out.instance.id}/status` },
     ]));

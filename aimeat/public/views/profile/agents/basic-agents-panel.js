@@ -20,6 +20,10 @@
  * @structure BasicAgentsPanel({ session, showToast, onCreated, first })
  * @usage <${BasicAgentsPanel} session=${session} showToast=${showToast} onCreated=${loadData} />
  * @version-history
+ *   v2.14.0 — 2026-10-01 — The words say the two agents run on the person's computer, and with no
+ *     connector running the install commands stand inline (agent-guide.js ConnectorSteps); "you do
+ *     not have to set anything up" was false for everyone without one. `num` sets the section number,
+ *     02 on the Agents page under "What should an agent do?" (guided journey P4).
  *   v2.13.0 — 2026-09-26 — Every part is a component that takes data (page group G1a): the section is
  *     Section, the leads and the hint are Note, the connector's state is the Mark status, the run
  *     mode's tag is dim again as on main (og-chip--dim), "you have it" is the numbered step's end word,
@@ -62,10 +66,11 @@ import { IndexList, IndexStep } from '/components/NumberedIndex.js';
 import { Note } from '/components/Note.js';
 import { Mark, Marks } from '/components/Mark.js';
 import { Action, Actions, Loud } from '/components/Action.js';
+import { ConnectorSteps } from './agent-guide.js';
 
 const p = (key, vars) => t('profile.agents.page.' + key, vars);
 
-export default function BasicAgentsPanel({ session, showToast, onCreated, first = false }) {
+export default function BasicAgentsPanel({ session, showToast, onCreated, first = false, num = '01' }) {
   const [state, setState] = useState(null);
   const [busy, setBusy] = useState(false);
   // null until the person chooses: open while there is still something to press, closed once
@@ -134,7 +139,7 @@ export default function BasicAgentsPanel({ session, showToast, onCreated, first 
   const door = html`<${Action} small soft onClick=${toggle}>${open ? p('close') : p('open')}<//>`;
 
   return html`
-    <${Section} id="agp-basic" num="01" title=${t('profile.agents.basic.title')}
+    <${Section} id="agp-basic" num=${num} title=${t('profile.agents.basic.title')}
       count=${allThere ? t('profile.agents.basic.allThere') : null} doors=${door} first=${first}>
       ${!open ? html`
         <${Note} kind="lead">
@@ -143,7 +148,8 @@ export default function BasicAgentsPanel({ session, showToast, onCreated, first 
         <//>` : html`
         <${Note} kind="lead">${t('profile.agents.basic.desc')}<//>
         <div>${connectorWord}</div>
-        ${!connected && html`<${Note}>${t('profile.agents.basic.notConnectedHint')}<//>`}
+        ${!connected && html`<${Note}>${t('profile.agents.basic.notConnectedHint')}<//>
+          <${ConnectorSteps} session=${session} />`}
         <${IndexList} steps>
           ${list.map((a) => html`
             <${IndexStep} key=${a.name}

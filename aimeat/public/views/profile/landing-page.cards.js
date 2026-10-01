@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   v1.21.0 -- 2026-10-01 -- The Packages page is "Get apps", right under Apps and in the basic menu (decision D8 of the user-journey review).
  *   v1.20.2 -- 2026-09-29 -- The build-an-app step opens /v1/appcat?create=1 instead of /app-catalog.html (Jouni).
  *   v1.20.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes itself, so an organism, workspace, agent, recent item or display name with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.20.0 -- 2026-09-26 -- Every part is a kit component (the panels are Card panel with its headline door and note, the rows FoldRow and List, the quota bars Meter, the figures FigureStrip and Card figure doors, the band NumberBand, the tags Mark with its live square, the promo a Box with framed Cards, the waiting box the aside Note with a Group): this file writes no class (page group G8).
@@ -653,6 +654,10 @@ export const SIDEBAR_GROUPS = [
   ] },
   { titleKey: 'profile.landing.menuBuildShare', items: [
     { id: 'apps', labelKey: 'profile.tabs.apps' },
+    /* The Packages page, named for what a person comes to it for and placed under Apps
+     * (Jouni's decision D8, 2026-10-01). The page keeps its own title, since it also lists
+     * the packages you made and the ones you installed. */
+    { id: 'packages', labelKey: 'profile.tabs.getApps' },
     { id: 'appdev', labelKey: 'profile.tabs.appDev' },
     /* foundry removed from the menu 2026-06-10 (owner: not in use). The tab module and
      * its route id still exist — restore by re-adding this item. */
@@ -660,7 +665,6 @@ export const SIDEBAR_GROUPS = [
     { id: 'libraries', labelKey: 'librariesTab.tabLabel' },
     { id: 'capabilities', labelKey: 'capabilities.tabLabel' },
     { id: 'skills', labelKey: 'skills.tabLabel' },
-    { id: 'packages', labelKey: 'profile.tabs.packages' },
     { id: 'portfolio', labelKey: 'portfolio.tabLabel' },
     /* The AI page: which model answers, on whose key, within what daily budget. Route id 'ai'
      * since 2026-09-03; 'generator' (the tab it grew out of) still resolves through profile.js. */
@@ -697,7 +701,7 @@ export const BASIC_TAB_IDS = new Set([
   'organisms', 'memory', 'notebook',            // where the work and knowledge live
   'agents', 'mcp',                              // the chat/agent connection
   'notifications', 'contacts',                  // what happened, who with
-  'apps', 'portfolio',                          // what you made
+  'apps', 'packages', 'portfolio',              // what you made, and the apps you get
   'wallet', 'access',                           // account
 ]);
 

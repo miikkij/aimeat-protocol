@@ -20,6 +20,7 @@
  * @structure Exports a PromptSeedEntry[] slice of PROMPT_SEEDS.
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.
  * @version-history
+ *   v1.1.1 — 2026-10-01 — The two card-payment lines send the person to the Wallet page; the payment secret is screen-only (decision D5).
  *   v1.1.0 — 2026-08-23 — playbook-brain (TARGET-071). A NEW id rather than a deepened existing one,
  *     because prompt-seeder re-syncs content only for the generator, builders and tiers groups:
  *     editing a live playbook never reaches a node that has already seeded it, and a new id does.
@@ -81,7 +82,7 @@ Publishing sends a copy to the shop front. Until they press that, everything is 
 
 ## Step 5 — Only now, money
 Ask before configuring any payment method, and only the ones they asked for:
-- Cards: \`aimeat_commerce_psp_set\` with their own provider credentials. Their keys, their payouts.
+- Cards: they enter their own provider key themselves on the Wallet page (/v1/profile?tab=wallet). A key that moves money never passes through the chat. Their keys, their payouts.
 - Stablecoin: read the settlement address back character by character before saving. A wrong address
   cannot be undone.
 - Check with \`aimeat_commerce_psp_status\` and say plainly which methods are live and which are off.
@@ -199,7 +200,7 @@ Ask what they sell and pick the shape with them: a thing with a fixed price, a s
 
 ## Step 2 — The money
 Set the payout side up before the buying side:
-- For cards, use \`aimeat_commerce_psp_set\` to attach their payment provider account. Their credentials, their payouts. Confirm with them before writing it.
+- For cards, they attach their payment provider account themselves on the Wallet page (/v1/profile?tab=wallet). A key that moves money never passes through the chat. Their credentials, their payouts.
 - For stablecoin, they give the address that receives settlement. Read it back to them and have them confirm it character by character before saving — a wrong address cannot be undone.
 - Check the result with \`aimeat_commerce_psp_status\` and tell them plainly which methods are live and which are still off.
 

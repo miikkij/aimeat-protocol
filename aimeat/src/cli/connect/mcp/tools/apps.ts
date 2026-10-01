@@ -5,6 +5,7 @@
  * @description MCP tool registrations for app/package management -- publishing,
  *   listing, retrieving, archiving versions, version history, sanctioned forks, and drafts (staging).
  * @version-history
+ *   2026-10-01 — aimeat_package_compose forwards `outcome` and `prompts` (the package sheet).
  *   2026-09-30 — aimeat_package_compose forwards `include_skills` (the composer's own bound skills travel).
  *   2026-09-29 — aimeat_package_sellers (GET, PUT, DELETE /v1/package-sellers).
  *   2026-09-28 — aimeat_package_config_needs (GET /v1/packages/:groupId/config-needs).
@@ -322,9 +323,11 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     include_cortex: z.boolean().optional().describe('Package the cortexes you installed yourself. Default true.'),
     include_skills: z.boolean().optional().describe('Package your own skills bound to these apps. Default true.'),
     allow_expectations: z.boolean().optional().describe('Compose even when an app calls an extension the package cannot carry'),
+    outcome: z.string().optional().describe('What the package gives a person, in one sentence (the head of its sheet)'),
+    prompts: z.array(z.string()).optional().describe('Up to three things a person can ask their AI once it is installed'),
   }, annotationsFor('aimeat_package_compose'), async (args) => {
     const body: Record<string, unknown> = { name: args.name, apps: args.apps };
-    for (const key of ['description', 'category', 'tags', 'visibility', 'status', 'include_cortex', 'include_skills', 'allow_expectations'] as const) {
+    for (const key of ['description', 'category', 'tags', 'visibility', 'status', 'include_cortex', 'include_skills', 'allow_expectations', 'outcome', 'prompts'] as const) {
       if (args[key] !== undefined) body[key] = args[key];
     }
     const resp = await client.post('/v1/packages/compose', body);

@@ -32,6 +32,8 @@
  * @usage
  *   const out = await applyInstallSet({ storage, config, peers }, { installSet, secrets, dryRun: true });
  * @version-history
+ *   v1.6.1 — 2026-10-01 — Reads `task_id` only from a deploy view that has one (a deploy can now answer
+ *     a proposal, though not to an install set, which passes no principal).
  *   v1.6.0 — 2026-10-01 — The repository the set names is linked only after its own card answers with
  *     the same node id and key, and how the peer arrived is recorded (peer-origin.ts). A repository
  *     that does not answer is PEER_UNREACHABLE, which the start-up apply tries again. The
@@ -476,7 +478,7 @@ async function deployAgents(deps: ApplyDeps, bundle: InstallBundle, record: Appl
             organismId: a.organism ? record.organisms[a.organism]?.id : undefined, undeploy: false,
         });
         record.agents[id] = out.ok
-            ? { group_id: a.groupId, app: a.app, agent: a.agent, result: 'deployed', task_id: out.view.task_id }
+            ? { group_id: a.groupId, app: a.app, agent: a.agent, result: 'deployed', task_id: 'task_id' in out.view ? out.view.task_id : undefined }
             : { group_id: a.groupId, app: a.app, agent: a.agent, result: out.code === 'RUNNER_NOT_FOUND' ? 'pending' : 'error', detail: `${out.code}: ${out.message}` };
     }
 }

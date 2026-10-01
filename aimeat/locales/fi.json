@@ -5761,7 +5761,7 @@
   "pkpage.chipOffers": "tarjolla {n}",
   "pkpage.chipOwn": "omia julkaisuja {n}",
   "pkpage.chipRemote": "muilta palvelimilta {n}",
-  "pkpage.desc": "Paketti on kokonaisuus, joka asentuu yhdellä otteella: sovellus, sen palvelinlaajennus ja selainkirjasto, muistin alkuarvot ja käännökset. Asennus tekee sinulle oman kopion jokaisesta osasta, ja kopiot ovat sen jälkeen sinun muokattavissasi. Uuden paketin saat pyytämällä tekoälyäsi rakentamaan sen.",
+  "pkpage.desc": "Paketti on kokonaisuus, joka asentuu yhdellä otteella: sovellukset, niiden palvelinlaajennus ja selainkirjasto, muistin alkuarvot, käännökset, tekoälysi saamat ohjeet ja mukana tulevat agentit. Avaa paketti, niin näet, mitä se antaa, mitä tietoja se säilyttää ja mitä se kysyy. Kun asennat täältä, saat oman kopion, jota voit muokata. Repositoriosta ostettu paketti pysyy tekijänsä ylläpitämänä, ja teet siitä oman kopion, kun haluat muuttaa sitä. Uuden paketin saat pyytämällä tekoälyäsi rakentamaan sen.",
   "pkpage.descEmpty": "Et ole vielä asentanut pakettia. Tarjolla olevia paketteja on {n}, ja jokainen asentuu yhdellä otteella omaksesi. Oman paketin saat pyytämällä tekoälyäsi rakentamaan sen.",
   "pkpage.copyRequest": "Kopioi pyyntö tekoälyllesi",
   "pkpage.importZip": "Tuo .zip",
@@ -5897,6 +5897,24 @@
   "pkpage.installSub": "Asennus vie hetken ja kertoo sitten, mitä syntyi. Kaikki osat ovat sen jälkeen sinun.",
   "pkpage.installOwnSub": "Oman pakettisi voit asentaa niin monta kertaa kuin haluat; jokainen kopio saa oman nimensä.",
   "pkpage.installedToast": "{name} on asennettu. Osat ({n}) ovat nyt sinun nimissäsi.",
+  "pkpage.agentsWaitToast": "Hyväksyntääsi odottavia agentteja avoimissa asioissasi: {n}.",
+  "pkpage.asksMissing": "Täytä ennen asennusta: {list}.",
+  "pkpage.sheetAsksDefault": "Jos jätät tyhjäksi: {value}.",
+  "pkpage.sheetLoading": "Luetaan, mitä paketti antaa…",
+  "pkpage.sheetAskK": "Pyydä tekoälyltäsi",
+  "pkpage.sheetAskSub": "Asennuksen jälkeen nämä toimivat chatissa, jota jo käytät.",
+  "pkpage.sheetDataK": "Tietosi",
+  "pkpage.sheetDataNoWhat": "ei kuvausta",
+  "pkpage.sheetDataLeaves": "Lähtee tältä palvelimelta: {list}.",
+  "pkpage.sheetDataUnmapped": "{app}: kukaan ei ole kirjannut, mitä se säilyttää tai minne tiedot menevät.",
+  "pkpage.sheetAgentsK": "Mukana tulevat agentit",
+  "pkpage.sheetAgentsSub": "Jokainen odottaa asennuksen jälkeen hyväksyntääsi avoimissa asioissasi. Mikään ei käynnisty ennen kuin hyväksyt sen.",
+  "pkpage.sheetRunsK": "Toimii itsestään",
+  "pkpage.sheetRunsSub": "Tehtävät, jotka käynnistyvät itsestään asennuksen jälkeen.",
+  "pkpage.sheetGuidesK": "Ohjeet tekoälyllesi",
+  "pkpage.sheetGuidesSub": "Tekoälysi saa nämä käyttöohjeet sovellusten mukana, jotta se osaa käyttää niitä puolestasi.",
+  "pkpage.sheetAsksK": "Kysyy",
+  "pkpage.sheetAsksSub": "Asetukset, joita asennus tarvitsee. Tähdellä merkittyjä ilman se ei onnistu.",
   "pkpage.needs": "tarvitsee: {list}",
   "pkpage.makerK": "Tekijä",
   "pkpage.makerSystem": "Palvelimen mukana tuleva esimerkki, jonka ylläpitäjä pitää ajan tasalla.",
@@ -5960,7 +5978,7 @@
   "pkpage.composeNamePlaceholder": "esimerkiksi: kauppa-ja-kassa",
   "pkpage.loadingApps": "Luetaan appsejasi…",
   "pkpage.noAppsYet": "Et ole vielä julkaissut yhtään appsia. Tee ensin yksi, niin se ilmestyy tähän.",
-  "pkpage.composeCarries": "Kunkin appsin nimi, kuvaus, ikoni ja kategoria lähtevät mukaan. Kuvakaappaukset, tallennetut asettelut ja sidotut taidot jäävät: jokainen niistä on kiinni tiedostonimessä, joka syntyy vasta asennuksessa.",
+  "pkpage.composeCarries": "Kunkin sovelluksen nimi, kuvaus, ikoni, kategoria ja datakartta lähtevät mukaan, samoin siihen sidotut taidot, joten asentajan tekoäly saa käyttöohjeet. Kuvakaappaukset ja tallennetut asettelut jäävät: jokainen niistä on kiinni tiedostonimessä, joka syntyy vasta asennuksessa.",
   "pkpage.composeN": "Tee paketti {n} appsista",
   "pkpage.composing": "Tehdään…",
   "pkpage.cancel": "Peruuta",
@@ -11996,7 +12014,15 @@
     "daysOne": "1 päivä jäljellä",
     "daysToday": "vanhenee tänään",
     "hidden": "{n} kunnossa olevaa agenttia piilotettu",
-    "hiddenOne": "1 kunnossa oleva agentti piilotettu"
+    "hiddenOne": "1 kunnossa oleva agentti piilotettu",
+    "week": {
+      "title": "Tällä viikolla",
+      "total": "Agenttiesi tekemiä tehtäviä viimeisen 7 päivän aikana: {n}.",
+      "agentDone": "{name}: {n} tehty",
+      "last": "viimeksi {when}",
+      "none": "Agenttisi eivät tehneet tehtäviä viimeisen 7 päivän aikana.",
+      "more": "Muita agentteja, jotka tekivät työtä: {n}."
+    }
   },
   "footer": {
     "ownNode": "Aja oma node",
@@ -15112,6 +15138,7 @@
       "notifications": "Ilmoitukset",
       "organisms": "Organismit",
       "packages": "Paketit",
+      "getApps": "Hanki sovelluksia",
       "inbox": "Viestit",
       "appDev": "AppDev",
       "pnl": "Tulos",
@@ -15512,7 +15539,7 @@
       "page": {
         "allTags": "Kaikki {n} tagia",
         "fewerTags": "Vähemmän tageja",
-        "lede": "Agentti on tekoäly, joka toimii sinun nimissäsi: sillä on oma tunniste, omat oikeudet ja omat tehtävät ja muisti. Kaksi on valmiina heti; loput teet täällä tai liität tekoälystä, jota jo käytät.",
+        "lede": "Agentti on tekoäly, joka tekee työtä puolestasi. Se voi olla keskustelupalvelu, kuten Claude tai ChatGPT, avustaja, kuten OpenClaw tai Goose, OpenRouterin kautta käyttämäsi malli, koodaustyökalu tai oma ohjelmasi.",
         "chipAgents": "{n} agenttia",
         "chipReady": "{n} valmiina",
         "chipWaiting": "{n} odottaa sinua",
@@ -15554,7 +15581,7 @@
           "unset": "Kukaan ei ole vielä päättänyt, joten mikään ei käynnistä tätä agenttia itsestään."
         },
         "runsChange": "Muuta",
-        "runsDecide": "Päätä: tarvittaessa vai aina päällä",
+        "runsDecide": "Päätä: kun työtä tulee vai aina päällä",
         "tabGroups": {
           "work": "Työ",
           "knowledge": "Tieto",
@@ -15891,9 +15918,9 @@
         "tooltip": "Toimintatila: vaikuttaa siihen, miten agentti läpäisee Hello Integrationin ja kuluttaa työtä."
       },
       "runMode": {
-        "spawn": "Tarvittaessa",
+        "spawn": "Kun työtä tulee",
         "resident": "Aina päällä",
-        "tooltip": "Miten tätä agenttia ajetaan. Tarvittaessa: se odottaa täällä ja käynnistyy kun töitä tulee. Aina päällä: yhdistimesi pitää sen käynnissä. Ei päätetty: kukaan ei ole sanonut, joten mikään ei käynnistä sitä itsestään. Voit vaihtaa näiden kolmen välillä milloin tahansa.",
+        "tooltip": "Miten tätä agenttia ajetaan. Kun työtä tulee: se odottaa täällä, kunnes työtä tulee. Aina päällä: yhdistimesi pitää sen käynnissä. Ei päätetty: kukaan ei ole sanonut, joten mikään ei käynnistä sitä itsestään. Voit vaihtaa näiden kolmen välillä milloin tahansa.",
         "label": "Miten se ajetaan",
         "saved": "Asetettu: {mode}.",
         "failed": "Tallennus ei onnistunut. Yritä uudelleen.",
@@ -15941,7 +15968,7 @@
       },
       "basic": {
         "title": "Aloita kahdella agentilla",
-        "desc": "Etuovi joka vastaa siihen mitä tulee, ja työnjohtaja joka tilaa töitä muilta agenteiltasi. Sinun ei tarvitse asentaa mitään.",
+        "desc": "Etuovi, joka vastaa siihen, mitä tulee, ja työnjohtaja, joka tilaa töitä muilta agenteiltasi. Molemmat toimivat tietokoneellasi yhdistimen sisällä.",
         "button": "Tee ne",
         "working": "Tehdään…",
         "done": "{count} agenttia on valmiina.",
@@ -15951,7 +15978,7 @@
         "have": "Jo sinun",
         "connected": "Yhdistimesi on käynnissä, joten ne pääsevät heti töihin",
         "notConnected": "Yhdistimesi ei ole käynnissä",
-        "notConnectedHint": "Nämä agentit pyörivät omalla koneellasi. Käynnistä yhdistin komennolla \"aimeat connect serve\", niin tämä nappi toimii.",
+        "notConnectedHint": "Asenna yhdistin parissa minuutissa. Sen jälkeen tämä nappi toimii:",
         "whatYouGet": "Mitä saat",
         "actsAloneNoticeOne": "{names} aloittaa työn heti kun sitä tulee, kysymättä sinulta joka kerta. Voit muuttaa tämän myöhemmin kenelle tahansa agentille."
       },
@@ -15963,7 +15990,8 @@
         "exampleDesc": "CrewAI-\"marketing-crew\" jossa on tutkija + kirjoittaja + AIMEAT Liaison. Liaison tarkistaa onboardingin, kävelee Hello Integrationin läpi, raportoi kruun kyvyt ja kirjoittaa lopullisen artikkelin AIMEATin memoryyn. Kaikki aimeat-crewai-paketin create_liaison_agent-factorin kautta. Ei aliprosessi-skriptejä, ei config.yaml-editointia.",
         "nameLabel": "Agentin nimi (käytetään alla olevassa pasteessa):",
         "copyButton": "Kopioi CrewAI-yhdistämisohje",
-        "repoLink": "Katso crewaimeat-fleet GitHubissa"
+        "repoLink": "Katso crewaimeat-fleet GitHubissa",
+        "names": "Kaksi samannäköistä nimeä: crewaimeat ajaa agentit tietokoneellasi, ja aimeat-crewai liittää itse kirjoittamasi CrewAI-tiimin."
       },
       "filter": {
         "byTag": "Suodata tagilla:",
@@ -16863,6 +16891,110 @@
         "issuer": "Myöntäjä",
         "manageHint": "Avaa hallitaksesi",
         "never": "ei koskaan"
+      },
+      "guide": {
+        "title": "Mitä agentin pitää tehdä?",
+        "lead": "Valitse, mitä tarvitset. Vastaus kertoo, millainen agentti sen tekee, missä se toimii, mitä se sinulta tarvitsee ja kuka maksaa.",
+        "ask": "Vastata, kun kysyn",
+        "askHint": "Puhut sille, ja se tekee työtä keskustelun aikana.",
+        "away": "Tehdä työtä, kun olen poissa",
+        "awayHint": "Se ottaa työn vastaan ja tekee sen ilman, että seuraat.",
+        "timetable": "Tehdä saman asian aikataulussa",
+        "timetableHint": "Joka aamu, joka maanantai, joka tunti.",
+        "app": "Tehdä työtä sovellukselle",
+        "appHint": "Osa sovelluksista tuo oman agenttinsa.",
+        "askResult": "Tämän tekee keskustelutekoälysi: Claude, ChatGPT, Copilot tai muu tekoäly, jota jo käytät ja jonka yhdistät omaan AIMEATiisi. Se tekee työtä, kun puhut sille, ja maksat sen omalla tilauksellasi.",
+        "askDoor": "Yhdistä tekoälysi",
+        "timetableResult": "Tämän tekee ajastus. Se ajaa kehotteen, agentin tehtävän tai sovelluksen toiminnon asettaminasi aikoina täällä omassa AIMEATissasi, omalla tekoälyavaimellasi.",
+        "scheduleDoor": "Avaa ajastin",
+        "appResult": "Sovellus voi tuoda oman agenttinsa. Kun asennat sovelluksen, agentti odottaa hyväksyntääsi avoimissa asioissasi, eikä mikään käynnisty ennen kuin hyväksyt sen.",
+        "appDoor": "Hanki sovelluksia",
+        "whereTitle": "Missä sen pitää toimia?",
+        "where": {
+          "machine": "Omalla tietokoneellani",
+          "machineHint": "Tarvitsee yhdistimen. Tietokone pysyy päällä, kun agentti tekee työtä.",
+          "node": "Tässä AIMEATissa",
+          "nodeHint": "Mitään ei asenneta. Käyttää omaa tekoälyavaintasi."
+        },
+        "machineResult": "Agentti toimii omalla tietokoneellasi. Yhdistin on pieni ohjelma, joka pitää yhden yhteyden auki tietokoneeltasi AIMEATiisi, ja agenttisi toimivat sen sisällä. Asenna se kerran näillä kahdella komennolla ja pidä tietokone päällä, kun agentit tekevät työtä.",
+        "machineDoor": "Tee agentti",
+        "nodeResult": "Ajastettu tekoälytyö tässä AIMEATissa. Se toimii täällä omalla tekoälyavaimellasi, joten et asenna mitään ja tietokoneesi voi olla kiinni. Jokainen ajo tekee yhden kehotteen asettamanasi aikana.",
+        "placesDoor": "Missä agentit toimivat",
+        "places": {
+          "chat": {
+            "title": "Keskustelutekoälysi",
+            "what": "Claude, ChatGPT, Copilot tai Cursor, yhdistettynä MCP:llä. Se toimii, kun puhut sille.",
+            "sub": "Käyttää kyseisen tekoälyn mallia. Maksat sen tilauksellasi."
+          },
+          "machine": {
+            "title": "Tietokoneesi",
+            "what": "Yhdistin ja sen sisällä toimivat agentit: kaksi perusagenttia, omat agenttisi ja CrewAI-tiimit. Ne ottavat työt AIMEATistasi ja palauttavat tulokset.",
+            "sub": "Käyttää asetuksissasi valittua mallia. Maksat omalla tekoälyavaimellasi."
+          },
+          "node": {
+            "title": "Tämä AIMEAT",
+            "what": "Ajastukset ja tämän sivuston keskustelu. Mitään ei asenneta.",
+            "sub": "Käyttää tekoälyasetuksissasi valittua mallia. Maksat omalla tekoälyavaimellasi."
+          },
+          "service": {
+            "title": "Toinen palvelu",
+            "what": "Agentti, jota joku muu ylläpitää. Annat sille työtä sopimuksella.",
+            "sub": "Käyttää omaa malliaan. Maksat sovitun hinnan."
+          }
+        },
+        "empty": {
+          "lead": "Sinulla ei ole vielä agentteja. Tässä on kolme asiaa, joita agentti voi tehdä puolestasi. Valitse yksi, niin yllä oleva lomake täyttyy valmiiksi tarkistettavaksesi.",
+          "button": "Käytä tätä",
+          "watcher": {
+            "title": "Sivun vahti",
+            "purpose": "Seuraa verkkosivua ja kerro, kun se muuttuu."
+          },
+          "inbox": {
+            "title": "Postilaatikon apuri",
+            "purpose": "Vastaa postilaatikkooni tuleviin viesteihin ja kysy minulta ennen kuin mitään lähetetään."
+          },
+          "receipts": {
+            "title": "Kuittien lajittelija",
+            "purpose": "Lajittele kuittini joka maanantai ja listaa, mitä puuttuu."
+          }
+        }
+      },
+      "facts": {
+        "label": "Missä toimii",
+        "line": "{runsOn} · malli: {thinksWith} · maksu: {paidBy}",
+        "yourChat": "keskustelutekoälysi",
+        "runsOn": {
+          "chat": "{client}",
+          "machine": "tietokoneellasi yhdistimen kautta",
+          "node": "tässä AIMEATissa",
+          "service": "toisen palvelun palvelimella",
+          "unknown": "ei vielä tiedossa, koska se ei ole ottanut yhteyttä"
+        },
+        "thinksWith": {
+          "chat": "kyseisen tekoälyn oma malli",
+          "machine": "yhdistimen asetuksissa valittu malli",
+          "node": "tekoälyasetuksissasi valittu malli",
+          "service": "palvelun oma malli",
+          "unknown": "ei vielä tiedossa"
+        },
+        "paidBy": {
+          "chat": "oma tilauksesi ({client})",
+          "machine": "oma tekoälyavaimesi",
+          "node": "oma tekoälyavaimesi",
+          "service": "palvelun kanssa sovittu hinta",
+          "unknown": "ei vielä tiedossa"
+        },
+        "weekLabel": "Tällä viikolla",
+        "weekDone": "Tehtyjä tehtäviä viimeisen 7 päivän aikana: {n}",
+        "weekNone": "Ei tehtyjä tehtäviä viimeisen 7 päivän aikana.",
+        "selfStart": "Aloittaa työn itse",
+        "yes": "päällä",
+        "no": "pois",
+        "selfStartOn": "Sille lähetetty työ alkaa heti kysymättä sinulta.",
+        "selfStartOff": "Sille lähetetty työ odottaa, kunnes käynnistät sen.",
+        "selfStartOnSaved": "Agentti aloittaa nyt työn itse.",
+        "selfStartOffSaved": "Agentin työ odottaa nyt, että käynnistät sen.",
+        "selfStartFailed": "Tallennus ei onnistunut. Yritä uudelleen."
       }
     },
     "scopes": {

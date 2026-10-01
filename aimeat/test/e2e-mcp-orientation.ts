@@ -17,6 +17,8 @@
  *       share their group, and prompts/get returns a body with the node values already filled.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-mcp-orientation.ts
  * @version-history
+ *   2026-10-01 — 17j/17k: the feature map in parts (tier "features"), on MCP and REST, and the
+ *     handbook's screen-only list.
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v1.1.0 — 2026-08-09 — Phase 4: the managed prompts a person picks (MCP prompts primitive).
  *   v1.0.0 — 2026-08-09 — Initial: MCP handshake instructions + the public app URL.
@@ -568,6 +570,30 @@ async function main() {
             const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/no-such-part' } }, 406);
             assert(body.result?.isError === true, 'MCP: isError');
             assert(/start, genre, libraries, book, patterns, look/.test(toolText(body)), `it names the parts: ${toolText(body).slice(0, 200)}`);
+        });
+
+        // The feature map (guided journey P6): what this node can do, in parts an AI can read once it
+        // knows the need. The same text on MCP and REST, every part one tool result.
+        await test('17j. tier "features" lists the areas; each area arrives whole and equals its REST part', async () => {
+            const start = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'features' } }, 418)).body);
+            const rest = await fetch(`${BASE}/v1/prompts/features/sections/start?format=txt`).then(r => r.text());
+            assert(start === rest && start.includes('`features/g-1`'), `the index names its parts and equals REST: ${start.slice(0, 160)}`);
+            const list = await json('/v1/prompts/features/sections');
+            const parts = list.body.data.parts as Array<{ id: string; chars: number }>;
+            assert(parts.length > 10 && parts[0].id === 'start', `the parts: ${parts.length}`);
+            for (const p of parts) assert(p.chars > 0 && p.chars < 24_000, `${p.id} fits one tool result: ${p.chars}`);
+            const apps = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'features/g-10' } }, 419)).body);
+            assert(apps.startsWith('# Apps') && !/<[a-z]+[ >]/.test(apps), `an area in plain text, no HTML left: ${apps.slice(0, 120)}`);
+            const handbook = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: {} }, 420)).body);
+            assert(handbook.includes('tier:\n"features"') || handbook.includes('"features"'), 'the handbook says where the map is');
+            assert(handbook.includes('## On the screen, and why') && handbook.includes('/v1/profile?tab=wallet'), 'and what happens on the screen, with the links');
+        });
+
+        await test('17k. FAILURE: a feature-map part that does not exist is an error that lists the parts, on both doors', async () => {
+            const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'features/g-999' } }, 421);
+            assert(body.result?.isError === true && /NOT_FOUND/.test(toolText(body)) && /start, g-1/.test(toolText(body)), `MCP: ${toolText(body).slice(0, 160)}`);
+            const r = await json('/v1/prompts/features/sections/g-999');
+            assert(r.status === 404 && r.body.error?.code === 'NOT_FOUND', `REST: ${r.status}`);
         });
 
         await test('17e. the Classic first part says it is Classic and where a new app is built', async () => {

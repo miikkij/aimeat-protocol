@@ -25,6 +25,8 @@
  * @structure NewAgentPanel({ session, showToast, onCreated, agents, open, setOpen, onWaiting })
  * @usage <${NewAgentPanel} session=${session} showToast=${showToast} onCreated=${loadData} />
  * @version-history
+ *   v2.13.0 -- 2026-10-01 -- A `draft` from the page's examples fills the form; the section is 03, under
+ *     the new "What should an agent do?" (guided journey P4).
  *   v2.12.0 -- 2026-09-26 -- Every part is a component that takes data (page group G1a): the fields
  *     are TextField and TextArea with their label and hint (the label stands over the field, as on
  *     every other form), the shape is the boxed Choice, what it reaches and how it runs are the
@@ -85,10 +87,14 @@ const BLANK = {
   template: 'researcher', scopes: 'standard', runMode: 'spawn',
 };
 
-export default function NewAgentPanel({ session, showToast, onCreated, agents, open, setOpen, onWaiting }) {
+export default function NewAgentPanel({ session, showToast, onCreated, agents, open, setOpen, onWaiting, draft }) {
   const [form, setForm] = useState(BLANK);
   const [busy, setBusy] = useState(false);
   const [waiting, setWaiting] = useState([]);
+
+  // An example picked on the page (agents/agent-guide.js NoAgentsYet) fills the name and the purpose;
+  // the person still reads and presses Create.
+  useEffect(() => { if (draft) setForm(f => ({ ...f, ...draft })); }, [draft]);
 
   // The fields and the choices hand over the value itself (components/TextField.js, Choice.js).
   const set = (k) => (v) => setForm(f => ({ ...f, [k]: v }));
@@ -204,7 +210,7 @@ export default function NewAgentPanel({ session, showToast, onCreated, agents, o
     { id: 'none', name: t('profile.agents.new.shapeNone'), desc: t('profile.agents.new.shapeNoneHint') }];
 
   return html`
-    <${Section} id="agp-new" num="02" title=${t('profile.agents.new.title')}
+    <${Section} id="agp-new" num="03" title=${t('profile.agents.new.title')}
       count=${waiting.length > 0 ? p('waitingCount', { n: waiting.length }) : null} doors=${door}>
       ${!open && waiting.length === 0 && unattached.length === 0
         ? html`<${Note} kind="lead">${t('profile.agents.new.desc')}<//>`

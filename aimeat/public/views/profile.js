@@ -10,6 +10,7 @@
  *   updateStats, navigate, renderTab) rendering LandingPage + a toast pill.
  * @usage Lazy-loaded route component for /v1/profile.
  * @version-history
+ *   2026-10-01 — The packages tab is shown from the 'new' tier: the menu names it "Get apps" (decision D8).
  *   2026-09-26 — The root and the toast pill are components (SettingsRoot in components/SettingsFrame.js,
  *     ToastBox in components/Toast.js): this file writes no class (page group G8).
  *   2026-09-13 — The toast pill shows above an open dialog (raiseAboveDialogs in /js/dialog.js)
@@ -170,7 +171,8 @@ const TABS = [
   // that leads to a tab the menu refuses to show is a dead end.
   { id: 'ai',            key: 'profile.generator.openrouter.title', component: AiTab,           minTier: 'new' },
   { id: 'calibrator',   key: 'profile.calibrator.tabLabel', component: CalibratorTab,     minTier: 'active' },
-  { id: 'packages',      key: 'profile.tabs.packages',       component: PackagesTab,       minTier: 'active' },
+  // 'new': the menu shows it as "Get apps" under Apps, the place a newcomer's first apps come from.
+  { id: 'packages',      key: 'profile.tabs.packages',       component: PackagesTab,       minTier: 'new' },
   { id: 'libraries',     key: 'librariesTab.tabLabel',       component: LibrariesTab,      minTier: 'new' },
 ];
 

@@ -20,6 +20,7 @@
  * @structure STRIPE_HANDLER_ID · stripePaymentHandler · stripeApi (module-local)
  * @usage registerPaymentHandler(stripePaymentHandler(config));
  * @version-history
+ *   v1.2.1 — 2026-10-01 — The missing-credentials message names only the Wallet tab: the MCP tool is screen-only now.
  *   v1.2.0 — 2026-09-16 — Takes the node config and opens the sealed Stripe key (commerce/psp-secrets.ts).
  *   v1.1.0 — 2026-08-06 — Hold rail (TINKI phase 1): authorize = manual-capture PaymentIntent
  *     (requires_capture), capture up to the held amount, release = cancel. The uncaptured intent
@@ -48,7 +49,7 @@ function sellerKey(config: EncryptionConfig, seller: { psp?: unknown } | undefin
   if (!key) {
     throw new PaymentError(
       'PSP_NOT_CONFIGURED', 403,
-      'The seller has no Stripe credentials — set them in the Wallet tab (Selling & payments) or with aimeat_commerce_psp_set',
+      'The seller has no Stripe credentials — the seller sets them in the Wallet tab (Selling & payments), signed in themselves',
     );
   }
   return key;

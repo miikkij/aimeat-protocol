@@ -10,6 +10,8 @@
  *   import { registerPromptsTools } from './prompts.js';
  *   registerPromptsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.9.0 -- 2026-10-01 -- tier "features" and "features/<id>": what this node can do, in parts
+ *     (services/feature-map.ts), for an AI that knows the need and looks for the one thing to offer.
  *   v1.8.0 -- 2026-10-01 -- The handbook ends, while the owner's path is not walked, with where they
  *     stand on it and the guided-journey skill to load (services/journey-state.ts).
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
@@ -60,6 +62,7 @@ import { atelierPieceWithBook } from '../services/build-atelier-book.js';
 import { toolError } from './tool-error.js';
 import { parseGaiiLoose, localAccountName } from '../utils/gaii.js';
 import { V2_ROLES, toolsForSurface, type SurfaceRole } from './catalog/surfaces.js';
+import { featureMapPiece, featureMapPieceIds } from '../services/feature-map.js';
 
 export function registerPromptsTools(
     mcp: McpServer,
@@ -77,7 +80,7 @@ export function registerPromptsTools(
         'aimeat_handbook_get',
         descriptionFor('aimeat_handbook_get'),
         {
-            tier: z.string().optional().describe('A REST-style tier handbook or a managed prompt by id (e.g. "tier1", "tier2", or a custom prompt ID), for an agent that works over HTTP. Leave it out over MCP: the handbook for your own surface comes back. Two values are for every builder. "build-app-atelier" returns the first part of the ATELIER build specification, the track an app is built on unless there is a reason not to, and "build-app-atelier/<id>" one of the parts it lists. "build-app" and "build-app/<id>" do the same for the Classic specification.'),
+            tier: z.string().optional().describe('A REST-style tier handbook or a managed prompt by id (e.g. "tier1", "tier2", or a custom prompt ID), for an agent that works over HTTP. Leave it out over MCP: the handbook for your own surface comes back. Two values are for every builder. "build-app-atelier" returns the first part of the ATELIER build specification, the track an app is built on unless there is a reason not to, and "build-app-atelier/<id>" one of the parts it lists. "build-app" and "build-app/<id>" do the same for the Classic specification. "features" lists what this node can do, by area, and "features/<id>" is one area: read it once you know what the person needs, to offer the one thing that fits.'),
             surface: z.enum(V2_ROLES as unknown as [SurfaceRole, ...SurfaceRole[]]).optional().describe('Read another interface\'s handbook than your own. Leave it out to get the one for the interface you are connected to.'),
         },
         annotationsFor('aimeat_handbook_get'),
@@ -130,6 +133,14 @@ export function registerPromptsTools(
                 const piece = await atelierPieceWithBook(full, id, config, storage);
                 if (piece) return { content: [{ type: 'text' as const, text: piece.text }] };
                 return toolError('NOT_FOUND', `The Atelier build specification has no part "${id}". It has: ${atelierPieceIds().join(', ')}. Ask for "build-app-atelier" to read the first part, which lists the others.`);
+            }
+            // What this node can do, in parts (services/feature-map.ts): read after the need is
+            // known, to offer the one thing that fits.
+            if (tierKey === 'features' || tierKey.startsWith('features/')) {
+                const id = tierKey.slice('features/'.length) || 'start';
+                const piece = featureMapPiece(id);
+                if (piece) return { content: [{ type: 'text' as const, text: piece.text }] };
+                return toolError('NOT_FOUND', `The feature map has no part "${id}". It has: ${featureMapPieceIds().join(', ')}. Ask for "features" to read the list of areas.`);
             }
             // Normalize tier aliases used in routes (tier1 → tier-1, etc.)
             const normalized = tierKey

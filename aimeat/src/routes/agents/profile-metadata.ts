@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.0 — 2026-10-01 — `stats.tasks.doneWeek`: done tasks of the last 7 days, for the Fleet page.
  *   v1.10.0 — 2026-09-30 — GET /v1/agents gives each agent `refusals` (the calls the node refused it
  *     for a missing permission, still unresolved) and `scope_request` (what it asked for and was
  *     granted at its last approval), to the owner and the owner's agents (services/agent-refusals.ts).
@@ -170,7 +171,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
     // for the whole fleet (services/agent-credential-health.ts), and only when asked for.
     const wantCredentials = include.includes('credentials');
 
-    let taskCounts: Record<string, { queued: number; active: number; done: number; failed: number; doneToday: number; lastTaskUpdateAt: string | null; lastFailedAt: string | null }> = {};
+    let taskCounts: Record<string, { queued: number; active: number; done: number; failed: number; doneToday: number; doneWeek: number; lastTaskUpdateAt: string | null; lastFailedAt: string | null }> = {};
     let msgCounts: Record<string, { total: number; lastMessageAt: string | null }> = {};
     const onboardingByGaii: Record<string, AgentOnboardingRecord | null> = {};
     const activeByGaii: Record<string, Array<{ id: string; title: string; status: string; updatedAt: string; createdAt: string; agentGaii: string }>> = {};
@@ -284,7 +285,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
         schedule_constraint_defaults: a.scheduleConstraintDefaults ?? [],
         ...(wantStats ? {
           stats: {
-            tasks: taskCounts[a.gaii] ?? { queued: 0, active: 0, done: 0, failed: 0, doneToday: 0, lastTaskUpdateAt: null, lastFailedAt: null },
+            tasks: taskCounts[a.gaii] ?? { queued: 0, active: 0, done: 0, failed: 0, doneToday: 0, doneWeek: 0, lastTaskUpdateAt: null, lastFailedAt: null },
             messages: msgCounts[a.gaii] ?? { total: 0, lastMessageAt: null },
             onboarding: onboardingByGaii[a.gaii] ?? null,
             active_tasks: activeByGaii[a.gaii] ?? [],

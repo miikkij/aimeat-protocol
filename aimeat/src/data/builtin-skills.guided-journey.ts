@@ -14,11 +14,16 @@
  * @structure GUIDED_JOURNEY_SKILL_ENTRY
  * @usage import { GUIDED_JOURNEY_SKILL_ENTRY } from './builtin-skills.guided-journey.js';
  * @version-history
+ *   v1.3.0 — 2026-10-01 — The screen-only list with its links (data/screen-only.ts), the feature map
+ *     (tier "features"), the package sheet and its agent proposals, and the Experience Center layer
+ *     for each stage (guided journey P3, P4, P6).
  *   v1.2.0 — 2026-10-01 — Stage 4 points at the aimeat-organisms skill and the starting shapes.
  *   v1.1.0 — 2026-10-01 — The first result offered first is a shared place, not a note: a person's
  *     chat app already remembers things (Jouni, 2026-10-01).
  *   v1.0.0 — 2026-10-01 — Initial.
  */
+import { SCREEN_ONLY_MD } from './screen-only.js';
+
 /** The shape of a BuiltinSkill, named here rather than imported so this file closes no import cycle
  *  with builtin-skills.ts, which imports it; the compiler checks the two agree where it is listed. */
 type BuiltinSkillEntry = { name: string; skillMd: string; visibility?: 'members' | 'public' };
@@ -76,10 +81,14 @@ the account holds, so it cannot drift.
   do not offer it again. They can ask for it any time.
 - **Do the stage with them.** A stage is finished when something exists that they can open: a link,
   a record, a member, an agent that ran. Hand over the address.
-- **The page is for approving, paying and looking.** Signing-in security, payments, giving an agent
-  or an app its permissions, reading their mail, API keys, and deleting or exporting the account
-  happen on their page, signed in themselves. Give the exact link and one sentence on why it is
-  theirs to do. Everything else happens here, in the chat.
+- **The page is for approving, paying and looking.** The list of what happens on the screen, with
+  the links, is at the end of this skill. Everything else happens here, in the chat.
+- **Offer from what exists.** Once you know what they need, \`aimeat_handbook_get { tier:
+  "features" }\` lists what this node can do by area, and \`"features/<id>"\` is one area. Offer the
+  one thing that fits; do not recite the list.
+- **For a person who likes to read**, each stage below names its layer in the Experience Center
+  (https://experience-center.apps.aimeat.io), a guided tour with a chat way and a copy-prompt way in
+  every lesson. Mention it once per stage, only if they ask how something works.
 
 ## The stages
 
@@ -103,7 +112,7 @@ says which is theirs (write it as \`road\`):
 ### 2. That AI connected
 
 Done if you can call this node. If they use a second AI, the connection steps are on their home
-page under "Which AI do you use?".
+page under "Which AI do you use?". Experience Center: layer L0, Basics.
 
 ### 3. A first real result
 
@@ -125,16 +134,20 @@ Load the skill \`aimeat-organisms\`: ask what it is for and who else will use it
 a starting shape (own work, team, company, family, club, project), and on their yes create it in one
 call, \`aimeat_organism_create { name, shape, lang }\`, which makes the workspaces too. Each workspace
 starts with a readme that says what it is for and what is current. That readme is how the place ages
-well: when something stops mattering, it says so there, or the material is archived.
+well: when something stops mattering, it says so there, or the material is archived. Experience
+Center: layer L2, Organisms & workspaces.
 
 ### 5. Apps
 
 What they get: ready tools for a job, which you can also use for them from the chat. Look at what
 they have (\`aimeat_app_list\`) and what can be installed (\`aimeat_package_list\`, and a repository's
 offer with \`aimeat_package_repository\`). Before installing, tell them what the package does, what
-data it handles, whether it brings an agent, and what it needs from them; read an app's bound skills
-(\`aimeat_skill_list\` with \`binding\`) before you drive it. Buying happens on the page. The stage is
-done when they have used one app once.
+data it handles, whether it brings an agent, and what it needs from them: \`aimeat_package_get\`
+returns all of that as its \`sheet\`, with the settings the install asks. The agents a package brings
+wait as proposals among their open items after the install; nothing runs before they approve one.
+Read an app's bound skills (\`aimeat_skill_list\` with \`binding\`) before you drive it. Buying happens
+on the page. The stage is done when they have used one app once. Experience Center: layer L4, Apps
+in depth.
 
 ### 6. Agents that work while they are away
 
@@ -148,13 +161,16 @@ should do, because that decides what it is:
 - work for an app: the app's own agent, if it brings one.
 
 Propose the agent (skill \`add-a-crew-agent\`, or \`aimeat_agent_propose\`); the person approves it and
-its permissions on their page. The stage is done when it has run one task on its own.
+its permissions on their page. The skill \`manage-my-agents\` has the picture of where agents run and
+who pays. The stage is done when it has run one task on its own. Experience Center: layer L3,
+Agents in depth.
 
 ### 7. Shared with someone
 
 What they get: other people, and other people's AIs, use what they built. Invite someone to the
 organism, publish a document or a knowledge package, or put a price on an app's tool. Each of these
-is their decision; offer the one that fits what they built.
+is their decision; offer the one that fits what they built. Experience Center: layer L5, Agents +
+apps together, and B6, EXCHANGE, for selling.
 
 ## Words
 
@@ -162,7 +178,5 @@ Use the person's words. A word from this system carries its meaning in the same 
 time: "an organism, a shared place where you and the people you invite keep your work", never just
 "an organism". Ids, keys and tool names stay in what you do, not in what you say.
 
-The guided tour for people who like to read is the Experience Center:
-https://experience-center.apps.aimeat.io. Mention it once, if they ask how things work in general.
-`,
+${SCREEN_ONLY_MD}`,
 };
