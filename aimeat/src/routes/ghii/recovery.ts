@@ -6,6 +6,8 @@
  *   POST /v1/ghii/email/verify, /email/confirm, /password/reset-request, /password/reset,
  *   /password/change, /account/recover. Extracted from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-10-01 — POST /v1/ghii/email/confirm applies the open app roster invitations of the
+ *     address it confirms (services/app-member-invites.ts), beside the contact promotion.
  *   v1.3.0 — 2026-09-29 — Password reset: only the newest code works (earlier pending codes expire
  *     at the request; SQLite had checked the OLDEST, so asking twice made the newest mail's code
  *     INVALID_CODE), the mail is the reset template instead of the email-verification one, and the
@@ -38,6 +40,7 @@ import { appendMailLog } from '../../services/notification-settings.js';
 import { passwordResetEmail } from '../../services/email-template-reset.js';
 import { validatePasswordStrength } from '../../utils/password-validation.js';
 import { promoteContactsForVerifiedEmail } from '../../services/contacts.js';
+import { applyAppInvitesForVerifiedEmail } from '../../services/app-member-invites.js';
 
 export function registerRecoveryRoutes(
     router: Router,
@@ -196,6 +199,9 @@ export function registerRecoveryRoutes(
         // address become this person (TARGET-063). Best-effort — recovery must never fail on it.
         await promoteContactsForVerifiedEmail(storage, record.emailHash, ghii)
             .catch(err => { logger.warn('recovery: contact promotion is best-effort', { error: String(err) }); });
+        // An app roster invitation sent to this address becomes a membership (services/app-member-invites.ts).
+        await applyAppInvitesForVerifiedEmail(storage, config.nodeId, record.emailHash, ghii)
+            .catch(err => { logger.warn('recovery: app invitations are best-effort', { error: String(err) }); });
 
         res.json(success(config.nodeId, {
             ok: true,

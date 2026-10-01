@@ -22,6 +22,9 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.41.0 -- 2026-10-01 -- aimeat_contact_list -> contacts:read, the word GET /v1/contacts now asks of
+ *     anything acting for the owner (the developer's ruling of 2026-10-01). It rode messages:read here
+ *     while the REST endpoint refused every agent, so the connector's copy of the tool never worked.
  *   v1.40.0 -- 2026-09-29 -- aimeat_refinery_run and aimeat_refinery_status -> connections:read-through, the
  *     word both REST endpoints ask (the run checks its other three words itself, as its route does).
  *     SCOPE_EXEMPT_TOOLS moved unchanged to ./scope-exempt-tools.ts and is re-exported here (max-file-lines).
@@ -591,7 +594,10 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_company_front_page: 'company:write',
     aimeat_company_portfolio_publish: 'company:write',
 
-    aimeat_contact_list: 'messages:read',
+    // Listing the book has its own word since 2026-10-01: contacts:read, the word GET /v1/contacts
+    // asks, which the tool calls. The conversation fields on each row stay empty unless the caller
+    // may also read the owner's mailbox (messages:read-as-owner for an agent).
+    aimeat_contact_list: 'contacts:read',
     aimeat_contact_resolve_email: 'messages:read',
     aimeat_contact_add: 'messages:send',
     aimeat_contact_remove: 'messages:send',

@@ -31,10 +31,14 @@
  * @structure eraseAppMembership(storage, account) → AppMembershipErasure
  * @usage const counts = await eraseAppMembership(storage, 'bob');
  * @version-history
+ *   v1.1.0 — 2026-10-01 — App roster invitations (`app-member-invite`, services/app-member-invites.ts)
+ *     go too: the ones the account sent, every one of the apps it owned, and every one addressed to
+ *     its verified address, found by the address hash on its identity record.
  *   v1.0.0 — 2026-10-01 — Initial: account erasure left app-membership records behind for a reused name.
  */
 import type { MemoryRecord, Storage } from '../storage/interface.js';
-import { accountOf, NS_MEMBER, NS_REQUEST, NS_PLAN, NS_SEEN } from './app-members.js';
+import { accountOf, bareOwner, NS_MEMBER, NS_REQUEST, NS_PLAN, NS_SEEN } from './app-members.js';
+import { NS_INVITE, INVITE_PREFIX } from './app-member-invites.js';
 
 /**
  * The development rights' own namespace, as services/app-dev-grant.ts writes it. That module keeps the
@@ -55,6 +59,11 @@ export interface AppMembershipErasure {
   plans: number;
   /** Blanket development rights the account gave or held. */
   blanketGrants: number;
+  /**
+   * App roster invitations: the ones the account sent, every one of the apps it owned, and every one
+   * addressed to the account's verified address.
+   */
+  invites: number;
 }
 
 /** A record address for bulkDeleteMemory. */
@@ -127,8 +136,12 @@ async function hardDelete(storage: Storage, refs: Ref[]): Promise<number> {
  */
 export async function eraseAppMembership(storage: Storage, account: string): Promise<AppMembershipErasure> {
   const who = accountOf(account);
-  const result: AppMembershipErasure = { members: 0, requests: 0, visits: 0, plans: 0, blanketGrants: 0 };
+  const result: AppMembershipErasure = { members: 0, requests: 0, visits: 0, plans: 0, blanketGrants: 0, invites: 0 };
   if (!who) return result;
+  // The account's verified address hash, read before the owner record goes (eraseOwner runs this
+  // step ahead of storage.deleteOwner). An invitation names an address, not an account, so this
+  // hash is the only thing that ties an invitation to the person being erased.
+  const emailHash = (await storage.getGHIIByOwner(bareOwner(account)))?.emailHash ?? null;
 
   const perApp: Array<[keyof AppMembershipErasure, string, string]> = [
     ['members', NS_MEMBER, 'appmember.'],
@@ -162,5 +175,18 @@ export async function eraseAppMembership(storage: Storage, account: string): Pro
     }
   }
   result.blanketGrants = await hardDelete(storage, blanket);
+
+  // Invitations: `appmeminv.<segment>.<address hash>`. The ones the account sent (invitedBy names one
+  // of its principals), every one of an app it owned, and every one addressed to its own address.
+  const invites: Ref[] = [];
+  for (const row of await scan(storage, NS_INVITE, INVITE_PREFIX)) {
+    const { segment, account: hash } = splitKey(row.key, INVITE_PREFIX);
+    const v = row.value as { invitedBy?: unknown; emailHash?: unknown } | null;
+    const sentBy = typeof v?.invitedBy === 'string' ? accountOf(v.invitedBy) : '';
+    if (sentBy === who || appOwnerOf(row, segment) === who || (emailHash && (hash === emailHash || v?.emailHash === emailHash))) {
+      invites.push({ ownerGaii: NS_INVITE, key: row.key });
+    }
+  }
+  result.invites = await hardDelete(storage, invites);
   return result;
 }

@@ -18,6 +18,11 @@
  *   if (AIMEAT.iam.can('analyse')) showTab();            // hint
  *   await AIMEAT.iam.guard('bid', () => runScoring());   // asks the server
  * @version-history
+ *   v1.3.0 — 2026-10-01 — invite(email, role), invites(), cancelInvite(id), audit(), people(q), and
+ *     me().canManage and displayName: the library side of the members round 2 (the node routes are
+ *     docs/internal/iam-members-and-library-blocks-plan.md A1 to B3).
+ *   v1.2.0 — 2026-10-01 — suggestRole(state, preferred): the one-click approval role, asked by the
+ *     owner panel and the Atelier kit's members block alike.
  *   v1.1.0 — 2026-10-01 — On the node roster a member holds capabilities: `roles` takes a map of role
  *     to capabilities, or a list of names (least power first) where each role holds its own name.
  *     Before this a member of an app with no extension held none, and can(), gate() and guard()
@@ -32,8 +37,9 @@ import { resolveNodeUrl } from '../_core/config.js';
 import { attach } from '../_core/namespace.js';
 import { detectDialect, callCheck, callAdmin, callRequest, callVocabulary } from './dialect.js';
 import { makeGate } from './gate.js';
-import { mountMemberAdmin, mountJoinPanel } from './panel.js';
-import { nodeMe, nodeState, nodeAssign, nodeRevoke, nodeDecline, nodeRequest, nodeDismissGuest } from './node-roster.js';
+import { mountMemberAdmin, mountJoinPanel, leastPower } from './panel.js';
+import { nodeMe, nodeState, nodeAssign, nodeRevoke, nodeDecline, nodeRequest, nodeDismissGuest,
+  nodeInvites, nodeCancelInvite, nodeAudit, nodePeople } from './node-roster.js';
 
 const { authFetch } = makeSession('aimeat-iam.js');
 
@@ -50,6 +56,9 @@ const { authFetch } = makeSession('aimeat-iam.js');
  * @property {string|null} since When the caller became a member, when the app records it.
  * @property {{ at: string, state: string, note?: string }|null} [requested] The caller's own ask for
  *   access, on the node roster: when, and whether it is pending or declined.
+ * @property {boolean} [canManage] The caller may manage members: the owner, or a member whose role
+ *   the plan lists in manageRoles.
+ * @property {string|null} [displayName] The caller's public display name, on the node roster.
  */
 
 /** @typedef {import('./dialect.js').Dialect} Dialect */
@@ -236,6 +245,8 @@ const iam = {
         // The caller's own ask, so the join form can say "you asked on …" instead of offering the
         // same form again to somebody who is already waiting.
         requested: raw.requested || null,
+        canManage: !!raw.canManage,
+        displayName: raw.displayName || null,
       };
       return state.me;
     }
@@ -244,7 +255,7 @@ const iam = {
       adminState = await callAdmin(authFetch, state.ext, state.dialect, 'state').catch(() => null);
       if (adminState && adminState.roles) state.roles = adminState.roles;
     }
-    const probe = state.dialect === 'op' ? { permission: ' probe' } : {};
+    const probe = state.dialect === 'op' ? { permission: '\u0000probe' } : {};
     const raw = await callCheck(authFetch, state.ext, state.dialect, probe);
     state.me = normalise(raw, state.roles, state.dialect);
     // In the `op` family the GATE never says whether the caller may administer: only the admin
@@ -402,6 +413,97 @@ const iam = {
   },
 
   /**
+   * Invite somebody by email: the node approves the account that holds the address, or keeps an
+   * invitation and emails it when nobody does yet. Node roster only.
+   * @param {string} email
+   * @param {string} role
+   * @param {string} [note]
+   */
+  invite(email, role, note) {
+    requireInit();
+    if (!state.app) return Promise.resolve({ ok: false, error: 'invitations belong to the node roster; init with { app }' });
+    return nodeAssign(authFetch, /** @type {string} */ (state.app), { email: email, role: role, note: note });
+  },
+
+  /** The open invitations. Node roster only. @returns {Promise<any>} */
+  invites() {
+    requireInit();
+    if (!state.app) return Promise.resolve([]);
+    return nodeInvites(authFetch, /** @type {string} */ (state.app));
+  },
+
+  /** Cancel an open invitation. @param {string} id */
+  cancelInvite(id) {
+    requireInit();
+    if (!state.app) return Promise.resolve({ ok: false, error: 'invitations belong to the node roster; init with { app }' });
+    return nodeCancelInvite(authFetch, /** @type {string} */ (state.app), id);
+  },
+
+  /**
+   * The roster's history, newest first. Owner and managers. Node roster only.
+   * @param {{ limit?: number, before?: string }} [opts]
+   */
+  audit(opts) {
+    requireInit();
+    if (!state.app) return Promise.resolve([]);
+    return nodeAudit(authFetch, /** @type {string} */ (state.app), opts);
+  },
+
+  /**
+   * What membership of the app means: access, seats, terms, who reads the roster, which roles
+   * manage members. Owner only. Node roster only.
+   * @returns {Promise<any>}
+   */
+  async plan() {
+    requireInit();
+    if (!state.app) return null;
+    const [o, f] = String(state.app).split('/');
+    const body = await authFetch('/v1/apps/' + encodeURIComponent(o || '') + '/' + encodeURIComponent(f || '') + '/members/plan');
+    if (body && body.ok === false) return body;
+    return body && body.data ? body.data.plan : null;
+  },
+
+  /**
+   * Declare what membership of the app means. Replaces the whole plan. Owner only.
+   * @param {{ roles: Record<string, string[]>, access?: string, rosterVisibility?: string,
+   *   seats?: Record<string, number>, terms?: Record<string, { days?: number, renewal?: string }>,
+   *   manageRoles?: string[] }} plan
+   */
+  async setPlan(plan) {
+    requireInit();
+    if (!state.app) return { ok: false, error: 'the plan belongs to the node roster; init with { app }' };
+    const [o, f] = String(state.app).split('/');
+    const body = await authFetch('/v1/apps/' + encodeURIComponent(o || '') + '/' + encodeURIComponent(f || '') + '/members/plan',
+      { method: 'PUT', body: JSON.stringify(plan) });
+    return body && body.data !== undefined ? body.data : body;
+  },
+
+  /**
+   * The people the owner knows, from their address book, with an account first. The app's token
+   * needs the scope word contacts:read (declare it in the page's aimeat-scopes).
+   * @param {string} [q]
+   */
+  people(q) {
+    return nodePeople(authFetch, q);
+  },
+
+  /**
+   * The role one click on Approve should grant, from the state admin('state') answered: `preferred`
+   * when it is one of the roles, else the role with the least power, leaving out the role a stranger
+   * already gets. The owner panel and the Atelier kit's members block both ask this, so the two
+   * surfaces cannot grant different roles for the same click.
+   * @param {any} st  What admin('state') answered.
+   * @param {string} [preferred]
+   * @returns {string|undefined}
+   */
+  suggestRole(st, preferred) {
+    const roles = (st && st.roles) ? Object.keys(st.roles) : [];
+    if (preferred && roles.indexOf(preferred) !== -1) return preferred;
+    const defaultRole = (st && st.config && st.config.defaultRole) || null;
+    return leastPower(roles, (st && st.roles) || {}, defaultRole);
+  },
+
+  /**
    * The owner's panel: the union of the six that already exist on this node. See panel.js for what
    * each section is and which app it came from.
    * @param {import('./panel.js').PanelOpts} opts
@@ -433,3 +535,19 @@ iam.gate = gateApi.gate;
 iam.guard = gateApi.guard;
 
 attach('iam', iam);
+
+// A different person signing in on the same page has a different standing. me() kept the last
+// one, so after a sign-out and a sign-in a visitor was shown the owner's controls, and the owner a
+// visitor's form, until a reload. The cached standing goes on either event and is read again.
+const authLib = /** @type {any} */ (typeof window !== 'undefined' ? window : {}).AIMEAT?.auth;
+if (authLib && typeof authLib.on === 'function') {
+  const forget = function () {
+    state.me = null;
+    if (state.app || state.ext) {
+      // Signed out, the read is refused and me() stays null, which is the truthful answer.
+      iam.refresh().catch(function (e) { console.debug('aimeat-iam: standing not read after a sign-in change', e); });
+    }
+  };
+  authLib.on('login', forget);
+  authLib.on('logout', forget);
+}

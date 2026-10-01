@@ -4286,6 +4286,7 @@
       "catalogue": "julkinen hakemisto",
       "social": "keskustelualueet",
       "messages": "viestisi",
+      "contacts": "osoitekirjasi",
       "wallet": "morselisaldosi",
       "knowledge": "tietopakettisi",
       "task": "agenttiesi tehtävät",
@@ -15602,6 +15603,7 @@
         "domainWork": "Työ",
         "domainSocial": "Sosiaalinen",
         "domainMessages": "Suorat viestit (postilaatikko)",
+        "domainContacts": "Osoitekirja",
         "domainWallet": "Lompakko",
         "domainConsent": "Suostumus",
         "domainShare": "Jakaminen",
@@ -15682,6 +15684,9 @@
             "read-as-owner": "Lue postilaatikkoasi sinuna: kaikki keskustelusi ja niiden viestit. Lukeminen ei merkitse mitään luetuksi.",
             "delete-as-owner": "Poistaa viestejä postilaatikostasi sinun nimissäsi. Oma kappaleesi häviää lopullisesti; vastapuolelle jää omansa.",
             "organize-as-owner": "Arkistoi keskusteluja postilaatikostasi ja asettaa Viestit-listasi säännöt sinun nimissäsi. Mitään ei poisteta, ja arkistoitu keskustelu palaa listalle, kun joku muu kuin oma agenttisi kirjoittaa siihen."
+          },
+          "contacts": {
+            "read": "Katso osoitekirjasi ihmisten nimet ja tilit."
           },
           "notifications": {
             "send": "Lähetä sinulle ilmoitus sovellukseen ja puhelimeesi. Vastaanottaja on aina sinä."

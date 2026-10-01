@@ -26,6 +26,8 @@
  *   resolveContactEmail; resolveOwnerByVerifiedEmail; promoteContactsForVerifiedEmail.
  * @usage const { contacts } = await listContactsMerged(storage, config, ownerGhii, { q });
  * @version-history
+ *   v2.5.0 — 2026-10-01 — withoutCorrespondence(row): the same row with the conversation columns empty,
+ *     for a caller reading the book on contacts:read that may not read the owner's mailbox.
  *   v2.4.1 — 2026-09-26 — The inviter's and a resolved owner's account names come from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v2.4.0 — 2026-09-25 — resolveContactEmail takes the asker, and it and a save by email both count
  *     against the account's 20 lookups in 10 minutes before the address is read (ContactsError 429
@@ -159,6 +161,17 @@ function messageOf(conv: ConversationSummary | undefined): Pick<ContactRow, 'has
     message_count: conv.messageCount,
     conversation_id: conv.conversationId,
   };
+}
+
+/**
+ * The same row with the conversation columns empty: no message text, no sender, no time, no count,
+ * no conversation id. For a caller reading the book on contacts:read that may not read the owner's
+ * mailbox (routes/contacts.ts decides). Those columns are the owner's correspondence, and a word that
+ * reads names and accounts does not carry it. `has_messages` stays: the row is in the book because
+ * a conversation exists (origin 'message'), so the flag tells nothing the row does not.
+ */
+export function withoutCorrespondence(row: ContactRow): ContactRow {
+  return { ...row, last_message_at: null, last_message: null, last_sender: null, message_count: 0, conversation_id: null };
 }
 
 /** The person behind an agent or an app id, as a GHII; null for anything else. */

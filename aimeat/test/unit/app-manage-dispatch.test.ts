@@ -6,6 +6,8 @@
  *   end by test/e2e-app-manage.ts.
  * @usage pnpm test -- app-manage-dispatch
  * @version-history
+ *   v1.3.0 — 2026-10-01 — IAM round 2: email on member_set, q/limit/offset on members, manage_roles
+ *     on member_plan_set, and member_audit and member_invite_cancel.
  *   v1.2.0 — 2026-10-01 — The member actions and their fields, and how snake_case tool fields reach
  *     the member routes' camelCase body.
  *   v1.1.0 — 2026-09-28 — config_get and config_set, and the `values` field.
@@ -50,6 +52,8 @@ const VALUE: Record<string, unknown> = {
     account: 'zqxacct', role: 'zqxrole', level: 4, offerings: ['zqxoff'], expires_at: '2027-01-02T03:04:05Z',
     roles: { zqxrole: ['zqxoff'] }, seats: { zqxrole: 2 }, terms: { zqxrole: { days: 30, renewal: 'manual' } },
     access: 'members-only', roster_visibility: 'members',
+    email: 'zqx@example.com', locale: 'fi', q: 'zqxq', offset: 11, before: '2026-09-01T00:00:00Z', invite_id: 'zqxinv',
+    manage_roles: ['zqxmgr'],
 };
 
 /** Where each action goes: method and path. The body is checked field by field below. */
@@ -82,7 +86,7 @@ const EXPECT: Record<string, [string, string]> = {
     subdomain_list: ['GET', '/v1/admin/subdomains'],
     subdomain_set: ['PATCH', '/v1/admin/subdomains/zqxsub'],
     subdomain_delete: ['DELETE', '/v1/admin/subdomains/zqxsub'],
-    members: ['GET', '/v1/apps/alice/shop.html/members'],
+    members: ['GET', '/v1/apps/alice/shop.html/members?q=zqxq&limit=7&offset=11'],
     member_set: ['POST', '/v1/apps/alice/shop.html/members'],
     member_remove: ['DELETE', '/v1/apps/alice/shop.html/members/zqxacct'],
     member_decline: ['DELETE', '/v1/apps/alice/shop.html/members/requests/zqxacct'],
@@ -92,10 +96,13 @@ const EXPECT: Record<string, [string, string]> = {
     member_sweep: ['POST', '/v1/apps/alice/shop.html/members/sweep'],
     member_me: ['GET', '/v1/apps/alice/shop.html/members/me'],
     member_request: ['POST', '/v1/apps/alice/shop.html/members/requests'],
+    member_audit: ['GET', '/v1/apps/alice/shop.html/members/audit?limit=7&before=2026-09-01T00%3A00%3A00Z'],
+    member_invite_cancel: ['DELETE', '/v1/apps/alice/shop.html/members/invites/zqxinv'],
 };
 
 /** A field that travels in the path or query, or shapes the request rather than appearing in it. */
-const IN_PATH = new Set(['filename', 'owner', 'bundled_agent', 'subdomain', 'limit', 'playtest', 'days', 'detail', 'runner_agent']);
+const IN_PATH = new Set(['filename', 'owner', 'bundled_agent', 'subdomain', 'limit', 'playtest', 'days', 'detail', 'runner_agent',
+    'q', 'offset', 'before', 'invite_id']);
 
 function fullInput(action: string): Record<string, unknown> {
     const input: Record<string, unknown> = { action };
@@ -150,15 +157,28 @@ describe('aimeat_app_manage: every action reaches its endpoint with its fields',
         const a = recorder();
         await appManageCall(a.client, 'me', fullInput('member_set'));
         expect(a.sent[0]!.body).toEqual({
-            account: 'zqxacct', role: 'zqxrole', level: 4, note: 'zqxnote', offerings: ['zqxoff'], days: 9,
+            account: 'zqxacct', email: 'zqx@example.com', locale: 'fi', role: 'zqxrole', level: 4, note: 'zqxnote', offerings: ['zqxoff'], days: 9,
             expiresAt: '2027-01-02T03:04:05Z',
         });
         const b = recorder();
         await appManageCall(b.client, 'me', fullInput('member_plan_set'));
         expect(b.sent[0]!.body).toEqual({
             roles: { zqxrole: ['zqxoff'] }, seats: { zqxrole: 2 }, terms: { zqxrole: { days: 30, renewal: 'manual' } },
-            access: 'members-only', rosterVisibility: 'members',
+            access: 'members-only', rosterVisibility: 'members', manageRoles: ['zqxmgr'],
         });
+    });
+
+    it('member_set takes an email instead of an account, and needs one of the two', async () => {
+        expect(checkAppManageInput({ action: 'member_set', filename: 'shop.html', role: 'member' }).ok).toBe(false);
+        const { client, sent } = recorder();
+        await appManageCall(client, 'me', { action: 'member_set', filename: 'shop.html', email: 'bob@example.com', role: 'member' });
+        expect(sent[0]).toEqual({ method: 'POST', path: '/v1/apps/me/shop.html/members', body: { email: 'bob@example.com', role: 'member' } });
+    });
+
+    it('members without search or paging sends no query', async () => {
+        const { client, sent } = recorder();
+        await appManageCall(client, 'me', { action: 'members', filename: 'shop.html' });
+        expect(sent[0]).toEqual({ method: 'GET', path: '/v1/apps/me/shop.html/members', body: undefined });
     });
 
     it('member_set with an empty expires_at sends null, the route\'s "does not end"', async () => {

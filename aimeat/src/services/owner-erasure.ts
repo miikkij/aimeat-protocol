@@ -197,7 +197,7 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
     // does not depend on the apps step above having succeeded.
     await step('app_membership', async () => {
       const c = await eraseAppMembership(storage, name);
-      const n = c.members + c.requests + c.visits + c.plans + c.blanketGrants;
+      const n = c.members + c.requests + c.visits + c.plans + c.blanketGrants + c.invites;
       return n ? `app_membership:${n}` : null;
     }, deletionLog);
 

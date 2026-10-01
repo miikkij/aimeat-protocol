@@ -12,6 +12,7 @@
  *   import { scopesForProfile } from '../catalog/scopes.js';
  *   const scopes = scopesForProfile('task-runner');
  * @version-history
+ *   v1.1.0 -- 2026-10-01 -- coordinator holds contacts:read, the word the contact list now asks for.
  *   v1.0.0 -- 2026-09-26 -- Moved unchanged from scopes.ts (v1.30.1), which had passed the 800-line
  *     limit.
  */
@@ -27,7 +28,7 @@ import { logger } from '../../utils/logger.js';
  */
 export const MCP_SCOPE_PROFILES: Record<string, string[]> = {
     'task-runner': ['memory:read', 'memory:write', 'work:read', 'work:accept'],
-    coordinator: ['memory:read', 'memory:write', 'social:read', 'social:write', 'messages:send', 'messages:read', 'work:read', 'work:request', 'workflow:read', 'workflow:write'],
+    coordinator: ['memory:read', 'memory:write', 'social:read', 'social:write', 'messages:send', 'messages:read', 'contacts:read', 'work:read', 'work:request', 'workflow:read', 'workflow:write'],
     appdev: ['memory:read', 'memory:write'],
     'organism-knowledge': ['memory:read', 'memory:write', 'social:read'],
     interactive: ['*'],

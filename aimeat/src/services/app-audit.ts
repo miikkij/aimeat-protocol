@@ -35,6 +35,10 @@
  * @usage
  *   await recordAppAudit(storage, { ownerGhii, filename, by: actorGhii, action: 'legal.set', detail: { kind: 'terms' } });
  * @version-history
+ *   v1.3.0 — 2026-10-01 — The member roster writes here: approve, role change, remove, decline,
+ *     dismiss, invite, invite cancel, plan change and sweep, each with the person it was about and
+ *     the role before and after. GET /v1/apps/:owner/:filename/members/audit reads those rows for the
+ *     owner and the members who manage the roster (services/app-member-rules.ts memberAuditRows).
  *   v1.2.0 — 2026-09-08 — `dev.granted` / `dev.revoked`: the owner letting somebody else build this
  *     app, and taking it back. It belongs in this log rather than only on the roster row for the
  *     reason the log exists at all — the row says who may build it now, and answering for the app
@@ -65,7 +69,12 @@ export type AppAuditAction =
   | 'access_code.set' | 'access_code.cleared'
   | 'protection'
   | 'name' | 'description'
-  | 'dev.granted' | 'dev.revoked';
+  | 'dev.granted' | 'dev.revoked'
+  // The member roster (routes/app-members.ts): each decision about a person, the plan and the sweep.
+  | 'member.approved' | 'member.role_changed' | 'member.removed'
+  | 'request.declined' | 'visitor.dismissed'
+  | 'invite.sent' | 'invite.cancelled'
+  | 'plan.changed' | 'roster.swept';
 
 export interface AppAuditEntry {
   at: string;

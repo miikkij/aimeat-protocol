@@ -13,6 +13,418 @@
     return ns;
   }
 
+  // src/static/sdk-libs/organism/members.js
+  var nameCache = /* @__PURE__ */ new Map();
+  var NAME_READS_AT_ONCE = 6;
+  function nodeOf(session) {
+    var g = String(session && (session.ghii || session.owner) || "");
+    var at = g.indexOf("@");
+    return at >= 0 ? g.slice(at + 1) : "";
+  }
+  async function displayNames(h, rows) {
+    var node = nodeOf(h.getSession());
+    var todo = [];
+    rows.forEach(function(r) {
+      if (r.account && !nameCache.has(r.account) && todo.indexOf(r.account) < 0) todo.push(r.account);
+    });
+    var next = 0;
+    async function worker() {
+      while (next < todo.length) {
+        var account = todo[next++];
+        var ghii = account.indexOf("@") >= 0 || !node ? account : account + "@" + node;
+        var name = "";
+        try {
+          var res = await h.authFetch("/v1/ghii/" + encodeURIComponent(ghii));
+          if (res && res.ok !== false) name = String(res.data && res.data.display_name || "");
+        } catch {
+          name = "";
+        }
+        nameCache.set(account, name);
+      }
+    }
+    var workers = [];
+    for (var w = 0; w < Math.min(NAME_READS_AT_ONCE, todo.length); w++) workers.push(worker());
+    await Promise.all(workers);
+    rows.forEach(function(r) {
+      var n = nameCache.get(r.account);
+      if (n) r.displayName = n;
+    });
+    return rows;
+  }
+  function post(body) {
+    return { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+  }
+  function orgPath(orgId) {
+    return "/v1/organisms/" + encodeURIComponent(orgId);
+  }
+  function workspaceMembers(h) {
+    async function readAccess(orgId, wsId) {
+      var res = await h.authFetch(orgPath(orgId) + "/workspace-access?ws=" + encodeURIComponent(wsId));
+      if (!res || res.ok === false) throw h.fail(res, "Failed to read workspace access");
+      return res.data !== void 0 ? res.data : res;
+    }
+    async function creatorOf(orgId, wsId) {
+      var res = await h.authFetch(orgPath(orgId) + "/workspaces");
+      if (!res || res.ok === false) throw h.fail(res, "Failed to list workspaces");
+      var d = res.data !== void 0 ? res.data : res;
+      var row = (d && d.workspaces || []).filter(function(w) {
+        return w && w.id === wsId;
+      })[0];
+      return row ? { account: row.created_by, since: row.created_at } : null;
+    }
+    function memberRow(m) {
+      return { account: m.owner, role: m.role || null, since: m.granted_at || void 0, source: m.source || null, grantedBy: m.granted_by || null };
+    }
+    function requestRow(r) {
+      return { account: r.requester, message: r.message || "", at: r.created_at || void 0, status: r.status || "pending", role: r.role || null };
+    }
+    var api = {
+      /**
+       * Members and requests in one read. Only the workspace's creator or an organism owner or admin may
+       * read them; anyone else gets the node's refusal (ACCESS_DENIED).
+       * @param {string} orgId
+       * @param {string} wsId
+       * @param {{ names?: boolean, creator?: boolean, all?: boolean }} [opts]  names (default true) fills
+       *   displayName; creator (default true) puts the creator first with role 'creator'; all (default
+       *   false) keeps decided requests in `requests`.
+       * @returns {Promise<{ members: WorkspaceMember[], requests: AccessRequest[] }>}
+       */
+      async access(orgId, wsId, opts) {
+        opts = opts || {};
+        var both = await Promise.all([
+          readAccess(orgId, wsId),
+          opts.creator === false ? Promise.resolve(null) : creatorOf(orgId, wsId)
+        ]);
+        var d = both[0], creator = both[1];
+        var members = (d && d.members || []).map(memberRow);
+        if (creator && creator.account && !members.some(function(m) {
+          return m.account === creator.account;
+        })) {
+          members.unshift({ account: creator.account, role: "creator", since: creator.since || void 0, source: null, grantedBy: null });
+        }
+        var requests = (d && d.requests || []).map(requestRow).filter(function(r) {
+          return opts.all || r.status === "pending";
+        });
+        if (opts.names !== false) await displayNames(
+          h,
+          /** @type {any[]} */
+          members.concat(requests)
+        );
+        return { members, requests };
+      },
+      /**
+       * Who holds a role in the workspace: GET /v1/organisms/:id/workspace-access?ws=, plus the creator
+       * from GET /v1/organisms/:id/workspaces. `{ pending: true }` adds each waiting requester with
+       * `pending: true` and role null, after the members.
+       * @param {string} orgId
+       * @param {string} wsId
+       * @param {{ names?: boolean, creator?: boolean, pending?: boolean }} [opts]
+       * @returns {Promise<WorkspaceMember[]>}
+       */
+      async members(orgId, wsId, opts) {
+        opts = opts || {};
+        var a = await api.access(orgId, wsId, { names: opts.names, creator: opts.creator });
+        if (!opts.pending) return a.members;
+        var waiting = a.requests.filter(function(r) {
+          return !a.members.some(function(m) {
+            return m.account === r.account;
+          });
+        }).map(function(r) {
+          return (
+            /** @type {WorkspaceMember} */
+            { account: r.account, displayName: r.displayName, role: null, since: r.at, pending: true }
+          );
+        });
+        return a.members.concat(waiting);
+      },
+      /**
+       * The access requests: GET /v1/organisms/:id/workspace-access?ws=. Pending ones only, unless
+       * `{ all: true }`.
+       * @param {string} orgId
+       * @param {string} wsId
+       * @param {{ names?: boolean, all?: boolean }} [opts]
+       * @returns {Promise<AccessRequest[]>}
+       */
+      async requests(orgId, wsId, opts) {
+        opts = opts || {};
+        var a = await api.access(orgId, wsId, { names: opts.names, creator: false, all: opts.all });
+        return a.requests;
+      },
+      /**
+       * Give a person a role, or change the one they hold: POST /v1/organisms/:id/workspace-access/grant
+       * { ws, grantee, role }. Needs the organism:invite scope on an app session, and the caller must be
+       * the workspace's creator or an organism owner or admin.
+       * @param {string} orgId
+       * @param {string} wsId
+       * @param {string} account  An account name, a GHII or a GAII; the grant goes to the person.
+       * @param {'viewer'|'contributor'} role
+       * @returns {Promise<{ ws: string, grantee: string, role: string }>}
+       */
+      async grant(orgId, wsId, account, role) {
+        var res = await h.authFetch(orgPath(orgId) + "/workspace-access/grant", post({ ws: wsId, grantee: account, role }));
+        if (!res || res.ok === false) throw h.fail(res, "Failed to grant access");
+        return res.data !== void 0 ? res.data : res;
+      },
+      /**
+       * Take every role a person holds in the workspace away: POST
+       * /v1/organisms/:id/workspace-access/revoke { ws, grantee }. Same permission as grant().
+       * @param {string} orgId
+       * @param {string} wsId
+       * @param {string} account
+       * @returns {Promise<{ ws: string, grantee: string, revoked: number }>}
+       */
+      async revoke(orgId, wsId, account) {
+        var res = await h.authFetch(orgPath(orgId) + "/workspace-access/revoke", post({ ws: wsId, grantee: account }));
+        if (!res || res.ok === false) throw h.fail(res, "Failed to revoke access");
+        return res.data !== void 0 ? res.data : res;
+      },
+      /**
+       * Approve or decline an access request: POST /v1/organisms/:id/workspace-access/decision
+       * { ws, requester, decision: 'approve' | 'deny', role }. 'decline' is sent as the node's 'deny'.
+       * An approval grants `role`; the node grants 'contributor' when no role or another word is sent.
+       * @param {string} orgId
+       * @param {string} wsId
+       * @param {string} account
+       * @param {'approve'|'decline'|'deny'} decision
+       * @param {'viewer'|'contributor'} [role]
+       * @returns {Promise<any>}  The node's answer: the decision, ws and requester.
+       */
+      async decide(orgId, wsId, account, decision, role) {
+        var body = { ws: wsId, requester: account, decision: decision === "decline" ? "deny" : decision };
+        if (role) body.role = role;
+        var res = await h.authFetch(orgPath(orgId) + "/workspace-access/decision", post(body));
+        if (!res || res.ok === false) throw h.fail(res, "Failed to decide the request");
+        return res.data !== void 0 ? res.data : res;
+      },
+      /**
+       * Invite an email address into the organism, with roles in chosen workspaces that apply when the
+       * invitation is accepted: POST /v1/organisms/:id/invitations/email. Organism owner or admin only,
+       * and the organism:invite scope on an app session. `accept_url` comes back so the link can be
+       * shared by hand when the node sends no email (`email_sent: false`).
+       * @param {string} orgId
+       * @param {string} email
+       * @param {{ workspaces?: Array<{ ws: string, role?: 'viewer'|'contributor' }>, ws?: string,
+       *   role?: 'viewer'|'contributor', orgRole?: 'member'|'admin', message?: string,
+       *   expiresInDays?: number, returnUrl?: string, locale?: 'en'|'fi'|'es' }} [opts]  `ws` + `role`
+       *   is the short form for one workspace.
+       * @returns {Promise<{ invitation: any, email_sent: boolean, email_locale?: string, accept_url: string }>}
+       */
+      async inviteByEmail(orgId, email, opts) {
+        opts = opts || {};
+        var workspaces = Array.isArray(opts.workspaces) ? opts.workspaces.slice() : [];
+        if (opts.ws && !workspaces.some(function(w) {
+          return w && w.ws === opts.ws;
+        })) workspaces.push({ ws: opts.ws, role: opts.role || "viewer" });
+        var body = { email, workspaces };
+        if (opts.orgRole) body.orgRole = opts.orgRole;
+        if (opts.message) body.message = opts.message;
+        if (opts.expiresInDays) body.expiresInDays = opts.expiresInDays;
+        if (opts.returnUrl) body.return_url = opts.returnUrl;
+        if (opts.locale) body.locale = opts.locale;
+        var res = await h.authFetch(orgPath(orgId) + "/invitations/email", post(body));
+        if (!res || res.ok === false) throw h.fail(res, "Failed to send the invitation");
+        return res.data !== void 0 ? res.data : res;
+      }
+    };
+    return api;
+  }
+
+  // src/static/sdk-libs/organism/first-run.js
+  function orgPath2(orgId) {
+    return "/v1/organisms/" + encodeURIComponent(orgId);
+  }
+  function dataOf(res) {
+    return res && res.data !== void 0 ? res.data : res;
+  }
+  function dataLib() {
+    var d = window.AIMEAT && window.AIMEAT.data;
+    return d && typeof d.get === "function" && typeof d.set === "function" ? d : null;
+  }
+  function choiceKey(appKey) {
+    var k = typeof appKey === "string" ? appKey.trim() : "";
+    if (!k || /\s/.test(k)) throw new Error('appKey must be a non-empty key prefix without spaces, e.g. "cadence"');
+    return k + ".workspace";
+  }
+  function asChoice(v) {
+    return v && typeof v === "object" && typeof v.orgId === "string" && v.orgId && typeof v.wsId === "string" && v.wsId ? { orgId: v.orgId, wsId: v.wsId } : null;
+  }
+  function firstRun(h, organism2) {
+    function myAccounts() {
+      var s = h.getSession();
+      var owner = String(s.owner || s.user && s.user.owner || "");
+      var ghii = String(s.ghii || "");
+      var out = [owner];
+      var at = owner.indexOf("@");
+      if (at >= 0 && ghii && ghii.slice(ghii.indexOf("@")) === owner.slice(at)) out.push(owner.slice(0, at));
+      if (at < 0 && ghii) out.push(ghii);
+      return out.filter(Boolean);
+    }
+    async function listWorkspaces(orgId) {
+      var res = await h.authFetch(orgPath2(orgId) + "/workspaces");
+      if (!res || res.ok === false) throw h.fail(res, "Failed to list workspaces");
+      var d = dataOf(res);
+      return d && d.workspaces || [];
+    }
+    async function manifestKind(orgId, wsId) {
+      var res = await h.authFetch(orgPath2(orgId) + "/workspace?ws=" + encodeURIComponent(wsId));
+      if (!res || res.ok === false) return null;
+      var d = dataOf(res);
+      return d && d.manifest && d.manifest.kind || null;
+    }
+    async function resolveOrg(org) {
+      if (typeof org === "string" && org) return { id: org, created: false };
+      if (org && typeof org === "object" && typeof org.id === "string" && org.id) return { id: org.id, created: false };
+      if (org && typeof org === "object" && typeof org.name === "string" && org.name.trim()) {
+        var made = await organism2.create(org.name.trim(), { type: org.type, visibility: org.visibility, join_policy: org.join_policy, description: org.description });
+        if (!made || !made.id) throw new Error("The node created no organism id");
+        return { id: made.id, created: true };
+      }
+      throw new Error("org must be an organism id, or { name } to create a new organism");
+    }
+    var api = {
+      /**
+       * The organisms the caller belongs to, with the role they hold: GET
+       * /v1/organisms?member=<account>&per_page=100. Archived organisms are left out unless
+       * `{ archived: true }`. Unlike list(), a refusal throws instead of falling back to the public list.
+       * @param {{ archived?: boolean }} [opts]
+       * @returns {Promise<MyOrganism[]>}
+       */
+      async organisms(opts) {
+        opts = opts || {};
+        var mine = myAccounts();
+        var res = await h.authFetch("/v1/organisms?member=" + encodeURIComponent(mine[0] || "") + "&per_page=100");
+        if (!res || res.ok === false) throw h.fail(res, "Failed to list organisms");
+        var d = dataOf(res);
+        var list = d && (d.organisms || d.items) || (Array.isArray(d) ? d : []);
+        function holds(arr) {
+          return Array.isArray(arr) && arr.some(function(a) {
+            return mine.indexOf(a) >= 0;
+          });
+        }
+        return list.filter(function(o) {
+          return o && o.id && (opts.archived || !o.archived);
+        }).map(function(o) {
+          var role = holds(o.owners) || mine.indexOf(o.creatorGhii) >= 0 ? "owner" : holds(o.admins) ? "admin" : "member";
+          return { id: o.id, name: o.name || o.id, role, type: o.type, description: o.description, archived: !!o.archived, raw: o };
+        });
+      },
+      /**
+       * Find the app's workspace in an organism, or create it.
+       *
+       * Found means: not archived, readable by the caller, and named `name` (case and outer spaces
+       * ignored). With `kind`, the workspace's manifest must also carry that kind, which is the app's
+       * marker: a workspace of the same name made by another app is passed over and a new one created.
+       * `anyName: true` with `kind` also checks the other readable workspaces, so a renamed one is found;
+       * each check is one workspace read. `create: false` answers null instead of creating.
+       *
+       * Creating calls createWorkspace() with `manifest`, or with { name, kind, summary: purpose,
+       * objectTypes } built from the options; the node refuses a manifest without objectTypes, and that
+       * refusal is thrown as it is. `org` may be `{ name, type?, visibility?, description? }` to create
+       * a new organism first (needs organism:write).
+       * @param {{ org: string | { id?: string, name?: string, type?: string, visibility?: string,
+       *   join_policy?: string, description?: string }, name: string, kind?: string, purpose?: string,
+       *   objectTypes?: any[], manifest?: any, schemas?: Record<string, any>, readme?: string,
+       *   anyName?: boolean, create?: boolean }} opts
+       * @returns {Promise<(WorkspaceChoice & { name: string, created: boolean, orgCreated: boolean }) | null>}
+       */
+      async findOrCreateWorkspace(opts) {
+        opts = opts || /** @type {any} */
+        {};
+        var name = String(opts.name || "").trim();
+        if (!name) throw new Error("findOrCreateWorkspace needs a workspace name");
+        var org = await resolveOrg(opts.org);
+        var kind = typeof opts.kind === "string" && opts.kind ? opts.kind : null;
+        if (!org.created) {
+          var rows = (await listWorkspaces(org.id)).filter(function(w) {
+            return w && w.id && !w.archived && w.access !== "none";
+          });
+          var lower = name.toLowerCase();
+          var named = rows.filter(function(w) {
+            return String(w.name || "").trim().toLowerCase() === lower;
+          });
+          var candidates = kind && opts.anyName ? named.concat(rows.filter(function(w) {
+            return named.indexOf(w) < 0;
+          })) : named;
+          for (var i = 0; i < candidates.length; i++) {
+            var c = candidates[i];
+            if (kind && await manifestKind(org.id, c.id) !== kind) continue;
+            return { orgId: org.id, wsId: c.id, name: c.name || name, created: false, orgCreated: false };
+          }
+        }
+        if (opts.create === false) return null;
+        var manifest = opts.manifest && typeof opts.manifest === "object" ? Object.assign({}, opts.manifest) : { name, objectTypes: opts.objectTypes };
+        if (kind && !manifest.kind) manifest.kind = kind;
+        if (opts.purpose && !manifest.summary) manifest.summary = String(opts.purpose);
+        var readme = opts.readme || (opts.purpose ? "# " + name + "\n\n" + String(opts.purpose) : void 0);
+        var made = await organism2.createWorkspace(org.id, name, manifest, opts.schemas, readme);
+        if (!made || !made.ws) throw new Error("The node created no workspace id");
+        return { orgId: org.id, wsId: made.ws, name, created: true, orgCreated: org.created };
+      },
+      /**
+       * Keep the app's workspace choice in the owner's memory under `<appKey>.workspace`, as
+       * { orgId, wsId } with visibility 'owner' (the owner and their own agents read it). Writes
+       * through AIMEAT.data.set when aimeat-data is loaded, else POST /v1/memory.
+       * @param {string} appKey  The app's key prefix, e.g. 'cadence'.
+       * @param {WorkspaceChoice} choice
+       * @returns {Promise<WorkspaceChoice>}
+       */
+      async remember(appKey, choice) {
+        var key = choiceKey(appKey);
+        var value = asChoice(choice);
+        if (!value) throw new Error("remember needs { orgId, wsId }");
+        var lib = dataLib();
+        if (lib) {
+          await lib.set(key, value, { visibility: "owner" });
+          return value;
+        }
+        var res = await h.authFetch("/v1/memory", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key, value, visibility: "owner" })
+        });
+        if (!res || res.ok === false) throw h.fail(res, "Failed to save the workspace choice");
+        return value;
+      },
+      /**
+       * The choice remember() kept, or null. Reads through AIMEAT.data.get when aimeat-data is loaded,
+       * else GET /v1/memory/<key>?soft=1. With `{ verify: true }` it also lists the organism's
+       * workspaces and answers null when the workspace is gone, archived or no longer readable, or the
+       * node answers ACCESS_DENIED or NOT_FOUND for the organism; any other refusal is thrown.
+       * @param {string} appKey
+       * @param {{ verify?: boolean }} [opts]
+       * @returns {Promise<WorkspaceChoice | null>}
+       */
+      async recall(appKey, opts) {
+        opts = opts || {};
+        var key = choiceKey(appKey);
+        var lib = dataLib();
+        var stored;
+        if (lib) {
+          stored = await lib.get(key);
+        } else {
+          var res = await h.authFetch("/v1/memory/" + encodeURIComponent(key) + "?soft=1");
+          if (!res || res.ok === false) throw h.fail(res, "Failed to read the workspace choice");
+          var d = dataOf(res);
+          stored = d ? d.value : null;
+        }
+        var choice = asChoice(stored);
+        if (!choice || !opts.verify) return choice;
+        var listed = await h.authFetch(orgPath2(choice.orgId) + "/workspaces");
+        if (!listed || listed.ok === false) {
+          var code = listed && listed.error && listed.error.code;
+          if (code === "ACCESS_DENIED" || code === "NOT_FOUND") return null;
+          throw h.fail(listed, "Failed to list workspaces");
+        }
+        var lw = dataOf(listed);
+        var row = (lw && lw.workspaces || []).filter(function(w) {
+          return w && w.id === choice.wsId;
+        })[0];
+        return row && !row.archived && row.access !== "none" ? choice : null;
+      }
+    };
+    return api;
+  }
+
   // src/static/sdk-libs/organism/index.js
   function getSession() {
     if (!window.AIMEAT || !window.AIMEAT.auth) {
@@ -402,5 +814,7 @@
       BODY_FIELDS: BODY_FIELDS.slice()
     }
   };
+  var http = { authFetch, fail, getSession };
+  Object.assign(organism, workspaceMembers(http), firstRun(http, organism));
   attach("organism", organism);
 })();

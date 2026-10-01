@@ -7,16 +7,43 @@
  *   (needs aimeat-auth) — defineForm()/listForms()/deleteForm() manage a workspace's intake forms.
  *   Componentized ESM source esbuild bundles to the IIFE served, unchanged, at /v1/libs/aimeat-intake.js.
  *   Ported verbatim from lib-intake.ts; the baked ${config.baseUrl} is now APEX_URL from _core/config.
- * @structure imports APEX_URL (config) + attach (namespace); base()/enc()/submitPath(); public
- *   getForm/submit; owner authFetch/defineForm/listForms/deleteForm; attach('intake', …).
+ * @structure imports APEX_URL (config) + attach (namespace) + fields/refusalField (./fields.js);
+ *   base()/enc()/submitPath()/refused(); public getForm/submit/fields; owner
+ *   authFetch/defineForm/listForms/deleteForm; attach('intake', …).
  * @usage <script src="/v1/libs/aimeat-intake.js"></script>
  *   const form = await AIMEAT.intake.getForm(org, ws, 'contact-us');
+ *   const list = AIMEAT.intake.fields(form);   // [{ name, label, type, required, options?, maxLength? }]
  *   await AIMEAT.intake.submit(org, ws, 'contact-us', { nimi: '…', email: '…' });
  * @version-history
+ *   v1.1.0 — 2026-10-01 — fields(form): the normalised field list a renderer draws. A refusal from
+ *     getForm or submit carries code, details, status and, from submit, the `field` it concerns when
+ *     the node's answer names one.
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-intake.ts (SDK-libs migration Phase 1).
  */
 import { APEX_URL } from '../_core/config.js';
 import { attach } from '../_core/namespace.js';
+import { fields, refusalField } from './fields.js';
+
+/**
+ * A refusal from the intake routes, thrown as an Error.
+ * @typedef {Error & { code?: string, details?: unknown, status?: number, field?: string }} IntakeRefusal
+ */
+
+/**
+ * The node's refusal as a thrown Error carrying its code, details and HTTP status.
+ * @param {any} body      The parsed envelope, or null when the answer was not JSON.
+ * @param {number} status The HTTP status.
+ * @param {string} fallback
+ * @returns {IntakeRefusal}
+ */
+function refused(body, status, fallback) {
+  const err = body && body.error;
+  const e = /** @type {IntakeRefusal} */ (new Error((err && err.message) || fallback));
+  e.code = err && err.code;
+  e.details = err && err.details;
+  e.status = status;
+  return e;
+}
 
 function base() {
   // Prefer the auth lib's node URL (same node), else the baked apex base (from _core/config prelude).
@@ -30,7 +57,7 @@ function submitPath(org, ws, formId) { return '/v1/intake/' + enc(org) + '/' + e
 async function getForm(org, ws, formId) {
   var res = await fetch(base() + submitPath(org, ws, formId), { headers: { 'Accept': 'application/json' } });
   var body = await res.json().catch(function () { return null; });
-  if (!body || body.ok === false) throw new Error((body && body.error && body.error.message) || 'Form not found');
+  if (!body || body.ok === false) throw refused(body, res.status, 'Form not found');
   return body.data;
 }
 async function submit(org, ws, formId, values) {
@@ -39,12 +66,13 @@ async function submit(org, ws, formId, values) {
   });
   var body = await res.json().catch(function () { return null; });
   if (!body || body.ok === false) {
-    var e = /** @type {Error & { code?: string, details?: unknown }} */ (new Error((body && body.error && body.error.message) || 'Submit failed'));
-    e.code = body && body.error && body.error.code;
-    e.details = body && body.error && body.error.details;
+    var e = refused(body, res.status, 'Submit failed');
+    // The field the refusal concerns, so a renderer can mark it; absent when the node names none.
+    var field = refusalField(body && body.error);
+    if (field) e.field = field;
     throw e;
   }
-  return body.data; // { ok, id, mode }
+  return body.data; // { ok, id, mode }; a filled honeypot answers { ok: true, id: null } and writes nothing
 }
 
 // ── OWNER (needs aimeat-auth) ─────────────────────────────────────────────────
@@ -72,4 +100,4 @@ async function deleteForm(org, ws, formId) {
   return body.data;
 }
 
-attach('intake', { getForm: getForm, submit: submit, defineForm: defineForm, listForms: listForms, deleteForm: deleteForm, submitPath: submitPath, nodeUrl: base() });
+attach('intake', { getForm: getForm, submit: submit, fields: fields, defineForm: defineForm, listForms: listForms, deleteForm: deleteForm, submitPath: submitPath, nodeUrl: base() });

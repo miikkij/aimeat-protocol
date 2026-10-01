@@ -5,6 +5,8 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-10-01 — The roster from a chat, round 2: email on member_set, search and paging on members,
+ *     managers through manage_roles, member_audit and member_invite_cancel.
  *   2026-10-01 — The roster from a chat: the member actions of aimeat_app_manage, with the permission
  *     each one needs, and member_me and member_request on somebody else's app.
  *   2026-10-01 — The IAM split names the role map in init({ app, roles }), the one-click role, that
@@ -236,14 +238,19 @@ their own member model before this existed and disagreed six ways, so the split 
   hides what a role does not hold.
 
 **The roster from a chat.** \`aimeat_app_manage\` reaches the same routes, so the owner or their agent
-can run the members of an app without opening it. \`members\` lists who holds which role, who asked to
-join and who opened the app without a role. \`member_set\` approves a person into a role or changes it
-(\`account\`, \`role\`, and \`days\` or \`expires_at\` for an end date); \`member_remove\` removes them and
-takes back their free access; \`member_decline\` declines a request; \`member_dismiss\` clears a visitor
-from the list; \`member_plan_get\` and \`member_plan_set\` read and replace what each role gets free, its
-seats and its term; \`member_sweep\` closes the memberships that have ended. Each action needs the
-permission its route needs: app:write to read, app:manage to decline or dismiss, exchange:grant to
-approve, remove or sweep, commerce:sell to set the plan. Anybody can call two of them on somebody
+can run the members of an app without opening it. \`members\` lists who holds which role (with display
+names), who asked to join, who opened the app without a role and the open email invitations; \`q\`,
+\`limit\` and \`offset\` search and page it. \`member_set\` approves a person into a role or changes it
+(\`account\` or \`email\`, \`role\`, and \`days\` or \`expires_at\` for an end date): an email of a
+verified account approves that account, any other address gets an invitation by email, and
+\`member_invite_cancel\` withdraws one. \`member_remove\` removes a member and takes back their free
+access; \`member_decline\` declines a request (the person may ask again after seven days);
+\`member_dismiss\` clears a visitor from the list; \`member_audit\` reads who decided what, newest
+first. \`member_plan_get\` and \`member_plan_set\` read and replace what each role gets free, its seats,
+its term, and \`manage_roles\`: the roles whose holders run the roster beside the owner, without the
+plan, the sweep or a managing role. \`member_sweep\` closes the memberships that have ended. Each
+action needs the permission its route needs: app:write to read, app:manage to decline, dismiss or
+cancel an invitation, exchange:grant to approve, remove or sweep, commerce:sell to set the plan. Anybody can call two of them on somebody
 else's app: \`member_me\` answers your own role and request there, and \`member_request\` (with
 \`owner\`, and an optional \`note\`) asks its owner to let you in, which needs social:write.
 

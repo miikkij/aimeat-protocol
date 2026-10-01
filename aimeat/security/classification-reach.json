@@ -865,6 +865,12 @@
       },
       "why": "Reviewed 2026-10-01, the node's own read: account erasure lists the system namespaces of app membership (members, requests, visits, carry plans, blanket development rights), and the bin of the same namespaces, to delete the erased account's rows. Nothing it reads is shown to anyone."
     },
+    "src/services/app-member-roster.ts": {
+      "reads": {
+        "listAllMemory": 1
+      },
+      "why": "Reviewed 2026-10-01, the node's own read: one bounded page of an app's member rows in the system namespace app-member, read for their role names only, to choose the role a request notification's one-click approval offers. Nothing it reads is shown to the caller."
+    },
     "src/services/app-members.ts": {
       "reads": {
         "listAllMemory": 1,

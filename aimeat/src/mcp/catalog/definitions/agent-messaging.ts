@@ -5,6 +5,8 @@
  * @description Handbook/onboarding, agent self-management (capabilities, activity, telemetry, tags, mode), owner-agent messaging, and federated direct-message (DM) tool definitions, plus aimeat_agents_list.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-01 — aimeat_contact_list says it takes contacts:read, as GET /v1/contacts does, and which
+ *     columns stay empty for a caller that may not read the owner's mailbox or organisms.
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   2026-09-26 — aimeat_contact_invite says it takes messages:send, as POST /v1/contacts/invite now
  *     does for an agent.
@@ -431,7 +433,7 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
     {
         // ── Contacts (address book) — server MCP only, like the email-invite tools. ──
         name: 'aimeat_contact_list',
-        description: "The owner's address book: everyone they saved, everyone they have exchanged direct messages with, and every PERSON they wrote down who has no account on this node. Each entry carries kind (ghii = a person here, gaii = an agent, geai = an app, mail = a person with no account here), the name to show, their email when one is known, and origin ('saved' vs 'message'). Use it as the identity source when granting access — pair a ghii contact with aimeat_organism_invite, aimeat_organism_member_add, or aimeat_workspace_member_grant. A 'mail' contact cannot be granted anything until they join; invite them with aimeat_organism_invite_email.",
+        description: "The owner's address book: everyone they saved, everyone they have exchanged direct messages with, and every PERSON they wrote down who has no account on this node. Each entry carries kind (ghii = a person here, gaii = an agent, geai = an app, mail = a person with no account here), the name to show, their email when one is known, and origin ('saved' vs 'message'). Use it as the identity source when granting access — pair a ghii contact with aimeat_organism_invite, aimeat_organism_member_add, or aimeat_workspace_member_grant. A 'mail' contact cannot be granted anything until they join; invite them with aimeat_organism_invite_email. It takes contacts:read, here and on GET /v1/contacts alike. The conversation columns (last message, who wrote it, when, how many, the conversation id) are empty unless you may also read the owner's mailbox (messages:read-as-owner), and include \"together\" is answered only with organism:read.",
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
         input: {

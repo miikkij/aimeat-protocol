@@ -13,6 +13,8 @@
  * @structure nodeMe · nodeState · nodeAssign · nodeRevoke · nodeRequest
  * @usage AIMEAT.iam.init({ app: 'alice/app.html' })
  * @version-history
+ *   v1.2.0 — 2026-10-01 — Approve by email, invitations, the audit, the owner's address book
+ *     (people), and canManage and displayName on the standing.
  *   v1.1.0 — 2026-10-01 — nodeState carries each role's capabilities (the app's own map, or the role
  *     name alone) and marks itself `nodeRoster`; nodeRequest throws the node's refusal instead of
  *     reporting it as recorded.
@@ -49,6 +51,9 @@ export async function nodeMe(call, appId) {
     // The node roster is the person's row by construction, so a role always resolved through them.
     via: m ? 'owner' : 'none',
     requested: d ? d.requested : null,
+    // A member whose role the plan lists in manageRoles manages members too (not the plan).
+    canManage: !!(d && (d.isOwner || d.canManage)),
+    displayName: d && d.displayName ? d.displayName : null,
   };
 }
 
@@ -89,6 +94,9 @@ export async function nodeState(call, appId, roles, caps) {
     // apps people were visiting daily.
     seen: Object.fromEntries(((d && d.seen) || []).map((v) => [v.owner, { visits: v.visits, lastSeen: v.lastSeen }])),
     members,
+    invites: (d && d.invites) || [],
+    total: (d && d.total) || null,
+    canManage: !!(d && (d.canManage !== false)),
   };
 }
 
@@ -97,10 +105,10 @@ export async function nodeState(call, appId, roles, caps) {
  * — the loop every app used to run itself, in both directions.
  */
 export function nodeAssign(call, appId, args) {
-  const body = {
-    account: args.ghii || args.owner || args.account,
-    role: args.role,
-  };
+  const body = { role: args.role };
+  // By email the node looks the address up exactly, and invites it when nobody holds it yet.
+  if (args.email) body.email = args.email;
+  else body.account = args.ghii || args.owner || args.account;
   if (args.note) body.note = args.note;
   if (Array.isArray(args.offerings)) body.offerings = args.offerings;
   return un(call(base(appId), { method: 'POST', body: JSON.stringify(body) }));
@@ -143,4 +151,59 @@ export async function nodeRequest(call, appId, note) {
  */
 export function nodeDismissGuest(call, appId, who) {
   return un(call(base(appId) + '/seen/' + encodeURIComponent(String(who)), { method: 'DELETE' }));
+}
+
+/**
+ * The open invitations of the app: addresses the owner or a manager invited that nobody holds yet.
+ * @param {(path: string, opts?: RequestInit) => Promise<any>} call
+ * @param {string} appId
+ */
+export async function nodeInvites(call, appId) {
+  const d = await un(call(base(appId)));
+  if (d && d.ok === false) return d;
+  return (d && d.invites) || [];
+}
+
+/** Cancel one open invitation. */
+export function nodeCancelInvite(call, appId, id) {
+  return un(call(base(appId) + '/invites/' + encodeURIComponent(String(id)), { method: 'DELETE' }));
+}
+
+/**
+ * The roster's history, newest first: who approved, removed, declined, invited or changed whom.
+ * @param {(path: string, opts?: RequestInit) => Promise<any>} call
+ * @param {string} appId
+ * @param {{ limit?: number, before?: string }} [opts]
+ */
+export async function nodeAudit(call, appId, opts) {
+  const o = opts || {};
+  const q = [];
+  if (o.limit) q.push('limit=' + encodeURIComponent(String(o.limit)));
+  if (o.before) q.push('before=' + encodeURIComponent(String(o.before)));
+  const d = await un(call(base(appId) + '/audit' + (q.length ? '?' + q.join('&') : '')));
+  if (d && d.ok === false) return d;
+  return (d && d.events) || [];
+}
+
+/**
+ * The owner's address book, the people with an account first: what the members screen offers when
+ * the owner adds somebody. Needs the scope word contacts:read on the app's token.
+ * @param {(path: string, opts?: RequestInit) => Promise<any>} call
+ * @param {string} [q]  part of a name or an address
+ * @returns {Promise<Array<{ account: string|null, displayName: string|null, email: string|null }>|{ ok: false, error: any }>}
+ */
+export async function nodePeople(call, q) {
+  const d = await un(call('/v1/contacts' + (q ? '?q=' + encodeURIComponent(q) : '')));
+  if (d && d.ok === false) return d;
+  const rows = (d && d.contacts) || [];
+  const people = rows
+    .filter(function (r) { return r && (r.kind === 'owner' || r.kind === 'person' || r.kind === 'ghii'); })
+    .map(function (r) {
+      const id = String(r.contact_id || '');
+      // An account here is name@node; a saved person without one has only what the owner wrote.
+      const account = id.indexOf('@') > 0 && id.indexOf('#') === -1 ? id.slice(0, id.lastIndexOf('@')) : null;
+      return { account: account, displayName: r.display_name || r.saved_name || null, email: r.email || null };
+    });
+  people.sort(function (a, b) { return (a.account ? 0 : 1) - (b.account ? 0 : 1); });
+  return people;
 }

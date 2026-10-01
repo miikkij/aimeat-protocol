@@ -21,6 +21,10 @@
  *   const checked = checkAppManageInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
+ *   2026-10-01 — IAM round 2 on the member actions: member_set takes `email` and `locale` (a verified account's
+ *     address approves it, any other address is invited by email), members takes `q`, `limit` and
+ *     `offset`, member_plan_set takes `manage_roles`, and member_audit and member_invite_cancel are
+ *     new. The roster actions name the managers beside the owner.
  *   2026-10-01 — The app's member roster: members, member_set, member_remove, member_decline,
  *     member_dismiss, member_plan_get, member_plan_set and member_sweep for the owner and their
  *     agents, member_me and member_request for anybody (routes/app-members.ts). New fields account,
@@ -64,7 +68,7 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     content: { type: 'string', description: 'For legal: the page text, the HTML document, or the absolute https URL.' },
     remove: { type: 'boolean', description: 'For legal: true removes the named page.' },
     // audit
-    limit: { type: 'number', description: 'For audit: how many of the newest entries. Default 50, at most 500.' },
+    limit: { type: 'number', description: 'For audit and member_audit: how many of the newest entries. Default 50, at most 500. For members: how many people per list on one page. Default 100, at most 500.' },
     playtest: { type: 'boolean', description: 'For audit: also open the app in a headless browser, signed out, and report what it did (about a minute).' },
     // visitors
     days: { type: 'number', description: 'For visitors: the trailing window in days, 0 to 360. 0 is today only. Default 30. For member_set: how many days the membership lasts, counted from now; omit it to use the role\'s term from the plan.' },
@@ -107,6 +111,13 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     terms: { type: 'object', description: 'For member_plan_set: each role and how long it lasts, { "member": { "days": 30, "renewal": "manual" } }. renewal is "manual", "self-serve" or "none" and only says what is meant to happen; nothing renews or charges by itself.' },
     access: { type: 'string', enum: ['members-free', 'free', 'members-only'], description: 'For member_plan_set: who pays for the app\'s paid calls. members-free (default): members pay nothing, everybody else pays. free: nobody pays. members-only: only members get in at all.' },
     roster_visibility: { type: 'string', enum: ['owner', 'members'], description: 'For member_plan_set: who reads the roster. owner (default) or members, who then see names, roles and join dates only.' },
+    manage_roles: { type: 'array', description: 'For member_plan_set: the roles whose holders manage the roster beside the owner: they approve, decline, change and remove roles that do not manage, invite by email and read the history. They never change the plan, run the sweep, or give or take away a managing role. Empty: the owner alone.' },
+    email: { type: 'string', description: 'For member_set, instead of account: an email address. When it belongs to a verified account on this server, that person is approved; any other address gets an invitation by email, which makes them a member when they sign up with it. Open invitations are listed by members and cancelled with member_invite_cancel.' },
+    locale: { type: 'string', enum: ['en', 'fi', 'es'], description: 'For member_set with email: the language of the invitation email. Omit it to use your own language.' },
+    q: { type: 'string', description: 'For members: show only people whose account name, display name, email or note contains this text.' },
+    offset: { type: 'number', description: 'For members: how many people to skip on each list, for the next page. Default 0.' },
+    before: { type: 'string', description: 'For member_audit: the time of the oldest entry you already have, to read the page before it.' },
+    invite_id: { type: 'string', description: 'For member_invite_cancel: the invitation id, from the invites list of members.' },
 };
 
 /** One action: its fields (true = required), its permission word (null = none), and one line. */
@@ -131,22 +142,26 @@ const SETTINGS_FIELDS = ['name', 'description', 'descriptions', 'parked', 'forka
  * Spread into APP_MANAGE_ACTIONS before the account-wide actions, so the operator actions stay last.
  */
 const MEMBER_ACTION_SPECS: Record<string, AppManageAction> = {
-    members: { fields: F(['filename'], ['owner']), scope: 'app:write',
-        summary: 'the app\'s member roster: who holds which role, who asked to join and waits for your decision, and who opened the app without a role. Only the owner and their agents read it all; when the plan shows the roster to members, a member reads names and roles only' },
-    member_set: { fields: F(['filename', 'account', 'role'], ['owner', 'level', 'note', 'offerings', 'days', 'expires_at']), scope: 'exchange:grant',
-        summary: 'approve a person into a role, or change their role or end date. A new member is notified, and the plan\'s free access for the role is given to them; the answer says what was given and taken back. Owner only' },
+    members: { fields: F(['filename'], ['owner', 'q', 'limit', 'offset']), scope: 'app:write',
+        summary: 'the app\'s member roster: who holds which role, with display names, who asked to join and waits for your decision, who opened the app without a role, and the open email invitations. The owner, and members whose role the plan names as managing the roster read it all; when the plan shows the roster to members, a member reads names and roles only' },
+    member_set: { fields: F(['filename', 'role'], ['owner', 'account', 'email', 'locale', 'level', 'note', 'offerings', 'days', 'expires_at']), oneOf: ['account', 'email'], scope: 'exchange:grant',
+        summary: 'approve a person into a role, or change their role or end date, by account or by email (an unknown address is invited). The person is notified of a new membership and of a role change, and the plan\'s free access for the role is given to them; the answer says what was given and taken back. The owner, and members whose role the plan names as managing the roster; only the owner gives a managing role' },
     member_remove: { fields: F(['filename', 'account'], ['owner']), scope: 'exchange:grant',
-        summary: 'remove a member: they are notified and the free access the membership gave them is taken back. A right to build the app stays. Owner only' },
+        summary: 'remove a member: they are notified and the free access the membership gave them is taken back. A right to build the app stays. The owner, and members whose role the plan names as managing the roster; only the owner removes a manager' },
     member_decline: { fields: F(['filename', 'account'], ['owner']), scope: 'app:manage',
-        summary: 'decline a request to join. It is kept as declined, so the same person asking again is not shown as new. Owner only' },
+        summary: 'decline a request to join. The person is told, and may ask again after seven days; until then their ask is kept as declined. The owner, and members whose role the plan names as managing the roster' },
     member_dismiss: { fields: F(['filename', 'account'], ['owner']), scope: 'app:manage',
-        summary: 'take a person off the list of people who opened the app without a role. It blocks nobody; they appear again on their next visit. Owner only' },
+        summary: 'take a person off the list of people who opened the app without a role. It blocks nobody; they appear again on their next visit. The owner, and members whose role the plan names as managing the roster' },
     member_plan_get: { fields: F(['filename'], ['owner']), scope: 'app:write',
-        summary: 'what membership of the app means: the free access per role, seats, terms, who pays, and who reads the roster. Owner only' },
-    member_plan_set: { fields: F(['filename', 'roles'], ['owner', 'seats', 'terms', 'access', 'roster_visibility']), scope: 'commerce:sell',
+        summary: 'what membership of the app means: the free access per role, seats, terms, who pays, who reads the roster, and which roles manage it. Owner only' },
+    member_plan_set: { fields: F(['filename', 'roles'], ['owner', 'seats', 'terms', 'access', 'roster_visibility', 'manage_roles']), scope: 'commerce:sell',
         summary: 'replace the whole membership plan (read it first with member_plan_get). It applies to approvals from now on; people approved before keep what they have until they are approved again. Owner only' },
     member_sweep: { fields: F(['filename'], ['owner']), scope: 'exchange:grant',
         summary: 'close every membership whose end date has passed now, and take back its free access, instead of waiting for the hourly run. Owner only' },
+    member_audit: { fields: F(['filename'], ['owner', 'limit', 'before']), scope: 'app:write',
+        summary: 'the roster\'s history, newest first: who approved, declined, invited, changed a role or removed whom, and when, and every plan change. The owner, and members whose role the plan names as managing the roster' },
+    member_invite_cancel: { fields: F(['filename', 'invite_id'], ['owner']), scope: 'app:manage',
+        summary: 'cancel an open email invitation, so the address no longer becomes a member on sign-up. The owner, and members whose role the plan names as managing the roster; only the owner cancels an invitation into a managing role' },
     member_me: { fields: F(['filename'], ['owner']), scope: null,
         summary: 'your own standing in an app, yours or somebody else\'s: your role, whether you are the owner, and your request to join and its state' },
     member_request: { fields: F(['filename', 'owner'], ['note']), scope: 'social:write',

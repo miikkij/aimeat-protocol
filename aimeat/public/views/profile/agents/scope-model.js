@@ -18,6 +18,8 @@
  *   const checked = expandScopes(agent.default_scopes ?? ['*']);
  *   await save(collapseScopes(checked));
  * @version-history
+ *   v1.15.0 — 2026-10-01 — contacts:read, inside the wildcard: listing the owner's address book. It
+ *     rode messages:read on the node's MCP tool while the REST endpoint refused every agent.
  *   v1.14.0 — 2026-09-24 — connections:read-through: reading what is in a connected account (a
  *     mailbox, its attachments, its send-as addresses). It rode connections:use, which the box
  *     describes as publishing and sending (security audit A5-1).
@@ -201,6 +203,10 @@ export const SCOPE_DOMAINS = [
   // read-as-owner — read the owner's own mailbox. `read` is the agent's own messages.
   // organize-as-owner — archive the owner's conversations and write the rules for their list.
   { key: 'messages',  permissions: ['send', 'read', 'send-as-owner', 'read-as-owner', 'delete-as-owner', 'organize-as-owner'] },
+  // contacts:read — list the owner's address book (GET /v1/contacts, aimeat_contact_list): names,
+  //   accounts and what the owner wrote about each person. The conversations stay behind
+  //   messages:read-as-owner. Inside the wildcard: a person who ticked "Full access" meant this.
+  { key: 'contacts',  permissions: ['read'] },
   { key: 'wallet',    permissions: ['read'] },
   // consent:groups — create a sharing group and decide who is in it. A sharing group IS the
   //   boundary of who reads the owner's memory, so it is separated from managing consents.

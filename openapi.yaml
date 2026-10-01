@@ -29365,15 +29365,25 @@ paths:
         approved person they were approved (the extension sandbox notifies the CALLER, so an approval
         notifies the approver), keeping the list off the public internet (an `ext:` namespace is
         world-readable by default), and taking free access away together with the role. The app keeps
-        what a member may DO; the node keeps who they are. Returns `{ members, requests, seen, count }`,
-        where `seen` lists the people who opened the app and hold no role.
+        what a member may DO; the node keeps who they are. Returns `{ members, requests, seen,
+        invites, count, total: { members, requests, seen, invites }, limit, offset, isOwner,
+        canManage }`, where `seen` lists the people who opened the app and hold no role and
+        `invites` the open invitations of addresses with no account here yet (`{ id, appId,
+        emailShown, role, note, invitedBy, at, expiresAt }`). Every row of members, requests and
+        seen carries `displayName`, the account's public profile name, null when it has none.
 
 
+        `q` filters members, requests and seen by account or display name, and invitations by
+        address, case-insensitively; `limit` (default 100, at most 500) and `offset` page each list,
+        and `total` counts each list after the search. `count` is `total.members`.
+
+
+        The owner and the members whose role the plan lists in `manageRoles` read the whole roster.
         A MEMBER may also read it when the app's plan sets `rosterVisibility: members` - some apps
         cannot work otherwise, because the roster IS their content index. That view is redacted to
-        names, roles and join dates and carries `redacted: true`: the note somebody wrote when they
-        asked, who approved them, what they are carried on, and anyone still waiting stay the
-        owner's. A non-member and an anonymous caller are refused either way.
+        names, display names, roles and join dates and carries `redacted: true`: the note somebody
+        wrote when they asked, who approved them, what they are carried on, and anyone still waiting
+        stay the owner's. A non-member and an anonymous caller are refused either way.
 
         Who may call: the owner's own session; the app's own token (role `app`, minted for this
         same app), which is the app managing its own roster; or another principal of the owner that
@@ -29384,8 +29394,11 @@ paths:
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string } }
         - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: q, in: query, required: false, schema: { type: string, maxLength: 100 }, description: "Search: account or display name (an invitation by its address), case-insensitive." }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 500, default: 100 }, description: "Rows per list. A value above 500 reads as 500." }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 }, description: "Rows to skip in each list." }
       responses:
-        '200': 
+        '200':
           description: OK
           content:
             application/json:
@@ -29396,14 +29409,36 @@ paths:
       operationId: appMembersApprove
       summary: Approve someone, or change the role they hold
       description: >
-        Owner-only, idempotent. A role belongs to the PERSON, so the row is keyed to the bare account
-        name and every agent of theirs resolves to it without a second entry. A NEW member is
-        notified that they were approved; a role change is not, because re-sending "you were
-        approved" to somebody who already had access reads as a mistake. `since` survives a role
-        change. The owner cannot be a member of their own app. Body:
-        `{ account, role, level?, note?, offerings?, days?, expiresAt? }`. Returns
+        Owner and managers, idempotent. A role belongs to the PERSON, so the row is keyed to the bare
+        account name and every agent of theirs resolves to it without a second entry. A NEW member is
+        notified that they were approved (`app_member_approved`); an existing member whose role
+        changes is notified of the new role (`app_member_role_changed`); approving somebody into the
+        role they hold renews the term and notifies nobody. The notifications are written in the
+        member's own profile language (en, fi or es). `since` survives a role change. The owner
+        cannot be a member of their own app. Body:
+        `{ account, role, level?, note?, offerings?, days?, expiresAt? }` or
+        `{ email, role, note?, locale?, level?, days?, expiresAt? }`. Returns
         `{ member, created, access }`, where `access` reports which grants were issued, withdrawn or
         left alone - an approval that only set a role would be a sentence with nothing behind it.
+        Every approval and role change writes a row to the roster's audit trail (`.../members/audit`).
+
+
+        BY EMAIL. `email` is looked up by exact match through the same lookup and per-account limit
+        as `POST /v1/contacts/resolve` (429 RATE_LIMITED with `retry_after_sec` past it). An address
+        of a VERIFIED account here approves that account and the answer adds
+        `found: { account, displayName }`. Any other address stores an INVITATION, valid 30 days,
+        and emails it (in `locale`, else the inviter's own language); the answer is 201
+        `{ invited: true, invite, emailSent }`. When a person verifies that address (signing up,
+        confirming it on their account, or an account created with it already proven), every open
+        invitation for it becomes a membership in the invited role, and they are notified as on
+        approval. An app holds at most 200 open invitations (429 TOO_MANY_INVITES); inviting the
+        same address again renews its invitation.
+
+
+        MANAGERS. A member whose role the carry plan lists in `manageRoles` may call this too, but
+        may not approve anybody INTO a managing role, nor change or renew somebody who holds one
+        (403): only the owner makes or unmakes a manager. A manager approves by the declared carry
+        plan only, as the app's own token does: `offerings` they name are ignored.
 
 
         Refused with `409 SEATS_FULL` when the app's plan caps that role and every seat is taken.
@@ -29432,9 +29467,12 @@ paths:
           application/json:
             schema:
               type: object
-              required: [account, role]
+              required: [role]
+              description: "Exactly one of `account` and `email`."
               properties:
                 account: { type: string, description: "The PERSON to approve — a bare account name, their GHII, or one of their agents' GAII; all three resolve to the same person." }
+                email: { type: string, description: "The person's email address, instead of `account`. Approves the verified account holding it, or invites the address when none does." }
+                locale: { type: string, enum: [en, fi, es], description: "Language of the invitation email when `email` belongs to nobody here. Default: the inviter's own language." }
                 role: { type: string, description: "Role key this app uses. The app's own extension decides what it permits; the node only records who holds it." }
                 level: { type: integer, description: "BBS ordinal, LOWER is more power. Optional." }
                 note: { type: string, description: "Free text kept with the decision — the audit trail the app-side versions did not have. At most 400 characters are kept. The member does not see it." }
@@ -29463,6 +29501,11 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '429':
+          description: RATE_LIMITED - the account has used its email lookups (details.retry_after_sec); or TOO_MANY_INVITES - the app holds 200 open invitations.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
   /v1/apps/{owner}/{filename}/members/plan:
     get:
       operationId: appMembersPlanGet
@@ -29471,7 +29514,8 @@ paths:
         Owner-only. The app's membership configuration, declared once and applied to every approval
         after it. Null when the owner has declared none, in which case seats are unlimited,
         memberships do not lapse, an approval carries nothing, and the app charges everybody who is
-        not a member.
+        not a member. `manageRoles` lists the roles whose holders manage the roster (empty when the
+        owner manages alone).
 
         Who may call: the owner's own session; the app's own token (role `app`, minted for this
         same app), which is the app managing its own roster; or another principal of the owner that
@@ -29493,9 +29537,17 @@ paths:
       operationId: appMembersPlanSet
       summary: Declare what membership of this app means
       description: >
-        Owner-only, and it replaces the whole plan. Applies to approvals from now on: people already
+        Owner-only (a manager is refused), and it replaces the whole plan, except `manageRoles`,
+        which is kept when the body leaves it out. Applies to approvals from now on: people already
         approved keep what they were given until they are approved again, because changing the plan
-        under them would move somebody's access with nobody deciding to.
+        under them would move somebody's access with nobody deciding to. Writes a `plan.changed` row
+        to the roster's audit trail.
+
+        Who may call: the owner's own session; the app's own token (role `app`, minted for this
+        same app), signed in as the owner; or another principal of the owner that holds
+        `commerce:sell`. The app's own token may keep or drop the offerings a role is carried on but
+        not add one (403), because carrying an offering gives away free access to it. Answers 404
+        when the app does not exist.
       tags: [Apps]
       security:
         - BearerAuth: []
@@ -29510,6 +29562,10 @@ paths:
               type: object
               required: [roles]
               properties:
+                manageRoles:
+                  type: array
+                  items: { type: string }
+                  description: "Roles whose holders manage the roster: approve, change a role, remove, decline, dismiss a visitor, invite and cancel an invitation, and read the roster, the invitations and the audit trail. Never the plan or the sweep, and never a member who holds one of these roles, so only the owner makes or unmakes a manager. Each name is shaped like a role (a letter first, then letters, digits, `.`, `_` or `-`, at most 40 characters; not `owner`)."
                 roles:
                   type: object
                   additionalProperties:
@@ -29565,7 +29621,8 @@ paths:
         their very next call - so this is not what ends a membership. What the clock cannot do is
         withdraw the EXCHANGE grants, and until something does, a person the owner stopped selling to
         keeps calling on the owner's money. A timer runs this hourly across the node; this is the
-        same act, now, for one app. Returns `{ swept, revoked, failed }`.
+        same act, now, for one app. Returns `{ swept, revoked, failed }`, and writes a
+        `roster.swept` row to the roster's audit trail. A manager is refused.
 
         Who may call: the owner's own session; the app's own token (role `app`, minted for this
         same app), which is the app managing its own roster; or another principal of the owner that
@@ -29590,10 +29647,13 @@ paths:
       description: >
         Any authenticated caller. An AGENT asking this gets its human's answer, which is the whole
         point of keying the roster to the person: a member who works through an agent is one member,
-        not two. Returns `{ member, isOwner, role, requested }`, with `role` null for a stranger.
+        not two. Returns `{ member, isOwner, canManage, displayName, role, requested }`, with `role`
+        null for a stranger. `canManage` is true for the owner and for a member whose role the plan
+        lists in `manageRoles`. `displayName` is the caller's own public profile name, or null.
         `member` leaves out the owner's own records of the decision (`note`, `approvedBy`).
-        `requested` is the caller's own ask, `{ at, state, note }`, with state `pending` or
-        `declined`. Answers 404 when the app does not exist, and then records no visit.
+        `requested` is the caller's own ask, `{ at, state, note, retryAt? }`, with state `pending`
+        or `declined`; `retryAt` is when a declined person may ask again, present only while they
+        must wait. Answers 404 when the app does not exist, and then records no visit.
       tags: [Apps]
       security:
         - BearerAuth: []
@@ -29611,11 +29671,12 @@ paths:
       operationId: appMembersRemove
       summary: Remove a member
       description: >
-        Owner-only. The removed person is notified. Removing somebody who is not a member answers 404
-        rather than a cheerful 200, because "removed" and "there was nobody" are different facts.
-        The free-access grants the membership carried are withdrawn. A development right the owner
-        gave the same person stays: it was granted through `dev-grants` and is taken back there.
-        Returns `{ removed, member }`.
+        Owner and managers. The removed person is notified, in their own language. Removing somebody
+        who is not a member answers 404 rather than a cheerful 200, because "removed" and "there was
+        nobody" are different facts. The free-access grants the membership carried are withdrawn. A
+        development right the owner gave the same person stays: it was granted through `dev-grants`
+        and is taken back there. A manager may not remove somebody who holds a managing role (403).
+        Writes a `member.removed` audit row. Returns `{ removed, member }`.
 
         Who may call: the owner's own session; the app's own token (role `app`, minted for this
         same app), which is the app managing its own roster; or another principal of the owner that
@@ -29644,7 +29705,15 @@ paths:
         never reach: there the caller is the applicant, so the applicant would only notify
         themselves. Asking again updates the note rather than queueing a second ask. Somebody who is
         already a member is told so instead of joining a queue. Body `{ note? }` (max 400 chars).
-        Returns `{ recorded, request }` or `{ recorded: false, alreadyMember: true, member }`.
+        Returns `{ recorded, request }` or `{ recorded: false, alreadyMember: true, member }`. The
+        owner's notification is in the owner's language and carries Approve and Decline buttons;
+        Approve grants the role most members hold (read from one page of the roster), never a role
+        listed in `manageRoles`, and `member` when there is none.
+
+
+        Somebody whose ask was declined less than 7 days ago is refused with 429 `REASK_TOO_SOON`,
+        `details.retryAt` saying when they may ask again; nothing is written and the owner is not
+        notified. After that, asking again is a new ask.
 
 
         Who may call: a session of the person asking; the app's own token, signed in as that
@@ -29677,13 +29746,22 @@ paths:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '429':
+          description: REASK_TOO_SOON - the caller's ask was declined less than 7 days ago; details.retryAt says when they may ask again.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
   /v1/apps/{owner}/{filename}/members/requests/{account}:
     delete:
       operationId: appMembersDecline
       summary: Decline an ask
       description: >
-        Owner-only. The ask is marked declined rather than deleted, so the same person asking again
-        does not look like a first-time visitor. Returns `{ declined }`.
+        Owner and managers. The ask is marked declined rather than deleted, so the same person asking
+        again does not look like a first-time visitor. The person is notified
+        (`app_member_declined`, in their own language) with the date from which they may ask again,
+        7 days on. Returns `{ declined, retryAt }` and writes a `request.declined` audit row.
+        Declining an ask that is already declined changes nothing and notifies nobody; an account
+        with no ask at all answers 404, so this cannot send a decline to somebody who never asked.
 
         Who may call: the owner's own session; the app's own token (role `app`, minted for this
         same app), which is the app managing its own roster; or another principal of the owner that
@@ -29696,12 +29774,75 @@ paths:
         - { name: filename, in: path, required: true, schema: { type: string } }
         - { name: account, in: path, required: true, schema: { type: string } }
       responses:
-        '200': 
+        '200':
           description: OK
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/apps/{owner}/{filename}/members/audit:
+    get:
+      operationId: appMembersAudit
+      summary: The roster's audit trail - who decided what about whom
+      description: >
+        Owner and managers. The rows of the app's audit log that are about the roster, newest first:
+        `{ entries: [{ at, by, action, account, from?, to?, detail? }], total, nextBefore }`.
+        `action` is one of `member.approved`, `member.role_changed`, `member.removed`,
+        `request.declined`, `visitor.dismissed`, `invite.sent`, `invite.cancelled`, `plan.changed`,
+        `roster.swept`; `by` is the principal that acted (a person's or an agent's identity);
+        `account` is the person it was about, null for an invitation, the plan and the sweep;
+        `from` and `to` are the role before and after. `total` counts the roster rows in the whole
+        log, and `nextBefore` is the `before` that reads the next page (null on the last). The log
+        keeps the newest 500 entries of the app, the owner's other settings included.
+
+        Who may call: the owner's own session; the app's own token (role `app`, minted for this
+        same app); or another principal of the owner that holds `app:write`. A plain member and a
+        stranger are refused. Answers 404 when the app does not exist.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 500, default: 50 } }
+        - { name: before, in: query, required: false, schema: { type: string, format: date-time }, description: "Only rows strictly older than this time." }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/apps/{owner}/{filename}/members/invites/{id}:
+    delete:
+      operationId: appMembersInviteCancel
+      summary: Cancel an open invitation to the app's roster
+      description: >
+        Owner and managers. Deletes the invitation, so verifying that address no longer makes anybody
+        a member. A manager may not cancel an invitation into a role listed in `manageRoles` (403).
+        Returns `{ cancelled: true, invite }` and writes an `invite.cancelled` audit row. The open
+        invitations are listed in GET `.../members` as `invites`.
+
+        Who may call: the owner's own session; the app's own token (role `app`, minted for this
+        same app); or another principal of the owner that holds `app:manage`. Answers 404 when the
+        app or the invitation does not exist.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: id, in: path, required: true, schema: { type: string }, description: "The invitation's id (`invites[].id`)." }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /v1/apps/{owner}/{filename}/roadmap:
     get:
       operationId: appRoadmapGet
@@ -36027,6 +36168,8 @@ paths:
       description: >-
         Returns only the public descriptor (title, fields to render, honeypot field name, success
         message). Never discloses the destination namespace, owner, defaults, or any submitted record.
+        Each field carries key, label, type and required (true also when the form lists the key in
+        required_fields), plus options for a select or radio and maxLength when the form declares them.
       tags: [Public Intake]
       security: []
       parameters:
@@ -50613,6 +50756,16 @@ paths:
         reinstated by the person source. Feeds identity pickers on every grant surface (organism
         invites, workspace grants, app grants); a 'mail' contact cannot be granted anything until
         that person joins.
+
+        Who may call it: the owner in person, and anything acting in the owner's name that holds
+        `contacts:read` (an app grant, an agent, an ecosystem app). Every caller reads the owner's
+        own book; no caller names whose book it reads. Without the word the answer is 403
+        SCOPE_DENIED, and a session signed in from another node is refused. The row shape is the
+        same for every caller, but the conversation columns (`last_message_at`, `last_message`,
+        `last_sender`, `conversation_id`, and `message_count`, which reads 0) are empty unless the
+        caller may also read the owner's mailbox (an app on `messages:read`, an agent on
+        `messages:read-as-owner`), and `include=together` is answered only for the owner in person
+        or a caller holding `organism:read`. Writing to the book stays with the owner in person.
       tags: [Contacts]
       security:
         - BearerAuth: []
@@ -50722,6 +50875,8 @@ paths:
                               projection folds. Reported rather than applied silently.
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     post:
       operationId: addContact
       summary: Save a contact to the address book
@@ -66920,8 +67075,10 @@ paths:
       description: >-
         Marks that the owner has looked at this visitor and takes them off the list. It is not a
         block and not a punishment: the person is recorded again the next time they open the app,
-        because the list answers who is here rather than who is unread. Only the app owner may do it:
-        their own session, the app's own token, or another principal of theirs holding `app:manage`.
+        because the list answers who is here rather than who is unread. The app owner may do it
+        (their own session, the app's own token, or another principal of theirs holding
+        `app:manage`), and so may a member whose role the plan lists in `manageRoles`. Writes a
+        `visitor.dismissed` row to the roster's audit trail.
       tags: [Apps]
       security:
         - BearerAuth: []

@@ -14,6 +14,9 @@
  * @structure appManageCall · MEMBER_ACTIONS
  * @usage return out(await appManageCall(client, owner, input));
  * @version-history
+ *   2026-10-01 -- IAM round 2: member_set sends email and locale, members sends q, limit and offset as a query,
+ *     member_plan_set sends manage_roles as manageRoles, and member_audit and member_invite_cancel
+ *     reach GET .../members/audit and DELETE .../members/invites/:id.
  *   2026-10-01 -- The member actions, over the /v1/apps/:owner/:filename/members routes. Tool fields
  *     are snake_case and the routes read camelCase (expires_at -> expiresAt, roster_visibility ->
  *     rosterVisibility); an empty expires_at is sent as null, the route's "does not end".
@@ -35,6 +38,13 @@ function pick(input: Input, fields: string[]): Input {
 
 const enc = encodeURIComponent;
 
+/** The named fields that are present, as a query string with its `?`, or '' when none is. */
+function query(input: Input, fields: string[]): string {
+    const parts = fields.filter(f => input[f] !== undefined && input[f] !== null && input[f] !== '')
+        .map(f => `${f}=${enc(String(input[f]))}`);
+    return parts.length ? `?${parts.join('&')}` : '';
+}
+
 /**
  * The actions over the member routes. The node MCP server sends these through appManageCall()
  * with a loopback client, because the routes hold the logic and there is no service to share.
@@ -42,6 +52,7 @@ const enc = encodeURIComponent;
 export const MEMBER_ACTIONS: ReadonlySet<string> = new Set([
     'members', 'member_set', 'member_remove', 'member_decline', 'member_dismiss',
     'member_plan_get', 'member_plan_set', 'member_sweep', 'member_me', 'member_request',
+    'member_audit', 'member_invite_cancel',
 ]);
 
 /**
@@ -138,9 +149,9 @@ export async function appManageCall(client: AimeatClient, owner: string, input: 
         // path that starts with a computed part as no path at all, and then pairs no route with this
         // tool. Spelled out, the member routes count this tool as their twin.
         case 'members':
-            return client.get(`/v1/apps/${enc(ownerName)}/${file}/members`);
+            return client.get(`/v1/apps/${enc(ownerName)}/${file}/members${query(input, ['q', 'limit', 'offset'])}`);
         case 'member_set': {
-            const body: Input = pick(input, ['account', 'role', 'level', 'note', 'offerings', 'days']);
+            const body: Input = pick(input, ['account', 'email', 'locale', 'role', 'level', 'note', 'offerings', 'days']);
             if (input.expires_at !== undefined && input.expires_at !== null) body.expiresAt = input.expires_at === '' ? null : input.expires_at;
             return client.post(`/v1/apps/${enc(ownerName)}/${file}/members`, body);
         }
@@ -155,6 +166,7 @@ export async function appManageCall(client: AimeatClient, owner: string, input: 
         case 'member_plan_set': {
             const body: Input = pick(input, ['roles', 'seats', 'terms', 'access']);
             if (input.roster_visibility !== undefined && input.roster_visibility !== null) body.rosterVisibility = input.roster_visibility;
+            if (input.manage_roles !== undefined && input.manage_roles !== null) body.manageRoles = input.manage_roles;
             return client.put(`/v1/apps/${enc(ownerName)}/${file}/members/plan`, body);
         }
         case 'member_sweep':
@@ -163,6 +175,10 @@ export async function appManageCall(client: AimeatClient, owner: string, input: 
             return client.get(`/v1/apps/${enc(ownerName)}/${file}/members/me`);
         case 'member_request':
             return client.post(`/v1/apps/${enc(ownerName)}/${file}/members/requests`, pick(input, ['note']));
+        case 'member_audit':
+            return client.get(`/v1/apps/${enc(ownerName)}/${file}/members/audit${query(input, ['limit', 'before'])}`);
+        case 'member_invite_cancel':
+            return client.delete(`/v1/apps/${enc(ownerName)}/${file}/members/invites/${enc(String(input.invite_id))}`);
         default:
             return { ok: false, error: { code: 'INVALID_INPUT', message: `Unknown action "${checked.action}".` } };
     }

@@ -13,6 +13,10 @@
  *   aimeat_contact_list, aimeat_contact_add, aimeat_contact_remove, aimeat_contact_resolve_email.
  * @usage import { registerContactTools } from './contacts.js';
  * @version-history
+ *   v1.6.0 — 2026-10-01 — aimeat_contact_list asks GET /v1/contacts with the session's own bearer over
+ *     loopback, as aimeat_contact_resolve_email does, and is registered on contacts:read: the route
+ *     decides who reads the book and which columns a scoped reader sees, for this tool, the
+ *     connector's copy and REST alike (the developer's ruling of 2026-10-01).
  *   v1.5.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.5.0 — 2026-09-26 — aimeat_contact_invite answers a refusal as `CODE: message` (toolError): an
@@ -42,7 +46,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { localAccountName } from '../utils/gaii.js';
 import {
-    ContactsError, listContactsMerged, addContact, removeContact, parseContactInclude,
+    ContactsError, addContact, removeContact,
     type AddContactInput,
 } from '../services/contacts.js';
 import { createContactInvitation, ContactInvitationError } from '../services/contact-invitations.js';
@@ -73,6 +77,11 @@ export function registerContactTools(
         e instanceof ContactsError ? e.message : ((e as Error)?.message || 'Contacts operation failed');
 
     // ── aimeat_contact_list — the owner's merged address book ──
+    //
+    // THE ROUTE, NOT THE SERVICE, for the reason the email lookup below gives. GET /v1/contacts decides
+    // who reads the book (contacts:read) and which columns a scoped reader sees (the conversation
+    // columns only with the owner's mailbox, ?include=together only with organism:read). Calling
+    // listContactsMerged() here handed every agent on messages:read the owner's last messages too.
     mcp.tool(
         'aimeat_contact_list',
         descriptionFor('aimeat_contact_list'),
@@ -83,8 +92,19 @@ export function registerContactTools(
         },
         annotationsFor('aimeat_contact_list'),
         async ({ q, state, include }) => {
-            const { contacts, truncated } = await listContactsMerged(storage, ownerGhii(), { q, state, include: parseContactInclude(include) });
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ contacts, total: contacts.length, truncated }, null, 2) }] };
+            const bearer = getToken();
+            if (!bearer) return { ...toolError('AUTH_REQUIRED', 'This session carries no credential to read the address book with.') };
+            const qs = new URLSearchParams();
+            if (q) qs.set('q', q);
+            if (state) qs.set('state', state);
+            if (include) qs.set('include', include);
+            // Loopback, not config.baseUrl: the call never leaves this process's host.
+            const client = new AimeatClient(`http://127.0.0.1:${config.port}`, bearer);
+            const answer = await client.get(`/v1/contacts${qs.size ? `?${qs}` : ''}`);
+            if (!answer.ok) {
+                return { ...toolError(answer.error?.code ?? 'REFUSED', answer.error?.message ?? 'The address book could not be read.') };
+            }
+            return { content: [{ type: 'text' as const, text: JSON.stringify(answer.data, null, 2) }] };
         },
     );
 

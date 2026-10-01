@@ -21,6 +21,10 @@
  *   listRequests/putRequest/removeRequest · AppMemberRecord/AppMemberRequest · writePrivateRecord
  * @usage const roster = await listMembers(storage, 'alice/app.html');
  * @version-history
+ *   v1.5.0 — 2026-10-01 — The carry plan holds `manageRoles`: members holding one of these roles
+ *     manage the roster (services/app-member-rules.ts). A declined ask records when it was declined
+ *     (`decidedAt`), which the 7-day wait before asking again counts from; asking again after a
+ *     decline is a new ask, dated now.
  *   v1.4.0 — 2026-10-01 — removeMember keeps the development right on the row (it was granted through
  *     another route) unless asked not to; getRequest reads one person's ask by its key; the
  *     namespace constants are exported for the account-erasure step.
@@ -197,6 +201,8 @@ export interface AppMemberRequest {
   note: string;
   at: string;
   state: 'pending' | 'approved' | 'declined';
+  /** When the ask was declined. The wait before the person may ask again counts from here. */
+  decidedAt?: string;
 }
 
 /**
@@ -360,6 +366,13 @@ export interface AppCarryPlan {
    * not the payment, and saying otherwise would be a promise it cannot keep.
    */
   terms: Record<string, { days?: number; renewal?: 'manual' | 'self-serve' | 'none' }>;
+  /**
+   * Roles whose holders manage the roster: approve, decline, remove, change a role, invite. Never the
+   * plan or the sweep, and never a member who holds one of these roles, so only the owner appoints
+   * or removes a manager. Empty when the owner manages alone, which is also what a plan stored
+   * before this field existed reads as.
+   */
+  manageRoles: string[];
   updatedAt: string;
   setBy: string;
 }
@@ -384,14 +397,16 @@ export const planKey = (appId: string) => `appmemplan.${slugOf(appId)}`;
 export async function getCarryPlan(storage: Storage, appId: string): Promise<AppCarryPlan | null> {
   const rec = await readAppRecord(storage, NS_PLAN, planKey(appId), appId);
   const v = rec?.value as AppCarryPlan | undefined;
-  return v && sameApp(v.appId, appId) ? v : null;
+  if (!v || !sameApp(v.appId, appId)) return null;
+  return { ...v, manageRoles: Array.isArray(v.manageRoles) ? v.manageRoles.filter(r => typeof r === 'string') : [] };
 }
 
 /** Declare (or replace) it. Roles are taken as given: the node has no opinion about their names. */
 export async function putCarryPlan(
   storage: Storage,
   input: { appId: string; roles: Record<string, string[]>; rosterVisibility?: 'owner' | 'members';
-    access?: AppCarryPlan['access'] | 'open'; seats?: Record<string, number>; terms?: AppCarryPlan['terms']; setBy: string },
+    access?: AppCarryPlan['access'] | 'open'; seats?: Record<string, number>; terms?: AppCarryPlan['terms'];
+    manageRoles?: string[]; setBy: string },
 ): Promise<AppCarryPlan> {
   const roles: Record<string, string[]> = {};
   for (const [role, ids] of Object.entries(input.roles || {})) {
@@ -417,6 +432,7 @@ export async function putCarryPlan(
       : input.access === 'free' ? 'free'
       : 'members-free',
     rosterVisibility: input.rosterVisibility === 'members' ? 'members' : 'owner',
+    manageRoles: [...new Set((input.manageRoles ?? []).filter(r => typeof r === 'string' && r))],
     updatedAt: new Date().toISOString(), setBy: input.setBy,
   };
   await writePrivateRecord(storage, NS_PLAN, planKey(input.appId), rec);
@@ -478,12 +494,17 @@ export async function putRequest(
   const account = accountOf(input.account);
   const existing = await readAppRecord(storage, NS_REQUEST, requestKey(input.appId, account), input.appId);
   const prev = existing?.value as AppMemberRequest | undefined;
+  const now = new Date().toISOString();
+  const state = input.state ?? 'pending';
+  // Asking again after a decline is a new ask: it is dated now and carries no decision.
+  const reask = prev?.state === 'declined' && state === 'pending';
   const rec: AppMemberRequest = {
     appId: input.appId,
     owner: account,
     note: input.note ?? prev?.note ?? '',
-    at: prev?.at ?? new Date().toISOString(),
-    state: input.state ?? 'pending',
+    at: reask ? now : (prev?.at ?? now),
+    state,
+    ...(state === 'declined' ? { decidedAt: now } : {}),
   };
   await writePrivateRecord(storage, NS_REQUEST, requestKey(input.appId, account), rec, { createdAt: prev ? undefined : rec.at });
   return rec;
