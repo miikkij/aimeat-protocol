@@ -2,6 +2,8 @@
  * @file app-collaboration-audit.test.ts
  * @description Regression checks for the shared-app audit, using real SQLite records.
  * @version-history
+ *   v1.0.2 - 2026-10-01 - The resurrection case removes the whole row explicitly (a plain removal keeps a
+ *     development right now), and a case proves a plain removal keeps it.
  *   v1.0.1 - 2026-09-09 - The 5001-row case gets a 30 s ceiling; it timed out under gate load.
  *   v1.0.0 - 2026-09-08 - Fail first for identity collisions and lost roadmap writes.
  */
@@ -71,8 +73,20 @@ describe('shared-app audit regressions', () => {
     expect(await getDevGrant(s, appId, 'bob')).toBe(10);
     expect(await s.getMemory('app-member', memberKey(appId, 'bob'))).not.toBeNull();
     expect(await s.getMemory('app-member', 'appmember.alice-a-b-html.bob')).toBeNull();
-    await removeMember(s, appId, 'bob');
+    // The whole row goes, development right included: a plain removal keeps the right since
+    // 2026-10-01, and what this case proves is that the legacy copy does not come back.
+    await removeMember(s, appId, 'bob', { keepDevRight: false });
     expect(await getDevGrant(s, appId, 'bob')).toBeNull();
+    expect(await s.getMemory('app-member', 'appmember.alice-a-b-html.bob')).toBeNull();
+  });
+  it('keeps the development right when only the membership is removed', async () => {
+    const s = store();
+    const appId = 'alice/keep.html';
+    await writePrivateRecord(s, 'app-member', memberKey(appId, 'bob'), {
+      appId, owner: 'bob', role: 'reader', dev: 10, since: new Date().toISOString(),
+    });
+    await removeMember(s, appId, 'bob');
+    expect(await getDevGrant(s, appId, 'bob')).toBe(10);
   });
   it('pins roster lists to the platform namespace', async () => {
     const s = store();

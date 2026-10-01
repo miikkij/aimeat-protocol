@@ -23,6 +23,14 @@
  *   GET/PUT/DELETE dev-grants (per app), GET/PUT/DELETE /v1/app-dev-grants (across all of them)
  * @usage app.use(appMembersRouter(config, storage))
  * @version-history
+ *   v1.2.0 — 2026-10-01 — The IAM defect round. Every roster route that reads or changes membership
+ *     needs a scope word (app:write to read, app:manage to decline or dismiss, exchange:grant to
+ *     sweep, approve or remove), except for the app's own token, which manages its own roster and
+ *     may not name offerings. The app must exist. An approval refuses a role named "owner" or of
+ *     the wrong shape, an account nobody holds, and an unreadable date, and keeps 400 characters of
+ *     its note. /me reads one request by key and leaves the owner's records off the member's row.
+ *     An identity of another node is notified at its own address. A removal always reconciles the
+ *     grants, and keeps a development right.
  *   v1.1.2 — 2026-09-24 — The dev-grant DELETE comment says what the revoke now does to a row that
  *     only carried the right (A6-5, services/app-dev-grant.ts). No behaviour change in this file.
  *   v1.1.1 — 2026-09-12 — bucketOf hands resolveGhii the node; composing `${owner}@${nodeId}` at the
@@ -40,12 +48,15 @@ import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireOwnerPrincipal, requireScope } from '../auth/middleware.js';
+// Every roster route that reads or changes membership: a scope word for an agent or another app,
+// none for the app's own token, which is the app managing its own roster (auth/app-own-gate.ts).
+import { requireScopeOrOwnApp, tokenOfThisApp } from '../auth/app-own-gate.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { listAppRecords } from '../services/app-record-keys.js';
 import {
   listMembers, getMember, putMember, removeMember,
-  listRequests, putRequest, removeRequest, accountOf,
+  listRequests, getRequest, putRequest, removeRequest, accountOf,
   getCarryPlan, putCarryPlan, seatsTaken, type AppCarryPlan,
   noteVisit, listVisits, forgetVisit, isLive,
 } from '../services/app-members.js';
@@ -62,6 +73,14 @@ import { sweepLapsedMemberships } from '../services/app-member-sweep.js';
 import { logger } from '../utils/logger.js';
 
 const FILENAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/;
+const OWNER_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/;
+/**
+ * A role name is the app's own word, so the node does not judge its meaning, only its shape. `owner`
+ * and `*` are refused: the browser library reads `owner` as the app's owner and `*` as every
+ * capability, so a member holding either would be shown, and could reach, what only the owner may.
+ */
+const ROLE_RE = /^[A-Za-z][A-Za-z0-9_.-]{0,39}$/;
+const RESERVED_ROLES = new Set(['owner']);
 
 export function appMembersRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -71,11 +90,16 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
     | { bad: string }
     | { appId: string; owner: string; filename: string; callerAccount: string; callerGaii: string; isOwner: boolean };
 
-  async function context(req: import('express').Request): Promise<Ctx> {
+  async function context(req: import('express').Request): Promise<Ctx | { missing: true }> {
     const owner = String(req.params.owner ?? '');
     const filename = String(req.params.filename ?? '');
     if (!FILENAME_RE.test(filename)) return { bad: 'Invalid filename.' as const };
+    if (!OWNER_RE.test(owner)) return { bad: 'Invalid owner.' as const };
     const appId = `${owner}/${filename}`;
+    // The app must exist. Without this anybody could ask for access to a made-up app of any owner,
+    // and the owner got a notification with working Approve and Decline buttons for nothing; and
+    // every read of /me on a made-up filename wrote a visit record, which grew storage without end.
+    if (!(await storage.getApp(await bucketOf(owner), filename))) return { missing: true as const };
     // The caller's OWNER, so an agent acting for the app's owner administers as the owner does. The
     // full principal is kept beside it: the roster asks WHO the person is, and an audit line asks
     // which of their agents did the thing.
@@ -90,6 +114,13 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
    */
   const bucketOf = (owner: string) => resolveGhii(storage, owner, config);
 
+  /**
+   * The member's identity for a notification or a grant. A member of THIS node is stored by bare
+   * account name and gets the node appended; an identity of another node already carries its own,
+   * and appending this node's id to it named nobody.
+   */
+  const addressOf = (account: string) => (account.includes('@') ? account : `${account}@${config.nodeId}`);
+
   /** A deep link back to the app, which is where every one of these notifications should land. */
   const appLink = (appId: string) => {
     const [o, f] = appId.split('/');
@@ -97,9 +128,10 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
   };
 
   // ── GET /v1/apps/:owner/:filename/members — the roster. Owner only. ──
-  router.get('/v1/apps/:owner/:filename/members', requireAuth(), async (req, res) => {
+  router.get('/v1/apps/:owner/:filename/members', requireAuth(), requireScopeOrOwnApp('app:write'), async (req, res) => {
     const c = await context(req);
     if ('bad' in c) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', c.bad));
+    if ('missing' in c) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such app.'));
     const plan = await getCarryPlan(storage, c.appId);
     if (!c.isOwner) {
       // An app can open the roster to its own members, and some have to: a board that renders by
@@ -136,6 +168,7 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
   router.get('/v1/apps/:owner/:filename/members/me', requireAuth(), async (req, res) => {
     const c = await context(req);
     if ('bad' in c) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', c.bad));
+    if ('missing' in c) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such app.'));
     const member = await getMember(storage, c.appId, c.callerAccount);
     // Asking "where do I stand" IS turning up: this is what the library calls when an app loads, so
     // it is the honest moment to record a visit. Throttled to one write an hour per person, so a page
@@ -149,10 +182,12 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
         logger.warn('app-members: could not note a visit', { error: String(err) });
       }
     }
-    const requests = c.isOwner ? [] : await listRequests(storage, c.appId, 'all');
-    const mine = requests.find(r => r.owner === c.callerAccount) ?? null;
+    const mine = c.isOwner ? null : await getRequest(storage, c.appId, c.callerAccount);
+    // The member's own row without the owner's side of it: the note the owner kept with the decision
+    // and who approved them are the owner's records, not something the app shows the member.
+    const own = member ? (({ note: _note, approvedBy: _by, ...rest }) => rest)(member) : null;
     return res.json(success(config.nodeId, {
-      member, isOwner: c.isOwner,
+      member: own, isOwner: c.isOwner,
       role: c.isOwner ? 'owner' : (member?.role ?? null),
       requested: mine ? { at: mine.at, state: mine.state, note: mine.note } : null,
     }));
@@ -161,9 +196,10 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
   // ── GET/PUT .../members/plan — what each role is CARRIED on. Owner only. ──
   // Declared once, applied on every approval after it. An approval that set a role and carried
   // nothing was the gap that made the panel's "approved" and the member's invoice disagree.
-  router.get('/v1/apps/:owner/:filename/members/plan', requireAuth(), async (req, res) => {
+  router.get('/v1/apps/:owner/:filename/members/plan', requireAuth(), requireScopeOrOwnApp('app:write'), async (req, res) => {
     const c = await context(req);
     if ('bad' in c) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', c.bad));
+    if ('missing' in c) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such app.'));
     if (!c.isOwner) return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the app owner reads its carry plan'));
     const plan = await getCarryPlan(storage, c.appId);
     return res.json(success(config.nodeId, {
@@ -177,6 +213,7 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
   router.put('/v1/apps/:owner/:filename/members/plan', requireAuth(), requireScope('commerce:sell'), async (req, res) => {
     const c = await context(req);
     if ('bad' in c) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', c.bad));
+    if ('missing' in c) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such app.'));
     if (!c.isOwner) return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the app owner sets its carry plan'));
     const b = (req.body ?? {}) as {
       roles?: Record<string, unknown>; rosterVisibility?: string; access?: string;
@@ -249,9 +286,10 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
   // ── DELETE .../members/seen/{account} — dismiss a guest from the list. Owner only. ──
   // Not a punishment and not a block: it only says "I have looked at this one". They are recorded
   // again the next time they turn up, because the list answers who is here, not who is unread.
-  router.delete('/v1/apps/:owner/:filename/members/seen/:account', requireAuth(), async (req, res) => {
+  router.delete('/v1/apps/:owner/:filename/members/seen/:account', requireAuth(), requireScopeOrOwnApp('app:manage'), async (req, res) => {
     const c = await context(req);
     if ('bad' in c) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', c.bad));
+    if ('missing' in c) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such app.'));
     if (!c.isOwner) return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the app owner manages its guest list'));
     await forgetVisit(storage, c.appId, String(req.params.account ?? ''));
     return res.json(success(config.nodeId, {
@@ -263,9 +301,10 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
   // ── POST .../members/sweep — close every lapsed membership NOW. Owner only. ──
   // The timer runs hourly, which bounds how long somebody the owner stopped selling to can keep
   // calling on the owner's money. An owner who has just ended a term should not have to wait for it.
-  router.post('/v1/apps/:owner/:filename/members/sweep', requireAuth(), async (req, res) => {
+  router.post('/v1/apps/:owner/:filename/members/sweep', requireAuth(), requireScopeOrOwnApp('exchange:grant'), async (req, res) => {
     const c = await context(req);
     if ('bad' in c) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', c.bad));
+    if ('missing' in c) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such app.'));
     if (!c.isOwner) return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the app owner sweeps its roster'));
     const result = await sweepLapsedMemberships(storage, config, c.appId);
     return res.json(success(config.nodeId, {
@@ -284,9 +323,10 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
   // the comment beside it says so ("an agent acting for the app's owner administers as the owner
   // does"), so an app grant approved for one unrelated word passed it. Owner sessions bypass scopes,
   // so the person's own Members screen is untouched; what needs the word is a machine doing it.
-  router.post('/v1/apps/:owner/:filename/members', requireAuth(), requireScope('exchange:grant'), async (req, res) => {
+  router.post('/v1/apps/:owner/:filename/members', requireAuth(), requireScopeOrOwnApp('exchange:grant'), async (req, res) => {
     const c = await context(req);
     if ('bad' in c) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', c.bad));
+    if ('missing' in c) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such app.'));
     if (!c.isOwner) return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the app owner approves its members'));
     const b = (req.body ?? {}) as Record<string, unknown>;
     const account = typeof b.account === 'string' ? accountOf(b.account) : '';
@@ -299,6 +339,27 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
         'The owner already reaches everything; a row for them would only be one more thing to keep in step.'));
     }
     const before = await getMember(storage, c.appId, account);
+    // The shape check is skipped for the role the person already holds, so a renewal of a row
+    // written before the check existed still goes through.
+    if (!(before && before.role === role) && (!ROLE_RE.test(role) || RESERVED_ROLES.has(role.toLowerCase()))) {
+      return res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+        'role must start with a letter and hold only letters, digits, ".", "_" or "-", at most 40 characters. '
+        + '"owner" and "*" are not roles: the owner already reaches everything.'));
+    }
+    // A name nobody answers to would wait on the roster forever and look, on the owner's panel,
+    // exactly like a member. An identity of another node is taken as given: this node cannot look it up.
+    if (!account.includes('@') && !(await storage.getGHIIByOwner(account))) {
+      return res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No account named "${account}" on this node.`));
+    }
+    let expiresIso: string | null | undefined;
+    if (b.expiresAt !== undefined && b.expiresAt !== null) {
+      const t = Date.parse(String(b.expiresAt));
+      if (!Number.isFinite(t)) {
+        return res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+          'expiresAt must be a date such as 2026-12-31T00:00:00Z, or null for a membership that does not lapse.'));
+      }
+      expiresIso = new Date(t).toISOString();
+    }
     const planEarly = await getCarryPlan(storage, c.appId);
 
     // A seat count is a product decision with teeth. Refusing past the last seat, and saying how
@@ -320,7 +381,7 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
     const term = planEarly?.terms?.[role];
     let expiresAt: string | null | undefined;
     if (b.expiresAt !== undefined) {
-      expiresAt = b.expiresAt === null ? null : String(b.expiresAt);
+      expiresAt = b.expiresAt === null ? null : (expiresIso ?? null);
     } else if (typeof b.days === 'number' && b.days > 0) {
       expiresAt = new Date(Date.now() + Math.floor(b.days) * 86400_000).toISOString();
     } else if (term?.days) {
@@ -333,13 +394,17 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
     // role and carried nothing, so the member was billed at list price on every call while the panel
     // showed them approved — the panel's word and the invoice disagreeing is the worst of the three.
     const plan = planEarly;
-    const carried = Array.isArray(b.offerings)
-      ? b.offerings.filter(x => typeof x === 'string') as string[]
+    // The app's own token approves by the declared plan only. Naming offerings means giving free
+    // access to what the owner sells, which is the exchange:grant act itself, and the exception that
+    // lets an app's token manage its roster without that word does not extend to it.
+    const namesOfferings = Array.isArray(b.offerings) && !tokenOfThisApp(req.auth, c.appId);
+    const carried = namesOfferings
+      ? (b.offerings as unknown[]).filter(x => typeof x === 'string') as string[]
       : (plan?.roles[role] ?? (before ? undefined : []));
     const rec = await putMember(storage, {
       appId: c.appId, account, role,
       level: typeof b.level === 'number' ? b.level : undefined,
-      note: typeof b.note === 'string' ? b.note : undefined,
+      note: typeof b.note === 'string' ? b.note.slice(0, 400) : undefined,
       approvedBy: c.callerAccount,
       offerings: carried,
       ...(expiresAt !== undefined ? { expiresAt } : {}),
@@ -359,7 +424,7 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
     const sync = (Array.isArray(b.offerings) || plan || before)
       ? await syncGrantsForMember(storage, {
           providerOwner: c.owner.toLowerCase(), providerGhii: `${c.owner}@${config.nodeId}`,
-          consumer: `${account}@${config.nodeId}`, appId: c.appId, role,
+          consumer: addressOf(account), appId: c.appId, role,
           offeringIds: rec.offerings, note: rec.note,
         })
       : null;
@@ -368,7 +433,7 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
     // sending "you were approved" again to somebody who already had access reads as a mistake.
     if (!before) {
       try {
-        await notify(storage, `${account}@${config.nodeId}`, {
+        await notify(storage, addressOf(account), {
           type: 'app_member_approved',
           title: `You were approved for ${c.filename.replace(/\.html?$/i, '')}`,
           body: `${c.owner} approved you as ${role}.`,
@@ -390,24 +455,27 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
   // ── DELETE .../members/:account — remove a member. Owner only. ──
   // Same word as the approval above, and for the same reason one door over: this withdraws the
   // grants, which is what POST /v1/exchange/grants/revoke does and demands `exchange:grant` for.
-  router.delete('/v1/apps/:owner/:filename/members/:account', requireAuth(), requireScope('exchange:grant'), async (req, res) => {
+  router.delete('/v1/apps/:owner/:filename/members/:account', requireAuth(), requireScopeOrOwnApp('exchange:grant'), async (req, res) => {
     const c = await context(req);
     if ('bad' in c) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', c.bad));
+    if ('missing' in c) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such app.'));
     if (!c.isOwner) return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the app owner removes its members'));
     const account = accountOf(String(req.params.account ?? ''));
     const gone = await removeMember(storage, c.appId, account);
     // Taking the role away takes the access with it. Leaving the grants behind would mean a removed
     // member keeps calling free and the owner keeps paying for it.
-    if (gone && gone.offerings.length) {
+    // Unconditional: the row's own list can be empty while grants issued another way (an earlier
+    // approval that named offerings, a plan that changed since) are still live.
+    if (gone) {
       await syncGrantsForMember(storage, {
         providerOwner: c.owner.toLowerCase(), providerGhii: `${c.owner}@${config.nodeId}`,
-        consumer: `${account}@${config.nodeId}`, appId: c.appId, role: gone.role,
+        consumer: addressOf(account), appId: c.appId, role: gone.role,
         offeringIds: [],
       });
     }
     if (!gone) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such member'));
     try {
-      await notify(storage, `${account}@${config.nodeId}`, {
+      await notify(storage, addressOf(account), {
         type: 'app_member_revoked',
         title: `Your access to ${c.filename.replace(/\.html?$/i, '')} ended`,
         body: `${c.owner} removed you from the member list.`,
@@ -420,9 +488,10 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
   });
 
   // ── POST .../members/requests — ask to be let in. Any authenticated caller. ──
-  router.post('/v1/apps/:owner/:filename/members/requests', requireAuth(), requireScope('social:write'), async (req, res) => {
+  router.post('/v1/apps/:owner/:filename/members/requests', requireAuth(), requireScopeOrOwnApp('social:write'), async (req, res) => {
     const c = await context(req);
     if ('bad' in c) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', c.bad));
+    if ('missing' in c) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such app.'));
     if (c.isOwner) {
       return res.status(400).json(error(config.nodeId, 'OWNER_CANNOT_ASK', 'You own this app; there is nobody to ask.'));
     }
@@ -465,9 +534,10 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
   });
 
   // ── DELETE .../members/requests/:account — decline an ask. Owner only. ──
-  router.delete('/v1/apps/:owner/:filename/members/requests/:account', requireAuth(), async (req, res) => {
+  router.delete('/v1/apps/:owner/:filename/members/requests/:account', requireAuth(), requireScopeOrOwnApp('app:manage'), async (req, res) => {
     const c = await context(req);
     if ('bad' in c) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', c.bad));
+    if ('missing' in c) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such app.'));
     if (!c.isOwner) return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the app owner decides its requests'));
     const account = accountOf(String(req.params.account ?? ''));
     await putRequest(storage, { appId: c.appId, account, state: 'declined' });
@@ -490,6 +560,7 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
   router.get('/v1/apps/:owner/:filename/dev-grants', requireAuth(), requireScope('app:write'), async (req, res) => {
     const c = await context(req);
     if ('bad' in c) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', c.bad));
+    if ('missing' in c) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such app.'));
     if (!c.isOwner) return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the app owner sees who may build it'));
     const grants = await listDevGrants(storage, c.appId);
     return res.json(success(config.nodeId, {
@@ -503,6 +574,7 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
   router.put('/v1/apps/:owner/:filename/dev-grants/:account', requireAuth(), requireScope('app:manage'), async (req, res) => {
     const c = await context(req);
     if ('bad' in c) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', c.bad));
+    if ('missing' in c) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such app.'));
     if (!c.isOwner) return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the app owner says who may build it'));
 
     const level = parseDevLevel((req.body ?? {}).level);
@@ -535,7 +607,7 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
       action: 'dev.granted', detail: { account, level, levelName: levelName(level) },
     });
     try {
-      await notify(storage, `${account}@${config.nodeId}`, {
+      await notify(storage, addressOf(account), {
         type: 'app_dev_grant',
         title: `${c.owner} invited you to build ${c.filename.replace(/\.html?$/i, '')}`,
         body: `You may ${actsFor(level).join(', ')} on this app. Your agents are covered by the same invitation.`,
@@ -556,6 +628,7 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
   router.delete('/v1/apps/:owner/:filename/dev-grants/:account', requireAuth(), requireScope('app:manage'), async (req, res) => {
     const c = await context(req);
     if ('bad' in c) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', c.bad));
+    if ('missing' in c) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such app.'));
     if (!c.isOwner) return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the app owner says who may build it'));
     const account = accountOf(String(req.params.account ?? ''));
     const had = await removeDevGrant(storage, c.appId, account);
@@ -621,7 +694,7 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
       ...(typeof body.expires_at === 'string' ? { expiresAt: body.expires_at } : {}),
     });
     try {
-      await notify(storage, `${account}@${config.nodeId}`, {
+      await notify(storage, addressOf(account), {
         type: 'app_dev_grant',
         title: `${me} invited you to build their apps`,
         body: `You may ${actsFor(level).join(', ')} on any app of theirs. Your agents are covered by the same invitation.`,

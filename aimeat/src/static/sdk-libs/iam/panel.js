@@ -25,6 +25,12 @@
  * @structure mountMemberAdmin(iam, target, opts) · mountJoinPanel(iam, target, opts)
  * @usage AIMEAT.iam.MemberAdmin({ target: '#members', appId: 'me/app.html', sections: [...] })
  * @version-history
+ *   v1.1.0 — 2026-10-01 — One click on Approve grants the role with the least power (or the panel's
+ *     `approveRole`), shown in a role select beside the button; it granted the last role listed,
+ *     which was admin in the IAM template. A refused action shows the node's reason at the top of
+ *     the panel instead of re-rendering as if nothing happened. On the node roster the stranger line
+ *     and the approve help say what is true there. JoinPanel says when the caller already asked or
+ *     was declined, and shows a refusal's reason. The settings switch is translated.
  *   v1.0.0 — 2026-07-30 — Initial (TARGET-055 phase 1).
  */
 import { el, injectPanelStyle, fmtDate } from './dom.js';
@@ -42,6 +48,8 @@ const MODES = ['open', 'members-only', 'invite-only'];
  * @property {boolean} [styles]    false to inject no stylesheet.
  * @property {Array<{id:string,type:'toggle'|'text',label:string,help?:string,value?:any,onChange:Function}>} [sections]
  * @property {() => Promise<Array<{id:string,label?:string,spend?:string}>>} [payingCustomers]
+ * @property {string} [approveRole] The role one click on Approve grants. Default: the role with the
+ *   least power, leaving out the role a stranger already gets.
  */
 
 /**
@@ -119,8 +127,19 @@ export function mountMemberAdmin(iam, opts) {
     });
   }
 
+  // The node answers a refusal as an envelope rather than a throw, so an action that did nothing
+  // re-rendered the same panel and looked like a click that was not heard. The reason is kept here
+  // and drawn at the top of the next render.
+  let failure = '';
+
   async function act(fn) {
-    try { await fn(); } catch { /* surfaced by the re-render below */ }
+    failure = '';
+    try {
+      const r = await fn();
+      if (r && r.ok === false) failure = refusalText(r) || S('failed');
+    } catch (e) {
+      failure = (e && e.message) || S('failed');
+    }
     await render();
   }
 
@@ -129,6 +148,9 @@ export function mountMemberAdmin(iam, opts) {
     const me = iam.me();
     const wrap = el('div', { cls: cls('aim-iam') });
     host.appendChild(wrap);
+    if (failure) {
+      wrap.appendChild(el('p', { cls: cls('aim-iam-warn'), text: S('failedWith', { why: failure }), attrs: { role: 'alert' } }));
+    }
 
     if (!me || !me.isOwner) {
       wrap.appendChild(el('p', { cls: cls('aim-iam-empty'), text: S('notOwner') }));
@@ -142,6 +164,9 @@ export function mountMemberAdmin(iam, opts) {
 
     const roles = (state && state.roles) ? Object.keys(state.roles) : [];
     const defaultRole = (state && state.config && state.config.defaultRole) || null;
+    // On the node roster a role is keyed to the person, and a row for one agent of theirs resolves to
+    // the same person, so the per-agent advice and the "refused" line are only true for an extension.
+    const nodeRoster = !!(state && state.nodeRoster);
 
     // ── mode ──
     if (me.mode) {
@@ -176,7 +201,7 @@ export function mountMemberAdmin(iam, opts) {
             return act(() => iam.admin('assign', role ? { ghii: id, role, owner: id } : { ghii: id, owner: id }));
           } } }),
       ]),
-      el('p', { cls: cls('aim-iam-lead'), text: S('approveHelp') }),
+      el('p', { cls: cls('aim-iam-lead'), text: S(nodeRoster ? 'approveHelpNode' : 'approveHelp') }),
     ]));
 
     // ── paying customers, kept out of the queue below ──
@@ -199,15 +224,31 @@ export function mountMemberAdmin(iam, opts) {
     // A gate with no request action cannot have a queue; there, turning up IS the application, and
     // the guests below are the only list. Everywhere else the two are shown apart.
     const isPassive = !state || !state.requests;
-    const approveRole = roles[roles.length - 1] || undefined;
+    // One click hands out the role with the least power, never the last one listed: the template
+    // listed ['member', 'admin'], so the last one made every approved stranger an admin. The owner
+    // sees the role beside the button and can pick another before clicking.
+    const approveRole = (opts.approveRole && roles.indexOf(opts.approveRole) !== -1)
+      ? opts.approveRole
+      : leastPower(roles, (state && state.roles) || {}, defaultRole);
+    /** A role select for one row, set to the role one click grants. Null when there is no choice. */
+    const approveSel = () => {
+      if (roles.length < 2) return null;
+      const s = el('select', { attrs: { 'aria-label': S('colRole') } },
+        roles.map((r) => el('option', { text: r, attrs: Object.assign({ value: r }, r === approveRole ? { selected: 'selected' } : {}) })));
+      /** @type {HTMLSelectElement} */ (s).value = approveRole || '';
+      return s;
+    };
+    const roleOf = (s) => (s ? /** @type {HTMLSelectElement} */ (s).value : approveRole) || undefined;
     if (!isPassive) {
       const qBody = [el('h3', { cls: cls('aim-iam-h'), text: S('pendingTitle') })];
       if (!pending.length) qBody.push(el('p', { cls: cls('aim-iam-empty'), text: S('pendingNone') }));
       for (const p of pending) {
+        const sel = approveSel();
         qBody.push(el('div', { cls: cls('aim-iam-row') }, [
           el('span', { cls: cls('aim-iam-id'), text: p.id }),
+          sel,
           el('button', { cls: cls('aim-iam-btn'), text: S('approveBtn'), attrs: { type: 'button' },
-            on: { click: () => act(() => iam.admin('assign', { ghii: p.id, owner: p.id, role: approveRole, note: p.note })) } }),
+            on: { click: () => act(() => iam.admin('assign', { ghii: p.id, owner: p.id, role: roleOf(sel), note: p.note })) } }),
           el('button', { cls: cls('aim-iam-btn'), text: S('decline'), attrs: { type: 'button' },
             on: { click: () => act(() => iam.admin('decline', { owner: p.id, ghii: p.id })) } }),
           p.note ? el('span', { cls: cls('aim-iam-note'), text: p.note }) : null,
@@ -223,11 +264,13 @@ export function mountMemberAdmin(iam, opts) {
     const gBody = [el('h3', { cls: cls('aim-iam-h'), text: S('seenTitle') })];
     if (!guests.length) gBody.push(el('p', { cls: cls('aim-iam-empty'), text: S('seenNone') }));
     for (const g of guests) {
+      const sel = approveSel();
       gBody.push(el('div', { cls: cls('aim-iam-row') }, [
         el('span', { cls: cls('aim-iam-id'), text: g.id }),
         g.visits ? el('span', { cls: cls('aim-iam-muted'), text: S('visits', { n: g.visits, d: fmtDate(g.lastSeen) }) }) : null,
+        sel,
         el('button', { cls: cls('aim-iam-btn'), text: S('approveBtn'), attrs: { type: 'button' },
-          on: { click: () => act(() => iam.admin('assign', { ghii: g.id, owner: g.id, role: approveRole })) } }),
+          on: { click: () => act(() => iam.admin('assign', { ghii: g.id, owner: g.id, role: roleOf(sel) })) } }),
         // Dismissing is not a block and does not refuse anybody: it says "I have looked at this one",
         // and they are recorded again the next time they come.
         el('button', { cls: cls('aim-iam-btn'), text: S('dismiss'), attrs: { type: 'button' },
@@ -264,7 +307,7 @@ export function mountMemberAdmin(iam, opts) {
       const sBody = [el('h3', { cls: cls('aim-iam-h'), text: S('settingsTitle') })];
       for (const s of opts.sections) {
         const ctrl = s.type === 'toggle'
-          ? el('button', { cls: cls('aim-iam-btn'), text: s.value ? 'on' : 'off', attrs: { type: 'button' },
+          ? el('button', { cls: cls('aim-iam-btn'), text: s.value ? S('on') : S('off'), attrs: { type: 'button', 'aria-pressed': s.value ? 'true' : 'false' },
               on: { click: () => act(async () => { await s.onChange(!s.value); s.value = !s.value; }) } })
           : el('input', { attrs: { type: 'text', value: s.value == null ? '' : String(s.value) },
               on: { change: (e) => s.onChange(/** @type {HTMLInputElement} */ (e.target).value) } });
@@ -281,12 +324,46 @@ export function mountMemberAdmin(iam, opts) {
     wrap.appendChild(el('section', { cls: cls('aim-iam-sec') }, [
       el('h3', { cls: cls('aim-iam-h'), text: S('strangerTitle') }),
       el('p', { cls: cls('aim-iam-lead'),
-        text: defaultRole ? S('strangerRole', { role: defaultRole }) : S('strangerDeny') }),
+        text: nodeRoster ? S('strangerNode') : (defaultRole ? S('strangerRole', { role: defaultRole }) : S('strangerDeny')) }),
     ]));
   }
 
   render();
   return { refresh: render, destroy: () => { host.textContent = ''; } };
+}
+
+/**
+ * The role a one-click approval grants: the one with the fewest capabilities (`*` counts as all),
+ * leaving out the role a stranger already gets, because approving someone into it changes nothing.
+ * A tie goes to the role named first, which for a list of names is the least powerful by the
+ * library's own convention.
+ * @param {string[]} roles
+ * @param {Record<string, string[]>} caps
+ * @param {string|null} defaultRole
+ * @returns {string|undefined}
+ */
+export function leastPower(roles, caps, defaultRole) {
+  const pool = roles.filter((r) => r !== defaultRole);
+  const list = pool.length ? pool : roles;
+  const power = (r) => {
+    const c = caps[r] || [];
+    return c.indexOf('*') !== -1 ? Infinity : c.length;
+  };
+  let best;
+  for (const r of list) if (best === undefined || power(r) < power(best)) best = r;
+  return best;
+}
+
+/**
+ * The sentence a refusal carries. The node's envelope holds it under `error.message`; an extension
+ * answers `{ ok: false, error: '…' }` with the sentence as the error itself.
+ * @param {any} r
+ * @returns {string}
+ */
+function refusalText(r) {
+  if (!r || !r.error) return '';
+  if (typeof r.error === 'string') return r.error;
+  return typeof r.error.message === 'string' ? r.error.message : '';
 }
 
 /**
@@ -332,13 +409,17 @@ export function mountJoinPanel(iam, opts) {
 
   host.textContent = '';
   const out = el('p', { cls: cls('aim-iam-lead') });
+  // Somebody already waiting is told so, rather than shown the same form as a first-time visitor.
+  const asked = iam.me() && iam.me().requested;
+  if (asked && asked.state === 'pending') out.textContent = S('joinPending', { d: fmtDate(asked.at) });
+  else if (asked && asked.state === 'declined') out.textContent = S('joinDeclined');
   const note = el('input', { attrs: { type: 'text', placeholder: S('joinNote'), 'aria-label': S('joinNote') } });
   const btn = el('button', { cls: cls('aim-iam-btn'), text: S('joinBtn'), attrs: { type: 'button' } });
   btn.addEventListener('click', async () => {
     try {
       const r = await iam.request(/** @type {HTMLInputElement} */ (note).value.trim());
       out.textContent = r.alreadyMember ? S('joinAlready') : (r.passive ? S('joinPassive') : S('joinSent'));
-    } catch { out.textContent = S('failed'); }
+    } catch (e) { out.textContent = (e && e.message) ? S('failedWith', { why: e.message }) : S('failed'); }
   });
   host.appendChild(el('section', { cls: cls('aim-iam') }, [
     el('h3', { cls: cls('aim-iam-h'), text: S('joinTitle') }),

@@ -26,6 +26,8 @@
  * @structure PRINCIPALS · GUARD_EFFECTS · principalsFor(guards) · scopesFrom(guards)
  * @usage const { principals, unknown } = principalsFor(['requireAuth()', "requireScope('memory:write')"]);
  * @version-history
+ *   v1.2.0 — 2026-10-01 — requireScopeOrOwnApp joins the authorization gates (auth/app-own-gate.ts): requireScope,
+ *     except the token of the app the route addresses.
  *   v1.1.0 — 2026-09-12 — requireOwnerMailboxRead is an authorization gate: the four owner-mailbox
  *     reads, for the owner in person, an app on messages:read and an agent on messages:read-as-owner.
  *   v1.0.0 — 2026-09-03 — Initial (wish-invarianttiauditointi, phase 1).
@@ -82,7 +84,7 @@ export const AUTHORIZATION_GATES = [
     'requireScope', 'requireAnyScope', 'requireRole', 'requireRoleOrScope', 'requireOperator',
     'requireOwnerPrincipal', 'requireScimConnection', 'requireOperatorPrincipal',
     'requireExternalPrincipal', 'requireOwnerSession', 'workspaceAccess', 'workspaceAccessMiddleware',
-    'requireOwnerMailboxRead',
+    'requireOwnerMailboxRead', 'requireScopeOrOwnApp',
 ];
 
 /**
@@ -100,6 +102,11 @@ export const GUARD_EFFECTS: Record<string, { admits: Principal[] | null; note?: 
     requireRoleOrScope: { admits: null, note: 'role OR any of the scopes; resolved by roleArgument()' },
     requireScope: { admits: AUTHENTICATED, note: 'narrows by scope word, not by principal class' },
     requireAnyScope: { admits: AUTHENTICATED, note: 'any ONE of the named scopes; two principals reach the same route by different trust' },
+    /**
+     * requireScope, except a role-'app' token minted for the app the route addresses
+     * (/v1/apps/:owner/:filename/...), which passes without the word (auth/app-own-gate.ts).
+     */
+    requireScopeOrOwnApp: { admits: AUTHENTICATED, note: 'narrows by scope word; the addressed app\'s own token passes without it' },
     /**
      * A scoped external principal: agent OR ecosystem app, with owner and operator also passing
      * because they act for their own. A deliberate superset of requireRole('agent').

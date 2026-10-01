@@ -5,6 +5,8 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-10-01 — The IAM split names the role map in init({ app, roles }), the one-click role, that
+ *     nothing on the node refuses a stranger without an extension, and aimeat_iam_define for the gate.
  *   2026-09-30 — Classified content in an app: one paragraph pointing at aimeat-labels.js (TARGET-082).
  *   2026-09-30 — The package line says a composed package carries your skills bound to its apps.
  *   2026-09-29 — aimeat_package_sellers: a shop's node sells your packages with no token.
@@ -222,9 +224,14 @@ their own member model before this existed and disagreed six ways, so the split 
 - **The EXTENSION owns what a member may do.** The capability vocabulary is genuinely per-app, and a
   browser can never enforce it. Declare the app in your manifest \`config:\` as \`app: owner/file.html\`
   and the node hands your script \`ctx.caller.member\` and \`ctx.caller.isAppOwner\`, resolved before the
-  sandbox starts. Do NOT keep your own roster in \`ctx.memory\`.
-- **The LIBRARY owns the surface.** \`/v1/libs/aimeat-iam.js\`: \`init({ app })\`, \`me()\`,
-  \`MemberAdmin({ target })\` for the owner's panel, \`JoinPanel({ target })\` for the applicant.
+  sandbox starts. Do NOT keep your own roster in \`ctx.memory\`. \`aimeat_iam_define\` generates such a
+  gate from your role design: install the extension it returns, then \`init({ app, ext })\`.
+- **The LIBRARY owns the surface.** \`/v1/libs/aimeat-iam.js\`:
+  \`init({ app, roles: { member: ['use'], admin: ['use', 'manage'] } })\` (each role and what it may
+  do), \`me()\`, \`gate()\`, \`guard()\`, \`MemberAdmin({ target })\` for the owner's panel (one click on
+  Approve grants the role with the least power), \`JoinPanel({ target })\` for the applicant.
+  Without an extension nothing on the node refuses a stranger who opens the page; the library only
+  hides what a role does not hold.
 
 ### can() is a HINT, never a gate
 

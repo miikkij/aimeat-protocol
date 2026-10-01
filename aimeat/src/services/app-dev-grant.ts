@@ -41,6 +41,8 @@
  *   const t = await resolveAppTarget(storage, config, { callerOwner, requestedOwner, filename, act: 'publish' });
  *   if (!t.ok) return res.status(t.status).json(error(config.nodeId, t.code, t.message));
  * @version-history
+ *   v1.1.1 — 2026-10-01 — removeDevGrant asks removeMember to delete the builder-only row, which now
+ *     keeps a development right by default when a membership is removed.
  *   v1.1.0 — 2026-09-24 — removeDevGrant deletes a roster row that carried nothing but the right
  *     (A6-5). Stripping the right and keeping the row left the ex-builder as a live member.
  *   v1.0.1 — 2026-09-12 — Both resolveGhii calls hand it the node; the GHII these composed by hand
@@ -209,7 +211,8 @@ export async function removeDevGrant(storage: Storage, appId: string, principal:
   const prev = await getMemberRow(storage, appId, account);
   if (!prev || typeof prev.dev !== 'number') return false;
   if (onlyCarriesTheRight(prev)) {
-    await removeMember(storage, appId, account);
+    // The right is what is being taken, so the row goes with it (removeMember keeps it otherwise).
+    await removeMember(storage, appId, account, { keepDevRight: false });
     return true;
   }
   const rec: AppMemberRecord = { ...prev, updatedAt: new Date().toISOString() };

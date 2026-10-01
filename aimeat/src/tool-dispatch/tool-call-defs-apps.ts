@@ -8,6 +8,8 @@
  * @usage
  *   import { appTools } from './tool-call-defs-apps.js';
  * @version-history
+ *   v1.11.0 -- 2026-10-01 -- aimeat_iam_define forwards default_role, version, author and ext_name to
+ *     defineAppIam, as both MCP tools do (audit 2026-10-01, defect B).
  *   2026-09-27 -- Agent-facing texts use industry terms: door and surface became tool and interface (docs/coding-guidelines/shell-and-git.md).
  *   v1.9.0 -- 2026-09-27 -- aimeat_app_versions, aimeat_app_ui_get and aimeat_app_ui_set moved into
  *     aimeat_app_manage (tool-call-defs-app-manage.ts).
@@ -181,6 +183,8 @@ export const appTools: ConnectCliToolDefinition[] = [
                 appId: optionalString(input, 'app_id'),
                 levels: requiredArray(input, 'levels') as LevelDef[],
                 commands: requiredArray(input, 'commands') as CommandDef[],
+                defaultRole: optionalString(input, 'default_role'), version: optionalString(input, 'version'),
+                author: optionalString(input, 'author'), extName: optionalString(input, 'ext_name'),
             });
             return result.ok === false
                 ? { ok: false as const, error: { code: 'IAM_INVALID', message: (result as { error: string }).error } }

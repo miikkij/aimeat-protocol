@@ -10,6 +10,8 @@
  * @structure SDK_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.20.0 — 2026-10-01 — aimeat-iam 1.1.0: the aiDoc and prompt line describe the node roster, the
+ *     role map, the panels and the generated gate; the size is measured (28 kB minified).
  *   v1.19.0 — 2026-09-29 — aimeat-storage 1.3.0: the aiDoc says how a team (workspace) or group file is stored.
  *   v1.18.0 — 2026-09-29 — aimeat-labels joins after aimeat-organism, from library-packs/sdk-labels.ts (TARGET-082 V5).
  *   v1.17.0 — 2026-09-29 — aimeat-refinery joins after aimeat-decide, from library-packs/sdk-refinery.ts.
@@ -367,15 +369,17 @@ export const SDK_PACKS: LibraryPack[] = [
     requires: ['aimeat-auth'],
     license: 'MIT',
     apiSurface: 'AIMEAT.iam',
-    aiDoc: "Talks to the in-app IAM extension your app installed, whichever fork it is (the admin action is multiplexed by `op` in the aimeat-iam pack and by `command` in some forks; the adapter absorbs that). init({ ext }) once, then me() for the caller's standing, can(cap) to paint, guard(cap, fn) to refuse. can() is a HINT read from a cached list: the extension is the gate, so enforce server-side in the action that mutates data. A role is keyed to the caller's OWNER by default, so a member's agents inherit it and one revoke removes it from all of them.",
-    changelog: [],
+    aiDoc: "Your app's own members and roles. The NODE keeps who is a member: await AIMEAT.iam.init({ app: 'owner/file.html', roles: { member: ['use'], admin: ['use', 'manage'] } }). `roles` maps each role to what it may do; a plain list of names, least power first, also works, and then each role holds its own name. me() is the caller's standing { member, isOwner, role, caps, requested }; can(cap) to paint, gate(selectorOrElement, cap) to show or hide one element, guard(cap, fn) asks the node before it runs fn. AIMEAT.iam.MemberAdmin({ target }) is the owner's panel: requests, visitors, the roster, role change, remove, and your own settings through `sections`; one click on Approve grants the role with the least power unless you pass `approveRole`. AIMEAT.iam.JoinPanel({ target }) is the applicant's form. All of this is a HINT: the node does not refuse a stranger who opens the page or writes their own memory. To refuse a change on the server, generate a gate with the MCP tool aimeat_iam_define, install the extension it returns, and init({ app, ext }); the extension reads the caller's role through ctx.caller.member, in the action that mutates data. A role belongs to the PERSON, so a member's agents hold it too and one removal ends it for all of them. init({ ext }) alone drives an older IAM extension that keeps its own roster.",
+    changelog: [
+      { version: '1.1.0', date: '2026-10-01', summary: 'On the node roster a member holds capabilities: init({ app, roles }) takes a map of role to capabilities (or a list of names, least power first). Before this an approved member held none and can(), gate() and guard() refused them. One-click Approve in MemberAdmin grants the role with the least power, shown beside the button; it granted the last role listed. guard() asks the node; a refusal shows its reason in both panels; JoinPanel says when the caller already asked. Spanish strings.' },
+    ],
     tierHint: 'T3',
     interviewTriggers: ['own users', 'members', 'roles', 'approve users', 'who may use this'],
-    sizeEstimate: '~7KB',
+    sizeEstimate: '~28KB',
     status: 'stable',
     modelTier: 'needs-doc',
     promptGroup: 'core',
-    promptLine: "- aimeat-iam.js — your app's own members and roles (`AIMEAT.iam`): init({ext}), me(), can() to paint, guard() to refuse. Needs an IAM extension installed; the extension is the gate, can() is only a hint.",
+    promptLine: "- aimeat-iam.js — your app's own members and roles (`AIMEAT.iam`): init({ app, roles: { member: ['use'] } }), can()/gate() to paint, guard() to refuse, MemberAdmin({target}) for the owner, JoinPanel({target}) for the applicant. The node keeps the roster; to enforce on the server, add a gate from aimeat_iam_define and init({ app, ext }).",
   },
   {
     id: 'aimeat-wallet',

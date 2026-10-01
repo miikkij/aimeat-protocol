@@ -13,6 +13,8 @@
  *   one-time token, and retries with `x-aimeat-pay-token`; the paywall verifies + consumes it (D1/D3).
  * @structure enforcePaywall · PaywallOutcome
  * @version-history
+ *   v1.8.2 — 2026-10-01 — The members-only refusal points at POST .../members/requests, the route
+ *     that exists; it named .../members/request, which answered 404.
  *   v1.8.1 — 2026-09-26 — The caller's owner comes from localAccountName (utils/gaii.ts), which keeps
  *     an identity of another node whole, so a visitor never calls free as the local namesake
  *     (secaudit 2026-09, F-1).
@@ -302,7 +304,7 @@ export async function enforcePaywall(args: {
             next_actions: [{
               description: 'Ask the owner for access',
               method: 'POST',
-              url: `/v1/apps/${encodeURIComponent(appOwner ?? '')}/${encodeURIComponent(file ?? '')}/members/request`,
+              url: `/v1/apps/${encodeURIComponent(appOwner ?? '')}/${encodeURIComponent(file ?? '')}/members/requests`,
             }],
           },
         });

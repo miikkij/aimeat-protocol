@@ -20,6 +20,15 @@
  *   default role · no relationship to app-grant scopes · server-side enforcement.
  *   See docs/internal/aimeat-iam-design.md.
  * @version-history
+ *   v1.5.0 — 2026-10-01 — Before a claim exists, only the account that installed the extension
+ *     (ctx.extension.owner, from the node's record, compared with ctx.caller.owner) may claim or
+ *     administer it. canAdmin used to open with `!config.ownerGhii`, so on an unclaimed instance every
+ *     signed-in caller was admin and the claim op gave the instance to whoever called first; on a
+ *     per-owner install that let a stranger take it before the owner opened the dashboard. Claim by
+ *     anyone else now answers ok:false, isOwner:false and writes nothing. An instance whose
+ *     config.ownerGhii is already set is decided exactly as before. Extension manifest 1.4.0. Audit
+ *     2026-10-01, defect A. A copy installed before this keeps its old script until its instance is
+ *     updated.
  *   v1.4.0 — 2026-09-13 — admin write ops REFUSE a missing or malformed field with ok:false naming
  *     what the op takes and any field it did not read (assign { user } now says it needs ghii).
  *     Each op used to skip the write when its field was absent and still answer ok:true with the
@@ -177,15 +186,34 @@ ${RESOLVE_FN}
   // deliberately narrowed simply does not hold '*', so the narrowing keeps working.
   const ownerBare = config.ownerGhii ? String(config.ownerGhii).toLowerCase().split('@')[0].split('#').pop() : null;
   const isHumanOwner = !!(ownerBare && owner && ownerBare === owner && caller && caller.indexOf('#') === -1);
+  // Before a claim exists, only the account that INSTALLED this extension may claim or administer
+  // it. ctx.extension.owner is resolved by the node from the extension record, never from the
+  // request. It is compared with ctx.caller.owner, the account behind any principal form, so the
+  // installer's own agent and the dashboard app's session qualify. The record may hold the
+  // installer as a bare name or as name@node; both are this node's account, so the node part is
+  // dropped from that side only. caller.owner is left whole: a visitor from another node carries
+  // name@home-node there and must not match a local namesake. A route that does not pass
+  // ctx.extension leaves installer null, which reads as "not the installer".
+  const installer = (ctx.extension && ctx.extension.owner)
+    ? String(ctx.extension.owner).toLowerCase().split('#').pop().split('@')[0] : null;
+  const isInstaller = !!(installer && owner && installer === owner);
   const myRole = resolveRole(assignments, subject, caller, owner).role;
   const myPerms = (myRole && roles[myRole]) || [];
-  // Three ways in, and claim seeds no role, so the roster stays exactly what the owner put there:
+  // Four ways in, and claim seeds no role, so the roster stays exactly what the owner put there:
+  //   - before any claim, the installing account (see above); "whoever calls first" used to be
+  //     admin here, and the claim op then handed the instance to that caller,
   //   - the identity that claimed it (unchanged from before, so nobody loses access on upgrade),
   //   - the human owner, which is what the old identity match wrongly excluded when an AGENT claimed,
   //   - anyone whose resolved role holds '*', which is what lets the owner's own agent administer.
-  const canAdmin = !config.ownerGhii || config.ownerGhii === caller || isHumanOwner || myPerms.indexOf('*') !== -1;
+  // config.ownerGhii is tested before the identity match so that an unclaimed instance and a call
+  // with no gaii (undefined === undefined) cannot pass it.
+  const canAdmin = (!config.ownerGhii && isInstaller) || (!!config.ownerGhii && config.ownerGhii === caller)
+    || isHumanOwner || myPerms.indexOf('*') !== -1;
   if (op === 'claim') {
     if (!config.ownerGhii) {
+      if (!isInstaller) {
+        return { ok: false, error: 'forbidden: only the account that installed this IAM extension can claim it', ownerGhii: null, isOwner: false };
+      }
       config.ownerGhii = caller;
       if (config.defaultRole === undefined) config.defaultRole = 'viewer';
       if (config.subject === undefined) config.subject = 'owner';
@@ -281,7 +309,7 @@ const EXTENSION_IAM = JSON.stringify({
   manifest: [
     'metadata:',
     '  name: iam',
-    '  version: 1.3.0',
+    '  version: 1.4.0',
     '  description: In-app role & permission management with server-side enforcement. A role is keyed to the caller OWNER by default, so a member who works through an agent is covered by one entry and one revoke removes it from all of their agents; subject gaii or both change that. BBS levels + command manifest.',
     '  author: operator',
     'required_apis:',
@@ -297,7 +325,7 @@ const EXTENSION_IAM = JSON.stringify({
     '  - id: admin',
     '    method: POST',
     '    path: /admin',
-    '    description: "Role, assignment and config management, multiplexed by op (claim, getState, setConfig, setSubject, setRoles, setLevels, setCommands, assign, revoke). Gated by capability: the human owner always qualifies, and so does any caller whose resolved role holds *, which is what lets the owner manage members through their own agent."',
+    '    description: "Role, assignment and config management, multiplexed by op (claim, getState, setConfig, setSubject, setRoles, setLevels, setCommands, assign, revoke). Gated by capability: the human owner always qualifies, and so does any caller whose resolved role holds *, which is what lets the owner manage members through their own agent. Before the first claim, only the account that installed the extension may claim or administer it."',
     '    input: { type: object, properties: { op: { type: string }, ghii: { type: string }, role: { type: string }, subject: { type: string }, roles: { type: object }, levels: { type: object }, config: { type: object }, commands: { type: array } }, required: [op] }',
     '    output: { type: object, properties: { ok: { type: boolean }, isOwner: { type: boolean }, ownerGhii: { type: string }, subject: { type: string }, assignments: { type: object }, roles: { type: object }, levels: { type: object }, commands: { type: array }, config: { type: object }, removed: { type: boolean }, takes: { type: array }, ignored: { type: array }, error: { type: string } } }',
     '    script: admin.js',

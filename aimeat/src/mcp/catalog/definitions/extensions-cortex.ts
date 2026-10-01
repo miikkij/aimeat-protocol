@@ -12,6 +12,10 @@
  * @structure extensionsCortexTools[] — concatenated into organismsWorkspacesAppsTools
  * @usage import { extensionsCortexTools } from './extensions-cortex.js';
  * @version-history
+ *   v1.6.0 — 2026-10-01 — aimeat_iam_define says what it returns (matrix, extension, apply) and how to
+ *     use the generated gate: install it with aimeat_extension_install, then AIMEAT.iam.init({ app, ext }).
+ *     It had sent the caller to an `admin` action the generated gate does not have. New inputs
+ *     default_role, version, author and ext_name reach the generator. Audit 2026-10-01, defect B.
  *   v1.5.0 — 2026-09-26 — aimeat_cortex_delete says what an uninstall removes.
  *   v1.4.0 — 2026-09-26 — aimeat_cortex_install says that a ZIP upload under the name of a cortex the
  *     caller installed replaces it the way update:true does, and what the redeploy of an active one
@@ -94,13 +98,17 @@ export const extensionsCortexTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_iam_define',
-        description: 'Design an app\'s in-app permission model (for the aimeat-iam extension): validate a level schema (BBS ordinal levels, lower = more power, with app capability strings — a level 0 holding "*" is required) + a command manifest (commands → required capability + mutation tier read|write|irreversible), compute the level→command matrix (which levels may run which commands + which need human confirmation), and return ready-to-apply admin payloads (setRoles/setLevels/setCommands). PURE DESIGN + VALIDATION — it does not change any live state; apply the returned payloads with aimeat_extension_invoke against the app\'s iam extension\'s "admin" action. One model for both user kinds (human GHII + agent GAII).',
+        description: 'Design an app\'s in-app permission model and get the gate that enforces it. Validates a level schema (ordinal levels, lower = more power, each with app capability strings; a level 0 holding "*" is required) and a command manifest (each command names the capability it needs and a mutation tier read|write|irreversible). A level also holds every weaker level\'s capabilities. It changes no live state; it returns: `matrix`, per level the commands it may run and the ones a human should confirm; `extension`, only when app_id names an app as owner/file.html, an installable gate { name, manifest, scripts } with the actions check, commands and roles, which reads each caller\'s role from the app\'s member list on this node; and `apply`, setRoles/setLevels/setCommands payloads for the "admin" action of an aimeat-iam package install (aimeat_extension_invoke), which the generated gate does not need. To use the generated gate: install it with aimeat_extension_install { manifest: extension.manifest, scripts: extension.scripts, activate: true } (add update: true and the next version when regenerating over an installed gate), then in the app call AIMEAT.iam.init({ app: "<owner/file.html>", ext: extension.name }) from the aimeat-iam browser library. One model for both user kinds (a person and their agents).',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
-            app_id: { type: 'string', description: 'App id / name for the schema label (optional).' },
+            app_id: { type: 'string', description: 'owner/file.html of the app the gate protects; with it the result includes the installable `extension`. A name without a slash only labels the schema and generates no extension.' },
             levels: { type: 'array', required: true, description: 'Level schema: array of { level (int, 0 = most power), key, label, capabilities: string[] }.' },
             commands: { type: 'array', required: true, description: 'Command manifest: array of { id, description, capability, tier: read|write|irreversible }.' },
+            default_role: { type: 'string', description: 'Level key that a signed-in caller who is not on the member list holds in the generated gate. Omit for a members-only app. A level holding "*" is refused.' },
+            version: { type: 'string', description: 'Manifest version of the generated gate, x.y.z. Default 1.0.0; pass the next version when you regenerate an installed gate.' },
+            author: { type: 'string', description: 'Manifest author of the generated gate. Default "generated".' },
+            ext_name: { type: 'string', description: 'Extension name of the generated gate (lowercase letters, digits, hyphens). Default: a slug of app_id plus -iam.' },
         },
     },
     {

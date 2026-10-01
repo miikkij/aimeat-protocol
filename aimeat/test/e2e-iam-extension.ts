@@ -13,6 +13,9 @@
  *            mutation I2 deleted it with the suite still 7/7 green.
  *   v1.2.0 — 2026-09-13 — Test 11: an admin op with a missing or misnamed field refuses by name and
  *            writes nothing, while the shared panel's { ghii, role, owner, note } shape still assigns.
+ *   v1.3.0 — 2026-10-01 — Tests 12 and 13 (audit 2026-10-01, defect A): on an UNCLAIMED install a
+ *            different owner and that owner's agent are refused claim and every admin op and do not
+ *            become owner; the installer, or the installer's own agent, claims as before.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=iam-extension
 
@@ -366,6 +369,84 @@ await test('11. an admin op with a missing or misnamed field refuses by name and
     assert(gone.ok === true && gone.removed === true && gone.assignments[bob] === undefined, `revoke removes: ${JSON.stringify(gone)}`);
     const again = data(await admin('revoke', { ghii: bob }));
     assert(again.ok === true && again.removed === false, `a revoke that matched no row says so: ${JSON.stringify(again)}`);
+});
+
+/** Install + activate a fresh copy of the package extension as `token`, unclaimed, under `name`. */
+async function installFresh(name: string, token: string) {
+    const m = extDef.manifest.replace('name: iam', `name: ${name}`);
+    const inst = await json('/v1/extensions', { method: 'POST', headers: authH(token), body: JSON.stringify({ manifest: m, scripts }) });
+    // POST /v1/extensions answers 201 for a new name (e2e-iam-generated-extension.ts D3 pins it).
+    assert(inst.status === 201, `install ${name} ${inst.status}: ${JSON.stringify(inst.body.error || inst.body)}`);
+    const act = await json(`/v1/extensions/${name}/activate`, { method: 'POST', headers: authH(token), body: '{}' });
+    assert(act.status === 200, `activate ${name} ${act.status}: ${JSON.stringify(act.body.error || act.body)}`);
+}
+const adminOn = (name: string, token: string, op: string, extra: Record<string, unknown> = {}) =>
+    json(`/v1/ext/${name}/admin`, { method: 'POST', headers: authH(token), body: JSON.stringify({ op, ...extra }) });
+
+/**
+ * Audit 2026-10-01, defect A. canAdmin opened with `!config.ownerGhii`, so before the owner first
+ * opened the dashboard EVERY signed-in caller was admin of their install, and `claim` gave the
+ * instance to whoever called first. On an unclaimed install, a different owner and that owner's
+ * agent must be refused every admin op and must not become owner; the installer then claims as usual.
+ */
+await test('12. an UNCLAIMED install refuses a different owner: no claim, no admin, no roster', async () => {
+    if (!B) B = await setupOwner('b');
+    const EXT2 = `${EXT}u`;
+    await installFresh(EXT2, A.token);
+    const bGhii = `${B.name}@${NODE_ID}`;
+    const asB = (op: string, extra: Record<string, unknown> = {}) => adminOn(EXT2, B.token, op, extra);
+
+    const claim = data(await asB('claim'));
+    assert(claim.ok === false && claim.isOwner === false && /forbidden/.test(claim.error || ''),
+        `B's claim on A's unclaimed install must be refused: ${JSON.stringify(claim)}`);
+
+    const st = data(await asB('getState'));
+    assert(st.isOwner === false, `B must not administer an unclaimed install: ${JSON.stringify(st.isOwner)}`);
+    assert(st.ownerGhii === null, `and B's claim must not have landed: ${JSON.stringify(st.ownerGhii)}`);
+    assert(Object.keys(st.assignments || {}).length === 0, `B sees no roster: ${JSON.stringify(st.assignments)}`);
+
+    const ops: [string, Record<string, unknown>][] = [
+        ['setConfig', { config: { defaultRole: 'admin' } }],
+        ['setRoles', { roles: { admin: ['*'], viewer: ['*'] } }],
+        ['setSubject', { subject: 'gaii' }],
+        ['assign', { ghii: bGhii, role: 'admin' }],
+    ];
+    for (const [op, extra] of ops) {
+        const r = data(await asB(op, extra));
+        assert(r.ok === false && /forbidden/.test(r.error || ''), `${op} by a non-installer on an unclaimed install must be refused, got ${JSON.stringify(r)}`);
+    }
+
+    // B's own agent is the same account as B, so it is refused the same way.
+    const bAgent = await setupAgent('claimer', B.name, B.token);
+    const agentClaim = data(await adminOn(EXT2, bAgent.token, 'claim'));
+    assert(agentClaim.ok === false && agentClaim.isOwner === false,
+        `another owner's agent must not claim either: ${JSON.stringify(agentClaim)}`);
+
+    // The installer claims exactly as before, and nothing B tried landed.
+    const mine = data(await adminOn(EXT2, A.token, 'claim'));
+    assert(mine.ok === true && mine.isOwner === true && mine.ownerGhii === aGaii,
+        `the installer claims its own install: ${JSON.stringify(mine)}`);
+    const after = data(await adminOn(EXT2, A.token, 'getState'));
+    assert(after.isOwner === true, `the installer administers: ${JSON.stringify(after.isOwner)}`);
+    assert(after.assignments[bGhii] === undefined, `B assigned itself nothing: ${JSON.stringify(after.assignments)}`);
+    assert(after.roles.viewer.length === 1 && after.roles.viewer[0] === 'read', `roles untouched: ${JSON.stringify(after.roles)}`);
+    assert(after.config.defaultRole === 'viewer' && after.subject === 'owner', `config is what claim seeds: ${JSON.stringify(after.config)}`);
+
+    // Once claimed, B is refused exactly as on any claimed install (test 6), and claim reports A.
+    const late = data(await asB('claim'));
+    assert(late.isOwner === false && late.ownerGhii === aGaii, `a late claim by B changes nothing: ${JSON.stringify(late)}`);
+});
+
+/** The installer's own agent counts as the installer (ctx.caller.owner is the account behind it). */
+await test('13. the installer\'s own agent may claim an unclaimed install, and the human still administers', async () => {
+    const EXT3 = `${EXT}g`;
+    await installFresh(EXT3, A.token);
+    const agent = await setupAgent('first-claim', A.name, A.token);
+    const claim = data(await adminOn(EXT3, agent.token, 'claim'));
+    assert(claim.ok === true && claim.isOwner === true && claim.ownerGhii === agent.gaii,
+        `the owner's agent claims the owner's install: ${JSON.stringify(claim)}`);
+    const human = data(await adminOn(EXT3, A.token, 'getState'));
+    assert(human.isOwner === true, `the human owner administers an install their agent claimed: ${JSON.stringify(human.isOwner)}`);
 });
 
 console.log(`\naimeat-iam Extension Evolution E2E: ${passed} passed, ${failed} failed (${passed + failed} total)\n`);

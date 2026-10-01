@@ -24,6 +24,8 @@
  * @structure APP_BUILDER_SKILL_ENTRY
  * @usage import { APP_BUILDER_SKILL_ENTRY } from './builtin-skills.app-builder.js';
  * @version-history
+ *   v1.6.1 — 2026-10-01 — The framing line on an app's own users names the node roster and a gate from
+ *     aimeat_iam_define instead of the aimeat-iam pack.
  *   v1.6.0 — 2026-09-28 — A section on the AI capabilities: capabilities() first, ask for the
  *     capability, models= and prefer.* in the meta, the price first (System 2 plan, V5).
  *   v1.5.0 — 2026-09-19 — The track comes first. This skill is where a "build me an app" request
@@ -143,9 +145,9 @@ registry), \`aimeat_appdev_pitfall_list\` (learned, model-filterable), \`aimeat_
 \`binding=app:{owner}/{file}\` (how existing apps want to be driven).
 
 Frame the build from the research (tier T1/T2/T3, packs, whether the app needs its own
-users → the aimeat-iam pack for the gate + AIMEAT.iam for the panel, decided NOW; a role
-belongs to the PERSON so a member's agents inherit it, and can() only paints while the extension
-enforces), then **propose the frame in the person's own words, not the node's**. The section
+users → the node roster + AIMEAT.iam for the panel, and a gate from aimeat_iam_define when the
+server must refuse, decided NOW; a role belongs to the PERSON so a member's agents inherit it, and
+can() only paints while the extension enforces), then **propose the frame in the person's own words, not the node's**. The section
 below is what that means. If the user says to just build it the usual way, skip the research
 and go.
 

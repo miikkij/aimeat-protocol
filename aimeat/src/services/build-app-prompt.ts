@@ -15,6 +15,8 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-10-01 — Own users/roles: init({ app, roles }) with what each role may do, and a gate from
+ *     aimeat_iam_define when the server must refuse.
  *   2026-09-29 — The bottom-chrome paragraph says where the marks are now (one row at the bottom-left,
  *     the developer's decision of 2026-09-29) and the fallback height they take (46px, was 56px).
  *     Nothing else in the paragraph changed.
@@ -210,7 +212,7 @@ function composeAppPrompt(
   body += '- **T1 — pure client** (shell-pure-client): auth + data + UI in one HTML file. The default; most apps end here.\n';
   body += '- **T2 — +cortex** (shell-cortex): the app leans on ready-made cortex UI libs (DataTable, forms, charts). Pick when the UI is data-heavy.\n';
   body += '- **T3 — +extension** (shell-extension): the app needs SERVER-side work — a third-party API (ctx.fetch), server-enforced rules (only-author-can-delete, one-vote-per-user), or its own `ext:` data. Only tier that ships an extension.\n';
-  body += '- **Own users/roles?** If the app has its own member community (roles, levels, approval) start from the **usecase-app-iam** template (`/v1/app-templates`), which wires the node roster, the owner panel and the applicant form together; the pack is only needed when the gate must live in an extension: `MemberAdmin({target})` is the roster and approval panel, and `sections` puts your own settings in it instead of a second admin screen. Decide at framing time; a hand-rolled auth list in memory keys is painful to retrofit. Two rules that are NOT obvious and have already cost rework: a role belongs to the PERSON, so the agents of a member inherit it (never key a role to the acting agent), and `can()` only paints while the extension enforces, in the action that mutates data.\n\n';
+  body += '- **Own users/roles?** If the app has its own member community (roles, levels, approval) start from the **usecase-app-iam** template (`/v1/app-templates`), which wires the node roster, the owner panel and the applicant form together; `init({ app, roles: { member: [\'use\'], admin: [\'use\', \'manage\'] } })` says what each role may do. When the server must refuse, generate a gate with `aimeat_iam_define`, install it and `init({ app, ext })`: `MemberAdmin({target})` is the roster and approval panel, and `sections` puts your own settings in it instead of a second admin screen. Decide at framing time; a hand-rolled auth list in memory keys is painful to retrofit. Two rules that are NOT obvious and have already cost rework: a role belongs to the PERSON, so the agents of a member inherit it (never key a role to the acting agent), and `can()` only paints while the extension enforces, in the action that mutates data.\n\n';
 
   // Libraries: the whole section (SDK groups + Ready-made UI cortex + Optional capability
   // packs) is generated from the library-pack registry — src/data/library-packs.ts — so this
