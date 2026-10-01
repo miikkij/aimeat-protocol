@@ -26,6 +26,9 @@
  *   import { UI_COMPONENTS, componentById } from './registry.js';
  *   import { buildUiCatalogue } from './catalogue.js';   // the catalogue reads this registry
  * @version-history
+ *   v1.23.0 — 2026-10-01 — `workspacePicker` joins the components, and workspaceTeam, intakeForm and
+ *     intakeAdmin take `app`: with org and ws left empty they open on the workspace the picker
+ *     chose. Their org and ws are no longer required, which keeps every stored layout valid.
  *   v1.22.0 — 2026-10-01 — THE MEMBERS BLOCKS (append-only, wish-library-blocks-in-the-kit-and-the-
  *     design-book-iam-members-fi): `members`, the owner's member screen, and `joinRequest`, the
  *     visitor's ask, self-sourced over AIMEAT.iam (atelier/members.js). Then `workspaceTeam` over
@@ -664,13 +667,27 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
   },
   {
     id: 'workspaceTeam',
-    summary: "A workspace's people: requests to approve as viewer or contributor or decline, the people with their role (raising to contributor asks first, the creator stays), and add by account name or invite by email. Needs aimeat-organism.js on the page.",
+    summary: "A workspace's people: requests to approve as viewer or contributor or decline, the people with their role (raising to contributor asks first, the creator stays), and add by account name or invite by email. Give org and ws, or leave them empty and give app to open on the workspace a workspacePicker block chose. Needs aimeat-organism.js on the page.",
     maxPerLayout: 1,
     props: {
-      org: requiredText('The organism id.', 80),
-      ws: requiredText('The workspace id.', 80),
+      org: text('The organism id. Leave empty, with app given, to follow the workspacePicker.', 80),
+      ws: text('The workspace id. Leave empty, with app given, to follow the workspacePicker.', 80),
       title: text("The section title, when the kit's own is not wanted.", 120),
       variant: text('"list" (the default) or "table".', 10),
+      app: text('The app key the workspacePicker on this page uses. Used only when org and ws are empty.', 120),
+    },
+  },
+  {
+    id: 'workspacePicker',
+    summary: "An app's first run: which organism and which workspace of it keep the app's records. A choice made before is used at once and shown as one line with Change; otherwise the person picks an organism or creates one, and the workspace is found or created and remembered. The blocks below that name the same app (workspaceTeam, intakeForm, intakeAdmin with org and ws left empty) open on the choice. Needs aimeat-organism.js on the page.",
+    maxPerLayout: 1,
+    props: {
+      app: requiredText('The app key the choice is remembered under, e.g. "cadence" (no spaces).', 120),
+      name: text('The workspace name to find or create. Defaults to the app key.', 120),
+      kind: text('The workspace kind written into its manifest.', 60),
+      purpose: text('One line saying what the workspace holds.', 200),
+      title: text("The section title, when the kit's own is not wanted.", 120),
+      variant: text('"dense" for a side panel; empty for the full block.', 10),
     },
   },
   {
@@ -678,11 +695,12 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
     summary: 'A Public Intake form drawn from its public descriptor: every field type, a hidden spam trap, the error on the field it names, and the thank-you line after sending. Without formId it reads ?form= from the page address. Needs aimeat-intake.js on the page.',
     maxPerLayout: 2,
     props: {
-      org: requiredText('The organism id.', 80),
-      ws: requiredText('The workspace id.', 80),
+      org: text('The organism id. Leave empty to read ?org= from the page address, or, with app given, to follow the workspacePicker.', 80),
+      ws: text('The workspace id. Leave empty to read ?ws= from the page address, or, with app given, to follow the workspacePicker.', 80),
       formId: text('The form id. Leave empty to read ?form= from the page address.', 80),
       title: text('The section title, when the form title is not wanted.', 120),
       hint: text('One line under the title.', 300),
+      app: text('The app key the workspacePicker on this page uses. Used only when org and ws are empty.', 120),
     },
   },
   {
@@ -690,10 +708,11 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
     summary: 'The owner list of Public Intake forms in one workspace: title, id and flags per form, copy link, delete after a confirm, and a create form with labelled fields. Needs aimeat-intake.js on the page.',
     maxPerLayout: 1,
     props: {
-      org: requiredText('The organism id.', 80),
-      ws: requiredText('The workspace id.', 80),
+      org: text('The organism id. Leave empty, with app given, to follow the workspacePicker.', 80),
+      ws: text('The workspace id. Leave empty, with app given, to follow the workspacePicker.', 80),
       namespace: text('The row space new forms write into. Leave empty to let the owner type it.', 80),
       title: text("The section title, when the kit's own is not wanted.", 120),
+      app: text('The app key the workspacePicker on this page uses. Used only when org and ws are empty.', 120),
     },
   },
   {

@@ -7,6 +7,8 @@
  *   link; the accounts with their status and capability words, disconnect asked first, connect
  *   started with the provider, and `need` keeping only the services that can do it.
  * @version-history
+ *   v1.1.0 - 2026-10-01 - The copied link carries org and ws, so a form that follows the picker opens
+ *     for a visitor who is not signed in.
  *   v1.0.0 - 2026-10-01 - Initial (iam-members-and-library-blocks plan, Phase D blocks 4 and 5).
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -243,14 +245,14 @@ describe('intakeAdmin', () => {
     expect(part(host, 'notice')[0].textContent).toBe('The form is deleted.');
   });
 
-  it('copies the app-side link of a form', async () => {
+  it('copies the app-side link of a form, with the organism and workspace a visitor needs', async () => {
     const host = document.createElement('div');
     forms.intakeAdmin({ target: host, org: 'org1', ws: 'ws1' });
     await settle();
     click(part(host, 'copy')[0]);
     await settle();
     const writes = (navigator as any).clipboard.writes;
-    expect(writes[writes.length - 1]).toBe('http://localhost:40050/?form=contact-us');
+    expect(writes[writes.length - 1]).toBe('http://localhost:40050/?form=contact-us&org=org1&ws=ws1');
     expect(part(host, 'notice')[0].textContent).toContain('?form=contact-us');
   });
 

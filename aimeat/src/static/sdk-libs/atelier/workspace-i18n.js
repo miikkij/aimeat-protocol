@@ -10,6 +10,8 @@
  *   import { tw } from './workspace-i18n.js';
  *   tw('team.title');
  * @version-history
+ *   v0.62.0 — 2026-10-01 — follow.wait: what a block that follows the picker says before a workspace
+ *     is chosen (workspace-choice.js).
  *   v0.61.0 — 2026-10-01 — Initial (IAM plan Phase D blocks 2 and 3).
  */
 import { i18n } from './i18n.js';
@@ -72,6 +74,7 @@ const STRINGS = {
     'picker.using': 'Using {ws} in {org}',
     'picker.change': 'Change',
     'picker.cancel': 'Keep the current one',
+    'follow.wait': 'Choose above where this app keeps its records. This part opens there.',
   },
   fi: {
     'sample.note': 'Esimerkki. Täältä ei lähetetä eikä muuteta mitään.',
@@ -130,6 +133,7 @@ const STRINGS = {
     'picker.using': 'Käytössä työtila {ws} organismissa {org}',
     'picker.change': 'Vaihda',
     'picker.cancel': 'Pidä nykyinen',
+    'follow.wait': 'Valitse yläpuolelta, mihin sovellus tallentaa tietonsa. Tämä osa avautuu siellä.',
   },
   es: {
     'sample.note': 'Una muestra. Desde aquí no se envía ni se cambia nada.',
@@ -188,6 +192,7 @@ const STRINGS = {
     'picker.using': 'Usando el espacio de trabajo {ws} de {org}',
     'picker.change': 'Cambiar',
     'picker.cancel': 'Mantener el actual',
+    'follow.wait': 'Elige arriba dónde guarda esta aplicación sus registros. Esta parte se abre ahí.',
   },
 };
 

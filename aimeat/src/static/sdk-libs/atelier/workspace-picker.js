@@ -15,6 +15,11 @@
  *
  *   THE SAMPLE STATE. `sample: true`, or an `app` that is still a fill's <placeholder>, draws marked
  *   sample organisms and changes nothing; onReady is never called.
+ *
+ *   THE BLOCKS BELOW IT. Every choice, recalled or picked, is also announced (workspace-choice.js):
+ *   one window event `aimeat-workspace-change`, and workspaceTeam, intakeForm and intakeAdmin given
+ *   the same `app` and no org or ws open on it. That is how the picker works as a mosaic block,
+ *   where a prop cannot carry onReady.
  * @parts workspacePicker root · title · intro · failure · using · change · orgs · row · who · chip · use · create · createGo · cancel · working
  * @slots workspacePicker onReady(choice)
  * @variants workspacePicker dense
@@ -25,16 +30,31 @@
  *   AIMEAT.atelier.workspacePicker({ target: '#home', app: 'cadence', name: 'CRM', kind: 'cadence-crm',
  *     purpose: 'Customers and deals', objectTypes, onReady: (c) => openWorkspace(c.orgId, c.wsId) });
  * @version-history
+ *   v0.62.0 — 2026-10-01 — The choice is announced to the page (workspace-choice.js), so the picker
+ *     is a mosaic block and the blocks below it follow its choice. Without objectTypes a new
+ *     workspace gets one records space; the node refused the manifest without one.
  *   v0.61.0 — 2026-10-01 — Initial (IAM plan Phase D block 3).
  */
 import { el, clear, resolve, enter } from './dom.js';
 import { tw } from './workspace-i18n.js';
 import { isPlaceholder, sampleBadge, watch, refusal, person } from './members-shared.js';
+import { announceWorkspace, pickerOpened } from './workspace-choice.js';
 
 const SAMPLE_ORGS = [
   { id: 'sample-shop', name: 'Shop team', role: 'owner' },
   { id: 'sample-club', name: 'Book club', role: 'member' },
 ];
+
+/**
+ * The space a new workspace gets when the app names none. The node refuses a manifest without at
+ * least one space, and a picker placed from a stored layout cannot carry objectTypes, so without
+ * this its first pick was refused. One records space; createWorkspace fills a schema that admits
+ * every field.
+ */
+const DEFAULT_OBJECT_TYPES = [{
+  name: 'record', schemaRef: 'schema:record@1', namespace: 'records', backing: 'memory',
+  writeRole: 'member', cardinality: 'many', versioned: true, mode: 'records',
+}];
 
 /** The page's AIMEAT.organism when it carries the first-run methods, or null. */
 function orgLib() {
@@ -80,6 +100,8 @@ export function workspacePicker(spec) {
   });
   if (spec.target) resolve(spec.target).appendChild(root);
   const wsName = String(spec.name || spec.app || '').trim();
+  // While this picker is on the page, the blocks that follow its app wait for its answer.
+  const closed = sample ? function () { /* the sample announces nothing */ } : pickerOpened(spec.app);
 
   /** @type {'loading'|'noLib'|'signedOut'|'using'|'choose'|'working'} */
   let mode = 'loading';
@@ -102,7 +124,10 @@ export function workspacePicker(spec) {
   }
 
   function report(c) {
-    if (sample || typeof spec.onReady !== 'function') return;
+    if (sample) return;
+    // The blocks below that follow this app's choice (workspace-choice.js) hear it here.
+    announceWorkspace(spec.app, c);
+    if (typeof spec.onReady !== 'function') return;
     try {
       Promise.resolve(spec.onReady(c)).catch(function (e) { console.error('aimeat-atelier: workspacePicker onReady failed', e); });
     } catch (e) {
@@ -228,7 +253,8 @@ export function workspacePicker(spec) {
     try {
       made = await o.findOrCreateWorkspace({
         org: target.id ? target.id : { name: target.name }, name: wsName,
-        kind: spec.kind, purpose: spec.purpose, objectTypes: spec.objectTypes,
+        kind: spec.kind, purpose: spec.purpose,
+        objectTypes: Array.isArray(spec.objectTypes) && spec.objectTypes.length ? spec.objectTypes : DEFAULT_OBJECT_TYPES,
       });
       if (mine !== gen) return;
     } catch (e) {
@@ -321,6 +347,6 @@ export function workspacePicker(spec) {
     choice: function () { return choice; },
     change: function () { change(); },
     refresh: function () { return ready0.then(start); },
-    destroy: function () { gen++; stop(); if (root.parentNode) root.parentNode.removeChild(root); },
+    destroy: function () { gen++; stop(); closed(); if (root.parentNode) root.parentNode.removeChild(root); },
   };
 }

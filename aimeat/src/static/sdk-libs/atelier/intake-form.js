@@ -24,9 +24,14 @@
  *   the component says what is missing.
  *
  *   THE LINK. The node answers a form's API address (submit_url), not a page a person opens. Copy
- *   link therefore copies the app's own page with `?form=<form id>`, and intakeForm without a
- *   `formId` reads the same parameter, so one page with both components works end to end. An app
- *   that draws its forms somewhere else passes `link(form)`.
+ *   link therefore copies the app's own page with `?form=<form id>&org=<org>&ws=<ws>`, and
+ *   intakeForm without a `formId` reads the same parameters, so one page with both components works
+ *   end to end, also when the form follows the picker and the visitor is not signed in. A link
+ *   with `?form=` only still opens a form whose org and ws are given. An app that draws its forms
+ *   somewhere else passes `link(form)`.
+ *
+ *   FOLLOWING THE PICKER. `app` with no org and no ws: both components open on the workspace the
+ *   app chose (workspace-choice.js) and say "choose above" until then.
  *
  *   THE SAMPLE STATE. `sample: true`, or an org, ws or form id that is missing or still a fill's
  *   <placeholder>, draws built-in sample content marked as such, and sends and changes nothing.
@@ -42,12 +47,15 @@
  *   AIMEAT.atelier.intakeForm({ target: '#contact', org, ws, formId: 'contact-us' });
  *   AIMEAT.atelier.intakeAdmin({ target: '#forms', org, ws, namespace: 'leads' });
  * @version-history
+ *   v0.62.0 — 2026-10-01 — `app` without org and ws follows the app's chosen workspace; the copied
+ *     link carries org and ws, and intakeForm reads them.
  *   v0.61.0 — 2026-10-01 — Initial (iam-members-and-library-blocks plan, Phase D block 4).
  */
 import { el, clear, resolve, uid, enter, whileBusy, attention } from './dom.js';
 import { t } from './i18n.js';
 import { ti } from './intake-connect-i18n.js';
 import { isPlaceholder, sampleBadge, watch, ask, refusal } from './members-shared.js';
+import { followsWorkspace, followWorkspace } from './workspace-choice.js';
 
 /** The ten types fields() answers, in the order the Create form offers them. */
 const TYPES = ['text', 'textarea', 'email', 'tel', 'url', 'number', 'date', 'select', 'radio', 'checkbox'];
@@ -77,6 +85,18 @@ function linkedFormId() {
     return new URLSearchParams(window.location.search || '').get('form') || '';
   } catch {
     return '';
+  }
+}
+
+/** The organism and workspace a copied link carries (`?org=&ws=`), or null. */
+function linkedWorkspace() {
+  try {
+    const q = new URLSearchParams(window.location.search || '');
+    const org = q.get('org') || '';
+    const ws = q.get('ws') || '';
+    return org && ws ? { org: org, ws: ws } : null;
+  } catch {
+    return null;
   }
 }
 
@@ -114,12 +134,16 @@ function sampleForm() {
 
 /**
  * One public form, drawn from its stored definition.
- * @param {{ target?: string|Element, org: string, ws: string, formId?: string, title?: string,
+ * @param {{ target?: string|Element, org?: string, ws?: string, app?: string, formId?: string, title?: string,
  *   hint?: string, sample?: boolean,
  *   onSent?: (values: Record<string, any>, answer: any) => void }} spec
  * @returns {{ el: HTMLElement, refresh: () => Promise<void>, destroy: () => void }}
  */
 export function intakeForm(spec) {
+  // A visitor opening a copied link is not signed in and has no chosen workspace: the link names it.
+  const named = linkedWorkspace();
+  if (named && unset(spec.org) && unset(spec.ws)) spec = Object.assign({}, spec, named);
+  if (followsWorkspace(spec)) return followWorkspace(spec, intakeForm);
   const formId = spec.formId || linkedFormId();
   const sample = spec.sample === true || unset(spec.org) || unset(spec.ws) || unset(formId);
   const root = el('section', { class: 'ak-root ak-intake', 'data-ak-part': 'root' });
@@ -412,11 +436,12 @@ function slug(label) {
 
 /**
  * The owner's public forms in one workspace: the list, Copy link, Delete, and Create.
- * @param {{ target?: string|Element, org: string, ws: string, namespace?: string, title?: string,
+ * @param {{ target?: string|Element, org?: string, ws?: string, app?: string, namespace?: string, title?: string,
  *   sample?: boolean, link?: (form: any) => string }} spec
  * @returns {{ el: HTMLElement, refresh: () => Promise<void>, destroy: () => void }}
  */
 export function intakeAdmin(spec) {
+  if (followsWorkspace(spec)) return followWorkspace(spec, intakeAdmin);
   const sample = spec.sample === true || unset(spec.org) || unset(spec.ws);
   const root = el('section', { class: 'ak-root ak-intake ak-intake-admin', 'data-ak-part': 'root' });
   if (spec.target) resolve(spec.target).appendChild(root);
@@ -450,7 +475,8 @@ export function intakeAdmin(spec) {
   function linkOf(f) {
     if (typeof spec.link === 'function') return spec.link(f);
     const here = String(window.location.href || '').split(/[?#]/)[0];
-    return here + '?form=' + encodeURIComponent(f.form_id);
+    return here + '?form=' + encodeURIComponent(f.form_id)
+      + '&org=' + encodeURIComponent(spec.org) + '&ws=' + encodeURIComponent(spec.ws);
   }
 
   function countOf(f) {
