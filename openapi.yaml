@@ -24594,7 +24594,10 @@ paths:
         action_id). All items must belong to the same seller owner. Prices are quoted from the
         live offer/tool document at creation time (cross-owner purchase requires a declared
         price; private offers are owner-only; self-purchase is free) — morsels are integers,
-        money currencies are 6-decimal micro-units. Sessions expire after one hour.
+        money currencies are 6-decimal micro-units. Sessions expire after one hour. An app-tool or
+        ext-call item whose extension serves an app with access `members-only` answers 403
+        MEMBERS_ONLY for a buyer who is not a member, before any session opens or anything is
+        collected.
       tags: [Commerce]
       security:
         - BearerAuth: []
@@ -24803,7 +24806,9 @@ paths:
         (body: { input }); an unpriced unbound tool answers 422. Before anything is metered or
         paid, the input is checked against the tool's published inputSchema: a mismatch answers
         400 INVALID_INPUT naming every missing field at once (`details.missing`,
-        `details.violations`). A schema that does not compile is not enforced.
+        `details.violations`). A schema that does not compile is not enforced. A tool whose
+        backing extension serves an app with access `members-only` answers 403 MEMBERS_ONLY to a
+        caller who is not a member, before anything is settled.
       tags: [Commerce]
       security:
         - BearerAuth: []
@@ -24826,6 +24831,8 @@ paths:
           description: INVALID_INPUT — the input does not match the tool's inputSchema; every missing field is named
         '402':
           description: Priced tool — pay via the checkout (x402-style accepts + checkout item)
+        '403':
+          description: MEMBERS_ONLY — the app serves its members only; nothing was charged
         '404':
           description: No public manifest / unknown tool / missing backing capability
         '422':

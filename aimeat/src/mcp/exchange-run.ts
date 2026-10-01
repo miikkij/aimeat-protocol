@@ -21,6 +21,8 @@
  *   import { registerExchangeRunTools } from './exchange-run.js';
  *   registerExchangeRunTools(mcp, storage, config, () => agentGaii, () => sessionToken, scopes);
  * @version-history
+ *   v1.8.0 — 2026-10-01 — aimeat_exchange_run refuses MEMBERS_ONLY before it settles a tool whose backing
+ *     extension serves members only, as its REST twin does.
  *   v1.7.2 — 2026-09-26 — aimeat_exchange_work refuses SELF_WORK and SAME_OWNER_WORK when the caller and
  *     the agent that does the work belong to the same owner, before it reads the contract: the rule
  *     for every endpoint and MCP tool that creates work, from services/work-parties.ts
@@ -83,6 +85,7 @@ import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.
 import { writeProvenanceEcho } from './ai-provenance-result.js';
 import { provenanceForWrite } from '../services/ai-provenance.js';
 import { logger } from '../utils/logger.js';
+import { membersOnlyRefusalForCapability, MEMBERS_ONLY_MESSAGE } from '../services/members-only.js';
 
 
 /** The app ids an owner publishes a public tool manifest for — the signpost on a missed lookup. */
@@ -190,6 +193,12 @@ export function registerExchangeRunTools(
             // first is what makes the two doors agree. `no_right` is the refusal that used to be
             // fabricated here, and it keeps the hint that says what to do about it.
             const label = `${app}/${tool}`;
+            // Who the app serves, before anything is charged (services/members-only.ts); the REST twin
+            // asks the same function. The settled call used to reach the paywall on this route's
+            // pass, which skipped the question.
+            if (await membersOnlyRefusalForCapability(storage, toolDef.action_id, callerGaii)) {
+                return fail(`MEMBERS_ONLY: ${MEMBERS_ONLY_MESSAGE}`);
+            }
             const outcome = await authoriseMeteredCall({
                 config, storage, caller: callerGaii,
                 product: { ext: coordExt, action: tool, label, providerOwner: ownerName },

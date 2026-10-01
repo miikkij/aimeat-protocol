@@ -24,6 +24,8 @@
  *   // inside an extension action
  *   const r = await ctx.buy('alice/data.html', 'lookup', { id: '123' });
  * @version-history
+ *   v1.3.0 — 2026-10-01 — A purchase of a tool whose backing extension serves members only refuses
+ *     MEMBERS_ONLY before it is charged when the buying extension's owner is not a member.
  *   v1.2.2 — 2026-09-26 — ownerNameOf takes the account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.2.1 — 2026-09-24 — The scope travels as the capability service's authority object; a purchase
  *     is never the owner in person.
@@ -41,6 +43,7 @@ import { AppToolsDocSchema, appToolsKey, applyLockedInput } from '../models/app-
 import { authoriseMeteredCall } from './metered-access.js';
 import { takeDesignations } from '../commerce/beneficiary-designation.js';
 import { logger } from '../utils/logger.js';
+import { membersOnlyRefusalForCapability, MEMBERS_ONLY_MESSAGE } from './members-only.js';
 
 /**
  * The bare owner name behind any principal the capability registry stores. Extension-backed
@@ -132,6 +135,12 @@ export async function buyForExtension(args: {
     return { ok: false, code: 'CAPABILITY_NOT_SOLD_BY_SELLER',
       message: `Tool "${tool}" on app "${appRef}" is bound to a capability "${sellerOwner}" does not own, so there is nothing here for them to sell. Nothing was charged.`,
       correlation };
+  }
+
+  // Who the app serves, before anything is charged (services/members-only.ts). The buying
+  // extension acts for its owner, so the owner's membership is what is asked.
+  if (await membersOnlyRefusalForCapability(storage, toolDef.action_id, buyer)) {
+    return { ok: false, code: 'MEMBERS_ONLY', message: MEMBERS_ONLY_MESSAGE, correlation };
   }
 
   const outcome = await authoriseMeteredCall({

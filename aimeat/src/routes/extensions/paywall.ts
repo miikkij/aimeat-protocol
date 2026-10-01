@@ -13,6 +13,11 @@
  *   one-time token, and retries with `x-aimeat-pay-token`; the paywall verifies + consumes it (D1/D3).
  * @structure enforcePaywall · PaywallOutcome
  * @version-history
+ *   v1.9.0 — 2026-10-01 — The members-only question is services/members-only.ts, asked by every route
+ *     that charges before it charges, and asked here again on a call settled upstream: the internal
+ *     pass used to return before step 1.5, so a non-member who paid through the checkout or an
+ *     app-tool was charged and served. A refusal there throws in invokeCapability and the settling
+ *     route refunds.
  *   v1.8.2 — 2026-10-01 — The members-only refusal points at POST .../members/requests, the route
  *     that exists; it named .../members/request, which answered 404.
  *   v1.8.1 — 2026-09-26 — The caller's owner comes from localAccountName (utils/gaii.ts), which keeps
@@ -48,7 +53,7 @@ import { error } from '../../middleware/envelope.js';
 import { paymentChallenge } from '../../commerce/x402.js';
 import { consumeExtPayToken } from '../../services/ext-pay-token.js';
 import { settleViaEntitlement, settleMeteredCoordinate } from './entitlement-gate.js';
-import { getCarryPlan, getMember } from '../../services/app-members.js';
+import { getCarryPlan } from '../../services/app-members.js';
 import { pricedAppToolsFor, type PricedBinding } from './priced-binding.js';
 import { readEntitlementForCall, computeCharge, type MeteredEntitlement } from '../../services/metered-entitlements.js';
 import type { BeneficiaryAccrual } from '../../services/metered-settlement.js';
@@ -59,6 +64,7 @@ import { appSpendRefusal } from '../../services/metered-access.js';
 import { respondMeteredRefusal } from './metered-response.js';
 import { burnPacingToll, resolvePacingToll } from './pacing.js';
 import { resolveGatedApp } from './permissions.js';
+import { membersOnlyRefusal, MEMBERS_ONLY_MESSAGE } from '../../services/members-only.js';
 import { ownerGhiiOf, localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 
@@ -229,6 +235,24 @@ async function coveringPass(
 }
 
 /**
+ * The members-only refusal with the route the caller asks through. One body for both places the
+ * paywall answers it, so the sentence and the link cannot drift apart.
+ */
+function respondMembersOnly(config: AimeatConfig, res: PaywallResponder, appId: string): void {
+  const [appOwner, file] = appId.split('/');
+  res.status(403).json({
+    ...error(config.nodeId, 'MEMBERS_ONLY', MEMBERS_ONLY_MESSAGE),
+    hints: {
+      next_actions: [{
+        description: 'Ask the owner for access',
+        method: 'POST',
+        url: `/v1/apps/${encodeURIComponent(appOwner ?? '')}/${encodeURIComponent(file ?? '')}/members/requests`,
+      }],
+    },
+  });
+}
+
+/**
  * Gate a raw extension invoke. Order: owner-free → anti-abuse toll (burn) → free (no commercial) →
  * money token (Phase 3; currently 402) → morsel payment (atomic debit-caller + credit-owner).
  */
@@ -270,6 +294,15 @@ export async function enforcePaywall(args: {
   const presented = consumeInternalPass(internalPass);
   const upstream = presented ? await coveringPass(storage, config.nodeId, ext, action, presented) : null;
   if (upstream?.kind === 'settled') {
+    // The route that settled is meant to have asked the members-only question before it charged
+    // (services/members-only.ts). Asked again here as the second line: a refusal now throws inside
+    // invokeCapability, and every route that settles refunds on a throw, so a route that forgot to
+    // ask still cannot keep the money of somebody the app does not serve.
+    const shut = await membersOnlyRefusal(storage, ext, callerGaii);
+    if (shut) {
+      respondMembersOnly(config, res, shut.appId);
+      return { ok: false };
+    }
     logger.debug('paywall stood down: settled upstream', { ext: ext.name, action: action.id, ...upstream });
     return { ok: true, upstream: true };
   }
@@ -291,26 +324,10 @@ export async function enforcePaywall(args: {
   //     nothing, everybody else pays. Membership is the free tier, not the door.
   const gatedApp = resolveGatedApp(ext);
   const appPlan = gatedApp ? await getCarryPlan(storage, gatedApp) : null;
-  if (gatedApp) {
-    if (appPlan?.access === 'members-only') {
-      const member = await getMember(storage, gatedApp, callerGaii);
-      if (!member) {
-        const [appOwner, file] = gatedApp.split('/');
-        res.status(403).json({
-          ...error(config.nodeId, 'MEMBERS_ONLY',
-            'This is open to approved members only, so there is nothing to buy here yet. Ask the owner '
-            + 'for access; nothing is charged for asking, and you have not been charged for this call.'),
-          hints: {
-            next_actions: [{
-              description: 'Ask the owner for access',
-              method: 'POST',
-              url: `/v1/apps/${encodeURIComponent(appOwner ?? '')}/${encodeURIComponent(file ?? '')}/members/requests`,
-            }],
-          },
-        });
-        return { ok: false };
-      }
-    }
+  const shut = await membersOnlyRefusal(storage, ext, callerGaii);
+  if (shut) {
+    respondMembersOnly(config, res, shut.appId);
+    return { ok: false };
   }
 
   // 2. Declared toll bounds this action's call rate. Validated here (it is extension config); the burn

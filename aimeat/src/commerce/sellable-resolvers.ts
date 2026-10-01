@@ -16,6 +16,8 @@
  *   registerSellableResolver(appToolSellableResolver());
  *   const sellable = await getSellableResolver(ref.kind).resolve(storage, config, ref, buyerOwner);
  * @version-history
+ *   v1.5.0 — 2026-10-01 — The app-tool and ext-call resolvers refuse a buyer the app's members-only
+ *     stance refuses (MEMBERS_ONLY, 403) before a session opens, so nothing is collected from them.
  *   v1.4.1 — 2026-09-24 — The scope travels as the capability service's authority object; a checkout
  *     is never the owner in person.
  *   v1.4.0 — 2026-09-24 — app-tool: fulfillment hands the capability service mcp:use, because the paid
@@ -38,6 +40,12 @@ import type { Sellable } from './types.js';
 import { CommerceError } from './errors.js';
 import { listPaymentHandlers } from './payment-handlers.js';
 import { integerMicros } from './money.js';
+import { membersOnlyRefusal, membersOnlyRefusalForCapability, MEMBERS_ONLY_MESSAGE } from '../services/members-only.js';
+
+/** The buyer as an identity: a checkout opens under a bare owner name of this node, or a full one. */
+function buyerIdentityOf(buyerOwner: string, config: AimeatConfig): string {
+  return buyerOwner.includes('@') ? buyerOwner : `${buyerOwner}@${config.nodeId}`;
+}
 
 /** A raw line-item reference before resolution. `kind` defaults to 'offer'. */
 export interface SellableRef {
@@ -172,6 +180,13 @@ export function appToolSellableResolver(): SellableResolver {
       const tool: AppTool | undefined = parsed.data.tools.find((t) => t.name === toolName);
       if (!tool) throw new CommerceError('TOOL_NOT_FOUND', 404, `Tool not found on app "${appRef}": ${toolName}`);
 
+      // Who the app serves is decided before a session opens, so nothing is collected from somebody
+      // the app would refuse. Without this a non-member paid here and the paywall let the call through
+      // on the checkout's pass (services/members-only.ts).
+      if (await membersOnlyRefusalForCapability(storage, tool.action_id, buyerIdentityOf(buyerOwner, config))) {
+        throw new CommerceError('MEMBERS_ONLY', 403, MEMBERS_ONLY_MESSAGE);
+      }
+
       // A provider who GRANTED this buyer carries their calls; the checkout is one of the doors that
       // has to honour that, or "approved" would mean free everywhere except the one place a buyer is
       // most likely to click. Checked against the buyer's owner GHII — the identity a checkout is
@@ -260,7 +275,7 @@ export function appToolSellableResolver(): SellableResolver {
 export function extCallSellableResolver(): SellableResolver {
   return {
     kind: 'ext-call',
-    async resolve(storage, config, ref, _buyerOwner): Promise<Sellable> {
+    async resolve(storage, config, ref, buyerOwner): Promise<Sellable> {
       const extName = ref.app ?? '';
       const actionId = ref.tool ?? ref.offer_id ?? '';
       if (!extName || !actionId) {
@@ -272,6 +287,11 @@ export function extCallSellableResolver(): SellableResolver {
       }
       const action = ext.actions.find((a) => a.id === actionId);
       if (!action) throw new CommerceError('ACTION_NOT_FOUND', 404, `Action not found: ${extName}:${actionId}`);
+      // The same question the app-tool resolver asks, about the extension itself: refused before any
+      // money is collected, rather than by the paywall after the pay token was bought.
+      if (await membersOnlyRefusal(storage, ext, buyerIdentityOf(buyerOwner, config))) {
+        throw new CommerceError('MEMBERS_ONLY', 403, MEMBERS_ONLY_MESSAGE);
+      }
       const payMoney = action.commercial?.payMoney;
       if (!payMoney) throw new CommerceError('TOOL_NOT_FOR_SALE', 422, `Action "${actionId}" declares no money price`);
       const currency = ref.currency ?? 'morsel';
