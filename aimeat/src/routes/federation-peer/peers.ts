@@ -171,7 +171,7 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
         // Refuse before you write (invariant 14): nothing about the peer changes until the exchange
         // has succeeded, so a failed activation leaves the record exactly as it was and the operator
         // can press again once the far end is up.
-        const keyExchangeResult = await performKeyExchange(peer.url, config, storage);
+        const keyExchangeResult = await performKeyExchange(peer.url, config, storage, peer.nodeId);
         if (!keyExchangeResult.success) {
             logger.warn('Peer activation refused: key exchange failed', {
                 peer: peer_node_id, peerUrl: peer.url, reason: keyExchangeResult.error,

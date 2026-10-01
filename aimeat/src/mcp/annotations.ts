@@ -23,6 +23,7 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   2026-10-01 — aimeat_admin_federation_peer_remove (destructive: a link ends, its work is cancelled).
  *   2026-09-30 — aimeat_admin_node_update: read only, open world (it reads npm).
  *   2026-09-29 — aimeat_refinery_classes and _status (read only), aimeat_refinery_run (writes rows,
  *     reads an outside mailbox, spends the model allowance).
@@ -592,6 +593,8 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_admin_node_update: { title: 'Admin: Newer AIMEAT Version', readOnlyHint: true, openWorldHint: true },
     // Setting the same word twice leaves the same peer; the previous word was a setting, not data.
     aimeat_admin_federation_relay_claim_set: { title: 'Admin: Keep a Peer on Its Own Relay-Claim Setting', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    // Ends a link and, with emergency, cancels the work in flight with that peer; a second call finds nothing.
+    aimeat_admin_federation_peer_remove: { title: 'Admin: Remove a Federation Peer', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     // Read-only about this node, but `ask_provider` reaches a third party, so it is not closed-world.
     aimeat_admin_usage: { title: 'Admin: Usage', readOnlyHint: true, openWorldHint: true },
     // Not destructive: binding replaces a list the operator can read first and set back.

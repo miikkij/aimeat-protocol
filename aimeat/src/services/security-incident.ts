@@ -23,6 +23,8 @@
  *   SECURITY_INCIDENT_PREFIX / QUARANTINE_PREFIX
  * @usage import { recordSecurityIncident } from '../services/security-incident.js';
  * @version-history
+ *   v1.3.2 -- 2026-10-01 -- recordSecurityIncident asks only for the node id of the config, the one
+ *     field it reads, so a service that holds no whole config records federation peer events too.
  *   v1.3.1 -- 2026-09-27 -- recordSecurityIncident quarantines only a Buffer: a blob of any other type
  *     is recorded without a copy (CodeQL js/type-confusion-through-parameter-tampering).
  *   v1.3.0 -- 2026-09-26 -- An incident names the runs of the records it was made from (`sources`), so
@@ -122,7 +124,7 @@ type IncidentRecord = Awaited<ReturnType<Storage['listAllMemory']>>['items'][num
 
 export async function recordSecurityIncident(
   storage: Storage,
-  config: AimeatConfig,
+  config: Pick<AimeatConfig, 'nodeId'>,
   input: SecurityIncidentInput,
 ): Promise<{ id: string; quarantined: boolean; recorded: boolean }> {
   const id = randomUUID();

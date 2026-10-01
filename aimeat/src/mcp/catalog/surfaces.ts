@@ -22,6 +22,7 @@
  *   import { toolsForSurface } from '../catalog/surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
+ *   2026-10-01 — aimeat_admin_federation_peer_remove beside aimeat_admin_federation.
  *   2026-09-30 — aimeat_workspace_comment_delete beside the other comment tools.
  *   2026-09-30 — aimeat_admin_node_update on the admin surface.
  *   2026-09-29 — aimeat_refinery_classes, _run and _status on `agent`, beside the mail tools.
@@ -359,8 +360,8 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         // The Knowledge page in one read: the whole collection, its shape, and who has already looked.
         'aimeat_admin_knowledge',
         // The Federation page in one read: the peers, what waits on a person, and the book's age.
-        // And one write beside it: a peer kept on its own relay-claim setting.
-        'aimeat_admin_federation', 'aimeat_admin_federation_relay_claim_set',
+        // And two writes beside it: a peer kept on its own relay-claim setting, and a peer removed.
+        'aimeat_admin_federation', 'aimeat_admin_federation_relay_claim_set', 'aimeat_admin_federation_peer_remove',
         // Setting this node up from an install set: owner, packages, organisms, users, crew agents.
         'aimeat_admin_install_set',
         // Selling a repository's packages from this node, signed by its own key.

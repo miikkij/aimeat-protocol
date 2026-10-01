@@ -392,7 +392,7 @@ export function registerPackageTools(
             if (!out.ok) return { ...toolError(out.code, out.message) };
             return { content: [{ type: 'text' as const, text: JSON.stringify({ revoked: true, node_id }, null, 2) }] };
         }
-        const out = await grantEntitlement(storage, caller, { groupId: group_id, nodeId: node_id, updatesUntil: updates_until, note, channel, node }, peers, { timeoutMs: config.federationTimeoutMs });
+        const out = await grantEntitlement(storage, caller, { groupId: group_id, nodeId: node_id, updatesUntil: updates_until, note, channel, node }, peers, { timeoutMs: config.federationTimeoutMs, thisNodeId: config.nodeId });
         if (!out.ok) return { ...toolError(out.code, out.message) };
         return { content: [{ type: 'text' as const, text: JSON.stringify({ entitlement: out.entitlement, peer_registered: out.peerRegistered === true, peer_pending: out.peerPending === true, repository_role: config.packageRepository }, null, 2) }] };
     });

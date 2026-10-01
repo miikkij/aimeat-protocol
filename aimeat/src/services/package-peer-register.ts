@@ -40,6 +40,9 @@
  *   if (!link.ok) return link;                          // nothing was written
  *   await adoptPendingPeer({ storage, peers, timeoutMs }, headerNodeId);   // before verifyPackageNode
  * @version-history
+ *   v2.1.0 — 2026-10-01 — With `thisNodeId` in the deps, a card that answers as another node or key and
+ *     a node id held under another key (a peer, or a pending registration) are recorded on the Security
+ *     page (peer-incidents.ts), so the operator learns of them.
  *   v2.0.0 — 2026-10-01 — The node's card is read before anything is written, and how the peer arrived
  *     is recorded (peer-origin.ts). A node that does not answer leaves a pending registration that its
  *     first signed request finishes. The peer-registration incident (finding F of
@@ -58,6 +61,7 @@ import {
     recordPeerOrigin, readPendingPeer, writePendingPeer, deletePendingPeer, pendingExpired, type PeerOriginSource,
 } from './peer-origin.js';
 import { emitChange } from './event-bus.js';
+import { reportPeerIncident, type PeerIncident } from './peer-incidents.js';
 import { logger } from '../utils/logger.js';
 
 export interface PackagePeerInput { url: string; publicKey: string }
@@ -88,7 +92,8 @@ export function checkPackagePeer(
 
 export type CardProof =
     | { kind: 'proven' }
-    | { kind: 'refused'; refusal: Refusal }
+    /** `card` is what answered, when the refusal is that it answered as another node or key. */
+    | { kind: 'refused'; refusal: Refusal; card?: { nodeId: string; publicKey: string } }
     | { kind: 'unreachable'; detail: string };
 
 /**
@@ -104,15 +109,24 @@ export async function proveNodeCard(nodeId: string, url: string, publicKey: stri
         return { kind: 'unreachable', detail: card.detail };
     }
     if (card.nodeId !== nodeId) {
-        return { kind: 'refused', refusal: { ok: false, status: 409, code: 'PEER_ID_MISMATCH', message: `The node at ${url} says it is ${card.nodeId}, not ${nodeId}. Nothing was written.` } };
+        return { kind: 'refused', card, refusal: { ok: false, status: 409, code: 'PEER_ID_MISMATCH', message: `The node at ${url} says it is ${card.nodeId}, not ${nodeId}. Nothing was written.` } };
     }
     if (card.publicKey !== publicKey) {
-        return { kind: 'refused', refusal: { ok: false, status: 409, code: 'PEER_KEY_MISMATCH', message: `The node at ${url} publishes another key than the one given for ${nodeId}. Copy the key from its /.well-known/aimeat; nothing was written.` } };
+        return { kind: 'refused', card, refusal: { ok: false, status: 409, code: 'PEER_KEY_MISMATCH', message: `The node at ${url} publishes another key than the one given for ${nodeId}. Copy the key from its /.well-known/aimeat; nothing was written.` } };
     }
     return { kind: 'proven' };
 }
 
-export interface PeerLinkDeps { storage: Storage; peers: Map<string, PeerInfo>; timeoutMs: number }
+export interface PeerLinkDeps {
+    storage: Storage; peers: Map<string, PeerInfo>; timeoutMs: number;
+    /** This node's id. With it, a failed card check and a held id are recorded on the Security page. */
+    thisNodeId?: string;
+}
+
+/** Record a refusal on the Security page when the deps name this node. Never throws. */
+function report(deps: PeerLinkDeps, e: PeerIncident): Promise<void> {
+    return deps.thisNodeId ? reportPeerIncident(deps.storage, deps.thisNodeId, e) : Promise.resolve();
+}
 export interface PeerLinkWho { source: PeerOriginSource; by: string; groupId?: string }
 export type PeerLinkResult = Refusal | { ok: true; registered: boolean; pending: boolean };
 
@@ -126,16 +140,32 @@ export async function linkPackagePeer(
     deps: PeerLinkDeps, nodeId: string, raw: unknown, who: PeerLinkWho, opts: { pendingWhenUnreachable: boolean },
 ): Promise<PeerLinkResult> {
     const check = checkPackagePeer(deps.peers, nodeId, raw);
-    if (!check.ok) return check;
+    if (!check.ok) {
+        const held = deps.peers.get(nodeId);
+        const asked = checkPackagePeer(new Map(), nodeId, raw);
+        if (check.code === 'PEER_KEY_MISMATCH' && held && asked.ok && asked.add) {
+            await report(deps, { kind: 'id-held', nodeId, via: who.source, actor: who.by,
+                presented: { key: asked.add.publicKey, url: asked.add.url }, other: { key: held.publicKey, url: held.url } });
+        }
+        return check;
+    }
     if (!check.add) return { ok: true, registered: false, pending: false };
     const add = check.add;
     const waiting = await readPendingPeer(deps.storage, nodeId);
     const pending = waiting && !pendingExpired(waiting) ? waiting : null;
     if (pending && pending.publicKey !== add.publicKey) {
+        await report(deps, { kind: 'id-held', nodeId, via: who.source, actor: who.by,
+            presented: { key: add.publicKey, url: add.url }, other: { key: pending.publicKey, url: pending.url } });
         return { ok: false, status: 409, code: 'PEER_KEY_MISMATCH', message: `${nodeId} was already named under another key, and this node is waiting for it to answer. Check which key is right; nothing was granted.` };
     }
     const proof = await proveNodeCard(nodeId, add.url, add.publicKey, deps.timeoutMs);
-    if (proof.kind === 'refused') return proof.refusal;
+    if (proof.kind === 'refused') {
+        if (proof.card) {
+            await report(deps, { kind: 'proof-failed', nodeId, via: who.source, actor: who.by,
+                presented: { key: add.publicKey, url: add.url }, other: { nodeId: proof.card.nodeId, key: proof.card.publicKey, url: add.url } });
+        }
+        return proof.refusal;
+    }
     const now = new Date().toISOString();
     if (proof.kind === 'unreachable') {
         if (!opts.pendingWhenUnreachable) {
@@ -183,6 +213,10 @@ export async function adoptPendingPeer(deps: PeerLinkDeps, nodeId: string | unde
     const at = new Date().toISOString();
     if (proof.kind !== 'proven') {
         const problem = proof.kind === 'refused' ? proof.refusal.message : proof.detail;
+        if (proof.kind === 'refused' && proof.card) {
+            await report(deps, { kind: 'proof-failed', nodeId, via: 'pending-registration', actor: pending.by,
+                presented: { key: pending.publicKey, url: pending.url }, other: { nodeId: proof.card.nodeId, key: proof.card.publicKey, url: pending.url } });
+        }
         await writePendingPeer(deps.storage, { ...pending, lastTryAt: at, lastProblem: problem });
         logger.warn('A pending package peer did not prove its card', { nodeId, problem });
         return;

@@ -492,7 +492,7 @@ export async function initializeServices(
     if (!peer) return;
 
     // Re-exchange keys with the recovered peer
-    performKeyExchange(peer.url, config, storage)
+    performKeyExchange(peer.url, config, storage, peer.nodeId)
       .then(result => {
         if (result.success) {
           logger.info(`Key exchange completed after recovery of peer ${peer.nodeId}`);

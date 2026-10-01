@@ -21,13 +21,19 @@
  *   pinned.
  * @structure Phase 1 boot · 2 who may register, and the card check · 3 a registered packages-only
  *   peer: its origin, no sign-in, no messages · 4 a node that does not answer: the grant waits, its
- *   first signed request finishes it · 5 releasing a node id · cleanup
+ *   first signed request finishes it · 5 releasing a node id · 6 the Security page · 7 the federation
+ *   routes the sweep found · cleanup
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-peer-registration-proof
  * @version-history
+ *   v1.1.0 — 2026-10-01 — Phase 6: the Security page entries for a failed card check and a held node
+ *     id. Phase 7: the five sweep defects (a pending introduction no longer deletes a leaving peer,
+ *     an open join cannot replace a held id, a message waits for a live link, a peer speaks only for
+ *     its own people, a join saves a peer only with a key from the node asked and never over an
+ *     existing one, a waiting join's key is proven by the approved card).
  *   v1.0.0 — 2026-10-01 — Initial. Against the code before the fix, the refusals of Phase 2, the
  *     sign-in and message assertions of Phase 3 and the pending registration of Phase 4 fail.
  */
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { createServer as createHttpServer, type Server as HttpServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createServer } from '../src/server.js';
@@ -68,6 +74,8 @@ function makeJson(baseUrl: string) {
 interface Stub {
     server: HttpServer; url: string; nodeId: string; keys: { publicKey: string; privateKey: string };
     verify: unknown[]; messages: unknown[];
+    /** How it answers an introduction and a key exchange, changeable while the test runs. */
+    behave: { introduceStatus?: 'auto_approved' | 'pending'; exchangeAs?: string };
 }
 
 function readBody(req: IncomingMessage): Promise<string> {
@@ -84,7 +92,7 @@ function send(res: ServerResponse, status: number, payload: unknown): void {
  */
 async function startStub(nodeId: string, opts: { port?: number; cardId?: string; cardKey?: string } = {}): Promise<Stub> {
     const keys = await generateKeyPair();
-    const stub = { nodeId, keys, verify: [] as unknown[], messages: [] as unknown[] } as Partial<Stub>;
+    const stub = { nodeId, keys, verify: [] as unknown[], messages: [] as unknown[], behave: {} } as Partial<Stub>;
     const server = createHttpServer((req, res) => {
         void (async () => {
             const body = req.method === 'POST' ? await readBody(req) : '';
@@ -102,6 +110,14 @@ async function startStub(nodeId: string, opts: { port?: number; cardId?: string;
             if (req.method === 'POST' && req.url === '/v1/federation/message') {
                 stub.messages!.push(JSON.parse(body));
                 send(res, 200, { ok: true, data: { received: true } });
+                return;
+            }
+            if (req.method === 'POST' && req.url === '/v1/federation/peer/introduce') {
+                send(res, 200, { ok: true, data: { request_id: `req-${randomUUID()}`, status: stub.behave!.introduceStatus ?? 'auto_approved' } });
+                return;
+            }
+            if (req.method === 'POST' && req.url === '/v1/federation/key-exchange') {
+                send(res, 200, { ok: true, data: { node_id: stub.behave!.exchangeAs ?? opts.cardId ?? nodeId, node_public_key: opts.cardKey ?? keys.publicKey, agent_keys: [] } });
                 return;
             }
             send(res, 404, { ok: false, error: { code: 'NOT_FOUND' } });
@@ -324,6 +340,142 @@ await test('Removing a node id that is only a waiting registration deletes the r
     assert(!(await peerList()).pending_registrations.some(p => p.node_id === id), 'the registration is gone');
     const again = await grant(id, { url: `http://127.0.0.1:${await freePort()}`, public_key: (await generateKeyPair()).publicKey });
     assert(again.status === 200 && again.body.data.peer_pending === true, `a grant under another key is taken now: ${again.status} ${JSON.stringify(again.body)}`);
+});
+
+console.log('\nPhase 6 — The operator hears of a failed card check and of a held node id');
+
+const incidents = async () => {
+    const r = await R.json('/v1/admin/security/incidents', { headers: auth(opsToken) });
+    assert(r.status === 200, `incidents: ${r.status} ${JSON.stringify(r.body)}`);
+    return (r.body.data.incidents as any[]).filter(i => i.type === 'federation_peer');
+};
+const introduce = async (nodeId: string, url: string, keys: { publicKey: string; privateKey: string }) => {
+    const timestamp = new Date().toISOString();
+    return R.json('/v1/federation/peer/introduce', {
+        method: 'POST',
+        body: JSON.stringify({ node_id: nodeId, node_url: url, public_key: keys.publicKey, role: 'contributor', timestamp,
+            signature: await sign(keys.privateKey, `${nodeId}${url}${timestamp}`) }),
+    });
+};
+
+await test('A card that answered as another node is on the Security page once, however often it is tried', async () => {
+    const claimed = `aimeat-test-001-claimed${ts}`;
+    const first = (await incidents()).filter(i => i.code === 'PEER_PROOF_FAILED' && String(i.detail).includes(claimed));
+    assert(first.length === 1, `one incident from Phase 2: ${JSON.stringify(await incidents())}`);
+    const other = stubs.find(x => x.nodeId === `aimeat-test-001-other${ts}`)!;
+    const again = await grant(claimed, { url: other.url, public_key: other.keys.publicKey });
+    assert(again.status === 409, `refused again: ${again.status}`);
+    const after = (await incidents()).filter(i => i.code === 'PEER_PROOF_FAILED' && String(i.detail).includes(claimed));
+    assert(after.length === 1, `still one: ${after.length}`);
+});
+
+await test('A node introducing itself under an id held by another key is refused, and the operator is told how to free it', async () => {
+    const heldId = squat.nodeId;   // held since Phase 5 by the real node's key
+    const r = await introduce(heldId, 'http://127.0.0.1:9', await generateKeyPair());
+    assert(r.status === 409, `refused: ${r.status} ${JSON.stringify(r.body)}`);
+    const held = (await incidents()).find(i => i.code === 'PEER_ID_HELD' && String(i.detail).includes(heldId));
+    assert(!!held && String(held.detail).includes('emergency=true') && held.source === 'introduce', `the incident names the release: ${JSON.stringify(held)}`);
+});
+
+console.log('\nPhase 7 — The federation routes the sweep found');
+
+/** A member peer added and activated by the operator, served by a stub that answers its card. */
+async function memberPeer(tag: string): Promise<Stub> {
+    const stub = await startStub(`aimeat-test-001-${tag}${ts}`); stubs.push(stub);
+    const add = await R.json('/v1/federation/peers', { method: 'POST', headers: auth(opsToken), body: JSON.stringify({ node_id: stub.nodeId, url: stub.url, public_key: stub.keys.publicKey }) });
+    assert(add.status === 201, `add ${tag}: ${add.status} ${JSON.stringify(add.body)}`);
+    const act = await R.json(`/v1/federation/peers/${stub.nodeId}`, { method: 'PUT', headers: auth(opsToken), body: JSON.stringify({ status: 'active' }) });
+    assert(act.status === 200, `activate ${tag}: ${act.status} ${JSON.stringify(act.body)}`);
+    return stub;
+}
+const peerOf = async (nodeId: string) => (await peerList()).peers.find(p => p.node_id === nodeId);
+const until = async (ok: () => Promise<boolean>, ms = 4000) => {
+    const end = Date.now() + ms;
+    while (Date.now() < end) { if (await ok()) return true; await new Promise(r => setTimeout(r, 150)); }
+    return ok();
+};
+
+let leaving: Stub;
+await test('An introduction that becomes a pending request leaves a leaving peer in place', async () => {
+    leaving = await memberPeer('leaving');
+    const off = await R.json(`/v1/federation/peers/${leaving.nodeId}`, { method: 'DELETE', headers: auth(opsToken) });
+    assert(off.status === 200 && off.body.data.status === 'depeering', `de-peer: ${off.status} ${JSON.stringify(off.body)}`);
+    const r = await introduce(leaving.nodeId, 'http://127.0.0.1:9', await generateKeyPair());
+    assert(r.status === 202 && r.body.data.status === 'pending', `pending: ${r.status} ${JSON.stringify(r.body)}`);
+    const p = await peerOf(leaving.nodeId);
+    assert(p?.status === 'depeering' && p.public_key === leaving.keys.publicKey, `the peer is still there, under its key: ${JSON.stringify(p)}`);
+});
+
+await test('With open join on, a newcomer cannot replace a peer held under another key', async () => {
+    R.config.federationOpenJoin = true;
+    try {
+        const r = await introduce(leaving.nodeId, 'http://127.0.0.1:9', await generateKeyPair());
+        assert(r.status === 409 && r.body.error?.code === 'PEER_KEY_MISMATCH', `refused: ${r.status} ${JSON.stringify(r.body)}`);
+        const p = await peerOf(leaving.nodeId);
+        assert(p?.public_key === leaving.keys.publicKey && p.tier === 'member', `unchanged: ${JSON.stringify(p)}`);
+    } finally { R.config.federationOpenJoin = false; }
+});
+
+await test('A direct message to a leaving peer waits in the queue and is not sent', async () => {
+    const r = await R.json('/v1/messages', { method: 'POST', headers: auth(opsToken), body: JSON.stringify({ to: `alice@${leaving.nodeId}`, body: 'not yet' }) });
+    assert(r.status === 201 && r.body.data.message?.status === 'queued', `queued: ${r.status} ${JSON.stringify(r.body)}`);
+    assert(leaving.messages.length === 0, `the peer received ${leaving.messages.length}`);
+});
+
+await test('A peer may deliver a message only from its own people', async () => {
+    const member = await memberPeer('member');
+    const deliver = async (senderGhii: string) => {
+        const message = { id: randomUUID(), senderGhii, recipientGhii: `ops${ts}@${R.nodeId}`, body: 'hello', createdAt: new Date().toISOString() };
+        const timestamp = new Date().toISOString();
+        const signature = await sign(member.keys.privateKey, JSON.stringify({ source_node: member.nodeId, message, timestamp }));
+        return R.json('/v1/federation/message', { method: 'POST', body: JSON.stringify({ source_node: member.nodeId, message, timestamp, signature }) });
+    };
+    const forged = await deliver(`bob@aimeat-test-001-elsewhere${ts}`);
+    assert(forged.status === 403 && forged.body.error?.code === 'SENDER_NOT_OF_PEER', `another node's sender: ${forged.status} ${JSON.stringify(forged.body)}`);
+    const own = await deliver(`bob@${member.nodeId}`);
+    assert(own.status < 300, `its own sender: ${own.status} ${JSON.stringify(own.body)}`);
+});
+
+await test('A join whose target claims an existing peer\'s id changes nothing about that peer', async () => {
+    const existing = await memberPeer('existing');
+    const impostor = await startStub(existing.nodeId); stubs.push(impostor);   // says it is `existing`, with its own key
+    const r = await R.json('/v1/admin/federation/join', { method: 'POST', headers: auth(opsToken), body: JSON.stringify({ genesis_url: impostor.url }) });
+    assert(r.status === 200, `join: ${r.status} ${JSON.stringify(r.body)}`);
+    await new Promise(res => setTimeout(res, 1500));
+    const p = await peerOf(existing.nodeId);
+    assert(p?.url === existing.url && p.public_key === existing.keys.publicKey, `the peer kept its address and key: ${JSON.stringify(p)}`);
+});
+
+await test('A join whose key exchange answers as another node saves no peer', async () => {
+    const target = await startStub(`aimeat-test-001-jointarget${ts}`); stubs.push(target);
+    const somebodyElse = `aimeat-test-001-somebodyelse${ts}`;
+    target.behave.exchangeAs = somebodyElse;
+    const r = await R.json('/v1/admin/federation/join', { method: 'POST', headers: auth(opsToken), body: JSON.stringify({ genesis_url: target.url }) });
+    assert(r.status === 200, `join: ${r.status} ${JSON.stringify(r.body)}`);
+    await new Promise(res => setTimeout(res, 1500));
+    assert(!(await peerOf(target.nodeId)), 'no peer was saved');
+    assert(!(await peerOf(somebodyElse)), 'and none under the id the answer named');
+    target.behave.exchangeAs = undefined;
+    const ok = await R.json('/v1/admin/federation/join', { method: 'POST', headers: auth(opsToken), body: JSON.stringify({ genesis_url: target.url }) });
+    assert(ok.status === 200, `join again: ${ok.status}`);
+    assert(await until(async () => (await peerOf(target.nodeId))?.public_key === target.keys.publicKey), 'an honest exchange saves the peer with its key');
+});
+
+await test('While a join waits for approval, a key exchange in the target\'s name is taken only with the key its card publishes', async () => {
+    const target = await startStub(`aimeat-test-001-joinwait${ts}`); stubs.push(target);
+    target.behave.introduceStatus = 'pending';
+    const r = await R.json('/v1/admin/federation/join', { method: 'POST', headers: auth(opsToken), body: JSON.stringify({ genesis_url: target.url }) });
+    assert(r.status === 200, `join: ${r.status} ${JSON.stringify(r.body)}`);
+    const exchange = (key: string) => R.json('/v1/federation/key-exchange', {
+        method: 'POST', body: JSON.stringify({ node_id: target.nodeId, node_url: 'http://127.0.0.1:9', node_public_key: key, timestamp: new Date().toISOString() }),
+    });
+    const intruder = await exchange((await generateKeyPair()).publicKey);
+    assert(intruder.status === 403 && intruder.body.error?.code === 'KEY_NOT_PROVEN', `another key: ${intruder.status} ${JSON.stringify(intruder.body)}`);
+    assert(!(await peerOf(target.nodeId)), 'no peer was admitted');
+    const real = await exchange(target.keys.publicKey);
+    assert(real.status === 200, `the target's own key: ${real.status} ${JSON.stringify(real.body)}`);
+    const p = await peerOf(target.nodeId);
+    assert(p?.public_key === target.keys.publicKey && p.url === target.url, `admitted at the approved address with its key: ${JSON.stringify(p)}`);
 });
 
 console.log('\nCleanup');

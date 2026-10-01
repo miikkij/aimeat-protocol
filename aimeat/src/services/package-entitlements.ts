@@ -125,7 +125,7 @@ export async function grantEntitlement(
     caller: { owner: string; isOperator: boolean },
     input: { groupId: string; nodeId: string; updatesUntil?: unknown; note?: unknown; channel?: unknown; node?: unknown },
     peers?: Map<string, PeerInfo>,
-    peerOpts: { timeoutMs?: number; seller?: string } = {},
+    peerOpts: { timeoutMs?: number; seller?: string; thisNodeId?: string } = {},
 ): Promise<EntitlementResult> {
     const refused = await mayManage(storage, input.groupId, caller);
     if (refused) return refused;
@@ -144,7 +144,7 @@ export async function grantEntitlement(
     if (input.node !== undefined && input.node !== null) {
         if (!peers) return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'node cannot be registered on this path.' };
         const link = await linkPackagePeer(
-            { storage, peers, timeoutMs: peerOpts.timeoutMs ?? 10_000 }, input.nodeId, input.node,
+            { storage, peers, timeoutMs: peerOpts.timeoutMs ?? 10_000, thisNodeId: peerOpts.thisNodeId }, input.nodeId, input.node,
             peerOpts.seller
                 ? { source: 'package-sale', by: peerOpts.seller, groupId: input.groupId }
                 : { source: 'package-grant', by: caller.owner, groupId: input.groupId },
@@ -280,12 +280,12 @@ export type NodeRead =
  * signed request is `unsigned` too: nothing private is served on a node that has not taken the role.
  */
 export async function resolveNodeRead(
-    storage: Storage, config: { packageRepository: boolean; federationTimeoutMs?: number }, peers: Map<string, PeerInfo>,
+    storage: Storage, config: { packageRepository: boolean; federationTimeoutMs?: number; nodeId?: string }, peers: Map<string, PeerInfo>,
     headers: Record<string, string | string[] | undefined>, groupId: string, version?: string,
 ): Promise<NodeRead> {
     if (!config.packageRepository) return { kind: 'unsigned' };
     // A node granted while it did not answer is registered on its first signed request.
-    await adoptPendingPeer({ storage, peers, timeoutMs: config.federationTimeoutMs ?? 10_000 }, headerNode(headers));
+    await adoptPendingPeer({ storage, peers, timeoutMs: config.federationTimeoutMs ?? 10_000, thisNodeId: config.nodeId }, headerNode(headers));
     const who = await verifyPackageNode(headers, peers, groupId, Date.now(),
         // A node whose bundle's updates ended is let through the peer gate too, so its signature is
         // checked before it hears anything about its purchase; it is served nothing.

@@ -8,6 +8,8 @@
  * @structure
  *   - registerCoreTools() -- Registers core REST-backed connector MCP tools
  * @version-history
+ *   v1.20.0 -- 2026-10-01 -- aimeat_admin_federation_peer_remove (DELETE /v1/federation/peers/:nodeId,
+ *     ?emergency=true).
  *   v1.19.0 -- 2026-09-30 -- aimeat_admin_node_update, thin over GET /v1/admin/node-update.
  *   v1.18.0 -- 2026-09-29 -- aimeat_storage_upload forwards workspace_refs for a 'workspace' file.
  *   v1.17.2 -- 2026-09-26 -- The `resolution` description of aimeat_admin_incident_resolve names the app
@@ -711,6 +713,17 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
   }, annotationsFor('aimeat_admin_federation_relay_claim_set'), async ({ agent_name, node_id, relay_claim }) => {
     const { client } = pickAgent(registry, agent_name);
     return asText(await client.put(`/v1/federation/peers/${encodeURIComponent(node_id)}/relay-claim`, { relay_claim }));
+  });
+
+  mcp.tool('aimeat_admin_federation_peer_remove', descriptionFor('aimeat_admin_federation_peer_remove'), {
+    agent_name: agentNameSchema,
+    node_id: z.string().describe('The peer, by its node id as aimeat_admin_federation lists it.'),
+    emergency: z.boolean().optional().describe('true: remove it now and free the node id. Omitted or false: start its de-peering grace.'),
+    reason: z.string().max(500).optional().describe('Why, in a few words: kept with the removal and sent with an emergency notice.'),
+  }, annotationsFor('aimeat_admin_federation_peer_remove'), async ({ agent_name, node_id, emergency, reason }) => {
+    const { client } = pickAgent(registry, agent_name);
+    const q = new URLSearchParams({ ...(emergency === true ? { emergency: 'true' } : {}), ...(reason ? { reason } : {}) }).toString();
+    return asText(await client.delete(`/v1/federation/peers/${encodeURIComponent(node_id)}${q ? `?${q}` : ''}`));
   });
 
   mcp.tool('aimeat_admin_knowledge', descriptionFor('aimeat_admin_knowledge'), {

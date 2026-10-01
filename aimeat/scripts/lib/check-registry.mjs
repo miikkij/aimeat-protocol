@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 1.13.0 (2026-10-01): check:peer-paths, every federation peer writer and reader says on what proof.
  *  - 1.12.0 (2026-09-29): check:classification-reach, stored content reaches a caller through the classification reader.
  *  - 1.11.0 (2026-09-28): check:skill-evals, a changed skill with an eval suite waits for the developer's run-or-skip.
  *  - 1.10.0 (2026-09-26): check:migration-hashes, a migration file on main never changes.
@@ -56,6 +57,9 @@ export const FAST_CHECKS = [
     { script: 'check:denial-coverage', label: 'Every suite asks what a second principal gets' },
     { script: 'check:suite-ports', label: 'No two E2E suites write down the same port' },
     { script: 'check:outbound-fetch', label: 'Outbound fetch goes through safeFetch' },
+    // 2026-10-01, after the peer-registration incident: who writes a federation peer, and who trusts
+    // its url or key, each with the proof it relies on (security/peer-paths.json).
+    { script: 'check:peer-paths', label: 'Every federation peer writer and reader says on what proof' },
     { script: 'check:trusted-keys', label: 'Server-trusted memory keys are guarded, and each exemption says why' },
     // From the September 2026 audit's check of the fixes: a visitor from another node is named
     // `alice@their-node`, and a cut at the '@' anywhere in src/ made it the local account `alice`.

@@ -6,6 +6,8 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.14.0 -- 2026-10-01 -- Federation: the roster's `origin`, and aimeat_admin_federation_peer_remove for
+ *     freeing a node id held under another key.
  *   v1.13.1 -- 2026-09-30 -- Classification: a person in their own session or an app makes an
  *     exception, never an AI; the node level needs operator:admin for an operator's agent.
  *   v1.13.0 -- 2026-09-30 -- Updates: aimeat_admin_node_update, a newer AIMEAT on npm and the update prompt.
@@ -82,7 +84,11 @@ usually nobody's decision. \`book.age_days\` says whether the directory is worth
 \`relay_claims.not_ready\` names the peers still relaying here without a signed claim: the default
 is required from 3.20.0, so this node refuses those relays unless it is set to optional. Tell the
 operator. \`aimeat_admin_federation_relay_claim_set\` keeps one such peer on optional until it
-updates, or holds one to required while the node is on optional.
+updates, or holds one to required while the node is on optional. Each roster row says how the peer
+arrived (\`origin\`): a peer a package grant or an install set added without the operator is
+\`recorded\` with who asked. \`aimeat_admin_federation_peer_remove\` with \`emergency: true\` removes a peer
+at once and frees its node id, which is what to do when the Security page says a node id is held
+under another key and the operator confirms the held peer is not the real node.
 
 **Classification (operator).** Content on this node can carry a classification (public, internal,
 confidential, highly confidential, or a level an owner or an organism adds), which decides which

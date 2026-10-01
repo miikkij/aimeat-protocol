@@ -22,6 +22,8 @@
  * @structure registerAdminFederationTools(mcp, storage, config, peers, getAgentGaii, scopes) — one read, one write.
  * @usage registerAdminFederationTools(mcp, storage, config, peers, () => agentGaii, scopes);
  * @version-history
+ *   v1.3.0 — 2026-10-01 — aimeat_admin_federation_peer_remove: remove a peer, or free a node id held
+ *     under another key, through the same service DELETE /v1/federation/peers/:nodeId calls.
  *   v1.2.0 — 2026-09-25 — aimeat_admin_federation_relay_claim_set: keep one peer on its own
  *     relay-claim setting, from chat.
  *   v1.1.0 — 2026-09-24 — SECURITY (audit A8-1): the operator test asks the operator:admin word as
@@ -40,6 +42,7 @@ import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/ow
 import { buildFederationOverview } from '../services/federation-overview.js';
 import { setPeerRelayClaim, peerRelayClaimView, FOLLOW_NODE } from '../services/relay-claim-policy.js';
 import { emitChange } from '../services/event-bus.js';
+import { removePeer } from '../services/federation-peer-remove.js';
 
 const text = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
 const refuse = (message: string) => ({ content: [{ type: 'text' as const, text: message }], isError: true });
@@ -75,5 +78,19 @@ export function registerAdminFederationTools(
       if (!out.ok) return toolError(out.code, out.message);
       emitChange('federation');
       return text({ node_id: out.peer.nodeId, relay_claim: peerRelayClaimView(config, out.peer) });
+    });
+
+  mcp.tool('aimeat_admin_federation_peer_remove', descriptionFor('aimeat_admin_federation_peer_remove'),
+    {
+      node_id: z.string().describe('The peer, by its node id as aimeat_admin_federation lists it.'),
+      emergency: z.boolean().optional().describe('true: remove it now and free the node id. Omitted or false: start its de-peering grace.'),
+      reason: z.string().max(500).optional().describe('Why, in a few words: kept with the removal and sent with an emergency notice.'),
+    },
+    annotationsFor('aimeat_admin_federation_peer_remove'),
+    async ({ node_id, emergency, reason }) => {
+      if (!(await resolveOperatorAgentName(storage, agentGaii, scopes))) return refuse(OPERATOR_AGENT_REFUSAL);
+      const out = await removePeer({ config, storage, peers }, node_id, { emergency: emergency === true, ...(reason ? { reason } : {}) });
+      if (!out.ok) return toolError(out.code, out.message);
+      return text(out.body);
     });
 }

@@ -21,6 +21,10 @@
  *   - create without a key · create with one · activate reachable · activate unreachable · rotation
  * @usage cd aimeat && pnpm exec vitest run test/unit/peer-needs-a-key.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-01 — The stub answers a key exchange as the node it plays (`stubNodeId`), as a
+ *     real node does; it answered every exchange as one fixed id, which activation now refuses
+ *     (performKeyExchange names the node it asks). New case: an answer as another node is refused.
+ *     Setup that no longer matched production, not a weaker test.
  *   v1.0.0 — 2026-09-01 — Initial, with the fix.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -40,6 +44,8 @@ const OWNER = 'peerop';
 
 /** What the stub far end returns from key-exchange. The test rewrites this per case. */
 let stubKey = '';
+/** The node id the stub answers as: the peer it plays, set per case. */
+let stubNodeId = 'aimeat-stub-peer';
 /** Whether the stub answers at all — false is the unreachable case without closing the socket. */
 let stubAnswers = true;
 
@@ -101,7 +107,7 @@ describe('a federation peer needs a key to exist and to become active', () => {
         stub.use(express.json());
         stub.post('/v1/federation/key-exchange', (_req, res) => {
             if (!stubAnswers) { res.status(503).json({ ok: false }); return; }
-            res.json({ ok: true, data: { node_id: 'aimeat-stub-peer', node_public_key: stubKey, agent_keys: [] } });
+            res.json({ ok: true, data: { node_id: stubNodeId, node_public_key: stubKey, agent_keys: [] } });
         });
         stubServer = http.createServer(stub);
         await new Promise<void>(resolve => stubServer.listen(0, '127.0.0.1', resolve));
@@ -145,6 +151,7 @@ describe('a federation peer needs a key to exist and to become active', () => {
         stubKey = kp.publicKey;
         stubAnswers = true;
         const nodeId = `good-${randomBytes(4).toString('hex')}`;
+        stubNodeId = nodeId;
 
         const created = await post('/v1/federation/peers', { node_id: nodeId, url: stubUrl, public_key: kp.publicKey });
         expect(created.status, JSON.stringify(created.body)).toBe(201);
@@ -188,6 +195,7 @@ describe('a federation peer needs a key to exist and to become active', () => {
         const onFile = await generateKeyPair();
         const presented = await generateKeyPair();
         const nodeId = `rotate-${randomBytes(4).toString('hex')}`;
+        stubNodeId = nodeId;
         await post('/v1/federation/peers', { node_id: nodeId, url: stubUrl, public_key: onFile.publicKey });
 
         stubKey = presented.publicKey;
@@ -196,6 +204,20 @@ describe('a federation peer needs a key to exist and to become active', () => {
         expect(r.body.error?.code).toBe('KEY_ROTATION_DENIED');
         expect(peers.get(nodeId)?.status).toBe('pending');
         expect(peers.get(nodeId)?.publicKey).toBe(onFile.publicKey);
+    });
+
+    it('a key exchange answered as another node is refused, and the peer is unchanged', async () => {
+        // The answer names the node; the exchange was with the peer this operator added. A different
+        // name is a different node at that address, and its key is no key for this peer.
+        const kp = await generateKeyPair();
+        const nodeId = `asother-${randomBytes(4).toString('hex')}`;
+        await post('/v1/federation/peers', { node_id: nodeId, url: stubUrl, public_key: kp.publicKey });
+        stubKey = kp.publicKey;
+        stubNodeId = `someone-else-${randomBytes(4).toString('hex')}`;
+        const r = await post('/v1/federation/peer/activate', { peer_node_id: nodeId });
+        expect(r.status).toBe(502);
+        expect(r.body.error?.code).toBe('KEY_EXCHANGE_FAILED');
+        expect(peers.get(nodeId)?.status).toBe('pending');
     });
 
     // ── The THIRD door: PUT, which sets status directly ──

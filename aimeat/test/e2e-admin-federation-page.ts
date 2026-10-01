@@ -21,6 +21,8 @@
  *   made appeared under "asking to join" with Approve and Refuse beside it, naming this node as the
  *   asker. Found by driving the browser on 2026-09-12.
  * @version-history
+ *   v1.5.0 — 2026-10-01 — aimeat_admin_federation_peer_remove: the operator's agent removes a peer in
+ *     chat, the page stops listing it, and a second call answers NOT_FOUND.
  *   v1.4.0 — 2026-09-25 — Relay claims peer by peer: a peer kept on its own setting through the REST
  *     door, the peer door and aimeat_admin_federation_relay_claim_set, an unclaimed relay written
  *     down on the peer it names, and the answer naming who is not ready.
@@ -365,6 +367,21 @@ await test('The relay-claim door is operator-only, and refuses a word it does no
     });
     assert(bad.status === 400, `an unknown word: expected 400, got ${bad.status}`);
     assert(rosterRow((await overview()).body.data, 'peer-waiting-001').relay_claim.setting === 'optional', 'and nothing changed');
+});
+
+await test("In chat, the operator's agent removes a peer and frees its node id; a second call finds nothing", async () => {
+    const add = await json('/v1/federation/peers', {
+        method: 'POST', headers: { Authorization: `Bearer ${opToken}` },
+        body: JSON.stringify({ node_id: 'peer-gone-001', url: 'https://gone.example', public_key: aKey }),
+    });
+    assert(add.status === 201, `add: ${add.status} ${JSON.stringify(add.body.error ?? '')}`);
+    const removed = await mcpRpc('tools/call', { name: 'aimeat_admin_federation_peer_remove', arguments: { node_id: 'peer-gone-001', emergency: true } }, 5);
+    assert(removed?.result?.isError !== true, `the tool refused: ${JSON.stringify(removed?.result ?? removed).slice(0, 300)}`);
+    const out = JSON.parse(removed.result.content[0].text);
+    assert(out.deleted === true && out.emergency === true && out.node_id === 'peer-gone-001', `the tool answers what it did: ${removed.result.content[0].text}`);
+    assert(!rosterRow((await overview()).body.data, 'peer-gone-001'), 'the page no longer lists it');
+    const again = await mcpRpc('tools/call', { name: 'aimeat_admin_federation_peer_remove', arguments: { node_id: 'peer-gone-001', emergency: true } }, 6);
+    assert(again?.result?.isError === true && String(again.result.content[0].text).startsWith('NOT_FOUND'), `a second call: ${JSON.stringify(again?.result).slice(0, 300)}`);
 });
 
 await test('The door is operator-only', async () => {

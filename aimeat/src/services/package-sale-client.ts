@@ -46,7 +46,7 @@ async function repositoryUrl(deps: SaleDeps, ref: unknown): Promise<Refusal | { 
         return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'repository is the repository\'s node id, or { node_id, url, public_key } the first time.' };
     }
     if (typeof ref === 'object' && ref !== null) {
-        const link = await linkPackagePeer({ storage, peers, timeoutMs: deps.config.federationTimeoutMs ?? 10000 }, nodeId, ref,
+        const link = await linkPackagePeer({ storage, peers, timeoutMs: deps.config.federationTimeoutMs ?? 10000, thisNodeId: deps.config.nodeId }, nodeId, ref,
             { source: 'sale-repository', by: 'operator' }, { pendingWhenUnreachable: false });
         if (!link.ok) return link.code === 'PEER_UNREACHABLE' ? { ...link, status: 502, code: 'REPOSITORY_UNREACHABLE' } : link;
     }

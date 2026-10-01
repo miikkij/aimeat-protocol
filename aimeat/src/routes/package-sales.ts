@@ -101,7 +101,7 @@ export function registerPackageSaleRoutes(
         const out = await grantEntitlement(storage, { owner: act.author, isOperator: false }, {
             groupId: act.groupId, nodeId: req.params.nodeId as string,
             updatesUntil: body.updates_until, channel: body.channel, note, node: body.node,
-        }, peers, { timeoutMs: config.federationTimeoutMs, seller: act.seller });
+        }, peers, { timeoutMs: config.federationTimeoutMs, seller: act.seller, thisNodeId: config.nodeId });
         if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
         res.json(success(config.nodeId, { entitlement: out.entitlement, peer_registered: out.peerRegistered === true, peer_pending: out.peerPending === true }));
     });

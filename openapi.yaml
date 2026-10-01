@@ -25916,7 +25916,13 @@ paths:
       summary: Exchange public keys with peer
       description: |
         Synchronise Ed25519 public keys between peered nodes. The peer must
-        already exist in the federation registry.
+        already exist in the federation registry, or have an approved peering request.
+        A key this node cannot check against an established one (an approval written by
+        this node's own join carries none, and a peer may have none) is taken only when the
+        card at the approved address (`/.well-known/aimeat`) publishes it for that node id;
+        otherwise 403 KEY_NOT_PROVEN and nothing is admitted. Changing an established key
+        needs a signature by the current key (409 KEY_ROTATION_DENIED), and a refused
+        rotation is recorded on the Security page as a node id held under another key.
       tags: [Federation]
       requestBody:
         required: true
@@ -43990,6 +43996,11 @@ paths:
         own trust level is not a door. An unknown, expired or already-used token is not an error; it
         falls through to the ordinary pending path, so a leaked token is worth one link, at one tier,
         once.
+
+        AN EXISTING PEER. An active peer of that node id answers 409 CONFLICT. A peer that is offline
+        or leaving is replaced only by an admission (an invite, or open join under the same key); a
+        pending request leaves it in place, and an open join under another key answers 409
+        PEER_KEY_MISMATCH. A node id held under another key is recorded on the Security page.
       tags: [Federation]
       requestBody:
         required: true
@@ -51425,8 +51436,9 @@ paths:
       summary: Receive a direct message from a peer node (signed)
       description: >-
         Node-to-node delivery of a human↔human direct message. The payload is signed with the source
-        node's Ed25519 key and verified against the peer's public key. The recipient must be a human
-        GHII hosted on this node; the first-contact gate applies. Not for client use.
+        node's Ed25519 key and verified against the peer's public key. The sender must be on the
+        signing node (403 SENDER_NOT_OF_PEER otherwise). The recipient must be a human GHII hosted on
+        this node; the first-contact gate applies. Not for client use.
       tags: [Federation]
       requestBody:
         required: true
@@ -51449,7 +51461,7 @@ paths:
         '401':
           description: Missing or invalid signature
         '403':
-          description: Source not an active peer, or recipient blocked the sender
+          description: Source not an active peer, the sender is not on the source node, or recipient blocked the sender
         '404':
           description: Recipient not hosted on this node
 
@@ -60503,7 +60515,10 @@ paths:
         Operator-only (requireRole('operator')). Discovers the target AIMEAT node, signs an
         Ed25519 introduction and posts it to the target's `/v1/federation/peer/introduce`,
         then stores a local peering request and begins polling for approval. Outbound URL is
-        SSRF-validated.
+        SSRF-validated. When the target approves, this node exchanges keys first and saves the
+        peer only with the key the target returned for the node id its card named; it saves
+        nothing when the exchange fails or answers as another node, and never replaces a peer
+        it already has.
       security:
         - BearerAuth: []
       requestBody:

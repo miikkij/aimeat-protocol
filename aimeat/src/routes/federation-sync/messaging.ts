@@ -5,6 +5,9 @@
  * @description Federation messaging + memory-replication routes — signed peer replicate, human↔human
  *   direct message, operator broadcast, delivery/read receipt, and attachment download grant. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-10-01 — POST /v1/federation/message refuses a sender who is not on the signing node
+ *     (403 SENDER_NOT_OF_PEER): a linked peer could name any sender, also a user of another node, and
+ *     pass the recipient's contact check as that person.
  *   v1.4.0 — 2026-09-29 — POST /v1/federation/storage/grant passes the attachment through the
  *     classification leave() (destination federation) before a download token is minted; a file
  *     that may not leave its organism is 403 CLASSIFIED (TARGET-082 V4).
@@ -193,6 +196,16 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
         const messagePayload = JSON.stringify({ source_node, message, timestamp });
         if (!await verify(peer.publicKey, messagePayload, signature)) {
             res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on message'));
+            return;
+        }
+        // The signature proves which node sent this, not who wrote it: `senderGhii` is the sending
+        // node's word. A node speaks for its own people only, so a sender on another node is refused.
+        // Until 2026-10-01 a peer could deliver a message that read as from bob@<any node>, and the
+        // recipient's contact check took it as bob (incident federated-dm-a-linked-peer-can-name-any-
+        // sender-also-a-user-o-muptii84).
+        if (parseGaiiLoose(String(message.senderGhii)).node !== source_node) {
+            res.status(403).json(error(config.nodeId, 'SENDER_NOT_OF_PEER',
+                `The sender ${String(message.senderGhii)} is not on ${String(source_node)}, the node that signed this message.`));
             return;
         }
 

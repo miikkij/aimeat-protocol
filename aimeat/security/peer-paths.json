@@ -1,0 +1,175 @@
+{
+  "about": "Every file under src/ that writes a federation peer (saveFederationPeer) or trusts a peer url or key (<name with peer>.url / .publicKey), how many times, and on what proof. pnpm check:peer-paths fails on a new file and on a count that grew. UNREVIEWED marks an entry nobody has answered yet. Written 2026-10-01 after the peer-registration incident; docs/pitfalls.md section 103.",
+  "writers": {
+    "src/routes/admin-monitoring.ts": {
+      "count": 1,
+      "why": "completeJoin, behind requireRole('operator') on POST /v1/admin/federation/join: the operator named the target url. The key comes from a key exchange that must answer as the node id the target's card named, and the peer is saved only with that key and only when no peer of that id exists (2026-10-01)."
+    },
+    "src/routes/federation-peer/introduce.ts": {
+      "count": 1,
+      "why": "POST /v1/federation/peer/introduce, no sign-in: the body is signed by the key it presents, so the caller holds that key; the peer is written only on an invite this operator minted for that node id or on open join (visiting tier), never over a peer held under another key by an open join, and never on a pending request (2026-10-01)."
+    },
+    "src/routes/federation-peer/lifecycle.ts": {
+      "count": 3,
+      "why": "Key exchange (no sign-in): admits only on an approved peering request, at the approved address and with the approved key, or a key the card at that operator-approved address publishes; a key change needs a signature by the current key. Ping and the de-peering grace change status only."
+    },
+    "src/routes/federation-peer/peers.ts": {
+      "count": 5,
+      "why": "Operator routes (requireRole('operator')): add, approve, activate (key exchange that must answer as the peer's id), update flags and tier (clamped to the tier ceiling), promote. Every write is the operator's decision."
+    },
+    "src/routes/federation-sync/catalogue-trust.ts": {
+      "count": 1,
+      "why": "A trust advisory, operator-gated on this node: it demotes a peer to visiting (tierRank keeps a contact peer from being promoted) or deletes it on a ban. Status and tier only."
+    },
+    "src/services/federation-peer-remove.ts": {
+      "count": 1,
+      "why": "removePeer, behind the operator role on REST and operator:admin on MCP: sets de-peering status with its grace end. Status only."
+    },
+    "src/services/federation.ts": {
+      "count": 3,
+      "why": "The heartbeat loop: availability, version and status from a ping signed by this node. Status and statistics only; never the url or the key."
+    },
+    "src/services/install-set-apply.ts": {
+      "count": 1,
+      "why": "linkRepository, behind the operator check (requireOperatorPrincipal with operator:admin, or the operator's own start-up file): the repository the set names is written only after its own card answers with the same node id and key (2026-10-01)."
+    },
+    "src/services/package-peer-register.ts": {
+      "count": 1,
+      "why": "registerPackagePeer, from linkPackagePeer and adoptPendingPeer only: a package author, an operator or a seller node of the author asked, and the node's own card answered with the same id and key. Written packages-only (contact tier, messaging off). The card does not prove the id is the asker's (docs/pitfalls.md section 103); the readers below keep such a peer to packages."
+    },
+    "src/services/relay-claim-policy.ts": {
+      "count": 2,
+      "why": "The operator's relay-claim setting for one peer, and the timestamps of verified relays. Neither touches the url or the key."
+    }
+  },
+  "readers": {
+    "src/routes/apps/catalogue-admin.ts": {
+      "count": 3,
+      "why": "Peer app search for an operator: active peers only, url checked with validateOutboundUrl first; reads public app listings and sends nothing private."
+    },
+    "src/routes/federation-genesis.ts": {
+      "count": 2,
+      "why": "Verifies a genesis node's signed message against the key pinned for the genesis peer, refusing when there is no key or no signature."
+    },
+    "src/routes/federation-peer/introduce.ts": {
+      "count": 4,
+      "why": "Compares the key an introduction presents with the key of the peer already holding that node id, to refuse or to record a held id. No outbound use."
+    },
+    "src/routes/federation-peer/lifecycle.ts": {
+      "count": 11,
+      "why": "Key exchange: compares the presented key with the pinned one (rotation needs a signature by it), proves an unpinned key against the card at the operator-approved address, and verifies a ping's signature with the pinned key."
+    },
+    "src/routes/federation-peer/peers.ts": {
+      "count": 13,
+      "why": "Operator listing and editing of peers, the activate key exchange (bound to the peer's id), and inbound heartbeat and presence verified with the pinned key after gatePeer."
+    },
+    "src/routes/federation-peer/promotion.ts": {
+      "count": 2,
+      "why": "Reads whether a visiting peer signed its introduction and its address, as promotion criteria shown to the operator. Nothing is sent."
+    },
+    "src/routes/federation-settlements.ts": {
+      "count": 4,
+      "why": "Inbound settlements and relay hops verified with the pinned key after gatePeer('allowSettlement'); the outbound settle is operator-only, to an active peer, with validateOutboundUrl first."
+    },
+    "src/routes/federation-sync/catalogue-trust.ts": {
+      "count": 1,
+      "why": "Inbound catalogue and trust traffic verified with the pinned key after gatePeer('shareCatalogue')."
+    },
+    "src/routes/federation-sync/messaging.ts": {
+      "count": 5,
+      "why": "Inbound messages, receipts, broadcasts, replication and storage grants: gatePeer with the capability word first, then the signature against the pinned key; a message's sender must be on the signing node (2026-10-01)."
+    },
+    "src/routes/federation-sync/routing.ts": {
+      "count": 7,
+      "why": "Routed calls go to an active peer with allowRouting; resolve answers an active peer's url; cross-node work checks validateOutboundUrl and allowRouting. A packages-only peer has allowRouting off."
+    },
+    "src/routes/federation-sync/templates.ts": {
+      "count": 4,
+      "why": "Template listing: inbound verified with the pinned key after gatePeer('shareCatalogue'); outbound only to active peers sharing the catalogue."
+    },
+    "src/routes/ghii/register-login.ts": {
+      "count": 8,
+      "why": "Federated sign-in: the home node must be an active peer whose tier can carry federated sign-in (member or genesis; contact, visiting and packages-only refused under every policy) and, under specific_peers, have allowFederatedAuth; the reply is verified with its pinned key and the visitor's home is the signing peer (2026-10-01)."
+    },
+    "src/routes/memory/federation.ts": {
+      "count": 9,
+      "why": "A federated visitor's pull, push and list go to the visitor's home peer, which only a sign-in through a member or genesis peer can have made; list-remote and pull-remote need an active peer and validateOutboundUrl."
+    },
+    "src/server-bootstrap/service-init.ts": {
+      "count": 1,
+      "why": "On a peer's recovery, a key exchange with it that must answer as its id; the key cache is written under that id only."
+    },
+    "src/services/agent-port-redirect.ts": {
+      "count": 1,
+      "why": "Redirects a ported agent to an active peer whose url origin matches the pointer the agent's owner wrote; the peer only supplies its own address."
+    },
+    "src/services/attachment-duplication.ts": {
+      "count": 2,
+      "why": "A storage-grant request goes only to a peer that takes messages (peerTakesMessages: active or degraded, messaging on), through safeFetch."
+    },
+    "src/services/catalogue-sync.ts": {
+      "count": 2,
+      "why": "Catalogue sync goes to peers sharing the catalogue, with validateOutboundUrl first."
+    },
+    "src/services/federation-book.ts": {
+      "count": 2,
+      "why": "Assembling the book reads node cards from active, non-private peers through safeFetch; verifying a book uses the issuer peer's pinned key, else the key cache, which is now written only under the node a key exchange asked."
+    },
+    "src/services/federation-peer-gate.ts": {
+      "count": 1,
+      "why": "gatePeer refuses a peer with no key; peerTakesMessages reads no url or key beyond that."
+    },
+    "src/services/federation-peer-remove.ts": {
+      "count": 2,
+      "why": "The emergency de-peering notice goes to the other active peers, with validateOutboundUrl and safeFetch."
+    },
+    "src/services/federation.ts": {
+      "count": 7,
+      "why": "resolveGaii answers an active peer's url (work routing then refuses a peer with allowRouting off); the heartbeat pings every active peer, a peer sharing no catalogue receiving uptime only."
+    },
+    "src/services/mcp-client/transport.ts": {
+      "count": 1,
+      "why": "Attached MCP calls go to an active peer with allowRouting; a packages-only peer has it off."
+    },
+    "src/services/memory-replication.ts": {
+      "count": 2,
+      "why": "Replication goes to active peers with replicateMemory, validateOutboundUrl first."
+    },
+    "src/services/message-broadcast.ts": {
+      "count": 1,
+      "why": "A federation broadcast goes to active, non-private peers; a packages-only or contact peer is private (peerMode), so it receives none."
+    },
+    "src/services/message-delivery.ts": {
+      "count": 3,
+      "why": "Messages and read receipts go only to a peer that takes messages (peerTakesMessages: active or degraded, messaging on); the plain fetch is the federation carve-out of security/outbound-fetch-exemptions.json (2026-10-01)."
+    },
+    "src/services/package-import.ts": {
+      "count": 2,
+      "why": "A pulled package's statement is verified with the pinned key of the node it names as signer; a node id with no key here is imported as not verified. A packages-only peer registered under a node id that is not its owner's would verify statements in that id's name: the pull gate (shareCatalogue) is what stands in front of it."
+    },
+    "src/services/package-node-auth.ts": {
+      "count": 1,
+      "why": "A customer node's signed request verified with its pinned key; a peer sharing no catalogue is heard only for what it holds an entitlement to."
+    },
+    "src/services/package-pull.ts": {
+      "count": 3,
+      "why": "A pull goes to a peer sharing the catalogue, verified with its pinned key; an address given directly is read for its card through safeFetch (trust on first use, the caller's own decision)."
+    },
+    "src/services/package-sale-auth.ts": {
+      "count": 2,
+      "why": "A seller node's signed sale request verified with its pinned key; the seller must also be named by the package's author (isSellerFor)."
+    },
+    "src/services/package-sale-client.ts": {
+      "count": 1,
+      "why": "This node's operator signs a sale and sends it to an active repository peer whose card was checked when it was linked."
+    },
+    "src/services/presence.ts": {
+      "count": 2,
+      "why": "Presence goes to active, non-private peers, with validateOutboundUrl first."
+    },
+    "src/services/relay-claim.ts": {
+      "count": 1,
+      "why": "A relay claim verified with the pinned key of the peer that signed it."
+    }
+  }
+}

@@ -5,6 +5,13 @@
  * @description Federation peer directory + node-to-node introduction/handshake routes (directory,
  *   service-summary, signed introduce, peering-request CRUD, readiness test). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-10-01 — An introduction that only becomes a pending request no longer deletes the
+ *     offline or de-peering peer of that node id; only an admission (an invite or an open join)
+ *     replaces it, and an open join may not replace one held under another key (409
+ *     PEER_KEY_MISMATCH). Until then anyone who signed an introduction with a key of their own removed
+ *     a peer that was down for a moment (incident federation-an-unsigned-in-caller-can-delete-a-peer-
+ *     that-is-o-muptibe1). A node id held under another key is recorded on the Security page.
+ *     The key exchange after an admission names the node it expects.
  *   v1.2.0 — 2026-09-01 — The outbound peering request records NO publicKey field when it has no
  *     key, instead of `publicKey: ''`. Absent and present-and-empty are different facts and only
  *     one of them is true; the empty string is the shape the whole keyless-peer class is made of.
@@ -31,6 +38,7 @@ import { deriveTierFlags, type PeerTier } from '../../services/federation-tiers.
 import { consumeLinkInvite } from '../../services/link-invites.js';
 import { getActivePolicy, evaluateAutoAdmit } from '../../services/network-policy.js';
 import { logger } from '../../utils/logger.js';
+import { reportPeerIncident } from '../../services/peer-incidents.js';
 
 export function registerIntroduceRoutes(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
     // GET /v1/federation/directory — public peer directory (Tier 0)
@@ -161,7 +169,18 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
         // (invariant 14): a rejected re-introduction must not destroy the existing link (audit
         // AI-triage 2026-08-23).
         const existingPeer = peers.get(node_id);
+        // The caller holds `public_key` (it signed with it). An existing peer under another key is a
+        // node id this node holds for someone else, and its operator hears of it (peer-incidents.ts).
+        const heldUnderAnotherKey = !!existingPeer && !!existingPeer.publicKey && existingPeer.publicKey !== public_key;
+        const reportHeld = (via: string) => {
+            if (!heldUnderAnotherKey) return;
+            void reportPeerIncident(storage, config.nodeId, {
+                kind: 'id-held', nodeId: node_id, via, actor: node_id,
+                presented: { key: public_key, url: node_url }, other: { key: existingPeer!.publicKey, url: existingPeer!.url },
+            });
+        };
         if (existingPeer && existingPeer.status !== 'depeering' && existingPeer.status !== 'offline') {
+            reportHeld('introduce');
             res.status(409).json(error(config.nodeId, 'CONFLICT', `Node "${node_id}" is already a peer`));
             return;
         }
@@ -194,13 +213,6 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
             return;
         }
 
-        // Past every refusal now: retire a re-introducible (depeering/offline) row so the new
-        // admission/request replaces it cleanly. Deferred to here on purpose (invariant 14).
-        if (existingPeer) {
-            peers.delete(node_id);
-            await storage.deleteFederationPeer(node_id);
-        }
-
         // An INVITE this node minted earlier. Its tier is this node's own decision quoted back, which
         // is why the tier is read from the stored invite and never from the request body — a door that
         // believes a caller's claim about its own trust level is not a door (the F1 finding in
@@ -210,8 +222,25 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
 
         const policy = await getActivePolicy(storage);
         const policyAdmit = evaluateAutoAdmit({ node_url }, policy);
+        // An open join admits whoever signs. It may not replace a peer that holds this node id under
+        // another key, offline or leaving as it may be: that is somebody else's link. An invite is this
+        // operator's decision for this node id and may; a pending request leaves the row alone.
+        if (!invited.ok && config.federationOpenJoin && policyAdmit.allowed && heldUnderAnotherKey) {
+            reportHeld('open-join');
+            res.status(409).json(error(config.nodeId, 'PEER_KEY_MISMATCH',
+                `Node "${node_id}" is a peer of this node under another key. Its operator decides; nothing was admitted.`));
+            return;
+        }
         if (invited.ok || (config.federationOpenJoin && policyAdmit.allowed)) {
             const admitTier: PeerTier = invited.ok ? invited.tier : 'visiting';
+            // Past every refusal now: retire the re-introducible (depeering/offline) row so the new
+            // admission replaces it cleanly. Deferred to here on purpose (invariant 14), and only on an
+            // admission: until 2026-10-01 it ran before the pending branch too, so any caller who signed
+            // an introduction with a key of their own deleted a peer that was offline for a moment.
+            if (existingPeer) {
+                peers.delete(node_id);
+                await storage.deleteFederationPeer(node_id);
+            }
 
             const admittedPeer: PeerInfo = {
                 nodeId: node_id,
@@ -243,7 +272,7 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
                 updatedAt: now,
             });
 
-            const keyExchange = await performKeyExchange(node_url, config, storage)
+            const keyExchange = await performKeyExchange(node_url, config, storage, node_id)
                 .catch(() => ({ success: false }));
 
             res.status(200).json(success(config.nodeId, {
