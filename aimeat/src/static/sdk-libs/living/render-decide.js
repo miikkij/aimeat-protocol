@@ -17,15 +17,16 @@
  * @structure decideRow(host, spec) → { el, update, relabel }
  * @usage  import { decideRow } from './render-decide.js';
  * @version-history
+ *   v0.8.2 — 2026-10-01 — The removed sentence and the two-decimal number moved to
+ *     decide/removed-line.js unchanged, so the Atelier kit's decision block says the same sentence
+ *     from the same code. The row's output is the same.
  *   v0.8.1 — 2026-09-19 — A line that says what personal data was taken out before the text left.
  *   v0.8.0 — 2026-09-19 — Initial (living 0.8.0).
  */
 import { el, clear } from './dom.js';
 import { sayDecide } from './decide-words.js';
 import { eventsAccepted } from './nodes/decide.js';
-
-/** A probability or a confidence as a person reads it: two decimals. */
-function num(v) { return typeof v === 'number' && Number.isFinite(v) ? v.toFixed(2) : ''; }
+import { removedLine, twoDecimals as num } from '../decide/removed-line.js';
 
 /**
  * @param {HTMLElement} host
@@ -73,14 +74,10 @@ export function decideRow(host, spec) {
     // that is visible. Drawn only once there is an answer to say it about.
     removedEl.hidden = f.removed === '' || f.removed == null;
     if (!removedEl.hidden) {
-      const parts = [];
-      for (const kind of ['person', 'email', 'phone', 'hetu', 'iban', 'address']) {
-        const n = Number(f['removed.' + kind]) || 0;
-        if (n > 0) parts.push(n + ' ' + sayDecide('kind.' + kind + (n === 1 ? '.1' : '.n'), langs()));
-      }
-      removedEl.textContent = parts.length
-        ? sayDecide('removedLead', langs()) + parts.join(', ') + sayDecide('removedTail', langs())
-        : sayDecide('removedNone', langs());
+      removedEl.textContent = removedLine(
+        function (kind) { return f['removed.' + kind]; },
+        function (key) { return sayDecide(key, langs()); },
+      );
     }
 
     clear(personEl);

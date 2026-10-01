@@ -20,6 +20,14 @@ export const PARTS = {
     fork: "Copying it out means asking AIMEAT.iam.can(cap) after init and drawing both sides yourself.",
     file: "members.js",
   },
+  "aiTask": {
+    parts: ["root","title","hint","notice","signIn","label","input","reason","bar","run","status","failure","result","aiLabel","body","meta","model","cost","truncated","copyRoute"],
+    slots: [],
+    variants: ["compact"],
+    tokens: ["--ak-ai-width"],
+    fork: "Copying it out means calling AIMEAT.ai.capabilities(), complete() or completeJson(), disclose() and AIMEAT.md.render() yourself, writing the no-AI, signed-out and error words in three languages, and holding the button busy.",
+    file: "ai-task.js",
+  },
   "bottomNav": {
     parts: ["root","item"],
     slots: ["item(entry)"],
@@ -68,6 +76,14 @@ export const PARTS = {
     fork: "Copying it out means calling AIMEAT.connect's list(), providers(), capabilities(), start(), attach() and revoke() yourself, starting start() inside the click, and keeping the confirm before a disconnect and the words for each status.",
     file: "connections.js",
   },
+  "decision": {
+    parts: ["root","title","status","body","intro","signIn","failure","settings","empty","ready","ask","provider","providerNote","outcome","answers","answer","question","value","verdict","bar","threshold","options","removed","cost","who","person","note","confirm","override","overridePanel","overridePick","record","cancel","recorded","again","retry"],
+    slots: ["onOutcome(result)","labels{ questionId: words }"],
+    variants: [],
+    tokens: ["--ak-decision-width"],
+    fork: "Copying it out means calling AIMEAT.decide's isAvailable(), unavailableReason(), providers(), ask() or gate() or rule(id).ask(), and review() yourself, drawing every answer with its number, threshold, removed data, cost and provider, and recording the person's verdict only when they press.",
+    file: "decision.js",
+  },
   "dialog": {
     parts: ["root","panel","head","title","close","body","text","before","after","actions","action"],
     slots: ["before()","after()","actions()","aside()"],
@@ -75,6 +91,22 @@ export const PARTS = {
     tokens: [],
     fork: "Do not: the focus trap, Escape and focus return are the browser's through native <dialog>, and a hand-rolled overlay loses all three. Put your own markup in body(host) instead.",
     file: "dialog.js",
+  },
+  "doc": {
+    parts: ["root","title","body","md","text","empty","sources","source"],
+    slots: [],
+    variants: [],
+    tokens: ["--ak-doc-width"],
+    fork: "Copying it out means calling AIMEAT.md.render() or renderRich() yourself, catching a failure into pre-wrapped text, and colouring .md-body's headings, lists, code, tables, quotes and links with the --ak-* tokens.",
+    file: "doc.js",
+  },
+  "dropzone": {
+    parts: ["files","file","name","state","bar","open"],
+    slots: [],
+    variants: [],
+    tokens: [],
+    fork: "",
+    file: "dropzone-upload.js",
   },
   "figure": {
     parts: ["root","label","row","value","unit","delta","sub","aside"],
@@ -347,6 +379,14 @@ export const PARTS = {
     tokens: [],
     fork: "",
     file: "menu.js",
+  },
+  "workflowInput": {
+    parts: ["root","title","intro","failure","notice","body","none","list","step","head","header","workflow","run","form","choices","question","how","choice","mark","other","error","bar","deadline","answer"],
+    slots: ["onAnswered(input, answer)"],
+    variants: ["dense"],
+    tokens: ["--ak-wf-width"],
+    fork: "Copying it out means calling AIMEAT.workflows.pendingInputs() and answer() yourself, sending picks as option ids with other only when the step accepts it, treating WORKFLOW_STEP_NOT_WAITING as a step that is gone, and reading the list again when the live 'workflows' domain changes.",
+    file: "workflow-input.js",
   },
   "workspacePicker": {
     parts: ["root","title","intro","failure","using","change","orgs","row","who","chip","use","create","createGo","cancel","working"],

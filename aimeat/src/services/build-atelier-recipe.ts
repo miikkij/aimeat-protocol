@@ -24,6 +24,9 @@
  *   import { renderCustomisation, renderLiving, renderPatterns } from './build-atelier-recipe.js';
  *   body += renderCustomisation() + renderLiving(base) + renderPatterns();
  * @version-history
+ *   v1.8.0 — 2026-10-01 — The variants line names aiTask (`compact`) and workflowInput (`dense`), and
+ *     the token count follows the kit at sixty-three (aiTask, workflowInput, doc and decision each
+ *     brought a width).
  *   v1.7.0 — 2026-10-01 — The variants line names members (`list`, `table`, `dense`), workspaceTeam
  *     (`list`, `table`) and workspacePicker (`dense`), and the per-component token count follows the
  *     kit at fifty-nine (the members, intake and connections blocks each brought a width).
@@ -72,11 +75,11 @@ export function renderCustomisation(): string {
     + 'cardGrid, mediaCard, queue, health, kanban, section and searchBar; `numbered` on list and '
     + 'listDetail; `wide` on cardGrid; `lined` on table; `tall`, `compact` and `center` on hero; '
     + '`compact`, `trend` and `plain` on statRow; `compact` and `center` on figure; `compact` on '
-    + 'rating; `dense` on tabs, bottomNav, segmented, members and workspacePicker; `pill` on tabs; '
+    + 'rating and aiTask; `dense` on tabs, bottomNav, segmented, members, workspacePicker and workflowInput; `pill` on tabs; '
     + '`quiet` on section; `ghost` on stateButton; `table` on members and workspaceTeam. An unknown name '
     + 'is refused with a console line naming the real ones.\n'
     + '4. **Per-component tokens.** `--ak-list-aside-size`, `--ak-stat-figure-size`, '
-    + '`--ak-card-aspect`, `--ak-hero-title-size` and fifty-five more, each defaulting to the '
+    + '`--ak-card-aspect`, `--ak-hero-title-size` and fifty-nine more, each defaulting to the '
     + 'value the component already had. Set one on YOUR OWN element and exactly that part '
     + 'changes, in every look and both modes.\n\n'
     + 'A statRow tile and a figure also take `unit` (what the number is measured in) and '

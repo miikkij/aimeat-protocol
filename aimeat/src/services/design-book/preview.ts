@@ -19,6 +19,9 @@
  * @usage
  *   const html = partPreviewHtml(part);   // a complete self-contained page, kit assets relative
  * @version-history
+ *   v1.6.0 — 2026-10-01 — A part with a block that draws markdown (doc, aiTask) loads
+ *     aimeat-markdown.js before the kit, so its sample renders as it does in an app instead of
+ *     showing the raw marks. Every other preview page is unchanged.
  *   v1.5.0 — 2026-09-20 — A part is shown on a stage that shows it (preview-stages.ts): a look on
  *     a page whose content fits its character, an ambient or a layer effect at full strength with
  *     nothing in front, a worn effect on its one block, a shape in a committed look. And THE
@@ -191,11 +194,15 @@ export function benchPageHtml(body: Record<string, unknown>, theme: 'light' | 'd
   // A genre part IS its page — serve it as-is instead of wrapping the demo frame around it.
   if (typeof body.__page === 'string') return body.__page;
   const partJson = JSON.stringify(body).replace(/<\//g, '<\\/');
+  // The kit's markdown blocks render through AIMEAT.md when it is on the page and fall back to the
+  // raw text when it is not, so a preview without it showed their samples as markup.
+  const needsMarkdown = /"component":"(doc|aiTask)"/.test(partJson);
   return [
     `<!DOCTYPE html><html lang="en" data-theme="${theme === 'dark' ? 'dark' : 'light'}"><head><meta charset="utf-8">`,
     '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
     '<link rel="stylesheet" href="/lib/aimeat-atelier.css">',
     `<style>${FRAME_CSS}</style></head><body>`,
+    ...(needsMarkdown ? ['<script src="/v1/libs/aimeat-markdown.js"></scr' + 'ipt>'] : []),
     '<script src="/v1/libs/aimeat-atelier.js"></scr' + 'ipt>',
     '<script>',
     'var BODY = ' + partJson + ';',

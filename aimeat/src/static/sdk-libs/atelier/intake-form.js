@@ -47,6 +47,8 @@
  *   AIMEAT.atelier.intakeForm({ target: '#contact', org, ws, formId: 'contact-us' });
  *   AIMEAT.atelier.intakeAdmin({ target: '#forms', org, ws, namespace: 'leads' });
  * @version-history
+ *   v0.62.1 — 2026-10-01 — Copy link goes through the kit's copy() (the platform's clipboard code,
+ *     with its fallback). When the browser refuses, the notice shows the link selected for Ctrl+C.
  *   v0.62.0 — 2026-10-01 — `app` without org and ws follows the app's chosen workspace; the copied
  *     link carries org and ws, and intakeForm reads them.
  *   v0.61.0 — 2026-10-01 — Initial (iam-members-and-library-blocks plan, Phase D block 4).
@@ -56,6 +58,7 @@ import { t } from './i18n.js';
 import { ti } from './intake-connect-i18n.js';
 import { isPlaceholder, sampleBadge, watch, ask, refusal } from './members-shared.js';
 import { followsWorkspace, followWorkspace } from './workspace-choice.js';
+import { copy, selectForHand } from './copy.js';
 
 /** The ten types fields() answers, in the order the Create form offers them. */
 const TYPES = ['text', 'textarea', 'email', 'tel', 'url', 'number', 'date', 'select', 'radio', 'checkbox'];
@@ -517,6 +520,20 @@ export function intakeAdmin(spec) {
 
     function tell(text) { noticeEl.textContent = text; noticeEl.hidden = false; }
 
+    /** Copying was refused: say so with the link in its own span, and select that span for Ctrl+C. */
+    function tellByHand(url) {
+      const whole = ti('intake.copyByHand', { url: url });
+      const at = whole.lastIndexOf(url);
+      clear(noticeEl);
+      const link = el('span', {}, url);
+      if (at < 0) noticeEl.appendChild(el('span', {}, whole + ' '));
+      else if (at > 0) noticeEl.appendChild(document.createTextNode(whole.slice(0, at)));
+      noticeEl.appendChild(link);
+      if (at >= 0 && at + url.length < whole.length) noticeEl.appendChild(document.createTextNode(whole.slice(at + url.length)));
+      noticeEl.hidden = false;
+      selectForHand(link);
+    }
+
     const rows = (Array.isArray(forms) ? forms : []).map(function (f) {
       const name = f.title || f.form_id;
       const meta = [
@@ -532,10 +549,10 @@ export function intakeAdmin(spec) {
         el('span', { class: 'ak-intake__acts', 'data-ak-part': 'acts' }, [
           button(ti('intake.copy'), 'ghost', 'copy', function () {
             const url = linkOf(f);
-            const clip = navigator.clipboard;
-            if (!clip || typeof clip.writeText !== 'function') { tell(ti('intake.copyByHand', { url: url })); return; }
-            clip.writeText(url).then(function () { tell(ti('intake.copied', { url: url })); },
-              function () { tell(ti('intake.copyByHand', { url: url })); });
+            copy(url).then(function (ok) {
+              if (ok) tell(ti('intake.copied', { url: url }));
+              else tellByHand(url);
+            });
           }),
           button(ti('intake.delete'), 'ghost', 'delete', function () {
             ask({

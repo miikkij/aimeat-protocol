@@ -9,6 +9,8 @@
  * @structure .ak-toasts/.ak-toast · .ak-palette · .ak-compare · .ak-ring · .ak-crew ·
  *   .ak-dropzone · .ak-tour · .ak-poll · .ak-keys/.ak-kbd
  * @version-history
+ *   v0.62.0 — 2026-10-01 — The dropzone's upload rows (dropzone({ upload })): one line per file with
+ *     its name, a progress bar, the saved key or the failure.
  *   v0.44.0 — 2026-09-28 — The palette's highlight is the travelling ink.
  *   v0.43.0 — 2026-09-05 — The measured review: the tour's own buttons and a poll option reach
  *     40px of hit area (they were 34 and 38).
@@ -160,6 +162,11 @@
 .ak-dropzone__hint { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
 .ak-dropzone__err { font-size: var(--ak-text-fine); color: var(--ak-err-text); }
 .ak-dropzone input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.ak-dropzone__files { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: var(--ak-text-fine); }
+.ak-dropzone__file { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--ak-ink); }
+.ak-dropzone__name { font-weight: 600; overflow-wrap: anywhere; }
+.ak-dropzone__bar { inline-size: 120px; accent-color: var(--ak-accent); }
+.ak-dropzone__open { color: var(--ak-accent-text); }
 
 /* ── The tour: three steps over the real screen ──────────────────────────────────────────── */
 .ak-tour__mark { outline: 3px solid var(--ak-accent); outline-offset: 4px; border-radius: var(--ak-radius-sm); }

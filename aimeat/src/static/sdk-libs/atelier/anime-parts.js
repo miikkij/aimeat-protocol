@@ -28,7 +28,18 @@
  *     currency: '€',
  *     plans: [{ id: 'pro', name: 'Pro', price: 19, priceYearly: 190, highlight: true,
  *               features: ['Every app', 'Your own agents'], cta: 'Choose Pro' }] } });
+ *   Amounts straight from AIMEAT.commerce (6-decimal micro-units) need no conversion:
+ *     data: { currency: 'EUR', unit: 'micros', plans: [{ id: 'pro', price: 19000000 }] }
+ *   or per plan `priceMicros` / `priceYearlyMicros`. Currency 'morsels' shows a morsel count.
  * @version-history
+ *   v0.62.2 — 2026-10-01 — priceTable keeps a plain price's cents: 4.90 showed as "€5". A whole price
+ *     still shows whole ("€19").
+ *   v0.62.1 — 2026-10-01 — The parts' own words come from the kit dictionary (./i18n.js): the
+ *     weekday names, Month and Year, /month and /year, Choose, Most chosen and the period group's
+ *     name, in en/fi/es, each one overridable with i18n.use(). The English text is unchanged.
+ *   v0.62.0 — 2026-10-01 — priceTable reads commerce amounts: `unit: 'micros'`, `priceMicros`,
+ *     `priceYearlyMicros` (decimals kept, up to six when sub-cent) and currency 'morsels' (an
+ *     integer and the kit's word, never money), through ./money-units.js. Plain numbers unchanged.
  *   v0.44.0 — 2026-09-02 — Initial: the anime.js pair (calendar, priceTable).
  */
 import { el, clear, resolve, enter, reducedMotion } from './dom.js';
@@ -37,6 +48,7 @@ import { NODE_URL } from '../_core/config.js';
 import { num, money as fmtMoney } from '../_core/format.js';
 import { t } from './i18n.js';
 import { emptyState } from './state.js';
+import { isMorsels, speaksMicros, hasAmount, readAmount, roundMicros, fractionDigits, morselText } from './money-units.js';
 
 /** `window` has no declared `anime`; one cast here beats a cast at every call site. */
 const W = /** @type {any} */ (window);
@@ -83,8 +95,6 @@ const TONES = ['ok', 'warn', 'err', 'accent'];
 function toneOf(value) { return TONES.indexOf(value) >= 0 ? value : 'accent'; }
 
 /* ── The month ──────────────────────────────────────────────────────────────────────────── */
-
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 function pad2(n) { return (n < 10 ? '0' : '') + n; }
 function isoDay(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
@@ -203,7 +213,7 @@ export function calendar(spec) {
 
     const names = el('div', { class: 'ak-calendar__row ak-calendar__row--head', role: 'row' });
     for (let i = 0; i < 7; i++) {
-      names.appendChild(el('span', { class: 'ak-calendar__wd', role: 'columnheader' }, WEEKDAYS[(weekStart + i) % 7]));
+      names.appendChild(el('span', { class: 'ak-calendar__wd', role: 'columnheader' }, t('wd' + ((weekStart + i) % 7))));
     }
     grid.appendChild(names);
 
@@ -287,6 +297,11 @@ export function calendar(spec) {
 
 const PERIODS = ['month', 'year'];
 
+/** The word after a figure: '/month' or '/year' in the kit's language. @param {string} period */
+function perWord(period) {
+  return t(period === 'year' ? 'pricePerYear' : 'pricePerMonth');
+}
+
 /** An ISO code Intl can look a currency up by, or nothing when the data carries a symbol. */
 function currencyCode(value) {
   return /^[A-Z]{3}$/.test(String(value == null ? '' : value)) ? String(value) : null;
@@ -295,48 +310,59 @@ function currencyCode(value) {
 /**
  * Whole units, grouped the way the viewer's locale groups numbers. A three-letter code goes
  * through Intl's own currency style; a symbol like '€' is placed in front of the grouped number,
- * because Intl has nothing to look that up by.
+ * because Intl has nothing to look that up by. Figures from micro-units keep their decimals (two,
+ * up to six when sub-cent); a morsel count is an integer with the kit's word, never money.
  * @param {number} value
  * @param {string} currency
+ * @param {number} [digits]  decimals for a figure from micro-units; omitted, whole units
  * @returns {string}
  */
-function money(value, currency) {
-  const whole = Math.round(Number(value) || 0);
+function money(value, currency, digits) {
+  if (isMorsels(currency)) return morselText(value);
+  const d = digits || 0;
+  const whole = d ? roundMicros(value) : Math.round(Number(value) || 0);
   const code = currencyCode(currency);
   if (typeof Intl !== 'undefined' && typeof Intl.NumberFormat === 'function') {
     if (code) {
-      return fmtMoney(whole, code, { maximumFractionDigits: 0, minimumFractionDigits: 0 });
+      return fmtMoney(whole, code, { maximumFractionDigits: d, minimumFractionDigits: d });
     }
-    return String(currency) + num(whole, { maximumFractionDigits: 0 });
+    return String(currency) + num(whole, d ? { minimumFractionDigits: d, maximumFractionDigits: d } : { maximumFractionDigits: 0 });
   }
-  return String(currency) + whole;
+  return String(currency) + (d ? whole.toFixed(d) : whole);
 }
 
 /**
  * What this plan costs over the asked period. `priceYearly` is believed when it is there; without
  * it a monthly price is multiplied and a yearly one divided, and nothing is invented beyond that.
+ * `priceMicros` and `priceYearlyMicros`, or `unit: 'micros'` on the data, are read in micro-units,
+ * and then the figure is exact to the micro-unit, except a twelfth of a yearly price, which is
+ * rounded to the cent because the node never stored it.
  * @param {any} plan
  * @param {string} period
+ * @param {any} data  the table's data, for `unit` and `currency`
+ * @param {boolean} [micros]  the table speaks micro-units
  * @returns {number}
  */
-function priceFor(plan, period) {
-  const base = Number(plan.price) || 0;
+function priceFor(plan, period, data, micros) {
+  const base = readAmount(plan, 'price', data);
   const own = plan.period === 'year' ? 'year' : 'month';
   if (period === 'year') {
-    if (typeof plan.priceYearly === 'number') return plan.priceYearly;
+    if (hasAmount(plan, 'priceYearly')) return readAmount(plan, 'priceYearly', data);
     return own === 'year' ? base : base * 12;
   }
-  return own === 'year' ? base / 12 : base;
+  if (own !== 'year') return base;
+  return micros ? Math.round(base / 12 * 100) / 100 : base / 12;
 }
 
 /**
  * The price table.
  * @param {{
  *   target?: string|Element, title?: string,
- *   data?: { plans: Array<{ id: string, name?: string, price: number, period?: string,
- *                           priceYearly?: number, features?: string[], highlight?: boolean,
+ *   data?: { plans: Array<{ id: string, name?: string, price?: number, priceMicros?: number,
+ *                           period?: string, priceYearly?: number, priceYearlyMicros?: number,
+ *                           features?: string[], highlight?: boolean,
  *                           cta?: string, note?: string }>,
- *            currency?: string, periods?: string[] }|null,
+ *            currency?: string, unit?: 'micros', periods?: string[] }|null,
  *   onPick?: (plan: any, period: string) => void,
  *   empty?: { title?: string, hint?: string },
  * }} spec
@@ -350,6 +376,8 @@ export function priceTable(spec) {
   let data = s.data === undefined ? null : s.data;
   let period = 'month';
   let currency = '€';
+  /** The data speaks micro-units: figures keep their decimals instead of rounding to whole. */
+  let micros = false;
   let emptyCard = null;
   /** One entry per card: the figure element, its unit line, and the number now on screen. */
   let figures = [];
@@ -362,8 +390,22 @@ export function priceTable(spec) {
       ? data.periods.filter(function (p) { return PERIODS.indexOf(p) >= 0; })
       : [];
     if (declared.length) return declared;
-    const yearly = plans.some(function (p) { return typeof p.priceYearly === 'number'; });
+    const yearly = plans.some(function (p) { return hasAmount(p, 'priceYearly'); });
     return yearly ? ['month', 'year'] : ['month'];
+  }
+
+  /** The figure a plan shows for the period: whole units, or exact micro-units. */
+  function figureOf(plan) {
+    const v = priceFor(plan, period, data, micros);
+    // A plain price keeps its cents; it was rounded to the whole unit until 2026-10-01.
+    return micros ? roundMicros(v) : Math.round(v * 100) / 100;
+  }
+
+  /** The decimals a figure is written with: none for whole units, two to six from micro-units. */
+  function digitsOf(v) {
+    // A whole price stays whole ("€19"); a price with cents shows them. Rounding 4.90 to "€5" told
+    // the buyer a different price than the one they would pay.
+    return micros || !Number.isInteger(Number(v) || 0) ? fractionDigits(v) : 0;
   }
 
   /**
@@ -374,16 +416,17 @@ export function priceTable(spec) {
   function roll() {
     const engine = (!reducedMotion() && W.anime && W.anime.animate) ? W.anime : null;
     figures.forEach(function (f) {
-      f.per.textContent = '/' + period;
-      const to = Math.round(priceFor(f.plan, period));
+      f.per.textContent = perWord(period);
+      const to = figureOf(f.plan);
       const from = f.shown;
       f.shown = to;
-      if (!engine || from === to) { f.amount.textContent = money(to, currency); return; }
+      const d = digitsOf(to);
+      if (!engine || from === to) { f.amount.textContent = money(to, currency, d); return; }
       const box = { v: from };
       engine.animate(box, {
         v: to, duration: 520, ease: 'outQuad',
-        onUpdate: function () { f.amount.textContent = money(box.v, currency); },
-        onComplete: function () { f.amount.textContent = money(to, currency); },
+        onUpdate: function () { f.amount.textContent = money(box.v, currency, d); },
+        onComplete: function () { f.amount.textContent = money(to, currency, d); },
       });
     });
     warmAnime();
@@ -400,13 +443,13 @@ export function priceTable(spec) {
 
   function segments(periods) {
     periodButtons = [];
-    const bar = el('div', { class: 'ak-price__periods', role: 'group', 'aria-label': 'Billing period' });
+    const bar = el('div', { class: 'ak-price__periods', role: 'group', 'aria-label': t('pricePeriods') });
     periods.forEach(function (p) {
       const node = el('button', {
         type: 'button', class: 'ak-price__period',
         'aria-pressed': p === period ? 'true' : 'false',
         on: { click: function () { pick(p); } },
-      }, p === 'year' ? 'Year' : 'Month');
+      }, t(p === 'year' ? 'priceYear' : 'priceMonth'));
       periodButtons.push({ id: p, node: node });
       bar.appendChild(node);
     });
@@ -414,9 +457,9 @@ export function priceTable(spec) {
   }
 
   function card(plan) {
-    const value = Math.round(priceFor(plan, period));
-    const amount = el('span', { class: 'ak-price__amount' }, money(value, currency));
-    const per = el('span', { class: 'ak-price__per' }, '/' + period);
+    const value = figureOf(plan);
+    const amount = el('span', { class: 'ak-price__amount' }, money(value, currency, digitsOf(value)));
+    const per = el('span', { class: 'ak-price__per' }, perWord(period));
     figures.push({ plan: plan, amount: amount, per: per, shown: value });
 
     const features = el('ul', { class: 'ak-price__features' });
@@ -430,7 +473,7 @@ export function priceTable(spec) {
     return el('article', {
       class: 'ak-price__card' + (plan.highlight ? ' ak-price__card--lift' : ''),
     }, [
-      plan.highlight ? el('span', { class: 'ak-price__chip' }, 'Most chosen') : null,
+      plan.highlight ? el('span', { class: 'ak-price__chip' }, t('priceMostChosen')) : null,
       el('h3', { class: 'ak-price__name' }, String(plan.name || plan.id)),
       el('div', { class: 'ak-price__figure' }, [amount, per]),
       features,
@@ -438,7 +481,7 @@ export function priceTable(spec) {
       el('button', {
         type: 'button', class: 'ak-btn ak-btn--primary ak-price__cta',
         on: s.onPick ? { click: function () { s.onPick(plan, period); } } : undefined,
-      }, String(plan.cta || 'Choose')),
+      }, String(plan.cta || t('priceChoose'))),
     ].filter(Boolean));
   }
 
@@ -458,6 +501,7 @@ export function priceTable(spec) {
       return;
     }
     currency = (data && data.currency) || '€';
+    micros = speaksMicros(data, plans, ['price', 'priceYearly']);
     const periods = periodsOf(plans);
     if (periods.indexOf(period) < 0) period = periods[0];
 

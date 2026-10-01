@@ -227,7 +227,7 @@
       best: "Paras {n}",
       inARow: "{n} peräkkäin",
       sortBy: "Järjestys",
-      morsels: "morselia",
+      morsels: "murusta",
       target: "Tavoite {n}",
       fix: "Korjaa tämä"
     },

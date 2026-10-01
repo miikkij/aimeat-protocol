@@ -33,6 +33,24 @@
     return ns;
   }
 
+  // src/static/sdk-libs/_core/config.js
+  function cfg() {
+    return window.__AIMEAT_SDK_CFG__ || { nodeId: "", baseUrl: "" };
+  }
+  function resolveNodeUrl() {
+    const meta = document.querySelector('meta[name="aimeat-node"]');
+    if (meta) return (meta.getAttribute("content") || "").replace(/\/$/, "");
+    if (location.protocol === "http:" || location.protocol === "https:") return location.origin;
+    if (typeof self !== "undefined" && typeof self.origin === "string" && self.origin.indexOf("http") === 0) {
+      return self.origin;
+    }
+    return cfg().baseUrl;
+  }
+  var NODE_URL = resolveNodeUrl();
+  var APEX_URL = cfg().baseUrl;
+  var NODE_ID = cfg().nodeId;
+  var HEARTBEAT_MS = cfg().heartbeatMs || 3e4;
+
   // src/static/sdk-libs/decide/index.js
   var { authFetch: authFetch2 } = makeSession("aimeat-decide.js");
   function decideError(r) {
@@ -197,6 +215,9 @@
   function unavailableReason() {
     return _availCache ? _availCache.reason : null;
   }
-  var decide = { yesNo, pickOne, scale, ask, gate, questionSet, rule, rules, decisions, review, run, settings, providers, isAvailable, unavailableReason };
+  function settingsUrl() {
+    return String(APEX_URL || NODE_URL || "") + "/v1/profile?tab=ai&open=decide-card";
+  }
+  var decide = { yesNo, pickOne, scale, ask, gate, questionSet, rule, rules, decisions, review, run, settings, providers, isAvailable, unavailableReason, settingsUrl };
   attach("decide", decide);
 })();

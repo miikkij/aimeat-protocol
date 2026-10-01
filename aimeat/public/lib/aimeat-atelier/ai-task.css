@@ -1,0 +1,107 @@
+/*
+ * @file aimeat-atelier/ai-task.css
+ * @description The clothes of the one-shot AI block (atelier/ai-task.js: aiTask). The box wears the
+ *   kit's form classes (.ak-form__field, .ak-input from data.css) and the copy route is the kit's
+ *   promptPanel (workbench.css); this sheet adds the title and notice lines, the reason under the
+ *   box, the run bar with its busy line, the refusal, and the answer with its label, body and meta
+ *   line. Everything rides the --ak-* token contract, so the block wears the app's look and mode; no
+ *   colour of its own. The block keeps to a readable width (--ak-ai-width), long words and model
+ *   names wrap instead of scrolling sideways at 390px, and every control keeps the touch floor.
+ * @structure .ak-aitask (shared lines) · the box and the reason · the run bar and the busy line ·
+ *   the refusal · the answer · the copy route · variant compact
+ * @version-history
+ *   v0.62.0 — 2026-10-01 — Initial.
+ */
+
+/* ── Shared lines: title, hint, notice ─────────────────────────────────────────────────────── */
+.ak-aitask { display: block; max-width: var(--ak-ai-width, 48rem); min-width: 0; }
+.ak-aitask[hidden] { display: none; }
+/* A field stands on the block's own surface. The kit's .ak-input takes the page colour (--ak-bg) so
+   it reads as sunk inside a card; this block is not a card, so on the page that colour hid the
+   field (members.css and intake-connect.css say the same). */
+.ak-aitask .ak-input:not(.ak-input--range) { background: var(--ak-surface); }
+.ak-aitask__title { margin: 0 0 4px; font-size: 1.05rem; color: var(--ak-ink); overflow-wrap: anywhere; }
+.ak-aitask__hint { margin: 0 0 10px; font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); max-width: 70ch; }
+.ak-aitask__notice, .ak-aitask__failure {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: var(--ak-radius-sm);
+  font-size: var(--ak-text-fine, 0.85rem);
+  color: var(--ak-ink);
+  max-width: 70ch;
+  overflow-wrap: anywhere;
+}
+.ak-aitask__notice {
+  border: 1px solid color-mix(in oklab, var(--ak-accent) 35%, var(--ak-line));
+  background: color-mix(in oklab, var(--ak-accent) 8%, var(--ak-surface));
+}
+
+/* ── The box and the reason ────────────────────────────────────────────────────────────────── */
+.ak-aitask__field { margin: 0 0 6px; }
+.ak-aitask__field .ak-input--area { min-height: 96px; resize: vertical; }
+.ak-aitask__reason { margin: 0 0 8px; font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); }
+.ak-aitask__reason[hidden] { display: none; }
+
+/* ── The run bar and the busy line ─────────────────────────────────────────────────────────── */
+.ak-aitask__bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 12px; }
+.ak-aitask .ak-btn { min-height: var(--ak-touch, 40px); }
+.ak-aitask__status { margin: 0; font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); }
+
+/* ── The refusal ───────────────────────────────────────────────────────────────────────────── */
+.ak-aitask__failure {
+  border: 1px solid color-mix(in oklab, var(--ak-err, var(--ak-warn)) 55%, var(--ak-line));
+  background: color-mix(in oklab, var(--ak-err, var(--ak-warn)) 10%, var(--ak-surface));
+}
+.ak-aitask__failure[hidden] { display: none; }
+
+/* ── The answer: label, body, meta line, the cut-off note ──────────────────────────────────── */
+.ak-aitask__answer {
+  margin: 0 0 12px;
+  padding: var(--ak-pad, 16px);
+  border: var(--ak-line-w, 1px) solid var(--ak-line);
+  border-radius: var(--ak-radius-sm);
+  background: var(--ak-surface);
+  min-width: 0;
+}
+.ak-aitask__answer[hidden] { display: none; }
+.ak-aitask__label:empty { display: none; }
+.ak-aitask__label { margin: 0 0 8px; }
+.ak-aitask__body { color: var(--ak-ink); line-height: 1.55; overflow-wrap: anywhere; min-width: 0; }
+.ak-aitask__body pre, .ak-aitask__body table { max-width: 100%; overflow-x: auto; }
+.ak-aitask__text { white-space: pre-wrap; }
+.ak-aitask__json {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: var(--ak-radius-sm);
+  background: var(--ak-surface-2);
+  font-family: var(--ak-font-mono);
+  font-size: var(--ak-text-fine, 0.85rem);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ak-aitask__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 10px 0 0;
+  font-size: var(--ak-text-fine, 0.85rem);
+  color: var(--ak-ink-dim);
+  overflow-wrap: anywhere;
+}
+.ak-aitask__truncated {
+  margin: 10px 0 0;
+  padding: 6px 10px;
+  border-left: 3px solid var(--ak-warn);
+  font-size: var(--ak-text-fine, 0.85rem);
+  color: var(--ak-ink);
+}
+
+/* ── The copy route (the kit's promptPanel inside) ─────────────────────────────────────────── */
+.ak-aitask__copy { margin: 16px 0 0; padding: 16px 0 0; border-top: var(--ak-line-w, 1px) solid var(--ak-line); min-width: 0; }
+.ak-aitask__copy-title { margin: 0 0 10px; font-size: 0.95rem; color: var(--ak-ink); }
+
+/* ── Variant: compact, for a side panel or a card ──────────────────────────────────────────── */
+.ak-aitask[data-ak-variant="compact"] .ak-aitask__title { font-size: 0.95rem; }
+.ak-aitask[data-ak-variant="compact"] .ak-aitask__field .ak-input--area { min-height: 64px; }
+.ak-aitask[data-ak-variant="compact"] .ak-aitask__answer { padding: 10px 12px; }
+.ak-aitask[data-ak-variant="compact"] .ak-aitask__bar { margin-bottom: 8px; }

@@ -34,6 +34,8 @@
  *   }, { subject: mail.key, gates: 'which folder the mail goes to', app_id: 'mail-sorter' });
  *   if (r.answers.urgent.value > 0.8) { ... }
  * @version-history
+ *   v1.4.0 - 2026-10-01 - settingsUrl(): the owner's AI settings opened at the decision model card,
+ *     so a page (the kit's decision block) can send the person there without naming a node path.
  *   v1.3.0 - 2026-09-23 - Decision providers: providers(), `provider` on ask() and decisions(), and
  *     words for the three new refusals.
  *   v1.2.0 - 2026-09-20 - rule(id) and rules(): the owner's decision rules, run by id with only the
@@ -45,6 +47,7 @@
 import { makeSession } from '../_core/session.js';
 const { authFetch } = makeSession('aimeat-decide.js');
 import { attach } from '../_core/namespace.js';
+import { APEX_URL, NODE_URL } from '../_core/config.js';
 
 /**
  * Turn an error envelope into an Error a person can act on, with the node's code on `.code`.
@@ -296,6 +299,9 @@ async function isAvailable() {
 /** Why isAvailable() said false, in words to show the person, or null. Call after isAvailable(). */
 function unavailableReason() { return _availCache ? _availCache.reason : null; }
 
-export const decide = { yesNo, pickOne, scale, ask, gate, questionSet, rule, rules, decisions, review, run, settings, providers, isAvailable, unavailableReason };
+/** The owner's AI settings page, opened at the decision model card. */
+function settingsUrl() { return String(APEX_URL || NODE_URL || '') + '/v1/profile?tab=ai&open=decide-card'; }
+
+export const decide = { yesNo, pickOne, scale, ask, gate, questionSet, rule, rules, decisions, review, run, settings, providers, isAvailable, unavailableReason, settingsUrl };
 
 attach('decide', decide);

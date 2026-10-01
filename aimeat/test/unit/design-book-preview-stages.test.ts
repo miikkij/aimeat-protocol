@@ -122,6 +122,14 @@ describe('the kit rules behind two of the findings', () => {
     for (const fx of ['scanlines', 'vignette', 'vhs', 'glitch']) expect(rule).toContain(`.ak-fx-${fx}:not(.ak-hero__image)`);
   });
 
+  it('loads aimeat-markdown.js only for a part whose blocks draw markdown', () => {
+    const fill = (component: string) => partPreviewHtml(part({ id: 'leiska-x', kind: 'fill', title: 'X',
+      body: { v: 1, blocks: [{ id: 'b', component, props: {} }] } }))!;
+    expect(fill('doc')).toContain('/v1/libs/aimeat-markdown.js');
+    expect(fill('aiTask')).toContain('/v1/libs/aimeat-markdown.js');
+    expect(fill('list')).not.toContain('aimeat-markdown.js');
+  });
+
   it('box-sizing is said outright, because inherit stops at a <details>', () => {
     expect(css('shell.css')).toMatch(/\.ak-root \*, \.ak-root \*::before, \.ak-root \*::after \{ box-sizing: border-box; \}/);
     expect(css('shell.css')).not.toMatch(/box-sizing:\s*inherit/);

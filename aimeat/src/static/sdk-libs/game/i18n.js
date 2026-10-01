@@ -15,6 +15,8 @@
  * @usage  AIMEAT.game.i18n.use({ fi: { play: 'Pelaa' }, en: { play: 'Play' } });
  *         AIMEAT.game.i18n.t('play');
  * @version-history
+ *   v1.2.0 — 2026-10-01 — Finnish says murunen for morsel ("12 murusta"), the word the locales use
+ *     (Jouni, 2026-10-01); it said morselia.
  *   v1.1.0 — 2026-08-12 — Spanish (es) added to BASE, HOST and langs.
  *   v1.0.0 — 2026-07-28 — Initial (NOSTE prompt 01).
  */
@@ -77,7 +79,7 @@ const BASE = {
     best: 'Paras {n}',
     inARow: '{n} peräkkäin',
     sortBy: 'Järjestys',
-    morsels: 'morselia',
+    morsels: 'murusta',
     target: 'Tavoite {n}',
     fix: 'Korjaa tämä',
   },

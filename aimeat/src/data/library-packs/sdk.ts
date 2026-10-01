@@ -722,8 +722,10 @@ export const SDK_PACKS: LibraryPack[] = [
     requires: ['aimeat-auth'],
     license: 'MIT',
     apiSurface: 'AIMEATAgentFace',
-    aiDoc: "Publish the app's markdown read-surface for agents in one call: AIMEATAgentFace.publish({ title, sections }, { app: 'my-app.html' }) — update it on the SAME writes that update the visible view, public data only, actions go through WebMCP tools. copyText(text) -> Promise<boolean> is the shared Copy-prompt clipboard helper — never hand-roll select()+execCommand.",
-    changelog: [],
+    aiDoc: "Publish the app's markdown read-surface for agents in one call: AIMEATAgentFace.publish({ title, sections }, { app: 'my-app.html' }) — update it on the SAME writes that update the visible view, public data only, actions go through WebMCP tools. An app that refreshes its face as it runs calls publishQuietly(input, { app, debounceMs }) instead of wrapping publish() in its own guard: it resolves true when written and false otherwise (signed out, no aimeat-auth, the same markdown as the last write for that app, or a failure, which logs one console.warn line), never throws, and with debounceMs writes only the last call of a burst; input may be a function returning the markdown or { title, sections }, read when the write happens. copyText(text) -> Promise<boolean> is the shared Copy-prompt clipboard helper — never hand-roll select()+execCommand.",
+    changelog: [
+      { version: '1.2.0', date: '2026-10-01', summary: 'publishQuietly(input, { app, debounceMs }): publish() that never throws, does nothing signed out, skips an unchanged face and can debounce. copyText() moved to the shared SDK core unchanged. publish() is unchanged.' },
+    ],
     tierHint: 'T1',
     interviewTriggers: [],
     sizeEstimate: '~3KB',

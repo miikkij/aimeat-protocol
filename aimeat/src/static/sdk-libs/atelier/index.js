@@ -55,6 +55,11 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.62.0 — 2026-10-01 — LIBRARY BLOCKS, ROUND 2: workflowInput (a workflow step waiting for a
+ *     person, over AIMEAT.workflows), aiTask (ask the person's own AI once, over AIMEAT.ai), doc (one
+ *     markdown document over AIMEAT.md), decision (one decision rule and its review, AIMEAT.decide), and
+ *     copy(text), the kit's one clipboard helper; form() takes type "model"; dropzone uploads through
+ *     AIMEAT.storage; priceTable, cart and checkout take commerce amounts (micro-units, morsels).
  *   v0.61.0 — 2026-10-01 — THE MEMBERS COMPONENTS (members.js): members, the owner's member screen;
  *     joinRequest, the visitor's ask; accessState, a members-only area. They draw AIMEAT.iam's data
  *     in the kit's tokens and fetch nothing themselves. members and joinRequest join the mosaic.
@@ -392,6 +397,11 @@ import { workspaceTeam } from './workspace-team.js';
 import { workspacePicker } from './workspace-picker.js';
 import { intakeForm, intakeAdmin } from './intake-form.js';
 import { connections } from './connections.js';
+import { workflowInput } from './workflow-input.js';
+import { aiTask } from './ai-task.js';
+import { doc } from './doc.js';
+import { decision } from './decision.js';
+import { copy } from './copy.js';
 import { crt, countdown, crawl } from './mtv.js';
 import { spotlight, tilt, sheen, odometer, thumb, deal } from './materials.js';
 import { ring, crew, poll, keys, dropzone } from './parts.js';
@@ -405,7 +415,8 @@ import { island, stateButton } from './island.js';
 import { carousel, lightbox } from './motion-parts.js';
 import { calendar, priceTable } from './anime-parts.js';
 import { thread, checkout } from './lenis-parts.js';
-import { sortable, cart, notices, facets, flipFrom } from './flow-parts.js';
+import { sortable, notices, facets, flipFrom } from './flow-parts.js';
+import { cart } from './cart.js';
 import { director, storyRail } from './lenis-director.js';
 import { parallax, readingRail } from './lenis-more.js';
 import { textReveal, drawPath, gridWave, sequence, orbit } from './anime-show.js';
@@ -425,7 +436,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.61.0',
+  version: '0.62.0',
 
   /**
    * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
@@ -453,6 +464,8 @@ const atelier = {
   // ── The workbench: the pieces of a tool somebody works in every day ──
   sideNav, statusBand, checkGrid, choiceCards, settingsGroup, progressFigure, callout,
   promptPanel, queueRow, parseAnswer,
+  // The kit's one clipboard helper: AIMEAT.agentface.copyText when loaded, the same code otherwise.
+  copy,
   // The empty sides of a wide frame: the node's margin figures (margins.js, margins.css).
   margins, marginsOf, MARGINS,
 
@@ -503,6 +516,11 @@ const atelier = {
 
   // ── A Public Intake form and its admin list (AIMEAT.intake), the owner's outside accounts (AIMEAT.connect) ──
   intakeForm, intakeAdmin, connections,
+
+  // ── A workflow step waiting for a person (AIMEAT.workflows), and one question to the person's own AI (AIMEAT.ai) ──
+  workflowInput, aiTask,
+  // ── One markdown document (AIMEAT.md), and one decision rule with its review (AIMEAT.decide) ──
+  doc, decision,
 
   // ── The broadcast family (the Music Television genre's parts as components) ──
   crt, countdown, crawl,

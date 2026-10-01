@@ -13,6 +13,8 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.27.0 — 2026-10-01 — The second round of library blocks: workflowInput, aiTask with the model
+ *     field, doc, decision, dropzone uploads, copy() and commerce amounts in the price parts.
  *   v1.26.0 — 2026-10-01 — The other library blocks: workspaceTeam and workspacePicker
  *     (aimeat-organism.js), intakeForm and intakeAdmin (aimeat-intake.js), connections
  *     (aimeat-connect.js). Read against describe-data.js after they joined it.
@@ -270,6 +272,14 @@ moved under you says so.
    \`aimeat-organism.js\`), a public form is \`intakeForm({ target, org, ws, formId })\` and the
    owner's list of forms \`intakeAdmin({ target, org, ws })\` (over \`aimeat-intake.js\`), and the
    owner's outside accounts are \`connections({ target, need })\` (over \`aimeat-connect.js\`).
+   The same goes for a workflow step waiting for the person (\`workflowInput\`, over
+   \`aimeat-workflows.js\`), one question to the person's own AI with its answer, AI label, model and
+   cost (\`aiTask\`, over \`aimeat-ai.js\`; a model choice is the form field type \`model\`), one
+   markdown document (\`doc\`, over \`aimeat-markdown.js\`), one decision rule with its review
+   (\`decision\`, over \`aimeat-decide.js\`), uploads (\`dropzone({ upload })\`, over
+   \`aimeat-storage.js\`), copying text (\`AIMEAT.atelier.copy(text)\`), and prices from
+   \`AIMEAT.commerce\` (\`unit: 'micros'\` or \`currency: 'morsels'\` on priceTable, cart and
+   checkout).
 4. **Ask the kit before you fork.** Before you fork a component, ask the kit what it already gives
    you. \`AIMEAT.atelier.describe("<component>")\` returns
    \`{ parts, slots, variants, tokens, fork }\` for the components that carry the model, and

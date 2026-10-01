@@ -3619,10 +3619,21 @@
     });
   }
 
-  // src/static/sdk-libs/living/render-decide.js
-  function num3(v) {
+  // src/static/sdk-libs/decide/removed-line.js
+  var SCRUB_KINDS = ["person", "email", "phone", "hetu", "iban", "address"];
+  function removedLine(countOf, say2) {
+    const parts = [];
+    for (const kind of SCRUB_KINDS) {
+      const n = Number(countOf(kind)) || 0;
+      if (n > 0) parts.push(n + " " + say2("kind." + kind + (n === 1 ? ".1" : ".n")));
+    }
+    return parts.length ? say2("removedLead") + parts.join(", ") + say2("removedTail") : say2("removedNone");
+  }
+  function twoDecimals(v) {
     return typeof v === "number" && Number.isFinite(v) ? v.toFixed(2) : "";
   }
+
+  // src/static/sdk-libs/living/render-decide.js
   function decideRow(host, spec) {
     const node2 = spec.node || {};
     const graph = spec.graph;
@@ -3657,19 +3668,21 @@
         const v = f[q];
         if (v === "" || v == null) continue;
         const conf = f[q + ".confidence"];
-        const shown = typeof v === "number" ? num3(v) : String(v);
+        const shown = typeof v === "number" ? twoDecimals(v) : String(v);
         answersEl.appendChild(el("dt", { text: q }));
-        answersEl.appendChild(el("dd", { text: conf === "" || conf == null ? shown : shown + " (" + num3(conf) + ")" }));
+        answersEl.appendChild(el("dd", { text: conf === "" || conf == null ? shown : shown + " (" + twoDecimals(conf) + ")" }));
       }
       answersEl.hidden = !answersEl.firstChild;
       removedEl.hidden = f.removed === "" || f.removed == null;
       if (!removedEl.hidden) {
-        const parts = [];
-        for (const kind of ["person", "email", "phone", "hetu", "iban", "address"]) {
-          const n = Number(f["removed." + kind]) || 0;
-          if (n > 0) parts.push(n + " " + sayDecide("kind." + kind + (n === 1 ? ".1" : ".n"), langs()));
-        }
-        removedEl.textContent = parts.length ? sayDecide("removedLead", langs()) + parts.join(", ") + sayDecide("removedTail", langs()) : sayDecide("removedNone", langs());
+        removedEl.textContent = removedLine(
+          function(kind) {
+            return f["removed." + kind];
+          },
+          function(key) {
+            return sayDecide(key, langs());
+          }
+        );
       }
       clear(personEl);
       const byHand = status === "unavailable" || status === "failed";
@@ -3681,7 +3694,7 @@
         const machine = graph.nodeOf(String(node2.machine)) || {};
         const accepted = eventsAccepted(machine, String(graph.valueOf(String(node2.machine)) || ""));
         personEl.appendChild(el("p", {
-          text: byHand ? sayDecide("byHand", langs()) : accepted.indexOf(pending) >= 0 ? sayDecide("proposal", langs(), { event: pending, conf: num3(conf), t: num3(Number(t)) }) : sayDecide("proposalNone", langs())
+          text: byHand ? sayDecide("byHand", langs()) : accepted.indexOf(pending) >= 0 ? sayDecide("proposal", langs(), { event: pending, conf: twoDecimals(conf), t: twoDecimals(Number(t)) }) : sayDecide("proposalNone", langs())
         }));
         const row = el("div", { class: "ak-living__decide-actions" });
         const ordered = accepted.indexOf(pending) >= 0 ? [pending].concat(accepted.filter(function(e) {
@@ -3710,7 +3723,7 @@
         personEl.appendChild(row);
       }
       const ts = Object.entries(node2.thresholds || {}).map(function(e) {
-        return e[0] + " " + num3(Number(e[1]));
+        return e[0] + " " + twoDecimals(Number(e[1]));
       });
       gatesEl.textContent = sayDecide("gates", langs()) + ": " + String(node2.gates || "") + (ts.length ? " · " + sayDecide("thresholds", langs()) + ": " + ts.join(", ") : "");
     }

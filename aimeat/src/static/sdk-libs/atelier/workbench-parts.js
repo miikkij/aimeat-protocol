@@ -25,12 +25,17 @@
  * @parts queueRow root · top · who · when · title · chips · chip · note
  * @fork queueRow Build your own row content; copy .ak-qrow* out of workbench.css.
  * @version-history
+ *   v0.1.2 — 2026-10-01 — Copy goes through the kit's copy() (the platform's clipboard code, with
+ *     its fallback). When the browser refuses, the whole prompt opens, selected, and a toast says
+ *     to press Ctrl+C; before, the refusal surfaced as a raw error toast.
  *   v0.1.1 — 2026-09-29 — A one-line prompt's preview says "1 line" (promptLine1), not "1 lines".
  *   v0.1.0 — 2026-09-29 — Initial.
  */
 import { el, clear, resolve, whileBusy, uid } from './dom.js';
 import { t } from './i18n.js';
 import { toast } from './parts-ui.js';
+import { copy, selectForHand } from './copy.js';
+import { tu } from './copy-upload-i18n.js';
 
 /**
  * The JSON object in an answer pasted from a chat window: fences stripped, the outermost braces
@@ -83,16 +88,23 @@ export function promptPanel(spec) {
   const preview = el('div', { class: 'ak-promptpanel__preview', 'data-ak-part': 'preview', text: shortText() });
   one.appendChild(preview);
   const row = el('div', { class: 'ak-promptpanel__row' });
-  row.appendChild(button(spec.copyLabel || t('promptCopy'), 'ak-btn--primary', 'copy', function () {
-    return navigator.clipboard.writeText(promptText()).then(function () { toast({ title: t('promptCopied'), tone: 'ok' }); });
-  }));
   let full = false;
-  const toggle = button(t('promptShowAll'), '', 'toggle', function () {
-    full = !full;
+  function showFull(on) {
+    full = on;
     preview.textContent = full ? promptText() : shortText();
     preview.classList.toggle('ak-promptpanel__preview--full', full);
     toggle.textContent = full ? t('promptHide') : t('promptShowAll');
-  });
+  }
+  row.appendChild(button(spec.copyLabel || t('promptCopy'), 'ak-btn--primary', 'copy', function () {
+    return copy(promptText()).then(function (ok) {
+      if (ok) { toast({ title: t('promptCopied'), tone: 'ok' }); return; }
+      // The browser refused: the whole prompt goes on the screen, selected, for Ctrl+C.
+      showFull(true);
+      selectForHand(preview);
+      toast({ title: tu('copy.promptByHand'), tone: 'warn', ttl: 8000 });
+    });
+  }));
+  const toggle = button(t('promptShowAll'), '', 'toggle', function () { showFull(!full); });
   row.appendChild(toggle);
   one.appendChild(row);
   root.appendChild(one);

@@ -14,6 +14,8 @@
  *     mosaic.js unchanged; members and joinRequest added (members.js), workspaceTeam
  *     (workspace-team.js), intakeForm and intakeAdmin (intake-form.js), and connections
  *     (connections.js).
+ *   v0.62.0 — 2026-10-01 — workflowInput (workflow-input.js), aiTask (ai-task.js), doc (doc.js) and
+ *     decision (decision.js).
  */
 import { legalLinks, auditTrail, feedbackForm, reviewerLine } from './commercial.js';
 import { members, joinRequest } from './members.js';
@@ -21,6 +23,10 @@ import { workspaceTeam } from './workspace-team.js';
 import { workspacePicker } from './workspace-picker.js';
 import { intakeForm, intakeAdmin } from './intake-form.js';
 import { connections } from './connections.js';
+import { workflowInput } from './workflow-input.js';
+import { aiTask } from './ai-task.js';
+import { doc } from './doc.js';
+import { decision } from './decision.js';
 
 /**
  * Render one self-sourced block into `into`, pushing its handle onto `handles`.
@@ -90,6 +96,34 @@ export function renderSelfSourced(block, into, handles) {
       return true;
     }
     // ── The owner's outside accounts, over AIMEAT.connect.
+    // ── A workflow step waiting for a person, over AIMEAT.workflows.
+    case 'workflowInput': {
+      handles.push(workflowInput({ target: into, run: p.run, title: p.title, variant: p.variant }));
+      return true;
+    }
+    // ── Ask the person's own AI once, over AIMEAT.ai. `prompt` is a template: {input} is what the
+    //    person wrote; input "none" draws a run button with no box.
+    case 'aiTask': {
+      const tpl = String(p.prompt || '{input}');
+      const min = parseInt(p.minChars, 10);
+      handles.push(aiTask({
+        target: into, appId: p.appId, title: p.title, hint: p.hint,
+        input: p.input === 'none' ? null : { placeholder: p.placeholder, minChars: isNaN(min) ? undefined : min },
+        prompt: function (text) { return tpl.split('{input}').join(text); },
+        systemPrompt: p.systemPrompt, runLabel: p.runLabel, render: p.render === 'text' ? 'text' : 'markdown',
+        copyPrompt: p.copyPrompt === 'true', variant: p.variant,
+      }));
+      return true;
+    }
+    // ── A markdown document, over AIMEAT.md, and one decision rule, over AIMEAT.decide.
+    case 'doc': {
+      handles.push(doc({ target: into, markdown: p.markdown, title: p.title, rich: p.rich === 'true' }));
+      return true;
+    }
+    case 'decision': {
+      handles.push(decision({ target: into, appId: p.appId, rule: p.rule, state: p.state, title: p.title }));
+      return true;
+    }
     case 'connections': {
       handles.push(connections({ target: into, title: p.title, need: p.need }));
       return true;

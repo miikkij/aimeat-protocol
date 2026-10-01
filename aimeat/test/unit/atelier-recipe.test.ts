@@ -127,6 +127,8 @@ describe('the customisation section is held to describe-data.js', () => {
       'fifty-two': 52, 'fifty-three': 53, 'fifty-four': 54,
       // The members, intake and connections blocks added three widths on 2026-10-01.
       'fifty-five': 55, 'fifty-six': 56, 'fifty-seven': 57,
+      // aiTask, workflowInput, doc and decision added four widths on 2026-10-01.
+      'fifty-eight': 58, 'fifty-nine': 59, 'sixty': 60,
     };
     const said = [...text.matchAll(/and ((?:thirty|forty|fifty)-[a-z]+) more/g)].map((m) => WORDS[m[1]]);
     expect(said.length).toBe(1);

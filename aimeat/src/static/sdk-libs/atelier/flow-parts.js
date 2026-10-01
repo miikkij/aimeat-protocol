@@ -1,38 +1,41 @@
 /**
  * @file atelier/flow-parts.js
- * @description The four parts that carry a FLOW rather than a figure: the kit-primitives
+ * @description The parts that carry a FLOW rather than a figure: the kit-primitives
  *   section of the Design Book, and the proof that motion.js carries real components with no
  *   vendored library underneath:
  *
  *     sortable  a list a hand reorders: the carried row rides the kit's own `drag`, the rows it
  *               crosses spring out of its way, and the new order reaches the app on release
- *     cart      the shopping cart: a stepper per line, a removal that folds the line away, and
- *               a total that ROLLS to its new value instead of blinking
+ *     (cart     the fourth of the family, the shopping cart, lives in ./cart.js)
  *     notices   the notification centre: items under day headings, unread ones marked, a tap
  *               opens, "Mark all read" settles the dots, and arriving items stagger in
  *     facets    filters over a list: chips per facet, counts that roll when they change, and
  *               one summary line that says how many filters stand and offers to clear them
  *
  *   Every travel here is finite and under the hand or a change: `drag`, `spring` and `stagger`
- *   from ./motion.js, `odometer` from ./materials.js, and the one collapse the cart owns. Under
- *   reduced motion each of those lands the end state with no travel, so the parts still work.
- *   Nothing fetches; a component renders what it is given and reports what happened.
- * @structure flipFrom · sortable · cart · notices · facets
+ *   from ./motion.js and `odometer` from ./materials.js. Under reduced motion each of those lands
+ *   the end state with no travel, so the parts still work. Nothing fetches; a component renders
+ *   what it is given and reports what happened. The parts' own words come from ./i18n.js.
+ * @structure flipFrom · sortable · notices · facets
  * @usage
  *   AIMEAT.atelier.sortable({ target, data: { items: [{ id: 'a', label: 'Flour' }] },
  *     onReorder(ids) { save(ids); } });
- *   AIMEAT.atelier.cart({ target, data: { lines, currency: '€' }, onChange(id, qty) {},
- *     onCheckout(lines) {} });
  *   AIMEAT.atelier.notices({ target, data: { items }, onOpen(item) {}, onRead(ids) {} });
  *   AIMEAT.atelier.facets({ target, data: { facets }, onChange(selection) {} });
  * @version-history
+ *   v0.62.1 — 2026-10-01 — cart moved to ./cart.js by pure extraction (this file was at its line
+ *     limit). The words of sortable, notices and facets come from the kit dictionary (en/fi/es,
+ *     overridable with i18n.use()); the English text is unchanged.
+ *   v0.62.0 — 2026-10-01 — cart reads commerce amounts (`unit: 'micros'`, `priceMicros`) and
+ *     currency 'morsels' through ./money-units.js. Plain numbers unchanged.
  *   v0.43.0 — 2026-09-02 — Initial (wish-atelier-motion-libraries-and-parts, stage 3).
  */
 import { el, clear, resolve, enter, reducedMotion } from './dom.js';
 import { emptyState } from './state.js';
 import { spring, stagger, drag } from './motion.js';
 import { odometer } from './materials.js';
-import { num, money as fmtMoney, date, time } from '../_core/format.js';
+import { date, time } from '../_core/format.js';
+import { t } from './i18n.js';
 
 /** The hand's spring: quick enough to feel attached to the pointer, soft enough to read. */
 const CARRY = { stiffness: 320, damping: 28 };
@@ -190,7 +193,7 @@ export function sortable(spec) {
     if (s.handle !== false) {
       kids.push(el('button', {
         type: 'button', class: 'ak-sortable__grip', 'data-ak-noguard': true,
-        'aria-label': 'Move ' + String(item.label || item.id),
+        'aria-label': t('sortMove', { label: String(item.label || item.id) }),
         on: { keydown: onGripKey },
       }, [el('span', { class: 'ak-sortable__gripmark', 'aria-hidden': 'true' })]));
     }
@@ -216,7 +219,7 @@ export function sortable(spec) {
       const e = s.empty || {};
       emptyCard = emptyState({
         target: root, tone: 'quiet',
-        title: e.title || s.title || 'Nothing to put in order', hint: e.hint,
+        title: e.title || s.title || t('sortEmpty'), hint: e.hint,
       });
       return;
     }
@@ -239,222 +242,15 @@ export function sortable(spec) {
   };
 }
 
-/** The line's picture is a URL the stylesheet paints; a data: URI is refused in words. */
-function pictureOf(url) {
-  if (!url) return null;
-  const v = String(url);
-  if (/^data:/i.test(v)) {
-    console.warn('aimeat-atelier: cart line image data: URIs are refused. Upload the image and pass its URL.');
-    return null;
-  }
-  return 'url("' + v.replace(/"/g, '%22') + '")';
-}
-
-/** Money in the viewer's own conventions: a three-letter code gets the real currency shape. */
-function money(amount, currency) {
-  const unit = currency || '€';
-  const n = Number(amount) || 0;
-  const hasIntl = typeof Intl === 'object' && Intl && typeof Intl.NumberFormat === 'function';
-  if (hasIntl && /^[A-Za-z]{3}$/.test(unit)) {
-    return fmtMoney(n, unit, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  }
-  if (hasIntl) {
-    return num(n, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + unit;
-  }
-  return n.toFixed(2) + ' ' + unit;
-}
-
-/**
- * The cart: a line per item with a quantity stepper, a removal that folds the line away, and a
- * total that rolls to its new value.
- *
- * The stepper answers at once, repainting the line and the total before the app hears, and then
- * reports through `onChange`, the way the kanban board moves its own card and then tells. The
- * quantity floor is 1; Remove is the way out, and it collapses the line (height and opacity on
- * one finite Web Animation) before the node goes. Component-only: the cart is not a mosaic block,
- * because a stored layout has no business arranging somebody's checkout.
- *
- * @param {{ target?: string|Element, title?: string,
- *   data: { lines: Array<{ id: string, title: string, sub?: string, price: number, qty: number, image?: string }>,
- *           currency?: string, note?: string },
- *   onChange?: (id: string, qty: number) => void,
- *   onRemove?: (id: string) => void,
- *   onCheckout?: (lines: any[]) => void,
- * }} spec
- * @returns {{ el: HTMLElement, set: (patch: { data?: any }) => void, destroy: () => void }}
- */
-export function cart(spec) {
-  const s = spec || /** @type {any} */ ({});
-  const root = el('div', { class: 'ak-root ak-cart' });
-  if (s.target) resolve(s.target).appendChild(root);
-  const lines = el('div', { class: 'ak-cart__lines' });
-  const totalValue = el('span', { class: 'ak-cart__totalvalue' });
-  const note = el('div', { class: 'ak-cart__note' });
-  const foot = el('div', { class: 'ak-cart__foot' }, [
-    el('div', { class: 'ak-cart__total' }, [
-      el('span', { class: 'ak-cart__totallabel', text: 'Total' }), totalValue,
-    ]),
-    el('button', {
-      type: 'button', class: 'ak-btn ak-btn--primary ak-cart__checkout', text: 'Checkout',
-      on: { click: function () { if (s.onCheckout) s.onCheckout(current.slice()); } },
-    }, null),
-  ]);
-  /** @type {Map<string, any>} */
-  const shown = new Map();
-  let current = [];
-  let unit = '€';
-  let emptyCard = null;
-
-  function totalOf() {
-    return current.reduce(function (n, l) { return n + (Number(l.price) || 0) * (Number(l.qty) || 0); }, 0);
-  }
-  function rollTotal() { odometer(totalValue, money(totalOf(), unit)); }
-
-  function setQty(line, next) {
-    const q = Math.max(1, Math.round(Number(next) || 1));
-    if (q === Number(line.qty)) return;
-    line.qty = q;
-    const rec = shown.get(String(line.id));
-    if (rec) {
-      rec.count.textContent = String(q);
-      rec.price.textContent = money((Number(line.price) || 0) * q, unit);
-    }
-    rollTotal();
-    if (s.onChange) s.onChange(line.id, q);
-  }
-
-  /** Fold a line away, then let the node go. Reduced motion drops it at once. */
-  function collapse(node, after) {
-    const done = function () {
-      if (node.parentNode) node.parentNode.removeChild(node);
-      if (after) after();
-    };
-    if (reducedMotion() || typeof node.animate !== 'function') { done(); return; }
-    const box = node.getBoundingClientRect();
-    const seen = getComputedStyle(node);
-    const anim = node.animate([
-      { height: box.height + 'px', opacity: 1, paddingTop: seen.paddingTop, paddingBottom: seen.paddingBottom },
-      { height: '0px', opacity: 0, paddingTop: '0px', paddingBottom: '0px' },
-    ], { duration: pace(node, 1.4), easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)', fill: 'forwards' });
-    anim.addEventListener('finish', done);
-    anim.addEventListener('cancel', done);
-  }
-
-  function remove(line) {
-    const id = String(line.id);
-    const rec = shown.get(id);
-    current = current.filter(function (l) { return String(l.id) !== id; });
-    shown.delete(id);
-    if (rec) collapse(rec.node, current.length ? null : function () { render({ lines: [], currency: unit, note: '' }); });
-    rollTotal();
-    if (s.onRemove) s.onRemove(line.id);
-  }
-
-  function buildLine(line) {
-    const picture = pictureOf(line.image);
-    const rec = /** @type {any} */ ({
-      node: null, line: line,
-      art: el('span', {
-        class: 'ak-cart__art' + (picture ? ' ak-cart__art--image' : ''), 'aria-hidden': 'true',
-        vars: picture ? { '--ak-cart-image': picture } : null,
-      }, picture ? null : el('span', { class: 'ak-cart__monogram' })),
-      title: el('span', { class: 'ak-cart__linetitle' }),
-      sub: el('span', { class: 'ak-cart__linesub' }),
-      count: el('span', { class: 'ak-cart__count', 'aria-live': 'polite' }),
-      price: el('span', { class: 'ak-cart__price' }),
-    });
-    const step = function (by) {
-      return function () { setQty(rec.line, (Number(rec.line.qty) || 1) + by); };
-    };
-    rec.node = el('div', { class: 'ak-cart__line', 'data-id': String(line.id) }, [
-      rec.art,
-      el('span', { class: 'ak-cart__body' }, [rec.title, rec.sub]),
-      el('span', { class: 'ak-cart__qty' }, [
-        el('button', { type: 'button', class: 'ak-cart__step', 'aria-label': 'One fewer', on: { click: step(-1) } }, '-'),
-        rec.count,
-        el('button', { type: 'button', class: 'ak-cart__step', 'aria-label': 'One more', on: { click: step(1) } }, '+'),
-      ]),
-      rec.price,
-      el('button', {
-        type: 'button', class: 'ak-btn ak-cart__remove', text: 'Remove',
-        on: { click: function () { remove(rec.line); } },
-      }, null),
-    ]);
-    fillLine(rec, line);
-    return rec;
-  }
-
-  function fillLine(rec, line) {
-    rec.line = line;
-    const qty = Math.max(1, Math.round(Number(line.qty) || 1));
-    rec.title.textContent = String(line.title || line.id);
-    rec.sub.textContent = line.sub != null ? String(line.sub) : '';
-    rec.sub.hidden = line.sub == null || line.sub === '';
-    rec.count.textContent = String(qty);
-    rec.price.textContent = money((Number(line.price) || 0) * qty, unit);
-    const mono = rec.art.querySelector('.ak-cart__monogram');
-    if (mono) mono.textContent = (Array.from(String(line.title || '?'))[0] || '?').toUpperCase();
-  }
-
-  function render(data) {
-    const list = (data && Array.isArray(data.lines) ? data.lines : []).filter(function (l) { return l && l.id != null; });
-    unit = (data && data.currency) || '€';
-    current = list;
-    if (emptyCard) { emptyCard.destroy(); emptyCard = null; }
-    if (!list.length) {
-      clear(root);
-      clear(lines);
-      shown.clear();
-      emptyCard = emptyState({
-        target: root, tone: 'quiet',
-        title: 'Your cart is empty', hint: 'Anything you add shows up here.',
-      });
-      return;
-    }
-    clear(root);
-    if (s.title) root.appendChild(el('div', { class: 'ak-cart__title', text: s.title }));
-    root.appendChild(lines);
-    note.textContent = (data && data.note) ? String(data.note) : '';
-    note.hidden = !note.textContent;
-    root.appendChild(foot);
-    root.appendChild(note);
-    const live = {};
-    list.forEach(function (l) { live[String(l.id)] = 1; });
-    Array.from(shown.keys()).forEach(function (id) {
-      if (live[id]) return;
-      const rec = shown.get(id);
-      shown.delete(id);
-      if (rec.node.parentNode) rec.node.parentNode.removeChild(rec.node);
-    });
-    list.forEach(function (line) {
-      const id = String(line.id);
-      let rec = shown.get(id);
-      if (!rec) { rec = buildLine(line); shown.set(id, rec); } else { fillLine(rec, line); }
-      lines.appendChild(rec.node);
-    });
-    rollTotal();
-  }
-
-  render(s.data);
-  return {
-    el: root,
-    set(patch) { if (patch && 'data' in patch) render(patch.data); },
-    destroy() {
-      if (emptyCard) emptyCard.destroy();
-      if (root.parentNode) root.parentNode.removeChild(root);
-    },
-  };
-}
-
 /** Midnight of a date, so two of them can be compared as days. */
 function startOfDay(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); }
 
 /** Today, Yesterday, then the date itself. */
 function dayLabel(when) {
-  if (!when) return 'Earlier';
+  if (!when) return t('earlier');
   const days = Math.round((startOfDay(new Date()) - startOfDay(when)) / 86400000);
-  if (days === 0) return 'Today';
-  if (days === 1) return 'Yesterday';
+  if (days === 0) return t('today');
+  if (days === 1) return t('yesterday');
   if (typeof when.toLocaleDateString !== 'function') return when.toISOString().slice(0, 10);
   const sameYear = when.getFullYear() === new Date().getFullYear();
   return date(when, sameYear
@@ -492,7 +288,7 @@ export function notices(spec) {
   const head = el('div', { class: 'ak-notices__head' });
   const body = el('div', { class: 'ak-notices__body' });
   const markAll = el('button', {
-    type: 'button', class: 'ak-btn ak-notices__markall', text: 'Mark all read',
+    type: 'button', class: 'ak-btn ak-notices__markall', text: t('noticesMarkAll'),
     on: { click: function () { markRead(); } },
   }, null);
   /** @type {Map<string, any>} */
@@ -578,7 +374,7 @@ export function notices(spec) {
       const e = s.empty || {};
       emptyCard = emptyState({
         target: root, tone: 'quiet',
-        title: e.title || 'Nothing new', hint: e.hint || 'Notices land here as they arrive.',
+        title: e.title || t('noticesEmpty'), hint: e.hint || t('noticesEmptyHint'),
       });
       return;
     }
@@ -646,7 +442,7 @@ export function facets(spec) {
   const summary = el('div', { class: 'ak-facets__summary' });
   const tally = el('span', { class: 'ak-facets__tally' });
   const clearAll = el('button', {
-    type: 'button', class: 'ak-btn ak-facets__clear', text: 'Clear',
+    type: 'button', class: 'ak-btn ak-facets__clear', text: t('facetsClear'),
     on: { click: function () { reset(); } },
   }, null);
   /** @type {Map<string, any>} */
@@ -680,7 +476,7 @@ export function facets(spec) {
     });
     const n = Object.keys(picked).reduce(function (sum, key) { return sum + picked[key].length; }, 0);
     clear(summary);
-    tally.textContent = n === 0 ? 'No filters' : n === 1 ? '1 filter' : n + ' filters';
+    tally.textContent = n === 0 ? t('facetsNone') : n === 1 ? t('facets1') : t('facetsN', { n: n });
     summary.appendChild(tally);
     if (n) {
       summary.appendChild(el('span', { class: 'ak-facets__sep', 'aria-hidden': 'true' }, '·'));
@@ -735,7 +531,7 @@ export function facets(spec) {
       const e = s.empty || {};
       emptyCard = emptyState({
         target: root, tone: 'quiet',
-        title: e.title || 'Nothing to filter by', hint: e.hint,
+        title: e.title || t('facetsEmpty'), hint: e.hint,
       });
       return;
     }

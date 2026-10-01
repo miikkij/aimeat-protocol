@@ -26,6 +26,8 @@
  *   import { UI_COMPONENTS, componentById } from './registry.js';
  *   import { buildUiCatalogue } from './catalogue.js';   // the catalogue reads this registry
  * @version-history
+ *   v1.24.0 — 2026-10-01 — Append-only: workflowInput over AIMEAT.workflows, aiTask over AIMEAT.ai, doc
+ *     over AIMEAT.md and decision over AIMEAT.decide.
  *   v1.23.0 — 2026-10-01 — `workspacePicker` joins the components, and workspaceTeam, intakeForm and
  *     intakeAdmin take `app`: with org and ws left empty they open on the workspace the picker
  *     chose. Their org and ws are no longer required, which keeps every stored layout valid.
@@ -722,6 +724,56 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
     props: {
       title: text("The section title, when the kit's own is not wanted.", 120),
       need: text('"readMail", "sendMail" or "publish": show only the services that can do it.', 20),
+    },
+  },
+  {
+    id: 'workflowInput',
+    summary: 'The steps a workflow waits on a person for: workflow and run, the question, options as radio buttons or checkboxes, an own answer when the step accepts one, the due time and Answer. An answered step leaves the list. run keeps to one run. Needs aimeat-workflows.js on the page.',
+    maxPerLayout: 1,
+    props: {
+      run: text('One run id: show only that run\'s waiting steps. Leave empty for every run.', 80),
+      title: text("The section title, when the kit's own is not wanted.", 120),
+      variant: text('"dense" for a side panel; leave empty for the default.', 10),
+    },
+  },
+  {
+    id: 'aiTask',
+    summary: "Ask the person's own AI once and show the answer: a prompt box, a run button held busy, the answer with the AI label, the model and today's cost, words for each refusal, and an optional copy-the-prompt route. Needs aimeat-ai.js on the page.",
+    maxPerLayout: 2,
+    props: {
+      appId: requiredText('The app id the AI call is made under.', 80),
+      prompt: requiredText('The prompt sent to the AI; {input} is replaced with what the person wrote.', 2000),
+      title: text("The section title, when the kit's own is not wanted.", 120),
+      hint: text('One line under the title.', 300),
+      placeholder: text('The grey text in the empty prompt box.', 200),
+      minChars: text('The fewest characters before the run button turns on, e.g. "10".', 4),
+      input: text('"none" for a run button with no prompt box.', 4),
+      systemPrompt: text('Instructions to the model that the person does not see.', 2000),
+      runLabel: text("The run button's words, when the kit's own are not wanted.", 60),
+      render: text('"markdown" (the default) or "text".', 10),
+      copyPrompt: text('"true" adds the route to copy the prompt into any AI chat and paste the answer back.', 5),
+      variant: text('"compact" for a side panel or a card.', 10),
+    },
+  },
+  {
+    id: 'doc',
+    summary: "One markdown document in the kit's box: headings, lists, code, tables, quotes and links in the app's colours, light and dark. Without aimeat-markdown.js on the page it shows the text as written; an empty text shows an empty card.",
+    maxPerLayout: 4,
+    props: {
+      markdown: text('The document, in markdown.', 8000),
+      title: text('The section title.', 120),
+      rich: text('"true" uses the full renderer (task lists, footnotes, highlighted code, diagrams).', 5),
+    },
+  },
+  {
+    id: 'decision',
+    summary: "Runs one of the owner's decision rules on the given text when the person presses Ask: each answer with its number and threshold, the personal data taken out before sending, the cost and who answered. Under the threshold the person confirms or overrides. Needs aimeat-decide.js.",
+    maxPerLayout: 2,
+    props: {
+      appId: requiredText('The app id the decision is recorded under.', 120),
+      rule: requiredText('The id of the owner decision rule to run.', 80),
+      state: text('The text to judge. Without it the block shows an empty card.', 4000),
+      title: text("The section title, when the kit's own is not wanted.", 120),
     },
   },
 ];

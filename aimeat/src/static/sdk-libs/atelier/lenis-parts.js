@@ -31,7 +31,16 @@
  *     lines: [{ id: 'l1', title: 'Filter coffee, 1 kg', price: 18.9, qty: 2 }],
  *     shipping: [{ id: 'std', label: 'Posti, 2 to 4 days', price: 5.9 }] },
  *     onSubmit(order) { place(order); } });
+ *   Amounts straight from AIMEAT.commerce (6-decimal micro-units): `unit: 'micros'` on the data,
+ *   or `priceMicros` on a line or a delivery option. Currency 'morsels' shows a morsel count.
  * @version-history
+ *   v0.62.1 — 2026-10-01 — The words of thread and checkout come from the kit dictionary
+ *     (./i18n.js, en/fi/es, overridable with i18n.use()): section names, field labels and hints,
+ *     buttons, totals, refusals, statuses and the day headings. The field list and the step names
+ *     are built at mount, so they follow the language in force. The English text is unchanged.
+ *   v0.62.0 — 2026-10-01 — checkout reads commerce amounts: `unit: 'micros'` and `priceMicros` on
+ *     lines and shipping (decimals kept, up to six when sub-cent), and currency 'morsels' (an
+ *     integer and the kit's word, never money), through ./money-units.js. Plain numbers unchanged.
  *   v0.44.0 — 2026-09-02 — Initial (wish-atelier-motion-libraries-and-parts, the Lenis pair).
  */
 import { el, clear, resolve, reducedMotion, attention, uid } from './dom.js';
@@ -40,6 +49,8 @@ import { num, money as fmtMoney, date, time } from '../_core/format.js';
 import { emptyState } from './state.js';
 import { form } from './form.js';
 import { stagger } from './motion.js';
+import { t } from './i18n.js';
+import { isMorsels, speaksMicros, readAmount, roundMicros, fractionDigits, morselText } from './money-units.js';
 
 /** One shared load of Lenis (script + stylesheet), whoever asks first. */
 let lenisPromise = null;
@@ -126,7 +137,8 @@ function wellScroller(well, content) {
    thread — the discussion
    ══════════════════════════════════════════════════════════════════════════════════════════════ */
 
-const STATUS_WORDS = { sent: 'Sent', read: 'Read', failed: 'Not sent' };
+/** The dictionary key for each message status the bubble names. */
+const STATUS_KEYS = { sent: 'threadSent', read: 'threadRead', failed: 'threadFailed' };
 
 /** @param {string|number|Date|undefined} at @returns {Date|null} */
 function dateOf(at) {
@@ -145,12 +157,12 @@ function dayKeyOf(at) {
 /** Today, Yesterday, or the date itself. */
 function dayLabelOf(at) {
   const d = dateOf(at);
-  if (!d) return 'Earlier';
+  if (!d) return t('earlier');
   const now = new Date();
   const key = dayKeyOf(at);
-  if (key === dayKeyOf(now)) return 'Today';
+  if (key === dayKeyOf(now)) return t('today');
   const back = new Date(now.getTime() - 86400000);
-  if (key === dayKeyOf(back)) return 'Yesterday';
+  if (key === dayKeyOf(back)) return t('yesterday');
   if (typeof Intl === 'object' && Intl.DateTimeFormat) {
     return date(d, { weekday: 'short', day: 'numeric', month: 'short' });
   }
@@ -194,7 +206,7 @@ export function thread(spec) {
   const stream = el('div', { class: 'ak-thread__stream' });
   const well = el('div', {
     class: 'ak-thread__well', role: 'log', 'aria-live': 'polite', tabindex: '0',
-    'aria-label': s.title || 'Discussion',
+    'aria-label': s.title || t('threadLabel'),
   }, [stream]);
   const root = el('section', { class: 'ak-root ak-thread' }, [
     s.title ? el('h2', { class: 'ak-section__title ak-thread__title' }, String(s.title)) : null,
@@ -213,7 +225,7 @@ export function thread(spec) {
   /** @param {any} m */
   function bubbleFor(m) {
     const who = String(m.label || m.who || '');
-    const word = STATUS_WORDS[m.status];
+    const word = STATUS_KEYS[m.status] ? t(STATUS_KEYS[m.status]) : '';
     const meta = el('div', { class: 'ak-thread__meta' }, [
       el('time', { class: 'ak-thread__time', datetime: m.at || null }, timeLabelOf(m.at)),
       word ? el('span', { class: 'ak-thread__status ak-thread__status--' + m.status }, word) : null,
@@ -242,8 +254,8 @@ export function thread(spec) {
       const e = s.empty || {};
       blank = emptyState({
         target: stream, tone: 'quiet',
-        title: e.title || 'No messages yet',
-        hint: e.hint || (s.onSend ? 'Write the first one.' : undefined),
+        title: e.title || t('threadEmpty'),
+        hint: e.hint || (s.onSend ? t('threadEmptyHint') : undefined),
       });
       return;
     }
@@ -294,7 +306,7 @@ export function thread(spec) {
   }
 
   if (s.onSend) {
-    const hint = s.placeholder || 'Write a message…';
+    const hint = s.placeholder || t('threadPlaceholder');
     const input = /** @type {HTMLTextAreaElement} */ (el('textarea', {
       class: 'ak-input ak-input--area ak-thread__input', rows: 2,
       placeholder: hint, 'aria-label': hint,
@@ -310,7 +322,7 @@ export function thread(spec) {
     });
     root.appendChild(el('div', { class: 'ak-thread__composer' }, [
       input,
-      el('button', { type: 'button', class: 'ak-btn ak-btn--primary', on: { click: send } }, 'Send'),
+      el('button', { type: 'button', class: 'ak-btn ak-btn--primary', on: { click: send } }, t('send')),
     ]));
   }
 
@@ -333,38 +345,52 @@ export function thread(spec) {
    checkout — one long page, four sections, a rail beside it
    ══════════════════════════════════════════════════════════════════════════════════════════════ */
 
-const STEP_NAMES = ['Your order', 'Details', 'Delivery', 'Review'];
+/** The four section names, in the kit's language. @returns {string[]} */
+function stepNames() {
+  return [t('coOrder'), t('coDetails'), t('coDelivery'), t('coReview')];
+}
 
 /**
  * The contact fields. Name, reach and address, and nothing else: the money is the node's business,
- * so a card number has no field here and never will.
- * @type {import('./form.js').FormField[]}
+ * so a card number has no field here and never will. Labels in the kit's language at mount time.
+ * @returns {import('./form.js').FormField[]}
  */
-const DETAIL_FIELDS = [
-  { name: 'name', label: 'Full name', type: 'text', required: true },
-  { name: 'email', label: 'Email', type: 'text', required: true, hint: 'Where the receipt goes.' },
-  { name: 'address', label: 'Street address', type: 'text', required: true },
-  { name: 'postcode', label: 'Postcode', type: 'text', required: true },
-  { name: 'city', label: 'City', type: 'text', required: true },
-  { name: 'country', label: 'Country', type: 'text' },
-];
+function detailFields() {
+  return [
+    { name: 'name', label: t('coName'), type: 'text', required: true },
+    { name: 'email', label: t('coEmail'), type: 'text', required: true, hint: t('coEmailHint') },
+    { name: 'address', label: t('coAddress'), type: 'text', required: true },
+    { name: 'postcode', label: t('coPostcode'), type: 'text', required: true },
+    { name: 'city', label: t('coCity'), type: 'text', required: true },
+    { name: 'country', label: t('coCountry'), type: 'text' },
+  ];
+}
 
-/** Money in the reader's own number habits; the symbol or code is the caller's. */
-function money(value, currency) {
-  const v = Math.round((Number(value) || 0) * 100) / 100;
+/**
+ * Money in the reader's own number habits; the symbol or code is the caller's. A figure from
+ * micro-units keeps two decimals, up to six when sub-cent; a morsel count is an integer with the
+ * kit's word and never money.
+ * @param {number} value  whole currency units, or a morsel count
+ * @param {string} [currency]
+ * @param {boolean} [micros]  the figure came from micro-units
+ * @returns {string}
+ */
+function money(value, currency, micros) {
+  if (isMorsels(currency)) return morselText(value);
+  const v = micros ? roundMicros(value) : Math.round((Number(value) || 0) * 100) / 100;
+  const d = micros ? fractionDigits(v) : 2;
   const cur = currency || '€';
   if (typeof Intl === 'object' && Intl.NumberFormat) {
     if (/^[A-Za-z]{3}$/.test(cur)) {
       try {
-        return fmtMoney(v, cur, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return fmtMoney(v, cur, { minimumFractionDigits: d, maximumFractionDigits: d });
       } catch {
-        // An unknown code, or a morsel, which money() refuses on purpose: fall through and show the
-        // number with the word beside it, which is the right shape for a morsel anyway.
+        // An unknown code: fall through and show the number with the code beside it.
       }
     }
-    return num(v, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + cur;
+    return num(v, { minimumFractionDigits: d, maximumFractionDigits: d }) + ' ' + cur;
   }
-  return v.toFixed(2) + ' ' + cur;
+  return v.toFixed(d) + ' ' + cur;
 }
 
 /**
@@ -372,8 +398,10 @@ function money(value, currency) {
  * vocabulary, the same rule the dialog family follows.
  * @param {{
  *   target?: string|Element,
- *   data: { lines: Array<{ id: string, title: string, sub?: string, price: number, qty: number }>,
- *     currency?: string, shipping?: Array<{ id: string, label: string, price: number }>,
+ *   data: { lines: Array<{ id: string, title: string, sub?: string, price?: number,
+ *       priceMicros?: number, qty: number }>,
+ *     currency?: string, unit?: 'micros',
+ *     shipping?: Array<{ id: string, label: string, price?: number, priceMicros?: number }>,
  *     steps?: string[] },
  *   onSubmit?: (order: { lines: any[], shipping: any, contact: Record<string, any>, note: string }) => void,
  *   onBack?: () => void,
@@ -386,7 +414,8 @@ export function checkout(spec) {
   let shipId = null;
   let placed = false;
 
-  const names = (data.steps && data.steps.length === 4) ? data.steps : STEP_NAMES;
+  const names = (data.steps && data.steps.length === 4) ? data.steps : stepNames();
+  const fields = detailFields();
   const ids = names.map(function () { return uid('ak-co'); });
 
   const lineList = el('ol', { class: 'ak-checkout__lines' });
@@ -395,16 +424,16 @@ export function checkout(spec) {
   const totals = el('div', { class: 'ak-checkout__totals' });
   const noteInput = /** @type {HTMLTextAreaElement} */ (el('textarea', {
     id: uid('ak-note'), class: 'ak-input ak-input--area', rows: 2,
-    placeholder: 'Anything we should know?', 'aria-label': 'A note with the order',
+    placeholder: t('coNotePlaceholder'), 'aria-label': t('coNote'),
   }));
   const refusal = el('p', { class: 'ak-checkout__refusal', role: 'alert', hidden: true });
   const settled = el('p', { class: 'ak-checkout__settled', role: 'status', hidden: true },
-    '✓ Order placed. The receipt is on its way to your email.');
-  const placeBtn = el('button', { type: 'button', class: 'ak-btn ak-btn--primary ak-checkout__place' }, 'Place order');
+    '✓ ' + t('coPlaced'));
+  const placeBtn = el('button', { type: 'button', class: 'ak-btn ak-btn--primary ak-checkout__place' }, t('coPlace'));
 
   const details = form({
-    fields: DETAIL_FIELDS,
-    submitLabel: 'Continue to delivery',
+    fields: fields,
+    submitLabel: t('coContinue'),
     onSubmit() { goTo(2); },
   });
 
@@ -421,7 +450,7 @@ export function checkout(spec) {
     section(2, [shipList]),
     section(3, [
       totals,
-      el('label', { class: 'ak-form__label', for: noteInput.id }, 'A note with the order'),
+      el('label', { class: 'ak-form__label', for: noteInput.id }, t('coNote')),
       noteInput, refusal, placeBtn, settled,
     ]),
   ];
@@ -435,11 +464,11 @@ export function checkout(spec) {
       on: { click: function () { goTo(i); } },
     }, [el('span', { class: 'ak-checkout__step-n' }, String(i + 1)), el('span', {}, name)]);
   });
-  const rail = el('nav', { class: 'ak-checkout__rail', 'aria-label': 'Order steps' }, [
+  const rail = el('nav', { class: 'ak-checkout__rail', 'aria-label': t('coSteps') }, [
     s.onBack ? el('button', {
       type: 'button', class: 'ak-btn ak-btn--ghost ak-checkout__back',
       on: { click: function () { if (s.onBack) s.onBack(); } },
-    }, '↩ Back') : null,
+    }, '↩ ' + t('back')) : null,
   ].filter(Boolean).concat(railBtns));
 
   const root = el('section', { class: 'ak-root ak-checkout' }, [rail, well]);
@@ -484,25 +513,38 @@ export function checkout(spec) {
     return options.find(function (o) { return o.id === shipId; }) || null;
   }
 
+  /** The order speaks micro-units: `unit: 'micros'`, or a line or delivery with `priceMicros`. */
+  function inMicros() {
+    const lines = Array.isArray(data.lines) ? data.lines : [];
+    const options = Array.isArray(data.shipping) ? data.shipping : [];
+    return speaksMicros(data, lines.concat(options), ['price']);
+  }
+
+  /** One line's sum, in whole currency units. */
+  function lineSum(l) {
+    return readAmount(l, 'price', data) * (Number(l.qty) || 0);
+  }
+
   function itemsTotal() {
     return (Array.isArray(data.lines) ? data.lines : []).reduce(function (n, l) {
-      return n + (Number(l.price) || 0) * (Number(l.qty) || 0);
+      return n + lineSum(l);
     }, 0);
   }
 
   function renderTotals() {
     const cur = data.currency;
+    const mu = inMicros();
     const ship = chosenShip();
     const items = itemsTotal();
-    const carriage = ship ? (Number(ship.price) || 0) : 0;
+    const carriage = ship ? readAmount(ship, 'price', data) : 0;
     clear(itemsSum);
-    itemsSum.appendChild(el('span', {}, 'Items'));
-    itemsSum.appendChild(el('span', { class: 'ak-checkout__figure' }, money(items, cur)));
+    itemsSum.appendChild(el('span', {}, t('coItems')));
+    itemsSum.appendChild(el('span', { class: 'ak-checkout__figure' }, money(items, cur, mu)));
     clear(totals);
     [
-      ['Items', money(items, cur), ''],
-      ['Delivery', ship ? money(carriage, cur) : 'Chosen after the order', ''],
-      ['Total', money(items + carriage, cur), ' ak-checkout__total--grand'],
+      [t('coItems'), money(items, cur, mu), ''],
+      [t('coDelivery'), ship ? money(carriage, cur, mu) : t('coShipLater'), ''],
+      [t('total'), money(items + carriage, cur, mu), ' ak-checkout__total--grand'],
     ].forEach(function (row) {
       totals.appendChild(el('div', { class: 'ak-checkout__total' + row[2] }, [
         el('span', {}, row[0]),
@@ -513,10 +555,11 @@ export function checkout(spec) {
 
   function renderLines() {
     const cur = data.currency;
+    const mu = inMicros();
     const lines = Array.isArray(data.lines) ? data.lines : [];
     clear(lineList);
     if (!lines.length) {
-      emptyState({ target: lineList, tone: 'quiet', title: 'Nothing in the order', hint: 'Add something and it appears here.' });
+      emptyState({ target: lineList, tone: 'quiet', title: t('coEmpty'), hint: t('coEmptyHint') });
       return;
     }
     lines.forEach(function (l) {
@@ -526,7 +569,7 @@ export function checkout(spec) {
           l.sub ? el('span', { class: 'ak-checkout__line-sub' }, String(l.sub)) : null,
         ].filter(Boolean)),
         el('span', { class: 'ak-checkout__qty' }, String(Number(l.qty) || 0) + ' ×'),
-        el('span', { class: 'ak-checkout__figure' }, money((Number(l.price) || 0) * (Number(l.qty) || 0), cur)),
+        el('span', { class: 'ak-checkout__figure' }, money(lineSum(l), cur, mu)),
       ]));
     });
     stagger(Array.prototype.slice.call(lineList.children), { from: 'up' });
@@ -534,12 +577,13 @@ export function checkout(spec) {
 
   function renderShipping() {
     const cur = data.currency;
+    const mu = inMicros();
     const options = Array.isArray(data.shipping) ? data.shipping : [];
     const group = uid('ak-ship');
     clear(shipList);
     if (!options.length) {
       shipId = null;
-      shipList.appendChild(el('p', { class: 'ak-checkout__quiet' }, 'Delivery is agreed after the order is in.'));
+      shipList.appendChild(el('p', { class: 'ak-checkout__quiet' }, t('coNoShipping')));
       return;
     }
     if (!options.some(function (o) { return o.id === shipId; })) shipId = options[0].id;
@@ -552,7 +596,7 @@ export function checkout(spec) {
       shipList.appendChild(el('label', { class: 'ak-checkout__ship' }, [
         radio,
         el('span', { class: 'ak-checkout__ship-label' }, String(o.label || o.id)),
-        el('span', { class: 'ak-checkout__figure' }, money(o.price, cur)),
+        el('span', { class: 'ak-checkout__figure' }, money(readAmount(o, 'price', data), cur, mu)),
       ]));
     });
   }
@@ -563,16 +607,16 @@ export function checkout(spec) {
     // takes the eye back to the section that holds it.
     const contact = details.values();
     details.clearErrors();
-    const missing = DETAIL_FIELDS.filter(function (f) {
+    const missing = fields.filter(function (f) {
       return f.required && !String(contact[f.name] == null ? '' : contact[f.name]).trim();
     });
     if (missing.length) {
-      missing.forEach(function (f) { details.setError(f.name, f.label + ' is needed before the order can go.'); });
+      missing.forEach(function (f) { details.setError(f.name, t('coNeeded', { field: f.label })); });
       goTo(1);
       return;
     }
     if (String(contact.email).indexOf('@') < 0) {
-      details.setError('email', 'An email address has an @ in it.');
+      details.setError('email', t('coEmailAt'));
       goTo(1);
       return;
     }
@@ -587,7 +631,7 @@ export function checkout(spec) {
       try {
         s.onSubmit(order);
       } catch (err) {
-        refusal.textContent = (err && err.message) || 'The order did not go through. Try once more.';
+        refusal.textContent = (err && err.message) || t('coFailed');
         refusal.hidden = false;
         attention(refusal, 'shake');
         return;
