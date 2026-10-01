@@ -13,6 +13,12 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.26.0 — 2026-10-01 — The other library blocks: workspaceTeam and workspacePicker
+ *     (aimeat-organism.js), intakeForm and intakeAdmin (aimeat-intake.js), connections
+ *     (aimeat-connect.js). Read against describe-data.js after they joined it.
+ *   v1.25.0 — 2026-10-01 — An app with its own members draws them with the kit: members, joinRequest
+ *     and accessState over aimeat-iam.js (kit v0.61.0). Read against describe-data.js after the
+ *     three components joined it.
  *   v1.24.0 — 2026-09-29 — The workbench genre's logo may be a small data:image (kit shell v0.66.0):
  *     it is the one form a package carries to a customer node.
  *   v1.23.0 — 2026-09-29 — Step 2 fixes the order after an approved drawing: genre first, the owner
@@ -254,6 +260,16 @@ moved under you says so.
    language switch of your own. Declare \`aimeat-locales\` "en fi" and every scope you use, put
    every string in \`AIMEAT.atelier.i18n.use({ en: {…}, fi: {…} })\`, paint from \`i18n.t()\`
    and repaint on \`i18n.onChange\`. The specification's part \`genre\` has the whole pattern.
+   **An app with its own members draws them with the kit.** Load \`aimeat-iam.js\` beside
+   \`aimeat-auth.js\` and use \`AIMEAT.atelier.members({ target, app, roles })\` for the owner's
+   screen, \`joinRequest({ target, app })\` for the visitor's ask and
+   \`accessState({ target, app, cap, render })\` around a members-only area; never write a member
+   list, a role select or a join form of your own. The same holds for the other libraries: a
+   workspace's people are \`workspaceTeam({ target, org, ws })\` and the first-run choice of where the
+   app keeps its data is \`workspacePicker({ target, app, onReady })\` (both over
+   \`aimeat-organism.js\`), a public form is \`intakeForm({ target, org, ws, formId })\` and the
+   owner's list of forms \`intakeAdmin({ target, org, ws })\` (over \`aimeat-intake.js\`), and the
+   owner's outside accounts are \`connections({ target, need })\` (over \`aimeat-connect.js\`).
 4. **Ask the kit before you fork.** Before you fork a component, ask the kit what it already gives
    you. \`AIMEAT.atelier.describe("<component>")\` returns
    \`{ parts, slots, variants, tokens, fork }\` for the components that carry the model, and

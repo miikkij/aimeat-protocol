@@ -125,6 +125,8 @@ describe('the customisation section is held to describe-data.js', () => {
       'forty-four': 44, 'forty-five': 45, 'forty-six': 46, 'forty-seven': 47, 'forty-eight': 48,
       // The motion parts added eight on 2026-09-28.
       'fifty-two': 52, 'fifty-three': 53, 'fifty-four': 54,
+      // The members, intake and connections blocks added three widths on 2026-10-01.
+      'fifty-five': 55, 'fifty-six': 56, 'fifty-seven': 57,
     };
     const said = [...text.matchAll(/and ((?:thirty|forty|fifty)-[a-z]+) more/g)].map((m) => WORDS[m[1]]);
     expect(said.length).toBe(1);

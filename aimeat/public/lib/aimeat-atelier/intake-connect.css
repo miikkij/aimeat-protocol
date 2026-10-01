@@ -1,0 +1,154 @@
+/*
+ * @file aimeat-atelier/intake-connect.css
+ * @description The clothes of the public-form components (atelier/intake-form.js: intakeForm and
+ *   intakeAdmin) and the connected accounts component (atelier/connections.js). The fields wear the
+ *   kit's form classes (.ak-form*, .ak-input, .ak-check from data.css); this sheet adds the radio
+ *   group, the hidden honeypot, the thank-you and refusal lines, the owner's form rows and Create
+ *   panel, and the account rows with their status. Everything rides the --ak-* token contract, so
+ *   the blocks wear the app's look and mode; no colour of their own. Each block keeps to a readable
+ *   width (--ak-intake-width, --ak-conn-width), rows wrap instead of scrolling sideways, and every
+ *   control keeps the kit's touch floor.
+ * @structure .ak-intake (shared lines) · the radio group and checkbox · the honeypot · the owner's
+ *   rows · Create · .ak-conn (shared lines) · account rows and status · Connect offers
+ * @version-history
+ *   v0.61.0 — 2026-10-01 — Initial (iam-members-and-library-blocks plan, Phase D blocks 4 and 5).
+ */
+
+/* ── Shared lines: title, intro, refusal, thank-you, notice ────────────────────────────────── */
+.ak-intake { display: block; max-width: var(--ak-intake-width, 40rem); }
+.ak-intake-admin { max-width: var(--ak-intake-width, 52rem); }
+.ak-conn { display: block; max-width: var(--ak-conn-width, 48rem); }
+.ak-intake__title, .ak-conn__title { margin: 0 0 4px; font-size: 1.05rem; color: var(--ak-ink); }
+.ak-intake__intro, .ak-intake__none, .ak-conn__intro, .ak-conn__none, .ak-conn__note {
+  margin: 0 0 10px; font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); max-width: 70ch;
+}
+.ak-conn__need { margin: 0 0 10px; font-size: var(--ak-text-fine, 0.85rem); font-weight: 650; color: var(--ak-ink); max-width: 70ch; }
+.ak-intake__failure, .ak-intake__sent, .ak-intake__notice, .ak-conn__failure, .ak-conn__notice {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: var(--ak-radius-sm);
+  font-size: var(--ak-text-fine, 0.85rem);
+  color: var(--ak-ink);
+  max-width: 70ch;
+  overflow-wrap: anywhere;
+}
+.ak-intake__failure, .ak-conn__failure {
+  border: 1px solid color-mix(in oklab, var(--ak-err, var(--ak-warn)) 55%, var(--ak-line));
+  background: color-mix(in oklab, var(--ak-err, var(--ak-warn)) 10%, var(--ak-surface));
+}
+.ak-intake__sent, .ak-intake__notice, .ak-conn__notice {
+  border: 1px solid color-mix(in oklab, var(--ak-ok, var(--ak-accent)) 45%, var(--ak-line));
+  background: color-mix(in oklab, var(--ak-ok, var(--ak-accent)) 10%, var(--ak-surface));
+}
+.ak-intake__sent { margin: 12px 0 0; }
+.ak-intake__failure[hidden], .ak-intake__sent[hidden], .ak-intake__notice[hidden], .ak-conn__notice[hidden] { display: none; }
+
+/* ── The radio group and the checkbox ──────────────────────────────────────────────────────── */
+.ak-intake__form { position: relative; }
+.ak-intake__group { margin: 0; padding: 0; border: 0; min-width: 0; }
+.ak-intake__group > legend { padding: 0; margin: 0 0 4px; }
+.ak-intake__choices { display: flex; flex-wrap: wrap; gap: 0 16px; }
+.ak-intake__choice { display: inline-flex; align-items: center; gap: 2px; min-height: var(--ak-touch-min, 40px); color: var(--ak-ink); cursor: pointer; }
+/* The mark is 18px and the target is the touch floor: appearance:none lets the box take the floor
+ * and the circle is painted into its middle, checked and unchecked alike (as lenis-parts.css). */
+.ak-intake__radio {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  width: var(--ak-touch-min, 40px);
+  height: var(--ak-touch-min, 40px);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ak-radius-pill, 999px);
+  background-color: transparent;
+  background-repeat: no-repeat;
+  background-image: radial-gradient(circle at 50% 50%, transparent 0 7px, var(--ak-line) 7px 9px, transparent 9px);
+  cursor: pointer;
+}
+.ak-intake__radio:checked {
+  background-image: radial-gradient(circle at 50% 50%,
+    var(--ak-accent) 0 5px, transparent 5px 7px, var(--ak-accent) 7px 9px, transparent 9px);
+}
+.ak-intake__radio:focus-visible { outline: 2px solid var(--ak-focus, var(--ak-accent)); outline-offset: -9px; }
+.ak-form__field--invalid .ak-intake__radio { background-image: radial-gradient(circle at 50% 50%, transparent 0 7px, var(--ak-err) 7px 9px, transparent 9px); }
+.ak-intake__check { display: flex; align-items: center; gap: 10px; min-height: var(--ak-touch-min, 40px); }
+.ak-intake__check .ak-form__label { font-weight: 400; }
+
+/* The honeypot: out of sight and out of the tab order, held inside the form's own box so it can
+ * never stretch the page. */
+.ak-intake__hp {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ── The owner's rows ──────────────────────────────────────────────────────────────────────── */
+.ak-intake__group-title, .ak-conn__group-title { margin: 0 0 6px; font-size: var(--ak-text-fine, 0.85rem); font-weight: 700; color: var(--ak-ink-dim); }
+.ak-intake-admin > .ak-intake__group, .ak-conn__group { margin: 0 0 16px; }
+.ak-intake__rows, .ak-intake__frows, .ak-conn__rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ak-intake__row, .ak-conn__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--ak-line);
+  border-radius: var(--ak-radius-sm);
+  background: var(--ak-surface);
+}
+.ak-intake__name { font-weight: 700; color: var(--ak-ink); overflow-wrap: anywhere; }
+.ak-intake__meta { flex: 1 1 10rem; min-width: 0; font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); overflow-wrap: anywhere; }
+/* The controls keep to the right edge of their line, whether the row fits on one line or wraps. */
+.ak-intake__acts, .ak-conn__acts { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; align-items: center; justify-content: flex-end; }
+
+/* ── Create ────────────────────────────────────────────────────────────────────────────────── */
+.ak-intake__create { display: flex; flex-direction: column; gap: 10px; }
+.ak-intake__create .ak-form__field { max-width: 32rem; }
+.ak-intake__frow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ak-intake__flabel { flex: 2 1 12rem; min-width: 0; }
+.ak-intake__ftype { flex: 1 1 9rem; width: auto; min-width: 0; }
+.ak-intake__fopts { flex: 1 1 100%; }
+.ak-intake__fopts[hidden] { display: none; }
+.ak-intake__frow .ak-intake__check { font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink); }
+.ak-intake__bar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+
+/* ── Account rows and their status ─────────────────────────────────────────────────────────── */
+.ak-conn__who { display: inline-flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 12rem; }
+.ak-conn__mark {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--ak-radius-sm);
+  background: color-mix(in oklab, var(--ak-accent) 22%, var(--ak-surface));
+  color: var(--ak-ink);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+.ak-conn__names { display: flex; flex-direction: column; min-width: 0; }
+.ak-conn__account { font-weight: 700; color: var(--ak-ink); overflow-wrap: anywhere; }
+.ak-conn__provider { font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); overflow-wrap: anywhere; }
+.ak-conn__status {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: var(--ak-radius-pill, 999px);
+  font-size: var(--ak-text-fine, 0.85rem);
+  font-weight: 650;
+  color: var(--ak-ink);
+  white-space: nowrap;
+}
+.ak-conn__status--active { background: color-mix(in oklab, var(--ak-ok, var(--ak-accent)) 14%, var(--ak-surface)); }
+.ak-conn__status--needs_reauth { background: color-mix(in oklab, var(--ak-warn) 18%, var(--ak-surface)); }
+.ak-conn__status--error { background: color-mix(in oklab, var(--ak-err, var(--ak-warn)) 14%, var(--ak-surface)); }
+.ak-conn__can { flex: 1 1 100%; font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); }
+
+/* ── Connect offers ────────────────────────────────────────────────────────────────────────── */
+.ak-conn__offer { flex-direction: column; align-items: stretch; }
+.ak-conn__fields { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ak-conn__input { flex: 1 1 12rem; min-width: 0; }
+.ak-conn__offer .ak-conn__note { margin: 0; }

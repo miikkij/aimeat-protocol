@@ -1,0 +1,60 @@
+/*
+ * @file aimeat-atelier/workspace.css
+ * @description The workspace components' clothes (atelier/workspace-team.js, workspace-picker.js).
+ *   Both wear the members screen's rows, tabs, person cell, failure line and readable width
+ *   (members.css, the .ak-mem classes they also carry), so one kind of thing has one look; this
+ *   sheet adds only what is theirs: the role chip, the one-line "Using … in …" view, the picker's
+ *   cancel button and the dense variant. Every colour rides the --ak-* token contract.
+ * @structure .ak-ws (shared) · the role chip · the one-line view · the picker · variants table, dense
+ * @version-history
+ *   v0.61.0 — 2026-10-01 — Initial (IAM plan Phase D blocks 2 and 3).
+ */
+
+.ak-ws[hidden] { display: none; }
+
+/* ── The role chip: the creator on a team row, the caller's role on an organism row ────────── */
+.ak-ws__chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 2px 10px;
+  border: 1px solid var(--ak-line);
+  border-radius: var(--ak-radius-pill, 999px);
+  background: color-mix(in oklab, var(--ak-accent) 10%, var(--ak-surface));
+  color: var(--ak-ink);
+  font-size: var(--ak-text-fine, 0.85rem);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ── The one-line view of a remembered choice ─────────────────────────────────────────────── */
+.ak-ws__using {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--ak-line);
+  border-radius: var(--ak-radius-sm);
+  background: var(--ak-surface);
+  color: var(--ak-ink);
+  font-size: var(--ak-text-fine, 0.85rem);
+}
+.ak-ws__using-text { flex: 1 1 14rem; min-width: 0; overflow-wrap: anywhere; }
+.ak-ws__using .ak-btn { min-height: 40px; }
+
+/* ── The picker ───────────────────────────────────────────────────────────────────────────── */
+.ak-ws__explain { color: var(--ak-ink); }
+.ak-ws--picker .ak-btn { min-height: 40px; }
+.ak-ws--picker > [data-ak-part="cancel"] { margin-top: 4px; }
+
+/* ── The team's controls keep the 40px floor on a touch screen ────────────────────────────── */
+.ak-ws--team .ak-btn, .ak-ws--team .ak-mem__role, .ak-ws .ak-mem__name.ak-input { min-height: 40px; }
+.ak-ws--table .ak-mem__table td { vertical-align: middle; }
+
+/* ── dense: for a side panel ──────────────────────────────────────────────────────────────── */
+.ak-ws--dense .ak-mem__row { padding: 6px 8px; }
+.ak-ws--dense .ak-mem__face { width: 26px; height: 26px; font-size: 0.75rem; }
+.ak-ws--dense .ak-mem__group { margin-bottom: 10px; }
+.ak-ws--dense .ak-ws__using { padding: 6px 8px; }
