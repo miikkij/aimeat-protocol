@@ -133,18 +133,21 @@ export function roleSelect(roles, value, label, labelOf) {
 }
 
 /**
- * One person: a face with their initial, the display name over the account name. A person with no
- * display name shows the account once.
+ * One person: a face with their initial, the name, and under it the address the owner holds for
+ * them (or, without one, the account name when it differs from the name). A name that is the
+ * account name is shown once. The account name is always in the title, for the pointer.
  * @param {string} account
  * @param {string|null|undefined} displayName
+ * @param {string|null|undefined} [email]
  */
-export function person(account, displayName) {
+export function person(account, displayName, email) {
   const shown = displayName || account || '';
-  return el('span', { class: 'ak-mem__person', 'data-ak-part': 'who' }, [
+  const sub = email || (displayName && account && displayName !== account ? account : '');
+  return el('span', { class: 'ak-mem__person', 'data-ak-part': 'who', title: account || null }, [
     el('span', { class: 'ak-mem__face', 'aria-hidden': 'true' }, shown.slice(0, 1).toUpperCase()),
     el('span', { class: 'ak-mem__names' }, [
       el('span', { class: 'ak-mem__name' }, shown),
-      displayName && account ? el('span', { class: 'ak-mem__account' }, account) : null,
+      sub ? el('span', { class: 'ak-mem__account' }, sub) : null,
     ].filter(Boolean)),
   ]);
 }

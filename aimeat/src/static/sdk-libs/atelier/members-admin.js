@@ -39,16 +39,16 @@ import {
 
 const SAMPLE = {
   roles: { member: ['use'], admin: ['use', 'manage'] },
-  requests: [{ owner: 'kim', displayName: 'Kim Laine', note: 'I run the bakery next door and order every week.', at: '2026-09-29T08:12:00Z' }],
-  seen: { alex: { visits: 3, lastSeen: '2026-09-30T17:40:00Z', displayName: 'Alex Berg' } },
+  requests: [{ owner: 'kim', displayName: 'Kim Laine', email: 'kim.laine@example.com', note: 'I run the bakery next door and order every week.', at: '2026-09-29T08:12:00Z' }],
+  seen: { alex: { visits: 3, lastSeen: '2026-09-30T17:40:00Z', displayName: 'Alex Berg', email: null } },
   members: [
-    { owner: 'robin', displayName: 'Robin Aho', role: 'member', since: '2026-08-12T10:00:00Z' },
-    { owner: 'sam', displayName: 'Sam Koski', role: 'admin', since: '2026-07-01T09:00:00Z' },
+    { owner: 'jouni', displayName: 'Jouni Miikki', email: 'jouni.miikki@aimeat.io', role: 'admin', since: '2026-07-01T09:00:00Z' },
+    { owner: 'robin', displayName: 'Robin Aho', email: 'robin.aho@example.com', role: 'member', since: '2026-08-12T10:00:00Z' },
   ],
   invites: [{ id: 'i1', emailShown: 'pia@example.com', role: 'member', at: '2026-09-30T09:00:00Z', expiresAt: '2026-10-30T09:00:00Z' }],
   audit: [
-    { at: '2026-09-30T09:00:00Z', by: 'sandbox', action: 'invite.sent', account: 'pia@example.com', to: 'member' },
-    { at: '2026-08-12T10:00:00Z', by: 'sandbox', action: 'member.approved', account: 'robin', to: 'member' },
+    { at: '2026-09-30T09:00:00Z', by: 'jouni', action: 'invite.sent', account: null, detail: { email: 'pia@example.com' }, to: 'member' },
+    { at: '2026-08-12T10:00:00Z', by: 'jouni', action: 'member.approved', account: 'robin', to: 'member' },
   ],
   plan: { access: 'members-free', rosterVisibility: 'owner', manageRoles: ['admin'], seats: {}, terms: {}, roles: {} },
 };
@@ -155,7 +155,7 @@ export function members(spec) {
     const caps = st.roles || {};
     const roles = Object.keys(caps);
     const oneClick = sample ? 'member' : iam.suggestRole(st, spec.approveRole);
-    const asked = (st.requests || []).map(function (q) { return { owner: q.owner || q.gaii || q.id, displayName: q.displayName, note: q.note, at: q.at }; });
+    const asked = (st.requests || []).map(function (q) { return { owner: q.owner || q.gaii || q.id, displayName: q.displayName, email: q.email, note: q.note, at: q.at }; });
     const seenMap = st.seen || {};
     const seen = Object.keys(seenMap).map(function (who) { return Object.assign({ owner: who }, seenMap[who] || {}); });
     const roster = (st.members || []).filter(function (m) { return m && m.role; });
@@ -234,11 +234,11 @@ export function members(spec) {
     function drawBody() {
       clear(body);
       if (tab === 'asked') {
-        const v = visible(asked, function (q) { return q.owner + ' ' + (q.displayName || '') + ' ' + (q.note || ''); });
+        const v = visible(asked, function (q) { return q.owner + ' ' + (q.displayName || '') + ' ' + (q.email || '') + ' ' + (q.note || ''); });
         body.appendChild(list('asked', v.rows.map(function (q) {
           const sel = roles.length > 1 ? roleSelect(roles, oneClick, tm('members.role')) : null;
           if (sel) sel.disabled = sample;
-          return row(person(q.owner, q.displayName), q.note || '', [
+          return row(person(q.owner, q.displayName, q.email), q.note || '', [
             sel,
             button(tm('members.approve'), 'primary', assign(q.owner, function () { return sel ? sel.value : oneClick; }, q.note), sample),
             button(tm('members.decline'), 'ghost', sample ? noop : function () {
@@ -247,12 +247,12 @@ export function members(spec) {
           ]);
         }), tm('members.askedNone'), v.more));
       } else if (tab === 'seen') {
-        const v = visible(seen, function (s) { return s.owner + ' ' + (s.displayName || ''); });
+        const v = visible(seen, function (s) { return s.owner + ' ' + (s.displayName || '') + ' ' + (s.email || ''); });
         body.appendChild(list('seen', v.rows.map(function (s) {
           const sel = roles.length > 1 ? roleSelect(roles, oneClick, tm('members.role')) : null;
           if (sel) sel.disabled = sample;
           const visits = s.visits ? tm(s.visits === 1 ? 'members.visit1' : 'members.visits', { n: s.visits, d: day(s.lastSeen) }) : '';
-          return row(person(s.owner, s.displayName), visits, [
+          return row(person(s.owner, s.displayName, s.email), visits, [
             sel,
             button(tm('members.approve'), 'primary', assign(s.owner, function () { return sel ? sel.value : oneClick; }), sample),
             button(tm('members.dismiss'), 'ghost', sample ? noop : function () { act(function () { return iam.dismissGuest(s.owner); }); }, sample),
@@ -260,7 +260,7 @@ export function members(spec) {
         }), tm('members.seenNone'), v.more));
       } else if (tab === 'members') {
         body.appendChild(addPanel());
-        const v = visible(roster, function (m) { return m.owner + ' ' + (m.displayName || '') + ' ' + m.role; });
+        const v = visible(roster, function (m) { return m.owner + ' ' + (m.displayName || '') + ' ' + (m.email || '') + ' ' + m.role; });
         const rows = v.rows.map(function (m) {
           const sel = roleSelect(roles.indexOf(m.role) === -1 ? roles.concat([m.role]) : roles, m.role, tm('members.role'));
           sel.disabled = sample;
@@ -269,7 +269,7 @@ export function members(spec) {
             return button(a.label, a.tone || 'ghost', function () { Promise.resolve(a.run(m)).then(function () { render(); }); }, sample);
           });
           const since = m.since ? (variant === 'table' ? day(m.since) : tm('members.since', { d: day(m.since) })) : '';
-          return row(person(m.owner, m.displayName), since, own.concat([
+          return row(person(m.owner, m.displayName, m.email), since, own.concat([
             sel,
             button(tm('members.remove'), 'ghost', sample ? noop : function () {
               ask({
@@ -301,7 +301,7 @@ export function members(spec) {
             return el('li', { class: 'ak-mem__row ak-mem__row--line', 'data-ak-part': 'row' }, [
               el('span', { class: 'ak-mem__when' }, day(h.at)),
               el('span', { class: 'ak-mem__meta' }, tm('history.' + h.action, {
-                by: String(h.by || '').split('#').pop().split('@')[0], who: h.account || (h.detail && h.detail.email) || '',
+                by: String(h.by || '').split('#').pop().split('@')[0], who: h.account || (h.detail && h.detail.email) || tm('history.noAddress'),
                 from: h.from || '', to: h.to || '',
               })),
             ]);
