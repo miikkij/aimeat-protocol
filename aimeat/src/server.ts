@@ -13,6 +13,8 @@
  *   - buildServer: builds and wires the Express app and its background managers
  *
  * @version-history
+ *   v1.5.0 — 2026-10-01 — apexPageRedirect() after robotsHeader(): the node's content pages asked
+ *     for on an app or portfolio host answer 301 to the apex instead of a copy.
  *   v1.4.0 — 2026-09-30 — robotsHeader() is mounted here, ahead of the static files, instead of in
  *     routes-loader, so the X-Robots-Tag reaches every response.
  *   v1.3.0 — 2026-09-26 — Everything createServer starts runs as this node: the body is buildServer,
@@ -36,6 +38,7 @@ import { cookieConsentMiddleware } from './middleware/cookie-consent.js';
 import { requestIdMiddleware } from './middleware/request-id.js';
 import { subdomainMiddleware } from './middleware/subdomain.js';
 import { robotsHeader } from './middleware/robots-header.js';
+import { apexPageRedirect } from './middleware/apex-page-redirect.js';
 import { agentMeAliasMiddleware } from './middleware/agent-me-alias.js';
 import { logger } from './utils/logger.js';
 import { runAsNode } from './utils/gaii.js';
@@ -187,6 +190,11 @@ async function buildServer(config: AimeatConfig, configSources?: ConfigSources):
   // decides its own pages; before the static files, because llms.txt, AGENTS.md and the stylesheets
   // are served there, and from routes-loader (where it stood until 2026-09-30) it never reached them.
   app.use(robotsHeader(config));
+
+  // One address per content page: the node's own pages asked for on an app or portfolio host go to
+  // the apex with a 301, instead of answering there as a copy (2026-10-01). Before the static files
+  // and the routes, for the same reason as the header above.
+  app.use(apexPageRedirect(config));
 
   // Static file serving (public, locales, PWA)
   setupStaticFiles(app, config);
