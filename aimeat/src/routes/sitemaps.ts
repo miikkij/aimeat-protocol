@@ -17,6 +17,7 @@
  *   v1.0.0 — 2026-08-16 — Extracted from bootstrap.ts (line ceiling), sitemap-index.xml included
  *   v1.0.1 — 2026-09-26 — The app owner comes from localAccountName (utils/gaii.ts), which keeps an
  *     identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
+ *   v1.1.0 — 2026-10-01 — The app sitemaps follow seo.announce_apps.
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -69,7 +70,10 @@ export function mountSitemapRoutes(router: Router, config: AimeatConfig, storage
     const now = new Date().toISOString().split('T')[0];
     const sitemaps = [`${b}/sitemap.xml`];
 
-    if (config.appHost) {
+    // seo.announce_apps off leaves the app hosts out of the index. Each app still serves its own
+    // sitemap and robots.txt; the node just stops pointing a crawler at them (aimeat.io, 2026-10-01,
+    // while Bing held the domain at "Discovered but not crawled").
+    if (config.appHost && config.seoAnnounceApps) {
       // The anonymous view: no viewerGhii and no adminView, so parked and operator-hidden apps are
       // already excluded by storage.
       const [{ apps }, sites] = await Promise.all([

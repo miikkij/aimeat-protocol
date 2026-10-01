@@ -28103,7 +28103,10 @@ paths:
                               url: { type: string }
                               index_url: { type: string }
                               page_count: { type: integer }
-                              app_host_count: { type: integer, description: App hosts the sitemap index will list }
+                              app_host_count: { type: integer, description: App hosts the sitemap index will list. 0 while announce_apps is off }
+                              announce_apps:
+                                type: boolean
+                                description: The seo.announce_apps setting. False leaves every app out of the sitemap index and out of IndexNow notices; the apps stay reachable.
                           verification:
                             type: object
                             properties:

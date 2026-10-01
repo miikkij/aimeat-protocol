@@ -36,6 +36,7 @@
  * @usage
  *   await announceApp(config, storage, { ownerGaii, ownerName, filename }, site?.subdomain);
  * @version-history
+ *   v1.2.0 — 2026-10-01 — announceApp sends nothing while seo.announce_apps is off.
  *   v1.1.0 — 2026-09-11 — Grouped by host with a key location per host (the cross-host batch was
  *     wrong). announceApp stamps seo.announcedAt on the app. A run records hosts, refusals, scope
  *     and sender. The whole-site notice is indexnow-site.ts.
@@ -193,6 +194,9 @@ export async function announceApp(
   subdomain?: string,
   opts: SubmitOptions = {},
 ): Promise<IndexNowRun | null> {
+  // seo.announce_apps off: no notice names an app, whichever caller asks (a publish, the owner's
+  // search switch). Checked here rather than at each caller so a third caller inherits it.
+  if (!config.seoAnnounceApps) return null;
   const run = await submitToIndexNow(config, storage, appSubmitUrls(config, app, subdomain), { scope: 'app', ...opts });
   if (run?.ok) await stampAnnounced(storage, [app], run.at);
   return run;

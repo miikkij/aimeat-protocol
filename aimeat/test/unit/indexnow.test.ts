@@ -41,6 +41,7 @@ const cfg = (over: Partial<AimeatConfig> = {}): AimeatConfig => ({
   appHost: 'apps.node.example',
   indexNowKey: 'k3y',
   seoIndexnowAuto: true,
+  seoAnnounceApps: true,
   seoIndexing: 'on',
   appsSeoMode: 'owner',
   ...over,
@@ -180,6 +181,14 @@ describe('announceApp stamps the app with when it was told', () => {
     expect(stamps).toEqual([]);
   });
 
+  it('sends nothing and stamps nothing while seo.announce_apps is off', async () => {
+    const { storage, stamps } = fakeStorage();
+    const run = await announceApp(cfg({ seoAnnounceApps: false }), storage, { ownerGaii: 'alice@node.example', ownerName: 'alice', filename: 'turbo.html' }, 'turbo');
+    expect(run).toBeNull();
+    expect(fetchCalls).toHaveLength(0);
+    expect(stamps).toEqual([]);
+  });
+
   it('appSubmitUrls: the apex path always, the app host first when there is one', () => {
     expect(appSubmitUrls(cfg(), { ownerName: 'alice', filename: 'a b.html' })).toEqual(['https://node.example/v1/apps/alice/a%20b.html']);
     expect(appSubmitUrls(cfg(), { ownerName: 'alice', filename: 'turbo.html' }, 'turbo')).toEqual(['https://turbo.apps.node.example/', 'https://node.example/v1/apps/alice/turbo.html']);
@@ -213,6 +222,19 @@ describe('planAnnouncement and announceEverything: what "everything" is', () => 
     expect(plan.urls).toContain('https://node.example/v1/apps/alice/nosub.html');
     expect(plan.urls.some((u) => u.includes('secret') || u.includes('gated'))).toBe(false);
     expect(plan.hosts.map((h) => h.host).sort()).toEqual(['https://node.example', 'https://turbo.apps.node.example']);
+  });
+
+  it('with seo.announce_apps off, "all" is the pages alone and the send names no app', async () => {
+    const { storage, stamps } = fakeStorage({ apps, sites });
+    const off = cfg({ seoAnnounceApps: false });
+    const plan = await planAnnouncement(off, storage, 'all');
+    const pages = await planAnnouncement(off, storage, 'pages');
+    expect(plan.apps).toEqual([]);
+    expect(plan.urls).toEqual(pages.urls);
+    const out = await announceEverything(off, storage, { scope: 'all' });
+    expect(out.sent).toBe(true);
+    expect(fetchCalls.map((c) => (c.body as { host: string }).host)).toEqual(['node.example']);
+    expect(stamps).toEqual([]);
   });
 
   it('with discovery off nothing is findable, and the send says why', async () => {
