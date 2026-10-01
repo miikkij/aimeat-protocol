@@ -12,6 +12,8 @@
  * @structure meta · AuditSection({ d }) · actWords(entry)
  * @usage const mod = await import('./sections/audit.js'); html`<${mod.default} d=${d} />`
  * @version-history
+ *   v1.2.0 — 2026-10-01 — Keeping the log (audit-keep.js) under the entries: what is kept, the
+ *     archived years, "Archive entries before" and the owner's limit.
  *   v1.1.0 — 2026-09-27 — Parity with the old page (sections-c): the log as .mk-log (List tone log),
  *     the grey lines as .dtl-ai-status, "Show {n} more" as the old door word in its own row.
  *   v1.0.0 — 2026-09-27 — Initial: the old catalogue's audit half of js/legal.js on components (appcat
@@ -26,6 +28,7 @@ import { List, Row, Name, When, Who } from '/components/List.js';
 import { x } from '/views/appcat/i18n.js';
 import { dateText } from '/views/appcat/sections/app-write.js';
 import { useLegal } from '/views/appcat/sections/legal-state.js';
+import AuditKeep from '/views/appcat/sections/audit-keep.js';
 
 const html = htm.bind(h);
 const FIRST = 12;
@@ -60,7 +63,14 @@ export default function AuditSection({ d }) {
   if (!st || st.audit.state === 'loading') return html`<${Note} kind="hint" chapter>${x('audit.loading')}<//>`;
   if (st.audit.state === 'error') return html`<${Note} kind="hint" chapter>${x('audit.loadFailed')}<//>`;
   const entries = st.audit.entries;
-  if (!entries.length) return html`${intro}<${Note} kind="hint" chapter>${x('audit.empty')}<//>`;
+  // What is kept, the archive and the owner's limit stand under the entries, also when the active
+  // log is empty: after "Archive" it is, and the archive is where the entries went.
+  const keep = html`<${AuditKeep} d=${d} st=${st} actWords=${actWords} />`;
+  if (!entries.length) {
+    // An empty active log is not "nothing changed" when the entries went into the archive.
+    const said = (st.audit.archives || []).length ? x('audit.emptyArchived') : x('audit.empty');
+    return html`${intro}<${Note} kind="hint" chapter>${said}<//>${keep}`;
+  }
   const rest = entries.length - shown;
   // The old page's .mk-log, and "Show {n} more" as its own door word in a row under it (.dtl-btn-row).
   return html`${intro}
@@ -69,5 +79,6 @@ export default function AuditSection({ d }) {
       <${Name}>${actWords(e)}<//>
       <${Who}>${e.by}<//>
     <//>`)}<//>
-    ${rest > 0 ? html`<${Actions} chapter><${Action} small onClick=${() => setShown((n) => n + STEP)}>${x('audit.more', { n: rest })}<//><//>` : null}`;
+    ${rest > 0 ? html`<${Actions} chapter><${Action} small onClick=${() => setShown((n) => n + STEP)}>${x('audit.more', { n: rest })}<//><//>` : null}
+    ${keep}`;
 }

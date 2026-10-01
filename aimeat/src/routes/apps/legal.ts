@@ -11,7 +11,10 @@
  *                                                  markdown page rendered here, or a redirect
  *   GET /v1/apps/:owner/:filename/audit            the owner's audit log of the app's settings, and
  *                                                  with ?playtest=true the app opened for real in a
- *                                                  headless browser beside it (app-playtest.ts)
+ *                                                  headless browser beside it (app-playtest.ts);
+ *                                                  ?archive=<year> reads that year's archive
+ *   POST /v1/apps/:owner/:filename/audit/archive   move the entries before a date into the archive
+ *   GET|PUT /v1/audit/apps/settings                how much of each app's log the owner keeps
  *
  *   A legal page is pre-contract information, so it is served without the app's access code and
  *   for a parked app; only an operator-hidden app is a 404 to anyone but its owner, the same rule
@@ -19,6 +22,10 @@
  *   the MCP tool, both through services/app-legal.ts.
  * @structure registerLegalRoutes(router, config, storage, canonicalOwner)
  * @version-history
+ *   v1.4.0 — 2026-10-01 — Keeping the audit log (IAM round 2 leftover 7): the read names the archived
+ *     years and the limit in force and reads a year with ?archive=; the owner archives entries before
+ *     a date; GET|PUT /v1/audit/apps/settings sets the owner's limit, a number only by the signed-in
+ *     person because it deletes.
  *   v1.3.1 — 2026-09-26 — The second lookup's owner comes from localAccountName (utils/gaii.ts), which
  *     keeps an identity of another node whole, so it never names the local namesake
  *     (secaudit 2026-09, F-1).
@@ -39,7 +46,7 @@
 import type { Router, Request } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AppRecord } from '../../storage/interface.js';
-import { optionalAuth, requireAuth, requireScope } from '../../auth/middleware.js';
+import { optionalAuth, requireAuth, requireScope, isOwnerPrincipal } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { detectLocale } from '../../i18n.js';
 import { sandboxedCsp } from './inline-frame.js';
@@ -47,7 +54,8 @@ import {
   appLegalState, legalReadiness, renderLegalPage, isLegalKind, LEGAL_KIND_INFO, legalLinksFor, apexLegalBase,
   appSellsForMoney,
 } from '../../services/app-legal.js';
-import { readAppAudit } from '../../services/app-audit.js';
+import { readAppAudit, archiveAppAuditBefore, setOwnerAuditKeep } from '../../services/app-audit.js';
+import { listArchives, readArchiveYear, effectiveKeep, KEEP_MAX } from '../../services/app-audit-archive.js';
 import { auditAppWithPlaytest } from '../../services/app-playtest.js';
 import { applyServeMarks } from '../../services/app-serve-marks.js';
 import { loadServedProvenance, setProvenanceHeaders } from '../../services/ai-provenance-marks.js';
@@ -189,7 +197,15 @@ export function registerLegalRoutes(
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found in your uploads`));
       return;
     }
-    const all = await readAppAudit(storage, app.ownerGaii, app.filename);
+    // `?archive=<year>` reads that year's archived entries instead of the active log.
+    const year = typeof req.query.archive === 'string' ? req.query.archive : undefined;
+    if (year !== undefined && !/^\d{4}$/.test(year)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'archive must be a year of four digits, e.g. 2026.'));
+      return;
+    }
+    const all = year
+      ? await readArchiveYear(storage, app.ownerGaii, app.filename, year)
+      : await readAppAudit(storage, app.ownerGaii, app.filename);
     // `?limit=N` returns the newest N, newest first — what a person or an agent asking "what
     // happened lately" wants. Without it, the whole log oldest first, as it is kept.
     const limitRaw = Number(req.query.limit);
@@ -204,7 +220,61 @@ export function registerLegalRoutes(
     res.json(success(config.nodeId, {
       owner: app.ownerName, filename: app.filename, entries, total: all.length,
       order: limit ? 'newest-first' : 'oldest-first',
+      // What else is kept, and how much: the archived years, and the limit in force.
+      archives: await listArchives(storage, app.ownerGaii, app.filename),
+      keep: await effectiveKeep(storage, app.ownerGaii),
+      ...(year ? { year } : {}),
       ...(live ? { live } : {}),
     }));
+  });
+
+  // ── The owner's "archive entries before a date": they move into the archive for their year and
+  //    stay readable with ?archive=<year>. Nothing is deleted, so an agent in the owner's name may. ──
+  router.post('/v1/apps/me/:filename/audit/archive', requireAuth(), requireScope('app:write'), async (req, res) => {
+    const { owner } = await canonicalOwner(req);
+    res.redirect(307, `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(req.params.filename as string)}/audit/archive`);
+  });
+  router.post('/v1/apps/:owner/:filename/audit/archive', requireAuth(), requireScope('app:write'), async (req, res) => {
+    const app = await visibleApp(req, req.params.owner as string, req.params.filename as string);
+    if (!app || app === 'hidden' || !(await isOwnerOf(req, app))) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${req.params.filename as string}" not found in your uploads`));
+      return;
+    }
+    const before = (req.body ?? {}).before;
+    if (typeof before !== 'string' || !Number.isFinite(Date.parse(before))) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'before must be a date, e.g. "2026-01-01" or an ISO time.'));
+      return;
+    }
+    const moved = await archiveAppAuditBefore(storage, app.ownerGaii, app.filename, new Date(before).toISOString());
+    res.json(success(config.nodeId, {
+      moved, before: new Date(before).toISOString(), archives: await listArchives(storage, app.ownerGaii, app.filename),
+    }));
+  });
+
+  // ── How much of each app's audit log the owner keeps. `keep` 0 or "all" keeps everything; a
+  //    number keeps that many newest entries per app and deletes the rest at once. Deleting audit
+  //    entries is the person's own act: an app or an agent may read the setting and set "all", and
+  //    only the signed-in person sets a number (the `audit.` prefix exists so the log of their
+  //    changes is not theirs to rewrite). `keep: null` returns to the node default. ──
+  router.get('/v1/audit/apps/settings', requireAuth(), requireScope('app:write'), async (req, res) => {
+    const { ownerGhii } = await canonicalOwner(req);
+    res.json(success(config.nodeId, { ...(await effectiveKeep(storage, ownerGhii)), nodeDefault: config.appAuditKeepDefault }));
+  });
+  router.put('/v1/audit/apps/settings', requireAuth(), requireScope('app:write'), async (req, res) => {
+    const { ownerGhii } = await canonicalOwner(req);
+    const raw = (req.body ?? {}).keep;
+    const keep = raw === null ? null : raw === 'all' ? 0 : raw;
+    if (keep !== null && (typeof keep !== 'number' || !Number.isInteger(keep) || keep < 0 || keep > KEEP_MAX)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `keep must be "all", 0 (all), a whole number up to ${KEEP_MAX}, or null for the node default.`));
+      return;
+    }
+    // Refuse before anything is written: a limit deletes, and that is the person's own decision.
+    const deletes = keep === null ? config.appAuditKeepDefault > 0 : keep > 0;
+    if (deletes && !isOwnerPrincipal(req.auth)) {
+      res.status(403).json(error(config.nodeId, 'OWNER_ONLY',
+        'A limit deletes audit entries, so only the account holder, signed in, can set one. An app or an assistant may keep everything (keep: "all").'));
+      return;
+    }
+    res.json(success(config.nodeId, { ...(await setOwnerAuditKeep(storage, ownerGhii, keep)), nodeDefault: config.appAuditKeepDefault }));
   });
 }

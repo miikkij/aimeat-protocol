@@ -1766,10 +1766,10 @@
      "slug": "g-10-app-audit-history",
      "cells": [
       "<strong>App audit history</strong>",
-      "Read the app's recorded changes and who made them, including changes made through delegated development rights.",
-      "<code>/v1/apps/:owner/:filename/audit</code>, <code>aimeat_app_manage</code> action <code>audit</code>"
+      "Read the app's recorded changes and who made them, including changes made through delegated development rights and every roster decision. Nothing is deleted by default: when the log grows long its older entries move into an archive for their year, which stays readable. You can also archive the entries before a date. A limit (keep only the newest N entries of each app) deletes, so only you, signed in, can set one; the operator can set a node default.",
+      "<code>/v1/apps/:owner/:filename/audit</code> (<code>?archive=&lt;year&gt;</code>), <code>/v1/apps/:owner/:filename/audit/archive</code>, <code>/v1/audit/apps/settings</code>, <code>aimeat_app_manage</code> actions <code>audit</code>, <code>audit_archive</code> and <code>audit_keep</code>, App Catalog &gt; Audit log"
      ],
-     "plain": "App audit history Read the app's recorded changes and who made them, including changes made through delegated development rights. /v1/apps/:owner/:filename/audit, aimeat_app_manage action audit"
+     "plain": "App audit history Read the app's recorded changes and who made them, including changes made through delegated development rights and every roster decision. Nothing is deleted by default: when the log grows long its older entries move into an archive for their year, which stays readable. You can also archive the entries before a date. A limit (keep only the newest N entries of each app) deletes, so only you, signed in, can set one; the operator can set a node default. /v1/apps/:owner/:filename/audit (?archive=<year>), /v1/apps/:owner/:filename/audit/archive, /v1/audit/apps/settings, aimeat_app_manage actions audit, audit_archive and audit_keep, App Catalog > Audit log"
     },
     {
      "slug": "g-10-manage-an-app-from-a-chat",

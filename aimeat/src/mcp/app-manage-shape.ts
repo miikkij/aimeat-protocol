@@ -10,6 +10,7 @@
  * @structure appManageShape
  * @usage mcp.tool('aimeat_app_manage', description, { ...appManageShape, ...aiProvenanceInputs }, …)
  * @version-history
+ *   v1.4.0 — 2026-10-01 — year (audit) and keep (audit_keep), for keeping the audit log.
  *   v1.3.0 — 2026-10-01 — IAM round 2: email, locale, q, offset, before, invite_id and manage_roles.
  *   v1.2.0 — 2026-10-01 — The member fields (account, role, level, offerings, expires_at, roles,
  *     seats, terms, access, roster_visibility). `days` takes a membership term too, so its ceiling
@@ -85,5 +86,7 @@ export const appManageShape = {
     q: z.string().max(100).optional().describe(d('q')),
     offset: z.number().int().min(0).optional().describe(d('offset')),
     before: z.string().optional().describe(d('before')),
+    year: z.string().regex(/^\d{4}$/).optional().describe(d('year')),
+    keep: z.string().max(20).optional().describe(d('keep')),
     invite_id: z.string().optional().describe(d('invite_id')),
 };

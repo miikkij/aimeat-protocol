@@ -60060,9 +60060,14 @@ paths:
         or withdrawn, search visibility, parked or unparked, forking, an access code set or
         cleared (never the code itself), copy-protection flags, the name or description. Each entry
         carries the principal that made it — the owner's own GHII, or the GAII of an agent acting
-        in their name — and the time. Owner only: anyone else gets 404. At most 500 entries are
-        kept; older ones fall off. `me` in the owner slot resolves to the signed-in account.
-        With `?limit=N` the newest N come back newest first; without it, the whole log oldest first.
+        in their name — and the time. Owner only: anyone else gets 404. `me` in the owner slot
+        resolves to the signed-in account. With `?limit=N` the newest N come back newest first;
+        without it, the whole active log oldest first.
+
+        Nothing is deleted unless a limit is set. Past 1000 entries the oldest move into one archive
+        record per year; `archives` lists the archived years with their counts, `?archive=<year>`
+        reads that year instead of the active log (400 for anything but four digits), and `keep`
+        is the limit in force ({ keep, source }, 0 = all; see /v1/audit/apps/settings).
 
         With `?playtest=true` the node also OPENS the app: the same check the publish runs on its
         bytes, then a live run in a headless browser with nobody signed in, at a 390x844 phone and
@@ -60082,6 +60087,7 @@ paths:
         - { in: path, name: filename, required: true, schema: { type: string } }
         - { in: query, name: limit, required: false, schema: { type: integer, minimum: 1, maximum: 500 }, description: The newest N entries, newest first }
         - { in: query, name: playtest, required: false, schema: { type: boolean }, description: Also open the app in a headless browser and report what it did }
+        - { in: query, name: archive, required: false, schema: { type: string, pattern: '^\d{4}$' }, description: Read this year's archived entries instead of the active log }
       responses:
         '200':
           description: The log
@@ -60107,6 +60113,21 @@ paths:
                                 by: { type: string }
                                 action: { type: string }
                                 detail: { type: object, additionalProperties: true }
+                          archives:
+                            type: array
+                            description: The archived years, oldest first.
+                            items:
+                              type: object
+                              properties:
+                                year: { type: string }
+                                entries: { type: integer }
+                          keep:
+                            type: object
+                            description: The limit in force. 0 keeps all.
+                            properties:
+                              keep: { type: integer }
+                              source: { type: string, enum: [owner, node] }
+                          year: { type: string, description: Present with ?archive=, the year read. }
                           live:
                             type: object
                             description: Present only with playtest=true. The bytes check and the live run.
@@ -60122,6 +60143,94 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+  /v1/apps/{owner}/{filename}/audit/archive:
+    post:
+      operationId: archiveAppAudit
+      summary: Move the app's log entries before a date into the archive
+      description: |
+        The owner's "archive entries before a date": the active log's entries older than `before`
+        move into the archive record for their year and stay readable with
+        GET .../audit?archive=<year>. Nothing is deleted, so an agent acting in the owner's name
+        (scope app:write) may do it. Owner only: anyone else gets 404.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { in: path, name: owner, required: true, schema: { type: string } }
+        - { in: path, name: filename, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [before]
+              properties:
+                before: { type: string, description: 'A date or an ISO time, e.g. "2026-01-01".' }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/apps/me/{filename}/audit/archive:
+    post:
+      operationId: archiveOwnAppAudit
+      summary: Archive the signed-in account's own app log before a date
+      description: >-
+        The same as POST /v1/apps/{owner}/{filename}/audit/archive for the account the token belongs
+        to, by a 307 redirect that keeps the method and the body.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { in: path, name: filename, required: true, schema: { type: string } }
+      responses:
+        '307':
+          description: Redirect to /v1/apps/{owner}/{filename}/audit/archive
+  /v1/audit/apps/settings:
+    get:
+      operationId: getAppAuditSettings
+      summary: How much of each app's audit log the owner keeps
+      description: |
+        `{ keep, source, nodeDefault }`: the limit in force for every app of the owner (0 = all),
+        whether it is the owner's own or the node default (AIMEAT_APP_AUDIT_KEEP), and the node
+        default. Scope app:write for an agent.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    put:
+      operationId: setAppAuditSettings
+      summary: Set how much of each app's audit log the owner keeps
+      description: |
+        `keep`: "all" or 0 keeps everything; a whole number keeps that many newest entries of each
+        app's log, archives first to go, and deletes the rest at once; null returns to the node
+        default. Answers `{ keep, source, deleted, nodeDefault }`. A limit that deletes is the
+        account holder's own decision: an app or an agent may read the setting and set "all", and
+        anything that deletes answers 403 OWNER_ONLY unless the caller is the signed-in person.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [keep]
+              properties:
+                keep:
+                  oneOf:
+                    - { type: string, enum: [all] }
+                    - { type: integer, minimum: 0, maximum: 1000000 }
+                    - { type: 'null' }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /v1/apps/{owner}/{filename}/versions:
     get:
       operationId: getAppVersions

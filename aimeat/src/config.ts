@@ -15,6 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.20.0 — 2026-10-01 — appAuditKeepDefault (AIMEAT_APP_AUDIT_KEEP, default 0 = keep all).
  *   v1.19.0 — 2026-09-30 — updateCheckDefaults(): the npm version check (config-update-check.ts).
  *   2026-09-29 — siteLinks moves to siteLinksFromEnv() (config-site-contacts.ts) by pure extraction
  *     to stay under 800 lines; appBadge (AIMEAT_APP_BADGE) and the signageEnabled getter join.
@@ -322,6 +323,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     memoryMaxKeysPerAgent: parseInt(process.env.AIMEAT_MEMORY_MAX_KEYS ?? '1000', 10),
     memoryDeleteGraceDays: parseInt(process.env.AIMEAT_MEMORY_DELETE_GRACE_DAYS ?? '7', 10),
     organismDecisionLogCap: parseInt(process.env.AIMEAT_ORGANISM_DECISION_LOG_CAP ?? '500', 10),
+    appAuditKeepDefault: Math.max(0, parseInt(process.env.AIMEAT_APP_AUDIT_KEEP ?? '0', 10) || 0),
     workspaceMaxVersions: parseInt(process.env.AIMEAT_WS_MAX_VERSIONS ?? '20', 10),
     wsRowsMaxPerWorkspace: parseInt(process.env.AIMEAT_WS_ROWS_MAX_PER_WORKSPACE ?? '50000', 10),
     wsRowsQuotaMb: parseInt(process.env.AIMEAT_WS_ROWS_QUOTA_MB ?? '100', 10),

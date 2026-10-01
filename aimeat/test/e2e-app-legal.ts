@@ -18,10 +18,14 @@
  *       other PATCH fields too (parked, forkable, access code — never the code); it is the
  *       owner's: an agent reads it in the owner's name, a stranger gets 404, and ?limit=N is
  *       newest first;
- *     - a republish carries the pages forward; removal takes the page down; bounds refuse.
+ *     - a republish carries the pages forward; removal takes the page down; bounds refuse;
+ *     - keeping the log: "archive before a date" moves entries into their year and reads them back,
+ *       the owner's limit keeps the newest N across the archive and the log, "all" deletes nothing.
  *
  *   Runs against a live server (E2E_BASE, default http://localhost:40251).
  * @version-history
+ *   v1.3.0 — 2026-10-01 — Phase 3, the archive and the owner's limit (IAM round 2 leftover 7). All
+ *     three cases failed before the change.
  *   v1.2.0 — 2026-09-26 — Every legal page runs sandboxed with the app frame's flags (A7-1). Failed
  *     on the code before the fix: the CSP had no sandbox directive.
  *   v1.1.1 — 2026-09-26 — Under the default strict policy the reviewed page keeps its chip, and the
@@ -398,6 +402,74 @@ await test('An agent that may not declare provenance is refused before anything 
     // Without the declaration the same agent sets the page, stamped as the node saw it written.
     const plain = await json(`/v1/apps/${FILE}`, narrow({ method: 'PATCH', body: JSON.stringify({ legal: { imprint: { format: 'markdown', content: '# Imprint\n\nShop Oy, Helsinki.' } } }) }));
     assert(plain.status === 200, `an undeclared page is the agent's to set: ${plain.status} ${JSON.stringify(plain.body?.error)}`);
+});
+
+console.log('\nPhase 3: keeping the log: the archive and the owner\'s limit');
+
+await test('Archive before a date moves the older entries into their year; the log reads them back and nothing is lost', async () => {
+    const before = await json(`${appPath}/audit`, aAuthed());
+    const total = before.body.data.total as number;
+    assert(before.body.data.keep?.keep === 0 && Array.isArray(before.body.data.archives) && before.body.data.archives.length === 0,
+        `keeps all, no archive yet: ${JSON.stringify({ keep: before.body.data.keep, archives: before.body.data.archives })}`);
+    const cut = new Date(Date.now() + 60_000).toISOString();
+    const moved = await json(`${appPath}/audit/archive`, aAuthed({ method: 'POST', body: JSON.stringify({ before: cut }) }));
+    assert(moved.status === 200 && moved.body.data.moved === total, `moved every entry: ${moved.status} ${JSON.stringify(moved.body?.error ?? moved.body.data)}`);
+    const after = await json(`${appPath}/audit`, aAuthed());
+    const year = new Date().toISOString().slice(0, 4);
+    assert(after.body.data.total === 0 && after.body.data.archives.length === 1 && after.body.data.archives[0].year === year && after.body.data.archives[0].entries === total,
+        `the active log is empty and the year holds them: ${JSON.stringify(after.body.data.archives)}`);
+    const read = await json(`${appPath}/audit?archive=${year}`, aAuthed());
+    assert(read.status === 200 && read.body.data.entries.length === total && read.body.data.entries.some((e: any) => e.action === 'legal.set'),
+        `the year reads back: ${read.status} ${read.body.data?.entries?.length}`);
+    assert((await patchA({ forkable: false })).status === 200, 'a new change');
+    const fresh = await json(`${appPath}/audit`, aAuthed());
+    assert(fresh.body.data.total === 1 && fresh.body.data.entries[0].action === 'forkable', 'a new entry lands in the active log');
+});
+
+await test('The archive refuses a bad date, a stranger and an anonymous caller; a year must be a year', async () => {
+    const bad = await json(`${appPath}/audit/archive`, aAuthed({ method: 'POST', body: JSON.stringify({ before: 'yesterday' }) }));
+    assert(bad.status === 400 && bad.body.error.code === 'INVALID_INPUT', `a date that is not one: ${bad.status}`);
+    const stranger = await json(`${appPath}/audit/archive`, bAuthed({ method: 'POST', body: JSON.stringify({ before: new Date().toISOString() }) }));
+    assert(stranger.status === 404, `a stranger archived: ${stranger.status}`);
+    const anon = await json(`${appPath}/audit/archive`, { method: 'POST', body: JSON.stringify({ before: new Date().toISOString() }) });
+    assert(anon.status === 401, `anonymous: ${anon.status}`);
+    const year = await json(`${appPath}/audit?archive=nineteen`, aAuthed());
+    assert(year.status === 400, `a year that is not one: ${year.status}`);
+});
+
+await test('The owner\'s limit keeps the newest N across the archive and the log, and "all" deletes nothing again', async () => {
+    const start = await json('/v1/audit/apps/settings', aAuthed());
+    assert(start.status === 200 && start.body.data.keep === 0 && start.body.data.source === 'node', `default keeps all: ${JSON.stringify(start.body?.data ?? start.body?.error)}`);
+    for (const on of [true, false, true]) assert((await patchA({ forkable: on })).status === 200, 'more changes');
+    const archivedBefore = (await json(`${appPath}/audit`, aAuthed())).body.data.archives[0].entries as number;
+    const set = await json('/v1/audit/apps/settings', aAuthed({ method: 'PUT', body: JSON.stringify({ keep: 3 }) }));
+    assert(set.status === 200 && set.body.data.keep === 3 && set.body.data.source === 'owner' && set.body.data.deleted === archivedBefore + 1,
+        `limit set and applied: ${JSON.stringify(set.body?.data ?? set.body?.error)}`);
+    const log = await json(`${appPath}/audit`, aAuthed());
+    assert(log.body.data.total === 3 && log.body.data.archives.length === 0, `three newest left, no archive: ${log.body.data.total} ${JSON.stringify(log.body.data.archives)}`);
+    assert((await patchA({ forkable: false })).status === 200, 'one more');
+    assert((await json(`${appPath}/audit`, aAuthed())).body.data.total === 3, 'a new entry keeps the log at three');
+    const all = await json('/v1/audit/apps/settings', aAuthed({ method: 'PUT', body: JSON.stringify({ keep: 'all' }) }));
+    assert(all.status === 200 && all.body.data.keep === 0 && all.body.data.deleted === 0, `back to all: ${JSON.stringify(all.body?.data)}`);
+    assert((await patchA({ forkable: true })).status === 200, 'another');
+    assert((await json(`${appPath}/audit`, aAuthed())).body.data.total === 4, 'and the log grows again');
+    const silly = await json('/v1/audit/apps/settings', aAuthed({ method: 'PUT', body: JSON.stringify({ keep: -2 }) }));
+    assert(silly.status === 400, `a negative limit: ${silly.status}`);
+    const theirs = await json('/v1/audit/apps/settings', bAuthed());
+    assert(theirs.status === 200 && theirs.body.data.keep === 0, 'another owner has their own setting');
+});
+
+await test('An agent in the owner\'s name reads the setting, archives and keeps all, but cannot set a limit that deletes', async () => {
+    const read = await json('/v1/audit/apps/settings', agentAuthed());
+    assert(read.status === 200 && read.body.data.keep === 0, `the agent reads: ${read.status} ${JSON.stringify(read.body?.data ?? read.body?.error)}`);
+    const totalBefore = (await json(`${appPath}/audit`, aAuthed())).body.data.total as number;
+    const limit = await json('/v1/audit/apps/settings', agentAuthed({ method: 'PUT', body: JSON.stringify({ keep: 1 }) }));
+    assert(limit.status === 403 && limit.body.error.code === 'OWNER_ONLY', `an agent set a limit: ${limit.status} ${JSON.stringify(limit.body?.error)}`);
+    assert((await json(`${appPath}/audit`, aAuthed())).body.data.total === totalBefore, 'and nothing was deleted');
+    const all = await json('/v1/audit/apps/settings', agentAuthed({ method: 'PUT', body: JSON.stringify({ keep: 'all' }) }));
+    assert(all.status === 200 && all.body.data.deleted === 0, `keeping all is the agent's to set: ${all.status}`);
+    const moved = await json(`/v1/apps/me/${FILE}/audit/archive`, agentAuthed({ method: 'POST', body: JSON.stringify({ before: new Date(Date.now() + 60_000).toISOString() }) }));
+    assert(moved.status === 200 && moved.body.data.moved === totalBefore, `the agent archives through me: ${moved.status} ${JSON.stringify(moved.body?.error ?? moved.body.data)}`);
 });
 
 console.log('\nCleanup');

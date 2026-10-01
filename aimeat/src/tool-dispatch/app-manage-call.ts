@@ -14,6 +14,8 @@
  * @structure appManageCall · MEMBER_ACTIONS
  * @usage return out(await appManageCall(client, owner, input));
  * @version-history
+ *   2026-10-01 -- Keeping the audit log: audit sends year as ?archive=, audit_archive and audit_keep go
+ *     over their routes (and so, on the node, through the loopback with the member actions).
  *   2026-10-01 -- IAM round 2: member_set sends email and locale, members sends q, limit and offset as a query,
  *     member_plan_set sends manage_roles as manageRoles, and member_audit and member_invite_cancel
  *     reach GET .../members/audit and DELETE .../members/invites/:id.
@@ -53,6 +55,8 @@ export const MEMBER_ACTIONS: ReadonlySet<string> = new Set([
     'members', 'member_set', 'member_remove', 'member_decline', 'member_dismiss',
     'member_plan_get', 'member_plan_set', 'member_sweep', 'member_me', 'member_request',
     'member_audit', 'member_invite_cancel',
+    // Keeping the audit log: the route decides who may set a limit that deletes (the account holder).
+    'audit_archive', 'audit_keep',
 ]);
 
 /**
@@ -83,7 +87,18 @@ export async function appManageCall(client: AimeatClient, owner: string, input: 
         }
         case 'audit': {
             const playtest = input.playtest ? '&playtest=true' : '';
-            return client.get(`/v1/apps/me/${file}/audit?limit=${Number(input.limit ?? 50)}${playtest}`);
+            const year = typeof input.year === 'string' && input.year ? `&archive=${enc(input.year)}` : '';
+            return client.get(`/v1/apps/me/${file}/audit?limit=${Number(input.limit ?? 50)}${playtest}${year}`);
+        }
+        case 'audit_archive':
+            return client.post(`${app}/audit/archive`, { before: input.before });
+        case 'audit_keep': {
+            if (input.keep === undefined || input.keep === null || input.keep === '') return client.get('/v1/audit/apps/settings');
+            const raw = String(input.keep).trim().toLowerCase();
+            // "all" and "default" are words; anything else is sent as the number it reads as, and the
+            // route refuses what is not a whole number.
+            const keep = raw === 'all' ? 'all' : raw === 'default' ? null : Number(raw);
+            return client.put('/v1/audit/apps/settings', { keep });
         }
         case 'versions':
             return client.get(`${app}/versions`);

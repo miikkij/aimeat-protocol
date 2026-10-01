@@ -10,6 +10,7 @@
  *   DELETE .../members/invites/:id
  * @usage router.use(appMembersExtraRouter(config, storage)), inside appMembersRouter
  * @version-history
+ *   v1.0.2 — 2026-10-01 — The roster history reads the archived years of the audit log too.
  *   v1.0.1 — 2026-10-01 — The cancel's audit row names the address, so the history can say whom.
  *   v1.0.0 — 2026-10-01 — Initial (IAM round 2, A2 and B2).
  */
@@ -21,6 +22,7 @@ import { requireScopeOrOwnApp } from '../auth/app-own-gate.js';
 import { success, error } from '../middleware/envelope.js';
 import { membersContext } from './app-members-context.js';
 import { readAppAudit } from '../services/app-audit.js';
+import { readAllEntries } from '../services/app-audit-archive.js';
 import { memberAuditRows, isManagerRole } from '../services/app-member-rules.js';
 import { findInvite, removeInvite, inviteView } from '../services/app-member-invites.js';
 
@@ -38,7 +40,9 @@ export function appMembersExtraRouter(config: AimeatConfig, storage: Storage): R
     if (!c.canManage) {
       return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the app owner, or a member who manages its roster, reads its audit trail'));
     }
-    const entries = await readAppAudit(storage, await bucketOf(c.owner), c.filename);
+    // The archived years too, so paging back with `before` reaches the oldest roster entry kept.
+    const bucket = await bucketOf(c.owner);
+    const entries = await readAllEntries(storage, bucket, c.filename, await readAppAudit(storage, bucket, c.filename));
     const page = memberAuditRows(entries, { limit: req.query.limit, before: req.query.before });
     return res.json(success(config.nodeId, page));
   });

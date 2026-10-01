@@ -16,6 +16,7 @@
  * @structure useLegal(d) · reloadLegal(owner, filename) · LegalChip({ d }) · KINDS
  * @usage import { LegalChip } from './sections/legal-state.js'; html`<${LegalChip} d=${d} />`
  * @version-history
+ *   v1.1.0 — 2026-10-01 — The audit read keeps the archived years and the limit in force.
  *   v1.0.0 — 2026-09-27 — Initial: the old catalogue's legalOnOpen, loadAudit and legalChipHtml
  *     (js/legal.js) as one shared state (appcat detail builder B).
  */
@@ -47,7 +48,7 @@ function path(owner, filename) { return '/v1/apps/' + encodeURIComponent(owner) 
 export function reloadLegal(owner, filename) {
   const ref = owner + '/' + filename;
   // A new slot per read: an answer that comes after the app was closed or read again lands nowhere.
-  const slot = { legal: { state: 'loading', data: null }, audit: { state: 'loading', entries: [], total: 0 } };
+  const slot = { legal: { state: 'loading', data: null }, audit: { state: 'loading', entries: [], total: 0, archives: [], keep: null } };
   byRef.set(ref, slot);
   emit();
   const land = () => { if (byRef.get(ref) === slot) emit(); };
@@ -58,11 +59,16 @@ export function reloadLegal(owner, filename) {
     .then(land);
   apiGet(path(owner, filename) + '/audit')
     .then((res) => {
-      const entries = (res && res.data && res.data.entries) || [];
-      slot.audit = { state: 'ready', entries, total: (res && res.data && res.data.total) || entries.length };
+      const data = (res && res.data) || {};
+      const entries = data.entries || [];
+      slot.audit = {
+        state: 'ready', entries, total: data.total || entries.length,
+        // The archived years and the limit in force (services/app-audit-archive.ts).
+        archives: data.archives || [], keep: data.keep || null,
+      };
     })
     // eslint-disable-next-line aimeat/no-silent-catch -- the 'error' state is said in words ("Could not read the audit log")
-    .catch(() => { slot.audit = { state: 'error', entries: [], total: 0 }; })
+    .catch(() => { slot.audit = { state: 'error', entries: [], total: 0, archives: [], keep: null }; })
     .then(land);
 }
 
