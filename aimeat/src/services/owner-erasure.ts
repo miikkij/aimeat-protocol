@@ -23,6 +23,9 @@
  * @structure eraseOwner(storage, nodeId, name) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name);
  * @version-history
+ *   v1.7.0 — 2026-10-01 — Exchange contracts and grants the account is a party to, as consumer or as
+ *     provider, are revoked (services/entitlement-erasure.ts). Their keys hash the owner GHII, which
+ *     a reused name reproduces, so the next holder of the name was authorised on them.
  *   v1.6.0 — 2026-10-01 — App rosters are erased (services/app-member-erasure.ts): the account's own
  *     member rows, requests, visits and blanket development rights on every app, and the whole roster,
  *     carry plan and given blanket rights of the apps it owned. Keyed by the reusable account name, so
@@ -52,6 +55,7 @@ import { evictAgentTelemetry } from './telemetry-buffer.js';
 import { purgeClassificationAudit } from './classification/audit.js';
 import { purgeExceptions } from './classification/exceptions.js';
 import { eraseAppMembership } from './app-member-erasure.js';
+import { revokeEntitlementsOfAccount } from './entitlement-erasure.js';
 
 export interface OwnerErasureResult {
   agentsDeleted: number;
@@ -195,6 +199,16 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
       const c = await eraseAppMembership(storage, name);
       const n = c.members + c.requests + c.visits + c.plans + c.blanketGrants;
       return n ? `app_membership:${n}` : null;
+    }, deletionLog);
+
+    // Exchange contracts and grants (services/entitlement-erasure.ts). Keyed by a hash of the
+    // consumer's owner GHII, which a new holder of the name gets back unchanged, so an active record
+    // authorises them; on the provider side it bills to or is carried by them. Revoked, not deleted:
+    // the other party's spend and earnings history stays readable.
+    await step('entitlements', async () => {
+      const c = await revokeEntitlementsOfAccount(storage, name, nodeId);
+      const n = c.asConsumer + c.asProvider;
+      return n ? `entitlements:${n}` : null;
     }, deletionLog);
 
     await step('ext_instances', async () => {
