@@ -3,7 +3,6 @@
   "exempt": {
     "no-twin:DELETE /v1/admin/email/templates/:id": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (locale) and no agent tool does the same job.",
     "no-twin:DELETE /v1/ecosystem/subscriptions": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (event) and no agent tool does the same job.",
-    "no-twin:DELETE /v1/federation/peers/:nodeId": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (reason) and no agent tool does the same job.",
     "no-twin:DELETE /v1/intake/forms": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (organism_id) and no agent tool does the same job.",
     "no-twin:DELETE /v1/knowledge/:id/link": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (target) and no agent tool does the same job.",
     "no-twin:DELETE /v1/push/subscribe": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (endpoint) and no agent tool does the same job.",

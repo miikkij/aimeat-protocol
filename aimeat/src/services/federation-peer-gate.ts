@@ -25,6 +25,7 @@
  *   folding eight payload shapes into one helper would hide the thing most worth reading. The route
  *   keeps its own `verify()` call and uses `peer.publicKey` from the result.
  * @structure
+ *   - peerTakesMessages() — the outbound check: may a message be sent to this peer
  *   - PeerCapability — the permission words a door can name
  *   - PeerGateResult — the peer, or the refusal to send
  *   - gatePeer() — find, check active, check the capability
@@ -33,6 +34,8 @@
  *   if (!gate.ok) { res.status(gate.status).json(error(config.nodeId, gate.code, gate.message)); return; }
  *   // ...then verify the signature against gate.peer.publicKey
  * @version-history
+ *   v1.2.0 — 2026-10-01 — peerTakesMessages(): the outbound check the message paths share (status and
+ *     messaging flag), next to the inbound one.
  *   v1.1.0 — 2026-09-03 — `allowRouting` is out of the vocabulary. No door ever asked for it, so its
  *     refusal text had never been sent to anyone, and it pointed the wrong way: routing is the
  *     SENDER's policy, checked in routes/federation-sync/routing.ts against its own record of the
@@ -127,4 +130,15 @@ export function gatePeer(
   }
 
   return { ok: true, peer };
+}
+
+/**
+ * The OUTBOUND twin, for the message paths (message-delivery.ts, attachment-duplication.ts): whether a
+ * message, a read receipt or an attachment request is sent to this peer. A link that is up, or up and
+ * flaky, with messaging on. Anything else (not yet activated, approved and never switched on, leaving,
+ * parked by the operator, down, or messaging off) is not sent to: a message is for a link the operator
+ * keeps, and a conversation needs both directions of the flag (2026-10-01).
+ */
+export function peerTakesMessages(peer: PeerInfo): boolean {
+  return (peer.status === 'active' || peer.status === 'degraded') && peer.allowMessaging !== false;
 }

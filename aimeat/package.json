@@ -191,6 +191,7 @@
     "check:denial-coverage:seed": "tsx scripts/check-denial-coverage.ts --seed",
     "check:route-scopes:report": "tsx scripts/check-route-scopes.ts",
     "check:outbound-fetch": "tsx scripts/check-outbound-fetch.ts --strict",
+    "check:peer-paths": "tsx scripts/check-peer-paths.ts --strict",
     "check:trusted-keys": "tsx scripts/check-trusted-keys.ts --strict",
     "check:trusted-keys:report": "tsx scripts/check-trusted-keys.ts",
     "check:trusted-keys:seed": "tsx scripts/check-trusted-keys.ts --seed",

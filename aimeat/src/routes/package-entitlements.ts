@@ -49,7 +49,7 @@ export function registerPackageEntitlementRoutes(
             note: body.note,
             channel: body.channel,
             node: body.node,
-        }, peers, { timeoutMs: config.federationTimeoutMs });
+        }, peers, { timeoutMs: config.federationTimeoutMs, thisNodeId: config.nodeId });
         if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
         res.json(success(config.nodeId, {
             entitlement: out.entitlement, peer_registered: out.peerRegistered === true, peer_pending: out.peerPending === true,
@@ -83,7 +83,7 @@ export function registerPackageEntitlementRoutes(
             return;
         }
         // A node granted while it did not answer is registered on its first signed request.
-        await adoptPendingPeer({ storage, peers, timeoutMs: config.federationTimeoutMs }, headerNode(req.headers));
+        await adoptPendingPeer({ storage, peers, timeoutMs: config.federationTimeoutMs, thisNodeId: config.nodeId }, headerNode(req.headers));
         // A packages-only peer (catalogue not shared, registered with its grant) is heard for what it
         // holds, and its listing carries only that: the public catalogue is what the flag withholds.
         const who = await verifyPackageNode(req.headers, peers, '*', Date.now(),

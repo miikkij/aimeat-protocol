@@ -13,6 +13,10 @@
  *   - POST /v1/admin/federation/join: introduces this node to a target via key exchange
  *
  * @version-history
+ *   Join keys first — 2026-10-01 — completeJoin exchanges keys before it saves the peer, saves nothing
+ *     when the exchange fails, and never replaces a peer this node already has: the id came from the
+ *     target's own card, and a keyless active peer took the first key any caller sent to
+ *     /v1/federation/key-exchange (incident federation-join-the-target-s-card-names-the-peer-id-an-exist-muptit8h).
  *   Revoke order — 2026-09-09 — The last-operator check runs before the self-revoke check; behind it
  *     the guard could never fire, because the caller holds the role and so the count was always two.
  *   Join completion — 2026-09-06 — Review items 4.4 and 4.5. The approved-join completion is awaited
@@ -610,11 +614,28 @@ async function completeJoin(
     storage: Storage,
     peers?: Map<string, PeerInfo>,
 ): Promise<void> {
+    // An existing peer is never replaced by a join: the id comes from the target's own card, and a
+    // target claiming the id of a peer this node already has would take over its url and key.
+    if (peers?.has(targetNodeId)) {
+        logger.warn(`Join: ${targetNodeId} is already a peer of this node; nothing was changed`, { targetUrl });
+        return;
+    }
+    // The key first, the peer after: a peer saved active with no key took the first key any caller
+    // sent to POST /v1/federation/key-exchange (that route checks rotation only against a key it has).
+    const result = await performKeyExchange(targetUrl, config, storage, targetNodeId);
+    if (!result.success || !result.peerPublicKey) {
+        logger.warn(`Join: key exchange with ${targetNodeId} failed, so no peer was saved: ${result.error ?? 'no public key received'}`, { targetUrl });
+        return;
+    }
+    if (peers?.has(targetNodeId)) {
+        logger.warn(`Join: ${targetNodeId} became a peer while the keys were exchanged; nothing was changed`, { targetUrl });
+        return;
+    }
     const now = new Date().toISOString();
     const newPeer: PeerInfo = {
         nodeId: targetNodeId,
         url: targetUrl,
-        publicKey: '',
+        publicKey: result.peerPublicKey,
         status: 'active',
         addedAt: now,
         lastSeen: now,
@@ -623,20 +644,9 @@ async function completeJoin(
         ...deriveTierFlags('member'),
         tier: 'member',
     };
-
     if (peers) peers.set(targetNodeId, newPeer);
     await storage.saveFederationPeer(newPeer);
-
-    const result = await performKeyExchange(targetUrl, config, storage);
-    if (result.success && result.peerPublicKey) {
-        newPeer.publicKey = result.peerPublicKey;
-        await storage.saveFederationPeer(newPeer);
-        logger.info(`Join complete: peer ${targetNodeId} added and keys exchanged`);
-    } else if (result.success) {
-        logger.info(`Join complete: peer ${targetNodeId} added (no public key received)`);
-    } else {
-        logger.warn(`Join: peer ${targetNodeId} saved but key exchange failed: ${result.error}`);
-    }
+    logger.info(`Join complete: peer ${targetNodeId} added and keys exchanged`);
     emitChange('federation');
 }
 

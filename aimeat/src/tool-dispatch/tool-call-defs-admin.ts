@@ -9,6 +9,7 @@
  * @structure adminCliTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { adminCliTools } from './tool-call-defs-admin.js';
  * @version-history
+ *   v1.9.0 -- 2026-10-01 -- aimeat_admin_federation_peer_remove (DELETE /v1/federation/peers/:nodeId).
  *   v1.8.0 -- 2026-09-30 -- aimeat_admin_node_update (GET /v1/admin/node-update, refresh forwarded).
  *   v1.7.0 -- 2026-09-29 -- aimeat_package_sale (GET, PUT, DELETE /v1/package-sales/...), every field forwarded.
  *   v1.6.0 -- 2026-09-28 -- aimeat_admin_install_set (POST /v1/install-sets/apply, GET /v1/install-sets):
@@ -49,6 +50,16 @@ export const adminCliTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) =>
             client.put(`/v1/federation/peers/${encodeURIComponent(requiredString(input, 'node_id'))}/relay-claim`,
                 { relay_claim: requiredString(input, 'relay_claim') }),
+    },
+    {
+        // THE THIRD SURFACE forwards all three: `node_id` in the path, `emergency` and `reason` as the
+        // query the route reads (a DELETE here carries no body). Without `emergency` the route starts
+        // the grace period, as the page's plain remove does.
+        name: 'aimeat_admin_federation_peer_remove',
+        handler: ({ client }, input) => client.delete(`/v1/federation/peers/${encodeURIComponent(requiredString(input, 'node_id'))}${query({
+            emergency: optionalBoolean(input, 'emergency') === true ? 'true' : undefined,
+            reason: optionalString(input, 'reason'),
+        })}`),
     },
     {
         // THE THIRD SURFACE forwards all three, and forwards each date WHETHER OR NOT its partner

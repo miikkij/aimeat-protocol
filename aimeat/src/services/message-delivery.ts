@@ -12,6 +12,12 @@
  *   - startMessageRetryJob(config, storage, peers) — periodic sweep (DECISION #6)
  * @usage import { deliverDirectMessage, startMessageRetryJob } from '../services/message-delivery.js';
  * @version-history
+ *   v1.2.0 -- 2026-10-01 -- Messages and read receipts go only to a peer that is active or degraded
+ *     (peerTakesMessages); a pending, approved, leaving or parked peer waits in the queue (incident
+ *     outbound-federated-dm-read-receipt-and-attachment-grant-use--muptilp4). The plain fetch to the
+ *     peer's url stays: it is the federation carve-out of security/outbound-fetch-exemptions.json
+ *     (ruled 2026-07-10), and the peers a message reaches have an address an operator approved or the
+ *     introduction checked; a peer a package path registers takes no messages.
  *   v1.1.0 -- 2026-10-01 -- A peer whose messaging is off gets no message, read receipt or attachment
  *     request from here: undeliverable, `peer_messaging_off`. Until then only the receiving route read
  *     the flag, so a packages-only peer (registered by a package grant, messaging off) still received
@@ -29,6 +35,7 @@ import { parseGaiiLoose } from '../utils/gaii.js';
 import { deliveryTargetFor } from '../utils/messaging.js';
 import { logger } from '../utils/logger.js';
 import { sweepReferenceAttachments } from './attachment-duplication.js';
+import { peerTakesMessages } from './federation-peer-gate.js';
 
 export interface DeliveryCtx {
   config: AimeatConfig;
@@ -82,8 +89,10 @@ export async function deliverDirectMessage(ctx: DeliveryCtx, record: DirectMessa
     logDelivery(ctx, { messageId: record.id, origin: 'federation', targetNodeId: targetNode, status, latencyMs: Date.now() - started, ...extra });
 
   const peer = peerForNode(peers, targetNode);
-  if (!peer || peer.status === 'offline' || peer.status === 'unreachable') {
-    // Peer not reachable — leave queued; the retry job will try again (no failure counted).
+  if (!peer || (peer.status !== 'active' && peer.status !== 'degraded')) {
+    // Not a link that is up (unknown, pending, approved, leaving, parked, down): leave it queued; the
+    // retry job tries again (no failure counted). Until 2026-10-01 only offline and unreachable were
+    // held back, so a peer the operator had parked or was letting go still received messages.
     await log('queued', { errorMessage: peer ? `peer_${peer.status}` : 'no_peer' });
     return 'queued';
   }
@@ -153,7 +162,7 @@ export async function propagateReadReceipt(ctx: DeliveryCtx, message: DirectMess
     return;
   }
   const peer = peerForNode(peers, senderNode);
-  if (!peer || !peer.url || peer.allowMessaging === false) return;
+  if (!peer || !peer.url || !peerTakesMessages(peer)) return;
   const nodeKey = await storage.getNodeKey();
   if (!nodeKey) return;
   const payload = { source_node: config.nodeId, message_id: message.id, kind: 'read' as const, timestamp: readAt };

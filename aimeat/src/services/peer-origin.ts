@@ -23,6 +23,7 @@
  * @structure PeerOrigin · PendingPeer · pendingExpired() · recordPeerOrigin() · listPeerOrigins() · readPendingPeer() ·
  *   writePendingPeer() · deletePendingPeer() · listPendingPeers() · pendingRegistrationView() · forgetPeer()
  * @version-history
+ *   v1.1.0 — 2026-10-01 — forgetPeer also removes the markers of the peer's Security page events.
  *   v1.0.0 — 2026-10-01 — Initial (the peer-registration incident, finding F).
  */
 import type { Storage } from '../storage/interface.js';
@@ -120,8 +121,14 @@ export function pendingRegistrationView(p: PendingPeer): Record<string, unknown>
     };
 }
 
-/** An operator removed the peer: its origin and any pending registration go with it, so the name is free. */
+/**
+ * An operator removed the peer: its origin, any pending registration and the markers of its Security
+ * page events (peer-incidents.ts) go with it, so the name is free and a new event about it is recorded.
+ */
 export async function forgetPeer(storage: Storage, nodeId: string): Promise<void> {
     await storage.deleteMemory(NS_PEER_ORIGIN, originKey(nodeId));
     await storage.deleteMemory(NS_PEER_ORIGIN, pendingKey(nodeId));
+    for (const r of await storage.listMemory(NS_PEER_ORIGIN, { prefix: `incident.${nodeId}.` })) {
+        if ((r.value as { nodeId?: string } | undefined)?.nodeId === nodeId) await storage.deleteMemory(NS_PEER_ORIGIN, r.key);
+    }
 }

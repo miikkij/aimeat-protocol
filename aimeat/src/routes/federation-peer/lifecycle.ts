@@ -5,6 +5,11 @@
  * @description Peer de-peering (grace + emergency), federation ping (cached service-summary hash), and
  *   Ed25519 key-exchange with key-continuity rotation guard. Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-10-01 — key-exchange takes a key it cannot check against an established one only from
+ *     the card at the address the operator approved: for an approval this node's own join wrote (it
+ *     carries no key) and for a peer with no key. Until then the first unauthenticated caller set the
+ *     key (incident federation-join-the-target-s-card-names-the-peer-id-an-exist-muptit8h). A refused
+ *     rotation is recorded on the Security page as an id held under another key (peer-incidents.ts).
  *   v1.3.0 — 2026-10-01 — DELETE /peers/:nodeId frees the name completely: an emergency delete takes the
  *     peer's recorded origin and any pending package registration with it, and a node id that is only a
  *     pending registration (no peer yet) is deleted as that (`pending_deleted`). The operator's way to
@@ -23,7 +28,6 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireRole } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
-import { returnEscrow } from '../../services/morsel.js';
 import { logger } from '../../utils/logger.js';
 import { LIVENESS_RECOVERABLE, OPERATOR_PARKED, type PeerInfo } from '../../services/federation.js';
 import { verify } from '../../auth/keypair.js';
@@ -32,158 +36,33 @@ import { emitChange } from '../../services/event-bus.js';
 import { peerKeyCache } from '../../services/federation-helpers.js';
 import { computeServiceSummary } from '../../utils/service-summary.js';
 import { deriveTierFlags, coerceTier, type PeerTier } from '../../services/federation-tiers.js';
-import { forgetPeer, readPendingPeer, deletePendingPeer } from '../../services/peer-origin.js';
+import { proveNodeCard } from '../../services/package-peer-register.js';
+import { reportPeerIncident } from '../../services/peer-incidents.js';
+import { removePeer } from '../../services/federation-peer-remove.js';
 
 /** Cached service summary hash to avoid recomputing on every ping (60s TTL). */
 let cachedSummaryHash = '';
 let summaryHashExpiry = 0;
 
 export function registerLifecycleRoutes(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
+    /** Whether the card at `url`, an address the operator chose, publishes `key` for `nodeId`. */
+    const keyFromApprovedCard = async (nodeId: string, url: string, key: string): Promise<boolean> =>
+        !!url && !!key && (await proveNodeCard(nodeId, url, key, config.federationTimeoutMs)).kind === 'proven';
+
     // DELETE /v1/federation/peers/:nodeId — de-peer (operator only)
     // Normal: grace period (configurable, default 72h) — in-flight work completes, new requests blocked
     // Emergency (?emergency=true): immediate disconnect, cancel in-flight work, return escrow
     router.delete('/v1/federation/peers/:nodeId', requireAuth(), requireRole('operator'), async (req, res) => {
-        const nodeId = req.params.nodeId as string;
-        const emergency = req.query.emergency === 'true';
-        const notifyNetwork = req.body?.notify_network === true;
-        const reason = (req.body?.reason as string) ?? (emergency ? 'emergency_depeer' : 'operator_decision');
-
-        const peer = peers.get(nodeId);
-        if (!peer) {
-            // Not a peer, but a package grant may still be waiting for a node by this id. Deleting it
-            // frees the id for a grant under another key.
-            if (await readPendingPeer(storage, nodeId)) {
-                await deletePendingPeer(storage, nodeId);
-                res.json(success(config.nodeId, { deleted: true, node_id: nodeId, pending_deleted: true }));
-                emitChange('federation');
-                return;
-            }
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Peer not found: ${nodeId}`));
-            return;
-        }
-
-        if (emergency) {
-            // ── Emergency de-peering: immediate disconnect ──
-            // 1. Remove peer immediately, with its recorded origin, so the name is free
-            peers.delete(nodeId);
-            await storage.deleteFederationPeer(nodeId);
-            await forgetPeer(storage, nodeId);
-
-            // 2. Cancel all in-flight cross-node work from/to this peer and return escrow
-            const allWork = await storage.listAllWork();
-            let cancelledCount = 0;
-            for (const work of allWork) {
-                if (work.status !== 'pending' && work.status !== 'accepted') continue;
-                // Check if the work involves an agent from the de-peered node
-                const isFromPeer = work.providerGaii.endsWith(`@${nodeId}`) || work.requesterGaii.endsWith(`@${nodeId}`);
-                if (!isFromPeer) continue;
-
-                await returnEscrow(storage, work);
-                await storage.updateWork(work.trackingCode, { status: 'cancelled', updatedAt: new Date().toISOString() });
-                cancelledCount++;
-            }
-
-            // 3. Notify other peers if requested
-            if (notifyNetwork) {
-                const activePeers = [...peers.values()].filter(p => p.status === 'active');
-                for (const otherPeer of activePeers) {
-                    try {
-                        // SSRF validation: block requests to private/reserved IPs
-                        const peerUrlCheck = await validateOutboundUrl(otherPeer.url);
-                        if (!peerUrlCheck.valid) {
-                            logger.warn(`Blocked outbound request to peer ${otherPeer.nodeId}: ${peerUrlCheck.reason}`);
-                            continue;
-                        }
-                        await fetch(`${otherPeer.url}/v1/federation/trust-advisory`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                target_node: nodeId,
-                                advisory_type: 'suspend',
-                                reason,
-                                issued_by: config.nodeId,
-                            }),
-                            signal: AbortSignal.timeout(5_000),
-                        });
-                    } catch {
-                        logger.warn(`Failed to notify peer ${otherPeer.nodeId} about emergency de-peering of ${nodeId}`);
-                    }
-                }
-            }
-
-            res.json(success(config.nodeId, {
-                deleted: true,
-                node_id: nodeId,
-                emergency: true,
-                reason,
-                cancelled_work_items: cancelledCount,
-                network_notified: notifyNetwork,
-                note: 'Peer immediately de-peered — all in-flight work cancelled, escrow returned',
-            }));
-            emitChange('federation');
-        } else {
-            // ── Normal de-peering: grace period ──
-            const graceHours = config.depeeringGracePeriodHours;
-            const gracePeriodEnd = new Date(Date.now() + graceHours * 3600_000).toISOString();
-
-            peer.status = 'depeering';
-            (peer as PeerInfo & { depeerGraceEnd?: string }).depeerGraceEnd = gracePeriodEnd;
-            await storage.saveFederationPeer(peer);
-
-            // Remove federated catalogue entries from this peer (mark expiring)
-            const allActions = await storage.listActions();
-            let expiredActions = 0;
-            for (const action of allActions) {
-                if (action.tags.includes(`federated:${nodeId}`)) {
-                    await storage.updateAction(action.id, action.providerGaii, {
-                        tags: [...action.tags.filter(t => t !== `federated:${nodeId}`), `expiring:${nodeId}`],
-                    });
-                    expiredActions++;
-                }
-            }
-
-            // C.4: Rename replica entries to expiring for grace period
-            const allAgents = await storage.listAgents();
-            let expiredReplicas = 0;
-            for (const agent of allAgents) {
-                const memories = await storage.listMemory(agent.gaii, { prefix: `replica:${nodeId}:` });
-                for (const mem of memories) {
-                    const expiringKey = mem.key.replace(`replica:${nodeId}:`, `expiring:${nodeId}:`);
-                    await storage.setMemory({
-                        ...mem,
-                        key: expiringKey,
-                        tags: [...mem.tags.filter(t => !t.startsWith('replica:')), `expiring:${nodeId}`],
-                        updatedAt: new Date().toISOString(),
-                    });
-                    await storage.deleteMemory(agent.gaii, mem.key);
-                    expiredReplicas++;
-                }
-            }
-
-            // Remove peer keys from cache
-            peerKeyCache.delete(nodeId);
-
-            logger.info(`De-peering grace period started for peer ${nodeId}`, {
-                expiredActions,
-                expiredReplicas,
-                graceHours,
-                gracePeriodEnd: gracePeriodEnd,
-            });
-
-            res.json(success(config.nodeId, {
-                deleted: false,
-                node_id: nodeId,
-                emergency: false,
-                status: 'depeering',
-                reason,
-                grace_period_hours: graceHours,
-                grace_period_ends: gracePeriodEnd,
-                expiring_actions: expiredActions,
-                expiring_replicas: expiredReplicas,
-                note: `Peer set to depeering status. In-flight work may complete. Peer will be purged after ${graceHours}h grace period.`,
-            }));
-            emitChange('federation');
-        }
+        const out = await removePeer({ config, storage, peers }, req.params.nodeId as string, {
+            emergency: req.query.emergency === 'true',
+            notifyNetwork: req.body?.notify_network === true,
+            // The reason from the body (the page) or the query (the MCP tool's connector and CLI twins,
+            // whose DELETE carries no body).
+            ...(typeof req.body?.reason === 'string' ? { reason: req.body.reason as string }
+                : typeof req.query.reason === 'string' ? { reason: req.query.reason } : {}),
+        });
+        if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
+        res.json(success(config.nodeId, out.body));
     });
 
     // POST /v1/federation/ping — federation health check (used by peers)
@@ -287,6 +166,18 @@ export function registerLifecycleRoutes(router: Router, config: AimeatConfig, st
             // presenting a different key gets admitted with the ESTABLISHED one, which they cannot
             // sign for, so the re-admission is worthless to anyone but the real node.
             const admittedKey = approvedRequest?.publicKey || (node_public_key as string);
+            // An approval written by this node's own join (admin-monitoring.ts) carries no key. Then the
+            // key in this unauthenticated body is taken only when the card at the address the operator
+            // approved publishes it under this node id: that address is the operator's choice, so its
+            // card is the operator's word, which a body sent from anywhere is not.
+            if (hasApprovedRequest && !approvedRequest?.publicKey) {
+                const proven = await keyFromApprovedCard(node_id as string, approvedRequest?.fromNodeUrl || '', node_public_key as string);
+                if (!proven) {
+                    res.status(403).json(error(config.nodeId, 'KEY_NOT_PROVEN',
+                        `The node at the approved address does not publish this key for ${node_id}. Nothing was admitted.`));
+                    return;
+                }
+            }
             // The same holds for the ADDRESS. This door is unauthenticated, and the address it
             // re-admits a peer at is where this node then sends that peer's traffic: attached MCP
             // credentials, relayed messages, a federated sign-in's password. It took the address from
@@ -336,11 +227,23 @@ export function registerLifecycleRoutes(router: Router, config: AimeatConfig, st
         // attacker-signed settlements/replication verify against it. Newly auto-added peers set their
         // key just above (no change), so this only bites an EXISTING peer presenting a different key.
         // A legitimate key rotation is re-established via the operator introduce/approval flow.
+        // A peer with no key at all took the first key any caller sent here: the rotation check below
+        // has nothing to check against. Its key is taken only from the card at the peer's own address.
+        if (!peer.publicKey && !(await keyFromApprovedCard(node_id as string, peer.url, node_public_key as string))) {
+            res.status(403).json(error(config.nodeId, 'KEY_NOT_PROVEN',
+                `${node_id} is a peer of this node with no key, and the node at its address does not publish this one. Nothing was changed.`));
+            return;
+        }
         if (peer.publicKey && node_public_key !== peer.publicKey) {
             const sig = (req.body?.signature as string | undefined) ?? '';
             const rotationPayload = `${node_id}:${node_public_key}:${timestamp ?? ''}`;
             const rotationOk = sig.length > 0 && await verify(peer.publicKey, rotationPayload, sig);
             if (!rotationOk) {
+                void reportPeerIncident(storage, config.nodeId, {
+                    kind: 'id-held', nodeId: node_id as string, via: 'key-exchange', actor: node_id as string,
+                    presented: { key: node_public_key as string, ...(typeof node_url === 'string' ? { url: node_url } : {}) },
+                    other: { key: peer.publicKey, url: peer.url },
+                });
                 res.status(409).json(error(config.nodeId, 'KEY_ROTATION_DENIED',
                     'Changing an established peer key requires a signature from the current key. Re-establish the peer via the operator introduce/approval flow to rotate.'));
                 return;

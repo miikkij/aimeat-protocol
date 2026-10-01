@@ -127,13 +127,14 @@ One record per group, not one per sale, so the key count does not grow with sale
       price:   { amount, currency },         // one-time; EUR or USD micro-units (commerce/money.ts)
       updates: { included_days, renewal: { amount, currency, period_days } | null },
       channel: 'stable' | 'beta',
-      licence: { scope: 'one-node', spdx?, terms_url?, text_sha256? },
+      licence: { subject: 'node', per: 'purchase', spdx?, terms_url?, text_sha256? },
       tax:     { prices_include_tax: boolean, category?: string },
       support: { email, security_email } } ] }
 ```
 
 **It may say:** a one-time price, how many days of updates come with it, the renewal price and
-period, the release channel, the licence scope (one node per purchase), how tax is to be read, and a
+period, the release channel, the licence scope (one subject per purchase; `node` is the only subject
+kind today, see "The subject" in section 3), how tax is to be read, and a
 support and security contact. **The security contact is required for a paid offer**: it is the one
 field a buyer who finds a problem needs, and it costs the author nothing.
 
@@ -180,30 +181,43 @@ a buyer depends on, and the buyer's only defence would be to notice.
 
 ### Who sells, who pays, where the money lands
 
-In this path the **repository node sells its authors' packages**. The seller of a checkout line is
-the package's author, an account on the repository, so the money lands on the author's own Stripe
-account (`commerce.psp` under their GHII, as for every other sale), the operator's fee is booked as a
-receivable for the repository's operator, and the author's revenue share, if they declared one,
-comes out of the author's cut. A seller node (a separate shop) keeps using the signed grant with its
-own prices; both paths end in `grantEntitlement`.
+**Revised 2026-10-01 after Jouni's answer to open question 2:** "A buyer NEVER needs an account on
+the repository. This is an invariant of the design, not a concession: the repository is a warehouse
+holding every vendor's private packages, and giving it consumer accounts and a login page is the
+wrong direction for the node that holds them. The buyer has an account on the SELLING node, and the
+sale may create it at checkout."
 
-### The buyer is a person, the entitlement is a node
+So **the selling node sells, and the repository runs no checkout**. The repository holds the
+packages, the offers and the entitlements, and grants on a signed request from a seller node it
+knows (the path that exists since 2026-09-29, with the card check of 2026-10-01). The checkout line,
+the buyer's account and the payment all live on the selling node.
 
-The checkout runs for a signed-in account on the selling node. The entitlement is for a node. The
-design joins them with a **pending grant** written by the checkout and completed by the buyer's
-node, signed with the node's own key. Two orders of events are both real, so both are supported:
+Where the money lands, and how the author is paid when the shop and the author are different
+people, follows from open question 1 and is open again (open question 6). The text below up to "The
+checkout line" describes the order of events; the rake and revenue-share subsection was written for a
+checkout on the repository and is to be redone with question 6.
 
-1. **The node asks first** (the chat path). The buyer's AI, connected to the buyer's own node, calls
-   `aimeat_package_buy { repository, group_id }`. The buyer's node signs an order intent
-   `{ group_id, terms_id, node_id, url, public_key, timestamp }` **with the key it names**, which
-   proves it holds that key, and sends it to the repository
-   (`POST /v1/federation/package-orders`). The repository stores the intent in the group's
-   entitlement record and answers with a checkout link. The person opens the link, signs in on the
-   repository and pays. Completing the checkout grants the entitlement to the node in the intent.
+### The buyer is a person, the entitlement is a subject
+
+The checkout runs for a signed-in account on the selling node, which the checkout may create. The
+entitlement is for a subject, today a node (see "The subject" below). **The selling node reads the
+offer on the buyer's behalf, node to node** (Jouni: "The buyer must never have to fetch it
+themselves"): a signed read beside the one for a package's questions,
+`GET /v1/federation/package-sales/:groupId/offer`, so the price and terms the buyer sees are the
+repository's own. Anonymous buying is out: "the install set creates an owner account regardless, and
+without one there is no way to tell a buyer about a security fix, let them re-download, or refund
+them." Two orders of events are both real, so both are supported:
+
+1. **The node is known at the checkout** (the buyer has a node, or the install set names one). The
+   buyer's AI asks the selling node (`aimeat_package_buy { repository, group_id, node }`). The selling
+   node reads the offer, opens its own checkout, and on completion grants the entitlement on the
+   repository with the signed seller grant, naming the buyer's node. The repository registers that
+   node only when its own card answers with the same id and key, or keeps the registration pending
+   until the node's first signed request (both since 2026-10-01).
 2. **The person pays first** (a shop selling a node that does not exist yet). The checkout completes
    with no node named, and its receipt carries a one-time claim code. Later, the new node redeems it
-   with a request signed by its own key (`POST /v1/federation/package-claims`), and the repository
-   grants the entitlement then.
+   with a request signed by its own key (`POST /v1/federation/package-claims`, node to node; no
+   person signs in on the repository), and the repository grants the entitlement then.
 
 In both cases **the node that will be served is the one that proved its key**. That is the
 difference from today's grant, where an author types in a URL and a key and nothing proves either
@@ -214,9 +228,20 @@ refused.
 Pending intents and unredeemed claims live in the group's existing `entitlements.<groupId>` record,
 under `pending`, and expire after 30 days. A claim code is stored as its hash.
 
-**The checkout link opens on the repository** and the person signs in there. Whether a person with
-no account on the repository can pay as a visitor (federated sign-in from their own node) is open
-question 2. Until then, the repository's registration mode decides who can buy.
+**The checkout opens on the selling node**, and the person signs in there or is registered there by
+the checkout. No checkout link, sign-in or registration exists on the repository for a buyer
+(answered 2026-10-01, open question 2).
+
+### The subject of an offer and an entitlement
+
+**Not hard-coded as a node** (Jouni, 2026-10-01: "do not hard-code the subject of an offer or an
+entitlement as a node. An owner-subject should be addable later without rewriting those records").
+An entitlement names its subject as `{ kind: 'node', id }` and its record keys it `node:<id>`; an
+offer's licence names `subject: 'node'`. Only `node` exists today. An owner subject
+(`{ kind: 'owner', ghii }`, key `owner:<ghii>`) is added later by adding a kind, not by rewriting
+records. Today's code keeps entitlements under `nodes`, keyed by the bare node id
+(`services/package-entitlements.ts`); the build of this section reads both shapes and writes the new
+one.
 
 ### The checkout line
 
@@ -280,14 +305,17 @@ a product that keeps working when it is not renewed. Open question 4.
 |---|---|
 | Repository, the author | `GET` / `PUT /v1/packages/:groupId/offer`, `aimeat_package_offer` (`packages:write`, author or operator) |
 | Repository, anyone | `GET /v1/packages/:groupId/offer`; the listing and the repository listing show the current terms |
-| Repository, the buyer node | `POST /v1/federation/package-orders`, `POST /v1/federation/package-claims` (signed by the buyer node) |
-| Buyer node | `aimeat_package_buy` (intent, link, renewal), `aimeat_package_claim` (redeem a code). Linking a repository is a node act, so both need the operator role on the buyer node; on a personal node the owner is the operator |
+| Repository, a seller node | `GET /v1/federation/package-sales/:groupId/offer` (signed by the seller node), beside the existing config-needs and grant |
+| Repository, the buyer node | `POST /v1/federation/package-claims` (signed by the buyer node; node to node, no account) |
+| Selling node, the buyer | `aimeat_package_buy` (read the offer, open the checkout, renewal) on the buyer's account there |
+| Buyer node | `aimeat_package_claim` (redeem a code). Redeeming is a node act, so it needs the operator role on the buyer node; on a personal node the owner is the operator |
 | Screens | the listing shows the price and a Buy button; the buyer's Packages page shows the update date and Renew. Screens come after the chat path works |
 
 ### How we know it works
 
-E2E on both backends, two nodes in one process (the pattern of `e2e-install-sets`): a package line
-completes with the test money handler and the node in the intent is entitled; a fulfill that throws
+E2E on both backends, three nodes in one process (repository, selling node, buyer node; the pattern
+of `e2e-install-sets`): a package line completes on the selling node with the test money handler and
+the buyer's node is entitled on the repository, and nobody signs in on the repository; a fulfill that throws
 refunds the buyer; a price change after purchase leaves the renewal price as accepted; a renewal
 moves the date; a claim signed by a key other than the one it names is refused; a claim for a node
 id that is a peer under another key is refused and grants nothing; the rake receivable and a
@@ -449,7 +477,7 @@ and its publisher, and the design should not offer that as a way to sell.
 **F. A defect, on `main` now, to file before any of this is built.** The fix:
 
 1. **Prove the key.** A node is registered only from a request signed by the key being registered
-   (section 3's intents and claims), or after the repository fetches the node's
+   (section 3's claims), or after the repository fetches the node's
    `/.well-known/aimeat` and finds the same node id and key there. The seller route does the second.
 2. **Bound it.** Registering a peer through the package routes needs the repository role on, and a
    caller who has published at least one package; a node-wide cap on packages-only peers, with the
@@ -518,9 +546,10 @@ repository operator needs. Two parts carry one product's shape, and the design w
   department asks, the owner of the shelf says yes. That is an entitlement granted on approval, and
   the offer model can carry it as a third state beside paid and free (open question 5).
 - **"Sell to other people's nodes"** assumes the buyer runs their own node. On a shared node (a
-  company's, a university's) the buyer is an owner on the **same** node as the package, and an
-  entitlement is granted to a node, not to an owner. A shelf inside one node needs an entitlement
-  for an owner, which nothing models today (open question 3).
+  company's, a university's) the buyer is an owner on the **same** node as the package. Answered
+  2026-10-01 (open question 3): the shelf inside one node is out of this round, and its first
+  problem is visibility, not money or approval. A third visibility level comes as its own change, and
+  this design keeps the subject of an offer and an entitlement open for an owner (section 3).
 
 The outside build script that scrapes app HTML is also one team's tool; section 4 replaces it with a
 declaration any app author can write.
@@ -534,8 +563,9 @@ Each phase is usable on its own and is tested before the next starts.
 2. **The trust layer before selling:** the consent step with `capabilities` (T1), no silent scopes
    for package-installed apps (T2), re-consent on a widening update (T7), and the display of author,
    signer and origin (T5).
-3. **The keystone:** the offer record, the `package` resolver, intents and claims with proof of the
-   node key, renewal and its notice, the split coordinate.
+3. **The keystone:** the offer record and the seller node's signed read of it, the `package`
+   resolver on the selling node, claims with proof of the node key, the subject shape of offers and
+   entitlements, renewal and its notice, and the money path open question 6 decides.
 4. **The set composer:** the `aimeat-workspace` declaration, compose that adds a version, compose-set
    with its dry run, and the owner part of the set install.
 5. **A repository open to strangers:** withdrawal (T6), review on a selling node, the scale
@@ -546,11 +576,22 @@ Each phase is usable on its own and is tested before the next starts.
 1. **The billing ruling of 2026-09-28.** Did it place billing for the entrepreneur bundle in
    aimeat-commercial, or did it rule that the platform never prices a package? Section 3 needs the
    first reading.
-2. **A buyer with no account on the repository.** May they pay as a visitor, signed in from their
-   own node, or must they register on the repository?
-3. **A shelf inside one node.** Is an entitlement for an owner on the same node in scope, or only
-   node-to-node sales?
+2. **A buyer with no account on the repository.** *Answered 2026-10-01:* "A buyer NEVER needs an
+   account on the repository. [...] The buyer has an account on the SELLING node, and the sale may
+   create it at checkout. The condition: the selling node reads the offer on the buyer's behalf,
+   node to node. The buyer must never have to fetch it themselves. Anonymous buying with no account
+   anywhere is out." Section 3 is revised to this.
+3. **A shelf inside one node.** *Answered 2026-10-01:* out of this round. "It is a VISIBILITY problem.
+   Visibility is binary and there is no 'the owners of this node' level, so owner B cannot even see
+   owner A's private package." A third visibility level (visible and installable to the owners of
+   this node, not outside it) is its own small change; this design does not hard-code the subject of
+   an offer or an entitlement as a node (section 3).
 4. **Renewal.** Buyer-started renewal with a notice, as proposed, or should the node store a payment
    method and charge by itself?
 5. **Approval instead of money.** Should an offer support "granted on the owner's approval" for
    shelves that charge nothing?
+6. **Who is the seller of record now that the checkout is on the selling node** (new, 2026-10-01,
+   from answer 2). The shop's own payment account with the author's share booked as a beneficiary
+   split, or the author's own payment account connected on the selling node? It decides where the
+   money lands and how section 3's rake and revenue-share subsection is redone, and it follows from
+   question 1.

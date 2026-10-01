@@ -5,6 +5,8 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.13.0 — 2026-10-01 — aimeat_admin_federation_peer_remove: remove a peer, or free a node id held
+ *     under another key, from chat (follow-up to the peer-registration incident, item 5).
  *   v1.12.0 — 2026-09-30 — aimeat_admin_node_update: a newer AIMEAT on npm, and the update prompt.
  *   v1.11.0 — 2026-09-29 — aimeat_storage_upload: visibility 'workspace' and workspace_refs.
  *   v1.10.0 — 2026-09-26 — aimeat_admin_incident_resolve says what a decision does to the app grants and
@@ -401,6 +403,17 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
         input: {
             node_id: { type: 'string', required: true, description: 'The peer, by its node id as aimeat_admin_federation lists it.' },
             relay_claim: { type: 'string', required: true, enum: ['optional', 'required', 'node'], description: '"optional" or "required" for this peer alone, or "node" to follow this node\'s setting again.' },
+        },
+    },
+    {
+        name: 'aimeat_admin_federation_peer_remove',
+        description: 'Operator-only. Remove a federation peer, or free a node id somebody else holds. With emergency true the peer goes at once, with the record of how it arrived, its in-flight work is cancelled and its escrow returned, and the node id is free for the real node to peer again; without it the peer enters its de-peering grace and is purged when the grace ends. A node id that is only a package registration still waiting for its node is deleted as that (`pending_deleted`). Read aimeat_admin_federation first: each roster row says how the peer arrived (`origin`), and the Security page names a node id held under another key. Say to the operator which peer you are removing and why before you call this. Returns NOT_FOUND for a node id that is neither a peer nor a waiting registration, and an operator-role error for non-operators. The same as DELETE /v1/federation/peers/:nodeId (?emergency=true).',
+        caller: 'operator',
+        visibility: agentEverywhere,
+        input: {
+            node_id: { type: 'string', required: true, description: 'The peer, by its node id as aimeat_admin_federation lists it.' },
+            emergency: { type: 'boolean', description: 'true: remove it now and free the node id. Omitted or false: start its de-peering grace.' },
+            reason: { type: 'string', description: 'Why, in a few words: kept with the removal and sent with an emergency notice. Defaults to emergency_depeer or operator_decision.' },
         },
     },
     {

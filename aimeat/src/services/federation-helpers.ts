@@ -9,9 +9,14 @@
  * @structure
  *   - matchesKeyword/matchesActionKeyword/matchesGenesisKeyword/matchesLocation: search filters
  *   - PeerKeyEntry / peerKeyCache: TTL cache of peer node + agent public keys
- *   - performKeyExchange(peerUrl, config, storage): exchange and cache peer public keys
+ *   - performKeyExchange(peerUrl, config, storage, expectNodeId): exchange and cache peer public keys
  *
  * @version-history
+ *   v1.1.0 — 2026-10-01 — performKeyExchange names the node it asks (`expectNodeId`). An answer that
+ *     says it is another node is a failed exchange, and the key is cached under the node asked, never
+ *     under the id the answer names: whatever answered at an address could place a key for any node id,
+ *     and the policy and federation books fall back to this cache for an issuer that is not a peer
+ *     (incident key-exchange-caches-the-key-under-the-node-id-the-answer-nam-muptiona).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
@@ -74,6 +79,8 @@ export async function performKeyExchange(
     peerUrl: string,
     config: AimeatConfig,
     storage: Storage,
+    /** The node this exchange is with. An answer naming another node fails the exchange. */
+    expectNodeId: string,
 ): Promise<{ success: boolean; error?: string; peerPublicKey?: string }> {
     try {
         const nodeKey = await storage.getNodeKey();
@@ -122,6 +129,10 @@ export async function performKeyExchange(
         if (!peerData?.node_id || !peerData?.node_public_key) {
             return { success: false, error: 'Peer returned incomplete key exchange data' };
         }
+        if (peerData.node_id !== expectNodeId) {
+            logger.warn('Key exchange answered as another node', { asked: expectNodeId, answered: peerData.node_id, peerUrl });
+            return { success: false, error: `The node at ${peerUrl} answered as ${peerData.node_id}, not ${expectNodeId}` };
+        }
 
         // Cache peer keys with TTL
         const ttlMs = config.keyCacheRefreshMinutes * 60_000;
@@ -132,7 +143,7 @@ export async function performKeyExchange(
             }
         }
 
-        peerKeyCache.set(peerData.node_id, {
+        peerKeyCache.set(expectNodeId, {
             publicKey: peerData.node_public_key,
             agentKeys: agentKeyMap,
             expiresAt: Date.now() + ttlMs,
