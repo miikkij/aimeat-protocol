@@ -1307,6 +1307,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The subscription index and inbound log, read to append."
     },
+    "src/services/entitlement-erasure.ts": {
+      "reads": {
+        "listAllMemory": 1
+      },
+      "why": "Reviewed 2026-10-01, the node's own read: account erasure lists the system namespaces of exchange contracts and grants (metered-entitlement, metered-grant) to revoke the records the erased account is a party to. Nothing it reads is shown to anyone."
+    },
     "src/services/entitlement-merge.ts": {
       "reads": {
         "listAllMemory": 2
