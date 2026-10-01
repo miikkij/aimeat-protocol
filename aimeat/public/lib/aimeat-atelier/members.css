@@ -153,6 +153,12 @@
 .ak-mem__table th, .ak-mem__table td { padding: 8px 10px; border-bottom: 1px solid var(--ak-line); text-align: left; vertical-align: middle; color: var(--ak-ink); }
 .ak-mem__table th { color: var(--ak-ink-dim); font-weight: 700; }
 .ak-mem__table td:last-child .ak-mem__acts { justify-content: flex-end; }
+/* A name breaks between words, never inside one: `anywhere` let the name column shrink to 86 px at
+   390 and split "second" into two lines. The wrap scrolls sideways when the row is wider. */
+.ak-mem__table .ak-mem__name, .ak-mem__table .ak-mem__account { overflow-wrap: normal; word-break: keep-all; }
+.ak-mem__table td:first-child { min-width: 9rem; }
+/* A date is one token: "2026-10-01" split after its first hyphen at 390. */
+.ak-mem__table td:nth-child(2) { white-space: nowrap; }
 .ak-mem__num { width: 6.5rem; }
 
 /* ── The plan ─────────────────────────────────────────────────────────────────────────────── */
