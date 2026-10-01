@@ -101,26 +101,6 @@ export function canSeeExtensionInstance(req: Request, createdBy: string): boolea
   return canSeeExtensionInstanceAs({ owner: auth.owner, roles: auth.roles || [] }, createdBy);
 }
 
-/**
- * Which app does this extension gate, if any — and only when the extension's installer owns it.
- *
- * An extension declares the app whose membership it enforces with `config: { app: owner/file.html }`,
- * and the node then reads that app's roster on the extension's behalf: `caller.member` and
- * `isAppOwner` on the invoke path, and the carry plan on the paywall path. The value comes from the
- * installer's manifest, and nothing compared its owner half against `installedBy` — so an extension
- * could name somebody else's app and be told, per call, what role the caller holds on a roster that
- * is deliberately private, and be carried under that app owner's plan.
- *
- * The install route refuses a mismatch outright (routes/extensions/manifest.ts). This is the runtime
- * half, for records written before that gate existed: a mismatched value is read as no gating rather
- * than as gating somebody else's app. All 8 extensions declaring `app` on aimeat.io name their own
- * installer's app, so nothing in production changes behaviour.
- */
-export function resolveGatedApp(ext: { config?: Record<string, unknown>; installedBy: string }): string | null {
-  const declared = typeof ext.config?.app === 'string' ? ext.config.app : null;
-  if (!declared) return null;
-  const appOwner = (declared.split('/')[0] ?? '').toLowerCase();
-  // installedBy is a bare owner name, but accept a GHII/GAII form defensively.
-  const installer = localAccountName(ext.installedBy.toLowerCase());
-  return appOwner === installer ? declared : null;
-}
+// resolveGatedApp moved to services/members-only.ts on 2026-10-01, so the commerce layer and the
+// services that charge for a call can ask it; re-exported here for the routes that import it.
+export { resolveGatedApp } from '../../services/members-only.js';

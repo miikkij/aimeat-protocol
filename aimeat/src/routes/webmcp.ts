@@ -16,6 +16,8 @@
  *   - GET  /v1/apps/:owner/:filename/webmcp             public WebMCP-shaped tool listing
  *   - POST /v1/apps/:owner/:filename/webmcp/tools/:tool invoke (402 for priced; auth for free)
  * @version-history
+ *   v1.7.0 — 2026-10-01 — A tool whose backing extension serves members only refuses a non-member
+ *     (MEMBERS_ONLY, 403) before the metered call is settled.
  *   v1.6.2 — 2026-09-26 — The app owner in the listing and the invoke comes from localAccountName
  *     (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local
  *     namesake (secaudit 2026-09, F-1).
@@ -45,6 +47,7 @@ import type { Storage, AppRecord } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { callAuthority } from '../auth/effective-scopes.js';
 import { success, error } from '../middleware/envelope.js';
+import { membersOnlyRefusalForCapability, MEMBERS_ONLY_MESSAGE } from '../services/members-only.js';
 import { resolveIdentity, callerPrincipal, localAccountName } from '../utils/gaii.js';
 import { AppToolsDocSchema, appToolsKey, isToolPriced, applyLockedInput, type AppTool } from '../models/app-tool-schemas.js';
 import { paymentChallenge } from '../commerce/x402.js';
@@ -208,6 +211,12 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
       // app's spending is attributable instead of arriving as its owner's own.
       const meteredCaller = callerPrincipal(req.auth, config.nodeId);
       const coordExt = `apptool:${ownerName}/${filename}`;
+      // Who the app serves, before anything is charged (services/members-only.ts). The settled call
+      // used to reach the paywall on this route's pass, which skipped the question.
+      if (await membersOnlyRefusalForCapability(storage, tool.action_id, callerGaii)) {
+        res.status(403).json(error(config.nodeId, 'MEMBERS_ONLY', MEMBERS_ONLY_MESSAGE));
+        return;
+      }
       const outcome = await authoriseMeteredCall({
         config, storage, caller: meteredCaller,
         session: { roles: req.auth.roles, scopes: req.auth.scopes, appGrantId: req.auth.app_grant ?? null },
