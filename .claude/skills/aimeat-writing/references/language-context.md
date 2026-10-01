@@ -150,6 +150,7 @@ everywhere at once, and say so in the Changes section.
 | the product a customer buys once | which packages, which organisms with their workspaces, which crew agents, and default settings; the same for every customer | install package | asennuspaketti | paquete de instalación |
 | one customer's own part of it | the owner, the other users and their roles, the organism names, the settings | install set | asennussetti | conjunto de instalación |
 | the AIMEAT that sells and updates packages | serves each customer the packages they bought, and their updates while the monthly service runs | package repository | pakettirepository | repositorio de paquetes |
+| a node named to sell an author's packages | the shop's own AIMEAT; the package's author names it once, and it then sells on the repository by requests signed with its own key | seller, seller node | myyjä, myyjäsolmu | vendedor, nodo vendedor |
 | an install the customer cannot edit | code and look come from the package and its updates; the settings are the owner's | managed install | hallittu asennus | instalación gestionada |
 | the customer's own copy of a managed install | free to change, and gets no more updates | fork | fork (oma kopio) | copia propia |
 | who gets a new version first | stable: published versions; beta: beta versions too | release channel | julkaisukanava | canal de publicación |
@@ -402,3 +403,6 @@ service, the directory, the token, the identifier and the username: the test nam
   customer's area). *Päästää sisään* is the developer's own phrase from his reply ("mitkä jäsenen
   agentit pääsevät alueelle"), and the Agents section is *Agentit-kohta*, after the section's own
   heading *Agentit*. Spanish *admitir* is the usual word for letting someone into a group.
+- **2026-10-01** — seller and seller node (the Federation page's "how this peer arrived" line). *Myyjä* is
+  the word of the package-sale design and the developer's marketplace brief; Spanish *vendedor*. The
+  line says *lisättiin, kun ... myi sille paketin* and *asennussetti lisäsi*, from the rows above.
