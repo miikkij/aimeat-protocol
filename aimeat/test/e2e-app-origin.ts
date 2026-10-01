@@ -1010,6 +1010,32 @@ async function main() {
             assert(v.frontNamesApp, 'the front page\'s server-rendered body does not name the app');
         });
 
+        // seo.announce_apps: the operator stops the node pointing search engines at its apps while
+        // every app keeps its own answers. aimeat.io turned it off on 2026-10-01, when thirty-odd
+        // thin app hosts were the bulk of what the node sent Bing. Runs while the app is "on", so
+        // the index listed it a step ago and the only thing that changes is the operator switch.
+        await test('with seo.announce_apps off the index leaves the app out, and the app answers as before', async () => {
+            const put = (value: boolean) => json('/v1/admin/config', {
+                method: 'PUT', headers: { Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ changes: [{ path: 'seo.announce_apps', value }] }),
+            });
+            const off = await put(false);
+            assert(off.status === 200, `PUT seo.announce_apps → ${off.status}: ${JSON.stringify(off.body.error)}`);
+            try {
+                const v = await crawlerView();
+                assert(!v.inSitemapIndex, 'the sitemap index still lists the app host');
+                assert(v.robotsAllows && v.sitemapStatus === 200 && !v.xRobots.includes('noindex'),
+                    'the switch changed the app\'s own answers, which it must not');
+                const status = await json('/v1/admin/seo/status', { headers: { Authorization: `Bearer ${token}` } });
+                assert(status.body.data?.sitemap?.announce_apps === false, `status announce_apps ${status.body.data?.sitemap?.announce_apps}`);
+                assert(status.body.data?.sitemap?.app_host_count === 0, `status app_host_count ${status.body.data?.sitemap?.app_host_count}`);
+            } finally {
+                const on = await put(true);
+                assert(on.status === 200, `restoring seo.announce_apps → ${on.status}`);
+            }
+            assert((await crawlerView()).inSitemapIndex, 'switching it back on did not restore the index entry');
+        });
+
         await test('the origin sitemap lists pages, not the machine documents', async () => {
             // llms.txt, AGENTS.md and sitemap.md are for agents and near-identical on every app
             // origin. Listed in the sitemap, they were a hundred thin pages to Bing (2026-09-23).

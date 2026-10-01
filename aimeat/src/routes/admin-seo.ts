@@ -27,6 +27,7 @@
  *                                       POST /v1/admin/apps/:owner/:filename/seo-approve
  * @usage registerAdminSeoRoutes(router, config, storage, canonicalOwner);
  * @version-history
+ *   v1.2.0 — 2026-10-01 — The status reports seo.announce_apps, and app_host_count follows it.
  *   v1.1.1 — 2026-09-26 — The app owner in the two per-app doors comes from localAccountName
  *     (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local
  *     namesake (secaudit 2026-09, F-1).
@@ -123,8 +124,10 @@ export async function buildSeoStatus(config: AimeatConfig, storage: Storage) {
       url: `${b}/sitemap.xml`,
       index_url: `${b}/sitemap-index.xml`,
       page_count: sitemapPages().length,
-      // How many app hosts the index will actually list. The same decision the index itself makes.
-      app_host_count: byState.on,
+      // How many app hosts the index will actually list. The same decision the index itself makes,
+      // including the operator's seo.announce_apps switch.
+      app_host_count: config.seoAnnounceApps ? byState.on : 0,
+      announce_apps: config.seoAnnounceApps,
     },
     verification: {
       google: !!config.seoVerificationGoogle,

@@ -21,6 +21,7 @@
  * @usage
  *   const out = await announceEverything(config, storage, { scope: 'all', by: operatorName });
  * @version-history
+ *   v1.1.0 — 2026-10-01 — With seo.announce_apps off, "all" carries the pages alone.
  *   v1.0.0 — 2026-09-11 — Initial.
  */
 import type { AimeatConfig } from '../config.js';
@@ -61,7 +62,9 @@ export async function planAnnouncement(
   const urls = sitemapPages().map((p) => `${b}${p.path === '/' ? '/' : p.path}`);
   const apps: AnnouncementPlan['apps'] = [];
 
-  if (scope === 'all') {
+  // seo.announce_apps off: the operator has asked that no notice name an app, so "everything" is
+  // the pages. The sitemap index reads the same switch, so the two still never disagree.
+  if (scope === 'all' && config.seoAnnounceApps) {
     const [all, sites] = await Promise.all([
       listed ?? storage.listApps({ adminView: true, limit: 1000, sort: 'newest' }).then((r) => r.apps),
       storage.listSubdomainSites(),

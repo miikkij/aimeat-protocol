@@ -15,6 +15,7 @@
  * @usage interface AimeatConfig extends SitePresenceConfig { … }
  *   return { ...seoDefaults(), … };
  * @version-history
+ *   2026-10-01 — seoAnnounceApps (AIMEAT_SEO_ANNOUNCE_APPS): whether the node points search engines at its apps.
  *   2026-09-29 — appBadge (AIMEAT_APP_BADGE): the served apps' aimeat.io badge, on or off node-wide.
  *   2026-09-17 - TARGET-078: ownership and useful work lead the default description.
  *   v1.1.0 — 2026-08-25 — The `seo*` block: who this node says it is, and whether it says it at
@@ -100,6 +101,15 @@ export interface SeoConfig {
   /** Notify IndexNow when indexable content changes. No-op without an IndexNow key. */
   seoIndexnowAuto: boolean;
   /**
+   * Point search engines at the published apps: the sitemap index names each findable app's
+   * sitemap, and IndexNow announces an app when it is published or switched on. Off leaves both
+   * out; the apps stay reachable, and each app's own robots.txt and sitemap answer as before.
+   * aimeat.io turned it off on 2026-10-01 while Bing held the whole domain at "Discovered but not
+   * crawled": thirty-odd app hosts answering with 9 to 28 words of text as sent were the bulk of
+   * what the node pointed Bing at.
+   */
+  seoAnnounceApps: boolean;
+  /**
    * Who decides whether a published app is search-visible. 'owner' means the app owner's own
    * switch is the whole decision; 'review' means the owner requests it and the operator approves.
    * The operator's per-app block works in both modes.
@@ -178,6 +188,7 @@ export function seoDefaults(): SeoConfig {
     seoVerificationBing: (process.env.AIMEAT_SEO_VERIFICATION_BING ?? '').trim(),
     seoVerificationExtra: parseVerificationExtra(process.env.AIMEAT_SEO_VERIFICATION_EXTRA),
     seoIndexnowAuto: process.env.AIMEAT_SEO_INDEXNOW_AUTO !== 'false',
+    seoAnnounceApps: process.env.AIMEAT_SEO_ANNOUNCE_APPS !== 'false',
     appsSeoMode: process.env.AIMEAT_APPS_SEO_MODE?.trim().toLowerCase() === 'review' ? 'review' : 'owner',
   };
 }

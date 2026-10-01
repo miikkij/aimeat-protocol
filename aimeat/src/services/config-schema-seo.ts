@@ -7,6 +7,7 @@
  *   Config tab lists them in the same order.
  * @structure SEO_CONFIG_FIELDS
  * @version-history
+ *   v1.2.0 — 2026-10-01 — seo.announce_apps: whether the sitemap index and IndexNow name the apps.
  *   v1.1.0 — 2026-09-29 — seo.indexing and apps.seo_mode take oneOf(): their values are the Config tab's pick.
  *   v1.0.0 — 2026-09-28 — Moved from config-schema.ts, unchanged.
  */
@@ -35,5 +36,6 @@ export const SEO_CONFIG_FIELDS: ConfigFieldShape<keyof SitePresenceConfig>[] = [
   { key: 'seoVerificationBing', dotPath: 'seo.verification_bing', envVar: 'AIMEAT_SEO_VERIFICATION_BING', type: 'string', validate: v => typeof v === 'string' && (v as string).length <= 200, immutable: false, description: 'Bing Webmaster Tools msvalidate.01 token (empty omits the tag)' },
   { key: 'seoVerificationExtra', dotPath: 'seo.verification_extra', envVar: 'AIMEAT_SEO_VERIFICATION_EXTRA', type: 'object', validate: v => !!v && typeof v === 'object' && !Array.isArray(v) && Object.values(v as Record<string, unknown>).every(c => typeof c === 'string'), immutable: false, description: 'Any other verification meta tag as {name: content} — Yandex, Pinterest, Facebook' },
   { key: 'seoIndexnowAuto', dotPath: 'seo.indexnow_auto', envVar: 'AIMEAT_SEO_INDEXNOW_AUTO', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Notify IndexNow when indexable content changes (no-op without an IndexNow key)' },
+  { key: 'seoAnnounceApps', dotPath: 'seo.announce_apps', envVar: 'AIMEAT_SEO_ANNOUNCE_APPS', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Point search engines at published apps: their sitemaps in the sitemap index, and IndexNow notices when one is published. Off leaves both out; the apps stay reachable' },
   { key: 'appsSeoMode', dotPath: 'apps.seo_mode', envVar: 'AIMEAT_APPS_SEO_MODE', type: 'string', ...oneOf('owner', 'review'), immutable: false, description: 'Who decides an app is search-visible: "owner" (their own switch is the decision) or "review" (they request, the operator approves). The operator\'s per-app block works in both', range: 'owner|review' },
 ];
