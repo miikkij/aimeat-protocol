@@ -192,10 +192,12 @@ packages, the offers and the entitlements, and grants on a signed request from a
 knows (the path that exists since 2026-09-29, with the card check of 2026-10-01). The checkout line,
 the buyer's account and the payment all live on the selling node.
 
-Where the money lands, and how the author is paid when the shop and the author are different
-people, follows from open question 1 and is open again (open question 6). The text below up to "The
-checkout line" describes the order of events; the rake and revenue-share subsection was written for a
-checkout on the repository and is to be redone with question 6.
+**The seller of record is the selling node's operator** (Jouni, 2026-10-01, open question 6): "the
+party whose payment account takes the money and whose terms the buyer accepts. The package author is
+that seller's supplier, and the author's share is the seller's cost, not a share of the buyer's
+payment." This follows the ruling of 2026-10-01 that the marketplace starts as a curated reseller,
+and the principle of `commerce/beneficiary-split.ts`: the node never stands between the parties.
+The money path is in "The seller of record, the supplier and the books" below.
 
 ### The buyer is a person, the entitlement is a subject
 
@@ -266,21 +268,33 @@ A new resolver, `kind: 'package'`, registered beside the other three in
 The closed lists of kinds that must learn `package`: `routes/commerce.ts`, `mcp/commerce.ts`,
 `openapi.yaml`, and the UCP and ACP SKU parsers (`routes/commerce-ucp.ts`, `routes/commerce-acp.ts`).
 
-### The rake and the revenue share work unchanged
+### The seller of record, the supplier and the books
 
-- **The rake.** `completeSession` computes `fee = percentFee(gross, commerceFeePercent)` for every
-  line whatever its kind, and for money records it with `recordMoneyPlatformFee` as the operator's
-  receivable. A package line is a money line, so nothing changes.
-- **The payout.** No `distribute` is set, so the default `handler.payout(net)` runs. For Stripe it is
-  a book entry: the money is already on the author's account.
-- **The revenue share.** The split is read by `bookCheckoutBeneficiaries` from
-  `meteredCoordinateOf(sellable)`, which returns a coordinate for `app-tool` and `ext-call` and
-  `null` otherwise. **One branch is needed**: for `package` it returns
-  `{ ext: 'package:<groupId>', action: 'purchase' | 'renewal' }`. The split route
-  (`POST /v1/commerce/beneficiary-splits`) already accepts any `ext` and `action` and always writes
-  under the caller's own GHII, so the author declares "20 % of my cut on this package goes to X" with
-  the existing tool, and the share is taken from the author's net after the rake, as for every
-  other sale. No route, record or tool changes.
+*Replaces "The rake and the revenue share work unchanged", which was written for a checkout on the
+repository with the author as the seller (revised 2026-10-01, open question 6).*
+
+- **The order names its seller of record explicitly**: `seller_of_record: { node_id, account }`, the
+  selling node and the account whose payment account takes the money. It is never inferred from the
+  package's author. The default is the selling node's operator. It stays a field, because a
+  vendor-of-record mode (the author as the seller, the shop as an agent) comes later, when a vendor
+  asks for it (Jouni, 2026-10-01).
+- **The order names the supplier**: `supplier: { repository: <node id>, author, group_id, terms_id }`,
+  and the supplier's price for this sale as an amount, `supplier_cost`. That is the seller's cost. It
+  is not a share of the buyer's payment, and the checkout does not split the buyer's money to the
+  author: no beneficiary split, no `distribute`. The selling node pays its supplier the way a
+  reseller pays one, outside the buyer's checkout.
+- **The checkout is the selling node's ordinary checkout.** The line's seller is the seller of
+  record, the money lands on that account's `commerce.psp`, and the rake, if the selling node's
+  operator charges one, is the selling node's ordinary `commerceFeePercent` on its own sale. Nothing
+  about a package line is special here except the fulfilment (the signed grant on the repository).
+- **The platform records, it does not decide tax.** "VAT and bookkeeping treatment are not the
+  platform's to decide. The platform records who sold, who supplied, and the amounts; the accountant
+  decides the rest." The order record carries exactly those three; `offer.terms.tax` stays a
+  statement of how the price is to be read, nothing more.
+- **Where the supplier's price comes from** is the offer the repository serves the seller node (the
+  signed offer read above): the author's terms are what the seller pays, and the seller's own price to
+  the buyer is the seller's decision on its own node. How a seller's price relates to the author's
+  terms (a fixed price, a margin) is the seller's business and is not modelled.
 
 ### Renewal: the date is the clock
 
@@ -565,7 +579,7 @@ Each phase is usable on its own and is tested before the next starts.
    signer and origin (T5).
 3. **The keystone:** the offer record and the seller node's signed read of it, the `package`
    resolver on the selling node, claims with proof of the node key, the subject shape of offers and
-   entitlements, renewal and its notice, and the money path open question 6 decides.
+   entitlements, renewal and its notice, and the order's seller of record, supplier and amounts.
 4. **The set composer:** the `aimeat-workspace` declaration, compose that adds a version, compose-set
    with its dry run, and the owner part of the set install.
 5. **A repository open to strangers:** withdrawal (T6), review on a selling node, the scale
@@ -591,7 +605,9 @@ Each phase is usable on its own and is tested before the next starts.
 5. **Approval instead of money.** Should an offer support "granted on the owner's approval" for
    shelves that charge nothing?
 6. **Who is the seller of record now that the checkout is on the selling node** (new, 2026-10-01,
-   from answer 2). The shop's own payment account with the author's share booked as a beneficiary
-   split, or the author's own payment account connected on the selling node? It decides where the
-   money lands and how section 3's rake and revenue-share subsection is redone, and it follows from
-   question 1.
+   from answer 2). *Answered 2026-10-01:* "The operator of the selling node: the party whose payment
+   account takes the money and whose terms the buyer accepts. The package author is that seller's
+   supplier, and the author's share is the seller's cost, not a share of the buyer's payment." The
+   order records the seller of record explicitly (default: the selling node's operator; a field, for
+   a later vendor-of-record mode), and "VAT and bookkeeping treatment are not the platform's to
+   decide." Section 3, "The seller of record, the supplier and the books".
