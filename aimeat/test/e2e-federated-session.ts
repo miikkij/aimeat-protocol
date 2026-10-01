@@ -41,6 +41,12 @@
  *   500, the verified:false pin, per-peer scopes) · 9 cleanup.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federated-session
  * @version-history
+ *   v1.4.0 — 2026-10-01 — An attestation naming another `home_node` than the peer that signed it is
+ *     refused (401 INVALID_ATTESTATION); this suite had asserted it as believed, and used it to mint
+ *     the dead-home session. That session is now the live one with its home peer moved to a dead
+ *     address by the operator's PUT, so push-home dials and fails (502) where it answered 404 for a
+ *     second identity. The two-home-nodes case stays in e2e-federated-namesake.ts. The
+ *     peer-registration incident, finding F.
  *   v1.3.0 — 2026-09-24 — A pull writes memory, so it costs memory:write and runs the memory write
  *     rules: the memory:read visitor is refused before its home node is asked, and a visitor signed
  *     in after the peer record grants memory:write pulls. A credential record and `__redirect__`
@@ -697,54 +703,64 @@ async function run() {
         doorMode = 'ok';
     });
 
-    await test('a home node nothing answers at is a proxy error on all three doors', async () => {
-        // The token for this one names the DEAD peer as home, and it gets there honestly: the home
-        // node's attestation says `home_node`, and register-login.ts:498 takes that word for it. The
-        // url is then resolved through the peer table, so what is dialled is a registered ACTIVE
-        // peer with nothing listening — the network catch, not the SSRF guard, which the message
-        // ("Failed to reach" rather than "Cannot reach") is what distinguishes.
+    await test('an attestation naming another home node than the peer that signed it is refused', async () => {
+        // Until 2026-10-01 register-login.ts took `home_node` from the signed reply, so this login
+        // minted a visitor of `deadNodeId` on the word of `homeNodeId`: any member peer could sign a
+        // visitor in as a user of any other node. This case asserted that as "believed"; it now
+        // asserts the hole closed (the peer-registration incident, finding F).
         verifyMode = 'redirect';
         const login = await federatedLogin(homeNodeId);
-        assert(login.status === 200, `redirect login ${login.status}: ${JSON.stringify(login.body)}`);
-        deadFedToken = login.body.data.token;
-        assert(claims(deadFedToken).homeNode === deadNodeId,
-            `the attestation names its own home node and is believed: ${claims(deadFedToken).homeNode}`);
         verifyMode = 'ok';
+        assert(login.status === 401 && login.body.error?.code === 'INVALID_ATTESTATION',
+            `redirect login refused: ${login.status} ${JSON.stringify(login.body)}`);
+    });
 
-        const pull = await json('/v1/memory/pull', {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${deadFedToken}` },
-            body: JSON.stringify({ key: PULL_KEY }),
-        });
-        assert(pull.status === 502, `pull ${pull.status}: ${JSON.stringify(pull.body)}`);
-        assert(pull.body.error?.code === 'FEDERATION_PROXY_ERROR', `pull code: ${pull.body.error?.code}`);
-        assert(String(pull.body.error?.message).startsWith('Failed to reach'),
-            `the network catch, not the url guard: ${pull.body.error?.message}`);
+    await test('a home node nothing answers at is a proxy error on all three doors', async () => {
+        // The session's home node is moved to an address nothing listens at, by the operator's own
+        // PUT /v1/federation/peers/:nodeId, and moved back afterwards. What is dialled is then a
+        // registered ACTIVE peer with nothing listening: the network catch, not the SSRF guard,
+        // which the message ("Failed to reach" rather than "Cannot reach") is what distinguishes.
+        // Until 2026-10-01 this session was minted through the `home_node` an attestation named,
+        // which the case above now refuses.
+        // A pull writes memory, so it needs the memory:write visitor; push and list take the first one.
+        deadFedToken = fedToken;
+        const moveTo = async (url: string) => {
+            const r = await json(`/v1/federation/peers/${homeNodeId}`, {
+                method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ url }),
+            });
+            assert(r.status === 200, `move the home peer to ${url}: ${r.status} ${JSON.stringify(r.body)}`);
+        };
+        await moveTo(DEAD_URL);
+        try {
+            const pull = await json('/v1/memory/pull', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${writerToken}` },
+                body: JSON.stringify({ key: PULL_KEY }),
+            });
+            assert(pull.status === 502, `pull ${pull.status}: ${JSON.stringify(pull.body)}`);
+            assert(pull.body.error?.code === 'FEDERATION_PROXY_ERROR', `pull code: ${pull.body.error?.code}`);
+            assert(String(pull.body.error?.message).startsWith('Failed to reach'),
+                `the network catch, not the url guard: ${pull.body.error?.message}`);
 
-        // push-home never reaches the socket for THIS session, and the reason is the point: the
-        // record was pulled by the visitor whose home is `homeNodeId`, and this session's home is
-        // `deadNodeId`. Two home nodes are two accounts even when the local part of the name is the
-        // same, so the key is not this identity's to push. It answers 404 before it dials.
-        //
-        // Until 2026-09-13 both sessions resolved to `visitor@<this node>` and shared one namespace,
-        // so this door found the other visitor's record and failed on the dead socket instead. That
-        // shared bucket was the defect (utils/gaii.ts resolveIdentity, test/e2e-federated-namesake.ts);
-        // the proxy path for push-home is covered by Phase 5, where the record IS the pusher's.
-        const push = await json('/v1/memory/push-home', {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${deadFedToken}` },
-            body: JSON.stringify({ key: PULL_KEY }),
-        });
-        assert(push.status === 404, `push ${push.status}: ${JSON.stringify(push.body)}`);
-        assert(push.body.error?.code === 'NOT_FOUND', `push code: ${push.body.error?.code}`);
+            // The record is this visitor's own (pulled in Phase 4), so push-home dials, and fails.
+            const push = await json('/v1/memory/push-home', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${deadFedToken}` },
+                body: JSON.stringify({ key: PULL_KEY }),
+            });
+            assert(push.status === 502, `push ${push.status}: ${JSON.stringify(push.body)}`);
+            assert(push.body.error?.code === 'FEDERATION_PROXY_ERROR', `push code: ${push.body.error?.code}`);
 
-        const list = await json('/v1/memory/list-home', {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${deadFedToken}` },
-            body: JSON.stringify({}),
-        });
-        assert(list.status === 502, `list ${list.status}: ${JSON.stringify(list.body)}`);
-        assert(list.body.error?.code === 'FEDERATION_PROXY_ERROR', `list code: ${list.body.error?.code}`);
+            const list = await json('/v1/memory/list-home', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${deadFedToken}` },
+                body: JSON.stringify({}),
+            });
+            assert(list.status === 502, `list ${list.status}: ${JSON.stringify(list.body)}`);
+            assert(list.body.error?.code === 'FEDERATION_PROXY_ERROR', `list code: ${list.body.error?.code}`);
+        } finally {
+            await moveTo(homeUrl);
+        }
     });
 
     await test('the two home-user doors refuse a federated session', async () => {

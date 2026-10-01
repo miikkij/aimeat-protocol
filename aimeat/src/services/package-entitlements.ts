@@ -27,6 +27,11 @@
  * @usage
  *   const pkg = await entitledVersion(storage, groupId, nodeId, versionParam);
  * @version-history
+ *   v1.3.0 — 2026-10-01 — A grant's `node` is registered only after the node's own card answers with
+ *     the same id and key (linkPackagePeer); a node that does not answer leaves the grant standing and
+ *     the registration pending, and its first signed request finishes it (adoptPendingPeer, called from
+ *     resolveNodeRead). `seller` names a signed sale's seller node as the one who asked. The
+ *     peer-registration incident (finding F).
  *   2026-09-30 — A package bought inside a bundle whose update period is over answers UPDATES_ENDED
  *     (after the node's signature is checked) instead of a bare 403 (updatesEndedInBundle).
  *   v1.1.0 — 2026-09-28 — Release channels (Jouni, 2026-09-28): an entitlement follows `stable` (published
@@ -44,7 +49,7 @@ import type { Storage, PackageRecord } from '../storage/interface.js';
 import type { PeerInfo } from './federation.js';
 import { verifyPackageNode } from './package-node-auth.js';
 import { bundleOfPackage } from './install-set-spec.js';
-import { checkPackagePeer, registerPackagePeer } from './package-peer-register.js';
+import { linkPackagePeer, adoptPendingPeer } from './package-peer-register.js';
 
 export const NS_PACKAGE_ENTITLEMENTS = 'package-entitlements';
 
@@ -92,7 +97,7 @@ async function write(storage: Storage, groupId: string, nodes: Record<string, Pa
 }
 
 export type EntitlementResult =
-    | { ok: true; entitlement: PackageEntitlement; peerRegistered?: boolean }
+    | { ok: true; entitlement: PackageEntitlement; peerRegistered?: boolean; peerPending?: boolean }
     | { ok: false; status: number; code: string; message: string };
 
 /** Only the package's author or an operator decides who a package is served to. */
@@ -111,13 +116,16 @@ const NODE_RE = /^[a-z0-9][a-z0-9.-]{2,127}$/i;
  * Grant a node the package, or change the grant: `updatesUntil` null keeps the updates running.
  * With `node` ({ url, public_key }) and the peers, a node this repository does not know yet is
  * registered as a packages-only peer in the same call (package-peer-register.ts), after every other
- * check has passed.
+ * check has passed and its own card has answered with the same id and key. A node that does not
+ * answer is granted all the same, and its registration waits for its first signed request.
+ * `seller` is the seller node of a signed sale, recorded as the one who asked for the peer.
  */
 export async function grantEntitlement(
     storage: Storage,
     caller: { owner: string; isOperator: boolean },
     input: { groupId: string; nodeId: string; updatesUntil?: unknown; note?: unknown; channel?: unknown; node?: unknown },
     peers?: Map<string, PeerInfo>,
+    peerOpts: { timeoutMs?: number; seller?: string } = {},
 ): Promise<EntitlementResult> {
     const refused = await mayManage(storage, input.groupId, caller);
     if (refused) return refused;
@@ -132,11 +140,19 @@ export async function grantEntitlement(
         updatesUntil = new Date(t).toISOString();
     }
     let peerRegistered = false;
+    let peerPending = false;
     if (input.node !== undefined && input.node !== null) {
         if (!peers) return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'node cannot be registered on this path.' };
-        const check = checkPackagePeer(peers, input.nodeId, input.node);
-        if (!check.ok) return check;
-        if (check.add) { await registerPackagePeer(storage, peers, check.add); peerRegistered = true; }
+        const link = await linkPackagePeer(
+            { storage, peers, timeoutMs: peerOpts.timeoutMs ?? 10_000 }, input.nodeId, input.node,
+            peerOpts.seller
+                ? { source: 'package-sale', by: peerOpts.seller, groupId: input.groupId }
+                : { source: 'package-grant', by: caller.owner, groupId: input.groupId },
+            { pendingWhenUnreachable: true },
+        );
+        if (!link.ok) return link;
+        peerRegistered = link.registered;
+        peerPending = link.pending;
     }
     const now = new Date().toISOString();
     const current = Object.fromEntries((await readEntitlements(storage, input.groupId)).map(e => [e.nodeId, e]));
@@ -151,7 +167,7 @@ export async function grantEntitlement(
         updatedAt: now,
     };
     await write(storage, input.groupId, { ...current, [input.nodeId]: entitlement });
-    return { ok: true, entitlement, peerRegistered };
+    return { ok: true, entitlement, peerRegistered, peerPending };
 }
 
 export async function revokeEntitlement(
@@ -264,10 +280,12 @@ export type NodeRead =
  * signed request is `unsigned` too: nothing private is served on a node that has not taken the role.
  */
 export async function resolveNodeRead(
-    storage: Storage, config: { packageRepository: boolean }, peers: Map<string, PeerInfo>,
+    storage: Storage, config: { packageRepository: boolean; federationTimeoutMs?: number }, peers: Map<string, PeerInfo>,
     headers: Record<string, string | string[] | undefined>, groupId: string, version?: string,
 ): Promise<NodeRead> {
     if (!config.packageRepository) return { kind: 'unsigned' };
+    // A node granted while it did not answer is registered on its first signed request.
+    await adoptPendingPeer({ storage, peers, timeoutMs: config.federationTimeoutMs ?? 10_000 }, headerNode(headers));
     const who = await verifyPackageNode(headers, peers, groupId, Date.now(),
         // A node whose bundle's updates ended is let through the peer gate too, so its signature is
         // checked before it hears anything about its purchase; it is served nothing.
@@ -283,6 +301,13 @@ export async function resolveNodeRead(
             : { kind: 'refused', status: 404, code: 'NOT_FOUND', message: `Package not found: ${groupId}` };
     }
     return { kind: 'served', pkg, nodeId: who.nodeId };
+}
+
+/** The node a signed request names (x-source-node), or undefined. */
+export function headerNode(headers: Record<string, string | string[] | undefined>): string | undefined {
+    const v = headers['x-source-node'];
+    const id = Array.isArray(v) ? v[0] : v;
+    return typeof id === 'string' && NODE_RE.test(id) ? id : undefined;
 }
 
 export interface RepositoryListingEntry {

@@ -44,6 +44,9 @@
  * @usage
  *   import { buildFederationOverview } from '../services/federation-overview.js';
  * @version-history
+ *   v1.2.0 — 2026-10-01 — Each roster row says how the peer arrived (`origin`), and the overview lists
+ *     the package registrations still waiting for their node (`pending_registrations`). The
+ *     peer-registration incident, finding F; aimeat_admin_federation reads this.
  *   v1.1.1 — 2026-09-29 — The header says `required` is the relay-claim default from 3.20.0. No code
  *     change.
  *   v1.1.0 — 2026-09-25 — Relay claims: each roster row carries the peer's own setting and its last
@@ -58,6 +61,8 @@ import type { NodeCard } from './federation-book.js';
 import { computeServiceSummary } from '../utils/service-summary.js';
 import { logger } from '../utils/logger.js';
 import { peerRelayClaimView, relayClaimSummary, type PeerRelayClaimView, type RelayClaimSummary } from './relay-claim-policy.js';
+import { describePeerOrigins, type PeerOriginView } from './peer-origin-view.js';
+import { pendingRegistrationView } from './peer-origin.js';
 
 export type FederationStanding = 'alone' | 'waiting' | 'degraded' | 'linked';
 
@@ -156,6 +161,8 @@ export interface FederationRosterRow {
   allow_federated_auth: boolean;
   /** Its own relay-claim setting, what the gate applies, and when it last relayed with and without. */
   relay_claim: PeerRelayClaimView;
+  /** How it arrived: recorded by the code path that added it, inferred, or the operator's or a handshake's. */
+  origin: PeerOriginView;
 }
 
 export interface FederationOverview {
@@ -164,6 +171,8 @@ export interface FederationOverview {
   peers: FederationPeerCounts;
   /** Every peer, with the one thing the page could not work out: how far behind, and behind what. */
   roster: FederationRosterRow[];
+  /** Package registrations waiting for their node to answer: not peers yet. */
+  pending_registrations: Array<Record<string, unknown>>;
   signin: FederationSignin;
   offer: FederationOffer;
   book: FederationBookState;
@@ -390,6 +399,7 @@ export async function buildFederationOverview(
         : counts.degraded + counts.offline > 0 ? 'degraded'
           : 'linked';
 
+  const origins = await describePeerOrigins(storage, all);
   const roster: FederationRosterRow[] = all.map(p => ({
     node_id: p.nodeId,
     url: p.url,
@@ -409,6 +419,7 @@ export async function buildFederationOverview(
     added_at: p.addedAt,
     allow_federated_auth: p.allowFederatedAuth === true,
     relay_claim: peerRelayClaimView(config, p),
+    origin: origins.byNode.get(p.nodeId) ?? { kind: 'operator_or_federation' },
   }));
 
   return {
@@ -416,6 +427,7 @@ export async function buildFederationOverview(
     needs,
     peers: counts,
     roster,
+    pending_registrations: origins.pending.map(pendingRegistrationView),
     signin,
     offer,
     book: {

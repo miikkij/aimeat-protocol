@@ -12,6 +12,8 @@
  *   - requestStorageGrant(ctx, message, attachment) — recipient→origin signed grant + download
  * @usage import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
  * @version-history
+ *   v1.4.0 -- 2026-10-01 -- No storage-grant request to a peer whose messaging is off (the
+ *     peer-registration incident, finding F; message-delivery.ts v1.1.0).
  *   v1.3.0 -- 2026-09-29 -- A same-node copy passes the classification leave() (external, to the
  *     recipient) before the bytes are copied; a classified attachment is not copied, is marked
  *     expired so the sweep stops retrying it, and is logged with the reason (TARGET-082 V4).
@@ -146,7 +148,7 @@ async function readFromOwnAgents(ctx: AttachmentCtx, att: DirectMessageAttachmen
 /** Recipient→origin: signed storage grant, then download the bytes from the returned URL. */
 export async function requestStorageGrant(ctx: AttachmentCtx, message: DirectMessageRecord, att: DirectMessageAttachment): Promise<Buffer | null> {
   const peer = peerForNode(ctx.peers, att.originNodeId);
-  if (!peer || !peer.url) return null;
+  if (!peer || !peer.url || peer.allowMessaging === false) return null;
   const nodeKey = await ctx.storage.getNodeKey();
   if (!nodeKey) return null;
 

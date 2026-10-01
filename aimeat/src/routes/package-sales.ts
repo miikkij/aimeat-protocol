@@ -48,7 +48,7 @@ export function registerPackageSaleRoutes(
 
     router.put('/v1/package-sellers/:nodeId', requireAuth(), requireLocalSession(), requireScope('packages:write'), async (req, res) => {
         const body = (req.body ?? {}) as Record<string, unknown>;
-        const out = await addSeller(storage, peers, { owner: req.auth!.owner }, { nodeId: req.params.nodeId as string, node: body.node, note: body.note });
+        const out = await addSeller({ storage, peers, config }, { owner: req.auth!.owner }, { nodeId: req.params.nodeId as string, node: body.node, note: body.note });
         if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
         res.json(success(config.nodeId, { seller: out.seller, peer_registered: out.peerRegistered, repository_role: config.packageRepository }));
     });
@@ -101,9 +101,9 @@ export function registerPackageSaleRoutes(
         const out = await grantEntitlement(storage, { owner: act.author, isOperator: false }, {
             groupId: act.groupId, nodeId: req.params.nodeId as string,
             updatesUntil: body.updates_until, channel: body.channel, note, node: body.node,
-        }, peers);
+        }, peers, { timeoutMs: config.federationTimeoutMs, seller: act.seller });
         if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
-        res.json(success(config.nodeId, { entitlement: out.entitlement, peer_registered: out.peerRegistered === true }));
+        res.json(success(config.nodeId, { entitlement: out.entitlement, peer_registered: out.peerRegistered === true, peer_pending: out.peerPending === true }));
     });
 
     router.delete('/v1/federation/package-sales/:groupId/entitlements/:nodeId', async (req, res) => {

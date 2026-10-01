@@ -11,6 +11,8 @@
  *   - gaiiCache/peerFailures: in-memory resolution cache and consecutive-failure counters
  *
  * @version-history
+ *   v1.5.0 — 2026-10-01 — A peer purged at the end of its de-peering grace takes its recorded origin
+ *     and any pending registration with it (peer-origin.ts forgetPeer), so the name is free.
  *   v1.4.0 — 2026-09-26 — resolveGaii answers local for a person of this node (a GHII with a record
  *     here), the identity an action published in person is stored under.
  *   v1.3.0 — 2026-09-25 — PeerInfo carries the peer's own relay-claim setting and its last claimed and
@@ -35,6 +37,7 @@ import { recordHeartbeatOutcome } from './federation-availability.js';
 import { getSoftwareVersion } from '../utils/version.js';
 import type { ServiceSummary } from '../utils/service-summary.js';
 import { logger } from '../utils/logger.js';
+import { forgetPeer } from './peer-origin.js';
 
 /** Cache of resolved GAIIs to their hosting node URL. TTL: 5 minutes. Expiry used to be
  * checked only on read, so every GAII ever resolved kept a permanent entry (memory audit
@@ -241,6 +244,7 @@ export function startHeartbeatJob(
             if (graceEnd && new Date(graceEnd).getTime() <= Date.now()) {
                 peers.delete(key);
                 storage.deleteFederationPeer(key).catch(err => { logger.warn('graceEnd: continuing after a suppressed failure', { error: String(err) }); });
+                forgetPeer(storage, key).catch(err => { logger.warn('graceEnd: the origin record of the purged peer stays',{ error: String(err) }); });
                 networkDirectory?.delete(key);
                 peerSummaryHashes.delete(key);
                 logger.info(`Peer ${peer.nodeId} purged after de-peering grace period expired`);

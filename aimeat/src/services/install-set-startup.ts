@@ -18,6 +18,8 @@
  * @structure applyStartupInstallSet(deps)
  * @usage await applyStartupInstallSet({ storage, config, peers, scheduler });
  * @version-history
+ *   v1.2.0 — 2026-10-01 — PEER_ID_MISMATCH and INVALID_URL are final: the repository's card named
+ *     another node, or its address is not one this node may reach; only a changed file fixes either.
  *   v1.1.0 — 2026-09-30 — The install's warnings (a skill left out) are logged, one line each.
  *   v1.0.1 — 2026-09-28 — A secrets file that cannot be read or parsed is logged by its kind of
  *     problem only: a JSON parse error quotes the text around the fault, and in that file the text is
@@ -45,7 +47,7 @@ async function readJson(path: string): Promise<{ ok: true; value: unknown } | { 
  * is tried again. A new node usually meets the first kind on its first start: the repository learns
  * the node's key only after the node exists, and grants it the bundle after that.
  */
-const FINAL = new Set(['INVALID_INPUT', 'INVALID_BUNDLE', 'NOT_A_BUNDLE', 'EMAIL_TAKEN', 'PEER_KEY_MISMATCH', 'REGISTRATION_CLOSED']);
+const FINAL = new Set(['INVALID_INPUT', 'INVALID_BUNDLE', 'NOT_A_BUNDLE', 'EMAIL_TAKEN', 'PEER_KEY_MISMATCH', 'PEER_ID_MISMATCH', 'INVALID_URL', 'REGISTRATION_CLOSED']);
 
 /** Minutes between tries after a refusal that may pass later; seconds on a test node. */
 const RETRY_MS = [1, 5, 15, 60, 360, 1440].map(m => m * 60_000);

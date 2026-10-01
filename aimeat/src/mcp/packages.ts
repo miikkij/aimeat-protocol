@@ -392,9 +392,9 @@ export function registerPackageTools(
             if (!out.ok) return { ...toolError(out.code, out.message) };
             return { content: [{ type: 'text' as const, text: JSON.stringify({ revoked: true, node_id }, null, 2) }] };
         }
-        const out = await grantEntitlement(storage, caller, { groupId: group_id, nodeId: node_id, updatesUntil: updates_until, note, channel, node }, peers);
+        const out = await grantEntitlement(storage, caller, { groupId: group_id, nodeId: node_id, updatesUntil: updates_until, note, channel, node }, peers, { timeoutMs: config.federationTimeoutMs });
         if (!out.ok) return { ...toolError(out.code, out.message) };
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ entitlement: out.entitlement, peer_registered: out.peerRegistered === true, repository_role: config.packageRepository }, null, 2) }] };
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ entitlement: out.entitlement, peer_registered: out.peerRegistered === true, peer_pending: out.peerPending === true, repository_role: config.packageRepository }, null, 2) }] };
     });
 
     // The nodes that sell this author's packages with no token: the same service /v1/package-sellers calls.
@@ -413,7 +413,7 @@ export function registerPackageTools(
             if (!out.ok) return { ...toolError(out.code, out.message) };
             return text({ removed: true, node_id });
         }
-        const out = await addSeller(storage, peers, { owner }, { nodeId: node_id, node, note });
+        const out = await addSeller({ storage, peers, config }, { owner }, { nodeId: node_id, node, note });
         if (!out.ok) return { ...toolError(out.code, out.message) };
         return text({ seller: out.seller, peer_registered: out.peerRegistered, repository_role: config.packageRepository });
     });

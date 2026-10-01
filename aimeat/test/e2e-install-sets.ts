@@ -26,6 +26,11 @@
  *     node that is not a seller, an agent without operator:admin and a replayed signature are refused
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-install-sets
  * @version-history
+ *   v1.4.0 — 2026-10-01 — A node is registered as a peer only after its own card answers with the same
+ *     id and key (the peer-registration incident, finding F). The sale to a node nothing answers for
+ *     (127.0.0.1:40799) now stands with its registration pending (`peer_pending`), and the seller whose
+ *     signatures are replayed answers its card from a server this test runs. Setup that no longer
+ *     matched production: both had registered addresses where nothing listened.
  *   v1.3.0 — 2026-09-29 — Phase 6b: an owner the crew image already signed in as is still welcomed;
  *     an owner whose verified address differs from the set's is not.
  *   v1.2.0 — 2026-09-29 — Phase 6b: the welcome for an owner the shop created before the set.
@@ -40,6 +45,8 @@ import { writeFileSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createServer } from '../src/server.js';
+import { createServer as createHttpServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { loadConfig } from '../src/config.js';
 import { sign, generateKeyPair } from '../src/auth/keypair.js';
 import type { AimeatConfig } from '../src/config.js';
@@ -695,7 +702,9 @@ await test('R\'s author names C a seller; C then reads the bundle\'s questions a
         method: 'PUT', headers: auth(opsToken),
         body: JSON.stringify({ repository: R.nodeId, group_id: setupOnR, node_id: newNode, node: { url: 'http://127.0.0.1:40799', public_key: newNodeKey }, note: 'order 3' }),
     });
-    assert(g.status === 200 && g.body.data.peer_registered === true, `grant: ${g.status} ${JSON.stringify(g.body)}`);
+    // Nothing answers at that address, so the sale stands and the node becomes a peer on its first
+    // signed request (e2e-peer-registration-proof.ts covers that request).
+    assert(g.status === 200 && g.body.data.peer_registered === false && g.body.data.peer_pending === true, `grant: ${g.status} ${JSON.stringify(g.body)}`);
     const list = await R.json(`/v1/packages/${encodeURIComponent(setupOnR)}/entitlements`, { headers: auth(vendorToken) });
     const e = (list.body.data.entitlements as any[]).find((x) => x.nodeId === newNode);
     assert(e?.updatesUntil === null && String(e?.note).startsWith(`sold by ${C.nodeId}`), `the grant on R: ${JSON.stringify(e)}`);
@@ -719,9 +728,16 @@ await test('A seller\'s signature taken for reading the questions does not grant
     // A seller node whose key this test holds, so its signatures can be made and replayed.
     const seller = await generateKeyPair();
     const sellerId = `aimeat-test-001-seller${ts}`;
-    const add = await R.json(`/v1/package-sellers/${sellerId}`, {
-        method: 'PUT', headers: auth(vendorToken), body: JSON.stringify({ node: { url: 'http://127.0.0.1:40798', public_key: seller.publicKey } }),
+    // Its card, which R reads before it registers the seller.
+    const card = createHttpServer((_req, res) => {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, data: { node_id: sellerId, public_key: seller.publicKey } }));
     });
+    const cardPort = await new Promise<number>(r => card.listen(0, '127.0.0.1', () => r((card.address() as AddressInfo).port)));
+    const add = await R.json(`/v1/package-sellers/${sellerId}`, {
+        method: 'PUT', headers: auth(vendorToken), body: JSON.stringify({ node: { url: `http://127.0.0.1:${cardPort}`, public_key: seller.publicKey } }),
+    });
+    card.closeAllConnections(); card.close();
     assert(add.status === 200 && add.body.data.peer_registered === true, `add seller: ${add.status} ${JSON.stringify(add.body)}`);
     const path = `/v1/federation/package-sales/${encodeURIComponent(setupOnR)}/config-needs`;
     const timestamp = new Date().toISOString();

@@ -458,6 +458,31 @@ and its publisher, and the design should not offer that as a way to sell.
    skip a peer whose flags do not allow them, as the catalogue and routing paths already do.
 4. **Clean up.** A packages-only peer that holds no entitlement and is no author's seller is removed.
 
+**F, as built on 2026-10-01** (incident `incident-security-f-package-routes-register-any-node-id-as-an-active--mupthonu`
+on the Lifecycle Central board). Two corrections to the plan above came out of building it:
+
+- **A card does not prove the id.** The registrant names the url, so the registrant decides what card
+  is served there, the real node's real key included. Reading the card refuses what cannot be true (a
+  key the url does not publish, a url that says it is another node) and nothing more. A signed
+  challenge proves only that the caller holds a key, which a registrant with their own key does too.
+  Node ids have no authority outside each node's own peer table. What makes the remaining case
+  harmless is item 3, not item 1.
+- **The consequence was larger than messages.** Under `AIMEAT_FEDERATION_AUTH_POLICY=all_peers`
+  (aimeat.io runs it), any active peer was a home node for federated sign-in: a password typed for
+  `user@<id>` went to the registered url, and the reply was checked with the registered key, so the
+  registrant could sign in as any user of that node id. Separately, the reply's own `home_node` named
+  the visitor's home, so any member peer could sign a visitor in as a user of another node.
+
+What was built: item 1 as the card check in `package-peer-register.ts` (every package path, and the
+two paths that link a repository on the client side), with a grant whose node does not answer made
+anyway and its registration finished by the node's first signed request (`peer_pending`); item 2
+without the cap (the repository role and an author with a package, for naming a seller; a grant
+already needed the package's author); item 3 for direct messages, read receipts, attachment grants and
+federated sign-in (a contact-tier peer is no home node, and the home node is the peer that signed);
+a record of how each such peer arrived (`peer-origin.ts`), shown on GET /v1/federation/peers and in
+aimeat_admin_federation; and DELETE /v1/federation/peers/{nodeId} freeing the id. Item 4 and the cap
+are not built.
+
 ## 7. Other defects found on the way
 
 Not in the brief. Each is on `main` now; none is fixed in this pass.

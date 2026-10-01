@@ -5,6 +5,10 @@
  * @description Peer de-peering (grace + emergency), federation ping (cached service-summary hash), and
  *   Ed25519 key-exchange with key-continuity rotation guard. Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-10-01 — DELETE /peers/:nodeId frees the name completely: an emergency delete takes the
+ *     peer's recorded origin and any pending package registration with it, and a node id that is only a
+ *     pending registration (no peer yet) is deleted as that (`pending_deleted`). The operator's way to
+ *     release a node id taken under a wrong key (the peer-registration incident, finding F).
  *   v1.2.0 — 2026-09-17 — key-exchange re-admits a peer at the address of its approved request, not the
  *     address in the unauthenticated body, and checks that address as outbound traffic. Anyone who knew
  *     a purged peer's id and public key could point it at a server of their own.
@@ -28,6 +32,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { peerKeyCache } from '../../services/federation-helpers.js';
 import { computeServiceSummary } from '../../utils/service-summary.js';
 import { deriveTierFlags, coerceTier, type PeerTier } from '../../services/federation-tiers.js';
+import { forgetPeer, readPendingPeer, deletePendingPeer } from '../../services/peer-origin.js';
 
 /** Cached service summary hash to avoid recomputing on every ping (60s TTL). */
 let cachedSummaryHash = '';
@@ -45,15 +50,24 @@ export function registerLifecycleRoutes(router: Router, config: AimeatConfig, st
 
         const peer = peers.get(nodeId);
         if (!peer) {
+            // Not a peer, but a package grant may still be waiting for a node by this id. Deleting it
+            // frees the id for a grant under another key.
+            if (await readPendingPeer(storage, nodeId)) {
+                await deletePendingPeer(storage, nodeId);
+                res.json(success(config.nodeId, { deleted: true, node_id: nodeId, pending_deleted: true }));
+                emitChange('federation');
+                return;
+            }
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Peer not found: ${nodeId}`));
             return;
         }
 
         if (emergency) {
             // ── Emergency de-peering: immediate disconnect ──
-            // 1. Remove peer immediately
+            // 1. Remove peer immediately, with its recorded origin, so the name is free
             peers.delete(nodeId);
             await storage.deleteFederationPeer(nodeId);
+            await forgetPeer(storage, nodeId);
 
             // 2. Cancel all in-flight cross-node work from/to this peer and return escrow
             const allWork = await storage.listAllWork();

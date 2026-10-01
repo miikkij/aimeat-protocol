@@ -25210,7 +25210,9 @@ paths:
         setting, and `node_setting`. Each `roster` row carries `relay_claim`: the peer's own
         `setting` (or null), the `effective` one, `first_signed_at`, `last_claimed_at` and
         `last_unclaimed_at` (each written at most every ten minutes), and `state`. An unclaimed relay
-        is named by its sender, so `last_unclaimed_at` is a sign and not proof.
+        is named by its sender, so `last_unclaimed_at` is a sign and not proof. Each `roster` row
+        also carries `origin`, how the peer arrived (as on GET /v1/federation/peers), and
+        `pending_registrations` lists the package registrations still waiting for their node.
       tags: [Admin, Federation]
       security:
         - BearerAuth: []
@@ -25224,7 +25226,15 @@ paths:
     get:
       operationId: listPeers
       summary: List peers
-      tags: [Federation]
+      description: >-
+        Operator only. Each peer carries `origin`, how it arrived: `{ kind: "recorded", source, by,
+        group_id?, proof, requested_at, proven_at }` for a peer a package grant, a package seller, a
+        sale's repository link or an install set added without an operator (source `package-grant`,
+        `package-sale`, `package-seller`, `sale-repository`, `install-set-repository`; recorded since
+        2026-10-01); `{ kind: "inferred", source: "package", named_by }` for an older peer with the
+        packages-only shape, with the entitlement and seller records that name it; or `{ kind:
+        "operator_or_federation" }`. `pending_registrations` lists package grants still waiting for
+        their node to answer: not peers yet. DELETE /v1/federation/peers/{nodeId} removes either.
       security:
         - BearerAuth: []
       responses:
@@ -25378,7 +25388,11 @@ paths:
     delete:
       operationId: depeer
       summary: De-peer
-      description: Remove a peered node. Use ?emergency=true for immediate de-peering (no grace period).
+      description: >-
+        Remove a peered node. Use ?emergency=true for immediate de-peering (no grace period): the peer
+        and its recorded origin go at once, so the node id is free for a registration under another
+        key. A node id that is only a waiting package registration (no peer yet) is deleted as that,
+        answering `pending_deleted: true`.
       tags: [Federation]
       security:
         - BearerAuth: []
@@ -44523,9 +44537,13 @@ paths:
       summary: Name a node a seller of your packages
       description: >-
         The seller sells every package of the caller's and nothing of anyone else's. `node`
-        ({ url, public_key }) registers a node this repository does not know yet as a packages-only peer;
-        without it the node must already be an active peer (409 PEER_UNKNOWN). A peer of that id under
-        another key answers 409 PEER_KEY_MISMATCH. Requires packages:write.
+        ({ url, public_key }) registers a node this repository does not know yet as a packages-only peer,
+        once the node's own /.well-known/aimeat answers with the same node id and key (409
+        PEER_ID_MISMATCH or PEER_KEY_MISMATCH when it does not, 400 INVALID_URL for an address this node
+        may not reach, 503 PEER_UNREACHABLE when nothing answers; nothing is written then). Without
+        `node` the node must already be an active peer (409 PEER_UNKNOWN). A peer of that id under another
+        key answers 409 PEER_KEY_MISMATCH. 404 NOT_A_REPOSITORY when the repository role is off; 403
+        NOT_AN_AUTHOR when the caller has no package here. Requires packages:write.
       tags: [Packages]
       security:
         - BearerAuth: []
@@ -44552,6 +44570,9 @@ paths:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
     delete:
       operationId: removePackageSeller
       summary: Stop a node selling your packages
@@ -44597,7 +44618,8 @@ paths:
       summary: A seller node grants a customer node, signed
       description: >-
         The grant of /v1/packages/{groupId}/entitlements/{nodeId}, made for the package's author by one of
-        its seller nodes, signed as described for the config-needs endpoint. The note records the seller.
+        its seller nodes, signed as described for the config-needs endpoint. The note records the seller,
+        and a node registered with the grant records the seller node as the one who asked.
       tags: [Federation]
       parameters:
         - { name: groupId, in: path, required: true, schema: { type: string } }
@@ -44618,7 +44640,7 @@ paths:
                 note: { type: string }
       responses:
         '200':
-          description: '`data` is `{ entitlement, peer_registered }`.'
+          description: '`data` is `{ entitlement, peer_registered, peer_pending }`.'
           content:
             application/json:
               schema:
@@ -44765,8 +44787,9 @@ paths:
         published version made up to `updates_until`, and nothing newer: a monthly subscription that
         ended. Null or omitted keeps the updates running. `channel` beta serves versions whose status
         is beta too, whichever is newest; stable (the default) serves published versions only. The
-        node must also be an active peer of this node with the catalogue shared. The package's author
-        or an operator; requires packages:write.
+        node must also be an active peer of this node: one sharing the catalogue, or a packages-only peer,
+        which is served what it holds an entitlement to and nothing else. The package's author or an
+        operator; requires packages:write.
       tags: [Packages]
       security:
         - BearerAuth: []
@@ -44787,15 +44810,22 @@ paths:
                   description: >-
                     A node this repository does not know yet, registered with the grant as a
                     packages-only peer (active, contact tier, messages off): it can pull only what it
-                    holds an entitlement to. 409 PEER_KEY_MISMATCH when a peer of that id has another
-                    key, 409 PEER_NOT_ACTIVE when it is switched off; nothing is granted then.
+                    holds an entitlement to, receives no direct messages and is no home node for a
+                    federated sign-in. It is registered only when its own /.well-known/aimeat answers
+                    with the same node id and key: 409 PEER_ID_MISMATCH or PEER_KEY_MISMATCH when it
+                    does not, 400 INVALID_URL for an address this node may not reach; nothing is
+                    granted then. When nothing answers, the grant is made and the registration waits
+                    (`peer_pending`): the node's first signed request here reads its card and
+                    registers it, within 30 days. 409 PEER_KEY_MISMATCH when a peer of that id, or a
+                    waiting registration, has another key; 409 PEER_NOT_ACTIVE when it is switched
+                    off; nothing is granted then.
                   required: [url, public_key]
                   properties:
                     url: { type: string }
                     public_key: { type: string }
       responses:
         '200':
-          description: '`data` is `{ entitlement, peer_registered, repository_role }`.'
+          description: '`data` is `{ entitlement, peer_registered, peer_pending, repository_role }`.'
           content:
             application/json:
               schema:
@@ -44828,7 +44858,8 @@ paths:
         On a node in the package repository role: the packages the calling peer node may pull, every
         published public one and each private one it is entitled to, with the version its entitlement
         reaches. The request is signed as that node over `group_id: "*"` (see the export endpoint).
-        404 NOT_A_REPOSITORY when the role is off.
+        A node granted while it did not answer is registered as a peer on this request, when its card
+        answers with the id and key the grant named. 404 NOT_A_REPOSITORY when the role is off.
       tags: [Federation]
       responses:
         '200':

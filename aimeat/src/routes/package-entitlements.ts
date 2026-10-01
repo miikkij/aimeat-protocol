@@ -22,8 +22,9 @@ import type { PeerInfo } from '../services/federation.js';
 import { requireAuth, requireScope, requireLocalSession } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import {
-    listEntitlements, grantEntitlement, revokeEntitlement, repositoryListing, entitledGroupsOf,
+    listEntitlements, grantEntitlement, revokeEntitlement, repositoryListing, entitledGroupsOf, headerNode,
 } from '../services/package-entitlements.js';
+import { adoptPendingPeer } from '../services/package-peer-register.js';
 import { verifyPackageNode } from '../services/package-node-auth.js';
 import { packageConfigNeeds } from '../services/package-config-needs.js';
 
@@ -48,9 +49,12 @@ export function registerPackageEntitlementRoutes(
             note: body.note,
             channel: body.channel,
             node: body.node,
-        }, peers);
+        }, peers, { timeoutMs: config.federationTimeoutMs });
         if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
-        res.json(success(config.nodeId, { entitlement: out.entitlement, peer_registered: out.peerRegistered === true, repository_role: config.packageRepository }));
+        res.json(success(config.nodeId, {
+            entitlement: out.entitlement, peer_registered: out.peerRegistered === true, peer_pending: out.peerPending === true,
+            repository_role: config.packageRepository,
+        }));
     });
 
     // What a package or an install bundle needs the customer to give: the questions a shop asks
@@ -78,6 +82,8 @@ export function registerPackageEntitlementRoutes(
             res.status(404).json(error(config.nodeId, 'NOT_A_REPOSITORY', 'This node does not serve packages as a repository.'));
             return;
         }
+        // A node granted while it did not answer is registered on its first signed request.
+        await adoptPendingPeer({ storage, peers, timeoutMs: config.federationTimeoutMs }, headerNode(req.headers));
         // A packages-only peer (catalogue not shared, registered with its grant) is heard for what it
         // holds, and its listing carries only that: the public catalogue is what the flag withholds.
         const who = await verifyPackageNode(req.headers, peers, '*', Date.now(),

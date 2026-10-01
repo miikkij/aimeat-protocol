@@ -12,6 +12,11 @@
  *   - startMessageRetryJob(config, storage, peers) — periodic sweep (DECISION #6)
  * @usage import { deliverDirectMessage, startMessageRetryJob } from '../services/message-delivery.js';
  * @version-history
+ *   v1.1.0 -- 2026-10-01 -- A peer whose messaging is off gets no message, read receipt or attachment
+ *     request from here: undeliverable, `peer_messaging_off`. Until then only the receiving route read
+ *     the flag, so a packages-only peer (registered by a package grant, messaging off) still received
+ *     every message addressed to someone at its node id (the peer-registration incident, finding F).
+ *     A conversation needs both directions, so the flag now holds both.
  *   v1.0.0 -- 2026-06-16 -- Initial creation for user-to-user messaging (layer 3: federation delivery).
  */
 
@@ -83,6 +88,14 @@ export async function deliverDirectMessage(ctx: DeliveryCtx, record: DirectMessa
     return 'queued';
   }
 
+  // Messaging off is this node's word about the link, not a passing state: nothing is sent, and
+  // nothing is queued to be sent later, because the retry job would send it the moment the flag moved.
+  if (peer.allowMessaging === false) {
+    await storage.updateMessageDeliveryStatus(record.id, 'undeliverable', { error: 'peer_messaging_off' });
+    await log('undeliverable', { errorMessage: 'peer_messaging_off' });
+    return 'undeliverable';
+  }
+
   const nodeKey = await storage.getNodeKey();
   if (!nodeKey) { await log('queued', { errorMessage: 'no_node_key' }); return 'queued'; }
 
@@ -140,7 +153,7 @@ export async function propagateReadReceipt(ctx: DeliveryCtx, message: DirectMess
     return;
   }
   const peer = peerForNode(peers, senderNode);
-  if (!peer || !peer.url) return;
+  if (!peer || !peer.url || peer.allowMessaging === false) return;
   const nodeKey = await storage.getNodeKey();
   if (!nodeKey) return;
   const payload = { source_node: config.nodeId, message_id: message.id, kind: 'read' as const, timestamp: readAt };

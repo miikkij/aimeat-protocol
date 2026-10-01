@@ -6,6 +6,13 @@
  *   POST /v1/ghii/login (password + federated + TOTP), POST /v1/ghii/login/attach-email. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.0 — 2026-10-01 — Federated login, two refusals (the peer-registration incident, finding F).
+ *     Under `all_peers` a home node must be a peer whose tier may carry federated sign-in at all
+ *     (member or genesis): a contact link and a packages-only peer (which any package grant could
+ *     register under a node id of its choosing) are not home nodes, so a password is never sent to
+ *     their url and their key never vouches for a visitor. And the visitor's home node is the peer
+ *     that signed, never a `home_node` the attestation names: a member peer could otherwise sign a
+ *     visitor in as a user of any other node.
  *   v1.10.0 — 2026-09-24 — The federated mint names the visitor as what it is: role `federated`, and
  *     its home GHII as `sub` and `owner`. It was roles:['owner'] and the bare local part, which a
  *     LOCAL account can share, so every door deciding on the role or the name answered for that
@@ -46,6 +53,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { EmailService } from '../../services/email.js';
 import type { PeerInfo } from '../../services/federation.js';
+import { coerceTier, tierCeiling } from '../../services/federation-tiers.js';
 import { generateKeyPair } from '../../auth/keypair.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
@@ -383,7 +391,10 @@ export function registerRegisterLoginRoutes(
                     'This node does not accept federated logins'));
                 return;
             }
-            if (config.federationAuthPolicy === 'specific_peers' && !homePeer.allowFederatedAuth) {
+            // `all_peers` means every peer whose link can carry a sign-in. A contact link and a
+            // packages-only peer cannot (tierCeiling), whatever the node-wide policy says.
+            if ((config.federationAuthPolicy === 'specific_peers' && !homePeer.allowFederatedAuth)
+                || !tierCeiling(coerceTier(homePeer.tier)).allowFederatedAuth) {
                 res.status(403).json(error(config.nodeId, 'FEDERATION_AUTH_NOT_ALLOWED',
                     'This node does not accept sign-ins from there. Sign in on your home node instead.'));
                 return;
@@ -491,7 +502,17 @@ export function registerRegisterLoginRoutes(
                 // A VISITOR, named by its home GHII and holding no local role. `loginName` alone is
                 // the local part, which a LOCAL account can share; a role of 'owner' made every door
                 // that asks the role take the visitor for that account (secaudit 2026-09, F-1).
-                const homeNode = attestation.home_node ?? federatedNodeId;
+                // The node that signed is the visitor's home. An attestation naming another home node
+                // is a peer vouching for users that are not its own.
+                if (attestation.home_node !== undefined && attestation.home_node !== homePeer.nodeId) {
+                    logger.warn('Federated login refused: the attestation names another home node', {
+                        peer: homePeer.nodeId, named: attestation.home_node, ghii: attestation.ghii,
+                    });
+                    res.status(401).json(error(config.nodeId, 'INVALID_ATTESTATION',
+                        'The reply names another home node than the one it came from.'));
+                    return;
+                }
+                const homeNode = homePeer.nodeId;
                 const visitor = homeIdentityOf({ owner: loginName, homeNode });
                 const token = await issueJWT({
                     sub: visitor,

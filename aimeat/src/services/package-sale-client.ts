@@ -12,16 +12,21 @@
  *
  *   THE REPOSITORY IS A PEER. Named by its node id when it already is one; otherwise the call carries
  *   { node_id, url, public_key } and this node links it as a packages-only peer under that key, the
- *   same registration a repository makes for its customer nodes (package-peer-register.ts).
+ *   same registration a repository makes for its customer nodes (package-peer-register.ts): only
+ *   when the repository's own card answers with that id and key, and with how it arrived recorded.
  * @structure SaleRepositoryRef · saleRequest() · saleConfigNeeds() · saleGrant() · saleRevoke()
  * @version-history
+ *   v1.1.0 — 2026-10-01 — A repository linked from the request is registered only after its card answers
+ *     with the same id and key (linkPackagePeer), and its origin is recorded (the peer-registration
+ *     incident, finding F). A repository that does not answer is REPOSITORY_UNREACHABLE, as the sale
+ *     itself would be.
  *   v1.0.0 — 2026-09-29 — Initial (install packages, phase 5: seller nodes).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from './federation.js';
 import { signedSaleHeaders } from './package-sale-auth.js';
-import { checkPackagePeer, registerPackagePeer } from './package-peer-register.js';
+import { linkPackagePeer } from './package-peer-register.js';
 import { safeFetch, stripTrailingSlashes } from '../utils/url-validator.js';
 import { readBodyCapped } from '../utils/read-capped.js';
 
@@ -31,16 +36,19 @@ type Refusal = { ok: false; status: number; code: string; message: string };
 
 const MAX_ANSWER_BYTES = 1024 * 1024;
 
+type SaleDeps = { storage: Storage; config: AimeatConfig; peers: Map<string, PeerInfo> };
+
 /** The repository's base URL: a known peer, or one linked now from the address and key given. */
-async function repositoryUrl(storage: Storage, peers: Map<string, PeerInfo>, ref: unknown): Promise<Refusal | { ok: true; nodeId: string; url: string }> {
+async function repositoryUrl(deps: SaleDeps, ref: unknown): Promise<Refusal | { ok: true; nodeId: string; url: string }> {
+    const { storage, peers } = deps;
     const nodeId = typeof ref === 'string' ? ref : (ref && typeof ref === 'object' ? (ref as { node_id?: unknown }).node_id : undefined);
     if (typeof nodeId !== 'string' || !nodeId) {
         return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'repository is the repository\'s node id, or { node_id, url, public_key } the first time.' };
     }
     if (typeof ref === 'object' && ref !== null) {
-        const check = checkPackagePeer(peers, nodeId, ref);
-        if (!check.ok) return check;
-        if (check.add) await registerPackagePeer(storage, peers, check.add);
+        const link = await linkPackagePeer({ storage, peers, timeoutMs: deps.config.federationTimeoutMs ?? 10000 }, nodeId, ref,
+            { source: 'sale-repository', by: 'operator' }, { pendingWhenUnreachable: false });
+        if (!link.ok) return link.code === 'PEER_UNREACHABLE' ? { ...link, status: 502, code: 'REPOSITORY_UNREACHABLE' } : link;
     }
     const peer = peers.get(nodeId);
     if (!peer || peer.status !== 'active') {
@@ -57,7 +65,7 @@ export async function saleRequest(
     deps: { storage: Storage; config: AimeatConfig; peers: Map<string, PeerInfo> },
     input: { repository: unknown; method: 'GET' | 'PUT' | 'DELETE'; path: string; body?: Record<string, unknown> },
 ): Promise<Refusal | { ok: true; status: number; body: unknown; repository: string }> {
-    const repo = await repositoryUrl(deps.storage, deps.peers, input.repository);
+    const repo = await repositoryUrl(deps, input.repository);
     if (!repo.ok) return repo;
     const body = input.method === 'PUT' ? (input.body ?? {}) : undefined;
     const headers = await signedSaleHeaders(deps.storage, deps.config, input.method, input.path, body);
@@ -82,7 +90,6 @@ export async function saleRequest(
     return { ok: true, status: res.status, body: parsed, repository: repo.nodeId };
 }
 
-type SaleDeps = { storage: Storage; config: AimeatConfig; peers: Map<string, PeerInfo> };
 type SaleAnswer = Awaited<ReturnType<typeof saleRequest>>;
 const salePath = (groupId: string, tail: string): string => `/v1/federation/package-sales/${encodeURIComponent(groupId)}/${tail}`;
 const missing = (what: string): SaleAnswer => ({ ok: false, status: 400, code: 'INVALID_INPUT', message: `${what} required.` });
