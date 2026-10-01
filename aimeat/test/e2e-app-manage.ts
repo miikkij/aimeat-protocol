@@ -407,6 +407,23 @@ await test('21. Each of the ten old names answers TOOL_MOVED and names the exact
     }
 });
 
+await test('23. audit_archive moves the log into its year, audit reads it back with year, audit_keep keeps all but refuses a deleting limit', async () => {
+    const before = await manage(s, { action: 'audit', filename: APP });
+    assert(!before.isError && Array.isArray(before.data.archives) && before.data.keep?.keep === 0, `audit answers archives and keep: ${before.text.slice(0, 300)}`);
+    const total = before.data.total as number;
+    const moved = await manage(s, { action: 'audit_archive', filename: APP, before: new Date(Date.now() + 60_000).toISOString() });
+    assert(!moved.isError && moved.data.moved === total, `archive: ${moved.text.slice(0, 300)}`);
+    const year = new Date().toISOString().slice(0, 4);
+    const read = await manage(s, { action: 'audit', filename: APP, year });
+    assert(!read.isError && read.data.year === year && read.data.total === total, `the year reads back: ${read.text.slice(0, 300)}`);
+    const keep = await manage(s, { action: 'audit_keep' });
+    assert(!keep.isError && keep.data.keep === 0, `read the setting: ${keep.text.slice(0, 300)}`);
+    const limit = await manage(s, { action: 'audit_keep', keep: '5' });
+    assert(limit.isError && limit.text.includes('OWNER_ONLY'), `an agent set a deleting limit: ${limit.text.slice(0, 300)}`);
+    const all = await manage(s, { action: 'audit_keep', keep: 'all' });
+    assert(!all.isError && all.data.keep === 0 && all.data.deleted === 0, `keep all: ${all.text.slice(0, 300)}`);
+});
+
 await test('22. aimeat_invoke with an old name gives the same answer', async () => {
     const r = await callTool(s, 'aimeat_invoke', { capability: 'aimeat_app_seo_set', input: { filename: APP } });
     // aimeat_invoke answers a refusal as JSON: { code, message }.

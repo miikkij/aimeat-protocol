@@ -21,6 +21,9 @@
  *   const checked = checkAppManageInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
+ *   2026-10-01 — Keeping the audit log: `audit` takes `year` and answers the archived years and the
+ *     limit in force; audit_archive moves the entries before a date into the archive; audit_keep
+ *     reads or sets how much is kept (a deleting limit is the account holder's own, signed in).
  *   2026-10-01 — `email` says the invitation lives 7 days and carries a sign-up link, and that the
  *     answer gives acceptUrl when no email left.
  *   2026-10-01 — IAM round 2 on the member actions: member_set takes `email` and `locale` (a verified account's
@@ -118,7 +121,9 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     locale: { type: 'string', enum: ['en', 'fi', 'es'], description: 'For member_set with email: the language of the invitation email. Omit it to use your own language.' },
     q: { type: 'string', description: 'For members: show only people whose account name, display name, email or note contains this text.' },
     offset: { type: 'number', description: 'For members: how many people to skip on each list, for the next page. Default 0.' },
-    before: { type: 'string', description: 'For member_audit: the time of the oldest entry you already have, to read the page before it.' },
+    before: { type: 'string', description: 'For member_audit: the time of the oldest entry you already have, to read the page before it. For audit_archive: a date or ISO time; the entries older than it move into the archive.' },
+    year: { type: 'string', description: 'For audit: read that year\'s archived entries (four digits, e.g. "2026") instead of the active log. The audit answer lists the archived years.' },
+    keep: { type: 'string', description: 'For audit_keep: "all" keeps every entry of every app\'s audit log (nothing deleted), a whole number such as "1000" keeps that many newest entries per app and deletes the rest, "default" returns to the node default. Omit it to read the setting. A number is the account holder\'s own decision: it is refused here and set on the app page, signed in.' },
     invite_id: { type: 'string', description: 'For member_invite_cancel: the invitation id, from the invites list of members.' },
 };
 
@@ -179,8 +184,12 @@ export const APP_MANAGE_ACTIONS: Record<string, AppManageAction> = {
         summary: 'switch the "publish your own app" badge and the install offer; naming nothing reports them. Naming the reviewer who lifts the AI label is the account holder\'s own act and is not here' },
     legal: { fields: F(['filename'], ['kind', 'format', 'content', 'remove']), provenance: true, scope: 'app:write',
         summary: 'publish, replace or remove one of the app\'s legal pages (terms, privacy, imprint, refunds, accessibility, cookies, support), served under its address; no kind reports which pages it still ought to have' },
-    audit: { fields: F(['filename'], ['limit', 'playtest']), scope: 'app:write',
-        summary: 'read the app\'s change log, newest first; playtest: true also opens the app signed out in a real browser and reports what a stranger sees' },
+    audit: { fields: F(['filename'], ['limit', 'playtest', 'year']), scope: 'app:write',
+        summary: 'read the app\'s change log, newest first, with the archived years and the limit in force; year reads one archived year; playtest: true also opens the app signed out in a real browser and reports what a stranger sees' },
+    audit_archive: { fields: F(['filename', 'before'], []), scope: 'app:write',
+        summary: 'move the app\'s log entries older than a date into the archive for their year. Nothing is deleted; audit with year reads them back' },
+    audit_keep: { fields: F([], ['keep']), scope: 'app:write',
+        summary: 'read or set how much of each app\'s audit log is kept. Everything is kept by default; "all" keeps it so, and a limit that deletes is the account holder\'s own decision' },
     versions: { fields: F(['filename'], ['owner']), scope: null,
         summary: 'list the version history (number, display version, size, created at)' },
     lineage: { fields: F(['filename'], ['owner']), scope: null,

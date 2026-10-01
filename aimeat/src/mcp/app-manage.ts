@@ -25,6 +25,8 @@
  * @structure registerAppManageTool
  * @usage registerAppManageTool(mcp, storage, config, agentGaii, scopes, getToken)
  * @version-history
+ *   v1.3.0 — 2026-10-01 — audit answers the archived years and the limit, and reads a year; the new
+ *     audit_archive and audit_keep go over their routes with the member actions.
  *   v1.2.0 — 2026-10-01 — The member actions (members, member_set, member_remove, member_decline,
  *     member_dismiss, member_plan_get, member_plan_set, member_sweep, member_me, member_request), over
  *     loopback to routes/app-members.ts with the session's bearer. registerAppManageTool takes getToken.
@@ -187,9 +189,13 @@ export function registerAppManageTool(
             case 'audit': {
                 const out = await ownerAppAudit(storage, config, {
                     callerGaii, filename, limit: typeof args.limit === 'number' ? args.limit : undefined, playtest: args.playtest === true,
+                    year: typeof args.year === 'string' && args.year ? args.year : undefined,
                 });
                 if ('error' in out) return plainRefusal(out.error);
-                return answer({ filename, total: out.total, entries: out.entries, ...(out.live ? { live: out.live } : {}) });
+                return answer({
+                    filename, total: out.total, entries: out.entries, archives: out.archives, keep: out.keep,
+                    ...(out.year ? { year: out.year } : {}), ...(out.live ? { live: out.live } : {}),
+                });
             }
             case 'versions': {
                 const out = await listAppVersionsView(storage, config, appOwner, filename);

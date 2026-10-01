@@ -12,6 +12,8 @@
  *     name an account by its bare name), and initializes revocation/session auth storage
  *
  * @version-history
+ *   v1.8.1 — 2026-10-01 — The app audit log is bound to the config (bindAppAuditConfig), so it reads
+ *     the operator's default limit.
  *   v1.8.0 — 2026-10-01 — Workspace spaces closed by the old filled schema are re-locked open at start
  *     (services/workspace-schema-relock.ts); an ambiguous one becomes a Security-page incident.
  *   v1.7.0 — 2026-09-26 — The app grants, personal access tokens and session rows of deleted accounts
@@ -50,6 +52,7 @@ import { initSessionAuth } from '../auth/middleware.js';
 import { settleStoredHookBindings, moveAccountNameHookBindings } from '../services/hooks-overview.js';
 import { openHeldNamesIncident, settleInstallsAtStart, settleCredentialsAtStart } from '../services/held-account-names.js';
 import { settleWorkspaceSchemasAtStart } from '../services/workspace-schema-relock.js';
+import { bindAppAuditConfig } from '../services/app-audit-archive.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import type { ConfigSources } from '../server.js';
@@ -194,6 +197,8 @@ export async function initializeConfig(
   // no field under the strict lock: that exact schema is re-locked open, anything else that says
   // open and admits nothing goes to the Security page. Every start; a re-locked space is not seen again.
   await settleWorkspaceSchemasAtStart(config, storage);
+  // The app audit log reads the operator's default limit from this config object, live.
+  bindAppAuditConfig(config);
 
   // Wire storage into token revocation system for persistent revocation, and into the session-aware
   // auth middleware (+ config for PAT browser cookies). Both are filed under this node's id and read

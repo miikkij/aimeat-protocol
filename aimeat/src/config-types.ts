@@ -7,6 +7,8 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.13.0 — 2026-10-01 — AppAuditConfig mixed in (config-app-audit.ts): the node's default limit
+ *     on an app's audit log.
  *   v1.12.0 — 2026-09-30 — UpdateCheckConfig mixed in (config-update-check.ts): the npm version check.
  *   2026-09-29 — signageEnabled, derived from siteLinks.signage like storeEnabled.
  *   v1.11.0 — 2026-09-29 — ClassificationConfig mixed in (config-data-access.ts, TARGET-082).
@@ -161,8 +163,9 @@ import type { ThemesConfig } from './config-themes.js';
 import type { PackagesConfig } from './config-types-packages.js';
 import type { ClassificationConfig } from './config-data-access.js';
 import type { UpdateCheckConfig } from './config-update-check.js';
+import type { AppAuditConfig } from './config-app-audit.js';
 
-export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, McpProxyConfig, EnterpriseSsoConfig, AccountSecurityConfig, CapabilitiesConfig, ThemesConfig, PackagesConfig, ClassificationConfig, UpdateCheckConfig {
+export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, McpProxyConfig, EnterpriseSsoConfig, AccountSecurityConfig, CapabilitiesConfig, ThemesConfig, PackagesConfig, ClassificationConfig, UpdateCheckConfig, AppAuditConfig {
   port: number;
   baseUrl: string;
   /**

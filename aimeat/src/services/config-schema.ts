@@ -12,6 +12,9 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   v1.20.0 — 2026-10-01 — apps.audit_keep_default (AIMEAT_APP_AUDIT_KEEP): the node's default limit
+ *     on each app's audit log, 0 = keep all. The morsel policy rows moved unchanged to
+ *     config-schema-morsels.ts (max-file-lines).
  *   v1.19.0 — 2026-09-30 — node.update_check and node.update_check_source (AIMEAT_UPDATE_CHECK*).
  *   v1.18.0 — 2026-09-29 — The mutable fixed-set string rows take oneOf(): the same check, and
  *     `choices` served to the Config tab, which offers a pick instead of a text field.
@@ -82,6 +85,7 @@ import type { ConfigFieldShape } from './config-field-def.js';
 import { isEmptyOrHttpUrl, isContactList, oneOf } from './config-schema-validators.js';
 import { SYSTEM2_AI_CONFIG_FIELDS } from './config-schema-ai.js';
 import { SEO_CONFIG_FIELDS } from './config-schema-seo.js';
+import { MORSEL_CONFIG_FIELDS } from './config-schema-morsels.js';
 
 // ── Field Definition ── the row's shape is in config-field-def.ts (this file reached the line ceiling).
 
@@ -181,20 +185,8 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
     validate: v => typeof v === 'string' && (v as string).length > 0 && (v as string).length <= 20, immutable: false,
     description: 'Version shown on the privacy policy and the terms. Raise it whenever their substance changes' },
 
-  // ── Morsel Policy (mutable) ──
-  { key: 'welcomeBonus', dotPath: 'morsel_policy.welcome_bonus', envVar: 'AIMEAT_WELCOME_BONUS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Morsels granted to new agents', range: '0-10000' },
-  { key: 'dailyAllowance', dotPath: 'morsel_policy.daily_allowance', envVar: 'AIMEAT_DAILY_ALLOWANCE', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Daily morsel allowance per agent', range: '0-10000' },
-  // The pacing floor sits with the morsel policy because that is what it is: how fast the daily
-  // allowance lets anyone consume a capability, whatever they pay for it in.
-  { key: 'pacingTollDefault', dotPath: 'morsel_policy.pacing_toll_default', envVar: 'AIMEAT_PACING_TOLL_DEFAULT', type: 'number',
-    validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 100, immutable: false,
-    description: 'Morsels burned per metered call when a capability declares no toll of its own. Bounds the call RATE for every capability, including money-priced ones. 0 = off; at 1 a consumer can make about 500 calls a day.',
-    range: '0-100' },
-  { key: 'dailyAllowanceCap', dotPath: 'morsel_policy.daily_allowance_cap', envVar: 'AIMEAT_DAILY_ALLOWANCE_CAP', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Max balance for daily allowance eligibility', range: '0-100000' },
-  { key: 'burnRate', dotPath: 'morsel_policy.burn_rate', envVar: 'AIMEAT_BURN_RATE', type: 'float', validate: v => typeof v === 'number' && (v as number) >= 0 && (v as number) <= 1, immutable: false, description: 'Fraction of network fees burned', range: '0.0-1.0' },
-  { key: 'maxOperatorMintPerDay', dotPath: 'morsel_policy.max_operator_mint_per_day', envVar: 'AIMEAT_MAX_OPERATOR_MINT_PER_DAY', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Max morsels operator can mint per day', range: '0-1000000' },
-  { key: 'boardPostBaseCost', dotPath: 'morsel_policy.board_post_base_cost', envVar: 'AIMEAT_BOARD_POST_BASE_COST', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Base morsel cost for public board posts', range: '0-1000' },
-  { key: 'boardPostCostPerKb', dotPath: 'morsel_policy.board_post_cost_per_kb', envVar: 'AIMEAT_BOARD_POST_COST_PER_KB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Additional morsel cost per KB of post body', range: '0-100' },
+  ...MORSEL_CONFIG_FIELDS,
+  { key: 'appAuditKeepDefault', dotPath: 'apps.audit_keep_default', envVar: 'AIMEAT_APP_AUDIT_KEEP', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 1000000, immutable: false, description: 'Entries of each app\'s audit log an owner keeps when they set no limit of their own (0 = all)', range: '0-1000000' },
   { key: 'boardPublicPerOwnerMax', dotPath: 'boards.public_per_owner_max', envVar: 'AIMEAT_BOARD_PUBLIC_PER_OWNER_MAX', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Public notice boards one account may keep (system boards stay operator-only)', range: '0-1000' },
 
   // ── Auth (mutable) ──
