@@ -5,13 +5,19 @@
   and the trust checks that must exist before a node sells somebody else's code. Written from a
   verification of the package, repository, commerce and install code on main at 31603ae7f.
 @version-history
+  v0.3.0 — 2026-10-02 — Questions 1, 4 and 5 answered. Renewal: the buyer starts it first, automatic
+    renewal comes before a product with a monthly fee goes on sale. Offers may grant on approval or
+    at once, with no money. The checkout line follows the seller-of-record ruling. Session
+    cc-jouni-packagesale.
+  v0.2.0 — 2026-10-01 — Answers to questions 2, 3 and 6, and finding F as built. Session
+    cc-jouni-peerproof.
   v0.1.0 — 2026-10-01 — Proposal for review. Nothing in it is built. Session cc-jouni-packagesale.
 -->
 
 # Selling a package: verification and design
 
-Status: **proposal for review.** Nothing here is built, and the code on `main` at `31603ae7f` is
-what every statement below was checked against.
+Status: **design with every open question answered (section 10).** Of the build, only finding F is
+done (section 6). The verification in section 1 was made against the code on `main` at `31603ae7f`.
 
 ## What a person gets
 
@@ -43,7 +49,7 @@ So a package has no price anywhere, a checkout cannot sell one, and nothing comp
 written by hand. And some of what a buyer would install from a stranger (an extension, an app's
 scopes, a schema lock, memory keys) takes effect with no question asked of the buyer.
 
-## 0. A ruling this design reopens
+## 0. The ruling this design depended on
 
 On 2026-09-28 Jouni ruled: "Billing, prices and the shop for install packages belong to
 aimeat-commercial (store.aimeat.io, shop.apps.store.aimeat.io). The package repository grants each
@@ -52,12 +58,18 @@ sale and registers the customer node in one call, as a packages-only peer."
 `decision-yritt-j-n-peruspaketti-costs-1090-once-and-14-90-a-month-for`: "The platform only grants
 the sale on the package repository.")
 
-Sections 2 and 3 put a price and a checkout into the platform. That is compatible with the ruling
-only if the ruling was about **one product and one shop**, and not about **whether the platform ever
-prices a package**. This design reads it the first way: aimeat-commercial keeps its own shop, its
-own prices and its own billing, and keeps granting through the signed seller request, which this
-design does not change. The platform adds a second way to sell, for an operator who has no shop of
-their own. **This needs Jouni's answer before section 3 is built** (open question 1).
+Sections 2 and 3 put a price and a checkout into the platform, so they depended on how that ruling
+was meant. **Answered on 2026-10-01** (decision
+`decision-marketplace-the-price-and-the-sale-go-into-the-platform-we-s`): "The price and the sale for
+install packages belong IN THE PLATFORM, not only in our shop: any operator running a package
+repository should be able to sell from it, and we are one of them." And on the old ruling: "'billing,
+prices and the shop for install packages belong to aimeat-commercial' meant ONE PRODUCT AND ONE SHOP,
+ours. It did NOT mean the platform never prices a package." The same ruling starts the marketplace
+as a curated reseller with invited vendors, not open, and makes it multi-product with a second
+bundle of its own before any outsider is involved.
+
+aimeat-commercial keeps its own shop, prices and billing for its product, and keeps granting through
+the signed seller request, which this design does not change.
 
 ## 1. The brief's findings, checked
 
@@ -124,7 +136,9 @@ One record per group, not one per sale, so the key count does not grow with sale
   state: 'on_sale' | 'paused' | 'ended',
   terms: [                                   // append-only; the last one is current
     { id: 't3', createdAt,
-      price:   { amount, currency },         // one-time; EUR or USD micro-units (commerce/money.ts)
+      grant:   'payment' | 'approval' | 'automatic',
+      price:   { amount, currency } | null,  // one-time; EUR or USD micro-units (commerce/money.ts);
+                                             // required for 'payment', null for the other two
       updates: { included_days, renewal: { amount, currency, period_days } | null },
       channel: 'stable' | 'beta',
       licence: { subject: 'node', per: 'purchase', spdx?, terms_url?, text_sha256? },
@@ -132,8 +146,8 @@ One record per group, not one per sale, so the key count does not grow with sale
       support: { email, security_email } } ] }
 ```
 
-**It may say:** a one-time price, how many days of updates come with it, the renewal price and
-period, the release channel, the licence scope (one subject per purchase; `node` is the only subject
+**It may say:** how access is granted (after payment, on approval, or at once), a one-time price,
+how many days of updates come with it, the renewal price and period, the release channel, the licence scope (one subject per purchase; `node` is the only subject
 kind today, see "The subject" in section 3), how tax is to be read, and a
 support and security contact. **The security contact is required for a paid offer**: it is the one
 field a buyer who finds a problem needs, and it costs the author nothing.
@@ -141,8 +155,18 @@ field a buyer who finds a problem needs, and it costs the author nothing.
 **It may not say:** anything about the package's content or permissions (those come from the
 package and the trust summary in section 5), anything a node cannot enforce (seat counts, usage
 limits), or anything that sounds like the node reviewed the code (the listing's moderation state
-says that, separately). An offer is money only: a morsel is a pacer and buys nothing, so a package
-priced in morsels is refused. A free private package needs no offer: the author grants it.
+says that, separately). A price is money only: a morsel is a pacer and buys nothing, so a package
+priced in morsels is refused.
+
+**Access without money** (answered 2026-10-02, open question 5). `grant: 'approval'` means the
+subject asks and the seller of record approves or refuses; `grant: 'automatic'` means any signed-in
+account on the selling node gets it at once. Both run the same grant as a paid order and record an
+order with the amount 0, so the books, the update date and the security contact work the same way.
+This is for pilots, partners, a company's other nodes and a university's departments, which need "you
+may have this" without a price. **A free trial is the same terms with a renewal price**: for example
+`grant: 'approval'`, `included_days: 30` and a monthly renewal, so the trial ends on its date and goes
+on only as a paid renewal. The author can still grant a private package by hand, as today; an offer
+is for when a seller hands it out.
 
 **When the author changes the price,** a new terms entry is appended. Buyers who already paid keep
 the terms they accepted, including the renewal price (see below). `paused` stops new sales and
@@ -174,8 +198,13 @@ PackageEntitlement += { terms?: { offerTermsId, price, renewal, licence_sha256, 
 ```
 
 A renewal charges the accepted renewal price, not the current one. The buyer may always choose the
-current terms instead, in a new checkout. Without this, the author could raise the price of updates
-a buyer depends on, and the buyer's only defence would be to notice.
+current terms instead, in a new checkout. Without this, the price of updates a buyer depends on could
+be raised, and the buyer's only defence would be to notice.
+
+The rule holds at both levels of a sale (section 3): the entitlement on the repository keeps the
+**author's** terms that the seller accepted (the supplier cost), and the order on the selling node
+keeps the **seller's** terms that the buyer accepted (the buyer's price). Neither side can change the
+other's accepted price.
 
 ## 3. The keystone: the purchase grants the entitlement
 
@@ -247,23 +276,32 @@ one.
 
 ### The checkout line
 
-A new resolver, `kind: 'package'`, registered beside the other three in
-`server-bootstrap/routes-loader.ts`:
+A new resolver, `kind: 'package'`, registered on the **selling node** beside the other three in
+`server-bootstrap/routes-loader.ts` (revised 2026-10-02 to follow the seller-of-record ruling; the
+first version put this resolver on the repository with the author as the seller):
 
-- **Resolve** reads `offer.<groupId>` and the current terms (or, for a renewal, the terms the
-  entitlement accepted). It refuses when the repository role is off, the package is not private,
-  the offer is not on sale, the currency has no payment handler, or the author has no payment
-  account. Seller is the package's author; `psp` is the author's `commerce.psp`. The group id and
-  terms id ride in the line's `app` and `offerId`, the two fields that survive re-resolution at
-  completion.
+- **Resolve** reads the offer from the repository by the signed seller read, and the selling
+  node's own price for the group. The seller sets that price in a sales catalogue record on its own
+  node (`package-sales.catalogue` under the seller of record); without an entry, the package is not
+  for sale there. It refuses when the selling node is not a seller for the package's author, the
+  offer is not on sale, the currency has no payment handler, or the seller of record has no payment
+  account. The line's seller is the seller of record, and `psp` is that account's `commerce.psp`.
+  The group id and terms id ride in the line's `app` and `offerId`, the two fields that survive
+  re-resolution at completion, and the author's terms read at that moment become the order's
+  `supplier_cost`.
 - **Fulfill** runs after the money is collected and before the payout, which is the order
-  `completeSession` already guarantees. It completes the pending intent (grants the entitlement with
-  `updatesUntil = now + included_days`, the channel and the terms snapshot) or writes the claim
-  code, and returns `{ entitlement }` or `{ claim_code }` on the receipt. **If it throws, the
+  `completeSession` already guarantees. It sends the signed seller grant to the repository (with
+  `updates_until = now + included_days`, the channel and the author's terms snapshot) or writes the
+  claim code, and returns `{ entitlement }` or `{ claim_code }` on the receipt. **If it throws, the
   checkout refunds the buyer and leaves the session open**: that is existing behaviour, so a
   purchase can never take money and grant nothing.
-- **Renewal** is the same kind with `renew: <nodeId>`: resolve uses the accepted renewal terms,
-  and fulfill moves `updatesUntil` to `max(now, updatesUntil) + period_days`.
+- **Renewal** is the same kind with `renew: <subject>`: resolve uses the renewal price the buyer
+  accepted, and fulfill moves the date to `max(now, updates_until) + period_days` by the same signed
+  grant.
+- **Approval and automatic grants** (`grant` in the terms) use the same line at the amount 0. With
+  `approval`, completing the line files a request instead of granting: the seller of record approves
+  it (REST, MCP, and the selling node's orders page), and the approval runs the same fulfil. A
+  request expires after 30 days. Requests live in one record on the selling node, not one key each.
 
 The closed lists of kinds that must learn `package`: `routes/commerce.ts`, `mcp/commerce.ts`,
 `openapi.yaml`, and the UCP and ACP SKU parsers (`routes/commerce-ucp.ts`, `routes/commerce-acp.ts`).
@@ -293,8 +331,9 @@ repository with the author as the seller (revised 2026-10-01, open question 6).*
   statement of how the price is to be read, nothing more.
 - **Where the supplier's price comes from** is the offer the repository serves the seller node (the
   signed offer read above): the author's terms are what the seller pays, and the seller's own price to
-  the buyer is the seller's decision on its own node. How a seller's price relates to the author's
-  terms (a fixed price, a margin) is the seller's business and is not modelled.
+  the buyer is the seller's decision on its own node, kept in its sales catalogue record. How a
+  seller's price relates to the author's terms (a fixed price, a margin) is the seller's business:
+  the platform stores the seller's price and does not compute it from the author's terms.
 
 ### Renewal: the date is the clock
 
@@ -305,13 +344,41 @@ updates on the right day, provided **every grant writes a date**. Two changes ma
 1. A grant that omits `updates_until` keeps the previous value instead of resetting it to `null`.
    A paid offer never writes `null`.
 2. The repository's listing already tells the buyer's node its `updates_until`, but the nightly
-   update check reads only the versions. It learns to read the date: fourteen days before it, the
-   owner is told once, with the renewal price and a link, and renews from chat
-   (`aimeat_package_buy { renew: true }`) or from the link.
+   update check reads only the versions. It learns to read the date, and the listing also names the
+   node that sold the entitlement (the grant already notes it), so the buyer's node knows where to
+   renew. Fourteen days before the date, the owner is told once, with the renewal price and a link to
+   the selling node, and renews from chat (`aimeat_package_buy { renew: true }`) or from the link.
 
-Automatic charging (a saved card, a Stripe subscription) is left out: the node stores no payment
-method and handles no Stripe invoice today, and a renewal the buyer starts is the honest default for
-a product that keeps working when it is not renewed. Open question 4.
+**Two steps, in this order** (answered 2026-10-02, open question 4):
+
+1. **The buyer starts each renewal.** This ships with the paid sale. It needs no stored payment
+   method and no job that charges money. The buyer may pay several periods at once (for example 12
+   months), and the date moves by that many periods.
+2. **Automatic renewal, before a product with a monthly fee goes on sale through the platform.** A
+   buyer who must pay by hand twelve times a year stops because of the effort, not because they chose
+   to stop, so a monthly product needs it. The design:
+   - **The buyer turns it on at checkout**, and can turn it off at any time from chat or the selling
+     node's page; turning it off applies from the next period. The checkout shows the text the buyer
+     agrees to: the amount, the period, and that the seller charges the card without asking again.
+   - **The card stays at Stripe.** The first payment asks Stripe to keep the card for later charges
+     (a Stripe customer and a saved payment method) on the seller of record's own Stripe account. The
+     selling node keeps only Stripe's reference ids, in the order record. The card number never
+     reaches the node.
+   - **A daily job on the selling node** charges the saved card three days before the update date,
+     at the renewal price the buyer accepted, with one idempotency key per order and period, and then
+     sends the signed grant that moves the date. The payment handler contract gains an optional
+     method for a charge without the buyer present; only the Stripe handler has it. A buyer who pays
+     by x402 always renews by hand.
+   - **When the charge fails** (a card declined, or the bank asks the buyer to confirm), the owner is
+     told with a link to pay by hand, and the job tries once a day until the date. When the date
+     passes unpaid, the updates stop and the install keeps working, as in step 1. Nothing else
+     follows a failed charge.
+   - **No Stripe subscriptions.** With them, Stripe keeps the clock and the node must follow Stripe's
+     events to keep its own date right: two clocks that can disagree. The update date stays the one
+     clock, and the node decides when to charge.
+
+aimeat-commercial bills its own product in its own shop, so step 2 matters only for products sold
+through the platform.
 
 ### Surfaces, chat first
 
@@ -321,7 +388,8 @@ a product that keeps working when it is not renewed. Open question 4.
 | Repository, anyone | `GET /v1/packages/:groupId/offer`; the listing and the repository listing show the current terms |
 | Repository, a seller node | `GET /v1/federation/package-sales/:groupId/offer` (signed by the seller node), beside the existing config-needs and grant |
 | Repository, the buyer node | `POST /v1/federation/package-claims` (signed by the buyer node; node to node, no account) |
-| Selling node, the buyer | `aimeat_package_buy` (read the offer, open the checkout, renewal) on the buyer's account there |
+| Selling node, the buyer | `aimeat_package_buy` (read the offer, open the checkout, ask for an approval grant, renew, turn automatic renewal on or off) on the buyer's account there |
+| Selling node, the seller of record | the sales catalogue (its own prices), approval requests (approve or refuse), orders with their supplier cost |
 | Buyer node | `aimeat_package_claim` (redeem a code). Redeeming is a node act, so it needs the operator role on the buyer node; on a personal node the owner is the operator |
 | Screens | the listing shows the price and a Buy button; the buyer's Packages page shows the update date and Renew. Screens come after the chat path works |
 
@@ -332,8 +400,11 @@ of `e2e-install-sets`): a package line completes on the selling node with the te
 the buyer's node is entitled on the repository, and nobody signs in on the repository; a fulfill that throws
 refunds the buyer; a price change after purchase leaves the renewal price as accepted; a renewal
 moves the date; a claim signed by a key other than the one it names is refused; a claim for a node
-id that is a peer under another key is refused and grants nothing; the rake receivable and a
-declared split are booked on a package line.
+id that is a peer under another key is refused and grants nothing; the order records the seller of
+record, the supplier and the supplier cost, and the selling node's rake applies as on any sale; an
+approval offer files a request that grants only when the seller of record approves; an automatic
+renewal charges once per period with the test handler, a failed charge leaves the date where it was,
+and the date then passes with no grant.
 
 ## 4. The set composer
 
@@ -527,7 +598,9 @@ are not built.
 
 ## 7. Other defects found on the way
 
-Not in the brief. Each is on `main` now; none is fixed in this pass.
+Not in the brief. Each code defect below, and T1, T2, T5, T6 and T7, is an open incident on the
+Lifecycle Central board since 2026-10-01. On 2026-10-02 none of the code defects was fixed yet; the
+two documentation rows were corrected by `d48f79f4f`.
 
 | Defect | Where | Weight |
 |---|---|---|
@@ -540,8 +613,8 @@ Not in the brief. Each is on `main` now; none is fixed in this pass.
 | `POST /v1/packages/:groupId/versions` asks for `app:write`, not `packages:write`, and skips the create role | `routes/packages.ts` | consistency |
 | Compose does not read the extension edges of the cortexes it packages | `services/package-compose.ts` | correctness |
 | The admin suspend call sends `reason`; the route reads `comment` | `public/js/services/admin.js`, `routes/templates.ts` | small |
-| `openapi.yaml` still says a granted node must share its catalogue | `openapi.yaml` | docs |
-| `package-sellers.ts` says the seller key is read from `/.well-known/aimeat`; it is not | `services/package-sellers.ts` | docs |
+| `openapi.yaml` still says a granted node must share its catalogue | `openapi.yaml` | docs; fixed in `d48f79f4f` |
+| `package-sellers.ts` says the seller key is read from `/.well-known/aimeat`; it is not | `services/package-sellers.ts` | docs; true since `d48f79f4f`, which reads it |
 
 **Scale.** A repository keeps one entitlements record per package group, and a memory value holds
 at most 1024 kB, so one group can hold a few thousand entitled nodes (about 250 bytes each) before
@@ -557,8 +630,9 @@ repository operator needs. Two parts carry one product's shape, and the design w
 
 - **"One price plus a monthly fee for updates"** is the entrepreneur bundle's model. A university
   shelf or a company's internal shelf usually needs **no money at all**, but an approval: the
-  department asks, the owner of the shelf says yes. That is an entitlement granted on approval, and
-  the offer model can carry it as a third state beside paid and free (open question 5).
+  department asks, the owner of the shelf says yes. That is an entitlement granted on approval.
+  Answered 2026-10-02 (open question 5): the offer carries it, as `grant: 'approval'` beside
+  `'payment'` and `'automatic'` (section 2).
 - **"Sell to other people's nodes"** assumes the buyer runs their own node. On a shared node (a
   company's, a university's) the buyer is an owner on the **same** node as the package. Answered
   2026-10-01 (open question 3): the shelf inside one node is out of this round, and its first
@@ -577,19 +651,27 @@ Each phase is usable on its own and is tested before the next starts.
 2. **The trust layer before selling:** the consent step with `capabilities` (T1), no silent scopes
    for package-installed apps (T2), re-consent on a widening update (T7), and the display of author,
    signer and origin (T5).
-3. **The keystone:** the offer record and the seller node's signed read of it, the `package`
-   resolver on the selling node, claims with proof of the node key, the subject shape of offers and
-   entitlements, renewal and its notice, and the order's seller of record, supplier and amounts.
+3. **The keystone:** the offer record (with `grant` and a price that may be empty) and the seller
+   node's signed read of it, the selling node's sales catalogue, the `package` resolver on the
+   selling node, claims with proof of the node key, the subject shape of offers and entitlements,
+   renewal the buyer starts and its notice, and the order's seller of record, supplier and amounts.
+   Then, in this order: **grants on approval and at once** (the request, its approval, the order at
+   0), and **automatic renewal**, which must be done before a product with a monthly fee goes on sale
+   through the platform.
 4. **The set composer:** the `aimeat-workspace` declaration, compose that adds a version, compose-set
    with its dry run, and the owner part of the set install.
 5. **A repository open to strangers:** withdrawal (T6), review on a selling node, the scale
    measurement, and the offer in the Exchange's discovery for agents.
 
-## 10. Open questions for Jouni
+## 10. Questions for Jouni, and his answers
+
+Every question is answered. The rulings are decision records on the Lifecycle Central board.
 
 1. **The billing ruling of 2026-09-28.** Did it place billing for the entrepreneur bundle in
-   aimeat-commercial, or did it rule that the platform never prices a package? Section 3 needs the
-   first reading.
+   aimeat-commercial, or did it rule that the platform never prices a package? *Answered
+   2026-10-01:* it "meant ONE PRODUCT AND ONE SHOP, ours. It did NOT mean the platform never prices a
+   package." The price and the sale go into the platform, starting as a curated reseller with
+   invited vendors. Section 0.
 2. **A buyer with no account on the repository.** *Answered 2026-10-01:* "A buyer NEVER needs an
    account on the repository. [...] The buyer has an account on the SELLING node, and the sale may
    create it at checkout. The condition: the selling node reads the offer on the buyer's behalf,
@@ -601,9 +683,16 @@ Each phase is usable on its own and is tested before the next starts.
    this node, not outside it) is its own small change; this design does not hard-code the subject of
    an offer or an entitlement as a node (section 3).
 4. **Renewal.** Buyer-started renewal with a notice, as proposed, or should the node store a payment
-   method and charge by itself?
+   method and charge by itself? *Answered 2026-10-02:* both, in order. Jouni accepted the proposal
+   ("ok, do as you sugest"): the buyer starts each renewal first; automatic renewal, with the card
+   kept at Stripe on the seller of record's account and the update date as the one clock, comes before
+   a product with a monthly fee goes on sale through the platform. No Stripe subscriptions. Section 3,
+   "Renewal: the date is the clock".
 5. **Approval instead of money.** Should an offer support "granted on the owner's approval" for
-   shelves that charge nothing?
+   shelves that charge nothing? *Answered 2026-10-02:* yes, accepted as proposed ("ok, do as you
+   sugest"). The offer carries `grant: 'payment' | 'approval' | 'automatic'` and a price that may be
+   empty now; the approval step is built after the paid sale. A free trial is approval terms with a
+   renewal price. Section 2, "Access without money".
 6. **Who is the seller of record now that the checkout is on the selling node** (new, 2026-10-01,
    from answer 2). *Answered 2026-10-01:* "The operator of the selling node: the party whose payment
    account takes the money and whose terms the buyer accepts. The package author is that seller's
