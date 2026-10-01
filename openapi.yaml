@@ -60127,7 +60127,7 @@ paths:
                             properties:
                               keep: { type: integer }
                               source: { type: string, enum: [owner, node] }
-                          year: { type: string, description: Present with ?archive=, the year read. }
+                          year: { type: string, description: 'Present with ?archive=, the year read.' }
                           live:
                             type: object
                             description: Present only with playtest=true. The bytes check and the live run.
