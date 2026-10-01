@@ -22,7 +22,7 @@ import { Action, Actions, Loud } from '/components/Action.js';
 import { Select } from '/components/Select.js';
 import { TextField } from '/components/TextField.js';
 import { Fields } from '/components/Field.js';
-import { List, Row, Name, When, Who } from '/components/List.js';
+import { List, Row, Name, When, Who, Doors } from '/components/List.js';
 import { apiGet, apiPost, apiPut } from '/js/api.js';
 import { confirmAsk } from '/views/appcat/dialogs/confirm.js';
 import { x } from '/views/appcat/i18n.js';
@@ -56,7 +56,7 @@ function ArchiveYear({ d, year, count, actWords }) {
   return html`
     <${Row}>
       <${Name}>${counted('audit.archiveYear', count, { year })}<//>
-      <${Actions}><${Action} small onClick=${show}>${rows ? x('audit.archiveHide') : x('audit.archiveShow')}<//><//>
+      <${Doors}><${Action} small onClick=${show}>${rows ? x('audit.archiveHide') : x('audit.archiveShow')}<//><//>
     <//>
     ${failed ? html`<${Note} kind="message" error>${failed}<//>` : null}
     ${rows ? html`<${List} tone="log" cols="when-name-who">${rows.slice(0, SHOW).map((e, i) => html`<${Row} key=${i}>
@@ -106,22 +106,25 @@ export default function AuditKeep({ d, st, actWords }) {
     setBusy(false);
   }
 
+  // The shape of the page's other forms (marks.js, legal.js): a part heading, the state in a line,
+  // then one narrow column of fields with its button inside it, the button a control-sized Loud.
   return html`
     <${SubHeading} level=${4} part="apart">${x('audit.keepTitle')}<//>
     <${Note} kind="hint" chapter>${keep > 0 ? counted('audit.keepN', keep) : x('audit.keepAll')}${source === 'node' && keep > 0 ? ' ' + x('audit.keepNode') : ''}<//>
-    <${SubHeading} level=${4} part="apart">${x('audit.archiveTitle')}<//>
-    ${archives.length
-      ? html`<${List}>${archives.slice().reverse().map((a) => html`<${ArchiveYear} key=${a.year} d=${d} year=${a.year} count=${a.entries} actWords=${actWords} />`)}<//>`
-      : html`<${Note} kind="hint" chapter>${x('audit.archiveNone')}<//>`}
-    <${Fields} chapter>
-      <${TextField} type="date" label=${x('audit.archiveBefore')} value=${before} onInput=${setBefore} />
-    <//>
-    <${Actions} chapter><${Action} onClick=${archive} disabled=${busy || !before}>${x('audit.archiveGo')}<//><//>
-    <${Fields} chapter>
+    <${Fields} plain column narrow>
       <${Select} label=${x('audit.keepLabel')} value=${mode} onChange=${setMode}
         options=${[['all', x('audit.keepOptAll')], ['n', x('audit.keepOptN')]]} />
       ${mode === 'n' ? html`<${TextField} type="number" min="1" step="1" label=${x('audit.keepCount')} value=${count} onInput=${setCount} />` : null}
+      <${Actions} chapter><${Loud} control onClick=${saveKeep} disabled=${busy}>${x('audit.keepSave')}<//><//>
     <//>
-    <${Actions} chapter><${Loud} onClick=${saveKeep} disabled=${busy}>${x('audit.keepSave')}<//><//>
+
+    <${SubHeading} level=${4} part="apart">${x('audit.archiveTitle')}<//>
+    ${archives.length
+      ? html`<${List} cols="name-doors">${archives.slice().reverse().map((a) => html`<${ArchiveYear} key=${a.year} d=${d} year=${a.year} count=${a.entries} actWords=${actWords} />`)}<//>`
+      : html`<${Note} kind="hint" chapter>${x('audit.archiveNone')}<//>`}
+    <${Fields} plain column narrow>
+      <${TextField} type="date" label=${x('audit.archiveBefore')} value=${before} onInput=${setBefore} />
+      <${Actions} chapter><${Loud} control onClick=${archive} disabled=${busy || !before}>${x('audit.archiveGo')}<//><//>
+    <//>
     ${notice ? html`<${Note} kind="message" error=${noticeKind(notice) === 'error'}>${notice}<//>` : null}`;
 }
