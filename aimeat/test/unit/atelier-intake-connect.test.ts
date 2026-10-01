@@ -328,7 +328,13 @@ describe('connections', () => {
     const rows = part(part(host, 'accounts')[0], 'row');
     expect(rows.length).toBe(2);
     expect(rows[0].textContent).toContain('robin@example.com');
-    expect(rows[0].textContent).toContain('Gmail (sending)');
+    // The node's bracketed English word is replaced with what the service can do, in the kit's words.
+    expect(rows[0].textContent).toContain('Gmail (send mail)');
+    expect(rows[0].textContent).not.toContain('(sending)');
+    // Two services under one brand both say what they do, so neither reads as a bare "Gmail".
+    const connect = part(part(host, 'add')[0], 'connect').map((b: any) => String(b.textContent));
+    expect(connect).toContain('Connect Gmail (read mail)');
+    expect(connect).toContain('Connect Gmail (send mail)');
     expect(part(rows[0], 'status')[0].textContent).toBe('Connected');
     expect(part(rows[0], 'can')[0].textContent).toBe('Can: send mail');
     expect(part(rows[0], 'reconnect')).toEqual([]);
@@ -352,7 +358,7 @@ describe('connections', () => {
     click(part(part(host, 'row')[0], 'disconnect')[0]);
     await settle();
     expect(calls.find((c) => c.op === 'revoke')?.args).toBe('c1');
-    expect(part(host, 'notice')[0].textContent).toBe('Disconnected. Gmail (sending) was told too.');
+    expect(part(host, 'notice')[0].textContent).toBe('Disconnected. Gmail (send mail) was told too.');
   });
 
   it('starts connecting with the provider from the click', async () => {

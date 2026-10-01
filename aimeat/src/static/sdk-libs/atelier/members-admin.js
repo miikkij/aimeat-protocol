@@ -193,7 +193,7 @@ export function members(spec) {
       const n = count[g];
       return el('button', {
         type: 'button', role: 'tab', class: 'ak-mem__tab' + (g === tab ? ' is-on' : ''), 'aria-selected': g === tab ? 'true' : 'false',
-        on: { click: function () { tab = g; shown = pageSize; render(); } },
+        on: { click: function () { tab = g; shown = pageSize; failure = ''; notice = ''; render(); } },
       }, tm('tab.' + g) + (typeof n === 'number' && n ? ' (' + n + ')' : ''));
     }));
     root.appendChild(tabs);
@@ -268,7 +268,8 @@ export function members(spec) {
           const own = (spec.actions || []).map(function (a) {
             return button(a.label, a.tone || 'ghost', function () { Promise.resolve(a.run(m)).then(function () { render(); }); }, sample);
           });
-          return row(person(m.owner, m.displayName), m.since ? tm('members.since', { d: day(m.since) }) : '', own.concat([
+          const since = m.since ? (variant === 'table' ? day(m.since) : tm('members.since', { d: day(m.since) })) : '';
+          return row(person(m.owner, m.displayName), since, own.concat([
             sel,
             button(tm('members.remove'), 'ghost', sample ? noop : function () {
               ask({
@@ -287,7 +288,7 @@ export function members(spec) {
         body.appendChild(list('invites', v.rows.map(function (i) {
           return row(person(i.emailShown || '', null), tm('members.invited', { role: i.role, d: day(i.at), until: day(i.expiresAt) }), [
             button(tm('members.cancelInvite'), 'ghost', sample ? noop : function () {
-              act(function () { return iam.cancelInvite(i.id); });
+              act(function () { return iam.cancelInvite(i.id); }, function () { return tm('members.inviteCancelled', { email: i.emailShown || '' }); });
             }, sample),
           ]);
         }), tm('members.invitesNone'), v.more));
@@ -300,7 +301,8 @@ export function members(spec) {
             return el('li', { class: 'ak-mem__row ak-mem__row--line', 'data-ak-part': 'row' }, [
               el('span', { class: 'ak-mem__when' }, day(h.at)),
               el('span', { class: 'ak-mem__meta' }, tm('history.' + h.action, {
-                by: String(h.by || '').split('#').pop().split('@')[0], who: h.account, from: h.from || '', to: h.to || '',
+                by: String(h.by || '').split('#').pop().split('@')[0], who: h.account || (h.detail && h.detail.email) || '',
+                from: h.from || '', to: h.to || '',
               })),
             ]);
           }), tm('members.historyNone'), 0));
@@ -371,6 +373,7 @@ export function members(spec) {
           act(function () { return iam.admin('assign', { ghii: value, owner: value, role: role }); });
         }
       }, sample);
+      if (EMAIL_RE.test(input.value.trim())) go.textContent = tm('members.invite');
       let timer = 0;
       input.addEventListener('input', function () {
         go.textContent = EMAIL_RE.test(input.value.trim()) ? tm('members.invite') : tm('members.approve');
@@ -405,9 +408,10 @@ export function members(spec) {
     // ── The plan: who gets in, how many, for how long, who manages ──
     function planForm(p) {
       const cur = p || { roles: {}, seats: {}, terms: {}, manageRoles: [], access: 'members-free', rosterVisibility: 'owner' };
-      const access = roleSelect(['members-free', 'free', 'members-only'], cur.access === 'open' ? 'members-free' : (cur.access || 'members-free'), tm('plan.access'));
+      const opt = function (v) { return tm('plan.opt.' + v); };
+      const access = roleSelect(['members-free', 'free', 'members-only'], cur.access === 'open' ? 'members-free' : (cur.access || 'members-free'), tm('plan.access'), opt);
       access.classList.add('ak-mem__plan-access');
-      const vis = roleSelect(['owner', 'members'], cur.rosterVisibility || 'owner', tm('plan.visibility'));
+      const vis = roleSelect(['owner', 'members'], cur.rosterVisibility || 'owner', tm('plan.visibility'), opt);
       const rows = roles.map(function (r) {
         const seats = /** @type {HTMLInputElement} */ (el('input', { type: 'number', min: '0', class: 'ak-input ak-mem__num', 'aria-label': tm('plan.seats') + ' ' + r,
           value: cur.seats && cur.seats[r] != null ? String(cur.seats[r]) : '', placeholder: tm('plan.noLimit') }));

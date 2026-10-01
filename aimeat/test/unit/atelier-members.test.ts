@@ -219,6 +219,43 @@ describe('members, the review round', () => {
   });
 });
 
+describe('members, the browser round', () => {
+  const tab = (host: any, name: string) => all(host).find((n) => n.attrs && n.attrs.role === 'tab' && String(n.textContent).startsWith(name));
+
+  it('names the plan choices in words, not by their stored values', async () => {
+    (window as any).AIMEAT.iam.plan = async () => ({ access: 'members-free', rosterVisibility: 'owner', manageRoles: [], seats: {}, terms: {}, roles: {} });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    kit.members({ target: host, app: 'me/club.html' });
+    await settle();
+    tab(host, 'Plan').dispatchEvent({ type: 'click', bubbles: true });
+    await settle();
+    const options = all(part(host, 'plan')[0]).filter((n) => n.tagName === 'OPTION').map((n) => String(n.textContent));
+    expect(options).toContain('Members free, others pay');
+    expect(options).toContain('Every member');
+    expect(options).not.toContain('members-free');
+    document.body.removeChild(host);
+  });
+
+  it('drops a refusal when another tab is opened, and the table cell carries the date alone', async () => {
+    (window as any).AIMEAT.iam.admin = async (op: string) => (op === 'state' ? state : { ok: false, error: { message: 'Scope "exchange:grant" required.' } });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    kit.members({ target: host, app: 'me/club.html', variant: 'table' });
+    await settle();
+    buttons(part(host, 'asked')[0], 'Approve')[0].dispatchEvent({ type: 'click', bubbles: true });
+    await settle();
+    expect(part(host, 'failure').length).toBe(1);
+    tab(host, 'Members').dispatchEvent({ type: 'click', bubbles: true });
+    await settle();
+    expect(part(host, 'failure')).toEqual([]);
+    const cells = all(part(host, 'roster')[0]).filter((n) => n.tagName === 'TD').map((n) => String(n.textContent));
+    expect(cells.some((t) => t.startsWith('since'))).toBe(false);
+    (window as any).AIMEAT.iam.admin = async (op: string, args: any) => { calls.push({ op, args }); return op === 'state' ? state : { ok: true }; };
+    document.body.removeChild(host);
+  });
+});
+
 describe('joinRequest', () => {
   it('sends the note for a stranger', async () => {
     me = { isOwner: false, member: false, role: null, caps: [], requested: null };

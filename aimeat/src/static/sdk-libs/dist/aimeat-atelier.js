@@ -12867,8 +12867,14 @@
       "history.plan.changed": "{by} changed the plan",
       "history.roster.swept": "{by} closed the memberships that had ended",
       "plan.access": "Who pays",
-      "plan.accessHint": "members-free: members pay nothing, others pay. free: nobody pays. members-only: only members get in, even with money.",
+      "plan.accessHint": "Members free: members pay nothing, others pay. Free for everyone: nobody pays. Members only: only members get in, not even with money.",
       "plan.visibility": "Who sees the member list",
+      "plan.opt.members-free": "Members free, others pay",
+      "plan.opt.free": "Free for everyone",
+      "plan.opt.members-only": "Members only",
+      "plan.opt.owner": "You and those who manage members",
+      "plan.opt.members": "Every member",
+      "members.inviteCancelled": "The invitation to {email} is cancelled.",
       "plan.seats": "Seats",
       "plan.days": "Days",
       "plan.manages": "Manages members",
@@ -12956,8 +12962,14 @@
       "history.plan.changed": "{by} muutti ehtoja",
       "history.roster.swept": "{by} päätti jäsenyydet, joiden kausi oli loppunut",
       "plan.access": "Kuka maksaa",
-      "plan.accessHint": "members-free: jäsenet eivät maksa, muut maksavat. free: kukaan ei maksa. members-only: vain jäsenet pääsevät sisään, rahallakaan ei pääse.",
+      "plan.accessHint": "Jäsenille ilmainen: jäsenet eivät maksa, muut maksavat. Ilmainen kaikille: kukaan ei maksa. Vain jäsenille: vain jäsenet pääsevät sisään, rahallakaan ei pääse.",
       "plan.visibility": "Kuka näkee jäsenlistan",
+      "plan.opt.members-free": "Jäsenille ilmainen, muut maksavat",
+      "plan.opt.free": "Ilmainen kaikille",
+      "plan.opt.members-only": "Vain jäsenille",
+      "plan.opt.owner": "Sinä ja jäsenistä vastaavat",
+      "plan.opt.members": "Kaikki jäsenet",
+      "members.inviteCancelled": "Kutsu osoitteeseen {email} on peruttu.",
       "plan.seats": "Paikat",
       "plan.days": "Päivät",
       "plan.manages": "Hallinnoi jäseniä",
@@ -13045,8 +13057,14 @@
       "history.plan.changed": "{by} cambió las condiciones",
       "history.roster.swept": "{by} cerró las membresías que habían terminado",
       "plan.access": "Quién paga",
-      "plan.accessHint": "members-free: los miembros no pagan, los demás sí. free: nadie paga. members-only: solo entran los miembros, ni siquiera pagando.",
+      "plan.accessHint": "Gratis para miembros: los miembros no pagan, los demás sí. Gratis para todos: nadie paga. Solo miembros: solo entran los miembros, ni siquiera pagando.",
       "plan.visibility": "Quién ve la lista de miembros",
+      "plan.opt.members-free": "Gratis para miembros, los demás pagan",
+      "plan.opt.free": "Gratis para todos",
+      "plan.opt.members-only": "Solo miembros",
+      "plan.opt.owner": "Tú y quienes administran miembros",
+      "plan.opt.members": "Todos los miembros",
+      "members.inviteCancelled": "La invitación a {email} está cancelada.",
       "plan.seats": "Plazas",
       "plan.days": "Días",
       "plan.manages": "Administra miembros",
@@ -13160,14 +13178,14 @@
     const c = caps && caps[role] || [];
     return c.indexOf("*") !== -1 ? Infinity : c.length;
   }
-  function roleSelect(roles, value, label) {
+  function roleSelect(roles, value, label, labelOf2) {
     const s = (
       /** @type {HTMLSelectElement} */
       el(
         "select",
         { class: "ak-input ak-mem__role", "aria-label": label },
         roles.map(function(r) {
-          return el("option", { value: r, selected: r === value ? true : null }, r);
+          return el("option", { value: r, selected: r === value ? true : null }, labelOf2 ? labelOf2(r) : r);
         })
       )
     );
@@ -13347,6 +13365,8 @@
           on: { click: function() {
             tab = g;
             shown = pageSize;
+            failure = "";
+            notice = "";
             render();
           } }
         }, tm("tab." + g) + (typeof n === "number" && n ? " (" + n + ")" : ""));
@@ -13465,7 +13485,8 @@
                 });
               }, sample);
             });
-            return row(person(m.owner, m.displayName), m.since ? tm("members.since", { d: day2(m.since) }) : "", own.concat([
+            const since = m.since ? variant === "table" ? day2(m.since) : tm("members.since", { d: day2(m.since) }) : "";
+            return row(person(m.owner, m.displayName), since, own.concat([
               sel,
               button2(tm("members.remove"), "ghost", sample ? noop : function() {
                 ask({
@@ -13492,6 +13513,8 @@
               button2(tm("members.cancelInvite"), "ghost", sample ? noop : function() {
                 act(function() {
                   return iam.cancelInvite(i.id);
+                }, function() {
+                  return tm("members.inviteCancelled", { email: i.emailShown || "" });
                 });
               }, sample)
             ]);
@@ -13506,7 +13529,7 @@
                 el("span", { class: "ak-mem__when" }, day2(h.at)),
                 el("span", { class: "ak-mem__meta" }, tm("history." + h.action, {
                   by: String(h.by || "").split("#").pop().split("@")[0],
-                  who: h.account,
+                  who: h.account || h.detail && h.detail.email || "",
                   from: h.from || "",
                   to: h.to || ""
                 }))
@@ -13592,6 +13615,7 @@
             });
           }
         }, sample);
+        if (EMAIL_RE.test(input.value.trim())) go.textContent = tm("members.invite");
         let timer = 0;
         input.addEventListener("input", function() {
           go.textContent = EMAIL_RE.test(input.value.trim()) ? tm("members.invite") : tm("members.approve");
@@ -13629,9 +13653,12 @@
       }
       function planForm(p) {
         const cur = p || { roles: {}, seats: {}, terms: {}, manageRoles: [], access: "members-free", rosterVisibility: "owner" };
-        const access = roleSelect(["members-free", "free", "members-only"], cur.access === "open" ? "members-free" : cur.access || "members-free", tm("plan.access"));
+        const opt = function(v) {
+          return tm("plan.opt." + v);
+        };
+        const access = roleSelect(["members-free", "free", "members-only"], cur.access === "open" ? "members-free" : cur.access || "members-free", tm("plan.access"), opt);
         access.classList.add("ak-mem__plan-access");
-        const vis = roleSelect(["owner", "members"], cur.rosterVisibility || "owner", tm("plan.visibility"));
+        const vis = roleSelect(["owner", "members"], cur.rosterVisibility || "owner", tm("plan.visibility"), opt);
         const rows = roles.map(function(r) {
           const seats = (
             /** @type {HTMLInputElement} */
@@ -14188,7 +14215,7 @@
       if (v == null || v === "") return null;
       return typeof v === "string" ? el("span", { class: "ak-mem__col" }, v) : v;
     }
-    function nameOf(m) {
+    function nameOf2(m) {
       return m.displayName || m.account;
     }
     let drawing = 0;
@@ -14256,7 +14283,7 @@
               return lib.grant(spec.org, spec.ws, m.account, next);
             },
             function() {
-              return tw("team.granted", { who: nameOf(m), role: tw("role." + next) });
+              return tw("team.granted", { who: nameOf2(m), role: tw("role." + next) });
             }
           );
         };
@@ -14264,7 +14291,7 @@
           go();
           return;
         }
-        ask({ title: tw("team.raise", { who: nameOf(m) }), text: tw("team.raiseText"), confirmLabel: tw("team.raiseYes") }).then(function(yes) {
+        ask({ title: tw("team.raise", { who: nameOf2(m) }), text: tw("team.raiseText"), confirmLabel: tw("team.raiseYes") }).then(function(yes) {
           if (yes) go();
           else sel.value = m.role;
         });
@@ -14283,7 +14310,7 @@
                   return lib.decide(spec.org, spec.ws, q.account, "approve", role);
                 },
                 function() {
-                  return tw("team.granted", { who: nameOf(q), role: tw("role." + role) });
+                  return tw("team.granted", { who: nameOf2(q), role: tw("role." + role) });
                 }
               );
             }, sample),
@@ -14293,7 +14320,7 @@
                   return lib.decide(spec.org, spec.ws, q.account, "decline");
                 },
                 function() {
-                  return tw("team.declined", { who: nameOf(q) });
+                  return tw("team.declined", { who: nameOf2(q) });
                 }
               );
             }, sample)
@@ -14323,7 +14350,7 @@
             sel,
             button2(tw("team.remove"), "ghost", sample ? noop : function() {
               ask({
-                title: tw("team.confirmRemove", { who: nameOf(m) }),
+                title: tw("team.confirmRemove", { who: nameOf2(m) }),
                 text: tw("team.confirmRemoveText"),
                 confirmLabel: tw("team.remove"),
                 tone: "danger"
@@ -14331,7 +14358,7 @@
                 if (yes) act(function() {
                   return lib.revoke(spec.org, spec.ws, m.account);
                 }, function() {
-                  return tw("team.removed", { who: nameOf(m) });
+                  return tw("team.removed", { who: nameOf2(m) });
                 });
               });
             }, sample)
@@ -15517,6 +15544,15 @@
       return ti("connect.cap." + k);
     }).join(", ");
   }
+  function nameOf(p, can, fallback, shared) {
+    const label = String(p && p.label || fallback || "");
+    const base = baseOf(label);
+    const words = capWords(can);
+    return (base !== label || shared && shared.has(base)) && words ? base + " (" + words + ")" : label;
+  }
+  function baseOf(label) {
+    return String(label).replace(/\s*\([^)]*\)\s*$/, "");
+  }
   function statusOf(c) {
     if (c.status === "active") return "active";
     if (c.status === "needs_reauth") return "needs_reauth";
@@ -15528,7 +15564,7 @@
   }
   function connections(spec) {
     const s = spec || {};
-    const sample = s.sample === true;
+    const sample = s.sample === true || isPlaceholder2(s.need);
     const need = NEEDS.indexOf(
       /** @type {string} */
       s.need
@@ -15539,6 +15575,7 @@
     let failure = "";
     let notice = "";
     let working = false;
+    let shared = /* @__PURE__ */ new Set();
     let noticeEl = null;
     async function act(work, done) {
       failure = "";
@@ -15614,6 +15651,12 @@
       const byId = new Map(providers.map(function(p) {
         return [p.id, p];
       }));
+      const brands = providers.map(function(p) {
+        return baseOf(p.label || p.id);
+      });
+      shared = new Set(brands.filter(function(b, i) {
+        return brands.indexOf(b) !== i;
+      }));
       root.appendChild(el("div", { class: "ak-conn__group", "data-ak-part": "accounts" }, [
         accounts.length ? el("ul", { class: "ak-conn__rows" }, accounts.map(function(c) {
           return row(lib, c, byId.get(c.provider), caps.get(c.provider));
@@ -15627,13 +15670,13 @@
       root.appendChild(el("div", { class: "ak-conn__group", "data-ak-part": "add" }, [
         el("h4", { class: "ak-conn__group-title" }, ti("connect.add")),
         offered.length ? el("ul", { class: "ak-conn__rows ak-conn__offers" }, offered.map(function(p) {
-          return offer(lib, p);
+          return offer(lib, p, caps.get(p.id));
         })) : el("p", { class: "ak-conn__none" }, need ? ti("connect.noProviders") : ti("connect.none"))
       ]));
     }
     function row(lib, c, p, can) {
       const state = statusOf(c);
-      const label = p && p.label || c.provider;
+      const label = nameOf(p, can, c.provider, shared);
       const reconnect = state !== "active" && !(p && p.attachFields);
       const words = capWords(can);
       return el("li", { class: "ak-conn__row", "data-ak-part": "row", "data-ak-status": state }, [
@@ -15668,7 +15711,7 @@
         ].filter(Boolean))
       ].filter(Boolean));
     }
-    function offer(lib, p) {
+    function offer(lib, p, can) {
       const notes = lib && lib.notes && lib.notes[p.id] || {};
       const instance = p.instanceScoped ? (
         /** @type {HTMLInputElement} */
@@ -15696,7 +15739,7 @@
           })
         );
       });
-      const go = button2(ti("connect.connectTo", { provider: p.label || p.id }), "ghost", "connect", function(ev) {
+      const go = button2(ti("connect.connectTo", { provider: nameOf(p, can, p.id, shared) }), "ghost", "connect", function(ev) {
         if (p.attachFields && p.attachFields.length) {
           const values = {};
           fields.forEach(function(i) {

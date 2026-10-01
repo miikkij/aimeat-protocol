@@ -125,9 +125,9 @@ export function power(caps, role) {
 }
 
 /** A role select, set to `value`. */
-export function roleSelect(roles, value, label) {
+export function roleSelect(roles, value, label, labelOf) {
   const s = /** @type {HTMLSelectElement} */ (el('select', { class: 'ak-input ak-mem__role', 'aria-label': label },
-    roles.map(function (r) { return el('option', { value: r, selected: r === value ? true : null }, r); })));
+    roles.map(function (r) { return el('option', { value: r, selected: r === value ? true : null }, labelOf ? labelOf(r) : r); })));
   if (value) s.value = value;
   return s;
 }

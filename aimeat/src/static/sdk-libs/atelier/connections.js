@@ -30,7 +30,7 @@
  */
 import { el, clear, resolve, enter, whileBusy } from './dom.js';
 import { ti } from './intake-connect-i18n.js';
-import { sampleBadge, watch, ask, refusal } from './members-shared.js';
+import { sampleBadge, watch, ask, refusal, isPlaceholder } from './members-shared.js';
 
 /** The capability words, in the order a row lists them. */
 const CAPS = ['readMail', 'sendMail', 'publishPost', 'publishVideo', 'readMetrics', 'readItems'];
@@ -87,6 +87,29 @@ function capWords(caps) {
   return CAPS.filter(function (k) { return caps[k]; }).map(function (k) { return ti('connect.cap.' + k); }).join(', ');
 }
 
+/**
+ * A service's name in the reader's language. The node names a service that shares its brand with
+ * another by a bracketed English word ("Gmail (sending)"); the bracket is replaced with what this
+ * service can do, in the kit's words, and a name without one is shown as it is.
+ * Two services under one brand both carry their words, so "Gmail (read mail)" stands beside
+ * "Gmail (send mail)" rather than a bare "Gmail".
+ * @param {any} p  the providers() entry, or undefined
+ * @param {any} can  its capabilities, or undefined
+ * @param {string} fallback
+ * @param {Set<string>} [shared]  the brand names more than one service carries
+ */
+function nameOf(p, can, fallback, shared) {
+  const label = String((p && p.label) || fallback || '');
+  const base = baseOf(label);
+  const words = capWords(can);
+  return (base !== label || (shared && shared.has(base))) && words ? base + ' (' + words + ')' : label;
+}
+
+/** A service's brand: its name without a bracketed word at the end. */
+function baseOf(label) {
+  return String(label).replace(/\s*\([^)]*\)\s*$/, '');
+}
+
 /** The three states a person reads: connected, needs sign-in again, or not working. */
 function statusOf(c) {
   if (c.status === 'active') return 'active';
@@ -108,7 +131,8 @@ function instanceOf(c) {
  */
 export function connections(spec) {
   const s = spec || {};
-  const sample = s.sample === true;
+  // A Design Book fill names `need` as a <placeholder>, which is the sample, like every other block.
+  const sample = s.sample === true || isPlaceholder(s.need);
   const need = NEEDS.indexOf(/** @type {string} */ (s.need)) !== -1 ? s.need : null;
   const root = el('section', { class: 'ak-root ak-conn', 'data-ak-part': 'root' });
   if (s.target) resolve(s.target).appendChild(root);
@@ -116,6 +140,8 @@ export function connections(spec) {
   let failure = '';
   let notice = '';
   let working = false;
+  /** The brand names more than one service carries, read on each draw. */
+  let shared = new Set();
   /** @type {HTMLElement|null} */
   let noticeEl = null;
 
@@ -183,6 +209,8 @@ export function connections(spec) {
     root.appendChild(noticeEl);
 
     const byId = new Map(providers.map(function (p) { return [p.id, p]; }));
+    const brands = providers.map(function (p) { return baseOf(p.label || p.id); });
+    shared = new Set(brands.filter(function (b, i) { return brands.indexOf(b) !== i; }));
     root.appendChild(el('div', { class: 'ak-conn__group', 'data-ak-part': 'accounts' }, [
       accounts.length
         ? el('ul', { class: 'ak-conn__rows' }, accounts.map(function (c) { return row(lib, c, byId.get(c.provider), caps.get(c.provider)); }))
@@ -197,7 +225,7 @@ export function connections(spec) {
     root.appendChild(el('div', { class: 'ak-conn__group', 'data-ak-part': 'add' }, [
       el('h4', { class: 'ak-conn__group-title' }, ti('connect.add')),
       offered.length
-        ? el('ul', { class: 'ak-conn__rows ak-conn__offers' }, offered.map(function (p) { return offer(lib, p); }))
+        ? el('ul', { class: 'ak-conn__rows ak-conn__offers' }, offered.map(function (p) { return offer(lib, p, caps.get(p.id)); }))
         : el('p', { class: 'ak-conn__none' }, need ? ti('connect.noProviders') : ti('connect.none')),
     ]));
   }
@@ -205,7 +233,7 @@ export function connections(spec) {
   /** One connected account. */
   function row(lib, c, p, can) {
     const state = statusOf(c);
-    const label = (p && p.label) || c.provider;
+    const label = nameOf(p, can, c.provider, shared);
     // A service connected by a supplied credential has no sign-in round to repeat; its fields are
     // under Connect, where the person supplies the credential again.
     const reconnect = state !== 'active' && !(p && p.attachFields);
@@ -241,7 +269,7 @@ export function connections(spec) {
   }
 
   /** One service to connect: its button, the server field or the credential fields it needs. */
-  function offer(lib, p) {
+  function offer(lib, p, can) {
     const notes = (lib && lib.notes && lib.notes[p.id]) || {};
     const instance = p.instanceScoped ? /** @type {HTMLInputElement} */ (el('input', {
       type: 'text', class: 'ak-input ak-conn__input', 'data-ak-part': 'instance', placeholder: ti('connect.instance'),
@@ -254,7 +282,7 @@ export function connections(spec) {
         autocomplete: f.secret ? 'new-password' : 'off', disabled: sample ? true : null,
       }));
     });
-    const go = button(ti('connect.connectTo', { provider: p.label || p.id }), 'ghost', 'connect', function (ev) {
+    const go = button(ti('connect.connectTo', { provider: nameOf(p, can, p.id, shared) }), 'ghost', 'connect', function (ev) {
       if (p.attachFields && p.attachFields.length) {
         /** @type {Record<string, string>} */
         const values = {};
