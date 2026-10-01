@@ -53,8 +53,18 @@
         "aimeat/public/views/home/journey-roads.js",
         "aimeat/public/views/home/journey-prompts.js"
       ],
-      "digest": "sha256:560c4fa8e2c7183618493449",
+      "digest": "sha256:0835be0c6ab848f1ae3c4792",
       "note": "The stages, the roads and the record journey.state are defined in journey-state.ts; the home's road question and the first note's key are in the two home files."
+    },
+    "node:aimeat-organisms": {
+      "reviewedOn": "2026-10-01",
+      "watches": [
+        "aimeat/src/data/organism-shapes.ts",
+        "aimeat/src/services/organism-lifecycle.ts",
+        "aimeat/src/services/organism-shape-apply.ts"
+      ],
+      "digest": "sha256:1f184c87b15cd240aecd32af",
+      "note": "The shapes table and what each makes come from organism-shapes.ts; the shape parameter, its defaults and the refusal of an unknown shape from the lifecycle service."
     },
     "node:aimeat-welcome-pages": {
       "reviewedOn": "2026-09-26",
@@ -593,7 +603,12 @@
     "node:aimeat-guided-journey": {
       "aimeat/src/services/journey-state.ts": "b7eeb1ff42a1544b",
       "aimeat/public/views/home/journey-roads.js": "80cfef93d8ed162a",
-      "aimeat/public/views/home/journey-prompts.js": "8371112d01308e9b"
+      "aimeat/public/views/home/journey-prompts.js": "4c10f62050c5d1c8"
+    },
+    "node:aimeat-organisms": {
+      "aimeat/src/data/organism-shapes.ts": "e876d870cd931846",
+      "aimeat/src/services/organism-lifecycle.ts": "62769e46c952038f",
+      "aimeat/src/services/organism-shape-apply.ts": "a1f8b5da4eb248d7"
     }
   }
 }

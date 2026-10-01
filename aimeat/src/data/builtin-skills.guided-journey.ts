@@ -14,6 +14,7 @@
  * @structure GUIDED_JOURNEY_SKILL_ENTRY
  * @usage import { GUIDED_JOURNEY_SKILL_ENTRY } from './builtin-skills.guided-journey.js';
  * @version-history
+ *   v1.2.0 — 2026-10-01 — Stage 4 points at the aimeat-organisms skill and the starting shapes.
  *   v1.1.0 — 2026-10-01 — The first result offered first is a shared place, not a note: a person's
  *     chat app already remembers things (Jouni, 2026-10-01).
  *   v1.0.0 — 2026-10-01 — Initial.
@@ -120,10 +121,11 @@ What they get: one place where they, the people they invite and all their AIs re
 same notes, documents and decisions, and nothing goes out without a person. They need one when more
 than one person, or more than one AI, works on the same material. For their own notes they do not.
 
-Ask what it is for, propose a name and one or two workspaces in their words, then create them
-(\`aimeat_organism_create\`, \`aimeat_workspace_create\`) and write one document that says what the
-place is for and what is current. That document is how the place ages well: when something stops
-mattering, it says so there, or the material is archived.
+Load the skill \`aimeat-organisms\`: ask what it is for and who else will use it, propose a name and
+a starting shape (own work, team, company, family, club, project), and on their yes create it in one
+call, \`aimeat_organism_create { name, shape, lang }\`, which makes the workspaces too. Each workspace
+starts with a readme that says what it is for and what is current. That readme is how the place ages
+well: when something stops mattering, it says so there, or the material is archived.
 
 ### 5. Apps
 

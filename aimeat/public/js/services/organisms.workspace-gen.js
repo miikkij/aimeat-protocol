@@ -2,64 +2,24 @@
  * @file public/js/services/organisms.workspace-gen.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Manifest-driven workspace generator — the shipped "project" template (object types,
- *   schemas, manifest), the one-shot Workspace Architect prompt, and the parse/validate/apply
+ * @description Manifest-driven workspace generator — applying the shipped "project" template (now the
+ *   server's `project` shape), the one-shot Workspace Architect prompt, and the parse/validate/apply
  *   pipeline that turns an AI response into a locked workspace. Extracted from organisms.js.
  * @usage import { buildGeneratorPrompt, parseGenerated, validateGenerated, applyGeneratedWorkspace } from './organisms.workspace-gen.js';
  * @version-history
+ *   v1.1.0 — 2026-10-01 — The project template's spaces, schemas and policy moved to the server
+ *     (src/data/organism-shapes.ts); applyProjectTemplate reads them from GET /v1/organisms/shapes
+ *     and writes through PUT /v1/organisms/:id/workspace instead of the memory API.
  *   v1.0.0 — 2026-07-13 — Extracted from organisms.js (max-file-lines)
  */
 import { api, apiGet, apiPost, apiPut } from '/js/api.js';
 import { wsRoot } from './organisms.shared.js';
 import { swallowed } from '/js/swallowed.js';
 
-// ── Workspace (manifest-driven; a "project" = an organism with a manifest) ──
-
-/** Object types in the shipped "project" template (mirror of docs/csm-bundles/project/). */
-export const PROJECT_OBJECT_TYPES = [
-  { name: 'goal',        namespace: 'meta.goals',          writeRole: 'owner',  versioned: true },
-  { name: 'plan',        namespace: 'meta.plans',          writeRole: 'owner',  versioned: true },
-  { name: 'deliverable', namespace: 'shared.deliverables', writeRole: 'member', versioned: true },
-  { name: 'decision',    namespace: 'meta.decisions',      writeRole: 'member', versioned: false, append: true },
-  { name: 'resource',    namespace: 'shared.resources',    writeRole: 'member', versioned: true },
-];
-
-/** Compiled JSON Schemas per object type (mirror of the bundle CSMs). */
-export const PROJECT_SCHEMAS = {
-  'meta.goals': { type: 'object', required: ['id', 'title', 'status'], properties: {
-    id: { type: 'string', minLength: 1 }, title: { type: 'string', minLength: 1 },
-    status: { type: 'string', enum: ['open', 'met', 'dropped'] },
-    definitionOfDone: { type: 'array', items: { type: 'string' } }, gateId: { type: 'string' } } },
-  'meta.plans': { type: 'object', required: ['id', 'approach', 'version', 'status'], properties: {
-    id: { type: 'string', minLength: 1 }, approach: { type: 'string', minLength: 1 },
-    version: { type: 'integer', minimum: 1 }, status: { type: 'string', enum: ['proposed', 'approved', 'superseded'] },
-    steps: { type: 'array', items: { type: 'string' } }, gateId: { type: 'string' } } },
-  'shared.deliverables': { type: 'object', required: ['id', 'title', 'status'], properties: {
-    id: { type: 'string', minLength: 1 }, title: { type: 'string', minLength: 1 },
-    status: { type: 'string', enum: ['proposed', 'in_progress', 'delivered', 'accepted', 'rejected'] },
-    description: { type: 'string' }, acceptanceCriteria: { type: 'array', items: { type: 'string' } } } },
-  'meta.decisions': { type: 'object', required: ['ts', 'kind', 'by', 'summary'], properties: {
-    ts: { type: 'string', minLength: 1 }, kind: { type: 'string', enum: ['decision', 'plan-change', 'deliverable', 'rating'] },
-    by: { type: 'string', minLength: 1 }, summary: { type: 'string', minLength: 1 } } },
-  'shared.resources': { type: 'object', required: ['id', 'kind', 'label', 'origin', 'pointer', 'visibility'], properties: {
-    id: { type: 'string', minLength: 1 }, kind: { type: 'string', enum: ['doc', 'code', 'asset', 'knowledge', 'link'] },
-    label: { type: 'string', minLength: 1 }, origin: { type: 'string', enum: ['local', 'referenced', 'link'] },
-    pointer: { type: 'string', minLength: 1 }, visibility: { type: 'string', enum: ['private', 'owner', 'group', 'public'] } } },
-};
-
-function projectManifest(orgId, name, summary) {
-  return {
-    manifestVersion: '1.0', id: orgId, name, kind: 'project', language: 'en',
-    summary: summary || '', status: 'active',
-    entry: { readme: `organism.${orgId}.meta.readme`, loadHint: 'readme -> goals -> plans -> deliverables -> decisions' },
-    objectTypes: PROJECT_OBJECT_TYPES.map(ot => ({
-      name: ot.name, schemaRef: `schema:project/${ot.name}@1`, namespace: ot.namespace,
-      cardinality: 'many', backing: 'memory', writeRole: ot.writeRole,
-      ...(ot.append ? { append: true } : {}), versioned: ot.versioned,
-    })),
-    policy: { agentAutonomy: 'L3', alwaysGate: ['external-release', 'spend', 'data-egress', 'data-model-change'] },
-  };
-}
+// ── Workspace (manifest-driven) ──
+// The "project" template's spaces, schemas and gate policy live on the server since 2026-10-01, as
+// the starting shape `project` (src/data/organism-shapes.ts, GET /v1/organisms/shapes), so this page
+// and a create call over MCP build the same workspace from one definition.
 
 /** Fetch the managed "manifest architect" prompt (the generator's instruction set). */
 export async function getManifestArchitectPrompt() {
@@ -272,15 +232,19 @@ export async function applyGeneratedWorkspace(orgId, wsId, generated, opts = {})
   }
 }
 
-/** Apply the project template to a workspace (register schemas + write the manifest + readme). */
+/**
+ * Apply the project template to an existing, empty workspace: the server's `project` shape, written
+ * through PUT /v1/organisms/:id/workspace, which locks the schemas and writes the manifest and the
+ * readme (services/workspace-meta.ts). It wrote them straight into memory until 2026-10-01.
+ */
 export async function applyProjectTemplate(orgId, wsId, name, summary) {
-  const root = wsRoot(orgId, wsId);
-  for (const [namespace, schema] of Object.entries(PROJECT_SCHEMAS)) {
-    // 'open' (not 'strict'): generated schemas enforce required fields + types but TOLERATE extra fields,
-    // so later autonomous/agent writes aren't silently rejected over a stray property. The generator
-    // pre-locks structure before any real content exists; strict betoni fights every later write.
-    await apiPut(`/v1/memory/${encodeURIComponent(`${root}.${namespace}`)}/schema`, { schema, apply_to: 'prefix', schema_mode: 'open' });
-  }
-  await apiPost('/v1/memory', { key: `${root}.meta.manifest`, value: projectManifest(orgId, name, summary), visibility: 'private' });
-  await apiPost('/v1/memory', { key: `${root}.meta.readme`, value: `# ${name}\n\n${summary || ''}`, visibility: 'private' });
+  const lang = (document.documentElement.lang || 'en').slice(0, 2);
+  const listed = await apiGet(`/v1/organisms/shapes?lang=${encodeURIComponent(lang)}`);
+  const project = (listed?.data?.shapes || []).find(s => s.id === 'project')?.workspaces?.[0];
+  if (!project) throw new Error('The project shape is not available on this server.');
+  const manifest = { ...project.manifest, id: orgId, name, summary: summary || project.manifest.summary || '' };
+  await api(`/v1/organisms/${encodeURIComponent(orgId)}/workspace?ws=${encodeURIComponent(wsId)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ manifest, schemas: project.schemas, readme: `# ${name}\n\n${summary || ''}` }),
+  });
 }

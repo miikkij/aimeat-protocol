@@ -34787,6 +34787,18 @@ paths:
                     listing). Unset = authenticated (any signed-in caller) — the anonymous internet
                     never sees rosters. 'public' is a deliberate opt-in. Creator + admins stay
                     visible at every tier (accountability); admins/operator always see the roster.
+                shape:
+                  type: string
+                  enum: [own-work, team, company, family, club, project]
+                  description: >-
+                    A starting shape (GET /v1/organisms/shapes): the organism takes the shape's
+                    type, join policy and visibility unless they are given, and gets the shape's
+                    workspaces, each with its spaces, locked schemas and a readme. An unknown shape
+                    is refused with 400 before anything is written. The answer carries `workspaces`.
+                lang:
+                  type: string
+                  enum: [en, fi, es]
+                  description: Language of the shape's workspace names and readme.
       responses:
         '201':
           description: Organism created
@@ -43837,6 +43849,54 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/organisms/shapes:
+    get:
+      operationId: listOrganismShapes
+      summary: The starting shapes a new organism can take
+      description: >-
+        My own work, team, company, family, club and project: each with its organism type, join
+        policy and visibility, and the workspaces it makes with their spaces, manifests and locked
+        schemas, named in the asked language. Pass one as `shape` to POST /v1/organisms. Public data:
+        it describes what a create call builds, nothing of anyone's.
+      tags:
+        - Organisms
+      parameters:
+        - name: lang
+          in: query
+          schema: { type: string, enum: [en, fi, es] }
+      responses:
+        '200':
+          description: The shapes
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          shapes:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string }
+                                type: { type: string }
+                                join_policy: { type: string }
+                                visibility: { type: string }
+                                label: { type: string }
+                                hint: { type: string }
+                                workspaces:
+                                  type: array
+                                  items:
+                                    type: object
+                                    properties:
+                                      name: { type: string }
+                                      spaces: { type: array, items: { type: object } }
+                                      manifest: { type: object }
+                                      schemas: { type: object }
   /v1/organisms/waiting:
     get:
       operationId: getOrganismsWaiting

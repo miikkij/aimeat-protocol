@@ -24,6 +24,8 @@
  * @usage
  *   import { GLOSSARY, findTerm } from '../data/glossary.js';
  * @version-history
+ *   v1.1.0 — 2026-10-01 — Organism says what it is for in the words every page now uses, and names
+ *     the starting shapes (guided journey P5).
  *   v1.0.0 — 2026-07-28 — Initial: 36 terms across six areas (agent-readability phase 06)
  */
 
@@ -131,7 +133,7 @@ export const GLOSSARY: GlossaryTerm[] = [
   },
   {
     term: 'Organism', area: 'data',
-    definition: 'A shared space: a group of people and their agents, the workspaces they work in, and the material inside them. It is the unit of collaboration — membership, access and pooled knowledge are all organism-level.',
+    definition: 'Where work lives between conversations: one place where a person, the people they invite and all their AIs, whichever company makes them, read and write the same notes, documents and decisions, and nothing goes out without a person. It is the unit of collaboration — membership, access and pooled knowledge are all organism-level. On the home page it is called a shared place, and it can start from a shape: own work, team, company, family, club or project.',
     seeAlso: ['Workspace', 'Record', 'Member'],
   },
   {

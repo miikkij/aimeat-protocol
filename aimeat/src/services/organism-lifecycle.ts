@@ -28,6 +28,9 @@
  *   const r = await createOrganismRecord({ storage, config }, ownerName, { name, visibility });
  *   if (!r.ok) { res.status(r.status).json(error(config.nodeId, r.code, r.message)); return; }
  * @version-history
+ *   2026-10-01 — createOrganismRecord takes a starting `shape` (data/organism-shapes.ts) and its
+ *     `lang`: the shape's type, policy and visibility unless given, and its workspaces afterwards
+ *     (services/organism-shape-apply.ts). An unknown shape is refused before anything is written.
  *   2026-09-28 — updateOrganismRecord takes agentAccess; widening it back to "all" needs the person in person.
  *   v1.1.1 — 2026-09-26 — The joiner's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-08-29 — The type is free text (1 to 40 characters, trimmed) on create and update; the
@@ -46,6 +49,7 @@ import { notify } from './notify.js';
 import { recordPublicActivity } from './public-activity.js';
 import { recordAccountEvent } from './account-events.js';
 import { updateOrganismStructure } from './structure-snapshot.js';
+import { resolveShape, applyOrganismShape, type ShapedWorkspace } from './organism-shape-apply.js';
 import { getOrganismReadme, setOrganismReadme } from './organism-readme.js';
 import { MEMBER_VISIBILITY_VALUES } from './organism-privacy.js';
 import { logger } from '../utils/logger.js';
@@ -94,6 +98,10 @@ export interface CreateOrganismInput {
   maxMembers?: unknown;
   visibility?: unknown;
   memberVisibility?: unknown;
+  /** A starting shape (data/organism-shapes.ts): its type, policy and workspaces, unless given. */
+  shape?: unknown;
+  /** The language a shape's workspace names and readme are written in: en, fi or es. */
+  lang?: unknown;
 }
 
 /**
@@ -105,18 +113,21 @@ export async function createOrganismRecord(
   deps: OrganismDeps,
   creatorOwner: string,
   input: CreateOrganismInput,
-): Promise<OrganismRefusal | { ok: true; organism: OrganismRecord }> {
+): Promise<OrganismRefusal | { ok: true; organism: OrganismRecord; workspaces?: ShapedWorkspace[] }> {
   const { storage, config } = deps;
 
   const name = typeof input.name === 'string' ? input.name.trim() : '';
   if (name.length < 2) return refuse(400, 'INVALID_INPUT', 'Name is required (min 2 characters)');
+  // Refuse an unknown shape before anything is written.
+  const shape = resolveShape(input.shape);
+  if (typeof shape === 'string') return refuse(400, 'INVALID_INPUT', shape);
 
   const description = typeof input.description === 'string' ? input.description : '';
-  // The type is the owner's own word (the five presets are suggestions the UI translates); empty
-  // means the first preset, and anything longer than a label is cut to one.
-  const type = typeof input.type === 'string' && input.type.trim() ? input.type.trim().slice(0, ORGANISM_TYPE_MAX) : 'community';
-  const joinPolicy = pickEnum(JOIN_POLICIES, input.joinPolicy, 'open');
-  const visibility = pickEnum(VISIBILITIES, input.visibility, 'public');
+  // The type is the owner's own word (the presets are suggestions the UI translates); empty means
+  // the shape's type, or the first preset, and anything longer than a label is cut to one.
+  const type = typeof input.type === 'string' && input.type.trim() ? input.type.trim().slice(0, ORGANISM_TYPE_MAX) : (shape?.type ?? 'community');
+  const joinPolicy = pickEnum(JOIN_POLICIES, input.joinPolicy, shape?.joinPolicy ?? 'open');
+  const visibility = pickEnum(VISIBILITIES, input.visibility, shape?.visibility ?? 'public');
   // Roster privacy tier; unset = 'authenticated' (see services/organism-privacy.ts).
   const memberVisibility = MEMBER_VISIBILITY_VALUES.includes(input.memberVisibility as OrganismRecord['memberVisibility'] & string)
     ? (input.memberVisibility as OrganismRecord['memberVisibility'])
@@ -194,6 +205,12 @@ export async function createOrganismRecord(
     }).catch(err => { logger.warn('createOrganismRecord: feed is best-effort', { error: String(err) }); });
   }
 
+  if (shape) {
+    const lang = typeof input.lang === 'string' ? input.lang.slice(0, 2) : 'en';
+    const workspaces = await applyOrganismShape(deps, id, creatorOwner, shape, lang);
+    if (workspaces.length) emitChange('organisms');
+    return { ok: true, organism, workspaces };
+  }
   return { ok: true, organism };
 }
 

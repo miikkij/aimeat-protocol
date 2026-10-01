@@ -8,6 +8,8 @@
  *   resolve gate approvals.
  * @usage import * as orgService from '/js/services/organisms.js';
  * @version-history
+ *   v1.10.0 — 2026-10-01 — PROJECT_OBJECT_TYPES and PROJECT_SCHEMAS are no longer re-exported: the
+ *     project template lives on the server as the `project` shape. getShapes() lists the shapes.
  *   v1.9.0 — 2026-09-25 — addSpace and saveSections move to organisms.member-changes.js, which calls the
  *     node's member change doors instead of writing the workspace's meta records itself; re-exported
  *     here with the rule and the suggestions. getAllSections is kept for a caller without the
@@ -49,7 +51,7 @@ import { getSession, getStoredGhii } from '/js/services/auth.js';
 // ── Re-exports of pieces extracted to sibling modules (pure extraction, max-file-lines) ──
 export { wsRoot, isMemorySpace, isDocSpace, getObjectSchema } from './organisms.shared.js';
 export {
-  PROJECT_OBJECT_TYPES, PROJECT_SCHEMAS, getManifestArchitectPrompt, generatorSystemPrompt,
+  getManifestArchitectPrompt, generatorSystemPrompt,
   buildGeneratorPrompt, parseGenerated, generateRaw, validateGenerated, buildFixPrompt,
   applyGeneratedWorkspace, applyProjectTemplate,
 } from './organisms.workspace-gen.js';
@@ -96,7 +98,13 @@ export async function getOrganism(id) {
   return apiGet(`/v1/organisms/${encodeURIComponent(id)}`);
 }
 
-/** Create a new organism. */
+/** The starting shapes a new organism can take, named in `lang`. */
+export async function getShapes(lang) {
+  const r = await apiGet(`/v1/organisms/shapes?lang=${encodeURIComponent(lang || 'en')}`);
+  return r?.data?.shapes || [];
+}
+
+/** Create a new organism. `data.shape` and `data.lang` start it from a shape with its workspaces. */
 export async function createOrganism(data) {
   return apiPost('/v1/organisms', data);
 }

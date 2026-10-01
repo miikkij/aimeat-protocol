@@ -6,6 +6,8 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   v1.13.0 -- 2026-10-01 -- POST takes `shape` and `lang` and answers the workspaces the shape made;
+ *     GET /v1/organisms/shapes lists the starting shapes (guided journey P5).
  *   v1.12.0 -- 2026-09-30 -- DELETE removes the organism's classification exceptions too.
  *   v1.11.0 -- 2026-09-30 -- DELETE purges the organism's unflushed classification audit rows.
  *   v1.10.0 -- 2026-09-29 -- TARGET-082 V4: GET /v1/organisms/:id reads the README through
@@ -50,6 +52,7 @@ import { canSeeMembers, redactOrganism, rosterCallerFromAuth } from '../../servi
 import { showOrganismReadme } from '../../services/organism-readme.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { createOrganismRecord, updateOrganismRecord, joinOrganism, leaveOrganism } from '../../services/organism-lifecycle.js';
+import { publicShapes } from '../../data/organism-shapes.js';
 import { revokeDepartedMemberAccess } from '../../services/invitations.js';
 import type { OrganismHelpers } from './shared.js';
 import { isOrganismOwner } from '../../services/organism-ownership.js';
@@ -82,20 +85,21 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
    * the word at boot, and a '*' agent is covered by the wildcard at this door. ── */
   router.post('/v1/organisms', requireAuth(), requireScope('organism:write'), async (req, res) => {
     const ghii = req.auth!.owner as string;
-    const { name, description, type, location, interests, join_policy, max_members, visibility, member_visibility } = req.body ?? {};
+    const { name, description, type, location, interests, join_policy, max_members, visibility, member_visibility, shape, lang } = req.body ?? {};
 
     // The record, the board, the creator membership and the feed/timeline side effects live in
     // services/organism-lifecycle.ts, shared with aimeat_organism_create.
     const result = await createOrganismRecord({ storage, config }, ghii, {
       name, description, type, location, interests,
       joinPolicy: join_policy, maxMembers: max_members, visibility, memberVisibility: member_visibility,
+      shape, lang,
     });
     if (!result.ok) {
       res.status(result.status).json(error(config.nodeId, result.code, result.message));
       return;
     }
 
-    res.status(201).json(success(config.nodeId, { organism: result.organism }, [
+    res.status(201).json(success(config.nodeId, { organism: result.organism, ...(result.workspaces ? { workspaces: result.workspaces } : {}) }, [
       { description: 'View organism', method: 'GET', url: `/v1/organisms/${result.organism.id}` },
       { description: 'List members', method: 'GET', url: `/v1/organisms/${result.organism.id}/members` },
     ]));
@@ -229,6 +233,14 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
   });
 
   /* ── GET /v1/organisms/:id — Get organism detail ── */
+  /* ── GET /v1/organisms/shapes?lang= — the starting shapes a new organism can take, with the
+   * workspaces, spaces and schemas each one makes, in the asked language. Public data: it describes
+   * what a create call would build, and nothing of anyone's. Registered before /:id. ── */
+  router.get('/v1/organisms/shapes', (req, res) => {
+    const lang = typeof req.query.lang === 'string' ? req.query.lang.slice(0, 2) : 'en';
+    res.json(success(config.nodeId, { shapes: publicShapes(lang) }));
+  });
+
   router.get('/v1/organisms/:id', optionalAuth(), async (req, res) => {
     const id = req.params.id as string;
     const organism = await storage.getOrganism(id);
