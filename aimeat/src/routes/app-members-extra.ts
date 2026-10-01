@@ -10,6 +10,7 @@
  *   DELETE .../members/invites/:id
  * @usage router.use(appMembersExtraRouter(config, storage)), inside appMembersRouter
  * @version-history
+ *   v1.0.1 — 2026-10-01 — The cancel's audit row names the address, so the history can say whom.
  *   v1.0.0 — 2026-10-01 — Initial (IAM round 2, A2 and B2).
  */
 import { Router } from 'express';
@@ -57,7 +58,7 @@ export function appMembersExtraRouter(config: AimeatConfig, storage: Storage): R
       return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the app owner gives, changes or takes away a role that manages the roster.'));
     }
     await removeInvite(storage, c.appId, inv.emailHash);
-    await audit(c, 'invite.cancelled', { account: null, from: inv.role, invite: inv.id });
+    await audit(c, 'invite.cancelled', { account: null, from: inv.role, invite: inv.id, email: inv.emailShown });
     return res.json(success(config.nodeId, { cancelled: true, invite: inviteView(inv) }));
   });
 
