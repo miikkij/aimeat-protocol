@@ -19,7 +19,7 @@ and its shape. Symptom first in the section too, then cause, then the rule.
 
 ## The five shapes
 
-1. **Silent success.** Something answers ok, 200, delivered or true, or logs green, on a path where the work did not happen: a branch that returns normally after skipping, `continue` inside a loop that decides, a catch that returns a plausible value, a parameter accepted and never read, a counter or a filter nobody can see working. *Ask what the caller sees when the work did NOT happen.* §1, 4, 5, 9, 16b, 28, 31, 36, 61, 63, 64, 65, 67, 73, 74, 75, 76, 77, 78b, 80, 82, 84, 88, 92, 93, 98, 101, 102
+1. **Silent success.** Something answers ok, 200, delivered or true, or logs green, on a path where the work did not happen: a branch that returns normally after skipping, `continue` inside a loop that decides, a catch that returns a plausible value, a parameter accepted and never read, a counter or a filter nobody can see working. *Ask what the caller sees when the work did NOT happen.* §1, 4, 5, 9, 16b, 28, 31, 36, 61, 63, 64, 65, 67, 73, 74, 75, 76, 77, 78b, 80, 82, 84, 88, 92, 93, 98, 101, 102, 104
 2. **A test or a measurement that cannot fail.** A test nobody saw red, a fixture smaller than the limit it tests, a comparison two empty results satisfy, a concurrency test run on sqlite only, a flag tested switched on only, a sweep total read as a regression. *Ask which line of the change turns the test red when it is reverted.* §12, 17, 18, 19, 21, 26, 34, 35, 37, 38, 45, 46, 50, 51, 54, 56, 57, 69, 72, 79, 89, 90, 91, 94, 99, 100
 3. **One rule, N doors, and one forgets.** A rule changed in one place while other doors reach the same capability: the REST route, the node MCP tool, the connector MCP tool, the CLI dispatch, an operator door, a second writer of the same record, a second backend. *Grep the capability's name and ask whether every door goes through the changed code.* §3, 7, 8b, 25, 33, 41, 44, 47, 48, 52, 58, 78, 81, 97
 4. **A name is not a principal.** A comparison or a storage key built from `req.auth.owner`, `sub`, a bare account name, a delivery target or a display identity where the holder or the addressed principal is meant. *Ask what the value holds for an agent, an app grant, a federated session and a namesake.* §6, 22, 43, 53, 66, 83, 103
@@ -136,6 +136,7 @@ and its shape. Symptom first in the section too, then cause, then the rule.
 | 101 | A view-transition fade flashes the page light at its midpoint | 1 |
 | 102 | Every write into a workspace space refused although its schema says additional properties are allowed | 1 |
 | 103 | A peer "proven" by its /.well-known card, and still not the node its id names | 4 |
+| 104 | A ratchet check refuses a count you lowered, right after a rebase that said it succeeded | 1 |
 
 ---
 
@@ -1171,3 +1172,12 @@ Two SESSIONS in one checkout is forbidden now (`CLAUDE.md`), so the case below i
 - **Why it hides.** A card check that compares id and key refuses typos and wrong urls, so it looks like proof in every test that uses an honest node. A signed challenge looks stronger and proves only that the caller holds some key.
 - **The rule.** A node id has no authority outside each node's own peer table: the first registration under it is trusted on first use, whatever was checked. So a peer that arrives without an operator is kept to what it was registered for (`registerPackagePeer` writes contact tier, messaging off), and every path that trusts a peer's url or key for something else reads the peer's flags or tier (`message-delivery.ts`, `register-login.ts` with `tierCeiling`). Record how such a peer arrived (`peer-origin.ts`) so an operator can find it and free the id (`DELETE /v1/federation/peers/:nodeId?emergency=true`).
 - **The tell.** A new code path that writes a peer, or reads `peer.url` / `peer.publicKey`, with no `gatePeer`, flag or tier check in sight. `pnpm check:peer-paths` (in `pnpm gate`) refuses one until `security/peer-paths.json` says on what proof it writes or trusts the peer.
+
+## 104. A ratchet check refuses a count you lowered, right after a rebase that said it succeeded
+
+*Symptoms: after `git rebase origin/main` finishes with "Successfully rebased", `pnpm gate` refuses a ratchet such as `check:classification-reach` with a stale line ("getMemory 5 → 4") for a read your own commit removed, or a generated file no longer matches its source.*
+
+- **The case.** On 2026-10-02 a rebase of the guided-journey commits stopped on `aimeat/security/classification-reach.json`, `aimeat/src/services/ui-library/facts.generated.ts` and one source file. The two data files were resolved with `git checkout --ours`. In a rebase, `--ours` is the branch being rebased onto (main), and `--theirs` is your own commit, the reverse of a merge. Main's copy of the ratchet file carried the count from before the commit that lowered it, so the count went back and the gate refused it 20 minutes later.
+- **Why it hid.** The conflict hunk shown was about two other lines in a different entry, the rebase reported success, and nothing between the resolution and the gate reads the file.
+- **The rule.** A ratchet file under `security/` or a generated file is never resolved by taking one side whole. Regenerate the generated file after the rebase (`pnpm build:ui-library`, `pnpm build:everything`, `pnpm generate:types`), and for a ratchet count run its own check with `--shrink` or merge the entries by hand, then run `pnpm check:fast` before the full gate.
+- **The tell.** `git checkout --ours` or `--theirs` on a file under `security/` or on a `*.generated.ts` during a rebase.
