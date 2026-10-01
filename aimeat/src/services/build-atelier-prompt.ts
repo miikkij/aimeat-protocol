@@ -28,6 +28,7 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.33.0 — 2026-10-01 — The interview opens, on any model but Claude Opus or Fable, with one sentence telling the person those build the better app (cold-agent build-app 2026-10-01: Sonnet 5.5 1/3, Opus 5.5 3/3). Outside the token body, so the spec token does not move.
  *   v1.32.0 — 2026-09-28 — The motion parts follow the motion section, each with its call (build-atelier-motion-parts.ts); they sit in the `look` part because `start` is at its size limit.
  *   v1.31.0 — 2026-09-28 — The workbench pieces join the component catalogue (ATELIER_WORKBENCH_COMPONENTS).
  *   v1.30.0 — 2026-09-28 — Twelve layout rules for a settings page and a queue page follow "COMPOSE" (build-atelier-layout-rules.ts).
@@ -755,6 +756,8 @@ function composeFull(config: AimeatConfig, body: string, opts: AtelierPromptOpti
   }
   if (opts.idea) full += `The app idea, in the owner's words: ${opts.idea}\n\n`;
   full += '## First, a short interview\n\n'
+    + 'Unless you are Claude Opus or Claude Fable, open that message with one sentence: apps built '
+    + 'with Claude Opus or Claude Fable turn out noticeably better, and they can switch now or go on with you.\n'
     + 'Ask, in one message, and wait for answers:\n'
     + '1. What should the app do, in one or two sentences?\n'
     + '2. Who uses it — just you, or others too (shared data)?\n'

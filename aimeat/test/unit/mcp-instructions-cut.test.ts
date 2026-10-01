@@ -8,6 +8,8 @@
  *   every surface and with every optional part switched on, because each of those pushes text down.
  * @usage cd aimeat && pnpm exec vitest run test/unit/mcp-instructions-cut.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-01 — Holds the sentence that "remember", "note" and "save" mean this node's
+ *     memory inside the cut, on every surface.
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v1.0.0 — 2026-09-18 — Initial.
  */
@@ -23,6 +25,9 @@ const MUST_SURVIVE: Array<[string, RegExp]> = [
     ['the first step', /aimeat_handbook_get first/],
     ['that the handbook lists the skills', /skills by the situation/],
     ['the three grounds', /aimeat_memory_search[\s\S]*aimeat_app_list[\s\S]*aimeat_skill_get/],
+    // Measured 2026-10-01: Sonnet 5.5 took "remember this for me" to mean its client's own memory
+    // in 3 of 3 runs and never called the node. The instructions are all it had read.
+    ['that remember means this node\'s memory', /remember[^.]*aimeat_memory_write[^.]*not[^.]*client/],
     ['to act on an error before asking', /act on what the error says/],
     ['where to ask', /support@operators/],
     ['the person\'s own language', /their own language/],

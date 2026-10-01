@@ -7,6 +7,7 @@
  *   that lands in `start` by default can push it over the limit without anybody deciding so.
  * @usage cd aimeat && pnpm vitest run test/unit/build-atelier-layers.test.ts
  * @version-history
+ *   v1.3.0 — 2026-10-01 — The interview tells the person, before its questions, that Claude Opus or Fable builds the better app.
  *   v1.2.0 — 2026-09-28 — The rules name the workbench pieces, and every piece is in the catalogue and exported by the kit.
  *   v1.1.0 — 2026-09-28 — The layout rules for a settings page and a queue page land in one part with their numbers.
  *   v1.0.0 — 2026-09-19 — Initial.
@@ -46,6 +47,15 @@ describe('the Atelier specification in parts', () => {
     expect(start).toMatch(/Read `genre`, `libraries`, `book` and `patterns` BEFORE you write any code/);
     expect(start).toMatch(/aimeat_handbook_get \{ tier: "build-app-atelier\/<id>" \}/);
     expect(start).toMatch(/spec_token: atelier-[0-9a-f]{12}/);
+  });
+
+  it('the interview first tells the person which models build the better app', () => {
+    // Measured 2026-10-01: Sonnet 5.5 built the asked app on this track in 1 of 3 runs, Opus 5.5
+    // in 3 of 3. The person decides which model builds, so the interview says so before the questions.
+    const start = atelierPiece(full, 'start', config.baseUrl)!.text;
+    const interview = start.slice(start.indexOf('## First, a short interview'), start.indexOf('1. What should the app do'));
+    expect(interview).toMatch(/Claude Opus or Claude Fable/);
+    expect(interview).toMatch(/turn out (noticeably )?better/);
   });
 
   it('carries the layout rules for a settings page and a queue page in one part, with the numbers', () => {

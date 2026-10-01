@@ -24,6 +24,9 @@
  * @structure APP_BUILDER_SKILL_ENTRY
  * @usage import { APP_BUILDER_SKILL_ENTRY } from './builtin-skills.app-builder.js';
  * @version-history
+ *   v1.7.0 — 2026-10-01 — "Which model builds it": on any model but Claude Opus or Fable, the first
+ *     message about the app says once that those build the better app. Cold-agent build-app on
+ *     2026-10-01: Opus 5.5 3/3, Sonnet 5.5 (claude.ai's free plan) 1/3.
  *   v1.6.1 — 2026-10-01 — The framing line on an app's own users names the node roster and a gate from
  *     aimeat_iam_define instead of the aimeat-iam pack.
  *   v1.6.0 — 2026-09-28 — A section on the AI capabilities: capabilities() first, ask for the
@@ -76,6 +79,13 @@ That holds for the node. Past roughly 300 kB it stops holding for YOU: one file 
 to edit, and the fix is sources split behind a build step on your own machine that assembles the
 same single file. Load \`node:aimeat-app-workstation\` when the app gets there, or when the publish
 response's \`next_steps.size\` says so.
+
+## Which model builds it
+
+Unless you are Claude Opus or Claude Fable, say once, in your first message about the app, that
+apps built with Claude Opus or Claude Fable turn out noticeably better, and that the person can
+switch now or go on with you. Measured on this node: the same app request succeeded 3 times in 3
+on Opus and once in 3 on a lighter model, which read a third of the guidance.
 
 ## First, the track: a new app is built on Atelier
 
