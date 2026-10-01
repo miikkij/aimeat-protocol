@@ -13,6 +13,7 @@
  * @structure nodeMe · nodeState · nodeAssign · nodeRevoke · nodeRequest
  * @usage AIMEAT.iam.init({ app: 'alice/app.html' })
  * @version-history
+ *   v1.2.2 — 2026-10-01 — A visitor row keeps the display name and the address the roster answers.
  *   v1.2.1 — 2026-10-01 — nodeAudit reads `entries`, the field GET .../members/audit answers with;
  *     it read `events`, so the history was always empty.
  *   v1.2.0 — 2026-10-01 — Approve by email, invitations, the audit, the owner's address book
@@ -94,7 +95,9 @@ export async function nodeState(call, appId, roles, caps) {
     // Everybody who turned up and holds no role. The panel has had a section for these since it was
     // written and the node had nothing to put in it, so it rendered "nobody has turned up yet" on
     // apps people were visiting daily.
-    seen: Object.fromEntries(((d && d.seen) || []).map((v) => [v.owner, { visits: v.visits, lastSeen: v.lastSeen }])),
+    seen: Object.fromEntries(((d && d.seen) || []).map((v) => [v.owner, {
+      visits: v.visits, lastSeen: v.lastSeen, displayName: v.displayName ?? null, email: v.email ?? null,
+    }])),
     members,
     invites: (d && d.invites) || [],
     total: (d && d.total) || null,

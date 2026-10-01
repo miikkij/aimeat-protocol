@@ -10,9 +10,16 @@
  *   DISPLAY NAMES. The public profile name (GHIIRecord.displayName, what GET /v1/ghii/:ghii serves to
  *   anyone), looked up for the accounts on the page only, or for every account when the caller
  *   searches, since a search by name needs the names. An identity of another node has none here.
+ *
+ *   EMAIL ADDRESSES. A person's verified address is their own and is never read off their account.
+ *   The owner's view carries the address the OWNER already holds for that person in their own address
+ *   book (a contact record linked to the identity), so the roster shows nothing the owner did not
+ *   have. A manager's view carries none: the owner's address book is not the manager's.
  * @structure displayNamesOf · sampleRoles · RosterView · rosterView · memberRowView
  * @usage const view = await rosterView(storage, appId, parseRosterPaging(req.query), { invites: true });
  * @version-history
+ *   v1.1.0 — 2026-10-01 — `email` on a row of the owner's view, from the owner's own address book;
+ *     a search matches it too.
  *   v1.0.0 — 2026-10-01 — Initial (IAM round 2, A1 and A5).
  */
 import type { Storage } from '../storage/interface.js';
@@ -57,8 +64,22 @@ export async function sampleRoles(storage: Storage, appId: string): Promise<Arra
     .map(v => ({ role: v.role }));
 }
 
-/** A row with the person's display name on it. */
-type Named<T> = T & { displayName: string | null };
+/** A row with the person's display name on it, and the address the owner holds for them, if any. */
+type Named<T> = T & { displayName: string | null; email?: string | null };
+
+/** How many address book records the roster reads at most, the same cap the address book has. */
+const ADDRESS_BOOK_CAP = 2000;
+
+/**
+ * The addresses the owner keeps in their own address book for people who have an identity here,
+ * keyed by that identity (`bob@node`).
+ */
+async function ownerAddresses(storage: Storage, ownerGhii: string): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const people = await storage.listOutboundContacts({ ownerGhii, limit: ADDRESS_BOOK_CAP });
+  for (const p of people) if (p.ghii && p.email) out.set(p.ghii, p.email);
+  return out;
+}
 
 export interface RosterView {
   members: Array<Named<AppMemberRecord>>;
@@ -78,10 +99,16 @@ export function memberRowView(m: AppMemberRecord): Pick<AppMemberRecord, 'appId'
  * an invitation by its address), paged by `limit` and `offset`, with `total` per list after the
  * search. A person appears in one list only: a member, waiting, or a visitor who is neither.
  */
-export async function rosterView(storage: Storage, appId: string, paging: RosterPaging): Promise<RosterView> {
-  const [members, requests, seen, invites] = await Promise.all([
+export async function rosterView(
+  storage: Storage, appId: string, paging: RosterPaging,
+  addressBook?: { ownerGhii: string; nodeId: string } | null,
+): Promise<RosterView> {
+  const [members, requests, seen, invites, addresses] = await Promise.all([
     listMembers(storage, appId), listRequests(storage, appId), listVisits(storage, appId), listInvites(storage, appId),
+    addressBook ? ownerAddresses(storage, addressBook.ownerGhii) : Promise.resolve(null),
   ]);
+  const emailOf = (account: string): string | null =>
+    (addresses && addressBook ? addresses.get(`${account}@${addressBook.nodeId}`) ?? null : null);
   const decided = new Set([...members.map(m => m.owner), ...requests.map(r => r.owner)]);
   const guests = seen.filter(v => !decided.has(v.owner));
 
@@ -91,14 +118,16 @@ export async function rosterView(storage: Storage, appId: string, paging: Roster
     if (missing.length) for (const [k, v] of await displayNamesOf(storage, missing)) names.set(k, v);
   };
   if (paging.q) await need([...members, ...requests, ...guests].map(r => r.owner));
-  const hit = <T extends { owner: string }>(rows: T[]) => rows.filter(r => matchesQuery(paging.q, r.owner, names.get(r.owner)));
+  const hit = <T extends { owner: string }>(rows: T[]) => rows.filter(r => matchesQuery(paging.q, r.owner, names.get(r.owner), emailOf(r.owner)));
 
   const m = pageRows(hit(members), paging);
   const r = pageRows(hit(requests), paging);
   const s = pageRows(hit(guests), paging);
   const i = pageRows(invites.filter(inv => matchesQuery(paging.q, inv.emailShown)), paging);
   await need([...m.items, ...r.items, ...s.items].map(x => x.owner));
-  const named = <T extends { owner: string }>(rows: T[]) => rows.map(x => ({ ...x, displayName: names.get(x.owner) ?? null }));
+  const named = <T extends { owner: string }>(rows: T[]) => rows.map(x => ({
+    ...x, displayName: names.get(x.owner) ?? null, ...(addresses ? { email: emailOf(x.owner) } : {}),
+  }));
   return {
     members: named(m.items), requests: named(r.items), seen: named(s.items), invites: i.items.map(inviteView),
     total: { members: m.total, requests: r.total, seen: s.total, invites: i.total },

@@ -29370,7 +29370,11 @@ paths:
         canManage }`, where `seen` lists the people who opened the app and hold no role and
         `invites` the open invitations of addresses with no account here yet (`{ id, appId,
         emailShown, role, note, invitedBy, at, expiresAt }`). Every row of members, requests and
-        seen carries `displayName`, the account's public profile name, null when it has none.
+        seen carries `displayName`, the account's public profile name, null when it has none. In
+        the OWNER's view each such row also carries `email`: the address the owner keeps for that
+        person in their own address book, or null. It is never read off the person's account, and a
+        manager's view carries no `email`, because the owner's address book is not the manager's.
+        `q` also matches that address.
 
 
         `q` filters members, requests and seen by account or display name, and invitations by

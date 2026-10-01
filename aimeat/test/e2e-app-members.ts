@@ -1719,6 +1719,24 @@ await test('B1: a member holding a managing role manages members, but not the pl
     assert(plain.status === 403, `a plain member approved somebody: ${plain.status}`);
 });
 
+await test('A1: the owner sees the address their own address book holds for a member; a manager sees no address', async () => {
+    const email = `r2book.${Date.now()}@example.com`;
+    const person = await provisionWithEmail(email, 'book');
+    const ok = await json(r2(), { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ account: person.name, role: 'member' }) });
+    assert(ok.status === 201, `approve ${ok.status}: ${JSON.stringify(ok.body?.error)}`);
+    const before = await json(`${r2()}?q=${person.name}`, { headers: auth(owner.token) });
+    const bare = (before.body.data.members as any[]).find(m => m.owner === person.name);
+    assert(bare && bare.email === null, `no address before the owner saved one: ${JSON.stringify(bare)}`);
+    const saved = await json('/v1/contacts', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ name: 'Book Person', email }) });
+    assert(saved.status === 201 || saved.status === 200, `save the contact ${saved.status}: ${JSON.stringify(saved.body?.error)}`);
+    const after = await json(`${r2()}?q=${encodeURIComponent(email)}`, { headers: auth(owner.token) });
+    const row = (after.body.data.members as any[]).find(m => m.owner === person.name);
+    assert(row?.email === email, `the owner's row carries the saved address, and a search by it finds the row: ${JSON.stringify(after.body.data.members)}`);
+    const mgr = await json(`${r2()}?q=${person.name}`, { headers: auth(r2mgr.token) });
+    const theirs = (mgr.body.data.members as any[]).find(m => m.owner === person.name);
+    assert(theirs && !('email' in theirs), `a manager reads no address from the owner's address book: ${JSON.stringify(theirs)}`);
+});
+
 await test('B2: every decision is on the audit trail, newest first; a plain member and a scope-less agent are refused', async () => {
     const all = await json(`${r2()}/audit?limit=500`, { headers: auth(owner.token) });
     assert(all.status === 200, `audit ${all.status}: ${JSON.stringify(all.body?.error)}`);
