@@ -8,6 +8,9 @@
  * @structure FULL_HANDBOOK — markdown, served by GET /v1/agents/me/handbook?surface=full
  * @usage import { FULL_HANDBOOK } from './full.js';
  * @version-history
+ *   v1.4.0 — 2026-10-01 — The Apps line says, for any model but Claude Opus or Fable, to tell the
+ *     person once before building that those build the better app. Cold-agent build-app: Sonnet 5.5
+ *     skipped the specification's interview in 2 of 3 runs, and read this page first in all three.
  *   v1.3.0 — 2026-09-20 — The Apps line says what to do when the person says an app turned out
  *     well (aimeat_designbook_keep). The AI they say it to is rarely the one that built the app.
  *   v1.2.0 — 2026-09-19 — The Apps line sends a builder to the app-builder skill, which says the
@@ -33,7 +36,9 @@ Three grounds carry most of the work:
   \`aimeat_memory_search\` finds by content. A feature here is usually a memory record under a key
   prefix plus something that reads it, so look before you build.
 - **Apps** are single-file web apps published on this node. \`aimeat_app_list\` gives each one the
-  \`url\` you hand the person. Before you build one, load the skill
+  \`url\` you hand the person. Unless you are Claude Opus or Claude Fable, say once, before you
+  build, that apps built with Claude Opus or Claude Fable turn out noticeably better, and that the
+  person can switch now or go on with you. Before you build one, load the skill
   \`node:aimeat-app-builder\`: a new app is built on the Atelier track, from a genre, and its
   specification is \`aimeat_handbook_get { tier: "build-app-atelier" }\` in parts. \`{ tier:
   "build-app" }\` is the Classic track's, for an app that is already Classic. **When the person

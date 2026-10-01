@@ -15,6 +15,11 @@
  *   import { instructionsFor } from './instructions.js';
  *   new McpServer({ name, version }, { capabilities, instructions: instructionsFor(role, { guidance }) });
  * @version-history
+ *   v1.5.0 — 2026-10-01 — The memory ground says that "remember", "note" and "save" mean this node's
+ *     memory, not the client's own. Measured with the cold-agent task `remember`: Sonnet 5.5 (the
+ *     model of claude.ai's free plan) called no tool in 3 of 3 runs and tried to write its client's
+ *     memory instead; Opus 5.5 read the handbook first and wrote here. To keep CORE inside the cut,
+ *     the clause on features living as memory records moved to DETAIL, word for word.
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v1.4.0 — 2026-09-20 — One sentence on the apps ground: an owner saying an app turned out well
  *     is recorded with aimeat_designbook_keep. Measured with the cold-agent task `keep-app`: in a
@@ -69,7 +74,7 @@ const CORE = `You are connected to an AIMEAT node, the personal knowledge and ac
 Call aimeat_handbook_get first, with no arguments. It is this node's operating guide: it names the tools that matter for the job in front of you, and it lists this node's skills by the situation each one covers.
 
 Three grounds carry most of the work:
-- Memory holds the person's own knowledge. aimeat_memory_list takes a key prefix and an owner scope, aimeat_memory_search finds by content, and many features here live as a memory record under a key prefix plus a prompt that reads it.
+- Memory holds the person's own knowledge. When they say remember, note or save, write it here with aimeat_memory_write, not in your client's memory. aimeat_memory_list takes a key prefix and an owner scope, aimeat_memory_search finds by content.
 - Apps are single-file web apps published on this node. aimeat_app_list gives each one a \`url\`, which is the address to hand the person when they want to open it.${KEEP_SENTENCE}
 - Organisms and workspaces are how the person shares knowledge with others. Skills (aimeat_skill_list, aimeat_skill_get) are the operating guide for one named capability.
 
@@ -79,7 +84,9 @@ When something does not work, act on what the error says. When that does not get
 
 Speak to the person in their own language and in their words: what you did and what happens next. Ids, keys, scopes and tool names belong in what you do, not in what you say, unless they ask.`;
 
-const DETAIL = `More on asking the operators. \`support@operators\` gives you a conversation id to continue in. Asking is the expected move, not a last resort, and what you report is how this node gets better.
+const DETAIL = `More on memory. Many features here live as a memory record under a key prefix plus a prompt that reads it.
+
+More on asking the operators. \`support@operators\` gives you a conversation id to continue in. Asking is the expected move, not a last resort, and what you report is how this node gets better.
 
 SPEAK TO THE PERSON, NOT ABOUT THE SYSTEM. They did not ask for a receipt, and most of them will
 never learn our vocabulary. Say what you did and what happens next, in their words:

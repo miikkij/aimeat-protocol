@@ -5,6 +5,8 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-10-01 — Build flow step 0: on any model but Claude Opus or Fable, tell the person once
+ *     before building that those build the better app (cold-agent build-app, Sonnet 5.5 1/3).
  *   2026-10-01 — The roster from a chat, round 2: email on member_set, search and paging on members,
  *     managers through manage_roles, member_audit and member_invite_cancel.
  *   2026-10-01 — The roster from a chat: the member actions of aimeat_app_manage, with the permission
@@ -160,7 +162,9 @@ required, upserts by slug, share:true publishes platform-wide) · \`aimeat_app_t
    \`node:aimeat-app-builder-atelier\` and read its specification, \`aimeat_handbook_get { tier:
    "build-app-atelier" }\` (in parts; over HTTP \`GET /v1/prompts/build-app-atelier\`). The Classic
    track below is for improving an app that is already Classic, or when the owner asks for it by
-   name. A track is not changed in the middle of a build.
+   name. A track is not changed in the middle of a build. Unless you are Claude Opus or Claude
+   Fable, say once, before you build, that apps built with Claude Opus or Claude Fable turn out
+   noticeably better, and that the person can switch now or go on with you.
 1. RESEARCH: load the \`node:aimeat-app-builder\` skill (\`aimeat_skill_get\`), call
    \`aimeat_appdev_overview\`, and on the Classic track fetch the canonical spec \`GET /v1/prompts/build-app\` (it is law). Over MCP the same spec
    comes in parts: \`aimeat_handbook_get { tier: "build-app" }\` is the first and lists the rest.
