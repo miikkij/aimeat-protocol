@@ -7,6 +7,8 @@
  *   {{app}} = memory namespace; {{owner-ghii}} = the owner's GHII. Consumed by ../app-templates.ts.
  * @structure USECASE_REALTIME_SOCIAL · USECASE_MARKETPLACE · USECASE_HOMEPAGE · USECASE_APP_IAM
  * @version-history
+ *   v1.2.0 — 2026-10-01 — USECASE_APP_IAM: roles as a map of role to capabilities, so an approved
+ *     member holds "use" and sees the members-only section; a closing-tag order fixed.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 5: USECASE_HOMEPAGE ships the AI disclosure wired —
  *     `<meta name="aimeat-ai">`, AIMEAT.ai.disclose() on the generated draft, and
  *     AIMEAT.ai.declare() on the published post. A builder who starts from this template and
@@ -515,7 +517,7 @@ entry: index.html
     <section class="card bg-base-200 shadow"><div class="card-body">
       <h2 class="card-title">{{What this app is}}</h2>
       <p class="text-sm opacity-70">{{One paragraph anyone may read, member or not.}}</p>
-    </section></div>
+    </div></section>
 
     <!-- Members only. can() decides what to PAINT; the extension decides what is allowed. -->
     <section id="members-only" hidden class="card bg-base-200 shadow"><div class="card-body">
@@ -540,8 +542,10 @@ entry: index.html
 
     async function boot(s) {
       session = s;
-      // The node keeps the roster; \`roles\` is this app's own vocabulary, which the node does not own.
-      var me = await AIMEAT.iam.init({ app: APP, roles: ['member', 'admin'] });
+      // The node keeps the roster; \`roles\` is this app's own vocabulary, which the node does not own:
+      // each role and what it may do. One click on Approve in the owner's panel grants the role with
+      // the least power, here member.
+      var me = await AIMEAT.iam.init({ app: APP, roles: { member: ['use'], admin: ['use', 'manage'] } });
 
       // A HINT for painting. The gate is server-side: enforce in the action that mutates data.
       AIMEAT.iam.gate('#members-only', 'use');

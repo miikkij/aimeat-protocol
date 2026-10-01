@@ -14,6 +14,8 @@
  *   to attachProofOverHttp() in tool-call-defs-apps.ts, which the shell path calls as well.
  * @usage registerAppdevTools(mcp, registry);
  * @version-history
+ *   v1.2.0 -- 2026-10-01 -- aimeat_iam_define takes default_role, version, author and ext_name, as the
+ *     node MCP tool and the CLI dispatch do (audit 2026-10-01, defect B).
  *   v1.1.1 -- 2026-09-13 -- appdev_overview's model parameter is described as ordering, not filtering.
  *     pitfall_report posts to POST /v1/appdev/pitfalls/learned instead of writing raw memory.
  *   v1.1.0 -- 2026-08-11 -- proof_attach takes the node's own parameters (subject_type, verdict,
@@ -147,11 +149,18 @@ export function registerAppdevTools(mcp: McpServer, registry: AgentRegistry): vo
 
   // iam_define is pure-local: validate + design an app IAM level/command schema (no node round-trip).
   mcp.tool('aimeat_iam_define', descriptionFor('aimeat_iam_define'), {
-    app_id: z.string().optional().describe('Optional app id the schema is for.'),
+    app_id: z.string().optional().describe('owner/file.html of the app the gate protects; a name without a slash generates no extension.'),
     levels: z.array(z.record(z.string(), z.unknown())).describe('Level definitions.'),
     commands: z.array(z.record(z.string(), z.unknown())).describe('Command definitions.'),
-  }, annotationsFor('aimeat_iam_define'), async ({ app_id, levels, commands }) => {
-    const result = defineAppIam({ appId: app_id, levels: levels as unknown as LevelDef[], commands: commands as unknown as CommandDef[] });
+    default_role: z.string().optional().describe('Level key a signed-in caller not on the member list holds in the generated gate.'),
+    version: z.string().optional().describe('Manifest version of the generated gate, x.y.z (default 1.0.0).'),
+    author: z.string().optional().describe('Manifest author of the generated gate (default "generated").'),
+    ext_name: z.string().optional().describe('Extension name of the generated gate (default: slug of app_id plus -iam).'),
+  }, annotationsFor('aimeat_iam_define'), async ({ app_id, levels, commands, default_role, version, author, ext_name }) => {
+    const result = defineAppIam({
+      appId: app_id, levels: levels as unknown as LevelDef[], commands: commands as unknown as CommandDef[],
+      defaultRole: default_role, version, author, extName: ext_name,
+    });
     const isError = (result as { ok?: boolean }).ok === false;
     return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }], ...(isError ? { isError: true } : {}) };
   });

@@ -858,6 +858,13 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A published app's screenshot copied into a fork; published by the owner."
     },
+    "src/services/app-member-erasure.ts": {
+      "reads": {
+        "listAllMemory": 1,
+        "listAllDeletedMemory": 1
+      },
+      "why": "Reviewed 2026-10-01, the node's own read: account erasure lists the system namespaces of app membership (members, requests, visits, carry plans, blanket development rights), and the bin of the same namespaces, to delete the erased account's rows. Nothing it reads is shown to anyone."
+    },
     "src/services/app-members.ts": {
       "reads": {
         "listAllMemory": 1,

@@ -189,6 +189,7 @@
       approvePlaceholder: "account name, or owner@node",
       approveBtn: "Approve",
       approveHelp: "A role belongs to the person, so their agents inherit it. Add a row for agent#owner@node only to give that one agent something different.",
+      approveHelpNode: "A role belongs to the person, so their agents have the same role.",
       pendingTitle: "Asked for access",
       pendingNone: "Nobody is waiting.",
       seenTitle: "Turned up, holds no role",
@@ -213,6 +214,7 @@
       strangerTitle: "What a stranger gets",
       strangerRole: 'Anyone signed in who is not on the list gets "{role}".',
       strangerDeny: "Anyone not on the list is refused.",
+      strangerNode: "Anyone who is signed in can open this app. The app hides the parts it marks for members, and only the extension of the app can refuse a change a stranger tries to make.",
       settingsTitle: "Settings",
       joinTitle: "Ask for access",
       joinNote: "Who you are and what you need it for",
@@ -220,8 +222,13 @@
       joinSent: "Your request was recorded. The owner decides.",
       joinPassive: "Your visit has been recorded. The owner sees you in their list and can approve you.",
       joinAlready: "You already have access.",
+      joinPending: "You asked on {d}. The owner has not decided yet.",
+      joinDeclined: "The owner declined your earlier request. You can ask again.",
       notOwner: "Only the owner manages members.",
       failed: "That did not go through.",
+      failedWith: "That did not go through: {why}",
+      on: "On",
+      off: "Off",
       loading: "Loading…"
     },
     fi: {
@@ -234,9 +241,10 @@
       modeMeaningOpen: "Kuka tahansa kirjautunut saa käyttää. Hyväksyntä muuttaa silti sen mitä käyttäjä maksaa.",
       modeMeaningMembers: "Vain hyväksytyt jäsenet saavat käyttää. Muille kerrotaan miten pääsyä pyydetään.",
       approveTitle: "Hyväksy käyttäjä",
-      approvePlaceholder: "tilinimi tai omistaja@solmu",
+      approvePlaceholder: "tilinimi",
       approveBtn: "Hyväksy",
-      approveHelp: "Rooli kuuluu ihmiselle, joten hänen agenttinsa perivät sen. Lisää rivi muodossa agentti#omistaja@solmu vain jos haluat että juuri se agentti pitää jotain muuta.",
+      approveHelp: "Rooli kuuluu ihmiselle, joten hänen agenttinsa perivät sen. Lisää rivi muodossa agent#owner@node vain, jos haluat antaa juuri sille agentille jotain muuta.",
+      approveHelpNode: "Rooli kuuluu ihmiselle, joten myös hänen agenteillaan on sama rooli.",
       pendingTitle: "Pyytäneet pääsyä",
       pendingNone: "Kukaan ei odota.",
       seenTitle: "Käyneet, ei roolia",
@@ -261,6 +269,7 @@
       strangerTitle: "Mitä tuntematon saa",
       strangerRole: 'Kirjautunut joka ei ole listalla saa roolin "{role}".',
       strangerDeny: "Listan ulkopuolinen ei saa käyttää tätä.",
+      strangerNode: "Kuka tahansa kirjautunut voi avata tämän sovelluksen. Sovellus piilottaa jäsenille merkityt osat, ja vain sovelluksen laajennus voi estää muutoksen, jota vieras yrittää tehdä.",
       settingsTitle: "Asetukset",
       joinTitle: "Pyydä pääsyä",
       joinNote: "Kuka olet ja mihin tarvitset tätä",
@@ -268,9 +277,69 @@
       joinSent: "Pyyntösi on kirjattu. Omistaja päättää.",
       joinPassive: "Käyntisi on kirjattu. Omistaja näkee sinut listallaan ja voi hyväksyä sinut.",
       joinAlready: "Sinulla on jo pääsy.",
+      joinPending: "Pyysit pääsyä {d}. Omistaja ei ole vielä päättänyt.",
+      joinDeclined: "Omistaja hylkäsi aiemman pyyntösi. Voit pyytää uudelleen.",
       notOwner: "Vain omistaja hallinnoi jäseniä.",
       failed: "Se ei mennyt läpi.",
+      failedWith: "Se ei mennyt läpi: {why}",
+      on: "Päällä",
+      off: "Pois",
       loading: "Ladataan…"
+    },
+    es: {
+      whoTitle: "Quién puede usar esto",
+      modeLabel: "Modo",
+      modeOpen: "abierto",
+      modeMembers: "solo miembros",
+      modeInvite: "solo con invitación",
+      modeSwitch: "Cambiar",
+      modeMeaningOpen: "Cualquier persona con sesión iniciada puede usarla. Aprobar a alguien cambia lo que paga.",
+      modeMeaningMembers: "Solo los miembros aprobados pueden usarla. A los demás se les rechaza y se les explica cómo pedir acceso.",
+      approveTitle: "Aprobar a alguien",
+      approvePlaceholder: "nombre de cuenta",
+      approveBtn: "Aprobar",
+      approveHelp: "El rol pertenece a la persona, así que sus agentes lo heredan. Agrega una fila para agent#owner@node solo si quieres darle a ese agente algo distinto.",
+      approveHelpNode: "El rol pertenece a la persona, así que sus agentes tienen el mismo rol.",
+      pendingTitle: "Pidieron acceso",
+      pendingNone: "Nadie está esperando.",
+      seenTitle: "Entraron, sin rol",
+      seenNone: "Todavía no ha entrado nadie.",
+      visits: "{n} visitas, la última el {d}",
+      membersTitle: "Aprobados",
+      membersNone: "Todavía no hay nadie aprobado.",
+      colAccount: "Cuenta",
+      colRole: "Rol",
+      colSince: "Miembro desde",
+      colGrants: "Acceso gratuito",
+      remove: "Quitar",
+      decline: "Rechazar",
+      dismiss: "Visto",
+      carried: "{n} de {of} cubiertos",
+      carriedNone: "ninguno cubierto",
+      usage: "{n} llamadas, {cost} cubiertos",
+      carriedWarn: "{n} sin cubrir",
+      payingTitle: "Clientes que pagan: {n}",
+      payingLead: "Contrataron y entraron por su cuenta. Aquí no hay nada pendiente para ti.",
+      payingNone: "Todavía no hay clientes que paguen.",
+      strangerTitle: "Qué recibe una persona desconocida",
+      strangerRole: 'Quien inicia sesión y no está en la lista recibe el rol "{role}".',
+      strangerDeny: "Quien no está en la lista no puede usar esto.",
+      strangerNode: "Cualquier persona con sesión iniciada puede abrir esta aplicación. La aplicación oculta las partes que marca para miembros, y solo la extensión de la aplicación puede rechazar un cambio que intente hacer una persona desconocida.",
+      settingsTitle: "Configuración",
+      joinTitle: "Pedir acceso",
+      joinNote: "Quién eres y para qué lo necesitas",
+      joinBtn: "Enviar solicitud",
+      joinSent: "Tu solicitud quedó registrada. El propietario decide.",
+      joinPassive: "Tu visita quedó registrada. El propietario te ve en su lista y puede aprobarte.",
+      joinAlready: "Ya tienes acceso.",
+      joinPending: "Pediste acceso el {d}. El propietario todavía no ha decidido.",
+      joinDeclined: "El propietario rechazó tu solicitud anterior. Puedes pedirlo de nuevo.",
+      notOwner: "Solo el propietario administra a los miembros.",
+      failed: "No se pudo completar.",
+      failedWith: "No se pudo completar: {why}",
+      on: "Activado",
+      off: "Desactivado",
+      loading: "Cargando…"
     }
   };
   function pickLang(explicit) {
@@ -350,10 +419,14 @@
         text: done ? S("carried", { n: g.carried, of: g.total }) : S("carriedWarn", { n: g.total - g.carried })
       });
     }
+    let failure = "";
     async function act(fn) {
+      failure = "";
       try {
-        await fn();
-      } catch {
+        const r = await fn();
+        if (r && r.ok === false) failure = refusalText(r) || S("failed");
+      } catch (e) {
+        failure = e && e.message || S("failed");
       }
       await render();
     }
@@ -362,6 +435,9 @@
       const me = iam2.me();
       const wrap = el("div", { cls: cls("aim-iam") });
       host.appendChild(wrap);
+      if (failure) {
+        wrap.appendChild(el("p", { cls: cls("aim-iam-warn"), text: S("failedWith", { why: failure }), attrs: { role: "alert" } }));
+      }
       if (!me || !me.isOwner) {
         wrap.appendChild(el("p", { cls: cls("aim-iam-empty"), text: S("notOwner") }));
         return;
@@ -372,6 +448,7 @@
       await loadPaying();
       const roles = state2 && state2.roles ? Object.keys(state2.roles) : [];
       const defaultRole = state2 && state2.config && state2.config.defaultRole || null;
+      const nodeRoster = !!(state2 && state2.nodeRoster);
       if (me.mode) {
         const next = MODES[(MODES.indexOf(me.mode) + 1) % MODES.length];
         wrap.appendChild(el("section", { cls: cls("aim-iam-sec") }, [
@@ -421,7 +498,7 @@
             } }
           })
         ]),
-        el("p", { cls: cls("aim-iam-lead"), text: S("approveHelp") })
+        el("p", { cls: cls("aim-iam-lead"), text: S(nodeRoster ? "approveHelpNode" : "approveHelp") })
       ]));
       if (opts.payingCustomers) {
         const body = [
@@ -440,18 +517,34 @@
       const payingIds = new Set(paying.map((p) => String(p.id).toLowerCase().split("@")[0]));
       const pending = collectPending(state2).filter((p) => !payingIds.has(String(p.id).toLowerCase().split("@")[0]));
       const isPassive = !state2 || !state2.requests;
-      const approveRole = roles[roles.length - 1] || void 0;
+      const approveRole = opts.approveRole && roles.indexOf(opts.approveRole) !== -1 ? opts.approveRole : leastPower(roles, state2 && state2.roles || {}, defaultRole);
+      const approveSel = () => {
+        if (roles.length < 2) return null;
+        const s = el(
+          "select",
+          { attrs: { "aria-label": S("colRole") } },
+          roles.map((r) => el("option", { text: r, attrs: Object.assign({ value: r }, r === approveRole ? { selected: "selected" } : {}) }))
+        );
+        s.value = approveRole || "";
+        return s;
+      };
+      const roleOf = (s) => (s ? (
+        /** @type {HTMLSelectElement} */
+        s.value
+      ) : approveRole) || void 0;
       if (!isPassive) {
         const qBody = [el("h3", { cls: cls("aim-iam-h"), text: S("pendingTitle") })];
         if (!pending.length) qBody.push(el("p", { cls: cls("aim-iam-empty"), text: S("pendingNone") }));
         for (const p of pending) {
+          const sel = approveSel();
           qBody.push(el("div", { cls: cls("aim-iam-row") }, [
             el("span", { cls: cls("aim-iam-id"), text: p.id }),
+            sel,
             el("button", {
               cls: cls("aim-iam-btn"),
               text: S("approveBtn"),
               attrs: { type: "button" },
-              on: { click: () => act(() => iam2.admin("assign", { ghii: p.id, owner: p.id, role: approveRole, note: p.note })) }
+              on: { click: () => act(() => iam2.admin("assign", { ghii: p.id, owner: p.id, role: roleOf(sel), note: p.note })) }
             }),
             el("button", {
               cls: cls("aim-iam-btn"),
@@ -468,14 +561,16 @@
       const gBody = [el("h3", { cls: cls("aim-iam-h"), text: S("seenTitle") })];
       if (!guests.length) gBody.push(el("p", { cls: cls("aim-iam-empty"), text: S("seenNone") }));
       for (const g of guests) {
+        const sel = approveSel();
         gBody.push(el("div", { cls: cls("aim-iam-row") }, [
           el("span", { cls: cls("aim-iam-id"), text: g.id }),
           g.visits ? el("span", { cls: cls("aim-iam-muted"), text: S("visits", { n: g.visits, d: fmtDate(g.lastSeen) }) }) : null,
+          sel,
           el("button", {
             cls: cls("aim-iam-btn"),
             text: S("approveBtn"),
             attrs: { type: "button" },
-            on: { click: () => act(() => iam2.admin("assign", { ghii: g.id, owner: g.id, role: approveRole })) }
+            on: { click: () => act(() => iam2.admin("assign", { ghii: g.id, owner: g.id, role: roleOf(sel) })) }
           }),
           // Dismissing is not a block and does not refuse anybody: it says "I have looked at this one",
           // and they are recorded again the next time they come.
@@ -526,8 +621,8 @@
         for (const s of opts.sections) {
           const ctrl = s.type === "toggle" ? el("button", {
             cls: cls("aim-iam-btn"),
-            text: s.value ? "on" : "off",
-            attrs: { type: "button" },
+            text: s.value ? S("on") : S("off"),
+            attrs: { type: "button", "aria-pressed": s.value ? "true" : "false" },
             on: { click: () => act(async () => {
               await s.onChange(!s.value);
               s.value = !s.value;
@@ -551,7 +646,7 @@
         el("h3", { cls: cls("aim-iam-h"), text: S("strangerTitle") }),
         el("p", {
           cls: cls("aim-iam-lead"),
-          text: defaultRole ? S("strangerRole", { role: defaultRole }) : S("strangerDeny")
+          text: nodeRoster ? S("strangerNode") : defaultRole ? S("strangerRole", { role: defaultRole }) : S("strangerDeny")
         })
       ]));
     }
@@ -559,6 +654,22 @@
     return { refresh: render, destroy: () => {
       host.textContent = "";
     } };
+  }
+  function leastPower(roles, caps, defaultRole) {
+    const pool = roles.filter((r) => r !== defaultRole);
+    const list = pool.length ? pool : roles;
+    const power = (r) => {
+      const c = caps[r] || [];
+      return c.indexOf("*") !== -1 ? Infinity : c.length;
+    };
+    let best;
+    for (const r of list) if (best === void 0 || power(r) < power(best)) best = r;
+    return best;
+  }
+  function refusalText(r) {
+    if (!r || !r.error) return "";
+    if (typeof r.error === "string") return r.error;
+    return typeof r.error.message === "string" ? r.error.message : "";
   }
   function collectPending(state2) {
     if (!state2 || !Array.isArray(state2.requests)) return [];
@@ -577,6 +688,9 @@
     const cls = (hook) => hook + (opts.classMap && opts.classMap[hook] ? " " + opts.classMap[hook] : "");
     host.textContent = "";
     const out = el("p", { cls: cls("aim-iam-lead") });
+    const asked = iam2.me() && iam2.me().requested;
+    if (asked && asked.state === "pending") out.textContent = S("joinPending", { d: fmtDate(asked.at) });
+    else if (asked && asked.state === "declined") out.textContent = S("joinDeclined");
     const note = el("input", { attrs: { type: "text", placeholder: S("joinNote"), "aria-label": S("joinNote") } });
     const btn = el("button", { cls: cls("aim-iam-btn"), text: S("joinBtn"), attrs: { type: "button" } });
     btn.addEventListener("click", async () => {
@@ -586,8 +700,8 @@
           note.value.trim()
         );
         out.textContent = r.alreadyMember ? S("joinAlready") : r.passive ? S("joinPassive") : S("joinSent");
-      } catch {
-        out.textContent = S("failed");
+      } catch (e) {
+        out.textContent = e && e.message ? S("failedWith", { why: e.message }) : S("failed");
       }
     });
     host.appendChild(el("section", { cls: cls("aim-iam") }, [
@@ -623,17 +737,20 @@
       requested: d ? d.requested : null
     };
   }
-  async function nodeState(call, appId, roles) {
+  async function nodeState(call, appId, roles, caps) {
     const d = await un(call(base(appId)));
     if (d && d.ok === false) return d;
     const members = d && d.members || [];
     const seen = new Set(roles || []);
     for (const m of members) if (m.role) seen.add(m.role);
     const roleMap = {};
-    for (const r of seen) roleMap[r] = [];
+    for (const r of seen) roleMap[r] = caps && caps[r] || [r];
     return {
       ok: true,
       isOwner: true,
+      // The panel words its "what a stranger gets" line from this: on the node roster nothing on the
+      // server refuses a stranger who opens the app, and saying "refused" there was false.
+      nodeRoster: true,
       roles: roleMap,
       levels: {},
       commands: [],
@@ -669,7 +786,10 @@
       method: "POST",
       body: JSON.stringify(note ? { note } : {})
     }));
-    return { recorded: r && r.recorded !== false, passive: false, alreadyMember: !!(r && r.alreadyMember) };
+    if (r && r.ok === false) {
+      throw new Error(r.error && typeof r.error.message === "string" && r.error.message || "The request was refused.");
+    }
+    return { recorded: !!r && r.recorded !== false, passive: false, alreadyMember: !!(r && r.alreadyMember) };
   }
   function nodeDismissGuest(call, appId, who) {
     return un(call(base(appId) + "/seen/" + encodeURIComponent(String(who)), { method: "DELETE" }));
@@ -742,6 +862,21 @@
       since: r.since || null
     };
   }
+  function readVocabulary(roles) {
+    if (Array.isArray(roles)) {
+      const names = roles.filter((r) => typeof r === "string" && r);
+      return { names, caps: Object.fromEntries(names.map((r) => [r, [r]])) };
+    }
+    if (roles && typeof roles === "object") {
+      const caps = {};
+      for (const [name, list] of Object.entries(roles)) {
+        if (!name) continue;
+        caps[name] = Array.isArray(list) ? list.filter((c) => typeof c === "string") : [];
+      }
+      return { names: Object.keys(caps), caps };
+    }
+    return { names: [], caps: {} };
+  }
   var iam = {
     /**
      * Learn how this app's gate is shaped, then read the caller's standing. One detection round-trip,
@@ -749,7 +884,8 @@
      * @param {Object} opts
      * @param {string} [opts.app]   `owner/file.html` — use the NODE's roster (preferred for anything new).
      * @param {string} [opts.ext]   An installed IAM extension, when the gate lives there.
-     * @param {string[]} [opts.roles] The app's role vocabulary. The node deliberately does not own it.
+     * @param {string[]|Record<string, string[]>} [opts.roles] The app's role vocabulary, which the node
+     *   deliberately does not own: a map of role to capabilities, or a list of role names, least power first.
      * @param {'node'|'op'|'command'|'level'} [opts.dialect] Skip detection.
      * @returns {Promise<IamMe>}
      */
@@ -759,7 +895,10 @@
       }
       state.ext = opts.ext || null;
       state.app = opts.app || null;
-      state.roleNames = Array.isArray(opts.roles) ? opts.roles : [];
+      const vocab = readVocabulary(opts.roles);
+      state.roleNames = vocab.names;
+      state.roles = vocab.caps;
+      state.me = null;
       if (state.app) {
         state.dialect = /** @type {Dialect} */
         "node";
@@ -770,10 +909,10 @@
             const d = await detectDialect(resolveNodeUrl(), state.ext);
             state.gateDialect = d.dialect;
             if (!state.roleNames.length && d.actions.indexOf("roles") !== -1) {
-              const vocab = await callVocabulary(authFetch2, state.ext).catch(() => null);
-              if (vocab && vocab.roles) {
-                state.roles = vocab.roles;
-                state.roleNames = Array.isArray(vocab.assignable) && vocab.assignable.length ? vocab.assignable : Object.keys(vocab.roles);
+              const vocab2 = await callVocabulary(authFetch2, state.ext).catch(() => null);
+              if (vocab2 && vocab2.roles) {
+                state.roles = vocab2.roles;
+                state.roleNames = Array.isArray(vocab2.assignable) && vocab2.assignable.length ? vocab2.assignable : Object.keys(vocab2.roles);
               }
             }
           } catch {
@@ -805,16 +944,20 @@
           /** @type {string} */
           state.app
         );
+        const own = raw2.role ? state.roles[raw2.role] || [raw2.role] : [];
         state.me = {
           member: raw2.member,
           isOwner: raw2.isOwner,
           role: raw2.role,
           level: raw2.level,
-          caps: raw2.isOwner ? ["*"] : state.roles[raw2.role] || [],
+          caps: raw2.isOwner ? ["*"] : raw2.member ? own : [],
           mode: null,
           via: raw2.via,
           subject: "owner",
-          since: raw2.since
+          since: raw2.since,
+          // The caller's own ask, so the join form can say "you asked on …" instead of offering the
+          // same form again to somebody who is already waiting.
+          requested: raw2.requested || null
         };
         return state.me;
       }
@@ -851,7 +994,7 @@
       requireInit();
       if (state.dialect === "node") {
         if (!state.gateDialect) {
-          const me = state.me || await iam.refresh();
+          const me = await iam.refresh();
           const cap = input && (input.permission || input.command) || "";
           return { allowed: me.caps.indexOf("*") !== -1 || me.caps.indexOf(cap) !== -1, role: me.role || void 0 };
         }
@@ -901,7 +1044,8 @@
           authFetch2,
           /** @type {string} */
           state.app,
-          state.roleNames
+          state.roleNames,
+          state.roles
         );
         if (st2 && st2.ok === false) return { ok: false, members: [], error: st2.error };
         return {
@@ -957,7 +1101,7 @@
           /** @type {string} */
           state.app
         );
-        if (op === "state") return nodeState(authFetch2, app, state.roleNames);
+        if (op === "state") return nodeState(authFetch2, app, state.roleNames, state.roles);
         if (op === "assign") return nodeAssign(authFetch2, app, args || {});
         if (op === "revoke") return nodeRevoke(authFetch2, app, args || {});
         if (op === "decline") return nodeDecline(authFetch2, app, args || {});

@@ -15,9 +15,15 @@
  *   as `ctx.caller.member`, resolved by the node before the sandbox starts. So there is nothing in it
  *   to leak, nothing to keep in step with a second copy of the truth, and a demotion reaches it on
  *   the next call rather than when someone remembers to sync.
- * @structure generateIamExtension(input) → { name, manifest, scripts }
+ * @structure accumulateCapabilities(levels) → role → capabilities (exported, so the design matrix in
+ *   define-app-iam.ts reads the ladder the gate enforces) · generateIamExtension(input) → { name, manifest, scripts }
  * @usage const ext = generateIamExtension({ appId, extName, levels, commands });
  * @version-history
+ *   v1.1.0 — 2026-10-01 — accumulate() is exported as accumulateCapabilities() so defineAppIam builds its
+ *     matrix and its setRoles payload from the same ladder this gate enforces (audit 2026-10-01, defect B).
+ *     The manifest no longer declares `required_apis: memory`: the generated scripts read and write no
+ *     memory, and the field is stored and displayed, never enforced. `author` is written as a quoted
+ *     YAML string, so a caller-supplied author holding a colon cannot break the manifest parse.
  *   v1.0.0 — 2026-07-30 — Initial (TARGET-055 phase 3): the spec becomes the gate.
  */
 import type { LevelDef } from './model.js';
@@ -66,8 +72,12 @@ function slug(appId: string): string {
  * passer-by could read. Nobody decided that; it fell out of listing each tier separately, which is
  * how anyone would write it. A tier that is above another and holds less is a bug every time, so the
  * generator resolves it once here rather than asking each app to remember.
+ *
+ * Exported because defineAppIam reports a level→command matrix beside the gate it generates, and a
+ * matrix computed from the literal lists told an agent the editor could not run a command the gate
+ * then allowed.
  */
-function accumulate(levels: LevelDef[]): Record<string, string[]> {
+export function accumulateCapabilities(levels: LevelDef[]): Record<string, string[]> {
   const out: Record<string, string[]> = {};
   for (const role of levels) {
     if (role.capabilities.includes('*')) { out[role.key] = ['*']; continue; }
@@ -85,7 +95,7 @@ function accumulate(levels: LevelDef[]): Record<string, string[]> {
  * a spec that can be edited in two places is a spec that disagrees with itself.
  */
 function checkScript(levels: LevelDef[], commands: CommandDef[], defaultRole?: string): string {
-  const roleCaps = accumulate(levels);
+  const roleCaps = accumulateCapabilities(levels);
   const roleLevel: Record<string, number> = {};
   for (const l of levels) roleLevel[l.key] = l.level;
   return `// GENERATED from this app's IAM spec. Edit the spec and regenerate; hand edits are lost.
@@ -136,7 +146,7 @@ export default async function (ctx, input) {
 
 /** The discovery script: an agent asks what it may call before calling anything. */
 function commandsScript(levels: LevelDef[], commands: CommandDef[], defaultRole?: string): string {
-  const roleCaps = accumulate(levels);
+  const roleCaps = accumulateCapabilities(levels);
   return `// GENERATED from this app's IAM spec. Edit the spec and regenerate; hand edits are lost.
 const CAPS = ${JSON.stringify(roleCaps)};
 const COMMANDS = ${JSON.stringify(commands)};
@@ -169,7 +179,7 @@ export default async function (ctx) {
  * no role at all, which the node refused with a 400. A gate that knows its own roles should say so.
  */
 function rolesScript(levels: LevelDef[], commands: CommandDef[], defaultRole?: string): string {
-  const roleCaps = accumulate(levels);
+  const roleCaps = accumulateCapabilities(levels);
   const roleLevel: Record<string, number> = {};
   for (const l of levels) roleLevel[l.key] = l.level;
   const labels: Record<string, string> = {};
@@ -229,13 +239,16 @@ export function generateIamExtension(input: GenerateIamExtensionInput): Generate
       + 'The NODE keeps who is a member; '
       + 'this keeps what each role may do, and reads the caller\'s role from ctx.caller.member. Generated from the app\'s IAM spec.',
     )}`,
-    `  author: ${input.author || 'generated'}`,
+    // Quoted when the caller names one: an author such as "ann: ledger team" is a YAML mapping
+    // when written bare, and the install route would refuse the whole manifest.
+    `  author: ${input.author ? JSON.stringify(input.author) : 'generated'}`,
     'config:',
     '  app:',
     '    type: string',
     `    default: ${input.appId}`,
-    'required_apis:',
-    '  - memory',
+    // No required_apis: the three scripts touch no ctx capability beyond ctx.caller, which every
+    // action receives. The field is stored and listed, never enforced, so declaring memory here
+    // only told a reader the gate keeps data it does not keep.
     'limits:',
     '  memory_mb: 32',
     '  timeout_ms: 5000',

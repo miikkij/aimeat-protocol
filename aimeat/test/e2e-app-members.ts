@@ -1051,8 +1051,11 @@ await test('access members-only: an outsider holding an entitlement is refused, 
     assert(shut.status === 403 && shut.body.error.code === 'MEMBERS_ONLY',
         `an outsider is refused even holding money: ${shut.status} ${JSON.stringify(shut.body?.error)}`);
     assert(/not been charged/.test(shut.body.error.message), `and told so: ${shut.body.error.message}`);
-    assert(/members\/request/.test(JSON.stringify(shut.body.hints ?? {})),
-        `with somewhere to go: ${JSON.stringify(shut.body.hints)}`);
+    // The link has to name the route that exists. A pattern on "members/request" matched the old
+    // ".../members/request" too, which answered 404, so this assertion never caught it.
+    const askHint = ((shut.body.hints?.next_actions ?? []) as any[]).find(h => h.method === 'POST');
+    assert(!!askHint && /\/members\/requests$/.test(String(askHint.url)),
+        `with somewhere to go that exists: ${JSON.stringify(shut.body.hints)}`);
 
     // The member is untouched by the stance — that is the whole point of it.
     assert((await call(member.token)).status === 200, 'members-only: a member still gets in');
@@ -1234,6 +1237,144 @@ await test('an agent of the owner needs exchange:grant to approve or remove a me
     });
     assert(asOwner.status === 200 || asOwner.status === 201, `the owner was refused their own roster: ${asOwner.status} ${JSON.stringify(asOwner.body?.error)}`);
     await json(`/v1/apps/${owner.name}/${APP}/members/${stranger.name}`, { method: 'DELETE', headers: auth(owner.token) });
+});
+
+// ── 2026-10-01: the IAM defect round ────────────────────────────────────────────────────────────────
+
+/** An agent of `who` holding only `scopes`, through the device flow every agent uses. */
+async function agentOf(who: { name: string; token: string }, scopes: string[]): Promise<string> {
+    const da = await json('/v1/agents/device-authorize', { method: 'POST', body: JSON.stringify({ agent_name: `iam${Date.now() % 100000}`, owner: who.name }) });
+    await json('/v1/agents/verify', { method: 'POST', body: JSON.stringify({ user_code: da.body.data.user_code, action: 'approve', scopes, owner_token: who.token }) });
+    const t = await json('/v1/agents/device-token', { method: 'POST', body: JSON.stringify({ device_code: da.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }) });
+    // The device-token answer is the OAuth shape, not the node's envelope.
+    const token = (t.body?.access_token ?? t.body?.data?.access_token) as string | undefined;
+    assert(!!token, `agent token: ${JSON.stringify(t.body?.error ?? t.status)}`);
+    return token as string;
+}
+
+/** The token an app on the app origin holds for `user`: role 'app', bound to `app`, with `scope`. */
+async function appTokenFor(user: { token: string }, app: string, scope: string): Promise<string> {
+    const { createHash, randomBytes } = await import('node:crypto');
+    const verifier = randomBytes(32).toString('base64url');
+    const challenge = createHash('sha256').update(verifier).digest('base64url');
+    const redirect = 'http://localhost:9911/callback';
+    const q = new URLSearchParams({ app, response_type: 'code', scope, redirect_uri: redirect, code_challenge: challenge, code_challenge_method: 'S256' });
+    const res = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
+    const rid = decodeURIComponent(/req=([^&]+)/.exec(res.headers.get('location') ?? '')?.[1] ?? '');
+    const con = await json('/v1/app-grants/authorize-consent', { method: 'POST', headers: auth(user.token), body: JSON.stringify({ request_id: rid }) });
+    assert(!!con.body?.data?.redirect_url, `consent: ${JSON.stringify(con.body?.error ?? con.body)}`);
+    const code = new URL(con.body.data.redirect_url).searchParams.get('code') ?? '';
+    const tok = await json('/v1/app-grants/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: redirect }) });
+    assert(!!tok.body?.data?.access_token, `app token: ${JSON.stringify(tok.body?.error ?? tok.body)}`);
+    return tok.body.data.access_token as string;
+}
+
+await test('a token granted for an unrelated word cannot read the roster or decide on anybody', async () => {
+    const mute = await agentOf(owner, ['memory:read']);
+    const base = `/v1/apps/${owner.name}/${APP}/members`;
+    const reads = [
+        await json(base, { headers: auth(mute) }),
+        await json(`${base}/plan`, { headers: auth(mute) }),
+    ];
+    for (const r of reads) {
+        assert(r.status === 403 && r.body.error.code === 'SCOPE_DENIED', `a memory:read agent read the roster: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    }
+    const acts = [
+        await json(`${base}/requests/${stranger.name}`, { method: 'DELETE', headers: auth(mute) }),
+        await json(`${base}/seen/${stranger.name}`, { method: 'DELETE', headers: auth(mute) }),
+        await json(`${base}/sweep`, { method: 'POST', headers: auth(mute) }),
+    ];
+    for (const r of acts) {
+        assert(r.status === 403 && r.body.error.code === 'SCOPE_DENIED', `a memory:read agent changed the roster: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    }
+    // An agent that holds the word still reads, so the gate is a word and not a wall.
+    const reader = await agentOf(owner, ['app:write']);
+    const ok = await json(base, { headers: auth(reader) });
+    assert(ok.status === 200, `an app:write agent of the owner reads the roster: ${ok.status} ${JSON.stringify(ok.body?.error)}`);
+});
+
+await test('the app\'s own token manages its roster without exchange:grant; another app\'s token does not', async () => {
+    const own = await appTokenFor(owner, `${owner.name}/${APP}`, 'memory:read');
+    const read = await json(`/v1/apps/${owner.name}/${APP}/members`, { headers: auth(own) });
+    assert(read.status === 200, `the app's own token reads its roster: ${read.status} ${JSON.stringify(read.body?.error)}`);
+    const ok = await json(`/v1/apps/${owner.name}/${APP}/members`, {
+        method: 'POST', headers: auth(own),
+        body: JSON.stringify({ account: stranger.name, role: 'member', offerings: ['not-in-the-plan'] }),
+    });
+    assert(ok.status === 200 || ok.status === 201, `the app's own token approves: ${ok.status} ${JSON.stringify(ok.body?.error)}`);
+    assert(!(ok.body.data.member.offerings as string[]).includes('not-in-the-plan'),
+        `an app token cannot name offerings of its own: ${JSON.stringify(ok.body.data.member.offerings)}`);
+    const rm = await json(`/v1/apps/${owner.name}/${APP}/members/${stranger.name}`, { method: 'DELETE', headers: auth(own) });
+    assert(rm.status === 200, `the app's own token removes: ${rm.status} ${JSON.stringify(rm.body?.error)}`);
+
+    // A token bound to a DIFFERENT app of the same owner is a different app's code.
+    const other = 'roster-other.html';
+    await json('/v1/apps', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({
+        filename: other, name: 'Other', description: 'other app', content: Buffer.from('<!doctype html><p>o', 'utf8').toString('base64') }) });
+    const foreign = await appTokenFor(owner, `${owner.name}/${other}`, 'memory:read');
+    const no = await json(`/v1/apps/${owner.name}/${APP}/members`, { headers: auth(foreign) });
+    assert(no.status === 403 && no.body.error.code === 'SCOPE_DENIED', `another app's token read this roster: ${no.status} ${JSON.stringify(no.body?.error)}`);
+
+    // A member signed in to the same app holds a token of this app, and is still not the owner.
+    const theirs = await appTokenFor(member, `${owner.name}/${APP}`, 'memory:read');
+    const notOwner = await json(`/v1/apps/${owner.name}/${APP}/members`, {
+        method: 'POST', headers: auth(theirs), body: JSON.stringify({ account: stranger.name, role: 'member' }),
+    });
+    assert(notOwner.status === 403 && notOwner.body.error.code === 'FORBIDDEN', `a member approved somebody: ${notOwner.status}`);
+    const asked = await json(`/v1/apps/${owner.name}/${APP}/members/me`, { headers: auth(theirs) });
+    assert(asked.status === 200, `and reads their own standing through it: ${asked.status}`);
+});
+
+await test('a roster call on an app that does not exist is refused and records nothing', async () => {
+    const ghost = `/v1/apps/${owner.name}/no-such-app.html/members`;
+    const before = (await bell(owner.token)).filter(n => n.type === 'app_member_request').length;
+    const ask = await json(`${ghost}/requests`, { method: 'POST', headers: auth(stranger.token), body: JSON.stringify({ note: 'x' }) });
+    assert(ask.status === 404, `asking for a made-up app was accepted: ${ask.status}`);
+    const me = await json(`${ghost}/me`, { headers: auth(stranger.token) });
+    assert(me.status === 404, `standing on a made-up app answered ${me.status}`);
+    const after = (await bell(owner.token)).filter(n => n.type === 'app_member_request').length;
+    assert(after === before, `the owner was notified about a made-up app: ${before} -> ${after}`);
+});
+
+await test('an approval refuses a role the library reads as the owner or as everything, an unknown account and a bad date', async () => {
+    const base = `/v1/apps/${owner.name}/${APP}/members`;
+    for (const role of ['owner', '*', 'bad role']) {
+        const r = await json(base, { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ account: stranger.name, role }) });
+        assert(r.status === 400, `role "${role}" was accepted: ${r.status}`);
+    }
+    const ghost = await json(base, { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ account: `nobody${Date.now()}`, role: 'member' }) });
+    assert(ghost.status === 404, `an account nobody holds was approved: ${ghost.status}`);
+    const date = await json(base, { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ account: stranger.name, role: 'member', expiresAt: 'next tuesday' }) });
+    assert(date.status === 400, `an unreadable date was accepted: ${date.status}`);
+    const roster = await json(base, { headers: auth(owner.token) });
+    assert(!(roster.body.data.members as any[]).some(m => m.owner === stranger.name), 'and nothing was written');
+});
+
+await test('a member reads their own standing without the owner\'s note on it', async () => {
+    const base = `/v1/apps/${owner.name}/${APP}/members`;
+    const ok = await json(base, { method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ account: stranger.name, role: 'member', note: 'only the owner reads this' }) });
+    assert(ok.status === 200 || ok.status === 201, `approve ${ok.status}: ${JSON.stringify(ok.body?.error)}`);
+    const me = await json(`${base}/me`, { headers: auth(stranger.token) });
+    assert(me.status === 200 && !!me.body.data.member, `standing ${me.status}: ${JSON.stringify(me.body?.data)}`);
+    assert(!('note' in me.body.data.member) && !('approvedBy' in me.body.data.member),
+        `the owner's records reached the member: ${JSON.stringify(me.body.data.member)}`);
+    await json(`${base}/${stranger.name}`, { method: 'DELETE', headers: auth(owner.token) });
+});
+
+await test('removing a member keeps the development right the owner gave them', async () => {
+    const base = `/v1/apps/${owner.name}/${APP}`;
+    await json(`${base}/members`, { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ account: stranger.name, role: 'member' }) });
+    const g = await json(`${base}/dev-grants/${stranger.name}`, { method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ level: 'drafter' }) });
+    assert(g.status === 200, `grant ${g.status}: ${JSON.stringify(g.body?.error)}`);
+    const rm = await json(`${base}/members/${stranger.name}`, { method: 'DELETE', headers: auth(owner.token) });
+    assert(rm.status === 200, `remove ${rm.status}`);
+    const grants = await json(`${base}/dev-grants`, { headers: auth(owner.token) });
+    assert((grants.body.data.grants as any[]).some(x => x.account === stranger.name || x.owner === stranger.name),
+        `the development right went with the membership: ${JSON.stringify(grants.body.data.grants)}`);
+    const me = await json(`${base}/members/me`, { headers: auth(stranger.token) });
+    assert(!me.body.data.member || !me.body.data.member.role, `and they are no longer a member: ${JSON.stringify(me.body.data.member)}`);
+    await json(`${base}/dev-grants/${stranger.name}`, { method: 'DELETE', headers: auth(owner.token) });
 });
 
 console.log(`\napp member roster E2E: ${passed} passed, ${failed} failed (${passed + failed} total)\n`);

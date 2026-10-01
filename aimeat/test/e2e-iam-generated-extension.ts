@@ -13,14 +13,16 @@
  *   to prevent are asserted directly — a tier that sits above another and holds less of it, and a
  *   command whose capability no role lists being left out of the input enum.
  *
- *   It also pins two disagreements found while writing it, so a fix moves a line here rather than
- *   passing unnoticed: the `matrix` the same response carries is computed WITHOUT the accumulation
- *   the generated gate applies, and the tool takes neither `defaultRole` nor `author`, so two of the
- *   generator's parameters cannot be reached through the only door it has.
+ *   It also asserts the `matrix` the same response carries agrees with the generated gate, and that
+ *   the generator's other inputs (default_role, version, author, ext_name) reach the gate.
  * @structure Setup (owner, agent, MCP session) · Part A rich design · Part B minimal design ·
  *   Part C the arms that generate nothing · Part D refusals
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=iam-generated-extension
  * @version-history
+ *   v1.1.0 — 2026-10-01 — Tests 0 and A6 pinned two defects and now assert their fix (audit
+ *     2026-10-01, defect B): the tool publishes default_role, version, author and ext_name, and the
+ *     matrix is accumulated like the gate. A7 is new: the four inputs reach the gate, the manifest
+ *     declares no required_apis, and a default role holding "*" is refused.
  *   v1.0.0 — 2026-09-08 — Initial.
  */
 
@@ -192,13 +194,15 @@ await test('0. aimeat_iam_define is on this session\'s tool surface', async () =
     const props = Object.keys(tool.inputSchema?.properties ?? {});
     assert(props.includes('app_id') && props.includes('levels') && props.includes('commands'),
         `the published parameters: ${JSON.stringify(props)}`);
-    // PINNED, NOT ENDORSED (2026-09-08): generateIamExtension takes `defaultRole`, `author`,
-    // `extName` and `version`, and NONE of the four is a parameter of the only door that reaches
-    // it. So a generated gate always says a signed-in stranger holds nothing, always claims
-    // author "generated", and always publishes 1.0.0 — which the generator's own comment calls a
-    // rollback when it lands over a live gate. If a parameter is added, this assertion fails.
-    assert(!props.includes('defaultRole') && !props.includes('author') && !props.includes('version'),
-        `today the tool exposes none of the generator's other inputs: ${JSON.stringify(props)}`);
+    // Pinned absent on 2026-09-08, exposed on 2026-10-01 (audit defect B): generateIamExtension
+    // takes defaultRole, author, extName and version, and without them on the tool a generated gate
+    // always gave a signed-in stranger nothing and always published 1.0.0, which reads as a rollback
+    // when it lands over a live gate.
+    for (const p of ['default_role', 'version', 'author', 'ext_name']) {
+        assert(props.includes(p), `the tool publishes ${p}: ${JSON.stringify(props)}`);
+    }
+    assert(/aimeat_extension_install/.test(tool.description) && /AIMEAT\.iam\.init/.test(tool.description),
+        `the description says how to install and use the returned extension: ${tool.description}`);
 });
 
 // ── Part A: the rich design ──────────────────────────────────────────────────
@@ -222,7 +226,7 @@ await test('A2. The manifest declares the three actions and names every role', a
     const m: string = rich.extension.manifest;
     assert(m.includes(`name: ${EXT_NAME}`), `manifest name: ${m.slice(0, 120)}`);
     assert(m.includes('version: 1.0.0'), 'a new gate publishes 1.0.0');
-    assert(m.includes('author: generated'), 'and claims no author, because the tool takes none');
+    assert(m.includes('author: generated'), 'and claims no author when the call names none');
     assert(m.includes(`default: ${APP_ID}`), 'the app it gates is config, so the node can resolve the roster');
     for (const id of ['check', 'commands', 'roles']) assert(m.includes(`- id: ${id}`), `action ${id} is declared`);
     for (const script of ['check.js', 'commands.js', 'roles.js']) assert(m.includes(`script: ${script}`), `${script} is wired to an action`);
@@ -277,7 +281,7 @@ await test('A5. roles.js is the vocabulary an approval screen reads', async () =
     const labels = JSON.parse(/const LABELS = (\{.*?\});/s.exec(s)![1]);
     assert(labels.admin === 'Administrator' && labels.editor === 'Editor' && labels.reader === 'Reader',
         `the labels reach the gate: ${JSON.stringify(labels)}`);
-    assert(/const DEFAULT_ROLE = null;/.test(s), 'defaultRole is null on every gate this door can build');
+    assert(/const DEFAULT_ROLE = null;/.test(s), 'defaultRole is null when the call names no default_role');
     assert(s.includes('const assignable = Object.keys(CAPS).filter'), 'assignable is computed from the default');
     // With DEFAULT_ROLE null nothing is filtered out, so all three roles are handable.
     assert(s.includes('defaultRole: DEFAULT_ROLE'), 'and the default is reported to the screen');
@@ -290,22 +294,41 @@ await test('A5. roles.js is the vocabulary an approval screen reads', async () =
     assert(!/return \{[\s\S]*assignments/.test(s), 'nothing about who holds what is returned');
 });
 
-await test('A6. PINNED: the matrix in the same response is NOT accumulated, so it disagrees with the gate', async () => {
-    // defineAppIam builds `matrix` with capabilitiesOf(), which reads a level's own capabilities
-    // literally; generateIamExtension builds the gate with accumulate(), which walks the ladder.
-    // Both ship in one response. Today an agent reading the matrix is told `editor` may not run
-    // `list`, and the gate it installs from the same reply allows it. Asserted as it stands so a
-    // fix moves this test rather than passing unnoticed.
+await test('A6. The matrix in the same response is accumulated, so it agrees with the gate', async () => {
+    // Until 2026-10-01 defineAppIam built `matrix` from each level's own capabilities while the gate
+    // accumulated the ladder, so an agent reading the matrix was told `editor` may not run `list`
+    // and the gate installed from the same reply allowed it. This asserted that disagreement; it now
+    // asserts the hole is closed (audit 2026-10-01, defect B).
     const m = rich.matrix;
     assert(m.admin.canRun.sort().join(',') === 'announce,list,purge,save', `admin runs everything: ${JSON.stringify(m.admin)}`);
     assert(m.admin.needsConfirmation.join(',') === 'purge', `and confirms only the irreversible one: ${JSON.stringify(m.admin.needsConfirmation)}`);
-    assert(m.editor.canRun.sort().join(',') === 'announce,save', `the matrix reads editor literally: ${JSON.stringify(m.editor.canRun)}`);
-    assert(!m.editor.canRun.includes('list'), 'so it withholds the read a reader holds');
+    assert(m.editor.canRun.sort().join(',') === 'announce,list,save', `editor holds the reader's read: ${JSON.stringify(m.editor.canRun)}`);
     const gateCaps = JSON.parse(/const CAPS = (\{.*?\});/s.exec(rich.extension.scripts['check.js'] as string)![1]);
-    assert(gateCaps.editor.includes('read'),
-        'while the gate generated beside it grants that read — the two halves of one reply disagree');
+    for (const l of LEVELS) {
+        const held: string[] = gateCaps[l.key];
+        const gateAllows = COMMANDS.filter(c => held.includes('*') || held.includes(c.capability)).map(c => c.id).sort().join(',');
+        assert([...m[l.key].canRun].sort().join(',') === gateAllows,
+            `${l.key}: the matrix says ${JSON.stringify(m[l.key].canRun)}, the gate allows ${gateAllows}`);
+    }
     assert(m.reader.canRun.join(',') === 'list', `reader runs the read command: ${JSON.stringify(m.reader.canRun)}`);
     assert(m.reader.needsConfirmation.length === 0, 'and confirms nothing');
+});
+
+await test('A7. default_role, version, author and ext_name reach the generated gate, and a wildcard default is refused', async () => {
+    const r = await call(session, 'aimeat_iam_define', {
+        app_id: APP_ID, levels: LEVELS, commands: COMMANDS,
+        default_role: 'reader', version: '1.1.0', author: 'ledger team', ext_name: `${EXT_NAME}-v2`,
+    });
+    assert(!r.isError && r.data?.ok === true, `the design validates: ${r.text.slice(0, 300)}`);
+    const ext = r.data.extension;
+    assert(ext.name === `${EXT_NAME}-v2`, `ext_name names the gate: ${ext.name}`);
+    assert((ext.manifest as string).includes('version: 1.1.0'), 'version reaches the manifest');
+    assert((ext.manifest as string).includes('author: "ledger team"'), 'author reaches the manifest');
+    assert(/const DEFAULT_ROLE = "reader";/.test(ext.scripts['check.js'] as string), 'default_role reaches the gate');
+    assert(!(ext.manifest as string).includes('required_apis'), 'the gate declares no API it does not call');
+
+    const wide = await call(session, 'aimeat_iam_define', { app_id: APP_ID, levels: LEVELS, commands: COMMANDS, default_role: 'admin' });
+    assert(wide.data?.ok === false && /holds "\*"/.test(wide.data.error), `a default holding "*" is refused: ${wide.text.slice(0, 200)}`);
 });
 
 // ── Part B: the minimal design ───────────────────────────────────────────────

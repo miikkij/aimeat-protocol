@@ -11,6 +11,8 @@
  *   import { registerExtensionsTools } from './extensions.js';
  *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v2.6.0 — 2026-10-01 — aimeat_iam_define takes default_role, version, author and ext_name and passes
+ *     them to defineAppIam (audit 2026-10-01, defect B).
  *   v2.5.0 — 2026-09-29 — ctx.files is told the caller is this session's agent, so a file read
  *     passes the classification check as an AI (TARGET-082 V4).
  *   v2.4.2 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
@@ -213,7 +215,7 @@ export function registerExtensionsTools(
         'aimeat_iam_define',
         descriptionFor('aimeat_iam_define'),
         {
-            app_id: z.string().optional().describe('App id / name for the schema label'),
+            app_id: z.string().optional().describe('owner/file.html of the app the gate protects; a name without a slash generates no extension'),
             levels: z.array(z.object({
                 level: z.number(), key: z.string(), label: z.string(), capabilities: z.array(z.string()),
             })).describe('Level schema: BBS ordinal levels (lower = more power; level 0 must hold "*") → app capabilities'),
@@ -221,10 +223,16 @@ export function registerExtensionsTools(
                 id: z.string(), description: z.string(), capability: z.string(),
                 tier: z.enum(['read', 'write', 'irreversible']),
             })).describe('Command manifest: commands → required capability + mutation tier'),
+            default_role: z.string().optional().describe('Level key a signed-in caller not on the member list holds in the generated gate'),
+            version: z.string().optional().describe('Manifest version of the generated gate, x.y.z (default 1.0.0)'),
+            author: z.string().optional().describe('Manifest author of the generated gate (default "generated")'),
+            ext_name: z.string().optional().describe('Extension name of the generated gate (default: slug of app_id plus -iam)'),
         },
         annotationsFor('aimeat_iam_define'),
-        async ({ app_id, levels, commands }) => {
-            const result = defineAppIam({ appId: app_id, levels, commands });
+        async ({ app_id, levels, commands, default_role, version, author, ext_name }) => {
+            const result = defineAppIam({
+                appId: app_id, levels, commands, defaultRole: default_role, version, author, extName: ext_name,
+            });
             return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
         },
     );

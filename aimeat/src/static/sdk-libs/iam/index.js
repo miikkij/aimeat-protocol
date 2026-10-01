@@ -18,6 +18,12 @@
  *   if (AIMEAT.iam.can('analyse')) showTab();            // hint
  *   await AIMEAT.iam.guard('bid', () => runScoring());   // asks the server
  * @version-history
+ *   v1.1.0 — 2026-10-01 — On the node roster a member holds capabilities: `roles` takes a map of role
+ *     to capabilities, or a list of names (least power first) where each role holds its own name.
+ *     Before this a member of an app with no extension held none, and can(), gate() and guard()
+ *     refused everybody the owner approved. A second init() starts from an empty vocabulary.
+ *     guard() without an extension asks the node instead of the cached standing. me() carries the
+ *     caller's own pending or declined ask.
  *   v1.0.0 — 2026-07-30 — Initial (TARGET-055 phase 1): dialect adapter + normalised me() + gate
  *     helpers, against the six live extensions unchanged.
  */
@@ -42,6 +48,8 @@ const { authFetch } = makeSession('aimeat-iam.js');
  * @property {string|null} via   owner | agent | none — WHY the role resolved. Null on older forks.
  * @property {string|null} subject owner | gaii | both, when the app declares it.
  * @property {string|null} since When the caller became a member, when the app records it.
+ * @property {{ at: string, state: string, note?: string }|null} [requested] The caller's own ask for
+ *   access, on the node roster: when, and whether it is pending or declined.
  */
 
 /** @typedef {import('./dialect.js').Dialect} Dialect */
@@ -108,6 +116,30 @@ function normalise(raw, roles, dialect) {
   };
 }
 
+/**
+ * Read the app's `roles` option. A map says what each role may do (`{ member: ['use'], admin:
+ * ['use', 'manage'] }`); a list names roles only, least power first, and each role then holds its
+ * own name as its one capability. Anything else is no vocabulary at all.
+ * @param {unknown} roles
+ * @returns {{ names: string[], caps: Record<string, string[]> }}
+ */
+function readVocabulary(roles) {
+  if (Array.isArray(roles)) {
+    const names = roles.filter((r) => typeof r === 'string' && r);
+    return { names, caps: Object.fromEntries(names.map((r) => [r, [r]])) };
+  }
+  if (roles && typeof roles === 'object') {
+    /** @type {Record<string, string[]>} */
+    const caps = {};
+    for (const [name, list] of Object.entries(roles)) {
+      if (!name) continue;
+      caps[name] = Array.isArray(list) ? list.filter((c) => typeof c === 'string') : [];
+    }
+    return { names: Object.keys(caps), caps };
+  }
+  return { names: [], caps: {} };
+}
+
 const iam = {
   /**
    * Learn how this app's gate is shaped, then read the caller's standing. One detection round-trip,
@@ -115,7 +147,8 @@ const iam = {
    * @param {Object} opts
    * @param {string} [opts.app]   `owner/file.html` — use the NODE's roster (preferred for anything new).
    * @param {string} [opts.ext]   An installed IAM extension, when the gate lives there.
-   * @param {string[]} [opts.roles] The app's role vocabulary. The node deliberately does not own it.
+   * @param {string[]|Record<string, string[]>} [opts.roles] The app's role vocabulary, which the node
+   *   deliberately does not own: a map of role to capabilities, or a list of role names, least power first.
    * @param {'node'|'op'|'command'|'level'} [opts.dialect] Skip detection.
    * @returns {Promise<IamMe>}
    */
@@ -125,7 +158,12 @@ const iam = {
     }
     state.ext = opts.ext || null;
     state.app = opts.app || null;
-    state.roleNames = Array.isArray(opts.roles) ? opts.roles : [];
+    // A second init starts from nothing: a vocabulary left over from the first one would hand a
+    // member capabilities the app no longer grants.
+    const vocab = readVocabulary(opts.roles);
+    state.roleNames = vocab.names;
+    state.roles = vocab.caps;
+    state.me = null;
     // An app id means the NODE keeps the roster: it notifies, keeps the list private and moves the
     // free access with the role, none of which an extension can do. An extension may still be named
     // alongside it, and then it holds only the capability vocabulary.
@@ -187,10 +225,17 @@ const iam = {
     // not an error — it just means capabilities cannot be listed, and `caps` stays empty.
     if (state.dialect === 'node') {
       const raw = await nodeMe(authFetch, /** @type {string} */ (state.app));
+      // A member always holds at least their own role name, so `can('member')` answers for an app
+      // that listed role names only. Before this a member of such an app held nothing, and every
+      // can(), gate() and guard() refused the people the owner had just approved.
+      const own = raw.role ? (state.roles[raw.role] || [raw.role]) : [];
       state.me = {
         member: raw.member, isOwner: raw.isOwner, role: raw.role, level: raw.level,
-        caps: raw.isOwner ? ['*'] : (state.roles[raw.role] || []),
+        caps: raw.isOwner ? ['*'] : (raw.member ? own : []),
         mode: null, via: raw.via, subject: 'owner', since: raw.since,
+        // The caller's own ask, so the join form can say "you asked on …" instead of offering the
+        // same form again to somebody who is already waiting.
+        requested: raw.requested || null,
       };
       return state.me;
     }
@@ -230,8 +275,10 @@ const iam = {
     // With the roster on the node and the vocabulary in an extension, the gate is the extension's.
     if (state.dialect === 'node') {
       if (!state.gateDialect) {
-        // No extension to ask: answer from the roster role, which is all there is to know.
-        const me = state.me || await iam.refresh();
+        // No extension to ask: answer from the roster role, read FRESH from the node. guard() promises
+        // to ask the server, and answering from the cached standing let a member removed while the
+        // page was open keep passing it until a reload.
+        const me = await iam.refresh();
         const cap = (input && (input.permission || input.command)) || '';
         return { allowed: me.caps.indexOf('*') !== -1 || me.caps.indexOf(cap) !== -1, role: me.role || undefined };
       }
@@ -270,7 +317,7 @@ const iam = {
   async roster() {
     requireInit();
     if (state.dialect === 'node') {
-      const st = await nodeState(authFetch, /** @type {string} */ (state.app), state.roleNames);
+      const st = await nodeState(authFetch, /** @type {string} */ (state.app), state.roleNames, state.roles);
       if (st && st.ok === false) return { ok: false, members: [], error: st.error };
       return {
         ok: true,
@@ -317,7 +364,7 @@ const iam = {
     requireInit();
     if (state.dialect === 'node') {
       const app = /** @type {string} */ (state.app);
-      if (op === 'state') return nodeState(authFetch, app, state.roleNames);
+      if (op === 'state') return nodeState(authFetch, app, state.roleNames, state.roles);
       if (op === 'assign') return nodeAssign(authFetch, app, args || {});
       if (op === 'revoke') return nodeRevoke(authFetch, app, args || {});
       if (op === 'decline') return nodeDecline(authFetch, app, args || {});

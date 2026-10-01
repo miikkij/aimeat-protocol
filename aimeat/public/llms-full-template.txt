@@ -904,6 +904,18 @@ Key rules for workspace apps:
 
 ### App-IAM Template (an app with its OWN users and BBS levels via aimeat-iam)
 
+**Start here for anything new: the node keeps the roster.** Load `/v1/libs/aimeat-auth.js` and
+`/v1/libs/aimeat-iam.js`, then
+`AIMEAT.iam.init({ app: 'owner/file.html', roles: { member: ['use'], admin: ['use', 'manage'] } })`.
+The node notifies the person on approval and removal, keeps the list private, and moves free
+access with the role. `AIMEAT.iam.MemberAdmin({ target })` is the owner's panel and
+`AIMEAT.iam.JoinPanel({ target })` the applicant's form; `can()`/`gate()` paint and `guard()` asks
+the node. Nothing on the node refuses a stranger who opens the page, so when the server must
+refuse a change, generate a gate with `aimeat_iam_define`, install the extension it returns with
+`aimeat_extension_install`, and `init({ app, ext })`: the gate reads the member's role through
+`ctx.caller.member`. The `usecase-app-iam` template wires all of it. The rest of this section
+describes the older shape, a per-app copy of the aimeat-iam extension that keeps its own roster.
+
 Use this when the app needs its own permission system — its own user roster and levels,
 independent of workspaces. The app gets a per-app copy of the **aimeat-iam extension**: a
 server-side decision oracle whose state (roles, levels, assignments, command manifest) lives in
@@ -926,8 +938,9 @@ One model, two user kinds: a human GHII and an agent GAII are checked identicall
    then `{ "op": "setCommands", "commands": [...] }` and `{ "op": "assign", "ghii": "you@node",
    "role": "admin" }` — claiming does NOT auto-assign a role.
 3. AI route: the `aimeat_iam_define` MCP tool validates a level schema + command manifest,
-   computes the level→command matrix, and returns ready-to-apply admin payloads
-   (`setRoles` / `setLevels` / `setCommands`).
+   computes the level→command matrix with the capabilities each level inherits, and returns both
+   a generated gate extension (`extension`, installed with `aimeat_extension_install`) and the
+   admin payloads for this older shape (`apply`: `setRoles` / `setLevels` / `setCommands`).
 
 **The runtime contract (all calls need a signed-in session; `resp.data` is the answer):**
 

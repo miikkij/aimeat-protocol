@@ -23,6 +23,10 @@
  * @structure eraseOwner(storage, nodeId, name) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name);
  * @version-history
+ *   v1.6.0 — 2026-10-01 — App rosters are erased (services/app-member-erasure.ts): the account's own
+ *     member rows, requests, visits and blanket development rights on every app, and the whole roster,
+ *     carry plan and given blanket rights of the apps it owned. Keyed by the reusable account name, so
+ *     the next holder of the name inherited them.
  *   v1.5.0 — 2026-09-30 — The person's classification exceptions (records of system@<node>) are erased.
  *   v1.4.0 — 2026-09-30 — Unflushed classification audit rows of the owner are purged first.
  *   v1.3.0 — 2026-09-26 — Work is settled inside storage.deleteOwner() on both backends, for every
@@ -47,6 +51,7 @@ import { logger } from '../utils/logger.js';
 import { evictAgentTelemetry } from './telemetry-buffer.js';
 import { purgeClassificationAudit } from './classification/audit.js';
 import { purgeExceptions } from './classification/exceptions.js';
+import { eraseAppMembership } from './app-member-erasure.js';
 
 export interface OwnerErasureResult {
   agentsDeleted: number;
@@ -179,6 +184,17 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
       const { apps } = await storage.listApps({ ownerGaii: ghii });
       for (const a of apps) await storage.deleteApp(ghii, a.filename);
       return apps.length ? `apps:${apps.length}` : null;
+    }, deletionLog);
+
+    // App rosters, right after the apps: the roster of an app goes with the app. The records live in
+    // platform namespaces keyed by the bare account name, which the cascade never sees and which is
+    // released for reuse, so a surviving row hands the next holder of the name the previous person's
+    // memberships, development rights, requests and visits. Reads the app id from each record, so it
+    // does not depend on the apps step above having succeeded.
+    await step('app_membership', async () => {
+      const c = await eraseAppMembership(storage, name);
+      const n = c.members + c.requests + c.visits + c.plans + c.blanketGrants;
+      return n ? `app_membership:${n}` : null;
     }, deletionLog);
 
     await step('ext_instances', async () => {

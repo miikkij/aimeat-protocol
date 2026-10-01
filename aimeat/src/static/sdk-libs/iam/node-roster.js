@@ -13,6 +13,9 @@
  * @structure nodeMe · nodeState · nodeAssign · nodeRevoke · nodeRequest
  * @usage AIMEAT.iam.init({ app: 'alice/app.html' })
  * @version-history
+ *   v1.1.0 — 2026-10-01 — nodeState carries each role's capabilities (the app's own map, or the role
+ *     name alone) and marks itself `nodeRoster`; nodeRequest throws the node's refusal instead of
+ *     reporting it as recorded.
  *   v1.0.0 — 2026-07-30 — Initial (TARGET-055 phase 2).
  */
 
@@ -54,8 +57,9 @@ export async function nodeMe(call, appId) {
  * @param {(path: string, opts?: RequestInit) => Promise<any>} call
  * @param {string} appId
  * @param {string[]} roles  The app's own role vocabulary, which the NODE does not hold.
+ * @param {Record<string, string[]>} [caps]  What each role may do, when the app said so.
  */
-export async function nodeState(call, appId, roles) {
+export async function nodeState(call, appId, roles, caps) {
   const d = await un(call(base(appId)));
   if (d && d.ok === false) return d;
   const members = (d && d.members) || [];
@@ -66,10 +70,14 @@ export async function nodeState(call, appId, roles) {
   for (const m of members) if (m.role) seen.add(m.role);
   /** @type {Record<string, string[]>} */
   const roleMap = {};
-  for (const r of seen) roleMap[r] = [];
+  // The capabilities travel with the names so the panel can tell which role holds the least power.
+  for (const r of seen) roleMap[r] = (caps && caps[r]) || [r];
   return {
     ok: true,
     isOwner: true,
+    // The panel words its "what a stranger gets" line from this: on the node roster nothing on the
+    // server refuses a stranger who opens the app, and saying "refused" there was false.
+    nodeRoster: true,
     roles: roleMap,
     levels: {},
     commands: [],
@@ -115,7 +123,12 @@ export async function nodeRequest(call, appId, note) {
   const r = await un(call(base(appId) + '/requests', {
     method: 'POST', body: JSON.stringify(note ? { note } : {}),
   }));
-  return { recorded: r && r.recorded !== false, passive: false, alreadyMember: !!(r && r.alreadyMember) };
+  // The session answers a refusal as an envelope, not a throw. Read as a result it had no
+  // `recorded: false`, so the join form said "your request was recorded" for a request the node refused.
+  if (r && r.ok === false) {
+    throw new Error((r.error && typeof r.error.message === 'string' && r.error.message) || 'The request was refused.');
+  }
+  return { recorded: !!r && r.recorded !== false, passive: false, alreadyMember: !!(r && r.alreadyMember) };
 }
 
 /**

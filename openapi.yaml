@@ -29358,7 +29358,8 @@ paths:
         approved person they were approved (the extension sandbox notifies the CALLER, so an approval
         notifies the approver), keeping the list off the public internet (an `ext:` namespace is
         world-readable by default), and taking free access away together with the role. The app keeps
-        what a member may DO; the node keeps who they are. Returns `{ members, requests, count }`.
+        what a member may DO; the node keeps who they are. Returns `{ members, requests, seen, count }`,
+        where `seen` lists the people who opened the app and hold no role.
 
 
         A MEMBER may also read it when the app's plan sets `rosterVisibility: members` - some apps
@@ -29366,6 +29367,10 @@ paths:
         names, roles and join dates and carries `redacted: true`: the note somebody wrote when they
         asked, who approved them, what they are carried on, and anyone still waiting stay the
         owner's. A non-member and an anonymous caller are refused either way.
+
+        Who may call: the owner's own session; the app's own token (role `app`, minted for this
+        same app), which is the app managing its own roster; or another principal of the owner that
+        holds `app:write`. Answers 404 when the app does not exist.
       tags: [Apps]
       security:
         - BearerAuth: []
@@ -29379,6 +29384,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
     post:
       operationId: appMembersApprove
       summary: Approve someone, or change the role they hold
@@ -29395,6 +29401,18 @@ paths:
 
         Refused with `409 SEATS_FULL` when the app's plan caps that role and every seat is taken.
         Somebody already holding the role is not taking a new one, so a renewal never hits the cap.
+
+
+        A role starts with a letter and holds only letters, digits, `.`, `_` or `-`, at most 40
+        characters; `owner` is refused, because the browser library reads it as the app's owner.
+        An account of this node that does not exist answers 404. An `expiresAt` that is not a date
+        answers 400. The app's own token approves by the declared carry plan only: `offerings` it
+        names are ignored, because naming them gives away free access, which is the
+        `exchange:grant` act itself.
+
+        Who may call: the owner's own session; the app's own token (role `app`, minted for this
+        same app), which is the app managing its own roster; or another principal of the owner that
+        holds `exchange:grant`. Answers 404 when the app does not exist.
       tags: [Apps]
       security:
         - BearerAuth: []
@@ -29412,7 +29430,7 @@ paths:
                 account: { type: string, description: "The PERSON to approve — a bare account name, their GHII, or one of their agents' GAII; all three resolve to the same person." }
                 role: { type: string, description: "Role key this app uses. The app's own extension decides what it permits; the node only records who holds it." }
                 level: { type: integer, description: "BBS ordinal, LOWER is more power. Optional." }
-                note: { type: string, description: "Free text kept with the decision — the audit trail the app-side versions did not have." }
+                note: { type: string, description: "Free text kept with the decision — the audit trail the app-side versions did not have. At most 400 characters are kept. The member does not see it." }
                 offerings:
                   type: array
                   items: { type: string }
@@ -29432,6 +29450,12 @@ paths:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: SEATS_FULL - every seat of that role is taken.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
   /v1/apps/{owner}/{filename}/members/plan:
     get:
       operationId: appMembersPlanGet
@@ -29441,6 +29465,10 @@ paths:
         after it. Null when the owner has declared none, in which case seats are unlimited,
         memberships do not lapse, an approval carries nothing, and the app charges everybody who is
         not a member.
+
+        Who may call: the owner's own session; the app's own token (role `app`, minted for this
+        same app), which is the app managing its own roster; or another principal of the owner that
+        holds `app:write`. Answers 404 when the app does not exist.
       tags: [Apps]
       security:
         - BearerAuth: []
@@ -29531,6 +29559,10 @@ paths:
         withdraw the EXCHANGE grants, and until something does, a person the owner stopped selling to
         keeps calling on the owner's money. A timer runs this hourly across the node; this is the
         same act, now, for one app. Returns `{ swept, revoked, failed }`.
+
+        Who may call: the owner's own session; the app's own token (role `app`, minted for this
+        same app), which is the app managing its own roster; or another principal of the owner that
+        holds `exchange:grant`. Answers 404 when the app does not exist.
       tags: [Apps]
       security:
         - BearerAuth: []
@@ -29552,6 +29584,9 @@ paths:
         Any authenticated caller. An AGENT asking this gets its human's answer, which is the whole
         point of keying the roster to the person: a member who works through an agent is one member,
         not two. Returns `{ member, isOwner, role, requested }`, with `role` null for a stranger.
+        `member` leaves out the owner's own records of the decision (`note`, `approvedBy`).
+        `requested` is the caller's own ask, `{ at, state, note }`, with state `pending` or
+        `declined`. Answers 404 when the app does not exist, and then records no visit.
       tags: [Apps]
       security:
         - BearerAuth: []
@@ -29571,7 +29606,13 @@ paths:
       description: >
         Owner-only. The removed person is notified. Removing somebody who is not a member answers 404
         rather than a cheerful 200, because "removed" and "there was nobody" are different facts.
+        The free-access grants the membership carried are withdrawn. A development right the owner
+        gave the same person stays: it was granted through `dev-grants` and is taken back there.
         Returns `{ removed, member }`.
+
+        Who may call: the owner's own session; the app's own token (role `app`, minted for this
+        same app), which is the app managing its own roster; or another principal of the owner that
+        holds `exchange:grant`. Answers 404 when the app does not exist.
       tags: [Apps]
       security:
         - BearerAuth: []
@@ -29597,6 +29638,11 @@ paths:
         themselves. Asking again updates the note rather than queueing a second ask. Somebody who is
         already a member is told so instead of joining a queue. Body `{ note? }` (max 400 chars).
         Returns `{ recorded, request }` or `{ recorded: false, alreadyMember: true, member }`.
+
+
+        Who may call: a session of the person asking; the app's own token, signed in as that
+        person; or another principal of theirs that holds `social:write`. Answers 404 when the app
+        does not exist, and then nobody is notified.
       tags: [Apps]
       security:
         - BearerAuth: []
@@ -29623,6 +29669,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /v1/apps/{owner}/{filename}/members/requests/{account}:
     delete:
       operationId: appMembersDecline
@@ -29630,6 +29677,10 @@ paths:
       description: >
         Owner-only. The ask is marked declined rather than deleted, so the same person asking again
         does not look like a first-time visitor. Returns `{ declined }`.
+
+        Who may call: the owner's own session; the app's own token (role `app`, minted for this
+        same app), which is the app managing its own roster; or another principal of the owner that
+        holds `app:manage`. Answers 404 when the app does not exist.
       tags: [Apps]
       security:
         - BearerAuth: []
@@ -66862,7 +66913,8 @@ paths:
       description: >-
         Marks that the owner has looked at this visitor and takes them off the list. It is not a
         block and not a punishment: the person is recorded again the next time they open the app,
-        because the list answers who is here rather than who is unread. Only the app owner may do it.
+        because the list answers who is here rather than who is unread. Only the app owner may do it:
+        their own session, the app's own token, or another principal of theirs holding `app:manage`.
       tags: [Apps]
       security:
         - BearerAuth: []

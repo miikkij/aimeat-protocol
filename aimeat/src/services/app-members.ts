@@ -21,6 +21,9 @@
  *   listRequests/putRequest/removeRequest · AppMemberRecord/AppMemberRequest · writePrivateRecord
  * @usage const roster = await listMembers(storage, 'alice/app.html');
  * @version-history
+ *   v1.4.0 — 2026-10-01 — removeMember keeps the development right on the row (it was granted through
+ *     another route) unless asked not to; getRequest reads one person's ask by its key; the
+ *     namespace constants are exported for the account-erasure step.
  *   v1.3.0 — 2026-09-26 — forgetVisitsLastSeenBefore: the visit retention job takes a guest off an
  *     app's list thirteen months after their last visit, as the privacy notice says of every visit
  *     record that names an account (secaudit 2026-09, A6-14).
@@ -41,10 +44,10 @@ import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 
 /** Platform-owned namespaces. Never an `ext:` one: that is the namespace the world can read. */
-const NS_MEMBER = 'app-member';
-const NS_REQUEST = 'app-member-request';
-const NS_PLAN = 'app-member-plan';
-const NS_SEEN = 'app-member-seen';
+export const NS_MEMBER = 'app-member';
+export const NS_REQUEST = 'app-member-request';
+export const NS_PLAN = 'app-member-plan';
+export const NS_SEEN = 'app-member-seen';
 
 /** One approved member of one app. `level` is BBS-ordinal, LOWER is more power, as everywhere else. */
 export interface AppMemberRecord {
@@ -420,14 +423,30 @@ export async function putCarryPlan(
   return rec;
 }
 
-/** Remove a member. Returns whether there was one. */
-export async function removeMember(storage: Storage, appId: string, principal: string): Promise<AppMemberRecord | null> {
+/**
+ * Remove a member. Returns the row as it was, or null when there was none. A development right on
+ * the same row stays unless `keepDevRight` is false.
+ */
+export async function removeMember(
+  storage: Storage, appId: string, principal: string, opts: { keepDevRight?: boolean } = {},
+): Promise<AppMemberRecord | null> {
   // The RAW row: a lapsed membership is exactly the one the sweep needs to remove, and reading it
   // through getMember — which hides lapsed rows — left the sweep revoking the grants and then
   // finding nothing to delete, so the dead row stayed on the roster and kept holding a seat.
   const prev = await getMemberRow(storage, appId, principal);
   if (!prev) return null;
   await readAppRecord(storage, NS_MEMBER, memberKey(appId, principal), appId);
+  // The development right lives on the same row and was granted through a different route. Removing
+  // somebody from the member list took it with it, silently. The row stays as a pure builder's row
+  // (empty role, nothing carried, no term), which is the shape putDevGrant writes for one. The
+  // development-right revoke passes keepDevRight: false, because there the right is what goes.
+  if (typeof prev.dev === 'number' && opts.keepDevRight !== false) {
+    const now = new Date().toISOString();
+    await writePrivateRecord(storage, NS_MEMBER, memberKey(appId, principal), {
+      ...prev, role: '', level: null, offerings: [], expiresAt: null, renewal: null, updatedAt: now,
+    });
+    return prev;
+  }
   await storage.deleteMemory(NS_MEMBER, memberKey(appId, principal));
   return prev;
 }
@@ -439,6 +458,16 @@ export async function listRequests(storage: Storage, appId: string, state: 'pend
     .map(r => r.value as AppMemberRequest)
     .filter(v => v && sameApp(v.appId, appId) && (state === 'all' || v.state === 'pending'))
     .sort((a, b) => String(a.at).localeCompare(String(b.at)));
+}
+
+/**
+ * One person's ask, in any state, read by its key. The caller's own standing is read on every app
+ * load, and listing the app's whole queue to find one row grew with every request the app had ever had.
+ */
+export async function getRequest(storage: Storage, appId: string, principal: string): Promise<AppMemberRequest | null> {
+  const rec = await readAppRecord(storage, NS_REQUEST, requestKey(appId, principal), appId);
+  const v = rec?.value as AppMemberRequest | undefined;
+  return v && sameApp(v.appId, appId) ? v : null;
 }
 
 /** Ask to be let in, or update the note on an ask already made. */
