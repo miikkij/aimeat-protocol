@@ -18,6 +18,10 @@
 .ak-intake { display: block; max-width: var(--ak-intake-width, 40rem); }
 .ak-intake-admin { max-width: var(--ak-intake-width, 52rem); }
 .ak-conn { display: block; max-width: var(--ak-conn-width, 48rem); }
+/* A field stands on the block's own surface. The kit's .ak-input takes the page colour (--ak-bg) so
+   it reads as sunk inside a card; these blocks are not cards, so on the page that colour hid the
+   field. The rows already use --ak-surface, and the workbench look does the same for its forms. */
+.ak-intake .ak-input:not(.ak-input--range), .ak-conn .ak-input:not(.ak-input--range) { background: var(--ak-surface); }
 .ak-intake__title, .ak-conn__title { margin: 0 0 4px; font-size: 1.05rem; color: var(--ak-ink); }
 .ak-intake__intro, .ak-intake__none, .ak-conn__intro, .ak-conn__none, .ak-conn__note {
   margin: 0 0 10px; font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); max-width: 70ch;

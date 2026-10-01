@@ -13,6 +13,10 @@
  */
 
 .ak-mem { display: block; max-width: var(--ak-mem-width, 52rem); }
+/* A field stands on the block's own surface. The kit's .ak-input takes the page colour (--ak-bg) so
+   it reads as sunk inside a card; these blocks are not cards, so on the page that colour hid the
+   field. The rows already use --ak-surface, and the workbench look does the same for its forms. */
+.ak-mem .ak-input:not(.ak-input--range) { background: var(--ak-surface); }
 .ak-mem[hidden] { display: none; }
 .ak-mem-sample {
   display: inline-block;
