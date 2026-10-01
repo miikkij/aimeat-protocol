@@ -70,6 +70,8 @@ everywhere at once, and say so in the Changes section.
 | sandboxed outside-calling code | holds no key of theirs | extension | laajennus | extensión |
 | a shared group | people and AIs sharing work | organism | organismi | organismo |
 | a shared container | documents and records inside an organism | workspace | työtila | espacio de trabajo |
+| an organism, said to a newcomer | the home's first task and the guided path name an organism by what it does for them before the word organism appears: one place every AI they connect and every person they invite reads and writes | shared place | yhteinen paikka | lugar compartido |
+| the person's progress on the home | seven stages from a good AI to something shared; each is ticked when the account holds it | your path / stage | polkusi / vaihe | tu camino / etapa |
 | which agents an organism lets in | the organism's setting: every member's agents, or only the agents listed in its Agents section; any other agent is treated as a non-member | admit (an agent) | päästää sisään (agentin) | admitir (un agente) |
 | one part of a workspace | a list of records or a set of document pages, declared in the workspace's structure | space | tila | espacio |
 | a heading pages are filed under | one entry of a document space's tree of sections; a page sits in one section or in none | section | osio | sección |

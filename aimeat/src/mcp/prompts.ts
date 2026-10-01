@@ -10,6 +10,8 @@
  *   import { registerPromptsTools } from './prompts.js';
  *   registerPromptsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.8.0 -- 2026-10-01 -- The handbook ends, while the owner's path is not walked, with where they
+ *     stand on it and the guided-journey skill to load (services/journey-state.ts).
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v1.7.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
@@ -48,6 +50,7 @@ import { descriptionFor } from './catalog/shape.js';
 import { handbookForRole } from '../services/handbooks/index.js';
 import { proactiveGuidance } from '../services/proactive-mode.js';
 import { skillsBySituation } from '../services/skills-by-situation.js';
+import { journeyHandbookFor } from '../services/journey-state.js';
 import { substituteVariables } from '../services/prompt-variables.js';
 import { buildAppPrompt } from '../services/build-app-prompt.js';
 import { buildAppPiece, buildAppPieceIds } from '../services/build-app-layers.js';
@@ -97,7 +100,10 @@ export function registerPromptsTools(
                 // surface carries the tool that loads one.
                 const canLoadSkills = role === 'all' || toolsForSurface(role).has('aimeat_skill_get');
                 const skills = canLoadSkills ? await skillsBySituation(storage, config, ownerName ?? null) : '';
-                const text = [handbookForRole(which), skills, guidance].filter(Boolean).join('\n\n');
+                // Where the person stands on their path, while it is not walked: it names the
+                // guided-journey skill, so an AI that read only this page still finds it.
+                const journey = await journeyHandbookFor(storage, config, ownerName);
+                const text = [handbookForRole(which), skills, journey, guidance].filter(Boolean).join('\n\n');
                 return { content: [{ type: 'text' as const, text }] };
             }
             const tierKey = tier;

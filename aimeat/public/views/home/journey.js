@@ -2,8 +2,18 @@
  * @file public/views/home/journey.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Choose useful work, connect an AI, copy the task and see the saved note at home.
+ * @description Where the path ends and where the person is on it, which AI they use, then useful
+ *   work for their AI: a shared place first, then an agent, a schedule or an app, with the result
+ *   shown at home.
  * @version-history
+ *   v1.3.0 — 2026-10-01 — Jouni's review: the first task is "Create a shared place" (an organism with
+ *     a workspace) instead of a note, and its result lists the person's places; the road question
+ *     goes once the path's connect stage is ticked, by the same test the tick uses; on the prompt
+ *     road the task chooser is hidden, since none of its tasks work without a connection.
+ *   v1.2.0 — 2026-10-01 — The block opens with where the path ends and the person's path in seven
+ *     stages; before the first connection it asks "Which AI do you use?" with three roads
+ *     (journey-roads.js). The connection block moved there unchanged; after a connection it still
+ *     opens under "Connect another AI" (guided journey P1 and P2).
  *   2026-09-27: The page writes no class: the action links are the Action component, the prompts'
  *     copy is PromptCard `quiet`, the setup guide takes `poster` (its tabs); the markup is the same
  *     (page group G9, a move).
@@ -28,49 +38,57 @@ import { PromptCard } from '/components/PromptCard.js';
 import { Hint } from '/components/Hint.js';
 import { Action } from '/components/Action.js';
 import {
-  Chooser, ChooserChoices, ChooserChoice, ChooserPanel, ChooserStatus, ChooserBox, ChooserFold,
+  Chooser, ChooserChoices, ChooserChoice, ChooserPanel, ChooserStatus, ChooserFold,
   ChooserLinks, ChooserResult,
 } from '/components/Chooser.js';
-import { McpSetupGuide } from '/views/profile/ai-setup-guide.js';
-import { StepAgent } from './step-agent.js';
 import { StepMat } from './step-mat.js';
 import { swallowed } from '/js/swallowed.js';
-import { buildJourneyPrompt, FIRST_NOTE_KEY } from './journey-prompts.js';
+import { buildJourneyPrompt } from './journey-prompts.js';
+import { JourneyPath, RoadChooser, ConnectBox, refreshHome as refresh } from './journey-roads.js';
 
 const html = htm.bind(h);
-const notePath = `/v1/memory/${FIRST_NOTE_KEY}?soft=1`;
-const actions = ['note', 'agent', 'schedule', 'app'];
-const targets = { note: 'memory', agent: 'agents', schedule: 'scheduler', app: 'apps' };
-const refresh = () => {
-  invalidateShared('home-state', '/v1/home/state');
-  invalidateShared('home-first-note', notePath);
-};
+const actions = ['place', 'agent', 'schedule', 'app'];
+const targets = { place: 'organisms', agent: 'agents', schedule: 'scheduler', app: 'apps' };
+/** The same read and key the home's shared-spaces row uses (surface/blocks-home.js), so it is one read. */
+const organismsPath = (owner) => (owner ? `/v1/organisms?member=${encodeURIComponent(owner)}&include=counts` : '');
+const pickOrganisms = (d) => (d?.organisms ?? d?.items ?? []).map((o) => ({
+  id: o.id, name: o.name || o.id, workspace_count: o.workspace_count, updatedAt: o.updated_at || o.updatedAt,
+}));
 
 export function HomeJourney() {
   const session = useSession();
-  const { state } = useHomeState();
+  const { state, journey } = useHomeState();
   const choiceKey = 'aimeat.home-task.' + session?.owner;
   const [action, setAction] = useState(() => {
-    try { const stored = sessionStorage.getItem(choiceKey); return actions.includes(stored) ? stored : 'note'; }
-    catch (e) { swallowed('home journey: choice read', e); return 'note'; }
+    try { const stored = sessionStorage.getItem(choiceKey); return actions.includes(stored) ? stored : 'place'; }
+    catch (e) { swallowed('home journey: choice read', e); return 'place'; }
   });
+  const [road, setRoad] = useState(null);
   const [connecting, setConnecting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [message, setMessage] = useState('');
-  const { data: record, ready } = useShared('home-first-note', notePath, ['memory']);
-  const { data: proof } = useShared('home-proof-prompt', '/v1/prompts/hello-mcp?lang=en', []);
+  const { data: orgs, ready } = useShared('organisms', organismsPath(session?.owner), ['organisms'], pickOrganisms);
   const { data: chat } = useShared('chat-status', '/v1/chat/status', ['chat']);
   const { data: connection } = useShared('home-connection-proof', '/v1/memory/onboarding.hello_mcp?soft=1', ['memory']);
   const hasProof = !!connection && connection.exists !== false;
   useEffect(() => { if (hasProof) invalidateShared('home-state', '/v1/home/state'); }, [hasProof]);
-  const note = record?.exists === false ? null : record?.value;
-  const saved = typeof note?.text === 'string' && !!note.text.trim();
   if (!state || !session) return null;
-  const connected = state.initialized;
+  // Connected means the same thing as the path's tick: any AI of theirs has reached this node.
+  const connected = state.initialized || !!journey?.stages?.find(s => s.id === 'connect')?.done;
+  const chosenRoad = road ?? journey?.road ?? null;
   const prompt = buildJourneyPrompt(action, window.location.origin, session.owner);
+  // The newest five: the list grows with the account, and "Open shared places" holds all of them.
+  const places = (Array.isArray(orgs) ? [...orgs] : [])
+    .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''))).slice(0, 5);
   return html`
-    <${Chooser} titleId="home-journey-title" title=${t('homeJourney.title')}
-      lead=${t(connected ? 'homeJourney.returning' : 'homeJourney.welcome')}>
+    <${Chooser} titleId="home-journey-title" title=${t('homeJourney.destinationTitle')}
+      lead=${t(connected ? 'homeJourney.returning' : 'homeJourney.destinationLead')}>
+      <${JourneyPath} journey=${journey} />
+      ${!connected && html`<${RoadChooser} road=${chosenRoad} onRoad=${setRoad}
+        chatEnabled=${!!chat?.enabled} onMessage=${setMessage} />`}
+      ${/* An AI that cannot connect cannot do these tasks; its road carries the one task it can. */''}
+      ${(connected || chosenRoad !== 'prompt') && html`
+      <h3>${t('homeJourney.title')}</h3>
       <${ChooserChoices} label=${t('homeJourney.title')}>
         ${actions.map(id => html`<${ChooserChoice} key=${id} on=${action === id} onClick=${() => {
             setAction(id); setCopied(false);
@@ -84,22 +102,11 @@ export function HomeJourney() {
       <${Hint}>${t('homeJourney.' + action + 'Hint')}<//>
       <${ChooserStatus}>
         <span>${t(connected ? 'homeJourney.connected' : 'homeJourney.notConnected')}</span>
-        <${Action} expanded=${connecting} onClick=${() => setConnecting(v => !v)}>
-          ${t(connecting ? 'homeJourney.hideConnection' : connected ? 'homeJourney.anotherAi' : 'homeJourney.connect')}
-        <//>
+        ${connected && html`<${Action} expanded=${connecting} onClick=${() => setConnecting(v => !v)}>
+          ${t(connecting ? 'homeJourney.hideConnection' : 'homeJourney.anotherAi')}
+        <//>`}
       <//>
-      ${connecting && html`<${ChooserBox}>
-        <p>${t('homeJourney.consent')}</p>
-        <${McpSetupGuide} poster />
-        <h3>${t('homeJourney.prove')}</h3>
-        <p>${t('homeJourney.proveHint')}</p>
-        <${PromptCard} label=${t('homeJourney.prove')} prompt=${proof?.prompt || ''} quiet
-          copyLabel=${t('common.copyPrompt')} copiedLabel=${t('common.copied')} />
-        <${Action} onClick=${refresh}>${t('homeJourney.check')}<//>
-        <${ChooserFold} summary=${t('homeJourney.deviceFlow')}>
-          <${StepAgent} onChanged=${refresh} showToast=${setMessage} />
-        <//>
-      <//>`}
+      ${connected && connecting && html`<${ConnectBox} onMessage=${setMessage} />`}
       <div>
         <p>${t('homeJourney.copyHint')}</p>
         <${PromptCard} key=${action} label=${t('homeJourney.' + action)} prompt=${prompt}
@@ -112,15 +119,14 @@ export function HomeJourney() {
           <${Action} href=${'/v1/profile?tab=' + targets[action]}>${t('homeJourney.open' + action)} →<//>
           ${chat?.enabled && html`<${Action} href="/v1/chat">${t('homeJourney.localChat')} →<//>`}
         <//>
-        ${ready && saved && html`<${ChooserResult}>
-          <h3>${t('homeJourney.saved')}</h3>
-          ${typeof note.title === 'string' && html`<strong>${note.title}</strong>`}
-          <p>${note.text}</p>
-          <${Hint}>${t('homeJourney.noteLifecycle')}<//>
+        ${action === 'place' && ready && places.length > 0 && html`<${ChooserResult}>
+          <h3>${t('homeJourney.placesSaved')}</h3>
+          ${places.map(o => html`<p key=${o.id}><${Action} href=${'/v1/profile?tab=organisms&org=' + encodeURIComponent(o.id)}>${o.name} →<//></p>`)}
+          <${Hint}>${t('homeJourney.placeLifecycle')}<//>
         <//>`}
-        ${copied && action === 'note' && ready && !saved && html`<p>${t('homeJourney.waiting')}</p>`}
+        ${copied && action === 'place' && ready && places.length === 0 && html`<p>${t('homeJourney.placeWaiting')}</p>`}
       </div>
-      <//>
+      <//>`}
       <${ChooserFold} summary=${t('homeJourney.optionalPage')}>
         <p>${t('homeJourney.optionalPageHint')}</p>
         ${state.mat.done

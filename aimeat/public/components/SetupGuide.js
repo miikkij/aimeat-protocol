@@ -20,6 +20,8 @@
  * @structure SetupGuide({ poster, asideInstall, facts, stepRows }) · InstructionsDialog({ open, onClose })
  * @usage html`<${SetupGuide} poster facts stepRows />` · html`<${InstructionsDialog} open=${o} onClose=${close} />`
  * @version-history
+ *   v1.1.0 — 2026-10-01 — `claudeNote` replaces claude.ai's model line: the home's free road
+ *     recommends Opus, which the free plan does not have (Jouni's decision).
  *   v1.0.1 — 2026-09-27 — Draws its own class names (every .ast-* → .setup-guide-*, .ast-tool-reco →
  *     .setup-guide-reco), its sheet css/components/setup-guide.css, moved unchanged out of
  *     hello-mcp.css; .ast-docs and .ast-step-rows go, as no sheet had a rule for them (a move, same
@@ -116,9 +118,10 @@ function Params({ params, facts = false }) {
 /**
  * How to attach this node to one AI tool: the steps as things to click or type, every field value,
  * and the vendor's own page.
- * @param {{ poster?: boolean, asideInstall?: boolean, facts?: boolean, stepRows?: boolean }} [props]
+ * @param {{ poster?: boolean, asideInstall?: boolean, facts?: boolean, stepRows?: boolean,
+ *   claudeNote?: string|null }} [props] claudeNote replaces claude.ai's model line, for a road on its free plan.
  */
-export function SetupGuide({ poster = false, asideInstall = false, facts = false, stepRows = false } = {}) {
+export function SetupGuide({ poster = false, asideInstall = false, facts = false, stepRows = false, claudeNote = null } = {}) {
   const tools = useAiTools();
   const [toolId, setToolId] = useState(rememberedTool);
   const pick = (id) => { setToolId(id); rememberTool(id); };
@@ -153,7 +156,9 @@ export function SetupGuide({ poster = false, asideInstall = false, facts = false
 
       <${Params} params=${tool.mcp.params} facts=${facts} />
 
-      ${tool.mcp.note ? html`<p class="setup-guide-note">${tool.mcp.note}</p>` : null}
+      ${/* The free Claude plan has no Opus, so a road for it says which model it does have. */''}
+      ${(claudeNote && tool.id === 'claude-web') ? html`<p class="setup-guide-note">${claudeNote}</p>`
+        : tool.mcp.note ? html`<p class="setup-guide-note">${tool.mcp.note}</p>` : null}
 
       <a class="poster-action poster-action--more" href=${tool.mcp.docs} target="_blank" rel="noopener">
         ${tr('setup.officialDocs', 'Official instructions from')} ${tool.label} →
