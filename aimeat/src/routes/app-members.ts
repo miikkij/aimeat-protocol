@@ -26,6 +26,7 @@
  *   (across all of them). The audit read and the invitation cancel are in routes/app-members-extra.ts.
  * @usage app.use(appMembersRouter(config, storage))
  * @version-history
+ *   v1.3.1 — 2026-10-01 — The invitation's audit row names the address, so the history can say whom.
  *   v1.3.0 — 2026-10-01 — IAM round 2. The roster answers display names (A1) and is searched and
  *     paged with `q`, `limit` and `offset`, with `total` per list (A5). POST members takes `email`:
  *     an address of a verified account approves that account, any other address stores an invitation
@@ -313,7 +314,9 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
       inviterName: (await displayNamesOf(storage, [c.callerAccount])).get(c.callerAccount) || c.callerAccount,
       appUrl: Object.values(urls)[0] ?? `${config.baseUrl}${appLink(c.appId)}`, lang: noticeLang(args.lang),
     });
-    await audit(c, 'invite.sent', { account: null, to: args.role, invite: inv.id, emailSent });
+    // The address, as the owner's and the managers' invitation list shows it: the history is read
+    // by the same people, and an invitation has no account to name.
+    await audit(c, 'invite.sent', { account: null, to: args.role, invite: inv.id, email: inv.emailShown, emailSent });
     return res.status(201).json(success(config.nodeId, { invited: true, invite: inviteView(inv), emailSent }));
   }
 

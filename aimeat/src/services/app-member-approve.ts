@@ -13,6 +13,7 @@
  * @structure memberAddress · appDeepLink · appStem · ApproveMemberInput · approveMember
  * @usage const r = await approveMember(storage, config.nodeId, { appId, owner, filename, account, role, approvedBy, by, ownerGhii });
  * @version-history
+ *   v1.0.1 — 2026-10-01 — A seat limit of 0 is refused as "the plan allows no seats", not "all 0 seats are taken".
  *   v1.0.0 — 2026-10-01 — Extracted from routes/app-members.ts POST .../members. Adds the role-change
  *     notification (A4), the notices in the member's language (B4) and the audit row (B2).
  */
@@ -92,8 +93,10 @@ export async function approveMember(storage: Storage, nodeId: string, input: App
     if (taken >= cap) {
       return {
         ok: false, status: 409, code: 'SEATS_FULL',
-        message: `All ${cap} "${role}" seats are taken (${taken} in use). Remove somebody, raise the seat count, `
-          + 'or approve them into a different role.',
+        message: cap === 0
+          ? `The plan allows no "${role}" seats. Raise the seat count, or approve them into a different role.`
+          : `All ${cap} "${role}" seats are taken (${taken} in use). Remove somebody, raise the seat count, `
+            + 'or approve them into a different role.',
       };
     }
   }

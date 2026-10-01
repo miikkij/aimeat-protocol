@@ -1731,6 +1731,8 @@ await test('B2: every decision is on the audit trail, newest first; a plain memb
     const change = rows.find(r => r.action === 'member.role_changed' && r.account === r2member.name);
     assert(change?.from === 'member' && change?.to === 'writer' && typeof change.by === 'string', `from and to: ${JSON.stringify(change)}`);
     assert(rows.some(r => r.action === 'invite.cancelled' && r.detail?.invite === r2inviteId), 'the cancel names the invitation');
+    assert(rows.filter(r => String(r.action).startsWith('invite.')).every(r => typeof r.detail?.email === 'string' && r.detail.email.includes('@')),
+        `an invitation row names the address: ${JSON.stringify(rows.filter(r => String(r.action).startsWith('invite.')))}`);
     assert(!actions.has('dev.granted') && rows.every(r => !String(r.action).startsWith('legal.')), 'and only roster actions');
     const page = await json(`${r2()}/audit?limit=2`, { headers: auth(owner.token) });
     assert(page.body.data.entries.length === 2 && typeof page.body.data.nextBefore === 'string', `paged: ${JSON.stringify(page.body.data.nextBefore)}`);
