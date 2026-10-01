@@ -35,6 +35,9 @@
  * @usage
  *   html = injectPageBody(html, page, config, isShell);
  * @version-history
+ *   v1.2.0 - 2026-10-01 - The page title is the block's visible <h1>, replacing the visually-hidden
+ *     <h1> spa.html carried on every page. Bing's guidelines treat text a crawler sees and a person
+ *     does not as cloaking, and the front page had sat at "Discovered but not crawled" since May.
  *   v1.1.0 - 2026-09-15 - Use trusted build-generated HTML when a page has a complete table guide.
  *   v1.0.0 — 2026-09-11 — Initial.
  */
@@ -108,9 +111,9 @@ function startsBlock(line: string): boolean {
 /**
  * The markdown subset the public-page registry is written in, as HTML.
  *
- * Heading levels are shifted down by one: the block is introduced by the page title as an `<h2>`
- * (see injectPageBody), and a registry body's own top level is `##`, so `##` becomes `<h3>` and the
- * outline reads as one document rather than two competing ones.
+ * Heading levels follow the markdown, with `<h2>` as the floor: the block is introduced by the page
+ * title as its one `<h1>` (see injectPageBody), and a registry body's own top level is `##`, so the
+ * outline reads as one document. A stray `#` in a body becomes `<h2>` rather than a second `<h1>`.
  */
 export function renderMarkdownBody(markdown: string): string {
   const lines = markdown.replace(/\r\n/g, '\n').split('\n');
@@ -135,7 +138,7 @@ export function renderMarkdownBody(markdown: string): string {
 
     const heading = line.match(/^(#{1,6})\s+(.{1,300})$/);
     if (heading) {
-      const level = Math.min(heading[1].length + 1, 6);
+      const level = Math.max(heading[1].length, 2);
       out.push(`<h${level}>${inline(esc(heading[2].trim()))}</h${level}>`);
       i += 1;
       continue;
@@ -220,7 +223,7 @@ export function injectPageBody(
     .replaceAll('{{NODE_ID}}', config.nodeId);
 
   const block = `<div id="crawler-body" class="md-body">`
-    + `<h2>${esc(page.title)}</h2>`
+    + `<h1>${esc(page.title)}</h1>`
     + (opts.markdown === undefined && page.generatedHtml ? page.generatedHtml : renderMarkdownBody(markdown))
     + `<p><a href="${esc(baseUrl + (page.path === '/' ? '/index.md' : `${page.path}.md`))}">`
     + `This page as markdown</a></p>`

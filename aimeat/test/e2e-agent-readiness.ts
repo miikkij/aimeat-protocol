@@ -170,7 +170,18 @@ function locs(xml: string): string[] {
         assert(!/\]\(http/.test(seen), 'unrendered markdown link syntax reached the page');
         assert(!/^#{1,6}\s/m.test(seen), 'unrendered markdown heading reached the page');
         const html = shellBodies.get('/v1/members') ?? '';
-        assert(/<div id="crawler-body"[^>]*>[\s\S]*?<h2>/.test(html), 'no heading in the injected body');
+        assert(/<div id="crawler-body"[^>]*><h1>/.test(html), 'the injected body does not open with the page h1');
+    });
+
+    // Bing's guidelines name text a crawler sees and a person does not (cloaking) and content
+    // written to steer a language model (prompt injection). The shell carried one of each until
+    // 2026-10-01: a visually-hidden h1 on every page and an HTML comment addressed to "AI".
+    await test('the shell hides no heading and carries no comment addressed to an AI', async () => {
+        for (const p of shellPages) {
+            const html = shellBodies.get(p.path) ?? '';
+            assert(!/<h1[^>]*class="[^"]*visually-hidden/.test(html), `${p.path}: visually-hidden h1`);
+            assert(!/<!--\s*AI:/.test(html), `${p.path}: HTML comment addressed to AI`);
+        }
     });
 
     // Live data in the body (services/page-body-live.ts). Bingbot read 130 words on the front page
