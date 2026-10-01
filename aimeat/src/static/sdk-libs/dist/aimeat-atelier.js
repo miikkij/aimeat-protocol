@@ -1254,7 +1254,38 @@
     }
     return (navigator.language || "en").slice(0, 2);
   }
+  function declared() {
+    try {
+      const m = (
+        /** @type {HTMLMetaElement|null} */
+        document.querySelector('meta[name="aimeat-locales"]')
+      );
+      if (!m || !m.content) return null;
+      return m.content.split(/[\s,]+/).map(function(c) {
+        return c.trim().toLowerCase();
+      }).filter(Boolean);
+    } catch {
+      return null;
+    }
+  }
+  function chosen() {
+    try {
+      return !!localStorage.getItem("aimeat-lang");
+    } catch {
+      return false;
+    }
+  }
+  function markPage(lang) {
+    if (typeof document === "undefined" || !document.documentElement) return;
+    const list2 = declared();
+    if (list2 ? list2.length < 2 || list2.indexOf(lang) < 0 : !chosen()) return;
+    try {
+      document.documentElement.setAttribute("lang", lang);
+    } catch {
+    }
+  }
   function announce(lang) {
+    markPage(lang);
     for (const cb of listeners.slice()) {
       try {
         cb(lang);
@@ -1273,6 +1304,12 @@
       current = String(lang).slice(0, 2);
       announce(current);
     });
+    markPage(current);
+    if (typeof document !== "undefined" && document.readyState === "loading" && document.addEventListener) {
+      document.addEventListener("DOMContentLoaded", function() {
+        markPage(current);
+      });
+    }
   }
   var i18n = {
     /** The languages the kit itself ships. A host may add more via `use()`. */
@@ -4554,12 +4591,12 @@
           hint: o.hint != null ? o.hint : (spec.tagline ? spec.tagline + " " : "") + t("signIn") + " " + t("signInHint")
         }
       };
-      const chosen = kinds[kind] || kinds.error;
+      const chosen2 = kinds[kind] || kinds.error;
       statusCard = emptyState({
         target: statusHost,
         tone: kind === "error" ? "error" : "quiet",
-        title: chosen.title,
-        hint: chosen.hint,
+        title: chosen2.title,
+        hint: chosen2.hint,
         action: kind === "error" && o.onRetry ? { label: t("retry"), onClick: o.onRetry } : null
       });
     }
@@ -6717,15 +6754,15 @@
       if (answer && answer.panel) renderPanel(answer.panel, b);
     }
     function offerAction(proposed, into) {
-      const declared = (s.actions || []).find(function(a) {
+      const declared2 = (s.actions || []).find(function(a) {
         return a.id === proposed.id;
       });
-      if (!declared) {
+      if (!declared2) {
         into.appendChild(el("p", { class: "ak-aide__text", text: t("aideUnknownAction") }));
         return;
       }
       const row = el("div", { class: "ak-aide__confirm" }, [
-        el("span", { text: declared.summary }),
+        el("span", { text: declared2.summary }),
         el("button", {
           type: "button",
           class: "ak-btn ak-btn--primary",
@@ -6733,7 +6770,7 @@
             clear(row);
             row.appendChild(el("span", { text: "…" }));
             try {
-              const result = await Promise.resolve(declared.run ? declared.run(proposed.params || {}) : null);
+              const result = await Promise.resolve(declared2.run ? declared2.run(proposed.params || {}) : null);
               clear(row);
               row.appendChild(el("span", { text: typeof result === "string" ? result : t("ready") }));
             } catch (err) {
@@ -13021,7 +13058,7 @@
       "access.intro": "Puedes pedirle acceso al propietario.",
       "sample.badge": "Contenido de muestra",
       "sample.note": "Una muestra. Desde aquí no se envía ni se cambia nada.",
-      "members.addHint": "Elige de tu libreta de contactos, escribe un nombre de cuenta o un correo. Una dirección que todavía no tiene cuenta recibe una invitación.",
+      "members.addHint": "Elige de tu libreta de direcciones, escribe un nombre de cuenta o un correo. Una dirección que todavía no tiene cuenta recibe una invitación.",
       "members.invite": "Invitar",
       "members.inviteSent": "La invitación se envió a {email}.",
       "members.addedFound": "{who} ahora es miembro.",
@@ -17050,10 +17087,10 @@
     let figures = [];
     let periodButtons = [];
     function periodsOf(plans) {
-      const declared = data && Array.isArray(data.periods) ? data.periods.filter(function(p) {
+      const declared2 = data && Array.isArray(data.periods) ? data.periods.filter(function(p) {
         return PERIODS.indexOf(p) >= 0;
       }) : [];
-      if (declared.length) return declared;
+      if (declared2.length) return declared2;
       const yearly = plans.some(function(p) {
         return typeof p.priceYearly === "number";
       });

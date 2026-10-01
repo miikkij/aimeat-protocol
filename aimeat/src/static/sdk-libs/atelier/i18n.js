@@ -11,10 +11,14 @@
  *   language is read from AIMEAT.auth.getLang() when the auth library is present, else the
  *   `aimeat-lang` storage key, else the browser, and it re-renders on the platform's
  *   `aimeat-lang-change` event. There is no language switch in this kit — the login pill has one.
- * @structure BASE (en/fi/es) · lang/setLang · use(dict) · t(key, vars) · onChange
+ *   The language it draws in goes on <html lang> at load and on every change (markPage), when the
+ *   page declares that language or, declaring none, the person chose it.
+ * @structure BASE (en/fi/es) · declared/chosen/markPage · lang/setLang · use(dict) · t(key, vars) · onChange
  * @usage  AIMEAT.atelier.i18n.use({ fi: { addTask: 'Lisää tehtävä' }, en: { addTask: 'Add task' } });
  *         AIMEAT.atelier.i18n.t('addTask');
  * @version-history
+ *   v0.9.0 — 2026-10-01 — markPage: <html lang> follows the kit's language from the first paint.
+ *     Nothing in the kit set it, so the Design Book preview drew Finnish under lang="en".
  *   v0.8.0 — 2026-09-29 — promptLine1 (en/fi/es): the prompt panel says "1 line", not "1 lines".
  *   v0.7.0 — 2026-09-29 — The prompt panel's words (en/fi/es): its two steps, copy, show and hide,
  *     the paste box, the apply button and the refusal when no JSON object is in the answer.
@@ -314,8 +318,39 @@ function detect() {
   return (navigator.language || 'en').slice(0, 2);
 }
 
+/** The languages the page declares in its aimeat-locales meta, or null when it declares none. */
+function declared() {
+  try {
+    const m = /** @type {HTMLMetaElement|null} */ (document.querySelector('meta[name="aimeat-locales"]'));
+    if (!m || !m.content) return null;
+    return m.content.split(/[\s,]+/).map(function (c) { return c.trim().toLowerCase(); }).filter(Boolean);
+  } catch {
+    return null;
+  }
+}
+
+/** Whether the person chose a language on this origin (the shared `aimeat-lang` key). */
+function chosen() {
+  try { return !!localStorage.getItem('aimeat-lang'); } catch { return false; }
+}
+
+/**
+ * Put the language the kit draws in on <html lang>. A page that declares its languages is marked
+ * only with one of them; a page that declares none (the Design Book preview) only when the person
+ * chose one. A one-language page keeps what the server wrote, and the browser default alone
+ * changes nothing.
+ * @param {string} lang
+ */
+function markPage(lang) {
+  if (typeof document === 'undefined' || !document.documentElement) return;
+  const list = declared();
+  if (list ? (list.length < 2 || list.indexOf(lang) < 0) : !chosen()) return;
+  try { document.documentElement.setAttribute('lang', lang); } catch { /* no document */ }
+}
+
 /** @param {string} lang */
 function announce(lang) {
+  markPage(lang);
   for (const cb of listeners.slice()) {
     try { cb(lang); } catch { /* one bad listener never stops the rest */ }
   }
@@ -329,6 +364,11 @@ if (typeof window !== 'undefined') {
     current = String(lang).slice(0, 2);
     announce(current);
   });
+  // At load, and again once the document is parsed when the meta may still lie below this script.
+  markPage(current);
+  if (typeof document !== 'undefined' && document.readyState === 'loading' && document.addEventListener) {
+    document.addEventListener('DOMContentLoaded', function () { markPage(current); });
+  }
 }
 
 export const i18n = {

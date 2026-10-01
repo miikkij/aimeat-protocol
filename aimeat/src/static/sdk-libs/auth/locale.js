@@ -15,11 +15,14 @@
  *   `<meta name="aimeat-locales" content="en fi">` (preferred: declarative, like aimeat-scopes) or
  *   `mountLoginButton('#login', { locales: ['en','fi'] })`. Declare nothing and no switch renders,
  *   so a single-language app is unaffected.
- * @structure AIMEAT_LANG_KEY · readLocales · aimeatReadLang/aimeatApplyLang · langName ·
+ * @structure AIMEAT_LANG_KEY · readLocales · aimeatReadLang/aimeatApplyLang/aimeatRestoreLang · langName ·
  *   langSwitchHtml/wireLangSwitch
  * @usage import { langSwitchHtml, wireLangSwitch } from './locale.js';
  *   In the app: window.addEventListener('aimeat-lang-change', e => render(e.detail.lang));
  * @version-history
+ *   v2.1.0 — 2026-10-01 — aimeatRestoreLang: <html lang> names the starting language at load. It
+ *     was set only by aimeatApplyLang, so after a reload with Finnish or Spanish stored the page
+ *     drew those words under lang="en".
  *   v2.0.0 — 2026-07-25 — Segmented control (every option visible, one click to any) up to three
  *     languages; a popover list beyond that. Replaces the cycling button, which with three or more
  *     languages was a blind carousel.
@@ -71,6 +74,18 @@ export function aimeatApplyLang(lang) {
   } catch { /* storage blocked */ }
   try { document.documentElement.setAttribute('lang', lang); } catch { /* no document */ }
   try { window.dispatchEvent(new CustomEvent('aimeat-lang-change', { detail: { lang: lang } })); } catch { /* no window */ }
+}
+
+/**
+ * Mark <html lang> with the language the page starts in, as aimeatApplyLang does on a change.
+ * Runs at parse time beside the mode and palette restores. Only a page that declares two or more
+ * languages is touched: one language (or none) is what the server already wrote into the tag.
+ * @param {{ locales?: string[] }} [opts]
+ */
+export function aimeatRestoreLang(opts) {
+  var locales = readLocales(opts);
+  if (!locales.length) return;
+  try { document.documentElement.setAttribute('lang', aimeatReadLang(locales)); } catch { /* no document */ }
 }
 
 /** The language's own name for the picker list ("suomi", not "Finnish"), code as the fallback. */

@@ -204,13 +204,15 @@
         },
         "type": {
           "zip_import": "Importación ZIP rechazada",
-          "held_account_names": "Registros que la actualización dejó como estaban"
+          "held_account_names": "Registros que la actualización dejó como estaban",
+          "workspace_schema_closed": "Espacios de un espacio de trabajo que rechazan todos los registros"
         },
         "source": {
           "workspace_import": "importación de espacio de trabajo",
           "organism_import": "importación de organismo",
           "app_backup": "copia de seguridad de una app",
-          "full_identity_move": "actualización al iniciar"
+          "full_identity_move": "actualización al iniciar",
+          "workspace_schema_relock": "revisión de los bloqueos de los espacios de trabajo al iniciar"
         },
         "kept": "{size} guardados",
         "notKept": "no guardado, demasiado grande",
@@ -3762,7 +3764,7 @@
   "contacts.addPlaceholder": "nombre de la persona o correo",
   "contacts.added": "Contacto guardado",
   "contacts.blockedNote": "{n} contacto(s) bloqueados: se llevan desde la pestaña Mensajes.",
-  "contacts.desc": "Tu agenda: gente de la que te fías y gente a la que has escrito. Los contactos alimentan los selectores de identidad de todos los sitios donde das acceso: organismos, espacios de trabajo y aplicaciones.",
+  "contacts.desc": "Tu libreta de direcciones: gente de la que te fías y gente a la que has escrito. Los contactos alimentan los selectores de identidad de todos los sitios donde das acceso: organismos, espacios de trabajo y aplicaciones.",
   "contacts.edit": "Editar",
   "contacts.filterPlaceholder": "Filtrar…",
   "contacts.fromDirectory": "directorio",

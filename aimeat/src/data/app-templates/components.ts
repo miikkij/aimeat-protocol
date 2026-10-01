@@ -11,6 +11,9 @@
  *   COMP_MERMAID_DIAGRAM · COMP_THREE_SCENE · COMP_P5_SKETCH · COMP_PIXI_STAGE · COMP_PHASER_ARCADE ·
  *   COMP_FLOW_EDITOR
  * @version-history
+ *   v1.4.0 — 2026-10-01 — COMP_PUBLIC_INTAKE shares the app's own page with ?form=<form id>, the
+ *     link the kit's intakeAdmin copies and intakeForm reads. It handed out '/f/<org>/<ws>/<form>',
+ *     which no route serves, so a link from an app built on it answered 404.
  *   v1.3.0 — 2026-09-13 — COMP_SHARED_FEED and COMP_PHASER_ARCADE's leaderboard read through
  *     AIMEAT.data.discover(). Both called search() as if it read every user's public keys, which it
  *     never did (it reads the caller's own namespaces), and sorted the { results, total } object it
@@ -77,7 +80,9 @@ async function loadFeed() {
 export const COMP_PUBLIC_INTAKE = `// public-intake — let ANYONE (not logged in) submit into your workspace: lead / contact / feedback / RSVP / quiz forms.
 // Load: <script src="/v1/libs/aimeat-intake.js"></script>
 // Every normal write needs auth, so anonymous submissions ONLY work through Public Intake.
-// 1) OWNER (once, logged in) defines a form → gets a shareable link:
+// 1) OWNER (once, logged in) defines a form → gets the link to share. The node serves the form's API
+//    address (submit_url), not a page, so the link is THIS app's page with ?form=<form id>; the same
+//    page reads it back (linkedFormId) and draws the form for a visitor.
 async function setupForm(orgId, ws) {
   var r = await AIMEAT.intake.defineForm({
     organism_id: orgId, ws: ws, namespace: 'crm.contacts',       // a schema-locked workspace namespace (records land here)
@@ -86,9 +91,14 @@ async function setupForm(orgId, ws) {
     defaults: { tila: 'uusi', lahde: 'public-form' },            // server-applied (must be valid schema fields)
     honeypot_field: 'company_url', mode: 'publish',              // 'draft' = you review before it goes live
     title: 'Contact us', fields: [{ key: 'nimi', label: 'Name' }, { key: 'email', label: 'Email' }, { key: 'viesti', label: 'Message', type: 'textarea' }] });
-  return '/f/' + orgId + '/' + ws + '/' + r.form_id;             // share this link
+  var page = String(window.location.href).split(/[?#]/)[0];
+  return page + '?form=' + encodeURIComponent(r.form_id);       // share this link
+}
+function linkedFormId() {                                        // the form id a shared link carries, or ''
+  return new URLSearchParams(window.location.search).get('form') || '';
 }
 // 2) PUBLIC form page (NO login): render from the descriptor, then submit anonymously.
+//    On load: var formId = linkedFormId(); if (formId) draw the form instead of the owner view.
 async function renderAndSubmit(orgId, ws, formId, values) {
   var form = await AIMEAT.intake.getForm(orgId, ws, formId);     // { title, fields, honeypot_field } — draw these
   // Render form.fields + a HIDDEN input named form.honeypot_field (leave it empty), then on submit:

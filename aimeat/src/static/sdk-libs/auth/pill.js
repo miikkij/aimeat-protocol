@@ -14,6 +14,8 @@
  *   container replaces the first.
  * @usage import { mountPill } from './pill.js';  (auth.mountLoginButton delegates here)
  * @version-history
+ *   v1.7.1 — 2026-10-01 — Languages passed as opts.locales mark <html lang> at mount, as the
+ *     aimeat-locales meta does at load (aimeatRestoreLang).
  *   v1.7.0 — 2026-09-24 — The pill re-draws on 'aimeat-look-change': on the node's own pages the picker
  *     and the light/dark switch follow the theme the page wears (Themes & Styles).
  *   v1.6.0 — 2026-09-13 — onSession(session, { restored }), the developer's decision: called whenever a
@@ -51,7 +53,7 @@
  */
 import { isAppOrigin, restoreSessionFromAppOrigin } from './session.js';
 import { escHtml, modeSwitchHtml, wireModeSwitch, ensureAuthPillStyles, pillInitials } from './theme.js';
-import { readLocales, langSwitchHtml, wireLangSwitch, aimeatReadLang } from './locale.js';
+import { readLocales, langSwitchHtml, wireLangSwitch, aimeatReadLang, aimeatRestoreLang } from './locale.js';
 import { pillStrings } from './pill-strings.js';
 import { paletteControlHtml, wirePaletteControl } from './palette.js';
 import { ensureClusterStyles, clampPopover } from './cluster.js';
@@ -83,6 +85,8 @@ export function mountPill(auth, selector, opts = {}) {
   // Languages the APP says it has: opts.locales, else <meta name="aimeat-locales" content="en fi">.
   // Empty when the app declares none or only one, and then no language control renders at all.
   const locales = readLocales(opts);
+  // An app that names its languages here rather than in the meta gets <html lang> marked now.
+  if (locales.length) aimeatRestoreLang({ locales: locales });
   // The pill's own labels follow the reader's language. The caller's strings always win, so the SPA
   // (which passes the node's full dictionary) is unaffected; an app that passes nothing stops
   // getting an English "Logout" under a Spanish page. Recomputed per render, because the pill's own
