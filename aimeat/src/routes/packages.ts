@@ -45,6 +45,8 @@
  *     nodes and their signed requests, with no token.
  *   v2.5.0 — 2026-09-30 — POST /v1/packages/compose takes `include_skills`: the composer's own skills
  *     bound to the apps travel as skill components (services/package-skill-component.ts).
+ *   v2.6.0 — 2026-10-02 — POST /v1/packages/:groupId/versions asks packages:write and the create role,
+ *     as POST /v1/packages does (it asked app:write and no role).
  */
 
 import { Router } from 'express';
@@ -379,9 +381,16 @@ export function packagesRouter(
   // ── Parameterized routes ─────────────────────────────────────────
 
   // POST /v1/packages/:groupId/versions — publish new version
-  router.post('/v1/packages/:groupId/versions', requireAuth(), requireScope('app:write'), async (req, res) => {
+  // A new version is a package write like the first one, so it asks what POST /v1/packages asks: the
+  // packages:write word and, on a node that keeps package writes to operators, the operator role. It
+  // asked app:write and no role, so an agent refused a package could still publish versions of one.
+  router.post('/v1/packages/:groupId/versions', requireAuth(), requireScope('packages:write'), async (req, res) => {
     const groupId = decodeURIComponent(req.params.groupId as string);
     const owner = req.auth!.owner;
+    if (!req.auth!.roles.includes('operator') && (config.packageCreateRole ?? 'owner') === 'operator') {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only operators can publish package versions'));
+      return;
+    }
     const { changelog, components, manifest, status } = req.body ?? {};
 
     const out = await addPackageVersion({ storage, config }, { owner }, {

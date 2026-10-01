@@ -20,6 +20,9 @@
  *   import { installPackage } from '../services/package-install.js';
  *   const out = await installPackage({ storage, config, scheduler }, caller, { groupId });
  * @version-history
+ *   v1.9.0 — 2026-10-02 — A memory component that would overwrite a record the owner already has, or a
+ *     cortex schema part that would replace another person's structure lock, is refused before anything
+ *     registers (409 KEY_EXISTS, SCHEMA_LOCKED_BY_OTHER), on a dry run too (package-component-collisions.ts).
  *   v1.8.0 — 2026-10-01 — After an install, the agents the package's apps bring are proposed to the
  *     owner (services/app-agent-propose.ts) and named in `agentsProposed`; approving one creates it
  *     with its definition. They used to wait for a crew-forge runner new accounts no longer have.
@@ -64,6 +67,7 @@ import {
     computeHash,
 } from './component-registrar.js';
 import { reservedKeysInComponent, reservedComponentMessage, memoryComponentWriteRefusal } from './package-memory-component.js';
+import { componentCollision } from './package-component-collisions.js';
 import { registerExtensionSchedules } from './extension-schedules.js';
 import { planPackageConfig, missingConfigMessage, configPreview } from './package-config.js';
 import { expectsOf, missingExpects, expectsMissingMessage, type PackageExpects } from './package-expects.js';
@@ -328,6 +332,13 @@ export async function installPackage(
                 message: `${reservedComponentMessage(comp.id, reserved)} Nothing was installed.`,
             };
         }
+        // Nor a record the owner already has, nor another person's structure lock
+        // (package-component-collisions.ts). Same moment, same answer on a dry run.
+        const taken = await componentCollision(storage, {
+            type: comp.type, content: comp.content, registeredAs: planned.registeredAs, componentId: comp.id,
+            owner, ownerGaii, groupId,
+        });
+        if (taken) return { ok: false, status: 409, code: taken.code, message: `${taken.message} Nothing was installed.` };
     }
     // The config the install was given (package-config.ts): every value checked against what its part
     // declares, and a required app field left empty refused by name, before anything registers. A dry

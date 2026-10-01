@@ -44618,8 +44618,9 @@ paths:
         Builds a package out of the caller's own apps, with the cortexes those apps load, read from
         the dependency map the node keeps from each app's source. A cortex the node itself ships, a
         library pack, and any extension are never packaged: they are recorded in `expects` so the
-        installing node knows what it must already have. An app that calls an extension is refused
-        unless allow_expectations is set, because that package could not work as installed. The
+        installing node knows what it must already have. An app that calls an extension, itself or
+        through a cortex the package carries, is refused unless allow_expectations is set, because that
+        package could not work as installed. The
         caller's own skills bound to a chosen app (metadata.binding `app:{owner}/{filename}`) travel
         as `skill` components, never a skill the caller merely can read and never a node skill.
       tags: [Packages]
@@ -44830,8 +44831,11 @@ paths:
       summary: A seller node grants a customer node, signed
       description: >-
         The grant of /v1/packages/{groupId}/entitlements/{nodeId}, made for the package's author by one of
-        its seller nodes, signed as described for the config-needs endpoint. The note records the seller,
-        and a node registered with the grant records the seller node as the one who asked.
+        its seller nodes, signed as described for the config-needs endpoint. The note and `soldBy` record
+        the seller, and a node registered with the grant records the seller node as the one who asked. A
+        seller changes only the grants it sold; on a grant the author or another seller made it may only
+        set a later `updates_until` (a new sale, which makes it the grant's seller), and anything else is
+        403 NOT_YOUR_GRANT. An omitted `updates_until` keeps the grant's own date.
       tags: [Federation]
       parameters:
         - { name: groupId, in: path, required: true, schema: { type: string } }
@@ -44862,6 +44866,8 @@ paths:
     delete:
       operationId: sellerRevokeEntitlement
       summary: A seller node revokes a customer node, signed
+      description: >-
+        Only a grant this seller sold; a grant the author or another seller made answers 403 NOT_YOUR_GRANT.
       tags: [Federation]
       parameters:
         - { name: groupId, in: path, required: true, schema: { type: string } }
@@ -44998,7 +45004,8 @@ paths:
       description: >-
         Grant a customer node this private package, or change its grant. The node is served every
         published version made up to `updates_until`, and nothing newer: a monthly subscription that
-        ended. Null or omitted keeps the updates running. `channel` beta serves versions whose status
+        ended. Null keeps the updates running; omitted keeps the grant's own date, and a new grant without
+        one runs on. `channel` beta serves versions whose status
         is beta too, whichever is newest; stable (the default) serves published versions only. The
         node must also be an active peer of this node: one sharing the catalogue, or a packages-only peer,
         which is served what it holds an entitlement to and nothing else. The package's author or an
@@ -45447,7 +45454,9 @@ paths:
     post:
       operationId: publishPackageVersion
       summary: Publish new version
-      description: Publish a new version of an existing package group.
+      description: >-
+        Publish a new version of an existing package group. Only its author. Requires packages:write, and
+        the operator role on a node whose package create role is operator, as creating a package does.
       tags: [Packages]
       security:
         - BearerAuth: []
@@ -45700,7 +45709,11 @@ paths:
         memory:write as POST /v1/skills does. When the owner already has a skill of that name that
         this package did not publish, that component is left out, the owner's skill stays as it is,
         and `warnings` names it, on the answer and on a dry run. Removing the instance with
-        removeComponents removes only a skill this instance published.
+        removeComponents removes only a skill this instance published. A memory component that would
+        overwrite a record the owner already has is refused with 409 KEY_EXISTS, unless an install of
+        the same package wrote it; a cortex schema part that would replace another person's structure
+        lock with a different structure is refused with 409 SCHEMA_LOCKED_BY_OTHER (the same structure is
+        shared and left alone). Both before anything registers, and on a dry run too.
       tags: [Instances]
       security:
         - BearerAuth: []
@@ -46436,7 +46449,11 @@ paths:
     post:
       operationId: createTemplateListing
       summary: Create listing
-      description: Create a template gallery listing for a published package.
+      description: >-
+        Create a template gallery listing for a published package of the caller's own (an operator may
+        list any). Requires packages:write. A listing made by anyone but an operator starts at
+        `pending_review` and enters the gallery when an operator approves it; an operator's starts at
+        `listed`. 403 for another author's package.
       tags: [Templates]
       security:
         - BearerAuth: []
@@ -46459,6 +46476,8 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     get:
       operationId: listTemplates
       summary: Gallery listing

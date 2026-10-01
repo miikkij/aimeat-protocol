@@ -18,6 +18,7 @@
  *   who could make it would sell the author's packages in the node's name.
  * @structure registerPackageSaleRoutes(router, config, storage, peers)
  * @version-history
+ *   v1.2.0 — 2026-10-02 — A seller's signed revoke reaches only a grant it sold (NOT_YOUR_GRANT).
  *   v1.1.0 — 2026-09-29 — GET /v1/package-sales/config-needs takes repository_url and
  *     repository_public_key to link a repository first; aimeat-commercial found that only the MCP
  *     tool could, and the questions are read before the first sale.
@@ -109,7 +110,7 @@ export function registerPackageSaleRoutes(
     router.delete('/v1/federation/package-sales/:groupId/entitlements/:nodeId', async (req, res) => {
         const act = await sellerAct(req, res);
         if (!act) return;
-        const out = await revokeEntitlement(storage, { owner: act.author, isOperator: false }, act.groupId, req.params.nodeId as string);
+        const out = await revokeEntitlement(storage, { owner: act.author, isOperator: false }, act.groupId, req.params.nodeId as string, act.seller);
         if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
         res.json(success(config.nodeId, { revoked: true }));
     });

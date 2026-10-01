@@ -8,6 +8,7 @@
  * @structure PackageRepository interface with CRUD, version queries, and archive
  * @usage import type { PackageRepository } from './package.repository.js';
  * @version-history
+ *   v1.1.0 — 2026-10-02 — countPackageGroups, for the per-author package quota.
  *   v1.0.0 — 2026-03-15 — initial implementation (Phase 1 storage layer)
  */
 
@@ -24,4 +25,6 @@ export interface PackageRepository {
   archivePackage(id: string): Promise<boolean>;
   /** Archive every non-archived version of a package group. Returns how many rows changed. */
   archivePackageGroup(groupId: string): Promise<number>;
+  /** How many package groups `author` holds with at least one version that is not archived. */
+  countPackageGroups(author: string): Promise<number>;
 }

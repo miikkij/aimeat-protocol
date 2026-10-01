@@ -36,6 +36,9 @@
  *   import { composePackageFromApps } from '../services/package-compose.js';
  *   const out = await composePackageFromApps({ storage, config }, caller, { name, apps });
  * @version-history
+ *   v1.4.0 — 2026-10-02 — The extensions a packaged cortex calls are read from its library files and
+ *     named in `expects` (and refused without allow_expectations), as the app's own calls are. Only the
+ *     app's edges were read, and an app reaches an extension through its cortex.
  *   v1.3.0 — 2026-10-01 — `outcome` and `prompts` go into the manifest as `sheet`, the author's words
  *     at the head of the package's "what you get" sheet (services/package-sheet.ts).
  *   v1.2.0 — 2026-09-30 — The composer's own skills bound to each app travel as `skill` components
@@ -47,7 +50,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, PackageRecord, AppRecord } from '../storage/interface.js';
-import { requirementsOf, appRef } from './dependency-map.js';
+import { requirementsOf, appRef, extractDependencies } from './dependency-map.js';
 import {
     createPackageGroup, hashContent,
     type PackageWriteResult, type RawComponentInput,
@@ -113,7 +116,7 @@ function cortexComponentId(name: string): string {
 /**
  * The app manifest fields that travel with a packaged app.
  *
- * Everything absent here is absent on purpose, and PackageAppMeta in storage/types/apps.ts carries
+ * Everything absent here is absent on purpose, and PackageAppMeta in storage/types/packages.ts carries
  * the reason for each one.
  */
 function appMetaOf(app: AppRecord): Record<string, unknown> {
@@ -246,6 +249,16 @@ export async function composePackageFromApps(
                     contentHash: hashContent(content),
                     dependencies: [],
                 });
+                // An app reaches an extension through its cortex, so the extensions the package needs
+                // are mostly the cortex's, read from the library files it carries (the rule
+                // refreshCortexDependencies applies). Reading only the app's own edges missed them.
+                const libs = (JSON.parse(content) as { libs?: Record<string, string> }).libs ?? {};
+                for (const e of extractDependencies(Object.values(libs).join('\n')).extensions) {
+                    if (!seenExpect.extensions.has(e.name)) {
+                        seenExpect.extensions.add(e.name);
+                        expects.extensions.push(e.name);
+                    }
+                }
             }
             if (!dependencies.includes(id)) dependencies.push(id);
         }

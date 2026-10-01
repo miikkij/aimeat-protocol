@@ -27,6 +27,10 @@
  * @usage
  *   const pkg = await entitledVersion(storage, groupId, nodeId, versionParam);
  * @version-history
+ *   v1.4.0 — 2026-10-02 — An omitted `updates_until` keeps the grant's own date instead of resetting it
+ *     to updates forever. A grant records the seller that sold it (`soldBy`, or the note of an older
+ *     one); a seller changes and revokes only its own grants and may extend another's only to a later
+ *     date (NOT_YOUR_GRANT). Package sale design, phase 1.
  *   v1.3.0 — 2026-10-01 — A grant's `node` is registered only after the node's own card answers with
  *     the same id and key (linkPackagePeer); a node that does not answer leaves the grant standing and
  *     the registration pending, and its first signed request finishes it (adoptPendingPeer, called from
@@ -65,6 +69,12 @@ export interface PackageEntitlement {
      */
     channel?: PackageChannel;
     note?: string;
+    /**
+     * The seller node whose signed sale made this grant. A seller changes and revokes only its own
+     * grants; the author and an operator change any. A grant sold before this field existed is read
+     * from its note ("sold by <node>"), which every seller grant has carried.
+     */
+    soldBy?: string;
     grantedAt: string;
     grantedBy: string;
     updatedAt: string;
@@ -112,8 +122,30 @@ async function mayManage(storage: Storage, groupId: string, caller: { owner: str
 
 const NODE_RE = /^[a-z0-9][a-z0-9.-]{2,127}$/i;
 
+/** The seller node that sold this grant, or undefined when the author or an operator made it. */
+export function sellerOf(e: PackageEntitlement): string | undefined {
+    return e.soldBy ?? /^sold by ([a-z0-9][a-z0-9.-]*)/i.exec(e.note ?? '')?.[1];
+}
+
 /**
- * Grant a node the package, or change the grant: `updatesUntil` null keeps the updates running.
+ * A seller acting on a grant it did not sell. It may sell the customer a later end of updates (a new
+ * sale: `extendsTo` after the grant's own date), and nothing else: not an earlier date, not a revoke,
+ * so one seller cannot end another's customer or the author's. Null when the act is allowed.
+ */
+function notYourGrant(prev: PackageEntitlement | undefined, seller: string | undefined, extendsTo?: string | null): EntitlementResult | null {
+    if (!seller || !prev || sellerOf(prev) === seller) return null;
+    const extension = typeof extendsTo === 'string' && prev.updatesUntil !== null && Date.parse(extendsTo) > Date.parse(prev.updatesUntil);
+    if (extension) return null;
+    return {
+        ok: false, status: 403, code: 'NOT_YOUR_GRANT',
+        message: `${prev.nodeId}'s entitlement was not sold by ${seller}. A seller may extend it to a later date, as a new sale, `
+            + 'but changes and revokes only the grants it sold; the package\'s author decides the others.',
+    };
+}
+
+/**
+ * Grant a node the package, or change the grant: `updatesUntil` null keeps the updates running, and
+ * an omitted one keeps what the grant had (a new grant without one runs on).
  * With `node` ({ url, public_key }) and the peers, a node this repository does not know yet is
  * registered as a packages-only peer in the same call (package-peer-register.ts), after every other
  * check has passed and its own card has answered with the same id and key. A node that does not
@@ -133,7 +165,14 @@ export async function grantEntitlement(
     if (input.channel !== undefined && input.channel !== 'stable' && input.channel !== 'beta') {
         return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'channel is "stable" or "beta".' };
     }
-    let updatesUntil: string | null = null;
+    // Read first: a seller is refused another's grant before a peer is linked or anything written.
+    const current = Object.fromEntries((await readEntitlements(storage, input.groupId)).map(e => [e.nodeId, e]));
+    const prev = current[input.nodeId];
+    const notYours = notYourGrant(prev, peerOpts.seller, typeof input.updatesUntil === 'string' ? input.updatesUntil : undefined);
+    if (notYours) return notYours;
+    // An omitted date keeps the grant's own. Resetting it to null turned an ending subscription into
+    // updates forever whenever a grant changed only its channel or note (package sale design, D).
+    let updatesUntil: string | null = input.updatesUntil === undefined ? (prev?.updatesUntil ?? null) : null;
     if (input.updatesUntil !== undefined && input.updatesUntil !== null) {
         const t = typeof input.updatesUntil === 'string' ? Date.parse(input.updatesUntil) : NaN;
         if (!Number.isFinite(t)) return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'updates_until is an ISO date-time, or null for updates that run on.' };
@@ -155,13 +194,13 @@ export async function grantEntitlement(
         peerPending = link.pending;
     }
     const now = new Date().toISOString();
-    const current = Object.fromEntries((await readEntitlements(storage, input.groupId)).map(e => [e.nodeId, e]));
-    const prev = current[input.nodeId];
+    const soldBy = peerOpts.seller ?? (prev ? sellerOf(prev) : undefined);
     const entitlement: PackageEntitlement = {
         nodeId: input.nodeId,
         updatesUntil,
         channel: (input.channel as PackageChannel | undefined) ?? prev?.channel ?? 'stable',
         ...(typeof input.note === 'string' && input.note ? { note: input.note.slice(0, 500) } : prev?.note ? { note: prev.note } : {}),
+        ...(soldBy ? { soldBy } : {}),
         grantedAt: prev?.grantedAt ?? now,
         grantedBy: prev?.grantedBy ?? caller.owner,
         updatedAt: now,
@@ -172,11 +211,15 @@ export async function grantEntitlement(
 
 export async function revokeEntitlement(
     storage: Storage, caller: { owner: string; isOperator: boolean }, groupId: string, nodeId: string,
+    /** The seller node of a signed revoke: it may revoke only a grant it sold. */
+    seller?: string,
 ): Promise<{ ok: true } | { ok: false; status: number; code: string; message: string }> {
     const refused = await mayManage(storage, groupId, caller);
     if (refused) return refused as { ok: false; status: number; code: string; message: string };
     const current = Object.fromEntries((await readEntitlements(storage, groupId)).map(e => [e.nodeId, e]));
     if (!current[nodeId]) return { ok: false, status: 404, code: 'NOT_FOUND', message: `${nodeId} holds no entitlement to ${groupId}.` };
+    const notYours = notYourGrant(current[nodeId], seller);
+    if (notYours) return notYours as { ok: false; status: number; code: string; message: string };
     delete current[nodeId];
     await write(storage, groupId, current);
     return { ok: true };

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description System-prompt, Package, Template-listing, Package-instance methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.3.0 — 2026-10-02 — countPackageGroups: the author's package groups with a version not archived,
+ *     which the per-author quota counts (it counted version rows).
  *   v1.2.0 — 2026-09-28 — An instance carries `mode` (managed | editable), `forkedAt` and `autoUpdate`.
  *   v1.1.0 — 2026-09-09 — deleteReview, deleteDiscussion and listInstancesByPackage deleted: no caller.
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
@@ -253,6 +255,13 @@ export const packagesMethods = {
       `UPDATE packages SET status = 'archived', updatedAt = ? WHERE packageGroupId = ? AND status != 'archived'`
     ).run(new Date().toISOString(), groupId);
     return result.changes;
+  },
+
+  async countPackageGroups(this: SqliteStorage, author: string): Promise<number> {
+    const row = this.db.prepare(
+      `SELECT COUNT(DISTINCT packageGroupId) as c FROM packages WHERE author = ? AND status != 'archived'`
+    ).get(author) as { c: number };
+    return row.c;
   },
 
   // ══════════════════════════════════════════════════════════
