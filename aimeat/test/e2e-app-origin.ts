@@ -193,6 +193,21 @@ async function main() {
             assert((res.header('location') ?? '') === `http://${SUB}.${APP_HOST}:${PORT}/`, `unexpected Location: ${res.header('location')}`);
         });
 
+        // The node's content pages had one copy per app host, each 200 with a canonical link to the
+        // apex: `turbo.apps.aimeat.io/v1/glossary`, and the bare `apps.aimeat.io/` as the whole front
+        // page. Bing's guidelines ask for a redirect rather than a canonical tag (2026-10-01).
+        await test('the node\'s content pages on an app host answer 301 to the apex, the app itself stays', async () => {
+            for (const [path, sub] of [['/v1/glossary', SUB], ['/v1/how-it-works?x=1', SUB], ['/v1/glossary', null], ['/', null]] as const) {
+                const r = await onAppOrigin(path, sub);
+                assert(r.status === 301, `${sub ?? 'bare'} ${path} → ${r.status}, expected 301`);
+                assert(r.header('location') === `${BASE}${path}`, `${sub ?? 'bare'} ${path} → Location ${r.header('location')}`);
+            }
+            const own = await onAppOrigin('/', SUB);
+            assert(own.status === 200 && own.body.includes('app origin demo'), `the app's own page → ${own.status}`);
+            const md = await onAppOrigin('/v1/glossary.md', SUB);
+            assert(md.status !== 301, 'the markdown mirror was redirected; only the HTML pages move');
+        });
+
         await test('app-origin path form ignores non-.html paths (API still reachable)', async () => {
             // /v1/spec on the app host must NOT be swallowed by the path-form app route.
             const res = await onAppOrigin('/v1/spec', null);
