@@ -8,6 +8,8 @@
  * @structure renderSelfSourced(block, into, handles) → whether the block was one of these
  * @usage if (renderSelfSourced(block, into, alive.handles)) return;   // inside mosaic.js buildBlock
  * @version-history
+ *   v0.62.0 — 2026-10-01 — workspacePicker joins (workspace-picker.js), and workspaceTeam, intakeForm
+ *     and intakeAdmin pass `app`, so they follow the picker's choice when org and ws are left empty.
  *   v0.61.0 — 2026-10-01 — Initial: legalLinks, auditTrail, feedbackForm and reviewerLine moved from
  *     mosaic.js unchanged; members and joinRequest added (members.js), workspaceTeam
  *     (workspace-team.js), intakeForm and intakeAdmin (intake-form.js), and connections
@@ -16,6 +18,7 @@
 import { legalLinks, auditTrail, feedbackForm, reviewerLine } from './commercial.js';
 import { members, joinRequest } from './members.js';
 import { workspaceTeam } from './workspace-team.js';
+import { workspacePicker } from './workspace-picker.js';
 import { intakeForm, intakeAdmin } from './intake-form.js';
 import { connections } from './connections.js';
 
@@ -62,20 +65,28 @@ export function renderSelfSourced(block, into, handles) {
       handles.push(joinRequest({ target: into, app: p.app, roles: rolesOf(p.roles), title: p.title }));
       return true;
     }
-    // ── A workspace's people, over AIMEAT.organism.
+    // ── A workspace's people, over AIMEAT.organism. With `app` and no org or ws, it opens on the
+    //    workspace the picker above it chose (workspace-choice.js).
     case 'workspaceTeam': {
-      handles.push(workspaceTeam({ target: into, org: p.org, ws: p.ws, title: p.title, variant: p.variant }));
+      handles.push(workspaceTeam({ target: into, org: p.org, ws: p.ws, app: p.app, title: p.title, variant: p.variant }));
+      return true;
+    }
+    // ── Where the app keeps its records: the first-run choice, announced to the blocks below.
+    case 'workspacePicker': {
+      handles.push(workspacePicker({
+        target: into, app: p.app, name: p.name, kind: p.kind, purpose: p.purpose, title: p.title, variant: p.variant,
+      }));
       return true;
     }
     // ── A Public Intake form and the owner's list of forms, over AIMEAT.intake.
     case 'intakeForm': {
       handles.push(intakeForm({
-        target: into, org: p.org, ws: p.ws, formId: p.formId, title: p.title, hint: p.hint,
+        target: into, org: p.org, ws: p.ws, app: p.app, formId: p.formId, title: p.title, hint: p.hint,
       }));
       return true;
     }
     case 'intakeAdmin': {
-      handles.push(intakeAdmin({ target: into, org: p.org, ws: p.ws, namespace: p.namespace, title: p.title }));
+      handles.push(intakeAdmin({ target: into, org: p.org, ws: p.ws, app: p.app, namespace: p.namespace, title: p.title }));
       return true;
     }
     // ── The owner's outside accounts, over AIMEAT.connect.

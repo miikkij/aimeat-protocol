@@ -14023,7 +14023,8 @@
       "picker.working": "Getting the workspace ready…",
       "picker.using": "Using {ws} in {org}",
       "picker.change": "Change",
-      "picker.cancel": "Keep the current one"
+      "picker.cancel": "Keep the current one",
+      "follow.wait": "Choose above where this app keeps its records. This part opens there."
     },
     fi: {
       "sample.note": "Esimerkki. Täältä ei lähetetä eikä muuteta mitään.",
@@ -14081,7 +14082,8 @@
       "picker.working": "Työtilaa valmistellaan…",
       "picker.using": "Käytössä työtila {ws} organismissa {org}",
       "picker.change": "Vaihda",
-      "picker.cancel": "Pidä nykyinen"
+      "picker.cancel": "Pidä nykyinen",
+      "follow.wait": "Valitse yläpuolelta, mihin sovellus tallentaa tietonsa. Tämä osa avautuu siellä."
     },
     es: {
       "sample.note": "Una muestra. Desde aquí no se envía ni se cambia nada.",
@@ -14139,7 +14141,8 @@
       "picker.working": "Preparando el espacio de trabajo…",
       "picker.using": "Usando el espacio de trabajo {ws} de {org}",
       "picker.change": "Cambiar",
-      "picker.cancel": "Mantener el actual"
+      "picker.cancel": "Mantener el actual",
+      "follow.wait": "Elige arriba dónde guarda esta aplicación sus registros. Esta parte se abre ahí."
     }
   };
   function tw(key, vars) {
@@ -14158,6 +14161,113 @@
     return text.replace(/\{(\w+)\}/g, function(whole, name) {
       return vars[name] == null ? whole : String(vars[name]);
     });
+  }
+
+  // src/static/sdk-libs/atelier/workspace-choice.js
+  var WORKSPACE_EVENT = "aimeat-workspace-change";
+  var CHOSEN = /* @__PURE__ */ new Map();
+  var PICKERS = /* @__PURE__ */ new Map();
+  function pickerOpened(app2) {
+    PICKERS.set(app2, (PICKERS.get(app2) || 0) + 1);
+    let open = true;
+    return function() {
+      if (!open) return;
+      open = false;
+      const n = (PICKERS.get(app2) || 1) - 1;
+      if (n > 0) PICKERS.set(app2, n);
+      else PICKERS.delete(app2);
+    };
+  }
+  function announceWorkspace(app2, choice) {
+    if (!app2 || !choice || !choice.orgId || !choice.wsId) return;
+    const before = CHOSEN.get(app2);
+    if (before && before.orgId === choice.orgId && before.wsId === choice.wsId) return;
+    CHOSEN.set(app2, { orgId: choice.orgId, wsId: choice.wsId });
+    try {
+      window.dispatchEvent(new CustomEvent(WORKSPACE_EVENT, {
+        detail: { app: app2, orgId: choice.orgId, wsId: choice.wsId, name: choice.name, orgName: choice.orgName, recalled: !!choice.recalled }
+      }));
+    } catch (e) {
+      console.debug("aimeat-atelier: workspace choice not announced", e);
+    }
+  }
+  function chosenWorkspace(app2) {
+    return CHOSEN.get(app2) || null;
+  }
+  function unset(v) {
+    return !v || isPlaceholder2(v);
+  }
+  function followsWorkspace(spec) {
+    return !!spec && spec.sample !== true && !!spec.app && !isPlaceholder2(spec.app) && unset(spec.org) && unset(spec.ws);
+  }
+  function followWorkspace(spec, factory) {
+    const root = el("div", { class: "ak-ws-follow", "data-ak-part": "follow" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let inner = null;
+    let at = "";
+    let stopped = false;
+    function waiting() {
+      clear(root);
+      root.appendChild(el("section", { class: "ak-root ak-mem ak-ws", "data-ak-part": "root" }, [
+        el("p", { class: "ak-mem__none", role: "status", "data-ak-part": "wait" }, tw("follow.wait"))
+      ]));
+    }
+    function mount(c) {
+      if (stopped || !c || !c.orgId || !c.wsId) return;
+      const key = c.orgId + "/" + c.wsId;
+      if (key === at) return;
+      at = key;
+      if (inner) inner.destroy();
+      clear(root);
+      inner = factory(Object.assign({}, spec, { target: root, org: c.orgId, ws: c.wsId }));
+    }
+    function onChoice(ev) {
+      const d = (
+        /** @type {any} */
+        ev.detail
+      );
+      if (d && d.app === spec.app) mount(d);
+    }
+    async function recall() {
+      if (PICKERS.has(spec.app)) return;
+      const ns = (
+        /** @type {any} */
+        window.AIMEAT
+      );
+      const o = ns && ns.organism;
+      if (!o || typeof o.recall !== "function") return;
+      try {
+        const c = await o.recall(spec.app, { verify: true });
+        if (!at && c && c.orgId && c.wsId) mount(c);
+      } catch (e) {
+        console.debug("aimeat-atelier: remembered workspace not read", e);
+      }
+    }
+    window.addEventListener(WORKSPACE_EVENT, onChoice);
+    const known3 = chosenWorkspace(spec.app);
+    if (known3) mount(known3);
+    else {
+      waiting();
+      recall();
+    }
+    const stopWatch = watch(function() {
+      if (at) return;
+      waiting();
+      recall();
+    }, root);
+    return {
+      el: root,
+      refresh: function() {
+        return inner && inner.refresh ? inner.refresh() : Promise.resolve();
+      },
+      destroy: function() {
+        stopped = true;
+        window.removeEventListener(WORKSPACE_EVENT, onChoice);
+        stopWatch();
+        if (inner) inner.destroy();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
   }
 
   // src/static/sdk-libs/atelier/workspace-team.js
@@ -14210,6 +14320,7 @@
     return s;
   }
   function workspaceTeam(spec) {
+    if (followsWorkspace(spec)) return followWorkspace(spec, workspaceTeam);
     const sample = !!spec && (spec.sample === true || !spec.org || !spec.ws || isPlaceholder2(spec.org) || isPlaceholder2(spec.ws));
     const variant = spec.variant === "table" ? "table" : "list";
     const root = el("section", { class: "ak-root ak-mem ak-ws ak-ws--team ak-ws--" + variant, "data-ak-part": "root", "data-ak-variant": variant });
@@ -14495,6 +14606,359 @@
       },
       destroy: function() {
         stop();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/workspace-picker.js
+  var SAMPLE_ORGS = [
+    { id: "sample-shop", name: "Shop team", role: "owner" },
+    { id: "sample-club", name: "Book club", role: "member" }
+  ];
+  var DEFAULT_OBJECT_TYPES = [{
+    name: "record",
+    schemaRef: "schema:record@1",
+    namespace: "records",
+    backing: "memory",
+    writeRole: "member",
+    cardinality: "many",
+    versioned: true,
+    mode: "records"
+  }];
+  function orgLib2() {
+    const ns = (
+      /** @type {any} */
+      window.AIMEAT
+    );
+    const o = ns && ns.organism;
+    return o && typeof o.organisms === "function" && typeof o.findOrCreateWorkspace === "function" && typeof o.remember === "function" && typeof o.recall === "function" ? o : null;
+  }
+  function identity() {
+    const ns = (
+      /** @type {any} */
+      window.AIMEAT
+    );
+    const auth = ns && ns.auth;
+    if (!auth || typeof auth.getSession !== "function") return "";
+    try {
+      const s = auth.getSession();
+      if (!s) return "";
+      return String(s.owner || s.ghii || s.user && s.user.owner || "signed-in");
+    } catch {
+      return "";
+    }
+  }
+  function workspacePicker(spec) {
+    const sample = !!spec && (spec.sample === true || !spec.app || isPlaceholder2(spec.app));
+    const variant = spec.variant === "dense" ? "dense" : "";
+    const root = el("section", {
+      class: "ak-root ak-mem ak-ws ak-ws--picker" + (variant ? " ak-ws--" + variant : ""),
+      "data-ak-part": "root",
+      "data-ak-variant": variant || null
+    });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    const wsName = String(spec.name || spec.app || "").trim();
+    const closed = sample ? function() {
+    } : pickerOpened(spec.app);
+    let mode = "loading";
+    let choice = null;
+    let orgs = null;
+    let failure = "";
+    let typedOrg = "";
+    let who = "";
+    let gen = 0;
+    function lib() {
+      return sample ? null : orgLib2();
+    }
+    function button2(label, tone, part, run, disabled) {
+      return el("button", {
+        type: "button",
+        class: "ak-btn ak-btn--" + tone,
+        "data-ak-part": part,
+        disabled: disabled ? true : null,
+        on: { click: run }
+      }, label);
+    }
+    function report(c) {
+      if (sample) return;
+      announceWorkspace(spec.app, c);
+      if (typeof spec.onReady !== "function") return;
+      try {
+        Promise.resolve(spec.onReady(c)).catch(function(e) {
+          console.error("aimeat-atelier: workspacePicker onReady failed", e);
+        });
+      } catch (e) {
+        console.error("aimeat-atelier: workspacePicker onReady failed", e);
+      }
+    }
+    function head() {
+      root.appendChild(el(
+        "h3",
+        { class: "ak-mem__title", "data-ak-part": "title" },
+        [spec.title || tw("picker.title"), sample ? sampleBadge2() : null].filter(Boolean)
+      ));
+      root.appendChild(el("p", { class: "ak-mem__intro ak-ws__explain", "data-ak-part": "intro" }, tw("picker.intro")));
+    }
+    function failureLine() {
+      if (failure) root.appendChild(el("p", { class: "ak-mem__failure", role: "alert", "data-ak-part": "failure" }, tw("failed", { why: failure })));
+    }
+    function draw() {
+      clear(root);
+      if (mode === "using" && choice) {
+        failureLine();
+        root.appendChild(el("p", { class: "ak-ws__using", "data-ak-part": "using" }, [
+          el("span", { class: "ak-ws__using-text" }, tw("picker.using", {
+            ws: choice.name || wsName,
+            org: choice.orgName || choice.orgId
+          })),
+          button2(tw("picker.change"), "ghost", "change", function() {
+            change();
+          })
+        ]));
+        return;
+      }
+      head();
+      if (mode === "noLib") {
+        root.appendChild(el("p", { class: "ak-mem__none" }, tw("noLib")));
+        return;
+      }
+      if (mode === "signedOut") {
+        root.appendChild(el("p", { class: "ak-mem__none" }, tw("picker.signIn")));
+        return;
+      }
+      if (mode === "loading" || mode === "working") {
+        root.appendChild(el(
+          "p",
+          { class: "ak-mem__none", role: "status", "data-ak-part": "working" },
+          mode === "working" ? tw("picker.working") : tw("loading")
+        ));
+        return;
+      }
+      failureLine();
+      if (sample) root.appendChild(el("p", { class: "ak-mem__hint" }, tw("sample.note")));
+      const list2 = orgs || [];
+      root.appendChild(el("div", { class: "ak-mem__group", "data-ak-part": "orgs" }, [
+        el("h4", { class: "ak-mem__group-title" }, tw("picker.choose")),
+        el("p", { class: "ak-mem__hint" }, tw("picker.wsWill", { name: wsName })),
+        list2.length ? el("ul", { class: "ak-mem__rows" }, list2.map(function(o) {
+          return el("li", { class: "ak-mem__row", "data-ak-part": "row" }, [
+            person(o.name, null),
+            el("span", { class: "ak-mem__meta" }, [el("span", { class: "ak-ws__chip", "data-ak-part": "chip" }, tw("orgRole." + o.role))]),
+            el("span", { class: "ak-mem__acts" }, [
+              button2(tw("picker.use"), "primary", "use", sample ? function() {
+              } : function() {
+                pick(o);
+              }, sample)
+            ])
+          ]);
+        })) : el("p", { class: "ak-mem__none" }, tw("picker.none"))
+      ]));
+      const input = (
+        /** @type {HTMLInputElement} */
+        el("input", {
+          type: "text",
+          class: "ak-input ak-mem__name",
+          placeholder: tw("picker.orgName"),
+          "aria-label": tw("picker.orgName"),
+          disabled: sample ? true : null,
+          autocomplete: "off",
+          maxlength: "120"
+        })
+      );
+      if (typedOrg) input.value = typedOrg;
+      root.appendChild(el("div", { class: "ak-mem__group", "data-ak-part": "create" }, [
+        el("h4", { class: "ak-mem__group-title" }, tw("picker.create")),
+        el("div", { class: "ak-mem__add" }, [
+          el("div", { class: "ak-mem__field" }, [input]),
+          button2(tw("picker.createGo"), "primary", "createGo", sample ? function() {
+          } : function() {
+            const n = input.value.trim();
+            typedOrg = n;
+            if (n) pick({ name: n });
+          }, sample)
+        ])
+      ]));
+      if (choice) {
+        root.appendChild(button2(tw("picker.cancel"), "ghost", "cancel", function() {
+          failure = "";
+          mode = "using";
+          draw();
+        }));
+      }
+    }
+    async function names(c, mine) {
+      const o = lib();
+      if (!o) return;
+      try {
+        if (!c.orgName) {
+          const list2 = orgs || await o.organisms();
+          if (mine !== gen) return;
+          orgs = orgs || list2;
+          const hit = (list2 || []).filter(function(x) {
+            return x && x.id === c.orgId;
+          })[0];
+          if (hit) c.orgName = hit.name;
+        }
+        if (!c.name && typeof o.workspaces === "function") {
+          const rows = await o.workspaces(c.orgId);
+          if (mine !== gen) return;
+          const w = (rows || []).filter(function(x) {
+            return x && x.id === c.wsId;
+          })[0];
+          if (w && w.name) c.name = w.name;
+        }
+      } catch (e) {
+        console.debug("aimeat-atelier: workspace names not read", e);
+      }
+      if (mine === gen && mode === "using" && choice === c) draw();
+    }
+    async function loadOrgs(mine) {
+      const o = lib();
+      try {
+        const list2 = await o.organisms();
+        if (mine !== gen) return;
+        orgs = Array.isArray(list2) ? list2 : [];
+      } catch (e) {
+        if (mine !== gen) return;
+        orgs = [];
+        failure = refusal(e) || String(e);
+      }
+    }
+    async function pick(target) {
+      const o = lib();
+      if (!o) return;
+      const mine = gen;
+      failure = "";
+      mode = "working";
+      draw();
+      let made;
+      try {
+        made = await o.findOrCreateWorkspace({
+          org: target.id ? target.id : { name: target.name },
+          name: wsName,
+          kind: spec.kind,
+          purpose: spec.purpose,
+          objectTypes: Array.isArray(spec.objectTypes) && spec.objectTypes.length ? spec.objectTypes : DEFAULT_OBJECT_TYPES
+        });
+        if (mine !== gen) return;
+      } catch (e) {
+        if (mine !== gen) return;
+        failure = refusal(e) || String(e);
+        mode = "choose";
+        draw();
+        return;
+      }
+      if (!made || !made.orgId || !made.wsId) {
+        mode = "choose";
+        draw();
+        return;
+      }
+      try {
+        await o.remember(spec.app, { orgId: made.orgId, wsId: made.wsId });
+      } catch (e) {
+        failure = refusal(e) || String(e);
+      }
+      if (mine !== gen) return;
+      typedOrg = "";
+      if (made.orgCreated) orgs = null;
+      choice = {
+        orgId: made.orgId,
+        wsId: made.wsId,
+        name: made.name || wsName,
+        orgName: target.name || void 0,
+        created: !!made.created,
+        orgCreated: !!made.orgCreated,
+        recalled: false
+      };
+      mode = "using";
+      draw();
+      report(choice);
+    }
+    async function change() {
+      const mine = gen;
+      failure = "";
+      if (!orgs) {
+        mode = "loading";
+        draw();
+        await loadOrgs(mine);
+        if (mine !== gen) return;
+      }
+      mode = "choose";
+      draw();
+    }
+    async function start() {
+      const mine = ++gen;
+      failure = "";
+      choice = null;
+      orgs = null;
+      if (sample) {
+        orgs = SAMPLE_ORGS.slice();
+        mode = "choose";
+        draw();
+        return;
+      }
+      const o = lib();
+      if (!o) {
+        mode = "noLib";
+        draw();
+        return;
+      }
+      who = identity();
+      if (!who) {
+        mode = "signedOut";
+        draw();
+        return;
+      }
+      mode = "loading";
+      draw();
+      let kept = null;
+      try {
+        kept = await o.recall(spec.app, { verify: true });
+      } catch (e) {
+        if (mine !== gen) return;
+        failure = refusal(e) || String(e);
+      }
+      if (mine !== gen) return;
+      if (kept && kept.orgId && kept.wsId) {
+        choice = { orgId: kept.orgId, wsId: kept.wsId, recalled: true };
+        mode = "using";
+        report(choice);
+        draw();
+        names(choice, mine);
+        return;
+      }
+      await loadOrgs(mine);
+      if (mine !== gen) return;
+      mode = "choose";
+      draw();
+    }
+    const ready0 = start().then(function() {
+      enter(root);
+    }, function(e) {
+      failure = refusal(e) || String(e);
+      mode = "choose";
+      draw();
+    });
+    const stop = watch(function() {
+      if (!sample && identity() !== who) start();
+      else draw();
+    }, root);
+    return {
+      el: root,
+      choice: function() {
+        return choice;
+      },
+      change: function() {
+        change();
+      },
+      refresh: function() {
+        return ready0.then(start);
+      },
+      destroy: function() {
+        gen++;
+        stop();
+        closed();
         if (root.parentNode) root.parentNode.removeChild(root);
       }
     };
@@ -14871,7 +15335,17 @@
       return "";
     }
   }
-  function unset(v) {
+  function linkedWorkspace() {
+    try {
+      const q = new URLSearchParams(window.location.search || "");
+      const org = q.get("org") || "";
+      const ws = q.get("ws") || "";
+      return org && ws ? { org, ws } : null;
+    } catch {
+      return null;
+    }
+  }
+  function unset2(v) {
     return !v || isPlaceholder2(v);
   }
   function sampleForm() {
@@ -14898,8 +15372,11 @@
     };
   }
   function intakeForm(spec) {
+    const named = linkedWorkspace();
+    if (named && unset2(spec.org) && unset2(spec.ws)) spec = Object.assign({}, spec, named);
+    if (followsWorkspace(spec)) return followWorkspace(spec, intakeForm);
     const formId = spec.formId || linkedFormId();
-    const sample = spec.sample === true || unset(spec.org) || unset(spec.ws) || unset(formId);
+    const sample = spec.sample === true || unset2(spec.org) || unset2(spec.ws) || unset2(formId);
     const root = el("section", { class: "ak-root ak-intake", "data-ak-part": "root" });
     if (spec.target) resolve(spec.target).appendChild(root);
     let gen = 0;
@@ -15085,8 +15562,8 @@
           if (typeof spec.onSent === "function") spec.onSent(payload, answer);
         }, function(e) {
           const why = refusal(e) || String(e);
-          const named = e && e.field && controls.has(e.field);
-          if (named) {
+          const named2 = e && e.field && controls.has(e.field);
+          if (named2) {
             setError(e.field, why);
             const c = controls.get(e.field);
             if (c) c.inputs[0].focus();
@@ -15223,7 +15700,8 @@
     return s || "field";
   }
   function intakeAdmin(spec) {
-    const sample = spec.sample === true || unset(spec.org) || unset(spec.ws);
+    if (followsWorkspace(spec)) return followWorkspace(spec, intakeAdmin);
+    const sample = spec.sample === true || unset2(spec.org) || unset2(spec.ws);
     const root = el("section", { class: "ak-root ak-intake ak-intake-admin", "data-ak-part": "root" });
     if (spec.target) resolve(spec.target).appendChild(root);
     let gen = 0;
@@ -15252,7 +15730,7 @@
     function linkOf(f) {
       if (typeof spec.link === "function") return spec.link(f);
       const here = String(window.location.href || "").split(/[?#]/)[0];
-      return here + "?form=" + encodeURIComponent(f.form_id);
+      return here + "?form=" + encodeURIComponent(f.form_id) + "&org=" + encodeURIComponent(spec.org) + "&ws=" + encodeURIComponent(spec.ws);
     }
     function countOf(f) {
       const n = [f.submissions, f.submission_count, f.count].filter(function(v) {
@@ -15922,9 +16400,23 @@
         handles.push(joinRequest({ target: into, app: p.app, roles: rolesOf(p.roles), title: p.title }));
         return true;
       }
-      // ── A workspace's people, over AIMEAT.organism.
+      // ── A workspace's people, over AIMEAT.organism. With `app` and no org or ws, it opens on the
+      //    workspace the picker above it chose (workspace-choice.js).
       case "workspaceTeam": {
-        handles.push(workspaceTeam({ target: into, org: p.org, ws: p.ws, title: p.title, variant: p.variant }));
+        handles.push(workspaceTeam({ target: into, org: p.org, ws: p.ws, app: p.app, title: p.title, variant: p.variant }));
+        return true;
+      }
+      // ── Where the app keeps its records: the first-run choice, announced to the blocks below.
+      case "workspacePicker": {
+        handles.push(workspacePicker({
+          target: into,
+          app: p.app,
+          name: p.name,
+          kind: p.kind,
+          purpose: p.purpose,
+          title: p.title,
+          variant: p.variant
+        }));
         return true;
       }
       // ── A Public Intake form and the owner's list of forms, over AIMEAT.intake.
@@ -15933,6 +16425,7 @@
           target: into,
           org: p.org,
           ws: p.ws,
+          app: p.app,
           formId: p.formId,
           title: p.title,
           hint: p.hint
@@ -15940,7 +16433,7 @@
         return true;
       }
       case "intakeAdmin": {
-        handles.push(intakeAdmin({ target: into, org: p.org, ws: p.ws, namespace: p.namespace, title: p.title }));
+        handles.push(intakeAdmin({ target: into, org: p.org, ws: p.ws, app: p.app, namespace: p.namespace, title: p.title }));
         return true;
       }
       // ── The owner's outside accounts, over AIMEAT.connect.
@@ -18824,344 +19317,6 @@
   }
   function sheet(spec) {
     return dialog({ ...spec, from: "bottom" });
-  }
-
-  // src/static/sdk-libs/atelier/workspace-picker.js
-  var SAMPLE_ORGS = [
-    { id: "sample-shop", name: "Shop team", role: "owner" },
-    { id: "sample-club", name: "Book club", role: "member" }
-  ];
-  function orgLib2() {
-    const ns = (
-      /** @type {any} */
-      window.AIMEAT
-    );
-    const o = ns && ns.organism;
-    return o && typeof o.organisms === "function" && typeof o.findOrCreateWorkspace === "function" && typeof o.remember === "function" && typeof o.recall === "function" ? o : null;
-  }
-  function identity() {
-    const ns = (
-      /** @type {any} */
-      window.AIMEAT
-    );
-    const auth = ns && ns.auth;
-    if (!auth || typeof auth.getSession !== "function") return "";
-    try {
-      const s = auth.getSession();
-      if (!s) return "";
-      return String(s.owner || s.ghii || s.user && s.user.owner || "signed-in");
-    } catch {
-      return "";
-    }
-  }
-  function workspacePicker(spec) {
-    const sample = !!spec && (spec.sample === true || !spec.app || isPlaceholder2(spec.app));
-    const variant = spec.variant === "dense" ? "dense" : "";
-    const root = el("section", {
-      class: "ak-root ak-mem ak-ws ak-ws--picker" + (variant ? " ak-ws--" + variant : ""),
-      "data-ak-part": "root",
-      "data-ak-variant": variant || null
-    });
-    if (spec.target) resolve(spec.target).appendChild(root);
-    const wsName = String(spec.name || spec.app || "").trim();
-    let mode = "loading";
-    let choice = null;
-    let orgs = null;
-    let failure = "";
-    let typedOrg = "";
-    let who = "";
-    let gen = 0;
-    function lib() {
-      return sample ? null : orgLib2();
-    }
-    function button2(label, tone, part, run, disabled) {
-      return el("button", {
-        type: "button",
-        class: "ak-btn ak-btn--" + tone,
-        "data-ak-part": part,
-        disabled: disabled ? true : null,
-        on: { click: run }
-      }, label);
-    }
-    function report(c) {
-      if (sample || typeof spec.onReady !== "function") return;
-      try {
-        Promise.resolve(spec.onReady(c)).catch(function(e) {
-          console.error("aimeat-atelier: workspacePicker onReady failed", e);
-        });
-      } catch (e) {
-        console.error("aimeat-atelier: workspacePicker onReady failed", e);
-      }
-    }
-    function head() {
-      root.appendChild(el(
-        "h3",
-        { class: "ak-mem__title", "data-ak-part": "title" },
-        [spec.title || tw("picker.title"), sample ? sampleBadge2() : null].filter(Boolean)
-      ));
-      root.appendChild(el("p", { class: "ak-mem__intro ak-ws__explain", "data-ak-part": "intro" }, tw("picker.intro")));
-    }
-    function failureLine() {
-      if (failure) root.appendChild(el("p", { class: "ak-mem__failure", role: "alert", "data-ak-part": "failure" }, tw("failed", { why: failure })));
-    }
-    function draw() {
-      clear(root);
-      if (mode === "using" && choice) {
-        failureLine();
-        root.appendChild(el("p", { class: "ak-ws__using", "data-ak-part": "using" }, [
-          el("span", { class: "ak-ws__using-text" }, tw("picker.using", {
-            ws: choice.name || wsName,
-            org: choice.orgName || choice.orgId
-          })),
-          button2(tw("picker.change"), "ghost", "change", function() {
-            change();
-          })
-        ]));
-        return;
-      }
-      head();
-      if (mode === "noLib") {
-        root.appendChild(el("p", { class: "ak-mem__none" }, tw("noLib")));
-        return;
-      }
-      if (mode === "signedOut") {
-        root.appendChild(el("p", { class: "ak-mem__none" }, tw("picker.signIn")));
-        return;
-      }
-      if (mode === "loading" || mode === "working") {
-        root.appendChild(el(
-          "p",
-          { class: "ak-mem__none", role: "status", "data-ak-part": "working" },
-          mode === "working" ? tw("picker.working") : tw("loading")
-        ));
-        return;
-      }
-      failureLine();
-      if (sample) root.appendChild(el("p", { class: "ak-mem__hint" }, tw("sample.note")));
-      const list2 = orgs || [];
-      root.appendChild(el("div", { class: "ak-mem__group", "data-ak-part": "orgs" }, [
-        el("h4", { class: "ak-mem__group-title" }, tw("picker.choose")),
-        el("p", { class: "ak-mem__hint" }, tw("picker.wsWill", { name: wsName })),
-        list2.length ? el("ul", { class: "ak-mem__rows" }, list2.map(function(o) {
-          return el("li", { class: "ak-mem__row", "data-ak-part": "row" }, [
-            person(o.name, null),
-            el("span", { class: "ak-mem__meta" }, [el("span", { class: "ak-ws__chip", "data-ak-part": "chip" }, tw("orgRole." + o.role))]),
-            el("span", { class: "ak-mem__acts" }, [
-              button2(tw("picker.use"), "primary", "use", sample ? function() {
-              } : function() {
-                pick(o);
-              }, sample)
-            ])
-          ]);
-        })) : el("p", { class: "ak-mem__none" }, tw("picker.none"))
-      ]));
-      const input = (
-        /** @type {HTMLInputElement} */
-        el("input", {
-          type: "text",
-          class: "ak-input ak-mem__name",
-          placeholder: tw("picker.orgName"),
-          "aria-label": tw("picker.orgName"),
-          disabled: sample ? true : null,
-          autocomplete: "off",
-          maxlength: "120"
-        })
-      );
-      if (typedOrg) input.value = typedOrg;
-      root.appendChild(el("div", { class: "ak-mem__group", "data-ak-part": "create" }, [
-        el("h4", { class: "ak-mem__group-title" }, tw("picker.create")),
-        el("div", { class: "ak-mem__add" }, [
-          el("div", { class: "ak-mem__field" }, [input]),
-          button2(tw("picker.createGo"), "primary", "createGo", sample ? function() {
-          } : function() {
-            const n = input.value.trim();
-            typedOrg = n;
-            if (n) pick({ name: n });
-          }, sample)
-        ])
-      ]));
-      if (choice) {
-        root.appendChild(button2(tw("picker.cancel"), "ghost", "cancel", function() {
-          failure = "";
-          mode = "using";
-          draw();
-        }));
-      }
-    }
-    async function names(c, mine) {
-      const o = lib();
-      if (!o) return;
-      try {
-        if (!c.orgName) {
-          const list2 = orgs || await o.organisms();
-          if (mine !== gen) return;
-          orgs = orgs || list2;
-          const hit = (list2 || []).filter(function(x) {
-            return x && x.id === c.orgId;
-          })[0];
-          if (hit) c.orgName = hit.name;
-        }
-        if (!c.name && typeof o.workspaces === "function") {
-          const rows = await o.workspaces(c.orgId);
-          if (mine !== gen) return;
-          const w = (rows || []).filter(function(x) {
-            return x && x.id === c.wsId;
-          })[0];
-          if (w && w.name) c.name = w.name;
-        }
-      } catch (e) {
-        console.debug("aimeat-atelier: workspace names not read", e);
-      }
-      if (mine === gen && mode === "using" && choice === c) draw();
-    }
-    async function loadOrgs(mine) {
-      const o = lib();
-      try {
-        const list2 = await o.organisms();
-        if (mine !== gen) return;
-        orgs = Array.isArray(list2) ? list2 : [];
-      } catch (e) {
-        if (mine !== gen) return;
-        orgs = [];
-        failure = refusal(e) || String(e);
-      }
-    }
-    async function pick(target) {
-      const o = lib();
-      if (!o) return;
-      const mine = gen;
-      failure = "";
-      mode = "working";
-      draw();
-      let made;
-      try {
-        made = await o.findOrCreateWorkspace({
-          org: target.id ? target.id : { name: target.name },
-          name: wsName,
-          kind: spec.kind,
-          purpose: spec.purpose,
-          objectTypes: spec.objectTypes
-        });
-        if (mine !== gen) return;
-      } catch (e) {
-        if (mine !== gen) return;
-        failure = refusal(e) || String(e);
-        mode = "choose";
-        draw();
-        return;
-      }
-      if (!made || !made.orgId || !made.wsId) {
-        mode = "choose";
-        draw();
-        return;
-      }
-      try {
-        await o.remember(spec.app, { orgId: made.orgId, wsId: made.wsId });
-      } catch (e) {
-        failure = refusal(e) || String(e);
-      }
-      if (mine !== gen) return;
-      typedOrg = "";
-      if (made.orgCreated) orgs = null;
-      choice = {
-        orgId: made.orgId,
-        wsId: made.wsId,
-        name: made.name || wsName,
-        orgName: target.name || void 0,
-        created: !!made.created,
-        orgCreated: !!made.orgCreated,
-        recalled: false
-      };
-      mode = "using";
-      draw();
-      report(choice);
-    }
-    async function change() {
-      const mine = gen;
-      failure = "";
-      if (!orgs) {
-        mode = "loading";
-        draw();
-        await loadOrgs(mine);
-        if (mine !== gen) return;
-      }
-      mode = "choose";
-      draw();
-    }
-    async function start() {
-      const mine = ++gen;
-      failure = "";
-      choice = null;
-      orgs = null;
-      if (sample) {
-        orgs = SAMPLE_ORGS.slice();
-        mode = "choose";
-        draw();
-        return;
-      }
-      const o = lib();
-      if (!o) {
-        mode = "noLib";
-        draw();
-        return;
-      }
-      who = identity();
-      if (!who) {
-        mode = "signedOut";
-        draw();
-        return;
-      }
-      mode = "loading";
-      draw();
-      let kept = null;
-      try {
-        kept = await o.recall(spec.app, { verify: true });
-      } catch (e) {
-        if (mine !== gen) return;
-        failure = refusal(e) || String(e);
-      }
-      if (mine !== gen) return;
-      if (kept && kept.orgId && kept.wsId) {
-        choice = { orgId: kept.orgId, wsId: kept.wsId, recalled: true };
-        mode = "using";
-        report(choice);
-        draw();
-        names(choice, mine);
-        return;
-      }
-      await loadOrgs(mine);
-      if (mine !== gen) return;
-      mode = "choose";
-      draw();
-    }
-    const ready0 = start().then(function() {
-      enter(root);
-    }, function(e) {
-      failure = refusal(e) || String(e);
-      mode = "choose";
-      draw();
-    });
-    const stop = watch(function() {
-      if (!sample && identity() !== who) start();
-      else draw();
-    }, root);
-    return {
-      el: root,
-      choice: function() {
-        return choice;
-      },
-      change: function() {
-        change();
-      },
-      refresh: function() {
-        return ready0.then(start);
-      },
-      destroy: function() {
-        gen++;
-        stop();
-        if (root.parentNode) root.parentNode.removeChild(root);
-      }
-    };
   }
 
   // src/static/sdk-libs/atelier/island.js

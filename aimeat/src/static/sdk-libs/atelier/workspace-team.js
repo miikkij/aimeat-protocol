@@ -14,6 +14,9 @@
  *
  *   THE SAMPLE STATE. `sample: true`, or an org or ws that is still a fill's <placeholder>, draws
  *   marked sample people and changes nothing.
+ *
+ *   FOLLOWING THE PICKER. `app` with no org and no ws: the block opens on the workspace the app
+ *   chose (workspacePicker above it, or the remembered choice), and says "choose above" until then.
  * @parts workspaceTeam root · title · intro · failure · notice · tabs · requests · people · invite · row · who · meta · acts · role · chip
  * @slots workspaceTeam columns(member) · actions[{ label, run(member), tone? }]
  * @variants workspaceTeam list · table
@@ -24,11 +27,13 @@
  *   AIMEAT.atelier.workspaceTeam({ target: '#team', org: orgId, ws: wsId });
  *   AIMEAT.atelier.workspaceTeam({ target, org, ws, variant: 'table', actions: [{ label: 'Message', run: (m) => open(m.account) }] });
  * @version-history
+ *   v0.62.0 — 2026-10-01 — `app` without org and ws follows the app's chosen workspace.
  *   v0.61.0 — 2026-10-01 — Initial (IAM plan Phase D block 2).
  */
 import { el, clear, resolve, enter } from './dom.js';
 import { tw } from './workspace-i18n.js';
 import { isPlaceholder, sampleBadge, watch, ask, refusal, day, person } from './members-shared.js';
+import { followsWorkspace, followWorkspace } from './workspace-choice.js';
 
 const SAMPLE = {
   members: [
@@ -75,12 +80,14 @@ function roleSel(value) {
 
 /**
  * The people of one workspace: requests, roles, removal and invitations.
- * @param {{ target?: string|Element, org: string, ws: string, title?: string, sample?: boolean,
+ * @param {{ target?: string|Element, org?: string, ws?: string, app?: string, title?: string, sample?: boolean,
  *   variant?: 'list'|'table', columns?: (m: any) => (string|Node|null),
  *   actions?: Array<{ label: string, run: (m: any) => any, tone?: string }> }} spec
  * @returns {{ el: HTMLElement, refresh: () => Promise<void>, destroy: () => void }}
  */
 export function workspaceTeam(spec) {
+  // An app named and no workspace given: open on the app's chosen workspace (workspace-choice.js).
+  if (followsWorkspace(spec)) return followWorkspace(spec, workspaceTeam);
   const sample = !!spec && (spec.sample === true || !spec.org || !spec.ws || isPlaceholder(spec.org) || isPlaceholder(spec.ws));
   const variant = spec.variant === 'table' ? 'table' : 'list';
   const root = el('section', { class: 'ak-root ak-mem ak-ws ak-ws--team ak-ws--' + variant, 'data-ak-part': 'root', 'data-ak-variant': variant });
