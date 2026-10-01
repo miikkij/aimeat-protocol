@@ -26,6 +26,7 @@
  *   (across all of them). The audit read and the invitation cancel are in routes/app-members-extra.ts.
  * @usage app.use(appMembersRouter(config, storage))
  * @version-history
+ *   v1.3.2 — 2026-10-01 — The owner's roster names each person's address from the owner's own address book.
  *   v1.3.1 — 2026-10-01 — The invitation's audit row names the address, so the history can say whom.
  *   v1.3.0 — 2026-10-01 — IAM round 2. The roster answers display names (A1) and is searched and
  *     paged with `q`, `limit` and `offset`, with `total` per list (A5). POST members takes `email`:
@@ -130,7 +131,8 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
     // Everybody who turned up and holds no role is listed too (`seen`): a roster tells the owner who
     // they already said yes to; this tells them who is there to say yes TO. A person appears in
     // exactly one place: promoted, waiting, or just here.
-    const v = await rosterView(storage, c.appId, paging);
+    // The owner's view names the address the owner keeps for each person in their own address book.
+    const v = await rosterView(storage, c.appId, paging, c.isOwner ? { ownerGhii: await bucketOf(c.owner), nodeId: config.nodeId } : null);
     return res.json(success(config.nodeId, {
       members: v.members, requests: v.requests, seen: v.seen, invites: v.invites, count: v.total.members,
       total: v.total, limit: paging.limit, offset: paging.offset, isOwner: c.isOwner, canManage: true,

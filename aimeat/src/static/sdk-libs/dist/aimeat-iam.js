@@ -763,7 +763,12 @@
       // Everybody who turned up and holds no role. The panel has had a section for these since it was
       // written and the node had nothing to put in it, so it rendered "nobody has turned up yet" on
       // apps people were visiting daily.
-      seen: Object.fromEntries((d && d.seen || []).map((v) => [v.owner, { visits: v.visits, lastSeen: v.lastSeen }])),
+      seen: Object.fromEntries((d && d.seen || []).map((v) => [v.owner, {
+        visits: v.visits,
+        lastSeen: v.lastSeen,
+        displayName: v.displayName ?? null,
+        email: v.email ?? null
+      }])),
       members,
       invites: d && d.invites || [],
       total: d && d.total || null,
