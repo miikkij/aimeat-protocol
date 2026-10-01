@@ -7,6 +7,9 @@
  *   behind. A 200 proved none of them.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-app-members
  * @version-history
+ *   v1.1.0 — 2026-10-01 — The roster from a chat: aimeat_app_manage's member actions on the node MCP
+ *     server, with the route's permission words and the owner test, and member_me and member_request
+ *     for somebody else's app.
  *   v1.0.0 — 2026-07-30 — Initial (TARGET-055 phase 2).
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -1375,6 +1378,159 @@ await test('removing a member keeps the development right the owner gave them', 
     const me = await json(`${base}/members/me`, { headers: auth(stranger.token) });
     assert(!me.body.data.member || !me.body.data.member.role, `and they are no longer a member: ${JSON.stringify(me.body.data.member)}`);
     await json(`${base}/dev-grants/${stranger.name}`, { method: 'DELETE', headers: auth(owner.token) });
+});
+
+// ── 2026-10-01: the roster from a chat (aimeat_app_manage on the node MCP server) ─────────────────
+//
+// The member actions reach the same routes over loopback with the session's own bearer, so what is
+// under test is that an agent gets exactly what REST gives it: the work done, the permission word
+// asked, and another owner's app refused.
+
+interface McpSession { token: string; sessionId?: string }
+let rpcId = 0;
+async function mcpRpc(session: McpSession, method: string, params: Record<string, any> = {}): Promise<any> {
+    const id = ++rpcId;
+    const res = await fetch(`${BASE}/v1/mcp`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json, text/event-stream',
+            Authorization: `Bearer ${session.token}`,
+            ...(session.sessionId ? { 'mcp-session-id': session.sessionId, 'mcp-protocol-version': '2025-03-26' } : {}),
+        },
+        body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+    });
+    const sid = res.headers.get('mcp-session-id');
+    if (sid) session.sessionId = sid;
+    if ((res.headers.get('content-type') ?? '').includes('text/event-stream')) {
+        const msgs = (await res.text()).split('\n').filter(l => l.startsWith('data: '))
+            .map(l => { try { return JSON.parse(l.slice(6)); } catch { return null; } }).filter(Boolean);
+        return msgs.find((m: any) => m.id === id) ?? msgs[0] ?? {};
+    }
+    return await res.json();
+}
+async function mcpSession(token: string): Promise<McpSession> {
+    const session: McpSession = { token };
+    await mcpRpc(session, 'initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'e2e-app-members', version: '1.0.0' } });
+    return session;
+}
+async function manage(session: McpSession, args: Record<string, unknown>): Promise<{ isError: boolean; data: any; text: string }> {
+    const body = await mcpRpc(session, 'tools/call', { name: 'aimeat_app_manage', arguments: args });
+    const text = body?.result?.content?.[0]?.text ?? JSON.stringify(body?.error ?? body ?? {});
+    let data: any;
+    try { data = JSON.parse(text); } catch { data = { _text: text }; }
+    return { isError: body?.result?.isError === true || body?.error !== undefined, data, text };
+}
+
+const CHAT_APP = 'roster-chat.html';
+const chatRoster = async () => {
+    const r = await json(`/v1/apps/${owner.name}/${CHAT_APP}/members`, { headers: auth(owner.token) });
+    assert(r.status === 200, `roster ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    return r.body.data as { members: any[]; requests: any[]; seen: any[] };
+};
+
+await test('setup: the owner publishes a second app for the chat cases', async () => {
+    const pub = await json('/v1/apps', {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ filename: CHAT_APP, name: 'Roster chat', description: 'roster over MCP',
+            content: Buffer.from('<!doctype html><title>chat</title><p>c', 'utf8').toString('base64') }),
+    });
+    assert(pub.status === 201, `publish ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
+});
+
+await test('MCP: an agent of the owner with exchange:grant lists the roster, approves and removes from a chat', async () => {
+    const s = await mcpSession(await agentOf(owner, ['app:write', 'exchange:grant']));
+    const list = await manage(s, { action: 'members', filename: CHAT_APP });
+    assert(!list.isError, `members: ${list.text}`);
+    assert(Array.isArray(list.data.members) && list.data.members.length === 0, `a new app carries nobody: ${list.text}`);
+
+    const before = (await bell(stranger.token)).filter(n => n.type === 'app_member_approved' && String(n.title).includes('roster-chat')).length;
+    const set = await manage(s, { action: 'member_set', filename: CHAT_APP, account: stranger.name, role: 'member', note: 'approved from a chat', days: 30 });
+    assert(!set.isError, `member_set: ${set.text}`);
+    assert(set.data.created === true && set.data.member?.role === 'member', `approved as member: ${set.text}`);
+    assert(typeof set.data.member?.expiresAt === 'string' && Date.parse(set.data.member.expiresAt) > Date.now() + 29 * 86400_000,
+        `days reached the route as a term: ${JSON.stringify(set.data.member)}`);
+    // Observed effects, not the answer: the row is on the roster REST reads, and the person was told.
+    assert((await chatRoster()).members.some(m => m.owner === stranger.name), 'the approval is on the roster');
+    const after = (await bell(stranger.token)).filter(n => n.type === 'app_member_approved' && String(n.title).includes('roster-chat')).length;
+    assert(after === before + 1, `the approved person is told once: ${before} -> ${after}`);
+
+    const rm = await manage(s, { action: 'member_remove', filename: CHAT_APP, account: stranger.name });
+    assert(!rm.isError && rm.data.removed === true, `member_remove: ${rm.text}`);
+    assert(!(await chatRoster()).members.some(m => m.owner === stranger.name), 'and the removal took them off it');
+
+    const again = await manage(s, { action: 'member_remove', filename: CHAT_APP, account: stranger.name });
+    assert(again.isError && again.text.startsWith('NOT_FOUND'), `removing nobody is the route's 404: ${again.text}`);
+});
+
+await test('MCP: an agent of the owner holding only memory:read is refused the roster, and nothing is written', async () => {
+    const s = await mcpSession(await agentOf(owner, ['memory:read']));
+    const set = await manage(s, { action: 'member_set', filename: CHAT_APP, account: stranger.name, role: 'member' });
+    assert(set.isError && set.text.startsWith('SCOPE_DENIED'), `member_set without exchange:grant: ${set.text}`);
+    const list = await manage(s, { action: 'members', filename: CHAT_APP });
+    assert(list.isError && list.text.startsWith('SCOPE_DENIED'), `members without app:write: ${list.text}`);
+    const decline = await manage(s, { action: 'member_decline', filename: CHAT_APP, account: stranger.name });
+    assert(decline.isError && decline.text.startsWith('SCOPE_DENIED'), `member_decline without app:manage: ${decline.text}`);
+    assert(!(await chatRoster()).members.some(m => m.owner === stranger.name), 'the refused approval wrote nothing');
+});
+
+await test('MCP: a non-owner reads their standing and asks to join from a chat; the owner\'s agent declines', async () => {
+    const theirs = await mcpSession(await agentOf(stranger, ['social:write']));
+    const me = await manage(theirs, { action: 'member_me', owner: owner.name, filename: CHAT_APP });
+    assert(!me.isError, `member_me: ${me.text}`);
+    assert(me.data.isOwner === false && me.data.role === null && me.data.requested === null, `a stranger with no ask: ${me.text}`);
+
+    const noOwner = await manage(theirs, { action: 'member_request', filename: CHAT_APP });
+    assert(noOwner.isError && noOwner.text.startsWith('INVALID_INPUT') && noOwner.text.includes('owner'), `asking needs the app's owner: ${noOwner.text}`);
+
+    const ask = await manage(theirs, { action: 'member_request', owner: owner.name, filename: CHAT_APP, note: 'asked from a chat' });
+    assert(!ask.isError && ask.data.recorded === true, `member_request: ${ask.text}`);
+    const told = (await bell(owner.token)).filter(n => n.type === 'app_member_request' && String(n.body).includes('asked from a chat'));
+    assert(told.length === 1, `the owner is told once, with the note: ${told.length}`);
+    assert((await chatRoster()).requests.some(r => r.owner === stranger.name), 'the ask waits on the roster');
+
+    const pending = await manage(theirs, { action: 'member_me', owner: owner.name, filename: CHAT_APP });
+    assert(pending.data.requested?.state === 'pending', `and they read it back: ${pending.text}`);
+
+    // Cross-owner: holding the word does not make somebody else's app theirs.
+    const intruder = await mcpSession(await agentOf(stranger, ['exchange:grant', 'app:write']));
+    const self = await manage(intruder, { action: 'member_set', owner: owner.name, filename: CHAT_APP, account: stranger.name, role: 'member' });
+    assert(self.isError && self.text.startsWith('FORBIDDEN'), `a stranger's agent approved itself into another owner's app: ${self.text}`);
+    const peek = await manage(intruder, { action: 'members', owner: owner.name, filename: CHAT_APP });
+    assert(peek.isError && peek.text.startsWith('FORBIDDEN'), `and read its roster: ${peek.text}`);
+
+    const ownersAgent = await mcpSession(await agentOf(owner, ['app:manage']));
+    const no = await manage(ownersAgent, { action: 'member_decline', filename: CHAT_APP, account: stranger.name });
+    assert(!no.isError && no.data.declined === true, `member_decline: ${no.text}`);
+    const declined = await manage(theirs, { action: 'member_me', owner: owner.name, filename: CHAT_APP });
+    assert(declined.data.requested?.state === 'declined', `the applicant reads the decision: ${declined.text}`);
+});
+
+await test('MCP: the owner\'s agent sets and reads the plan, sweeps, and clears a visitor', async () => {
+    const s = await mcpSession(await agentOf(owner, ['app:write', 'app:manage', 'commerce:sell', 'exchange:grant']));
+    const set = await manage(s, { action: 'member_plan_set', filename: CHAT_APP, roles: { member: [] }, seats: { member: 5 },
+        terms: { member: { days: 30, renewal: 'manual' } }, roster_visibility: 'members' });
+    assert(!set.isError, `member_plan_set: ${set.text}`);
+    const got = await manage(s, { action: 'member_plan_get', filename: CHAT_APP });
+    assert(!got.isError, `member_plan_get: ${got.text}`);
+    assert(got.data.plan?.rosterVisibility === 'members' && got.data.plan?.seats?.member === 5 && got.data.plan?.terms?.member?.days === 30,
+        `the plan the chat set is the plan the route keeps: ${got.text}`);
+
+    const sweep = await manage(s, { action: 'member_sweep', filename: CHAT_APP });
+    assert(!sweep.isError && typeof sweep.data.swept === 'number', `member_sweep: ${sweep.text}`);
+
+    // A signed-in person who opens the app with no role is a visitor; reading /me is that visit.
+    const visitor = await setupOwner('vis');
+    await json(`/v1/apps/${owner.name}/${CHAT_APP}/members/me`, { headers: auth(visitor.token) });
+    const seen = await manage(s, { action: 'members', filename: CHAT_APP });
+    assert((seen.data.seen as any[]).some(v => v.owner === visitor.name), `the visitor is listed: ${seen.text}`);
+    const gone = await manage(s, { action: 'member_dismiss', filename: CHAT_APP, account: visitor.name });
+    assert(!gone.isError && gone.data.dismissed === true, `member_dismiss: ${gone.text}`);
+    assert(!(await chatRoster()).seen.some(v => v.owner === visitor.name), 'and is off the list');
+
+    const sellerless = await mcpSession(await agentOf(owner, ['app:write']));
+    const refused = await manage(sellerless, { action: 'member_plan_set', filename: CHAT_APP, roles: { member: [] } });
+    assert(refused.isError && refused.text.startsWith('SCOPE_DENIED'), `setting the plan needs commerce:sell: ${refused.text}`);
 });
 
 console.log(`\napp member roster E2E: ${passed} passed, ${failed} failed (${passed + failed} total)\n`);

@@ -10,6 +10,9 @@
  * @structure appManageShape
  * @usage mcp.tool('aimeat_app_manage', description, { ...appManageShape, ...aiProvenanceInputs }, …)
  * @version-history
+ *   v1.2.0 — 2026-10-01 — The member fields (account, role, level, offerings, expires_at, roles,
+ *     seats, terms, access, roster_visibility). `days` takes a membership term too, so its ceiling
+ *     is no longer the visitors window of 360: the visitors service clamps its own value.
  *   v1.1.0 — 2026-09-28 — `values`, for config_set.
  *   v1.0.0 — 2026-09-27 — Initial.
  */
@@ -38,7 +41,7 @@ export const appManageShape = {
     remove: z.boolean().optional().describe(d('remove')),
     limit: z.number().int().min(1).max(500).optional().describe(d('limit')),
     playtest: z.boolean().optional().describe(d('playtest')),
-    days: z.number().int().min(0).max(360).optional().describe(d('days')),
+    days: z.number().int().min(0).max(36500).optional().describe(d('days')),
     on: z.boolean().optional().describe(d('on')),
     geo: z.enum(SIGNAL_GEO_LEVELS).optional().describe(d('geo')),
     detail: z.array(z.string()).optional().describe(d('detail')),
@@ -61,4 +64,18 @@ export const appManageShape = {
     runner_agent: z.string().optional().describe(d('runner_agent')),
     organism_id: z.string().optional().describe(d('organism_id')),
     values: z.record(z.string(), z.unknown()).optional().describe(d('values')),
+    account: z.string().optional().describe(d('account')),
+    role: z.string().optional().describe(d('role')),
+    level: z.number().optional().describe(d('level')),
+    offerings: z.array(z.string()).optional().describe(d('offerings')),
+    expires_at: z.string().optional().describe(d('expires_at')),
+    // The same bounds the PUT .../members/plan route checks, so neither interface refuses what the other takes.
+    roles: z.record(z.string(), z.array(z.string())).optional().describe(d('roles')),
+    seats: z.record(z.string(), z.number().min(0)).optional().describe(d('seats')),
+    terms: z.record(z.string(), z.object({
+        days: z.number().positive().optional(),
+        renewal: z.enum(['manual', 'self-serve', 'none']).optional(),
+    })).optional().describe(d('terms')),
+    access: z.enum(['members-free', 'free', 'members-only']).optional().describe(d('access')),
+    roster_visibility: z.enum(['owner', 'members']).optional().describe(d('roster_visibility')),
 };

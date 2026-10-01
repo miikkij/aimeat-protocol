@@ -24,6 +24,8 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   v1.16.0 — 2026-10-01 — registerAppManageTool receives getToken: its member actions call the
+ *     member routes over loopback with the session's own bearer.
  *   v1.15.0 — 2026-09-29 — registerAiJobTools receives the session's scopes, recorded on a started job
  *     so the job reads its inputs as the agent (TARGET-082 V4).
  *   v1.14.0 — 2026-09-29 — registerRefineryTools (aimeat_refinery_classes, _run, _status).
@@ -201,7 +203,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerAppDraftEditTools(mcp, storage, config, agentGaii);
     registerSeoTools(mcp, storage, config, agentGaii, scopes);
     // One tool for the settings and reads of an app, each action checked against its own permission word.
-    registerAppManageTool(mcp, storage, config, agentGaii, scopes);
+    registerAppManageTool(mcp, storage, config, agentGaii, scopes, getToken);
     registerAiImageTool(mcp, storage, config, agentGaii);
     registerSharingGroupTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     registerAgentTaskTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);

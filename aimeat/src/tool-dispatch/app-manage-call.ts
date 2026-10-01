@@ -4,13 +4,19 @@
  * SPDX-License-Identifier: MIT
  * @description aimeat_app_manage for the connector MCP server and the CLI dispatch: one function
  *   both call, which checks the call against its action's field list and sends it to the node's own
- *   REST endpoint. The node MCP server calls the services those endpoints call (src/mcp/app-manage.ts).
+ *   REST endpoint. The node MCP server calls the services those endpoints call (src/mcp/app-manage.ts),
+ *   except for the member actions: their logic lives in the route handlers of routes/app-members.ts,
+ *   so the node MCP server sends those through this function too, over loopback with the caller's
+ *   own bearer.
  *
  *   A `switch` with literal client calls, not a lookup table: check:field-reach pairs a tool with a
  *   route by the REST calls it can see, and it does not follow a table.
- * @structure appManageCall
+ * @structure appManageCall · MEMBER_ACTIONS
  * @usage return out(await appManageCall(client, owner, input));
  * @version-history
+ *   2026-10-01 -- The member actions, over the /v1/apps/:owner/:filename/members routes. Tool fields
+ *     are snake_case and the routes read camelCase (expires_at -> expiresAt, roster_visibility ->
+ *     rosterVisibility); an empty expires_at is sent as null, the route's "does not end".
  *   2026-09-28 -- config_get and config_set over GET and PUT /v1/apps/:owner/:filename/config.
  *   2026-09-27 -- Agent-facing texts use industry terms: door and surface became tool and interface (docs/coding-guidelines/shell-and-git.md).
  *   v1.0.0 — 2026-09-27 — Initial.
@@ -28,6 +34,15 @@ function pick(input: Input, fields: string[]): Input {
 }
 
 const enc = encodeURIComponent;
+
+/**
+ * The actions over the member routes. The node MCP server sends these through appManageCall()
+ * with a loopback client, because the routes hold the logic and there is no service to share.
+ */
+export const MEMBER_ACTIONS: ReadonlySet<string> = new Set([
+    'members', 'member_set', 'member_remove', 'member_decline', 'member_dismiss',
+    'member_plan_get', 'member_plan_set', 'member_sweep', 'member_me', 'member_request',
+]);
 
 /**
  * Run one aimeat_app_manage call over REST. `owner` is the caller's own account, the default for
@@ -119,6 +134,35 @@ export async function appManageCall(client: AimeatClient, owner: string, input: 
         }
         case 'subdomain_delete':
             return client.delete(`/v1/admin/subdomains/${enc(String(input.subdomain))}`);
+        // The member paths are written out from /v1 rather than from `app`: check:field-reach reads a
+        // path that starts with a computed part as no path at all, and then pairs no route with this
+        // tool. Spelled out, the member routes count this tool as their twin.
+        case 'members':
+            return client.get(`/v1/apps/${enc(ownerName)}/${file}/members`);
+        case 'member_set': {
+            const body: Input = pick(input, ['account', 'role', 'level', 'note', 'offerings', 'days']);
+            if (input.expires_at !== undefined && input.expires_at !== null) body.expiresAt = input.expires_at === '' ? null : input.expires_at;
+            return client.post(`/v1/apps/${enc(ownerName)}/${file}/members`, body);
+        }
+        case 'member_remove':
+            return client.delete(`/v1/apps/${enc(ownerName)}/${file}/members/${enc(String(input.account))}`);
+        case 'member_decline':
+            return client.delete(`/v1/apps/${enc(ownerName)}/${file}/members/requests/${enc(String(input.account))}`);
+        case 'member_dismiss':
+            return client.delete(`/v1/apps/${enc(ownerName)}/${file}/members/seen/${enc(String(input.account))}`);
+        case 'member_plan_get':
+            return client.get(`/v1/apps/${enc(ownerName)}/${file}/members/plan`);
+        case 'member_plan_set': {
+            const body: Input = pick(input, ['roles', 'seats', 'terms', 'access']);
+            if (input.roster_visibility !== undefined && input.roster_visibility !== null) body.rosterVisibility = input.roster_visibility;
+            return client.put(`/v1/apps/${enc(ownerName)}/${file}/members/plan`, body);
+        }
+        case 'member_sweep':
+            return client.post(`/v1/apps/${enc(ownerName)}/${file}/members/sweep`, {});
+        case 'member_me':
+            return client.get(`/v1/apps/${enc(ownerName)}/${file}/members/me`);
+        case 'member_request':
+            return client.post(`/v1/apps/${enc(ownerName)}/${file}/members/requests`, pick(input, ['note']));
         default:
             return { ok: false, error: { code: 'INVALID_INPUT', message: `Unknown action "${checked.action}".` } };
     }

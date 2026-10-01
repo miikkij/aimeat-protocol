@@ -6,6 +6,8 @@
  *   end by test/e2e-app-manage.ts.
  * @usage pnpm test -- app-manage-dispatch
  * @version-history
+ *   v1.2.0 — 2026-10-01 — The member actions and their fields, and how snake_case tool fields reach
+ *     the member routes' camelCase body.
  *   v1.1.0 — 2026-09-28 — config_get and config_set, and the `values` field.
  *   v1.0.0 — 2026-09-27 — Initial.
  */
@@ -45,6 +47,9 @@ const VALUE: Record<string, unknown> = {
     forkable: true, access_code: 'zqxcode', protection: { obfuscate: true }, screenshot: 'zqxb64', screenshot_mime_type: 'image/webp',
     subdomain: 'zqxsub', target: 'alice/shop.html', subdomain_kind: 'redirect', enabled: false, bundled_agent: 'zqxagent',
     runner_agent: 'zqxrunner', organism_id: 'zqxorg', values: { zqxfield: 'zqxvalue' },
+    account: 'zqxacct', role: 'zqxrole', level: 4, offerings: ['zqxoff'], expires_at: '2027-01-02T03:04:05Z',
+    roles: { zqxrole: ['zqxoff'] }, seats: { zqxrole: 2 }, terms: { zqxrole: { days: 30, renewal: 'manual' } },
+    access: 'members-only', roster_visibility: 'members',
 };
 
 /** Where each action goes: method and path. The body is checked field by field below. */
@@ -77,6 +82,16 @@ const EXPECT: Record<string, [string, string]> = {
     subdomain_list: ['GET', '/v1/admin/subdomains'],
     subdomain_set: ['PATCH', '/v1/admin/subdomains/zqxsub'],
     subdomain_delete: ['DELETE', '/v1/admin/subdomains/zqxsub'],
+    members: ['GET', '/v1/apps/alice/shop.html/members'],
+    member_set: ['POST', '/v1/apps/alice/shop.html/members'],
+    member_remove: ['DELETE', '/v1/apps/alice/shop.html/members/zqxacct'],
+    member_decline: ['DELETE', '/v1/apps/alice/shop.html/members/requests/zqxacct'],
+    member_dismiss: ['DELETE', '/v1/apps/alice/shop.html/members/seen/zqxacct'],
+    member_plan_get: ['GET', '/v1/apps/alice/shop.html/members/plan'],
+    member_plan_set: ['PUT', '/v1/apps/alice/shop.html/members/plan'],
+    member_sweep: ['POST', '/v1/apps/alice/shop.html/members/sweep'],
+    member_me: ['GET', '/v1/apps/alice/shop.html/members/me'],
+    member_request: ['POST', '/v1/apps/alice/shop.html/members/requests'],
 };
 
 /** A field that travels in the path or query, or shapes the request rather than appearing in it. */
@@ -129,6 +144,34 @@ describe('aimeat_app_manage: every action reaches its endpoint with its fields',
         const a = recorder();
         await appManageCall(a.client, 'me', { action: 'ui_set', filename: 'shop.html', layout: { v: 1 }, ai_provenance: declared });
         expect((a.sent[0]!.body as Record<string, unknown>).ai_provenance).toEqual(declared);
+    });
+
+    it('member_set and member_plan_set send the route\'s own body, camelCase included', async () => {
+        const a = recorder();
+        await appManageCall(a.client, 'me', fullInput('member_set'));
+        expect(a.sent[0]!.body).toEqual({
+            account: 'zqxacct', role: 'zqxrole', level: 4, note: 'zqxnote', offerings: ['zqxoff'], days: 9,
+            expiresAt: '2027-01-02T03:04:05Z',
+        });
+        const b = recorder();
+        await appManageCall(b.client, 'me', fullInput('member_plan_set'));
+        expect(b.sent[0]!.body).toEqual({
+            roles: { zqxrole: ['zqxoff'] }, seats: { zqxrole: 2 }, terms: { zqxrole: { days: 30, renewal: 'manual' } },
+            access: 'members-only', rosterVisibility: 'members',
+        });
+    });
+
+    it('member_set with an empty expires_at sends null, the route\'s "does not end"', async () => {
+        const { client, sent } = recorder();
+        await appManageCall(client, 'me', { action: 'member_set', filename: 'shop.html', account: 'bob', role: 'member', expires_at: '' });
+        expect(sent[0]).toEqual({ method: 'POST', path: '/v1/apps/me/shop.html/members', body: { account: 'bob', role: 'member', expiresAt: null } });
+    });
+
+    it('member_request needs the owner of the app being asked, and sends the note alone', async () => {
+        expect(checkAppManageInput({ action: 'member_request', filename: 'shop.html' }).ok).toBe(false);
+        const { client, sent } = recorder();
+        await appManageCall(client, 'me', { action: 'member_request', filename: 'shop.html', owner: 'carol', note: 'hi' });
+        expect(sent[0]).toEqual({ method: 'POST', path: '/v1/apps/carol/shop.html/members/requests', body: { note: 'hi' } });
     });
 
     it('subdomain_set creates the entry when there is none to change', async () => {
