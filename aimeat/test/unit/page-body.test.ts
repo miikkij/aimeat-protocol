@@ -57,7 +57,7 @@ describe('renderMarkdownBody', () => {
       'Some `inline code` and **bold** and a [link](https://example.com/x).',
     ].join('\n'));
 
-    expect(html).toContain('<h3>A section</h3>');
+    expect(html).toContain('<h2>A section</h2>');
     expect(html).toContain('<p>A paragraph that runs across two source lines.</p>');
     expect(html).toContain('<ul><li>first</li><li>second</li></ul>');
     expect(html).toContain('<ol><li>step one</li><li>step two</li></ol>');
@@ -102,6 +102,13 @@ describe('renderMarkdownBody', () => {
 
   // The placeholder the code-span pass uses must not be forgeable from the source text, or a page
   // could address another page's code span by writing the placeholder itself.
+  it('never emits a second h1: the page title is the only one', () => {
+    const html = renderMarkdownBody('# A stray top heading\n\n###### Deep');
+    expect(html).toContain('<h2>A stray top heading</h2>');
+    expect(html).toContain('<h6>Deep</h6>');
+    expect(html).not.toContain('<h1');
+  });
+
   it('cannot be made to restore a code span the source did not open', () => {
     const html = renderMarkdownBody('A number 0 alone, and `real` code.');
     expect(html).toContain('A number 0 alone');
@@ -112,10 +119,10 @@ describe('renderMarkdownBody', () => {
 describe('injectPageBody', () => {
   const shell = '<body>\n  <div id="app"></div>\n  <footer>f</footer>\n</body>';
 
-  it('puts the page body after the app root, with the title as a heading', () => {
+  it('puts the page body after the app root, with the title as its visible h1', () => {
     const out = injectPageBody(shell, page({ markdown: 'Hello.' }), cfg(), { isShell: true });
     expect(out).toContain('<div id="app"></div>');
-    expect(out).toContain('<div id="crawler-body" class="md-body"><h2>The thing</h2>');
+    expect(out).toContain('<div id="crawler-body" class="md-body"><h1>The thing</h1>');
     expect(out.indexOf('id="crawler-body"')).toBeGreaterThan(out.indexOf('id="app"'));
     expect(out).toContain('<p>Hello.</p>');
   });
