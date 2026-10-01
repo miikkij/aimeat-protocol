@@ -6,6 +6,7 @@
  *   end by test/e2e-app-manage.ts.
  * @usage pnpm test -- app-manage-dispatch
  * @version-history
+ *   v1.4.0 — 2026-10-01 — year on audit, and audit_archive and audit_keep.
  *   v1.3.0 — 2026-10-01 — IAM round 2: email on member_set, q/limit/offset on members, manage_roles
  *     on member_plan_set, and member_audit and member_invite_cancel.
  *   v1.2.0 — 2026-10-01 — The member actions and their fields, and how snake_case tool fields reach
@@ -53,7 +54,7 @@ const VALUE: Record<string, unknown> = {
     roles: { zqxrole: ['zqxoff'] }, seats: { zqxrole: 2 }, terms: { zqxrole: { days: 30, renewal: 'manual' } },
     access: 'members-only', roster_visibility: 'members',
     email: 'zqx@example.com', locale: 'fi', q: 'zqxq', offset: 11, before: '2026-09-01T00:00:00Z', invite_id: 'zqxinv',
-    manage_roles: ['zqxmgr'],
+    manage_roles: ['zqxmgr'], year: '2026', keep: '12345',
 };
 
 /** Where each action goes: method and path. The body is checked field by field below. */
@@ -62,7 +63,9 @@ const EXPECT: Record<string, [string, string]> = {
     seo: ['PATCH', '/v1/apps/shop.html'],
     marks: ['PATCH', '/v1/apps/shop.html'],
     legal: ['PATCH', '/v1/apps/shop.html'],
-    audit: ['GET', '/v1/apps/me/shop.html/audit?limit=7&playtest=true'],
+    audit: ['GET', '/v1/apps/me/shop.html/audit?limit=7&playtest=true&archive=2026'],
+    audit_archive: ['POST', '/v1/apps/me-owner/shop.html/audit/archive'],
+    audit_keep: ['PUT', '/v1/audit/apps/settings'],
     versions: ['GET', '/v1/apps/alice/shop.html/versions'],
     lineage: ['GET', '/v1/apps/alice/shop.html/lineage'],
     screenshot: ['POST', '/v1/apps/alice/shop.html/screenshot/capture'],
@@ -102,7 +105,7 @@ const EXPECT: Record<string, [string, string]> = {
 
 /** A field that travels in the path or query, or shapes the request rather than appearing in it. */
 const IN_PATH = new Set(['filename', 'owner', 'bundled_agent', 'subdomain', 'limit', 'playtest', 'days', 'detail', 'runner_agent',
-    'q', 'offset', 'before', 'invite_id']);
+    'q', 'offset', 'before', 'invite_id', 'year']);
 
 function fullInput(action: string): Record<string, unknown> {
     const input: Record<string, unknown> = { action };
