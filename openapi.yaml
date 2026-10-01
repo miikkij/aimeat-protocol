@@ -840,6 +840,19 @@ components:
                 type: array
                 items:
                   $ref: '#/components/schemas/AiAppRoleView'
+    AgentPurchaseLimitView:
+      type: object
+      properties:
+        agent: { type: string, description: The agent's GAII }
+        limits:
+          type: array
+          items:
+            type: object
+            properties:
+              currency: { type: string }
+              per_day: { type: number, nullable: true, description: Major units; null means no limit set, so no spending }
+              spent_today: { type: number, description: Major units, spent since 00:00 UTC }
+        note: { type: string }
     AimeatEnvelope:
       type: object
       required: [ok, protocol, version, node, timestamp, request_id]
@@ -48599,6 +48612,98 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
+  /v1/agents/{name}/purchase-limit:
+    get:
+      operationId: getAgentPurchaseLimit
+      summary: An agent's daily purchase limit in money, and what it spent today
+      description: >-
+        Per currency: the most the agent may spend on purchases in a day (null when no limit is set,
+        and then it does not spend money in that currency) and what it spent today (UTC). Readable by
+        every principal of the agent's owner, so an agent can see what is left before it opens a
+        checkout. A checkout an agent completes in money past its limit, or with no limit, answers 403
+        PURCHASE_LIMIT_REACHED or PURCHASE_LIMIT_NOT_SET. Morsel prices are not limited.
+      tags: [Agents]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The limits and today's spending
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentPurchaseLimitView'
+        '404':
+          description: No such agent on the caller's account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+    put:
+      operationId: setAgentPurchaseLimit
+      summary: Set or remove an agent's daily purchase limit in one currency
+      description: >-
+        The owner only, signed in themselves (requireOwnerPrincipal): an agent cannot raise its own
+        limit. `per_day` is in the currency's major unit; null removes the limit, after which the
+        agent does not spend money in that currency.
+      tags: [Agents]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currency, per_day]
+              properties:
+                currency: { type: string, enum: [EUR, USD] }
+                per_day: { type: number, nullable: true, minimum: 0, maximum: 1000000 }
+      responses:
+        '200':
+          description: The limits after the change
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentPurchaseLimitView'
+        '400':
+          description: An unknown currency or an amount out of range
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '403':
+          description: The caller is not the owner signed in themselves
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '404':
+          description: No such agent on the caller's account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
   /v1/agents/{name}/schedule-constraints:
     patch:
       operationId: setAgentScheduleConstraints

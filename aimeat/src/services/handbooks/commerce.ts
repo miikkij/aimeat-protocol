@@ -7,6 +7,7 @@
  *   checkout, and the memory/storage a listing lives in. Self-contained; the tool list mirrors
  *   MCP_SURFACES.commerce.
  * @version-history
+ *   v2.2.0 — 2026-10-02 — An agent buys in money only within its daily purchase limit, and reads it from two records.
  *   v2.1.0 — 2026-10-01 — The payment-provider secret is entered by the owner on the Wallet page; aimeat_commerce_psp_set refuses (decision D5).
  *   v2.0.0 — 2026-07-28 — Renamed from the `enterprise` surface handbook when the edition seam was
  *     removed: no company objects, no KYB gate, every seller carries their own credentials.
@@ -35,6 +36,13 @@ price an offer on one of the owner's agents (morsels and/or priceMoney micro-uni
 app-tool returns its result on session.fulfillment.results; task fulfillments land as the
 seller's agent task. Discover sellables with \`aimeat_discover\` or GET /v1/commerce/feed +
 /v1/commerce/tools.
+
+**Your daily purchase limit.** You pay in money only within the limit your owner set on your card,
+per currency; with no limit you do not spend money, and a checkout in money answers
+PURCHASE_LIMIT_NOT_SET. Read it before you buy: \`aimeat_memory_read { key: "commerce.agent-limits",
+owner_scope: true }\` (per agent GAII and currency, in 6-decimal micro-units) and today's spending
+under \`commerce.agent-spend\`. Only the owner changes it, signed in, on the Agents page; give them
+that link. Morsel prices are not limited.
 
 **Working state.** \`aimeat_memory_*\` for notes and state · \`aimeat_storage_upload\`/\`_download\`
 · \`aimeat_wallet_balance\`/\`_transactions\` · \`aimeat_handbook_get\`.

@@ -279,7 +279,7 @@ export function commerceAcpRouter(config: AimeatConfig, storage: Storage): Route
         handlerFor(parsed.data.payment_data),
         parsed.data.payment_data?.token,
         callerJwt,
-        req.auth ? { roles: req.auth.roles, scopes: req.auth.scopes ?? [], appGrantId: req.auth.app_grant ?? null } : null,
+        req.auth ? { sub: req.auth.sub, roles: req.auth.roles, scopes: req.auth.scopes ?? [], appGrantId: req.auth.app_grant ?? null } : null,
       );
       res.json(toAcpSession(completed));
     } catch (err) { sendAcpError(res, config, err); }

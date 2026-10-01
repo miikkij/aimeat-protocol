@@ -15045,7 +15045,18 @@
         "selfStartOff": "El trabajo que le envían espera hasta que lo inicies.",
         "selfStartOnSaved": "Ahora empieza el trabajo por sí solo.",
         "selfStartOffSaved": "Ahora su trabajo espera a que lo inicies.",
-        "selfStartFailed": "No se pudo guardar. Inténtalo de nuevo."
+        "selfStartFailed": "No se pudo guardar. Inténtalo de nuevo.",
+        "buyLabel": "Compras por día",
+        "buyLine": "{amount} {currency}, gastado hoy {spent}",
+        "buyNone": "Ninguno: este agente no gasta dinero hasta que fijes un límite.",
+        "buyChange": "Fijar límite",
+        "buyCurrency": "Moneda",
+        "buyAmount": "Lo máximo que puede gastar en un día",
+        "buyHint": "Cuenta solo las compras con dinero del propio agente. Tus compras y los precios en morsels no tienen límite.",
+        "buySave": "Guardar el límite",
+        "buyRemove": "Quitar el límite en {currency}",
+        "buySaved": "Ahora el agente puede gastar hasta {amount} {currency} al día.",
+        "buyCleared": "El agente ya no gasta {currency}."
       }
     },
     "scopes": {

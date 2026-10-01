@@ -526,6 +526,7 @@ const ALL_SUITES = [
     'test/e2e-organism-shapes.ts',
     // A package's "what you get" sheet, its questions for an installer, and its agents as proposals.
     'test/e2e-package-sheet.ts',
+    'test/e2e-agent-purchase-limit.ts',
     // The account's own record, and the mount-order collision that made its window unreadable.
     'test/e2e-account-events.ts',
     'test/e2e-operator-welcome.ts',

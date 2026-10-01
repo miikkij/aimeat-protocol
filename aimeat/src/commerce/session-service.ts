@@ -15,6 +15,9 @@
  *   updateSessionItems · cancelSession · completeSession
  * @usage import { createSession, completeSession } from '../commerce/session-service.js';
  * @version-history
+ *   v2.6.0 — 2026-10-02 — An agent pays money only within the daily purchase limit its owner set on
+ *     its card (agent-purchase-limit.ts): refused before the collect, counted after the completion.
+ *     The caller now carries `sub`, the principal the limit is about.
  *   v2.5.1 — 2026-09-26 — The buyer and seller names on the payment rows come from localAccountName
  *     (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local
  *     namesake (secaudit 2026-09, F-1).
@@ -57,6 +60,7 @@ import { bookBeneficiaryShares } from './beneficiary-book.js';
 import { takeDesignations } from './beneficiary-designation.js';
 import { emitChange } from '../services/event-bus.js';
 import { localAccountName } from '../utils/gaii.js';
+import { agentPurchaseRefusal, recordAgentPurchase } from './agent-purchase-limit.js';
 
 export { CommerceError } from './errors.js';
 
@@ -412,7 +416,7 @@ export async function completeSession(
   callerJwt?: string,
   /** The completing principal. Present for every door that a granted app can reach; see the spend
    *  gate below. Omitted only where no external principal can be the caller. */
-  caller?: { roles: string[]; scopes: string[]; appGrantId?: string | null } | null,
+  caller?: { sub?: string; roles: string[]; scopes: string[]; appGrantId?: string | null } | null,
 ): Promise<CheckoutSessionRecord> {
   requireOpen(session);
 
@@ -429,6 +433,9 @@ export async function completeSession(
       ? new CommerceError('SCOPE_REQUIRED', 403, `This app was not granted the "${spendRefusal.scope}" permission, so it cannot spend on your behalf.`)
       : new CommerceError('APP_SPEND_CAP_REACHED', 403, `This app has reached the spending limit you set for it (${spendRefusal.capMorsels} morsels).`);
   }
+  // The same question for an AGENT: money only within the daily limit its owner set on its card.
+  const agentRefusal = await agentPurchaseRefusal(storage, config, session, caller);
+  if (agentRefusal) throw agentRefusal;
   if (Date.now() > new Date(session.expiresAt).getTime()) {
     session.status = 'expired';
     session.updatedAt = new Date().toISOString();
@@ -548,6 +555,8 @@ export async function completeSession(
   await putRecord(storage, session.buyerGhii, sessionKey(session.id), completed);
   // The seller's orders-received copy, under THEIR GHII (readable without touching buyer data).
   await putRecord(storage, session.sellerGhii, orderKey(session.id), completed);
+  // An agent's money purchase counts toward its daily limit once it went through (agent-purchase-limit.ts).
+  await recordAgentPurchase(storage, session, caller);
 
   // BOTH sides get a row. Money moved in two directions and each party experienced a different
   // event: one paid, one was paid. A single row on the buyer's feed would leave the seller — the

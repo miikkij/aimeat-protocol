@@ -33,6 +33,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's revenue-split configuration (bensplit.*)."
     },
+    "src/commerce/agent-purchase-limit.ts": {
+      "reads": {
+        "getMemory": 3
+      },
+      "why": "Reviewed 2026-10-02, the node's own read: the owner's purchase-limit settings (commerce.agent-limits) and today's spending counter (commerce.agent-spend), read to allow or refuse an agent's checkout. No content is shown to anyone."
+    },
     "src/commerce/hold-book.ts": {
       "reads": {
         "getMemory": 4,

@@ -457,7 +457,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
       const xPayment = decodeXPayment(req.header('X-PAYMENT') ?? undefined);
       const handlerId = parsed.data.payment?.handler ?? (xPayment ? X402_HANDLER_ID : undefined);
       const instrument = xPayment ?? parsed.data.payment?.instrument;
-      const completed = await completeSession(storage, config, session, handlerId, instrument, callerJwt, req.auth ? { roles: req.auth.roles, scopes: req.auth.scopes ?? [], appGrantId: req.auth.app_grant ?? null } : null);
+      const completed = await completeSession(storage, config, session, handlerId, instrument, callerJwt, req.auth ? { sub: req.auth.sub, roles: req.auth.roles, scopes: req.auth.scopes ?? [], appGrantId: req.auth.app_grant ?? null } : null);
       res.json(success(config.nodeId, { session: completed }, [
         { description: 'Wallet balance', method: 'GET', url: '/v1/wallet' },
       ]));
