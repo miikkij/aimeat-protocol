@@ -22,7 +22,7 @@ and its shape. Symptom first in the section too, then cause, then the rule.
 1. **Silent success.** Something answers ok, 200, delivered or true, or logs green, on a path where the work did not happen: a branch that returns normally after skipping, `continue` inside a loop that decides, a catch that returns a plausible value, a parameter accepted and never read, a counter or a filter nobody can see working. *Ask what the caller sees when the work did NOT happen.* §1, 4, 5, 9, 16b, 28, 31, 36, 61, 63, 64, 65, 67, 73, 74, 75, 76, 77, 78b, 80, 82, 84, 88, 92, 93, 98, 101, 102
 2. **A test or a measurement that cannot fail.** A test nobody saw red, a fixture smaller than the limit it tests, a comparison two empty results satisfy, a concurrency test run on sqlite only, a flag tested switched on only, a sweep total read as a regression. *Ask which line of the change turns the test red when it is reverted.* §12, 17, 18, 19, 21, 26, 34, 35, 37, 38, 45, 46, 50, 51, 54, 56, 57, 69, 72, 79, 89, 90, 91, 94, 99, 100
 3. **One rule, N doors, and one forgets.** A rule changed in one place while other doors reach the same capability: the REST route, the node MCP tool, the connector MCP tool, the CLI dispatch, an operator door, a second writer of the same record, a second backend. *Grep the capability's name and ask whether every door goes through the changed code.* §3, 7, 8b, 25, 33, 41, 44, 47, 48, 52, 58, 78, 81, 97
-4. **A name is not a principal.** A comparison or a storage key built from `req.auth.owner`, `sub`, a bare account name, a delivery target or a display identity where the holder or the addressed principal is meant. *Ask what the value holds for an agent, an app grant, a federated session and a namesake.* §6, 22, 43, 53, 66, 83
+4. **A name is not a principal.** A comparison or a storage key built from `req.auth.owner`, `sub`, a bare account name, a delivery target or a display identity where the holder or the addressed principal is meant. *Ask what the value holds for an agent, an app grant, a federated session and a namesake.* §6, 22, 43, 53, 66, 83, 103
 5. **Parallel sessions and the machine.** A hardcoded port, a probe that binds narrower than the server, a file or a log used as state, a path from the other shell's world, a recursive delete near a link. *Ask what happens when a second session runs the same thing on this machine at the same moment.* §13, 14, 23, 32, 38b, 39, 60, 71, 77b
 
 ## Symptom index
@@ -135,6 +135,7 @@ and its shape. Symptom first in the section too, then cause, then the rule.
 | 100 | An app never signs in on the sandbox; an owner-token check passes, the app's call fails | 2 |
 | 101 | A view-transition fade flashes the page light at its midpoint | 1 |
 | 102 | Every write into a workspace space refused although its schema says additional properties are allowed | 1 |
+| 103 | A peer "proven" by its /.well-known card, and still not the node its id names | 4 |
 
 ---
 
@@ -1161,3 +1162,12 @@ Two SESSIONS in one checkout is forbidden now (`CLAUDE.md`), so the case below i
 - **Why it hid.** The registration answers 201 with the schema as it was sent, so the request and the reply both say "open". The override happens only at write time, inside the validator.
 - **The rule.** A schema for a workspace space lists its properties, or names them by `patternProperties`; `additionalProperties` decides nothing there, because strict mode overrides it. `test/unit/sdk-organism-members-first-run.test.ts` holds the shape the library fills.
 - **The tell.** A schema registered as permissive, and writes refused as if it were closed.
+
+## 103. A peer "proven" by its /.well-known card, and still not the node its id names
+
+*Symptoms: a peer registered from a request (`{ url, public_key }` for a node id) passes a check against the node's own `/.well-known/aimeat`, and a direct message, a federated sign-in or an identity lookup for that node id still reaches a server the requester chose.*
+
+- **The case.** Three package routes registered any node id that was not yet a peer as an active peer, from the url and key in the request (`services/package-peer-register.ts`, 2026-09-28). The design that found it (`docs/specs/package-sale-design.md` §6 F) proposed reading the candidate's card and requiring the same id and key. That was built on 2026-10-01 and is not the fix by itself: the requester names the url, so the requester decides what card is served there, the real node's real key included. Under `AIMEAT_FEDERATION_AUTH_POLICY=all_peers` such a peer was a home node for federated sign-in, so a password went to that url and the reply was verified with the requester's key (`test/e2e-peer-registration-proof.ts` signs in as `alice@<id>` on the code before the fix).
+- **Why it hides.** A card check that compares id and key refuses typos and wrong urls, so it looks like proof in every test that uses an honest node. A signed challenge looks stronger and proves only that the caller holds some key.
+- **The rule.** A node id has no authority outside each node's own peer table: the first registration under it is trusted on first use, whatever was checked. So a peer that arrives without an operator is kept to what it was registered for (`registerPackagePeer` writes contact tier, messaging off), and every path that trusts a peer's url or key for something else reads the peer's flags or tier (`message-delivery.ts`, `register-login.ts` with `tierCeiling`). Record how such a peer arrived (`peer-origin.ts`) so an operator can find it and free the id (`DELETE /v1/federation/peers/:nodeId?emergency=true`).
+- **The tell.** A new code path that writes a peer, or reads `peer.url` / `peer.publicKey`, with no `gatePeer`, flag or tier check in sight.

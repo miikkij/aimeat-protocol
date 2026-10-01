@@ -7,9 +7,14 @@
  *   signed with the seller node's own key (package-sale-auth.ts), with no token.
  *
  *   A DECISION, NOT A SECRET. The author names the seller once ("store.aimeat.io sells my packages"),
- *   from a chat or the API. Nothing is copied between machines: the seller's public key is read from
- *   its /.well-known/aimeat and pinned here. Jouni ruled on 2026-09-29 that the system does this
- *   itself.
+ *   from a chat or the API. Nothing is copied between machines: a seller this repository does not
+ *   know yet is given as { url, public_key }, and it is registered only when its own
+ *   /.well-known/aimeat answers with the same node id and key (package-peer-register.ts). Jouni ruled
+ *   on 2026-09-29 that the system does this itself.
+ *
+ *   WHO MAY NAME ONE. An author: the caller holds at least one package here, and the node has taken
+ *   the repository role. Naming a seller is not a sale, so a seller that does not answer is refused
+ *   (PEER_UNREACHABLE) rather than left pending; the author tries again.
  *
  *   PER AUTHOR. A seller sells every package of the author who named it, and nothing of anyone else's:
  *   an install bundle and the packages it lists share their author (package-entitlements.ts), so one
@@ -19,12 +24,16 @@
  *   `sellers.<author>`: no principal can address it.
  * @structure SellerRecord · listSellers() · addSeller() · removeSeller() · isSellerFor()
  * @version-history
+ *   v1.1.0 — 2026-10-01 — A new seller is registered only after its card answers with the same id and
+ *     key; adding one needs the repository role and an author with a package here. Until then any
+ *     owner with packages:write could register any node id as a peer through this route (the
+ *     peer-registration incident, finding F).
  *   v1.0.0 — 2026-09-29 — Initial (install packages, phase 5: seller nodes).
  */
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from './federation.js';
 import { NS_PACKAGE_ENTITLEMENTS } from './package-entitlements.js';
-import { checkPackagePeer, registerPackagePeer } from './package-peer-register.js';
+import { linkPackagePeer } from './package-peer-register.js';
 
 export interface SellerRecord { nodeId: string; addedAt: string; addedBy: string; note?: string }
 type Stored = { author: string; nodes: Record<string, SellerRecord> };
@@ -60,19 +69,28 @@ export async function isSellerFor(storage: Storage, author: string, nodeId: stri
 
 /**
  * Name `nodeId` a seller of the caller's packages. With `node` ({ url, public_key }) a node this
- * repository does not know yet is registered as a packages-only peer (package-peer-register.ts); a
- * known peer must be active and under the same key.
+ * repository does not know yet is registered as a packages-only peer once its card answers with the
+ * same id and key (package-peer-register.ts); a known peer must be active and under the same key.
  */
 export async function addSeller(
-    storage: Storage, peers: Map<string, PeerInfo>, caller: { owner: string },
+    deps: { storage: Storage; peers: Map<string, PeerInfo>; config: { packageRepository: boolean; federationTimeoutMs: number } },
+    caller: { owner: string },
     input: { nodeId: string; node?: unknown; note?: unknown },
 ): Promise<Refusal | { ok: true; seller: SellerRecord; peerRegistered: boolean }> {
+    const { storage, peers, config } = deps;
     if (!NODE_RE.test(input.nodeId)) return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'node_id is a node id such as "aimeat-finland-003-store".' };
+    if (!config.packageRepository) {
+        return { ok: false, status: 404, code: 'NOT_A_REPOSITORY', message: 'This node does not serve packages as a repository, so nothing here can be sold. The operator turns the role on with AIMEAT_PACKAGE_REPOSITORY.' };
+    }
+    if ((await storage.listPackages({ author: caller.owner, limit: 1, offset: 0 })).total === 0) {
+        return { ok: false, status: 403, code: 'NOT_AN_AUTHOR', message: 'You have no packages on this repository, so there is nothing for a seller to sell. Publish a package first.' };
+    }
     let peerRegistered = false;
     if (input.node !== undefined && input.node !== null) {
-        const check = checkPackagePeer(peers, input.nodeId, input.node);
-        if (!check.ok) return check;
-        if (check.add) { await registerPackagePeer(storage, peers, check.add); peerRegistered = true; }
+        const link = await linkPackagePeer({ storage, peers, timeoutMs: config.federationTimeoutMs }, input.nodeId, input.node,
+            { source: 'package-seller', by: caller.owner }, { pendingWhenUnreachable: false });
+        if (!link.ok) return link;
+        peerRegistered = link.registered;
     } else {
         const known = peers.get(input.nodeId);
         if (!known || known.status !== 'active' || !known.publicKey) {

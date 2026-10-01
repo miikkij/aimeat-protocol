@@ -5,6 +5,9 @@
  * @description Peering-request admin decisions + peer lifecycle routes (approve/reject/delete requests,
  *   activate, heartbeat, presence, peer list/add/update, visiting→member promotion). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-10-01 — GET /peers says how each peer arrived (`origin`, services/peer-origin-view.ts)
+ *     and lists the package registrations still waiting for their node (`pending_registrations`), so
+ *     an operator can find a peer no operator added (the peer-registration incident, finding F).
  *   v1.5.0 — 2026-09-25 — A peer's own relay-claim setting: `relay_claim` on PUT /peers/:nodeId, and
  *     PUT /peers/:nodeId/relay-claim, the door the operator's AI reaches it through.
  *   v1.4.0 — 2026-09-01 — The THIRD door closed: `PUT /peers/:nodeId` refuses `status: 'active'`
@@ -46,6 +49,8 @@ import { gatePeer } from '../../services/federation-peer-gate.js';
 import { getActivePolicy, evaluatePromotion } from '../../services/network-policy.js';
 import { parsePeerRelayClaim, setPeerRelayClaim, peerRelayClaimView } from '../../services/relay-claim-policy.js';
 import { promotionMetrics } from './promotion.js';
+import { describePeerOrigins } from '../../services/peer-origin-view.js';
+import { pendingRegistrationView } from '../../services/peer-origin.js';
 
 export function registerPeersRoutes(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
     // GET /v1/admin/peering/requests — list pending peering requests (operator)
@@ -311,6 +316,7 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
         // Compute promotion eligibility for visiting peers (one work scan + policy fetch reused).
         const policy = await getActivePolicy(storage);
         const allWork = await storage.listAllWork().catch(err => { logger.warn('GET /v1/federation/peers: continuing after a suppressed failure', { error: String(err) }); return []; }) as unknown as { status: string; providerGaii: string; requesterGaii: string }[];
+        const origins = await describePeerOrigins(storage, peers.values());
         const peerList = await Promise.all([...peers.values()].map(async p => {
             let promotion_eligible: boolean | undefined;
             let promotion_failing: string[] | undefined;
@@ -343,6 +349,7 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
                 heartbeat_total: p.heartbeatTotal ?? 0,
                 software_version: p.softwareVersion ?? null,
                 expires_at: p.expiresAt ?? null,
+                origin: origins.byNode.get(p.nodeId) ?? { kind: 'operator_or_federation' },
                 ...(promotion_eligible !== undefined ? { promotion_eligible, promotion_failing } : {}),
                 ...((p as PeerInfo & { depeerGraceEnd?: string }).depeerGraceEnd
                     ? { depeer_grace_end: (p as PeerInfo & { depeerGraceEnd?: string }).depeerGraceEnd } : {}),
@@ -352,6 +359,7 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
         res.json(success(config.nodeId, {
             peers: peerList,
             total: peerList.length,
+            pending_registrations: origins.pending.map(pendingRegistrationView),
         }));
     });
 

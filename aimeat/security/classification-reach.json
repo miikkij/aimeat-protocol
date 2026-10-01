@@ -1724,6 +1724,19 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: An update-notice marker."
     },
+    "src/services/peer-origin-view.ts": {
+      "reads": {
+        "listMemory": 2
+      },
+      "why": "Reviewed 2026-10-01, the node's own read: the entitlement and seller records in the package-entitlements system namespace, listed only to show the operator which of them name an older packages-only peer."
+    },
+    "src/services/peer-origin.ts": {
+      "reads": {
+        "getMemory": 2,
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-10-01, the node's own read: how a federation peer arrived and the package registrations waiting for their node, in the federation-peer-origin system namespace. No content of a person's."
+    },
     "src/services/portfolio-members.ts": {
       "reads": {
         "listMemoryForOwners": 1

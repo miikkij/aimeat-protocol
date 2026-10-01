@@ -32,6 +32,10 @@
  * @usage
  *   const out = await applyInstallSet({ storage, config, peers }, { installSet, secrets, dryRun: true });
  * @version-history
+ *   v1.6.0 — 2026-10-01 — The repository the set names is linked only after its own card answers with
+ *     the same node id and key, and how the peer arrived is recorded (peer-origin.ts). A repository
+ *     that does not answer is PEER_UNREACHABLE, which the start-up apply tries again. The
+ *     peer-registration incident (finding F).
  *   v1.5.0 — 2026-09-30 — The install's warnings reach the operator: each package step keeps them,
  *     the apply answer lists them (`warnings`) and so does the plan. A skill the owner already had
  *     of their own was skipped in silence (aimeat-apps, 2026-09-29).
@@ -61,6 +65,8 @@ import { createOrganismRecord } from './organism-lifecycle.js';
 import { provisionWorkspace, checkWorkspaceManifest, type ProvisionWorkspaceInput } from './workspace-provision.js';
 import { deployAppAgent } from './app-agent-deploy.js';
 import { deriveTierFlags } from './federation-tiers.js';
+import { proveNodeCard } from './package-peer-register.js';
+import { recordPeerOrigin } from './peer-origin.js';
 import { NS_INSTALL_SETS } from './install-set-trust.js';
 
 // The namespace lives with the trust check (install-set-trust.ts), which package-pull.ts reads
@@ -198,7 +204,8 @@ function installProblems(groupId: string, preview: PackageInstallPreview): strin
  * exists under another key, or that the operator switched off, is refused and left as it is.
  *
  * Written here rather than through POST /v1/federation/peers because that route leaves a new peer
- * pending for a person to activate, and the set is that person's decision made in advance.
+ * pending for a person to activate, and the set is that person's decision made in advance. The
+ * repository's own card must answer with the id and key the set names before anything is linked.
  */
 async function linkRepository(
     deps: ApplyDeps, set: InstallSet, write: boolean,
@@ -211,6 +218,14 @@ async function linkRepository(
         if (known.status !== 'active' || known.shareCatalogue === false) return { ok: false, status: 409, code: 'PEER_NOT_ACTIVE', message: `${repo.nodeId} is a peer of this node, but not active with the catalogue shared. Activate it on the Federation page, then apply the set.` };
         return { ok: true, peers: deps.peers };
     }
+    const proof = await proveNodeCard(repo.nodeId, repo.url, repo.publicKey, deps.config.federationTimeoutMs ?? 10000);
+    if (proof.kind === 'refused') return proof.refusal;
+    if (proof.kind === 'unreachable') {
+        return { ok: false, status: 503, code: 'PEER_UNREACHABLE', message: `The repository ${repo.nodeId} did not answer at ${repo.url} (${proof.detail}), so its key could not be checked. Nothing was linked.` };
+    }
+    const raced = deps.peers.get(repo.nodeId);
+    if (raced && raced.publicKey !== repo.publicKey) return { ok: false, status: 409, code: 'PEER_KEY_MISMATCH', message: `${repo.nodeId} is a peer of this node under another key than the set names. Check which key is right before applying.` };
+    if (raced) return { ok: true, peers: deps.peers };
     const now = new Date().toISOString();
     const peer: PeerInfo = {
         nodeId: repo.nodeId, url: repo.url, publicKey: repo.publicKey, status: 'active', addedAt: now, lastSeen: now,
@@ -219,6 +234,10 @@ async function linkRepository(
     if (!write) return { ok: true, peers: new Map(deps.peers).set(repo.nodeId, peer) };
     deps.peers.set(repo.nodeId, peer);
     await deps.storage.saveFederationPeer(peer);
+    await recordPeerOrigin(deps.storage, {
+        nodeId: repo.nodeId, source: 'install-set-repository', by: 'install-set', url: repo.url, publicKey: repo.publicKey,
+        proof: 'node-card', requestedAt: now, provenAt: now,
+    });
     return { ok: true, peers: deps.peers };
 }
 

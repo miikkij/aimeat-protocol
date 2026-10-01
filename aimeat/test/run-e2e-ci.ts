@@ -848,6 +848,9 @@ const ALL_SUITES = [
     // An install set applied to a customer node: a bundle from a repository, the owner, the members
     // (an account now or an email invitation), the organism, the config, and the crew agent.
     'test/e2e-install-sets.ts',
+    // A peer a package path registers: only on the node's own card, packages-only, no sign-in and no
+    // messages through it, a sale that waits for a node that is down, and the operator's release.
+    'test/e2e-peer-registration-proof.ts',
     'test/e2e-businesslauncher.ts',
     'test/e2e-company-brain.ts',
     'test/e2e-personal-node.ts',
