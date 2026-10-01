@@ -8,6 +8,8 @@
  *   refusal line, which is an alert.
  * @usage cd aimeat && pnpm exec vitest run test/unit/atelier-shop-words.test.ts
  * @version-history
+ *   v1.1.0 - 2026-10-01 - crew's live count, the palette, compare and the tour take their words
+ *     from the kit dictionary too (atelier 0.62.2).
  *   v1.0.0 - 2026-10-01 - Initial (atelier 0.62.1, the shop parts in three languages).
  */
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -22,6 +24,7 @@ let lenis: any;
 let flow: any;
 let shop: any;
 let parts: any;
+let partsUi: any;
 
 beforeAll(async () => {
   restore = installGlobals({ motion: 'less' });
@@ -33,6 +36,7 @@ beforeAll(async () => {
   flow = await import('../../src/static/sdk-libs/atelier/flow-parts.js');
   shop = await import('../../src/static/sdk-libs/atelier/cart.js');
   parts = await import('../../src/static/sdk-libs/atelier/parts.js');
+  partsUi = await import('../../src/static/sdk-libs/atelier/parts-ui.js');
 });
 afterEach(() => { doc.body.innerHTML = ''; kit.i18n.setLang('en'); });
 afterAll(() => restore());
@@ -234,6 +238,62 @@ describe('the cart line', () => {
     const h = host();
     shop.cart({ target: h, data: { currency: '€', lines: [{ id: 'a', title: 'Flour', sub: 'Rye', price: 5.9, qty: 1 }] } });
     expect(sub(h).textContent).toBe('Rye');
+  });
+});
+
+/** crew, the palette, compare and the tour, drawn so every word of their own is on screen. */
+function drawPeople(): string[] {
+  const h = host();
+  parts.crew({ target: h, data: { people: [{ id: 'a', label: 'Ann Lee' }], live: 3 } });
+  partsUi.compare({ target: h, before: { label: 'Old' }, after: { label: 'New' } });
+  const p = partsUi.palette({ hotkey: false, items: [{ id: 'x', label: 'Open', run() {} }] });
+  p.open();
+  const input = doc.body.querySelector('.ak-palette__input');
+  input.value = 'zzz';
+  input.dispatchEvent({ type: 'input', bubbles: true });
+  const one = doc.createElement('div');
+  const two = doc.createElement('div');
+  h.appendChild(one);
+  h.appendChild(two);
+  const tr = partsUi.tour({ steps: [{ target: one, text: 'First' }, { target: two, text: 'Second' }] });
+  tr.start();
+  const seen = heard(doc.body);
+  click(byClass(doc.body, 'ak-tour__nav')[0].children[0]);
+  seen.push(...heard(doc.body));
+  tr.end();
+  p.destroy();
+  return seen;
+}
+
+/** The English those four drew before their words moved to the dictionary. */
+const PEOPLE_ENGLISH = ['3 here now', 'Compare', 'Commands', 'go to, run, adopt…', 'Nothing matches.', 'Next', 'Skip', 'Done'];
+
+describe('crew, palette, compare and tour', () => {
+  it('draw their English exactly as before', () => {
+    kit.i18n.setLang('en');
+    const seen = drawPeople();
+    expect(PEOPLE_ENGLISH.filter((w) => !seen.includes(w))).toEqual([]);
+  });
+
+  for (const lang of ['fi', 'es']) {
+    it('leave no English word of their own in ' + lang, () => {
+      kit.i18n.setLang(lang);
+      const seen = drawPeople();
+      expect(PEOPLE_ENGLISH.filter((w) => seen.includes(w))).toEqual([]);
+      for (const key of ['paletteLabel', 'palettePlaceholder', 'paletteEmpty', 'compareLabel', 'next', 'tourSkip', 'done']) {
+        expect(seen, key).toContain(kit.i18n.t(key));
+      }
+      expect(seen).toContain(kit.i18n.t('crewLive', { n: 3 }));
+    });
+  }
+
+  it('says "paikalla nyt" in Finnish, and an app label still wins', () => {
+    kit.i18n.setLang('fi');
+    const h = host();
+    parts.crew({ target: h, data: { people: [{ id: 'a' }], live: 2 } });
+    expect(byClass(h, 'ak-crew__live')[0].textContent).toBe('2 paikalla nyt');
+    parts.crew({ target: h, data: { people: [{ id: 'a' }], live: 2, liveLabel: 'linjoilla' } });
+    expect(byClass(h, 'ak-crew__live')[1].textContent).toBe('2 linjoilla');
   });
 });
 

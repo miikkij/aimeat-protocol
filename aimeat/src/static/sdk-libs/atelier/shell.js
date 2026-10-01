@@ -41,6 +41,10 @@
  * @tokens bottomNav --ak-chrome-bottom
  * @fork bottomNav Copy .ak-bottomnav* out of shell.css; the chrome reserve is the shell's.
  * @version-history
+ *   v0.67.0 — 2026-10-01 — The tab row scrolls ITSELF so the chosen tab is fully in view: at the
+ *     first draw, on a pick and on set({ value }), smoothly on a change unless motion is reduced
+ *     (scroll-edge.js keepInView). Only the strip's scrollLeft moves, never the page. The bar's
+ *     less-motion helpers moved to shell-motion.js unchanged, to keep this file under 800 lines.
  *   v0.66.0 — 2026-09-29 — `logo` takes a small inline image (data:image, at most 8192 characters):
  *     a package carries the app's file and not the owner's storage, so a mark read from storage was
  *     missing on every customer node. A larger data: URI, or one that is not an image, is refused.
@@ -93,6 +97,8 @@ import { partEl, slotInto, applyVariant, hasPart, partValue } from './parts-mode
 import { sideNav } from './workbench.js';
 import { ink } from './ink.js';
 import { margins } from './margins.js';
+import { motionLabel, motionIcon, motionIsLess } from './shell-motion.js';
+import { keepInView } from './scroll-edge.js';
 
 /** The longest inline logo drawn: a 64px WebP is 1 to 3 kB of base64, a photograph is not a logo. */
 const LOGO_INLINE_MAX = 8192;
@@ -142,56 +148,8 @@ const BOOT_POLL_MS = 300;
  * signed-out first visit never reads as a hung page. */
 const SIGNIN_GRACE_MS = 2500;
 
-/** The namespace SVG is drawn in: an icon is a shape, never a character from a font. */
-const SVG_NS = 'http://www.w3.org/2000/svg';
-
-/** The mark on the root that says the viewer asked for less motion (dom.js writes it). */
-const MOTION_ATTR = 'data-ak-motion';
-
 /** The account pill's own light/dark control, which the shell wraps in an iris. */
 const MODE_BUTTON = '#aimeat-mode-switch button[data-mode]';
-
-/**
- * The less-motion switch's words. The kit's dictionary has no key of its own for this yet, so a
- * host that supplies one wins and English is the floor, never the bare key on screen.
- * @returns {string}
- */
-function motionLabel() {
-  const said = t('lessMotion');
-  return said === 'lessMotion' ? 'Less motion' : said;
-}
-
-/**
- * The switch's mark: three speed lines, and a stroke through them the stylesheet reveals when
- * the switch is pressed. Drawn in currentColor, so it is the bar's own ink in every look.
- * @returns {SVGElement}
- */
-function motionIcon() {
-  const svg = document.createElementNS(SVG_NS, 'svg');
-  svg.setAttribute('viewBox', '0 0 24 24');
-  svg.setAttribute('width', '18');
-  svg.setAttribute('height', '18');
-  svg.setAttribute('fill', 'none');
-  svg.setAttribute('stroke', 'currentColor');
-  svg.setAttribute('stroke-width', '2');
-  svg.setAttribute('stroke-linecap', 'round');
-  svg.setAttribute('aria-hidden', 'true');
-  const lines = document.createElementNS(SVG_NS, 'path');
-  lines.setAttribute('class', 'ak-app__motion-lines');
-  lines.setAttribute('d', 'M4 7h15M4 12h11M4 17h7');
-  const slash = document.createElementNS(SVG_NS, 'path');
-  slash.setAttribute('class', 'ak-app__motion-slash');
-  slash.setAttribute('d', 'M20 4 5 20');
-  svg.appendChild(lines);
-  svg.appendChild(slash);
-  return svg;
-}
-
-/** Is the kit's own less-motion switch on right now? (The OS setting is a separate voice, and
- *  the switch reports itself, not the operating system.) @returns {boolean} */
-function motionIsLess() {
-  return document.documentElement.getAttribute(MOTION_ATTR) === 'less';
-}
 
 /**
  * @typedef {object} AppHandle
@@ -679,6 +637,7 @@ export function section(spec) {
  * A tab row. Reports the pick; the host swaps the view — inside the kit's screen transition, so
  * the swap is SEEN as a change without the host asking for it. `transition` names another move
  * (slide, wipe, zoom, iris, curtain); the app's `motion: false` and reduced motion collapse it.
+ * A row wider than its box scrolls sideways by itself so the chosen tab is fully in view.
  * @param {{
  *   target?: string|Element, items: Array<{ id: string, label: string }>,
  *   value?: string, onChange?: (id: string) => void,
@@ -693,8 +652,11 @@ export function tabs(spec) {
   if (spec.target) resolve(spec.target).appendChild(root);
   // The chosen tab's fill is the ink, one marker that travels to the next pick (ink.js).
   const mark = ink(root, { active: '.ak-tab--active' });
+  // The strip scrolls itself (never the page) so the chosen tab is fully in view.
+  const follow = keepInView(root, '.ak-tab--active');
 
-  function render() {
+  /** @param {boolean} [moved]  a change of choice, which may scroll smoothly; the first draw never does */
+  function render(moved) {
     clear(root);
     for (const item of state.items) {
       const active = item.id === state.value;
@@ -717,7 +679,7 @@ export function tabs(spec) {
             const release = mark.pin();
             viewSwap(function () {
               state.value = item.id;
-              render();
+              render(true);
               if (spec.onChange) spec.onChange(item.id);
             }, { kind: spec.transition, node: root }).then(release, release);
           },
@@ -725,6 +687,7 @@ export function tabs(spec) {
       }, tabLabel(spec, 'tab', item)));
     }
     mark.sync();
+    follow.request(moved);
   }
   render();
 
@@ -735,9 +698,9 @@ export function tabs(spec) {
       if (!patch) return;
       if (patch.items) state.items = patch.items;
       if (patch.value != null) state.value = patch.value;
-      render();
+      render(true);
     },
-    destroy() { mark.destroy(); if (root.parentNode) root.parentNode.removeChild(root); },
+    destroy() { follow.destroy(); mark.destroy(); if (root.parentNode) root.parentNode.removeChild(root); },
   };
 }
 

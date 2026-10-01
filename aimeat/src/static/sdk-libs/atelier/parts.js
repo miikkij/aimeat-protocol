@@ -17,6 +17,9 @@
  *   const zone = AIMEAT.atelier.dropzone({ target, upload: { visibility: 'public' }, onUploaded(f, a) {} });
  *   if (zone.pending()) return;  // hold the app's own submit while files are still going up
  * @version-history
+ *   v0.62.2 — 2026-10-01 — crew: the default line after the live count comes from the kit
+ *     dictionary (crewLive: "3 here now", "3 paikalla nyt", "Aquí ahora: 3"); `liveLabel` still
+ *     replaces it, drawn after the count as before.
  *   v0.62.1 — 2026-10-01 — dropzone: the refusal line carries role="alert", so a screen reader
  *     announces "is not a kind this takes" and "is over N MB" when they appear.
  *   v0.62.0 — 2026-10-01 — dropzone takes `upload` (key, visibility, workspaceRef, chunkedOver,
@@ -30,6 +33,7 @@ import { svg } from './chart-core.js';
 import { emptyState } from './state.js';
 import { storageLib, uploader } from './dropzone-upload.js';
 import { tu } from './copy-upload-i18n.js';
+import { t } from './i18n.js';
 
 function rowsOf(data) {
   if (Array.isArray(data)) return data;
@@ -110,7 +114,8 @@ export function crew(spec) {
     if (people.length > max) stack.appendChild(el('span', { class: 'ak-crew__face ak-crew__more' }, '+' + (people.length - max)));
     root.appendChild(stack);
     if (d && typeof d.live === 'number' && d.live > 0) {
-      root.appendChild(el('span', { class: 'ak-crew__live' }, [el('span', { class: 'ak-crew__dot' }), String(d.live) + ' ' + (d.liveLabel || 'here now')]));
+      root.appendChild(el('span', { class: 'ak-crew__live' }, [el('span', { class: 'ak-crew__dot' }),
+        d.liveLabel ? String(d.live) + ' ' + d.liveLabel : t('crewLive', { n: d.live })]));
     }
     enter(root);
   }

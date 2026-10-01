@@ -13,6 +13,10 @@
  *   AIMEAT.atelier.toast({ title: 'Part adopted', sub: 'shop.html', action: { label: 'Undo', onPick } });
  *   AIMEAT.atelier.palette({ items: [{ id: 'adopt', label: 'Adopt…', run() {} }], hotkey: 'k' });
  * @version-history
+ *   v0.62.2 — 2026-10-01 — The kit's own words here come from its dictionary in en/fi/es: the
+ *     palette's name, placeholder and no-match line, the compare handle's name, and the tour's
+ *     Next, Done and Skip. An app's `empty`, `placeholder` and `labels` still win; English is the
+ *     text drawn before.
  *   v0.59.0 — 2026-09-29 — The toasts, the palette and a tour note wear the app's look (wearLook):
  *     they sit on the body, outside the frame that carries the look's tokens.
  *   v0.55.0 — 2026-09-28 — The palette moves: it grows out of the button that opened it (`anchor`,
@@ -30,6 +34,7 @@ import { fadeIn, paceOf, settle } from './arrive.js';
 import { springFrames } from './motion.js';
 import { ink } from './ink.js';
 import { openMotion, closeMotion } from './menu.js';
+import { t } from './i18n.js';
 
 let toastHost = null;
 
@@ -169,7 +174,7 @@ export function palette(spec) {
     const host = list;
     settle(host, function () {
       Array.prototype.slice.call(host.querySelectorAll('.ak-palette__item, .ak-palette__empty')).forEach(function (n) { host.removeChild(n); });
-      if (!shown.length) { host.appendChild(el('li', { class: 'ak-palette__empty', 'data-ak-id': '__empty' }, s.empty || 'Nothing matches.')); return; }
+      if (!shown.length) { host.appendChild(el('li', { class: 'ak-palette__empty', 'data-ak-id': '__empty' }, s.empty || t('paletteEmpty'))); return; }
       shown.forEach(function (it, i) {
         host.appendChild(el('li', { class: 'ak-palette__item', role: 'option', 'data-ak-id': keyOf(it, i), 'aria-selected': 'false', on: {
           click: function () { runItem(it); },
@@ -185,7 +190,7 @@ export function palette(spec) {
     cursor = 0;
     shown = s.items.slice();
     list = el('ul', { class: 'ak-palette__list', role: 'listbox' });
-    const input = el('input', { class: 'ak-palette__input', type: 'text', placeholder: s.placeholder || 'go to, run, adopt…', autocomplete: 'off', on: {
+    const input = el('input', { class: 'ak-palette__input', type: 'text', placeholder: s.placeholder || t('palettePlaceholder'), autocomplete: 'off', on: {
       input: function () {
         const q = /** @type {HTMLInputElement} */ (input).value.trim().toLowerCase();
         shown = s.items.filter(function (it) { return !q || (it.label + ' ' + (it.hint || '')).toLowerCase().indexOf(q) >= 0; });
@@ -199,7 +204,7 @@ export function palette(spec) {
         else if (e.key === 'Escape') { e.preventDefault(); close(function () { if (opener && opener.isConnected) /** @type {HTMLElement} */ (opener).focus(); }); }
       },
     } });
-    box = el('div', { class: 'ak-palette__box', role: 'dialog', 'aria-modal': 'true', 'aria-label': s.placeholder || 'Commands' }, [input, list]);
+    box = el('div', { class: 'ak-palette__box', role: 'dialog', 'aria-modal': 'true', 'aria-label': s.placeholder || t('paletteLabel') }, [input, list]);
     root = el('div', { class: 'ak-root ak-palette', on: { click: function (e) { if (e.target === root) close(); } } }, [box]);
     document.body.appendChild(wearLook(root, opener));
     mark = ink(list, { axis: 'y', active: '.ak-palette__item[aria-selected="true"]:not(.ak-layout__ghost)', className: 'ak-palette__ink' });
@@ -270,7 +275,7 @@ export function compare(spec) {
     const body = side.el ? side.el : side.image ? el('img', { src: side.image, alt: side.label || '' }) : el('span', {}, side.label || '');
     return el('div', { class: 'ak-compare__layer ' + cls }, [body]);
   }
-  const handle = el('button', { type: 'button', class: 'ak-compare__handle', 'aria-label': 'Compare', role: 'slider', 'aria-valuemin': '0', 'aria-valuemax': '100' }, '⇄');
+  const handle = el('button', { type: 'button', class: 'ak-compare__handle', 'aria-label': t('compareLabel'), role: 'slider', 'aria-valuemin': '0', 'aria-valuemax': '100' }, '⇄');
   const root = el('div', { class: 'ak-root ak-compare' }, [
     layer(s.before || {}, 'ak-compare__before'),
     layer(s.after || {}, 'ak-compare__after'),
@@ -313,7 +318,6 @@ export function compare(spec) {
  */
 export function tour(spec) {
   const s = spec || { steps: [] };
-  const L = Object.assign({ next: 'Next', done: 'Done', skip: 'Skip' }, s.labels || {});
   let i = -1;
   let note = null;
   let marked = null;
@@ -338,6 +342,8 @@ export function tour(spec) {
     marked.classList.add('ak-tour__mark');
     if (!reducedMotion()) marked.scrollIntoView({ block: 'center', behavior: 'smooth' });
     const last = n === s.steps.length - 1;
+    // Read per step, so a language change during the tour reaches the next note.
+    const L = Object.assign({ next: t('next'), done: t('done'), skip: t('tourSkip') }, s.labels || {});
     note = el('div', { class: 'ak-root ak-tour__note', role: 'dialog', 'aria-live': 'polite' }, [
       el('div', {}, [el('span', { class: 'ak-tour__step' }, (n + 1) + '/' + s.steps.length), el('span', {}, step.text)]),
       el('div', { class: 'ak-tour__nav' }, [
