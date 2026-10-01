@@ -17011,7 +17011,18 @@
         "selfStartOff": "Work sent to it waits until you start it.",
         "selfStartOnSaved": "It now starts work by itself.",
         "selfStartOffSaved": "Its work now waits for you to start it.",
-        "selfStartFailed": "That could not be saved. Try again."
+        "selfStartFailed": "That could not be saved. Try again.",
+        "buyLabel": "Purchases per day",
+        "buyLine": "{amount} {currency}, spent today {spent}",
+        "buyNone": "None: this agent does not spend money until you set a limit.",
+        "buyChange": "Set limit",
+        "buyCurrency": "Currency",
+        "buyAmount": "Most it may spend in a day",
+        "buyHint": "Counts only the agent's own purchases in money. Your own purchases and morsel prices are not limited.",
+        "buySave": "Save the limit",
+        "buyRemove": "Remove the {currency} limit",
+        "buySaved": "The agent may now spend up to {amount} {currency} a day.",
+        "buyCleared": "The agent no longer spends {currency}."
       }
     },
     "scopes": {

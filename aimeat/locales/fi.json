@@ -16994,7 +16994,18 @@
         "selfStartOff": "Sille lähetetty työ odottaa, kunnes käynnistät sen.",
         "selfStartOnSaved": "Agentti aloittaa nyt työn itse.",
         "selfStartOffSaved": "Agentin työ odottaa nyt, että käynnistät sen.",
-        "selfStartFailed": "Tallennus ei onnistunut. Yritä uudelleen."
+        "selfStartFailed": "Tallennus ei onnistunut. Yritä uudelleen.",
+        "buyLabel": "Ostot päivässä",
+        "buyLine": "{amount} {currency}, tänään käytetty {spent}",
+        "buyNone": "Ei rajaa: agentti ei käytä rahaa, ennen kuin asetat rajan.",
+        "buyChange": "Aseta raja",
+        "buyCurrency": "Valuutta",
+        "buyAmount": "Enintään päivässä",
+        "buyHint": "Raja koskee vain agentin omia ostoja rahalla. Omia ostojasi ja morsel-hintoja se ei rajoita.",
+        "buySave": "Tallenna raja",
+        "buyRemove": "Poista {currency}-raja",
+        "buySaved": "Agentti voi nyt käyttää enintään {amount} {currency} päivässä.",
+        "buyCleared": "Agentti ei enää käytä valuuttaa {currency}."
       }
     },
     "scopes": {

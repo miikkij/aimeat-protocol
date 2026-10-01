@@ -14,6 +14,7 @@
  * @structure SCREEN_ONLY_MD (Markdown, links relative to the node)
  * @usage `${SCREEN_ONLY_MD}` inside a handbook or a skill's text
  * @version-history
+ *   v1.1.0 — 2026-10-02 — Money names each agent's daily purchase limit, set on its card.
  *   v1.0.0 — 2026-10-01 — Initial.
  */
 
@@ -26,8 +27,10 @@ another way round: the node refuses an agent on each of these.
 
 - **Signing in:** two-step sign-in, passkeys, open sessions, the password and the email address.
   /v1/profile?tab=security . Why: they decide who can get into the account.
-- **Money:** the payment provider's secret key and the payout accounts. /v1/profile?tab=wallet .
-  Why: a key that moves money never passes through a chat.
+- **Money:** the payment provider's secret key and the payout accounts (/v1/profile?tab=wallet),
+  and how much money each agent may spend on purchases in a day (on that agent's card,
+  /v1/profile?tab=agents). Why: a key that moves money never passes through a chat, and an agent
+  does not set its own spending.
 - **Giving rights:** approving an agent and choosing what it may reach (/v1/profile?tab=agents),
   letting an agent read mail (on that agent's card), and approving an app's access. Why: the person
   gives rights in their own name, so they give them themselves.

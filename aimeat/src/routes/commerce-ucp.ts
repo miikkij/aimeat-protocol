@@ -219,7 +219,7 @@ export function commerceUcpRouter(config: AimeatConfig, storage: Storage): Route
     try {
       const session = await loadOwnSession(req);
       const callerJwt = (req.headers.authorization || '').replace('Bearer ', '');
-      const completed = await completeSession(storage, config, session, parsed.data.payment?.handler, parsed.data.payment?.instrument, callerJwt, req.auth ? { roles: req.auth.roles, scopes: req.auth.scopes ?? [], appGrantId: req.auth.app_grant ?? null } : null);
+      const completed = await completeSession(storage, config, session, parsed.data.payment?.handler, parsed.data.payment?.instrument, callerJwt, req.auth ? { sub: req.auth.sub, roles: req.auth.roles, scopes: req.auth.scopes ?? [], appGrantId: req.auth.app_grant ?? null } : null);
       res.json(ucpEnvelope(UCP_CAPABILITIES, { checkout_session: toUcpSession(completed) }));
     } catch (err) { sendUcpError(res, config, err); }
   });

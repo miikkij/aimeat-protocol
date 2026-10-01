@@ -1,6 +1,7 @@
 {
   "note": "REST doors against their agent twins, door by door (scripts/inventory/field-reach.ts). `rest-only:<field> <route>`: the route reads the record field and no twin tool declares it. `no-twin:<route>`: the route reads record fields and no agent tool does the same job. `unnamed:` and `unrouted:` hold, per file, the reads the measurement cannot place. Seeded so the gate fails only on a NEW entry. \"NOT YET REVIEWED\" is a question nobody has answered, not a clearance; an answered entry says why only a person with a browser is meant to reach it.",
   "exempt": {
+    "no-twin:PUT /v1/agents/:name/purchase-limit": "SCREEN ONLY BY DECISION (D5, Jouni 2026-10-02). The daily limit on an agent's money purchases is set by the owner, signed in themselves (requireOwnerPrincipal); an agent tool that sets it would let an agent raise its own spending. Agents read it through GET on the same route or the commerce.agent-limits record.",
     "no-twin:DELETE /v1/admin/email/templates/:id": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (locale) and no agent tool does the same job.",
     "no-twin:DELETE /v1/ecosystem/subscriptions": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (event) and no agent tool does the same job.",
     "no-twin:DELETE /v1/intake/forms": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (organism_id) and no agent tool does the same job.",

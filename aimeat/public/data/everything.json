@@ -2408,6 +2408,15 @@
      "plain": "x402 off testnet Non-custodial settlement in USDC or EURC on Base Sepolia by default; Base mainnet is configurable. /.well-known/x402.json"
     },
     {
+     "slug": "g-14-a-daily-purchase-limit-for-each-agent",
+     "cells": [
+      "<strong>A daily purchase limit for each agent</strong>",
+      "An agent of yours pays in money only within the daily limit you set on its card, per currency. With no limit it does not spend money, and a checkout it tries is refused with a link to the card. You set the limit yourself, signed in; an agent can read its limit and what it spent today, but cannot change it. Your own purchases and morsel prices are not limited. Limits: the limit covers checkouts; a hold for a bid is not counted.",
+      "Profile › Agents (agent card), <code>/v1/agents/:name/purchase-limit</code>"
+     ],
+     "plain": "A daily purchase limit for each agent An agent of yours pays in money only within the daily limit you set on its card, per currency. With no limit it does not spend money, and a checkout it tries is refused with a link to the card. You set the limit yourself, signed in; an agent can read its limit and what it spent today, but cannot change it. Your own purchases and morsel prices are not limited. Limits: the limit covers checkouts; a hold for a bid is not counted. Profile › Agents (agent card), /v1/agents/:name/purchase-limit"
+    },
+    {
      "slug": "g-14-agent-commerce-protocols",
      "cells": [
       "<strong>Agent commerce protocols</strong>",
@@ -3655,6 +3664,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-09-15 against node 3.15.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 363
+  "rows": 364
  }
 }
