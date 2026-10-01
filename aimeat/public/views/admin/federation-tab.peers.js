@@ -26,6 +26,8 @@
  *   - AskingToJoin (05) — the pending requests, and the door to the history
  * @usage Imported by views/admin/federation-tab.js.
  * @version-history
+ *   v2.1.0 — 2026-10-01 — Under a peer's rung, how it arrived when no operator added it (a package
+ *     sale and who asked, a seller, an install set), so the operator finds such a peer on the page.
  *   v2.0.0 — 2026-09-27 — Library components, no class: the peers, the requests and the history
  *     are Lists (each cell says its column on a narrow screen; the peers turn into one block each at
  *     1100px, as before), the state and the version keep their status colours as Tinted words, the
@@ -93,6 +95,17 @@ function stateOf(p) {
   return { word: p.status || '—', why: null, tone: '' };
 }
 
+/**
+ * How the peer arrived, when no operator added it: a package sale, a seller, an install set. Shown
+ * under its rung, because the rung is what that arrival gave it. Nothing for a peer the operator or a
+ * federation handshake added (GET /v1/federation/peers `origin`, services/peer-origin-view.ts).
+ */
+function arrivedBy(o) {
+  if (!o || o.kind === 'operator_or_federation') return undefined;
+  if (o.kind === 'inferred') return S('peers.origin_inferred');
+  return S('peers.origin_' + String(o.source).replace(/-/g, '_'), { by: o.by });
+}
+
 /** A version, how far behind the newest it is (in the warn colour), or that it is the newest. */
 function Version({ version, behind, newest }) {
   const same = !behind && version && newest && version === newest;
@@ -125,7 +138,7 @@ export function PeerTable({ peers, overview, onActivate, onPromote, onRemove, on
             <${Desc} sub=${st.why || undefined}>
               <${Tinted} strong tone=${TONE[st.tone]}>${st.word}<//>
             <//>
-            <${Desc}>${t('dashboard.fedTier_' + (p.tier || 'member')) || p.tier || 'member'}<//>
+            <${Desc} sub=${arrivedBy(p.origin)}>${t('dashboard.fedTier_' + (p.tier || 'member')) || p.tier || 'member'}<//>
             <${Version} version=${p.software_version} behind=${p.versions_behind} newest=${newest} />
             <${When}>${dt(p.last_seen)}<//>
             <${MayDo} peer=${p} />
