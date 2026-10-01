@@ -23,6 +23,8 @@
  *     aimeat_organism_members names only the agents the organism admits.
  *   v1.8.2 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
+ *   v1.9.0 — 2026-10-01 — aimeat_organism_create takes `shape` and `lang` (a starting shape and its
+ *     workspaces, the same call POST /v1/organisms makes), and its type presets add company and family.
  *   v1.8.1 — 2026-08-29 — aimeat_organism_create's `type` is described as free text with five presets.
  *   v1.8.0 — 2026-08-11 — create/update/join/leave call services/organism-lifecycle.ts, the same
  *     writer the REST routes use (August 2026 MCP audit step 8). The tools keep their gates and their
@@ -567,17 +569,19 @@ export function registerOrganismsTools(
         {
             name: z.string().describe('Organism name (min 2 chars)'),
             description: z.string().optional(),
-            type: z.string().optional().describe('What kind of group, in your own word (1 to 40 characters). Presets with a translation: community | team | club | cooperative | project'),
+            type: z.string().optional().describe('What kind of group, in your own word (1 to 40 characters). Presets with a translation: community | team | club | cooperative | project | company | family'),
             join_policy: z.string().optional().describe('open | approval_required | invite_only'),
             visibility: z.string().optional().describe('public | listed | private'),
+            shape: z.string().optional().describe('A starting shape that also creates its workspaces: own-work | team | company | family | club | project. Sets the type, join policy and visibility unless you give them.'),
+            lang: z.string().optional().describe('Language of the shape\'s workspace names and readme: en | fi | es. The person\'s language.'),
         },
         annotationsFor('aimeat_organism_create'),
-        async ({ name, description, type, join_policy, visibility }) => {
-            // Validation, the board, the record, the creator membership and the feed/timeline side
-            // effects are the shared writer's (services/organism-lifecycle.ts, same call
-            // POST /v1/organisms makes).
+        async ({ name, description, type, join_policy, visibility, shape, lang }) => {
+            // Validation, the board, the record, the creator membership, the shape's workspaces and
+            // the feed/timeline side effects are the shared writer's (services/organism-lifecycle.ts,
+            // same call POST /v1/organisms makes).
             const result = await createOrganismRecord({ storage, config }, getOwnerName(), {
-                name, description, type, joinPolicy: join_policy, visibility,
+                name, description, type, joinPolicy: join_policy, visibility, shape, lang,
             });
             if (!result.ok) return { content: [{ type: 'text' as const, text: result.message }], isError: true };
             const record = result.organism;
@@ -588,6 +592,7 @@ export function registerOrganismsTools(
                     text: JSON.stringify({
                         created: true,
                         organism: { id: record.id, name: record.name, board_id: record.boardId, visibility: record.visibility, join_policy: record.joinPolicy },
+                        ...(result.workspaces ? { workspaces: result.workspaces } : {}),
                     }, null, 2),
                 }],
             };

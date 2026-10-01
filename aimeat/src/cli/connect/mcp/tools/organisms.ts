@@ -9,6 +9,7 @@
  *     aimeat_organism_invite_email takes `locale`, the email's language.
  *   v1.7.2 -- 2026-09-28 -- aimeat_organism_invite_email takes return_url and passes it to the REST route;
  *     aimeat_organism_update takes agent_access.
+ *   v1.8.0 -- 2026-10-01 -- aimeat_organism_create forwards `shape` and `lang` (starting shapes).
  *   v1.7.1 -- 2026-08-29 -- aimeat_organism_create's `type` is described as free text with five presets.
  *   v1.7.0 -- 2026-08-25 -- aimeat_organism_member_remove (DELETE /v1/organisms/:id/members/:ghii,
  *     ?ban=1), parity with the server MCP and the CLI dispatch.
@@ -135,15 +136,19 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
   mcp.tool('aimeat_organism_create', descriptionFor('aimeat_organism_create'), {
     name: z.string().describe('Organism name (min 2 chars)'),
     description: z.string().optional().describe('What this organism is for'),
-    type: z.string().optional().describe('What kind of group, in your own word (1 to 40 characters). Presets with a translation: community | team | club | cooperative | project'),
+    type: z.string().optional().describe('What kind of group, in your own word (1 to 40 characters). Presets with a translation: community | team | club | cooperative | project | company | family'),
     join_policy: z.string().optional().describe('open | approval_required | invite_only'),
     visibility: z.string().optional().describe('public | listed | private'),
-  }, annotationsFor('aimeat_organism_create'), async ({ name, description, type, join_policy, visibility }) => {
+    shape: z.string().optional().describe('A starting shape that also creates its workspaces: own-work | team | company | family | club | project. Sets the type, join policy and visibility unless you give them.'),
+    lang: z.string().optional().describe('Language of the shape\'s workspace names and readme: en | fi | es. The person\'s language.'),
+  }, annotationsFor('aimeat_organism_create'), async ({ name, description, type, join_policy, visibility, shape, lang }) => {
     const body: Record<string, unknown> = { name };
     if (description != null) body.description = description;
     if (type != null) body.type = type;
     if (join_policy != null) body.join_policy = join_policy;
     if (visibility != null) body.visibility = visibility;
+    if (shape != null) body.shape = shape;
+    if (lang != null) body.lang = lang;
     const resp = await client.post('/v1/organisms', body);
     return envelopeResult(resp);
   });

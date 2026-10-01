@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Public-memory, organism, workspace and schedule connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-01 — aimeat_organism_create forwards `shape` and `lang` (starting shapes).
  *   2026-09-30 — aimeat_workspace_comment_delete handler (DELETE /v1/organisms/:id/comments/:commentId).
  *   2026-09-28 — aimeat_organism_update passes agent_access.
  *   2026-09-27 -- aimeat_schedule_list forwards detail (GET /v1/schedules?detail=true); aimeat_schedule_update forwards prompt with the rest.
@@ -104,6 +105,8 @@ export const organismTools: ConnectCliToolDefinition[] = [
             const type = optionalString(input, 'type'); if (type) body.type = type;
             const joinPolicy = optionalString(input, 'join_policy'); if (joinPolicy) body.join_policy = joinPolicy;
             const visibility = optionalString(input, 'visibility'); if (visibility) body.visibility = visibility;
+            const shape = optionalString(input, 'shape'); if (shape) body.shape = shape;
+            const lang = optionalString(input, 'lang'); if (lang) body.lang = lang;
             return client.post('/v1/organisms', body);
         },
     },

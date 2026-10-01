@@ -766,10 +766,19 @@
      "slug": "g-6-organisms",
      "cells": [
       "<strong>Organisms</strong>",
-      "Groups, teams and projects with members, owners, join requests and an overview.",
+      "Where work lives between conversations: one place where you, the people you invite and all your AIs, from any vendor, read and write the same material, with members, owners, join requests and an overview.",
       "<code>/v1/organisms</code>, <code>aimeat_organism_*</code>"
      ],
-     "plain": "Organisms Groups, teams and projects with members, owners, join requests and an overview. /v1/organisms, aimeat_organism_*"
+     "plain": "Organisms Where work lives between conversations: one place where you, the people you invite and all your AIs, from any vendor, read and write the same material, with members, owners, join requests and an overview. /v1/organisms, aimeat_organism_*"
+    },
+    {
+     "slug": "g-6-start-from-a-shape",
+     "cells": [
+      "<strong>Start from a shape</strong>",
+      "Create an organism as your own work, a team, a company, a family, a club or a project, and it comes with its workspaces: their spaces, locked schemas and a readme that says what the place is for and what is current, named in your language. The shape sets a safe join policy and visibility, which you can change. Your AI does the same in one call, and the skill <code>aimeat-organisms</code> tells it when a person needs an organism and how to set one up. The organism page's one-click project template is the same shape.",
+      "<code>GET /v1/organisms/shapes</code> · <code>POST /v1/organisms</code> with <code>shape</code>, <code>lang</code> · <code>aimeat_organism_create</code>"
+     ],
+     "plain": "Start from a shape Create an organism as your own work, a team, a company, a family, a club or a project, and it comes with its workspaces: their spaces, locked schemas and a readme that says what the place is for and what is current, named in your language. The shape sets a safe join policy and visibility, which you can change. Your AI does the same in one call, and the skill aimeat-organisms tells it when a person needs an organism and how to set one up. The organism page's one-click project template is the same shape. GET /v1/organisms/shapes · POST /v1/organisms with shape, lang · aimeat_organism_create"
     },
     {
      "slug": "g-6-invitations",
@@ -3628,6 +3637,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-09-15 against node 3.15.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 360
+  "rows": 361
  }
 }

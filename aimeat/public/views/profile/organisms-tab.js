@@ -19,6 +19,9 @@
  *   import OrganismsTab from '/views/profile/organisms-tab.js';
  *   <OrganismsTab session={session} showToast={showToast} onStats={onStats} />
  * @version-history
+ *   v2.33.0 -- 2026-10-01 -- The create form starts from a shape (own work, team, company, family, club,
+ *     project; GET /v1/organisms/shapes): the shape sets the type, policy and visibility and the create
+ *     call makes its workspaces. Type presets add company and family (guided journey P5).
  *   v2.32.0 -- 2026-09-26 -- Every part is a kit component (page group G2a): the page is the SettingsPage (crumb, title, description, the confirm dialog after), the create form a section Card with the Fields, the Selects, the Note and FormActions, the search the Search line with Clear and its hits the List under a Group heading per organism (a hit's workspace a tag), the organisms the List in the mark-name-tags-stats-doors cut (the name opens the thing and takes Enter, the lock and the archived status in the tags cell, the four counts in Stats, Open or Join and the ⋯ menu at the end, drag to reorder with the row a drag is over marked, a discovered organism's Facts and interests in its opened panel), the import field the hidden FileDrop, the archived ones under a folded Section, the joined banner the aside Note. The page writes no class.
  *   v2.31.0 -- 2026-09-26 -- The line under an organism's name is the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
  *   v2.30.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
@@ -158,6 +161,14 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   const [formPolicy, setFormPolicy] = useState('open');
   const [formVisibility, setFormVisibility] = useState('public');
   const [formInterests, setFormInterests] = useState('');
+  // A starting shape (GET /v1/organisms/shapes): '' is none, the organism starts empty.
+  const [formShape, setFormShape] = useState('');
+  const [shapes, setShapes] = useState([]);
+  const shapeLang = (typeof document !== 'undefined' && document.documentElement.lang || 'en').slice(0, 2);
+  useEffect(() => {
+    if (!showCreate || shapes.length) return;
+    orgService.getShapes(shapeLang).then(setShapes).catch(err => swallowed('organisms-tab: shapes', err));
+  }, [showCreate, shapes.length, shapeLang]);
 
   const ghii = session?.owner || '';
   const [wsCounts, setWsCounts] = useState({});   // orgId → workspace count (own orgs)
@@ -327,11 +338,12 @@ export default function OrganismsTab({ session, showToast, onStats }) {
         join_policy: formPolicy,
         visibility: formVisibility,
         interests,
+        ...(formShape ? { shape: formShape, lang: shapeLang } : {}),
       });
       if (result?.data?.organism) {
         showToast(t('organisms.created') || 'Organism created!');
         setShowCreate(false);
-        setFormName(''); setFormDesc(''); setFormInterests('');
+        setFormName(''); setFormDesc(''); setFormInterests(''); setFormShape('');
         loadData();
       } else {
         showToast(result?.error?.message || (t('organisms.createError') || 'Failed to create'));
@@ -340,7 +352,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
       swallowed('organisms-tab: onOpen', err);
       showToast(t('organisms.createError') || 'Failed to create');
     } finally { setCreating(false); }
-  }, [formName, formDesc, formType, formTypeCustom, formPolicy, formVisibility, formInterests, showToast, loadData]);
+  }, [formName, formDesc, formType, formTypeCustom, formPolicy, formVisibility, formInterests, formShape, shapeLang, showToast, loadData]);
 
   const handleJoin = useCallback(async (id) => {
     try {
@@ -552,7 +564,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   // after picking the type.
   const pickFormType = (v) => {
     setFormType(v);
-    if (v === 'team' || v === 'cooperative' || v === 'project') {
+    if (v === 'team' || v === 'cooperative' || v === 'project' || v === 'company' || v === 'family') {
       setFormPolicy('invite_only');
       setFormVisibility('private');
     } else {
@@ -560,6 +572,14 @@ export default function OrganismsTab({ session, showToast, onStats }) {
       setFormVisibility('public');
     }
   };
+  // A shape brings its own type, join policy and visibility; the person can still change them.
+  const pickFormShape = (id) => {
+    setFormShape(id);
+    const s = shapes.find(x => x.id === id);
+    if (!s) return;
+    setFormType(s.type); setFormPolicy(s.join_policy); setFormVisibility(s.visibility);
+  };
+  const chosenShape = shapes.find(x => x.id === formShape) || null;
   const ORG_COLS = 'mark-name-tags-stats-doors';
 
   return html`
@@ -573,6 +593,15 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     ${!showCreate ? null : html`
       <${Card} tone="section" title=${t('organisms.createTitle') || 'Create New Organism'}>
         <${Fields}>
+          <${Select} fit value=${formShape} onChange=${pickFormShape} ariaLabel=${t('organisms.shapeLabel')} options=${[
+            ['', t('organisms.shapeNone')],
+            ...shapes.map(s => [s.id, s.label]),
+          ]} />
+          <${Note} kind="meta">
+            ${chosenShape
+              ? `${chosenShape.hint} ${t('organisms.shapeMakes', { list: chosenShape.workspaces.map(w => w.name).join(', ') })}`
+              : t('organisms.shapeNoneHint')}
+          <//>
           <${TextField} placeholder=${t('organisms.namePlaceholder') || 'Name'} ariaLabel=${t('organisms.namePlaceholder') || 'Name'} value=${formName} onInput=${setFormName} />
           <${TextArea} placeholder=${t('organisms.descPlaceholder') || 'Description'} ariaLabel=${t('organisms.descPlaceholder') || 'Description'} value=${formDesc} onInput=${setFormDesc} rows=${2} />
           <${TextField} placeholder=${t('organisms.interestsPlaceholder') || 'Interests (comma separated)'} ariaLabel=${t('organisms.interestsPlaceholder') || 'Interests (comma separated)'} value=${formInterests} onInput=${setFormInterests} />
@@ -583,6 +612,8 @@ export default function OrganismsTab({ session, showToast, onStats }) {
               ['club', t('organisms.types.club') || 'Club'],
               ['cooperative', t('organisms.types.cooperative') || 'Cooperative'],
               ['project', t('organisms.types.project') || 'Project'],
+              ['company', t('organisms.types.company')],
+              ['family', t('organisms.types.family')],
               ['__custom', t('organisms.typeCustom') || 'Other'],
             ]} />
             ${formType === '__custom' ? html`

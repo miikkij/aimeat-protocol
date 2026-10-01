@@ -5,6 +5,7 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-01 — aimeat_organism_create takes `shape` and `lang` (starting shapes with their workspaces).
  *   2026-09-30 — aimeat_workspace_comment_delete; aimeat_organism_invite_email takes `locale`.
  *   2026-09-28 — aimeat_organism_invite_email takes `return_url`, where the invitee lands after accepting;
  *     aimeat_organism_update takes `agent_access`.
@@ -400,15 +401,17 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
     ...workspaceMemberChangeTools,
     {
         name: 'aimeat_organism_create',
-        description: 'Create a new ORGANISM (a shared, governed container for people + agents). You become its creator/admin/member, and it gets a discussion board. After creating, add workspaces with aimeat_workspace_create. Use this to bootstrap a collaboration space from scratch.',
+        description: 'Create a new ORGANISM (a shared, governed container for people + agents): one place every AI the person connects and every person they invite reads and writes. You become its creator/admin/member, and it gets a discussion board. Give a `shape` to start it with ready workspaces (own-work, team, company, family, club, project; GET /v1/organisms/shapes lists what each makes), or add workspaces afterwards with aimeat_workspace_create. Use this to bootstrap a collaboration space from scratch.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
             name: { type: 'string', required: true, description: 'Organism name (min 2 chars).' },
             description: { type: 'string', description: 'What this organism is for.' },
-            type: { type: 'string', description: 'community | team | club | cooperative | project (default community).' },
-            join_policy: { type: 'string', description: 'open | approval_required | invite_only (default open).' },
-            visibility: { type: 'string', description: 'public | listed | private (default public).' },
+            type: { type: 'string', description: 'community | team | club | cooperative | project | company | family (default community, or the shape\'s).' },
+            join_policy: { type: 'string', description: 'open | approval_required | invite_only (default open, or the shape\'s).' },
+            visibility: { type: 'string', description: 'public | listed | private (default public, or the shape\'s).' },
+            shape: { type: 'string', description: 'A starting shape that also creates its workspaces: own-work | team | company | family | club | project.' },
+            lang: { type: 'string', description: 'Language of the shape\'s workspace names and readme: en | fi | es.' },
         },
     },
     {
