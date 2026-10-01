@@ -7,6 +7,10 @@
  *   behind. A 200 proved none of them.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-app-members
  * @version-history
+ *   v1.2.0 — 2026-10-01 — IAM round 2: display names on every row and on /me, approve by email
+ *     (found, invited, cancelled, and an invited address that gets a verified account), a role change
+ *     told to the member in their own language, paging and search, managers and what they may not
+ *     touch, the audit trail, the 7-day wait after a decline, and the app's own token setting the plan.
  *   v1.1.0 — 2026-10-01 — The roster from a chat: aimeat_app_manage's member actions on the node MCP
  *     server, with the route's permission words and the owner test, and member_me and member_request
  *     for somebody else's app.
@@ -1531,6 +1535,254 @@ await test('MCP: the owner\'s agent sets and reads the plan, sweeps, and clears 
     const sellerless = await mcpSession(await agentOf(owner, ['app:write']));
     const refused = await manage(sellerless, { action: 'member_plan_set', filename: CHAT_APP, roles: { member: [] } });
     assert(refused.isError && refused.text.startsWith('SCOPE_DENIED'), `setting the plan needs commerce:sell: ${refused.text}`);
+});
+
+// ── 2026-10-01: IAM round 2 — display names, approve by email and invitations, role-change
+// notices, paging, managers, the audit trail, the decline wait, notices in the member's language,
+// and the app's own token setting the plan ────────────────────────────────────────────────────────
+
+const R2 = 'roster-r2.html';
+const r2 = () => `/v1/apps/${owner.name}/${R2}/members`;
+let r2member: Awaited<ReturnType<typeof setupOwner>>;
+let r2mgr: Awaited<ReturnType<typeof setupOwner>>;
+let r2asker: Awaited<ReturnType<typeof setupOwner>>;
+let r2org = '';
+const R2_CODE = 'SuperSecret99';
+
+/** An account whose email is VERIFIED, made the one e2e-safe way there is: an organism code key. */
+async function provisionWithEmail(email: string, label: string): Promise<{ name: string; code: string }> {
+    assert(!!r2org, 'the round 2 setup made the organism the code keys are minted in');
+    const name = `amr2${label}${Date.now().toString(36)}`;
+    const mint = await json(`/v1/organisms/${r2org}/invitations/code`, { method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ email, username: name, code: R2_CODE, display_name: `R2 ${label}` }) });
+    assert(mint.status === 201, `code key ${mint.status}: ${JSON.stringify(mint.body?.error)}`);
+    return { name, code: R2_CODE };
+}
+
+await test('setup: the owner publishes an app for round 2, makes an organism for code keys, and three more accounts exist', async () => {
+    const pub = await json('/v1/apps', {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ filename: R2, name: 'Roster round 2', description: 'roster round 2',
+            content: Buffer.from('<!doctype html><title>r2</title><p>r2', 'utf8').toString('base64') }),
+    });
+    assert(pub.status === 201, `publish ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
+    const org = await json('/v1/organisms', { method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ name: `R2 org ${Date.now()}`, type: 'project', join_policy: 'invite_only', visibility: 'public' }) });
+    assert(org.status === 201, `organism ${org.status}: ${JSON.stringify(org.body?.error)}`);
+    r2org = org.body.data.organism.id as string;
+    r2member = await setupOwner('r2m');
+    r2mgr = await setupOwner('r2g');
+    r2asker = await setupOwner('r2a');
+});
+
+await test('A1: every roster row and /me carry the public display name; a plain member still cannot read the roster', async () => {
+    const ask = await json(`${r2()}/requests`, { method: 'POST', headers: auth(r2member.token), body: JSON.stringify({ note: 'r2' }) });
+    assert(ask.status === 201, `ask ${ask.status}`);
+    const before = await json(r2(), { headers: auth(owner.token) });
+    const req = (before.body.data.requests as any[]).find(r => r.owner === r2member.name);
+    assert(req?.displayName === 'AM', `the request row is named: ${JSON.stringify(req)}`);
+    const ok = await json(r2(), { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ account: r2member.name, role: 'member' }) });
+    assert(ok.status === 201, `approve ${ok.status}: ${JSON.stringify(ok.body?.error)}`);
+    const after = await json(r2(), { headers: auth(owner.token) });
+    const row = (after.body.data.members as any[]).find(m => m.owner === r2member.name);
+    assert(row?.displayName === 'AM', `the member row is named: ${JSON.stringify(row)}`);
+    assert(after.body.data.canManage === true && after.body.data.isOwner === true, `the owner manages: ${JSON.stringify(after.body.data)}`);
+    const me = await json(`${r2()}/me`, { headers: auth(r2member.token) });
+    assert(me.body.data.displayName === 'AM' && me.body.data.canManage === false, `own standing: ${JSON.stringify(me.body.data)}`);
+    const ownerMe = await json(`${r2()}/me`, { headers: auth(owner.token) });
+    assert(ownerMe.body.data.canManage === true, `the owner's own standing says it manages: ${JSON.stringify(ownerMe.body.data)}`);
+    const peek = await json(r2(), { headers: auth(r2member.token) });
+    assert(peek.status === 403, `a plain member read an owner-only roster: ${peek.status}`);
+});
+
+await test('A4 + B4: a role change tells the member in their own language; a renewal tells nobody', async () => {
+    const lang = await json('/v1/ghii', { method: 'PUT', headers: auth(r2member.token), body: JSON.stringify({ locale: 'fi' }) });
+    assert(lang.status === 200, `set locale ${lang.status}: ${JSON.stringify(lang.body?.error)}`);
+    const changed = () => bell(r2member.token).then(n => n.filter(x => x.type === 'app_member_role_changed' && String(x.title).includes('roster-r2')));
+    const up = await json(r2(), { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ account: r2member.name, role: 'writer' }) });
+    assert(up.status === 200 && up.body.data.created === false, `role change ${up.status}: ${JSON.stringify(up.body?.error ?? up.body.data)}`);
+    const told = await changed();
+    assert(told.length === 1, `the member is told once: ${told.length}`);
+    assert(told[0].title === 'Roolisi sovelluksessa roster-r2 on nyt writer', `in Finnish, naming the new role: ${told[0].title}`);
+    assert(String(told[0].body).includes('member'), `and the old one: ${told[0].body}`);
+    await json(r2(), { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ account: r2member.name, role: 'writer' }) });
+    assert((await changed()).length === 1, 'a renewal of the same role sends nothing');
+    const intruder = await json(r2(), { method: 'POST', headers: auth(stranger.token), body: JSON.stringify({ account: r2member.name, role: 'member' }) });
+    assert(intruder.status === 403, `a stranger changed somebody's role: ${intruder.status}`);
+    assert((await changed()).length === 1, 'and the refused change told nobody');
+});
+
+await test('A5: the roster pages each list with totals and searches by account or display name', async () => {
+    const ok = await json(r2(), { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ account: r2mgr.name, role: 'member' }) });
+    assert(ok.status === 201, `approve ${ok.status}`);
+    const p1 = await json(`${r2()}?limit=1`, { headers: auth(owner.token) });
+    assert(p1.body.data.members.length === 1 && p1.body.data.total.members === 2 && p1.body.data.limit === 1, `page 1: ${JSON.stringify(p1.body.data.total)}`);
+    const p2 = await json(`${r2()}?limit=1&offset=1`, { headers: auth(owner.token) });
+    assert(p2.body.data.members.length === 1 && p2.body.data.members[0].owner !== p1.body.data.members[0].owner, 'page 2 is the other one');
+    const byName = await json(`${r2()}?q=${encodeURIComponent(r2member.name.toUpperCase())}`, { headers: auth(owner.token) });
+    assert(byName.body.data.members.length === 1 && byName.body.data.members[0].owner === r2member.name, `by account, any case: ${JSON.stringify(byName.body.data.members)}`);
+    const byDisplay = await json(`${r2()}?q=am`, { headers: auth(owner.token) });
+    assert(byDisplay.body.data.total.members === 2, `by display name: ${JSON.stringify(byDisplay.body.data.total)}`);
+    const none = await json(`${r2()}?q=nobody-zz-${Date.now()}`, { headers: auth(owner.token) });
+    assert(none.body.data.total.members === 0 && none.body.data.members.length === 0, 'a search that matches nobody');
+    const clamped = await json(`${r2()}?limit=99999`, { headers: auth(owner.token) });
+    assert(clamped.status === 200 && clamped.body.data.limit === 500, `a huge limit reads as 500: ${clamped.body.data.limit}`);
+});
+
+await test('A2: approve by email finds a verified account and names it; refusals come before any lookup', async () => {
+    const email = `r2found.${Date.now()}@example.com`;
+    const found = await provisionWithEmail(email, 'fnd');
+    const ok = await json(r2(), { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ email: email.toUpperCase(), role: 'member' }) });
+    assert(ok.status === 201, `approve by email ${ok.status}: ${JSON.stringify(ok.body?.error)}`);
+    assert(ok.body.data.found?.account === found.name && ok.body.data.found?.displayName === 'R2 fnd', `found: ${JSON.stringify(ok.body.data.found)}`);
+    assert(ok.body.data.member?.owner === found.name && ok.body.data.created === true, `approved as that account: ${JSON.stringify(ok.body.data.member)}`);
+    const both = await json(r2(), { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ email, account: found.name, role: 'member' }) });
+    assert(both.status === 400, `account and email together: ${both.status}`);
+    const junk = await json(r2(), { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ email: 'not-an-email', role: 'member' }) });
+    assert(junk.status === 400 && junk.body.error.code === 'INVALID_INPUT', `a malformed address: ${junk.status} ${JSON.stringify(junk.body?.error)}`);
+    const theirs = await json(r2(), { method: 'POST', headers: auth(stranger.token), body: JSON.stringify({ email, role: 'member' }) });
+    assert(theirs.status === 403, `a stranger looked up an address through somebody else's app: ${theirs.status}`);
+});
+
+let r2inviteId = '';
+await test('A2: an unknown address is invited, listed for the owner, and cancelled; a stranger cannot cancel it', async () => {
+    const email = `r2inv.${Date.now()}@example.com`;
+    const inv = await json(r2(), { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ email, role: 'writer', note: 'from the panel' }) });
+    assert(inv.status === 201 && inv.body.data.invited === true, `invite ${inv.status}: ${JSON.stringify(inv.body?.error ?? inv.body.data)}`);
+    const invite = inv.body.data.invite;
+    assert(typeof invite?.id === 'string' && invite.emailShown === email && invite.role === 'writer' && !('emailHash' in invite), `invite: ${JSON.stringify(invite)}`);
+    assert(typeof inv.body.data.emailSent === 'boolean', 'says whether the email left');
+    r2inviteId = invite.id;
+    const listed = await json(`${r2()}?q=r2inv`, { headers: auth(owner.token) });
+    assert((listed.body.data.invites as any[]).some(i => i.id === invite.id) && listed.body.data.total.invites === 1, `listed: ${JSON.stringify(listed.body.data.invites)}`);
+    const stolen = await json(`${r2()}/invites/${invite.id}`, { method: 'DELETE', headers: auth(stranger.token) });
+    assert(stolen.status === 403, `a stranger cancelled an invitation: ${stolen.status}`);
+    const cancel = await json(`${r2()}/invites/${invite.id}`, { method: 'DELETE', headers: auth(owner.token) });
+    assert(cancel.status === 200 && cancel.body.data.cancelled === true, `cancel ${cancel.status}: ${JSON.stringify(cancel.body?.error)}`);
+    const gone = await json(r2(), { headers: auth(owner.token) });
+    assert(!(gone.body.data.invites as any[]).some(i => i.id === invite.id), 'and it is off the list');
+    const again = await json(`${r2()}/invites/${invite.id}`, { method: 'DELETE', headers: auth(owner.token) });
+    assert(again.status === 404, `cancelling nothing: ${again.status}`);
+});
+
+await test('A2: an invited address that gets a verified account becomes a member in the invited role, and is told', async () => {
+    const email = `r2join.${Date.now()}@example.com`;
+    const inv = await json(r2(), { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ email, role: 'writer' }) });
+    assert(inv.status === 201 && inv.body.data.invited === true, `invite ${inv.status}`);
+    const joined = await provisionWithEmail(email, 'join');
+    const roster = await json(r2(), { headers: auth(owner.token) });
+    const row = (roster.body.data.members as any[]).find(m => m.owner === joined.name);
+    assert(row?.role === 'writer', `the new account is a writer: ${JSON.stringify(row)}`);
+    assert(!(roster.body.data.invites as any[]).some(i => i.id === inv.body.data.invite.id), 'and the invitation is used up');
+    const lg = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: joined.name, password: joined.code }) });
+    assert(lg.status === 200, `login ${lg.status}: ${JSON.stringify(lg.body?.error)}`);
+    const told = (await bell(lg.body.data.token)).filter(n => n.type === 'app_member_approved' && String(n.title).includes('roster-r2'));
+    assert(told.length === 1, `the new member is told once: ${told.length}`);
+});
+
+await test('B1: a member holding a managing role manages members, but not the plan, the sweep or another manager', async () => {
+    const plan = await json(`${r2()}/plan`, { method: 'PUT', headers: auth(owner.token),
+        body: JSON.stringify({ roles: { member: [], writer: [], admin: [] }, manageRoles: ['admin'] }) });
+    assert(plan.status === 200 && plan.body.data.plan.manageRoles?.[0] === 'admin', `plan ${plan.status}: ${JSON.stringify(plan.body?.error ?? plan.body.data.plan)}`);
+    const badPlan = await json(`${r2()}/plan`, { method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ roles: { member: [] }, manageRoles: ['owner'] }) });
+    assert(badPlan.status === 400, `"owner" as a managing role: ${badPlan.status}`);
+    const appoint = await json(r2(), { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ account: r2mgr.name, role: 'admin' }) });
+    assert(appoint.status === 200, `the owner makes a manager: ${appoint.status} ${JSON.stringify(appoint.body?.error)}`);
+    const me = await json(`${r2()}/me`, { headers: auth(r2mgr.token) });
+    assert(me.body.data.canManage === true, `the manager's standing: ${JSON.stringify(me.body.data)}`);
+    const read = await json(r2(), { headers: auth(r2mgr.token) });
+    assert(read.status === 200 && read.body.data.canManage === true && read.body.data.isOwner === false, `the manager reads the roster: ${read.status}`);
+
+    const helper = await setupOwner('r2h');
+    const other = await setupOwner('r2x');
+    const add = await json(r2(), { method: 'POST', headers: auth(r2mgr.token), body: JSON.stringify({ account: helper.name, role: 'member' }) });
+    assert(add.status === 201, `the manager approves: ${add.status} ${JSON.stringify(add.body?.error)}`);
+    const promote = await json(r2(), { method: 'POST', headers: auth(r2mgr.token), body: JSON.stringify({ account: helper.name, role: 'admin' }) });
+    assert(promote.status === 403, `the manager made a manager: ${promote.status}`);
+    const second = await json(r2(), { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ account: other.name, role: 'admin' }) });
+    assert(second.status === 201, `the owner makes a second manager: ${second.status}`);
+    const demote = await json(r2(), { method: 'POST', headers: auth(r2mgr.token), body: JSON.stringify({ account: other.name, role: 'member' }) });
+    assert(demote.status === 403, `the manager demoted another manager: ${demote.status}`);
+    const oust = await json(`${r2()}/${other.name}`, { method: 'DELETE', headers: auth(r2mgr.token) });
+    assert(oust.status === 403, `the manager removed another manager: ${oust.status}`);
+    const setPlan = await json(`${r2()}/plan`, { method: 'PUT', headers: auth(r2mgr.token), body: JSON.stringify({ roles: { member: [] } }) });
+    assert(setPlan.status === 403, `the manager set the plan: ${setPlan.status}`);
+    const readPlan = await json(`${r2()}/plan`, { headers: auth(r2mgr.token) });
+    assert(readPlan.status === 403, `the manager read the plan: ${readPlan.status}`);
+    const sweep = await json(`${r2()}/sweep`, { method: 'POST', headers: auth(r2mgr.token) });
+    assert(sweep.status === 403, `the manager swept: ${sweep.status}`);
+    const still = await json(r2(), { headers: auth(owner.token) });
+    assert((still.body.data.members as any[]).find(m => m.owner === other.name)?.role === 'admin', 'the other manager is untouched');
+    const remove = await json(`${r2()}/${helper.name}`, { method: 'DELETE', headers: auth(r2mgr.token) });
+    assert(remove.status === 200, `the manager removes a plain member: ${remove.status}`);
+    const plain = await json(r2(), { method: 'POST', headers: auth(r2member.token), body: JSON.stringify({ account: helper.name, role: 'member' }) });
+    assert(plain.status === 403, `a plain member approved somebody: ${plain.status}`);
+});
+
+await test('B2: every decision is on the audit trail, newest first; a plain member and a scope-less agent are refused', async () => {
+    const all = await json(`${r2()}/audit?limit=500`, { headers: auth(owner.token) });
+    assert(all.status === 200, `audit ${all.status}: ${JSON.stringify(all.body?.error)}`);
+    const rows = all.body.data.entries as any[];
+    const actions = new Set(rows.map(r => r.action));
+    for (const a of ['member.approved', 'member.role_changed', 'member.removed', 'invite.sent', 'invite.cancelled', 'plan.changed']) {
+        assert(actions.has(a), `${a} is on the trail: ${JSON.stringify([...actions])}`);
+    }
+    assert(rows.every((r, i) => i === 0 || rows[i - 1].at >= r.at), 'newest first');
+    const change = rows.find(r => r.action === 'member.role_changed' && r.account === r2member.name);
+    assert(change?.from === 'member' && change?.to === 'writer' && typeof change.by === 'string', `from and to: ${JSON.stringify(change)}`);
+    assert(rows.some(r => r.action === 'invite.cancelled' && r.detail?.invite === r2inviteId), 'the cancel names the invitation');
+    assert(!actions.has('dev.granted') && rows.every(r => !String(r.action).startsWith('legal.')), 'and only roster actions');
+    const page = await json(`${r2()}/audit?limit=2`, { headers: auth(owner.token) });
+    assert(page.body.data.entries.length === 2 && typeof page.body.data.nextBefore === 'string', `paged: ${JSON.stringify(page.body.data.nextBefore)}`);
+    const next = await json(`${r2()}/audit?limit=2&before=${encodeURIComponent(page.body.data.nextBefore)}`, { headers: auth(owner.token) });
+    assert(next.body.data.entries.every((r: any) => r.at < page.body.data.nextBefore), 'the next page is older');
+    const mgr = await json(`${r2()}/audit`, { headers: auth(r2mgr.token) });
+    assert(mgr.status === 200, `a manager reads the trail: ${mgr.status}`);
+    const member = await json(`${r2()}/audit`, { headers: auth(r2member.token) });
+    assert(member.status === 403, `a plain member read the trail: ${member.status}`);
+    const theirs = await json(`${r2()}/audit`, { headers: auth(stranger.token) });
+    assert(theirs.status === 403, `a stranger read the trail: ${theirs.status}`);
+    const mute = await json(`${r2()}/audit`, { headers: auth(await agentOf(owner, ['memory:read'])) });
+    assert(mute.status === 403 && mute.body.error.code === 'SCOPE_DENIED', `a memory:read agent read the trail: ${mute.status} ${JSON.stringify(mute.body?.error)}`);
+});
+
+await test('B3: a decline tells the person; asking again within 7 days is refused without ringing the owner', async () => {
+    const ask = await json(`${r2()}/requests`, { method: 'POST', headers: auth(r2asker.token), body: JSON.stringify({ note: 'first ask' }) });
+    assert(ask.status === 201, `ask ${ask.status}`);
+    const no = await json(`${r2()}/requests/${r2asker.name}`, { method: 'DELETE', headers: auth(owner.token) });
+    assert(no.status === 200 && no.body.data.declined === true && typeof no.body.data.retryAt === 'string', `decline: ${JSON.stringify(no.body?.data ?? no.body?.error)}`);
+    const declinedBell = () => bell(r2asker.token).then(n => n.filter(x => x.type === 'app_member_declined' && String(x.title).includes('roster-r2')));
+    assert((await declinedBell()).length === 1, 'the declined person is told once');
+    const twice = await json(`${r2()}/requests/${r2asker.name}`, { method: 'DELETE', headers: auth(owner.token) });
+    assert(twice.status === 200 && (await declinedBell()).length === 1, 'declining again tells nobody again');
+    const asks = () => bell(owner.token).then(n => n.filter(x => x.type === 'app_member_request' && String(x.title).includes(r2asker.name)));
+    const rung = (await asks()).length;
+    const again = await json(`${r2()}/requests`, { method: 'POST', headers: auth(r2asker.token), body: JSON.stringify({ note: 'second ask' }) });
+    assert(again.status === 429 && again.body.error.code === 'REASK_TOO_SOON', `asking again at once: ${again.status} ${JSON.stringify(again.body?.error)}`);
+    assert(again.body.error.details?.retryAt === no.body.data.retryAt, `with the date: ${JSON.stringify(again.body.error.details)}`);
+    assert((await asks()).length === rung, 'and the owner was not rung again');
+    const me = await json(`${r2()}/me`, { headers: auth(r2asker.token) });
+    assert(me.body.data.requested?.state === 'declined' && me.body.data.requested?.retryAt === no.body.data.retryAt, `own standing: ${JSON.stringify(me.body.data.requested)}`);
+    const nobody = await json(`${r2()}/requests/${stranger.name}`, { method: 'DELETE', headers: auth(owner.token) });
+    assert(nobody.status === 404, `declining somebody who never asked: ${nobody.status}`);
+});
+
+await test('the app\'s own token sets the plan but cannot add an offering; another app\'s token and a member\'s token are refused', async () => {
+    const own = await appTokenFor(owner, `${owner.name}/${R2}`, 'memory:read');
+    const set = await json(`${r2()}/plan`, { method: 'PUT', headers: auth(own),
+        body: JSON.stringify({ roles: { member: [], writer: [], admin: [] }, seats: { member: 50 } }) });
+    assert(set.status === 200, `the app's own token set the plan: ${set.status} ${JSON.stringify(set.body?.error)}`);
+    assert(set.body.data.plan.seats.member === 50 && set.body.data.plan.manageRoles?.[0] === 'admin', `kept the managers it did not name: ${JSON.stringify(set.body.data.plan)}`);
+    const carry = await json(`${r2()}/plan`, { method: 'PUT', headers: auth(own), body: JSON.stringify({ roles: { member: ['off-r2-x'] } }) });
+    assert(carry.status === 403, `the app's own token added an offering: ${carry.status}`);
+    const other = await appTokenFor(owner, `${owner.name}/${CHAT_APP}`, 'memory:read');
+    const cross = await json(`${r2()}/plan`, { method: 'PUT', headers: auth(other), body: JSON.stringify({ roles: { member: [] } }) });
+    assert(cross.status === 403 && cross.body.error.code === 'SCOPE_DENIED', `another app's token set this app's plan: ${cross.status} ${JSON.stringify(cross.body?.error)}`);
+    const membersOwn = await appTokenFor(r2member, `${owner.name}/${R2}`, 'memory:read');
+    const byMember = await json(`${r2()}/plan`, { method: 'PUT', headers: auth(membersOwn), body: JSON.stringify({ roles: { member: [] } }) });
+    assert(byMember.status === 403 && byMember.body.error.code === 'FORBIDDEN', `a member's token of the app set the plan: ${byMember.status} ${JSON.stringify(byMember.body?.error)}`);
+    const plan = await json(`${r2()}/plan`, { headers: auth(owner.token) });
+    assert(plan.body.data.plan.seats.member === 50 && (plan.body.data.plan.roles.member ?? []).length === 0, 'and the refused writes changed nothing');
 });
 
 console.log(`\napp member roster E2E: ${passed} passed, ${failed} failed (${passed + failed} total)\n`);

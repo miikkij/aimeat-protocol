@@ -15,6 +15,11 @@
  *   gate); POST /v1/contacts/resolve (email → GHII exact match, or invite fallback signal).
  * @usage app.use(contactsRouter(config, storage))
  * @version-history
+ *   v1.7.0 — 2026-10-01 — GET /v1/contacts admits an app grant, an agent or an ecosystem app holding
+ *     contacts:read beside the owner in person, and reads the owner's own book for each of them
+ *     (the developer's ruling of 2026-10-01). A caller that may not read the owner's mailbox gets the
+ *     rows with the conversation columns empty, and ?include=together only with organism:read. The
+ *     write endpoints are unchanged.
  *   v1.6.0 — 2026-09-26 — POST /invite admits the owner's agent holding messages:send beside the owner
  *     in person, as aimeat_contact_invite does and the connector's tool, which asks this door, now
  *     can; an app grant, an ecosystem app and a visitor from another node stay out.
@@ -52,10 +57,12 @@ import type { OutboundContactLink } from '../models/outbound-schemas.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope, requireLocalSession } from '../auth/middleware.js';
 import { rateLimit } from '../middleware/rate-limit.js';
-import { resolveIdentity } from '../utils/gaii.js';
+import { resolveIdentity, ownerCoordinate } from '../utils/gaii.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { mailboxReaderOf } from '../services/owner-mailbox-reads.js';
 import {
   ContactsError, listContactsMerged, addContact, updatePersonContact, removeContact, resolveContactEmail,
-  sendToContact, parseContactInclude, type AddContactInput,
+  sendToContact, parseContactInclude, withoutCorrespondence, type AddContactInput,
 } from '../services/contacts.js';
 import { identityKind } from '../services/local-identity.js';
 import { contactTogether } from '../services/contacts-together.js';
@@ -111,14 +118,37 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
   /* ── GET /v1/contacts — the merged address book (consent rows ∪ DM conversation peers ∪ saved
    * people), enriched with kind + display name. ?state= narrows to one consent state (default
    * hides blocked, and excludes people, who have no consent state); ?q= filters on id, display
-   * name, saved name or email. ── */
-  router.get('/v1/contacts', requireAuth(), requireLocalSession(), requireRole('owner'), async (req, res) => {
-    const { contacts, truncated } = await listContactsMerged(storage, resolve(req), {
+   * name, saved name or email.
+   *
+   * WHO. The owner in person, and anything acting in the owner's name that holds contacts:read: an
+   * app grant, an agent, an ecosystem app (the developer's ruling of 2026-10-01). requireScope waves
+   * the owner in person through and holds every other principal to the word, with a SCOPE_DENIED
+   * refusal naming it. A session from another node stays out (requireLocalSession). Read-only: the
+   * write endpoints below keep requireRole('owner').
+   *
+   * WHOSE BOOK. The owner's, always: ownerCoordinate collapses an agent's GAII, an app grant's or a
+   * GEAI's identity to the owner GHII, so no caller names the book it reads.
+   *
+   * WHAT A SCOPED READER SEES. The row shape is the same for every caller. The conversation columns
+   * are the owner's correspondence, so they are filled only for a caller that may read the owner's
+   * mailbox (mailboxReaderOf: the owner in person, an app on messages:read, an agent on
+   * messages:read-as-owner) and are empty otherwise. ?include=together lists the owner's organisms,
+   * so it is answered only for the owner in person or a caller holding organism:read. The owner's
+   * own card on each person (saved name, email, note, tags, links) stays: it is the owner's data and
+   * the reason the word exists. ── */
+  router.get('/v1/contacts', requireAuth(), requireLocalSession(), requireScope('contacts:read'), async (req, res) => {
+    const auth = req.auth!;
+    const reader = mailboxReaderOf(auth, config.nodeId);
+    const inPerson = reader?.kind === 'owner';
+    const include = parseContactInclude(req.query.include);
+    if (!inPerson && !scopeIsCovered(auth.scopes ?? [], 'organism:read')) include.delete('together');
+    const { contacts, truncated } = await listContactsMerged(storage, ownerCoordinate(auth, config.nodeId), {
       state: typeof req.query.state === 'string' ? req.query.state as ContactConsentRecord['state'] : undefined,
       q: typeof req.query.q === 'string' ? req.query.q : undefined,
-      include: parseContactInclude(req.query.include),
+      include,
     });
-    res.json(success(config.nodeId, { contacts, total: contacts.length, truncated }));
+    const rows = reader ? contacts : contacts.map(withoutCorrespondence);
+    res.json(success(config.nodeId, { contacts: rows, total: rows.length, truncated }));
   });
 
   /* ── GET /v1/contacts/:contactId/together — what the owner and ONE person have in common: the

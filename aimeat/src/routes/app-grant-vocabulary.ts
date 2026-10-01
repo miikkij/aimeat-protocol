@@ -9,6 +9,8 @@
  * @structure APP_GRANTABLE_SCOPES — the one list, keyed by scope word.
  * @usage import { APP_GRANTABLE_SCOPES } from './app-grant-vocabulary.js';
  * @version-history
+ *   v1.6.0 -- 2026-10-01 -- contacts:read, reading the owner's address book (GET /v1/contacts), askable
+ *     by an app: the developer's ruling of 2026-10-01.
  *   v1.5.0 -- 2026-09-26 -- work:request, giving agents work, askable by an app: an automation step
  *     that dispatches to an agent costs it, and an app could not otherwise save one.
  *   v1.4.0 -- 2026-09-24 -- connections:read-through, reading what is in a connected account, and
@@ -36,6 +38,11 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   'social:write': 'Post to boards on your behalf',
   'messages:send': 'Send direct messages on your behalf across the federation',
   'messages:read': 'Read direct messages addressed to you across the federation',
+  // The owner's address book, read-only (GET /v1/contacts): names, accounts and what the owner wrote
+  // about each person. Its own word rather than messages:read, because an app that lists people to
+  // pick from has no business reading the conversations, and the route leaves those fields empty
+  // unless the app also holds messages:read (the developer's ruling of 2026-10-01).
+  'contacts:read': 'See the names and accounts of the people in your address book',
   'wallet:read': 'See your morsel balance and transactions',
   'knowledge:read': 'Read your knowledge packages',
   // Installing a package REGISTERS an app, a cortex, an extension and any @activate cron the

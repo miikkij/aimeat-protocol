@@ -19,6 +19,8 @@
  *   GET    /v1/intake/:org/:ws/:formId   (PUBLIC)                 — public descriptor (title+fields), for any renderer
  *   POST   /v1/intake/:org/:ws/:formId   (PUBLIC, no-auth, rate-limited) — submit → one validated record
  * @version-history
+ *   v1.1.0 — 2026-10-01 — The public form read carries a field's options and length limit, and marks a
+ *     field required when the form lists it in required_fields, so a renderer draws what the submit enforces.
  *   v1.0.0 — 2026-07-16 — Initial: generic Public Intake capability (forms CRUD + anon submit).
  *   v1.1.0 — 2026-07-16 — Server-computed default tokens ({{now}}/{{today}}/{{uuid}}) resolved per
  *     submission, so a form can stamp a schema-required created-at/id without the node knowing field names.
@@ -56,7 +58,7 @@ interface IntakeFormConfig {
   allowedFields: string[]; requiredFields: string[]; defaults: Record<string, unknown>;
   mode: 'publish' | 'draft'; honeypotField: string | null; enabled: boolean; discoverable: boolean;
   maxPerDay: number | null; title: string;
-  fields: Array<{ key: string; label?: string; type?: string; required?: boolean }>;
+  fields: Array<{ key: string; label?: string; type?: string; required?: boolean; options?: unknown[]; maxLength?: number }>;
   successMessage: string; redirectUrl: string | null; createdAt: string; updatedAt: string;
 }
 
@@ -258,7 +260,14 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
     if (!cfg || !cfg.enabled) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Form not found')); return; }
     res.json(success(config.nodeId, {
       form_id: cfg.formId, title: cfg.title,
-      fields: (cfg.fields || []).map(f => ({ key: f.key, label: f.label ?? f.key, type: f.type ?? 'text', required: !!f.required })),
+      // The form as a renderer needs it: the choices of a select or radio, the length limit, and a
+      // field listed only in required_fields marked required, which the submit enforces anyway.
+      fields: (cfg.fields || []).map(f => ({
+        key: f.key, label: f.label ?? f.key, type: f.type ?? 'text',
+        required: !!f.required || (cfg.requiredFields || []).includes(f.key),
+        ...(Array.isArray(f.options) ? { options: f.options.slice(0, 200) } : {}),
+        ...(typeof f.maxLength === 'number' && f.maxLength > 0 ? { maxLength: Math.min(8000, Math.floor(f.maxLength)) } : {}),
+      })),
       honeypot_field: cfg.honeypotField, success_message: cfg.successMessage, redirect_url: cfg.redirectUrl,
     }));
   });

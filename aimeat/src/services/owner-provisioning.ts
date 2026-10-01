@@ -10,6 +10,8 @@
  * @structure emailHashOf; ProvisionEmailTakenError; creditWelcomeBonus; ProvisionOwnerOpts / ProvisionedOwner; provisionOwner(storage, config, opts).
  * @usage const { owner, ghii } = await provisionOwner(storage, config, { username, displayName, passwordHash });
  * @version-history
+ *   v1.6.0 — 2026-10-01 — An account created with an already-proven address takes up the open app
+ *     roster invitations of that address (services/app-member-invites.ts), beside the contact promotion.
  *   v1.5.0 — 2026-09-14 — creditWelcomeBonus() is exported, and the two registration routes that
  *     minted their own accounts call it instead of writing the transaction themselves. The bonus was
  *     the same eight lines in three files, so its amount and its condition had three homes.
@@ -35,6 +37,7 @@ import type { Storage, GHIIRecord, OwnerRecord } from '../storage/interface.js';
 import { generateKeyPair } from '../auth/keypair.js';
 import { logger } from '../utils/logger.js';
 import { promoteContactsForVerifiedEmail } from './contacts.js';
+import { applyAppInvitesForVerifiedEmail } from './app-member-invites.js';
 
 /** SHA-256 hex of a normalized email — matches GHII.emailHash hashing everywhere else. */
 export function emailHashOf(email: string): string {
@@ -225,6 +228,9 @@ export async function provisionOwner(
   if (verified) {
     await promoteContactsForVerifiedEmail(storage, emailHashOf(verified), ghii)
       .catch(err => { logger.warn('provisionOwner: contact promotion is best-effort', { error: String(err) }); });
+    // An app roster invitation sent to this address becomes a membership (services/app-member-invites.ts).
+    await applyAppInvitesForVerifiedEmail(storage, config.nodeId, emailHashOf(verified), ghii)
+      .catch(err => { logger.warn('provisionOwner: app invitations are best-effort', { error: String(err) }); });
   }
 
   await creditWelcomeBonus(storage, config, ghii, now);

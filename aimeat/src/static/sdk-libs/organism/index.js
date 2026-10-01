@@ -9,10 +9,14 @@
  *   /v1/libs/aimeat-organism.js. Ported verbatim from lib-organism.ts; getSession/authFetch stay
  *   inline (authFetch keeps the defensive Response.json() reparse branch _core/session lacks).
  * @structure imports attach (namespace); field/normalize helpers; the `organism` object + util;
- *   attach('organism', …).
+ *   the members.js and first-run.js methods assigned onto it; attach('organism', …).
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-organism.js"></script>
  *   const ws = await AIMEAT.organism.read(orgId, wsId); ws.spaces[0].items[0].value
  * @version-history
+ *   v1.4.0 — 2026-10-01 — Workspace members (access, members, requests, grant, revoke, decide,
+ *     inviteByEmail) from members.js, and the first run (organisms, findOrCreateWorkspace, remember,
+ *     recall) from first-run.js, over the existing workspace-access, invitation, workspace and memory
+ *     routes. Each refusal throws the node's own message.
  *   v1.3.0 — 2026-09-14 — createWorkspace fills a permissive schema only for a MEMORY records space.
  *     A row space has no schema-validated records, and a missing mode reads as 'records', so every
  *     row space created through here left a schema lock standing over a namespace nothing validates.
@@ -28,6 +32,8 @@
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-organism.ts (SDK-libs migration Phase 1).
  */
 import { attach } from '../_core/namespace.js';
+import { workspaceMembers } from './members.js';
+import { firstRun } from './first-run.js';
 
 function getSession() {
   if (!window.AIMEAT || !window.AIMEAT.auth) {
@@ -416,5 +422,10 @@ var organism = {
     BODY_FIELDS: BODY_FIELDS.slice(),
   },
 };
+
+// Workspace members (members.js) and the first run (first-run.js) share this file's session fetch
+// and refusal shape, so a refusal reads the same from every method.
+var http = { authFetch: authFetch, fail: fail, getSession: getSession };
+Object.assign(organism, workspaceMembers(http), firstRun(http, organism));
 
 attach('organism', organism);

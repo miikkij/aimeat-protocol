@@ -280,6 +280,39 @@
   async function providers() {
     return must(await authFetch2("/v1/connections/providers"), "could not read the providers").providers ?? [];
   }
+  var providersOnce = null;
+  async function capabilities(provider) {
+    let id = "";
+    let names = null;
+    if (typeof provider === "string") id = provider;
+    else if (provider && Array.isArray(provider.capabilities)) {
+      id = provider.id || "";
+      names = provider.capabilities;
+    } else if (provider) id = provider.provider || provider.id || "";
+    if (!names) {
+      if (!providersOnce) {
+        providersOnce = providers().catch((err) => {
+          providersOnce = null;
+          throw err;
+        });
+      }
+      const all = await providersOnce;
+      const hit = all.find((p) => p.id === id);
+      names = hit && Array.isArray(hit.capabilities) ? hit.capabilities : [];
+    }
+    const has = (n) => names.includes(n);
+    return {
+      provider: id,
+      readMail: has("read-mail"),
+      sendMail: has("send-mail"),
+      publish: has("publish-post") || has("publish-video"),
+      publishPost: has("publish-post"),
+      publishVideo: has("publish-video"),
+      readMetrics: has("read-metrics"),
+      readItems: has("read-items"),
+      names: names.slice()
+    };
+  }
   async function publish(input) {
     if (!input?.connectionId) throw new Error("publish needs a connectionId");
     const res = await authFetch2("/v1/connections/publish", {
@@ -412,6 +445,7 @@
   var connect = {
     list,
     providers,
+    capabilities,
     start,
     attach: attachAccount,
     revoke,

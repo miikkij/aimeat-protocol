@@ -4287,6 +4287,7 @@
       "catalogue": "the public catalogue",
       "social": "boards",
       "messages": "your messages",
+      "contacts": "your address book",
       "wallet": "your morsel balance",
       "knowledge": "your knowledge packages",
       "task": "your agents' tasks",
@@ -15615,6 +15616,7 @@
         "domainWork": "Work",
         "domainSocial": "Social",
         "domainMessages": "Direct messages (inbox)",
+        "domainContacts": "Address book",
         "domainWallet": "Wallet",
         "domainConsent": "Consent",
         "domainShare": "Sharing",
@@ -15695,6 +15697,9 @@
             "read-as-owner": "Read your mailbox as you: every conversation and the messages in it. Reading marks nothing as read.",
             "delete-as-owner": "Remove messages from your mailbox, as you. Your copy goes for good; the other side keeps theirs.",
             "organize-as-owner": "Archive conversations in your mailbox and set the rules for your Messages list, as you. Nothing is deleted, and an archived conversation comes back when someone other than your own agents writes in it."
+          },
+          "contacts": {
+            "read": "See the names and accounts of the people in your address book."
           },
           "notifications": {
             "send": "Send you a notification in the app and on your phone. The recipient is always you."

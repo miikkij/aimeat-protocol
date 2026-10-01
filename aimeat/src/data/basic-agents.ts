@@ -41,6 +41,8 @@
  * @structure BASIC_AGENTS · BasicAgentTemplate · basicAgentByName
  * @usage import { BASIC_AGENTS } from '../data/basic-agents.js';
  * @version-history
+ *   v2.1.0 — 2026-10-01 — The concierge holds contacts:read: the contact list now asks for that word
+ *     instead of messages:read.
  *   v2.0.0 — 2026-09-02 — TWO basic agents. `crew-forge` leaves the set; the tombstone where its
  *     template stood carries the reasoning. Creating an agent is two data writes and does not need
  *     an agent of its own, and writing a good definition is a reasoning task best done by the model
@@ -154,6 +156,8 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
     scopes: [
       'memory:read', 'memory:write',
       'messages:read', 'messages:send',
+      // The front door answers people, so it looks them up in the owner's address book.
+      'contacts:read',
       'task:read', 'task:write',
       'organism:read',
       'catalogue:read',

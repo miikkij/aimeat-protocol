@@ -10,6 +10,7 @@
  * @structure TRANSLATIONS[lang][packId] = { title?, description }
  * @usage import { TRANSLATIONS } from './library-packs/translations.js'; (getLibraryPackIndex(lang))
  * @version-history
+ *   v1.3.0 - 2026-10-01 - aimeat-intake and aimeat-connect in Finnish and Spanish, now that they have packs.
  *   v1.2.0 - 2026-09-28 - System 2 plan, V5: aimeat-ai in Finnish and Spanish names the user's own
  *     AI providers, the capabilities and the check an app makes first, not an OpenRouter key.
  *   v1.1.0 - 2026-09-18 - Calendar and print descriptions in Finnish and Spanish.
@@ -30,6 +31,8 @@ export const TRANSLATIONS: Record<string, Record<string, { title?: string; descr
     'aimeat-ai': { description: 'Tekoäly käyttäjän omien tekoälyn tarjoajien kautta: teksti, kuvan teko, puhe, litterointi ja upotukset, joilla haku löytää samaa tarkoittavan tekstin. Sovellus tarkistaa ensin tekoälyn kyvyt ja näyttää korjausohjeen, kun jokin kyky ei ole käytössä. Päiväbudjetti, sovelluskohtainen kiintiö ja omistajan mallirajaus pitävät kulut kurissa.' },
     'aimeat-datapackage': { description: 'Julkaise taulukko Frictionless-datapakettina AIMEAT-alkuperätiedoin: skeema päätellään, rivit ja sarakkeet tarkistetaan, versio lukitaan sisällön tiivisteeseen, ja pysyvä julkinen CSV-osoite avautuu suoraan DuckDB:llä, pandasilla ja Excelillä.' },
     'aimeat-iam': { description: 'Sovelluksen omat jäsenet ja roolit: kuka on hyväksytty, mitä rooli sallii, ja omistajan paneeli päätöksiin.' },
+    'aimeat-intake': { description: 'Julkinen lomake, jonka kuka tahansa voi täyttää ilman tiliä. Vierailija lähettää yhden tietueen työtilaan, ja omistaja määrittää lomakkeen.' },
+    'aimeat-connect': { description: 'Henkilön omat tilit muissa palveluissa: yhdistä tili, katso mitä kukin palvelu osaa, julkaise ja lue tulokset. Tunnus ei koskaan näy sovellukselle.' },
     'aimeat-wallet': { description: 'Morselit: saldo, tapahtumat, morselien pyytäminen ja saldomerkki käyttöliittymään.' },
     'aimeat-work': { description: 'Toiminnot ja työt: luettelo, työpyynnöt, saapuneet, toimitus, arviointi ja tilan seuranta.' },
     'aimeat-agents': { description: 'Agentit: listaus, tehtävän tilaaminen (createTask/run), edistymisen seuranta suorana, tulosten luku ja kysy-käyttäjältä-valintasilmukka.' },
@@ -100,6 +103,8 @@ export const TRANSLATIONS: Record<string, Record<string, { title?: string; descr
     'aimeat-ai': { description: 'IA con los proveedores de IA del propio usuario: texto, creación de imágenes, voz, transcripción e incrustaciones, que permiten buscar por significado. La app consulta primero las capacidades de la IA y, si alguna no está disponible, muestra cómo activarla. El presupuesto diario, la cuota por app y la restricción de modelos del propietario mantienen el gasto a raya.' },
     'aimeat-datapackage': { description: 'Publica una tabla como paquete de datos Frictionless con procedencia AIMEAT: el esquema se infiere, filas y columnas se comprueban, la versión se fija al hash del contenido y una dirección CSV pública permanente que DuckDB, pandas y Excel leen directamente.' },
     'aimeat-iam': { description: 'Los miembros y roles propios de la app: quién está aprobado, qué permite su rol, y el panel del dueño para decidirlo.' },
+    'aimeat-intake': { description: 'Un formulario público que cualquiera puede llenar sin cuenta. El visitante envía un registro a un espacio de trabajo, y el propietario define el formulario.' },
+    'aimeat-connect': { description: 'Las cuentas propias de la persona en otros servicios: conecta una cuenta, mira qué puede hacer cada servicio, publica y lee los resultados. La credencial nunca llega a la aplicación.' },
     'aimeat-wallet': { description: 'Morsels: saldo, movimientos, solicitud de morsels y la insignia de saldo para la interfaz.' },
     'aimeat-work': { description: 'Acciones y trabajo: catálogo, solicitudes, bandeja de entrada, entrega, valoración y seguimiento.' },
     'aimeat-agents': { description: 'Agentes: listado, encargo de tareas (createTask/run), progreso en vivo, lectura de entregables y el bucle de preguntar al usuario con opciones.' },

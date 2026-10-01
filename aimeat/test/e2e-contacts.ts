@@ -5,6 +5,11 @@
  *   contact never resets the DM first-contact gate), blocked-row handling, the q filter,
  *   cross-owner isolation, and exact-match email resolve (found / not-found / invalid / unauth).
  * @version-history
+ *   v1.8.0 — 2026-10-01 — Tests 34–40: contacts:read (the developer's ruling of 2026-10-01). An app of
+ *     the owner's own and an agent holding the word read the owner's book on GET /v1/contacts, the
+ *     agent over aimeat_contact_list too, with the conversation columns empty unless the caller may
+ *     read the owner's mailbox; without the word 403 SCOPE_DENIED; the app's writes are refused;
+ *     another owner's agent reads its own owner's book only.
  *   v1.7.0 — 2026-09-26 — Test 33: an agent holding messages:send invites on POST /v1/contacts/invite
  *     as over the tool, in its owner's name and on its owner's allowance; an agent without the word
  *     is refused on both doors (the developer's ruling of 2026-09-26: enable safely).
@@ -48,7 +53,7 @@ async function json(path: string, opts: RequestInit = {}) {
 }
 
 import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function sign(privB64: string, msg: string): Promise<string> {
     return Buffer.from(await ed.signAsync(new TextEncoder().encode(msg), Buffer.from(privB64, 'base64'))).toString('base64');
@@ -700,6 +705,132 @@ await test('33. An agent holding messages:send invites on REST as over MCP, in i
     const body21 = await res21.json() as any;
     assert(res21.status === 429 && body21.error?.code === 'RATE_LIMITED', `the agent's 21st on REST: ${res21.status} ${JSON.stringify(body21.error ?? body21.data)}`);
     assert(Number(res21.headers.get('retry-after')) > 0, `it says when to try again: ${res21.headers.get('retry-after')}`);
+});
+
+// -- contacts:read (the developer's ruling of 2026-10-01): an app or an agent of the owner reads the
+//    owner's own book on the word; the conversation columns stay with the owner's mailbox --
+
+/** The token an app on the app origin holds for `user`: role 'app', bound to `app`, with `scope`.
+ *  Copied from test/e2e-app-members.ts, where the same flow is proven. */
+async function appTokenFor(user: { token: string }, app: string, scope: string): Promise<string> {
+    const verifier = randomBytes(32).toString('base64url');
+    const challenge = createHash('sha256').update(verifier).digest('base64url');
+    const redirect = 'http://localhost:9911/callback';
+    const q = new URLSearchParams({ app, response_type: 'code', scope, redirect_uri: redirect, code_challenge: challenge, code_challenge_method: 'S256' });
+    const res = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
+    const rid = decodeURIComponent(/req=([^&]+)/.exec(res.headers.get('location') ?? '')?.[1] ?? '');
+    const con = await json('/v1/app-grants/authorize-consent', { method: 'POST', headers: auth(user.token), body: JSON.stringify({ request_id: rid }) });
+    assert(!!con.body?.data?.redirect_url, `consent: ${JSON.stringify(con.body?.error ?? con.body)}`);
+    const code = new URL(con.body.data.redirect_url).searchParams.get('code') ?? '';
+    const tok = await json('/v1/app-grants/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: redirect }) });
+    assert(!!tok.body?.data?.access_token, `app token: ${JSON.stringify(tok.body?.error ?? tok.body)}`);
+    return tok.body.data.access_token as string;
+}
+
+/** Publish a one-page app for `owner` that declares `scopes` in its aimeat-scopes tag. */
+async function publishApp(owner: { token: string }, filename: string, scopes: string) {
+    const html = `<!doctype html><meta name="aimeat-scopes" content="${scopes}"><title>book</title><p>book`;
+    const pub = await json('/v1/apps', {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ filename, name: filename, description: 'contacts:read e2e', content: Buffer.from(html, 'utf8').toString('base64') }),
+    });
+    assert(pub.status === 201, `publish ${filename} ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
+}
+
+const listAs = (token: string, qs = '') => json(`/v1/contacts${qs}`, { headers: auth(token) });
+const ids = (rows: any[]) => rows.map(r => r.contact_id as string).sort();
+
+let H: Awaited<ReturnType<typeof setupOwner>>;   // the owner whose book is read
+let hPersonId = '';
+await test('34. setup: H saves a person and B, and writes to B, so H\'s book has a card and a conversation', async () => {
+    H = await setupOwner('h');
+    const person = await json('/v1/contacts', { method: 'POST', headers: auth(H.token), body: JSON.stringify({ name: 'Hanna Book', email: `hanna-${Date.now()}@example.com`, note: 'from the fair' }) });
+    assert(person.status === 201 && person.body.data.kind === 'mail', `person ${person.status}: ${JSON.stringify(person.body.error ?? person.body.data)}`);
+    hPersonId = person.body.data.contact_id;
+    const saveB = await json('/v1/contacts', { method: 'POST', headers: auth(H.token), body: JSON.stringify({ contact_id: B.name }) });
+    assert(saveB.status === 201, `save B ${saveB.status}: ${JSON.stringify(saveB.body.error)}`);
+    const dm = await json('/v1/messages', { method: 'POST', headers: auth(H.token), body: JSON.stringify({ to: B.ghii, body: 'private line from H' }) });
+    assert(dm.status === 201, `dm ${dm.status}: ${JSON.stringify(dm.body.error)}`);
+    const own =(await contactsOf(H.token)).find(c => c.contact_id === B.ghii);
+    assert(own?.last_message === 'private line from H' && !!own?.conversation_id, `the owner sees the conversation: ${JSON.stringify(own)}`);
+});
+
+await test('35. An app of the owner\'s own holding contacts:read lists the owner\'s book: the card is there, the conversation is not', async () => {
+    await publishApp(H, 'book-reader.html', 'contacts:read');
+    const app = await appTokenFor(H, `${H.name}/book-reader.html`, 'contacts:read');
+    const r = await listAs(app);
+    assert(r.status === 200, `the app was refused: ${r.status} ${JSON.stringify(r.body.error)}`);
+    const rows = r.body.data.contacts as any[];
+    assert(JSON.stringify(ids(rows)) === JSON.stringify(ids(await contactsOf(H.token))), `the app reads the owner's whole book: ${JSON.stringify(ids(rows))}`);
+    const person = rows.find(c => c.contact_id === hPersonId);
+    assert(person?.display_name === 'Hanna Book' && person?.note === 'from the fair' && typeof person?.email === 'string', `the owner's card on the person: ${JSON.stringify(person)}`);
+    const b = rows.find(c => c.contact_id === B.ghii);
+    assert(!!b && b.has_messages === true, `B is in the book: ${JSON.stringify(b)}`);
+    assert(b.last_message === null && b.last_sender === null && b.conversation_id === null && b.last_message_at === null && b.message_count === 0,
+        `the conversation columns are empty without the mailbox word: ${JSON.stringify(b)}`);
+    const together = await listAs(app, '?include=together');
+    assert(together.status === 200 && !together.body.data.contacts.some((c: any) => 'shared_organisms' in c), `include=together needs organism:read: ${JSON.stringify(together.body.data?.contacts?.[0])}`);
+});
+
+await test('36. An app of the owner\'s own without contacts:read is refused 403 SCOPE_DENIED', async () => {
+    await publishApp(H, 'book-blind.html', 'memory:read');
+    const app = await appTokenFor(H, `${H.name}/book-blind.html`, 'memory:read');
+    const r = await listAs(app);
+    assert(r.status === 403 && r.body.error?.code === 'SCOPE_DENIED', `expected 403 SCOPE_DENIED, got ${r.status} ${r.body.error?.code}`);
+});
+
+await test('37. The book stays read-only for the app: a save, an edit and a removal by its token are refused, and nothing changes', async () => {
+    const app = await appTokenFor(H, `${H.name}/book-reader.html`, 'contacts:read');
+    const before = ids(await contactsOf(H.token));
+    const save = await json('/v1/contacts', { method: 'POST', headers: auth(app), body: JSON.stringify({ contact_id: C.name }) });
+    assert(save.status === 403, `a save by the app: ${save.status} ${JSON.stringify(save.body.error ?? save.body.data)}`);
+    const edit = await json(`/v1/contacts/${encodeURIComponent(hPersonId)}`, { method: 'PATCH', headers: auth(app), body: JSON.stringify({ note: 'rewritten by the app' }) });
+    assert(edit.status === 403, `an edit by the app: ${edit.status}`);
+    const del = await json(`/v1/contacts/${encodeURIComponent(hPersonId)}`, { method: 'DELETE', headers: auth(app) });
+    assert(del.status === 403, `a removal by the app: ${del.status}`);
+    const after = await contactsOf(H.token);
+    assert(JSON.stringify(ids(after)) === JSON.stringify(before), `the book changed: ${JSON.stringify(ids(after))}`);
+    assert(after.find(c => c.contact_id === hPersonId)?.note === 'from the fair', 'the card is untouched');
+});
+
+await test('38. An agent holding contacts:read lists its owner\'s book on REST and over aimeat_contact_list; the mailbox word adds the conversation', async () => {
+    const reader = await agentOf(H, 'bookreader', ['contacts:read']);
+    const r = await listAs(reader.token);
+    assert(r.status === 200, `the agent was refused: ${r.status} ${JSON.stringify(r.body.error)}`);
+    assert(JSON.stringify(ids(r.body.data.contacts)) === JSON.stringify(ids(await contactsOf(H.token))), `the agent reads its owner's book: ${JSON.stringify(ids(r.body.data.contacts))}`);
+    const b = (r.body.data.contacts as any[]).find(c => c.contact_id === B.ghii);
+    assert(b?.last_message === null && b?.conversation_id === null, `no conversation without messages:read-as-owner: ${JSON.stringify(b)}`);
+
+    const over = await mcpCallAs(reader.gaii, reader.key, 'aimeat_contact_list', {});
+    const answer = over.result?.isError === true ? null : JSON.parse(String(over.result?.content?.[0]?.text ?? 'null'));
+    assert(Array.isArray(answer?.contacts) && answer.contacts.some((c: any) => c.contact_id === hPersonId),
+        `the tool answered ${JSON.stringify(over.result ?? over.error).slice(0, 200)}`);
+    assert(answer.contacts.find((c: any) => c.contact_id === B.ghii)?.last_message === null, 'the tool shows what the route shows');
+
+    const delegate = await agentOf(H, 'bookdelegate', ['contacts:read', 'messages:read-as-owner']);
+    const full = (await listAs(delegate.token)).body.data.contacts.find((c: any) => c.contact_id === B.ghii);
+    assert(full?.last_message === 'private line from H' && !!full?.conversation_id, `with the mailbox word the conversation shows: ${JSON.stringify(full)}`);
+});
+
+await test('39. An agent without contacts:read is refused on REST, and aimeat_contact_list is not offered to it, messages:read or not', async () => {
+    const reader = await agentOf(H, 'bookblind', ['messages:read']);
+    const r = await listAs(reader.token);
+    assert(r.status === 403 && r.body.error?.code === 'SCOPE_DENIED', `expected 403 SCOPE_DENIED, got ${r.status} ${r.body.error?.code}`);
+    const over = await mcpCallAs(reader.gaii, reader.key, 'aimeat_contact_list', {});
+    assert(over.result?.isError === true && String(over.result?.content?.[0]?.text).includes('not found'),
+        `the tool answered an agent without the word: ${JSON.stringify(over.result ?? over.error).slice(0, 200)}`);
+});
+
+await test('40. Cross-owner: another owner\'s agent holding contacts:read reads only its own owner\'s book', async () => {
+    const theirs = await agentOf(B, 'bookreaderb', ['contacts:read']);
+    const r = await listAs(theirs.token);
+    assert(r.status === 200, `B's agent: ${r.status} ${JSON.stringify(r.body.error)}`);
+    const rows = r.body.data.contacts as any[];
+    assert(JSON.stringify(ids(rows)) === JSON.stringify(ids(await contactsOf(B.token))), `B's agent reads B's book: ${JSON.stringify(ids(rows))}`);
+    assert(!rows.some(c => c.contact_id === hPersonId), 'H\'s saved person is not in it');
+    // No parameter names whose book is read: a query naming H changes nothing.
+    const named = await listAs(theirs.token, `?owner=${encodeURIComponent(H.ghii)}&q=${encodeURIComponent('Hanna')}`);
+    assert(named.status === 200 && named.body.data.contacts.length === 0, `a query naming H: ${JSON.stringify(named.body.data?.contacts)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);

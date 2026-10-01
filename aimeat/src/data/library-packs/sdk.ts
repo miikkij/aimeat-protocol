@@ -10,6 +10,10 @@
  * @structure SDK_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.24.0 — 2026-10-01 — aimeat-iam 1.3.0: invitations by email, the address book picker, the
+ *     roster history, the plan and the members who manage the roster, in the aiDoc and changelog.
+ *   v1.23.0 — 2026-10-01 — aimeat-organism 1.4.0: workspace members and the first run in the aiDoc, prompt line and changelog.
+ *   v1.22.0 — 2026-10-01 — aimeat-intake and aimeat-connect join after aimeat-webhook, from library-packs/sdk-intake-connect.ts.
  *   v1.20.0 — 2026-10-01 — aimeat-iam 1.1.0: the aiDoc and prompt line describe the node roster, the
  *     role map, the panels and the generated gate; the size is measured (28 kB minified).
  *   v1.19.0 — 2026-09-29 — aimeat-storage 1.3.0: the aiDoc says how a team (workspace) or group file is stored.
@@ -109,6 +113,7 @@ import { DECIDE_PACKS } from './sdk-decide.js';
 import { REFINERY_PACKS } from './sdk-refinery.js';
 import { WORKFLOWS_PACKS } from './sdk-workflows.js';
 import { WEBHOOK_PACKS } from './sdk-webhook.js';
+import { INTAKE_CONNECT_PACKS } from './sdk-intake-connect.js';
 import { AI_PACKS } from './sdk-ai.js';
 import { LABELS_PACKS } from './sdk-labels.js';
 
@@ -209,6 +214,7 @@ export const SDK_PACKS: LibraryPack[] = [
     promptLine: '- aimeat-push.js — show your app own notifications on the person device, under its own name and icon (`AIMEAT.push`)',
   },
   ...WEBHOOK_PACKS,
+  ...INTAKE_CONNECT_PACKS,
   {
     id: 'aimeat-onto',
     kind: 'sdk',
@@ -268,15 +274,17 @@ export const SDK_PACKS: LibraryPack[] = [
     requires: ['aimeat-auth'],
     license: 'MIT',
     apiSurface: 'AIMEAT.organism',
-    aiDoc: 'Organisms & workspaces. list(), workspaces(orgId), read(orgId, wsId) → { manifest, readmeText, spaces } where each space\'s items merge published + draft per instance — the raw workspace GET returns objects (published) and drafts as SEPARATE maps; this lib does the merging, id resolution and metadata handling for you. writeDraft, publish, revertToDraft, deleteObject (needs memory:delete scope), saveReadme, search. Items with hasRealId:false render read-only.',
-    changelog: [],
+    aiDoc: 'Organisms & workspaces. list(), workspaces(orgId), read(orgId, wsId) → { manifest, readmeText, spaces } where each space\'s items merge published + draft per instance — the raw workspace GET returns objects (published) and drafts as SEPARATE maps; this lib does the merging, id resolution and metadata handling for you. writeDraft, publish, revertToDraft, deleteObject (needs memory:delete scope), saveReadme, search. Items with hasRealId:false render read-only. Who may open a workspace (its creator or an organism owner or admin manages this; an app needs the organism:invite scope to change it): members(orgId, wsId, { pending? }) → [{ account, displayName?, role (\'creator\' | \'viewer\' | \'contributor\'), since?, pending? }], requests(orgId, wsId, { all? }), access(orgId, wsId) for both in one read, grant(orgId, wsId, account, \'viewer\' | \'contributor\'), revoke(orgId, wsId, account), decide(orgId, wsId, account, \'approve\' | \'decline\', role?), inviteByEmail(orgId, email, { ws, role } or { workspaces, message, returnUrl, locale }) → { accept_url, email_sent }. First run, so the app asks once: organisms() → [{ id, name, role (\'owner\' | \'admin\' | \'member\') }], findOrCreateWorkspace({ org, name, kind?, purpose?, objectTypes? }) → { orgId, wsId, created } finds the workspace by name (and by its manifest kind when you pass one, which keeps another app\'s same-named workspace out) or creates it, and org may be { name } to create a new organism; remember(appKey, { orgId, wsId }) and recall(appKey, { verify: true }) keep the choice in the owner\'s memory under <appKey>.workspace. Every refusal throws the node\'s own message, with err.code.',
+    changelog: [
+      { version: '1.4.0', date: '2026-10-01', summary: 'Added workspace members (members, requests, access, grant, revoke, decide, inviteByEmail) and the first run (organisms, findOrCreateWorkspace, remember, recall), over the existing workspace-access, email invitation, workspace and memory routes. Each refusal throws the node\'s own message. Additive.' },
+    ],
     tierHint: 'T1',
     interviewTriggers: ['workspace', 'organism', 'team'],
-    sizeEstimate: '~9KB',
+    sizeEstimate: '~17KB',
     status: 'stable',
     modelTier: 'needs-doc',
     promptGroup: 'core',
-    promptLine: '- aimeat-organism.js — organisms & workspaces: list, normalized workspace read (published + drafts merged per item), write drafts, publish, README, search (`AIMEAT.organism`). Requires aimeat-auth.',
+    promptLine: '- aimeat-organism.js — organisms & workspaces: list, normalized workspace read (published + drafts merged per item), write drafts, publish, README, search, workspace members (members, grant, revoke, decide, inviteByEmail), first run (findOrCreateWorkspace, remember, recall) (`AIMEAT.organism`). Requires aimeat-auth.',
   },
   ...LABELS_PACKS,
   ...AI_PACKS,
@@ -369,8 +377,9 @@ export const SDK_PACKS: LibraryPack[] = [
     requires: ['aimeat-auth'],
     license: 'MIT',
     apiSurface: 'AIMEAT.iam',
-    aiDoc: "Your app's own members and roles. The NODE keeps who is a member: await AIMEAT.iam.init({ app: 'owner/file.html', roles: { member: ['use'], admin: ['use', 'manage'] } }). `roles` maps each role to what it may do; a plain list of names, least power first, also works, and then each role holds its own name. me() is the caller's standing { member, isOwner, role, caps, requested }; can(cap) to paint, gate(selectorOrElement, cap) to show or hide one element, guard(cap, fn) asks the node before it runs fn. AIMEAT.iam.MemberAdmin({ target }) is the owner's panel: requests, visitors, the roster, role change, remove, and your own settings through `sections`; one click on Approve grants the role with the least power unless you pass `approveRole`. AIMEAT.iam.JoinPanel({ target }) is the applicant's form. All of this is a HINT: the node does not refuse a stranger who opens the page or writes their own memory. To refuse a change on the server, generate a gate with the MCP tool aimeat_iam_define, install the extension it returns, and init({ app, ext }); the extension reads the caller's role through ctx.caller.member, in the action that mutates data. A role belongs to the PERSON, so a member's agents hold it too and one removal ends it for all of them. init({ ext }) alone drives an older IAM extension that keeps its own roster.",
+    aiDoc: "Your app's own members and roles. The NODE keeps who is a member: await AIMEAT.iam.init({ app: 'owner/file.html', roles: { member: ['use'], admin: ['use', 'manage'] } }). `roles` maps each role to what it may do; a plain list of names, least power first, also works, and then each role holds its own name. me() is the caller's standing { member, isOwner, canManage, role, caps, displayName, requested }; can(cap) to paint, gate(selectorOrElement, cap) to show or hide one element, guard(cap, fn) asks the node before it runs fn. AIMEAT.iam.MemberAdmin({ target }) is the owner's panel: requests, visitors, the roster, role change, remove, and your own settings through `sections`; one click on Approve grants the role with the least power unless you pass `approveRole`. AIMEAT.iam.JoinPanel({ target }) is the applicant's form. On the node roster the owner, and members whose role the plan lists in manageRoles, also have: invite(email, role, note?) (an address of a verified account approves that account at once and answers { member, found }; any other address gets an email and answers { invited, invite }), invites() and cancelInvite(id); audit({ limit, before }) for who decided what, newest first; people(q) for names from the owner's address book to suggest (needs the contacts:read scope on an app token); plan() and setPlan(plan) for what each role gets, seats, terms, access, rosterVisibility and manageRoles (setPlan is the owner's only). A manager never gives, changes or removes a managing role. A declined person may ask again after seven days, and request() before then throws REASK_TOO_SOON with err.details.retryAt. All of this is a HINT: the node does not refuse a stranger who opens the page or writes their own memory. To refuse a change on the server, generate a gate with the MCP tool aimeat_iam_define, install the extension it returns, and init({ app, ext }); the extension reads the caller's role through ctx.caller.member, in the action that mutates data. A role belongs to the PERSON, so a member's agents hold it too and one removal ends it for all of them. init({ ext }) alone drives an older IAM extension that keeps its own roster.",
     changelog: [
+      { version: '1.3.0', date: '2026-10-01', summary: 'On the node roster: invite(email, role) approves a verified account by its address or emails an invitation, invites() and cancelInvite(id) manage the open ones, audit() reads the roster history, people(q) suggests names from the owner\'s address book, plan() and setPlan() read and change the plan, and me() carries canManage and displayName. Members whose role the plan lists in manageRoles run the roster beside the owner. Additive.' },
       { version: '1.1.0', date: '2026-10-01', summary: 'On the node roster a member holds capabilities: init({ app, roles }) takes a map of role to capabilities (or a list of names, least power first). Before this an approved member held none and can(), gate() and guard() refused them. One-click Approve in MemberAdmin grants the role with the least power, shown beside the button; it granted the last role listed. guard() asks the node; a refusal shows its reason in both panels; JoinPanel says when the caller already asked. Spanish strings.' },
     ],
     tierHint: 'T3',

@@ -12,6 +12,8 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   v1.4.2 — 2026-10-01 — manage-my-agents: reading the address book needs contacts:read, and an
+ *     agent approved before it existed is refused until the owner gives it.
  *   v1.4.1 — 2026-09-30 — aimeat-node-operations: aimeat_admin_config reports the classification
  *     switch, and aimeat_classification switch_set is what changes it (TARGET-082).
  *   v1.4.0 — 2026-09-30 — manage-my-agents: aimeat_agents_list carries the permissions, the calls the
@@ -115,7 +117,9 @@ You are assisting an OWNER with their own agents (never another owner's).
   when last), and \`scope_request\` says what the agent asked for at its last approval. A refusal is
   often why a task waits or a run looked fine and wrote nothing. Tell the owner which permission is
   missing, in words, and that they give it in Profile → Agents → Manage access rights. A refusal
-  goes away when the permission is given.
+  goes away when the permission is given. Reading the owner's address book (\`aimeat_contact_list\`)
+  needs its own permission, contacts:read, since 2026-10-01; an agent approved before then holds only
+  messages:read for it and is refused until the owner gives contacts:read.
 - **Inspect one:** \`aimeat_agent_profile\` — capabilities, trust, linked skills; pass the agent's GAII.
 - **Onboarding state:** \`aimeat_onboarding_status\` — which Hello-Integration steps remain. It
   reports the calling agent's own onboarding only.

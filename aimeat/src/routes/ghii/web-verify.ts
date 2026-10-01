@@ -6,6 +6,8 @@
  *   POST /v1/ghii/verify-email, POST /v1/ghii/magic-link, GET /v1/ghii/magic-link/verify. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.0 — 2026-10-01 — POST /v1/ghii/verify-email applies the open app roster invitations of the
+ *     address it verifies (services/app-member-invites.ts), beside the contact promotion.
  *   v1.10.0 — 2026-09-29 — POST /v1/ghii/magic-link takes `redirect`, the place the link returns to
  *     (services/login-link.ts loginReturnTarget).
  *   v1.9.0 — 2026-09-29 — The emailed sign-in link points at GET /v1/ghii/magic-link/open
@@ -51,6 +53,7 @@ import { issueJWT } from '../../auth/jwt.js';
 import { createHash, randomBytes } from 'node:crypto';
 import { GhiiWebRegistrationSchema, validateBody } from '../../models/schemas.js';
 import { promoteContactsForVerifiedEmail } from '../../services/contacts.js';
+import { applyAppInvitesForVerifiedEmail } from '../../services/app-member-invites.js';
 import { loginTarpit } from '../../middleware/login-tarpit.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { registrationRefusal, creditWelcomeBonus } from '../../services/owner-provisioning.js';
@@ -356,6 +359,10 @@ export function registerWebVerifyRoutes(
         // is cosmetic, and a verification that fails to finish is an account nobody can get into.
         await promoteContactsForVerifiedEmail(storage, record.emailHash, ghii)
             .catch(err => { logger.warn('verify-email: contact promotion is best-effort', { error: String(err) }); });
+        // An invitation to an app's roster sent to this address becomes a membership now
+        // (services/app-member-invites.ts). Best-effort for the same reason.
+        await applyAppInvitesForVerifiedEmail(storage, config.nodeId, record.emailHash, ghii)
+            .catch(err => { logger.warn('verify-email: app invitations are best-effort', { error: String(err) }); });
 
         // Create an agent if not exists, then issue JWT
         const agents = await storage.getAgentsByOwner(record.ownerName);

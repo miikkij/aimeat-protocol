@@ -3229,6 +3229,7 @@
       "catalogue": "el catálogo público",
       "social": "los tableros",
       "messages": "tus mensajes",
+      "contacts": "tu libreta de direcciones",
       "wallet": "tu saldo de morsels",
       "knowledge": "tus paquetes de conocimiento",
       "task": "las tareas de tus agentes",
@@ -13829,6 +13830,7 @@
         "domainWork": "Trabajo",
         "domainSocial": "Social",
         "domainMessages": "Mensajes directos (bandeja)",
+        "domainContacts": "Libreta de direcciones",
         "domainWallet": "Cartera",
         "domainConsent": "Consentimiento",
         "domainShare": "Compartir",
@@ -13909,6 +13911,9 @@
             "read-as-owner": "Leer tu buzón como tú: todas tus conversaciones y sus mensajes. Leer no marca nada como leído.",
             "delete-as-owner": "Borra mensajes de tu buzón en tu nombre. Tu copia se pierde para siempre; la otra persona conserva la suya.",
             "organize-as-owner": "Archiva conversaciones de tu buzón y define las reglas de tu lista de mensajes en tu nombre. No se borra nada, y una conversación archivada vuelve a la lista cuando alguien que no sea uno de tus agentes escribe en ella."
+          },
+          "contacts": {
+            "read": "Ver los nombres y las cuentas de las personas de tu libreta de direcciones."
           },
           "notifications": {
             "send": "Mandarte un aviso en la aplicación y en tu teléfono. Quien lo recibe siempre eres tú."

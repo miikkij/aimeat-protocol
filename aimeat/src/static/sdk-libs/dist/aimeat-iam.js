@@ -734,7 +734,10 @@
       since: m ? m.since : null,
       // The node roster is the person's row by construction, so a role always resolved through them.
       via: m ? "owner" : "none",
-      requested: d ? d.requested : null
+      requested: d ? d.requested : null,
+      // A member whose role the plan lists in manageRoles manages members too (not the plan).
+      canManage: !!(d && (d.isOwner || d.canManage)),
+      displayName: d && d.displayName ? d.displayName : null
     };
   }
   async function nodeState(call, appId, roles, caps) {
@@ -761,14 +764,16 @@
       // written and the node had nothing to put in it, so it rendered "nobody has turned up yet" on
       // apps people were visiting daily.
       seen: Object.fromEntries((d && d.seen || []).map((v) => [v.owner, { visits: v.visits, lastSeen: v.lastSeen }])),
-      members
+      members,
+      invites: d && d.invites || [],
+      total: d && d.total || null,
+      canManage: !!(d && d.canManage !== false)
     };
   }
   function nodeAssign(call, appId, args) {
-    const body = {
-      account: args.ghii || args.owner || args.account,
-      role: args.role
-    };
+    const body = { role: args.role };
+    if (args.email) body.email = args.email;
+    else body.account = args.ghii || args.owner || args.account;
     if (args.note) body.note = args.note;
     if (Array.isArray(args.offerings)) body.offerings = args.offerings;
     return un(call(base(appId), { method: "POST", body: JSON.stringify(body) }));
@@ -793,6 +798,39 @@
   }
   function nodeDismissGuest(call, appId, who) {
     return un(call(base(appId) + "/seen/" + encodeURIComponent(String(who)), { method: "DELETE" }));
+  }
+  async function nodeInvites(call, appId) {
+    const d = await un(call(base(appId)));
+    if (d && d.ok === false) return d;
+    return d && d.invites || [];
+  }
+  function nodeCancelInvite(call, appId, id) {
+    return un(call(base(appId) + "/invites/" + encodeURIComponent(String(id)), { method: "DELETE" }));
+  }
+  async function nodeAudit(call, appId, opts) {
+    const o = opts || {};
+    const q = [];
+    if (o.limit) q.push("limit=" + encodeURIComponent(String(o.limit)));
+    if (o.before) q.push("before=" + encodeURIComponent(String(o.before)));
+    const d = await un(call(base(appId) + "/audit" + (q.length ? "?" + q.join("&") : "")));
+    if (d && d.ok === false) return d;
+    return d && d.events || [];
+  }
+  async function nodePeople(call, q) {
+    const d = await un(call("/v1/contacts" + (q ? "?q=" + encodeURIComponent(q) : "")));
+    if (d && d.ok === false) return d;
+    const rows = d && d.contacts || [];
+    const people = rows.filter(function(r) {
+      return r && (r.kind === "owner" || r.kind === "person" || r.kind === "ghii");
+    }).map(function(r) {
+      const id = String(r.contact_id || "");
+      const account = id.indexOf("@") > 0 && id.indexOf("#") === -1 ? id.slice(0, id.lastIndexOf("@")) : null;
+      return { account, displayName: r.display_name || r.saved_name || null, email: r.email || null };
+    });
+    people.sort(function(a, b) {
+      return (a.account ? 0 : 1) - (b.account ? 0 : 1);
+    });
+    return people;
   }
 
   // src/static/sdk-libs/iam/index.js
@@ -957,7 +995,9 @@
           since: raw2.since,
           // The caller's own ask, so the join form can say "you asked on …" instead of offering the
           // same form again to somebody who is already waiting.
-          requested: raw2.requested || null
+          requested: raw2.requested || null,
+          canManage: !!raw2.canManage,
+          displayName: raw2.displayName || null
         };
         return state.me;
       }
@@ -1139,6 +1179,110 @@
       );
     },
     /**
+     * Invite somebody by email: the node approves the account that holds the address, or keeps an
+     * invitation and emails it when nobody does yet. Node roster only.
+     * @param {string} email
+     * @param {string} role
+     * @param {string} [note]
+     */
+    invite(email, role, note) {
+      requireInit();
+      if (!state.app) return Promise.resolve({ ok: false, error: "invitations belong to the node roster; init with { app }" });
+      return nodeAssign(
+        authFetch2,
+        /** @type {string} */
+        state.app,
+        { email, role, note }
+      );
+    },
+    /** The open invitations. Node roster only. @returns {Promise<any>} */
+    invites() {
+      requireInit();
+      if (!state.app) return Promise.resolve([]);
+      return nodeInvites(
+        authFetch2,
+        /** @type {string} */
+        state.app
+      );
+    },
+    /** Cancel an open invitation. @param {string} id */
+    cancelInvite(id) {
+      requireInit();
+      if (!state.app) return Promise.resolve({ ok: false, error: "invitations belong to the node roster; init with { app }" });
+      return nodeCancelInvite(
+        authFetch2,
+        /** @type {string} */
+        state.app,
+        id
+      );
+    },
+    /**
+     * The roster's history, newest first. Owner and managers. Node roster only.
+     * @param {{ limit?: number, before?: string }} [opts]
+     */
+    audit(opts) {
+      requireInit();
+      if (!state.app) return Promise.resolve([]);
+      return nodeAudit(
+        authFetch2,
+        /** @type {string} */
+        state.app,
+        opts
+      );
+    },
+    /**
+     * What membership of the app means: access, seats, terms, who reads the roster, which roles
+     * manage members. Owner only. Node roster only.
+     * @returns {Promise<any>}
+     */
+    async plan() {
+      requireInit();
+      if (!state.app) return null;
+      const [o, f] = String(state.app).split("/");
+      const body = await authFetch2("/v1/apps/" + encodeURIComponent(o || "") + "/" + encodeURIComponent(f || "") + "/members/plan");
+      if (body && body.ok === false) return body;
+      return body && body.data ? body.data.plan : null;
+    },
+    /**
+     * Declare what membership of the app means. Replaces the whole plan. Owner only.
+     * @param {{ roles: Record<string, string[]>, access?: string, rosterVisibility?: string,
+     *   seats?: Record<string, number>, terms?: Record<string, { days?: number, renewal?: string }>,
+     *   manageRoles?: string[] }} plan
+     */
+    async setPlan(plan) {
+      requireInit();
+      if (!state.app) return { ok: false, error: "the plan belongs to the node roster; init with { app }" };
+      const [o, f] = String(state.app).split("/");
+      const body = await authFetch2(
+        "/v1/apps/" + encodeURIComponent(o || "") + "/" + encodeURIComponent(f || "") + "/members/plan",
+        { method: "PUT", body: JSON.stringify(plan) }
+      );
+      return body && body.data !== void 0 ? body.data : body;
+    },
+    /**
+     * The people the owner knows, from their address book, with an account first. The app's token
+     * needs the scope word contacts:read (declare it in the page's aimeat-scopes).
+     * @param {string} [q]
+     */
+    people(q) {
+      return nodePeople(authFetch2, q);
+    },
+    /**
+     * The role one click on Approve should grant, from the state admin('state') answered: `preferred`
+     * when it is one of the roles, else the role with the least power, leaving out the role a stranger
+     * already gets. The owner panel and the Atelier kit's members block both ask this, so the two
+     * surfaces cannot grant different roles for the same click.
+     * @param {any} st  What admin('state') answered.
+     * @param {string} [preferred]
+     * @returns {string|undefined}
+     */
+    suggestRole(st, preferred) {
+      const roles = st && st.roles ? Object.keys(st.roles) : [];
+      if (preferred && roles.indexOf(preferred) !== -1) return preferred;
+      const defaultRole = st && st.config && st.config.defaultRole || null;
+      return leastPower(roles, st && st.roles || {}, defaultRole);
+    },
+    /**
      * The owner's panel: the union of the six that already exist on this node. See panel.js for what
      * each section is and which app it came from.
      * @param {import('./panel.js').PanelOpts} opts
@@ -1164,4 +1308,20 @@
   iam.gate = gateApi.gate;
   iam.guard = gateApi.guard;
   attach("iam", iam);
+  var authLib = (
+    /** @type {any} */
+    (typeof window !== "undefined" ? window : {}).AIMEAT?.auth
+  );
+  if (authLib && typeof authLib.on === "function") {
+    const forget = function() {
+      state.me = null;
+      if (state.app || state.ext) {
+        iam.refresh().catch(function(e) {
+          console.debug("aimeat-iam: standing not read after a sign-in change", e);
+        });
+      }
+    };
+    authLib.on("login", forget);
+    authLib.on("logout", forget);
+  }
 })();

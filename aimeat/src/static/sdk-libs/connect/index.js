@@ -14,14 +14,19 @@
  *   act on rather than a red error, telling a Bluesky user where an app password comes from BEFORE
  *   they go looking, and warning an Instagram user about the Business-account requirement BEFORE
  *   the attempt rather than after it fails for a reason nobody can read.
- * @structure list() · providers() · start() · attach() · revoke() · on()/off() · panel()
+ * @structure list() · providers() · capabilities() · start() · attach() · revoke() · on()/off() · panel()
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-connect.js"></script>
  *   const accounts = await AIMEAT.connect.list();
+ *   const can = await AIMEAT.connect.capabilities(accounts[0]);   // { sendMail, readMail, publish, … }
  *   await AIMEAT.connect.start('mastodon', { instance: 'mastodon.social' });
  *   await AIMEAT.connect.publish({ connectionId: accounts[0].id, caption: 'hello' });
  *   const sent = await AIMEAT.connect.history({ limit: 50 });
  *   await AIMEAT.connect.measure(sent[0].id);   // costs a provider request, and money on X
  * @version-history
+ *   v1.3.0 — 2026-10-01 — capabilities(provider | providerEntry | connection): what a provider can
+ *     do (read mail, send mail, publish, read metrics, read items) as booleans, from the node's
+ *     provider list. An app had matched /mail/ on the provider name, which cannot tell the reading
+ *     provider from the sending one.
  *   v1.2.0 — 2026-08-08 — attach() and revoke() were the two WRITERS still exempt from that rule:
  *     both returned a hardcoded success and announced a change on any answer, so a 403 for an app
  *     holding only `connections:use` read back as `{connected: true}`. Found by an app doing exactly
@@ -105,6 +110,62 @@ async function list() {
  */
 async function providers() {
   return must(await authFetch('/v1/connections/providers'), 'could not read the providers').providers ?? [];
+}
+
+/**
+ * What a provider can do, in AIMEAT's vocabulary, as yes-or-no answers.
+ * @typedef {Object} ProviderCapabilities
+ * @property {string} provider     The provider id the answer is for ('' when none could be named).
+ * @property {boolean} readMail    `read-mail`: the connection reads the account's mail.
+ * @property {boolean} sendMail    `send-mail`: the connection sends mail as the account.
+ * @property {boolean} publish     `publish-post` or `publish-video`: publish() can post to it.
+ * @property {boolean} publishPost `publish-post`.
+ * @property {boolean} publishVideo `publish-video`.
+ * @property {boolean} readMetrics `read-metrics`: measure() can succeed for it.
+ * @property {boolean} readItems   `read-items`: its items can be read back.
+ * @property {string[]} names      The node's own capability names, unchanged.
+ */
+
+/** The provider list, read once per page: what a provider can do is node configuration. */
+let providersOnce = null;
+
+/**
+ * What a provider can do, so an app never decides it from the provider's name.
+ *
+ * Takes a provider id ('google-mail-send'), an entry of providers() (no request is made), or a
+ * connection from list() (its `provider` is looked up). Read from GET /v1/connections/providers,
+ * whose entries carry `capabilities`; a provider the node does not list answers all false. A mail
+ * provider is split in two at the node (google-mail reads, google-mail-send sends), which is the
+ * case a name match gets wrong.
+ * @param {string | { id?: string, provider?: string, capabilities?: string[] }} provider
+ * @returns {Promise<ProviderCapabilities>}
+ */
+async function capabilities(provider) {
+  let id = '';
+  let names = null;
+  if (typeof provider === 'string') id = provider;
+  else if (provider && Array.isArray(provider.capabilities)) { id = provider.id || ''; names = provider.capabilities; }
+  else if (provider) id = provider.provider || provider.id || '';
+  if (!names) {
+    if (!providersOnce) {
+      providersOnce = providers().catch((err) => { providersOnce = null; throw err; });
+    }
+    const all = await providersOnce;
+    const hit = all.find((p) => p.id === id);
+    names = (hit && Array.isArray(hit.capabilities)) ? hit.capabilities : [];
+  }
+  const has = (n) => names.includes(n);
+  return {
+    provider: id,
+    readMail: has('read-mail'),
+    sendMail: has('send-mail'),
+    publish: has('publish-post') || has('publish-video'),
+    publishPost: has('publish-post'),
+    publishVideo: has('publish-video'),
+    readMetrics: has('read-metrics'),
+    readItems: has('read-items'),
+    names: names.slice(),
+  };
 }
 
 /**
@@ -382,7 +443,7 @@ function on(fn) {
 function off(fn) { listeners.delete(fn); }
 
 const connect = {
-  list, providers, start, attach: attachAccount, revoke, publish, on, off,
+  list, providers, capabilities, start, attach: attachAccount, revoke, publish, on, off,
   clients, setClient, removeClient,
   history, measure, series,
   /** Per-provider things a user must be told BEFORE they try. See notes.js. */
