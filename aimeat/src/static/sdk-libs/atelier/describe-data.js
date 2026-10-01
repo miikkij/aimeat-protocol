@@ -12,6 +12,14 @@
  *   v1.0.0 — 2026-09-05 — Generated (wish-atelier-always-excellent, part 3).
  */
 export const PARTS = {
+  "accessState": {
+    parts: ["root","title","intro","join"],
+    slots: [],
+    variants: [],
+    tokens: [],
+    fork: "Copying it out means asking AIMEAT.iam.can(cap) after init and drawing both sides yourself.",
+    file: "members.js",
+  },
   "bottomNav": {
     parts: ["root","item"],
     slots: ["item(entry)"],
@@ -51,6 +59,14 @@ export const PARTS = {
     tokens: ["--ak-choice-min"],
     fork: "A radio group drawn as cards; copy .ak-choices* out of workbench.css and keep role=radiogroup.",
     file: "workbench.js",
+  },
+  "connections": {
+    parts: ["root","title","intro","need","failure","notice","accounts","row","who","status","can","acts","reconnect","disconnect","add","provider","instance","connect","providerNote"],
+    slots: [],
+    variants: [],
+    tokens: ["--ak-conn-width"],
+    fork: "Copying it out means calling AIMEAT.connect's list(), providers(), capabilities(), start(), attach() and revoke() yourself, starting start() inside the click, and keeping the confirm before a disconnect and the words for each status.",
+    file: "connections.js",
   },
   "dialog": {
     parts: ["root","panel","head","title","close","body","text","before","after","actions","action"],
@@ -92,6 +108,22 @@ export const PARTS = {
     fork: "Copy .ak-hero and .ak-hero__* out of shell.css; you keep the tokens and the scrim's mode-following arithmetic, and you give up the repeated-title claim and the picture layer an effect knows how to land on.",
     file: "hero.js",
   },
+  "intakeAdmin": {
+    parts: ["root","title","intro","failure","notice","forms","row","meta","acts","copy","delete","create","fieldRows","addField","removeField","save"],
+    slots: ["link(form)"],
+    variants: [],
+    tokens: ["--ak-intake-width"],
+    fork: "Copying it out means calling AIMEAT.intake.listForms(), deleteForm() and defineForm() yourself, and building each form's link, its allowed and required fields and its honeypot.",
+    file: "intake-form.js",
+  },
+  "intakeForm": {
+    parts: ["root","title","hint","failure","form","field","label","req","input","choice","error","honeypot","bar","send","sent"],
+    slots: [],
+    variants: [],
+    tokens: ["--ak-intake-width"],
+    fork: "Copying it out means calling AIMEAT.intake.getForm(), fields() and submit() yourself, drawing a hidden input named form.honeypot_field and sending its value, and putting err.field on its field.",
+    file: "intake-form.js",
+  },
   "island": {
     parts: ["root","content"],
     slots: [],
@@ -99,6 +131,14 @@ export const PARTS = {
     tokens: ["--ak-island-pad","--ak-island-radius"],
     fork: "Animate width, height and border-radius yourself and swap the content; you give up the spring, the separate enter and exit timing of the content, and the interruption that continues from where it was.",
     file: "island.js",
+  },
+  "joinRequest": {
+    parts: ["root","title","intro","note","send","status"],
+    slots: [],
+    variants: [],
+    tokens: [],
+    fork: "Copying it out means reading me().requested and calling AIMEAT.iam.request(note) yourself.",
+    file: "members.js",
   },
   "kanban": {
     parts: ["root","col","head","colname","count","well","card","cardtitle","cardsub","badge","extra","aside"],
@@ -131,6 +171,14 @@ export const PARTS = {
     tokens: ["--ak-card-aspect","--ak-card-pad"],
     fork: "Same as cardGrid; this is one card and its action row.",
     file: "grid.js",
+  },
+  "members": {
+    parts: ["root","title","intro","faces","tabs","search","failure","asked","seen","roster","invites","history","plan","settings","paying","row","who","meta","acts","add","suggest","stranger","more"],
+    slots: ["columns(member)","actions[{ label, run(member), tone? }]","sections[{ id, type, label, help?, value, onChange }]"],
+    variants: ["list","table","dense"],
+    tokens: ["--ak-mem-width"],
+    fork: "Copying it out means calling AIMEAT.iam's admin(), roster(), invite(), invites(), audit(), people(), plan() and setPlan() yourself, and keeping the one-click role (suggestRole), the confirm on a raise and the refusal sentence.",
+    file: "members-admin.js",
   },
   "menu": {
     parts: ["root","item","label","hint","separator","ink"],
@@ -299,5 +347,21 @@ export const PARTS = {
     tokens: [],
     fork: "",
     file: "menu.js",
+  },
+  "workspacePicker": {
+    parts: ["root","title","intro","failure","using","change","orgs","row","who","chip","use","create","createGo","cancel","working"],
+    slots: ["onReady(choice)"],
+    variants: ["dense"],
+    tokens: ["--ak-mem-width"],
+    fork: "Copying it out means calling AIMEAT.organism's recall(app, { verify: true }), organisms(), findOrCreateWorkspace() and remember() yourself, in that order, and keeping the one-line view of a remembered choice.",
+    file: "workspace-picker.js",
+  },
+  "workspaceTeam": {
+    parts: ["root","title","intro","failure","notice","tabs","requests","people","invite","row","who","meta","acts","role","chip"],
+    slots: ["columns(member)","actions[{ label, run(member), tone? }]"],
+    variants: ["list","table"],
+    tokens: ["--ak-mem-width"],
+    fork: "Copying it out means calling AIMEAT.organism's access(), decide(), grant(), revoke() and inviteByEmail() yourself, and keeping the creator unremovable, the confirm on a raise to contributor and the refusal sentence.",
+    file: "workspace-team.js",
   },
 };

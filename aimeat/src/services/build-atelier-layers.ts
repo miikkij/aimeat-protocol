@@ -22,6 +22,9 @@
  * @usage
  *   const piece = atelierPiece(buildAtelierPrompt(config, { mode: 'new' }).full, 'genre', config.baseUrl);
  * @version-history
+ *   v1.1.0 — 2026-10-01 — "AI inside the app" moved from `start` to `libraries`: the kit's library
+ *     blocks (members, workspaceTeam, intakeForm, connections) took `start` to 24 057 characters
+ *     against the 24 000 a result holds, and the section is about a library (AIMEAT.ai, the aide block).
  *   v1.0.0 — 2026-09-19 — Initial.
  */
 import { MAX_PART_CHARS } from './build-app-layers.js';
@@ -32,7 +35,7 @@ export type AtelierPartId = 'start' | 'genre' | 'libraries' | 'book' | 'patterns
 export const ATELIER_PARTS: Array<{ id: AtelierPartId; what: string }> = [
   { id: 'start', what: 'The interview, what the Atelier track is, the component kit, how a component is customised, data, how to finish and publish, and what is never done.' },
   { id: 'genre', what: 'REQUIRED before any code: an app starts from a genre, a complete page in a committed register, and the publish refuses an app without a register. Also the pattern shelf, the Design Book and the signature.' },
-  { id: 'libraries', what: 'REQUIRED before any code: every library this node serves, with what it is for. Speech, audio, files, live updates, notifications, printing, calendars and decisions are already written. An address that is not in it does not exist.' },
+  { id: 'libraries', what: 'REQUIRED before any code: every library this node serves, with what it is for, and AI inside the app. Speech, audio, files, live updates, notifications, printing, calendars and decisions are already written. An address that is not in it does not exist.' },
   { id: 'book', what: 'REQUIRED before any code: the Design Book. How a proven part reaches a page forked from a genre (the working screen is a mosaic), the components other apps made, writing down why you took, passed over and made each thing, and the whole Book on one page, every part on a line.' },
   { id: 'patterns', what: 'How the code is written: six patterns to copy, the living record, and the mosaic that arranges a screen from outside the file.' },
   { id: 'look', what: 'The look presets, the one ambient layer, effects, motion and imagery. Read it before you change anything the genre did not decide for you.' },
@@ -50,7 +53,6 @@ export const ATELIER_HEADING_PART: Record<string, AtelierPartId> = {
   'The Atelier track': 'start',
   'The components (`AIMEAT.atelier`)': 'start',
   'A COMPONENT THAT IS NEARLY RIGHT IS CUSTOMISED, NEVER COPIED': 'start',
-  'AI inside the app': 'start',
   'Data, in short': 'start',
   'Finishing': 'start',
   'What the review always catches': 'start',
@@ -62,6 +64,8 @@ export const ATELIER_HEADING_PART: Record<string, AtelierPartId> = {
   'The signature: this app\'s own hand': 'genre',
 
   'The node\'s libraries: read this list before you write a mechanism': 'libraries',
+  // Moved from `start` on 2026-10-01, when the library blocks took `start` past the limit.
+  'AI inside the app': 'libraries',
 
   // The Design Book has a part of its own since 2026-09-20: the mosaic inside a genre, the
   // components, the build notes and the one-page map outgrew what `patterns` and `libraries`

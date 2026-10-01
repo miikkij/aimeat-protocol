@@ -34,6 +34,9 @@
  *   });
  *   // later, when the app's data changed:  m.refresh('errands.');
  * @version-history
+ *   v0.61.0 — 2026-10-01 — The self-sourced blocks (legalLinks, auditTrail, feedbackForm,
+ *     reviewerLine) moved to mosaic-self.js unchanged, under the 800-line cap; members and
+ *     joinRequest render there too.
  *   v0.53.2 — 2026-09-13 — A section's `fill` runs once its unit is in the page, still inside the
  *     same render. It used to run on a detached element, so a fill that measured got 0x0, and a
  *     fill that threw ended the render with every later block missing; now a throw is logged with
@@ -124,7 +127,7 @@ import { projectStack, projectOverlay, projectRail, projectPicker, projectDeck, 
 import { health, queue, gauge } from './ops.js';
 import { kanban, plan, schedule, steps } from './planner.js';
 import { konsole } from './konsole.js';
-import { legalLinks, auditTrail, feedbackForm, reviewerLine } from './commercial.js';
+import { renderSelfSourced } from './mosaic-self.js';
 import { crt, countdown, crawl } from './mtv.js';
 import { ring, crew, poll, keys } from './parts.js';
 import { thread } from './lenis-parts.js';
@@ -476,29 +479,9 @@ export function mosaic(spec) {
         }));
         return;
       }
-      // ── The commercial side: self-sourced blocks (the app's own public legal surface, the
-      //    organism row space and the intake form the props name), no memory source to bind.
-      case 'legalLinks': {
-        alive.handles.push(legalLinks({ target: into, title: p.title }));
-        return;
-      }
-      case 'auditTrail': {
-        alive.handles.push(auditTrail({
-          target: into, org: p.org, ws: p.ws, space: p.space, title: p.title, hint: p.hint,
-        }));
-        return;
-      }
-      case 'feedbackForm': {
-        alive.handles.push(feedbackForm({
-          target: into, org: p.org, ws: p.ws, formId: p.formId, title: p.title, hint: p.hint,
-        }));
-        return;
-      }
-      case 'reviewerLine': {
-        alive.handles.push(reviewerLine({ target: into }));
-        return;
-      }
       default:
+        // The self-sourced blocks (commercial, members) live in mosaic-self.js.
+        if (renderSelfSourced(block, into, alive.handles)) return;
         // A component newer than this kit build: name it rather than break the screen.
         console.warn('aimeat-atelier: this kit build has no renderer for "' + block.component + '" — skipping block "' + block.id + '".');
     }

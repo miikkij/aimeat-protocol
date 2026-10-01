@@ -55,6 +55,13 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.61.0 — 2026-10-01 — THE MEMBERS COMPONENTS (members.js): members, the owner's member screen;
+ *     joinRequest, the visitor's ask; accessState, a members-only area. They draw AIMEAT.iam's data
+ *     in the kit's tokens and fetch nothing themselves. members and joinRequest join the mosaic.
+ *     workspaceTeam (a workspace's people) and workspacePicker (the first-run choice of organism
+ *     and workspace) over AIMEAT.organism; workspaceTeam joins the mosaic. intakeForm and
+ *     intakeAdmin (a Public Intake form, and the owner's list of forms) over AIMEAT.intake, and
+ *     connections (the owner's outside accounts) over AIMEAT.connect; all three join the mosaic.
  *   v0.60.0 — 2026-09-29 — app({ logo }) takes a small inline image, a data:image of at most 8192
  *     characters (shell.js v0.66.0), the one form a package carries to a customer node.
  *   v0.59.1 — 2026-09-29 — No script changed: the stylesheet's version, for the node's marks on
@@ -380,6 +387,11 @@ import {
   legalLinks, readinessChip, legalPageFrame, auditTrail, recordEvent, feedbackForm,
   reviewerLine, marksSwitches,
 } from './commercial.js';
+import { members, joinRequest, accessState } from './members.js';
+import { workspaceTeam } from './workspace-team.js';
+import { workspacePicker } from './workspace-picker.js';
+import { intakeForm, intakeAdmin } from './intake-form.js';
+import { connections } from './connections.js';
 import { crt, countdown, crawl } from './mtv.js';
 import { spotlight, tilt, sheen, odometer, thumb, deal } from './materials.js';
 import { ring, crew, poll, keys, dropzone } from './parts.js';
@@ -413,7 +425,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.60.0',
+  version: '0.61.0',
 
   /**
    * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
@@ -482,6 +494,15 @@ const atelier = {
   // ── The commercial side (legal pages, marks, reviewer, audit trail, feedback) ──
   legalLinks, readinessChip, legalPageFrame, auditTrail, recordEvent, feedbackForm,
   reviewerLine, marksSwitches,
+
+  // ── The app's own members, drawn over AIMEAT.iam (the owner's screen, the ask, a members-only area) ──
+  members, joinRequest, accessState,
+
+  // ── An organism's workspace for the app: its people, and the first-run choice of where it lives ──
+  workspaceTeam, workspacePicker,
+
+  // ── A Public Intake form and its admin list (AIMEAT.intake), the owner's outside accounts (AIMEAT.connect) ──
+  intakeForm, intakeAdmin, connections,
 
   // ── The broadcast family (the Music Television genre's parts as components) ──
   crt, countdown, crawl,

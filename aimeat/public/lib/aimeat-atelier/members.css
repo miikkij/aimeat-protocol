@@ -1,0 +1,174 @@
+/*
+ * @file aimeat-atelier/members.css
+ * @description The members components' clothes (atelier/members*.js): the owner's member screen with
+ *   its tabs, faces, rows, table, address-book suggestions and plan; the visitor's ask; a members-only
+ *   area. Everything rides the --ak-* token contract, so the screen wears the app's look and mode; no
+ *   colour of its own. The screen keeps to a readable width (--ak-mem-width) instead of stretching a
+ *   row across a wide window, and rows wrap instead of scrolling sideways.
+ * @structure .ak-mem (shared) · tabs · faces · rows and the person cell · add and suggestions ·
+ *   table · plan · the ask · a members-only area · variants list, table, dense
+ * @version-history
+ *   v0.61.0 — 2026-10-01 — Initial (wish-library-blocks-in-the-kit-and-the-design-book-iam-members-fi);
+ *     rebuilt on review: a readable width, tabs, faces, the person cell, suggestions, the table, the plan.
+ */
+
+.ak-mem { display: block; max-width: var(--ak-mem-width, 52rem); }
+.ak-mem[hidden] { display: none; }
+.ak-mem-sample {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border: 1px dashed color-mix(in oklab, var(--ak-ink) 45%, var(--ak-line));
+  border-radius: var(--ak-radius-pill, 999px);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ak-ink-dim);
+  vertical-align: middle;
+}
+.ak-mem__title { margin: 0 0 4px; font-size: 1.05rem; color: var(--ak-ink); }
+.ak-mem__intro, .ak-mem__hint, .ak-mem__stranger, .ak-mem__none {
+  margin: 0 0 10px; font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); max-width: 70ch;
+}
+.ak-mem__stranger { margin-top: 12px; }
+.ak-mem__failure, .ak-mem__notice {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: var(--ak-radius-sm);
+  font-size: var(--ak-text-fine, 0.85rem);
+  color: var(--ak-ink);
+  max-width: 70ch;
+}
+.ak-mem__failure {
+  border: 1px solid color-mix(in oklab, var(--ak-warn) 55%, var(--ak-line));
+  background: color-mix(in oklab, var(--ak-warn) 10%, var(--ak-surface));
+}
+.ak-mem__notice {
+  border: 1px solid color-mix(in oklab, var(--ak-ok, var(--ak-accent)) 45%, var(--ak-line));
+  background: color-mix(in oklab, var(--ak-ok, var(--ak-accent)) 10%, var(--ak-surface));
+}
+
+/* ── Faces: who is in, before anything is opened ─────────────────────────────────────────── */
+.ak-mem__faces { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 12px; }
+.ak-mem__face {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--ak-accent) 22%, var(--ak-surface));
+  color: var(--ak-ink);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+.ak-mem__face--more { background: var(--ak-surface); border: 1px solid var(--ak-line); color: var(--ak-ink-dim); }
+
+/* ── Tabs ─────────────────────────────────────────────────────────────────────────────────── */
+.ak-mem__tabs { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 10px; border-bottom: 1px solid var(--ak-line); }
+.ak-mem__tab {
+  min-height: 40px;
+  padding: 6px 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--ak-ink-dim);
+  font: inherit;
+  font-size: var(--ak-text-fine, 0.85rem);
+  font-weight: 700;
+  cursor: pointer;
+}
+.ak-mem__tab.is-on { color: var(--ak-ink); border-bottom-color: var(--ak-accent); }
+.ak-mem__tab:focus-visible { outline: 2px solid var(--ak-accent); outline-offset: 2px; }
+.ak-mem__search { width: 100%; max-width: 24rem; margin: 0 0 10px; }
+
+/* ── Rows and the person cell ─────────────────────────────────────────────────────────────── */
+.ak-mem__group { margin: 0 0 14px; }
+.ak-mem__group-title { margin: 0 0 6px; font-size: var(--ak-text-fine, 0.85rem); font-weight: 700; color: var(--ak-ink-dim); }
+.ak-mem__rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ak-mem__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--ak-line);
+  border-radius: var(--ak-radius-sm);
+  background: var(--ak-surface);
+}
+.ak-mem__row--line { padding: 6px 12px; }
+.ak-mem__person { display: inline-flex; align-items: center; gap: 10px; min-width: 0; flex: 0 1 auto; }
+.ak-mem__names { display: flex; flex-direction: column; min-width: 0; }
+.ak-mem__name { font-weight: 700; color: var(--ak-ink); overflow-wrap: anywhere; }
+.ak-mem__account { font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); overflow-wrap: anywhere; }
+.ak-mem__meta { flex: 1 1 10rem; min-width: 0; font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); overflow-wrap: anywhere; }
+.ak-mem__col { margin-left: 8px; color: var(--ak-ink); }
+.ak-mem__when { flex: 0 0 auto; font-variant-numeric: tabular-nums; font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); }
+/* The controls keep to the right edge of their line, whether the row fits on one line or wraps. */
+.ak-mem__acts { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; align-items: center; flex: 1 0 auto; justify-content: flex-end; }
+.ak-mem__role { width: auto; min-width: 7rem; }
+.ak-mem__more { margin-top: 6px; }
+
+/* ── Adding somebody, with suggestions from the address book ──────────────────────────────── */
+.ak-mem__add, .ak-mem__ask { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }
+.ak-mem__field { position: relative; flex: 1 1 14rem; min-width: 0; }
+.ak-mem__name.ak-input, .ak-mem__field .ak-input { width: 100%; }
+.ak-mem__suggest {
+  position: absolute;
+  z-index: 5;
+  inset: calc(100% + 4px) 0 auto 0;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--ak-line);
+  border-radius: var(--ak-radius-sm);
+  background: var(--ak-surface);
+  box-shadow: 0 8px 24px color-mix(in oklab, var(--ak-ink) 18%, transparent);
+}
+.ak-mem__suggest[hidden] { display: none; }
+.ak-mem__pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--ak-radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ak-mem__pick:hover, .ak-mem__pick:focus-visible { background: color-mix(in oklab, var(--ak-accent) 12%, var(--ak-surface)); outline: none; }
+.ak-mem__note { flex: 1 1 100%; }
+.ak-mem__status { margin: 8px 0 0; font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink); }
+.ak-mem__status:empty { display: none; }
+
+/* ── The table variant and the plan's table ───────────────────────────────────────────────── */
+.ak-mem__table-wrap { overflow-x: auto; }
+.ak-mem__table { width: 100%; border-collapse: collapse; font-size: var(--ak-text-fine, 0.85rem); }
+.ak-mem__table th, .ak-mem__table td { padding: 8px 10px; border-bottom: 1px solid var(--ak-line); text-align: left; vertical-align: middle; color: var(--ak-ink); }
+.ak-mem__table th { color: var(--ak-ink-dim); font-weight: 700; }
+.ak-mem__table td:last-child .ak-mem__acts { justify-content: flex-end; }
+.ak-mem__num { width: 6.5rem; }
+
+/* ── The plan ─────────────────────────────────────────────────────────────────────────────── */
+.ak-mem__plan { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.ak-mem__plan-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink); }
+
+/* ── A members-only area ──────────────────────────────────────────────────────────────────── */
+.ak-mem-access:not(.is-open) {
+  padding: 16px;
+  border: 1px dashed color-mix(in oklab, var(--ak-accent) 45%, var(--ak-line));
+  border-radius: var(--ak-radius-sm);
+}
+.ak-mem-access.is-open { max-width: none; }
+.ak-mem-access .ak-mem-join .ak-mem__title { font-size: var(--ak-text-fine, 0.85rem); }
+
+/* ── dense: for a side panel ──────────────────────────────────────────────────────────────── */
+.ak-mem--dense .ak-mem__row { padding: 6px 8px; }
+.ak-mem--dense .ak-mem__face { width: 26px; height: 26px; font-size: 0.75rem; }
+.ak-mem--dense .ak-mem__group { margin-bottom: 10px; }

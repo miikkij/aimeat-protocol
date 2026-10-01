@@ -4250,7 +4250,7 @@
     }
     function sync(travel3) {
       attach2();
-      watch2();
+      watch3();
       const box = measure();
       if (!box) {
         show(false);
@@ -4277,7 +4277,7 @@
       });
       ro.observe(container);
     }
-    function watch2() {
+    function watch3() {
       if (!ro) return;
       const found = typeof o.active === "function" ? o.active(container) : o.active ? container.querySelector(o.active) : null;
       if (found === watched) return;
@@ -5707,8 +5707,8 @@
         return;
       }
       const from = box.getBoundingClientRect();
-      const tw = Math.min(360, window.innerWidth - 32);
-      const to = { left: window.innerWidth - tw - 16, top: window.innerHeight - 72, width: tw, height: 56 };
+      const tw2 = Math.min(360, window.innerWidth - 32);
+      const to = { left: window.innerWidth - tw2 - 16, top: window.innerHeight - 72, width: tw2, height: 56 };
       const dx = to.left - from.left;
       const dy = to.top - from.top;
       const sx = to.width / Math.max(from.width, 1);
@@ -8735,12 +8735,12 @@
     });
     let drawn = false;
     let late = null;
-    let watch2 = null;
+    let watch3 = null;
     const draw = function() {
       if (drawn) return;
       drawn = true;
       clearTimeout(late);
-      if (watch2) watch2.destroy();
+      if (watch3) watch3.destroy();
       requestAnimationFrame(function() {
         lines.forEach(function(line) {
           line.classList.add("ak-chart__line--drawn");
@@ -8750,7 +8750,7 @@
         });
       });
     };
-    watch2 = inView(root, draw);
+    watch3 = inView(root, draw);
     if (!drawn) late = setTimeout(draw, LATEST_DRAW);
   }
   function hoverRig(root, node, geom) {
@@ -12788,6 +12788,3093 @@
     } };
   }
 
+  // src/static/sdk-libs/atelier/members-i18n.js
+  var STRINGS2 = {
+    en: {
+      "members.title": "Members",
+      "members.intro": "Who may use this app, and with which role. A role belongs to the person, so their agents have it too.",
+      "members.asked": "Asked for access",
+      "members.askedNone": "Nobody is waiting.",
+      "members.seen": "Opened the app, no role yet",
+      "members.seenNone": "Nobody else has opened the app yet.",
+      "members.roster": "Members",
+      "members.rosterNone": "Nobody is a member yet.",
+      "members.add": "Add someone",
+      "members.addPlaceholder": "Name, account or email",
+      "members.approve": "Approve",
+      "members.decline": "Decline",
+      "members.dismiss": "Seen it",
+      "members.remove": "Remove",
+      "members.role": "Role",
+      "members.since": "since {d}",
+      "members.visit1": "1 visit, on {d}",
+      "members.visits": "{n} visits, last {d}",
+      "members.confirmRemove": "Remove {who}?",
+      "members.confirmRemoveText": "They lose access at once, and AIMEAT tells them.",
+      "members.stranger": "Anyone who is signed in can open this app. Only the parts the app keeps for members are closed to them.",
+      "members.notOwner": "Only the owner of this app manages its members.",
+      "members.noLib": "This block needs aimeat-iam.js on the page.",
+      "members.failed": "That did not go through: {why}",
+      "join.title": "Ask for access",
+      "join.intro": "The owner decides who may use this app. Say who you are and what you need it for.",
+      "join.note": "Who you are and what you need it for",
+      "join.send": "Send request",
+      "join.sent": "Your request was sent. The owner decides.",
+      "join.pending": "You asked on {d}. The owner has not decided yet.",
+      "join.declined": "The owner declined your earlier request. You can ask again.",
+      "join.member": "You are a member, as {role}.",
+      "join.already": "You already have access.",
+      "join.signIn": "Sign in to ask for access.",
+      "access.title": "This part is for members",
+      "access.intro": "You can ask the owner to let you in.",
+      "sample.badge": "Sample content",
+      "sample.note": "A sample. Nothing here is sent or changed.",
+      "members.addHint": "Pick from your address book, type an account name, or type an email: an address nobody holds yet gets an invitation.",
+      "members.invite": "Invite",
+      "members.inviteSent": "Invitation sent to {email}.",
+      "members.addedFound": "{who} is now a member.",
+      "members.noAccount": "no account yet",
+      "members.search": "Search by name",
+      "members.more": "Show {n} more",
+      "members.raise": "Make {who} {role}?",
+      "members.raiseText": "This role may: {caps}.",
+      "members.raiseAll": "This role may do everything the owner allows in this app.",
+      "members.raiseYes": "Change role",
+      "members.invited": "{role}, invited {d}, open until {until}",
+      "members.cancelInvite": "Cancel",
+      "members.invitesNone": "No open invitations.",
+      "members.historyNone": "Nothing has happened yet.",
+      "members.payingNone": "No paying customers yet.",
+      "members.loading": "Loading…",
+      "members.colName": "Name",
+      "members.colSince": "Since",
+      "members.colActions": "Role and actions",
+      "tab.asked": "Requests",
+      "tab.seen": "Visitors",
+      "tab.members": "Members",
+      "tab.invites": "Invitations",
+      "tab.history": "History",
+      "tab.plan": "Plan",
+      "tab.paying": "Paying customers",
+      "tab.settings": "Settings",
+      "history.member.approved": "{by} approved {who} as {to}",
+      "history.member.role_changed": "{by} changed {who} from {from} to {to}",
+      "history.member.removed": "{by} removed {who}",
+      "history.request.declined": "{by} declined {who}",
+      "history.visitor.dismissed": "{by} marked {who} as seen",
+      "history.invite.sent": "{by} invited {who} as {to}",
+      "history.invite.cancelled": "{by} cancelled the invitation to {who}",
+      "history.plan.changed": "{by} changed the plan",
+      "history.roster.swept": "{by} closed the memberships that had ended",
+      "plan.access": "Who pays",
+      "plan.accessHint": "members-free: members pay nothing, others pay. free: nobody pays. members-only: only members get in, even with money.",
+      "plan.visibility": "Who sees the member list",
+      "plan.seats": "Seats",
+      "plan.days": "Days",
+      "plan.manages": "Manages members",
+      "plan.noLimit": "no limit",
+      "plan.noEnd": "no end",
+      "plan.save": "Save plan",
+      "plan.saved": "The plan is saved. It applies to approvals from now on.",
+      "settings.on": "On",
+      "settings.off": "Off"
+    },
+    fi: {
+      "members.title": "Jäsenet",
+      "members.intro": "Ketkä saavat käyttää tätä sovellusta ja millä roolilla. Rooli kuuluu ihmiselle, joten myös hänen agenteillaan on sama rooli.",
+      "members.asked": "Pyytäneet pääsyä",
+      "members.askedNone": "Kukaan ei odota.",
+      "members.seen": "Avanneet sovelluksen, ei vielä roolia",
+      "members.seenNone": "Kukaan muu ei ole vielä avannut sovellusta.",
+      "members.roster": "Jäsenet",
+      "members.rosterNone": "Jäseniä ei vielä ole.",
+      "members.add": "Lisää käyttäjä",
+      "members.addPlaceholder": "Nimi, tilinimi tai sähköposti",
+      "members.approve": "Hyväksy",
+      "members.decline": "Hylkää",
+      "members.dismiss": "Nähty",
+      "members.remove": "Poista",
+      "members.role": "Rooli",
+      "members.since": "{d} alkaen",
+      "members.visit1": "1 käynti, {d}",
+      "members.visits": "{n} käyntiä, viimeksi {d}",
+      "members.confirmRemove": "Poistetaanko {who}?",
+      "members.confirmRemoveText": "Pääsy päättyy heti, ja AIMEAT kertoo siitä hänelle.",
+      "members.stranger": "Kuka tahansa kirjautunut voi avata tämän sovelluksen. Häneltä on suljettu vain ne osat, jotka sovellus pitää jäsenille.",
+      "members.notOwner": "Vain sovelluksen omistaja hallinnoi jäseniä.",
+      "members.noLib": "Tämä osa tarvitsee sivulle aimeat-iam.js-kirjaston.",
+      "members.failed": "Se ei mennyt läpi: {why}",
+      "join.title": "Pyydä pääsyä",
+      "join.intro": "Omistaja päättää, kuka saa käyttää tätä sovellusta. Kerro, kuka olet ja mihin tarvitset sitä.",
+      "join.note": "Kuka olet ja mihin tarvitset tätä",
+      "join.send": "Lähetä pyyntö",
+      "join.sent": "Pyyntösi lähti. Omistaja päättää.",
+      "join.pending": "Pyysit pääsyä {d}. Omistaja ei ole vielä päättänyt.",
+      "join.declined": "Omistaja hylkäsi aiemman pyyntösi. Voit pyytää uudelleen.",
+      "join.member": "Olet jäsen, roolina {role}.",
+      "join.already": "Sinulla on jo pääsy.",
+      "join.signIn": "Kirjaudu sisään, niin voit pyytää pääsyä.",
+      "access.title": "Tämä osa on jäsenille",
+      "access.intro": "Voit pyytää omistajalta pääsyä.",
+      "sample.badge": "Esimerkkisisältö",
+      "sample.note": "Esimerkki. Täältä ei lähetetä eikä muuteta mitään.",
+      "members.addHint": "Valitse osoitekirjastasi, kirjoita tilinimi tai sähköposti. Osoite, jolla ei vielä ole tiliä, saa kutsun.",
+      "members.invite": "Kutsu",
+      "members.inviteSent": "Kutsu lähti osoitteeseen {email}.",
+      "members.addedFound": "{who} on nyt jäsen.",
+      "members.noAccount": "ei vielä tiliä",
+      "members.search": "Hae nimellä",
+      "members.more": "Näytä {n} lisää",
+      "members.raise": "Annetaanko käyttäjälle {who} rooli {role}?",
+      "members.raiseText": "Tällä roolilla saa: {caps}.",
+      "members.raiseAll": "Tällä roolilla saa tehdä kaiken, minkä omistaja tässä sovelluksessa sallii.",
+      "members.raiseYes": "Vaihda rooli",
+      "members.invited": "{role}, kutsuttu {d}, voimassa {until} asti",
+      "members.cancelInvite": "Peru",
+      "members.invitesNone": "Avoimia kutsuja ei ole.",
+      "members.historyNone": "Mitään ei ole vielä tapahtunut.",
+      "members.payingNone": "Maksavia asiakkaita ei vielä ole.",
+      "members.loading": "Ladataan…",
+      "members.colName": "Nimi",
+      "members.colSince": "Alkaen",
+      "members.colActions": "Rooli ja toiminnot",
+      "tab.asked": "Pyynnöt",
+      "tab.seen": "Kävijät",
+      "tab.members": "Jäsenet",
+      "tab.invites": "Kutsut",
+      "tab.history": "Historia",
+      "tab.plan": "Ehdot",
+      "tab.paying": "Maksavat asiakkaat",
+      "tab.settings": "Asetukset",
+      "history.member.approved": "{by} hyväksyi käyttäjän {who} roolilla {to}",
+      "history.member.role_changed": "{by} vaihtoi käyttäjän {who} roolin {from} → {to}",
+      "history.member.removed": "{by} poisti käyttäjän {who}",
+      "history.request.declined": "{by} hylkäsi käyttäjän {who} pyynnön",
+      "history.visitor.dismissed": "{by} merkitsi käyttäjän {who} nähdyksi",
+      "history.invite.sent": "{by} kutsui osoitteen {who} roolilla {to}",
+      "history.invite.cancelled": "{by} perui kutsun osoitteeseen {who}",
+      "history.plan.changed": "{by} muutti ehtoja",
+      "history.roster.swept": "{by} päätti jäsenyydet, joiden kausi oli loppunut",
+      "plan.access": "Kuka maksaa",
+      "plan.accessHint": "members-free: jäsenet eivät maksa, muut maksavat. free: kukaan ei maksa. members-only: vain jäsenet pääsevät sisään, rahallakaan ei pääse.",
+      "plan.visibility": "Kuka näkee jäsenlistan",
+      "plan.seats": "Paikat",
+      "plan.days": "Päivät",
+      "plan.manages": "Hallinnoi jäseniä",
+      "plan.noLimit": "ei rajaa",
+      "plan.noEnd": "ei loppua",
+      "plan.save": "Tallenna ehdot",
+      "plan.saved": "Ehdot on tallennettu. Ne koskevat tästä eteenpäin tehtäviä hyväksyntöjä.",
+      "settings.on": "Päällä",
+      "settings.off": "Pois"
+    },
+    es: {
+      "members.title": "Miembros",
+      "members.intro": "Quién puede usar esta aplicación y con qué rol. El rol pertenece a la persona, así que sus agentes también lo tienen.",
+      "members.asked": "Pidieron acceso",
+      "members.askedNone": "Nadie está esperando.",
+      "members.seen": "Abrieron la aplicación, todavía sin rol",
+      "members.seenNone": "Nadie más ha abierto la aplicación todavía.",
+      "members.roster": "Miembros",
+      "members.rosterNone": "Todavía no hay miembros.",
+      "members.add": "Agregar a alguien",
+      "members.addPlaceholder": "Nombre, cuenta o correo",
+      "members.approve": "Aprobar",
+      "members.decline": "Rechazar",
+      "members.dismiss": "Visto",
+      "members.remove": "Quitar",
+      "members.role": "Rol",
+      "members.since": "desde el {d}",
+      "members.visit1": "1 visita, el {d}",
+      "members.visits": "{n} visitas, la última el {d}",
+      "members.confirmRemove": "¿Quitar a {who}?",
+      "members.confirmRemoveText": "Pierde el acceso de inmediato, y AIMEAT se lo avisa.",
+      "members.stranger": "Cualquier persona con sesión iniciada puede abrir esta aplicación. Solo tiene cerradas las partes que la aplicación reserva para sus miembros.",
+      "members.notOwner": "Solo el propietario de esta aplicación administra a sus miembros.",
+      "members.noLib": "Este bloque necesita aimeat-iam.js en la página.",
+      "members.failed": "No se pudo completar: {why}",
+      "join.title": "Pedir acceso",
+      "join.intro": "El propietario decide quién puede usar esta aplicación. Cuéntale quién eres y para qué la necesitas.",
+      "join.note": "Quién eres y para qué lo necesitas",
+      "join.send": "Enviar solicitud",
+      "join.sent": "Tu solicitud se envió. El propietario decide.",
+      "join.pending": "Pediste acceso el {d}. El propietario todavía no ha decidido.",
+      "join.declined": "El propietario rechazó tu solicitud anterior. Puedes pedirlo de nuevo.",
+      "join.member": "Eres miembro, con el rol {role}.",
+      "join.already": "Ya tienes acceso.",
+      "join.signIn": "Inicia sesión para pedir acceso.",
+      "access.title": "Esta parte es para miembros",
+      "access.intro": "Puedes pedirle acceso al propietario.",
+      "sample.badge": "Contenido de muestra",
+      "sample.note": "Una muestra. Desde aquí no se envía ni se cambia nada.",
+      "members.addHint": "Elige de tu libreta de contactos, escribe un nombre de cuenta o un correo. Una dirección que todavía no tiene cuenta recibe una invitación.",
+      "members.invite": "Invitar",
+      "members.inviteSent": "La invitación se envió a {email}.",
+      "members.addedFound": "{who} ahora es miembro.",
+      "members.noAccount": "todavía sin cuenta",
+      "members.search": "Buscar por nombre",
+      "members.more": "Mostrar {n} más",
+      "members.raise": "¿Darle a {who} el rol {role}?",
+      "members.raiseText": "Con este rol se puede: {caps}.",
+      "members.raiseAll": "Con este rol se puede hacer todo lo que el propietario permite en esta aplicación.",
+      "members.raiseYes": "Cambiar rol",
+      "members.invited": "{role}, invitado el {d}, válido hasta el {until}",
+      "members.cancelInvite": "Cancelar",
+      "members.invitesNone": "No hay invitaciones abiertas.",
+      "members.historyNone": "Todavía no ha pasado nada.",
+      "members.payingNone": "Todavía no hay clientes que paguen.",
+      "members.loading": "Cargando…",
+      "members.colName": "Nombre",
+      "members.colSince": "Desde",
+      "members.colActions": "Rol y acciones",
+      "tab.asked": "Solicitudes",
+      "tab.seen": "Visitantes",
+      "tab.members": "Miembros",
+      "tab.invites": "Invitaciones",
+      "tab.history": "Historial",
+      "tab.plan": "Condiciones",
+      "tab.paying": "Clientes que pagan",
+      "tab.settings": "Configuración",
+      "history.member.approved": "{by} aprobó a {who} como {to}",
+      "history.member.role_changed": "{by} cambió el rol de {who} de {from} a {to}",
+      "history.member.removed": "{by} quitó a {who}",
+      "history.request.declined": "{by} rechazó a {who}",
+      "history.visitor.dismissed": "{by} marcó a {who} como visto",
+      "history.invite.sent": "{by} invitó a {who} como {to}",
+      "history.invite.cancelled": "{by} canceló la invitación a {who}",
+      "history.plan.changed": "{by} cambió las condiciones",
+      "history.roster.swept": "{by} cerró las membresías que habían terminado",
+      "plan.access": "Quién paga",
+      "plan.accessHint": "members-free: los miembros no pagan, los demás sí. free: nadie paga. members-only: solo entran los miembros, ni siquiera pagando.",
+      "plan.visibility": "Quién ve la lista de miembros",
+      "plan.seats": "Plazas",
+      "plan.days": "Días",
+      "plan.manages": "Administra miembros",
+      "plan.noLimit": "sin límite",
+      "plan.noEnd": "sin fin",
+      "plan.save": "Guardar condiciones",
+      "plan.saved": "Las condiciones están guardadas. Se aplican a las aprobaciones desde ahora.",
+      "settings.on": "Activado",
+      "settings.off": "Desactivado"
+    }
+  };
+  function tm(key, vars) {
+    const hosted = i18n.t("members." + key, vars);
+    if (hosted !== "members." + key) return hosted;
+    const lang = i18n.lang();
+    const table2 = (
+      /** @type {Record<string, string>} */
+      STRINGS2[
+        /** @type {'en'|'fi'|'es'} */
+        lang
+      ] || STRINGS2.en
+    );
+    const text = table2[key] || STRINGS2.en[key] || key;
+    if (!vars) return text;
+    return text.replace(/\{(\w+)\}/g, function(whole, name) {
+      return vars[name] == null ? whole : String(vars[name]);
+    });
+  }
+
+  // src/static/sdk-libs/atelier/members-shared.js
+  function isPlaceholder2(v) {
+    return /^\s*</.test(String(v == null ? "" : v));
+  }
+  function wantsSample2(spec) {
+    return !!spec && (spec.sample === true || !spec.app || isPlaceholder2(spec.app));
+  }
+  function sampleBadge2() {
+    return el("span", { class: "ak-mem-sample" }, tm("sample.badge"));
+  }
+  function watch(again, root) {
+    let stopped = false;
+    const auth = (
+      /** @type {any} */
+      window.AIMEAT && /** @type {any} */
+      window.AIMEAT.auth
+    );
+    const on = auth && typeof auth.on === "function";
+    function handle2() {
+      if (stopped) return;
+      if (!root.isConnected) {
+        stop();
+        return;
+      }
+      again();
+    }
+    const stopLang = i18n.onChange(handle2);
+    if (on) {
+      auth.on("login", handle2);
+      auth.on("logout", handle2);
+    }
+    function stop() {
+      if (stopped) return;
+      stopped = true;
+      if (typeof stopLang === "function") stopLang();
+      if (on && typeof auth.off === "function") {
+        auth.off("login", handle2);
+        auth.off("logout", handle2);
+      }
+    }
+    return stop;
+  }
+  function ask(spec) {
+    const kit = (
+      /** @type {any} */
+      window.AIMEAT && /** @type {any} */
+      window.AIMEAT.atelier
+    );
+    if (kit && typeof kit.confirm === "function") return kit.confirm(spec);
+    return Promise.resolve(window.confirm(spec.title));
+  }
+  function iamOf() {
+    const ns = (
+      /** @type {any} */
+      window.AIMEAT
+    );
+    return ns && ns.iam ? ns.iam : null;
+  }
+  async function ready(spec) {
+    const iam = iamOf();
+    if (!iam) return null;
+    if (!iam.me()) {
+      await iam.init({ app: spec.app, roles: spec.roles }).catch(function(e) {
+        console.debug("aimeat-atelier: members standing not read", e);
+      });
+    }
+    return iam;
+  }
+  function refusal(r) {
+    if (!r) return "";
+    if (r instanceof Error) return r.message;
+    if (r.ok !== false) return "";
+    if (typeof r.error === "string") return r.error;
+    return r.error && typeof r.error.message === "string" ? r.error.message : "";
+  }
+  function day2(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return isNaN(d.getTime()) ? String(iso) : d.toISOString().slice(0, 10);
+  }
+  function power(caps, role) {
+    const c = caps && caps[role] || [];
+    return c.indexOf("*") !== -1 ? Infinity : c.length;
+  }
+  function roleSelect(roles, value, label) {
+    const s = (
+      /** @type {HTMLSelectElement} */
+      el(
+        "select",
+        { class: "ak-input ak-mem__role", "aria-label": label },
+        roles.map(function(r) {
+          return el("option", { value: r, selected: r === value ? true : null }, r);
+        })
+      )
+    );
+    if (value) s.value = value;
+    return s;
+  }
+  function person(account, displayName) {
+    const shown = displayName || account || "";
+    return el("span", { class: "ak-mem__person", "data-ak-part": "who" }, [
+      el("span", { class: "ak-mem__face", "aria-hidden": "true" }, shown.slice(0, 1).toUpperCase()),
+      el("span", { class: "ak-mem__names" }, [
+        el("span", { class: "ak-mem__name" }, shown),
+        displayName && account ? el("span", { class: "ak-mem__account" }, account) : null
+      ].filter(Boolean))
+    ]);
+  }
+
+  // src/static/sdk-libs/atelier/members-admin.js
+  var SAMPLE = {
+    roles: { member: ["use"], admin: ["use", "manage"] },
+    requests: [{ owner: "kim", displayName: "Kim Laine", note: "I run the bakery next door and order every week.", at: "2026-09-29T08:12:00Z" }],
+    seen: { alex: { visits: 3, lastSeen: "2026-09-30T17:40:00Z", displayName: "Alex Berg" } },
+    members: [
+      { owner: "robin", displayName: "Robin Aho", role: "member", since: "2026-08-12T10:00:00Z" },
+      { owner: "sam", displayName: "Sam Koski", role: "admin", since: "2026-07-01T09:00:00Z" }
+    ],
+    invites: [{ id: "i1", emailShown: "pia@example.com", role: "member", at: "2026-09-30T09:00:00Z", expiresAt: "2026-10-30T09:00:00Z" }],
+    audit: [
+      { at: "2026-09-30T09:00:00Z", by: "sandbox", action: "invite.sent", account: "pia@example.com", to: "member" },
+      { at: "2026-08-12T10:00:00Z", by: "sandbox", action: "member.approved", account: "robin", to: "member" }
+    ],
+    plan: { access: "members-free", rosterVisibility: "owner", manageRoles: ["admin"], seats: {}, terms: {}, roles: {} }
+  };
+  var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  function members(spec) {
+    const sample = wantsSample2(spec);
+    const variant = spec.variant === "table" ? "table" : spec.variant === "dense" ? "dense" : "list";
+    const root = el("section", { class: "ak-root ak-mem ak-mem--" + variant, "data-ak-part": "root", "data-ak-variant": variant });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    const pageSize = Math.max(5, Math.min(500, spec.pageSize || 50));
+    let tab = "";
+    let failure = "";
+    let notice = "";
+    let typed = "";
+    let query = "";
+    let shown = pageSize;
+    async function act(work, done) {
+      failure = "";
+      notice = "";
+      try {
+        const r = await work();
+        failure = refusal(r);
+        if (!failure && done) notice = done(r) || "";
+      } catch (e) {
+        failure = refusal(e) || String(e);
+      }
+      await render();
+    }
+    function button2(label, tone, run, disabled) {
+      return el("button", { type: "button", class: "ak-btn ak-btn--" + tone, disabled: disabled ? true : null, on: { click: run } }, label);
+    }
+    function visible(rows, text) {
+      const q = query.trim().toLowerCase();
+      const hit = q ? rows.filter(function(r) {
+        return text(r).toLowerCase().indexOf(q) !== -1;
+      }) : rows;
+      return { rows: hit.slice(0, shown), more: hit.length - Math.min(hit.length, shown) };
+    }
+    function list2(part, rows, none, more) {
+      const host = el("div", { class: "ak-mem__group", "data-ak-part": part });
+      if (!rows.length) host.appendChild(el("p", { class: "ak-mem__none" }, none));
+      else host.appendChild(el("ul", { class: "ak-mem__rows" }, rows));
+      if (more > 0) {
+        host.appendChild(el("button", { type: "button", class: "ak-btn ak-btn--ghost ak-mem__more", "data-ak-part": "more", on: {
+          click: function() {
+            shown += pageSize;
+            render();
+          }
+        } }, tm("members.more", { n: more })));
+      }
+      return host;
+    }
+    function row(who, meta, acts, extra) {
+      return el("li", { class: "ak-mem__row", "data-ak-part": "row" }, [
+        who,
+        el("span", { class: "ak-mem__meta", "data-ak-part": "meta" }, [meta || "", extra || null].filter(Boolean)),
+        el("span", { class: "ak-mem__acts", "data-ak-part": "acts" }, acts.filter(Boolean))
+      ]);
+    }
+    function columnsOf(m) {
+      if (typeof spec.columns !== "function") return null;
+      const v = spec.columns(m);
+      if (v == null || v === "") return null;
+      return typeof v === "string" ? el("span", { class: "ak-mem__col" }, v) : v;
+    }
+    async function render() {
+      clear(root);
+      let iam = null;
+      let st = SAMPLE;
+      let me = { isOwner: true, canManage: true };
+      let auditRows = SAMPLE.audit;
+      let plan2 = SAMPLE.plan;
+      root.appendChild(el(
+        "h3",
+        { class: "ak-mem__title", "data-ak-part": "title" },
+        [spec.title || tm("members.title"), sample ? sampleBadge2() : null].filter(Boolean)
+      ));
+      root.appendChild(el("p", { class: "ak-mem__intro", "data-ak-part": "intro" }, sample ? tm("sample.note") : tm("members.intro")));
+      if (!sample) {
+        iam = await ready(spec);
+        if (!iam) {
+          root.appendChild(el("p", { class: "ak-mem__none" }, tm("members.noLib")));
+          return;
+        }
+        me = iam.me();
+        if (!me || !(me.isOwner || me.canManage)) {
+          root.appendChild(el("p", { class: "ak-mem__none" }, tm("members.notOwner")));
+          return;
+        }
+        st = await iam.admin("state").catch(function() {
+          return null;
+        }) || { roles: {}, requests: [], seen: {}, members: [], invites: [] };
+        if (!Array.isArray(st.members)) {
+          const r = await iam.roster().catch(function() {
+            return { members: [] };
+          });
+          st = Object.assign({}, st, { members: (r.members || []).map(function(m) {
+            return { owner: m.id, role: m.role, since: m.since };
+          }) });
+        }
+      }
+      const caps = st.roles || {};
+      const roles = Object.keys(caps);
+      const oneClick = sample ? "member" : iam.suggestRole(st, spec.approveRole);
+      const asked = (st.requests || []).map(function(q) {
+        return { owner: q.owner || q.gaii || q.id, displayName: q.displayName, note: q.note, at: q.at };
+      });
+      const seenMap = st.seen || {};
+      const seen = Object.keys(seenMap).map(function(who) {
+        return Object.assign({ owner: who }, seenMap[who] || {});
+      });
+      const roster = (st.members || []).filter(function(m) {
+        return m && m.role;
+      });
+      const invites = st.invites || [];
+      const total = st.total || {};
+      const groups = (spec.groups || ["asked", "seen", "members", "invites", "history", "plan", "paying", "settings"]).filter(function(g) {
+        if (g === "plan") return !!me.isOwner;
+        if (g === "paying") return typeof spec.payingCustomers === "function";
+        if (g === "settings") return !!(spec.sections && spec.sections.length);
+        return true;
+      });
+      const count = {
+        asked: total.requests != null ? total.requests : asked.length,
+        seen: total.seen != null ? total.seen : seen.length,
+        members: total.members != null ? total.members : roster.length,
+        invites: total.invites != null ? total.invites : invites.length
+      };
+      if (!tab || groups.indexOf(tab) === -1) tab = count.asked ? "asked" : groups.indexOf("members") !== -1 ? "members" : groups[0];
+      if (roster.length) {
+        const faces = roster.slice(0, 8).map(function(m) {
+          const shownName = m.displayName || m.owner;
+          return el("span", { class: "ak-mem__face", title: shownName }, String(shownName).slice(0, 1).toUpperCase());
+        });
+        if (roster.length > 8) faces.push(el("span", { class: "ak-mem__face ak-mem__face--more" }, "+" + (roster.length - 8)));
+        root.appendChild(el("div", { class: "ak-mem__faces", "data-ak-part": "faces", "aria-label": tm("members.roster") + ": " + count.members }, faces));
+      }
+      if (failure) root.appendChild(el("p", { class: "ak-mem__failure", role: "alert", "data-ak-part": "failure" }, tm("members.failed", { why: failure })));
+      if (notice) root.appendChild(el("p", { class: "ak-mem__notice", role: "status" }, notice));
+      const tabs2 = el("div", { class: "ak-mem__tabs", role: "tablist", "data-ak-part": "tabs" }, groups.map(function(g) {
+        const n = count[g];
+        return el("button", {
+          type: "button",
+          role: "tab",
+          class: "ak-mem__tab" + (g === tab ? " is-on" : ""),
+          "aria-selected": g === tab ? "true" : "false",
+          on: { click: function() {
+            tab = g;
+            shown = pageSize;
+            render();
+          } }
+        }, tm("tab." + g) + (typeof n === "number" && n ? " (" + n + ")" : ""));
+      }));
+      root.appendChild(tabs2);
+      const listTab = ["asked", "seen", "members", "invites"].indexOf(tab) !== -1;
+      if (listTab) {
+        const search = (
+          /** @type {HTMLInputElement} */
+          el("input", {
+            type: "search",
+            class: "ak-input ak-mem__search",
+            placeholder: tm("members.search"),
+            "aria-label": tm("members.search"),
+            value: query,
+            "data-ak-part": "search"
+          })
+        );
+        search.addEventListener("input", function() {
+          query = search.value;
+          shown = pageSize;
+          drawBody();
+        });
+        root.appendChild(search);
+      }
+      const body = el("div", { class: "ak-mem__body" });
+      root.appendChild(body);
+      const noop = function() {
+      };
+      const assign = function(who, roleOf, note) {
+        return sample ? noop : function() {
+          act(function() {
+            return iam.admin("assign", { ghii: who, owner: who, role: roleOf(), note });
+          });
+        };
+      };
+      function changeRole(m, sel) {
+        const next = sel.value;
+        if (sample || next === m.role) return;
+        const raising = power(caps, next) > power(caps, m.role);
+        const go = function() {
+          act(function() {
+            return iam.admin("assign", { ghii: m.owner, owner: m.owner, role: next });
+          });
+        };
+        if (!raising) {
+          go();
+          return;
+        }
+        const may = caps[next] || [];
+        ask({
+          title: tm("members.raise", { who: m.displayName || m.owner, role: next }),
+          text: may.indexOf("*") !== -1 ? tm("members.raiseAll") : tm("members.raiseText", { caps: may.join(", ") }),
+          confirmLabel: tm("members.raiseYes")
+        }).then(function(yes) {
+          if (yes) go();
+          else sel.value = m.role;
+        });
+      }
+      function drawBody() {
+        clear(body);
+        if (tab === "asked") {
+          const v = visible(asked, function(q) {
+            return q.owner + " " + (q.displayName || "") + " " + (q.note || "");
+          });
+          body.appendChild(list2("asked", v.rows.map(function(q) {
+            const sel = roles.length > 1 ? roleSelect(roles, oneClick, tm("members.role")) : null;
+            if (sel) sel.disabled = sample;
+            return row(person(q.owner, q.displayName), q.note || "", [
+              sel,
+              button2(tm("members.approve"), "primary", assign(q.owner, function() {
+                return sel ? sel.value : oneClick;
+              }, q.note), sample),
+              button2(tm("members.decline"), "ghost", sample ? noop : function() {
+                act(function() {
+                  return iam.admin("decline", { ghii: q.owner, owner: q.owner });
+                });
+              }, sample)
+            ]);
+          }), tm("members.askedNone"), v.more));
+        } else if (tab === "seen") {
+          const v = visible(seen, function(s) {
+            return s.owner + " " + (s.displayName || "");
+          });
+          body.appendChild(list2("seen", v.rows.map(function(s) {
+            const sel = roles.length > 1 ? roleSelect(roles, oneClick, tm("members.role")) : null;
+            if (sel) sel.disabled = sample;
+            const visits = s.visits ? tm(s.visits === 1 ? "members.visit1" : "members.visits", { n: s.visits, d: day2(s.lastSeen) }) : "";
+            return row(person(s.owner, s.displayName), visits, [
+              sel,
+              button2(tm("members.approve"), "primary", assign(s.owner, function() {
+                return sel ? sel.value : oneClick;
+              }), sample),
+              button2(tm("members.dismiss"), "ghost", sample ? noop : function() {
+                act(function() {
+                  return iam.dismissGuest(s.owner);
+                });
+              }, sample)
+            ]);
+          }), tm("members.seenNone"), v.more));
+        } else if (tab === "members") {
+          body.appendChild(addPanel());
+          const v = visible(roster, function(m) {
+            return m.owner + " " + (m.displayName || "") + " " + m.role;
+          });
+          const rows = v.rows.map(function(m) {
+            const sel = roleSelect(roles.indexOf(m.role) === -1 ? roles.concat([m.role]) : roles, m.role, tm("members.role"));
+            sel.disabled = sample;
+            sel.addEventListener("change", function() {
+              changeRole(m, sel);
+            });
+            const own = (spec.actions || []).map(function(a) {
+              return button2(a.label, a.tone || "ghost", function() {
+                Promise.resolve(a.run(m)).then(function() {
+                  render();
+                });
+              }, sample);
+            });
+            return row(person(m.owner, m.displayName), m.since ? tm("members.since", { d: day2(m.since) }) : "", own.concat([
+              sel,
+              button2(tm("members.remove"), "ghost", sample ? noop : function() {
+                ask({
+                  title: tm("members.confirmRemove", { who: m.displayName || m.owner }),
+                  text: tm("members.confirmRemoveText"),
+                  confirmLabel: tm("members.remove"),
+                  tone: "danger"
+                }).then(function(yes) {
+                  if (yes) act(function() {
+                    return iam.admin("revoke", { ghii: m.owner, owner: m.owner });
+                  });
+                });
+              }, sample)
+            ]), columnsOf(m));
+          });
+          body.appendChild(variant === "table" ? table2(v.rows, rows, v.more) : list2("roster", rows, tm("members.rosterNone"), v.more));
+        } else if (tab === "invites") {
+          body.appendChild(addPanel());
+          const v = visible(invites, function(i) {
+            return (i.emailShown || "") + " " + i.role;
+          });
+          body.appendChild(list2("invites", v.rows.map(function(i) {
+            return row(person(i.emailShown || "", null), tm("members.invited", { role: i.role, d: day2(i.at), until: day2(i.expiresAt) }), [
+              button2(tm("members.cancelInvite"), "ghost", sample ? noop : function() {
+                act(function() {
+                  return iam.cancelInvite(i.id);
+                });
+              }, sample)
+            ]);
+          }), tm("members.invitesNone"), v.more));
+        } else if (tab === "history") {
+          body.appendChild(el("p", { class: "ak-mem__none" }, tm("members.loading")));
+          (sample ? Promise.resolve(auditRows) : iam.audit({ limit: 100 })).then(function(rows) {
+            clear(body);
+            const list0 = Array.isArray(rows) ? rows : [];
+            body.appendChild(list2("history", list0.map(function(h) {
+              return el("li", { class: "ak-mem__row ak-mem__row--line", "data-ak-part": "row" }, [
+                el("span", { class: "ak-mem__when" }, day2(h.at)),
+                el("span", { class: "ak-mem__meta" }, tm("history." + h.action, {
+                  by: String(h.by || "").split("#").pop().split("@")[0],
+                  who: h.account,
+                  from: h.from || "",
+                  to: h.to || ""
+                }))
+              ]);
+            }), tm("members.historyNone"), 0));
+          });
+        } else if (tab === "plan") {
+          body.appendChild(el("p", { class: "ak-mem__none" }, tm("members.loading")));
+          (sample ? Promise.resolve(plan2) : iam.plan()).then(function(p) {
+            clear(body);
+            body.appendChild(planForm(p && p.ok !== false ? p : null));
+          });
+        } else if (tab === "paying") {
+          body.appendChild(el("p", { class: "ak-mem__none" }, tm("members.loading")));
+          Promise.resolve(spec.payingCustomers ? spec.payingCustomers() : []).then(function(rows) {
+            clear(body);
+            body.appendChild(list2("paying", (rows || []).map(function(c) {
+              return row(person(c.label || c.id, null), c.spend || "", []);
+            }), tm("members.payingNone"), 0));
+          });
+        } else if (tab === "settings") {
+          body.appendChild(settings());
+        }
+      }
+      function table2(models, rows, more) {
+        const t2 = el("table", { class: "ak-mem__table", "data-ak-part": "roster" }, [
+          el("thead", {}, [el("tr", {}, [
+            el("th", { scope: "col" }, tm("members.colName")),
+            el("th", { scope: "col" }, tm("members.colSince")),
+            el("th", { scope: "col" }, tm("members.colActions"))
+          ])]),
+          el("tbody", {}, rows.map(function(r) {
+            const cells = Array.prototype.slice.call(r.children);
+            return el("tr", {}, cells.map(function(c) {
+              return el("td", {}, [c]);
+            }));
+          }))
+        ]);
+        const host = el("div", { class: "ak-mem__group ak-mem__table-wrap" }, [models.length ? t2 : el("p", { class: "ak-mem__none" }, tm("members.rosterNone"))]);
+        if (more > 0) {
+          host.appendChild(el("button", { type: "button", class: "ak-btn ak-btn--ghost ak-mem__more", on: {
+            click: function() {
+              shown += pageSize;
+              render();
+            }
+          } }, tm("members.more", { n: more })));
+        }
+        return host;
+      }
+      function addPanel() {
+        const input = (
+          /** @type {HTMLInputElement} */
+          el("input", {
+            type: "text",
+            class: "ak-input ak-mem__name",
+            placeholder: tm("members.addPlaceholder"),
+            "aria-label": tm("members.addPlaceholder"),
+            disabled: sample ? true : null,
+            autocomplete: "off"
+          })
+        );
+        if (failure && typed) input.value = typed;
+        const roleSel2 = roles.length > 1 ? roleSelect(roles, oneClick, tm("members.role")) : null;
+        if (roleSel2) roleSel2.disabled = sample;
+        const suggest = el("ul", { class: "ak-mem__suggest", "data-ak-part": "suggest", hidden: true, role: "listbox" });
+        const go = button2(tm("members.approve"), "primary", sample ? noop : function() {
+          const value = input.value.trim();
+          typed = value;
+          if (!value) return;
+          const role = roleSel2 ? roleSel2.value : oneClick;
+          if (EMAIL_RE.test(value)) {
+            act(function() {
+              return iam.invite(value, role);
+            }, function(r) {
+              const d = r && r.data !== void 0 ? r.data : r;
+              if (d && d.invited) return tm("members.inviteSent", { email: value });
+              if (d && d.found) return tm("members.addedFound", { who: d.found.displayName || d.found.account });
+              return "";
+            });
+          } else {
+            act(function() {
+              return iam.admin("assign", { ghii: value, owner: value, role });
+            });
+          }
+        }, sample);
+        let timer = 0;
+        input.addEventListener("input", function() {
+          go.textContent = EMAIL_RE.test(input.value.trim()) ? tm("members.invite") : tm("members.approve");
+          clearTimeout(timer);
+          const q = input.value.trim();
+          if (sample || q.length < 2 || EMAIL_RE.test(q)) {
+            suggest.hidden = true;
+            return;
+          }
+          timer = window.setTimeout(function() {
+            iam.people(q).then(function(people) {
+              clear(suggest);
+              const found = Array.isArray(people) ? people.slice(0, 6) : [];
+              suggest.hidden = !found.length;
+              found.forEach(function(p) {
+                suggest.appendChild(el("li", { role: "option" }, [el("button", { type: "button", class: "ak-mem__pick", on: {
+                  click: function() {
+                    input.value = p.account || p.email || "";
+                    go.textContent = EMAIL_RE.test(input.value) ? tm("members.invite") : tm("members.approve");
+                    suggest.hidden = true;
+                    input.focus();
+                  }
+                } }, [person(p.account || p.email || "", p.displayName), p.account ? null : el("span", { class: "ak-mem__meta" }, tm("members.noAccount"))].filter(Boolean))]));
+              });
+            }, function() {
+              suggest.hidden = true;
+            });
+          }, 250);
+        });
+        return el("div", { class: "ak-mem__group", "data-ak-part": "add" }, [
+          el("h4", { class: "ak-mem__group-title" }, tm("members.add")),
+          el("div", { class: "ak-mem__add" }, [el("div", { class: "ak-mem__field" }, [input, suggest]), roleSel2, go].filter(Boolean)),
+          el("p", { class: "ak-mem__hint" }, tm("members.addHint"))
+        ]);
+      }
+      function planForm(p) {
+        const cur = p || { roles: {}, seats: {}, terms: {}, manageRoles: [], access: "members-free", rosterVisibility: "owner" };
+        const access = roleSelect(["members-free", "free", "members-only"], cur.access === "open" ? "members-free" : cur.access || "members-free", tm("plan.access"));
+        access.classList.add("ak-mem__plan-access");
+        const vis = roleSelect(["owner", "members"], cur.rosterVisibility || "owner", tm("plan.visibility"));
+        const rows = roles.map(function(r) {
+          const seats = (
+            /** @type {HTMLInputElement} */
+            el("input", {
+              type: "number",
+              min: "0",
+              class: "ak-input ak-mem__num",
+              "aria-label": tm("plan.seats") + " " + r,
+              value: cur.seats && cur.seats[r] != null ? String(cur.seats[r]) : "",
+              placeholder: tm("plan.noLimit")
+            })
+          );
+          const days = (
+            /** @type {HTMLInputElement} */
+            el("input", {
+              type: "number",
+              min: "1",
+              class: "ak-input ak-mem__num",
+              "aria-label": tm("plan.days") + " " + r,
+              value: cur.terms && cur.terms[r] && cur.terms[r].days ? String(cur.terms[r].days) : "",
+              placeholder: tm("plan.noEnd")
+            })
+          );
+          const mgr = (
+            /** @type {HTMLInputElement} */
+            el("input", {
+              type: "checkbox",
+              "aria-label": tm("plan.manages") + " " + r,
+              checked: (cur.manageRoles || []).indexOf(r) !== -1 ? true : null
+            })
+          );
+          return { r, seats, days, mgr, node: el("tr", {}, [
+            el("th", { scope: "row" }, r),
+            el("td", {}, [seats]),
+            el("td", {}, [days]),
+            el("td", {}, [mgr])
+          ]) };
+        });
+        const save = button2(tm("plan.save"), "primary", sample ? noop : function() {
+          const seats = {};
+          const terms = {};
+          const manageRoles = [];
+          rows.forEach(function(x) {
+            if (x.seats.value !== "") seats[x.r] = Number(x.seats.value);
+            if (x.days.value !== "") terms[x.r] = { days: Number(x.days.value) };
+            if (x.mgr.checked) manageRoles.push(x.r);
+          });
+          act(function() {
+            return iam.setPlan({ roles: cur.roles || {}, access: access.value, rosterVisibility: vis.value, seats, terms, manageRoles });
+          }, function() {
+            return tm("plan.saved");
+          });
+        }, sample);
+        return el("div", { class: "ak-mem__group ak-mem__plan", "data-ak-part": "plan" }, [
+          el("label", { class: "ak-mem__plan-row" }, [el("span", {}, tm("plan.access")), access]),
+          el("p", { class: "ak-mem__hint" }, tm("plan.accessHint")),
+          el("label", { class: "ak-mem__plan-row" }, [el("span", {}, tm("plan.visibility")), vis]),
+          el("table", { class: "ak-mem__table" }, [
+            el("thead", {}, [el("tr", {}, [
+              el("th", { scope: "col" }, tm("members.role")),
+              el("th", { scope: "col" }, tm("plan.seats")),
+              el("th", { scope: "col" }, tm("plan.days")),
+              el("th", { scope: "col" }, tm("plan.manages"))
+            ])]),
+            el("tbody", {}, rows.map(function(x) {
+              return x.node;
+            }))
+          ]),
+          save
+        ]);
+      }
+      function settings() {
+        return el("div", { class: "ak-mem__group", "data-ak-part": "settings" }, (spec.sections || []).map(function(s) {
+          const ctrl = s.type === "toggle" ? el("button", { type: "button", class: "ak-btn ak-btn--ghost", "aria-pressed": s.value ? "true" : "false", on: {
+            click: function() {
+              act(async function() {
+                await s.onChange(!s.value);
+                s.value = !s.value;
+              });
+            }
+          } }, s.value ? tm("settings.on") : tm("settings.off")) : el("input", { type: "text", class: "ak-input", value: s.value == null ? "" : String(s.value), "aria-label": s.label, on: {
+            change: function(e) {
+              act(function() {
+                return s.onChange(
+                  /** @type {HTMLInputElement} */
+                  e.target.value
+                );
+              });
+            }
+          } });
+          return el("div", { class: "ak-mem__row ak-mem__row--line" }, [
+            el("span", { class: "ak-mem__name" }, s.label),
+            ctrl,
+            s.help ? el("span", { class: "ak-mem__meta" }, s.help) : null
+          ].filter(Boolean));
+        }));
+      }
+      drawBody();
+      root.appendChild(el("p", { class: "ak-mem__stranger", "data-ak-part": "stranger" }, tm("members.stranger")));
+    }
+    const ready0 = render().then(function() {
+      enter(root);
+    });
+    const stop = watch(function() {
+      failure = "";
+      notice = "";
+      render();
+    }, root);
+    return {
+      el: root,
+      refresh: function() {
+        return ready0.then(render);
+      },
+      destroy: function() {
+        stop();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/members.js
+  function joinRequest(spec) {
+    const sample = wantsSample2(spec);
+    const root = el("section", { class: "ak-root ak-mem ak-mem-join", "data-ak-part": "root" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    async function build() {
+      clear(root);
+      root.hidden = false;
+      const status = el("p", { class: "ak-mem__status", role: "status", "data-ak-part": "status" });
+      root.appendChild(el(
+        "h3",
+        { class: "ak-mem__title", "data-ak-part": "title" },
+        [spec.title || tm("join.title"), sample ? sampleBadge2() : null].filter(Boolean)
+      ));
+      root.appendChild(el("p", { class: "ak-mem__intro", "data-ak-part": "intro" }, sample ? tm("sample.note") : tm("join.intro")));
+      function form2(iam2) {
+        const note = (
+          /** @type {HTMLTextAreaElement} */
+          el("textarea", {
+            class: "ak-input ak-input--area ak-mem__note",
+            rows: "3",
+            maxlength: "400",
+            "aria-label": tm("join.note"),
+            placeholder: tm("join.note"),
+            "data-ak-part": "note",
+            disabled: sample ? true : null
+          })
+        );
+        const ask2 = el("div", { class: "ak-mem__ask" });
+        const send = el("button", { type: "button", class: "ak-btn ak-btn--primary", "data-ak-part": "send", disabled: sample ? true : null, on: {
+          click: function() {
+            if (sample || !iam2) return;
+            iam2.request(note.value.trim()).then(function(r) {
+              status.textContent = r && r.alreadyMember ? tm("join.already") : tm("join.sent");
+              if (ask2.parentNode) ask2.parentNode.removeChild(ask2);
+            }, function(e) {
+              status.textContent = tm("members.failed", { why: refusal(e) || String(e) });
+            });
+          }
+        } }, tm("join.send"));
+        ask2.appendChild(note);
+        ask2.appendChild(send);
+        root.appendChild(ask2);
+      }
+      if (sample) {
+        form2(null);
+        root.appendChild(status);
+        return;
+      }
+      const iam = await ready(spec);
+      if (!iam) {
+        root.appendChild(el("p", { class: "ak-mem__none" }, tm("members.noLib")));
+        return;
+      }
+      const me = iam.me();
+      if (!me) {
+        status.textContent = tm("join.signIn");
+        root.appendChild(status);
+        return;
+      }
+      if (me.isOwner) {
+        root.hidden = true;
+        return;
+      }
+      if (me.member) {
+        status.textContent = tm("join.member", { role: me.role || "" });
+        root.appendChild(status);
+        return;
+      }
+      const asked = me.requested;
+      if (asked && asked.state === "pending") status.textContent = tm("join.pending", { d: day2(asked.at) });
+      else {
+        if (asked && asked.state === "declined") status.textContent = tm("join.declined");
+        form2(iam);
+      }
+      root.appendChild(status);
+    }
+    function run() {
+      return build().catch(function(e) {
+        root.appendChild(el("p", { class: "ak-mem__none" }, tm("members.failed", { why: refusal(e) || String(e) })));
+      });
+    }
+    run().then(function() {
+      enter(root);
+    });
+    const stop = watch(run, root);
+    return { el: root, destroy: function() {
+      stop();
+      if (root.parentNode) root.parentNode.removeChild(root);
+    } };
+  }
+  function accessState(spec) {
+    const sample = wantsSample2(spec);
+    const root = el("section", { class: "ak-root ak-mem ak-mem-access", "data-ak-part": "root" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let ask2 = null;
+    function locked() {
+      root.appendChild(el(
+        "h3",
+        { class: "ak-mem__title", "data-ak-part": "title" },
+        [spec.title || tm("access.title"), sample ? sampleBadge2() : null].filter(Boolean)
+      ));
+      root.appendChild(el("p", { class: "ak-mem__intro", "data-ak-part": "intro" }, tm("access.intro")));
+      const join = el("div", { "data-ak-part": "join" });
+      root.appendChild(join);
+      ask2 = joinRequest({ target: join, app: spec.app, roles: spec.roles, sample, title: tm("join.title") });
+    }
+    async function build() {
+      if (ask2) {
+        ask2.destroy();
+        ask2 = null;
+      }
+      clear(root);
+      root.classList.remove("is-open");
+      if (sample) {
+        locked();
+        return;
+      }
+      const iam = await ready(spec);
+      if (!iam) {
+        root.appendChild(el("p", { class: "ak-mem__none" }, tm("members.noLib")));
+        return;
+      }
+      const me = iam.me();
+      if (me && (me.isOwner || iam.can(spec.cap))) {
+        root.classList.add("is-open");
+        if (typeof spec.render === "function") spec.render(root, me);
+        return;
+      }
+      locked();
+    }
+    function run() {
+      return build().catch(function(e) {
+        root.appendChild(el("p", { class: "ak-mem__none" }, tm("members.failed", { why: refusal(e) || String(e) })));
+      });
+    }
+    run();
+    const stop = watch(run, root);
+    return { el: root, destroy: function() {
+      stop();
+      if (ask2) ask2.destroy();
+      if (root.parentNode) root.parentNode.removeChild(root);
+    } };
+  }
+
+  // src/static/sdk-libs/atelier/workspace-i18n.js
+  var STRINGS3 = {
+    en: {
+      "sample.note": "A sample. Nothing here is sent or changed.",
+      "failed": "That did not go through: {why}",
+      "noLib": "This block needs aimeat-organism.js on the page.",
+      "loading": "Loading…",
+      "role.viewer": "viewer",
+      "role.contributor": "contributor",
+      "role.creator": "creator",
+      "orgRole.owner": "owner",
+      "orgRole.admin": "admin",
+      "orgRole.member": "member",
+      "team.title": "People in this workspace",
+      "team.intro": "Who may read this workspace, and who may also write in it.",
+      "team.signIn": "Sign in to see who has access to this workspace.",
+      "tab.requests": "Requests",
+      "tab.people": "People",
+      "tab.invite": "Invite",
+      "team.requestsNone": "Nobody is waiting.",
+      "team.peopleNone": "Nobody else has access yet.",
+      "team.approve": "Approve",
+      "team.decline": "Decline",
+      "team.remove": "Remove",
+      "team.role": "Role",
+      "team.since": "since {d}",
+      "team.asked": "asked {d}",
+      "team.creatorHint": "Created this workspace. The creator always has access.",
+      "team.raise": "May {who} write in this workspace?",
+      "team.raiseText": "A contributor reads and writes in this workspace. A viewer only reads.",
+      "team.raiseYes": "Allow writing",
+      "team.confirmRemove": "Remove {who} from this workspace?",
+      "team.confirmRemoveText": "They can no longer read or write here. You can add them again later.",
+      "team.invitePlaceholder": "Account name or email",
+      "team.inviteHint": "An account name gets the role at once. An email address gets an invitation to the organism, with this role in this workspace.",
+      "team.add": "Add",
+      "team.invite": "Invite",
+      "team.granted": "{who} is now a {role}.",
+      "team.declined": "You declined the request from {who}.",
+      "team.removed": "{who} no longer has access.",
+      "team.inviteSent": "Invitation sent to {email}.",
+      "team.inviteLink": "No email went out. Send them this link yourself: {url}",
+      "team.colName": "Name",
+      "team.colSince": "Since",
+      "team.colActions": "Role and actions",
+      "picker.title": "Where this app keeps its records",
+      "picker.intro": "An organism is a shared space for a group; this app keeps its records in one workspace of it.",
+      "picker.signIn": "Sign in to choose where this app keeps its records.",
+      "picker.choose": "Choose the organism",
+      "picker.wsWill": 'The app uses the workspace "{name}" in it, and creates it if it is not there yet.',
+      "picker.none": "You do not belong to any organism yet. Create one below.",
+      "picker.use": "Use this",
+      "picker.create": "Create a new organism",
+      "picker.orgName": "Name of the new organism",
+      "picker.createGo": "Create",
+      "picker.working": "Getting the workspace ready…",
+      "picker.using": "Using {ws} in {org}",
+      "picker.change": "Change",
+      "picker.cancel": "Keep the current one"
+    },
+    fi: {
+      "sample.note": "Esimerkki. Täältä ei lähetetä eikä muuteta mitään.",
+      "failed": "Se ei mennyt läpi: {why}",
+      "noLib": "Tämä osa tarvitsee sivulle aimeat-organism.js-kirjaston.",
+      "loading": "Ladataan…",
+      "role.viewer": "lukija",
+      "role.contributor": "kirjoittaja",
+      "role.creator": "luoja",
+      "orgRole.owner": "omistaja",
+      "orgRole.admin": "ylläpitäjä",
+      "orgRole.member": "jäsen",
+      "team.title": "Työtilan ihmiset",
+      "team.intro": "Ketkä saavat lukea tätä työtilaa ja ketkä saavat myös kirjoittaa siihen.",
+      "team.signIn": "Kirjaudu sisään, niin näet, kenellä on pääsy tähän työtilaan.",
+      "tab.requests": "Pyynnöt",
+      "tab.people": "Ihmiset",
+      "tab.invite": "Kutsu",
+      "team.requestsNone": "Kukaan ei odota.",
+      "team.peopleNone": "Kenelläkään muulla ei vielä ole pääsyä.",
+      "team.approve": "Hyväksy",
+      "team.decline": "Hylkää",
+      "team.remove": "Poista",
+      "team.role": "Rooli",
+      "team.since": "{d} alkaen",
+      "team.asked": "pyysi {d}",
+      "team.creatorHint": "Loi tämän työtilan. Luojalla on aina pääsy.",
+      "team.raise": "Saako {who} kirjoittaa tähän työtilaan?",
+      "team.raiseText": "Kirjoittaja voi lukea ja kirjoittaa tässä työtilassa. Lukija voi vain lukea.",
+      "team.raiseYes": "Salli kirjoittaminen",
+      "team.confirmRemove": "Poistetaanko {who} tästä työtilasta?",
+      "team.confirmRemoveText": "Hän ei voi enää lukea eikä kirjoittaa täällä. Voit lisätä hänet myöhemmin uudelleen.",
+      "team.invitePlaceholder": "Tilinimi tai sähköposti",
+      "team.inviteHint": "Tilinimi saa roolin heti. Sähköpostiosoite saa kutsun organismiin, ja kutsussa on tämä rooli tähän työtilaan.",
+      "team.add": "Lisää",
+      "team.invite": "Kutsu",
+      "team.granted": "{who} on nyt {role}.",
+      "team.declined": "Hylkäsit pyynnön: {who}.",
+      "team.removed": "Käyttäjällä {who} ei enää ole pääsyä.",
+      "team.inviteSent": "Kutsu lähti osoitteeseen {email}.",
+      "team.inviteLink": "Sähköposti ei lähtenyt. Lähetä tämä linkki itse: {url}",
+      "team.colName": "Nimi",
+      "team.colSince": "Alkaen",
+      "team.colActions": "Rooli ja toiminnot",
+      "picker.title": "Mihin sovellus tallentaa tietonsa",
+      "picker.intro": "Organismi on ryhmän yhteinen tila. Tämä sovellus pitää tietonsa yhdessä sen työtilassa.",
+      "picker.signIn": "Kirjaudu sisään, niin voit valita, mihin sovellus tallentaa tietonsa.",
+      "picker.choose": "Valitse organismi",
+      "picker.wsWill": 'Sovellus käyttää siinä työtilaa "{name}" ja luo sen, jos sitä ei vielä ole.',
+      "picker.none": "Et vielä kuulu mihinkään organismiin. Luo uusi alla.",
+      "picker.use": "Käytä tätä",
+      "picker.create": "Luo uusi organismi",
+      "picker.orgName": "Uuden organismin nimi",
+      "picker.createGo": "Luo",
+      "picker.working": "Työtilaa valmistellaan…",
+      "picker.using": "Käytössä työtila {ws} organismissa {org}",
+      "picker.change": "Vaihda",
+      "picker.cancel": "Pidä nykyinen"
+    },
+    es: {
+      "sample.note": "Una muestra. Desde aquí no se envía ni se cambia nada.",
+      "failed": "No se pudo completar: {why}",
+      "noLib": "Este bloque necesita aimeat-organism.js en la página.",
+      "loading": "Cargando…",
+      "role.viewer": "lector",
+      "role.contributor": "colaborador",
+      "role.creator": "quien lo creó",
+      "orgRole.owner": "propietario",
+      "orgRole.admin": "administrador",
+      "orgRole.member": "miembro",
+      "team.title": "Personas en este espacio de trabajo",
+      "team.intro": "Quién puede leer este espacio de trabajo y quién puede además escribir en él.",
+      "team.signIn": "Inicia sesión para ver quién tiene acceso a este espacio de trabajo.",
+      "tab.requests": "Solicitudes",
+      "tab.people": "Personas",
+      "tab.invite": "Invitar",
+      "team.requestsNone": "Nadie está esperando.",
+      "team.peopleNone": "Nadie más tiene acceso todavía.",
+      "team.approve": "Aprobar",
+      "team.decline": "Rechazar",
+      "team.remove": "Quitar",
+      "team.role": "Rol",
+      "team.since": "desde el {d}",
+      "team.asked": "lo pidió el {d}",
+      "team.creatorHint": "Creó este espacio de trabajo. Quien lo crea siempre tiene acceso.",
+      "team.raise": "¿Puede {who} escribir en este espacio de trabajo?",
+      "team.raiseText": "Un colaborador lee y escribe en este espacio de trabajo. Un lector solo lee.",
+      "team.raiseYes": "Permitir escribir",
+      "team.confirmRemove": "¿Quitar a {who} de este espacio de trabajo?",
+      "team.confirmRemoveText": "Ya no podrá leer ni escribir aquí. Puedes volver a agregar a esa persona más tarde.",
+      "team.invitePlaceholder": "Nombre de cuenta o correo",
+      "team.inviteHint": "Un nombre de cuenta recibe el rol de inmediato. Una dirección de correo recibe una invitación al organismo, con este rol en este espacio de trabajo.",
+      "team.add": "Agregar",
+      "team.invite": "Invitar",
+      "team.granted": "{who} ahora es {role}.",
+      "team.declined": "Rechazaste la solicitud de {who}.",
+      "team.removed": "{who} ya no tiene acceso.",
+      "team.inviteSent": "La invitación se envió a {email}.",
+      "team.inviteLink": "No se envió ningún correo. Mándale tú este enlace: {url}",
+      "team.colName": "Nombre",
+      "team.colSince": "Desde",
+      "team.colActions": "Rol y acciones",
+      "picker.title": "Dónde guarda esta aplicación sus registros",
+      "picker.intro": "Un organismo es un espacio compartido para un grupo; esta aplicación guarda sus registros en uno de sus espacios de trabajo.",
+      "picker.signIn": "Inicia sesión para elegir dónde guarda esta aplicación sus registros.",
+      "picker.choose": "Elige el organismo",
+      "picker.wsWill": 'La aplicación usa ahí el espacio de trabajo "{name}" y lo crea si todavía no existe.',
+      "picker.none": "Todavía no perteneces a ningún organismo. Crea uno abajo.",
+      "picker.use": "Usar este",
+      "picker.create": "Crear un organismo nuevo",
+      "picker.orgName": "Nombre del organismo nuevo",
+      "picker.createGo": "Crear",
+      "picker.working": "Preparando el espacio de trabajo…",
+      "picker.using": "Usando el espacio de trabajo {ws} de {org}",
+      "picker.change": "Cambiar",
+      "picker.cancel": "Mantener el actual"
+    }
+  };
+  function tw(key, vars) {
+    const hosted = i18n.t("workspace." + key, vars);
+    if (hosted !== "workspace." + key) return hosted;
+    const lang = i18n.lang();
+    const table2 = (
+      /** @type {Record<string, string>} */
+      STRINGS3[
+        /** @type {'en'|'fi'|'es'} */
+        lang
+      ] || STRINGS3.en
+    );
+    const text = table2[key] || STRINGS3.en[key] || key;
+    if (!vars) return text;
+    return text.replace(/\{(\w+)\}/g, function(whole, name) {
+      return vars[name] == null ? whole : String(vars[name]);
+    });
+  }
+
+  // src/static/sdk-libs/atelier/workspace-team.js
+  var SAMPLE2 = {
+    members: [
+      { account: "robin", displayName: "Robin Aho", role: "creator", since: "2026-06-02T09:00:00Z" },
+      { account: "sam", displayName: "Sam Koski", role: "contributor", since: "2026-07-01T09:00:00Z" },
+      { account: "alex", displayName: "Alex Berg", role: "viewer", since: "2026-08-12T10:00:00Z" }
+    ],
+    requests: [
+      { account: "kim", displayName: "Kim Laine", message: "I keep the order book and would like to read the plans.", at: "2026-09-29T08:12:00Z", status: "pending", role: null }
+    ]
+  };
+  var ROLES = ["viewer", "contributor"];
+  var EMAIL_RE2 = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  function orgLib() {
+    const ns = (
+      /** @type {any} */
+      window.AIMEAT
+    );
+    const o = ns && ns.organism;
+    return o && typeof o.access === "function" && typeof o.grant === "function" && typeof o.revoke === "function" && typeof o.decide === "function" ? o : null;
+  }
+  function signedIn() {
+    const ns = (
+      /** @type {any} */
+      window.AIMEAT
+    );
+    const auth = ns && ns.auth;
+    if (!auth || typeof auth.getSession !== "function") return false;
+    try {
+      return !!auth.getSession();
+    } catch {
+      return false;
+    }
+  }
+  function roleSel(value) {
+    const list2 = ROLES.indexOf(value) === -1 && value ? ROLES.concat([value]) : ROLES;
+    const s = (
+      /** @type {HTMLSelectElement} */
+      el(
+        "select",
+        { class: "ak-input ak-mem__role", "aria-label": tw("team.role"), "data-ak-part": "role" },
+        list2.map(function(r) {
+          return el("option", { value: r, selected: r === value ? true : null }, tw("role." + r));
+        })
+      )
+    );
+    if (value) s.value = value;
+    return s;
+  }
+  function workspaceTeam(spec) {
+    const sample = !!spec && (spec.sample === true || !spec.org || !spec.ws || isPlaceholder2(spec.org) || isPlaceholder2(spec.ws));
+    const variant = spec.variant === "table" ? "table" : "list";
+    const root = el("section", { class: "ak-root ak-mem ak-ws ak-ws--team ak-ws--" + variant, "data-ak-part": "root", "data-ak-variant": variant });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let tab = "";
+    let failure = "";
+    let notice = "";
+    let typed = "";
+    let typedRole = "viewer";
+    const noop = function() {
+    };
+    async function act(work, done) {
+      failure = "";
+      notice = "";
+      try {
+        const r = await work();
+        failure = refusal(r);
+        if (!failure && done) notice = done(r) || "";
+      } catch (e) {
+        failure = refusal(e) || String(e);
+      }
+      await render();
+    }
+    function button2(label, tone, run2, disabled) {
+      return el("button", { type: "button", class: "ak-btn ak-btn--" + tone, disabled: disabled ? true : null, on: { click: run2 } }, label);
+    }
+    function row(who, meta, acts, extra) {
+      return el("li", { class: "ak-mem__row", "data-ak-part": "row" }, [
+        who,
+        el("span", { class: "ak-mem__meta", "data-ak-part": "meta" }, [meta || "", extra || null].filter(Boolean)),
+        el("span", { class: "ak-mem__acts", "data-ak-part": "acts" }, acts.filter(Boolean))
+      ]);
+    }
+    function list2(part, rows, none) {
+      return el(
+        "div",
+        { class: "ak-mem__group", "data-ak-part": part },
+        rows.length ? el("ul", { class: "ak-mem__rows" }, rows) : el("p", { class: "ak-mem__none" }, none)
+      );
+    }
+    function columnsOf(m) {
+      if (typeof spec.columns !== "function") return null;
+      const v = spec.columns(m);
+      if (v == null || v === "") return null;
+      return typeof v === "string" ? el("span", { class: "ak-mem__col" }, v) : v;
+    }
+    function nameOf(m) {
+      return m.displayName || m.account;
+    }
+    let drawing = 0;
+    async function render() {
+      const mine = ++drawing;
+      clear(root);
+      root.appendChild(el(
+        "h3",
+        { class: "ak-mem__title", "data-ak-part": "title" },
+        [spec.title || tw("team.title"), sample ? sampleBadge2() : null].filter(Boolean)
+      ));
+      root.appendChild(el("p", { class: "ak-mem__intro", "data-ak-part": "intro" }, sample ? tw("sample.note") : tw("team.intro")));
+      const lib = sample ? null : orgLib();
+      let data = SAMPLE2;
+      if (!sample) {
+        if (!lib) {
+          root.appendChild(el("p", { class: "ak-mem__none" }, tw("noLib")));
+          return;
+        }
+        if (!signedIn()) {
+          root.appendChild(el("p", { class: "ak-mem__none" }, tw("team.signIn")));
+          return;
+        }
+        try {
+          data = await lib.access(spec.org, spec.ws);
+        } catch (e) {
+          if (mine !== drawing) return;
+          root.appendChild(el("p", { class: "ak-mem__failure", role: "alert", "data-ak-part": "failure" }, tw("failed", { why: refusal(e) || String(e) })));
+          return;
+        }
+        if (mine !== drawing) return;
+      }
+      const people = (data && data.members || []).filter(function(m) {
+        return m && m.account;
+      }).slice().sort(function(a, b) {
+        return (a.role === "creator" ? 0 : 1) - (b.role === "creator" ? 0 : 1);
+      });
+      const requests = (data && data.requests || []).filter(function(r) {
+        return r && r.account && (!r.status || r.status === "pending");
+      });
+      const count = { requests: requests.length, people: people.length };
+      const tabs2 = ["requests", "people", "invite"];
+      if (!tab) tab = count.requests ? "requests" : "people";
+      if (failure) root.appendChild(el("p", { class: "ak-mem__failure", role: "alert", "data-ak-part": "failure" }, tw("failed", { why: failure })));
+      if (notice) root.appendChild(el("p", { class: "ak-mem__notice", role: "status", "data-ak-part": "notice" }, notice));
+      root.appendChild(el("div", { class: "ak-mem__tabs", role: "tablist", "data-ak-part": "tabs" }, tabs2.map(function(g) {
+        const n = count[g];
+        return el("button", {
+          type: "button",
+          role: "tab",
+          class: "ak-mem__tab" + (g === tab ? " is-on" : ""),
+          "aria-selected": g === tab ? "true" : "false",
+          on: { click: function() {
+            tab = g;
+            render();
+          } }
+        }, tw("tab." + g) + (typeof n === "number" && n ? " (" + n + ")" : ""));
+      })));
+      function changeRole(m, sel) {
+        const next = sel.value;
+        if (sample || next === m.role) return;
+        const go = function() {
+          act(
+            function() {
+              return lib.grant(spec.org, spec.ws, m.account, next);
+            },
+            function() {
+              return tw("team.granted", { who: nameOf(m), role: tw("role." + next) });
+            }
+          );
+        };
+        if (!(next === "contributor" && m.role === "viewer")) {
+          go();
+          return;
+        }
+        ask({ title: tw("team.raise", { who: nameOf(m) }), text: tw("team.raiseText"), confirmLabel: tw("team.raiseYes") }).then(function(yes) {
+          if (yes) go();
+          else sel.value = m.role;
+        });
+      }
+      function requestsTab() {
+        return list2("requests", requests.map(function(q) {
+          const sel = roleSel("viewer");
+          sel.disabled = sample;
+          const meta = [q.message || "", q.at ? tw("team.asked", { d: day2(q.at) }) : ""].filter(Boolean).join(" · ");
+          return row(person(q.account, q.displayName), meta, [
+            sel,
+            button2(tw("team.approve"), "primary", sample ? noop : function() {
+              const role = sel.value;
+              act(
+                function() {
+                  return lib.decide(spec.org, spec.ws, q.account, "approve", role);
+                },
+                function() {
+                  return tw("team.granted", { who: nameOf(q), role: tw("role." + role) });
+                }
+              );
+            }, sample),
+            button2(tw("team.decline"), "ghost", sample ? noop : function() {
+              act(
+                function() {
+                  return lib.decide(spec.org, spec.ws, q.account, "decline");
+                },
+                function() {
+                  return tw("team.declined", { who: nameOf(q) });
+                }
+              );
+            }, sample)
+          ]);
+        }), tw("team.requestsNone"));
+      }
+      function peopleRows() {
+        return people.map(function(m) {
+          const since = m.since ? tw("team.since", { d: day2(m.since) }) : "";
+          const own = (spec.actions || []).map(function(a) {
+            return button2(a.label, a.tone || "ghost", sample ? noop : function() {
+              Promise.resolve(a.run(m)).then(function() {
+                render();
+              });
+            }, sample);
+          });
+          if (m.role === "creator") {
+            const chip = el("span", { class: "ak-ws__chip", "data-ak-part": "chip", title: tw("team.creatorHint") }, tw("role.creator"));
+            return row(person(m.account, m.displayName), since, own.concat([chip]), columnsOf(m));
+          }
+          const sel = roleSel(m.role || "viewer");
+          sel.disabled = sample;
+          sel.addEventListener("change", function() {
+            changeRole(m, sel);
+          });
+          return row(person(m.account, m.displayName), since, own.concat([
+            sel,
+            button2(tw("team.remove"), "ghost", sample ? noop : function() {
+              ask({
+                title: tw("team.confirmRemove", { who: nameOf(m) }),
+                text: tw("team.confirmRemoveText"),
+                confirmLabel: tw("team.remove"),
+                tone: "danger"
+              }).then(function(yes) {
+                if (yes) act(function() {
+                  return lib.revoke(spec.org, spec.ws, m.account);
+                }, function() {
+                  return tw("team.removed", { who: nameOf(m) });
+                });
+              });
+            }, sample)
+          ]), columnsOf(m));
+        });
+      }
+      function peopleTab() {
+        const rows = peopleRows();
+        if (variant !== "table" || !rows.length) return list2("people", rows, tw("team.peopleNone"));
+        return el("div", { class: "ak-mem__group ak-mem__table-wrap", "data-ak-part": "people" }, [
+          el("table", { class: "ak-mem__table" }, [
+            el("thead", {}, [el("tr", {}, [
+              el("th", { scope: "col" }, tw("team.colName")),
+              el("th", { scope: "col" }, tw("team.colSince")),
+              el("th", { scope: "col" }, tw("team.colActions"))
+            ])]),
+            el("tbody", {}, rows.map(function(r) {
+              const cells = Array.prototype.slice.call(r.children);
+              return el("tr", { "data-ak-part": "row" }, cells.map(function(c) {
+                return el("td", {}, [c]);
+              }));
+            }))
+          ])
+        ]);
+      }
+      function inviteTab() {
+        const input = (
+          /** @type {HTMLInputElement} */
+          el("input", {
+            type: "text",
+            class: "ak-input ak-mem__name",
+            placeholder: tw("team.invitePlaceholder"),
+            "aria-label": tw("team.invitePlaceholder"),
+            disabled: sample ? true : null,
+            autocomplete: "off"
+          })
+        );
+        if (typed) input.value = typed;
+        const sel = roleSel(typedRole);
+        sel.disabled = sample;
+        const go = button2(EMAIL_RE2.test(typed) ? tw("team.invite") : tw("team.add"), "primary", sample ? noop : function() {
+          const value = input.value.trim();
+          const role = sel.value;
+          typed = value;
+          typedRole = role;
+          if (!value) return;
+          if (EMAIL_RE2.test(value)) {
+            act(function() {
+              if (typeof lib.inviteByEmail !== "function") throw new Error(tw("noLib"));
+              return lib.inviteByEmail(spec.org, value, { ws: spec.ws, role });
+            }, function(r) {
+              typed = "";
+              return r && r.email_sent === false && r.accept_url ? tw("team.inviteLink", { url: r.accept_url }) : tw("team.inviteSent", { email: value });
+            });
+          } else {
+            act(function() {
+              return lib.grant(spec.org, spec.ws, value, role);
+            }, function() {
+              typed = "";
+              return tw("team.granted", { who: value, role: tw("role." + role) });
+            });
+          }
+        }, sample);
+        input.addEventListener("input", function() {
+          go.textContent = EMAIL_RE2.test(input.value.trim()) ? tw("team.invite") : tw("team.add");
+        });
+        return el("div", { class: "ak-mem__group", "data-ak-part": "invite" }, [
+          el("div", { class: "ak-mem__add" }, [el("div", { class: "ak-mem__field" }, [input]), sel, go]),
+          el("p", { class: "ak-mem__hint" }, tw("team.inviteHint"))
+        ]);
+      }
+      root.appendChild(el("div", { class: "ak-mem__body" }, [
+        tab === "requests" ? requestsTab() : tab === "invite" ? inviteTab() : peopleTab()
+      ]));
+    }
+    function run() {
+      return render().catch(function(e) {
+        root.appendChild(el("p", { class: "ak-mem__failure", role: "alert" }, tw("failed", { why: refusal(e) || String(e) })));
+      });
+    }
+    const ready0 = run().then(function() {
+      enter(root);
+    });
+    const stop = watch(function() {
+      failure = "";
+      notice = "";
+      run();
+    }, root);
+    return {
+      el: root,
+      refresh: function() {
+        return ready0.then(run);
+      },
+      destroy: function() {
+        stop();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/intake-connect-i18n.js
+  var STRINGS4 = {
+    en: {
+      "intake.title": "Send us a message",
+      "intake.send": "Send",
+      "intake.sent": "Thank you. Your answer went through.",
+      "intake.required": "{label}: this is required.",
+      "intake.notNumber": "{label}: write a number.",
+      "intake.choose": "Choose…",
+      "intake.failed": "That did not go through: {why}",
+      "intake.notFound": "This form is not open.",
+      "intake.noLib": "This block needs aimeat-intake.js on the page.",
+      "intake.noFields": "This form has no fields yet.",
+      "intake.sampleNote": "A sample form. Nothing is sent from here.",
+      "intake.sampleSent": "A sample. Nothing was sent.",
+      "intake.honeypot": "Leave this empty",
+      "intake.loading": "Loading…",
+      "intake.sample.name": "Your name",
+      "intake.sample.email": "Email",
+      "intake.sample.phone": "Phone",
+      "intake.sample.site": "Your website",
+      "intake.sample.people": "How many people",
+      "intake.sample.day": "Which day",
+      "intake.sample.topic": "Topic",
+      "intake.sample.order": "An order",
+      "intake.sample.question": "A question",
+      "intake.sample.other": "Something else",
+      "intake.sample.found": "How did you find us",
+      "intake.sample.friend": "A friend told me",
+      "intake.sample.search": "A search",
+      "intake.sample.social": "Social media",
+      "intake.sample.message": "Message",
+      "intake.sample.consent": "You may answer me by email",
+      "intake.adminTitle": "Forms",
+      "intake.adminIntro": "Public forms that anyone can fill in, also without an account. Each answer is saved in this workspace.",
+      "intake.none": "No forms yet.",
+      "intake.answers1": "1 answer",
+      "intake.answers": "{n} answers",
+      "intake.closed": "closed",
+      "intake.private": "private link",
+      "intake.draft": "answers wait for review",
+      "intake.copy": "Copy link",
+      "intake.copied": "The link is copied: {url}",
+      "intake.copyByHand": "Copy this link: {url}",
+      "intake.delete": "Delete",
+      "intake.confirmDelete": 'Delete the form "{name}"?',
+      "intake.confirmDeleteText": "Its link stops working at once. The answers already saved stay in the workspace.",
+      "intake.deleted": "The form is deleted.",
+      "intake.create": "Create a form",
+      "intake.formId": "Form name in the link",
+      "intake.formIdHint": "Small letters, numbers and hyphens, for example contact-us. Leave it empty for a private link that nobody can guess.",
+      "intake.formTitle": "Title",
+      "intake.namespace": "Space the answers are saved in",
+      "intake.fields": "Fields",
+      "intake.fieldLabel": "Field label",
+      "intake.fieldType": "Type",
+      "intake.fieldRequired": "Required",
+      "intake.fieldOptions": "Choices, separated by commas",
+      "intake.addField": "Add a field",
+      "intake.removeField": "Remove field",
+      "intake.save": "Create form",
+      "intake.created": "The form is ready: {name}.",
+      "intake.needField": "Add at least one field with a label.",
+      "intake.needNamespace": "Name the space the answers are saved in.",
+      "intake.badId": "Use 2 to 64 small letters, numbers or hyphens.",
+      "intake.signIn": "Sign in to manage the forms.",
+      "intake.type.text": "Short text",
+      "intake.type.textarea": "Long text",
+      "intake.type.email": "Email",
+      "intake.type.tel": "Phone",
+      "intake.type.url": "Web address",
+      "intake.type.number": "Number",
+      "intake.type.date": "Date",
+      "intake.type.select": "Drop-down list",
+      "intake.type.radio": "One choice",
+      "intake.type.checkbox": "Checkbox",
+      "connect.title": "Connected accounts",
+      "connect.intro": "Your accounts at other services. AIMEAT keeps the sign-in. This app sees only the account name and what the account can do.",
+      "connect.none": "No accounts are connected yet.",
+      "connect.status.active": "Connected",
+      "connect.status.needs_reauth": "Needs sign-in again",
+      "connect.status.error": "Not working",
+      "connect.can": "Can: {what}",
+      "connect.cap.readMail": "read mail",
+      "connect.cap.sendMail": "send mail",
+      "connect.cap.publishPost": "publish posts",
+      "connect.cap.publishVideo": "publish videos",
+      "connect.cap.readMetrics": "read how posts do",
+      "connect.cap.readItems": "read its items",
+      "connect.reconnect": "Sign in again",
+      "connect.disconnect": "Disconnect",
+      "connect.confirm": "Disconnect {account}?",
+      "connect.confirmText": "AIMEAT removes the sign-in it keeps, and tells {provider} when it can. Apps that use this account stop reaching it.",
+      "connect.toldProvider": "Disconnected. {provider} was told too.",
+      "connect.notToldProvider": "Disconnected here. {provider} could not be told, so you can remove the access there too.",
+      "connect.add": "Connect an account",
+      "connect.connectTo": "Connect {provider}",
+      "connect.instance": "Your server, for example mastodon.social",
+      "connect.connected": "{account} is connected.",
+      "connect.notConnected": "Nothing was connected. If the window closed too early, try again.",
+      "connect.waiting": "Finish in the window that opened.",
+      "connect.noProviders": "None of the services here can do what this app needs.",
+      "connect.need.readMail": "This app needs an account it can read mail from.",
+      "connect.need.sendMail": "This app needs an account it can send mail from.",
+      "connect.need.publish": "This app needs an account it can publish to.",
+      "connect.failed": "That did not go through: {why}",
+      "connect.noLib": "This block needs aimeat-connect.js on the page.",
+      "connect.signIn": "Sign in to see your connected accounts.",
+      "connect.sampleNote": "A sample. Nothing here is connected or changed."
+    },
+    fi: {
+      "intake.title": "Lähetä meille viesti",
+      "intake.send": "Lähetä",
+      "intake.sent": "Kiitos. Vastauksesi meni perille.",
+      "intake.required": "{label}: tämä tieto tarvitaan.",
+      "intake.notNumber": "{label}: kirjoita numero.",
+      "intake.choose": "Valitse…",
+      "intake.failed": "Lähetys ei mennyt läpi: {why}",
+      "intake.notFound": "Tämä lomake ei ole auki.",
+      "intake.noLib": "Tämä osa tarvitsee sivulle aimeat-intake.js-kirjaston.",
+      "intake.noFields": "Tässä lomakkeessa ei ole vielä kenttiä.",
+      "intake.sampleNote": "Esimerkkilomake. Täältä ei lähetetä mitään.",
+      "intake.sampleSent": "Esimerkki. Mitään ei lähetetty.",
+      "intake.honeypot": "Jätä tämä tyhjäksi",
+      "intake.loading": "Ladataan…",
+      "intake.sample.name": "Nimesi",
+      "intake.sample.email": "Sähköposti",
+      "intake.sample.phone": "Puhelin",
+      "intake.sample.site": "Verkkosivusi",
+      "intake.sample.people": "Montako henkeä",
+      "intake.sample.day": "Mikä päivä",
+      "intake.sample.topic": "Aihe",
+      "intake.sample.order": "Tilaus",
+      "intake.sample.question": "Kysymys",
+      "intake.sample.other": "Jokin muu",
+      "intake.sample.found": "Mistä löysit meidät",
+      "intake.sample.friend": "Ystävä kertoi",
+      "intake.sample.search": "Haun kautta",
+      "intake.sample.social": "Sosiaalisesta mediasta",
+      "intake.sample.message": "Viesti",
+      "intake.sample.consent": "Saatte vastata minulle sähköpostilla",
+      "intake.adminTitle": "Lomakkeet",
+      "intake.adminIntro": "Julkiset lomakkeet, jotka kuka tahansa voi täyttää, myös ilman tiliä. Jokainen vastaus tallentuu tähän työtilaan.",
+      "intake.none": "Lomakkeita ei vielä ole.",
+      "intake.answers1": "1 vastaus",
+      "intake.answers": "{n} vastausta",
+      "intake.closed": "suljettu",
+      "intake.private": "yksityinen linkki",
+      "intake.draft": "vastaukset odottavat tarkistusta",
+      "intake.copy": "Kopioi linkki",
+      "intake.copied": "Linkki on kopioitu: {url}",
+      "intake.copyByHand": "Kopioi tämä linkki: {url}",
+      "intake.delete": "Poista",
+      "intake.confirmDelete": 'Poistetaanko lomake "{name}"?',
+      "intake.confirmDeleteText": "Lomakkeen linkki lakkaa toimimasta heti. Jo tallennetut vastaukset jäävät työtilaan.",
+      "intake.deleted": "Lomake on poistettu.",
+      "intake.create": "Luo lomake",
+      "intake.formId": "Lomakkeen nimi linkissä",
+      "intake.formIdHint": "Pieniä kirjaimia, numeroita ja yhdysmerkkejä, esimerkiksi ota-yhteytta. Jos jätät kentän tyhjäksi, linkki on yksityinen eikä sitä voi arvata.",
+      "intake.formTitle": "Otsikko",
+      "intake.namespace": "Tila, johon vastaukset tallentuvat",
+      "intake.fields": "Kentät",
+      "intake.fieldLabel": "Kentän nimi",
+      "intake.fieldType": "Tyyppi",
+      "intake.fieldRequired": "Pakollinen",
+      "intake.fieldOptions": "Vaihtoehdot pilkulla erotettuina",
+      "intake.addField": "Lisää kenttä",
+      "intake.removeField": "Poista kenttä",
+      "intake.save": "Luo lomake",
+      "intake.created": "Lomake on valmis: {name}.",
+      "intake.needField": "Lisää vähintään yksi kenttä, jolla on nimi.",
+      "intake.needNamespace": "Kerro, mihin tilaan vastaukset tallentuvat.",
+      "intake.badId": "Käytä 2–64 pientä kirjainta, numeroa tai yhdysmerkkiä.",
+      "intake.signIn": "Kirjaudu sisään, niin voit hallita lomakkeita.",
+      "intake.type.text": "Lyhyt teksti",
+      "intake.type.textarea": "Pitkä teksti",
+      "intake.type.email": "Sähköposti",
+      "intake.type.tel": "Puhelin",
+      "intake.type.url": "Verkko-osoite",
+      "intake.type.number": "Numero",
+      "intake.type.date": "Päivämäärä",
+      "intake.type.select": "Pudotusvalikko",
+      "intake.type.radio": "Yksi vaihtoehto",
+      "intake.type.checkbox": "Valintaruutu",
+      "connect.title": "Yhdistetyt tilit",
+      "connect.intro": "Tilisi muissa palveluissa. AIMEAT säilyttää kirjautumistiedot. Tämä sovellus näkee vain tilin nimen ja sen, mitä tilillä voi tehdä.",
+      "connect.none": "Yhtään tiliä ei ole vielä yhdistetty.",
+      "connect.status.active": "Yhdistetty",
+      "connect.status.needs_reauth": "Kirjautuminen on vanhentunut",
+      "connect.status.error": "Ei toimi",
+      "connect.can": "Voi: {what}",
+      "connect.cap.readMail": "lukea postia",
+      "connect.cap.sendMail": "lähettää postia",
+      "connect.cap.publishPost": "julkaista päivityksiä",
+      "connect.cap.publishVideo": "julkaista videoita",
+      "connect.cap.readMetrics": "lukea julkaisujen tilastoja",
+      "connect.cap.readItems": "lukea sisältöä",
+      "connect.reconnect": "Kirjaudu uudelleen",
+      "connect.disconnect": "Katkaise yhteys",
+      "connect.confirm": "Katkaistaanko yhteys tiliin {account}?",
+      "connect.confirmText": "AIMEAT poistaa säilyttämänsä kirjautumistiedot ja kertoo siitä palvelulle {provider}, jos se on mahdollista. Tätä tiliä käyttävät sovellukset eivät enää pääse siihen.",
+      "connect.toldProvider": "Yhteys on katkaistu. Myös {provider} sai tiedon.",
+      "connect.notToldProvider": "Yhteys on katkaistu täällä. Palvelulle {provider} ei voitu kertoa, joten voit poistaa pääsyn myös siellä.",
+      "connect.add": "Yhdistä tili",
+      "connect.connectTo": "Yhdistä {provider}",
+      "connect.instance": "Palvelimesi, esimerkiksi mastodon.social",
+      "connect.connected": "{account} on yhdistetty.",
+      "connect.notConnected": "Mitään ei yhdistetty. Jos ikkuna sulkeutui liian aikaisin, yritä uudelleen.",
+      "connect.waiting": "Viimeistele yhdistäminen ikkunassa, joka aukesi.",
+      "connect.noProviders": "Mikään täällä tarjolla oleva palvelu ei pysty siihen, mitä tämä sovellus tarvitsee.",
+      "connect.need.readMail": "Tämä sovellus tarvitsee tilin, jonka postia se voi lukea.",
+      "connect.need.sendMail": "Tämä sovellus tarvitsee tilin, josta se voi lähettää postia.",
+      "connect.need.publish": "Tämä sovellus tarvitsee tilin, johon se voi julkaista.",
+      "connect.failed": "Se ei mennyt läpi: {why}",
+      "connect.noLib": "Tämä osa tarvitsee sivulle aimeat-connect.js-kirjaston.",
+      "connect.signIn": "Kirjaudu sisään, niin näet yhdistetyt tilisi.",
+      "connect.sampleNote": "Esimerkki. Täällä ei yhdistetä eikä muuteta mitään."
+    },
+    es: {
+      "intake.title": "Envíanos un mensaje",
+      "intake.send": "Enviar",
+      "intake.sent": "Gracias. Tu respuesta llegó.",
+      "intake.required": "{label}: este dato es obligatorio.",
+      "intake.notNumber": "{label}: escribe un número.",
+      "intake.choose": "Elige…",
+      "intake.failed": "No se pudo enviar: {why}",
+      "intake.notFound": "Este formulario no está abierto.",
+      "intake.noLib": "Este bloque necesita aimeat-intake.js en la página.",
+      "intake.noFields": "Este formulario todavía no tiene campos.",
+      "intake.sampleNote": "Un formulario de muestra. Desde aquí no se envía nada.",
+      "intake.sampleSent": "Una muestra. No se envió nada.",
+      "intake.honeypot": "Deja esto vacío",
+      "intake.loading": "Cargando…",
+      "intake.sample.name": "Tu nombre",
+      "intake.sample.email": "Correo",
+      "intake.sample.phone": "Teléfono",
+      "intake.sample.site": "Tu sitio web",
+      "intake.sample.people": "Cuántas personas",
+      "intake.sample.day": "Qué día",
+      "intake.sample.topic": "Tema",
+      "intake.sample.order": "Un pedido",
+      "intake.sample.question": "Una pregunta",
+      "intake.sample.other": "Otra cosa",
+      "intake.sample.found": "Cómo nos encontraste",
+      "intake.sample.friend": "Me lo contó alguien",
+      "intake.sample.search": "Con una búsqueda",
+      "intake.sample.social": "En redes sociales",
+      "intake.sample.message": "Mensaje",
+      "intake.sample.consent": "Pueden responderme por correo",
+      "intake.adminTitle": "Formularios",
+      "intake.adminIntro": "Formularios públicos que cualquiera puede llenar, también sin cuenta. Cada respuesta se guarda en este espacio de trabajo.",
+      "intake.none": "Todavía no hay formularios.",
+      "intake.answers1": "1 respuesta",
+      "intake.answers": "{n} respuestas",
+      "intake.closed": "cerrado",
+      "intake.private": "enlace privado",
+      "intake.draft": "las respuestas esperan revisión",
+      "intake.copy": "Copiar enlace",
+      "intake.copied": "El enlace está copiado: {url}",
+      "intake.copyByHand": "Copia este enlace: {url}",
+      "intake.delete": "Eliminar",
+      "intake.confirmDelete": '¿Eliminar el formulario "{name}"?',
+      "intake.confirmDeleteText": "Su enlace deja de funcionar de inmediato. Las respuestas ya guardadas se quedan en el espacio de trabajo.",
+      "intake.deleted": "El formulario está eliminado.",
+      "intake.create": "Crear un formulario",
+      "intake.formId": "Nombre del formulario en el enlace",
+      "intake.formIdHint": "Minúsculas, números y guiones, por ejemplo contactanos. Si lo dejas vacío, el enlace es privado y nadie lo puede adivinar.",
+      "intake.formTitle": "Título",
+      "intake.namespace": "Espacio donde se guardan las respuestas",
+      "intake.fields": "Campos",
+      "intake.fieldLabel": "Etiqueta del campo",
+      "intake.fieldType": "Tipo",
+      "intake.fieldRequired": "Obligatorio",
+      "intake.fieldOptions": "Opciones, separadas por comas",
+      "intake.addField": "Agregar un campo",
+      "intake.removeField": "Quitar campo",
+      "intake.save": "Crear formulario",
+      "intake.created": "El formulario está listo: {name}.",
+      "intake.needField": "Agrega al menos un campo con etiqueta.",
+      "intake.needNamespace": "Indica el espacio donde se guardan las respuestas.",
+      "intake.badId": "Usa de 2 a 64 minúsculas, números o guiones.",
+      "intake.signIn": "Inicia sesión para administrar los formularios.",
+      "intake.type.text": "Texto corto",
+      "intake.type.textarea": "Texto largo",
+      "intake.type.email": "Correo",
+      "intake.type.tel": "Teléfono",
+      "intake.type.url": "Dirección web",
+      "intake.type.number": "Número",
+      "intake.type.date": "Fecha",
+      "intake.type.select": "Lista desplegable",
+      "intake.type.radio": "Una opción",
+      "intake.type.checkbox": "Casilla",
+      "connect.title": "Cuentas conectadas",
+      "connect.intro": "Tus cuentas en otros servicios. AIMEAT guarda el acceso. Esta aplicación solo ve el nombre de la cuenta y lo que la cuenta puede hacer.",
+      "connect.none": "Todavía no hay cuentas conectadas.",
+      "connect.status.active": "Conectada",
+      "connect.status.needs_reauth": "Hay que iniciar sesión de nuevo",
+      "connect.status.error": "No funciona",
+      "connect.can": "Puede: {what}",
+      "connect.cap.readMail": "leer correo",
+      "connect.cap.sendMail": "enviar correo",
+      "connect.cap.publishPost": "publicar entradas",
+      "connect.cap.publishVideo": "publicar videos",
+      "connect.cap.readMetrics": "ver cómo les va a las publicaciones",
+      "connect.cap.readItems": "leer su contenido",
+      "connect.reconnect": "Iniciar sesión de nuevo",
+      "connect.disconnect": "Desconectar",
+      "connect.confirm": "¿Desconectar {account}?",
+      "connect.confirmText": "AIMEAT borra el acceso que guarda y se lo avisa a {provider} cuando puede. Las aplicaciones que usan esta cuenta dejan de llegar a ella.",
+      "connect.toldProvider": "Desconectada. También se le avisó a {provider}.",
+      "connect.notToldProvider": "Desconectada aquí. No se le pudo avisar a {provider}, así que puedes quitar el acceso también allí.",
+      "connect.add": "Conectar una cuenta",
+      "connect.connectTo": "Conectar {provider}",
+      "connect.instance": "Tu servidor, por ejemplo mastodon.social",
+      "connect.connected": "{account} está conectada.",
+      "connect.notConnected": "No se conectó nada. Si la ventana se cerró antes de tiempo, inténtalo de nuevo.",
+      "connect.waiting": "Termina en la ventana que se abrió.",
+      "connect.noProviders": "Ninguno de los servicios disponibles aquí puede hacer lo que esta aplicación necesita.",
+      "connect.need.readMail": "Esta aplicación necesita una cuenta de la que pueda leer el correo.",
+      "connect.need.sendMail": "Esta aplicación necesita una cuenta desde la que pueda enviar correo.",
+      "connect.need.publish": "Esta aplicación necesita una cuenta en la que pueda publicar.",
+      "connect.failed": "No se pudo completar: {why}",
+      "connect.noLib": "Este bloque necesita aimeat-connect.js en la página.",
+      "connect.signIn": "Inicia sesión para ver tus cuentas conectadas.",
+      "connect.sampleNote": "Una muestra. Desde aquí no se conecta ni se cambia nada."
+    }
+  };
+  function ti(key, vars) {
+    const hosted = i18n.t(key, vars);
+    if (hosted !== key) return hosted;
+    const lang = i18n.lang();
+    const table2 = (
+      /** @type {Record<string, string>} */
+      STRINGS4[
+        /** @type {'en'|'fi'|'es'} */
+        lang
+      ] || STRINGS4.en
+    );
+    const text = table2[key] || STRINGS4.en[key] || key;
+    if (!vars) return text;
+    return text.replace(/\{(\w+)\}/g, function(whole, name) {
+      return vars[name] == null ? whole : String(vars[name]);
+    });
+  }
+
+  // src/static/sdk-libs/atelier/intake-form.js
+  var TYPES = ["text", "textarea", "email", "tel", "url", "number", "date", "select", "radio", "checkbox"];
+  var HONEYPOT = "company_url";
+  var FORM_ID_RE = /^[a-z0-9][a-z0-9-]{1,63}$/;
+  function intakeOf() {
+    const ns = (
+      /** @type {any} */
+      window.AIMEAT
+    );
+    return ns && ns.intake ? ns.intake : null;
+  }
+  function signedOut() {
+    const ns = (
+      /** @type {any} */
+      window.AIMEAT
+    );
+    const auth = ns && ns.auth;
+    return !!(auth && typeof auth.getSession === "function" && !auth.getSession());
+  }
+  function linkedFormId() {
+    try {
+      return new URLSearchParams(window.location.search || "").get("form") || "";
+    } catch {
+      return "";
+    }
+  }
+  function unset(v) {
+    return !v || isPlaceholder2(v);
+  }
+  function sampleForm() {
+    const opt = function(keys2) {
+      return keys2.map(function(k) {
+        return { value: k, label: ti("intake.sample." + k) };
+      });
+    };
+    return {
+      title: "",
+      honeypot_field: HONEYPOT,
+      fields: [
+        { name: "name", label: ti("intake.sample.name"), type: "text", required: true, maxLength: 200 },
+        { name: "email", label: ti("intake.sample.email"), type: "email", required: true, maxLength: 320 },
+        { name: "phone", label: ti("intake.sample.phone"), type: "tel", required: false, maxLength: 40 },
+        { name: "site", label: ti("intake.sample.site"), type: "url", required: false, maxLength: 400 },
+        { name: "people", label: ti("intake.sample.people"), type: "number", required: false },
+        { name: "day", label: ti("intake.sample.day"), type: "date", required: false },
+        { name: "topic", label: ti("intake.sample.topic"), type: "select", required: true, options: opt(["order", "question", "other"]) },
+        { name: "found", label: ti("intake.sample.found"), type: "radio", required: false, options: opt(["friend", "search", "social"]) },
+        { name: "message", label: ti("intake.sample.message"), type: "textarea", required: true, maxLength: 4e3 },
+        { name: "consent", label: ti("intake.sample.consent"), type: "checkbox", required: false }
+      ]
+    };
+  }
+  function intakeForm(spec) {
+    const formId = spec.formId || linkedFormId();
+    const sample = spec.sample === true || unset(spec.org) || unset(spec.ws) || unset(formId);
+    const root = el("section", { class: "ak-root ak-intake", "data-ak-part": "root" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let gen = 0;
+    let snapshot = function() {
+      return {};
+    };
+    function heading(def) {
+      root.appendChild(el(
+        "h3",
+        { class: "ak-intake__title", "data-ak-part": "title" },
+        [spec.title || def && def.title || ti("intake.title"), sample ? sampleBadge2() : null].filter(Boolean)
+      ));
+      if (spec.hint) root.appendChild(el("p", { class: "ak-intake__intro", "data-ak-part": "hint" }, spec.hint));
+      if (sample) root.appendChild(el("p", { class: "ak-intake__intro" }, ti("intake.sampleNote")));
+    }
+    function stop(text) {
+      root.appendChild(el("p", { class: "ak-intake__failure", role: "alert", "data-ak-part": "failure" }, text));
+    }
+    async function render() {
+      const mine = ++gen;
+      const kept = snapshot();
+      let def;
+      let list2;
+      if (sample) {
+        def = sampleForm();
+        list2 = def.fields;
+      } else {
+        const lib = intakeOf();
+        if (!lib) {
+          clear(root);
+          heading(null);
+          stop(ti("intake.noLib"));
+          return;
+        }
+        try {
+          def = await lib.getForm(spec.org, spec.ws, formId);
+        } catch (e) {
+          if (mine !== gen) return;
+          clear(root);
+          heading(null);
+          stop(e && e.code === "NOT_FOUND" ? ti("intake.notFound") : ti("intake.failed", { why: refusal(e) || String(e) }));
+          return;
+        }
+        if (mine !== gen) return;
+        list2 = typeof lib.fields === "function" ? lib.fields(def) : [];
+      }
+      clear(root);
+      heading(def);
+      draw(def, list2, kept);
+    }
+    function draw(def, list2, kept) {
+      const controls = /* @__PURE__ */ new Map();
+      const failure = el("p", { class: "ak-intake__failure", role: "alert", "data-ak-part": "failure", hidden: true });
+      const sent = el("p", { class: "ak-intake__sent", role: "status", "data-ak-part": "sent", hidden: true });
+      const form2 = el("form", { class: "ak-form ak-intake__form", "data-ak-part": "form", novalidate: true });
+      root.appendChild(failure);
+      if (!list2.length) root.appendChild(el("p", { class: "ak-intake__intro" }, ti("intake.noFields")));
+      for (const f of list2) form2.appendChild(fieldNode(f, controls));
+      const hpName = def && def.honeypot_field || HONEYPOT;
+      const hp = (
+        /** @type {HTMLInputElement} */
+        el("input", {
+          type: "text",
+          name: hpName,
+          tabindex: "-1",
+          autocomplete: "off",
+          "aria-label": ti("intake.honeypot")
+        })
+      );
+      form2.appendChild(el("div", { class: "ak-intake__hp", "aria-hidden": "true", "data-ak-part": "honeypot" }, [hp]));
+      const send = el("button", { type: "submit", class: "ak-btn ak-btn--primary", "data-ak-part": "send", "data-ak-noguard": true }, ti("intake.send"));
+      form2.appendChild(el("div", { class: "ak-form__bar", "data-ak-part": "bar" }, [send]));
+      root.appendChild(form2);
+      root.appendChild(sent);
+      function valueOf(c) {
+        const type = c.field.type;
+        if (type === "checkbox") return !!c.inputs[0].checked;
+        if (type === "radio") {
+          const on = c.inputs.filter(function(i) {
+            return i.checked;
+          })[0];
+          return on ? on.value : "";
+        }
+        const v = c.inputs[0].value;
+        if (type === "number") return v === "" || v == null ? null : Number(v);
+        return v == null ? "" : String(v);
+      }
+      function setValue(c, v) {
+        const type = c.field.type;
+        if (type === "checkbox") c.inputs[0].checked = !!v;
+        else if (type === "radio") c.inputs.forEach(function(i) {
+          i.checked = v != null && i.value === String(v);
+        });
+        else c.inputs[0].value = v == null ? "" : String(v);
+      }
+      function setError(name, message) {
+        const c = controls.get(name);
+        if (!c) return;
+        c.error.textContent = message;
+        c.error.hidden = false;
+        c.wrap.classList.add("ak-form__field--invalid");
+        c.inputs.forEach(function(i) {
+          i.setAttribute("aria-invalid", "true");
+        });
+        attention(c.wrap, "shake");
+      }
+      function clearErrors() {
+        failure.hidden = true;
+        failure.textContent = "";
+        for (const [, c] of controls) {
+          c.error.hidden = true;
+          c.error.textContent = "";
+          c.wrap.classList.remove("ak-form__field--invalid");
+          c.inputs.forEach(function(i) {
+            i.removeAttribute("aria-invalid");
+          });
+        }
+      }
+      function validate() {
+        let first = null;
+        for (const [name, c] of controls) {
+          const v = valueOf(c);
+          let problem = "";
+          const empty = v === "" || v == null || v === false || typeof v === "string" && !v.trim();
+          if (c.field.required && empty) problem = ti("intake.required", { label: c.field.label });
+          else if (c.field.type === "number" && typeof v === "number" && Number.isNaN(v)) problem = ti("intake.notNumber", { label: c.field.label });
+          if (problem) {
+            setError(name, problem);
+            if (!first) first = name;
+          }
+        }
+        return first;
+      }
+      function values() {
+        const out = {};
+        for (const [name, c] of controls) {
+          const v = valueOf(c);
+          if (v === "" || v == null || typeof v === "string" && !v.trim()) continue;
+          out[name] = v;
+        }
+        return out;
+      }
+      function reset() {
+        for (const [, c] of controls) setValue(c, c.field.type === "checkbox" ? false : "");
+        hp.value = "";
+      }
+      for (const name in kept) {
+        const c = controls.get(name);
+        if (c) setValue(c, kept[name]);
+      }
+      snapshot = function() {
+        const out = {};
+        for (const [name, c] of controls) out[name] = valueOf(c);
+        return out;
+      };
+      form2.addEventListener("submit", function(ev) {
+        ev.preventDefault();
+        clearErrors();
+        sent.hidden = true;
+        const bad = validate();
+        if (bad) {
+          const c = controls.get(bad);
+          if (c) c.inputs[0].focus();
+          return;
+        }
+        if (sample) {
+          sent.textContent = ti("intake.sampleSent");
+          sent.hidden = false;
+          return;
+        }
+        const lib = intakeOf();
+        if (!lib) {
+          failure.textContent = ti("intake.noLib");
+          failure.hidden = false;
+          return;
+        }
+        const payload = values();
+        if (def && def.honeypot_field) payload[def.honeypot_field] = hp.value;
+        whileBusy(send, lib.submit(spec.org, spec.ws, formId, payload)).then(function(answer) {
+          reset();
+          sent.textContent = def && def.success_message || ti("intake.sent");
+          sent.hidden = false;
+          if (typeof spec.onSent === "function") spec.onSent(payload, answer);
+        }, function(e) {
+          const why = refusal(e) || String(e);
+          const named = e && e.field && controls.has(e.field);
+          if (named) {
+            setError(e.field, why);
+            const c = controls.get(e.field);
+            if (c) c.inputs[0].focus();
+          } else {
+            failure.textContent = ti("intake.failed", { why });
+            failure.hidden = false;
+            attention(failure, "shake");
+          }
+        });
+      });
+    }
+    function fieldNode(f, controls) {
+      const id = uid("ak-intake");
+      const errId = id + "-err";
+      const error = el("p", { class: "ak-form__error", "data-ak-part": "error", id: errId, role: "alert", hidden: true });
+      const marks = f.required ? [
+        el("span", { class: "ak-form__req", "data-ak-part": "req", "aria-hidden": "true" }, "*"),
+        el("span", { class: "ak-sr-only" }, " (" + t("required") + ")")
+      ] : [];
+      const req = f.required ? "true" : null;
+      let inputs;
+      let wrap2;
+      if (f.type === "radio") {
+        const group = id + "-r";
+        const labels = (f.options || []).map(function(o, i) {
+          const oid = id + "-" + i;
+          const input = (
+            /** @type {HTMLInputElement} */
+            el("input", {
+              type: "radio",
+              id: oid,
+              name: group,
+              value: o.value,
+              class: "ak-intake__radio",
+              "data-ak-part": "input",
+              "aria-describedby": errId
+            })
+          );
+          return { input, node: el("label", { class: "ak-intake__choice", "data-ak-part": "choice", for: oid }, [input, el("span", {}, o.label)]) };
+        });
+        inputs = labels.map(function(x) {
+          return x.input;
+        });
+        wrap2 = el("fieldset", { class: "ak-form__field ak-intake__group", "data-ak-part": "field", "data-ak-field": f.name, "aria-required": req }, [
+          el("legend", { class: "ak-form__label", "data-ak-part": "label" }, [f.label].concat(marks)),
+          el("div", { class: "ak-intake__choices" }, labels.map(function(x) {
+            return x.node;
+          })),
+          error
+        ]);
+      } else if (f.type === "checkbox") {
+        const input = (
+          /** @type {HTMLInputElement} */
+          el("input", {
+            type: "checkbox",
+            id,
+            class: "ak-check",
+            "data-ak-part": "input",
+            "aria-describedby": errId,
+            "aria-required": req
+          })
+        );
+        inputs = [input];
+        wrap2 = el("div", { class: "ak-form__field", "data-ak-part": "field", "data-ak-field": f.name }, [
+          el("div", { class: "ak-intake__check" }, [
+            input,
+            el("label", { class: "ak-form__label", "data-ak-part": "label", for: id }, [f.label].concat(marks))
+          ]),
+          error
+        ]);
+      } else {
+        let input;
+        if (f.type === "textarea") {
+          input = el("textarea", { id, class: "ak-input ak-input--area", "data-ak-part": "input", rows: 4, maxlength: f.maxLength || null, "aria-describedby": errId, "aria-required": req });
+        } else if (f.type === "select") {
+          input = el(
+            "select",
+            { id, class: "ak-input", "data-ak-part": "input", "aria-describedby": errId, "aria-required": req },
+            [el("option", { value: "" }, ti("intake.choose"))].concat((f.options || []).map(function(o) {
+              return el("option", { value: o.value }, o.label);
+            }))
+          );
+        } else {
+          const type = TYPES.indexOf(f.type) === -1 ? "text" : f.type;
+          input = el("input", {
+            id,
+            type,
+            class: "ak-input",
+            "data-ak-part": "input",
+            maxlength: f.maxLength || null,
+            autocomplete: type === "email" ? "email" : type === "tel" ? "tel" : type === "url" ? "url" : null,
+            inputmode: type === "number" ? "decimal" : null,
+            "aria-describedby": errId,
+            "aria-required": req
+          });
+        }
+        inputs = [
+          /** @type {HTMLInputElement} */
+          input
+        ];
+        wrap2 = el("div", { class: "ak-form__field", "data-ak-part": "field", "data-ak-field": f.name }, [
+          el("label", { class: "ak-form__label", "data-ak-part": "label", for: id }, [f.label].concat(marks)),
+          input,
+          error
+        ]);
+      }
+      controls.set(f.name, { field: f, wrap: wrap2, error, inputs });
+      return wrap2;
+    }
+    const ready2 = render().then(function() {
+      enter(root);
+    });
+    const stopWatch = watch(function() {
+      render();
+    }, root);
+    return {
+      el: root,
+      refresh: function() {
+        return ready2.then(render);
+      },
+      destroy: function() {
+        stopWatch();
+        gen += 1;
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+  var SAMPLE_FORMS = [
+    { form_id: "contact-us", title: "Contact us", enabled: true, discoverable: true, mode: "publish", allowed_fields: ["name", "email", "message"], submissions: 12 },
+    { form_id: "frm_q7k2m9x4w1p8z3n6", title: "Autumn party RSVP", enabled: true, discoverable: false, mode: "draft", allowed_fields: ["name", "people"], submissions: 1 }
+  ];
+  function slug(label) {
+    const s = String(label || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40);
+    return s || "field";
+  }
+  function intakeAdmin(spec) {
+    const sample = spec.sample === true || unset(spec.org) || unset(spec.ws);
+    const root = el("section", { class: "ak-root ak-intake ak-intake-admin", "data-ak-part": "root" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let gen = 0;
+    let failure = "";
+    let notice = "";
+    let failureEl = null;
+    let createHost = null;
+    const draft = { formId: "", title: "", namespace: spec.namespace || "", rows: [{ label: "", type: "text", required: false, options: "" }] };
+    async function act(work, done) {
+      failure = "";
+      notice = "";
+      try {
+        const r = await work();
+        failure = refusal(r);
+        if (!failure && done) notice = done(r) || "";
+      } catch (e) {
+        failure = refusal(e) || String(e);
+      }
+      await render();
+    }
+    function button2(label, tone, part, run) {
+      const noop = function() {
+      };
+      return el("button", { type: "button", class: "ak-btn ak-btn--" + tone, "data-ak-part": part, disabled: sample ? true : null, on: { click: sample ? noop : run } }, label);
+    }
+    function linkOf(f) {
+      if (typeof spec.link === "function") return spec.link(f);
+      const here = String(window.location.href || "").split(/[?#]/)[0];
+      return here + "?form=" + encodeURIComponent(f.form_id);
+    }
+    function countOf(f) {
+      const n = [f.submissions, f.submission_count, f.count].filter(function(v) {
+        return typeof v === "number";
+      })[0];
+      if (typeof n !== "number") return "";
+      return n === 1 ? ti("intake.answers1") : ti("intake.answers", { n });
+    }
+    async function render() {
+      const mine = ++gen;
+      let forms = [];
+      let stopText = "";
+      const lib = intakeOf();
+      if (sample) forms = SAMPLE_FORMS;
+      else if (!lib) stopText = ti("intake.noLib");
+      else if (signedOut()) stopText = ti("intake.signIn");
+      else {
+        try {
+          forms = await lib.listForms(spec.org, spec.ws);
+        } catch (e) {
+          if (!failure) failure = refusal(e) || String(e);
+        }
+      }
+      if (mine !== gen) return;
+      clear(root);
+      failureEl = null;
+      createHost = null;
+      root.appendChild(el(
+        "h3",
+        { class: "ak-intake__title", "data-ak-part": "title" },
+        [spec.title || ti("intake.adminTitle"), sample ? sampleBadge2() : null].filter(Boolean)
+      ));
+      root.appendChild(el("p", { class: "ak-intake__intro", "data-ak-part": "intro" }, sample ? ti("intake.sampleNote") : ti("intake.adminIntro")));
+      if (stopText) {
+        root.appendChild(el("p", { class: "ak-intake__none" }, stopText));
+        return;
+      }
+      failureEl = el(
+        "p",
+        { class: "ak-intake__failure", role: "alert", "data-ak-part": "failure", hidden: failure ? null : true },
+        failure ? ti("intake.failed", { why: failure }) : ""
+      );
+      root.appendChild(failureEl);
+      const noticeEl = el("p", { class: "ak-intake__notice", role: "status", "data-ak-part": "notice", hidden: notice ? null : true }, notice);
+      root.appendChild(noticeEl);
+      function tell(text2) {
+        noticeEl.textContent = text2;
+        noticeEl.hidden = false;
+      }
+      const rows = (Array.isArray(forms) ? forms : []).map(function(f) {
+        const name = f.title || f.form_id;
+        const meta = [
+          f.form_id !== name ? f.form_id : "",
+          countOf(f),
+          f.enabled === false ? ti("intake.closed") : "",
+          f.discoverable === false ? ti("intake.private") : "",
+          f.mode === "draft" ? ti("intake.draft") : ""
+        ].filter(Boolean).join(" · ");
+        return el("li", { class: "ak-intake__row", "data-ak-part": "row", "data-ak-form": f.form_id }, [
+          el("span", { class: "ak-intake__name" }, name),
+          el("span", { class: "ak-intake__meta", "data-ak-part": "meta" }, meta),
+          el("span", { class: "ak-intake__acts", "data-ak-part": "acts" }, [
+            button2(ti("intake.copy"), "ghost", "copy", function() {
+              const url = linkOf(f);
+              const clip = navigator.clipboard;
+              if (!clip || typeof clip.writeText !== "function") {
+                tell(ti("intake.copyByHand", { url }));
+                return;
+              }
+              clip.writeText(url).then(
+                function() {
+                  tell(ti("intake.copied", { url }));
+                },
+                function() {
+                  tell(ti("intake.copyByHand", { url }));
+                }
+              );
+            }),
+            button2(ti("intake.delete"), "ghost", "delete", function() {
+              ask({
+                title: ti("intake.confirmDelete", { name }),
+                text: ti("intake.confirmDeleteText"),
+                confirmLabel: ti("intake.delete"),
+                tone: "danger"
+              }).then(function(yes) {
+                if (yes) act(function() {
+                  return lib.deleteForm(spec.org, spec.ws, f.form_id);
+                }, function() {
+                  return ti("intake.deleted");
+                });
+              });
+            })
+          ])
+        ]);
+      });
+      root.appendChild(el("div", { class: "ak-intake__group", "data-ak-part": "forms" }, [
+        rows.length ? el("ul", { class: "ak-intake__rows" }, rows) : el("p", { class: "ak-intake__none" }, ti("intake.none"))
+      ]));
+      createHost = el("div", { class: "ak-intake__group ak-intake__create", "data-ak-part": "create" });
+      root.appendChild(createHost);
+      drawCreate(lib);
+    }
+    function local(text2) {
+      if (!failureEl) return;
+      failureEl.textContent = text2;
+      failureEl.hidden = false;
+      attention(failureEl, "shake");
+    }
+    function text(label, key, hint) {
+      const id = uid("ak-intake-new");
+      const input = (
+        /** @type {HTMLInputElement} */
+        el("input", { type: "text", id, class: "ak-input", value: draft[key], disabled: sample ? true : null, autocomplete: "off" })
+      );
+      input.addEventListener("input", function() {
+        draft[key] = input.value;
+      });
+      return el("div", { class: "ak-form__field" }, [
+        el("label", { class: "ak-form__label", for: id }, label),
+        input,
+        hint ? el("p", { class: "ak-form__hint" }, hint) : null
+      ].filter(Boolean));
+    }
+    function fieldRow(r, i, lib) {
+      const label = (
+        /** @type {HTMLInputElement} */
+        el("input", { type: "text", class: "ak-input ak-intake__flabel", value: r.label, "aria-label": ti("intake.fieldLabel"), placeholder: ti("intake.fieldLabel"), disabled: sample ? true : null })
+      );
+      const type = (
+        /** @type {HTMLSelectElement} */
+        el(
+          "select",
+          { class: "ak-input ak-intake__ftype", "aria-label": ti("intake.fieldType"), disabled: sample ? true : null },
+          TYPES.map(function(k) {
+            return el("option", { value: k, selected: k === r.type ? true : null }, ti("intake.type." + k));
+          })
+        )
+      );
+      type.value = r.type;
+      const reqId = uid("ak-intake-req");
+      const required = (
+        /** @type {HTMLInputElement} */
+        el("input", { type: "checkbox", id: reqId, class: "ak-check", checked: r.required ? true : null, disabled: sample ? true : null })
+      );
+      const options = (
+        /** @type {HTMLInputElement} */
+        el("input", { type: "text", class: "ak-input ak-intake__fopts", value: r.options, "aria-label": ti("intake.fieldOptions"), placeholder: ti("intake.fieldOptions"), disabled: sample ? true : null })
+      );
+      const choice = function() {
+        return r.type === "select" || r.type === "radio";
+      };
+      options.hidden = !choice();
+      label.addEventListener("input", function() {
+        r.label = label.value;
+      });
+      type.addEventListener("change", function() {
+        r.type = type.value;
+        options.hidden = !choice();
+      });
+      required.addEventListener("change", function() {
+        r.required = !!required.checked;
+      });
+      options.addEventListener("input", function() {
+        r.options = options.value;
+      });
+      return el("li", { class: "ak-intake__frow" }, [
+        label,
+        type,
+        el("span", { class: "ak-intake__check" }, [required, el("label", { for: reqId }, ti("intake.fieldRequired"))]),
+        options,
+        draft.rows.length > 1 ? button2(ti("intake.removeField"), "ghost", "removeField", function() {
+          draft.rows.splice(i, 1);
+          drawCreate(lib);
+        }) : null
+      ].filter(Boolean));
+    }
+    function drawCreate(lib) {
+      if (!createHost) return;
+      clear(createHost);
+      const save = button2(ti("intake.save"), "primary", "save", function() {
+        const id = draft.formId.trim().toLowerCase();
+        const namespace2 = draft.namespace.trim();
+        const rows = draft.rows.filter(function(r) {
+          return r.label.trim();
+        });
+        if (!rows.length) {
+          local(ti("intake.needField"));
+          return;
+        }
+        if (!namespace2) {
+          local(ti("intake.needNamespace"));
+          return;
+        }
+        if (id && !FORM_ID_RE.test(id)) {
+          local(ti("intake.badId"));
+          return;
+        }
+        const taken = {};
+        taken[HONEYPOT] = true;
+        const fields = rows.map(function(r) {
+          let key = slug(r.label);
+          for (let n = 2; taken[key]; n++) key = slug(r.label) + "_" + n;
+          taken[key] = true;
+          const out = { key, label: r.label.trim(), type: r.type, required: !!r.required };
+          const opts = String(r.options || "").split(",").map(function(s) {
+            return s.trim();
+          }).filter(Boolean);
+          if ((r.type === "select" || r.type === "radio") && opts.length) out.options = opts;
+          return out;
+        });
+        const cfg2 = {
+          organism_id: spec.org,
+          ws: spec.ws,
+          namespace: namespace2,
+          title: draft.title.trim(),
+          allowed_fields: fields.map(function(f) {
+            return f.key;
+          }),
+          required_fields: fields.filter(function(f) {
+            return f.required;
+          }).map(function(f) {
+            return f.key;
+          }),
+          fields,
+          honeypot_field: HONEYPOT
+        };
+        if (id) cfg2.form_id = id;
+        act(function() {
+          return lib.defineForm(cfg2);
+        }, function(r) {
+          draft.formId = "";
+          draft.title = "";
+          draft.rows = [{ label: "", type: "text", required: false, options: "" }];
+          return ti("intake.created", { name: r && r.form_id || id });
+        });
+      });
+      const rowOf = function(r, i) {
+        return fieldRow(r, i, lib);
+      };
+      [
+        el("h4", { class: "ak-intake__group-title" }, ti("intake.create")),
+        text(ti("intake.formTitle"), "title"),
+        text(ti("intake.formId"), "formId", ti("intake.formIdHint")),
+        spec.namespace ? null : text(ti("intake.namespace"), "namespace"),
+        el("p", { class: "ak-form__label" }, ti("intake.fields")),
+        el("ul", { class: "ak-intake__frows", "data-ak-part": "fieldRows" }, draft.rows.map(rowOf)),
+        el("div", { class: "ak-intake__bar" }, [
+          button2(ti("intake.addField"), "ghost", "addField", function() {
+            draft.rows.push({ label: "", type: "text", required: false, options: "" });
+            drawCreate(lib);
+          }),
+          save
+        ])
+      ].filter(Boolean).forEach(function(n) {
+        createHost.appendChild(n);
+      });
+    }
+    const ready2 = render().then(function() {
+      enter(root);
+    });
+    const stopWatch = watch(function() {
+      failure = "";
+      notice = "";
+      render();
+    }, root);
+    return {
+      el: root,
+      refresh: function() {
+        return ready2.then(render);
+      },
+      destroy: function() {
+        stopWatch();
+        gen += 1;
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/connections.js
+  var CAPS = ["readMail", "sendMail", "publishPost", "publishVideo", "readMetrics", "readItems"];
+  var NEEDS = ["readMail", "sendMail", "publish"];
+  var SAMPLE3 = {
+    accounts: [
+      { id: "s1", provider: "google-mail-send", mode: "personal", accountLabel: "robin@example.com", status: "active" },
+      { id: "s2", provider: "mastodon", mode: "personal", accountLabel: "@robin@mastodon.social", status: "needs_reauth" },
+      { id: "s3", provider: "linkedin", mode: "personal", accountLabel: "Robin Aho", status: "revoked" }
+    ],
+    providers: [
+      { id: "google-mail", label: "Gmail", instanceScoped: false, capabilities: ["read-mail"], attachFields: null },
+      { id: "google-mail-send", label: "Gmail (sending)", instanceScoped: false, capabilities: ["send-mail"], attachFields: null },
+      { id: "mastodon", label: "Mastodon", instanceScoped: true, capabilities: ["publish-post", "publish-video", "read-metrics"], attachFields: null },
+      { id: "linkedin", label: "LinkedIn", instanceScoped: false, capabilities: ["publish-post"], attachFields: null }
+    ]
+  };
+  function connectOf() {
+    const ns = (
+      /** @type {any} */
+      window.AIMEAT
+    );
+    return ns && ns.connect ? ns.connect : null;
+  }
+  function signedOut2() {
+    const ns = (
+      /** @type {any} */
+      window.AIMEAT
+    );
+    const auth = ns && ns.auth;
+    return !!(auth && typeof auth.getSession === "function" && !auth.getSession());
+  }
+  function sampleCaps(p) {
+    const names = p && p.capabilities || [];
+    const has = function(n) {
+      return names.indexOf(n) !== -1;
+    };
+    return {
+      readMail: has("read-mail"),
+      sendMail: has("send-mail"),
+      publish: has("publish-post") || has("publish-video"),
+      publishPost: has("publish-post"),
+      publishVideo: has("publish-video"),
+      readMetrics: has("read-metrics"),
+      readItems: has("read-items")
+    };
+  }
+  function capWords(caps) {
+    if (!caps) return "";
+    return CAPS.filter(function(k) {
+      return caps[k];
+    }).map(function(k) {
+      return ti("connect.cap." + k);
+    }).join(", ");
+  }
+  function statusOf(c) {
+    if (c.status === "active") return "active";
+    if (c.status === "needs_reauth") return "needs_reauth";
+    return "error";
+  }
+  function instanceOf(c) {
+    const m = /@([^@\s]+\.[^@\s]+)$/.exec(String(c.accountLabel || ""));
+    return m ? m[1] : void 0;
+  }
+  function connections(spec) {
+    const s = spec || {};
+    const sample = s.sample === true;
+    const need = NEEDS.indexOf(
+      /** @type {string} */
+      s.need
+    ) !== -1 ? s.need : null;
+    const root = el("section", { class: "ak-root ak-conn", "data-ak-part": "root" });
+    if (s.target) resolve(s.target).appendChild(root);
+    let gen = 0;
+    let failure = "";
+    let notice = "";
+    let working = false;
+    let noticeEl = null;
+    async function act(work, done) {
+      failure = "";
+      notice = "";
+      try {
+        const r = await work();
+        failure = refusal(r);
+        if (!failure && done) notice = done(r) || "";
+      } catch (e) {
+        failure = refusal(e) || String(e);
+      }
+      await render();
+    }
+    function button2(label, tone, part, run) {
+      const noop = function() {
+      };
+      return el("button", {
+        type: "button",
+        class: "ak-btn ak-btn--" + tone,
+        "data-ak-part": part,
+        disabled: sample || working ? true : null,
+        on: { click: sample ? noop : run }
+      }, label);
+    }
+    async function render() {
+      const mine = ++gen;
+      const lib = connectOf();
+      let stopText = "";
+      let accounts = [];
+      let providers = [];
+      const caps = /* @__PURE__ */ new Map();
+      if (sample) {
+        accounts = SAMPLE3.accounts;
+        providers = SAMPLE3.providers;
+        providers.forEach(function(p) {
+          caps.set(p.id, sampleCaps(p));
+        });
+      } else if (!lib) stopText = ti("connect.noLib");
+      else if (signedOut2()) stopText = ti("connect.signIn");
+      else {
+        try {
+          const both = await Promise.all([lib.list(), lib.providers()]);
+          accounts = both[0] || [];
+          providers = both[1] || [];
+          const read = await Promise.all(providers.map(function(p) {
+            return Promise.resolve(lib.capabilities(p)).catch(function() {
+              return null;
+            });
+          }));
+          providers.forEach(function(p, i) {
+            caps.set(p.id, read[i]);
+          });
+        } catch (e) {
+          if (!failure) failure = refusal(e) || String(e);
+        }
+      }
+      if (mine !== gen) return;
+      clear(root);
+      root.appendChild(el(
+        "h3",
+        { class: "ak-conn__title", "data-ak-part": "title" },
+        [s.title || ti("connect.title"), sample ? sampleBadge2() : null].filter(Boolean)
+      ));
+      root.appendChild(el("p", { class: "ak-conn__intro", "data-ak-part": "intro" }, sample ? ti("connect.sampleNote") : ti("connect.intro")));
+      if (need) root.appendChild(el("p", { class: "ak-conn__need", "data-ak-part": "need" }, ti("connect.need." + need)));
+      if (stopText) {
+        root.appendChild(el("p", { class: "ak-conn__none" }, stopText));
+        return;
+      }
+      if (failure) root.appendChild(el("p", { class: "ak-conn__failure", role: "alert", "data-ak-part": "failure" }, ti("connect.failed", { why: failure })));
+      noticeEl = el("p", { class: "ak-conn__notice", role: "status", "data-ak-part": "notice", hidden: notice ? null : true }, notice);
+      root.appendChild(noticeEl);
+      const byId = new Map(providers.map(function(p) {
+        return [p.id, p];
+      }));
+      root.appendChild(el("div", { class: "ak-conn__group", "data-ak-part": "accounts" }, [
+        accounts.length ? el("ul", { class: "ak-conn__rows" }, accounts.map(function(c) {
+          return row(lib, c, byId.get(c.provider), caps.get(c.provider));
+        })) : el("p", { class: "ak-conn__none" }, ti("connect.none"))
+      ]));
+      const offered = providers.filter(function(p) {
+        if (!need) return true;
+        const can = caps.get(p.id);
+        return !!(can && can[need]);
+      });
+      root.appendChild(el("div", { class: "ak-conn__group", "data-ak-part": "add" }, [
+        el("h4", { class: "ak-conn__group-title" }, ti("connect.add")),
+        offered.length ? el("ul", { class: "ak-conn__rows ak-conn__offers" }, offered.map(function(p) {
+          return offer(lib, p);
+        })) : el("p", { class: "ak-conn__none" }, need ? ti("connect.noProviders") : ti("connect.none"))
+      ]));
+    }
+    function row(lib, c, p, can) {
+      const state = statusOf(c);
+      const label = p && p.label || c.provider;
+      const reconnect = state !== "active" && !(p && p.attachFields);
+      const words = capWords(can);
+      return el("li", { class: "ak-conn__row", "data-ak-part": "row", "data-ak-status": state }, [
+        el("span", { class: "ak-conn__who", "data-ak-part": "who" }, [
+          el("span", { class: "ak-conn__mark", "aria-hidden": "true" }, String(label).slice(0, 1).toUpperCase()),
+          el("span", { class: "ak-conn__names" }, [
+            el("span", { class: "ak-conn__account" }, c.accountLabel || label),
+            el("span", { class: "ak-conn__provider" }, label)
+          ])
+        ]),
+        el("span", { class: "ak-conn__status ak-conn__status--" + state, "data-ak-part": "status" }, ti("connect.status." + state)),
+        words ? el("span", { class: "ak-conn__can", "data-ak-part": "can" }, ti("connect.can", { what: words })) : null,
+        el("span", { class: "ak-conn__acts", "data-ak-part": "acts" }, [
+          reconnect ? button2(ti("connect.reconnect"), "primary", "reconnect", function(ev) {
+            begin(lib, c.provider, { instance: p && p.instanceScoped ? instanceOf(c) : void 0 }, ev);
+          }) : null,
+          button2(ti("connect.disconnect"), "ghost", "disconnect", function() {
+            ask({
+              title: ti("connect.confirm", { account: c.accountLabel || label }),
+              text: ti("connect.confirmText", { provider: label }),
+              confirmLabel: ti("connect.disconnect"),
+              tone: "danger"
+            }).then(function(yes) {
+              if (!yes) return;
+              act(function() {
+                return lib.revoke(c.id);
+              }, function(r) {
+                return ti(r && r.toldProvider ? "connect.toldProvider" : "connect.notToldProvider", { provider: label });
+              });
+            });
+          })
+        ].filter(Boolean))
+      ].filter(Boolean));
+    }
+    function offer(lib, p) {
+      const notes = lib && lib.notes && lib.notes[p.id] || {};
+      const instance = p.instanceScoped ? (
+        /** @type {HTMLInputElement} */
+        el("input", {
+          type: "text",
+          class: "ak-input ak-conn__input",
+          "data-ak-part": "instance",
+          placeholder: ti("connect.instance"),
+          "aria-label": ti("connect.instance"),
+          autocomplete: "off",
+          disabled: sample ? true : null
+        })
+      ) : null;
+      const fields = (p.attachFields || []).map(function(f) {
+        return (
+          /** @type {HTMLInputElement} */
+          el("input", {
+            type: f.secret ? "password" : "text",
+            class: "ak-input ak-conn__input",
+            "data-field": f.name,
+            placeholder: f.placeholder || f.label,
+            "aria-label": f.label,
+            autocomplete: f.secret ? "new-password" : "off",
+            disabled: sample ? true : null
+          })
+        );
+      });
+      const go = button2(ti("connect.connectTo", { provider: p.label || p.id }), "ghost", "connect", function(ev) {
+        if (p.attachFields && p.attachFields.length) {
+          const values = {};
+          fields.forEach(function(i) {
+            values[i.getAttribute("data-field")] = i.value;
+          });
+          act(function() {
+            return lib.attach(p.id, values);
+          }, function(r) {
+            fields.forEach(function(i) {
+              i.value = "";
+            });
+            const added = r && r.connection;
+            return ti("connect.connected", { account: added && added.accountLabel || p.label });
+          });
+          return;
+        }
+        begin(lib, p.id, { instance: instance ? instance.value.trim() || void 0 : void 0 }, ev);
+      });
+      return el("li", { class: "ak-conn__row ak-conn__offer", "data-ak-part": "provider", "data-ak-provider": p.id }, [
+        el(
+          "span",
+          { class: "ak-conn__fields" },
+          /** @type {HTMLElement[]} */
+          [instance].concat(fields, [go]).filter(Boolean)
+        ),
+        notes.needs ? el("p", { class: "ak-conn__note", "data-ak-part": "providerNote" }, notes.needs) : null,
+        notes.before ? el("p", { class: "ak-conn__note", "data-ak-part": "providerNote" }, notes.before) : null
+      ].filter(Boolean));
+    }
+    function begin(lib, provider, opts, ev) {
+      if (sample || working || !lib) return;
+      working = true;
+      failure = "";
+      notice = "";
+      const btn = ev && ev.currentTarget ? (
+        /** @type {Element} */
+        ev.currentTarget
+      ) : null;
+      const round = lib.start(provider, opts || {});
+      if (noticeEl) {
+        noticeEl.textContent = ti("connect.waiting");
+        noticeEl.hidden = false;
+      }
+      whileBusy(btn, round).then(function(r) {
+        working = false;
+        const added = r && r.connection;
+        notice = r && r.connected ? ti("connect.connected", { account: added && added.accountLabel || provider }) : ti("connect.notConnected");
+        return render();
+      }, function(e) {
+        working = false;
+        notice = "";
+        failure = refusal(e) || String(e);
+        return render();
+      });
+    }
+    const ready2 = render().then(function() {
+      enter(root);
+    });
+    const stopWatch = watch(function() {
+      failure = "";
+      notice = "";
+      render();
+    }, root);
+    const lib0 = connectOf();
+    let stopLib = null;
+    if (!sample && lib0 && typeof lib0.on === "function") {
+      stopLib = lib0.on(function changed() {
+        if (!root.isConnected) {
+          if (typeof stopLib === "function") stopLib();
+          else if (typeof lib0.off === "function") lib0.off(changed);
+          return;
+        }
+        if (!working) render();
+      });
+    }
+    return {
+      el: root,
+      refresh: function() {
+        return ready2.then(render);
+      },
+      destroy: function() {
+        stopWatch();
+        if (typeof stopLib === "function") stopLib();
+        gen += 1;
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/mosaic-self.js
+  function renderSelfSourced(block, into, handles) {
+    const p = block.props || {};
+    switch (block.component) {
+      // ── The commercial side: self-sourced blocks (the app's own public legal surface, the
+      //    organism row space and the intake form the props name), no memory source to bind.
+      case "legalLinks": {
+        handles.push(legalLinks({ target: into, title: p.title }));
+        return true;
+      }
+      case "auditTrail": {
+        handles.push(auditTrail({
+          target: into,
+          org: p.org,
+          ws: p.ws,
+          space: p.space,
+          title: p.title,
+          hint: p.hint
+        }));
+        return true;
+      }
+      case "feedbackForm": {
+        handles.push(feedbackForm({
+          target: into,
+          org: p.org,
+          ws: p.ws,
+          formId: p.formId,
+          title: p.title,
+          hint: p.hint
+        }));
+        return true;
+      }
+      case "reviewerLine": {
+        handles.push(reviewerLine({ target: into }));
+        return true;
+      }
+      // ── The app's own members, over AIMEAT.iam. `roles` is a comma list, least power first.
+      case "members": {
+        handles.push(members({
+          target: into,
+          app: p.app,
+          roles: rolesOf(p.roles),
+          approveRole: p.approveRole,
+          title: p.title,
+          variant: p.variant
+        }));
+        return true;
+      }
+      case "joinRequest": {
+        handles.push(joinRequest({ target: into, app: p.app, roles: rolesOf(p.roles), title: p.title }));
+        return true;
+      }
+      // ── A workspace's people, over AIMEAT.organism.
+      case "workspaceTeam": {
+        handles.push(workspaceTeam({ target: into, org: p.org, ws: p.ws, title: p.title, variant: p.variant }));
+        return true;
+      }
+      // ── A Public Intake form and the owner's list of forms, over AIMEAT.intake.
+      case "intakeForm": {
+        handles.push(intakeForm({
+          target: into,
+          org: p.org,
+          ws: p.ws,
+          formId: p.formId,
+          title: p.title,
+          hint: p.hint
+        }));
+        return true;
+      }
+      case "intakeAdmin": {
+        handles.push(intakeAdmin({ target: into, org: p.org, ws: p.ws, namespace: p.namespace, title: p.title }));
+        return true;
+      }
+      // ── The owner's outside accounts, over AIMEAT.connect.
+      case "connections": {
+        handles.push(connections({ target: into, title: p.title, need: p.need }));
+        return true;
+      }
+      default:
+        return false;
+    }
+  }
+  function rolesOf(v) {
+    if (typeof v !== "string" || !v.trim()) return void 0;
+    return v.split(",").map(function(s) {
+      return s.trim();
+    }).filter(Boolean);
+  }
+
   // src/static/sdk-libs/atelier/mtv.js
   function rowsOf2(data) {
     if (Array.isArray(data)) return data;
@@ -13420,7 +16507,7 @@
         "aria-label": "A note with the order"
       })
     );
-    const refusal = el("p", { class: "ak-checkout__refusal", role: "alert", hidden: true });
+    const refusal2 = el("p", { class: "ak-checkout__refusal", role: "alert", hidden: true });
     const settled = el(
       "p",
       { class: "ak-checkout__settled", role: "status", hidden: true },
@@ -13447,7 +16534,7 @@
         totals,
         el("label", { class: "ak-form__label", for: noteInput.id }, "A note with the order"),
         noteInput,
-        refusal,
+        refusal2,
         placeBtn,
         settled
       ])
@@ -13614,7 +16701,7 @@
         goTo(1);
         return;
       }
-      refusal.hidden = true;
+      refusal2.hidden = true;
       const order = {
         lines: Array.isArray(data.lines) ? data.lines.slice() : [],
         shipping: chosenShip(),
@@ -13625,9 +16712,9 @@
         try {
           s.onSubmit(order);
         } catch (err) {
-          refusal.textContent = err && err.message || "The order did not go through. Try once more.";
-          refusal.hidden = false;
-          attention(refusal, "shake");
+          refusal2.textContent = err && err.message || "The order did not go through. Try once more.";
+          refusal2.hidden = false;
+          attention(refusal2, "shake");
           return;
         }
       }
@@ -13809,20 +16896,20 @@
       for (let w = 0; w < weeks; w++) {
         const row = el("div", { class: "ak-calendar__row", role: "row" });
         for (let i = 0; i < 7; i++) {
-          const day2 = isoDay(cursor);
-          const events = byDay[day2] || [];
+          const day3 = isoDay(cursor);
+          const events = byDay[day3] || [];
           const outside2 = cursor.getMonth() !== mon;
           const hover = events.map(function(e) {
             return String(e.title || "");
           }).filter(Boolean).join(" · ");
           const button2 = el("button", {
             type: "button",
-            class: "ak-calendar__day" + (outside2 ? " ak-calendar__day--out" : "") + (day2 === today ? " ak-calendar__day--today" : ""),
-            "aria-label": day2 + (events.length ? " · " + events.length : ""),
-            "aria-current": day2 === today ? "date" : null,
+            class: "ak-calendar__day" + (outside2 ? " ak-calendar__day--out" : "") + (day3 === today ? " ak-calendar__day--today" : ""),
+            "aria-label": day3 + (events.length ? " · " + events.length : ""),
+            "aria-current": day3 === today ? "date" : null,
             title: hover || null,
             on: s.onPick ? { click: function() {
-              s.onPick(day2, events);
+              s.onPick(day3, events);
             } } : void 0
           }, [
             el("span", { class: "ak-calendar__num" }, String(cursor.getDate())),
@@ -15079,8 +18166,8 @@
               title: p.title,
               weekStart: p.weekStart,
               empty,
-              onPick: spec.onPick ? function(day2, events) {
-                spec.onPick(block.id, { day: day2, events });
+              onPick: spec.onPick ? function(day3, events) {
+                spec.onPick(block.id, { day: day3, events });
               } : void 0,
               onMonth: spec.onPick ? function(month) {
                 spec.onPick(block.id, { month });
@@ -15205,39 +18292,8 @@
           }));
           return;
         }
-        // ── The commercial side: self-sourced blocks (the app's own public legal surface, the
-        //    organism row space and the intake form the props name), no memory source to bind.
-        case "legalLinks": {
-          alive.handles.push(legalLinks({ target: into, title: p.title }));
-          return;
-        }
-        case "auditTrail": {
-          alive.handles.push(auditTrail({
-            target: into,
-            org: p.org,
-            ws: p.ws,
-            space: p.space,
-            title: p.title,
-            hint: p.hint
-          }));
-          return;
-        }
-        case "feedbackForm": {
-          alive.handles.push(feedbackForm({
-            target: into,
-            org: p.org,
-            ws: p.ws,
-            formId: p.formId,
-            title: p.title,
-            hint: p.hint
-          }));
-          return;
-        }
-        case "reviewerLine": {
-          alive.handles.push(reviewerLine({ target: into }));
-          return;
-        }
         default:
+          if (renderSelfSourced(block, into, alive.handles)) return;
           console.warn('aimeat-atelier: this kit build has no renderer for "' + block.component + '" — skipping block "' + block.id + '".');
       }
     }
@@ -15684,6 +18740,344 @@
   }
   function sheet(spec) {
     return dialog({ ...spec, from: "bottom" });
+  }
+
+  // src/static/sdk-libs/atelier/workspace-picker.js
+  var SAMPLE_ORGS = [
+    { id: "sample-shop", name: "Shop team", role: "owner" },
+    { id: "sample-club", name: "Book club", role: "member" }
+  ];
+  function orgLib2() {
+    const ns = (
+      /** @type {any} */
+      window.AIMEAT
+    );
+    const o = ns && ns.organism;
+    return o && typeof o.organisms === "function" && typeof o.findOrCreateWorkspace === "function" && typeof o.remember === "function" && typeof o.recall === "function" ? o : null;
+  }
+  function identity() {
+    const ns = (
+      /** @type {any} */
+      window.AIMEAT
+    );
+    const auth = ns && ns.auth;
+    if (!auth || typeof auth.getSession !== "function") return "";
+    try {
+      const s = auth.getSession();
+      if (!s) return "";
+      return String(s.owner || s.ghii || s.user && s.user.owner || "signed-in");
+    } catch {
+      return "";
+    }
+  }
+  function workspacePicker(spec) {
+    const sample = !!spec && (spec.sample === true || !spec.app || isPlaceholder2(spec.app));
+    const variant = spec.variant === "dense" ? "dense" : "";
+    const root = el("section", {
+      class: "ak-root ak-mem ak-ws ak-ws--picker" + (variant ? " ak-ws--" + variant : ""),
+      "data-ak-part": "root",
+      "data-ak-variant": variant || null
+    });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    const wsName = String(spec.name || spec.app || "").trim();
+    let mode = "loading";
+    let choice = null;
+    let orgs = null;
+    let failure = "";
+    let typedOrg = "";
+    let who = "";
+    let gen = 0;
+    function lib() {
+      return sample ? null : orgLib2();
+    }
+    function button2(label, tone, part, run, disabled) {
+      return el("button", {
+        type: "button",
+        class: "ak-btn ak-btn--" + tone,
+        "data-ak-part": part,
+        disabled: disabled ? true : null,
+        on: { click: run }
+      }, label);
+    }
+    function report(c) {
+      if (sample || typeof spec.onReady !== "function") return;
+      try {
+        Promise.resolve(spec.onReady(c)).catch(function(e) {
+          console.error("aimeat-atelier: workspacePicker onReady failed", e);
+        });
+      } catch (e) {
+        console.error("aimeat-atelier: workspacePicker onReady failed", e);
+      }
+    }
+    function head() {
+      root.appendChild(el(
+        "h3",
+        { class: "ak-mem__title", "data-ak-part": "title" },
+        [spec.title || tw("picker.title"), sample ? sampleBadge2() : null].filter(Boolean)
+      ));
+      root.appendChild(el("p", { class: "ak-mem__intro ak-ws__explain", "data-ak-part": "intro" }, tw("picker.intro")));
+    }
+    function failureLine() {
+      if (failure) root.appendChild(el("p", { class: "ak-mem__failure", role: "alert", "data-ak-part": "failure" }, tw("failed", { why: failure })));
+    }
+    function draw() {
+      clear(root);
+      if (mode === "using" && choice) {
+        failureLine();
+        root.appendChild(el("p", { class: "ak-ws__using", "data-ak-part": "using" }, [
+          el("span", { class: "ak-ws__using-text" }, tw("picker.using", {
+            ws: choice.name || wsName,
+            org: choice.orgName || choice.orgId
+          })),
+          button2(tw("picker.change"), "ghost", "change", function() {
+            change();
+          })
+        ]));
+        return;
+      }
+      head();
+      if (mode === "noLib") {
+        root.appendChild(el("p", { class: "ak-mem__none" }, tw("noLib")));
+        return;
+      }
+      if (mode === "signedOut") {
+        root.appendChild(el("p", { class: "ak-mem__none" }, tw("picker.signIn")));
+        return;
+      }
+      if (mode === "loading" || mode === "working") {
+        root.appendChild(el(
+          "p",
+          { class: "ak-mem__none", role: "status", "data-ak-part": "working" },
+          mode === "working" ? tw("picker.working") : tw("loading")
+        ));
+        return;
+      }
+      failureLine();
+      if (sample) root.appendChild(el("p", { class: "ak-mem__hint" }, tw("sample.note")));
+      const list2 = orgs || [];
+      root.appendChild(el("div", { class: "ak-mem__group", "data-ak-part": "orgs" }, [
+        el("h4", { class: "ak-mem__group-title" }, tw("picker.choose")),
+        el("p", { class: "ak-mem__hint" }, tw("picker.wsWill", { name: wsName })),
+        list2.length ? el("ul", { class: "ak-mem__rows" }, list2.map(function(o) {
+          return el("li", { class: "ak-mem__row", "data-ak-part": "row" }, [
+            person(o.name, null),
+            el("span", { class: "ak-mem__meta" }, [el("span", { class: "ak-ws__chip", "data-ak-part": "chip" }, tw("orgRole." + o.role))]),
+            el("span", { class: "ak-mem__acts" }, [
+              button2(tw("picker.use"), "primary", "use", sample ? function() {
+              } : function() {
+                pick(o);
+              }, sample)
+            ])
+          ]);
+        })) : el("p", { class: "ak-mem__none" }, tw("picker.none"))
+      ]));
+      const input = (
+        /** @type {HTMLInputElement} */
+        el("input", {
+          type: "text",
+          class: "ak-input ak-mem__name",
+          placeholder: tw("picker.orgName"),
+          "aria-label": tw("picker.orgName"),
+          disabled: sample ? true : null,
+          autocomplete: "off",
+          maxlength: "120"
+        })
+      );
+      if (typedOrg) input.value = typedOrg;
+      root.appendChild(el("div", { class: "ak-mem__group", "data-ak-part": "create" }, [
+        el("h4", { class: "ak-mem__group-title" }, tw("picker.create")),
+        el("div", { class: "ak-mem__add" }, [
+          el("div", { class: "ak-mem__field" }, [input]),
+          button2(tw("picker.createGo"), "primary", "createGo", sample ? function() {
+          } : function() {
+            const n = input.value.trim();
+            typedOrg = n;
+            if (n) pick({ name: n });
+          }, sample)
+        ])
+      ]));
+      if (choice) {
+        root.appendChild(button2(tw("picker.cancel"), "ghost", "cancel", function() {
+          failure = "";
+          mode = "using";
+          draw();
+        }));
+      }
+    }
+    async function names(c, mine) {
+      const o = lib();
+      if (!o) return;
+      try {
+        if (!c.orgName) {
+          const list2 = orgs || await o.organisms();
+          if (mine !== gen) return;
+          orgs = orgs || list2;
+          const hit = (list2 || []).filter(function(x) {
+            return x && x.id === c.orgId;
+          })[0];
+          if (hit) c.orgName = hit.name;
+        }
+        if (!c.name && typeof o.workspaces === "function") {
+          const rows = await o.workspaces(c.orgId);
+          if (mine !== gen) return;
+          const w = (rows || []).filter(function(x) {
+            return x && x.id === c.wsId;
+          })[0];
+          if (w && w.name) c.name = w.name;
+        }
+      } catch (e) {
+        console.debug("aimeat-atelier: workspace names not read", e);
+      }
+      if (mine === gen && mode === "using" && choice === c) draw();
+    }
+    async function loadOrgs(mine) {
+      const o = lib();
+      try {
+        const list2 = await o.organisms();
+        if (mine !== gen) return;
+        orgs = Array.isArray(list2) ? list2 : [];
+      } catch (e) {
+        if (mine !== gen) return;
+        orgs = [];
+        failure = refusal(e) || String(e);
+      }
+    }
+    async function pick(target) {
+      const o = lib();
+      if (!o) return;
+      const mine = gen;
+      failure = "";
+      mode = "working";
+      draw();
+      let made;
+      try {
+        made = await o.findOrCreateWorkspace({
+          org: target.id ? target.id : { name: target.name },
+          name: wsName,
+          kind: spec.kind,
+          purpose: spec.purpose,
+          objectTypes: spec.objectTypes
+        });
+        if (mine !== gen) return;
+      } catch (e) {
+        if (mine !== gen) return;
+        failure = refusal(e) || String(e);
+        mode = "choose";
+        draw();
+        return;
+      }
+      if (!made || !made.orgId || !made.wsId) {
+        mode = "choose";
+        draw();
+        return;
+      }
+      try {
+        await o.remember(spec.app, { orgId: made.orgId, wsId: made.wsId });
+      } catch (e) {
+        failure = refusal(e) || String(e);
+      }
+      if (mine !== gen) return;
+      typedOrg = "";
+      if (made.orgCreated) orgs = null;
+      choice = {
+        orgId: made.orgId,
+        wsId: made.wsId,
+        name: made.name || wsName,
+        orgName: target.name || void 0,
+        created: !!made.created,
+        orgCreated: !!made.orgCreated,
+        recalled: false
+      };
+      mode = "using";
+      draw();
+      report(choice);
+    }
+    async function change() {
+      const mine = gen;
+      failure = "";
+      if (!orgs) {
+        mode = "loading";
+        draw();
+        await loadOrgs(mine);
+        if (mine !== gen) return;
+      }
+      mode = "choose";
+      draw();
+    }
+    async function start() {
+      const mine = ++gen;
+      failure = "";
+      choice = null;
+      orgs = null;
+      if (sample) {
+        orgs = SAMPLE_ORGS.slice();
+        mode = "choose";
+        draw();
+        return;
+      }
+      const o = lib();
+      if (!o) {
+        mode = "noLib";
+        draw();
+        return;
+      }
+      who = identity();
+      if (!who) {
+        mode = "signedOut";
+        draw();
+        return;
+      }
+      mode = "loading";
+      draw();
+      let kept = null;
+      try {
+        kept = await o.recall(spec.app, { verify: true });
+      } catch (e) {
+        if (mine !== gen) return;
+        failure = refusal(e) || String(e);
+      }
+      if (mine !== gen) return;
+      if (kept && kept.orgId && kept.wsId) {
+        choice = { orgId: kept.orgId, wsId: kept.wsId, recalled: true };
+        mode = "using";
+        report(choice);
+        draw();
+        names(choice, mine);
+        return;
+      }
+      await loadOrgs(mine);
+      if (mine !== gen) return;
+      mode = "choose";
+      draw();
+    }
+    const ready0 = start().then(function() {
+      enter(root);
+    }, function(e) {
+      failure = refusal(e) || String(e);
+      mode = "choose";
+      draw();
+    });
+    const stop = watch(function() {
+      if (!sample && identity() !== who) start();
+      else draw();
+    }, root);
+    return {
+      el: root,
+      choice: function() {
+        return choice;
+      },
+      change: function() {
+        change();
+      },
+      refresh: function() {
+        return ready0.then(start);
+      },
+      destroy: function() {
+        gen++;
+        stop();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
   }
 
   // src/static/sdk-libs/atelier/island.js
@@ -18481,7 +21875,7 @@
     scope.matches(SCROLLERS)) scrollEdge(scope);
     for (const node of scope.querySelectorAll(SCROLLERS)) scrollEdge(node);
   }
-  function watch() {
+  function watch2() {
     if (started) return true;
     if (typeof document === "undefined" || typeof ResizeObserver === "undefined") return false;
     started = true;
@@ -18504,12 +21898,20 @@
     return true;
   }
   if (typeof document !== "undefined") {
-    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", watch, { once: true });
-    else watch();
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", watch2, { once: true });
+    else watch2();
   }
 
   // src/static/sdk-libs/atelier/describe-data.js
   var PARTS = {
+    "accessState": {
+      parts: ["root", "title", "intro", "join"],
+      slots: [],
+      variants: [],
+      tokens: [],
+      fork: "Copying it out means asking AIMEAT.iam.can(cap) after init and drawing both sides yourself.",
+      file: "members.js"
+    },
     "bottomNav": {
       parts: ["root", "item"],
       slots: ["item(entry)"],
@@ -18549,6 +21951,14 @@
       tokens: ["--ak-choice-min"],
       fork: "A radio group drawn as cards; copy .ak-choices* out of workbench.css and keep role=radiogroup.",
       file: "workbench.js"
+    },
+    "connections": {
+      parts: ["root", "title", "intro", "need", "failure", "notice", "accounts", "row", "who", "status", "can", "acts", "reconnect", "disconnect", "add", "provider", "instance", "connect", "providerNote"],
+      slots: [],
+      variants: [],
+      tokens: ["--ak-conn-width"],
+      fork: "Copying it out means calling AIMEAT.connect's list(), providers(), capabilities(), start(), attach() and revoke() yourself, starting start() inside the click, and keeping the confirm before a disconnect and the words for each status.",
+      file: "connections.js"
     },
     "dialog": {
       parts: ["root", "panel", "head", "title", "close", "body", "text", "before", "after", "actions", "action"],
@@ -18590,6 +22000,22 @@
       fork: "Copy .ak-hero and .ak-hero__* out of shell.css; you keep the tokens and the scrim's mode-following arithmetic, and you give up the repeated-title claim and the picture layer an effect knows how to land on.",
       file: "hero.js"
     },
+    "intakeAdmin": {
+      parts: ["root", "title", "intro", "failure", "notice", "forms", "row", "meta", "acts", "copy", "delete", "create", "fieldRows", "addField", "removeField", "save"],
+      slots: ["link(form)"],
+      variants: [],
+      tokens: ["--ak-intake-width"],
+      fork: "Copying it out means calling AIMEAT.intake.listForms(), deleteForm() and defineForm() yourself, and building each form's link, its allowed and required fields and its honeypot.",
+      file: "intake-form.js"
+    },
+    "intakeForm": {
+      parts: ["root", "title", "hint", "failure", "form", "field", "label", "req", "input", "choice", "error", "honeypot", "bar", "send", "sent"],
+      slots: [],
+      variants: [],
+      tokens: ["--ak-intake-width"],
+      fork: "Copying it out means calling AIMEAT.intake.getForm(), fields() and submit() yourself, drawing a hidden input named form.honeypot_field and sending its value, and putting err.field on its field.",
+      file: "intake-form.js"
+    },
     "island": {
       parts: ["root", "content"],
       slots: [],
@@ -18597,6 +22023,14 @@
       tokens: ["--ak-island-pad", "--ak-island-radius"],
       fork: "Animate width, height and border-radius yourself and swap the content; you give up the spring, the separate enter and exit timing of the content, and the interruption that continues from where it was.",
       file: "island.js"
+    },
+    "joinRequest": {
+      parts: ["root", "title", "intro", "note", "send", "status"],
+      slots: [],
+      variants: [],
+      tokens: [],
+      fork: "Copying it out means reading me().requested and calling AIMEAT.iam.request(note) yourself.",
+      file: "members.js"
     },
     "kanban": {
       parts: ["root", "col", "head", "colname", "count", "well", "card", "cardtitle", "cardsub", "badge", "extra", "aside"],
@@ -18629,6 +22063,14 @@
       tokens: ["--ak-card-aspect", "--ak-card-pad"],
       fork: "Same as cardGrid; this is one card and its action row.",
       file: "grid.js"
+    },
+    "members": {
+      parts: ["root", "title", "intro", "faces", "tabs", "search", "failure", "asked", "seen", "roster", "invites", "history", "plan", "settings", "paying", "row", "who", "meta", "acts", "add", "suggest", "stranger", "more"],
+      slots: ["columns(member)", "actions[{ label, run(member), tone? }]", "sections[{ id, type, label, help?, value, onChange }]"],
+      variants: ["list", "table", "dense"],
+      tokens: ["--ak-mem-width"],
+      fork: "Copying it out means calling AIMEAT.iam's admin(), roster(), invite(), invites(), audit(), people(), plan() and setPlan() yourself, and keeping the one-click role (suggestRole), the confirm on a raise and the refusal sentence.",
+      file: "members-admin.js"
     },
     "menu": {
       parts: ["root", "item", "label", "hint", "separator", "ink"],
@@ -18797,6 +22239,22 @@
       tokens: [],
       fork: "",
       file: "menu.js"
+    },
+    "workspacePicker": {
+      parts: ["root", "title", "intro", "failure", "using", "change", "orgs", "row", "who", "chip", "use", "create", "createGo", "cancel", "working"],
+      slots: ["onReady(choice)"],
+      variants: ["dense"],
+      tokens: ["--ak-mem-width"],
+      fork: "Copying it out means calling AIMEAT.organism's recall(app, { verify: true }), organisms(), findOrCreateWorkspace() and remember() yourself, in that order, and keeping the one-line view of a remembered choice.",
+      file: "workspace-picker.js"
+    },
+    "workspaceTeam": {
+      parts: ["root", "title", "intro", "failure", "notice", "tabs", "requests", "people", "invite", "row", "who", "meta", "acts", "role", "chip"],
+      slots: ["columns(member)", "actions[{ label, run(member), tone? }]"],
+      variants: ["list", "table"],
+      tokens: ["--ak-mem-width"],
+      fork: "Copying it out means calling AIMEAT.organism's access(), decide(), grant(), revoke() and inviteByEmail() yourself, and keeping the creator unremovable, the confirm on a raise to contributor and the refusal sentence.",
+      file: "workspace-team.js"
     }
   };
 
@@ -18807,7 +22265,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.60.0",
+    version: "0.61.0",
     /**
      * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
      * named parts (every one carries `data-ak-part`, so an app's own CSS reaches it), the slots
@@ -18915,6 +22373,17 @@
     feedbackForm,
     reviewerLine,
     marksSwitches,
+    // ── The app's own members, drawn over AIMEAT.iam (the owner's screen, the ask, a members-only area) ──
+    members,
+    joinRequest,
+    accessState,
+    // ── An organism's workspace for the app: its people, and the first-run choice of where it lives ──
+    workspaceTeam,
+    workspacePicker,
+    // ── A Public Intake form and its admin list (AIMEAT.intake), the owner's outside accounts (AIMEAT.connect) ──
+    intakeForm,
+    intakeAdmin,
+    connections,
     // ── The broadcast family (the Music Television genre's parts as components) ──
     crt,
     countdown,

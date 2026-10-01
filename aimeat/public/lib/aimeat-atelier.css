@@ -49,6 +49,10 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.61.0 — 2026-10-01 — members.css joins the imports: the members components (the owner's
+ *     member screen, the visitor's ask, a members-only area), and workspace.css (a workspace's
+ *     people, the first-run choice of organism and workspace), and intake-connect.css (a Public
+ *     Intake form, the owner's list of forms, the owner's outside accounts).
  *   v0.60.0 — 2026-09-29 — No rule changed: the stylesheet names the kit's version, whose app({ logo })
  *     now takes a small inline image.
  *   v0.59.1 — 2026-09-29 — The node's marks moved onto one 46px row at the bottom-left: the
@@ -353,6 +357,9 @@
  * always lands after the rule it narrows. */
 @import url('./aimeat-atelier/custom.css');
 @import url('./aimeat-atelier/commercial.css');
+@import url('./aimeat-atelier/members.css');
+@import url('./aimeat-atelier/workspace.css');
+@import url('./aimeat-atelier/intake-connect.css');
 @import url('./aimeat-atelier/mtv.css');
 @import url('./aimeat-atelier/materials.css');
 @import url('./aimeat-atelier/parts.css');

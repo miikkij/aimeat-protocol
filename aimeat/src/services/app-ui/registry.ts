@@ -26,6 +26,11 @@
  *   import { UI_COMPONENTS, componentById } from './registry.js';
  *   import { buildUiCatalogue } from './catalogue.js';   // the catalogue reads this registry
  * @version-history
+ *   v1.22.0 — 2026-10-01 — THE MEMBERS BLOCKS (append-only, wish-library-blocks-in-the-kit-and-the-
+ *     design-book-iam-members-fi): `members`, the owner's member screen, and `joinRequest`, the
+ *     visitor's ask, self-sourced over AIMEAT.iam (atelier/members.js). Then `workspaceTeam` over
+ *     AIMEAT.organism, `intakeForm` and `intakeAdmin` over AIMEAT.intake, and `connections` over
+ *     AIMEAT.connect, all self-sourced.
  *   v1.21.0 — 2026-09-05 — Two pure moves under the 800-line cap (the file stood at 798, and the
  *     effects round adds a shelf): SIGNATURE_TOKENS to signature-tokens.ts (re-exported here) and
  *     buildUiCatalogue() to catalogue.ts (imported by its two doors from there, because a
@@ -631,6 +636,73 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
       title: text('The block\'s name in tabs, decks and canvas tiles.', 80),
       emptyTitle: text('What the empty state says when no plan is offered.', 80),
       emptyHint: text('The line under it.', 160),
+    },
+  },
+  // ── The app's own members (2026-10-01, append-only): self-sourced over AIMEAT.iam, so they bind
+  //    no memory source. The page loads aimeat-auth.js and aimeat-iam.js; the node keeps the roster.
+  {
+    id: 'members',
+    summary: "The owner's member screen: who asked for access (approve with a role, decline), who opened the app and holds no role (approve, seen it), the members with a role select and Remove (confirmed), add someone by account name, and what a stranger gets. One click on Approve grants the role with the least power. A non-owner is told only the owner manages members. A refused action shows the node's reason. Needs aimeat-iam.js on the page.",
+    maxPerLayout: 1,
+    props: {
+      app: requiredText('The app whose roster this is, "owner/file.html".', 120),
+      roles: text("The app's roles, a comma list, least power first, e.g. \"member, admin\". Leave empty when the page already called AIMEAT.iam.init.", 200),
+      approveRole: text('The role one click on Approve grants, when it is not the least powerful one.', 40),
+      variant: text('"list" (the default: tabs, faces and rows), "table" (one dense table of members) or "dense" (for a side panel).', 10),
+      title: text("The section title, when the kit's own is not wanted.", 120),
+    },
+  },
+  {
+    id: 'joinRequest',
+    summary: "The visitor's side: ask the owner for access with a note, or see \"you asked on …\", \"declined, you can ask again\" or \"you are a member\". Renders nothing for the app's owner. Needs aimeat-iam.js on the page.",
+    maxPerLayout: 1,
+    props: {
+      app: requiredText('The app to ask for, "owner/file.html".', 120),
+      roles: text("The app's roles, a comma list, least power first. Leave empty when the page already called AIMEAT.iam.init.", 200),
+      title: text("The section title, when the kit's own is not wanted.", 120),
+    },
+  },
+  {
+    id: 'workspaceTeam',
+    summary: "A workspace's people: requests to approve as viewer or contributor or decline, the people with their role (raising to contributor asks first, the creator stays), and add by account name or invite by email. Needs aimeat-organism.js on the page.",
+    maxPerLayout: 1,
+    props: {
+      org: requiredText('The organism id.', 80),
+      ws: requiredText('The workspace id.', 80),
+      title: text("The section title, when the kit's own is not wanted.", 120),
+      variant: text('"list" (the default) or "table".', 10),
+    },
+  },
+  {
+    id: 'intakeForm',
+    summary: 'A Public Intake form drawn from its public descriptor: every field type, a hidden spam trap, the error on the field it names, and the thank-you line after sending. Without formId it reads ?form= from the page address. Needs aimeat-intake.js on the page.',
+    maxPerLayout: 2,
+    props: {
+      org: requiredText('The organism id.', 80),
+      ws: requiredText('The workspace id.', 80),
+      formId: text('The form id. Leave empty to read ?form= from the page address.', 80),
+      title: text('The section title, when the form title is not wanted.', 120),
+      hint: text('One line under the title.', 300),
+    },
+  },
+  {
+    id: 'intakeAdmin',
+    summary: 'The owner list of Public Intake forms in one workspace: title, id and flags per form, copy link, delete after a confirm, and a create form with labelled fields. Needs aimeat-intake.js on the page.',
+    maxPerLayout: 1,
+    props: {
+      org: requiredText('The organism id.', 80),
+      ws: requiredText('The workspace id.', 80),
+      namespace: text('The row space new forms write into. Leave empty to let the owner type it.', 80),
+      title: text("The section title, when the kit's own is not wanted.", 120),
+    },
+  },
+  {
+    id: 'connections',
+    summary: 'The owner outside accounts (mail, social): status per account, what each can do, sign in again, disconnect after a confirm, and connect a new one. need narrows the list to the services that can do it. Needs aimeat-connect.js on the page.',
+    maxPerLayout: 1,
+    props: {
+      title: text("The section title, when the kit's own is not wanted.", 120),
+      need: text('"readMail", "sendMail" or "publish": show only the services that can do it.', 20),
     },
   },
 ];
