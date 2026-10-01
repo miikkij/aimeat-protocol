@@ -1060,6 +1060,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The component's key list, read only to delete those keys."
     },
+    "src/services/package-component-collisions.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-02 (package sale design, phase 1), the node's own read: a memory component's own key list and whether each key it names already exists, read only to refuse an install that would overwrite the owner's record. Only the record's tags are looked at; no value leaves."
+    },
     "src/services/connect-tunnel-push.ts": {
       "reads": {
         "getMemory": 1
