@@ -14,9 +14,20 @@
  *   ORDER OF CHECKS. The field list first (every missing and foreign field in one answer), then the
  *   action's permission word (catalog/action-scopes.ts), then the service, which decides whose app it
  *   is and refuses what it has always refused.
+ *
+ *   THE MEMBER ACTIONS GO THROUGH THE ROUTE. routes/app-members.ts holds the roster logic in its
+ *   handlers (the owner test, the seat cap, the grant sync, the notifications), and no service
+ *   function carries it. So those actions call the route over loopback with the session's own
+ *   bearer, through the same appManageCall() the connector and the CLI use, as aimeat_invoke and
+ *   aimeat_contact_resolve_email do. The route's scope gate and its refusals are then the answer,
+ *   so this file does not check their permission word a second time: the route's gate lets the
+ *   app's own token through without the word, and a copy here would refuse what REST allows.
  * @structure registerAppManageTool
- * @usage registerAppManageTool(mcp, storage, config, agentGaii, scopes)
+ * @usage registerAppManageTool(mcp, storage, config, agentGaii, scopes, getToken)
  * @version-history
+ *   v1.2.0 — 2026-10-01 — The member actions (members, member_set, member_remove, member_decline,
+ *     member_dismiss, member_plan_get, member_plan_set, member_sweep, member_me, member_request), over
+ *     loopback to routes/app-members.ts with the session's bearer. registerAppManageTool takes getToken.
  *   v1.1.0 — 2026-09-28 — config_get and config_set call services/app-config.ts, as the REST routes do.
  *   v1.0.0 — 2026-09-27 — Initial (wish-app-toiminnot-ilman-mcp-ty-kalua-ja-ty-kalujen-m-r-n-hallint).
  */
@@ -58,6 +69,8 @@ import { exportAppsBackupToStorage } from '../services/apps-backup-export.js';
 import {
     listSubdomainSites, createSubdomainSite, updateSubdomainSite, deleteSubdomainSite,
 } from '../services/subdomain-sites.js';
+import { appManageCall, MEMBER_ACTIONS } from '../tool-dispatch/app-manage-call.js';
+import { AimeatClient } from '../tool-dispatch/api-client.js';
 
 type Args = Record<string, unknown>;
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v ? v : undefined);
@@ -75,6 +88,7 @@ export function registerAppManageTool(
     config: AimeatConfig,
     getAgentGaii: () => string,
     scopes: string[],
+    getToken: () => string | undefined = () => undefined,
 ): void {
     const ui = new AppUiService(storage, config);
 
@@ -88,6 +102,9 @@ export function registerAppManageTool(
             const checked = checkAppManageInput(args);
             if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
             const action = checked.action;
+            // A member action's permission word is checked by its route alone (requireScopeOrOwnApp),
+            // so the answer is exactly what REST answers, owner bypass and the app's own token included.
+            if (MEMBER_ACTIONS.has(action)) return viaRoute(args);
             const word = requiredScopeForAction('aimeat_app_manage', action);
             if (word && !scopeIsCovered(scopes, word)) {
                 return toolError('SCOPE_DENIED', `action "${action}" needs the "${word}" permission, which the owner grants this agent in its settings.`);
@@ -100,6 +117,20 @@ export function registerAppManageTool(
             }
         },
     );
+
+    /**
+     * A member action: the route over loopback, as the caller. Not config.baseUrl, which would add a
+     * public-internet hop for a call that never leaves this host. The owner defaults to the caller's
+     * own account, as on the connector and the CLI.
+     */
+    async function viaRoute(args: Args): Promise<ToolAnswer> {
+        const bearer = getToken();
+        if (!bearer) return toolError('AUTH_REQUIRED', 'This session carries no credential to reach the member roster with.');
+        const client = new AimeatClient(`http://127.0.0.1:${config.port}`, bearer);
+        const out = await appManageCall(client, localAccountName(getAgentGaii()), args);
+        if (!out.ok) return toolError(out.error?.code ?? 'REFUSED', out.error?.message ?? 'The member roster refused the call.');
+        return answer(out.data ?? {});
+    }
 
     async function dispatch(action: string, args: Args): Promise<ToolAnswer> {
         const callerGaii = getAgentGaii();

@@ -21,6 +21,11 @@
  *   const checked = checkAppManageInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
+ *   2026-10-01 — The app's member roster: members, member_set, member_remove, member_decline,
+ *     member_dismiss, member_plan_get, member_plan_set and member_sweep for the owner and their
+ *     agents, member_me and member_request for anybody (routes/app-members.ts). New fields account,
+ *     role, level, offerings, expires_at, roles, seats, terms, access, roster_visibility; days and
+ *     note name their member meaning too (wish-manage-an-app-s-members-from-chat-mcp-cli-and-crewai-tools-f).
  *   2026-09-28 — config_get and config_set, with the `values` field: the config an app declares
  *     (services/app-config.ts).
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
@@ -62,13 +67,13 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     limit: { type: 'number', description: 'For audit: how many of the newest entries. Default 50, at most 500.' },
     playtest: { type: 'boolean', description: 'For audit: also open the app in a headless browser, signed out, and report what it did (about a minute).' },
     // visitors
-    days: { type: 'number', description: 'For visitors: the trailing window in days, 0 to 360. 0 is today only. Default 30.' },
+    days: { type: 'number', description: 'For visitors: the trailing window in days, 0 to 360. 0 is today only. Default 30. For member_set: how many days the membership lasts, counted from now; omit it to use the role\'s term from the plan.' },
     on: { type: 'boolean', description: 'For visitors_measure: true starts counting who opens the app; false stops and keeps what was counted.' },
     geo: { type: 'string', enum: ['off', 'country', 'region', 'city'], description: 'For visitors_measure: the place kept for each person. Choose the coarsest that answers the question. Omit to keep what it was.' },
     // ui
     detail: { type: 'array', description: UI_DETAIL_PARAM },
     layout: { type: 'object', description: 'For ui_set: the WHOLE layout { v: 1, look?, nav?, blocks: [{ id, component, props }] }. It replaces what is there; read it first with ui_get.' },
-    note: { type: 'string', description: 'For ui_set: one line on what this change was for.' },
+    note: { type: 'string', description: 'For ui_set: one line on what this change was for. For member_set: the owner\'s own note on the decision (at most 400 characters; the member does not see it). For member_request: your message to the owner, who sees it with the request.' },
     version: { type: 'number', description: 'For ui_restore: the layout version to put back (ui_set answers with the one it replaced).' },
     // settings
     name: { type: 'string', description: 'For settings: the app\'s display name. Changes it without a new version.' },
@@ -91,6 +96,17 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     organism_id: { type: 'string', description: 'For agent_deploy: the organism the deployed agent works in, when the app needs one.' },
     // config
     values: { type: 'object', description: 'For config_set: the fields to change, { "<field>": value }. A null puts a field back to its default; fields not named keep their values.' },
+    // members (routes/app-members.ts)
+    account: { type: 'string', description: 'For member_set, member_remove, member_decline and member_dismiss: the person, as an account name ("bob"), their identity ("bob@node") or one of their agents. All three mean the same person.' },
+    role: { type: 'string', description: 'For member_set: the role to give, in the app\'s own words (e.g. "member", "editor"). It starts with a letter and holds letters, digits, ".", "_" or "-", at most 40 characters. "owner" is refused: the owner already reaches everything.' },
+    level: { type: 'number', description: 'For member_set: an optional rank inside the app, where a lower number is more power. Most apps leave it out.' },
+    offerings: { type: 'array', description: 'For member_set: the offering ids this membership gives free access to. Omit it to use what the app\'s plan says for the role (member_plan_get).' },
+    expires_at: { type: 'string', description: 'For member_set: when the membership ends, as a date such as "2026-12-31T00:00:00Z". It wins over days. An empty string means it does not end.' },
+    roles: { type: 'object', description: 'For member_plan_set: each role and the offering ids a member in that role uses free, { "member": ["<offering id>"] }. A role with no entry gives nothing free.' },
+    seats: { type: 'object', description: 'For member_plan_set: each role and how many people may hold it at once, { "editor": 3 }. A role with no entry has no limit.' },
+    terms: { type: 'object', description: 'For member_plan_set: each role and how long it lasts, { "member": { "days": 30, "renewal": "manual" } }. renewal is "manual", "self-serve" or "none" and only says what is meant to happen; nothing renews or charges by itself.' },
+    access: { type: 'string', enum: ['members-free', 'free', 'members-only'], description: 'For member_plan_set: who pays for the app\'s paid calls. members-free (default): members pay nothing, everybody else pays. free: nobody pays. members-only: only members get in at all.' },
+    roster_visibility: { type: 'string', enum: ['owner', 'members'], description: 'For member_plan_set: who reads the roster. owner (default) or members, who then see names, roles and join dates only.' },
 };
 
 /** One action: its fields (true = required), its permission word (null = none), and one line. */
@@ -108,6 +124,34 @@ const F = (required: string[], optional: string[] = []): Record<string, boolean>
     Object.fromEntries([...required.map(f => [f, true] as const), ...optional.map(f => [f, false] as const)]);
 
 const SETTINGS_FIELDS = ['name', 'description', 'descriptions', 'parked', 'forkable', 'access_code', 'protection'];
+
+/**
+ * The member roster. Each action is one route of routes/app-members.ts and names the word that route
+ * asks; the route checks it and decides who is the owner, so another owner's app is refused there.
+ * Spread into APP_MANAGE_ACTIONS before the account-wide actions, so the operator actions stay last.
+ */
+const MEMBER_ACTION_SPECS: Record<string, AppManageAction> = {
+    members: { fields: F(['filename'], ['owner']), scope: 'app:write',
+        summary: 'the app\'s member roster: who holds which role, who asked to join and waits for your decision, and who opened the app without a role. Only the owner and their agents read it all; when the plan shows the roster to members, a member reads names and roles only' },
+    member_set: { fields: F(['filename', 'account', 'role'], ['owner', 'level', 'note', 'offerings', 'days', 'expires_at']), scope: 'exchange:grant',
+        summary: 'approve a person into a role, or change their role or end date. A new member is notified, and the plan\'s free access for the role is given to them; the answer says what was given and taken back. Owner only' },
+    member_remove: { fields: F(['filename', 'account'], ['owner']), scope: 'exchange:grant',
+        summary: 'remove a member: they are notified and the free access the membership gave them is taken back. A right to build the app stays. Owner only' },
+    member_decline: { fields: F(['filename', 'account'], ['owner']), scope: 'app:manage',
+        summary: 'decline a request to join. It is kept as declined, so the same person asking again is not shown as new. Owner only' },
+    member_dismiss: { fields: F(['filename', 'account'], ['owner']), scope: 'app:manage',
+        summary: 'take a person off the list of people who opened the app without a role. It blocks nobody; they appear again on their next visit. Owner only' },
+    member_plan_get: { fields: F(['filename'], ['owner']), scope: 'app:write',
+        summary: 'what membership of the app means: the free access per role, seats, terms, who pays, and who reads the roster. Owner only' },
+    member_plan_set: { fields: F(['filename', 'roles'], ['owner', 'seats', 'terms', 'access', 'roster_visibility']), scope: 'commerce:sell',
+        summary: 'replace the whole membership plan (read it first with member_plan_get). It applies to approvals from now on; people approved before keep what they have until they are approved again. Owner only' },
+    member_sweep: { fields: F(['filename'], ['owner']), scope: 'exchange:grant',
+        summary: 'close every membership whose end date has passed now, and take back its free access, instead of waiting for the hourly run. Owner only' },
+    member_me: { fields: F(['filename'], ['owner']), scope: null,
+        summary: 'your own standing in an app, yours or somebody else\'s: your role, whether you are the owner, and your request to join and its state' },
+    member_request: { fields: F(['filename', 'owner'], ['note']), scope: 'social:write',
+        summary: 'ask the owner of somebody else\'s app to let you in. The owner is notified with your note; asking again replaces the note. A member is told they already are one' },
+};
 
 export const APP_MANAGE_ACTIONS: Record<string, AppManageAction> = {
     settings: { fields: F(['filename'], ['owner', ...SETTINGS_FIELDS]), oneOf: SETTINGS_FIELDS, scope: 'app:write',
@@ -156,6 +200,7 @@ export const APP_MANAGE_ACTIONS: Record<string, AppManageAction> = {
         summary: 'the deployed instances of an agent the app declares' },
     agent_status: { fields: F(['filename', 'bundled_agent'], ['owner', 'runner_agent']), scope: null,
         summary: 'whether it is registered, when it was last seen, and its deploy state' },
+    ...MEMBER_ACTION_SPECS,
     grants: { fields: F([], []), scope: 'consent:manage',
         summary: 'the apps your owner has granted permissions to, with their permissions and spend; revoking one is the owner\'s own act on the Access page' },
     backup_export: { fields: F([], []), scope: 'app:write',
@@ -210,7 +255,7 @@ export function checkAppManageInput(input: Record<string, unknown>, extra: strin
     return { ok: false, message: `action "${actionName}" ${parts.join('. It ')}. Its fields: ${fieldList(action)}.` };
 }
 
-const DESCRIPTION = 'Manage one of your apps: its settings, search visibility, legal pages, visitors, screen layout, thumbnail, versions, forks, cost, bundled agents and backup, in one tool. Pick `action`; each action takes only its own fields, and a call with a missing or foreign field is refused with every problem named at once, so nothing is charged or changed. Actions:\n'
+const DESCRIPTION = 'Manage one of your apps: its settings, search visibility, legal pages, visitors, screen layout, thumbnail, versions, forks, cost, bundled agents, members and backup, in one tool. Two member actions work on somebody else\'s app: member_me reads your standing and member_request asks to join. Pick `action`; each action takes only its own fields, and a call with a missing or foreign field is refused with every problem named at once, so nothing is charged or changed. Actions:\n'
     + APP_MANAGE_ACTION_NAMES.map(n => `- ${n} (${fieldList(APP_MANAGE_ACTIONS[n]!)}): ${APP_MANAGE_ACTIONS[n]!.summary}.`).join('\n')
     + '\nPermissions are checked per action: an action needs the word shown by the refusal, so an agent without app:write can still read versions, lineage and agent status.'
     + AI_PROVENANCE_TOOL_NOTE;
