@@ -82,12 +82,16 @@ await test('GET /data/everything.json — the list the page reads, every group w
     const res = await fetch(`${BASE}/data/everything.json`);
     assert(res.status === 200, `status ${res.status}`);
     const data = await res.json();
-    assert(Array.isArray(data.groups) && data.groups.length === 23, `${data.groups?.length} groups`);
+    // The group count follows docs/AIMEAT-Feature-List.md, so it is held against the file's own counts and
+    // the meta file, not a literal: a literal 23 went red when the packages section became group 24.
+    assert(Array.isArray(data.groups) && data.groups.length === data.counts.groups && data.groups.length >= 20,
+        `${data.groups?.length} groups, counts says ${data.counts?.groups}`);
     assert(data.groups.every((g: any) => Array.isArray(g.rows) && g.rows.length > 0), 'every group has rows');
     const rows = data.groups.reduce((s: number, g: any) => s + g.rows.length, 0);
     assert(rows === data.counts.rows && rows > 200, `${rows} rows, counts says ${data.counts.rows}`);
     const meta = await (await fetch(`${BASE}/data/everything-meta.json`)).json();
     assert(meta.rows === rows, `meta says ${meta.rows} rows`);
+    assert(meta.groups === data.groups.length, `meta says ${meta.groups} groups`);
     assert(data.stamp === null || (typeof data.stamp.version === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data.stamp.date)), 'the stamp is a version and a date, or absent');
 });
 

@@ -57,13 +57,13 @@
       "note": "The stages, the roads and the record journey.state are defined in journey-state.ts; the home's road question and the first note's key are in the two home files."
     },
     "node:aimeat-organisms": {
-      "reviewedOn": "2026-10-01",
+      "reviewedOn": "2026-10-02",
       "watches": [
         "aimeat/src/data/organism-shapes.ts",
         "aimeat/src/services/organism-lifecycle.ts",
         "aimeat/src/services/organism-shape-apply.ts"
       ],
-      "digest": "sha256:1f184c87b15cd240aecd32af",
+      "digest": "sha256:a3d79775c1bd9cd4f2d4aad9",
       "note": "The shapes table and what each makes come from organism-shapes.ts; the shape parameter, its defaults and the refusal of an unknown shape from the lifecycle service."
     },
     "node:aimeat-welcome-pages": {
@@ -607,8 +607,8 @@
     },
     "node:aimeat-organisms": {
       "aimeat/src/data/organism-shapes.ts": "e876d870cd931846",
-      "aimeat/src/services/organism-lifecycle.ts": "62769e46c952038f",
-      "aimeat/src/services/organism-shape-apply.ts": "a1f8b5da4eb248d7"
+      "aimeat/src/services/organism-lifecycle.ts": "f37deee8382d35d0",
+      "aimeat/src/services/organism-shape-apply.ts": "14fc1dff927d3970"
     }
   }
 }

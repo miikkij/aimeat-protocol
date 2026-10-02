@@ -23,7 +23,7 @@ and its shape. Symptom first in the section too, then cause, then the rule.
 2. **A test or a measurement that cannot fail.** A test nobody saw red, a fixture smaller than the limit it tests, a comparison two empty results satisfy, a concurrency test run on sqlite only, a flag tested switched on only, a sweep total read as a regression. *Ask which line of the change turns the test red when it is reverted.* §12, 17, 18, 19, 21, 26, 34, 35, 37, 38, 45, 46, 50, 51, 54, 56, 57, 69, 72, 79, 89, 90, 91, 94, 99, 100
 3. **One rule, N doors, and one forgets.** A rule changed in one place while other doors reach the same capability: the REST route, the node MCP tool, the connector MCP tool, the CLI dispatch, an operator door, a second writer of the same record, a second backend. *Grep the capability's name and ask whether every door goes through the changed code.* §3, 7, 8b, 25, 33, 41, 44, 47, 48, 52, 58, 78, 81, 97
 4. **A name is not a principal.** A comparison or a storage key built from `req.auth.owner`, `sub`, a bare account name, a delivery target or a display identity where the holder or the addressed principal is meant. *Ask what the value holds for an agent, an app grant, a federated session and a namesake.* §6, 22, 43, 53, 66, 83, 103
-5. **Parallel sessions and the machine.** A hardcoded port, a probe that binds narrower than the server, a file or a log used as state, a path from the other shell's world, a recursive delete near a link. *Ask what happens when a second session runs the same thing on this machine at the same moment.* §13, 14, 23, 32, 38b, 39, 60, 71, 77b
+5. **Parallel sessions and the machine.** A hardcoded port, a probe that binds narrower than the server, a file or a log used as state, a path from the other shell's world, a recursive delete near a link. *Ask what happens when a second session runs the same thing on this machine at the same moment.* §13, 14, 23, 32, 38b, 39, 60, 71, 77b, 105
 
 ## Symptom index
 
@@ -137,6 +137,7 @@ and its shape. Symptom first in the section too, then cause, then the rule.
 | 102 | Every write into a workspace space refused although its schema says additional properties are allowed | 1 |
 | 103 | A peer "proven" by its /.well-known card, and still not the node its id names | 4 |
 | 104 | A ratchet check refuses a count you lowered, right after a rebase that said it succeeded | 1 |
+| 105 | A suite's own node gets EADDRINUSE on a number no file names, Postgres sweep only | 5 |
 
 ---
 
@@ -1181,3 +1182,12 @@ Two SESSIONS in one checkout is forbidden now (`CLAUDE.md`), so the case below i
 - **Why it hid.** The conflict hunk shown was about two other lines in a different entry, the rebase reported success, and nothing between the resolution and the gate reads the file.
 - **The rule.** A ratchet file under `security/` or a generated file is never resolved by taking one side whole. Regenerate the generated file after the rebase (`pnpm build:ui-library`, `pnpm build:everything`, `pnpm generate:types`), and for a ratchet count run its own check with `--shrink` or merge the entries by hand, then run `pnpm check:fast` before the full gate.
 - **The tell.** `git checkout --ours` or `--theirs` on a file under `security/` or on a `*.generated.ts` during a rebase.
+
+## 105. A fixed port for a suite's own node, held by a database connection, on one backend only
+
+*Symptoms: a suite that spawns a second node fails in the nightly sweep with `could not listen on port 41104: EADDRINUSE`, on the Postgres backend only, on some nights and not others, always on the same number, and passes alone.*
+
+- **The case.** e2e-capability-webhook-update started its allowlist node on `41100 + lane port % 100`, and e2e-capabilities on `41000 + …`. Both blocks were chosen to keep the two suites apart (§38b had already cost one collision between them). On the Postgres sweeps of 2026-09-30 and 2026-10-02 port 41104 was taken anyway, and no suite names it.
+- **The cause.** Linux gives out the local port of every outgoing TCP connection from 32768 to 60999. The Postgres sweep keeps many connections open to one address, and Linux picks local ports for connections to one address from a starting point derived from that address, so the same numbers come up night after night. A port in that range is free only until a connection takes it. The SQLite sweep opens far fewer connections, which is why it never failed.
+- **The rule.** A node a suite starts for itself takes a port from the operating system: `freePort()` in `aimeat/test/helpers/free-port.ts`, which binds port 0 on every address, as the node does (§77b). A fixed number between 32768 and 60999 is never safe on Linux, however carefully it is kept apart from the other suites.
+- **The tell.** `EADDRINUSE` on a number no file names, in one backend's sweep only.
