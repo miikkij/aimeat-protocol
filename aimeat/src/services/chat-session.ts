@@ -29,6 +29,14 @@
  * @usage
  *   for await (const u of runChatTurn({ storage, config }, ownerName, threadId, text)) { … }
  * @version-history
+ *   v1.8.0 — 2026-10-02 — The node speaks in the turn and the turn has a ceiling
+ *     (services/chat-turn-guard.ts). A progress line within 1.5 s and one per kind of step, in the
+ *     page's language; a note asks the model to write between its steps and says how a new agent is
+ *     proposed; past the main phase's limit the turn is cancelled and the agent asked, in the same
+ *     session, to answer from what it found; past that, the node ends the turn in words of its own.
+ *     The words after a round of tool calls start a new paragraph. Measured on deepseek-v4-pro on
+ *     the node route: the agent request went from first words at 141.8 s and no proposal to a line
+ *     at 1.7 s and a proposal at 64.7 s.
  *   v1.7.0 — 2026-09-29 — Attachments are read through the classification reader (TARGET-082).
  *   v1.6.0 — 2026-09-28 — System 2 plan, V5: without the shared key each person's turns run in a
  *     process of their own whose model calls go through /v1/llm with their chat token, so the model
@@ -58,7 +66,12 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { GooseAcpClient, aimeatMcpServer, type SessionUpdate } from './goose-acp.js';
+import { GooseAcpClient, aimeatMcpServer, type PromptImage, type SessionUpdate } from './goose-acp.js';
+import {
+    TURN_LIMITS, TurnWatch, stepForTool, turnNote, wrapUpPrompt, withTicks, progressText, stoppedText,
+    type GuardReason, type NodeUpdate, type ProgressStep,
+} from './chat-turn-guard.js';
+import { DEFAULT_LOCALE, type Locale } from '../i18n.js';
 import { CHAT_AGENT_NAME, ensureChatAgent, mintChatAgentToken } from './chat-agent.js';
 import { AgentPool, type AgentLease, type PoolStart } from './chat-agent-pool.js';
 import { chatUsesSharedKey } from './goose-env.js';
@@ -70,6 +83,18 @@ import { systemReader } from './classification/reader.js';
 import { logger } from '../utils/logger.js';
 
 export interface ChatDeps { storage: Storage; config: AimeatConfig }
+
+/** What a turn streams: the agent's own updates, and the node's progress and guard events. */
+export type ChatUpdate = SessionUpdate | NodeUpdate;
+
+/** How one phase of a turn ended: its `done` or `error`, the limit it reached, and whether goose ignored the cancel. */
+interface PhaseEnd { end: SessionUpdate | null; limit: GuardReason | null; stuck: boolean }
+
+/** What goes before a new paragraph so that it is one: nothing at the start, or after a blank line. */
+function paragraphBreak(answer: string): string {
+    if (!answer || answer.endsWith('\n\n')) return '';
+    return answer.endsWith('\n') ? '\n' : '\n\n';
+}
 
 /** How long a person's own agent process stays up with no turn in flight. */
 export const CHAT_AGENT_IDLE_MS = 15 * 60_000;
@@ -208,9 +233,10 @@ async function sessionFor(
  */
 export async function* runChatTurn(
     deps: ChatDeps, ownerName: string, threadId: string, text: string, signal?: AbortSignal,
-    attachmentKeys: string[] = [],
-): AsyncGenerator<SessionUpdate> {
+    attachmentKeys: string[] = [], opts: { locale?: Locale } = {},
+): AsyncGenerator<ChatUpdate> {
     const { storage, config } = deps;
+    const locale = opts.locale ?? DEFAULT_LOCALE;
     if (!chatEnabled(config)) {
         yield { kind: 'error', message: 'This node has no chat agent configured.' };
         return;
@@ -289,24 +315,110 @@ export async function* runChatTurn(
     const cards = new Map<string, { kind: string; title: string; url?: string; image?: string; ref?: string }>();
     let answer = '';
 
-    try {
-        for await (const update of acp.prompt(sessionId, prompt, images)) {
-            if (update.kind === 'text') answer += update.text;
-            if (update.kind === 'tool_call') {
-                const key = update.id || update.title;
-                const seen = tools.get(key);
-                if (seen) {
-                    seen.status = update.status;
-                    if (update.title) seen.title = update.title;
+    // WHAT THE PERSON SEES BEFORE THE AGENT SPEAKS (services/chat-turn-guard.ts). A reasoning model
+    // spends 15 to 35 s per round and writes its words at the end, so without these lines a turn of
+    // several rounds is minutes of nothing. They are progress events, not words: the record keeps
+    // only what the agent wrote.
+    const startedAt = Date.now();
+    let lastVisibleAt = startedAt;
+    let lastStep: ProgressStep | null = null;
+    let spoke = false;
+    // Set by a tool call, cleared by words: the words after a round of tool calls are a new
+    // paragraph, not the end of the sentence before the calls.
+    let callsSinceWords = false;
+    const progress = (step: ProgressStep): NodeUpdate => {
+        lastStep = step;
+        lastVisibleAt = Date.now();
+        spoke = true;
+        return { kind: 'progress', step, text: progressText(locale, step) };
+    };
+
+    /**
+     * One phase of the turn: one prompt, read to its end, cancelled when the watch says its limit is
+     * reached. The phase's own `done` or `error` is returned rather than yielded, because the caller
+     * decides whether it is the end of the turn or the start of the answer phase.
+     */
+    async function* phase(text: string, imgs: PromptImage[], watch: TurnWatch): AsyncGenerator<ChatUpdate, PhaseEnd> {
+        let limit: GuardReason | null = null;
+        let cancelledAt = 0;
+        for await (const update of withTicks(acp.prompt(sessionId, text, imgs), 1_000)) {
+            const now = Date.now();
+            if (update.kind === 'tick') {
+                // A goose that does not end the turn after a cancel is left behind, and the turn ends.
+                if (cancelledAt && now - cancelledAt > 15_000) return { end: null, limit, stuck: true };
+                if (!spoke && now - startedAt >= TURN_LIMITS.firstLineMs) yield progress('start');
+                else if (now - lastVisibleAt >= TURN_LIMITS.quietMs && lastStep !== 'thinking' && !watch.inFlight) yield progress('thinking');
+            } else {
+                watch.observe(update, now);
+                if (update.kind === 'done' || update.kind === 'error') return { end: update, limit, stuck: false };
+                if (update.kind === 'text') {
+                    const out = callsSinceWords ? { ...update, text: `${paragraphBreak(answer)}${update.text.replace(/^\n+/, '')}` } : update;
+                    answer += out.text;
+                    callsSinceWords = false;
+                    spoke = true;
+                    lastVisibleAt = now;
+                    lastStep = null;
+                    yield out;
                 } else {
-                    tools.set(key, { title: update.title, status: update.status });
+                    if (update.kind === 'tool_call') {
+                        callsSinceWords = true;
+                        const key = update.id || update.title;
+                        const seen = tools.get(key);
+                        if (seen) {
+                            seen.status = update.status;
+                            if (update.title) seen.title = update.title;
+                        } else {
+                            tools.set(key, { title: update.title, status: update.status });
+                            const step = stepForTool(update.title);
+                            if (step && step !== lastStep) yield progress(step);
+                        }
+                        // Keyed by what it points at, so the same thing published twice in one turn
+                        // is one card rather than two identical ones.
+                        if (update.card) cards.set(update.card.url ?? update.card.ref ?? update.card.title, update.card);
+                    }
+                    yield update;
                 }
-                // Keyed by what it points at, so the same thing published twice in one turn is one
-                // card rather than two identical ones.
-                if (update.card) cards.set(update.card.url ?? update.card.ref ?? update.card.title, update.card);
             }
-            yield update;
+            if (!limit && !signal?.aborted) {
+                limit = watch.reached(now);
+                if (limit) {
+                    cancelledAt = now;
+                    logger.info(`[chat] ${gaii}: turn limit reached (${limit}) after ${watch.toolCalls} tool call(s), ${Math.round((now - startedAt) / 1000)}s`);
+                    void acp.cancel(sessionId);
+                }
+            }
         }
+        return { end: null, limit, stuck: false };
+    }
+
+    try {
+        const main = yield* phase(`${prompt}\n\n${turnNote()}`, images, new TurnWatch({
+            toolCalls: TURN_LIMITS.softToolCalls, rounds: TURN_LIMITS.softRounds, ms: TURN_LIMITS.softMs,
+        }, startedAt));
+        let end = main.end;
+
+        // THE CEILING. The main phase ran out, so the agent is asked once more, in the same session,
+        // to answer from what it found; past the answer phase's own limit the node ends the turn in
+        // words of its own. A person who pressed Stop is not asked anything further.
+        const finishedAnyway = main.end?.kind === 'done' && main.end.stopReason !== 'cancelled';
+        if (main.limit && !signal?.aborted && !finishedAnyway) {
+            yield { kind: 'guard', phase: 'wrap_up', reason: main.limit, text: progressText(locale, 'wrappingUp') };
+            yield progress('wrappingUp');
+            callsSinceWords = true;
+            const wrap = main.stuck ? null : yield* phase(wrapUpPrompt(main.limit), [], new TurnWatch({
+                toolCalls: TURN_LIMITS.wrapUpToolCalls, rounds: 2, ms: TURN_LIMITS.wrapUpMs,
+            }, Date.now()));
+            end = wrap?.end ?? null;
+            if (!wrap || wrap.limit || end?.kind === 'error') {
+                const stopped = stoppedText(locale);
+                const words = `${paragraphBreak(answer)}${stopped}`;
+                answer += words;
+                yield { kind: 'text', text: words };
+                yield { kind: 'guard', phase: 'stopped', reason: wrap?.limit ?? main.limit, text: stopped };
+                end = { kind: 'done', stopReason: 'max_turn_requests' };
+            }
+        }
+        if (end) yield end;
     } finally {
         signal?.removeEventListener('abort', onAbort);
         lease.release();

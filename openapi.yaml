@@ -11707,6 +11707,17 @@ paths:
         `{ kind: 'error', message }` when the turn could not run — a node with no agent configured
         answers with exactly that rather than hanging. `:keepalive` comments arrive every 15 s.
 
+        The node adds two of its own. `{ kind: 'progress', step, text }` says what the agent is
+        doing before it says so itself: `start` within 1.5 s when no words have come, then
+        `reading`, `proposing`, `writing` or `working` as a tool call of that kind starts,
+        `thinking` after 20 s of silence, `wrappingUp` at the ceiling. `{ kind: 'guard', phase,
+        reason, text }` marks the ceiling: past 12 tool calls, 3 rounds of them or 100 s
+        (`reason` tool_calls, rounds or time) the turn is cancelled and the agent asked, in the same
+        session, to answer from what it found (`phase: wrap_up`); when that answer phase passes 3
+        tool calls or 45 s, the node ends the turn with a line of its own (`phase: stopped`) and
+        `done` carries `stopReason: max_turn_requests`. `text` is in the language `lang` names.
+        Progress lines are not saved; the stopped line is part of the saved answer.
+
         The person's own words are written to the conversation before the agent is asked anything,
         so a turn that fails halfway leaves a record of what was said. Owner sessions only.
       requestBody:
@@ -11731,6 +11742,12 @@ paths:
                     Which starter button fired this turn (page | work | connect), for the
                     write-once onboarding.first_chat_turn funnel marker. Omitted when the person
                     typed their own words.
+                lang:
+                  type: string
+                  enum: [en, fi, es]
+                  description: >-
+                    The language of the lines the node writes into the turn (progress, and the
+                    stopped line). The page sends its own language. Accept-Language when omitted.
       responses:
         '200':
           description: SSE stream of turn updates

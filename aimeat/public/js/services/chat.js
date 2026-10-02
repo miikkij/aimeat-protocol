@@ -17,6 +17,8 @@
  *   import * as chat from '/js/services/chat.js';
  *   for await (const u of chat.streamTurn(threadId, 'build me pong')) { … }
  * @version-history
+ *   v1.4.0 — 2026-10-02 — streamTurn sends the page's language, so the node's own lines in the turn
+ *     (progress, and the stopped line) are in it.
  *   v1.3.0 — 2026-08-16 — uploadAttachment(): any file, not only a picture.
  *   v1.2.0 — 2026-08-16 — uploadImage(): an attached picture takes the presigned road to the owner's
  *     own storage, and the turn carries its key. The model gets the bytes from the node.
@@ -25,6 +27,7 @@
  */
 import { api, apiGet } from '/js/api.js';
 import { authHeaders, getNodeUrl } from '/js/services/auth.js';
+import { getLocale } from '/js/i18n.js';
 
 const enc = encodeURIComponent;
 
@@ -66,7 +69,8 @@ export async function resetThread(id) {
  * Send one message and yield each update as it arrives.
  *
  * Yields the server's own events: `text` and `thought` as words are written, `tool_call` as each
- * call starts and finishes, `done` at the end, and `error` when the turn could not run. A turn that
+ * call starts and finishes, `progress` when the node says what the agent is doing, `guard` when the
+ * turn's ceiling is reached, `done` at the end, and `error` when the turn could not run. A turn that
  * ends without a verdict yields one `error` of its own rather than stopping silently, because a
  * conversation that just stops is indistinguishable from one still thinking.
  *
@@ -79,6 +83,7 @@ export async function* streamTurn(id, text, signal, attachments = [], starter) {
         headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream', ...authHeaders() },
         body: JSON.stringify({
             text,
+            lang: getLocale(),
             ...(attachments.length ? { attachments } : {}),
             ...(starter ? { starter } : {}),
         }),

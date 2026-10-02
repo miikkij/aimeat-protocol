@@ -16,6 +16,8 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   2026-10-02: A `progress` event (the node's line about what the agent is doing) is kept in the
+ *     live turn and shown before the agent's first words.
  *   2026-09-27: The page writes no class: the copy of the conversation is ConversationCopy (the
  *     rail's link, the head's icon), the phone's notice is AiNotice `main`, the ceiling's two ways
  *     are ConversationCap `ways`; the markup and the look are unchanged (page group G9, a move).
@@ -170,7 +172,7 @@ export default function ChatView() {
     const [thread, setThread] = useState(null);
     const [draft, setDraft] = useState('');
     const [busy, setBusy] = useState(false);
-    const [live, setLive] = useState({ text: '', thought: '', tools: [], cards: [] });
+    const [live, setLive] = useState({ text: '', thought: '', progress: '', tools: [], cards: [] });
     const [failure, setFailure] = useState('');
     const [loading, setLoading] = useState(true);
     // On a phone the conversation takes the whole screen, so the list is a separate place rather
@@ -216,7 +218,7 @@ export default function ChatView() {
         if (seq !== openSeqRef.current) return;   // a later open won; this answer is stale
         setThread(res?.data?.thread ?? null);
         setFailure('');
-        setLive({ text: '', thought: '', tools: [], cards: [] });
+        setLive({ text: '', thought: '', progress: '', tools: [], cards: [] });
     }, []);
 
     // First load: what this node offers, and where the person left off.
@@ -362,7 +364,7 @@ export default function ChatView() {
         setDraft('');
         setFailure('');
         setBusy(true);
-        setLive({ text: '', thought: '', tools: [], cards: [] });
+        setLive({ text: '', thought: '', progress: '', tools: [], cards: [] });
         setThread((prev) => (prev ? {
             ...prev,
             turns: [...(prev.turns ?? []), { role: 'user', text, at: new Date().toISOString() }],
@@ -388,6 +390,9 @@ export default function ChatView() {
                     setLive((l) => ({ ...l, text: answer }));
                 } else if (update.kind === 'thought') {
                     setLive((l) => ({ ...l, thought: update.text }));
+                } else if (update.kind === 'progress') {
+                    // The node's own line about what the agent is doing, in the page's language.
+                    setLive((l) => ({ ...l, progress: update.text }));
                 } else if (update.kind === 'tool_call') {
                     // By id, not title: a call arrives once as it starts and once as it finishes,
                     // and only the first carries a title.
@@ -417,7 +422,7 @@ export default function ChatView() {
         } finally {
             abortRef.current = null;
             setBusy(false);
-            if (stillOpen()) setLive({ text: '', thought: '', tools: [], cards: [] });
+            if (stillOpen()) setLive({ text: '', thought: '', progress: '', tools: [], cards: [] });
             // Read the conversation back from the node: it is the record, and what it holds is what
             // was actually saved rather than what this page happened to see.
             try {
@@ -662,7 +667,7 @@ export default function ChatView() {
                         <//>` : ''}
 
                     ${turns.map((turn, i) => html`<${Turn} key=${i} id=${`${thread?.id}-${i}`} turn=${turn} />`)}
-                    <${LiveTurn} text=${live.text} thought=${live.thought} tools=${live.tools} cards=${live.cards} busy=${busy} />
+                    <${LiveTurn} text=${live.text} thought=${live.thought} progress=${live.progress} tools=${live.tools} cards=${live.cards} busy=${busy} />
                     ${!busy && html`<${Choices} options=${openChoices} disabled=${disabled}
                         onPick=${(opt) => send(opt)} />`}
                     <${TurnError} message=${failure}

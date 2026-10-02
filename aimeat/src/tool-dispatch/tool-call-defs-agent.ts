@@ -5,6 +5,7 @@
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
  *   2026-10-02 -- aimeat_agent_runtime_report forwards `llm` ('node' | 'machine').
+ *   2026-10-02 -- aimeat_agent_propose gives the smallest crew_def that runs, as the catalog does.
  *   2026-10-02 -- aimeat_agent_scope_narrow: a `*` agent narrowed to the permissions it used.
  *   2026-10-02 -- aimeat_task_create forwards `start`; aimeat_task_start and aimeat_agent_task_start_set:
  *     whether a task starts on its own or waits for the owner's OK (services/agent-task-rules.ts).
@@ -250,7 +251,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_agent_propose',
-        description: "How a new agent is made on this node: when the person asks for one, propose it here, never through an outside agent builder or another product. First read what it will work on (aimeat_organism_list, aimeat_workspace_list) and name that data in purpose and crew_def. Scopes: what the job needs plus memory:write, which the crew runtime writes its result with; no agent:write unless the job is making or changing agents. Creates nothing: only their own press creates it, seeds its definition and hands it to their connector. Then give them approval_url from the answer. Send crew_def with it whenever you can: an agent approved without one exists and cannot run.",
+        description: "How a new agent is made on this node: when the person asks for one, propose it here, never through an outside agent builder or another product. First read what it will work on (aimeat_organism_list, aimeat_workspace_list) and name that data in purpose and crew_def. Scopes: what the job needs plus memory:write, which the crew runtime writes its result with; no agent:write unless the job is making or changing agents. Creates nothing: only their own press creates it, seeds its definition and hands it to their connector. Then give them approval_url from the answer. Send crew_def with it whenever you can: an agent approved without one exists and cannot run. The smallest crew_def that runs: {\"agents\":[{\"role\":\"Reader\",\"goal\":\"…\",\"backstory\":\"…\",\"tools\":[\"memory\"]}],\"tasks\":[{\"id\":\"main\",\"agent\":\"Reader\",\"description\":\"… {{ctx.prompt}} …\",\"expected_output\":\"…\"}]}; each task's `agent` is one of the agents' role (or name), and at least one task's description contains {{ctx.prompt}}, which becomes each run's own task text.",
         input: {
             name: { type: 'string', required: true, description: 'The agent name: 3 to 40 characters, lowercase letters, digits and hyphens, starting with a letter.' },
             purpose: { type: 'string', required: true, description: 'What this agent is for, in a sentence the owner can decide from.' },

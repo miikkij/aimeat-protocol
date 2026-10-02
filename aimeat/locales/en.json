@@ -22538,5 +22538,17 @@
     "row.draftPreviewFailed": "The draft could not be opened.",
     "cortex.chipMeta": "{libs} lib · {schemas} schema",
     "wc.shotAlt": "App screenshot"
+  },
+  "chatTurn": {
+    "progress": {
+      "start": "On it. I'll look at what you have here first.",
+      "reading": "Reading your workspaces, memory and apps.",
+      "proposing": "Writing the proposal for the new agent.",
+      "writing": "Saving the change you asked for.",
+      "working": "Working on what you asked.",
+      "thinking": "Still working out how best to do this.",
+      "wrappingUp": "This is taking a while, so I'll answer now with what I have."
+    },
+    "stopped": "I stopped here because this took too long, and my answer is not finished. Say \"continue\" and I go on from here, or ask again in smaller parts."
   }
 }

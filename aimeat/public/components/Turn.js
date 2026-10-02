@@ -9,6 +9,8 @@
  *   TurnError({ message, onRetry })
  * @usage html`<${Turn} key=${i} id=${`${thread.id}-${i}`} turn=${turn} />`
  * @version-history
+ *   v1.2.0 — 2026-10-02 — LiveTurn shows the node's progress line before the agent's first words, in
+ *     the place and look the thought fragment had, and in the status line after them.
  *   v1.1.0 — 2026-09-24 — Try again is the underlined action link (Jouni's decision "Panel action").
  *   v1.0.0 — 2026-09-23 — Moved out of views/chat/parts.js with its markup unchanged (UI
  *     consolidation phase 1, a move).
@@ -109,17 +111,20 @@ export function Turn({ turn, id }) {
  * A person watching a spinner for four minutes cannot tell work from a hang, so the live turn shows
  * the words as they are written and each tool call as it starts.
  */
-export function LiveTurn({ text, thought, tools, cards, busy }) {
+export function LiveTurn({ text, thought, progress, tools, cards, busy }) {
     if (!busy && !text && (!tools || tools.length === 0)) return null;
+    // Before the agent's first words: the node's line about what it is doing, which is a sentence,
+    // over the latest thought chunk, which is a fragment of a few characters.
+    const before = progress || thought;
     return html`
         <div class="poster-turn poster-turn--agent poster-turn--live">
             <div class="poster-turn-body">
                 ${text ? html`<${Markdown} text=${stripChoices(text)} />` : ''}
-                ${!text && thought ? html`<p class="poster-turn-thinking">${thought}</p>` : ''}
-                ${!text && !thought && busy ? html`<p class="poster-turn-thinking">${tr('chat.working', 'Working…')}</p>` : ''}
+                ${!text && before ? html`<p class="poster-turn-thinking">${before}</p>` : ''}
+                ${!text && !before && busy ? html`<p class="poster-turn-thinking">${tr('chat.working', 'Working…')}</p>` : ''}
                 <${ResultCards} cards=${cards} />
                 <${WorkLog} tools=${tools} />
-                ${busy && html`<${LiveStatus} tools=${tools} hasText=${!!text} />`}
+                ${busy && html`<${LiveStatus} tools=${tools} hasText=${!!text} progress=${progress} />`}
             </div>
         </div>
     `;
@@ -135,7 +140,7 @@ export function LiveTurn({ text, thought, tools, cards, busy }) {
  * been at it, ticking. The number is the part that cannot be faked by a spinner that would keep
  * spinning after the connection died.
  */
-function LiveStatus({ tools, hasText }) {
+function LiveStatus({ tools, hasText, progress }) {
     const [seconds, setSeconds] = useState(0);
     useEffect(() => {
         const started = Date.now();
@@ -144,11 +149,15 @@ function LiveStatus({ tools, hasText }) {
     }, []);
 
     const running = (tools ?? []).filter(t => t.status !== 'completed' && t.status !== 'failed');
-    const what = running.length > 0
-        ? tr('chat.busyTool', 'running {t}').replace('{t}', running[running.length - 1].title)
-        : hasText
-            ? tr('chat.busyWriting', 'writing the answer')
-            : tr('chat.busyThinking', 'thinking');
+    // Once the agent has written, the body shows its words, so the node's latest progress line
+    // ("reading your workspaces", "answering with what I have") moves here rather than vanishing.
+    const what = hasText && progress
+        ? progress
+        : running.length > 0
+            ? tr('chat.busyTool', 'running {t}').replace('{t}', running[running.length - 1].title)
+            : hasText
+                ? tr('chat.busyWriting', 'writing the answer')
+                : tr('chat.busyThinking', 'thinking');
     const clock = seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 
     return html`

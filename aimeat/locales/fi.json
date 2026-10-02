@@ -22507,5 +22507,17 @@
     "row.draftPreviewFailed": "Luonnosta ei voitu avata.",
     "cortex.chipMeta": "{libs} kirjastoa · {schemas} skeemaa",
     "wc.shotAlt": "Kuvakaappaus sovelluksesta"
+  },
+  "chatTurn": {
+    "progress": {
+      "start": "Selvä. Katson ensin, mitä sinulla on täällä.",
+      "reading": "Luen työtilojasi, muistiasi ja sovelluksiasi.",
+      "proposing": "Kirjoitan ehdotuksen uudesta agentista.",
+      "writing": "Tallennan muutoksen, jota pyysit.",
+      "working": "Teen sitä, mitä pyysit.",
+      "thinking": "Mietin vielä, miten tämä kannattaa tehdä.",
+      "wrappingUp": "Tämä vie aikaa, joten vastaan nyt sillä, mitä jo tiedän."
+    },
+    "stopped": "Lopetin tähän, koska tämä kesti liian kauan, eikä vastaukseni ole valmis. Sano \"jatka\", niin jatkan tästä, tai kysy asia pienemmissä osissa."
   }
 }

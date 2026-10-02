@@ -37,6 +37,9 @@
  *   NODE_OPTIONS="--import tsx --import file:///…/test/helpers/fake-goose-acp.ts"
  *   FAKE_GOOSE_LOG=<path to a JSONL file>
  * @version-history
+ *   v1.3.0 — 2026-10-02 — `session/cancel` is obeyed as the notification ACP defines and refused as a
+ *     request, as goose 1.50.0 refuses it. LOOPTOOLS and LOOPALL are a model that reads until it is
+ *     stopped, for the chat's turn ceiling.
  *   v1.2.0 — 2026-09-28 — System 2 plan, V5: every record carries the process id, the started record
  *     carries the OPENAI_* settings, and an LLMCALL turn calls the node's /v1/llm with them.
  *   v1.1.0 — 2026-09-16 — The started record lists any AIMEAT_* or DATABASE_URL it was given.
@@ -109,6 +112,8 @@ async function runPeer(): Promise<void> {
     const pending = new Map<number, (msg: JsonRpcMessage) => void>();
     /** Turns waiting to be cancelled, by session. */
     const cancels = new Map<string, () => void>();
+    /** Sessions whose model keeps reading in the answer phase too (LOOPALL). */
+    const loopForever = new Set<string>();
 
     record({
         kind: 'started',
@@ -154,9 +159,48 @@ async function runPeer(): Promise<void> {
         return blocks.filter((b) => b?.type === 'text').map((b) => String(b.text ?? '')).join('\n');
     }
 
+    /**
+     * A model that never stops reading: silence first, one sentence, then a tool call every 150 ms
+     * until it is cancelled. What the node's turn ceiling exists for (services/chat-turn-guard.ts).
+     */
+    async function loopTools(requestId: number | string, sessionId: string, opening: string): Promise<void> {
+        let stopped = false;
+        cancels.set(sessionId, () => { stopped = true; });
+        await sleep(3_000);
+        if (!stopped) update(sessionId, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: opening } });
+        // One thought, then calls with none between them: one long round, so the limit reached is
+        // the number of calls, not the number of rounds.
+        update(sessionId, { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'Let me read everything.' } });
+        for (let n = 1; !stopped && n <= 200; n++) {
+            update(sessionId, { sessionUpdate: 'tool_call', toolCallId: `loop-${n}`, title: 'aimeat: aimeat organism list', status: 'pending' });
+            update(sessionId, { sessionUpdate: 'tool_call_update', toolCallId: `loop-${n}`, status: 'completed' });
+            await sleep(150);
+        }
+        cancels.delete(sessionId);
+        record({ kind: 'loop-ended', sessionId, cancelled: stopped });
+        send({ jsonrpc: '2.0', id: requestId, result: { stopReason: stopped ? 'cancelled' : 'end_turn' } });
+    }
+
     async function runTurn(requestId: number | string, params: Record<string, any>): Promise<void> {
         const sessionId = String(params.sessionId ?? '');
         const text = textOf(params);
+
+        // LOOPTOOLS reads until stopped and then answers the node's request for an answer; LOOPALL
+        // keeps reading in that answer phase too, so the node has to end the turn itself.
+        if (text.includes('LOOPTOOLS') || text.includes('LOOPALL')) {
+            if (text.includes('LOOPALL')) loopForever.add(sessionId);
+            await loopTools(requestId, sessionId, 'I will look first.');
+            return;
+        }
+        if (text.includes('stop looking for more')) {
+            if (loopForever.has(sessionId)) {
+                await loopTools(requestId, sessionId, 'Just one more.');
+                return;
+            }
+            update(sessionId, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Here is what I found.' } });
+            send({ jsonrpc: '2.0', id: requestId, result: { stopReason: 'end_turn' } });
+            return;
+        }
 
         update(sessionId, { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'Working out what they want.' } });
         update(sessionId, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Here is ' } });
@@ -184,6 +228,7 @@ async function runPeer(): Promise<void> {
             });
             if (beat) clearInterval(beat);
             cancels.delete(sessionId);
+            record({ kind: 'stall-ended', sessionId, cancelled: stopped });
             send({ jsonrpc: '2.0', id: requestId, result: { stopReason: stopped ? 'cancelled' : 'end_turn' } });
             return;
         }
@@ -301,13 +346,11 @@ async function runPeer(): Promise<void> {
             return;
         }
 
-        if (method === 'session/cancel') {
-            cancels.get(String(params.sessionId ?? ''))?.();
-            send({ jsonrpc: '2.0', id: msg.id, result: {} });
-            return;
-        }
-
-        send({ jsonrpc: '2.0', id: msg.id, error: { code: -32601, message: `no such method: ${method}` } });
+        // `session/cancel` sent as a REQUEST lands here and is refused, because that is what goose
+        // 1.50.0 does: "-32601: Method not found". In ACP it is a notification (handle() below).
+        // This peer answered it as a request until 2026-10-02, so the cancel test passed against a
+        // client whose cancel real goose had never once obeyed.
+        send({ jsonrpc: '2.0', id: msg.id, error: { code: -32601, message: 'Method not found' } });
     }
 
     function handle(line: string): void {
@@ -327,6 +370,7 @@ async function runPeer(): Promise<void> {
         }
         if (msg.method && msg.id !== undefined) { dispatch(msg); return; }
         record({ kind: 'notification', method: msg.method ?? null, params: msg.params ?? null });
+        if (msg.method === 'session/cancel') cancels.get(String(msg.params?.sessionId ?? ''))?.();
     }
 
     await new Promise<void>((resolve) => {

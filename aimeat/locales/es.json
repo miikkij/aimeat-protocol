@@ -20308,5 +20308,17 @@
     "row.draftPreviewFailed": "No se pudo abrir el borrador.",
     "cortex.chipMeta": "{libs} bibliotecas · {schemas} esquemas",
     "wc.shotAlt": "Captura de pantalla de la aplicación"
+  },
+  "chatTurn": {
+    "progress": {
+      "start": "De acuerdo. Primero miro lo que tienes aquí.",
+      "reading": "Estoy leyendo tus espacios de trabajo, tu memoria y tus aplicaciones.",
+      "proposing": "Estoy escribiendo la propuesta del nuevo agente.",
+      "writing": "Estoy guardando el cambio que pediste.",
+      "working": "Estoy trabajando en lo que pediste.",
+      "thinking": "Sigo pensando cuál es la mejor forma de hacerlo.",
+      "wrappingUp": "Esto tarda, así que respondo ahora con lo que ya sé."
+    },
+    "stopped": "Me detuve aquí porque esto tardó demasiado y mi respuesta no está terminada. Di \"continúa\" y sigo desde aquí, o pregunta de nuevo por partes más pequeñas."
   }
 }
