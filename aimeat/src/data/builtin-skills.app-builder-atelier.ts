@@ -13,6 +13,8 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.29.1 — 2026-10-02 — The board's tow, anchored rings and onDrop, and requestPanel's extra host,
+ *     named in the board-family paragraph. Read against describe-data.js after they joined.
  *   v1.29.0 — 2026-10-02 — The board family (kit board.js, request-panel.js, shelf.js, verbs.js):
  *     board over aimeat-viewport, requestPanel, shelf and the data-ak-do card verbs, named beside the
  *     other library blocks. Read against describe-data.js after the four joined it.
@@ -291,11 +293,14 @@ moved under you says so.
    checkout). A follow-up conversation about one document is \`aiChat({ target, appId, context,
    history, onTurn })\`; an AI answer you kept is drawn again with \`aiTask(...).show(result)\`.
    A spatial surface, frames a person arranges on an infinite plane, is the board family:
-   \`board({ target, frames, rings, actions, render, onMove, onAction })\` draws keyed frames with a
-   head and a grip that stay one size at every zoom, rings around a request panel's frames and the
+   \`board({ target, frames, rings, actions, render, onMove, onAction, tow, onDrop })\` draws keyed
+   frames with a head and a grip that stay one size at every zoom, rings around a request panel's
+   frames (a ring with an \`anchor\` is centred on that frame, \`tow\` names the frames that move with
+   a dragged one, and \`onDrop\` is asked once when a frame enters a ring it was not in) and the
    Move/Use switch, over the camera of \`aimeat-viewport\` (the cortex library the page loads from
    \`/v1/cortex/aimeat-viewport/libs/aimeat-viewport.js\`); \`requestPanel\` is the prompt line, the
-   plan with its states and gate, and the console of a sentence being worked; \`shelf\` is the
+   plan with its states and gate, the console of a sentence being worked, and an \`extra\` host for
+   the app's own question (set({ extra: node })); \`shelf\` is the
    pieces to use on two tabs with a search; and \`verbs({ root, adapters })\` runs a card's
    \`data-ak-do\` controls (submit with no session, read on sight, save, ai, copy, now, count, and
    offer and tool through the app's adapters). The app plans, routes and runs; these draw.

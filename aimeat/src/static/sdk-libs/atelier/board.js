@@ -33,7 +33,9 @@
  *     onMove: save, onAction: act, onSelect: show });
  *   b.set({ frames: frames });        // keyed: adds, moves, removes; re-renders on frame.rev
  * @version-history
- *   v0.64.0 — 2026-10-02 — Initial, from ORIGAMI 1.2.0's board (wish-origami-atelieriin-ja-laudan-osat-kitin-lohkoiksi-ja-design-).
+ *   v0.64.0 — 2026-10-02 — Initial, from ORIGAMI 1.2.0's board (wish-origami-atelieriin-ja-laudan-osat-kitin-lohkoiksi-ja-design-):
+ *     keyed frames, rings with an anchor, `tow`, a drop asked only on new ground, centerOn a frame
+ *     or a rectangle, set({ camera, animate }).
  */
 import { el, clear, resolve } from './dom.js';
 import { applyVariant } from './parts-model.js';
@@ -454,6 +456,8 @@ export function board(spec) {
 
   function drawRings() {
     const keep = new Set();
+    // Membership is read from the rings every time, so a frame that left a ring loses the mark.
+    shown.forEach(function (e) { e.el.classList.remove('ak-board__frame--member'); });
     rings.forEach(function (ring) {
       const g = ringGeom(ring);
       if (!g) return;
@@ -471,7 +475,9 @@ export function board(spec) {
       r.el.style.top = (g.cy - g.r) + 'px';
       r.el.style.width = (g.r * 2) + 'px';
       r.el.style.height = (g.r * 2) + 'px';
-      const mine = selected != null && ((ring.members || []).indexOf(selected) >= 0 || (ring.borrowed || []).indexOf(selected) >= 0);
+      // The ring lights when its anchor, a member or a borrowed frame is the selected one.
+      const mine = selected != null && ((ring.anchor != null && String(ring.anchor) === selected) ||
+        (ring.members || []).indexOf(selected) >= 0 || (ring.borrowed || []).indexOf(selected) >= 0);
       r.el.classList.toggle('ak-board__ring--selected', mine);
       (ring.members || []).forEach(function (id) {
         const e = shown.get(String(id));
@@ -532,12 +538,13 @@ export function board(spec) {
   return {
     el: root,
     world: world,
-    /** @param {{ frames?: BoardFrame[], rings?: BoardRing[], camera?: object|null, mode?: 'move'|'use' }} patch */
+    /** @param {{ frames?: BoardFrame[], rings?: BoardRing[], camera?: object|null, animate?: boolean, mode?: 'move'|'use' }} patch
+     *  `animate: false` jumps to the camera (a stored view on open); the default glides. */
     set: function (patch) {
       if (destroyed || !patch) return;
       if (patch.rings) { rings = patch.rings; }
       if (patch.frames) reconcile(patch.frames); else if (patch.rings) drawRings();
-      if (patch.camera && vp) vp.setCamera(patch.camera, true);
+      if (patch.camera && vp) vp.setCamera(patch.camera, patch.animate !== false);
       if (patch.mode) setMode(patch.mode);
     },
     select: select,
@@ -545,9 +552,12 @@ export function board(spec) {
     frameEl: function (id) { const e = shown.get(String(id)); return e ? e.el : null; },
     bodyEl: function (id) { const e = shown.get(String(id)); return e ? e.body : null; },
     fit: function (animated) { if (vp) vp.fit(animated !== false); },
-    centerOn: function (id, animated) {
-      const e = shown.get(String(id));
-      if (e && vp) vp.centerOn(rectOf(e), animated !== false);
+    /** A frame id, or a world rectangle { x, y, w, h } (two frames side by side, say). */
+    centerOn: function (idOrRect, animated) {
+      if (!vp) return;
+      if (idOrRect && typeof idOrRect === 'object') { vp.centerOn(idOrRect, animated !== false); return; }
+      const e = shown.get(String(idOrRect));
+      if (e) vp.centerOn(rectOf(e), animated !== false);
     },
     camera: function () { return vp ? vp.cam() : null; },
     mode: function () { return mode === 'interact' ? 'use' : 'move'; },
