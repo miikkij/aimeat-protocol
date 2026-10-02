@@ -237,6 +237,24 @@ await test('8. Start on a task the agent already took and proposed for wakes it 
   await t.close();
 });
 
+await test('9. Another owner cannot start this agent\'s task, and nothing is pushed for it', async () => {
+  // The fence beside the wake: a second account's session is refused, and the agent's socket hears
+  // nothing, so a refused Start can never wake somebody else's agent.
+  const strangerName = `delstranger${Date.now()}`;
+  const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: strangerName, public_key: 'placeholder' }) });
+  assert(reg.status === 201, `stranger ${reg.status}`);
+  const strangerToken = await getToken(strangerName, reg.body.data.private_key, false);
+  const taskId = await createQueuedTask('Not the stranger\'s to start');
+  const t = await TunnelClient.connect(BASE, agentToken);
+  await t.waitForBacklog(1500);
+  const r = await json(`/v1/agents/${agentName}/tasks/${taskId}/start`, { method: 'POST', headers: { Authorization: `Bearer ${strangerToken}` } });
+  assert(r.status === 403, `a second owner is refused, got ${r.status}`);
+  const d = await t.waitForDeliver(500);
+  assert(d === null, `nothing is pushed for a refused Start, got ${JSON.stringify(d)}`);
+  await t.close();
+  await json(`/v1/owners/${encodeURIComponent(strangerName)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${strangerToken}` } });
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 await test('Cascade-delete owner', async () => {
