@@ -17,6 +17,9 @@
  *   AutonomyLine({ agent, showToast }) · WildcardLine({ agent, showToast })
  * @usage <${FactsLine} agent=${agent} /> <${PurchaseLimitLine} agent=${agent} showToast=${showToast} />
  * @version-history
+ *   v1.5.0 — 2026-10-02 — The question marks that explain "Starts work by itself" (agent.self_start)
+ *     and the daily purchase limit (agent.purchase_limit, which carries what buyHint said)
+ *     (components/HelpTip.js).
  *   v1.4.0 — 2026-10-02 — LastTaskLine: the newest task's title, who ordered it (you, an agent, an app) and when.
  *   v1.3.0 — 2026-10-02 — WildcardLine: an agent holding all permissions (`*`) says how far the record
  *     of what it uses is, and offers the narrowing to those permissions with one press (ruling C).
@@ -36,6 +39,7 @@ import { areaLine } from '/js/consent-vocab.js';
 import { swallowed } from '/js/swallowed.js';
 import { timeAgo } from '/js/utils.js';
 import { CardLine } from '/components/OpenCard.js';
+import { HelpLabel } from '/components/HelpTip.js';
 import { Switch } from '/components/Switch.js';
 import { Choice } from '/components/Choice.js';
 import { TextField } from '/components/TextField.js';
@@ -137,7 +141,7 @@ export function PurchaseLimitLine({ agent, showToast }) {
         <${Fields}>
           <${Choice} label=${f('buyCurrency')} value=${currency} onChange=${pickCurrency}
             options=${[['EUR', 'EUR'], ['USD', 'USD']]} />
-          <${TextField} label=${f('buyAmount')} hint=${f('buyHint')} value=${amount} onInput=${setAmount} />
+          <${TextField} label=${f('buyAmount')} help="agent.purchase_limit" value=${amount} onInput=${setAmount} />
         <//>
         <${Actions}>
           <${Loud} control disabled=${!valid || saving} onClick=${() => save(n)}>${f('buySave')}<//>
@@ -185,7 +189,7 @@ export function AutonomyLine({ agent, showToast }) {
   }
 
   return html`
-    <${CardLine} label=${f('selfStart')}>
+    <${CardLine} label=${html`<${HelpLabel} term="agent.self_start" label=${f('selfStart')}>${f('selfStart')}<//>`}>
       <${Switch} on=${on} disabled=${held} onToggle=${toggle} label=${on ? f('yes') : f('no')} ariaLabel=${f('selfStart')} />
       <span>${held ? f('selfStartHeld') : on ? f('selfStartOn') : f('selfStartOff')}</span>
     <//>
