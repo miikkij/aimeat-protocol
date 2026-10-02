@@ -21,6 +21,8 @@
  *   const membership = await createNameInvitation(storage, config, { organism, inviterGhii, inviteeRaw, role, workspaces });
  *   await revokeDepartedMemberAccess(storage, config, { organism, departing });
  * @version-history
+ *   2026-10-02 — cancelEmailInvitation refuses a provisioned-code key (404), which has its own cancel
+ *     route: cancelled here, the key read cancelled while the account it provisioned stayed a member.
  *   2026-09-30 — The invitation email is written in the language the inviter asks for (`locale`),
  *     else the recipient's account language, else the inviter's own; before, an address with no
  *     account always got English although the Finnish and Spanish templates existed. It names the
@@ -673,7 +675,9 @@ export async function cancelEmailInvitation(
   input: { organismId: string; invitationId: string },
 ): Promise<InvitationRecord> {
   const inv = await storage.getInvitation(input.invitationId);
-  if (!inv || inv.organismId !== input.organismId) {
+  // A provisioned-code key has its own cancel, which also deletes the account it provisioned.
+  // Cancelled here, the key read cancelled and the account stayed, member of the organism.
+  if (!inv || inv.organismId !== input.organismId || inv.type === 'code') {
     throw new InvitationError(404, 'NOT_FOUND', 'Invitation not found');
   }
   if (inv.status !== 'pending') {

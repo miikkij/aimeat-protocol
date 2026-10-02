@@ -21,6 +21,8 @@
  *   v1.4.0 — 2026-08-23 — S1: organism:invite is ENFORCED on the four email-invite doors (invariant
  *     15). A scopeless agent of the org admin's owner gets 403 on every door; the same owner's agent
  *     holding the scope passes. Fails against the pre-fix requireRoleOrScope source.
+ *   v1.5.0 — 2026-10-02 — C5c: the email-invitation cancel and edit answer 404 for a key, which
+ *     stays pending; the cancel had marked it cancelled and left the provisioned account a member.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=invitations
 
@@ -458,6 +460,23 @@ await test('C5b. A member cannot cancel ANOTHER member\'s un-activated key', asy
     // And the account behind it is still there, which is what the cancel would have deleted.
     const lg = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: target!.u, password: target!.c }) });
     assert(lg.status === 200, `the refused cancel deleted the account anyway: ${lg.status}`);
+});
+
+await test('C5c. The email-invitation cancel and edit do not reach a key', async () => {
+    // A key has its own cancel, which deletes the account it provisioned. Through the email door it
+    // was marked cancelled and the account stayed a member of the organism; the edit door rewrote
+    // the grants the key cancel later revokes.
+    const target = bMints[2];
+    assert(!!target, 'B has a third, un-activated key');
+    const edit = await json(`/v1/organisms/${orgId}/invitations/email/${target!.id}`, {
+        method: 'PATCH', headers: auth(A.token), body: JSON.stringify({ orgRole: 'admin' }),
+    });
+    assert(edit.status === 404, `the email edit reached a key: ${edit.status} ${JSON.stringify(edit.body?.error)}`);
+    const cancel = await json(`/v1/organisms/${orgId}/invitations/email/${target!.id}/cancel`, { method: 'POST', headers: auth(A.token), body: '{}' });
+    assert(cancel.status === 404, `the email cancel reached a key: ${cancel.status} ${JSON.stringify(cancel.body?.error)}`);
+    const list = await json(`/v1/organisms/${orgId}/invitations/code`, { headers: auth(B.token) });
+    const still = (list.body.data.items || []).find((x: any) => x.id === target!.id);
+    assert(still && still.status === 'pending', `the key is still pending: ${JSON.stringify(still)}`);
 });
 
 await test('C6. Mint validates: bad email → 400, short code → 400', async () => {
