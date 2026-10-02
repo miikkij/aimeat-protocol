@@ -13,6 +13,9 @@
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-organism.js"></script>
  *   const ws = await AIMEAT.organism.read(orgId, wsId); ws.spaces[0].items[0].value
  * @version-history
+ *   v1.5.0 — 2026-10-02 — invitations and cancelInvitation (members.js) over the email-invitation
+ *     list and cancel routes; remember/recall take the private choice, and rememberList/recallList
+ *     keep several workspaces per app (first-run.js).
  *   v1.4.1 — 2026-10-01 — The schema createWorkspace fills for a records space admits every field:
  *     `patternProperties: { '^.*$': {} }` instead of `additionalProperties: true`, which the
  *     workspace's strict lock closed to every property. A space created before keeps its old lock.

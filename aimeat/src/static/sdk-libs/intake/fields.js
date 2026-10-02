@@ -11,6 +11,8 @@
  * @structure NODE_MAX_VALUE · fields(form) · refusalField(error)
  * @usage import { fields, refusalField } from './fields.js';
  * @version-history
+ *   v1.0.1 - 2026-10-02 - A label written per language ({ en, fi, es }) reads as its English text,
+ *     not as "[object Object]".
  *   v1.0.0 - 2026-10-01 - Initial: fields() and refusalField() for the kit's public-form block.
  */
 
@@ -23,6 +25,21 @@ const KNOWN_TYPES = ['text', 'textarea', 'email', 'tel', 'url', 'number', 'date'
 const TEXT_TYPES = ['text', 'textarea', 'email', 'tel', 'url'];
 /** Types that are drawn from a list of options and mean nothing without one. */
 const CHOICE_TYPES = ['select', 'radio'];
+
+/**
+ * A stored label as text. A label written per language ({ en, fi, es }) gives its English, else the
+ * first language with text; the kit's block reads the page language itself from the raw definition.
+ * @param {unknown} label
+ * @returns {string}
+ */
+function labelText(label) {
+  if (label == null) return '';
+  if (typeof label !== 'object') return String(label);
+  const byLang = /** @type {Record<string, unknown>} */ (label);
+  if (typeof byLang.en === 'string' && byLang.en) return byLang.en;
+  for (const k of Object.keys(byLang)) if (typeof byLang[k] === 'string' && byLang[k]) return /** @type {string} */ (byLang[k]);
+  return '';
+}
 
 /**
  * One field of a form, in the shape a renderer draws.
@@ -98,7 +115,7 @@ export function fields(form) {
     /** @type {IntakeField} */
     const field = {
       name,
-      label: raw.label != null && String(raw.label) !== '' ? String(raw.label) : name,
+      label: labelText(raw.label) || name,
       type,
       required: raw.required === true || required.has(name),
     };

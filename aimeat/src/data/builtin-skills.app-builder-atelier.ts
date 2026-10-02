@@ -13,6 +13,9 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.28.0 — 2026-10-02 — Kit 0.63.0: aiChat, a kept aiTask answer, and the props the app migration
+ *     asked for (decision, workspaceTeam, workspacePicker, intake, dropzone, connections inside an
+ *     app, a Classic page and the look on <html>). Read against describe-data.js after they joined.
  *   v1.27.0 — 2026-10-01 — The second round of library blocks: workflowInput, aiTask with the model
  *     field, doc, decision, dropzone uploads, copy() and commerce amounts in the price parts.
  *   v1.26.0 — 2026-10-01 — The other library blocks: workspaceTeam and workspacePicker
@@ -279,7 +282,18 @@ moved under you says so.
    (\`decision\`, over \`aimeat-decide.js\`), uploads (\`dropzone({ upload })\`, over
    \`aimeat-storage.js\`), copying text (\`AIMEAT.atelier.copy(text)\`), and prices from
    \`AIMEAT.commerce\` (\`unit: 'micros'\` or \`currency: 'morsels'\` on priceTable, cart and
-   checkout).
+   checkout). A follow-up conversation about one document is \`aiChat({ target, appId, context,
+   history, onTurn })\`; an AI answer you kept is drawn again with \`aiTask(...).show(result)\`.
+   Before you write your own version of one of these because "it does not quite fit", read its
+   \`describe(id)\`: they take questions per run and a verdict (\`decision\`), invitations into
+   several workspaces (\`workspaceTeam\` \`inviteInto\`), schemas, a private choice and a list
+   (\`workspacePicker\`), labels per language, \`create(name)\` and row actions (\`intakeForm\`,
+   \`intakeAdmin\`), and \`image/*\` (\`dropzone\`). Inside an app, \`connections\` opens the node's own
+   accounts page, because an app is never granted \`connections:write\`, and \`decision\` sends
+   Confirm and Override to the owner's AI settings, because the node refuses a review by the app
+   that asked for the decision. A Classic page may load the
+   kit for these blocks alone; a page without the app frame sets their look with \`data-ak-look\` on
+   \`<html>\` or \`<body>\`.
 4. **Ask the kit before you fork.** Before you fork a component, ask the kit what it already gives
    you. \`AIMEAT.atelier.describe("<component>")\` returns
    \`{ parts, slots, variants, tokens, fork }\` for the components that carry the model, and

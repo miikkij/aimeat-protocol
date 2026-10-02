@@ -20,10 +20,13 @@
  *   Each block keeps to a readable width (--ak-doc-width, --ak-decision-width), long words and
  *   addresses wrap, a wide table or code block scrolls inside its own box, and every control keeps
  *   the kit's touch floor, so nothing pushes the page sideways at 390px.
- * @structure .ak-doc (box, plain text, sources) · .ak-doc .md-body (headings, lists, links, code,
- *   quotes, tables, rules, images, memory embeds) · .ak-dec (lines, answers, bars, the person's
+ * @structure .ak-doc (box, the plain variant, plain text, sources) · .ak-doc .md-body (headings,
+ *   lists, links, code, quotes, tables, rules, images, memory embeds) · .ak-dec (lines, answers,
+ *   bars, the app's verdict, rounds of a chained ask, a stored decision's record, the person's
  *   verdict, the provider field)
  * @version-history
+ *   v0.63.0 — 2026-10-02 — The doc's plain variant (no box); the decision's app verdict, its rounds
+ *     and a stored decision's record lines.
  *   v0.62.0 — 2026-10-01 — Initial.
  */
 
@@ -41,6 +44,9 @@
 }
 /* The empty card brings its own box; the document box does not draw a second one around it. */
 .ak-doc[data-ak-state='empty'] .ak-doc__body { padding: 0; border: 0; background: none; }
+/* variant: 'plain': the text inside a card the app already draws, so no box and no width cap. */
+.ak-doc[data-ak-variant='plain'] { max-width: var(--ak-doc-width, none); }
+.ak-doc[data-ak-variant='plain'] .ak-doc__body { padding: 0; border: 0; border-radius: 0; background: none; }
 .ak-doc__text {
   white-space: pre-wrap;
   font-family: var(--ak-font);
@@ -210,6 +216,23 @@
 }
 .ak-dec__num { color: var(--ak-ink); font-variant-numeric: tabular-nums; }
 .ak-dec__options { display: flex; flex-direction: column; gap: 4px; padding-top: 2px; }
+
+/* ── The app's verdict, the rounds of a chained ask, a stored decision's record ────────────── */
+.ak-dec__stamp {
+  margin: 0;
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 4px 12px;
+  border: 1px solid color-mix(in oklab, var(--ak-accent) 45%, var(--ak-line));
+  border-radius: var(--ak-radius-sm);
+  background: var(--ak-surface);
+  font-weight: 700;
+  color: var(--ak-ink);
+  overflow-wrap: anywhere;
+}
+.ak-dec__step { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ak-dec__step-title { margin: 0; font-size: var(--ak-text-fine, 0.85rem); font-weight: 700; color: var(--ak-ink-dim); }
+.ak-dec__stored { display: flex; flex-direction: column; gap: 2px; }
 
 /* ── The person's verdict ──────────────────────────────────────────────────────────────────── */
 .ak-dec__person {

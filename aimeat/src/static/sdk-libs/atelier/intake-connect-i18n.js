@@ -4,12 +4,17 @@
  *   accounts component (connections) in the kit's three languages. Each language is written in that
  *   language. The keys carry their own prefix (`intake.` or `connect.`), and a host overrides any of
  *   them by defining the same key through i18n.use().
- * @structure STRINGS (en/fi/es) · ti(key, vars): host override first, then this dictionary
+ * @structure STRINGS (en/fi/es) · TI_KEYS (per language, for the parity test) · ti(key, vars): host
+ *   override first, then this dictionary
  * @usage
  *   import { ti } from './intake-connect-i18n.js';
  *   ti('intake.send');
  *   ti('connect.confirm', { account: 'robin@example.com' });
  * @version-history
+ *   v0.63.0 — 2026-10-02 — intake.createName and intake.createdPlain (Create by name, when the app
+ *     supplies create()), and
+ *     connect.viaNode, connect.newTab, connect.switched (the block inside an app links to the node's
+ *     own connections page). TI_KEYS for the parity test.
  *   v0.61.0 — 2026-10-01 — Initial (iam-members-and-library-blocks plan, Phase D blocks 4 and 5).
  */
 import { i18n } from './i18n.js';
@@ -89,6 +94,8 @@ const STRINGS = {
     'intake.type.select': 'Drop-down list',
     'intake.type.radio': 'One choice',
     'intake.type.checkbox': 'Checkbox',
+    'intake.createName': 'Name of the new form',
+    'intake.createdPlain': 'The form is ready.',
     'connect.title': 'Connected accounts',
     'connect.intro': 'Your accounts at other services. AIMEAT keeps the sign-in. This app sees only the account name and what the account can do.',
     'connect.none': 'No accounts are connected yet.',
@@ -122,6 +129,11 @@ const STRINGS = {
     'connect.noLib': 'This block needs aimeat-connect.js on the page.',
     'connect.signIn': 'Sign in to see your connected accounts.',
     'connect.sampleNote': 'A sample. Nothing here is connected or changed.',
+    'connect.viaNode': 'You connect and disconnect accounts on your own AIMEAT page. The buttons open it in a new tab. When you come back here, this list updates.',
+    'connect.newTab': '(opens in a new tab)',
+    'connect.openPage': 'Open your accounts page',
+    'connect.cannotList': 'This app may not see your accounts. You find them on your own AIMEAT page.',
+    'connect.switched': 'This app may not change your accounts itself. The buttons now open your own AIMEAT page.',
   },
   fi: {
     'intake.title': 'Lähetä meille viesti',
@@ -197,6 +209,8 @@ const STRINGS = {
     'intake.type.select': 'Pudotusvalikko',
     'intake.type.radio': 'Yksi vaihtoehto',
     'intake.type.checkbox': 'Valintaruutu',
+    'intake.createName': 'Uuden lomakkeen nimi',
+    'intake.createdPlain': 'Lomake on valmis.',
     'connect.title': 'Yhdistetyt tilit',
     'connect.intro': 'Tilisi muissa palveluissa. AIMEAT säilyttää kirjautumistiedot. Tämä sovellus näkee vain tilin nimen ja sen, mitä tilillä voi tehdä.',
     'connect.none': 'Yhtään tiliä ei ole vielä yhdistetty.',
@@ -230,6 +244,11 @@ const STRINGS = {
     'connect.noLib': 'Tämä osa tarvitsee sivulle aimeat-connect.js-kirjaston.',
     'connect.signIn': 'Kirjaudu sisään, niin näet yhdistetyt tilisi.',
     'connect.sampleNote': 'Esimerkki. Täällä ei yhdistetä eikä muuteta mitään.',
+    'connect.viaNode': 'Yhdistät tilit ja katkaiset yhteydet omalla AIMEAT-sivullasi. Painikkeet avaavat sivun uuteen välilehteen. Kun palaat tänne, lista päivittyy.',
+    'connect.newTab': '(avautuu uuteen välilehteen)',
+    'connect.openPage': 'Avaa tilisivusi',
+    'connect.cannotList': 'Tämä sovellus ei saa nähdä tilejäsi. Löydät ne omalta AIMEAT-sivultasi.',
+    'connect.switched': 'Tämä sovellus ei saa muuttaa tilejäsi itse. Painikkeet avaavat nyt oman AIMEAT-sivusi.',
   },
   es: {
     'intake.title': 'Envíanos un mensaje',
@@ -305,6 +324,8 @@ const STRINGS = {
     'intake.type.select': 'Lista desplegable',
     'intake.type.radio': 'Una opción',
     'intake.type.checkbox': 'Casilla',
+    'intake.createName': 'Nombre del formulario nuevo',
+    'intake.createdPlain': 'El formulario está listo.',
     'connect.title': 'Cuentas conectadas',
     'connect.intro': 'Tus cuentas en otros servicios. AIMEAT guarda el acceso. Esta aplicación solo ve el nombre de la cuenta y lo que la cuenta puede hacer.',
     'connect.none': 'Todavía no hay cuentas conectadas.',
@@ -338,7 +359,19 @@ const STRINGS = {
     'connect.noLib': 'Este bloque necesita aimeat-connect.js en la página.',
     'connect.signIn': 'Inicia sesión para ver tus cuentas conectadas.',
     'connect.sampleNote': 'Una muestra. Desde aquí no se conecta ni se cambia nada.',
+    'connect.viaNode': 'Conectas y desconectas cuentas en tu propia página de AIMEAT. Los botones la abren en una pestaña nueva. Cuando vuelvas aquí, esta lista se actualiza.',
+    'connect.newTab': '(se abre en una pestaña nueva)',
+    'connect.openPage': 'Abrir tu página de cuentas',
+    'connect.cannotList': 'Esta aplicación no puede ver tus cuentas. Las encuentras en tu propia página de AIMEAT.',
+    'connect.switched': 'Esta aplicación no puede cambiar tus cuentas por sí misma. Ahora los botones abren tu propia página de AIMEAT.',
   },
+};
+
+/** The keys of each language, for the parity test. */
+export const TI_KEYS = {
+  en: Object.keys(STRINGS.en),
+  fi: Object.keys(STRINGS.fi),
+  es: Object.keys(STRINGS.es),
 };
 
 /**

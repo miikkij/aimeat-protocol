@@ -27,13 +27,20 @@
  * @usage
  *   AIMEAT.atelier.joinRequest({ target: '#join', app: 'me/club.html' });
  *   AIMEAT.atelier.accessState({ target: '#tools', app: 'me/club.html', cap: 'use', render(host) { … } });
+ *   REFUSALS IN THE PAGE'S LANGUAGE. A refusal the node answers with a code the members dictionary
+ *   knows (REASK_TOO_SOON, SEATS_FULL, FORBIDDEN, ...) is said in the page's language, its date
+ *   through the SDK's formatter; an unknown code keeps the node's own sentence (members-shared.js
+ *   refusal).
  * @version-history
+ *   v0.62.0 — 2026-10-02 — joinRequest says a refusal in the page's language, and a person declined
+ *     less than a week ago reads when they may ask again instead of a form the node would refuse
+ *     (me().requested.retryAt).
  *   v0.61.0 — 2026-10-01 — Initial. The owner's screen moved to members-admin.js and the shared
  *     helpers to members-shared.js when the screen grew.
  */
 import { el, clear, resolve, enter } from './dom.js';
 import { tm } from './members-i18n.js';
-import { wantsSample, sampleBadge, watch, ready, refusal, day } from './members-shared.js';
+import { wantsSample, sampleBadge, watch, ready, refusal, refusalWords, day } from './members-shared.js';
 
 export { members } from './members-admin.js';
 
@@ -93,7 +100,12 @@ export function joinRequest(spec) {
       return;
     }
     const asked = me.requested;
+    // A declined person may ask again a week later; until then the node refuses the ask, so the
+    // block says when instead of offering a form that can only be refused.
+    const waits = asked && asked.state === 'declined' && typeof asked.retryAt === 'string'
+      && Date.parse(asked.retryAt) > Date.now();
     if (asked && asked.state === 'pending') status.textContent = tm('join.pending', { d: day(asked.at) });
+    else if (waits) status.textContent = refusalWords('REASK_TOO_SOON', { retryAt: asked.retryAt });
     else {
       if (asked && asked.state === 'declined') status.textContent = tm('join.declined');
       form(iam);

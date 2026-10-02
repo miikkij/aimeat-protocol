@@ -4,9 +4,13 @@
  *   Both wear the members screen's rows, tabs, person cell, failure line and readable width
  *   (members.css, the .ak-mem classes they also carry), so one kind of thing has one look; this
  *   sheet adds only what is theirs: the role chip, the one-line "Using … in …" view, the picker's
- *   cancel button and the dense variant. Every colour rides the --ak-* token contract.
- * @structure .ak-ws (shared) · the role chip · the one-line view · the picker · variants table, dense
+ *   cancel button, its kept list, the team's tick per workspace and the dense variant. Every colour
+ *   rides the --ak-* token contract.
+ * @structure .ak-ws (shared) · the role chip · the one-line view · the picker · the kept list ·
+ *   the team's controls · the tick per workspace · variants table, dense
  * @version-history
+ *   v0.63.0 — 2026-10-02 — The picker's kept list (multiple) and Add button; the team's tick and
+ *     role per workspace (inviteInto). Rows wrap, so nothing overflows at 390px.
  *   v0.61.0 — 2026-10-01 — Initial (IAM plan Phase D blocks 2 and 3).
  */
 
@@ -49,9 +53,30 @@
 .ak-ws--picker .ak-btn { min-height: 40px; }
 .ak-ws--picker > [data-ak-part="cancel"] { margin-top: 4px; }
 
+/* ── The picker's private choice and its kept list (allowPrivate, multiple) ───────────────── */
+.ak-ws--picker > [data-ak-part="add"] { margin-top: 4px; }
+.ak-ws__list { margin-bottom: 8px; }
+.ak-ws__entry-text { flex: 1 1 12rem; min-width: 0; color: var(--ak-ink); overflow-wrap: anywhere; }
+.ak-ws__entry[data-ak-current="true"] { border-color: var(--ak-accent); }
+
 /* ── The team's controls keep the 40px floor on a touch screen ────────────────────────────── */
 .ak-ws--team .ak-btn, .ak-ws--team .ak-mem__role, .ak-ws .ak-mem__name.ak-input { min-height: 40px; }
 .ak-ws--table .ak-mem__table td { vertical-align: middle; }
+
+/* ── The team's invitation into several workspaces: a tick and a role per workspace ───────── */
+.ak-ws__target { padding: 4px 12px; }
+.ak-ws__tick {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 12rem;
+  min-width: 0;
+  min-height: 40px;
+  color: var(--ak-ink);
+  cursor: pointer;
+}
+.ak-ws__tick-text { min-width: 0; overflow-wrap: anywhere; }
+.ak-ws--team [data-ak-part="targets"] { margin: 6px 0 0; }
 
 /* ── dense: for a side panel ──────────────────────────────────────────────────────────────── */
 .ak-ws--dense .ak-mem__row { padding: 6px 8px; }

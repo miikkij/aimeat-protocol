@@ -13,6 +13,8 @@
  * @structure nodeMe · nodeState · nodeAssign · nodeRevoke · nodeRequest
  * @usage AIMEAT.iam.init({ app: 'alice/app.html' })
  * @version-history
+ *   v1.2.3 — 2026-10-02 — nodeRequest's refusal carries the node's `code` and `details`, so a block
+ *     can say REASK_TOO_SOON in the page's language with the date from details.retryAt.
  *   v1.2.2 — 2026-10-01 — A visitor row keeps the display name and the address the roster answers.
  *   v1.2.1 — 2026-10-01 — nodeAudit reads `entries`, the field GET .../members/audit answers with;
  *     it read `events`, so the history was always empty.
@@ -139,7 +141,8 @@ export async function nodeRequest(call, appId, note) {
   // The session answers a refusal as an envelope, not a throw. Read as a result it had no
   // `recorded: false`, so the join form said "your request was recorded" for a request the node refused.
   if (r && r.ok === false) {
-    throw new Error((r.error && typeof r.error.message === 'string' && r.error.message) || 'The request was refused.');
+    throw Object.assign(new Error((r.error && typeof r.error.message === 'string' && r.error.message) || 'The request was refused.'),
+      { code: r.error && r.error.code, details: r.error && r.error.details });
   }
   return { recorded: !!r && r.recorded !== false, passive: false, alreadyMember: !!(r && r.alreadyMember) };
 }

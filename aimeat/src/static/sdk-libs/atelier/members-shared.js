@@ -5,15 +5,45 @@
  *   public surface, the library on the page, the refusal sentence, dates, roles and their power, and
  *   one person drawn as a face with a name over an account. Split out of members.js when the owner's
  *   screen grew past what one file holds.
- * @structure isPlaceholder · wantsSample · sampleBadge · watch · ask · iamOf · ready · refusal · day ·
- *   power · roleSelect · person
+ * @structure appSession · isPlaceholder · wantsSample · sampleBadge · watch · ask · iamOf · ready ·
+ *   refusalWords · refusal · day · power · roleSelect · person
  * @usage import { ready, refusal, person } from './members-shared.js';
  * @version-history
+ *   v0.63.0 — 2026-10-02 — appSession() moves here from connections.js unchanged, for decision.js;
+ *     refusal() keeps the node's own sentence for INVALID_INPUT and NOT_FOUND when it names the field.
+ *   v0.62.0 — 2026-10-02 — refusal() says a refusal code it knows in the page's language
+ *     (refusalWords, members-i18n.js refuse.<CODE>), with the retry date and the wait through
+ *     _core/format.js; an unknown code keeps the node's sentence. The code and details are read off
+ *     the envelope's `error` and off a thrown error's own `code` and `details`.
  *   v0.61.0 — 2026-10-01 — Initial: moved out of members.js unchanged, plus power() and person().
  */
 import { el } from './dom.js';
 import { tm } from './members-i18n.js';
 import { i18n } from './i18n.js';
+import { dateTime, duration } from '../_core/format.js';
+import { APEX_URL } from '../_core/config.js';
+
+/**
+ * True when this page is an app kept apart from the node (its own origin, or the node's isolated
+ * frame), where the node grants no connections:write and refuses an app's review of a decision it
+ * asked for. Read from AIMEAT.auth, which knows both; a page without the auth library compares its
+ * origin with the node's apex. Moved from connections.js unchanged; decision.js asks it too.
+ * @returns {boolean}
+ */
+export function appSession() {
+  const ns = /** @type {any} */ (window).AIMEAT;
+  const auth = ns && ns.auth;
+  if (auth && typeof auth.isAppOrigin === 'function') {
+    try { if (auth.isAppOrigin()) return true; } catch { /* read the session below */ }
+    const s = typeof auth.getSession === 'function' ? auth.getSession() : null;
+    return !!(s && s._appOrigin);
+  }
+  try {
+    return !!APEX_URL && window.location.origin !== new URL(APEX_URL).origin;
+  } catch {
+    return false;
+  }
+}
 
 /** A fill's unreplaced placeholder: "<owner/file.html>" and friends. */
 export function isPlaceholder(v) {
@@ -97,13 +127,57 @@ export async function ready(spec) {
   return iam;
 }
 
-/** The sentence a refusal carries: the node's envelope, an extension's string, or a thrown error. */
+/** Codes that share another code's words: the node says ACCESS_DENIED where a role is missing. */
+const SAME_WORDS = /** @type {Record<string, string>} */ ({ ACCESS_DENIED: 'FORBIDDEN' });
+
+/** How the date in a refusal is written: short enough to read the same in any language around it. */
+const WHEN = { dateStyle: 'medium', timeStyle: 'short' };
+
+/**
+ * A refusal code in the page's language, or '' when this dictionary (or the host's, under
+ * `members.refuse.<CODE>`) has no words for it. `details.retryAt` becomes the date `{d}` and
+ * `details.retry_after_sec` the wait `{t}`, both through the SDK's formatter (_core/format.js); a
+ * sentence that needs one the refusal did not carry takes its `.later` form.
+ * @param {unknown} code
+ * @param {any} [details]
+ * @returns {string}
+ */
+export function refusalWords(code, details) {
+  if (typeof code !== 'string' || !/^[A-Z][A-Z0-9_]*$/.test(code)) return '';
+  const key = 'refuse.' + (SAME_WORDS[code] || code);
+  const d = details && typeof details === 'object' ? details : {};
+  /** @type {Record<string, string>} */
+  const vars = {};
+  if (typeof d.retryAt === 'string' && Number.isFinite(Date.parse(d.retryAt))) vars.d = dateTime(d.retryAt, WHEN);
+  if (typeof d.retry_after_sec === 'number' && d.retry_after_sec > 0) vars.t = duration(d.retry_after_sec * 1000, { max: 2 });
+  const text = tm(key, vars);
+  if (text === key) return '';
+  if (!/\{[dt]\}/.test(text)) return text;
+  const later = tm(key + '.later');
+  return later === key + '.later' ? '' : later;
+}
+
+/**
+ * Codes whose node sentence names the field or the thing that failed ("Field 'email' is too long",
+ * "No account named x"). The general words would lose that, so they stand in only when the node
+ * said nothing.
+ */
+const SPECIFIC = new Set(['INVALID_INPUT', 'NOT_FOUND']);
+
+/**
+ * The sentence a refusal carries: the node's envelope, an extension's string, or a thrown error.
+ * A code this dictionary knows is said in the page's language (refusalWords); any other keeps the
+ * node's own sentence, which is English, and so does a SPECIFIC code that came with one.
+ */
 export function refusal(r) {
   if (!r) return '';
-  if (r instanceof Error) return r.message;
-  if (r.ok !== false) return '';
-  if (typeof r.error === 'string') return r.error;
-  return (r.error && typeof r.error.message === 'string') ? r.error.message : '';
+  const thrown = r instanceof Error;
+  if (!thrown && r.ok !== false) return '';
+  const env = thrown ? /** @type {any} */ (r) : (r.error && typeof r.error === 'object' ? r.error : {});
+  const said = thrown ? r.message
+    : (typeof r.error === 'string' ? r.error : (typeof env.message === 'string' ? env.message : ''));
+  if (said && SPECIFIC.has(env.code)) return said;
+  return refusalWords(env.code, env.details) || said;
 }
 
 /** A date as a person reads it; a value that is not a date is shown as itself. */

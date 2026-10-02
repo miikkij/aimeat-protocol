@@ -14,37 +14,67 @@
  *   given, which records the thresholds with the decision. The block never asks on its own: asking
  *   spends the owner's AI budget, so the app calls ask(state), or the person presses Ask.
  *
+ *   QUESTIONS BUILT PER RUN, AND A CHAIN. An app that builds its questions from the input of each run
+ *   passes them to ask(state, questions) or set({ questions }); `names` (names to take out of the
+ *   text before sending) goes to every call. onAnswered(result, round) may return the next question
+ *   set, built from the answers so far: the block asks it with the same state, up to MAX_ROUNDS
+ *   calls, and draws every round in order, each with its own answers and facts. ask() resolves with
+ *   the last round's answer, plus `steps` (each round's answer) when more than one round ran.
+ *   Measured 2026-10-02: PÄÄTÖSPAJA builds its questions per run and asks a second time from the
+ *   first answers.
+ *
+ *   THE APP'S VERDICT. verdict(result) returns the app's own word for the answers (a string or a
+ *   Node), drawn as the block's verdict part above the answers; the per-answer threshold words are
+ *   then left out, while the numbers, bars and threshold marks stay. Without it the threshold words
+ *   stay as they were.
+ *
+ *   A STORED DECISION. decisionId draws a decision recorded earlier (AIMEAT.decide.decisions({ id }))
+ *   with its record: when it was made, what it was about, what it decides, the rule that ran, and any
+ *   earlier review. It never asks; Confirm and Override are offered at any time and recorded with
+ *   review(). PÄÄTÖSPAJA reads its decisions back by id, POSTINJALOSTAMO reviews what its batch run
+ *   decided.
+ *
  *   THE STATES (data-ak-state on the root). sample (a built-in answer marked as such; nothing is
  *   asked or recorded); signed-out; no-library; unavailable (the node's reason, and a link to the
  *   AI settings); empty (no state yet); ready (a state, not yet asked); asking; answered, which
  *   under the threshold asks the person and then says what was recorded; failed, in the kit's
- *   words for decide's error codes.
+ *   words for decide's error codes; loading and stored, for a stored decision.
  *
  *   SHARED WITH THE LIVING DOCUMENT. The "taken out before sending" sentence and the two-decimal
  *   number come from decide/removed-line.js, which living/render-decide.js uses too. The rest of
  *   living's decide row is drawn over a living graph and a state machine (its buttons send machine
  *   events, its words are living's own two languages), so it is not this block's shape and is not
  *   imported: the kit bundling it would also carry living's graph and machine code.
- * @parts decision root · title · status · body · intro · signIn · failure · settings · empty · ready · ask · provider · providerNote · outcome · answers · answer · question · value · verdict · bar · threshold · options · removed · cost · who · person · note · confirm · override · overridePanel · overridePick · record · cancel · recorded · again · retry
- * @slots decision onOutcome(result) · labels{ questionId: words }
+ * @parts decision root · title · status · body · intro · signIn · failure · settings · empty · ready · ask · provider · providerNote · outcome · answers · answer · question · value · verdict · bar · threshold · options · removed · cost · who · step · stepTitle · loading · stored · decidedAt · subject · gates · ruleRun · reviewed · askPerson · person · note · confirm · override · overridePanel · overridePick · record · cancel · recorded · again · retry · reviewOnNode · reviewLink
+ * @slots decision onOutcome(result) · onAnswered(result, round) · verdict(result) · labels{ questionId: words }
  * @tokens decision --ak-decision-width
- * @fork decision Copying it out means calling AIMEAT.decide's isAvailable(), unavailableReason(), providers(), ask() or gate() or rule(id).ask(), and review() yourself, drawing every answer with its number, threshold, removed data, cost and provider, and recording the person's verdict only when they press.
+ * @fork decision Copying it out means calling AIMEAT.decide's isAvailable(), unavailableReason(), providers(), ask() or gate() or rule(id).ask(), decisions({ id }) and review() yourself, drawing every answer with its number, threshold, removed data, cost and provider, every round of a chained ask, a stored decision with its record, and recording the person's verdict only when they press.
  * @structure decision(spec) (helpers: decideOf · signedOut · settingsHref · noState · errorWords ·
- *   needsPerson · money · answerText · bar · drawAnswer · firstUnder · overrideChoices · SAMPLE)
+ *   needsPerson · money · SAMPLE; one answer's drawing and the stored-row helpers are in
+ *   decision-answer.js)
  * @usage
  *   const d = AIMEAT.atelier.decision({ target: '#triage', appId: 'mail-sorter', rule: 'urgent-mail' });
  *   d.ask(mail.body).then((r) => { if (r && r.outcome === 'act') file(mail); });
+ *   AIMEAT.atelier.decision({ target: row, appId: 'mail-sorter', decisionId: item.decisionId });
  * @version-history
+ *   v0.63.0 — 2026-10-02 — Questions per run (ask(state, questions), set()), names, a chain of
+ *     asks through onAnswered, the app's verdict(result), and a stored decision by decisionId with
+ *     its record and the review. INSIDE AN APP the review happens on the node's own page (Jouni,
+ *     2026-10-02): the node refuses a review by the principal that asked (OWN_DECISION), so Confirm
+ *     and Override become one link to AIMEAT.decide.settingsUrl() in a new tab, and the decision
+ *     is read again with its review when the window gets the focus back. `via: 'node'` forces it,
+ *     and an OWN_DECISION refusal switches to it.
  *   v0.62.0 — 2026-10-01 — Initial.
  */
 import { el, clear, resolve, whileBusy, uid } from './dom.js';
 import { emptyState } from './state.js';
 import { td, hasWords } from './decision-i18n.js';
-import { isPlaceholder, sampleBadge, watch, refusal } from './members-shared.js';
-import { removedLine, twoDecimals } from '../decide/removed-line.js';
+import { isPlaceholder, sampleBadge, watch, refusal, day, appSession } from './members-shared.js';
+import { removedLine } from '../decide/removed-line.js';
+import { drawAnswer, firstUnder, overrideChoices, fromRow, reviewedWords } from './decision-answer.js';
 
-/** How many of a choice's options are drawn as bars, most likely first. */
-const OPTIONS_SHOWN = 6;
+/** The most calls one ask() makes through onAnswered: each call spends the owner's AI budget. */
+const MAX_ROUNDS = 5;
 
 /** The answer the sample state draws: one question passes, one waits for a person. */
 const SAMPLE = {
@@ -115,110 +145,23 @@ function money(usd) {
   return '$' + (n > 0 && n < 0.01 ? n.toFixed(4) : n.toFixed(2));
 }
 
-/** A scale level in the words the answer's legend gives it, else the number. */
-function levelWords(a, level) {
-  const words = a.legend && a.legend[String(level)];
-  return typeof words === 'string' ? words : String(level);
-}
-
-/** The answer itself as words: a probability, an option name, or a scale level. */
-function answerText(a) {
-  if (a.type === 'noul') return twoDecimals(Number(a.value));
-  if (a.type === 'score') {
-    const words = a.legend && a.legend[String(Math.round(Number(a.value)))];
-    return typeof words === 'string' ? words : Number(a.value).toFixed(1);
-  }
-  return String(a.value == null ? '' : a.value);
-}
-
-/**
- * One bar with its number beside it, so the value never rests on colour or length alone. The
- * threshold, when there is one, is a mark on the track and part of the spoken value.
- * @param {string} label @param {number} v @param {number|null} t @param {string} [extra]
- */
-function bar(label, v, t, extra) {
-  const val = Math.max(0, Math.min(1, Number(v) || 0));
-  const text = twoDecimals(Number(v)) || '0.00';
-  /** @type {Record<string, string>} */
-  const vars = { '--ak-dec-v': String(val) };
-  if (t != null) vars['--ak-dec-t'] = String(Math.max(0, Math.min(1, t)));
-  return el('div', {
-    class: 'ak-dec__meter' + (extra ? ' ' + extra : ''), 'data-ak-part': 'bar', role: 'meter',
-    'aria-label': label, 'aria-valuemin': '0', 'aria-valuemax': '1', 'aria-valuenow': String(val),
-    'aria-valuetext': text + (t != null ? ', ' + td('decision.threshold', { t: twoDecimals(t) }) : ''),
-    vars: vars,
-  }, [
-    el('span', { class: 'ak-dec__meter-label', 'aria-hidden': 'true' }, label),
-    el('span', { class: 'ak-dec__track', 'aria-hidden': 'true' }, [
-      el('span', { class: 'ak-dec__fill' }),
-      t != null ? el('span', { class: 'ak-dec__mark' }) : null,
-    ]),
-    el('span', { class: 'ak-dec__num', 'aria-hidden': 'true' }, text),
-  ]);
-}
-
-/**
- * One answer: the question, the answer, whether it reaches its threshold, and its bars.
- * @param {string} q @param {any} a @param {any} t @param {boolean|undefined} passed @param {string} label
- */
-function drawAnswer(q, a, t, passed, label) {
-  const hasT = typeof t === 'number' && Number.isFinite(t);
-  const li = el('li', {
-    class: 'ak-dec__answer' + (passed === false ? ' ak-dec__answer--under' : ''),
-    'data-ak-part': 'answer', 'data-question': q,
-  });
-  li.appendChild(el('div', { class: 'ak-dec__qhead' }, [
-    el('span', { class: 'ak-dec__q', 'data-ak-part': 'question' }, label),
-    el('span', { class: 'ak-dec__value', 'data-ak-part': 'value' }, answerText(a)),
-    passed === undefined ? null
-      : el('span', { class: 'ak-dec__verdict', 'data-ak-part': 'verdict' }, td(passed ? 'decision.passed' : 'decision.under')),
-  ]));
-  // A yes/no answer's value is the probability; a choice is held to its confidence; a scale's
-  // threshold is a level, so it is said in words rather than marked on the confidence bar.
-  if (a.type === 'noul') li.appendChild(bar(td('decision.probability'), Number(a.value), hasT ? t : null));
-  else if (typeof a.confidence === 'number') li.appendChild(bar(td('decision.confidence'), a.confidence, hasT && a.type === 'choice' ? t : null));
-  if (hasT) li.appendChild(el('p', { class: 'ak-dec__fine', 'data-ak-part': 'threshold' }, td('decision.threshold', { t: twoDecimals(t) })));
-  const probs = a.type !== 'noul' && a.probabilities && typeof a.probabilities === 'object' ? a.probabilities : null;
-  if (probs) {
-    const rows = Object.keys(probs).sort(function (x, y) { return Number(probs[y]) - Number(probs[x]); }).slice(0, OPTIONS_SHOWN);
-    const list = el('div', { class: 'ak-dec__options', 'data-ak-part': 'options' });
-    for (const k of rows) list.appendChild(bar(a.type === 'score' ? levelWords(a, k) : k, Number(probs[k]), null, 'ak-dec__meter--option'));
-    li.appendChild(list);
-  }
-  return li;
-}
-
-/** The first question whose answer fell short of its threshold, else the first answer. */
-function firstUnder(r) {
-  const answers = (r && r.answers) || {};
-  const passed = (r && r.passed) || {};
-  const ids = Object.keys(answers);
-  for (const q of ids) if (passed[q] === false) return q;
-  return ids[0] || '';
-}
-
-/** What a person may answer instead, for one question: yes or no, or the options it had. */
-function overrideChoices(r, q) {
-  const a = r && r.answers && r.answers[q];
-  if (!a) return [];
-  if (a.type === 'noul') return [{ value: 'true', label: td('decision.yes') }, { value: 'false', label: td('decision.no') }];
-  return Object.keys(a.probabilities || {}).map(function (k) {
-    return { value: k, label: a.type === 'score' ? levelWords(a, k) : k };
-  });
-}
-
 /**
  * One question set put to the decision model, with the whole answer and the person's verdict.
  * @param {{ target?: string|Element, appId: string, state?: any, questions?: Record<string, any>,
  *   rule?: string, thresholds?: Record<string, number>, gates?: string, subject?: string,
  *   provider?: string, review?: boolean, title?: string, sample?: boolean,
- *   labels?: Record<string, string>, onOutcome?: (r: any) => void }} spec
- * @returns {{ el: HTMLElement, ask: (state?: any) => Promise<any>, refresh: () => Promise<void>,
- *   destroy: () => void }}
+ *   labels?: Record<string, string>, onOutcome?: (r: any) => void, names?: string[],
+ *   onAnswered?: (r: any, round: number) => (Record<string, any> | null | Promise<Record<string, any> | null>),
+ *   verdict?: (r: any) => (string | Node | null), decisionId?: string, via?: 'node' }} spec
+ * @returns {{ el: HTMLElement,
+ *   ask: (state?: any, questions?: Record<string, any>, more?: { names?: string[] }) => Promise<any>,
+ *   set: (patch: { questions?: Record<string, any>, state?: any, names?: string[], decisionId?: string }) => Promise<void>,
+ *   refresh: () => Promise<void>, destroy: () => void }}
  */
 export function decision(spec) {
   const s = spec || /** @type {any} */ ({});
-  const sample = s.sample === true || !s.appId || isPlaceholder(s.appId);
+  // A stored decision needs no app id to be read; its own placeholder id asks for the sample.
+  const sample = s.sample === true || isPlaceholder(s.appId) || (s.decisionId ? isPlaceholder(s.decisionId) : !s.appId);
   const root = el('section', { class: 'ak-root ak-dec', 'data-ak-part': 'root' });
   const head = el('h3', { class: 'ak-dec__title', 'data-ak-part': 'title' });
   // One live region for the whole life of the block: a region drawn anew is not announced.
@@ -230,9 +173,54 @@ export function decision(spec) {
   if (s.target) resolve(s.target).appendChild(root);
 
   let state = s.state;
+  let questions = s.questions;
+  /** @type {string[] | null} */ let names = Array.isArray(s.names) ? s.names : null;
+  /** The stored decision this block draws, or '' when it asks. */
+  let storedId = s.decisionId ? String(s.decisionId) : '';
+  /** @type {any} */ let stored = null;
+  /** @type {Promise<{ row?: any, err?: any }> | null} */ let storedLoad = null;
+  /** @type {Record<string, number>} */ let storedThresholds = {};
+  /** The node refused this page's review (OWN_DECISION), so the owner reviews on the node's page. */
+  let forcedNode = false;
+  /** The person went to the node's page to review; the next focus reads the decision again. */
+  let away = false;
+
+  /**
+   * Whether the review happens on the node's own page. Inside an app (its own origin or the node's
+   * isolated frame) the app asked for the decision, and the node refuses a review by the principal
+   * that asked; `via: 'node'` forces it, and so does an OWN_DECISION refusal. It needs the decide
+   * library's settingsUrl(), the owner's AI settings at the decision card, where every recent
+   * decision has Confirm and Override.
+   */
+  function onNodePage() {
+    return !sample && !!settingsHref(decideOf()) && (forcedNode || s.via === 'node' || appSession());
+  }
+
+  /** The line and the link that send the person to review on the node's page, in a new tab. */
+  function reviewOnNode(lib) {
+    return el('div', { class: 'ak-dec__on-node', 'data-ak-part': 'reviewOnNode' }, [
+      el('p', { class: 'ak-dec__fine' }, td('decision.reviewOnNode')),
+      el('div', { class: 'ak-dec__acts' }, [el('a', {
+        class: 'ak-btn ak-btn--primary', 'data-ak-part': 'reviewLink', href: settingsHref(lib), target: '_blank', rel: 'noopener',
+        on: { click: function () { away = true; } },
+      }, [td('decision.reviewOnNodeAction'), el('span', { class: 'ak-sr-only' }, ' ' + td('decision.newTab'))])]),
+    ]);
+  }
+
+  /** Back from the node's page: the decision is read again, with the review the person recorded. */
+  function onFocus() {
+    if (!away || destroyed) return;
+    away = false;
+    const t = storedId ? null : personTarget();
+    if (storedId) api.refresh();
+    else if (t && t.decision_id) api.set({ decisionId: String(t.decision_id) });
+  }
+  window.addEventListener('focus', onFocus);
   /** @type {'idle'|'asking'|'answered'|'failed'} */
   let phase = 'idle';
   /** @type {any} */ let result = null;
+  /** Each round's answer, in order: one for a plain ask, more through onAnswered. */
+  /** @type {any[]} */ let steps = [];
   /** The thresholds of the rule that answered, read from its record. */
   /** @type {Record<string, number>} */ let ruleThresholds = {};
   let failure = '';
@@ -268,7 +256,14 @@ export function decision(spec) {
   /** The thresholds this answer was held to: the app's, or the rule's from its record. */
   function thresholdsNow() {
     if (sample) return SAMPLE_THRESHOLDS;
+    if (storedId) return storedThresholds;
     return s.rule ? ruleThresholds : (s.thresholds || {});
+  }
+
+  /** The answer a person reviews: the latest round that waits for one, else the answer shown. */
+  function personTarget() {
+    for (let i = steps.length - 1; i >= 0; i--) if (needsPerson(steps[i])) return steps[i];
+    return result;
   }
 
   /** The provider's name as the provider list gives it, else its id. */
@@ -295,30 +290,45 @@ export function decision(spec) {
     }
     if (r.provider && r.provider.id) {
       const chosen = 'decision.chosen.' + String(r.provider.chosen_by || '');
-      const who = td('decision.who', {
+      const where = td(r.provider.kind === 'local' ? 'decision.where.local' : 'decision.where.hosted');
+      // A stored decision does not record who chose the provider, so that part is left out.
+      const who = r.provider.chosen_by ? td('decision.who', {
         provider: providerName(r.provider.id),
-        where: td(r.provider.kind === 'local' ? 'decision.where.local' : 'decision.where.hosted'),
+        where: where,
         chosen: hasWords(chosen) ? td(chosen) : String(r.provider.chosen_by || ''),
-      });
+      }) : td('decision.whoPlain', { provider: providerName(r.provider.id), where: where });
       out.push(fine('who', r.model ? who + ' ' + td('decision.model', { model: r.model }) : who));
     }
     return out;
   }
 
-  /** The person's verdict, under the threshold. */
+  /**
+   * The person's verdict: under the threshold, or at any time on a stored decision. Null when a
+   * stored decision has no earlier review and cannot be reviewed from here.
+   * @returns {HTMLElement|null}
+   */
   function drawPerson() {
     const lib = decideOf();
-    const canRecord = s.review !== false && !!(result && result.decision_id) && (sample || !!(lib && typeof lib.review === 'function'));
+    const target = personTarget();
+    const canRecord = s.review !== false && !!(target && target.decision_id) && (sample || !!(lib && typeof lib.review === 'function'));
     const box = el('div', { class: 'ak-dec__person', 'data-ak-part': 'person' });
     if (verdict) {
       box.appendChild(el('p', { class: 'ak-dec__recorded', 'data-ak-part': 'recorded' }, verdict.outcome === 'confirmed'
         ? td('decision.recorded.confirmed') : td('decision.recorded.overridden', { v: verdict.shown })));
       return box;
     }
-    box.appendChild(el('p', { class: 'ak-dec__ask-person' }, td(canRecord ? 'decision.youDecide' : 'decision.personDecides')));
-    if (!canRecord) return box;
-    const under = firstUnder(result);
-    const choices = overrideChoices(result, under);
+    if (storedId) {
+      const prev = stored && stored.record && stored.record.review;
+      if (prev) box.appendChild(el('p', { class: 'ak-dec__recorded', 'data-ak-part': 'reviewed' }, reviewedWords(prev)));
+      if (!canRecord) return prev ? box : null;
+      box.appendChild(el('p', { class: 'ak-dec__ask-person', 'data-ak-part': 'askPerson' }, td(prev ? 'decision.reviewAgain' : 'decision.reviewStored')));
+    } else {
+      box.appendChild(el('p', { class: 'ak-dec__ask-person' }, td(canRecord ? 'decision.youDecide' : 'decision.personDecides')));
+      if (!canRecord) return box;
+    }
+    if (onNodePage()) { box.appendChild(reviewOnNode(lib)); return box; }
+    const under = firstUnder(target);
+    const choices = overrideChoices(target, under);
     const noteId = uid('ak-dec-note');
     const pickId = uid('ak-dec-pick');
     const note = /** @type {HTMLInputElement} */ (el('input', {
@@ -343,7 +353,7 @@ export function decision(spec) {
       if (sample) { say(td('decision.sampleReview')); return Promise.resolve(); }
       const n = note.value.trim();
       if (n) extra.note = n;
-      return whileBusy(btn, decideOf().review(result.decision_id, outcome, extra)).then(function () {
+      return whileBusy(btn, decideOf().review(target.decision_id, outcome, extra)).then(function () {
         if (destroyed) return;
         verdict = { outcome: outcome, shown: shown };
         say(outcome === 'confirmed' ? td('decision.recorded.confirmed') : td('decision.recorded.overridden', { v: shown }));
@@ -352,7 +362,11 @@ export function decision(spec) {
         }
         draw();
       }, function (e) {
-        if (!destroyed) failSlot.appendChild(failLine(td('decision.reviewFailed', { why: errorWords(e) })));
+        if (destroyed) return;
+        // The node refuses the review from the principal that asked; the owner reviews it on the
+        // node's own page instead, and the block says so rather than failing the press again.
+        if (e && /** @type {any} */ (e).code === 'OWN_DECISION' && settingsHref(decideOf())) { forcedNode = true; draw(); return; }
+        failSlot.appendChild(failLine(td('decision.reviewFailed', { why: errorWords(e) })));
       });
     }
 
@@ -368,7 +382,7 @@ export function decision(spec) {
       override.focus();
     });
     save.addEventListener('click', function () {
-      const a = result.answers && result.answers[under];
+      const a = target.answers && target.answers[under];
       const value = a && a.type === 'noul' ? select.value === 'true' : select.value;
       const opt = choices.find(function (c) { return c.value === select.value; });
       record(save, 'overridden', { override: value }, opt ? opt.label : select.value);
@@ -382,20 +396,68 @@ export function decision(spec) {
     return box;
   }
 
+  /**
+   * The app's own word for the answers, from its verdict(result) slot. False when there is no slot
+   * or it threw (the threshold words are drawn then); null when it had nothing to say.
+   * @returns {HTMLElement|null|false}
+   */
+  function appVerdict() {
+    if (typeof s.verdict !== 'function') return false;
+    let v;
+    try { v = s.verdict(result); } catch (e) { console.warn('aimeat-atelier: decision verdict threw', e); return false; }
+    if (v == null || v === '') return null;
+    return el('div', { class: 'ak-dec__stamp', 'data-ak-part': 'verdict' }, typeof v === 'object' ? v : String(v));
+  }
+
+  /** One round's answers. A round after a rule's first is held to the spec's own thresholds. */
+  function answerList(r, round, ownWord) {
+    const list = el('ul', { class: 'ak-dec__answers', 'data-ak-part': 'answers' });
+    const ts = round > 0 && s.rule && !storedId ? (s.thresholds || {}) : thresholdsNow();
+    for (const q of Object.keys(r.answers || {})) {
+      list.appendChild(drawAnswer(q, r.answers[q], ts[q], r.passed ? r.passed[q] : undefined, labelOf(q), ownWord));
+    }
+    return list;
+  }
+
+  /** What a stored decision's record says about it: when, about what, what it decides, which rule. */
+  function storedLines(row) {
+    const rec = row.record || {};
+    const box = el('div', { class: 'ak-dec__stored', 'data-ak-part': 'stored' });
+    if (row.createdAt) box.appendChild(fine('decidedAt', td('decision.decidedAt', { at: day(row.createdAt) })));
+    const subject = rec.subject || row.subject;
+    if (subject) box.appendChild(fine('subject', td('decision.subject', { subject: subject })));
+    if (rec.gates) box.appendChild(fine('gates', td('decision.gates', { gates: rec.gates })));
+    if (row.rule) {
+      const rule = String(row.rule).replace(/^decide\.rules\./, '');
+      box.appendChild(fine('ruleRun', row.ruleVersion != null
+        ? td('decision.ruleRun', { rule: rule, version: row.ruleVersion }) : td('decision.ruleRunBare', { rule: rule })));
+    }
+    return box;
+  }
+
   function drawAnswered() {
+    if (storedId && stored) body.appendChild(storedLines(stored));
+    const stamp = appVerdict();
+    if (stamp) body.appendChild(stamp);
     if (result.outcome && hasWords('decision.outcome.' + result.outcome)) {
       body.appendChild(el('p', { class: 'ak-dec__outcome', 'data-ak-part': 'outcome', 'data-outcome': result.outcome },
         td('decision.outcome.' + result.outcome)));
     }
-    const list = el('ul', { class: 'ak-dec__answers', 'data-ak-part': 'answers' });
-    const ts = thresholdsNow();
-    for (const q of Object.keys(result.answers || {})) {
-      list.appendChild(drawAnswer(q, result.answers[q], ts[q], result.passed ? result.passed[q] : undefined, labelOf(q)));
-    }
-    body.appendChild(list);
-    if (needsPerson(result)) body.appendChild(drawPerson());
-    for (const line of facts(result)) body.appendChild(line);
-    if (!sample && !noState(state)) {
+    const ownWord = stamp !== false;
+    const rounds = steps.length > 1;
+    if (rounds) {
+      steps.forEach(function (r, i) {
+        const box = el('div', { class: 'ak-dec__step', 'data-ak-part': 'step', 'data-step': String(i + 1) });
+        box.appendChild(el('p', { class: 'ak-dec__step-title', 'data-ak-part': 'stepTitle' }, td('decision.round', { n: i + 1 })));
+        box.appendChild(answerList(r, i, ownWord));
+        for (const line of facts(r)) box.appendChild(line);
+        body.appendChild(box);
+      });
+    } else body.appendChild(answerList(result, 0, ownWord));
+    if (storedId) { const p = drawPerson(); if (p) body.appendChild(p); }
+    else if (needsPerson(personTarget())) body.appendChild(/** @type {HTMLElement} */ (drawPerson()));
+    if (!rounds) for (const line of facts(result)) body.appendChild(line);
+    if (!sample && !storedId && !noState(state)) {
       const again = el('button', { type: 'button', class: 'ak-btn ak-btn--ghost', 'data-ak-part': 'again' }, td('decision.again'));
       again.addEventListener('click', function () { whileBusy(again, api.ask()); });
       body.appendChild(el('div', { class: 'ak-dec__acts' }, [again]));
@@ -444,7 +506,8 @@ export function decision(spec) {
     const lib = decideOf();
     if (!lib) { root.setAttribute('data-ak-state', 'no-library'); body.appendChild(failLine(td('decision.noLib'))); return; }
     if (signedOut()) { root.setAttribute('data-ak-state', 'signed-out'); body.appendChild(fine('signIn', td('decision.signIn'))); return; }
-    if (!s.rule && !s.questions) { root.setAttribute('data-ak-state', 'failed'); body.appendChild(failLine(td('decision.noQuestions'))); return; }
+    if (storedId) { await drawStored(lib, mine); return; }
+    if (!s.rule && !questions) { root.setAttribute('data-ak-state', 'failed'); body.appendChild(failLine(td('decision.noQuestions'))); return; }
     let available = true;
     if (typeof lib.isAvailable === 'function') {
       try { available = !!(await lib.isAvailable()); } catch { available = false; }
@@ -492,6 +555,49 @@ export function decision(spec) {
     ]));
   }
 
+  /**
+   * A stored decision: read once through AIMEAT.decide.decisions({ id }), then drawn with its record
+   * and the review. Nothing is asked. A redraw while the read is out waits for the same read.
+   * @param {any} lib @param {number} mine
+   */
+  async function drawStored(lib, mine) {
+    if (typeof lib.decisions !== 'function') {
+      root.setAttribute('data-ak-state', 'no-library');
+      body.appendChild(failLine(td('decision.noLib')));
+      return;
+    }
+    if (!storedLoad) {
+      const id = storedId;
+      storedLoad = Promise.resolve().then(function () { return lib.decisions({ id: id }); })
+        .then(function (row) { return { row: row }; }, function (err) { return { err: err }; });
+    }
+    root.setAttribute('data-ak-state', 'loading');
+    root.setAttribute('aria-busy', 'true');
+    body.appendChild(fine('loading', td('decision.loading')));
+    const got = await storedLoad;
+    if (mine !== drawn || destroyed) return;
+    root.removeAttribute('aria-busy');
+    clear(body);
+    const row = got.row;
+    if (!row || typeof row !== 'object' || !row.record) {
+      const err = got.err;
+      root.setAttribute('data-ak-state', 'failed');
+      body.appendChild(failLine(!err || err.code === 'NOT_FOUND' ? td('decision.storedMissing')
+        : td('decision.storedFailed', { why: errorWords(err) })));
+      const retry = el('button', { type: 'button', class: 'ak-btn', 'data-ak-part': 'retry' }, td('decision.retry'));
+      retry.addEventListener('click', function () { whileBusy(retry, api.refresh()); });
+      body.appendChild(el('div', { class: 'ak-dec__acts' }, [retry]));
+      return;
+    }
+    stored = row;
+    const read = fromRow(row);
+    result = read.result;
+    storedThresholds = read.thresholds;
+    steps = [result];
+    root.setAttribute('data-ak-state', 'stored');
+    drawAnswered();
+  }
+
   /** The rule's handle, read once: its fields and its ask(). A failed read is tried again next time. */
   function ruleOf(lib) {
     if (!ruleHandle) {
@@ -501,37 +607,63 @@ export function decision(spec) {
     return ruleHandle;
   }
 
-  /** Put the question to the model, the one way the spec names. */
-  async function put(lib) {
+  /**
+   * Put one round to the model, the one way the spec names. The first round of a rule runs the rule;
+   * every other round asks `qs`.
+   * @param {any} lib @param {any} qs @param {number} round
+   */
+  async function put(lib, qs, round) {
     /** @type {Record<string, any>} */
     const opts = { app_id: s.appId };
     if (s.subject) opts.subject = s.subject;
     const chosen = s.provider === 'pick' ? pick : s.provider;
     if (chosen) opts.provider = chosen;
-    if (s.rule) {
+    if (names) opts.names = names;
+    if (s.rule && round === 0) {
       const handle = await ruleOf(lib);
       ruleThresholds = (handle && handle.thresholds) || {};
       return handle.ask(state, opts);
     }
     if (s.gates) opts.gates = s.gates;
-    if (s.thresholds && typeof lib.gate === 'function') return lib.gate(state, s.questions, s.thresholds, opts);
-    return lib.ask(state, s.questions, opts);
+    if (s.thresholds && typeof lib.gate === 'function') return lib.gate(state, qs, s.thresholds, opts);
+    return lib.ask(state, qs, opts);
+  }
+
+  /**
+   * Every round of one ask: the first, then each set onAnswered returns, up to MAX_ROUNDS. Stops
+   * when the hook returns nothing, or when a newer ask or a destroy makes the answers stale.
+   * @param {any} lib @param {number} mine @returns {Promise<any[]>}
+   */
+  async function rounds(lib, mine) {
+    const done = [await put(lib, questions, 0)];
+    while (typeof s.onAnswered === 'function' && done.length < MAX_ROUNDS && !destroyed && mine === asked) {
+      const nextSet = await s.onAnswered(done[done.length - 1], done.length - 1);
+      if (!nextSet || typeof nextSet !== 'object' || !Object.keys(nextSet).length || destroyed || mine !== asked) break;
+      say(td('decision.askingRound', { n: done.length + 1 }));
+      done.push(await put(lib, nextSet, done.length));
+    }
+    return done;
   }
 
   const api = {
     el: root,
     /**
-     * Ask about `state` (or the state already given). Resolves with the decide result, or null when
-     * nothing was asked or the question failed; the block shows why.
-     * @param {any} [next]
+     * Ask about `state` (or the state already given), with `qs` as the question set from now on when
+     * given, and `more.names` as the names to take out. Resolves with the decide result (the last
+     * round's, plus `steps` when onAnswered asked more than one round), or null when nothing was
+     * asked or the question failed; the block shows why. A stored decision is never asked: null.
+     * @param {any} [next] @param {Record<string, any>} [qs] @param {{ names?: string[] }} [more]
      * @returns {Promise<any>}
      */
-    async ask(next) {
+    async ask(next, qs, more) {
       if (destroyed) return null;
       if (next !== undefined) state = next;
+      if (qs != null) questions = qs;
+      if (more && Array.isArray(more.names)) names = more.names;
       if (sample) { result = Object.assign({}, SAMPLE); await draw(); return result; }
+      if (storedId) return null;
       const lib = decideOf();
-      if (!lib || signedOut() || (!s.rule && !s.questions) || noState(state)) {
+      if (!lib || signedOut() || (!s.rule && !questions) || noState(state)) {
         phase = 'idle'; result = null; await draw(); return null;
       }
       if (typeof lib.isAvailable === 'function') {
@@ -545,9 +677,11 @@ export function decision(spec) {
       root.setAttribute('aria-busy', 'true');
       say(td('decision.asking'));
       await draw();
-      let r = null;
+      /** @type {any[]} */ let done = [];
       let err = null;
-      try { r = await put(lib); } catch (e) { err = e; }
+      try { done = await rounds(lib, mine); } catch (e) { err = e; }
+      const last = done[done.length - 1];
+      const r = done.length > 1 ? Object.assign({}, last, { steps: done.slice() }) : last;
       // A newer ask or a destroy while this one was out: its answer describes nothing on screen.
       if (destroyed || mine !== asked) return err ? null : r;
       root.removeAttribute('aria-busy');
@@ -555,23 +689,55 @@ export function decision(spec) {
         phase = 'failed';
         failure = errorWords(err);
         result = null;
+        steps = [];
         say('');
         await draw();
         return null;
       }
       phase = 'answered';
       result = r;
+      steps = done;
       say(td('decision.answered'));
       if (typeof s.onOutcome === 'function') {
-        try { s.onOutcome(Object.assign({}, r, { needsPerson: needsPerson(r) })); } catch (e) { console.warn('aimeat-atelier: decision onOutcome threw', e); }
+        try { s.onOutcome(Object.assign({}, r, { needsPerson: done.some(needsPerson) })); } catch (e) { console.warn('aimeat-atelier: decision onOutcome threw', e); }
       }
       await draw();
       return r;
     },
-    /** Read availability and the providers again, and draw. */
+    /**
+     * Change what is asked, or which stored decision is drawn, and draw again; nothing is asked. A new
+     * state, question set or decision id clears the answer on screen, which described the old one.
+     * @param {{ questions?: Record<string, any>, state?: any, names?: string[], decisionId?: string }} patch
+     * @returns {Promise<void>}
+     */
+    async set(patch) {
+      if (!patch || destroyed) return;
+      if (patch.names !== undefined) names = Array.isArray(patch.names) ? patch.names : null;
+      const fresh = patch.questions !== undefined || patch.state !== undefined || patch.decisionId !== undefined;
+      if (patch.questions !== undefined) questions = patch.questions;
+      if (patch.state !== undefined) state = patch.state;
+      if (patch.decisionId !== undefined) {
+        storedId = patch.decisionId ? String(patch.decisionId) : '';
+        stored = null;
+        storedLoad = null;
+        storedThresholds = {};
+      }
+      if (fresh) {
+        asked++;
+        phase = 'idle';
+        result = null;
+        steps = [];
+        verdict = null;
+        root.removeAttribute('aria-busy');
+        say('');
+      }
+      await draw();
+    },
+    /** Read availability, the providers and a stored decision again, and draw. */
     async refresh() {
       providerList = null;
       providerError = '';
+      if (storedId) { stored = null; storedLoad = null; verdict = null; }
       await draw();
     },
     destroy() {
@@ -579,6 +745,7 @@ export function decision(spec) {
       drawn++;
       asked++;
       stop();
+      window.removeEventListener('focus', onFocus);
       if (root.parentNode) root.parentNode.removeChild(root);
     },
   };

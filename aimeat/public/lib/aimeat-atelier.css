@@ -48,7 +48,19 @@
  *   look presets ([data-ak-look]) · reduced-motion
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
+ *
+ *   A PAGE WITHOUT THE APP FRAME PICKS ITS LOOK ON <html> OR <body>. A Classic page that uses kit
+ *   blocks has no `.ak-app` to carry `data-ak-look`; `<html data-ak-look="flat">` (or the same on
+ *   <body>) is the one way to give all its blocks, and the layers the kit puts on the body, one
+ *   look. The contract below sits in :where() so a look on <html> wins over it, and dom.js
+ *   wearLook reads the page's look for a dialog, a menu or a toast. Inside an app frame the
+ *   frame's own data-ak-look wins.
  * @version-history
+ *   v0.63.0 — 2026-10-02 — The light and dark contract blocks sit in :where(:root), zero
+ *     specificity, so `data-ak-look` on <html> takes effect: before, the contract's :root tied with
+ *     the imported look block on the same element and won by coming later
+ *     (wish-a-page-with-kit-blocks-but-no-kit-app-frame-cannot-pick-the-). A page's own `:root`
+ *     or `html` rule for an --ak-* token now wins over the contract wherever it sits.
  *   v0.62.0 — 2026-10-01 — workflow.css (a workflow step waiting for a person) and ai-task.css (one
  *     question to the person's own AI) join the imports, and doc-decision.css (one markdown
  *     document, one decision with its review).
@@ -396,9 +408,16 @@
 /* ══════════════════════════════════════════════════════════════════════════════════════════
    THE CONTRACT — light. Set these to author a look; do not override component selectors.
    The base values ARE the vivid preset.
+
+   :where() HOLDS THE CONTRACT AT ZERO SPECIFICITY, so a look named on <html> wins over it. The
+   looks are imported above and therefore come first; with a bare :root (0,1,0) the contract tied
+   with `[data-ak-look='flat']` (0,1,0) on the same element and won by coming later, so
+   `<html data-ak-look="flat">` did nothing and a look reached only a descendant. A page with kit
+   blocks and no app frame names its look on <html> or <body>; inside an app frame the frame's
+   own data-ak-look still wins, as the nearer element.
    ══════════════════════════════════════════════════════════════════════════════════════════ */
 /* @preset-block vivid */
-:root {
+:where(:root) {
   /* ── Surfaces and ink ─────────────────────────────────────────────────────────────────── */
   --ak-bg:            var(--color-base-100, #f3f5f8);   /* the page                          */
   --ak-surface:       var(--color-base-200, #ffffff);   /* cards, bars, panels               */
@@ -640,7 +659,7 @@
    THE CONTRACT — dark. Same names, dark literals. A look re-declares only what it changes.
    ══════════════════════════════════════════════════════════════════════════════════════════ */
 /* @preset-block vivid-dark */
-:root[data-theme='dark'] {
+:where(:root[data-theme='dark']) {
   /* Dark with a SOUL: the surfaces lean toward the accent instead of sitting on neutral grey —
    * the "sieluton harmaa" verdict was about exactly these three tokens. A few percent of hue
    * on a near-black ground changes the temperature of the whole app without touching a single

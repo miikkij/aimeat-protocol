@@ -33,20 +33,45 @@
  *   FOLLOWING THE PICKER. `app` with no org and no ws: both components open on the workspace the
  *   app chose (workspace-choice.js) and say "choose above" until then.
  *
+ *   LABELS PER LANGUAGE. A field's stored label may be text, or an object of languages
+ *   ({ en, fi, es }); the node stores a field as it is given and returns it in the public descriptor,
+ *   so intakeForm reads such a label (and a choice's label written the same way) in the page
+ *   language, then English, then the first language given. `label(field)` has the last word: a
+ *   string replaces the label, null or '' keeps it. The visitor's language change draws the form
+ *   again and keeps what was typed.
+ *
+ *   THE APP'S OWN CREATE AND ROW ACTIONS. intakeAdmin's Create is a field builder. An app with fixed
+ *   fields and defaults passes `create(name)`: Create then asks only for a name and calls it; it
+ *   answers a definition, which the block saves with defineForm (organism_id and ws filled in when
+ *   missing), or nothing after saving itself, and the list is read again. `actions` adds the app's
+ *   own buttons to each form's row, as members() does: run(form) is called, a refusal it answers or
+ *   throws is said at the top, and the list is read again when it settles.
+ *
  *   THE SAMPLE STATE. `sample: true`, or an org, ws or form id that is missing or still a fill's
  *   <placeholder>, draws built-in sample content marked as such, and sends and changes nothing.
  * @parts intakeForm root · title · hint · failure · form · field · label · req · input · choice · error · honeypot · bar · send · sent
+ * @slots intakeForm label(field)
  * @tokens intakeForm --ak-intake-width
- * @fork intakeForm Copying it out means calling AIMEAT.intake.getForm(), fields() and submit() yourself, drawing a hidden input named form.honeypot_field and sending its value, and putting err.field on its field.
- * @parts intakeAdmin root · title · intro · failure · notice · forms · row · meta · acts · copy · delete · create · fieldRows · addField · removeField · save
- * @slots intakeAdmin link(form)
+ * @fork intakeForm Copying it out means calling AIMEAT.intake.getForm(), fields() and submit() yourself, drawing a hidden input named form.honeypot_field and sending its value, putting err.field on its field, and reading a label written per language in the page language.
+ * @parts intakeAdmin root · title · intro · failure · notice · forms · row · meta · acts · copy · action · delete · create · createName · fieldRows · addField · removeField · save
+ * @slots intakeAdmin link(form) · create(name) · actions[{ label, run(form), tone? }]
  * @tokens intakeAdmin --ak-intake-width
  * @fork intakeAdmin Copying it out means calling AIMEAT.intake.listForms(), deleteForm() and defineForm() yourself, and building each form's link, its allowed and required fields and its honeypot.
- * @structure intakeForm(spec) · intakeAdmin(spec) (helpers: intakeOf · signedOut · linkedFormId · sampleForm · slug)
+ * @structure intakeForm(spec) · intakeAdmin(spec) (helper: slug; the shared helpers are in
+ *   intake-form-helpers.js: intakeOf · signedOut · linkedFormId · sampleForm · inLanguage · labelled · isDefinition)
  * @usage
  *   AIMEAT.atelier.intakeForm({ target: '#contact', org, ws, formId: 'contact-us' });
+ *   AIMEAT.atelier.intakeForm({ target: '#contact', org, ws, formId: 'leads', label: (f) => myWords[f.name] || null });
  *   AIMEAT.atelier.intakeAdmin({ target: '#forms', org, ws, namespace: 'leads' });
+ *   AIMEAT.atelier.intakeAdmin({ target: '#forms', org, ws, create: (name) => leadForm(name),
+ *     actions: [{ label: 'Build the page with AI', run: (form) => openPrompt(form) }] });
  * @version-history
+ *   v0.63.0 — 2026-10-02 — intakeForm: a stored label may be { en, fi, es } and is read in the page
+ *     language; `label(field)` relabels a field. intakeAdmin: `create(name)` replaces the field
+ *     builder with one name field, and `actions` adds the app's own buttons to each row
+ *     (wish-workspacepicker-intakeform-and-intakeadmin-what-cadence-need, parts 2 and 3). The
+ *     constants and helpers both components share moved unchanged to intake-form-helpers.js (pure
+ *     extraction: this file had passed the 800-line ceiling).
  *   v0.62.2 — 2026-10-02 — The link shown for Ctrl+C is set as the span's text rather than passed as
  *     a child, so the address taken from the page's URL reaches the page only through textContent
  *     (CodeQL js/xss, alert 1694).
@@ -59,89 +84,22 @@
 import { el, clear, resolve, uid, enter, whileBusy, attention } from './dom.js';
 import { t } from './i18n.js';
 import { ti } from './intake-connect-i18n.js';
-import { isPlaceholder, sampleBadge, watch, ask, refusal } from './members-shared.js';
+import { sampleBadge, watch, ask, refusal } from './members-shared.js';
 import { followsWorkspace, followWorkspace } from './workspace-choice.js';
 import { copy, selectForHand } from './copy.js';
-
-/** The ten types fields() answers, in the order the Create form offers them. */
-const TYPES = ['text', 'textarea', 'email', 'tel', 'url', 'number', 'date', 'select', 'radio', 'checkbox'];
-
-/** The honeypot every form made here carries: a name a crawler fills and a person never sees. */
-const HONEYPOT = 'company_url';
-
-/** The node's form id rule (routes/organisms/intake.ts FORM_ID_RE). */
-const FORM_ID_RE = /^[a-z0-9][a-z0-9-]{1,63}$/;
-
-/** The page's AIMEAT.intake, or null. */
-function intakeOf() {
-  const ns = /** @type {any} */ (window).AIMEAT;
-  return ns && ns.intake ? ns.intake : null;
-}
-
-/** True when the page knows for certain that nobody is signed in. */
-function signedOut() {
-  const ns = /** @type {any} */ (window).AIMEAT;
-  const auth = ns && ns.auth;
-  return !!(auth && typeof auth.getSession === 'function' && !auth.getSession());
-}
-
-/** The form id a copied link carries (`?form=`), or ''. */
-function linkedFormId() {
-  try {
-    return new URLSearchParams(window.location.search || '').get('form') || '';
-  } catch {
-    return '';
-  }
-}
-
-/** The organism and workspace a copied link carries (`?org=&ws=`), or null. */
-function linkedWorkspace() {
-  try {
-    const q = new URLSearchParams(window.location.search || '');
-    const org = q.get('org') || '';
-    const ws = q.get('ws') || '';
-    return org && ws ? { org: org, ws: ws } : null;
-  } catch {
-    return null;
-  }
-}
-
-/** Whether a prop is missing or still a fill's placeholder. */
-function unset(v) {
-  return !v || isPlaceholder(v);
-}
-
-/**
- * The sample form: every type once, in the shape fields() answers. Built at draw time so the
- * labels follow the language.
- * @returns {{ title: string, honeypot_field: string, fields: any[] }}
- */
-function sampleForm() {
-  const opt = function (keys) { return keys.map(function (k) { return { value: k, label: ti('intake.sample.' + k) }; }); };
-  return {
-    title: '',
-    honeypot_field: HONEYPOT,
-    fields: [
-      { name: 'name', label: ti('intake.sample.name'), type: 'text', required: true, maxLength: 200 },
-      { name: 'email', label: ti('intake.sample.email'), type: 'email', required: true, maxLength: 320 },
-      { name: 'phone', label: ti('intake.sample.phone'), type: 'tel', required: false, maxLength: 40 },
-      { name: 'site', label: ti('intake.sample.site'), type: 'url', required: false, maxLength: 400 },
-      { name: 'people', label: ti('intake.sample.people'), type: 'number', required: false },
-      { name: 'day', label: ti('intake.sample.day'), type: 'date', required: false },
-      { name: 'topic', label: ti('intake.sample.topic'), type: 'select', required: true, options: opt(['order', 'question', 'other']) },
-      { name: 'found', label: ti('intake.sample.found'), type: 'radio', required: false, options: opt(['friend', 'search', 'social']) },
-      { name: 'message', label: ti('intake.sample.message'), type: 'textarea', required: true, maxLength: 4000 },
-      { name: 'consent', label: ti('intake.sample.consent'), type: 'checkbox', required: false },
-    ],
-  };
-}
+import {
+  TYPES, HONEYPOT, FORM_ID_RE, intakeOf, signedOut, linkedFormId, linkedWorkspace, unset, sampleForm,
+  labelled, SAMPLE_FORMS, isDefinition,
+} from './intake-form-helpers.js';
 
 // ── intakeForm: the visitor's side ────────────────────────────────────────────────────────────
 
 /**
- * One public form, drawn from its stored definition.
+ * One public form, drawn from its stored definition. `label(field, lang)` relabels a field: a
+ * string replaces the stored label, null keeps it.
  * @param {{ target?: string|Element, org?: string, ws?: string, app?: string, formId?: string, title?: string,
  *   hint?: string, sample?: boolean,
+ *   label?: (field: { name: string, label: string, type: string, required: boolean }, lang: string) => string|null|undefined,
  *   onSent?: (values: Record<string, any>, answer: any) => void }} spec
  * @returns {{ el: HTMLElement, refresh: () => Promise<void>, destroy: () => void }}
  */
@@ -195,6 +153,7 @@ export function intakeForm(spec) {
       if (mine !== gen) return;
       list = typeof lib.fields === 'function' ? lib.fields(def) : [];
     }
+    list = labelled(def, list, spec.label);
     clear(root);
     heading(def);
     draw(def, list, kept);
@@ -424,12 +383,6 @@ export function intakeForm(spec) {
 
 // ── intakeAdmin: the owner's forms ────────────────────────────────────────────────────────────
 
-/** The owner's list in the sample, shaped like listForms() answers. */
-const SAMPLE_FORMS = [
-  { form_id: 'contact-us', title: 'Contact us', enabled: true, discoverable: true, mode: 'publish', allowed_fields: ['name', 'email', 'message'], submissions: 12 },
-  { form_id: 'frm_q7k2m9x4w1p8z3n6', title: 'Autumn party RSVP', enabled: true, discoverable: false, mode: 'draft', allowed_fields: ['name', 'people'], submissions: 1 },
-];
-
 /**
  * A field key from what the owner typed as its label: small letters, numbers and underscores.
  * @param {string} label
@@ -441,9 +394,17 @@ function slug(label) {
 }
 
 /**
- * The owner's public forms in one workspace: the list, Copy link, Delete, and Create.
+ * One button the app adds to each form's row.
+ * @typedef {{ label: string, run: (form: any) => any, tone?: 'primary'|'ghost'|'danger' }} IntakeAction
+ */
+
+/**
+ * The owner's public forms in one workspace: the list, Copy link, Delete, and Create. With
+ * `create(name)` the app makes the form from a name; `actions` adds the app's own buttons per row.
  * @param {{ target?: string|Element, org?: string, ws?: string, app?: string, namespace?: string, title?: string,
- *   sample?: boolean, link?: (form: any) => string }} spec
+ *   sample?: boolean, link?: (form: any) => string,
+ *   create?: (name: string) => Promise<Record<string, any>|void>|Record<string, any>|void,
+ *   actions?: IntakeAction[] }} spec
  * @returns {{ el: HTMLElement, refresh: () => Promise<void>, destroy: () => void }}
  */
 export function intakeAdmin(spec) {
@@ -459,7 +420,7 @@ export function intakeAdmin(spec) {
   /** @type {HTMLElement|null} */
   let createHost = null;
   /** What the owner is typing into Create; kept across a redraw so a refusal loses nothing. */
-  const draft = { formId: '', title: '', namespace: spec.namespace || '', rows: [{ label: '', type: 'text', required: false, options: '' }] };
+  const draft = { name: '', formId: '', title: '', namespace: spec.namespace || '', rows: [{ label: '', type: 'text', required: false, options: '' }] };
 
   async function act(work, done) {
     failure = ''; notice = '';
@@ -483,6 +444,23 @@ export function intakeAdmin(spec) {
     const here = String(window.location.href || '').split(/[?#]/)[0];
     return here + '?form=' + encodeURIComponent(f.form_id)
       + '&org=' + encodeURIComponent(spec.org) + '&ws=' + encodeURIComponent(spec.ws);
+  }
+
+  /**
+   * The app's own buttons for one form's row. run(form) is called; what it answers or throws as a
+   * refusal is said at the top, and the list is read again when it settles.
+   * @param {any} f
+   * @returns {HTMLElement[]}
+   */
+  function ownActions(f) {
+    return (Array.isArray(spec.actions) ? spec.actions : []).filter(function (a) {
+      return a && a.label && typeof a.run === 'function';
+    }).map(function (a) {
+      const b = button(String(a.label), a.tone || 'ghost', 'action', function () {
+        whileBusy(b, act(function () { return a.run(f); }));
+      });
+      return b;
+    });
   }
 
   function countOf(f) {
@@ -559,6 +537,7 @@ export function intakeAdmin(spec) {
               else tellByHand(url);
             });
           }),
+        ].concat(ownActions(f), [
           button(ti('intake.delete'), 'ghost', 'delete', function () {
             ask({
               title: ti('intake.confirmDelete', { name: name }), text: ti('intake.confirmDeleteText'),
@@ -567,7 +546,7 @@ export function intakeAdmin(spec) {
               if (yes) act(function () { return lib.deleteForm(spec.org, spec.ws, f.form_id); }, function () { return ti('intake.deleted'); });
             });
           }),
-        ]),
+        ])),
       ]);
     });
     root.appendChild(el('div', { class: 'ak-intake__group', 'data-ak-part': 'forms' }, [
@@ -587,11 +566,11 @@ export function intakeAdmin(spec) {
   }
 
   /** A labelled input bound to one key of the draft. */
-  function text(label, key, hint) {
+  function text(label, key, hint, part) {
     const id = uid('ak-intake-new');
     const input = /** @type {HTMLInputElement} */ (el('input', { type: 'text', id: id, class: 'ak-input', value: draft[key], disabled: sample ? true : null, autocomplete: 'off' }));
     input.addEventListener('input', function () { draft[key] = input.value; });
-    return el('div', { class: 'ak-form__field' }, [
+    return el('div', { class: 'ak-form__field', 'data-ak-part': part || null }, [
       el('label', { class: 'ak-form__label', for: id }, label),
       input,
       hint ? el('p', { class: 'ak-form__hint' }, hint) : null,
@@ -620,10 +599,36 @@ export function intakeAdmin(spec) {
     ].filter(Boolean));
   }
 
+  /**
+   * Create by name, when the app supplies create(name): one field and one button. The app answers a
+   * definition, which is saved here, or nothing after saving it itself.
+   */
+  function drawCreateByName(lib, host) {
+    const save = button(ti('intake.save'), 'primary', 'save', function () {
+      const name = draft.name.trim();
+      act(function () {
+        return Promise.resolve(spec.create(name)).then(function (def) {
+          if (!isDefinition(def)) return def;
+          return lib.defineForm(Object.assign({ organism_id: spec.org, ws: spec.ws }, def));
+        });
+      }, function (r) {
+        draft.name = '';
+        const made = (r && r.form_id) || name;
+        return made ? ti('intake.created', { name: made }) : ti('intake.createdPlain');
+      });
+    });
+    [
+      el('h4', { class: 'ak-intake__group-title' }, ti('intake.create')),
+      text(ti('intake.createName'), 'name', '', 'createName'),
+      el('div', { class: 'ak-intake__bar' }, [save]),
+    ].forEach(function (n) { host.appendChild(n); });
+  }
+
   /** The Create panel, drawn into its own host so adding a field reads nothing from the node. */
   function drawCreate(lib) {
     if (!createHost) return;
     clear(createHost);
+    if (typeof spec.create === 'function') { drawCreateByName(lib, createHost); return; }
     const save = button(ti('intake.save'), 'primary', 'save', function () {
       const id = draft.formId.trim().toLowerCase();
       const namespace = draft.namespace.trim();

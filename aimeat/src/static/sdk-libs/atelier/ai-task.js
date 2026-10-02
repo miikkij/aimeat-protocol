@@ -17,63 +17,191 @@
  *                 button off and says why under it
  *     busy        the button is held busy and a status line says the AI is working
  *     answered    the answer (markdown through AIMEAT.md when it is loaded, else text), the visible
- *                 AI label through AIMEAT.ai.disclose(), the model, a cost line from r.budget, and
- *                 a note when the answer was cut at the length limit
+ *                 AI label through AIMEAT.ai.disclose(), the model, the date and time it was made,
+ *                 a cost line from r.budget, and a note when the answer was cut at the length limit
+ *     stored      a result the app kept (spec `result`, or show(result)) is drawn the same way,
+ *                 with its own provenance, model and date, and no AI call; the cost line is left
+ *                 out, because "today" in a stored budget is the day the answer was made
  *     error       words for each code the library throws; SPEND_CANCELLED says nothing
  *
- *   WHAT FETCHES. Nothing here fetches: every call goes through AIMEAT.ai, which spends the signed-in
- *   person's own budget on their own provider. The block redraws on a sign-in, a sign-out and a
- *   language change (members-shared watch()).
+ *   A STRUCTURED ANSWER. With `schema` the call goes through completeJson() and the result carries
+ *   `parsed`. With `render` a function, the block calls render(result, host) for a fresh answer and
+ *   for a stored one alike, and the app draws its own cards from result.parsed into host; without
+ *   it the object is shown as JSON. A fresh result gets `at` (an ISO time) before onResult sees it,
+ *   so the record the app keeps can be shown again with its date.
+ *
+ *   WHAT FETCHES. Nothing here fetches and nothing here writes memory: every call goes through
+ *   AIMEAT.ai, which spends the signed-in person's own budget on their own provider, and the app
+ *   keeps the results itself. The block redraws on a sign-in, a sign-out and a language change
+ *   (members-shared watch()).
  *
  *   THE SECOND ROUTE. With `copyPrompt: true` the kit's promptPanel sits under the block: copy the
  *   prompt into any AI chat and paste the answer back, for a person whose AI is not connected here.
  *   A pasted answer is drawn like a model answer, says where it came from, and reaches onResult with
  *   `pasted: true` and no provenance record.
- * @parts aiTask root · title · hint · notice · signIn · label · input · reason · bar · run · status · failure · result · aiLabel · body · meta · model · cost · truncated · copyRoute
+ * @parts aiTask root · title · sample · hint · notice · signIn · field · label · input · reason · bar · run · status · failure · result · aiLabel · body · meta · model · made · cost · truncated · copyRoute · copyTitle
  * @variants aiTask compact
  * @tokens aiTask --ak-ai-width
- * @fork aiTask Copying it out means calling AIMEAT.ai.capabilities(), complete() or completeJson(), disclose() and AIMEAT.md.render() yourself, writing the no-AI, signed-out and error words in three languages, and holding the button busy.
- * @structure aiTask(spec) (helpers: aiOf · authOf · signedOut · unset · money · errorWords)
+ * @fork aiTask Copying it out means calling AIMEAT.ai.capabilities(), complete() or completeJson(), disclose() and AIMEAT.md.render() yourself, writing the no-AI, signed-out and error words in three languages, holding the button busy, and drawing a stored answer again with its label and date.
+ * @structure exported helpers, shared with ai-chat.js (aiOf · authOf · signedOut · unset · money ·
+ *   errorWords · probeAi · aiNotice · sampleMark · aiLabelInto · drawText · madeWhen) · aiTask(spec)
  * @usage
  *   AIMEAT.atelier.aiTask({ target: '#ask', appId: 'my-app', title: 'Read my situation',
  *     input: { placeholder: 'Describe it in your own words', minChars: 10 },
  *     prompt: (text) => 'Analyse this situation:\n' + text, copyPrompt: true,
  *     onResult: (r) => save(r.content, r.provenance) });
+ *   // A structured answer the app keeps, drawn again later from its archive:
+ *   const task = AIMEAT.atelier.aiTask({ target: '#go', appId: 'my-app', schema: SHAPE,
+ *     prompt: (text) => buildPrompt(text), render: (r, host) => drawCards(r.parsed, host),
+ *     onResult: (r) => AIMEAT.data.set('my-app.analyses.' + id, r) });
+ *   task.show(await AIMEAT.data.get('my-app.analyses.' + id));
  * @version-history
+ *   v0.63.0 — 2026-10-02 — A stored result: `result` in the spec and show(result) on the handle draw
+ *     an answer the app kept, with its AI label, model and date, without calling the AI. A fresh
+ *     result gets `at`. render(result, host) draws both. The meta line has the date (part `made`).
+ *     The shared helpers are exported for aiChat (ai-chat.js).
  *   v0.62.1 — 2026-10-01 — The cost line's amounts go through _core/format.js money() in the
  *     currency the budget names (default USD), not a hand-made "$0.00", so a Finnish reader sees
  *     their own number format.
  *   v0.62.0 — 2026-10-01 — Initial.
  */
 import { el, clear, resolve, uid, enter, attention } from './dom.js';
-import { money as fmtMoney } from '../_core/format.js';
+import { money as fmtMoney, dateTime } from '../_core/format.js';
 import { t } from './i18n.js';
 import { tai } from './ai-task-i18n.js';
 import { isPlaceholder, sampleBadge, watch } from './members-shared.js';
 import { promptPanel } from './workbench-parts.js';
 import { applyVariant } from './parts-model.js';
 
-/** The page's AIMEAT.ai, or null. */
-function aiOf() {
+/** The page's AIMEAT.ai, or null. @returns {any} */
+export function aiOf() {
   const ns = /** @type {any} */ (window).AIMEAT;
   return ns && ns.ai ? ns.ai : null;
 }
 
-/** The page's AIMEAT.auth, or null. */
-function authOf() {
+/** The page's AIMEAT.auth, or null. @returns {any} */
+export function authOf() {
   const ns = /** @type {any} */ (window).AIMEAT;
   return ns && ns.auth ? ns.auth : null;
 }
 
-/** True when the page knows for certain that nobody is signed in. */
-function signedOut() {
+/** True when the page knows for certain that nobody is signed in. @returns {boolean} */
+export function signedOut() {
   const auth = authOf();
   return !!(auth && typeof auth.getSession === 'function' && !auth.getSession());
 }
 
-/** Whether a prop is missing or still a fill's placeholder. */
-function unset(v) {
+/** Whether a prop is missing or still a fill's placeholder. @param {any} v @returns {boolean} */
+export function unset(v) {
   return !v || isPlaceholder(v);
+}
+
+/**
+ * Which AI route this page has, for one app id. Spends nothing: capabilities() plans the call
+ * without making it.
+ * @param {string} appId
+ * @param {boolean} sample  the block is a sample, so nothing is asked
+ * @returns {Promise<{ avail: 'sample'|'nolib'|'signedout'|'off'|'on', fix: string }>}
+ */
+export async function probeAi(appId, sample) {
+  if (sample) return { avail: 'sample', fix: '' };
+  const lib = aiOf();
+  if (!lib) return { avail: 'nolib', fix: '' };
+  if (signedOut()) return { avail: 'signedout', fix: '' };
+  if (typeof lib.capabilities === 'function') {
+    try {
+      const caps = await lib.capabilities({ app_id: appId });
+      const text = caps && caps.capabilities && caps.capabilities.text;
+      if (text && text.on === false) return { avail: 'off', fix: String(text.fix || text.message || text.reason || '') };
+      if (text && text.on === true) return { avail: 'on', fix: '' };
+    } catch (e) {
+      // A node without GET /v1/ai/capabilities: isAvailable() below answers instead.
+      console.debug('aimeat-atelier: AI capabilities not read', e);
+    }
+  }
+  if (typeof lib.isAvailable === 'function') {
+    const ok = await Promise.resolve(lib.isAvailable()).catch(function () { return false; });
+    return ok ? { avail: 'on', fix: '' } : { avail: 'off', fix: '' };
+  }
+  return { avail: 'on', fix: '' };
+}
+
+/**
+ * The line that says why the AI route is not here and what to do, with a Sign in button through
+ * AIMEAT.auth.signIn() when nobody is signed in and the page has the library. Empty when the
+ * route is here.
+ * @param {string} block  the BEM block of the caller, e.g. 'aitask' or 'aichat'
+ * @param {{ avail: string, fix: string }} st
+ * @param {boolean} [copy]  the block offers the copy-the-prompt route
+ * @returns {HTMLElement[]}
+ */
+export function aiNotice(block, st, copy) {
+  let words = '';
+  if (st.avail === 'sample') words = tai('aiTask.sampleNote');
+  else if (st.avail === 'nolib') words = copy ? tai('aiTask.noLibCopy') : tai('aiTask.noLib');
+  else if (st.avail === 'signedout') words = tai('aiTask.signIn');
+  else if (st.avail === 'off') words = st.fix || tai('aiTask.off');
+  if (!words) return [];
+  const out = [el('p', { class: 'ak-' + block + '__notice', 'data-ak-part': 'notice' }, words)];
+  const auth = authOf();
+  if (st.avail === 'signedout' && auth && typeof auth.signIn === 'function') {
+    const b = el('button', { type: 'button', class: 'ak-btn ak-btn--primary', 'data-ak-part': 'signIn', 'data-ak-noguard': true }, tai('aiTask.signInBtn'));
+    b.addEventListener('click', function () {
+      // The click is the user gesture that opens the sign-in window; the login event redraws.
+      Promise.resolve(auth.signIn()).catch(function (e) { console.debug('aimeat-atelier: sign-in closed', e); });
+    });
+    out.push(el('div', { class: 'ak-' + block + '__bar', 'data-ak-part': 'bar' }, [b]));
+  }
+  return out;
+}
+
+/** The kit's sample badge, named as a part of the AI blocks. @returns {HTMLElement} */
+export function sampleMark() {
+  const b = sampleBadge();
+  b.setAttribute('data-ak-part', 'sample');
+  return b;
+}
+
+/**
+ * The visible AI label from a provenance record, through AIMEAT.ai.disclose(), which draws nothing
+ * when no label is owed. A stored record works the same as a fresh one.
+ * @param {HTMLElement} host
+ * @param {any} provenance
+ * @returns {void}
+ */
+export function aiLabelInto(host, provenance) {
+  const lib = aiOf();
+  if (!provenance || !lib || typeof lib.disclose !== 'function') return;
+  try { lib.disclose(provenance, { target: host }); } catch (e) { console.debug('aimeat-atelier: AI label not drawn', e); }
+}
+
+/**
+ * A text as markdown through AIMEAT.md when it is loaded and `mode` is not 'text', else as text.
+ * @param {string} text
+ * @param {HTMLElement} host
+ * @param {string} [mode]  'text' draws plain text
+ * @param {string} [cls]  the class of the plain-text box
+ * @returns {void}
+ */
+export function drawText(text, host, mode, cls) {
+  const ns = /** @type {any} */ (window).AIMEAT;
+  const md = ns && ns.md;
+  if (mode !== 'text' && md && typeof md.render === 'function') {
+    try { md.render(text, host); return; } catch (e) { console.debug('aimeat-atelier: markdown not drawn', e); }
+  }
+  host.appendChild(el('div', { class: cls || 'ak-aitask__text' }, text));
+}
+
+/**
+ * When a result was made, in the reader's own date and time format, or '' when `at` is not a time.
+ * @param {any} at  an ISO time or a millisecond count
+ * @returns {string}
+ */
+export function madeWhen(at) {
+  if (at == null || at === '') return '';
+  const d = new Date(at);
+  if (!isFinite(d.getTime())) return '';
+  return dateTime(d.toISOString(), { dateStyle: 'medium', timeStyle: 'short' });
 }
 
 /**
@@ -84,7 +212,7 @@ function unset(v) {
  * @param {string} [currency]  a three-letter code
  * @returns {string}
  */
-function money(v, currency) {
+export function money(v, currency) {
   if (typeof v !== 'number' || !isFinite(v)) return '';
   const code = /^[A-Za-z]{3}$/.test(String(currency || '')) ? String(currency).toUpperCase() : 'USD';
   return fmtMoney(v, code);
@@ -96,8 +224,9 @@ const CODES = ['NO_API_KEY', 'INVALID_API_KEY', 'QUOTA_EXHAUSTED', 'APP_QUOTA_EX
 /**
  * The words for a failed call, in the current language.
  * @param {{ code?: string, message?: string }} e
+ * @returns {string}
  */
-function errorWords(e) {
+export function errorWords(e) {
   const code = e && e.code === 'JSON_PARSE_FAILED' ? 'JSON_SCHEMA_MISMATCH' : (e && e.code);
   if (code && CODES.indexOf(code) >= 0) return tai('aiTask.err.' + code);
   const why = e && e.message ? String(e.message) : '';
@@ -115,20 +244,38 @@ function errorWords(e) {
  * @property {(text: string) => string} prompt  the full prompt from what the person wrote
  * @property {string} [systemPrompt]
  * @property {any} [schema]  ask for JSON through completeJson(); the answer's object is `parsed`
- * @property {'markdown'|'text'|((result: any, host: HTMLElement) => void)} [render]  'markdown' by default
+ * @property {'markdown'|'text'|((result: any, host: HTMLElement) => void)} [render]  'markdown' by
+ *   default; a function draws the answer itself from result.parsed (or result.content) into host,
+ *   for a fresh answer and a stored one alike
+ * @property {AiResult|null} [result]  a result the app kept, drawn without calling the AI
  * @property {string} [runLabel]
  * @property {boolean} [copyPrompt]  add the copy-the-prompt, paste-the-answer route under the block
  * @property {boolean} [sample]
  * @property {Record<string, any>} [options]  more fields for the call: model, temperature,
  *   max_tokens, confirm, role
  * @property {'compact'} [variant]
- * @property {(result: any) => void} [onResult]  the result, with `provenance` (or `pasted: true`)
+ * @property {(result: AiResult) => void} [onResult]  the result, with `provenance` (or `pasted:
+ *   true`) and `at`; the app keeps it where it wants, and show() draws it again
+ */
+
+/**
+ * What a call gave, and what the app keeps and hands back to show().
+ * @typedef {object} AiResult
+ * @property {string} [content]  the answer's text (the raw JSON text for a schema call)
+ * @property {any} [parsed]  the object of a schema call
+ * @property {string} [model]
+ * @property {{ spent_today_usd?: number, daily_budget_usd?: number, currency?: string }} [budget]
+ * @property {any} [provenance]  the node's provenance record, which the AI label is drawn from
+ * @property {string} [at]  when the answer was made, an ISO time
+ * @property {boolean} [truncated]
+ * @property {boolean} [pasted]  pasted back from the person's own AI chat
  */
 
 /**
  * Ask the AI once and show the answer.
  * @param {AiTaskSpec} spec
  * @returns {{ el: HTMLElement, run: (text?: string) => Promise<any>,
+ *   show: (result: AiResult|null) => void,
  *   set: (patch: Partial<AiTaskSpec>) => void, destroy: () => void }}
  */
 export function aiTask(spec) {
@@ -140,7 +287,8 @@ export function aiTask(spec) {
 
   /**
    * What the block knows between draws. `avail` is the route: checking, sample, nolib, signedout,
-   * off or on. `answer` is what is shown: a model's result, a pasted one, or the sample.
+   * off or on. `answer` is what is shown: a model's result, a pasted one, a stored one, or the
+   * sample; `stored` says it came from the app (spec `result` or show()), not from a call.
    */
   const state = {
     avail: 'checking',
@@ -148,7 +296,8 @@ export function aiTask(spec) {
     text: '',
     busy: false,
     /** @type {any} */
-    answer: null,
+    answer: s.result || null,
+    stored: !!s.result,
     /** @type {any} */
     error: null,
     session: !signedOut(),
@@ -173,35 +322,11 @@ export function aiTask(spec) {
     return typeof s.prompt === 'function' ? String(s.prompt(hasBox() ? state.text : '') || '') : '';
   };
 
-  /** Which route this page has. Spends nothing: capabilities() plans the call without making it. */
-  async function probe() {
-    if (isSample()) return { avail: 'sample', fix: '' };
-    const lib = aiOf();
-    if (!lib) return { avail: 'nolib', fix: '' };
-    if (signedOut()) return { avail: 'signedout', fix: '' };
-    if (typeof lib.capabilities === 'function') {
-      try {
-        const caps = await lib.capabilities({ app_id: s.appId });
-        const text = caps && caps.capabilities && caps.capabilities.text;
-        if (text && text.on === false) return { avail: 'off', fix: String(text.fix || text.message || text.reason || '') };
-        if (text && text.on === true) return { avail: 'on', fix: '' };
-      } catch (e) {
-        // A node without GET /v1/ai/capabilities: isAvailable() below answers instead.
-        console.debug('aimeat-atelier: aiTask capabilities not read', e);
-      }
-    }
-    if (typeof lib.isAvailable === 'function') {
-      const ok = await Promise.resolve(lib.isAvailable()).catch(function () { return false; });
-      return ok ? { avail: 'on', fix: '' } : { avail: 'off', fix: '' };
-    }
-    return { avail: 'on', fix: '' };
-  }
-
   async function refresh() {
     const mine = ++gen;
     state.avail = 'checking';
     build();
-    const r = await probe();
+    const r = await probeAi(s.appId, isSample());
     if (mine !== gen || dead) return;
     state.avail = r.avail;
     state.fix = r.fix;
@@ -228,12 +353,13 @@ export function aiTask(spec) {
     if (panel) { panel.destroy(); panel = null; }
     clear(root);
     parts = {};
-    // The sample answer is drawn in the current language, so a language change redraws it too.
-    if (state.avail === 'sample') state.answer = sampleAnswer();
+    // The sample answer is drawn in the current language, so a language change redraws it too. A
+    // stored result the app handed in stays: showing it calls nothing.
+    if (state.avail === 'sample' && !state.stored) state.answer = sampleAnswer();
     root.appendChild(el('h3', { class: 'ak-aitask__title', 'data-ak-part': 'title' },
-      [s.title || tai('aiTask.title'), state.avail === 'sample' ? sampleBadge() : null].filter(Boolean)));
+      [s.title || tai('aiTask.title'), state.avail === 'sample' ? sampleMark() : null].filter(Boolean)));
     if (s.hint) root.appendChild(el('p', { class: 'ak-aitask__hint', 'data-ak-part': 'hint' }, s.hint));
-    notice();
+    for (const n of aiNotice('aitask', state, !!s.copyPrompt)) root.appendChild(n);
     // The box is also the copy route's input: without it a pasted-answer route would build the
     // prompt from an empty text.
     const live = canAsk() || state.avail === 'checking';
@@ -245,27 +371,6 @@ export function aiTask(spec) {
     if (s.copyPrompt) copyRoute();
     paint();
     drawAnswer(parts.answer);
-  }
-
-  /** The line that says why the AI route is not here, and what to do. */
-  function notice() {
-    let words = '';
-    if (state.avail === 'sample') words = tai('aiTask.sampleNote');
-    else if (state.avail === 'nolib') words = s.copyPrompt ? tai('aiTask.noLibCopy') : tai('aiTask.noLib');
-    else if (state.avail === 'signedout') words = tai('aiTask.signIn');
-    else if (state.avail === 'off') words = state.fix || tai('aiTask.off');
-    if (!words) return;
-    const line = el('p', { class: 'ak-aitask__notice', 'data-ak-part': 'notice' }, words);
-    root.appendChild(line);
-    const auth = authOf();
-    if (state.avail === 'signedout' && auth && typeof auth.signIn === 'function') {
-      const b = el('button', { type: 'button', class: 'ak-btn ak-btn--primary', 'data-ak-part': 'signIn', 'data-ak-noguard': true }, tai('aiTask.signInBtn'));
-      b.addEventListener('click', function () {
-        // The click is the user gesture that opens the sign-in window; the login event redraws.
-        Promise.resolve(auth.signIn()).catch(function (e) { console.debug('aimeat-atelier: sign-in closed', e); });
-      });
-      root.appendChild(el('div', { class: 'ak-aitask__bar' }, [b]));
-    }
   }
 
   /**
@@ -285,7 +390,7 @@ export function aiTask(spec) {
       }));
       box.value = state.text;
       box.addEventListener('input', function () { state.text = box.value; paint(); });
-      root.appendChild(el('div', { class: 'ak-form__field ak-aitask__field' }, [
+      root.appendChild(el('div', { class: 'ak-form__field ak-aitask__field', 'data-ak-part': 'field' }, [
         el('label', { class: 'ak-form__label', 'data-ak-part': 'label', for: id }, cfg.label || tai('aiTask.inputLabel')),
         box,
       ]));
@@ -307,7 +412,7 @@ export function aiTask(spec) {
   /** The kit's prompt panel as the second route. */
   function copyRoute() {
     const host = el('div', { class: 'ak-aitask__copy', 'data-ak-part': 'copyRoute' }, [
-      el('h4', { class: 'ak-aitask__copy-title' }, tai('aiTask.copyTitle')),
+      el('h4', { class: 'ak-aitask__copy-title', 'data-ak-part': 'copyTitle' }, tai('aiTask.copyTitle')),
     ]);
     root.appendChild(host);
     panel = promptPanel({
@@ -316,9 +421,10 @@ export function aiTask(spec) {
       expect: s.schema ? 'json' : 'text',
       onResult: function (value, raw) {
         /** @type {any} */
-        const r = { content: raw, pasted: true, provenance: null };
+        const r = { content: raw, pasted: true, provenance: null, at: new Date().toISOString() };
         if (s.schema) r.parsed = value;
         state.answer = r;
+        state.stored = false;
         state.error = null;
         paint();
         drawAnswer(parts.answer);
@@ -382,17 +488,17 @@ export function aiTask(spec) {
     if (!r) return;
     const label = el('div', { class: 'ak-aitask__label', 'data-ak-part': 'aiLabel' });
     host.appendChild(label);
-    const lib = aiOf();
-    if (r.provenance && lib && typeof lib.disclose === 'function') {
-      try { lib.disclose(r.provenance, { target: label }); } catch (e) { console.debug('aimeat-atelier: AI label not drawn', e); }
-    }
+    aiLabelInto(label, r.provenance);
     const body = el('div', { class: 'ak-aitask__body', 'data-ak-part': 'body' });
     host.appendChild(body);
     drawBody(r, body);
     const meta = [];
     if (r.pasted) meta.push(el('span', { class: 'ak-aitask__model', 'data-ak-part': 'model' }, tai('aiTask.pasted')));
     if (r.model) meta.push(el('span', { class: 'ak-aitask__model', 'data-ak-part': 'model' }, tai('aiTask.model', { model: r.model })));
-    const b = r.budget;
+    const when = r.sample ? '' : madeWhen(r.at);
+    if (when) meta.push(el('time', { class: 'ak-aitask__made', 'data-ak-part': 'made', datetime: new Date(r.at).toISOString() }, tai('aiTask.made', { when: when })));
+    // A stored budget says what was spent on the day the answer was made, not today.
+    const b = state.stored ? null : r.budget;
     if (b && typeof b.spent_today_usd === 'number') {
       const cap = typeof b.daily_budget_usd === 'number' && b.daily_budget_usd > 0;
       meta.push(el('span', { class: 'ak-aitask__cost', 'data-ak-part': 'cost' }, cap
@@ -403,22 +509,22 @@ export function aiTask(spec) {
     if (r.truncated) host.appendChild(el('p', { class: 'ak-aitask__truncated', 'data-ak-part': 'truncated' }, tai('aiTask.truncated')));
   }
 
-  /** The answer itself: the app's own render, markdown, or text. */
+  /**
+   * The answer itself: the app's own render, markdown, or text. The app's render gets the whole
+   * result, so a structured answer is result.parsed and a stored one is drawn by the same code.
+   * @param {any} r
+   * @param {HTMLElement} body
+   */
   function drawBody(r, body) {
-    if (typeof s.render === 'function') {
-      try { s.render(r, body); } catch (e) { body.textContent = String(r.content || ''); console.debug('aimeat-atelier: aiTask render failed', e); }
-      return;
-    }
-    const text = s.schema && r.parsed !== undefined && !r.pasted
+    const json = r.parsed !== undefined && (!r.pasted || r.content == null)
       ? JSON.stringify(r.parsed, null, 2)
       : String(r.content == null ? '' : r.content);
-    if (s.schema) { body.appendChild(el('pre', { class: 'ak-aitask__json' }, text)); return; }
-    const ns = /** @type {any} */ (window).AIMEAT;
-    const md = ns && ns.md;
-    if (s.render !== 'text' && md && typeof md.render === 'function') {
-      try { md.render(text, body); return; } catch (e) { console.debug('aimeat-atelier: markdown not drawn', e); }
+    if (typeof s.render === 'function') {
+      try { s.render(r, body); } catch (e) { clear(body); body.textContent = json; console.debug('aimeat-atelier: aiTask render failed', e); }
+      return;
     }
-    body.appendChild(el('div', { class: 'ak-aitask__text' }, text));
+    if (s.schema || (r.parsed !== undefined && r.content == null)) { body.appendChild(el('pre', { class: 'ak-aitask__json' }, json)); return; }
+    drawText(json, body, s.render, 'ak-aitask__text');
   }
 
   /** One run from the button or from run(). Resolves to the result, or null when nothing ran. */
@@ -426,6 +532,7 @@ export function aiTask(spec) {
     if (inFlight) return inFlight;
     if (!canAsk() || reason()) return Promise.resolve(null);
     state.error = null;
+    state.stored = false;
     if (state.avail === 'sample') {
       state.answer = sampleAnswer();
       paint();
@@ -444,7 +551,10 @@ export function aiTask(spec) {
     drawAnswer(parts.answer);
     // A library that throws before it returns a promise is a failed call like any other.
     const call = new Promise(function (ok) { ok(s.schema ? lib.completeJson(opts) : lib.complete(opts)); });
-    inFlight = call.then(function (r) {
+    inFlight = call.then(function (got) {
+      // The time it was made rides on the result, so the record the app keeps can say it later.
+      // A copy: the library's own object stays as the library made it.
+      const r = got && typeof got === 'object' ? Object.assign({}, got, { at: got.at || new Date().toISOString() }) : got;
       state.answer = r;
       return r;
     }, function (e) {
@@ -471,6 +581,7 @@ export function aiTask(spec) {
     if (now !== state.session) {
       state.session = now;
       state.answer = null;
+      state.stored = false;
       state.error = null;
       const lib = aiOf();
       if (lib && typeof lib.invalidateCache === 'function') lib.invalidateCache();
@@ -493,13 +604,30 @@ export function aiTask(spec) {
       }
       return ready.then(go);
     },
-    /** Change any part of the spec; a new appId or sample flag reads the route again. */
+    /**
+     * Draw a result the app kept, as a fresh answer is drawn (its AI label, model and date), with
+     * no AI call and no onResult. null takes the answer away. A call in flight wins when it lands.
+     */
+    show: function (result) {
+      state.answer = result || null;
+      state.stored = !!result;
+      state.error = null;
+      if (dead) return;
+      paint();
+      drawAnswer(parts.answer);
+    },
+    /**
+     * Change any part of the spec; a new appId or sample flag reads the route again, and
+     * `result` is drawn as show() draws it.
+     */
     set: function (patch) {
       if (!patch) return;
       const reprobe = ('appId' in patch && patch.appId !== s.appId) || ('sample' in patch && patch.sample !== s.sample);
       Object.assign(s, patch);
       if ('variant' in patch) { root.removeAttribute('data-ak-variant'); applyVariant(root, s, ['compact']); }
-      if (reprobe) { state.answer = null; state.error = null; refresh(); } else build();
+      if (reprobe) { state.answer = null; state.stored = false; state.error = null; }
+      if ('result' in patch) { state.answer = patch.result || null; state.stored = !!patch.result; state.error = null; }
+      if (reprobe) refresh(); else build();
     },
     destroy: function () {
       dead = true;

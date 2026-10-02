@@ -1,15 +1,17 @@
 /**
  * @file atelier/ai-task-i18n.js
- * @description The words of the one-shot AI block (aiTask) and of the form's `model` field, in the
- *   kit's three languages. Each language is written in that language. The keys carry their own
- *   prefix (`aiTask.` or `modelField.`), and a host overrides any of them by defining the same key
- *   through i18n.use().
+ * @description The words of the one-shot AI block (aiTask), the follow-up chat (aiChat) and the
+ *   form's `model` field, in the kit's three languages. Each language is written in that language.
+ *   The keys carry their own prefix (`aiTask.`, `aiChat.` or `modelField.`), and a host overrides
+ *   any of them by defining the same key through i18n.use(). aiChat also uses the aiTask keys for
+ *   the states the two blocks share (sample, no library, signed out, unavailable, busy, errors).
  * @structure STRINGS (en/fi/es) · tai(key, vars): host override first, then this dictionary
  * @usage
  *   import { tai } from './ai-task-i18n.js';
  *   tai('aiTask.run');
  *   tai('aiTask.needChars', { n: 20, m: 4 });
  * @version-history
+ *   v0.63.0 — 2026-10-02 — aiTask.made (the date a result was made) and the aiChat words.
  *   v0.62.0 — 2026-10-01 — Initial: aiTask (every state, the error words per code) and the form's
  *     model field.
  */
@@ -37,6 +39,7 @@ const STRINGS = {
     'aiTask.costNoCap': 'AI use today: {spent}',
     'aiTask.truncated': 'The answer stopped at the length limit, so it can be unfinished.',
     'aiTask.pasted': 'Pasted from your own AI chat.',
+    'aiTask.made': 'Made {when}',
     'aiTask.sampleNote': 'A sample. Nothing is sent to an AI.',
     'aiTask.sampleAnswer': '**A sample answer.** When this block runs for real, the answer of the AI comes here. Above it is the label that says an AI made it. Under it are the model and what AI use cost today.',
     'aiTask.err.NO_API_KEY': 'No AI is set up for your account yet. Add one on the AI page of your AIMEAT profile.',
@@ -47,6 +50,19 @@ const STRINGS = {
     'aiTask.err.JSON_SCHEMA_MISMATCH': 'The AI answered, but not in the form this app needs. Try again.',
     'aiTask.err.generic': 'The AI request did not go through: {why}',
     'aiTask.err.noReason': 'The AI request did not go through.',
+    'aiChat.title': 'Ask about this document',
+    'aiChat.inputLabel': 'Your question',
+    'aiChat.placeholder': 'Ask about the document',
+    'aiChat.send': 'Ask',
+    'aiChat.you': 'You',
+    'aiChat.ai': 'AI',
+    'aiChat.log': 'The conversation',
+    'aiChat.empty': 'No questions yet. The AI answers from the document and from this conversation.',
+    'aiChat.noContext': 'There is no document to ask about yet.',
+    'aiChat.needText': 'Write a question first.',
+    'aiChat.clear': 'Start over',
+    'aiChat.sampleQuestion': 'What does the document say about the deadline?',
+    'aiChat.sampleAnswer': '**A sample answer.** When this block runs for real, the AI answers here from the document and the conversation. Each answer has the label that says an AI made it.',
     'modelField.default': 'The default model',
     'modelField.loading': 'Reading the models…',
     'modelField.failed': 'The model list could not be read',
@@ -73,6 +89,7 @@ const STRINGS = {
     'aiTask.costNoCap': 'Tekoälyn käyttö tänään: {spent}',
     'aiTask.truncated': 'Vastaus katkesi pituusrajaan, joten se voi olla kesken.',
     'aiTask.pasted': 'Liitetty omasta tekoälykeskustelustasi.',
+    'aiTask.made': 'Tehty {when}',
     'aiTask.sampleNote': 'Esimerkki. Mitään ei lähetetä tekoälylle.',
     'aiTask.sampleAnswer': '**Esimerkkivastaus.** Kun lohko on oikeasti käytössä, tähän tulee tekoälyn vastaus. Sen yläpuolella on merkintä, joka kertoo, että vastauksen teki tekoäly. Alla näkyvät malli ja päivän tekoälykulut.',
     'aiTask.err.NO_API_KEY': 'Tilillesi ei ole vielä asetettu tekoälyä. Lisää se AIMEAT-profiilisi tekoälysivulla.',
@@ -83,6 +100,19 @@ const STRINGS = {
     'aiTask.err.JSON_SCHEMA_MISMATCH': 'Tekoäly vastasi, mutta ei siinä muodossa, jota sovellus tarvitsee. Yritä uudelleen.',
     'aiTask.err.generic': 'Tekoälypyyntö ei onnistunut: {why}',
     'aiTask.err.noReason': 'Tekoälypyyntö ei onnistunut.',
+    'aiChat.title': 'Kysy tästä asiakirjasta',
+    'aiChat.inputLabel': 'Kysymyksesi',
+    'aiChat.placeholder': 'Kysy asiakirjasta',
+    'aiChat.send': 'Kysy',
+    'aiChat.you': 'Sinä',
+    'aiChat.ai': 'Tekoäly',
+    'aiChat.log': 'Keskustelu',
+    'aiChat.empty': 'Kysymyksiä ei ole vielä. Tekoäly vastaa asiakirjan ja tämän keskustelun perusteella.',
+    'aiChat.noContext': 'Asiakirjaa ei ole vielä, joten siitä ei voi kysyä.',
+    'aiChat.needText': 'Kirjoita ensin kysymys.',
+    'aiChat.clear': 'Aloita alusta',
+    'aiChat.sampleQuestion': 'Mitä asiakirjassa sanotaan määräajasta?',
+    'aiChat.sampleAnswer': '**Esimerkkivastaus.** Kun lohko on oikeasti käytössä, tekoäly vastaa tähän asiakirjan ja keskustelun perusteella. Jokaisessa vastauksessa on merkintä, joka kertoo, että vastauksen teki tekoäly.',
     'modelField.default': 'Oletusmalli',
     'modelField.loading': 'Haen malleja…',
     'modelField.failed': 'Malliluetteloa ei saatu luettua',
@@ -109,6 +139,7 @@ const STRINGS = {
     'aiTask.costNoCap': 'Uso de IA hoy: {spent}',
     'aiTask.truncated': 'La respuesta se cortó en el límite de longitud, así que puede estar incompleta.',
     'aiTask.pasted': 'Pegada desde tu propio chat de IA.',
+    'aiTask.made': 'Hecha el {when}',
     'aiTask.sampleNote': 'Un ejemplo. No se envía nada a una IA.',
     'aiTask.sampleAnswer': '**Una respuesta de ejemplo.** Cuando este bloque funcione de verdad, aquí aparece la respuesta de la IA. Arriba va la etiqueta que dice que la hizo una IA. Abajo van el modelo y lo que costó hoy el uso de IA.',
     'aiTask.err.NO_API_KEY': 'Tu cuenta todavía no tiene una IA configurada. Agrégala en la página de IA de tu perfil de AIMEAT.',
@@ -119,6 +150,19 @@ const STRINGS = {
     'aiTask.err.JSON_SCHEMA_MISMATCH': 'La IA respondió, pero no en la forma que esta app necesita. Vuelve a intentarlo.',
     'aiTask.err.generic': 'La solicitud a la IA no se completó: {why}',
     'aiTask.err.noReason': 'La solicitud a la IA no se completó.',
+    'aiChat.title': 'Pregunta sobre este documento',
+    'aiChat.inputLabel': 'Tu pregunta',
+    'aiChat.placeholder': 'Pregunta algo sobre el documento',
+    'aiChat.send': 'Preguntar',
+    'aiChat.you': 'Tú',
+    'aiChat.ai': 'IA',
+    'aiChat.log': 'La conversación',
+    'aiChat.empty': 'Todavía no hay preguntas. La IA responde a partir del documento y de esta conversación.',
+    'aiChat.noContext': 'Todavía no hay un documento sobre el cual preguntar.',
+    'aiChat.needText': 'Primero escribe una pregunta.',
+    'aiChat.clear': 'Empezar de nuevo',
+    'aiChat.sampleQuestion': '¿Qué dice el documento sobre la fecha límite?',
+    'aiChat.sampleAnswer': '**Una respuesta de ejemplo.** Cuando este bloque funcione de verdad, la IA responde aquí a partir del documento y de la conversación. Cada respuesta lleva la etiqueta que dice que la hizo una IA.',
     'modelField.default': 'El modelo predeterminado',
     'modelField.loading': 'Cargando los modelos…',
     'modelField.failed': 'No se pudo leer la lista de modelos',
@@ -130,7 +174,7 @@ const STRINGS = {
  * The lookup of the AI block and the model field: a host's own definition of the same key (through
  * i18n.use()) wins; otherwise this dictionary answers in the platform language, falling back to
  * English, then to the key.
- * @param {string} key  a key with its prefix, `aiTask.` or `modelField.`
+ * @param {string} key  a key with its prefix, `aiTask.`, `aiChat.` or `modelField.`
  * @param {Record<string, any>} [vars]
  * @returns {string}
  */

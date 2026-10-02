@@ -41,6 +41,13 @@
  *   const { blocking, warnings } = await lintAppArtifact(html, config);
  *   if (blocking.length) return refusal;
  * @version-history
+ *   2026-10-02 — Classic with kit blocks is a case of its own (wish-a-classic-app-that-loads-the-
+ *     atelier-kit-for-its-library-blo): `aimeat-track` classic plus the kit is silent when the page
+ *     calls into AIMEAT.atelier and draws no shell. The track-mixing warning stays for a Classic
+ *     page that draws the shell (`atelier.app(`) and for one that loads the kit and calls nothing
+ *     in it, and neither tells a page using blocks to drop the kit any more. The register refusal
+ *     of a page with the kit and no track line names `content="classic"` as the fix for a page that
+ *     only uses blocks; the refusal itself is unchanged.
  *   2026-09-19 — checkRegister stands down for a page whose owner chose the level "proto" or
  *     "plain" (`<meta name="aimeat-level">`, app-build-level.ts). Ruled the same day: the default
  *     look is refused unless the owner chose that level themselves.
@@ -164,6 +171,13 @@ export async function lintAppArtifact(html: string, config: AimeatConfig): Promi
  * The section escape check is deliberately permissive about what counts as using the hatch: any
  * `section(` call silences it. A missed warning costs nothing; a warning on a correct app teaches
  * people to ignore the check.
+ *
+ * CLASSIC WITH KIT BLOCKS IS A TRACK OF ITS OWN, NOT A MIX. A Classic page loads the kit for the
+ * library blocks it uses (members, joinRequest, aiTask, copy, workspaceTeam, ...), because those
+ * blocks are the one implementation of their screens on either track. So Classic plus the kit is
+ * silent when the page calls into the kit's namespace and does not draw the Atelier shell. It is
+ * told when it draws the shell (that is an Atelier app with the wrong track line, and the line is
+ * how it escapes the register), and when it calls nothing in the kit at all (a load with no use).
  */
 function checkTrackMixing(html: string): AppArtifactFinding[] {
   const out: AppArtifactFinding[] = [];
@@ -172,13 +186,19 @@ function checkTrackMixing(html: string): AppArtifactFinding[] {
   const track = declaredTrack(head);
   const loadsAtelier = loadsAtelierKit(html);
 
-  if (track === 'classic' && loadsAtelier) {
+  if (track === 'classic' && loadsAtelier && drawsAtelierShell(html)) {
     out.push(finding('track-mixing', 'warn',
-      'The head declares the Classic track and the page loads the Atelier kit. The two tracks have '
-      + 'separate guides that never reference each other, so the next edit session will load the '
-      + 'Classic guide and not know what half this file is. If this is an Atelier app, declare '
-      + '`<meta name="aimeat-track" content="atelier">`; if it is Classic, drop the aimeat-atelier '
-      + 'script and stylesheet.'));
+      'The head declares the Classic track and the page draws the Atelier app shell '
+      + '(`AIMEAT.atelier.app(...)`). A Classic page may load the kit for the library blocks it uses, '
+      + 'but the shell makes this an Atelier app, and the next edit session will load the Classic guide '
+      + 'and not know what half this file is. Declare `<meta name="aimeat-track" content="atelier">` '
+      + 'with its `aimeat-register`, and build with the Atelier guide.'));
+  } else if (track === 'classic' && loadsAtelier && !callsAtelierKit(html)) {
+    out.push(finding('track-mixing', 'warn',
+      'The head declares the Classic track and the page loads the Atelier kit without calling anything '
+      + 'in it. A Classic page loads the kit only for the library blocks it uses (for example '
+      + '`AIMEAT.atelier.members(...)`, `joinRequest`, `aiTask`, `copy`, `workspaceTeam`). Call the '
+      + 'block this page needs, or drop the aimeat-atelier script and stylesheet.'));
   }
 
   if (track === 'atelier' && !loadsAtelier) {
@@ -206,12 +226,31 @@ function checkTrackMixing(html: string): AppArtifactFinding[] {
 
   if (!track && loadsAtelier) {
     out.push(finding('track-mixing', 'warn',
-      'The page loads the Atelier kit and declares no build track. Without '
-      + '`<meta name="aimeat-track" content="atelier">` in the head, a later edit session reads '
-      + 'this app as Classic and loads the wrong guide. One line fixes it.'));
+      'The page loads the Atelier kit and declares no build track. Without a track line in the head, '
+      + 'a later edit session reads this app as Classic and loads the wrong guide. Declare '
+      + '`<meta name="aimeat-track" content="atelier">` for an Atelier app, or `content="classic"` for '
+      + 'a Classic page that loads the kit only for its library blocks. One line fixes it.'));
   }
 
   return out;
+}
+
+/**
+ * Whether the page calls into the Atelier kit's namespace: a library block, copy(), the i18n, or
+ * the namespace held in a name of its own (`var K = AIMEAT.atelier`). Permissive on purpose, like
+ * the section check above: any reference counts.
+ */
+function callsAtelierKit(html: string): boolean {
+  return /\bAIMEAT\s*(?:\.\s*atelier\b|\[\s*["']atelier["']\s*\])/.test(html);
+}
+
+/**
+ * Whether the page draws the Atelier app shell, written as a call on the namespace
+ * (`AIMEAT.atelier.app(` or `atelier.app(`). An alias (`K.app(`) is not seen, which only means a
+ * warning is missed.
+ */
+function drawsAtelierShell(html: string): boolean {
+  return /\batelier\s*\.\s*app\s*\(/.test(html);
 }
 
 /**
@@ -313,8 +352,9 @@ const REGISTER_PLACEHOLDER = /^REPLACE-ME\b/i;
  * it (`custom:`, `custom:default`) — "default" is the look this exists to prevent.
  *
  * WHICH APPS ARE ASKED. The declared Atelier track, and the Atelier kit loaded with no track
- * declared at all: deleting the track line must not be the way past, and an app that loads the kit
- * is an Atelier app whatever its head says. Classic apps never hear about this.
+ * declared at all: deleting the track line must not be the way past. A page that declares Classic
+ * never hears about this, including a Classic page that loads the kit for its library blocks; the
+ * refusal of the no-track case names that line, because it is the fix for such a page.
  */
 function checkRegister(html: string): AppArtifactFinding[] {
   const head = html.slice(0, SCAN_BYTES);
@@ -336,11 +376,19 @@ function checkRegister(html: string): AppArtifactFinding[] {
     : declared
       ? `This Atelier app names "${declared}" as its register, which is not a name. `
       : 'This Atelier app names no register. ';
+  // A page that loads the kit with no track line may be a Classic page using library blocks; the
+  // refusal names that one-line way out too, since the page then owes no register.
+  const classicWayOut = track === undefined
+    ? ' If this is a Classic page that loads the kit only for its library blocks (members, aiTask, '
+      + 'copy, workspaceTeam, ...) and does not draw the Atelier shell, declare '
+      + '<meta name="aimeat-track" content="classic"> instead: such a page owes no register.'
+    : '';
   return [finding('atelier-register', 'critical',
     what
     + 'Every app here starts from a committed look: fork a genre from the Design Book '
     + '(GET /v1/designbook?kind=genre, then GET /v1/app-templates/genre-<id>) or name your own with '
-    + '<meta name="aimeat-register" content="custom:<name>">. The bare shell is a frame, not a page.')];
+    + '<meta name="aimeat-register" content="custom:<name>">. The bare shell is a frame, not a page.'
+    + classicWayOut)];
 }
 
 // ── Blocking check 1: does the app's own JavaScript compile? ────────────────────────────────────

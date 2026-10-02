@@ -1,32 +1,48 @@
 /**
  * @file atelier/workspace-team.js
  * @description workspaceTeam(): who may open one workspace of an organism (IAM plan Phase D block
- *   2). Three tabs: the access requests waiting for a decision (approve with a role, or decline),
- *   the people who hold a role (change it, or remove them), and an invite field that takes an
+ *   2). Four tabs: the access requests waiting for a decision (approve with a role, or decline),
+ *   the people who hold a role (change it, or remove them), an invite field that takes an
  *   account name (the role is granted at once) or an email address (an invitation into the
- *   organism with this role in this workspace). The workspace's creator is shown first, marked, and
- *   cannot be removed. A raise from viewer to contributor asks first; a lowering does not. A refused
- *   action shows the node's own sentence at the top and keeps what was typed.
+ *   organism with this role in this workspace), and the open email invitations, each with Cancel.
+ *   The workspace's creator is shown first, marked, and cannot be removed. A raise from viewer to
+ *   contributor asks first; a lowering does not. A refused action shows the node's own sentence at
+ *   the top and keeps what was typed.
+ *
+ *   SEVERAL WORKSPACES IN ONE INVITATION. `inviteInto: [{ ws, role?, label?, checked? }]` (a mosaic
+ *   prop takes "wsId:role:label, wsId:role") lists the workspaces an invitation goes into, each with
+ *   a tick and a role: one email invitation names every ticked workspace (as the Experience Center
+ *   invites a customer into both tier workspaces), and an account name is granted each ticked role.
+ *   The list replaces the block's own workspace, so name it there too when it belongs.
+ *
+ *   THE OPEN INVITATIONS. The Invitations tab lists the organism's open email invitations that name
+ *   this workspace or one in inviteInto. The node lets only an organism owner or admin read them,
+ *   so a workspace creator who is neither sees the node's sentence in that tab and the other tabs
+ *   work. The node has no resend route: cancel, then invite again.
  *
  *   WHAT FETCHES AND WHY. The kit renders; it does not fetch. Every read and write goes through
- *   AIMEAT.organism (access, decide, grant, revoke, inviteByEmail), feature-detected on the page;
- *   without it the block says what is missing.
+ *   AIMEAT.organism (access, decide, grant, revoke, inviteByEmail, invitations, cancelInvitation),
+ *   feature-detected on the page; without it the block says what is missing. A library without
+ *   invitations() draws the first three tabs only.
  *
  *   THE SAMPLE STATE. `sample: true`, or an org or ws that is still a fill's <placeholder>, draws
- *   marked sample people and changes nothing.
+ *   marked sample people and one sample invitation, and changes nothing.
  *
  *   FOLLOWING THE PICKER. `app` with no org and no ws: the block opens on the workspace the app
  *   chose (workspacePicker above it, or the remembered choice), and says "choose above" until then.
- * @parts workspaceTeam root · title · intro · failure · notice · tabs · requests · people · invite · row · who · meta · acts · role · chip
- * @slots workspaceTeam columns(member) · actions[{ label, run(member), tone? }]
+ * @parts workspaceTeam root · title · intro · failure · notice · tabs · requests · people · invite · invitations · row · who · meta · acts · role · chip · targetsTitle · targets · target · targetOn · targetName · inviteGo · hint · cancel · refused
+ * @slots workspaceTeam columns(member) · actions[{ label, run(member), tone? }] · inviteInto[{ ws, role?, label?, checked? }]
  * @variants workspaceTeam list · table
  * @tokens workspaceTeam --ak-mem-width
- * @fork workspaceTeam Copying it out means calling AIMEAT.organism's access(), decide(), grant(), revoke() and inviteByEmail() yourself, and keeping the creator unremovable, the confirm on a raise to contributor and the refusal sentence.
- * @structure workspaceTeam(spec) · roleSel · the sample
+ * @fork workspaceTeam Copying it out means calling AIMEAT.organism's access(), decide(), grant(), revoke(), inviteByEmail(), invitations() and cancelInvitation() yourself, and keeping the creator unremovable, the confirm on a raise to contributor and the refusal sentence.
+ * @structure workspaceTeam(spec) · targetsOf · roleSel · the sample · tabs requests, people, invite (inviteIntoTab), invitations
  * @usage
  *   AIMEAT.atelier.workspaceTeam({ target: '#team', org: orgId, ws: wsId });
  *   AIMEAT.atelier.workspaceTeam({ target, org, ws, variant: 'table', actions: [{ label: 'Message', run: (m) => open(m.account) }] });
+ *   AIMEAT.atelier.workspaceTeam({ target, org, ws: b12, inviteInto: [{ ws: b12, label: 'B1–B2' }, { ws: b34, label: 'B3–B4', checked: false }] });
  * @version-history
+ *   v0.63.0 — 2026-10-02 — inviteInto: one invitation into several workspaces; the Invitations tab
+ *     with Cancel (AIMEAT.organism.invitations, cancelInvitation).
  *   v0.62.0 — 2026-10-01 — `app` without org and ws follows the app's chosen workspace.
  *   v0.61.0 — 2026-10-01 — Initial (IAM plan Phase D block 2).
  */
@@ -46,8 +62,36 @@ const SAMPLE = {
   ],
 };
 
+/** The sample's open invitation; its workspace is the block's own, filled at draw time. */
+const SAMPLE_INVITATION = { id: 'inv-sample', email: 'pia@example.com', role: 'viewer', expiresAt: '2026-10-16T09:00:00Z' };
+
 const ROLES = ['viewer', 'contributor'];
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * The workspaces an invitation from this block goes into, or null when the block invites into its
+ * own workspace only (spec.inviteInto not given). A mosaic prop carries the list as a string:
+ * "wsId:role:label, wsId:role" (role viewer or contributor, label optional).
+ * @param {any} spec
+ * @returns {Array<{ ws: string, role: string, label: string, checked: boolean }>|null}
+ */
+function targetsOf(spec) {
+  let raw = spec && spec.inviteInto;
+  if (typeof raw === 'string') {
+    raw = raw.split(',').map(function (part) {
+      const bits = part.split(':').map(function (b) { return b.trim(); });
+      return { ws: bits[0], role: bits[1], label: bits.slice(2).join(':') };
+    });
+  }
+  if (!Array.isArray(raw)) return null;
+  const out = [];
+  raw.forEach(function (t) {
+    const ws = t && typeof t.ws === 'string' ? t.ws.trim() : '';
+    if (!ws || isPlaceholder(ws) || out.some(function (o) { return o.ws === ws; })) return;
+    out.push({ ws: ws, role: t.role === 'contributor' ? 'contributor' : 'viewer', label: t.label ? String(t.label) : '', checked: t.checked !== false });
+  });
+  return out.length ? out : null;
+}
 
 /** The page's AIMEAT.organism when it carries the workspace-access methods, or null. */
 function orgLib() {
@@ -79,10 +123,11 @@ function roleSel(value) {
 }
 
 /**
- * The people of one workspace: requests, roles, removal and invitations.
+ * The people of one workspace: requests, roles, removal, invitations and the open invitations.
  * @param {{ target?: string|Element, org?: string, ws?: string, app?: string, title?: string, sample?: boolean,
  *   variant?: 'list'|'table', columns?: (m: any) => (string|Node|null),
- *   actions?: Array<{ label: string, run: (m: any) => any, tone?: string }> }} spec
+ *   actions?: Array<{ label: string, run: (m: any) => any, tone?: string }>,
+ *   inviteInto?: string|Array<{ ws: string, role?: 'viewer'|'contributor', label?: string, checked?: boolean }> }} spec
  * @returns {{ el: HTMLElement, refresh: () => Promise<void>, destroy: () => void }}
  */
 export function workspaceTeam(spec) {
@@ -98,6 +143,21 @@ export function workspaceTeam(spec) {
   let typed = '';
   let typedRole = 'viewer';
   const noop = function () { /* the sample changes nothing */ };
+  // The workspaces an invitation goes into, each with its tick and role as the person left them.
+  const targets = targetsOf(spec);
+  /** @type {Record<string, { on: boolean, role: string }>} */
+  const picked = {};
+  (targets || []).forEach(function (t) { picked[t.ws] = { on: t.checked, role: t.role }; });
+  // The open invitations shown: those naming this workspace or one the block invites into.
+  const watched = [spec.ws].concat((targets || []).map(function (t) { return t.ws; }))
+    .filter(function (w, i, a) { return w && a.indexOf(w) === i; });
+
+  /** A workspace's name on screen: its label in inviteInto, "this workspace", or its id. */
+  function wsLabel(ws) {
+    const t = (targets || []).filter(function (x) { return x.ws === ws; })[0];
+    if (t && t.label) return t.label;
+    return ws === spec.ws ? tw('team.thisWorkspace') : ws;
+  }
 
   async function act(work, done) {
     failure = ''; notice = '';
@@ -150,11 +210,22 @@ export function workspaceTeam(spec) {
 
     const lib = sample ? null : orgLib();
     let data = SAMPLE;
+    // The open invitations: a list, or the node's refusal (only an organism owner or admin may read
+    // them, while the workspace's creator may read the rest), or null when the library has no method.
+    /** @type {{ list: any[], refused: string }|null} */
+    let open = sample ? { list: [Object.assign({ workspaces: [{ ws: spec.ws || '', role: SAMPLE_INVITATION.role }] }, SAMPLE_INVITATION)], refused: '' } : null;
     if (!sample) {
       if (!lib) { root.appendChild(el('p', { class: 'ak-mem__none' }, tw('noLib'))); return; }
       if (!signedIn()) { root.appendChild(el('p', { class: 'ak-mem__none' }, tw('team.signIn'))); return; }
+      const invited = typeof lib.invitations === 'function'
+        ? Promise.resolve().then(function () { return lib.invitations(spec.org, { ws: watched }); }).then(
+          function (list) { return { list: Array.isArray(list) ? list : [], refused: '' }; },
+          function (e) { return { list: [], refused: refusal(e) || String(e) }; })
+        : Promise.resolve(null);
       try {
-        data = await lib.access(spec.org, spec.ws);
+        const both = await Promise.all([lib.access(spec.org, spec.ws), invited]);
+        data = both[0];
+        open = both[1];
       } catch (e) {
         if (mine !== drawing) return;
         // Only the creator or an organism owner or admin may read the list: the node says so.
@@ -166,9 +237,9 @@ export function workspaceTeam(spec) {
     const people =((data && data.members) || []).filter(function (m) { return m && m.account; }).slice()
       .sort(function (a, b) { return (a.role === 'creator' ? 0 : 1) - (b.role === 'creator' ? 0 : 1); });
     const requests = ((data && data.requests) || []).filter(function (r) { return r && r.account && (!r.status || r.status === 'pending'); });
-    const count = { requests: requests.length, people: people.length };
-    const tabs = ['requests', 'people', 'invite'];
-    if (!tab) tab = count.requests ? 'requests' : 'people';
+    const count = { requests: requests.length, people: people.length, invitations: open ? open.list.length : 0 };
+    const tabs = open ? ['requests', 'people', 'invite', 'invitations'] : ['requests', 'people', 'invite'];
+    if (!tab || tabs.indexOf(tab) === -1) tab = count.requests ? 'requests' : 'people';
 
     if (failure) root.appendChild(el('p', { class: 'ak-mem__failure', role: 'alert', 'data-ak-part': 'failure' }, tw('failed', { why: failure })));
     if (notice) root.appendChild(el('p', { class: 'ak-mem__notice', role: 'status', 'data-ak-part': 'notice' }, notice));
@@ -266,6 +337,7 @@ export function workspaceTeam(spec) {
         'aria-label': tw('team.invitePlaceholder'), disabled: sample ? true : null, autocomplete: 'off',
       }));
       if (typed) input.value = typed;
+      if (targets) return inviteIntoTab(input);
       const sel = roleSel(typedRole);
       sel.disabled = sample;
       const go = button(EMAIL_RE.test(typed) ? tw('team.invite') : tw('team.add'), 'primary', sample ? noop : function () {
@@ -299,9 +371,94 @@ export function workspaceTeam(spec) {
       ]);
     }
 
-    root.appendChild(el('div', { class: 'ak-mem__body' }, [
-      tab === 'requests' ? requestsTab() : (tab === 'invite' ? inviteTab() : peopleTab()),
-    ]));
+    /**
+     * The invite tab with spec.inviteInto: one field, then a tick and a role per workspace. An email
+     * address gets one invitation with a role in each ticked workspace; an account name gets each
+     * ticked role at once, one grant per workspace.
+     * @param {HTMLInputElement} input
+     */
+    function inviteIntoTab(input) {
+      const rows = (targets || []).map(function (t) {
+        const box = /** @type {HTMLInputElement} */ (el('input', {
+          type: 'checkbox', class: 'ak-check', 'data-ak-part': 'targetOn', disabled: sample ? true : null,
+          'aria-label': wsLabel(t.ws),
+        }));
+        box.checked = picked[t.ws].on;
+        box.addEventListener('change', function () { picked[t.ws].on = !!box.checked; });
+        const sel = roleSel(picked[t.ws].role);
+        sel.disabled = sample;
+        sel.addEventListener('change', function () { picked[t.ws].role = sel.value; });
+        return el('li', { class: 'ak-mem__row ak-ws__target', 'data-ak-part': 'target', 'data-ak-ws': t.ws }, [
+          el('label', { class: 'ak-ws__tick', 'data-ak-part': 'targetName' }, [box, el('span', { class: 'ak-ws__tick-text' }, wsLabel(t.ws))]),
+          el('span', { class: 'ak-mem__acts', 'data-ak-part': 'acts' }, [sel]),
+        ]);
+      });
+      const go = button(EMAIL_RE.test(typed) ? tw('team.invite') : tw('team.add'), 'primary', sample ? noop : function () {
+        const value = input.value.trim();
+        typed = value;
+        if (!value) return;
+        const into = (targets || []).filter(function (t) { return picked[t.ws].on; })
+          .map(function (t) { return { ws: t.ws, role: picked[t.ws].role }; });
+        if (!into.length) { failure = tw('team.pickOne'); notice = ''; render(); return; }
+        if (EMAIL_RE.test(value)) {
+          act(function () {
+            if (typeof lib.inviteByEmail !== 'function') throw new Error(tw('noLib'));
+            return lib.inviteByEmail(spec.org, value, { workspaces: into });
+          }, function (r) {
+            typed = '';
+            return r && r.email_sent === false && r.accept_url
+              ? tw('team.inviteLink', { url: r.accept_url })
+              : tw('team.inviteSent', { email: value });
+          });
+        } else {
+          act(async function () {
+            // One grant per workspace, in order; a refusal stops there and says which sentence.
+            for (const g of into) await lib.grant(spec.org, g.ws, value, g.role);
+          }, function () {
+            typed = '';
+            return into.length === 1
+              ? tw('team.granted', { who: value, role: tw('role.' + into[0].role) })
+              : tw('team.grantedMany', { who: value, n: into.length });
+          });
+        }
+      }, sample);
+      go.setAttribute('data-ak-part', 'inviteGo');
+      input.addEventListener('input', function () {
+        go.textContent = EMAIL_RE.test(input.value.trim()) ? tw('team.invite') : tw('team.add');
+      });
+      return el('div', { class: 'ak-mem__group', 'data-ak-part': 'invite' }, [
+        el('div', { class: 'ak-mem__add' }, [el('div', { class: 'ak-mem__field' }, [input]), go]),
+        el('h4', { class: 'ak-mem__group-title', 'data-ak-part': 'targetsTitle' }, tw('team.inviteInto')),
+        el('ul', { class: 'ak-mem__rows', 'data-ak-part': 'targets' }, rows),
+        el('p', { class: 'ak-mem__hint', 'data-ak-part': 'hint' }, tw('team.inviteIntoHint')),
+      ]);
+    }
+
+    /** The open email invitations, each with the workspaces it names and a Cancel. */
+    function invitationsTab() {
+      if (open && open.refused) {
+        return el('div', { class: 'ak-mem__group', 'data-ak-part': 'invitations' }, [
+          el('p', { class: 'ak-mem__none', 'data-ak-part': 'refused' }, tw('failed', { why: open.refused })),
+        ]);
+      }
+      return list('invitations', ((open && open.list) || []).map(function (inv) {
+        const into = (inv.workspaces || []).map(function (w) {
+          return tw('team.wsRole', { ws: wsLabel(w.ws), role: tw('role.' + w.role) });
+        }).join(', ');
+        const meta = [into, inv.expiresAt ? tw('team.expires', { d: day(inv.expiresAt) }) : ''].filter(Boolean).join(' · ');
+        const cancel = button(tw('team.cancelInvite'), 'ghost', sample ? noop : function () {
+          act(function () {
+            if (typeof lib.cancelInvitation !== 'function') throw new Error(tw('noLib'));
+            return lib.cancelInvitation(spec.org, inv.id);
+          }, function () { return tw('team.inviteCancelled', { email: inv.email }); });
+        }, sample);
+        cancel.setAttribute('data-ak-part', 'cancel');
+        return row(person(inv.email, null), meta, [cancel]);
+      }), tw('team.invitationsNone'));
+    }
+
+    const draw = { requests: requestsTab, invite: inviteTab, invitations: invitationsTab, people: peopleTab };
+    root.appendChild(el('div', { class: 'ak-mem__body' }, [(draw[tab] || peopleTab)()]));
   }
 
   function run() {

@@ -7,11 +7,15 @@
  *   link; the accounts with their status and capability words, disconnect asked first, connect
  *   started with the provider, and `need` keeping only the services that can do it.
  * @version-history
+ *   v1.2.0 - 2026-10-02 - A stored label written per language is read in the page language, and
+ *     label(field) relabels; intakeAdmin's create(name) and row actions; connections inside an app
+ *     links to the node's own page, reads the list again on focus, and switches on SCOPE_DENIED;
+ *     the dictionary's three languages carry the same keys.
  *   v1.1.0 - 2026-10-01 - The copied link carries org and ws, so a form that follows the picker opens
  *     for a visitor who is not signed in.
  *   v1.0.0 - 2026-10-01 - Initial (iam-members-and-library-blocks plan, Phase D blocks 4 and 5).
  */
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { installGlobals } from './phaser-stub.mjs';
 
 let restore: () => void;
@@ -22,6 +26,25 @@ let calls: Array<{ op: string; args: any }>;
 let submitAnswer: (values: any) => Promise<any>;
 let confirmAnswer: boolean;
 let asked: any[];
+let i18nMod: any;
+let tiMod: any;
+let listCount: number;
+let listFormsCount: number;
+let revokeImpl: (id: string) => Promise<any>;
+
+/** A CRM form whose labels and one choice are written per language, as an app stores them. */
+const DESCRIPTOR_I18N = {
+  form_id: 'crm',
+  title: 'Leads',
+  honeypot_field: 'company_url',
+  success_message: '',
+  fields: [
+    { key: 'etunimi', label: { en: 'First name', fi: 'Etunimi', es: 'Nombre' }, type: 'text', required: true },
+    { key: 'email', label: { en: 'Email', fi: 'Sähköposti', es: 'Correo' }, type: 'email', required: true },
+    { key: 'tila', label: 'Status', type: 'select', required: false, options: [{ value: 'uusi', label: { en: 'New', fi: 'Uusi', es: 'Nuevo' } }, { value: 'vanha', label: 'Old' }] },
+    { key: 'muistiinpano', label: { sv: 'Anteckning' }, type: 'textarea', required: false },
+  ],
+};
 
 function all(root: any): any[] {
   const out: any[] = [];
@@ -67,20 +90,21 @@ beforeAll(async () => {
   (window as any).AIMEAT = {
     atelier: { confirm: async (s: any) => { asked.push(s); return confirmAnswer; } },
     intake: {
-      getForm: async (org: string, ws: string, formId: string) => { calls.push({ op: 'getForm', args: { org, ws, formId } }); return DESCRIPTOR; },
+      getForm: async (org: string, ws: string, formId: string) => { calls.push({ op: 'getForm', args: { org, ws, formId } }); return formId === 'crm' ? DESCRIPTOR_I18N : DESCRIPTOR; },
       fields: (f: any) => fieldsOf(f),
       submit: async (org: string, ws: string, formId: string, values: any) => { calls.push({ op: 'submit', args: { org, ws, formId, values } }); return submitAnswer(values); },
-      listForms: async () => [
+      listForms: async () => { listFormsCount++; return [
         { form_id: 'contact-us', title: 'Contact us', enabled: true, discoverable: true, mode: 'publish', allowed_fields: ['name'], submissions: 3 },
-      ],
+      ]; },
       deleteForm: async (org: string, ws: string, formId: string) => { calls.push({ op: 'deleteForm', args: { org, ws, formId } }); return { deleted: true }; },
       defineForm: async (cfg: any) => { calls.push({ op: 'defineForm', args: cfg }); return { form_id: cfg.form_id || 'frm_x', submit_url: '/v1/intake/o/w/x' }; },
     },
     connect: {
-      list: async () => [
+      settingsUrl: () => 'http://localhost:40050/v1/profile?tab=access',
+      list: async () => { listCount++; return [
         { id: 'c1', provider: 'google-mail-send', mode: 'personal', accountLabel: 'robin@example.com', status: 'active' },
         { id: 'c2', provider: 'mastodon', mode: 'personal', accountLabel: '@robin@mastodon.social', status: 'needs_reauth' },
-      ],
+      ]; },
       providers: async () => PROVIDERS,
       capabilities: async (p: any) => {
         const names: string[] = (p && p.capabilities) || [];
@@ -93,7 +117,7 @@ beforeAll(async () => {
       },
       start: async (provider: string, opts: any) => { calls.push({ op: 'start', args: { provider, opts } }); return { connected: false }; },
       attach: async () => ({ connected: true }),
-      revoke: async (id: string) => { calls.push({ op: 'revoke', args: id }); return { revoked: true, toldProvider: true }; },
+      revoke: async (id: string) => { calls.push({ op: 'revoke', args: id }); return revokeImpl(id); },
       notes: {},
       on: () => () => {},
       off: () => {},
@@ -101,6 +125,8 @@ beforeAll(async () => {
   };
   forms = await import('../../src/static/sdk-libs/atelier/intake-form.js');
   conn = await import('../../src/static/sdk-libs/atelier/connections.js');
+  i18nMod = await import('../../src/static/sdk-libs/atelier/i18n.js');
+  tiMod = await import('../../src/static/sdk-libs/atelier/intake-connect-i18n.js');
 });
 afterAll(() => restore());
 
@@ -108,8 +134,13 @@ beforeEach(() => {
   calls = [];
   asked = [];
   confirmAnswer = true;
+  listCount = 0;
+  listFormsCount = 0;
   submitAnswer = async () => ({ ok: true, id: 'r1', mode: 'publish' });
+  revokeImpl = async () => ({ revoked: true, toldProvider: true });
 });
+
+const labelOf = (root: any, name: string) => String(part(field(root, name), 'label')[0].textContent).replace(/\*.*$/, '').trim();
 
 describe('intakeForm', () => {
   it('draws every field type from the stored definition, with the required marks', async () => {
@@ -205,7 +236,8 @@ describe('intakeForm', () => {
     part(host, 'form')[0].dispatchEvent({ type: 'submit' });
     await settle();
     expect(top.hidden).toBe(false);
-    expect(top.textContent).toContain('Too many submissions');
+    // RATE_LIMITED is said in the page's language (members-shared refusalWords, 2026-10-02).
+    expect(top.textContent).toContain('Too many tries in a short time');
     expect(part(field(host, 'email'), 'error')[0].hidden).toBe(true);
   });
 
@@ -221,6 +253,56 @@ describe('intakeForm', () => {
     await settle();
     expect(calls).toEqual([]);
     expect(part(host, 'sent')[0].textContent).toBe('A sample. Nothing was sent.');
+  });
+
+  it('reads a label written per language in the page language, and keeps what was typed across a change', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    try {
+      forms.intakeForm({ target: host, org: 'org1', ws: 'ws1', formId: 'crm' });
+      await settle();
+      expect(labelOf(host, 'etunimi')).toBe('First name');
+      expect(labelOf(host, 'email')).toBe('Email');
+      expect(labelOf(host, 'tila')).toBe('Status');
+      // No page language and no English: the first language given, never "[object Object]".
+      expect(labelOf(host, 'muistiinpano')).toBe('Anteckning');
+      expect(field(host, 'tila').textContent).toContain('New');
+      expect(host.textContent).not.toContain('[object Object]');
+      inputsOf(field(host, 'etunimi'))[0].value = 'Kim';
+      i18nMod.i18n.setLang('fi');
+      await settle();
+      expect(labelOf(host, 'etunimi')).toBe('Etunimi');
+      expect(labelOf(host, 'email')).toBe('Sähköposti');
+      expect(field(host, 'tila').textContent).toContain('Uusi');
+      expect(field(host, 'tila').textContent).toContain('Old');
+      expect(inputsOf(field(host, 'etunimi'))[0].value).toBe('Kim');
+      // The required refusal names the field in the reader's language too.
+      part(host, 'form')[0].dispatchEvent({ type: 'submit' });
+      await settle();
+      expect(part(field(host, 'email'), 'error')[0].textContent).toContain('Sähköposti');
+      i18nMod.i18n.setLang('es');
+      await settle();
+      expect(labelOf(host, 'etunimi')).toBe('Nombre');
+    } finally {
+      i18nMod.i18n.setLang('en');
+      document.body.removeChild(host);
+    }
+  });
+
+  it('lets label(field) relabel a field, and null keep the stored label', async () => {
+    const host = document.createElement('div');
+    const seen: any[] = [];
+    forms.intakeForm({
+      target: host, org: 'org1', ws: 'ws1', formId: 'contact-us',
+      label: (f: any, lang: string) => { seen.push([f.name, lang]); return f.name === 'email' ? 'Your email' : null; },
+    });
+    await settle();
+    expect(labelOf(host, 'email')).toBe('Your email');
+    expect(labelOf(host, 'name')).toBe('Name');
+    expect(seen).toContainEqual(['email', 'en']);
+    part(host, 'form')[0].dispatchEvent({ type: 'submit' });
+    await settle();
+    expect(part(field(host, 'email'), 'error')[0].textContent).toContain('Your email');
   });
 });
 
@@ -320,6 +402,92 @@ describe('intakeAdmin', () => {
     expect(calls).toEqual([]);
     expect(asked).toEqual([]);
   });
+
+  it('asks only for a name when the app supplies create(name), and saves the definition it answers', async () => {
+    const host = document.createElement('div');
+    const names: string[] = [];
+    forms.intakeAdmin({
+      target: host, org: 'org1', ws: 'ws1',
+      create: async (name: string) => {
+        names.push(name);
+        return { namespace: 'crm.contacts', form_id: 'syysaamiainen', allowed_fields: ['email'], fields: [{ key: 'email', label: { en: 'Email', fi: 'Sähköposti' } }], defaults: { tila: 'uusi' } };
+      },
+    });
+    await settle();
+    const create = part(host, 'create')[0];
+    expect(part(create, 'fieldRows')).toEqual([]);
+    expect(part(create, 'addField')).toEqual([]);
+    const input = all(part(create, 'createName')[0]).find((n) => n.tagName === 'INPUT');
+    input.value = ' Syysaamiainen '; input.dispatchEvent({ type: 'input' });
+    const before = listFormsCount;
+    click(part(create, 'save')[0]);
+    await settle();
+    expect(names).toEqual(['Syysaamiainen']);
+    expect(calls.find((c) => c.op === 'defineForm')?.args).toEqual({
+      organism_id: 'org1', ws: 'ws1', namespace: 'crm.contacts', form_id: 'syysaamiainen', allowed_fields: ['email'],
+      fields: [{ key: 'email', label: { en: 'Email', fi: 'Sähköposti' } }], defaults: { tila: 'uusi' },
+    });
+    expect(part(host, 'notice')[0].textContent).toBe('The form is ready: syysaamiainen.');
+    expect(listFormsCount).toBe(before + 1);
+  });
+
+  it('reads the list again after a create(name) that saved the form itself, and says a refusal at the top', async () => {
+    const host = document.createElement('div');
+    let fail = false;
+    forms.intakeAdmin({
+      target: host, org: 'org1', ws: 'ws1',
+      create: async () => { if (fail) throw new Error('The name is taken'); },
+    });
+    await settle();
+    const before = listFormsCount;
+    click(part(host, 'save')[0]);
+    await settle();
+    expect(calls.find((c) => c.op === 'defineForm')).toBeUndefined();
+    expect(part(host, 'notice')[0].textContent).toBe('The form is ready.');
+    expect(listFormsCount).toBe(before + 1);
+    fail = true;
+    click(part(host, 'save')[0]);
+    await settle();
+    expect(part(host, 'failure')[0].hidden).toBe(false);
+    expect(part(host, 'failure')[0].textContent).toContain('The name is taken');
+  });
+
+  it('adds the app actions to each row, calls run with the form and reads the list again', async () => {
+    const host = document.createElement('div');
+    const ran: any[] = [];
+    forms.intakeAdmin({
+      target: host, org: 'org1', ws: 'ws1', namespace: 'leads',
+      actions: [
+        { label: 'Build the page with AI', run: (f: any) => { ran.push(f.form_id); } },
+        { label: 'Broken', tone: 'danger', run: () => { throw new Error('No prompt today'); } },
+      ],
+    });
+    await settle();
+    const row = part(host, 'row')[0];
+    const acts = part(row, 'action');
+    expect(acts.map((b: any) => b.textContent)).toEqual(['Build the page with AI', 'Broken']);
+    expect(acts[1].attrs.class).toContain('ak-btn--danger');
+    // The app's buttons sit between Copy link and Delete.
+    expect(part(row, 'acts')[0].children.map((b: any) => b.attrs['data-ak-part'])).toEqual(['copy', 'action', 'action', 'delete']);
+    const before = listFormsCount;
+    click(acts[0]);
+    await settle();
+    expect(ran).toEqual(['contact-us']);
+    expect(listFormsCount).toBe(before + 1);
+    click(part(part(host, 'row')[0], 'action')[1]);
+    await settle();
+    expect(part(host, 'failure')[0].textContent).toContain('No prompt today');
+  });
+
+  it('draws the app actions and create(name) disabled in the sample', async () => {
+    const host = document.createElement('div');
+    let ran = 0;
+    forms.intakeAdmin({ target: host, org: '<org>', ws: '<ws>', create: async () => { ran++; }, actions: [{ label: 'X', run: () => { ran++; } }] });
+    await settle();
+    for (const b of all(host).filter((n) => n.tagName === 'BUTTON')) { expect(b.disabled).toBe(true); click(b); }
+    await settle();
+    expect(ran).toBe(0);
+  });
 });
 
 describe('connections', () => {
@@ -401,5 +569,145 @@ describe('connections', () => {
     await settle();
     expect(calls).toEqual([]);
     expect(asked).toEqual([]);
+  });
+});
+
+describe('connections inside an app', () => {
+  const NODE_PAGE = 'http://localhost:40050/v1/profile?tab=access';
+  /** The auth library as it answers on an app origin. */
+  function appAuth(app: boolean) {
+    (window as any).AIMEAT.auth = {
+      isAppOrigin: () => app,
+      getSession: () => ({ owner: 'robin', _appOrigin: app }),
+      on: () => {},
+      off: () => {},
+    };
+  }
+  afterEach(() => { delete (window as any).AIMEAT.auth; });
+
+  it('links Connect, Sign in again and Disconnect to the node page in a new tab, and calls none of start, attach or revoke', async () => {
+    appAuth(true);
+    const host = document.createElement('div');
+    conn.connections({ target: host });
+    await settle();
+    expect(part(host, 'viaNode')[0].textContent).toContain('your own AIMEAT page');
+    // The list still shows: it needs only connections:use.
+    const rows = part(part(host, 'accounts')[0], 'row');
+    expect(rows.length).toBe(2);
+    const links = [part(rows[1], 'reconnect')[0], part(rows[0], 'disconnect')[0], ...part(host, 'connect')];
+    expect(links.length).toBe(5);
+    for (const a of links) {
+      expect(a.tagName).toBe('A');
+      expect(a.attrs.href).toBe(NODE_PAGE);
+      expect(a.attrs.target).toBe('_blank');
+      expect(a.attrs.rel).toBe('noopener');
+      expect(a.textContent).toContain('(opens in a new tab)');
+    }
+    // The node's page asks for the server itself.
+    expect(part(host, 'instance')).toEqual([]);
+    for (const a of links) click(a);
+    await settle();
+    expect(calls).toEqual([]);
+    expect(asked).toEqual([]);
+  });
+
+  it('tells an app refused the list itself where the accounts are, with one link and no alert', async () => {
+    // Measured in the browser on 2026-10-02: an app without connections:use drew an empty list, a
+    // red alert and no link at all.
+    appAuth(true);
+    const lib = (window as any).AIMEAT.connect;
+    const list = lib.list;
+    lib.list = async () => { throw Object.assign(new Error('This app does not have permission to do this.'), { code: 'SCOPE_DENIED' }); };
+    try {
+      const host = document.createElement('div');
+      conn.connections({ target: host });
+      await settle();
+      expect(part(host, 'viaNode')[0].textContent).toContain('may not see your accounts');
+      const open = part(host, 'openPage')[0];
+      expect(open.tagName).toBe('A');
+      expect(open.attrs.href).toBe(NODE_PAGE);
+      expect(part(host, 'failure')).toEqual([]);
+      expect(part(host, 'accounts')).toEqual([]);
+    } finally {
+      lib.list = list;
+    }
+  });
+
+  it('reads the list again when the window gets the focus back after a trip to the node page, once', async () => {
+    appAuth(true);
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    try {
+      const block = conn.connections({ target: host });
+      await settle();
+      const start = listCount;
+      // A focus without a trip reads nothing.
+      (window as any).dispatchEvent({ type: 'focus' });
+      await settle();
+      expect(listCount).toBe(start);
+      click(part(host, 'disconnect')[0]);
+      (window as any).dispatchEvent({ type: 'focus' });
+      await settle();
+      expect(listCount).toBe(start + 1);
+      (window as any).dispatchEvent({ type: 'focus' });
+      await settle();
+      expect(listCount).toBe(start + 1);
+      // After destroy nothing listens.
+      click(part(host, 'connect')[0]);
+      block.destroy();
+      (window as any).dispatchEvent({ type: 'focus' });
+      await settle();
+      expect(listCount).toBe(start + 1);
+    } finally {
+      if (host.parentNode) document.body.removeChild(host);
+    }
+  });
+
+  it('works as before on the owner page, where the auth library says it is not an app', async () => {
+    appAuth(false);
+    const host = document.createElement('div');
+    conn.connections({ target: host });
+    await settle();
+    expect(part(host, 'viaNode')).toEqual([]);
+    expect(part(host, 'connect')[0].tagName).toBe('BUTTON');
+    click(part(part(host, 'row')[1], 'reconnect')[0]);
+    await settle();
+    expect(calls.find((c) => c.op === 'start')?.args).toEqual({ provider: 'mastodon', opts: { instance: 'mastodon.social' } });
+  });
+
+  it('switches to the node page when the node refuses connections:write, and says why', async () => {
+    revokeImpl = async () => { throw Object.assign(new Error('Scope "connections:write" required'), { code: 'SCOPE_DENIED' }); };
+    const host = document.createElement('div');
+    conn.connections({ target: host });
+    await settle();
+    click(part(part(host, 'row')[0], 'disconnect')[0]);
+    await settle();
+    expect(calls.find((c) => c.op === 'revoke')).toBeTruthy();
+    expect(part(host, 'failure')).toEqual([]);
+    expect(part(host, 'notice')[0].textContent).toContain('may not change your accounts itself');
+    expect(part(host, 'viaNode').length).toBe(1);
+    expect(part(part(host, 'row')[0], 'disconnect')[0].tagName).toBe('A');
+  });
+
+  it("forces the node page with via: 'node', and the sample keeps its buttons disabled", async () => {
+    const host = document.createElement('div');
+    conn.connections({ target: host, via: 'node' });
+    await settle();
+    expect(part(host, 'disconnect')[0].attrs.href).toBe(NODE_PAGE);
+    const sample = document.createElement('div');
+    conn.connections({ target: sample, sample: true, via: 'node' });
+    await settle();
+    expect(part(sample, 'viaNode').length).toBe(1);
+    expect(all(sample).filter((n) => n.tagName === 'A')).toEqual([]);
+    for (const b of part(sample, 'disconnect')) expect(b.disabled).toBe(true);
+  });
+});
+
+describe('the words of the form and account blocks', () => {
+  it('carries the same keys in English, Finnish and Spanish', () => {
+    const en = [...tiMod.TI_KEYS.en].sort();
+    expect([...tiMod.TI_KEYS.fi].sort()).toEqual(en);
+    expect([...tiMod.TI_KEYS.es].sort()).toEqual(en);
+    for (const k of ['intake.createName', 'intake.createdPlain', 'connect.viaNode', 'connect.newTab', 'connect.switched']) expect(en).toContain(k);
   });
 });

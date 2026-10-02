@@ -19,7 +19,18 @@
  *   kinetic · countUp · attention · wearLook
  * @usage  import { el, $, injectStyle, enter } from './dom.js';
  *   el('div', { class: 'ak-card', vars: { '--ak-fill': '42%' }, on: { click: fn } }, ['text']);
+ *
+ *   A PAGE WITHOUT THE APP FRAME PICKS ITS LOOK ON <html> OR <body>. A Classic page that uses kit
+ *   blocks has no `.ak-app`; `<html data-ak-look="flat">` (or the same on <body>) gives every block
+ *   and every layer the kit puts on the body that look (wearLook), and the stylesheet lets a look
+ *   on <html> win over the kit's own :root values (aimeat-atelier.css). Inside an app frame the
+ *   frame's own look still wins.
  * @version-history
+ *   v0.62.0 — 2026-10-02 — wearLook reads the page's own look, data-ak-look on <body> or <html>,
+ *     after the element the layer came from and the app frame, so a page with kit blocks and no app
+ *     frame dresses the members block's confirm dialog, the toasts and the menus in its look
+ *     (wish-a-page-with-kit-blocks-but-no-kit-app-frame-cannot-pick-the-). The body or <html> as
+ *     `from` counts as no element.
  *   v0.59.0 — 2026-09-29 — wearLook(node, from): a layer the kit appends to the body (a dialog, a
  *     drawer, a menu, a popover, a tooltip, a toast, the palette, a tour note, a leaving row's
  *     ghost) names the look of the element it came from, or of the page's app. A look's tokens
@@ -49,16 +60,26 @@
 /**
  * The look a layer outside the app frame wears. The kit appends a dialog, a menu, a toast, a drawer
  * or a leaving row's ghost to the BODY, while a look's tokens are scoped to the element that carries
- * `data-ak-look` (the app frame). The layer names the look of the element it belongs to, or of the
- * page's app when it has none; a layer that already names a look keeps it.
+ * `data-ak-look` (the app frame). A layer that already names a look keeps it. Otherwise, in order:
+ *   1. the nearest look on the element it came from, when that element is inside the page (an app
+ *      frame, a block, or the page itself, whichever is nearest);
+ *   2. the page's app frame (`.ak-app[data-ak-look]`);
+ *   3. the page's own look, `data-ak-look` on <body>, then on <html>. This is how a page with kit
+ *      blocks and no app frame (a Classic page) picks one look for its blocks and their layers.
+ * The body and <html> as `from` count as no element: document.activeElement is the body when
+ * nothing has focus, and that says nothing about where the layer belongs.
  * @param {HTMLElement} node  the layer
  * @param {Element|null} [from]  the element it came from (an anchor, a leaving row), when there is one
  * @returns {HTMLElement} the same node
  */
 export function wearLook(node, from) {
   if (!node || node.hasAttribute('data-ak-look')) return node;
-  const host = (from && typeof from.closest === 'function' && from.closest('[data-ak-look]'))
-    || document.querySelector('.ak-app[data-ak-look]');
+  const page = /** @type {(Element|null)[]} */ ([document.body, document.documentElement]);
+  const near = from && page.indexOf(from) === -1 && typeof from.closest === 'function'
+    ? from.closest('[data-ak-look]') : null;
+  const host = near
+    || document.querySelector('.ak-app[data-ak-look]')
+    || page.find(function (p) { return !!p && p.hasAttribute('data-ak-look'); });
   const look = host ? host.getAttribute('data-ak-look') : null;
   if (look) node.setAttribute('data-ak-look', look);
   return node;

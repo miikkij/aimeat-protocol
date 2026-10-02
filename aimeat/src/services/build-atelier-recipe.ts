@@ -75,7 +75,7 @@ export function renderCustomisation(): string {
     + 'cardGrid, mediaCard, queue, health, kanban, section and searchBar; `numbered` on list and '
     + 'listDetail; `wide` on cardGrid; `lined` on table; `tall`, `compact` and `center` on hero; '
     + '`compact`, `trend` and `plain` on statRow; `compact` and `center` on figure; `compact` on '
-    + 'rating and aiTask; `dense` on tabs, bottomNav, segmented, members, workspacePicker and workflowInput; `pill` on tabs; '
+    + 'rating, aiTask and aiChat; `plain` on doc; `dense` on tabs, bottomNav, segmented, members, workspacePicker and workflowInput; `pill` on tabs; '
     + '`quiet` on section; `ghost` on stateButton; `table` on members and workspaceTeam. An unknown name '
     + 'is refused with a console line naming the real ones.\n'
     + '4. **Per-component tokens.** `--ak-list-aside-size`, `--ak-stat-figure-size`, '

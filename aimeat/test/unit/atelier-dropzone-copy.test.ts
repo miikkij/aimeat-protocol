@@ -7,6 +7,8 @@
  *   prompt panel and the forms list say when the browser refuses; and agentface's publishQuietly
  *   (nothing signed out, never a throw, an unchanged face skipped, a burst written once, in order).
  * @version-history
+ *   v1.1.0 - 2026-10-02 - The dropzone's accept takes type families ('image/*'), with extensions and
+ *     whole types still working, and the picker carries the same list; the zone's parts are marked.
  *   v1.0.0 - 2026-10-01 - Initial.
  */
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -106,6 +108,52 @@ describe('dropzone without uploads', () => {
     expect(host.textContent).toContain('notes.txt is not a kind this takes.');
     expect(st.calls.length).toBe(0);
     expect(part(host, 'files').length).toBe(0);
+  });
+});
+
+describe('dropzone accept wildcards', () => {
+  it("takes every photo with accept: ['image/*'] and puts the same value on the picker", () => {
+    const host = document.createElement('div');
+    const got: any[] = [];
+    const z = parts.dropzone({ target: host, accept: ['image/*'], multiple: true, onFiles: (f: any) => got.push(...f) });
+    const input = part(host, 'input')[0];
+    expect(input.attrs.accept).toBe('image/*');
+    pick(z, [file('IMG_0001.JPG', 10, 'image/jpeg'), file('IMG_0002.HEIC', 10, 'image/heic'), file('shot.png', 10, 'image/png')]);
+    expect(got.map((f) => f.name)).toEqual(['IMG_0001.JPG', 'IMG_0002.HEIC', 'shot.png']);
+    expect(part(host, 'error')[0].hidden).toBe(true);
+    pick(z, [file('menu.pdf', 10, 'application/pdf')]);
+    expect(part(host, 'error')[0].hidden).toBe(false);
+    expect(part(host, 'error')[0].textContent).toContain('menu.pdf is not a kind this takes.');
+    // 'image/*' is not 'imagex/…': the slash is part of the start.
+    pick(z, [file('odd.bin', 10, 'imagex/raw')]);
+    expect(got.length).toBe(3);
+  });
+
+  it('keeps extensions and whole types working beside a wildcard', () => {
+    const host = document.createElement('div');
+    const got: any[] = [];
+    const z = parts.dropzone({ target: host, accept: ['.MD', 'application/pdf', 'video/*'], multiple: true, onFiles: (f: any) => got.push(...f) });
+    expect(part(host, 'input')[0].attrs.accept).toBe('.md,application/pdf,video/*');
+    pick(z, [file('notes.md', 10, ''), file('menu.pdf', 10, 'application/pdf'), file('clip.mov', 10, 'video/quicktime')]);
+    expect(got.map((f) => f.name)).toEqual(['notes.md', 'menu.pdf', 'clip.mov']);
+    pick(z, [file('photo.jpg', 10, 'image/jpeg')]);
+    expect(got.length).toBe(3);
+  });
+
+  it('reads an accept list the way the browser does', () => {
+    const ok = (name: string, type: string, accept: string[]) => parts.acceptsFile({ name, type }, accept);
+    expect(ok('a.png', 'image/png', [])).toBe(true);
+    expect(ok('a.png', 'IMAGE/PNG', ['image/*'])).toBe(true);
+    expect(ok('a', '', ['image/*'])).toBe(false);
+    expect(ok('a.txt', 'text/plain', ['*/*'])).toBe(true);
+    expect(ok('a.txt', 'text/plain', ['.png', 'image/png'])).toBe(false);
+    expect(ok('README', '', ['.readme'])).toBe(false);
+  });
+
+  it('marks the zone and its picker with data-ak-part', () => {
+    const host = document.createElement('div');
+    parts.dropzone({ target: host, hint: 'Pictures' });
+    for (const p of ['root', 'label', 'hint', 'error', 'input']) expect(part(host, p).length).toBe(1);
   });
 });
 

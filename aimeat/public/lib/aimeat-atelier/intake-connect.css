@@ -11,6 +11,8 @@
  * @structure .ak-intake (shared lines) · the radio group and checkbox · the honeypot · the owner's
  *   rows · Create · .ak-conn (shared lines) · account rows and status · Connect offers
  * @version-history
+ *   v0.63.0 — 2026-10-02 — .ak-conn__go: inside an app, Connect, Sign in again and Disconnect are
+ *     links to the node's own page, drawn as the kit's buttons (no underline, the touch floor).
  *   v0.61.0 — 2026-10-01 — Initial (iam-members-and-library-blocks plan, Phase D blocks 4 and 5).
  */
 
@@ -156,3 +158,10 @@
 .ak-conn__fields { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .ak-conn__input { flex: 1 1 12rem; min-width: 0; }
 .ak-conn__offer .ak-conn__note { margin: 0; }
+/* Inside an app the actions are links to the node's own page, worn as the kit's buttons. */
+.ak-conn a.ak-conn__go {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--ak-touch-min, var(--ak-touch, 40px));
+  text-decoration: none;
+}

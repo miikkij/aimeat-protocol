@@ -22,6 +22,24 @@
     };
   }
 
+  // src/static/sdk-libs/_core/config.js
+  function cfg() {
+    return window.__AIMEAT_SDK_CFG__ || { nodeId: "", baseUrl: "" };
+  }
+  function resolveNodeUrl() {
+    const meta = document.querySelector('meta[name="aimeat-node"]');
+    if (meta) return (meta.getAttribute("content") || "").replace(/\/$/, "");
+    if (location.protocol === "http:" || location.protocol === "https:") return location.origin;
+    if (typeof self !== "undefined" && typeof self.origin === "string" && self.origin.indexOf("http") === 0) {
+      return self.origin;
+    }
+    return cfg().baseUrl;
+  }
+  var NODE_URL = resolveNodeUrl();
+  var APEX_URL = cfg().baseUrl;
+  var NODE_ID = cfg().nodeId;
+  var HEARTBEAT_MS = cfg().heartbeatMs || 3e4;
+
   // src/static/sdk-libs/_core/namespace.js
   function namespace() {
     if (!window.AIMEAT) window.AIMEAT = {};
@@ -376,7 +394,7 @@
         return_url: "/connection-done.html"
       })
     });
-    const url = res?.data?.authorize_url;
+    const url = must(res, "the connection could not be started").authorize_url;
     if (!url) throw new Error("the node did not return an authorization URL");
     const win = window.open(url, "aimeat-connect", "width=620,height=760,noopener=no");
     if (!win) throw new Error("the connect window was blocked; allow pop-ups for this site");
@@ -442,6 +460,9 @@
   function off(fn) {
     listeners.delete(fn);
   }
+  function settingsUrl() {
+    return String(APEX_URL || NODE_URL || "").replace(/\/+$/, "") + "/v1/profile?tab=access";
+  }
   var connect = {
     list,
     providers,
@@ -452,6 +473,7 @@
     publish,
     on,
     off,
+    settingsUrl,
     clients,
     setClient,
     removeClient,

@@ -8,6 +8,9 @@
  * @structure renderSelfSourced(block, into, handles) → whether the block was one of these
  * @usage if (renderSelfSourced(block, into, alive.handles)) return;   // inside mosaic.js buildBlock
  * @version-history
+ *   v0.63.0 — 2026-10-02 — aiChat joins (ai-chat.js); doc passes `variant`, decision `decisionId`,
+ *     workspaceTeam `inviteInto`, workspacePicker `allowPrivate` and `multiple`, connections and
+ *     decision `via`.
  *   v0.62.0 — 2026-10-01 — workspacePicker joins (workspace-picker.js), and workspaceTeam, intakeForm
  *     and intakeAdmin pass `app`, so they follow the picker's choice when org and ws are left empty.
  *   v0.61.0 — 2026-10-01 — Initial: legalLinks, auditTrail, feedbackForm and reviewerLine moved from
@@ -25,6 +28,7 @@ import { intakeForm, intakeAdmin } from './intake-form.js';
 import { connections } from './connections.js';
 import { workflowInput } from './workflow-input.js';
 import { aiTask } from './ai-task.js';
+import { aiChat } from './ai-chat.js';
 import { doc } from './doc.js';
 import { decision } from './decision.js';
 
@@ -74,13 +78,14 @@ export function renderSelfSourced(block, into, handles) {
     // ── A workspace's people, over AIMEAT.organism. With `app` and no org or ws, it opens on the
     //    workspace the picker above it chose (workspace-choice.js).
     case 'workspaceTeam': {
-      handles.push(workspaceTeam({ target: into, org: p.org, ws: p.ws, app: p.app, title: p.title, variant: p.variant }));
+      handles.push(workspaceTeam({ target: into, org: p.org, ws: p.ws, app: p.app, title: p.title, variant: p.variant, inviteInto: p.inviteInto }));
       return true;
     }
     // ── Where the app keeps its records: the first-run choice, announced to the blocks below.
     case 'workspacePicker': {
       handles.push(workspacePicker({
         target: into, app: p.app, name: p.name, kind: p.kind, purpose: p.purpose, title: p.title, variant: p.variant,
+        allowPrivate: p.allowPrivate, multiple: p.multiple,
       }));
       return true;
     }
@@ -117,15 +122,22 @@ export function renderSelfSourced(block, into, handles) {
     }
     // ── A markdown document, over AIMEAT.md, and one decision rule, over AIMEAT.decide.
     case 'doc': {
-      handles.push(doc({ target: into, markdown: p.markdown, title: p.title, rich: p.rich === 'true' }));
+      handles.push(doc({ target: into, markdown: p.markdown, title: p.title, rich: p.rich === 'true', variant: p.variant }));
       return true;
     }
     case 'decision': {
-      handles.push(decision({ target: into, appId: p.appId, rule: p.rule, state: p.state, title: p.title }));
+      handles.push(decision({ target: into, appId: p.appId, rule: p.rule, state: p.state, title: p.title, decisionId: p.decisionId, via: p.via }));
+      return true;
+    }
+    // ── A follow-up conversation about one document, over AIMEAT.ai.
+    case 'aiChat': {
+      const keep = parseInt(p.keep, 10);
+      handles.push(aiChat({ target: into, appId: p.appId, context: p.context, title: p.title, hint: p.hint,
+        placeholder: p.placeholder, systemPrompt: p.systemPrompt, keep: isNaN(keep) ? undefined : keep, variant: p.variant }));
       return true;
     }
     case 'connections': {
-      handles.push(connections({ target: into, title: p.title, need: p.need }));
+      handles.push(connections({ target: into, title: p.title, need: p.need, via: p.via }));
       return true;
     }
     default:

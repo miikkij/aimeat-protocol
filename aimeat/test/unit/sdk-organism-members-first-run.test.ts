@@ -4,6 +4,8 @@
  *   a stub session fetch: the route and body each method sends, the shapes it answers, and that a
  *   refusal throws the node's own message.
  * @version-history
+ *   v1.1.0 - 2026-10-02 - invitations and cancelInvitation; the private choice; rememberList and
+ *     recallList with verify.
  *   v1.0.0 - 2026-10-01 - Initial: members/access/requests/grant/revoke/decide/inviteByEmail and
  *     organisms/findOrCreateWorkspace/remember/recall.
  */
@@ -144,6 +146,35 @@ describe('workspace members', () => {
     await expect(organism.inviteByEmail(ORG, 'nope')).rejects.toThrow('A valid email address is required');
     expect(calls[1].body).toEqual({ email: 'nope', workspaces: [] });
   });
+
+  it('lists the open email invitations, leaves code invitations out, and keeps those naming a workspace asked for', async () => {
+    routes['GET /v1/organisms/org-1/invitations/email'] = () => ({ ok: true, data: { total: 3, invitations: [
+      { id: 'inv-1', email: 'erin@example.com', org_role: 'member', type: 'link', status: 'pending', invited_by: 'alice',
+        workspaces: [{ ws: 'ws-a', role: 'viewer' }, { ws: 'ws-b', role: 'contributor' }], created_at: '2026-10-01T00:00:00Z', expires_at: '2026-10-15T00:00:00Z' },
+      { id: 'inv-2', email: 'code@example.com', type: 'code', status: 'pending', workspaces: [{ ws: 'ws-a', role: 'viewer' }] },
+      { id: 'inv-3', email: 'fay@example.com', type: 'link', status: 'pending', workspaces: [{ ws: 'ws-c', role: 'viewer' }] },
+    ] } });
+    const every = await organism.invitations(ORG);
+    expect(every.map((i: any) => i.id)).toEqual(['inv-1', 'inv-3']);
+    expect(every[0]).toEqual({
+      id: 'inv-1', email: 'erin@example.com', orgRole: 'member', status: 'pending', invitedBy: 'alice', message: null,
+      workspaces: [{ ws: 'ws-a', role: 'viewer' }, { ws: 'ws-b', role: 'contributor' }],
+      createdAt: '2026-10-01T00:00:00Z', expiresAt: '2026-10-15T00:00:00Z',
+    });
+    expect((await organism.invitations(ORG, { ws: 'ws-b' })).map((i: any) => i.id)).toEqual(['inv-1']);
+    expect((await organism.invitations(ORG, { ws: ['ws-c', 'ws-x'] })).map((i: any) => i.id)).toEqual(['inv-3']);
+    expect(calls.every((c) => c.path === '/v1/organisms/org-1/invitations/email' && c.method === 'GET')).toBe(true);
+    routes['GET /v1/organisms/org-1/invitations/email'] = refusal('ACCESS_DENIED', 'Only the organism creator or an admin can do this');
+    await expect(organism.invitations(ORG)).rejects.toMatchObject({ message: 'Only the organism creator or an admin can do this', code: 'ACCESS_DENIED' });
+  });
+
+  it('cancels an invitation over the cancel route, and throws the refusal for one already used', async () => {
+    routes['POST /v1/organisms/org-1/invitations/email/inv%2F1/cancel'] = () => ({ ok: true, data: { status: 'cancelled' } });
+    expect(await organism.cancelInvitation(ORG, 'inv/1')).toEqual({ status: 'cancelled' });
+    expect(calls[0]).toEqual({ path: '/v1/organisms/org-1/invitations/email/inv%2F1/cancel', method: 'POST', body: {} });
+    routes['POST /v1/organisms/org-1/invitations/email/inv-2/cancel'] = refusal('INVALID_STATE', 'Invitation is already accepted');
+    await expect(organism.cancelInvitation(ORG, 'inv-2')).rejects.toMatchObject({ message: 'Invitation is already accepted', code: 'INVALID_STATE' });
+  });
 });
 
 describe('first run', () => {
@@ -267,5 +298,45 @@ describe('first run', () => {
   it('refuses an appKey with spaces before calling the node', async () => {
     await expect(organism.recall('my app')).rejects.toThrow(/appKey/);
     expect(calls.length).toBe(0);
+  });
+
+  it('remembers the private choice; recall answers it only when asked, and verifies nothing for it', async () => {
+    let stored: any = null;
+    routes['POST /v1/memory'] = (b) => { stored = b; return { ok: true, data: { key: b.key } }; };
+    routes['GET /v1/memory/lattice.workspace?soft=1'] = () => ({ ok: true, data: { value: stored ? stored.value : null } });
+    expect(await organism.remember('lattice', { private: true, orgId: '' })).toEqual({ private: true });
+    expect(stored).toEqual({ key: 'lattice.workspace', value: { private: true }, visibility: 'owner' });
+    expect(await organism.recall('lattice', { verify: true })).toBeNull();
+    expect(await organism.recall('lattice', { verify: true, private: true })).toEqual({ private: true });
+    expect(calls.some((c) => c.path.includes('/workspaces'))).toBe(false);
+    await expect(organism.remember('lattice', { private: 'yes' })).rejects.toThrow(/private: true/);
+  });
+
+  it('keeps a list with the one in use, which recall() still reads, and verifies it one organism at a time', async () => {
+    const mem = new Map<string, any>();
+    (window as any).AIMEAT.data = {
+      set: async (k: string, v: any) => { mem.set(k, v); return { key: k }; },
+      get: async (k: string) => (mem.has(k) ? mem.get(k) : null),
+    };
+    const a = { orgId: 'org-1', wsId: 'ws-a' };
+    const b = { orgId: 'org-1', wsId: 'ws-b' };
+    const c = { orgId: 'org-2', wsId: 'ws-c' };
+    expect(await organism.recallList('lahetin')).toBeNull();
+    expect(await organism.rememberList('lahetin', [a, b, a, { orgId: 'bad' }], b)).toEqual({ list: [a, b], current: b, private: false });
+    expect(mem.get('lahetin.workspace')).toEqual({ orgId: 'org-1', wsId: 'ws-b', list: [a, b] });
+    expect(await organism.recall('lahetin')).toEqual(b);
+    await organism.rememberList('lahetin', [a, b, c], { private: true });
+    expect(mem.get('lahetin.workspace')).toEqual({ private: true, list: [a, b, c] });
+    expect(await organism.recall('lahetin')).toBeNull();
+    await organism.rememberList('lahetin', [a, b, c], c);
+    routes['GET /v1/organisms/org-1/workspaces'] = () => ({ ok: true, data: { workspaces: [{ id: 'ws-a', access: 'granted' }, { id: 'ws-b', access: 'none' }] } });
+    routes['GET /v1/organisms/org-2/workspaces'] = refusal('ACCESS_DENIED', 'Not an active member of this organism');
+    expect(await organism.recallList('lahetin', { verify: true })).toEqual({ list: [a], current: null, private: false });
+    expect(calls.filter((x) => x.path.endsWith('/workspaces')).length).toBe(2);
+    routes['GET /v1/organisms/org-2/workspaces'] = refusal('INTERNAL', 'The store did not answer');
+    await expect(organism.recallList('lahetin', { verify: true })).rejects.toThrow('The store did not answer');
+    // A single choice kept by remember() reads as a list of one.
+    await organism.remember('cadence', a);
+    expect(await organism.recallList('cadence')).toEqual({ list: [a], current: a, private: false });
   });
 });

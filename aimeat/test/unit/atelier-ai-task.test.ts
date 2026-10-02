@@ -4,9 +4,11 @@
  *   `model` field: the sample sends nothing, an unavailable AI shows the library's fix, a run sends
  *   the built prompt and draws the answer with its label, model and cost, a schema goes through
  *   completeJson, each error code has its words, a cut answer says so, the page without the library
- *   offers the copy route, and the model field is a select with the library and a text field
- *   without it.
+ *   offers the copy route, a stored result is drawn again without a call, and the model field is a
+ *   select with the library and a text field without it.
  * @version-history
+ *   v1.2.0 - 2026-10-02 - A stored result: show() and `result` draw it with its label, model and
+ *     date and no call; a fresh result carries `at`; render() gets both.
  *   v1.1.0 - 2026-10-01 - The cost line in Finnish: the SDK money formatter and the budget's currency.
  *   v1.0.0 - 2026-10-01 - Initial.
  */
@@ -271,6 +273,80 @@ describe('aiTask', () => {
     expect(part(host, 'run').length).toBe(1);
     h.destroy();
     expect((handlers.login || []).length).toBe(0);
+  });
+
+  it('draws a stored result with its own label, model and date, calls no AI, and leaves the old cost out', async () => {
+    const { host, h } = await ready({});
+    calls = [];
+    const stored = {
+      content: 'Kept answer.', model: 'anthropic/claude-haiku', at: '2026-09-20T10:30:00.000Z',
+      budget: { spent_today_usd: 0.3, daily_budget_usd: 1 }, provenance: { record: { id: 'prov-old' } },
+    };
+    h.show(stored);
+    expect(calls.filter((c) => c.op === 'complete' || c.op === 'completeJson')).toEqual([]);
+    expect(calls.find((c) => c.op === 'disclose')?.args).toEqual({ record: { id: 'prov-old' } });
+    expect(part(host, 'body')[0].textContent).toBe('MD:Kept answer.');
+    expect(part(host, 'model')[0].textContent).toBe('Model: anthropic/claude-haiku');
+    const made = part(host, 'made')[0];
+    expect(made.tagName).toBe('TIME');
+    expect(made.attrs.datetime).toBe('2026-09-20T10:30:00.000Z');
+    expect(made.textContent.startsWith('Made ')).toBe(true);
+    expect(made.textContent).toMatch(/2026/);
+    expect(part(host, 'cost')).toEqual([]);
+    expect(part(host, 'result')[0].hidden).toBe(false);
+    h.show(null);
+    expect(part(host, 'result')[0].hidden).toBe(true);
+    h.destroy();
+  });
+
+  it('stamps a fresh result with the time it was made, and draws the same result again from the spec', async () => {
+    let got: any = null;
+    const a = await ready({ onResult: (r: any) => { got = r; } });
+    const before = Date.now();
+    await a.h.run('a long enough text');
+    expect(typeof got.at).toBe('string');
+    expect(Date.parse(got.at)).toBeGreaterThanOrEqual(before - 1000);
+    expect(part(a.host, 'made').length).toBe(1);
+    expect(part(a.host, 'cost').length).toBe(1);
+    a.h.destroy();
+    calls = [];
+    const b = await ready({ result: got });
+    expect(calls.filter((c) => c.op === 'complete')).toEqual([]);
+    expect(part(b.host, 'body')[0].textContent).toBe('MD:# Reading\nThe answer.');
+    expect(part(b.host, 'made')[0].attrs.datetime).toBe(got.at);
+    expect(part(b.host, 'cost')).toEqual([]);
+    b.h.destroy();
+  });
+
+  it('hands a structured answer to render() fresh and stored alike, and keeps a stored one in a sample', async () => {
+    const schema = { type: 'object', properties: { verdict: { type: 'string' } } };
+    const seen: any[] = [];
+    const render = (r: any, host: any) => {
+      seen.push(r);
+      const card = document.createElement('div');
+      card.textContent = 'CARD:' + r.parsed.verdict;
+      host.appendChild(card);
+    };
+    let kept: any = null;
+    const a = await ready({ schema, render, onResult: (r: any) => { kept = r; } });
+    await a.h.run('a long enough text');
+    expect(seen[0].parsed).toEqual({ verdict: 'go' });
+    expect(part(a.host, 'body')[0].textContent).toBe('CARD:go');
+    a.h.show({ ...kept, parsed: { verdict: 'no_go' } });
+    expect(seen[1].parsed).toEqual({ verdict: 'no_go' });
+    expect(part(a.host, 'body')[0].textContent).toBe('CARD:no_go');
+    a.h.destroy();
+    calls = [];
+    const b = await ready({ appId: '<app-id>', schema, render, result: kept });
+    expect(b.host.textContent).toContain('CARD:go');
+    expect(b.host.textContent).not.toContain('A sample answer.');
+    // The block draws while it checks the route and again when it knows it; each draw labels it.
+    const labels = calls.filter((c) => c.op === 'disclose');
+    expect(labels.length).toBeGreaterThan(0);
+    expect(labels.every((c) => c.args === kept.provenance)).toBe(true);
+    b.h.set({ result: null });
+    expect(b.host.textContent).toContain('A sample answer.');
+    b.h.destroy();
   });
 
   it('carries the same keys in English, Finnish and Spanish', () => {
