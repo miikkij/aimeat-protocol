@@ -15,6 +15,7 @@
  *     nothing on the node refuses a stranger without an extension, and aimeat_iam_define for the gate.
  *   2026-09-30 — Classified content in an app: one paragraph pointing at aimeat-labels.js (TARGET-082).
  *   2026-09-30 — The package line says a composed package carries your skills bound to its apps.
+ *   2026-10-02 — aimeat_package_compose_set and the aimeat-workspace block with AIMEAT.data.appWorkspace().
  *   2026-10-02 — aimeat_package_offer: the terms a seller sells your private package on.
  *   2026-09-29 — aimeat_package_sellers: a shop's node sells your packages with no token.
  *   2026-09-28 — aimeat_package_config_needs: the settings a shop asks before the sale.
@@ -81,7 +82,11 @@ An install takes \`config\`, each part's values: run it with \`dry_run\` first, 
 field and which required ones are empty, so you ask your owner for them before installing.
 \`aimeat_package_compose\` also carries your own skills bound to the chosen apps. Installing publishes each
 in the installer's skills, bound to their copy of the app; a skill of that name they already have stays
-theirs, and the answer names it in \`warnings\`.
+theirs, and the answer names it in \`warnings\`. Composing again under the same name publishes the next
+version. \`aimeat_package_compose_set\` makes a set to sell: one package per app and an install bundle
+with the workspaces the apps declare, their crews and your default config. Run it with \`dry_run\` first
+and tell your owner the \`questions\` a buyer will be asked and every \`problem\`. A buyer's AI installs
+the set with \`aimeat_package_install\`, which makes its organism and workspaces for the buyer.
 A package repository is a peer node that serves private packages to the nodes entitled to them:
 \`aimeat_package_repository\` lists what it serves this node, \`aimeat_package_pull\` takes one, and the
 node's daily check (\`aimeat_package_check_updates\` runs it now) pulls newer versions and updates the
@@ -102,6 +107,10 @@ keeps the terms they accepted.
 secret: everyone who opens the app can read them) and reads them with \`AIMEAT.data.appConfig()\`. The owner
 changes them with \`aimeat_app_manage\` action \`config_set\`; \`config_get\` reads them with what is still
 missing. An API key belongs in an extension's \`type: secret\` config, which a package install fills too.
+An app that keeps its records in an organism workspace declares it in
+\`<script type="application/json" id="aimeat-workspace">\` ({ "workspaces": [{ contract, name, manifest,
+schemas }] }); publish refuses one that provisioning would not take. Installed from a set, the app reads
+where its workspace was made with \`AIMEAT.data.appWorkspace(contract)\`.
 
 **Extensions (server-side sandboxed WASM; can store ext: memory + ctx.fetch external APIs).**
 \`aimeat_extension_install\` (UPLOAD mode recommended: no manifest → get an upload_url, PUT a ZIP with

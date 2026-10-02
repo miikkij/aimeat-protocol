@@ -29,6 +29,8 @@
  *   const set = parseInstallSet(body.install_set);
  *   if (!set.ok) return refusal(set.message);
  * @version-history
+ *   v1.1.0 — 2026-10-02 — A bundle workspace may name the `contract` its apps declare (package sale
+ *     design, phase 4: the set composer writes it, and the install links the apps to the workspace).
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 4).
  */
 import type { PackageRecord } from '../storage/interface.js';
@@ -65,6 +67,11 @@ export interface BundleWorkspace {
     manifest: Record<string, unknown>;
     schemas?: Record<string, Record<string, unknown>>;
     readme?: string;
+    /**
+     * The contract an app declares for this workspace (services/app-workspaces.ts). The install
+     * tells every installed app that declares it where the workspace is.
+     */
+    contract?: string;
 }
 export interface BundleOrganism { key: string; name: string; description?: string; workspaces: BundleWorkspace[] }
 /** A crew agent an app of the bundle declares, deployed through the owner's runner agent. */
@@ -181,11 +188,14 @@ export function parseInstallBundle(raw: unknown): Parsed<InstallBundle> {
                 if (!isObj(wo.manifest)) fail(`Workspace "${wkey}": manifest is required, an object with an objectTypes list of at least one type.`);
                 if (wo.schemas !== undefined && !isObj(wo.schemas)) fail(`Workspace "${wkey}": schemas is an object of JSON Schemas by namespace.`);
                 const readme = str(wo.readme, 20000);
+                if (wo.contract !== undefined && !str(wo.contract, 100)) fail(`Workspace "${wkey}": contract is the name apps declare for it, such as "aimeat.backoffice/1".`);
+                const contract = str(wo.contract, 100);
                 return {
                     key: wkey as string, name: str(wo.name) ?? fail(`Workspace "${wkey}" has a name.`),
                     manifest: wo.manifest as Obj,
                     ...(isObj(wo.schemas) ? { schemas: wo.schemas as Record<string, Record<string, unknown>> } : {}),
                     ...(readme ? { readme } : {}),
+                    ...(contract ? { contract } : {}),
                 };
             });
             return { key: key as string, name: str(o.name) ?? fail(`Organism "${key}" has a name.`), ...(str(o.description, 2000) ? { description: str(o.description, 2000) } : {}), workspaces };

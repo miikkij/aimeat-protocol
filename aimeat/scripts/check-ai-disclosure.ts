@@ -291,6 +291,11 @@ const AI_PROVENANCE_REQUIRED = [
  * nothing to anyone. `app_draft_save` is the one deliberate content exception; the reason is on it.
  */
 const AI_PROVENANCE_REVIEWED_WITHOUT = [
+  // DECIDED, 2026-10-02 (package sale design, phase 4; the developer reviews it with the build). The
+  // free text is the set's listing: a title, a description, one outcome sentence and up to three
+  // example prompts, the same fields aimeat_package_compose takes. The apps it packages are copied
+  // with their own recorded provenance, which is the content a person reads.
+  'aimeat_package_compose_set',
   // DECIDED, 2026-09-24 (the session that built Themes & Styles; the developer reviews it with the
   // build). A style is CONFIGURATION of the node's own look: colour values, three font names from a
   // fixed list, a mode, and a name the look picker shows as a label beside a colour chip. Nobody reads

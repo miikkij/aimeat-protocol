@@ -6,6 +6,9 @@
  *   itself (dry_run validation, component registration, @activate-cron firing, rollback on failure)
  *   lives in the service, so this door and the MCP tool run the same code.
  * @version-history
+ *   v1.11.0 — 2026-10-02 — A package that carries an install bundle installs as a set for the caller's
+ *     owner: its packages, organisms and workspaces (services/install-bundle-owner.ts); the body takes
+ *     `organism_names`, and `config` is per package group. Package sale design, phase 4.
  *   v1.10.0 — 2026-10-01 — The 201 answer carries `agents_proposed`: the package's agents, each waiting
  *     for the owner's approval (services/app-agent-propose.ts).
  *   v1.9.0 — 2026-09-30 — The 201 answer carries `warnings` when the install left out a skill because
@@ -45,12 +48,15 @@ import { installOrRequest, requestedBody } from '../../services/package-install-
 import { resolveGhii } from '../../utils/ghii-resolver.js';
 import type { Scheduler } from '../../services/scheduler.js';
 import { actCallerOf } from './install-requests.js';
+import type { PeerInfo } from '../../services/federation.js';
+import { bundleInstallOf, installSetForOwner } from '../../services/install-bundle-owner.js';
 
 export function registerInstallRoutes(
   router: Router,
   config: AimeatConfig,
   storage: Storage,
   scheduler?: Scheduler,
+  peers: Map<string, PeerInfo> = new Map(),
 ): void {
   // POST /v1/packages/:groupId/install — Install package as instance.
   //
@@ -66,7 +72,26 @@ export function registerInstallRoutes(
     const owner = req.auth!.owner;
     const ownerGhii = await resolveGhii(storage, owner, config);
 
-    const { label, version, dry_run: dryRun, mode, config: installConfig } = req.body ?? {};
+    const { label, version, dry_run: dryRun, mode, config: installConfig, organism_names: organismNames } = req.body ?? {};
+
+    // A package that carries an install bundle is a set: its packages, its organisms and workspaces,
+    // for this owner (services/install-bundle-owner.ts). `config` is then per package group.
+    if (await bundleInstallOf({ storage, config, peers }, groupId, owner)) {
+      const set = await installSetForOwner({ storage, config, peers, scheduler }, actCallerOf(req, owner, ownerGhii), {
+        groupId, config: installConfig, organismNames, dryRun: dryRun === true,
+      });
+      if (!set.ok) {
+        res.status(set.status).json(error(config.nodeId, set.code, set.message, set.status, set.problems ? { problems: set.problems } : undefined));
+        return;
+      }
+      if (set.kind === 'set-plan') { res.json(success(config.nodeId, { set: true, ...set.plan })); return; }
+      if (set.kind === 'set-waiting') {
+        res.status(202).json(success(config.nodeId, { set: true, status: 'awaiting_owner', record: set.record, requests: set.requests }));
+        return;
+      }
+      res.status(201).json(success(config.nodeId, { set: true, record: set.record, ...(set.warnings.length ? { warnings: set.warnings } : {}), ...(set.agents_proposed.length ? { agents_proposed: set.agents_proposed } : {}) }));
+      return;
+    }
 
     const out = await installOrRequest(
       { storage, config, scheduler },

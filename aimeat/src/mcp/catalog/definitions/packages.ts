@@ -12,6 +12,8 @@
  * @structure packagesTools[] -- catalog entries, folded into definitions.ts
  * @usage import { packagesTools } from './packages.js';
  * @version-history
+ *   v1.13.0 -- 2026-10-02 -- aimeat_package_compose_set; aimeat_package_install installs a set and takes
+ *     `organism_names` (package sale design, phase 4).
  *   v1.12.0 -- 2026-10-02 -- aimeat_package_offer and aimeat_package_buy (package sale design, phase 3).
  *   v1.11.0 -- 2026-10-02 -- aimeat_package_install names packages:install-code, and the dry run's
  *     `capabilities` and `source` (package sale design, phase 2).
@@ -125,6 +127,29 @@ export const packagesTools: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_package_compose_set',
+        description: 'Make a set to sell from apps you already published: one package per app (or its next version), and an install bundle that lists them, with the organism and workspaces the apps declare in their aimeat-workspace block (joined on the contract; one organism named after the set), the crews their aimeat-crews blocks carry, and your default config. Run dry_run first: it writes nothing and answers `questions` (what a buyer will be asked), `expects` (what the buyer\'s node must already have), `not_carried` (what stays behind), `capabilities` (what the parts can do), the `bundle`, and every `problem`. Without dry_run a set with any problem is refused and nothing is written. Composing again adds a version to each package and to the set. Then set its terms with aimeat_package_offer. The same as POST /v1/packages/compose-set.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            name: { type: 'string', required: true, description: 'The set\'s package name. With your owner name it forms the group id.' },
+            apps: { type: 'array', required: true, description: 'Filenames of your own apps, e.g. ["shop.html", "backoffice.html"].' },
+            title: { type: 'string', description: 'The name a buyer sees. Defaults to name.' },
+            organism: { type: 'object', description: '{ key, name }: the organism the declared workspaces go into, its key in the set and its default name.' },
+            defaults: { type: 'object', description: 'The set\'s default config, { <app filename>: { <field>: value } }. A field given here is not asked of the buyer.' },
+            description: { type: 'string', description: 'What the set is for.' },
+            category: { type: 'string', description: 'Category for the package gallery.' },
+            tags: { type: 'array', description: 'Tags for search.' },
+            visibility: { type: 'string', enum: ['private', 'public'], description: 'Defaults to private: a set is made to be sold.' },
+            include_cortex: { type: 'boolean', description: 'Package the cortexes you installed yourself. Default true.' },
+            include_skills: { type: 'boolean', description: 'Package your own skills bound to these apps. Default true.' },
+            allow_expectations: { type: 'boolean', description: 'Compose even when an app calls an extension a package cannot carry.' },
+            outcome: { type: 'string', description: 'What the set gives a person, in one sentence.' },
+            prompts: { type: 'array', description: 'Up to three things a person can ask their AI once it is installed.' },
+            dry_run: { type: 'boolean', description: 'Write nothing; answer what the set would be and every problem.' },
+        },
+    },
+    {
         // Publishing was unreachable. A package is created private and, until this tool existed, the
         // only way to move it between draft, published and archived was PATCH
         // /v1/packages/{group}/versions/{version} — a door no MCP or CLI surface carried. So an agent
@@ -174,7 +199,7 @@ export const packagesTools: AimeatToolDefinition[] = [
         // reaches for by name ("install the company brain"), and until 2026-08-23 it existed on the
         // HTTP route alone, so an agent could list a package and not install it.
         name: 'aimeat_package_install',
-        description: 'Install a component package as your own copy. Each component is registered under your identity. With mode "editable" (the default) what you get is yours to edit; with mode "managed" the package owns the code and layout, an update replaces them, and you change only the settings (name, description, access code, parking, search visibility, legal texts) until you fork the install. A package that seeds memory records writes them into your owner\'s memory, which takes the memory:write and memory:write-as-owner permissions; without them the install becomes a request your owner approves (status awaiting_owner, with a request_id), and nothing is installed until then. A package that carries code (an app, an extension, a cortex, a skill) takes packages:install-code in the same way. Run dry_run first: it answers `capabilities` (what each part will be able to do) and `source` (who made it and where it came from), which is what you tell your owner before they approve.',
+        description: 'Install a component package as your own copy. Each component is registered under your identity. With mode "editable" (the default) what you get is yours to edit; with mode "managed" the package owns the code and layout, an update replaces them, and you change only the settings (name, description, access code, parking, search visibility, legal texts) until you fork the install. A package that seeds memory records writes them into your owner\'s memory, which takes the memory:write and memory:write-as-owner permissions; without them the install becomes a request your owner approves (status awaiting_owner, with a request_id), and nothing is installed until then. A package that carries code (an app, an extension, a cortex, a skill) takes packages:install-code in the same way. Run dry_run first: it answers `capabilities` (what each part will be able to do) and `source` (who made it and where it came from), which is what you tell your owner before they approve. A set (a package that carries an install bundle) installs all of it for your owner: each package of the set by these same rules, then its organisms and workspaces under your owner\'s names (`organism_names`), each app told where its workspace is; `config` is then { <package group id>: { <component id>: { <field>: value } } }. A set that makes organisms needs organism:write. If a package of the set waits for your owner, the set stops there, and installing it again continues and makes nothing twice.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -184,6 +209,7 @@ export const packagesTools: AimeatToolDefinition[] = [
             dry_run: { type: 'boolean', description: 'Report what would be registered and register nothing.' },
             mode: { type: 'string', enum: ['managed', 'editable'], description: '"managed": the package owns the code and layout. "editable" (default): you may edit everything.' },
             config: { type: 'object', description: PACKAGE_CONFIG_PARAM },
+            organism_names: { type: 'object', description: 'For a set: your own names for its organisms, { <organism key>: name }.' },
         },
     },
     {

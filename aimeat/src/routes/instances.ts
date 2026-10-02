@@ -29,6 +29,7 @@
  *   v2.3.0 — 2026-09-25 — ./instances/install-requests.ts: the package install requests and their decision door
  *   v2.4.0 — 2026-09-28 — The router takes the federation peers, for POST /v1/instances/check-updates.
  *   v2.5.0 — 2026-09-28 — ./instances/install-sets.ts: applying an install set (install packages, phase 4).
+ *   v2.6.0 — 2026-10-02 — The install route takes the peers too: installing a set reaches its repository.
  */
 
 import { Router } from 'express';
@@ -57,7 +58,7 @@ export function instancesRouter(
   // ══════════════════════════════════════════════════════════════════════
 
   // POST /v1/packages/:groupId/install
-  registerInstallRoutes(router, config, storage, scheduler);
+  registerInstallRoutes(router, config, storage, scheduler, peers);
 
   // GET /v1/instances, GET/:id/status, GET/:id/check-update, GET/:id, DELETE /:id, PATCH /:id,
   // POST /:id/fork, POST /check-updates (the last reaches other nodes, so it takes the peers)

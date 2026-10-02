@@ -21,6 +21,8 @@
  *   import { packagesRouter } from '../routes/packages.js';
  *   app.use(packagesRouter(config, storage));
  * @version-history
+ *   2026-10-02 — POST /v1/packages/compose under a name the caller already has publishes the next
+ *     version (`new_version` true) instead of 409; POST /v1/packages/compose-set (package sale design, phase 4).
  *   2026-10-01 — GET /v1/packages/:groupId carries `sheet`, the "what you get" sheet (guided journey P3).
  *   v1.0.0 — 2026-03-15 — initial implementation (Phase 2)
  *   v1.1.0 — 2026-03-15 — rename routes from /v1/packages to /v1/bundles to avoid collision with knowledge system
@@ -67,6 +69,7 @@ import {
   listPackagesFor, getPackageFor, getPackageVersionFor, listPackageVersionsFor,
 } from '../services/package-read.js';
 import { composePackageFromApps } from '../services/package-compose.js';
+import { composeSet } from '../services/package-compose-set.js';
 import { packageSheet } from '../services/package-sheet.js';
 import { importParsedPackage, upstreamFromZip } from '../services/package-import.js';
 import type { PeerInfo } from '../services/federation.js';
@@ -136,10 +139,41 @@ export function packagesRouter(
     }
 
     res.status(201).json(success(config.nodeId, {
-      ...out.package, expects: out.expects, notes: out.notes,
+      ...out.package, expects: out.expects, notes: out.notes, new_version: out.newVersion === true,
     }, [
       { description: 'Install it', method: 'POST', url: `/v1/packages/${encodeURIComponent(out.package.packageGroupId)}/install` },
       { description: 'Make it public', method: 'PATCH', url: `/v1/packages/${encodeURIComponent(out.package.packageGroupId)}` },
+    ]));
+  });
+
+  // POST /v1/packages/compose-set — a set to sell: one package per app and the install bundle that
+  // lists them (services/package-compose-set.ts). With dry_run nothing is written.
+  router.post('/v1/packages/compose-set', requireAuth(), requireScope('packages:write'), async (req, res) => {
+    const owner = req.auth!.owner;
+    if (!req.auth!.roles.includes('operator') && (config.packageCreateRole ?? 'owner') === 'operator') {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only operators can create packages'));
+      return;
+    }
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const ownerGhii = await resolveGhii(storage, owner, config);
+    const out = await composeSet({ storage, config }, { owner, ownerGhii }, {
+      name: b.name as string, apps: b.apps as string[], title: b.title as string | undefined,
+      organism: b.organism as { key?: string; name?: string } | undefined,
+      defaults: b.defaults as Record<string, Record<string, unknown>> | undefined,
+      description: b.description as string | undefined, category: b.category as string | undefined,
+      tags: b.tags as string[] | undefined, visibility: b.visibility as string | undefined,
+      includeCortex: b.include_cortex as boolean | undefined, includeSkills: b.include_skills as boolean | undefined,
+      allowExpectations: b.allow_expectations as boolean | undefined,
+      outcome: b.outcome as string | undefined, prompts: b.prompts as string[] | undefined, dryRun: b.dry_run === true,
+    });
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message, out.status, out.problems ? { problems: out.problems } : undefined));
+      return;
+    }
+    const { ok, ...answer } = out;
+    void ok;
+    res.status(answer.dry_run ? 200 : 201).json(success(config.nodeId, answer, answer.dry_run ? [] : [
+      { description: 'Sell it: set its terms', method: 'PUT', url: `/v1/packages/${encodeURIComponent(answer.set.group_id)}/offer` },
     ]));
   });
 

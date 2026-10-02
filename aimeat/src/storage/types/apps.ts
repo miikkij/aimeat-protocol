@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description App, subdomain, CSM/MSM/schema and system-prompt record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.13.0 — 2026-10-02 — AppManifest gains `workspaces`: the workspaces an app declares it needs.
  *   v1.12.0 — 2026-09-28 — AppManifest gains `configSchema`: the config an app declares it needs.
  *   v1.11.0 — 2026-09-28 — The package, template-listing and package-instance types moved unchanged
  *     to src/storage/types/packages.ts (max-file-lines).
@@ -148,6 +149,12 @@ export interface AppManifest {
    * source, so it is never carried forward: a version without the block has no config.
    */
   configSchema?: Record<string, unknown>;
+  /**
+   * The workspaces the app declares it needs (services/app-workspaces.ts), parsed from its
+   * `<script type="application/json" id="aimeat-workspace">` block at every publish, never carried
+   * forward. The contract is what the set composer matches on.
+   */
+  workspaces?: Array<{ contract: string; name: string; manifest: Record<string, unknown>; schemas?: Record<string, Record<string, unknown>>; readme?: string }>;
   priceMorsels?: number;        // 0 or absent = free
   licenseType?: 'single' | 'lifetime';
   // Provenance: when this app was created by forking another app, this records the

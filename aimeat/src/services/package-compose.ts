@@ -36,6 +36,9 @@
  *   import { composePackageFromApps } from '../services/package-compose.js';
  *   const out = await composePackageFromApps({ storage, config }, caller, { name, apps });
  * @version-history
+ *   v1.5.0 — 2026-10-02 — Composing again under a name the caller already has publishes the group's next
+ *     version instead of refusing 409 (`newVersion` in the result); planComposeFromApps() plans without
+ *     writing, for the set composer (package-compose-set.ts). Package sale design, phase 4.
  *   v1.4.0 — 2026-10-02 — The extensions a packaged cortex calls are read from its library files and
  *     named in `expects` (and refused without allow_expectations), as the app's own calls are. Only the
  *     app's edges were read, and an app reaches an extension through its cortex.
@@ -52,7 +55,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, PackageRecord, AppRecord } from '../storage/interface.js';
 import { requirementsOf, appRef, extractDependencies } from './dependency-map.js';
 import {
-    createPackageGroup, hashContent,
+    createPackageGroup, addPackageVersion, hashContent,
     type PackageWriteResult, type RawComponentInput,
 } from './package-create.js';
 import { boundSkillComponents } from './package-skill-component.js';
@@ -68,7 +71,7 @@ export interface ComposeExpectations {
 }
 
 export type PackageComposeResult =
-    | { ok: true; package: PackageRecord; expects: ComposeExpectations; notes: string[] }
+    | { ok: true; package: PackageRecord; expects: ComposeExpectations; notes: string[]; newVersion?: boolean }
     | { ok: false; status: number; code: string; message: string };
 
 export interface PackageComposeDeps {
@@ -169,12 +172,22 @@ function composeSheet(input: PackageComposeInput): { sheet?: { outcome?: string;
     return { sheet: { ...(outcome ? { outcome } : {}), ...(prompts.length ? { prompts } : {}) } };
 }
 
-export async function composePackageFromApps(
+/** What a compose would write, read and checked, with nothing written yet. */
+export type PackageComposePlan =
+    | { ok: true; components: RawComponentInput[]; appComponents: RawComponentInput[]; apps: AppRecord[]; expects: ComposeExpectations; notes: string[] }
+    | { ok: false; status: number; code: string; message: string };
+
+/**
+ * Read the caller's apps and plan the package: its components, what it expects, and the notes. The
+ * set composer (package-compose-set.ts) plans every app this way before it writes anything.
+ */
+export async function planComposeFromApps(
     deps: PackageComposeDeps,
     caller: PackageComposeCaller,
     input: PackageComposeInput,
-): Promise<PackageComposeResult> {
+): Promise<PackageComposePlan> {
     const { storage, config } = deps;
+    const apps: AppRecord[] = [];
     const includeCortex = input.includeCortex !== false;
     const includeSkills = input.includeSkills !== false;
     /** The composer's own skills bound to the apps, each after the app it binds to. */
@@ -207,6 +220,7 @@ export async function composePackageFromApps(
             // same way, and saying "that is not yours" tells a stranger it exists.
             return { ok: false, status: 404, code: 'NOT_FOUND', message: `You have no app named ${filename}` };
         }
+        apps.push(app);
 
         const source = app.data.toString('utf-8');
         const needs = await requirementsOf(storage, 'app', appRef(caller.owner, filename));
@@ -329,27 +343,56 @@ export async function composePackageFromApps(
     notes.push('Screenshots, app tools, agent faces, data maps and saved layouts stay behind: '
         + 'each is addressed by a filename that only exists once the package is installed.');
 
-    const written: PackageWriteResult = await createPackageGroup(
-        { storage, config },
-        { owner: caller.owner },
-        {
-            name: input.name,
-            components,
-            // A composed package without a description reads as a blank column on every row that
-            // ever shows it, and the composer knows something worth saying: which apps are in it.
-            // A caller that gave a description keeps it.
-            description: input.description?.trim()
-                || appComponents.map(c => (c.meta?.app as { name?: string } | undefined)?.name || c.id).join(', '),
-            category: input.category,
-            tags: input.tags,
-            visibility: input.visibility,
-            status: input.status,
-            changelog: `Made from ${appComponents.length === 1 ? 'the app' : 'the apps'} ${appComponents.map(c => c.id).join(', ')}`,
-            // The author's own words for the sheet travel in the manifest beside `expects`.
-            manifest: JSON.stringify({ expects, ...composeSheet(input) }),
-        },
-    );
+    return { ok: true, components, appComponents, apps, expects, notes };
+}
+
+/**
+ * Compose one package from the caller's own apps, or, when the caller already has a package of that
+ * name, publish its next version from the apps as they are now (wish
+ * wish-compose-can-make-a-second-version-keeps-the-data-map-and-pac). A new version keeps the group's
+ * description, visibility and listing; it is published unless `status` says otherwise, so a managed
+ * install receives it.
+ */
+export async function composePackageFromApps(
+    deps: PackageComposeDeps,
+    caller: PackageComposeCaller,
+    input: PackageComposeInput,
+): Promise<PackageComposeResult> {
+    const { storage, config } = deps;
+    const plan = await planComposeFromApps(deps, caller, input);
+    if (!plan.ok) return plan;
+    const { components, appComponents, expects, notes } = plan;
+    const changelog = `Made from ${appComponents.length === 1 ? 'the app' : 'the apps'} ${appComponents.map(c => c.id).join(', ')}`;
+    // The author's own words for the sheet travel in the manifest beside `expects`.
+    const manifest = JSON.stringify({ expects, ...composeSheet(input) });
+    const groupId = `${input.name}::${caller.owner}`;
+    const exists = (await storage.listVersions(groupId, 1, 0)).total > 0;
+
+    const written: PackageWriteResult = exists
+        ? await addPackageVersion({ storage, config }, { owner: caller.owner }, {
+            groupId, components, changelog, manifest, status: input.status ?? 'published',
+        })
+        : await createPackageGroup(
+            { storage, config },
+            { owner: caller.owner },
+            {
+                name: input.name,
+                components,
+                // A composed package without a description reads as a blank column on every row that
+                // ever shows it, and the composer knows something worth saying: which apps are in it.
+                // A caller that gave a description keeps it.
+                description: input.description?.trim()
+                    || appComponents.map(c => (c.meta?.app as { name?: string } | undefined)?.name || c.id).join(', '),
+                category: input.category,
+                tags: input.tags,
+                visibility: input.visibility,
+                status: input.status,
+                changelog,
+                manifest,
+            },
+        );
 
     if (!written.ok) return written;
-    return { ok: true, package: written.package, expects, notes };
+    if (exists) notes.push('Published as a new version of your package of this name; installs on the stable channel receive it.');
+    return { ok: true, package: written.package, expects, notes, newVersion: exists };
 }

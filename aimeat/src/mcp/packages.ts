@@ -23,6 +23,9 @@
  *   aimeat_package_check_updates, aimeat_package_repository, aimeat_package_entitlements.
  * @usage import { registerPackageTools } from './packages.js';
  * @version-history
+ *   v1.12.0 — 2026-10-02 — aimeat_package_compose_set (a set to sell, with its dry run); aimeat_package_compose
+ *     answers `new_version`; aimeat_package_install installs a set for the owner and takes
+ *     `organism_names`. Package sale design, phase 4.
  *   v1.11.0 — 2026-10-01 — aimeat_package_get answers `sheet` (what the package gives, its data, agents,
  *     schedules, guides and questions); aimeat_package_install answers `agents_proposed`.
  *   v1.10.0 — 2026-09-30 — aimeat_package_compose takes `include_skills` (the composer's own skills
@@ -84,6 +87,8 @@ import { readOffer, setOffer, publicOffer } from '../services/package-offer.js';
 import { buyerOfferView } from '../services/package-sale-checkout.js';
 import { subscriptionsOf, readRequests, setAutoRenew } from '../services/package-sale-catalogue.js';
 import { createSession } from '../commerce/session-service.js';
+import { bundleInstallOf, installSetForOwner } from '../services/install-bundle-owner.js';
+import { composeSet } from '../services/package-compose-set.js';
 
 /** A package row as a conversation needs it: what it is, not every byte it holds. */
 function packageSummary(pkg: { packageGroupId: string; name: string; author: string; version: string; status: string; visibility: string; description: string; category: string; tags: string[]; components: { id: string; type: string; label: string }[] }) {
@@ -258,9 +263,41 @@ export function registerPackageTools(
                     ...packageSummary(out.package),
                     expects: out.expects,
                     notes: out.notes,
+                    new_version: out.newVersion === true,
                 }, null, 2),
             }],
         };
+    });
+
+    // A set to sell: the same service POST /v1/packages/compose-set calls.
+    mcp.tool('aimeat_package_compose_set', descriptionFor('aimeat_package_compose_set'), {
+        name: z.string().describe('The set\'s package name. With your owner name it forms the group id.'),
+        apps: z.array(z.string()).min(1).describe('Filenames of your own apps, e.g. ["shop.html", "backoffice.html"].'),
+        title: z.string().optional().describe('The name a buyer sees. Defaults to name.'),
+        organism: z.object({ key: z.string().optional(), name: z.string().optional() }).optional().describe('The organism the declared workspaces go into: its key in the set and its default name.'),
+        defaults: z.record(z.string(), z.record(z.string(), z.unknown())).optional().describe('The set\'s default config, { <app filename>: { <field>: value } }. A field given here is not asked of the buyer.'),
+        description: z.string().optional().describe('What the set is for.'),
+        category: z.string().optional().describe('Category for the package gallery.'),
+        tags: z.array(z.string()).optional().describe('Tags for search.'),
+        visibility: z.enum(['private', 'public']).optional().describe('Defaults to private: a set is made to be sold.'),
+        include_cortex: z.boolean().optional().describe('Package the cortexes you installed yourself. Default true.'),
+        include_skills: z.boolean().optional().describe('Package your own skills bound to these apps. Default true.'),
+        allow_expectations: z.boolean().optional().describe('Compose even when an app calls an extension a package cannot carry.'),
+        outcome: z.string().optional().describe('What the set gives a person, in one sentence.'),
+        prompts: z.array(z.string()).optional().describe('Up to three things a person can ask their AI once it is installed.'),
+        dry_run: z.boolean().optional().describe('Write nothing: answer the questions a buyer will be asked, what the set expects, what stays behind, what the parts can do, the bundle and every problem.'),
+    }, annotationsFor('aimeat_package_compose_set'), async (args) => {
+        const owner = ownerOf();
+        const out = await composeSet({ storage, config }, { owner, ownerGhii: await resolveGhii(storage, owner, config) }, {
+            name: args.name, apps: args.apps, title: args.title, organism: args.organism, defaults: args.defaults,
+            description: args.description, category: args.category, tags: args.tags, visibility: args.visibility,
+            includeCortex: args.include_cortex, includeSkills: args.include_skills, allowExpectations: args.allow_expectations,
+            outcome: args.outcome, prompts: args.prompts, dryRun: args.dry_run === true,
+        });
+        if (!out.ok) return { ...toolError(out.code, out.problems ? `${out.message} ${out.problems.join(' | ')}` : out.message) };
+        const { ok, ...answer } = out;
+        void ok;
+        return { content: [{ type: 'text' as const, text: JSON.stringify(answer, null, 2) }] };
     });
 
     mcp.tool('aimeat_package_pull', descriptionFor('aimeat_package_pull'), {
@@ -347,11 +384,25 @@ export function registerPackageTools(
         dry_run: z.boolean().optional().describe('Report what would be registered and register nothing.'),
         mode: z.enum(['managed', 'editable']).optional().describe('"managed": the package owns the code and layout, updates replace them, and only settings are yours to change. "editable" (default): you may edit everything.'),
         config: z.record(z.string(), z.record(z.string(), z.unknown())).optional().describe(PACKAGE_CONFIG_PARAM),
-    }, annotationsFor('aimeat_package_install'), async ({ group_id, label, version, dry_run: dryRun, mode, config: installConfig }) => {
+        organism_names: z.record(z.string(), z.string()).optional().describe('For a set: your own names for its organisms, by the set\'s organism key.'),
+    }, annotationsFor('aimeat_package_install'), async ({ group_id, label, version, dry_run: dryRun, mode, config: installConfig, organism_names: organismNames }) => {
         // Packages install under the OWNER, so resolve the agent's owner and never a supplied id.
         const gaii = getAgentGaii();
         const owner = localAccountName(gaii);
         const ownerGhii = await resolveGhii(storage, owner, config);
+
+        // A package that carries an install bundle is a set (services/install-bundle-owner.ts), the
+        // same branch POST /v1/packages/:groupId/install takes.
+        const setDeps = { storage, config, peers, scheduler: getActiveScheduler() ?? undefined };
+        if (await bundleInstallOf(setDeps, group_id, owner)) {
+            const set = await installSetForOwner(setDeps, { owner, sub: gaii, ownerGhii, ...grant }, {
+                groupId: group_id, config: installConfig, organismNames, dryRun: dryRun === true,
+            });
+            if (!set.ok) return { ...toolError(set.code, set.problems ? `${set.message} ${set.problems.join(' | ')}` : set.message) };
+            const { ok, ...shown } = set;
+            void ok;
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ set: true, ...shown }, null, 2) }] };
+        }
 
         const out = await installOrRequest(
             { storage, config, scheduler: getActiveScheduler() ?? undefined },
