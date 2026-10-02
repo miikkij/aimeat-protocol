@@ -30329,8 +30329,11 @@ paths:
       description: >
         Owner-only. The development right is what somebody may do TO the app, as opposed to what a
         role says they may do INSIDE it, and it is given to a PERSON so that every agent of theirs is
-        covered by the one entry. Returns `{ grants, levels, never }`: who holds a right and which
-        rung, the three rungs with what each one carries, and the three acts no rung ever carries.
+        covered by the one entry. Returns `{ grants, allApps, levels, never, page }`: who holds a
+        right on this app and which rung, who holds one over every app of the owner (they may build
+        this one too), the three rungs with what each one carries, the three acts no rung ever
+        carries, and `page` (`{ url, section }`), the owner's settings page where these rights are
+        seen and taken back. MCP: `aimeat_app_manage` action `builders`.
 
 
         The rungs are `full` (0), `publisher` (10) and `drafter` (20), lower being more power as
@@ -30365,6 +30368,12 @@ paths:
 
         Refused before anything is written: `404` when no such owner or no such app, `400` for a rung
         that is not a rung and for granting it to yourself.
+
+
+        The answer carries `next`, a sentence on what the invited person's AI does to start
+        (`aimeat_app_list` with `building: true`, then the app tools with this `owner`), and `page`,
+        the owner's settings page where the right is seen and taken back. MCP: `aimeat_app_manage`
+        actions `builder_set` and `builder_remove`.
       tags: [Apps]
       security:
         - BearerAuth: []

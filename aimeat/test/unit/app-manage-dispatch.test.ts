@@ -6,6 +6,7 @@
  *   end by test/e2e-app-manage.ts.
  * @usage pnpm test -- app-manage-dispatch
  * @version-history
+ *   v1.5.0 — 2026-10-02 — builders, builder_set and builder_remove, and the dev_level field.
  *   v1.4.0 — 2026-10-01 — year on audit, and audit_archive and audit_keep.
  *   v1.3.0 — 2026-10-01 — IAM round 2: email on member_set, q/limit/offset on members, manage_roles
  *     on member_plan_set, and member_audit and member_invite_cancel.
@@ -54,7 +55,7 @@ const VALUE: Record<string, unknown> = {
     roles: { zqxrole: ['zqxoff'] }, seats: { zqxrole: 2 }, terms: { zqxrole: { days: 30, renewal: 'manual' } },
     access: 'members-only', roster_visibility: 'members',
     email: 'zqx@example.com', locale: 'fi', q: 'zqxq', offset: 11, before: '2026-09-01T00:00:00Z', invite_id: 'zqxinv',
-    manage_roles: ['zqxmgr'], year: '2026', keep: '12345',
+    manage_roles: ['zqxmgr'], year: '2026', keep: '12345', dev_level: 'publisher',
 };
 
 /** Where each action goes: method and path. The body is checked field by field below. */
@@ -101,6 +102,10 @@ const EXPECT: Record<string, [string, string]> = {
     member_request: ['POST', '/v1/apps/alice/shop.html/members/requests'],
     member_audit: ['GET', '/v1/apps/alice/shop.html/members/audit?limit=7&before=2026-09-01T00%3A00%3A00Z'],
     member_invite_cancel: ['DELETE', '/v1/apps/alice/shop.html/members/invites/zqxinv'],
+    // The development right has no owner field: its routes take the owner alone, so it is the caller.
+    builders: ['GET', '/v1/apps/me-owner/shop.html/dev-grants'],
+    builder_set: ['PUT', '/v1/apps/me-owner/shop.html/dev-grants/zqxacct'],
+    builder_remove: ['DELETE', '/v1/apps/me-owner/shop.html/dev-grants/zqxacct'],
 };
 
 /** A field that travels in the path or query, or shapes the request rather than appearing in it. */
@@ -169,6 +174,13 @@ describe('aimeat_app_manage: every action reaches its endpoint with its fields',
             roles: { zqxrole: ['zqxoff'] }, seats: { zqxrole: 2 }, terms: { zqxrole: { days: 30, renewal: 'manual' } },
             access: 'members-only', rosterVisibility: 'members', manageRoles: ['zqxmgr'],
         });
+    });
+
+    it('builder_set sends dev_level as the route\'s level, with the note, and needs a level', async () => {
+        expect(checkAppManageInput({ action: 'builder_set', filename: 'shop.html', account: 'bob' }).ok).toBe(false);
+        const { client, sent } = recorder();
+        await appManageCall(client, 'me', fullInput('builder_set'));
+        expect(sent[0]!.body).toEqual({ level: 'publisher', note: 'zqxnote' });
     });
 
     it('member_set takes an email instead of an account, and needs one of the two', async () => {

@@ -26,6 +26,11 @@
  *   (across all of them). The audit read and the invitation cancel are in routes/app-members-extra.ts.
  * @usage app.use(appMembersRouter(config, storage))
  * @version-history
+ *   v1.5.0 — 2026-10-02 — The per-app dev-grants answers are written for an agent working from a
+ *     chat (aimeat_app_manage builders, builder_set): GET names the people who may build every app
+ *     of the owner (`allApps`) and the settings page where the rights are seen (`page`); PUT says
+ *     what the invited person's AI does next (`next`) and names the same page; the 404 for an
+ *     unknown account says how to find the right name.
  *   v1.4.0 — 2026-10-01 — An invitation by email carries a sign-up link (services/app-invite-link.ts)
  *     and lives 7 days; the answer gives the inviter `acceptUrl` only when no email left.
  *   v1.3.2 — 2026-10-01 — The owner's roster names each person's address from the owner's own address book.
@@ -512,6 +517,23 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
   /** The rungs as a door answers them, so a client never has to hardcode the numbers. */
   const rungs = APP_DEV_LEVEL_LIST.map(l => ({ name: l.name, level: l.level, carries: actsFor(l.level) }));
 
+  /**
+   * Where the owner sees and changes every development right: the Apps tab of their settings. An
+   * agent that gives a right from a chat hands this address to the person, so the right can be read
+   * back and taken away without asking an AI.
+   */
+  const buildersPage = () => ({
+    url: `${config.baseUrl.replace(/\/+$/, '')}/v1/profile?tab=apps`,
+    section: 'Who else may build these',
+  });
+
+  /** What the invited person's AI does next, in the terms of the tools it holds. */
+  const builderNext = (owner: string, filename: string, account: string) =>
+    `Tell ${account} the app is open to them; they were also notified on this server. `
+    + `Their AI finds it with aimeat_app_list { building: true } and works on it with the app tools, `
+    + `giving owner: "${owner}" and filename: "${filename}" (aimeat_app_get, the aimeat_app_draft_* tools, `
+    + `and aimeat_app_publish when the level carries publishing). What the level allows is in carries.`;
+
   // ── GET .../dev-grants — who can build this app. Owner only. ──
   // app:write, not a read word: the app domain carries write and manage, and an agent that may
   // manage an app may read who else builds it. Without a scope this list is readable by any
@@ -521,10 +543,15 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
     if (sendContextError(res, c)) return;
     if (!c.isOwner) return forbidden(res, 'Only the app owner sees who may build it');
     const grants = await listDevGrants(storage, c.appId);
+    // The people who may build EVERY app of this owner may build this one too, so "who can build
+    // this app" names them beside the per-app list rather than leaving them out of the answer.
+    const allApps = await listBlanketGrants(storage, c.owner);
     return res.json(success(config.nodeId, {
       grants: grants.map(g => ({ ...g, levelName: levelName(g.level), carries: actsFor(g.level) })),
+      allApps: allApps.map(g => ({ account: g.grantee, level: g.level, levelName: levelName(g.level), carries: actsFor(g.level) })),
       levels: rungs,
       never: ['delete the app', 'change its price or licence', 'pass the right on'],
+      page: buildersPage(),
     }));
   });
 
@@ -548,7 +575,9 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
     // Both of these are refusals BEFORE anything is written. A grant to a name nobody answers to
     // waits forever and looks, on the owner's own page, exactly like a grant that works.
     if (!(await storage.getGHIIByOwner(account))) {
-      return res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No owner named "${account}" on this node.`));
+      return res.status(404).json(error(config.nodeId, 'NOT_FOUND',
+        `No owner named "${account}" on this node. A development right goes to an account on this same server: `
+        + 'find the person\'s account name from their email address with aimeat_contact_resolve_email, or ask them to sign up here first.'));
     }
     const ownerGhii = await bucketOf(c.owner);
     if (!(await storage.getApp(ownerGhii, c.filename))) {
@@ -575,6 +604,8 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
     }
     return res.json(success(config.nodeId, {
       granted: true, account, level, levelName: levelName(level), carries: actsFor(level), member: rec,
+      next: builderNext(c.owner, c.filename, account),
+      page: buildersPage(),
     }));
   });
 

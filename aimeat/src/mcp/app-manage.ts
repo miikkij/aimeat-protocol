@@ -25,6 +25,8 @@
  * @structure registerAppManageTool
  * @usage registerAppManageTool(mcp, storage, config, agentGaii, scopes, getToken)
  * @version-history
+ *   v1.4.0 — 2026-10-02 — builders, builder_set and builder_remove go over loopback to the dev-grants
+ *     routes with the member actions (MEMBER_ACTIONS in tool-dispatch/app-manage-call.ts).
  *   v1.3.1 — 2026-10-01 — agent_deploy passes the caller's principal: with no runner, the agent
  *     becomes a proposal the owner approves.
  *   v1.3.0 — 2026-10-01 — audit answers the archived years and the limit, and reads a year; the new
