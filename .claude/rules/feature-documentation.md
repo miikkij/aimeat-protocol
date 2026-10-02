@@ -22,7 +22,7 @@ of these and no single page said so.
 | 5 | `docs/AIMEAT-Feature-List.md`, then `pnpm build:everything` | anyone reading `/v1/everything` | `check:everything` (freshness only) |
 | 6 | `aimeat/public/changelog.json`, newest first | people on the landing page | `check:changelog` (shape only). **Ask Jouni first**, platform work only |
 | 7 | Settings: `src/services/config-schema.ts` row, `.env.example`, a Config-tab group in `public/views/admin/config-tab.js` `DOMAINS` | the operator | `check:config-coverage` |
-| 8 | Locales `en`, `fi`, `es`, and a row in the language context for any new term (skill `aimeat-writing`) | people in their language | `check:locales` |
+| 8 | Locales `en`, `fi`, `es`, and a row in the language context for any new term (skill `aimeat-writing`); a new setting a person cannot read from its label gets `help` and `explain.<term>.*` (`.claude/rules/frontend.md`) | people in their language, and an AI through `aimeat_handbook_get { tier: "settings/<term>" }` | `check:locales` |
 | 9 | A skill: node-wide (`src/data/builtin-skills*.ts`) or the owner's registry (`aimeat_skill_publish`) | an AI using the feature | `check:skill-reviews` (for skills that already watch the code) |
 | 10 | The appdev pitfalls (`aimeat_appdev_pitfall_report`) when app builders can get it wrong | an AI building an app | none |
 | 11 | `docs/catalog.md` for every new file under `docs/` | the documentation check | `check:docs` |

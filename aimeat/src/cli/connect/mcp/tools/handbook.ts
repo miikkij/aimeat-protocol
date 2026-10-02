@@ -5,6 +5,7 @@
  * @description MCP tool registration for retrieving the agent operating handbook,
  *   with optional module-level drill-down.
  * @version-history
+ *   2026-10-02 — `tier` names "settings" and "settings/<term>", the setting explanations in parts.
  *   2026-10-01 — `tier` names "features" and "features/<id>", the feature map in parts.
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   2026-09-19 — The `tier` description names the Atelier specification first.
@@ -32,7 +33,7 @@ export function registerHandbookTools(mcp: McpServer, registry: AgentRegistry): 
     agent_name: agentNameSchema,
     module: z.string().optional().describe('Specific handbook module to retrieve'),
     surface: z.enum(['appdev', 'agent', 'service', 'admin']).optional().describe('Return the v2 handbook of one interface for this role (use the interface you serve, e.g. "agent") instead of a module.'),
-    tier: z.string().optional().describe('A prompt by id. "build-app-atelier" is the first part of the Atelier build specification, the track an app is built on unless there is a reason not to, and "build-app-atelier/<id>" is one of the parts it lists. "build-app" and "build-app/<id>" do the same for the Classic specification. "features" lists what this node can do, by area, and "features/<id>" is one area: read it once you know what the person needs, to offer the one thing that fits.'),
+    tier: z.string().optional().describe('A prompt by id. "build-app-atelier" is the first part of the Atelier build specification, the track an app is built on unless there is a reason not to, and "build-app-atelier/<id>" is one of the parts it lists. "build-app" and "build-app/<id>" do the same for the Classic specification. "features" lists what this node can do, by area, and "features/<id>" is one area: read it once you know what the person needs, to offer the one thing that fits. "settings" lists the settings the pages explain behind a question mark, by area, and "settings/<term>" is one of them in English, Finnish and Spanish: read it when the person asks what a setting means or which value to pick.'),
   }, annotationsFor('aimeat_handbook_get'), async ({ agent_name, module, surface, tier }) => {
     const { client } = pickAgent(registry, agent_name);
     const path = tier ? handbookTierPath(tier) : surface

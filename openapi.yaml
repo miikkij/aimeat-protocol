@@ -13121,6 +13121,83 @@ paths:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
 
+  /v1/prompts/settings/sections:
+    get:
+      operationId: listSettingsExplainParts
+      summary: The parts of the setting explanations
+      description: >-
+        The explanations the pages show behind the question mark next to a setting (locale data
+        `explain.<term>.*`), in parts: `start` lists the settings by area with their English title and
+        short text, and `<term>` (for example `ai.temperature`) is one setting explained in full in
+        English, Finnish and Spanish. For an AI that answers what a setting does or which value to pick,
+        in the person's language. The MCP tool aimeat_handbook_get serves the same parts for tier
+        "settings" and "settings/{term}". Public.
+      tags:
+        - Discovery
+      responses:
+        '200':
+          description: The parts, with their size
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          parts:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string, example: ai.temperature }
+                                what: { type: string }
+                                chars: { type: integer }
+
+  /v1/prompts/settings/sections/{id}:
+    get:
+      operationId: getSettingsExplainPart
+      summary: One part of the setting explanations
+      description: >-
+        `start` (the settings by area, each with its part id) or a setting's term id such as
+        `ai.temperature` (its explanation in English, Finnish and Spanish). Plain text with ?format=txt.
+        Public.
+      tags:
+        - Discovery
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, example: ai.temperature }
+        - name: format
+          in: query
+          schema: { type: string, enum: [txt] }
+          description: txt returns the part as text/plain instead of the JSON envelope
+      responses:
+        '200':
+          description: The part
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          id: { type: string, example: settings/ai.temperature }
+                          kind: { type: string, enum: [part] }
+                          prompt: { type: string }
+        '404':
+          description: No setting has that id; the message lists the ids there are
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
   /v1/prompts/build-app-atelier:
     get:
       operationId: getBuildAppAtelierPrompt

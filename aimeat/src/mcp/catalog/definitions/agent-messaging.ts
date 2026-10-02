@@ -5,6 +5,7 @@
  * @description Handbook/onboarding, agent self-management (capabilities, activity, telemetry, tags, mode), owner-agent messaging, and federated direct-message (DM) tool definitions, plus aimeat_agents_list.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-02 — aimeat_handbook_get's `tier` names "settings" and "settings/<term>", the setting explanations in parts.
  *   2026-10-02 — aimeat_agent_propose: the node adds memory:read and memory:write itself.
  *   2026-10-02 — aimeat_handbook_get's `surface` names `chat`.
  *   2026-10-02 — aimeat_agent_propose gives the smallest crew_def that runs. A chat model with only
@@ -56,7 +57,7 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
         visibility: agentEverywhere,
         input: {
             module: { type: 'string', description: 'Optional handbook module name, such as tasks or messages.' },
-            tier: { type: 'string', description: 'A prompt by id. "build-app-atelier" is the first part of the Atelier build specification, the track an app is built on unless there is a reason not to, and "build-app-atelier/<id>" is one of the parts it lists. "build-app" and "build-app/<id>" do the same for the Classic specification. "features" lists what this node can do, by area, and "features/<id>" is one area: read it once you know what the person needs, to offer the one thing that fits.' },
+            tier: { type: 'string', description: 'A prompt by id. "build-app-atelier" is the first part of the Atelier build specification, the track an app is built on unless there is a reason not to, and "build-app-atelier/<id>" is one of the parts it lists. "build-app" and "build-app/<id>" do the same for the Classic specification. "features" lists what this node can do, by area, and "features/<id>" is one area: read it once you know what the person needs, to offer the one thing that fits. "settings" lists the settings the pages explain behind a question mark, by area, and "settings/<term>" is one of them in English, Finnish and Spanish: read it when the person asks what a setting means or which value to pick.' },
             surface: { type: 'string', enum: ['appdev', 'agent', 'service', 'admin', 'commerce', 'primitives', 'chat', 'full'], description: 'Another interface\'s handbook than your own. Leave it out to get the one for the interface you are connected to.' },
         },
     },

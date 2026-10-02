@@ -84,6 +84,15 @@
      "plain": "What this node can do, for your AI This list, in parts your AI can read: the areas first, then one area with every feature, what it gives and where it is reached. Your AI reads it once it knows what you need, to offer the one thing that fits. aimeat_handbook_get { tier: \"features\" }, /v1/prompts/features/sections"
     },
     {
+     "slug": "g-1-what-a-setting-means-for-your-ai",
+     "cells": [
+      "<strong>What a setting means, for your AI</strong>",
+      "The explanations the pages show behind the question mark next to a setting, readable by your AI: a list of the settings by area, then one setting in full, with what it does, its range, what a lower and a higher value give, examples and when to change it, in English, Finnish and Spanish. Ask your AI what a setting does or which value to pick, and it answers in your language with the same words the page uses.",
+      "<code>aimeat_handbook_get { tier: &quot;settings&quot; }</code>, <code>/v1/prompts/settings/sections</code>"
+     ],
+     "plain": "What a setting means, for your AI The explanations the pages show behind the question mark next to a setting, readable by your AI: a list of the settings by area, then one setting in full, with what it does, its range, what a lower and a higher value give, examples and when to change it, in English, Finnish and Spanish. Ask your AI what a setting does or which value to pick, and it answers in your language with the same words the page uses. aimeat_handbook_get { tier: \"settings\" }, /v1/prompts/settings/sections"
+    },
+    {
      "slug": "g-1-your-path-from-your-ai-to-what-others-use",
      "cells": [
       "<strong>Your path, from your AI to what others use</strong>",
@@ -3700,6 +3709,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-09-15 against node 3.15.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 368
+  "rows": 369
  }
 }
