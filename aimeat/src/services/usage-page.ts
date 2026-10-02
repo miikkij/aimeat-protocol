@@ -32,10 +32,14 @@
  *   import { buildUsagePage } from '../services/usage-page.js';
  *   const data = await buildUsagePage(config, storage, { from, to, includeKeySpend: false });
  * @version-history
+ *   v1.1.0 — 2026-10-02 — keys.chat.metered_here is true on the node route (no shared chat key): the
+ *     chat's calls go through /v1/llm and are in the house and own figures. It was false on every
+ *     node, so a hosted place moved off the shared key would read "one key you cannot see".
  *   v1.0.0 — 2026-09-12 — Initial, with the Usage page's rebuild.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import { chatUsesSharedKey } from './goose-env.js';
 import { getAdminLedger } from './ledger-admin.js';
 import { readKeySpend, type KeySpend } from './openrouter-key.js';
 
@@ -170,9 +174,11 @@ export async function buildUsagePage(
       configured: !!config.gooseProviderApiKey,
       enabled: !!(config.gooseBin || '').trim(),
       model: config.gooseModel || null,
-      // The honest half, and the reason this whole service exists: every chat turn is spent from
-      // this key by a child process, so no figure the node counts includes any of it.
-      metered_here: false,
+      // On the shared chat key every turn is spent from that key by a child process, so no figure
+      // the node counts includes any of it. Without it (the node route, services/goose-env.ts) each
+      // person's turns go through /v1/llm and are metered like any other call: they are already in
+      // the house and own figures, and saying "not measured" would be false.
+      metered_here: !chatUsesSharedKey(config),
       node_counted_usd: null,
       spend: null as KeySpend | null,
     },
@@ -184,17 +190,16 @@ export async function buildUsagePage(
       readKeySpend(config, config.gooseProviderApiKey, 'chat'),
     ]);
     (keys.house as Record<string, unknown>).spend = house;
-    // THE CHAT AGENT CAN BE RUNNING ON A KEY THIS NODE DOES NOT HOLD. `enabled` follows the goose
-    // binary being configured, while the key is a separate setting; when it is unset the child
-    // process takes whatever is in its own environment. "No key is set for this" is then true of
-    // the node and false of the situation, and beside a row that names a live model it reads as a
-    // contradiction. Say the harder, accurate thing instead.
+    // WITHOUT THE SHARED KEY THE CHAT HAS NO KEY OF ITS OWN. Until 2026-09-28 the child process then
+    // took whatever key was in its own environment, and this said so. Since the node route the child
+    // holds only the person's chat token (goose-env.ts removes OPENROUTER_API_KEY), so its calls are
+    // the house key's and people's own keys', already counted above.
     (keys.chat as Record<string, unknown>).spend =
       !chat.ok && !config.gooseProviderApiKey && (config.gooseBin || '').trim()
         ? {
           ok: false,
           which: 'chat',
-          reason: 'The chat agent is running on a key this node does not hold, so there is nothing to ask about. Its spend is on whichever provider account that key belongs to.',
+          reason: 'The chat has no key of its own here: its calls go through this server and are counted on the server\'s key and people\'s own keys.',
         }
         : chat;
   }

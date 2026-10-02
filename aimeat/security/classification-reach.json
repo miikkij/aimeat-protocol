@@ -288,12 +288,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Public knowledge package manifests, published by their owners' choice."
     },
-    "src/routes/chat.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Checks only whether an API key record exists."
-    },
     "src/routes/commerce-acp.ts": {
       "reads": {
         "listAllMemory": 1
@@ -1710,6 +1704,12 @@
         "searchText": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
+    },
+    "src/services/own-key-coverage.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-02, the node's own read: the owner's encrypted AI key records (openrouter.apikey, ai.apikey.provider.*), read only to answer whether a ciphertext is there. No content and no key leaves the function."
     },
     "src/services/outbound/outbound-service.ts": {
       "reads": {

@@ -8,6 +8,8 @@
  * @structure StatusBar({ status, onReset })
  * @usage html`<${StatusBar} status=${status} onReset=${reset} />`
  * @version-history
+ *   v1.2.0 — 2026-10-02 — A person with a key of their own, on the shared chat key, is told the key
+ *     does not pay for this chat (the server's own_key.not_covered names the chat).
  *   v1.1.0 — 2026-09-24 — "Use your own key →" is the action link's more tone (Jouni's decision
  *     "Small link").
  *   v1.0.0 — 2026-09-23 — Moved out of views/chat/parts.js with its markup unchanged (UI
@@ -53,11 +55,19 @@ export function StatusBar({ status, onReset }) {
     const ownKeyLink = status.pays === 'node' && !status.has_own_key
         ? tr('chat.useOwnKeyLink', 'Use your own key')
         : null;
+    // A person who saved a key of their own, on a node where the operator's shared key pays for the
+    // chat. Without this line "The house pays" beside a saved key read as "my key is in use" (measured
+    // on a hosted node, 2026-10-02). The server says which parts the key misses (status.own_key).
+    const ownKeyMissesChat = status.has_own_key
+        && (status.own_key?.not_covered ?? []).some((g) => g.part === 'chat')
+        ? tr('chat.ownKeyNotForChat', 'Your own key does not pay for this chat. It pays for your apps and your other AI requests through this server.')
+        : null;
     return html`
         <div class="poster-agent-status">
             <span class="poster-agent-status-who" title=${status.agent_name}>${tr('chat.statusYourAgent', 'Your agent')}</span>
             ${payer && html`<span>${payer()}</span>`}
             ${elsewhere && html`<span class="poster-agent-status-note">${elsewhere}</span>`}
+            ${ownKeyMissesChat && html`<span class="poster-agent-status-note">${ownKeyMissesChat}</span>`}
             ${ownKeyLink && html`<a class="poster-action poster-action--more poster-agent-status-link" href="/v1/profile?tab=ai">${ownKeyLink} →</a>`}
             ${status.model && html`<span class="poster-turn-model poster-agent-status-model"
                 title=${tr('chat.modelTitle', 'The model that answered this turn')}>${status.model}</span>`}

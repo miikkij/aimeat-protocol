@@ -25,6 +25,8 @@
  *   v1.1.0 — 2026-09-28 — `roles`: an app's declared AI roles, each bound or not with the fix; the
  *     owner's roles for the owner and their agents (services/ai/roles.ts).
  *   v1.2.0 — 2026-09-29 — content_classifier: the Content Classifier's state and fix (TARGET-082 V3).
+ *   v1.3.0 — 2026-10-02 — `own_key` for the owner and their agents: what the owner's own key pays for
+ *     on this node and what it never reaches (services/own-key-coverage.ts).
  *   v1.1.1 — 2026-09-28 — The settings read in aiCapabilitiesView's Promise.all is wrapped in an async
  *     function: a storage that threw synchronously left the sibling reads' rejections unhandled.
  */
@@ -39,6 +41,7 @@ import { readOwnerAiPolicy, appAiMetaOf } from './policy-store.js';
 import type { CallerClass } from './policy.js';
 import { readRoles, rolesWithLegacy, bindingKey } from './roles.js';
 import { classifierState } from '../classification/classifier-state.js';
+import { ownKeyCoverage } from '../own-key-coverage.js';
 
 export const CAPABILITY_ORDER: readonly AiCapability[] = ['text', 'vision', 'files', 'image', 'speech', 'transcription', 'embed'];
 
@@ -214,11 +217,14 @@ export async function aiCapabilitiesView(
   const providers = [...owner, ...node];
   // The storage read inside an async function, so a storage that throws before returning a promise
   // rejects this call rather than leaving a sibling's rejection unhandled (as provider-store.ts does).
-  const [states, policy, usage, prefsRecord] = await Promise.all([
+  const [states, policy, usage, prefsRecord, ownKey] = await Promise.all([
     Promise.all(CAPABILITY_ORDER.map(cap => stateOf(storage, config, gaii, cap, ctx, providers))),
     readOwnerAiPolicy(storage, gaii),
     getTodayUsage(storage, gaii),
     (async () => storage.getMemory(gaii, 'openrouter.settings'))(),
+    // What the owner's own key reaches on this node. Not for an app: whose key pays is the owner's
+    // business, and `budget.keySource` already tells an app whether a call would run.
+    ctx.caller === 'app' ? Promise.resolve(null) : ownKeyCoverage(storage, config, gaii),
   ]);
   const prefs = (prefsRecord?.value as Record<string, unknown> | undefined) ?? {};
   const switchOf: Record<CallerClass, keyof typeof policy.appliesTo> = { owner: 'owner', chat: 'chat', agent: 'agents', app: 'apps' };
@@ -236,6 +242,7 @@ export async function aiCapabilitiesView(
       dailyBudgetUsd: getDailyBudgetUsd(prefs), spentTodayUsd: usage.total_cost_usd,
       ...(textState.keySource ? { keySource: textState.keySource } : {}),
     },
+    ...(ownKey ? { own_key: ownKey } : {}),
     catalog: { refreshedAt: meta?.refreshedAt ?? null, snapshot: meta?.snapshot ?? null },
     guide: 'node:aimeat-ai-capabilities',
   };

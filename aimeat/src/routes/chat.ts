@@ -15,6 +15,9 @@
  *   - chatRouter(config, storage) — GET/POST/DELETE threads, POST .../turn (SSE), GET /v1/chat/status
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.9.0 — 2026-10-02 — /v1/chat/status answers `own_key`: what an own key pays for on this node
+ *     and what it never reaches (the chat on the shared key, an agent's crew), with the reason.
+ *     `has_own_key` counts a key on one of the owner's providers too.
  *   v1.8.0 — 2026-09-29 — TARGET-082 V4: GET /v1/chat/threads and GET /v1/chat/threads/:id read
  *     through showThreads and showThread with the caller's ContentReader. Delete, reset and turn keep
  *     readThread, which only checks that the conversation exists.
@@ -50,6 +53,7 @@ import { readerFor } from '../services/classification/reader.js';
 import { chatEnabled, chatPayer, runChatTurn, resetChatSession } from '../services/chat-session.js';
 import { ensureChatAgent } from '../services/chat-agent.js';
 import { readAllowance, remainingOf } from '../services/ai-allowance.js';
+import { ownKeyCoverage } from '../services/own-key-coverage.js';
 import { recordFirstChatTurn } from '../services/onboarding-funnel.js';
 import { logger } from '../utils/logger.js';
 
@@ -64,8 +68,9 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
     router.get('/v1/chat/status', requireAuth(), requireRole('owner'), async (req, res) => {
         const gaii = identity(req);
         const enabled = chatEnabled(config);
-        const [allowance, pushDevices] = await Promise.all([
+        const [allowance, ownKey, pushDevices] = await Promise.all([
             readAllowance(storage, config, gaii),
+            ownKeyCoverage(storage, config, gaii),
             // How many of this person's DEVICES can be reached when something finishes. Zero is the
             // whole reason the chat suggests a phone: an agent that can only be seen when a tab
             // happens to be open is a website. The count comes from the node rather than from the
@@ -86,7 +91,11 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
             enabled,
             agent_name: `chat#${owner(req)}@${config.nodeId}`,
             allowance_remaining_usd: remainingOf(allowance),
-            has_own_key: !!(await storage.getMemory(gaii, 'openrouter.apikey')),
+            has_own_key: ownKey.set,
+            // WHAT THE OWN KEY REACHES ON THIS NODE (services/own-key-coverage.ts). `has_own_key`
+            // beside `pays: "node"` read as "my key is in use" while the node's key paid: on the
+            // shared chat key the own key never pays for the chat, and an agent's crew never uses it.
+            own_key: ownKey,
             push_devices: pushDevices,
             // WHO ACTUALLY PAYS FOR A TURN, decided on the server rather than guessed on the page.
             //

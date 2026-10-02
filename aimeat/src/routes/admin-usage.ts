@@ -28,6 +28,7 @@
  *   import { adminUsageRouter } from './routes/admin-usage.js';
  *   app.use(adminUsageRouter(config, storage));
  * @version-history
+ *   v1.2.0 — 2026-10-02 — chat_agent.metered_here is true on the node route (no shared chat key).
  *   v1.1.0 — 2026-09-12 — The Usage page's own read, and the one route that asks the provider what
  *     the operator's own keys have spent. The chat agent's key is spent by a child process and no
  *     figure this node counts had ever included a cent of it.
@@ -47,6 +48,7 @@ import {
 import { rebuildUsageRollup } from '../services/usage/rollup-engine.js';
 import { recordUsageCall, pendingUsageCalls } from '../services/usage/usage-buffer.js';
 import { buildUsagePage } from '../services/usage-page.js';
+import { chatUsesSharedKey } from '../services/goose-env.js';
 import { logger } from '../utils/logger.js';
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -235,8 +237,9 @@ export function adminUsageRouter(config: AimeatConfig, storage: Storage): Router
           enabled: !!(config.gooseBin || '').trim(),
           model: config.gooseModel || null,
           key_configured: !!config.gooseProviderApiKey,
-          // The honest half. Everything above is metered per person; this is not.
-          metered_here: false,
+          // Not metered per person only on the shared chat key. On the node route each turn's calls
+          // go through /v1/llm and are already in the figures above.
+          metered_here: !chatUsesSharedKey(config),
         },
       }));
     });

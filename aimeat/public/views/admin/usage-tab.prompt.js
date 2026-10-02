@@ -17,6 +17,8 @@
  *   English, like every prompt here, while the page around it follows the reader's language.
  * @structure buildUsagePrompt({ url, from, to })
  * @version-history
+ *   v1.0.1 — 2026-10-02 — The chat line is conditional on keys.chat.metered_here, which is true on
+ *     the node route. Two sentences changed, nothing else.
  *   v1.0.0 — 2026-09-12 — Initial (the Usage page in the poster face).
  */
 
@@ -44,7 +46,7 @@ Three totals appear in that payload and only one of them is mine.
 whose_money.ceiling_usd is the free grant times the number of accounts: the most the house key can cost me before somebody is refused. If drawn_usd is approaching it, say so — that is the one number on this page that turns into a decision.
 
 == 3. Say what is missing ==
-keys.chat.metered_here is false. Every chat turn on this node is spent from one key handed to a child process, so NO total in this payload contains a cent of it. Whenever you report what AI cost me, say that this figure excludes the chat agent, and give me the provider's number for that key if you asked for it.
+When keys.chat.metered_here is false, every chat turn on this node is spent from one key handed to a child process, so NO total in this payload contains a cent of it. When it is true, the chat's calls are already in the totals above and nothing is missing. Whenever you report what AI cost me, say that this figure excludes the chat agent, and give me the provider's number for that key if you asked for it.
 
 models.unpriced explains the calls that carry no price: most are free or local models that have none, and estimated_missing_usd is what the rest would have cost at the average of the priced calls. Tell me which of those two it is rather than repeating the raw count.
 

@@ -943,6 +943,10 @@ const ALL_SUITES = [
     // The other half of e2e-chat: a node that HAS an agent. Runs two nodes of its own (40300 and
     // 40301) with a fake ACP peer as goose, because AIMEAT_GOOSE_BIN is process-wide configuration.
     'test/e2e-chat-agent.ts',
+    // Which key paid, road by road (the chat, a node AI call, an agent through /v1/llm, an agent's
+    // own key, the shared chat key), read from the Authorization header a stand-in provider got.
+    // Runs two nodes of its own (40350 and 40351) and the stand-in on 40352.
+    'test/e2e-own-key-roads.ts',
     'test/e2e-llm-proxy.ts',
     'test/e2e-message-transcript.ts',
     'test/ai.ts',
