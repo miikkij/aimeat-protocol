@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.23.0 -- 2026-10-02 -- add-a-crew-agent: aimeat_crew_llm_set's {kind:"node"} choice and the
+ *     rules a pinned model is held to.
  *   v1.22.1 -- 2026-10-02 -- add-a-crew-agent: a crew agent needs memory:write and no agent:write;
  *     its own tags need no word.
  *   v1.22.0 -- 2026-10-02 -- add-a-crew-agent: the node makes the agent, so never an outside builder;
@@ -423,7 +425,9 @@ is online. Edit the document, then \`aimeat_crew_validate\` (the agent's own run
 its messages go to the owner unchanged), \`aimeat_crew_try\` (one run with a prompt, nothing
 stored), \`aimeat_crew_publish\` (live within seconds, the last ten revisions stay restorable).
 \`aimeat_crew_draft\` keeps half-finished edits. \`aimeat_crew_llm_set\` chooses the model for one
-agent or the owner's default. Never write \`crews.registry.<agent>\` with \`aimeat_memory_write\`:
+agent or the owner's default; \`{kind: "node"}\` makes the crew think through this node, so the
+owner's own key pays before the node's (the agent needs \`ai:use\`), and a pinned \`model\` may name
+only a provider key variable and a public https address. Never write \`crews.registry.<agent>\` with \`aimeat_memory_write\`:
 it lands in YOUR namespace, where neither the runtime nor the Crew tab looks.
 
 ## 4. After it exists
