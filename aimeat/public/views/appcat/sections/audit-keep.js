@@ -11,7 +11,8 @@
  * @structure AuditKeep({ d, st }) · ArchiveYear
  * @usage html`<${AuditKeep} d=${d} st=${st} />`   // from sections/audit.js
  * @version-history
- *   v1.0.0 — 2026-10-01 — Initial (IAM round 2 leftover 7).
+ *   v1.1.0 — 2026-10-02 — The question mark that explains how many audit rows are kept: app.audit_keep on its Select (components/HelpTip.js).
+ *   v1.0.0 —2026-10-01 — Initial (IAM round 2 leftover 7).
  */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
@@ -112,7 +113,7 @@ export default function AuditKeep({ d, st, actWords }) {
     <${SubHeading} level=${4} part="apart">${x('audit.keepTitle')}<//>
     <${Note} kind="hint" chapter>${keep > 0 ? counted('audit.keepN', keep) : x('audit.keepAll')}${source === 'node' && keep > 0 ? ' ' + x('audit.keepNode') : ''}<//>
     <${Fields} plain column narrow>
-      <${Select} label=${x('audit.keepLabel')} value=${mode} onChange=${setMode}
+      <${Select} label=${x('audit.keepLabel')} help="app.audit_keep" value=${mode} onChange=${setMode}
         options=${[['all', x('audit.keepOptAll')], ['n', x('audit.keepOptN')]]} />
       ${mode === 'n' ? html`<${TextField} type="number" min="1" step="1" label=${x('audit.keepCount')} value=${count} onInput=${setCount} />` : null}
       <${Actions} chapter><${Loud} control onClick=${saveKeep} disabled=${busy}>${x('audit.keepSave')}<//><//>

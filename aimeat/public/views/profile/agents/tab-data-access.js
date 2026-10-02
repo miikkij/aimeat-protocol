@@ -5,6 +5,7 @@
  * @description Data Access tab: shared tags, memory areas, knowledge packages,
  *   and effective scope summary.
  * @version-history
+ *   v1.37.0 -- 2026-10-02 -- The new key's visibility Select has its visible label (profile.memory.visLabel), translated options (knowledge.visibility.*) and the question mark that explains it: memory.visibility (components/HelpTip.js).
  *   v1.36.1 -- 2026-09-26 -- A stored value scrolls after 300px again, as main's
  *     .pf-agd-memory-preview did (Code scroll="medium"; fix pass).
  *   v1.36.0 -- 2026-09-26 -- Onto the components: the sections are the section Card in a CardGrid, the
@@ -656,7 +657,8 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
           ${addingKey && html`<${Space} below="small"><${Fields}>
             <${TextField} value=${newKeyName} onInput=${setNewKeyName}
               placeholder=${t('profile.agents.detail.data_access.keyNamePlaceholder')} />
-            <${Select} value=${newKeyVis} onChange=${setNewKeyVis} options=${['private', 'owner', 'public']} />
+            <${Select} label=${t('profile.memory.visLabel')} help="memory.visibility" value=${newKeyVis} onChange=${setNewKeyVis}
+              options=${['private', 'owner', 'public'].map(v => [v, t('knowledge.visibility.' + v)])} />
             <${TextArea} rows=${5} value=${newKeyValue} onInput=${setNewKeyValue}
               placeholder=${t('profile.agents.detail.data_access.keyValuePlaceholder')}
               disabled=${creatingKey} />

@@ -5,6 +5,7 @@
  * @description Sharing Groups section — CRUD for sharing groups with expandable
  *   member lists. Extracted from access-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.22.0 -- 2026-10-02 -- The question mark that explains a share pattern: memory.key_pattern (components/HelpTip.js).
  *   v1.21.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
  *     itself, so names with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.21.0 -- 2026-09-26 -- Every part is a component that takes data, and the file writes no class
@@ -382,7 +383,7 @@ export function SharingGroupsSection({ showToast, initial, inRow }) {
               <${Card} tone="section">
                 <${Fields}>
                   <${TextField} label=${t('profile.access.shPattern')} placeholder="deliveries.abc.**"
-                    hint=${t('profile.access.shPatternHelp')}
+                    help="memory.key_pattern"
                     value=${sharePattern} onInput=${setSharePattern}
                     onEnter=${() => handleCreateShare(group.id)} />
                   <${TextField} label=${t('profile.access.shNote')}

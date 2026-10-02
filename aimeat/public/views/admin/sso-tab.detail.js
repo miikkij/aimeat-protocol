@@ -26,6 +26,7 @@
  *   - ConnectionDetail — the six steps, the walkthroughs, troubleshooting, the danger zone
  * @usage Imported by views/admin/sso-tab.js.
  * @version-history
+ *   v2.1.0 — 2026-10-02 — The question mark that explains a sign-in that starts at the company's end: sso.idp_initiated (components/HelpTip.js).
  *   v2.0.0 — 2026-09-27 — Library components only: the Verdict with the six steps beside it as a
  *     numbered List, the copy rows as Code with a copying Action, TextField and TextArea, Check,
  *     the walkthroughs as StepList in ExpandableHelp, the troubleshooting as a List, SettingBox.
@@ -201,7 +202,7 @@ export function ConnectionDetail({ id, node, onBack, onChanged, showErr, confirm
               onChange=${checked => act(() => updateSsoConnection(id, { login_visibility: checked ? 'listed' : 'hidden' }))}>
               <b>${S('step.listedLabel')}</b>
             <//>
-            <${Check} checked=${conn.allow_idp_initiated} disabled=${frozen} hint=${S('step.idpInitiatedWhy')}
+            <${Check} checked=${conn.allow_idp_initiated} disabled=${frozen} help="sso.idp_initiated"
               onChange=${checked => act(() => updateSsoConnection(id, { allow_idp_initiated: checked }))}>
               <b>${S('step.idpInitiated')}</b>
             <//>

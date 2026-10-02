@@ -11,7 +11,8 @@
  * @structure renderBoard · composer · rulesFold · membersBlock
  * @usage import { renderBoard } from './board.js';
  * @version-history
- *   v1.12.0 — 2026-09-26 — On the component kit (page group G7): the tags, the strip and the rail are data (the topics and the most thanked as rail items), the category filter the Tabs in the fold tone, "show more" the More line, the composer the Beside with the TextField, TextArea and Choice (a chosen category pressed again clears it), the rules the Fields with the Choice, the members the Tags with their remove mark and the TextField with its add door, the hairlines the Split. The file writes no class.
+ *   v1.13.0 — 2026-10-02 — The question mark that explains morsels: commerce.morsels on the price TextField (components/HelpTip.js).
+ *   v1.12.0 —2026-09-26 — On the component kit (page group G7): the tags, the strip and the rail are data (the topics and the most thanked as rail items), the category filter the Tabs in the fold tone, "show more" the More line, the composer the Beside with the TextField, TextArea and Choice (a chosen category pressed again clears it), the rules the Fields with the Choice, the members the Tags with their remove mark and the TextField with its add door, the hairlines the Split. The file writes no class.
  *   v1.11.0 — 2026-09-26 — A member's ✗ is the Tag's remove mark (.poster-chip-x, poster.css): grey, coral under the pointer, where it was coral always (a unification: Jouni's decision "Remove mark").
  *   v1.10.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.9.0 — 2026-09-26 — The hairline over a part of the panel is the split (.og-split), a unification: the line Workflows and Boards drew alike.
@@ -161,7 +162,7 @@ function rulesFold(ctx, b, mine) {
       <${TextField} id="bp-r-cats" label=${c('fCategories')} value=${r.categories} disabled=${!mine} onInput=${(v) => set('categories', v)} placeholder=${c('categoriesPlaceholder')} />
       ${choice('ttl', c('fLifetime'), [['72', c('life3')], ['168', c('life7')], ['720', c('life30')], ['8760', c('lifeYear')]])}
       ${r.visibility === 'public' ? html`
-        <${TextField} id="bp-r-price" size="short" label=${c('fPrice')} hint=${c('priceHint')} type="number" min="0" step="1" value=${r.price} disabled=${!mine} onInput=${(v) => set('price', v)} />
+        <${TextField} id="bp-r-price" size="short" label=${c('fPrice')} help="commerce.morsels" hint=${c('priceHint')} type="number" min="0" step="1" value=${r.price} disabled=${!mine} onInput=${(v) => set('price', v)} />
         ${choice('federate', c('federate'), [['no', c('federateNo')], ['yes', c('federateYes')]], c('federateHint'))}` : null}
     <//>
     ${mine ? html`<${Space} above="large"><${Actions}><${Loud} control disabled=${ctx.savingRules} onClick=${save}>${c('saveRules')}<//><//><//>` : null}

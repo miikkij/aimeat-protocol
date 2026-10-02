@@ -13,7 +13,8 @@
  * @structure renderOffer · SellingEditor · askWord
  * @usage import { renderOffer } from './offer-page.js';
  * @version-history
- *   v2.0.0 — 2026-09-26 — Every part is a component call that gets data (page group G6): the frame
+ *   v2.1.0 — 2026-10-02 — The question mark that explains morsels: commerce.morsels on the price TextField (components/HelpTip.js).
+ *   v2.0.0 —2026-09-26 — Every part is a component call that gets data (page group G6): the frame
  *     is renderPage (SettingsPage), the tags data (the data handling and the format the dim Tag
  *     again, main's og-chip--dim, which the previous branch lost), the strip FigureStrip (the latest
  *     state a word in the fine colour or coral), the rail's own lists rail groups; the ask the lead,
@@ -103,7 +104,7 @@ function SellingEditor({ it, ctx }) {
     <${Fields} cols=${4}>
       <${Select} label=${c('colVisibility')} value=${vis} onChange=${setVis}
         options=${['private', 'unlisted', 'public'].map(v => [v, t('profile.offers.visibility.' + v)])} />
-      <${TextField} label=${`${t('profile.offers.morsels')} / ${t('profile.offers.perCall')}`} type="number" min="0" value=${morsels} onInput=${setMorsels} />
+      <${TextField} label=${`${t('profile.offers.morsels')} / ${t('profile.offers.perCall')}`} help="commerce.morsels" type="number" min="0" value=${morsels} onInput=${setMorsels} />
       <${TextField} label=${c('colPrice')} inputMode="decimal" value=${moneyAmt} placeholder="0.00" onInput=${setMoneyAmt} />
       <${Select} label="EUR / USD" value=${moneyCur} onChange=${setMoneyCur} options=${['EUR', 'USD']} />
     <//>

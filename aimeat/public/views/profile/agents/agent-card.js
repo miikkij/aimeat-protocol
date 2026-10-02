@@ -5,6 +5,7 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v2.27.0 -- 2026-10-02 -- The question mark that explains the run mode: agent.run_mode on its CardLine label (components/HelpTip.js).
  *   v2.26.0 -- 2026-10-02 -- The opened card names the last task, who ordered it and when (LastTaskLine).
  *   v2.25.0 -- 2026-10-02 -- WildcardLine under the start switch for an agent holding `*`.
  *   v2.24.0 -- 2026-10-02 -- The opened card sets the agent's daily purchase limit in money (PurchaseLimitLine).
@@ -176,6 +177,7 @@ import { Mark, Marks } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Sticker, Meter } from '/components/Figure.js';
 import { SubHeading } from '/components/SubHeading.js';
+import { HelpLabel } from '/components/HelpTip.js';
 import { TagInput } from '/components/TagInput.js';
 import { TextField } from '/components/TextField.js';
 
@@ -419,7 +421,7 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
 
       ${/* How this agent is meant to be RUN: one sentence, and the switch behind one door. The
             node stores and shows this and never enforces it; the sentence says what is true. */''}
-      <${CardLine} label=${t('profile.agents.runMode.label')} below=${runsOpen && html`<${RunModeSwitch} agent=${agent} showToast=${showToast} />`}>
+      <${CardLine} label=${html`<${HelpLabel} term="agent.run_mode" label=${t('profile.agents.runMode.label')}>${t('profile.agents.runMode.label')}<//>`} below=${runsOpen && html`<${RunModeSwitch} agent=${agent} showToast=${showToast} />`}>
         <span>${t(`profile.agents.page.runs.${agent.run_mode || 'unset'}`)}</span>
         <${Action} small soft onClick=${() => setRunsOpen(v => !v)}>
           ${runsOpen ? t('profile.agents.page.close') : (agent.run_mode ? t('profile.agents.page.runsChange') : t('profile.agents.page.runsDecide'))} →

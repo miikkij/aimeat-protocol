@@ -19,12 +19,15 @@
  *   bold part (<strong>) in ink (the app catalogue's copy protection flags).
  *   `strong`: a choice that decides what a form does, bold words and a larger box (the app
  *   catalogue's "List in EXCHANGE").
+ *   `help`: a term whose question mark (components/HelpTip.js) stands after the line, outside the
+ *   <label>, explaining what ticking it does.
  *   A set of checks under one row label stands in a Field with `group` (components/Field.js).
- * @structure Check({ checked, onChange, radio, name, value, hint, inline, pill, ruled, strong, disabled, title, id, ariaLabel,
+ * @structure Check({ checked, onChange, radio, name, value, hint, help, inline, pill, ruled, strong, disabled, title, id, ariaLabel,
  *   onFocus, onBlur, onMouseEnter, onMouseLeave, children })
  * @usage html`<${Check} checked=${on} onChange=${setOn}>${t('x.autoRetry')}<//>`
  *        html`${langs.map((l) => html`<${Check} radio inline name="stt-lang" checked=${lang === l} onChange=${() => setLang(l)}>${word(l)}<//>`)}`
  * @version-history
+ *   v1.4.0 — 2026-10-02 — `help`: the question mark that explains the choice; additive.
  *   v1.3.0 — 2026-09-27 — `strong`: a choice that decides what a form does, bold words and an 18px box
  *     (the old app catalogue's .mz-check), appcat parity (sections-d); additive, check-line.css
  *     .check--strong.
@@ -37,12 +40,13 @@
  *     layout most of them draw (a row, the box level with the words, .5rem between) (component plan C5).
  */
 import { h } from 'preact';
+import { HelpLabel } from '/components/HelpTip.js';
 import htm from 'htm';
 
 const html = htm.bind(h);
 const cx = (...parts) => parts.filter(Boolean).join(' ');
 
-export function Check({ checked, onChange, radio, name, value, hint, inline, pill, ruled, strong, disabled, title, id, ariaLabel,
+export function Check({ checked, onChange, radio, name, value, hint, help, inline, pill, ruled, strong, disabled, title, id, ariaLabel,
   onFocus, onBlur, onMouseEnter, onMouseLeave, children }) {
   // strong (added by appcat sections-d, parity): a choice that decides what a form does, its words
   // bold and its box a step larger, 14px under what is above it (the old catalogue's .mz-check).
@@ -52,13 +56,15 @@ export function Check({ checked, onChange, radio, name, value, hint, inline, pil
   // pill (added by appcat dialogs builder 2): one of several small framed choices side by side, on the
   // sun while ticked (the prompt builder's capability packs). onFocus / onBlur reach the box and
   // onMouseEnter / onMouseLeave the line, so a page can say what the pointed or focused choice is.
-  return html`
+  const line = html`
     <label class=${cx('check-line', 'check', inline && 'check--inline', pill && 'check--pill', ruled && 'check--ruled', strong && 'check--strong', hint && 'check--hint', disabled && 'check--off')} title=${title}
       onMouseEnter=${onMouseEnter} onMouseLeave=${onMouseLeave}>
       <input type=${radio ? 'radio' : 'checkbox'} id=${id} name=${name} value=${value} checked=${!!checked}
         disabled=${disabled} aria-label=${ariaLabel} onChange=${change} onFocus=${onFocus} onBlur=${onBlur} />
       ${hint ? html`<span class="check-words">${children}<span class="poster-hint">${hint}</span></span>` : children}
     </label>`;
+  // help: the question mark after the line, outside the <label>, so pressing it does not tick the box.
+  return help ? html`<${HelpLabel} term=${help} label=${typeof children === 'string' ? children : undefined}>${line}<//>` : line;
 }
 
 export default Check;

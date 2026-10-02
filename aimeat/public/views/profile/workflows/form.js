@@ -12,7 +12,8 @@
  * @structure renderForm · basics · varsBlock · stepFold · offerWords · endFold
  * @usage import { renderForm } from './form.js';
  * @version-history
- *   v1.12.0 — 2026-09-26 — The form is the Field family (page group G5): the fields are TextField and Select with their row labels, the yes-and-no and the other one-of settings the Choice, "starts when" the Tabs where several are on at once, "wait for an answer" the Check, the timeout's own number the TextField beside its Choice; the rail's checks are plain lines (a failing one in coral), the crumb's way back is data. It writes no class.
+ *   v1.13.0 — 2026-10-02 — The question marks that explain the workflow settings: schedule.cron, schedule.timezone (TextField help), workflow.step_timeout (Field group help), workflow.skip_done, workflow.fresh, workflow.parallel (yn() help argument), workflow.llm_checks (HelpTip beside its Choice); their grey hints moved into them (components/HelpTip.js).
+ *   v1.12.0 —2026-09-26 — The form is the Field family (page group G5): the fields are TextField and Select with their row labels, the yes-and-no and the other one-of settings the Choice, "starts when" the Tabs where several are on at once, "wait for an answer" the Check, the timeout's own number the TextField beside its Choice; the rail's checks are plain lines (a failing one in coral), the crumb's way back is data. It writes no class.
  *   v1.11.0 — 2026-09-26 — "Wait for an answer" is the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
  *   v1.10.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.9.0 — 2026-09-26 — How to read this page is the Facts; a fold's paragraph is the lead and a read-only value under its label the Facts' value (a unification: the look most tabs use); the rail's dead base look goes.
@@ -42,7 +43,7 @@ import { PageSection } from '/components/PageSection.js';
 import { FoldSection } from '/components/FoldSection.js';
 import { timeOfCron, withTime } from '../scheduler/cron-words.js';
 import { c, loc, triggerWords, signalWords, kindWords, renderPage } from './frame.js';
-import { Hint } from '/components/Hint.js';
+import { HelpTip } from '/components/HelpTip.js';
 import { Field, Fields } from '/components/Field.js';
 import { TextField } from '/components/TextField.js';
 import { Select } from '/components/Select.js';
@@ -96,8 +97,10 @@ export function renderForm(ctx) {
       <//>
       <${FoldSection} clip id="wp-end" num="03" title=${c('secEnd')} sub=${c('endSub')} open=${ctx.folds.end} onToggle=${() => ctx.setFold('end', !ctx.folds.end)}>${endFold(f, set)}<//>
       <${FoldSection} clip id="wp-llm" num="04" title=${c('secLlm')} sub=${c('llmSub')} open=${ctx.folds.llm} onToggle=${() => ctx.setFold('llm', !ctx.folds.llm)}>
-        <${Choice} ariaLabel=${c('secLlm')} value=${!!f.llm} options=${YES_NO()} onChange=${(v) => set({ llm: v })} />
-        <${Hint}>${c('llmHint')}<//>
+        <${Row} wrap>
+          <${Choice} ariaLabel=${c('secLlm')} value=${!!f.llm} options=${YES_NO()} onChange=${(v) => set({ llm: v })} />
+          <${HelpTip} term="workflow.llm_checks" label=${c('secLlm')} />
+        <//>
       <//>
       <${ctx.ConfirmUI} />`,
   });
@@ -119,8 +122,8 @@ function basics(ctx, f, set, editing) {
           ${f.triggerKind === 'schedule' ? html`
             <${Row} wrap gap="large" align="end">
               <${TextField} type="time" size="short" label=${c('fTime')} value=${time} onInput=${v => set({ cron: withTime(f.cron, v) })} />
-              <${TextField} code label=${c('fCron')} value=${f.cron} onInput=${v => set({ cron: v })} />
-              <${TextField} label=${c('fTimezone')} value=${f.timezone} onInput=${v => set({ timezone: v })} />
+              <${TextField} code label=${c('fCron')} help="schedule.cron" value=${f.cron} onInput=${v => set({ cron: v })} />
+              <${TextField} label=${c('fTimezone')} help="schedule.timezone" value=${f.timezone} onInput=${v => set({ timezone: v })} />
             <//>
             <${Note}>${triggerWords({ kind: 'schedule', cron: f.cron, timezone: f.timezone })}<//>` : null}
           ${f.triggerKind === 'event' ? html`
@@ -183,7 +186,7 @@ function stepFold(ctx, f, s, i) {
               ${!s.action ? html`<${Check} checked=${s.noInput} onChange=${on => setStep({ noInput: on })}>${c('noInputGate')}<//>` : null}
             <//>
           <//>
-          <${Field} label=${c('fIfNotProduced')} hint=${c('timeoutHint')} group>
+          <${Field} label=${c('fIfNotProduced')} help="workflow.step_timeout" group>
             <${Stack}>
               ${!s.action ? html`<${Choice} ariaLabel=${c('fIfNotProduced')} value=${String(s.retryMax)} onChange=${v => setStep({ retryMax: Number(v) })}
                 options=${RETRY_CHOICES.map(([v, key]) => [v, c(key)])} />` : null}
@@ -210,12 +213,12 @@ function offerWords(o) {
 }
 
 function endFold(f, set) {
-  const yn = (key, label, hint) => html`<${Choice} label=${label} hint=${hint} value=${!!f[key]} options=${YES_NO()} onChange=${(v) => set({ [key]: v })} />`;
+  const yn = (key, label, hint, help) => html`<${Choice} label=${label} hint=${hint} help=${help} value=${!!f[key]} options=${YES_NO()} onChange=${(v) => set({ [key]: v })} />`;
   return html`<${Fields} cols=${2}>
     ${yn('notify', c('setNotify'), c('notifyHint'))}
-    ${yn('skipDone', c('setSkipDone'), c('skipDoneHint'))}
-    ${yn('fresh', c('setFresh'), c('freshHint'))}
-    ${yn('parallel', c('setParallel'), c('parallelHint'))}
+    ${yn('skipDone', c('setSkipDone'), null, 'workflow.skip_done')}
+    ${yn('fresh', c('setFresh'), null, 'workflow.fresh')}
+    ${yn('parallel', c('setParallel'), null, 'workflow.parallel')}
     <${Field} label=${c('setOnFail')} hint=${c('onFailHint')} group>${c('onFailInspect')}<//>
   <//>`;
 }

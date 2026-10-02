@@ -10,6 +10,7 @@
  * @structure renderSpacesAdd, renderSettingsPanel, renderShareTab, renderReviewTab, renderActivityTab
  * @usage import { renderSettingsPanel } from '/views/profile/organisms/workspace/panels.js';
  * @version-history
+ *   v2.23.0 -- 2026-10-02 -- The question marks that explain the workspace settings: workspace.autonomy, workspace.member_changes, workspace.publish_gate (components/HelpTip.js).
  *   2026-09-25 -- Settings: "Members' changes", the workspace's rule for a change from a member who is
  *     neither its creator nor an admin (made at once, or waits for approval).
  *   v2.22.0 -- 2026-09-26 -- Every part is a library component that takes data: the boxes are the Object
@@ -120,7 +121,7 @@ export function renderSettingsPanel(ctx) {
 
         <${Space} above="large"><${Label} block>${t('organisms.formAgentPolicy') || 'Agent policy'}<//><//>
         <${Select} label=${t('organisms.autonomy') || 'AI autonomy (L1 cautious → L5 free)'} value=${sAutonomy} onChange=${setSAutonomy}
-          hint=${t('organisms.autonomyHint') || 'Guidance for agents working here — L1 asks before nearly everything, L5 acts freely. The publish gate (Review tab) still applies regardless.'}
+          help="workspace.autonomy"
           options=${['L1', 'L2', 'L3', 'L4', 'L5'].map(l => [l, `${l} — ${t(`organisms.autonomyLevels.${l}`) || ''}`])} />
 
         <${FormActions}>
@@ -150,7 +151,7 @@ export function renderSettingsPanel(ctx) {
         <${Label} block>${t('organisms.memberChanges.title') || "Members' changes"}<//>
         <${Note}>${t('organisms.memberChanges.hint') || 'When a member who is neither the creator nor an admin adds a space or changes sections:'}<//>
         <${Select} label=${t('organisms.memberChanges.label') || 'Their change'} value=${ws.rules?.member_changes || 'suggest'} disabled=${busy}
-          onChange=${setMemberChanges}
+          help="workspace.member_changes" onChange=${setMemberChanges}
           options=${[
             ['suggest', t('organisms.memberChanges.suggest') || 'waits until the creator or an admin approves it'],
             ['direct', t('organisms.memberChanges.direct') || 'is made at once, with their name on it'],
@@ -286,7 +287,7 @@ export function renderReviewTab(ctx) {
   return html`
     <${Card} tone="section">
       <${Check} inline checked=${gateOn} onChange=${() => toggleGate()} disabled=${busy}
-        title=${t('organisms.publishGateHint') || 'When on, an agent’s publish is held for your review instead of going live'}>
+        help="workspace.publish_gate">
         ${'🔒 '}${t('organisms.publishGate') || 'Require review before publishing'}
       <//>
       ${approvals.length === 0

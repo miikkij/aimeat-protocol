@@ -15,6 +15,9 @@
  *   components/ModelPicker.js · openrouter/pricing.js · openrouter/budget-panel.js
  * @usage import { OpenRouterSettings } from './openrouter-settings.js';
  * @version-history
+ *   v3.20.0 -- 2026-10-02 -- The question marks that explain the fine-tuning fields: ai.max_retries, ai.temperature, ai.top_p,
+ *     ai.max_tokens on their fields (components/HelpTip.js); the grey lines under temperature, top P and the longest answer
+ *     go, the explanations carry them.
  *   v3.19.0 -- 2026-09-26 -- Every part is a component that gets data (component plan, page group G4): the panel
  *     (Box), its sections (Card section), the fields (TextField, Select, Check radios in a Field group, the
  *     model pickers from components/ModelPicker.js, which replaces openrouter/model-picker.js), the ways on
@@ -541,21 +544,21 @@ function ParamsSection({
         <${Check} checked=${autoRetry} onChange=${setAutoRetry}>${t('profile.openrouter.autoRetry')}<//>
 
         ${autoRetry && html`
-          <${TextField} type="number" size="short" label=${t('profile.openrouter.maxRetries')} min="1" max="10" value=${maxRetries}
+          <${TextField} type="number" size="short" label=${t('profile.openrouter.maxRetries')} help="ai.max_retries" min="1" max="10" value=${maxRetries}
             onInput=${v => setMaxRetries(Math.min(10, Math.max(1, parseInt(v) || 1)))} />`}
 
         <${TextField} type="number" size="short" label=${t('profile.openrouter.temperature')}
-          hint=${t('profile.openrouter.temperature_hint')} min="0" max="2" step="0.1"
+          help="ai.temperature" min="0" max="2" step="0.1"
           placeholder=${t('profile.openrouter.paramDefault')} value=${temperature}
           onInput=${setTemperature} />
 
         <${TextField} type="number" size="short" label=${t('profile.openrouter.topP')}
-          hint=${t('profile.openrouter.topP_hint')} min="0" max="1" step="0.05"
+          help="ai.top_p" min="0" max="1" step="0.05"
           placeholder=${t('profile.openrouter.paramDefault')} value=${topP}
           onInput=${setTopP} />
 
         <${TextField} type="number" size="short" label=${t('profile.openrouter.maxTokens')}
-          hint=${t('profile.openrouter.maxTokens_hint')} min="256" max="128000" step="256"
+          help="ai.max_tokens" min="256" max="128000" step="256"
           placeholder=${t('profile.openrouter.paramDefault')} value=${maxTokens}
           onInput=${setMaxTokens} />
       <//>

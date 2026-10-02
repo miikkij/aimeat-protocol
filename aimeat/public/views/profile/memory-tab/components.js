@@ -8,6 +8,7 @@
  *   Extracted from memory-tab.js to satisfy max-file-lines. Every part is a component of the kit
  *   that gets data; the file writes no class.
  * @version-history
+ *   v2.1.0 -- 2026-10-02 -- The question mark that explains a record's visibility in MemoryForm and EditMemoryModal: memory.visibility (components/HelpTip.js). MemoryForm offers "My agents" (owner) where it offered "Shared", which the write route refuses (MemoryWriteSchema has no 'shared').
  *   v2.0.1 -- 2026-09-26 -- The collection folds from a click anywhere on its head again, as on main
  *     (Group wholeHead), and a discovered value scrolls after 300px as main's .mem-discover-preview
  *     did (Code scroll="medium"; fix pass).
@@ -212,7 +213,7 @@ export function MemoryForm({ onSave, onCancel }) {
   // row or from Access — one share covers the keys written after it.
   const visOptions = [
     ['private', t('profile.memory.visPrivate')],
-    ['shared', t('profile.memory.visShared')],
+    ['owner', t('knowledge.visibility.owner')],
     ['members', t('knowledge.visibility.members')],
     ['public', t('profile.memory.visPublic')],
   ];
@@ -220,7 +221,7 @@ export function MemoryForm({ onSave, onCancel }) {
     <${Fields}>
       <${TextField} label=${t('profile.memory.keyLabel')} placeholder=${t('profile.memory.keyPlaceholder')} value=${key} onInput=${setKey} />
       <${TextArea} label=${t('profile.memory.valueLabel')} rows=${3} placeholder=${t('profile.memory.valuePlaceholder')} value=${value} onInput=${setValue} />
-      <${Select} label=${t('profile.memory.visLabel')} value=${vis} onChange=${setVis} options=${visOptions} />
+      <${Select} label=${t('profile.memory.visLabel')} help="memory.visibility" value=${vis} onChange=${setVis} options=${visOptions} />
       <${TextField} label=${t('profile.memory.tagsLabel')} placeholder=${t('profile.memory.tagsPlaceholder')} value=${tags} onInput=${setTags} />
       <${FormActions}>
         <${Loud} onClick=${() => { if (!key || !value) return; onSave(key, value, vis, tags, undefined); }}>${t('profile.memory.saveBtn')}<//>
@@ -372,7 +373,7 @@ export function EditMemoryModal({ memKey, initialValue, initialVisibility, initi
         <${Action} onClick=${onCancel}>${t('profile.cancel')}<//>
         <${Loud} control disabled=${!canSave} onClick=${() => onSave(value, vis, initialVersion, undefined)}>${t('profile.save')}<//>`}>
       <${Stack}>
-        <${Select} label=${t('profile.memory.visLabel')} fit value=${vis} onChange=${setVis} options=${visOptions} />
+        <${Select} label=${t('profile.memory.visLabel')} help="memory.visibility" fit value=${vis} onChange=${setVis} options=${visOptions} />
         <${TextArea} label=${t('profile.memory.valueLabel')} rows=${14} value=${value} onInput=${setValue}
           message=${jsonError ? { text: `${t('profile.memory.invalidJson')} — ${jsonError}`, error: true } : null} />
       <//>

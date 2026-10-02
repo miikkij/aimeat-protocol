@@ -20,6 +20,7 @@
  *   const ex = useExceptions({ level: 'owner', off: federated, confirm, ok: toast, fail: (m) => toast(m, true) });
  *   html`${exceptionsGroup(ex)}${exceptionDialog(ex)}`; ex.open(item) opens the dialog for an explorer item.
  * @version-history
+ *   v1.2.0 — 2026-10-02 — The question mark that explains an exception: classification.exception (components/HelpTip.js).
  *   v1.1.0 — 2026-09-30 — A withdrawn or ended row is no longer faded as a whole (its reason fell to
  *     about 2.3:1 in light): a grey status mark says "withdrawn" or "ended" with the act in grey
  *     words beside it, and the reason keeps its contrast. A withdrawn row says who withdrew it. The
@@ -241,7 +242,7 @@ export function exceptionDialog(ex) {
         <${Loud} control onClick=${() => ex.send()} disabled=${ex.busy || !said}>${W('make.send')}<//>`}>
       <${Fields}>
         <${Note}>${W('make.body', { item: m.item.key, label })}<//>
-        <${Choice} label=${W('make.action')} boxed cols=${2} dot name="cls-exception-action" value=${m.action}
+        <${Choice} label=${W('make.action')} help="classification.exception" boxed cols=${2} dot name="cls-exception-action" value=${m.action}
           onChange=${(v) => ex.set({ action: v })} options=${options} />
         <${TextArea} label=${W('make.reason')} hint=${W('make.reasonHint', { n: fmtNum(REASON_MAX) })} rows=${3} maxLength=${REASON_MAX}
           value=${m.reason} onInput=${(v) => ex.set({ reason: v })} />

@@ -19,6 +19,9 @@
  * @structure AgentAiSection({ agentName, showToast })
  * @usage import { AgentAiSection } from './agent-ai-section.js';
  * @version-history
+ *   v1.14.0 — 2026-10-02 — The question marks that explain the daily cap and the gate: agent.daily_cap,
+ *     decide.gate on their headings (components/HelpTip.js). The cap's line with today's spend and the
+ *     gate's description stay.
  *   v1.13.0 — 2026-09-26 — Every part is a component that takes data (page group G1a): the section card,
  *     SubHeading and Note, the key a password TextField that keeps password managers out (no eye, as
  *     on main), the variable name the code TextField, the provider the Select, the daily cap a short
@@ -53,6 +56,7 @@ import { apiGet, apiPut, apiPost, apiDelete } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { Card } from '/components/Card.js';
 import { SubHeading } from '/components/SubHeading.js';
+import { HelpLabel } from '/components/HelpTip.js';
 import { Note } from '/components/Note.js';
 import { Fields } from '/components/Field.js';
 import { TextField } from '/components/TextField.js';
@@ -221,7 +225,7 @@ export function AgentAiSection({ agentName, showToast }) {
           })}<//>`}
       `)}
 
-      ${part(t('agentAi.capTitle'), html`
+      ${part(html`<${HelpLabel} term="agent.daily_cap" label=${t('agentAi.capTitle')}>${t('agentAi.capTitle')}<//>`, html`
         <${Note}>${t('agentAi.capDesc', { spent: money(data.spent_today_usd) })}<//>
         <${TextField} type="number" min="0" step="0.1" size="short" ariaLabel=${t('agentAi.capLabel')} placeholder=${t('agentAi.capNone')}
           value=${cap} disabled=${!!busy} onInput=${setCap}
@@ -229,7 +233,7 @@ export function AgentAiSection({ agentName, showToast }) {
             onClick=${() => put({ daily_usd: cap.trim() === '' ? null : Number(cap) }, 'agentAi.saved')}>${t('agentAi.save')}<//>`} />
       `)}
 
-      ${part(t('agentAi.gateTitle'), html`
+      ${part(html`<${HelpLabel} term="decide.gate" label=${t('agentAi.gateTitle')}>${t('agentAi.gateTitle')}<//>`, html`
         <${Note}>${t('agentAi.gateDesc')}<//>
         <${Choice} ariaLabel=${t('agentAi.gateTitle')} value=${data.gate} disabled=${!!busy}
           options=${['rule', 'on', 'off'].map(g => ({ value: g, label: t(`agentAi.gate.${g}`) }))}

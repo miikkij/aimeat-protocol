@@ -2012,7 +2012,7 @@
         "policy_specific_peers": "Vain nimeämäni vertaiset",
         "policyWhy_specific_peers": "Nimetään yksi vertainen kerrallaan osiossa 03. Juuri nyt se on {n} / {total}.",
         "scopes": "Mitä he saavat saapuessaan",
-        "openJoin": "Anna tuntemattomien solmujen liittyä omin päin",
+        "openJoin": "Anna tuntemattomien palvelinten liittyä omin päin",
         "openJoinWhy": "Ne saapuvat vierailevina vertaisina: ne saavat selata ja pyytää työtä, ei muuta. Hyvät ylennät myöhemmin.",
         "saved": "Tallennettu"
       },
@@ -2099,7 +2099,7 @@
         "letsIn_disabled": "kukaan ei kirjaudu muualta",
         "letsIn_all_peers": "kuka tahansa aktiiviselta vertaiselta",
         "letsIn_specific_peers": "vain nimeämänsä vertaiset",
-        "openJoin": "tuntemattomat solmut saavat liittyä omin päin",
+        "openJoin": "tuntemattomat palvelimet saavat liittyä omin päin",
         "crossFed": "liittyy myös muihin federaatioihin",
         "stamp": "Painos {edition} · allekirjoittanut {by} · {when}, {age}",
         "ageDays": "{n} päivää sitten",
@@ -2528,8 +2528,8 @@
         "findableWhy": "Ilmestyykö tämän yrityksen nimellä varustettu painike julkiselle kirjautumissivulle, vai käyttävätkö he sen sijaan suoraa linkkiä.",
         "listedLabel": "Näytä painike julkisella kirjautumissivulla",
         "listedWhy": "Pois päältä on se minkä jaettu sivusto tekee, jottei se koskaan julkaise keitä sen asiakkaat ovat.",
-        "idpInitiated": "Hyväksy kirjautuminen joka alkaa heidän päästään",
-        "idpInitiatedWhy": "Jotkin yritykset käynnistävät sovelluksia omasta portaalistaan. Jätä pois päältä ellei sitä pyydetä.",
+        "idpInitiated": "Hyväksy kirjautuminen, joka alkaa heidän päästään",
+        "idpInitiatedWhy": "Jotkin yritykset käynnistävät sovelluksia omasta portaalistaan. Jätä pois päältä, ellei sitä pyydetä.",
         "key": "Hakemistolla on avain",
         "keyWhy": "Yksi avain, näytetään kerran, jolla yrityksen hakemisto lisää ja poistaa väkeään täällä. Uuden luominen lopettaa vanhan toiminnan välittömästi.",
         "signedIn": "Joku on oikeasti kirjautunut",
@@ -4169,6 +4169,7 @@
   "decideRules.declined": "Ehdotus on hylätty.",
   "decideRules.sampleNotJson": "Esimerkki ei ole kelvollista JSONia.",
   "decideRules.idMissing": "Anna säännölle tunniste.",
+  "decideRules.bandsMissing": "Anna kummallekin kaistalle luku väliltä 0–1, ennen kuin tallennat säännön.",
   "decideRules.proposals": "Agenttiesi ehdotukset",
   "decideRules.proposedBy": "Ehdottaja: {who}",
   "decideRules.approve": "Hyväksy",
@@ -11789,7 +11790,19 @@
     "prev": "Edellinen",
     "next": "Seuraava",
     "delete": "Poista",
-    "themes": "Teemat ja tyylit"
+    "themes": "Teemat ja tyylit",
+    "fedTier_contact": "Kontakti",
+    "fedAllowMessaging": "Toimita viestit tänne",
+    "fedAllowBroadcast": "Tiedota kaikille täällä",
+    "fedAllowSettlement": "Siirrä murusia tänne",
+    "fedTierLadderTitle": "Mitä kukin taso antaa vertaisen tehdä",
+    "fedTierLocked": "Tämän vertaisen taso ei salli tätä. Vaihda tasoa, jos haluat sallia enemmän.",
+    "fedTierMeaning_contact": "Vain viestit. Ei katalogia, ei muistia eikä reititystä, eikä kumpikaan näy toisen julkisilla listoilla.",
+    "fedTierMeaning_visiting": "Viestit sekä täkäläisen katalogin luku ja maksullisen työn tilaaminen. Ei koskaan tarjoaja eikä välittäjä, eivätkä sen käyttäjät voi kirjautua tänne.",
+    "fedTierMeaning_member": "Täysi vertainen. Federaatiokirjautuminen pysyy pois päältä, kunnes kytket sen päälle.",
+    "fedTierMeaning_genesis": "Ankkurisuhde. Samat oikeudet kuin jäsenellä.",
+    "fedSupportUpstream": "Vastaa tukipyyntöihin täällä",
+    "fedSupportUpstreamOn": "Jokainen täkäläinen, joka kirjoittaa osoitteeseen support@operators, tavoittaa tämän vertaisen omien operaattoriesi sijaan."
   },
   "dev": {
     "crumb": "Kehittäjille",
@@ -22586,6 +22599,992 @@
         "ex2": "Keskitaso: kolmen tarjouksen vertailu ja suositus yhdestä.",
         "ex3": "Syvä: virheen etsiminen pitkästä koodista.",
         "tip": "Jos vastaus jää tyhjäksi, miettiminen on käyttänyt koko Pisin vastaus -rajan. Käännä päättely pois tai suurenna rajaa."
+      },
+      "max_cost_per_call": {
+        "title": "Enintään kutsua kohden",
+        "short": "Kuinka paljon yksi tekoälykutsu saa enintään maksaa, Yhdysvaltain dollareina. Tarjoaja ohitetaan, jos kutsun hinta on sillä korkeampi. Tyhjä kenttä tarkoittaa, ettei rajaa ole.",
+        "what": "Ennen kutsua tämä AIMEAT arvioi kutsun hinnan jokaisella tarjoajalla vuorollaan malliluettelon hintojen perusteella. Jos arvio ylittää rajan, tarjoaja ohitetaan ja seuraavaa kokeillaan. Jos yksikään tarjoaja ei mahdu rajaan, kutsu hylätään, ja vastaus kertoo syyn. Mallia, jolle malliluettelossa ei ole hintaa, ei ohiteta. Raja koskee tekstiä, kuvien ja tiedostojen lukemista sekä kuvien tekemistä.",
+        "range": "0–100 dollaria. Tyhjä kenttä tarkoittaa, ettei rajaa ole. Tekstikutsun arvioon lasketaan 1 024 tokenia kysymystä ja 1 024 tokenia vastausta. Roolin raja voi olla vain tiukempi kuin reitityksesi sääntö.",
+        "low": "Pieni raja: vain edulliset mallit vastaavat, ja kutsuja hylätään useammin, kun mikään tarjoaja ei mahdu rajaan.",
+        "high": "Suuri raja tai tyhjä kenttä: mikä tahansa reitityksesi malli saa vastata, myös kallis.",
+        "ex1": "Tyhjä: ei rajaa. Jokainen reitityksesi tarjoaja saa vastata.",
+        "ex2": "0,01: malli, jonka hinta on 3 dollaria miljoonalta kysymystokenilta ja 15 dollaria miljoonalta vastaustokenilta, arvioidaan noin 0,018 dollariin kutsulta. Se ohitetaan.",
+        "ex3": "0,05 roolissa ja 0,01 reitityksen säännöissä: rooli käyttää rajaa 0,01, koska rooli voi vain tiukentaa.",
+        "tip": "Aseta raja, kun varalle siirtyminen ei saa koskaan viedä kutsua paljon kalliimmalle mallille. Arvio ei ole lasku: pitkä kysymys tai pitkä vastaus maksaa enemmän kuin arvio. Päivän kokonaiskulun rajaat päiväbudjetilla."
+      },
+      "fallback": {
+        "title": "Kun tarjoaja ei vastaa",
+        "short": "Siirtyykö kutsu varalla olevalle tarjoajalle, kun ensimmäinen ei vastaa. Oletuksena päällä.",
+        "what": "Kun asetus on päällä ja tarjoaja ei vastaa, kutsu siirtyy reitityksesi seuraavalle tarjoajalle. Aikakatkaisu, käyttörajoitus, palvelimen virhe, alhaalla oleva palvelu tai hylätty avain siirtää kutsun. Virheellinen pyyntö, hylätty sisältö tai tyhjä vastaus ei siirrä. Kun asetus on pois päältä, kutsu pysähtyy ensimmäiseen virheeseen ja näyttää sen. Tarjoaja, joka epäonnistuu kolme kertaa peräkkäin, jää muiden taakse viideksi minuutiksi. Sen jälkeen yksi kutsu kokeilee sitä uudelleen.",
+        "range": "Päällä tai pois. Oletuksena päällä. Montako tarjoajaa yksi kutsu saa kokeilla, valitset kohdassa Tarjoajia kutsua kohden.",
+        "ex1": "Päällä: OpenAI vastaa käyttörajoituksella. Kutsu siirtyy seuraavalle tekstin tarjoajallesi, ja saat vastauksen.",
+        "ex2": "Pois: sama käyttörajoitus pysäyttää kutsun, ja sovellus näyttää virheen.",
+        "ex3": "Päällä, ja tarjoaja hylkää avaimesi: kutsu siirtyy eteenpäin, ja tarjoaja ohitetaan, kunnes testaat sen uudelleen tai vaihdat avaimen.",
+        "tip": "Pidä asetus päällä, ellei sinun pidä nähdä virhettä heti, esimerkiksi kun kokeilet uutta tarjoajaa. Osa kutsuista ei siirry koskaan: kutsu, joka nimeää tarjoajansa, puhe, ellei Toinen ääni ole päällä, ja upotukset muuhun kuin samaan malliin."
+      },
+      "fallback_attempts": {
+        "title": "Tarjoajia kutsua kohden",
+        "short": "Montako tarjoajaa yksi kutsu saa kokeilla, ensimmäinen mukaan lukien. Kokonaisluku 1–5. Oletus on 3.",
+        "what": "Kun tarjoaja ei vastaa ja kutsu siirtyy varalle, tämä rajaa, montako tarjoajaa kutsu kokeilee yhteensä. Ensimmäinen tarjoaja lasketaan mukaan. Kun raja tulee vastaan, kutsu pysähtyy ja näyttää virheen. Jokainen epäonnistunut yritys vie aikaa, joten suuri luku voi hidastaa kutsua, joka ei onnistu. Asetuksella ei ole vaikutusta, kun varalle siirtyminen on pois päältä: silloin kokeillaan vain yhtä tarjoajaa.",
+        "range": "1–5, kokonaislukuna. Oletus on 3. Arvo 1 tarkoittaa, ettei kutsu siirry varalle.",
+        "low": "1 tai 2: epäonnistuva kutsu pysähtyy pian. Sopii, kun sovelluksen pitää vastata nopeasti tai ei ollenkaan.",
+        "high": "4 tai 5: enemmän mahdollisuuksia saada vastaus, kun tarjoajia on monta. Kutsu, jossa kaikki epäonnistuvat, kestää kauemmin.",
+        "ex1": "1: vain ensimmäinen tarjoaja, kuin varalle siirtyminen olisi pois päältä.",
+        "ex2": "3: ensimmäinen tarjoaja ja kaksi varalla olevaa. Tämä on oletus.",
+        "ex3": "5: sinulla on viisi tekstin tarjoajaa, ja kutsu saa vastauksen, vaikka neljä niistä olisi alhaalla.",
+        "tip": "Luku koskee vain reitityksesi tarjoajia ja, kun Valintojesi jälkeen on päällä, muita tarjoajiasi. Jos luku on suurempi kuin tarjoajiesi määrä, se ei muuta mitään."
+      },
+      "fallback_leaves_machine": {
+        "title": "Tiedot koneen ulkopuolelle",
+        "short": "Saako varalle siirtyminen lähettää tiedot tämän koneen tarjoajalta pilvipalveluun. Oletuksena pois päältä.",
+        "what": "Paikallinen tekoälypalvelin toimii samalla koneella kuin tämä AIMEAT, joten tiedot eivät lähde koneelta. Jos tällainen tarjoaja ei vastaa, reitityksesi seuraava tarjoaja voi olla pilvipalvelu, kuten OpenAI. Kun asetus on pois päältä, se tarjoaja ohitetaan, ja tiedot pysyvät koneella. Kun asetus on päällä, kutsu siirtyy pilvipalveluun, ja kysymys ja mahdolliset tiedostot lähtevät sinne. Asetus vaikuttaa vain, kun ensimmäinen tarjoaja on paikallinen.",
+        "range": "Päällä tai pois. Oletuksena pois päältä.",
+        "ex1": "Pois: tämän koneen LM Studio ei vastaa. Sen jälkeinen pilvitarjoaja ohitetaan, ja kutsu näyttää virheen.",
+        "ex2": "Päällä: sama vika siirtää kutsun OpenRouteriin, ja vastaus tulee sieltä.",
+        "ex3": "Pois, ja ensimmäinen tarjoaja on OpenAI: asetuksella ei ole vaikutusta, koska tiedot lähtevät koneelta joka tapauksessa.",
+        "tip": "Pidä asetus pois päältä, kun käytät paikallista tarjoajaa siksi, etteivät tiedot saa lähteä koneelta, esimerkiksi henkilötietojen tai luottamuksellisen aineiston kanssa. Laita se päälle, kun vastauksen saaminen on tärkeämpää kuin se, missä vastaus tehdään. Julkisessa AIMEATissa, kuten aimeat.io:ssa, tämä kone on palvelin eikä oma tietokoneesi."
+      },
+      "fallback_pool": {
+        "title": "Valintojesi jälkeen",
+        "short": "Saako kutsu kokeilla muita tarjoajiasi niiden jälkeen, jotka valitsit tähän työhön, ja missä järjestyksessä. Oletuksena päällä.",
+        "what": "Reitityksessä valitset jokaiseen työhön enintään kolme tarjoajaa. Kun asetus on päällä, kutsu kokeilee niiden jälkeen muita tarjoajiasi, joilla on malli tähän työhön. Kun asetus on pois päältä, kokeillaan vain valintojasi. Tarjoajia kutsua kohden -raja rajaa silti, montako kokeillaan yhteensä. Jos valinnoistasi ja muista tarjoajistasi ei löydy yhtään tarjoajaa, vastaa tämän AIMEATin oma oletus.",
+        "range": "Päällä tai pois, oletuksena päällä. Järjestys: listan järjestyksessä (oletus), halvin ensin tai nopein ensin. Halvin ensin käyttää malliluettelon tekstihintaa ja koskee tekstiä sekä kuvien ja tiedostojen lukemista. Tarjoaja, jolla ei ole hintaa, tulee viimeiseksi. Nopein ensin käyttää toistaiseksi listan järjestystä, koska tämä AIMEAT ei vielä mittaa nopeutta.",
+        "ex1": "Päällä, listan järjestyksessä: valitsit tekstiin OpenAI:n. Kun se ei vastaa, seuraavaksi kokeillaan Mistral- ja OpenRouter-tarjoajiasi siinä järjestyksessä, jossa sivu ne näyttää.",
+        "ex2": "Päällä, halvin ensin: muista tekstin tarjoajistasi halvinta kokeillaan ensin.",
+        "ex3": "Pois: valitsit tekstiin vain OpenAI:n. Kun se ei vastaa, kutsu pysähtyy, vaikka sinulla olisi muita tarjoajia.",
+        "tip": "Pidä asetus päällä, niin kutsulla on minne siirtyä. Laita se pois, kun vain valitsemasi tarjoajat saavat nähdä tiedot. Tarjoaja tulee tähän joukkoon vasta, kun asetat sille mallin tähän työhön."
+      },
+      "only_tested": {
+        "title": "Vain testatut tarjoajat",
+        "short": "Ohittaako tämä AIMEAT tarjoajasi, joita ei ole vielä testattu. Oletuksena päällä.",
+        "what": "Kun tämä AIMEAT valitsee kutsulle tarjoajan, se ohittaa tarjoajasi, joiden kykyä tähän työhön ei ole koskaan testattu. Tämä koskee myös tarjoajia, jotka valitsit reitityksessä. Testi on tarjoajan Testaa nyt -painike, ja myös onnistunut kutsu, joka nimeää tarjoajan, lasketaan testiksi. Sääntö ei koske kutsua, joka nimeää tarjoajansa tai mallinsa tai toimii roolina: silloin sitä valintaa kokeillaan. Tämän AIMEATin omia tarjoajia ei tarkisteta, koska palvelun ylläpitäjä vastaa niistä. Testattu tarjoaja, joka nyt epäonnistuu, käsitellään erikseen: se jää toimivien tarjoajien taakse.",
+        "range": "Päällä tai pois. Oletuksena päällä.",
+        "ex1": "Päällä: lisäät Mistral-tarjoajan ja asetat sille mallin, mutta et testaa sitä. Tekstikutsut ohittavat sen, ja sivu kertoo, ettei sitä ole testattu, ja näyttää Testaa nyt -painikkeen.",
+        "ex2": "Päällä, ja testi onnistuu: tarjoaja vastaa kutsuihin kuten muutkin.",
+        "ex3": "Pois: uusi tarjoaja vastaa kutsuihin heti. Väärä avain näkyy silloin epäonnistuneena kutsuna eikä ohitettuna tarjoajana.",
+        "tip": "Pidä asetus päällä, niin uusi tarjoaja, jonka avaimessa tai mallin nimessä on kirjoitusvirhe, ei riko kutsujasi. Testaa jokainen uusi tarjoaja kerran."
+      },
+      "embeddings": {
+        "title": "Upotukset",
+        "short": "Muuttaa tekstin luvuiksi, jotta haku löytää samaa tarkoittavat tekstit eikä vain tekstejä, joissa on samat sanat. Sovellukset ja agentit pyytävät tätä.",
+        "what": "Upotus on lukujono, jonka malli tekee tekstistä. Samaa tarkoittavat tekstit saavat samankaltaiset luvut, joten merkityksen mukainen haku voi verrata niitä. Sovellukset ja agentit käyttävät upotuksia, kun ne etsivät toisiinsa liittyviä muistiinpanoja, asiakirjoja tai vastauksia. Vain saman mallin lukuja voi verrata keskenään. Siksi upotuskutsu siirtyy varalle vain samaan malliin toisella tarjoajalla, ei koskaan toiseen malliin.",
+        "range": "Päällä tai pois tarjoajakohtaisesti, yhdellä mallilla. Upotuksia tekevät OpenRouter, OpenAI, Mistral, paikallinen tekoälypalvelin, OpenAI-yhteensopiva osoite ja laajennus. Anthropic ja xAI eivät tee niitä. Yksi kutsu ottaa enintään 256 tekstiä ja 500 000 merkkiä.",
+        "ex1": "Haet sanalla ”loma”, ja muistiinpanosovellus löytää myös muistiinpanon, jossa kerrotaan matkasta Kreetalle.",
+        "ex2": "Vaihdat upotusmallin: luvut, jotka sovellus tallensi aiemmin, eivät enää vastaa uusia, joten sovelluksen pitää tehdä ne uudelleen.",
+        "tip": "Valitse upotusmalli kerran ja pidä se. Vaihdon jälkeen tallennettuja upotuksia ei voi verrata uusiin, ennen kuin ne tehdään uudelleen. Ylläpidon asetuksissa upotusten oletusmalli on se, jota palvelimen oma avain käyttää. Jos kenttä on siellä tyhjä, palvelimen avain ei tee upotuksia."
+      },
+      "model_policy": {
+        "title": "Sallitut mallit",
+        "short": "Mitä malleja tekoälykutsusi saavat käyttää: mitä tahansa mallia, suositeltuja malleja tai omaa listaasi.",
+        "what": "Mallirajaus määrää, mitkä mallit saavat vastata. Mikä tahansa malli ei rajaa mitään. Suositellut mallit ovat lista, jota tämän AIMEATin ylläpitäjät pitävät, ja rajauksesi seuraa heidän muutoksiaan. Omalla listalla nimeät mallit itse. Kutsu mallille, joka on rajauksen ulkopuolella, hylätään, ja vastaus kertoo sallitut mallit. Jos kutsu ei nimeä mallia, se käyttää tarjoajan mallia, kun se on sallittu, ja muuten ensimmäistä sallittua mallia. Kenen kutsut -kohta kertoo, mitä rajaus koskee: omia kutsujasi, chatia, agenttejasi ja sovelluksiasi.",
+        "range": "Mikä tahansa malli (oletus), suositellut mallit tai oma lista. Suositellut mallit voit valita vain, kun tällä AIMEATilla on niitä. Omalle listalle tulee vähintään 1 ja enintään 200 mallia, yksi riviä kohden muodossa tyyppi:mallin tunniste. Kun otat rajauksen käyttöön, se koskee kaikkia neljää kutsujen lajia, kunnes poistat rastin joistakin.",
+        "lowLabel": "Väljä",
+        "highLabel": "Tiukka",
+        "low": "Mikä tahansa malli: mitään kutsua ei hylätä mallin takia. Sovellus voi silti nimetä oman, lyhyemmän listansa.",
+        "high": "Oma lista: vain nimeämäsi mallit vastaavat. Kaikki muut hylätään, myös varalle siirryttäessä.",
+        "ex1": "Mikä tahansa malli: sovellus pyytää mallia, jota et ole koskaan käyttänyt, ja malli vastaa.",
+        "ex2": "Suositellut mallit, vain sovellukseni: sovelluksesi käyttävät vain ylläpitäjien listaa, ja oma chatisi saa käyttää mitä tahansa mallia.",
+        "ex3": "Oma lista, jossa on openai:gpt-5-mini: agentti pyytää kalliimpaa mallia, ja kutsu hylätään. Vastaus kertoo sallitun mallin.",
+        "tip": "Jokainen taso voi vain tiukentaa: sekä sovelluksen oman listan että sinun listasi pitää sallia malli. Jos käytät omaa listaa, kirjoita siihen jokaisen käyttämäsi kyvyn mallit, myös upotusten ja puheen. Muuten ne kutsut hylätään."
+      },
+      "content_classifier": {
+        "title": "Sisällön luokittelija",
+        "short": "Malli, joka antaa sisällöllesi luokituksen, kuten julkinen, sisäinen tai luottamuksellinen: päätösmalli tai tekstimalli.",
+        "what": "Luokitus määrää, ketkä ihmiset ja mikä tekoäly saavat lukea sisällön ja saako se lähteä organismista. Säännöt, jotka tunnistavat salasanat ja henkilötunnukset, toimivat ensin. Sen jälkeen sisällön luokittelija arvioi loput. Päätösmalli vastaa suljettuihin kysymyksiin eikä kirjoita tekstiä. Tekstimalli lukee sisällön ja vastaa kuten mikä tahansa tekstikutsu, joko tekstin reitityksesi kautta tai nimeämäsi tarjoajan kautta. Luokittelukäytäntö määrää, vahvistaako ihminen tuloksen ja montako kutsua päivässä luokittelija saa tehdä.",
+        "range": "Päätösmalli: oletus tai nimetty päätösmallin tarjoaja. Tekstimalli: tekstin reititys tai nimetty tekstin tarjoaja. Palvelun ylläpitäjä valitsee palvelimen oletuksen, ja voit valita omalle sisällöllesi toisen.",
+        "lowLabel": "Päätösmalli",
+        "highLabel": "Tekstimalli",
+        "low": "Vastaa suljettuihin kysymyksiin todennäköisyyden kanssa eikä kirjoita tekstiä. Ylläpitäjän pitää ottaa se käyttöön palvelimella.",
+        "high": "Käyttää tekstin tarjoajiasi ja niiden hintoja. Toimii myös, kun päätösmalli ei ole käytössä.",
+        "ex1": "Päätösmalli: oletus. Päätösmallin tarjoaja, jota tämä AIMEAT käyttää oletuksena, luokittelee sisältösi. Tekstin reitityksesi ei muutu.",
+        "ex2": "Tekstimalli: tekstin reititys. Sama tarjoaja, joka vastaa tekstikutsuihisi, luokittelee myös sisältösi, ja kutsut lasketaan päiväbudjettiisi.",
+        "ex3": "Tekstimalli: nimetty tarjoaja, kuten paikallinen tekoälypalvelimesi. Sisältösi luokitellaan, eikä teksti lähde pilvipalveluun.",
+        "tip": "Valitse tekstimalli, kun päätösmalli ei ole tässä AIMEATissa käytössä. Silloin sivu näyttää luokittelijan pois päältä. Valitse paikallinen tarjoaja, kun sisältösi ei saa lähteä tältä koneelta. Salasanoja ja henkilötunnuksia tunnistavat säännöt toimivat, valitsitpa minkä mallin tahansa."
+      },
+      "daily_budget": {
+        "title": "Päiväbudjetti",
+        "short": "Kuinka paljon tekoälykutsusi saavat maksaa yhdessä päivässä, Yhdysvaltain dollareina. Kun budjetti on käytetty, seuraavat kutsut hylätään keskiyöhön (UTC) asti.",
+        "what": "Budjettiin lasketaan kaikki tänään nimissäsi tehdyt tekoälykutsut: omasi, agenttiesi ja sovellustesi, maksoi kutsun sitten oma avaimesi tai palvelimen avain. Ennen jokaista kutsua tämä AIMEAT vertaa jo käytettyä summaa budjettiin. Kun käytetty summa yltää budjettiin, kutsu hylätään, ja pyytäjä saa tietää syyn. Yksi kutsu voi ylittää budjetin vähän, koska tarkistus tehdään ennen kutsua ja kutsun oma hinta selviää vasta sen jälkeen. Budjetti alkaa alusta keskiyöllä UTC-aikaa.",
+        "range": "0–1 000 dollaria. Oletus on 1 dollari päivässä. Arvo 0 hylkää jokaisen kutsun.",
+        "low": "Pieni budjetti: sovellus tai agentti, joka toimii väärin, ehtii käyttää vain vähän. Oma työsi voi pysähtyä kesken päivän.",
+        "high": "Suuri budjetti: työ ei pysähdy, mutta sovelluksen vika ehtii maksaa enemmän, ennen kuin huomaat sen.",
+        "ex1": "1: oletus. Riittää moneen tavalliseen vastaukseen, koska yksi vastaus maksaa yleensä sentin murto-osan.",
+        "ex2": "0: mikään tekoälykutsu ei toimi, esimerkiksi kun olet poissa etkä halua mitään kulua.",
+        "ex3": "20, ja yhdellä sovelluksella raja 2: sovellus pysähtyy 2 dollariin, ja loput budjetista jää muulle työlle.",
+        "tip": "Katso budjetin alta, paljonko viimeiset 30 päivää maksoivat, ja aseta budjetti vähän tavallisen päivän yläpuolelle. Anna uudelle tai paljon käytetylle sovellukselle oma raja, niin se ei voi käyttää koko budjettia."
+      },
+      "app_daily_cap": {
+        "title": "Raja päivässä",
+        "short": "Kuinka paljon yksi sovellus saa käyttää tekoälyyn päivässä, Yhdysvaltain dollareina. Tyhjä: sovellus saa käyttää koko päiväbudjetin.",
+        "what": "Jokainen sovellus saa käyttää koko päiväbudjettisi, ellei sillä ole omaa rajaa. Raja pysäyttää yhden sovelluksen, ennen kuin se käyttää budjetin, jota muu työsi tarvitsee. Ennen jokaista sovelluksen kutsua tämä AIMEAT vertaa sovelluksen tämän päivän kulua sen rajaan. Kun sovellus saavuttaa rajansa, sen kutsut hylätään keskiyöhön (UTC) asti, ja muut sovelluksesi jatkavat. Päiväbudjetti on silti voimassa: budjettia suurempi raja ei anna sovelluksen käyttää enempää.",
+        "range": "0–1 000 dollaria, sovelluksen rivillä. Tyhjä: ei omaa rajaa. Arvo 0 pysäyttää sovelluksen tekoälykutsut.",
+        "low": "Pieni raja: sovellus voi kokeilla tekoälytoimintojaan, mutta sen vika maksaa vähän.",
+        "high": "Suuri raja tai tyhjä kenttä: sovellus saa käyttää sen, mitä päiväbudjetista on jäljellä.",
+        "ex1": "Tyhjä: kirjoitussovellus, jota käytät koko päivän, jakaa koko budjetin.",
+        "ex2": "0,50: uusi peli, jota testaat. Silmukka, joka kutsuu tekoälyä yhä uudelleen, pysähtyy 50 senttiin.",
+        "ex3": "0: sovellus, johon et enää luota. Sen tekoälykutsut hylätään, mutta sovellus aukeaa yhä.",
+        "tip": "Aseta raja uudelle sovellukselle ja jokaiselle sovellukselle, jonka 30 päivän kulu yllättää sinut. Taulukko on järjestetty 30 päivän kulun mukaan, joten kalleimmat sovellukset ovat ylimpänä."
+      },
+      "pdf_engine": {
+        "title": "PDF-moottori",
+        "short": "Kuka muuttaa PDF-tiedoston tekstiksi mallille, joka ei osaa lukea sitä itse. Vain OpenRouter-tarjoajan Lukee tiedostoja -kyvyssä.",
+        "what": "Osa malleista lukee PDF-tiedoston itse, ja osa lukee vain tekstiä. OpenRouter voi muuttaa PDF-tiedoston tekstiksi tällaiselle mallille, ennen kuin malli lukee sen. Tällä asetuksella valitset muuntajan. Tämä AIMEAT ei muunna mitään itse. Jos PDF-moottoria ei ole tai valinta on mallin oma, malli, joka ei osaa lukea tiedostoja, hylätään kutsussa, jossa on tiedosto, ja kutsu siirtyy seuraavalle tarjoajalle. Kun valinta on Mistral OCR tai Cloudflare AI, OpenRouter muuntaa PDF-tiedoston, ja malli saa tekstin.",
+        "range": "Ei PDF-moottoria (oletus), mallin oma, Mistral OCR, Cloudflare AI. Malliluettelo kertoo, mitkä mallit lukevat tiedostoja. Mallin, jota luettelo ei tunne, oletetaan lukevan niitä.",
+        "ex1": "Mallin oma: mallisi lukee PDF-tiedostot itse. PDF menee sille sellaisenaan.",
+        "ex2": "Mistral OCR: skannattu sopimus, jonka sivut ovat kuvia. OCR tunnistaa sivujen tekstin, ja malli, joka lukee vain tekstiä, pystyy lukemaan sen.",
+        "ex3": "Ei PDF-moottoria, ja malli lukee vain tekstiä: kutsu, jossa on PDF, ohittaa tämän tarjoajan ja siirtyy seuraavalle, joka osaa lukea tiedostoja.",
+        "tip": "Valitse mallin oma, kun mallisi lukee tiedostoja. Valitse moottori, kun käytät OpenRouterissa mallia, joka lukee vain tekstiä, ja haluat sen lukevan PDF-tiedostoja. Skannatuille sivuille sopii Mistral OCR."
+      },
+      "local_only": {
+        "title": "Tämä kone",
+        "short": "Saako tämä rooli käyttää vain tarjoajia, jotka ovat samalla koneella kuin tämä AIMEAT. Silloin tiedot eivät lähde koneelta.",
+        "what": "Kun asetus on päällä, roolin kutsut ohittavat jokaisen tarjoajan, jolle tiedot lähtisivät koneelta: OpenRouterin, OpenAI:n, Anthropicin, Mistralin, xAI:n, itse antamasi osoitteen ja laajennukset. Vain paikallinen tekoälypalvelin, kuten LM Studio tai Ollama, saa vastata. Jos roolissa ei ole tällaista tarjoajaa, sen kutsut hylätään, ja vastaus kertoo syyn. Sovellus voi pyytää samaa omalle roolilleen, ja silloin sääntö on voimassa, vaikka jättäisit tämän pois päältä.",
+        "range": "Päällä tai pois. Oletuksena pois päältä.",
+        "ex1": "Päällä: rooli ”Päiväkirjan tiivistelmät”, jossa on tämän koneen Ollama. Päiväkirjasi teksti ei koskaan lähde pilvipalveluun.",
+        "ex2": "Päällä, ja roolissa on vain OpenAI: jokainen roolin kutsu hylätään, koska yksikään tarjoaja ei ole tällä koneella.",
+        "ex3": "Pois: rooli käyttää listaamiasi tarjoajia, missä ne sitten toimivatkin.",
+        "tip": "Laita asetus päälle roolille, joka käsittelee henkilötietoja tai luottamuksellista sisältöä. Julkisessa AIMEATissa, kuten aimeat.io:ssa, tämä kone on palvelin, etkä voi lisätä sinne paikallista tarjoajaa. Silloin asetus toimii vain sellaisen paikallisen tekoälypalvelimen kanssa, jonka palvelun ylläpitäjä tarjoaa, tai AIMEATissa, jota ylläpidät itse."
+      },
+      "max_retries": {
+        "title": "Yritysten enimmäismäärä",
+        "short": "Kuinka monta kertaa AIMEATisi kysyy mallilta uudelleen, kun vastaus tulee tyhjänä. 1–10.",
+        "what": "Joskus malli vastaa tyhjällä. Päättelymalli tekee niin useimmin, kun sen miettiminen käyttää koko Pisin vastaus -rajan. Kun automaattinen uusintayritys on päällä, AIMEATisi kysyy saman kysymyksen uudelleen enintään näin monta kertaa. Jos jokainen yritys jää tyhjäksi, kutsu epäonnistuu ja kertoo syyn. Jokainen uusi yritys on uusi kutsu, ja malli voi laskuttaa siitä.",
+        "range": "1–10. Kentässä on aluksi 3. Kun automaattinen uusintayritys on pois päältä, tyhjä vastaus epäonnistuu heti.",
+        "low": "1: vika näkyy pian, ja tyhjä vastaus maksaa enintään yhden ylimääräisen kutsun.",
+        "high": "10: malli, joka joskus vastaa tyhjällä, saa monta mahdollisuutta. Jos vika on asetuksissa, kaikki kymmenen yritystä epäonnistuvat ja maksavat.",
+        "ex1": "3: aloitusarvo. Riittää tarjoajan ohimenevään vikaan.",
+        "ex2": "1: testaat uusia asetuksia ja haluat nähdä tyhjän vastauksen heti.",
+        "tip": "Jos vastaukset tulevat usein tyhjinä, suurenna Pisin vastaus -rajaa tai vähennä päättelyä. Lisää uusintayrityksiä vain toistaa saman vian."
+      }
+    },
+    "decide": {
+      "bands": {
+        "title": "Kaistat",
+        "short": "Kaksi lukua väliltä 0–1. Ne ratkaisevat säännön tuloksesta, toimiiko kutsuja itse, kysytäänkö ihmiseltä vai pysähdytäänkö.",
+        "what": "Joka kerta kun sääntö ajetaan, siitä tulee tulos: kuinka varma malli on, asteikolla 0–1. Tulos on heikoin varmuus niistä kysymyksistä, joilla on kynnys. Kun tulos on vähintään ensimmäinen luku, kutsuja toimii itse. Kun tulos jää sen alle mutta on vähintään toinen luku, kysytään ihmiseltä. Toisen luvun alapuolella kutsuja pysähtyy. Jos jonkin kysymyksen vastaus jää oman kynnyksensä alle, toiminta pysähtyy jo ennen kaistoja.",
+        "range": "Kaksi lukua väliltä 0–1, desimaalit sallittuja. Toinen luku ei saa olla suurempi kuin ensimmäinen. Lukuja ei täytetä puolestasi. Jos malli ei anna varmuutta lainkaan, kysytään ihmiseltä.",
+        "low": "Kutsuja toimii useammin itse, ja ihminen näkee harvempia tapauksia.",
+        "high": "Kutsuja toimii itse vain, kun malli on hyvin varma. Useampi tapaus menee ihmiselle tai pysähtyy.",
+        "ex1": "Toimi 0,9, kysy 0,6: tuloksella 0,95 kutsuja toimii, tuloksella 0,75 kysytään ihmiseltä ja tuloksella 0,4 kutsuja pysähtyy.",
+        "ex2": "Toimi 0,8, kysy 0,8: ihmiseltä ei kysytä koskaan. Kutsuja toimii, kun tulos on vähintään 0,8, ja pysähtyy, kun tulos jää sen alle.",
+        "ex3": "Toimi 0,9, kysy 0: kaistat eivät pysäytä kutsujaa koskaan. Vain kynnyksensä alle jäävä vastaus pysäyttää, ja jokainen alle 0,9:n tulos menee ihmiselle.",
+        "tip": "Valitse luvut omien esimerkkiesi perusteella. Kokeile sääntöä esimerkeillä, lue viimeisimmät päätökset ja katso, mihin oikeat ja väärät vastaukset osuvat. Jätä aluksi lukujen väliin leveä rako, jotta ihminen näkee epäselvät tapaukset. Kavenna rakoa, kun päätökset osoittavat, että malli osuu oikeaan. Täytä molemmat luvut ennen kuin tallennat säännön."
+      },
+      "question_threshold": {
+        "title": "Kynnys",
+        "short": "Arvo, joka vastauksen pitää saavuttaa, tai toiminta pysähtyy. Asteikossa se on taso nollasta alkaen, muissa kysymystyypeissä luku väliltä 0–1.",
+        "what": "Vain kysymys, jolla on kynnys, vaikuttaa tulokseen. Kysymys ilman kynnystä kysytään ja kirjataan, mutta se ei muuta tulosta. Luvun merkitys riippuu kysymyksen tyypistä. Kyllä vai ei -kysymyksessä se on pienin hyväksytty kyllä-vastauksen todennäköisyys. Yksi vaihtoehto -kysymyksessä se kertoo, kuinka varma mallin pitää olla valinnastaan. Asteikossa se on alin taso, joka vastauksen pitää saavuttaa. Jos vastaus jää kynnyksen alle, toiminta pysähtyy kaistoista riippumatta.",
+        "range": "Kyllä vai ei: 0–1. Yksi vaihtoehto: 0–1. Asteikko: taso 0:sta alkaen. 0 on listasi ensimmäinen taso, ja suurin sallittu arvo on viimeinen taso. Tyhjä kenttä tarkoittaa, että kysymys ei vaikuta tulokseen. Säännössä pitää olla ainakin yksi kysymys, jolla on kynnys.",
+        "low": "Kysymys pysäyttää toiminnan vain, kun vastaus on selvästi sitä vastaan.",
+        "high": "Vastauksen pitää olla selvä, tai toiminta pysähtyy. Toiminta pysähtyy useammin.",
+        "ex1": "Kyllä vai ei, 0,8: väite on ”The reply answers the customer's question”. Mallin pitää antaa sille vähintään 0,8, tai vastaus ei lähde.",
+        "ex2": "Yksi vaihtoehto, 0,7: viesti lajitellaan myyntiin, tukeen tai laskutukseen. Mallin varmuuden valinnastaan pitää olla vähintään 0,7, tai toiminta pysähtyy.",
+        "ex3": "Asteikko, 2: tasot ovat poor, fair, good ja excellent (0–3). Vastauksen pitää olla good tai excellent.",
+        "tip": "Kirjoita jokainen kysymys niin, että suuri arvo tarkoittaa, että saa toimia. Silloin kynnys toimii aina alarajana. Anna kynnys vain kysymyksille, joiden pitää voida pysäyttää toiminta. Säädä luvut viimeisimpien päätösten perusteella, älä arvaa."
+      },
+      "gate": {
+        "title": "Portti",
+        "short": "Odottaako agentti sinua, kun päätösmalli ei ole tarpeeksi varma. Portti on pois päältä, kunnes kytket sen.",
+        "what": "Portti on päätössääntö, joka vartioi tekoa, jota ei voi perua, esimerkiksi vastauksen lähettämistä. Kun portti on päällä, agentti toimii vain, kun tulos on Toimi. Kun tulos on Kysy ihmiseltä tai Pysähdy, AIMEAT käskee agenttia odottamaan, antaa sinulle tehtävän ja lähettää sinulle ilmoituksen. Kun portti on pois päältä, agentti saa toimia tuloksesta riippumatta, ja päätös kirjataan silti. Portti koskee vain agentteja. Sovellus lukee tuloksen, ja sen oma koodi päättää.",
+        "range": "Sääntöeditorissa: valittu tai ei valittu, oletuksena ei valittu. Agentin sivulla: Kuten kukin sääntö sanoo, Päällä kaikissa säännöissä tai Pois päältä. Oletus on Kuten kukin sääntö sanoo, ja silloin kunkin säännön oma valinta ratkaisee.",
+        "lowLabel": "Portti pois päältä",
+        "highLabel": "Portti päällä",
+        "low": "Pois päältä: agentti toimii itse. Näet jälkikäteen, mitä malli vastasi, ja voit verrata.",
+        "high": "Päällä: agentti odottaa sinua aina, kun malli ei ole tarpeeksi varma. Tämä on turvallisempaa, mutta saat enemmän tehtäviä.",
+        "ex1": "Päällä: agentti vastaa asiakkaille. Vastaus, josta malli ei ole varma, odottaa sinua tehtävänä.",
+        "ex2": "Pois päältä: uuden säännön ensimmäiset viikot. Agentti toimii, ja kirjatut päätökset näyttävät, kuinka usein portti olisi pysäyttänyt sen.",
+        "ex3": "Kuten kukin sääntö sanoo: tietueen poistoa vartioiva sääntö on merkitty portiksi, viestejä lajitteleva sääntö ei ole.",
+        "tip": "Pidä portti aluksi pois päältä ja lue päätökset, niin voit verrata, miten agentti pärjää ilman sitä. Kytke portti, kun väärä teko maksaa enemmän kuin lyhyt odotus. AIMEAT ei tee tekoa itse: se käskee agenttia odottamaan ja kirjaa käskyn."
+      },
+      "price_per_mtok": {
+        "title": "Hinta USD:nä miljoonalta tokenilta",
+        "short": "Mitä tarjoaja veloittaa lukemastaan tekstistä, Yhdysvaltain dollareina miljoonalta tokenilta. AIMEAT laskee hinnan avulla, mitä päätöksesi maksavat.",
+        "what": "Mallit laskevat tekstin tokeneina eli sanojen paloina. Verkkopalveluna toimiva päätösmallin tarjoaja veloittaa lukemistaan tokeneista. AIMEAT laskee jokaisen päätöksen kulun sen tokeneista ja tästä hinnasta ja kirjaa kulun päätöksen yhteyteen. Kulu lasketaan päiväbudjettiisi ja agentin päiväkattoon. Hinta ei muuta sitä, mitä tarjoaja sinulta laskuttaa. Vain verkkopalvelulla on hinta: paikallinen päätösmalli ei maksa mitään.",
+        "range": "0–1 000 Yhdysvaltain dollaria miljoonalta tokenilta, desimaalit sallittuja. Jos kenttä on tyhjä, hintaa ei kirjata: tarjoajan kohdalla lukee ”hintaa ei ole annettu”, ja sen päätökset lasketaan maksuttomiksi.",
+        "ex1": "0,042: hinta, jota AIMEAT käyttää TypeSafen Jeville, ellei ylläpitäjä muuta sitä. Noin 4 000 merkin päätös maksaa silloin noin 0,000042 USD.",
+        "ex2": "2: tarjoaja veloittaa 2 dollaria miljoonalta tokenilta. 1 000 tokenin päätös maksaa 0,002 USD.",
+        "ex3": "Tyhjä: et vielä tiedä hintaa. Päätökset kirjataan maksuttomiksi, joten päiväbudjettisi ei rajoita niitä.",
+        "tip": "Kopioi tarjoajan hinnastosta hinta, jonka se perii lukemastaan tekstistä (input). Jätä kenttä tyhjäksi vain siksi aikaa, kun et tiedä hintaa. Ilman hintaa päiväbudjettisi ja agentin päiväkatto eivät laske näitä päätöksiä."
+      },
+      "provider_limits": {
+        "title": "Mitä se pystyy käsittelemään",
+        "short": "Kuinka monesta vaihtoehdosta tarjoaja enintään valitsee ja kuinka paljon tekstiä se enintään lukee, merkkeinä. AIMEAT hylkää kysymyksen, joka ei mahdu, ennen kuin mitään lähtee.",
+        "what": "Jokaisella päätösmallilla on rajansa. Osa malleista lukee pitkästä tekstistä vain alun ja jättää loput huomiotta ilmoittamatta virheestä. Silloin päätös perustuu vain osaan sisällöstä. Tässä kerrot AIMEATille tämän tarjoajan rajat. AIMEAT tarkistaa jokaisen pyynnön niitä vasten, ennen kuin se lähettää mitään. Se hylkää myös säännön, joka nimeää tämän tarjoajan, jos säännön kysymykset eivät mahdu. Tekstiin lasketaan sisältö ja kysymykset yhdessä.",
+        "range": "Vaihtoehtoja enintään: kokonaisluku 2–10 000. Tyhjä kenttä tarkoittaa 20:tä. Tekstiä enintään: 256–4 000 000 merkkiä. AIMEAT laskee noin neljä merkkiä yhdeksi tokeniksi. Tyhjä kenttä tarkoittaa noin 4 000:ta merkkiä (4 096). Nämä ovat pienimmät arvot, joihin paikallinen malli pystyy.",
+        "low": "AIMEAT hylkää useampia kysymyksiä, mutta mitään sisältöä ei katkaista huomaamatta.",
+        "high": "Pidempi sisältö ja useammat vaihtoehdot menevät läpi. Jos raja on suurempi kuin mihin malli oikeasti pystyy, malli voi vastata vain osan perusteella.",
+        "ex1": "20 ja 4 096: valmis paikallinen esimerkki Laya. Se lukee noin 4 000 merkkiä, joten AIMEAT hylkää pidemmän viestin, ennen kuin lähettää sen.",
+        "ex2": "60 ja 20 000: valmis paikallinen esimerkki jeff, joka mittauksissa valitsi hyvin 60 aiheen joukosta. Yksi vaihtoehto -kysymys, jossa on 61 vaihtoehtoa, hylätään.",
+        "tip": "Ota luvut tarjoajan ohjeista tai mittaa ne itse: lisää pitkän tekstin loppuun tunnettu tosiasia ja katso, käyttääkö vastaus sitä. Kun kysymys hylätään, lähetä vähemmän kenttiä tai jaa pitkä vaihtoehtolista osiin."
+      },
+      "store_state": {
+        "title": "Säilytä puhdistettu teksti jokaisen päätöksen yhteydessä",
+        "short": "Kun asetus on päällä, jokaisen päätöksen yhteyteen jää teksti, jonka malli arvioi, ilman henkilötietoja. Kun asetus on pois päältä, tekstistä jää vain tiiviste. Oletuksena pois päältä.",
+        "what": "AIMEAT poistaa henkilötiedot ennen kuin se lähettää sisällön päätösmallille. Tämä asetus ratkaisee, mitä puhdistetusta tekstistä jää päätöksen kirjaukseen. Kun asetus on päällä, kirjaukseen jää koko teksti, ja näet myöhemmin tarkalleen, mitä malli arvioi. Kun asetus on pois päältä, kirjaukseen jää vain tiiviste eli tekstistä laskettu lyhyt koodi. Tiivisteestä näkee, koskivatko kaksi päätöstä samaa sisältöä, mutta tekstiä ei saa siitä takaisin. Päätöksen kirjaus poistetaan vuoden kuluttua, ellei ylläpitäjä ole asettanut muuta aikaa.",
+        "range": "Oletuksena pois päältä. Asetus koskee päätöksiä, jotka tehdään muutoksen jälkeen.",
+        "tip": "Kytke asetus päälle, kun säädät sääntöä, niin näet, mitä malli arvioi. Kytke se pois, kun päätökset sujuvat, niin sisällöstäsi säilyy vähemmän. Jos sovellus tai agentti lähetti sisällön julkisena poistamatta henkilötietoja, sisältö säilyy sellaisena kuin se lähetettiin."
+      },
+      "public_opt_out": {
+        "title": "Salli sovellusteni ja agenttieni lähettää julkiseksi merkitsemänsä sisältö poistamatta henkilötietoja",
+        "short": "Kun asetus on päällä, sovellus tai agentti voi lähettää julkiseksi merkitsemänsä sisällön poistamatta henkilötietoja. Oletuksena pois päältä.",
+        "what": "Oletuksena AIMEAT poistaa henkilötiedot kaikesta, mikä lähtee päätösmallille: sähköpostiosoitteet, puhelinnumerot, henkilötunnukset, tilinumerot, katuosoitteet ja nimet. Sovellus tai agentti voi merkitä sisällön julkiseksi, esimerkiksi julkaistun uutisen, jossa ei ole mitään yksityistä. Kun asetus on päällä, AIMEAT lähettää tällaisen sisällön sellaisenaan. Kun asetus on pois päältä, AIMEAT poistaa henkilötiedot kaikesta sisällöstä, merkitsi sovellus tai agentti sen miten tahansa.",
+        "range": "Oletuksena pois päältä. Kun merkitset sisällön itse julkiseksi, se lähtee aina sellaisenaan.",
+        "tip": "Kytke asetus päälle vain, jos luotat jokaiseen sovellukseen ja agenttiin, joka kysyy päätösmallilta puolestasi. Sovellus voi merkitä mitä tahansa julkiseksi, eikä AIMEAT tarkista merkintää. Jos tarjoaja on verkkopalvelu, sisältö lähtee silloin tältä koneelta henkilötietoineen. TypeSafe toimii Yhdysvalloissa ja voi säilyttää saamansa tiedot."
+      }
+    },
+    "agent": {
+      "daily_cap": {
+        "title": "Päiväkatto",
+        "short": "Enimmäismäärä, jonka agentti saa käyttää tekoälyyn päivässä, Yhdysvaltain dollareina. Tyhjä kenttä: agentilla ei ole omaa kattoa.",
+        "what": "Jokainen agentin tekoälykutsu maksaa: sekä päätökset että teksti, jonka se kirjoittaa. Katto laskee molemmat yhteen. Ennen jokaista kutsua AIMEATisi vertaa agentin tämän päivän kuluja kattoon. Kun katto täyttyy, AIMEATisi hylkää agentin seuraavat kutsut, kunnes päivä vaihtuu. Yksi kutsu voi ylittää katon vähän, koska kutsun hinta selviää vasta kutsun jälkeen. Oma päiväbudjettisi rajoittaa agenttia joka tapauksessa.",
+        "range": "0–10 000 Yhdysvaltain dollaria. Tyhjä: ei omaa kattoa, ja vain päiväbudjettisi rajoittaa agenttia. 0 estää agentin kaikki tekoälykutsut. Päivä vaihtuu keskiyöllä UTC-aikaa (Suomessa kello 2 tai 3).",
+        "low": "Pieni katto suojaa sinua, jos agentti menee vikaan ja jää esimerkiksi silmukkaan. Kiireisenä päivänä agentti pysähtyy, ja sen työ odottaa seuraavaan päivään.",
+        "high": "Suuri katto antaa agentin tehdä pitkän työn loppuun saman päivän aikana. Vika, kuten silmukka, ehtii maksaa enemmän ennen kuin agentti pysähtyy.",
+        "ex1": "0: haluat, että agentti ei nyt käytä tekoälyä lainkaan. Jokainen kutsu hylätään heti.",
+        "ex2": "0,5: agentti tekee lyhyitä päätöksiä, kuten lajittelee viestejä. Silmukka pysähtyy 50 sentin kohdalla.",
+        "ex3": "5: agentti kirjoittaa pitkiä raportteja suurella mallilla. Päivän työ ehtii valmiiksi, ja vika maksaa enintään noin 5 dollaria.",
+        "tip": "Aseta katto jokaiselle agentille, joka toimii ilman valvontaa. Seuraa muutaman päivän ajan katon alla näkyvää Tänään käytetty -lukua ja aseta katto vähän tavallisen päivän yläpuolelle. Jos agentti pysähtyy kesken päivän, tarkista ensin katto."
+      },
+      "run_mode": {
+        "title": "Miten se ajetaan",
+        "short": "Käynnistääkö yhdistimesi tämän agentin vasta, kun työtä tulee, vai pitääkö se agentin käynnissä koko ajan.",
+        "what": "Oma agenttisi on ohjelma, joka toimii jollakin koneella. Yhdistin on sillä koneella oleva ohjelma, joka käynnistää agenttisi. Tämä asetus kertoo yhdistimelle, milloin se käynnistää tämän agentin. AIMEATisi tallentaa valinnan ja näyttää sen, ja yhdistin toimii sen mukaan. Jos mikään yhdistin ei aja agenttia, asetus ei muuta mitään.",
+        "range": "Kun työtä tulee, Aina päällä, Ei päätetty. Tällä sivulla tehty uusi agentti saa valinnan Kun työtä tulee. Muulla tavalla tehty agentti on aluksi Ei päätetty.",
+        "lowLabel": "Kun työtä tulee",
+        "low": "Agentista ei ole mitään käynnissä, kun se odottaa. Ensimmäinen vastaus tulee muutaman sekunnin viiveellä, koska ohjelman pitää ensin käynnistyä. Sopii työhön, jota tulee silloin tällöin: raportit, lajittelu, selvitykset.",
+        "highLabel": "Aina päällä",
+        "high": "Agentti vastaa heti, mutta sen ohjelma on koneella käynnissä koko ajan. Sopii etuovelle, jonka kanssa ihmiset keskustelevat ja jossa muutaman sekunnin odotus tuntuu.",
+        "ex1": "Kun työtä tulee: agentti kirjoittaa joka aamu uutiskoosteen. Se on käynnissä muutaman minuutin päivässä.",
+        "ex2": "Aina päällä: asiakaspalvelun agentti verkkosivullasi. Kävijä saa vastauksen odottamatta.",
+        "ex3": "Ei päätetty: agentti, jota testaat vielä käsin. Yhdistin ei käynnistä sitä.",
+        "tip": "Valitse Kun työtä tulee, ellei joku odota vastausta. Voit vaihtaa näiden kolmen välillä milloin tahansa. Jos agentti ei vastaa lainkaan, tarkista ensin tämä asetus: Ei päätetty tarkoittaa, että yhdistin ei käynnistä agenttia."
+      },
+      "concurrency": {
+        "title": "Tehtäviä rinnakkain enintään",
+        "short": "Montako tehtävää agentti tekee yhtä aikaa. 1–20; 1 tarkoittaa yhtä tehtävää kerrallaan.",
+        "what": "Tehtävät odottavat agentin jonossa. Arvolla 1 agentti tekee yhden tehtävän valmiiksi ennen kuin aloittaa seuraavan. Suuremmalla arvolla se aloittaa useita tehtäviä yhtä aikaa, joten pitkä jono purkautuu nopeammin. AIMEATisi tallentaa luvun, ja agenttia ajava ohjelma noudattaa sitä. Yli 1:n arvo vaatii ohjelman, joka osaa tehdä useita tehtäviä yhtä aikaa, kuten aimeat-crewai-paketin CrewAI-daemonin.",
+        "range": "1–20 tehtävää. Oletus on 1.",
+        "low": "1: yksi tehtävä kerrallaan. Toimii jokaisen agentteja ajavan ohjelman kanssa.",
+        "high": "Yli 1: pitkä jono purkautuu nopeammin. Tehtävät käyttävät samaa konetta ja samaa päiväkattoa, ja myöhemmin tullut tehtävä voi valmistua ennen aiempaa.",
+        "ex1": "1: agentti kirjoittaa jokaisessa tehtävässä samaan dokumenttiin. Kaksi samanaikaista tehtävää voisi kirjoittaa toistensa päälle.",
+        "ex2": "3: agentti vastaa erillisiin asiakaskysymyksiin. Kolme ihmistä saa vastauksen yhtä aikaa.",
+        "ex3": "10: agentti tarkistaa sata verkkosivua, yhden sivun kussakin tehtävässä.",
+        "tip": "Pidä arvona 1, ellei jono kasva nopeammin kuin agentti ehtii purkaa sitä. Nosta arvoa vain, kun tehtävät eivät riipu toisistaan. Varmista ensin, että agenttia ajava ohjelma osaa tehdä useita tehtäviä yhtä aikaa."
+      },
+      "token_budget": {
+        "title": "Token-budjetti",
+        "short": "Tokenimäärä, jonka asetat oletukseksi kaikille agenteillesi. Tyhjä kenttä tarkoittaa, ettei rajaa ole.",
+        "what": "Mallit laskevat tekstin tokeneina eli sanojen paloina. Tämä luku kuuluu agenttien oletuksiin, jotka koskevat kaikkia agenttejasi, ellei agentin omissa direktiiveissä sanota muuta. AIMEATisi tallentaa luvun ja näyttää sen tässä. Tässä versiossa mikään AIMEATissasi ei pysäytä agenttia, kun luku täyttyy, eikä lukua lähetetä agenteille. Jos haluat rajoittaa agentin kuluja, käytä päiväkattoa agentin omalla sivulla.",
+        "range": "Kokonaisluku 0:sta ylöspäin. Tyhjä: rajoittamaton.",
+        "tip": "Kun haluat rajan, joka pysäyttää agentin, aseta päiväkatto agentin omalla sivulla."
+      },
+      "self_start": {
+        "title": "Aloittaa työn itse",
+        "short": "Päällä: agentille lähetetty työ alkaa heti. Pois: työ odottaa, kunnes käynnistät sen.",
+        "what": "Työ tulee agentille tehtävinä: sinulta, ajastukselta tai toiselta agentilta. Kun kytkin on päällä, agentti aloittaa jokaisen tehtävän heti, ja näet jälkikäteen, mitä se teki. Kun kytkin on pois, jokainen tehtävä odottaa jonossa, kunnes painat Käynnistä tai pyydät tekoälyäsi käynnistämään sen. Agentti, joka voi käyttää rahaa, lähettää postia tai poistaa asioita nimissäsi, odottaa aina lupaasi, eikä kytkin käänny päälle. Agentti ei voi muuttaa tätä asetusta itse.",
+        "range": "Päällä tai pois. Jos kukaan ei ole asettanut sitä, tehtäviä ajamaan tehty agentti aloittaa työn itse, ja muut agentit odottavat.",
+        "ex1": "Päällä: agentti kirjoittaa ajastuksen mukaan joka aamu uutiskoosteen. Kenenkään ei tarvitse olla hereillä käynnistämässä sitä.",
+        "ex2": "Pois: uusi agentti, jota et vielä tunne hyvin. Luet sen suunnitelman ja painat Käynnistä.",
+        "ex3": "Aina pois: agentti, joka saa maksaa laskuja. Jokainen maksu odottaa lupaasi, eikä kytkin käänny päälle.",
+        "tip": "Aloita pois-asennosta ja käännä kytkin päälle, kun agentti on tehnyt samanlaisen työn hyvin muutaman kerran. Tehtävällä voi olla oma ohjeensa, kuten \"tarkista ensin minulta\", ja silloin se menee tämän kytkimen edelle."
+      },
+      "purchase_limit": {
+        "title": "Enintään päivässä",
+        "short": "Kuinka paljon rahaa agentti saa käyttää ostoihin päivässä valitsemassasi valuutassa. Ilman rajaa se ei käytä rahaa lainkaan.",
+        "what": "Agentti voi ostaa asioita nimissäsi, ja raha tulee sinulta. Tämä raja kertoo, kuinka paljon se saa käyttää päivässä. Ennen jokaista ostoa AIMEATisi laskee hinnan yhteen agentin tämän päivän ostojen kanssa. Jos summa ylittäisi rajan, osto hylätään, ja agentti saa tiedon, mistä voit nostaa rajaa. Jokaisella valuutalla on oma rajansa. Valuutassa, jolle ei ole rajaa, agentti ei voi käyttää rahaa lainkaan.",
+        "range": "0–1 000 000 euroa tai Yhdysvaltain dollaria. Kun poistat rajan, agentti ei käytä rahaa siinä valuutassa. Päivä vaihtuu keskiyöllä UTC-aikaa. Tarjousta varten tehty katevaraus lasketaan käytetyksi, vaikka se vapautuisi myöhemmin samana päivänä.",
+        "low": "Pieni raja pitää virheen pienenä. Agentti pysähtyy ensimmäiseen ostoon, joka ei mahdu rajaan.",
+        "high": "Suuri raja antaa agentin tehdä isompia ostoja itse. Väärä osto voi maksaa rajan verran.",
+        "ex1": "20 EUR: agentti ostaa yksittäisiä raportteja tai aineistoja. Väärä osto maksaa enintään 20 euroa päivässä.",
+        "ex2": "50 EUR eikä rajaa dollareille: agentti voi maksaa euroina, ja dollareina hinnoiteltu osto hylätään.",
+        "ex3": "500 EUR: agentti tilaa tarvikkeita yrityksellesi. Päivän tilaukset pysyvät alle 500 euron.",
+        "tip": "Aseta pienin raja, jolla agentti pystyy tekemään työnsä, ja seuraa kortilta, paljonko se on käyttänyt tänään. Raja ei koske omia ostojasi eikä morsel-hintoja. Vain sinä voit muuttaa rajaa, kun olet itse kirjautuneena."
+      }
+    },
+    "access": {
+      "scopes": {
+        "title": "Mitä se saa tehdä",
+        "short": "Mitkä oikeudet agentti saa. Jokainen oikeus antaa sen lukea tai muuttaa yhdenlaista asiaa sinun nimissäsi. Voit kaventaa oikeuksia myöhemmin.",
+        "what": "Oikeus antaa agentin lukea tai muuttaa yhdenlaista asiaa, esimerkiksi lukea muistiasi tai kirjoittaa siihen. Agentti voi tehdä vain sen, mihin sen oikeudet riittävät. Jos se yrittää muuta, AIMEATisi kieltäytyy ja kertoo, mikä oikeus puuttuu. Mitä vähemmän oikeuksia agentilla on, sitä vähemmän virhe tai varastettu avain voi vahingoittaa. Agentti, joka voi käyttää rahaa, lähettää postia tai poistaa asioita nimissäsi, ei koskaan aloita tehtävää itse.",
+        "range": "Uusi agentti: Vain lukeminen, Luku ja kirjoitus, Kaikki mihin sinä pystyt. Tunniste: Vain nämä (valitset jokaisen oikeuden itse), Kaiken, minkä sinäkin, ja tämän palvelimen operaattorille Koko palvelimen hallinta.",
+        "lowLabel": "Vähemmän oikeuksia",
+        "low": "Vain lukeminen: agentti lukee muistiasi, tiedostojasi, julkista hakemistoa ja keskustelualueita, joihin pääset, eikä muuta mitään. Luku ja kirjoitus antaa lisäksi luvan kirjoittaa muistiisi ja tiedostoihisi, pyytää muilta agenteilta työtä puolestasi ja nähdä työjonosi.",
+        "highLabel": "Enemmän oikeuksia",
+        "high": "Kaikki mihin sinä pystyt: agentti voi tehdä kaiken saman kuin sinä, jokaisessa sovelluksessa ja jokaisella tiedolla. Virhe tai varastettu avain ulottuu kaikkeen. Muutaman päivän kuluttua AIMEATisi tietää, mitä oikeuksia agentti käytti. Siitä lähtien agentin tehtävät odottavat lupaasi, ja AIMEATisi tarjoutuu kaventamaan oikeudet niihin.",
+        "ex1": "Vain lukeminen: agentti vastaa keskustelussa kysymyksiin muistiinpanoistasi. Se ei voi muuttaa eikä poistaa mitään.",
+        "ex2": "Luku ja kirjoitus: agentti kerää uutisia ja tallentaa tiivistelmän muistiisi.",
+        "ex3": "Vain nämä, pelkkä muistiin kirjoittaminen: mittalaite tallentaa lukemansa. Jos sen tunniste vuotaa, kukaan ei voi lukea tietojasi sillä.",
+        "tip": "Anna vain se, mitä työ vaatii, ja lisää oikeus, kun agentti saa kieltävän vastauksen. Valitse Kaikki mihin sinä pystyt vain omalle tekoälyllesi, johon luotat kuin itseesi."
+      }
+    },
+    "crew": {
+      "process": {
+        "title": "Prosessi",
+        "short": "Peräkkäin: tehtävät ajetaan yksi kerrallaan listan järjestyksessä. Hierarkkinen: vetäjä jakaa tehtävät jäsenille ja tarkistaa niiden työn.",
+        "what": "Miehistö on joukko jäseniä, ja jokainen tehtävä nimeää jäsenen, joka tekee sen. Peräkkäin-valinnalla miehistö ajaa tehtävät listan järjestyksessä, ja tehtävä voi lukea aiempien tehtävien tulokset. Hierarkkinen-valinnalla miehistöön tulee vetäjä, joka suunnittelee työn, antaa jokaisen tehtävän sopivimmaksi katsomalleen jäsenelle ja tarkistaa vastauksen ennen kuin jatkaa. Vetäjäkin on malli, joten ajo tekee enemmän mallikutsuja ja maksaa enemmän.",
+        "range": "Peräkkäin tai Hierarkkinen. Oletus on Peräkkäin.",
+        "lowLabel": "Peräkkäin",
+        "low": "Ennustettava ja edullisempi. Sinä päätät järjestyksen ja sen, kuka tekee mitäkin. Sopii useimmille miehistöille.",
+        "highLabel": "Hierarkkinen",
+        "high": "Vetäjä voi muuttaa järjestystä ja valita jäsenen kullekin tehtävälle. Hitaampi ja kalliimpi, ja tulosta on vaikeampi ennustaa.",
+        "ex1": "Peräkkäin: tutkija etsii lähteet, kirjoittaja kirjoittaa artikkelin ja toimittaja tarkistaa sen. Järjestys ei muutu koskaan.",
+        "ex2": "Hierarkkinen: tukimiehistö, jossa on laskutuksen ja tekniikan asiantuntija. Vetäjä ohjaa jokaisen kysymyksen oikealle asiantuntijalle.",
+        "tip": "Aloita Peräkkäin-valinnalla. Vaihda Hierarkkiseen vain, kun oikea järjestys tai oikea jäsen riippuu syötteestä. Testaa miehistö silloin muutaman kerran, koska vetäjä päättää reitin jokaisessa ajossa uudelleen."
+      },
+      "llm_profile": {
+        "title": "Malliprofiili",
+        "short": "Mikä malliasetus miehistöllä on käytössä, nimettynä kuten sitä ajavan ohjelman llm_providers.json-tiedostossa. Tyhjä käyttää ohjelman oletusta.",
+        "what": "Miehistöä ajava ohjelma pitää malliasetuksensa omalla koneellaan tiedostossa llm_providers.json. Jokaisella asetuksella on nimi, malli ja osoite, josta malli löytyy. Tämä kenttä nimeää asetuksen, jota tämä miehistö käyttää. Kolme valintaa menee tämän kentän edelle: koneelle lukittu malli, tälle agentille valittu malli ja koneen oma miehistöluettelo. Kaikkien agenttiesi oletus ja koneen oletus tulevat tämän kentän jälkeen.",
+        "range": "Profiilin nimi, 1–64 merkkiä, kuten se on kirjoitettu llm_providers.json-tiedostoon. Tyhjä: järjestyksessä seuraava valinta on voimassa.",
+        "ex1": "fast: itse nimeämäsi profiili halvalle ja nopealle mallille. Sopii miehistölle, joka lajittelee viestejä.",
+        "ex2": "Tyhjä: miehistö käyttää mallia, jonka valitsit kaikille agenteillesi, tai koneen oletusta.",
+        "tip": "Jos miehistö ei käytä odottamaasi mallia, tarkista ensin, onko agentille itselleen valittu malli. Kopioi profiilin nimi tiedostosta täsmälleen."
+      },
+      "delegation": {
+        "title": "Saa delegoida muille jäsenille",
+        "short": "Päällä: tämä jäsen saa antaa osan työstään toiselle miehistön jäsenelle tai kysyä toiselta jäseneltä.",
+        "what": "Kun tämä on päällä, jäsen saa kaksi työkalua lisää: yhdellä se antaa osan työstä toiselle jäsenelle, toisella se kysyy toiselta jäseneltä. Jäsen päättää itse, milloin se käyttää niitä. Jokainen luovutus tarkoittaa lisää mallikutsuja, joten ajo kestää kauemmin ja maksaa enemmän. Kun tämä on pois, jäsen tekee tehtävänsä yksin omilla työkaluillaan. Hierarkkisessa miehistössä vetäjä jakaa työt tästä asetuksesta riippumatta.",
+        "range": "Päällä tai pois. Oletus on pois.",
+        "ex1": "Päällä: kirjoittaja, joka saa pyytää tutkijaa tarkistamaan tosiasian.",
+        "ex2": "Pois: jäsen, joka muotoilee lopullisen tekstin. Se ei tarvitse muita.",
+        "tip": "Kytke tämä päälle yhdelle jäsenelle kerrallaan, kun toiselta kysyminen auttaa. Jos useampi jäsen saa delegoida, ne voivat siirrellä työtä edestakaisin, ja ajo venyy pitkäksi ja kalliiksi."
+      },
+      "async": {
+        "title": "Ajetaan edellisen rinnalla",
+        "short": "Päällä: miehistö aloittaa tämän tehtävän ja jatkaa odottamatta sitä, joten tehtävä ajetaan samaan aikaan viereisten tehtävien kanssa.",
+        "what": "Yleensä miehistö tekee yhden tehtävän valmiiksi ennen kuin aloittaa seuraavan. Kun tämä on päällä, miehistö aloittaa tämän tehtävän ja siirtyy heti seuraavaan. Kaksi peräkkäistä tehtävää, joissa tämä on päällä, ajetaan samaan aikaan, joten miehistö valmistuu nopeammin. Myöhempi tehtävä, joka lukee tämän tehtävän tulokset, odottaa, kunnes tämä tehtävä on valmis.",
+        "range": "Päällä tai pois. Oletus on pois.",
+        "ex1": "Päällä kahdessa selvitystehtävässä: toinen hakee uutisia ja toinen tutkimusartikkeleita samaan aikaan. Niiden jälkeinen kirjoitustehtävä lukee molempien tulokset ja odottaa molempia.",
+        "ex2": "Pois: tehtävä, joka tarvitsee edellisen tehtävän tuloksen.",
+        "tip": "Kytke tämä päälle vain tehtäville, jotka eivät tarvitse toistensa tuloksia. Tehtävän, joka tarvitsee aiemman tuloksen, pitää nimetä se kohdassa \"Lukee tulokset tehtävistä\". Muuten se voi alkaa ennen kuin tulosta on."
+      },
+      "memory": {
+        "title": "Säilyttää muistin ajojen välillä",
+        "short": "Päällä: miehistö muistaa, mitä se oppi aiemmissa ajoissa, ja käyttää sitä seuraavassa ajossa.",
+        "what": "Kun tämä on pois, jokainen ajo alkaa pelkästä tehtävästä ja syötteestä. Kun tämä on päällä, miehistö tallentaa muistiinpanoja jokaisesta ajosta ja hakee niistä sopivat myöhemmissä ajoissa. Muisti on miehistön oma, ja sitä säilyttää miehistöä ajava ohjelma. Muistaminen vaatii ylimääräisiä mallikutsuja, jotka maksavat ja vievät aikaa.",
+        "range": "Päällä tai pois.",
+        "ex1": "Päällä: miehistö vastaa asiakkaille. Se muistaa, että asiakas kysyi samasta tilauksesta viime viikolla.",
+        "ex2": "Pois: miehistö kirjoittaa joka aamu uuden uutiskoosteen. Vanhat ajot toisivat siihen vain vanhentunutta sisältöä.",
+        "tip": "Kytke tämä päälle, kun myöhemmät ajot hyötyvät aiemmista. Tiedot, joiden pitää olla oikein ja yhteisiä, kuuluvat AIMEATisi muistiin, jossa voit lukea ja muuttaa niitä."
+      }
+    },
+    "schedule": {
+      "cron": {
+        "title": "Cron",
+        "short": "Milloin ajo tapahtuu, viidellä kentällä: minuutti, tunti, kuukauden päivä, kuukausi, viikonpäivä. 0 7 * * * on joka päivä kello 7.00.",
+        "what": "Cron on vakiintunut tapa kirjoittaa toistuva ajankohta. Siinä on viisi kenttää välilyönnein erotettuina: minuutti, tunti, kuukauden päivä, kuukausi ja viikonpäivä. Tähti tarkoittaa mitä tahansa arvoa. Pilkku erottaa luettelon arvot, viiva tekee välin, ja */15 tarkoittaa joka 15. arvoa. Sunnuntai on 0 ja maanantai 1. Tunti luetaan vieressä olevan aikavyöhykkeen mukaan. AIMEATisi ei hyväksy cronia, jota se ei osaa lukea.",
+        "range": "Minuutti 0–59, tunti 0–23, päivä 1–31, kuukausi 1–12, viikonpäivä 0–7 (0 ja 7 ovat sunnuntai). Jos aikavyöhyke on tyhjä, tunti luetaan palvelimen oman kellon mukaan.",
+        "ex1": "0 7 * * *: joka päivä kello 7.00.",
+        "ex2": "*/15 * * * *: 15 minuutin välein ympäri vuorokauden.",
+        "ex3": "0 9 * * 1: joka maanantai kello 9.00.",
+        "ex4": "0 7 * * 1-5: maanantaista perjantaihin kello 7.00.",
+        "ex5": "0 5 1 * *: joka kuun ensimmäisenä päivänä kello 5.00.",
+        "ex6": "30 8,16 * * *: joka päivä kello 8.30 ja 16.30.",
+        "tip": "Kentän alla oleva rivi kertoo cronin sanoin. Lue se ennen kuin tallennat. Cron, joka ajaa muutaman minuutin välein, toistaa työn ja sen kulut joka kerta."
+      },
+      "timezone": {
+        "title": "Aikavyöhyke",
+        "short": "Aikavyöhyke, jonka mukaan cronin tunnit luetaan, IANA-nimenä kuten Europe/Helsinki. Tyhjä käyttää palvelimen omaa kelloa.",
+        "what": "Cron sanoo \"7.00\", ja tämä kenttä kertoo, missä kello on 7.00. Kirjoita vyöhyke IANA-nimenä: alue ja kaupunki, esimerkiksi Europe/Helsinki tai America/Bogota. AIMEATisi siirtää ajoja kesäajan mukana, joten ajo tapahtuu paikallista aikaa kello 7.00 koko vuoden.",
+        "range": "IANA-aikavyöhykkeen nimi. Uusi ajastus saa aluksi oman aikavyöhykkeesi ja uusi työnkulku vyöhykkeen Europe/Helsinki. Tyhjä: palvelimen oma kello, joka ei välttämättä ole sinun.",
+        "ex1": "Europe/Helsinki: 0 7 * * * ajaa kello 7.00 Suomen aikaa talvella ja kesällä.",
+        "ex2": "America/Bogota: sama cron ajaa kello 7.00 Bogotán aikaa.",
+        "ex3": "UTC: 0 7 * * * ajaa Suomessa kello 9.00 tai 10.00 vuodenajan mukaan.",
+        "tip": "Valitse niiden ihmisten aikavyöhyke, jotka odottavat tulosta. Jätä kenttä tyhjäksi vain, jos tiedät, millä vyöhykkeellä palvelin toimii."
+      },
+      "max_runs": {
+        "title": "Pysäytä N ajon jälkeen",
+        "short": "Kun valinta on päällä, ajastus kytkeytyy pois päältä, kun näin monta ajoa on onnistunut. Epäonnistunutta tai ohitettua ajoa ei lasketa.",
+        "what": "Osa työstä pitää tehdä vain tietty määrä kertoja: päivittäinen muistutus viikon ajan tai testi. Kun tämä on päällä, AIMEATisi laskee jokaisen onnistuneen ajon. Kun luku täyttyy, ajastus kytkeytyy pois päältä. Agentin sivulla asetus on oletus jokaiselle uudelle ajastukselle, joka tehdään tälle agentille. Ajastuksen oma asetus menee oletuksen edelle.",
+        "range": "Kokonaisluku 1:stä ylöspäin. Lomakkeessa on aluksi 7. Kun valinta ei ole päällä, ajastus toimii, kunnes pysäytät sen.",
+        "ex1": "7 ja 0 7 * * *: aamumuistutus viikon ajan.",
+        "ex2": "1: työ, joka ajetaan kerran, seuraavana cronin mukaisena hetkenä.",
+        "ex3": "30: päivittäinen raportti 30 päivän kokeilun ajan.",
+        "tip": "Käytä tätä kaikkeen, millä on päättymispäivä, niin sinun ei tarvitse muistaa pysäyttää sitä. Epäonnistuneita ajoja ei lasketa, joten joka kerta epäonnistuva ajastus jatkuu, kunnes pysäytät sen."
+      },
+      "daily_limit": {
+        "title": "Päivittäinen tekoälykulujen raja (USD)",
+        "short": "Kun valinta on päällä, tekoälyajastus ohittaa ajonsa, kun tekoälykulusi ovat tänään saavuttaneet näin monta Yhdysvaltain dollaria.",
+        "what": "Raja laskee yhteen kaikki tämän päivän tekoälykulusi, jokaisesta ajastuksesta ja kaikesta muusta käytöstä. Ennen jokaista ajoa AIMEATisi vertaa summaa rajaan. Kun summa on saavuttanut rajan, ajo ohitetaan, ja ajoloki kertoo syyn. Ajastus pysyy päällä ja yrittää uudelleen seuraavana ajankohtanaan. Raja toimii vain Tekoäly-tyyppisissä ajastuksissa. Ajastus, joka antaa agentille tehtävän, ei tarkista sitä: käytä siihen agentin päiväkattoa.",
+        "range": "Yhdysvaltain dollareina, 0,1:n välein. Lomakkeessa on aluksi 1. 0 tarkoittaa, ettei rajaa ole. Päivä vaihtuu keskiyöllä UTC-aikaa.",
+        "ex1": "1: tekoälytiivistelmä joka tunti. Päivänä, jona olet jo käyttänyt muualla dollarin tekoälyyn, tiivistelmät jäävät tekemättä UTC-keskiyöhön asti.",
+        "ex2": "5: yöllinen tekoälytyö, jota ei saa ajaa, jos päivä on jo ollut kallis.",
+        "tip": "Aseta raja vähän tavallisen päiväsi yläpuolelle, niin se pysäyttää vain poikkeuksellisen päivän. Summa sisältää kaiken tekoälyn käyttösi, joten kiireinen päivä muualla voi pysäyttää myös ajastuksen."
+      }
+    },
+    "workflow": {
+      "step_timeout": {
+        "title": "Jos ei tuota",
+        "short": "Kuinka kauan askel saa olla tuottamatta tulosta, ennen kuin AIMEATisi luovuttaa sen kanssa, ja yritetäänkö askelta ensin uudelleen.",
+        "what": "Jokaisen askeleen pitää tuottaa tulos, esimerkiksi merkintä muistiisi. AIMEATisi odottaa sitä. Aika alkaa alusta aina, kun askel tuottaa osan tuloksestaan, joten hidasta mutta etenevää askelta ei pysäytetä. Jos aika kuluu ilman edistystä ja valitsit uusintayrityksen, askelta yritetään uudelleen 5 minuutin kuluttua. Kun uusintayrityksiä ei ole jäljellä, askel päättyy aikakatkaisuun. Askeleet, jotka tarvitsevat sen tulosta, jäävät ajamatta, ja muut askeleet valmistuvat.",
+        "range": "1 minuutista 7 vuorokauteen, minuutteina. Valmiit valinnat: 15 min, 1 h, 4 h ja 24 h. Oletus on 1 h, ja askeleella, joka kysyy sinulta, 24 h. Uusintayritykset: ei yhtään, yksi tai kaksi.",
+        "low": "15 min: jumiin jäänyt askel huomataan pian. Hidas mutta toimiva agentti voi pysähtyä liian aikaisin.",
+        "high": "24 h: hitaalla agentilla on aikaa valmistua. Jumiin jäänyt askel pitää ajoa paikallaan koko päivän.",
+        "ex1": "15 min, yritä kerran uudelleen: askel hakee verkkosivun. Se kestää yleensä minuutin.",
+        "ex2": "1 h: askel, jossa agentti kirjoittaa kolme artikkelia.",
+        "ex3": "24 h: askel odottaa, että ihminen vastaa kysymykseen.",
+        "tip": "Aseta ajaksi noin kaksi kertaa se, mitä askel tavallisesti kestää. Uusintayritys auttaa ohimenevään vikaan, kuten hitaaseen verkkoon, ja se voi tehdä askeleen tekoälykutsut uudelleen. Jos agentti ei ole yhteydessä, askel epäonnistuu aiemmin eikä odota koko aikaa."
+      },
+      "parallel": {
+        "title": "Salli rinnakkaiset ajot",
+        "short": "Ei: uusi käynnistys kesken ajon ei käynnistä mitään. Kyllä: jokainen käynnistys ajetaan rinnakkain muiden kanssa.",
+        "what": "Työnkulun askeleet kirjoittavat tuloksensa muistiisi avainten alle. Jos saman työnkulun kaksi ajoa kirjoittaa samoihin avaimiin, toinen ajo kirjoittaa toisen tulosten päälle. Siksi uusi käynnistys kesken ajon ei oletuksena käynnistä mitään ja kertoo sen. Kyllä-valinnalla jokainen käynnistys ajetaan. Se on turvallista vain, kun jokainen ajo kirjoittaa omiin avaimiinsa: tapausviite muuttujissa tai {run} avaimissa.",
+        "range": "Kyllä tai ei. Oletus on ei. Kyllä-valintaa ei voi tallentaa yhdessä valinnan Tyhjennä vanhat tulokset ensin kanssa.",
+        "ex1": "Ei: aamun uutistyönkulku. Vahingossa tehty toinen käynnistys ei tee mitään.",
+        "ex2": "Kyllä: tukityönkulku, joka käynnistyy jokaisesta uudesta tukipyynnöstä, ja pyynnön numero on muuttujassa. Kolme pyyntöä ajetaan yhtä aikaa.",
+        "ex3": "Kyllä ja {run} jokaisessa avaimessa: työnkulku, jota käynnistät monta kertaa testiksi. Jokainen ajo säilyttää omat tuloksensa.",
+        "tip": "Tarkista ennen kuin kytket tämän päälle jokainen avain, johon askeleet kirjoittavat. Jos yhdessäkin avaimessa ei ole tapausviitettä eikä {run}-merkintää, samaan aikaan käynnissä olevat ajot kirjoittavat siinä toistensa päälle."
+      },
+      "skip_done": {
+        "title": "Ohita jo tehdyt",
+        "short": "Kyllä: askel, jonka tulos on jo muistissasi, merkitään tehdyksi, eikä sitä ajeta uudelleen.",
+        "what": "Ennen kuin askel alkaa, AIMEATisi tarkistaa, onko sen tulos jo muistissasi. Kyllä-valinnalla askel, jonka tulos löytyy, merkitään tehdyksi, eikä sen agenttia kutsuta. Sitä seuraavat askeleet jatkuvat tavalliseen tapaan. Näin puolivälissä pysähtyneen ajon voi käynnistää uudelleen, ja se jatkuu ensimmäisestä tekemättömästä askeleesta. Se säästää aikaa ja tekoälykuluja.",
+        "range": "Kyllä tai ei. Oletus on ei. Jos myös Tyhjennä vanhat tulokset ensin on Kyllä, vanhat tulokset poistetaan ajon alussa, joten mitään ei ohiteta.",
+        "ex1": "Kyllä: viiden askeleen työnkulku pysähtyi neljänteen askeleeseen. Uusi ajo tekee vain askeleet neljä ja viisi.",
+        "ex2": "Ei: päivittäinen raportti, jonka avaimet pysyvät samoina päivästä toiseen. Kyllä-valinnalla toinen päivä löytäisi eilisen tuloksen ja ohittaisi työn.",
+        "tip": "Kytke tämä päälle työnkuluille, jotka käynnistät uudelleen virheen jälkeen. Jos haluat ajaa yhden askeleen uudelleen, poista ensin sen tulos. Silloin tämä asetus jättää muut askeleet rauhaan."
+      },
+      "fresh": {
+        "title": "Tyhjennä vanhat tulokset ensin",
+        "short": "Kyllä: kun ajo alkaa, edellisen ajon tulokset poistetaan, joten jokainen askel tuottaa tuloksensa uudelleen.",
+        "what": "Osa agenteista jättää työn tekemättä, jos ne löytävät tuloksensa jo muististasi. Jos työnkulun avaimet pysyvät samoina ajosta toiseen, tällainen agentti löytää edellisen ajon tuloksen eikä tee mitään. Kyllä-valinnalla AIMEATisi poistaa työnkulun tuottamat tulokset kerran ajon alussa, ennen kuin yksikään askel alkaa. Sen jälkeen jokainen askel tekee tuloksensa uudelleen.",
+        "range": "Kyllä tai ei. Oletus on ei. Kyllä-valintaa ei voi tallentaa yhdessä valinnan Salli rinnakkaiset ajot kanssa, koska uusi ajo poistaisi vielä käynnissä olevan ajon tulokset.",
+        "ex1": "Kyllä: päivittäinen hinnasto, jonka avaimet ovat joka päivä samat. Joka aamu hinnasto tehdään alusta asti uudelleen.",
+        "ex2": "Ei: työnkulku, jonka avaimissa on päivämäärä. Joka päivä syntyy uudet avaimet, eikä mikään vanha ole tiellä.",
+        "tip": "Käytä tätä vain, kun tarvitset pelkän uusimman tuloksen. Jos haluat säilyttää aiemmat tulokset, lisää avaimiin päivämäärä tai {run} ja jätä tämän valinnaksi Ei."
+      },
+      "llm_checks": {
+        "title": "Tekoälysi arviot",
+        "short": "Kyllä antaa oman tekoälysi arvioida työnkulun sanalliset tarkistukset, kuten \"onko tämä artikkeli julkaisukelpoinen?\". Jokainen tarkistus kuluttaa tekoälyä.",
+        "what": "Askel tarkistetaan ennen kuin seuraava askel alkaa. Useimmat tarkistukset laskevat tai vertaavat asioita, esimerkiksi \"kolme artikkelia on olemassa\". Sanallinen tarkistus kysyy kysymyksen sanoin, ja mallin pitää vastata siihen. Kyllä-valinnalla oma tekoälysi vastaa näihin kysymyksiin tekoälybudjetillasi aina, kun tarkistus tehdään. Kulu lasketaan työnkulun kulukattoon. Ei-valinnalla työnkulkua, jossa on sanallinen tarkistus, ei voi tallentaa.",
+        "range": "Kyllä tai ei. Oletus on ei. Jos AIMEATissasi ei ole tekoälymallia käytössä, sanallinen tarkistus menee läpi ilman arviota.",
+        "ex1": "Kyllä: uutistyönkulku kysyy ennen julkaisua \"onko jokainen artikkeli vapaa asiavirheistä?\".",
+        "ex2": "Ei: työnkulku, jonka tarkistukset vain laskevat merkintöjä. Siinä ei tarvita mallia.",
+        "tip": "Kytke tämä päälle vain työnkululle, jossa on sanallisia tarkistuksia. Jokainen niistä maksaa yhden mallikutsun joka ajossa, joten 15 minuutin välein ajettava työnkulku maksaa tarkistuksistaan 96 kertaa päivässä."
+      }
+    },
+    "commerce": {
+      "pacing_toll": {
+        "title": "Tahdistuspoltto per kutsu (murusia)",
+        "short": "Muruset, jotka jokainen työkalun kutsu polttaa. Ne rajaavat, kuinka nopeasti muut voivat käyttää työkalua. Kokonaisluku 0–100.",
+        "what": "Kun toinen ihminen tai hänen agenttinsa kutsuu työkalua, kutsu polttaa näin monta murusta kutsujan saldosta. Kukaan ei saa näitä murusia, et myöskään sinä. Poltto rajaa, kuinka usein sama kutsuja voi käyttää työkalua, koska muruset karttuvat hitaasti. Jos kutsujan saldo ei riitä, palvelin hylkää kutsun ennen kuin työkalu käynnistyy. Omat kutsusi ovat maksuttomia. Poltto koskee myös työkalua, jonka myyt rahalla.",
+        "range": "Kokonaisluku 0–100. Tyhjä kenttä käyttää palvelimen oletusta. Oletus on 0 eli ei polttoa, ellei palvelun ylläpitäjä ole muuttanut sitä. 0 poistaa tahdistuksen tästä työkalusta.",
+        "low": "0: ei polttoa. 1–5: jokainen kutsu polttaa muutaman murusen. Muruset loppuvat ensin siltä, joka kutsuu hyvin usein.",
+        "high": "50–100: jokainen kutsu polttaa paljon murusia. Kutsuja ehtii tehdä vain muutaman kutsun, ennen kuin hänen saldonsa loppuu.",
+        "ex1": "0: työkalu, jonka myyt rahalla. Hinta riittää jarruksi.",
+        "ex2": "5: tiivistelmätyökalu markkinapaikalla. Jos joku lähettää satoja kutsuja peräkkäin, häneltä loppuvat muruset, ja hänen täytyy odottaa, että saldo karttuu.",
+        "ex3": "100: kallis kutsu, joka esimerkiksi käynnistää pitkän tekoälyajon. Sama kutsuja ehtii tehdä vain muutaman kutsun, ennen kuin muruset loppuvat.",
+        "tip": "Jätä kenttä tyhjäksi, ellei joku käytä työkalua liikaa. Poltto ei ole hinta, etkä saa siitä mitään. Jos haluat työkalusta jotain vastineeksi, aseta sille hinta yllä. Jos annat hinnan sekä rahana että murusina ja jätät tämän kentän tyhjäksi, markkinapaikka polttaa murusina annetun hinnan jokaisella kutsulla."
+      },
+      "morsels": {
+        "title": "Muruset",
+        "short": "Murunen tahdistaa käyttöä: kuinka nopeasti ihmiset ja agentit saavat ilmoittaa, kirjoittaa ja kutsua työkaluja täällä. Murunen ei ole rahaa, eikä sitä voi vaihtaa rahaksi.",
+        "what": "Jokaisella ihmisellä on yksi murusten saldo. Agenttisi ja sovelluksesi käyttävät samaa saldoa, eikä niillä ole omaa. Saat murusia, kun tilisi luodaan, ja saldo karttuu joka päivä hieman lisää palvelimen asettamaan rajaan asti. Osa toiminnoista maksaa murusia, esimerkiksi ilmoitus julkiselle taululle tai toisen ihmisen työkalun kutsu. Jos saldo ei riitä, palvelin hylkää toiminnon, kunnes saldo on taas karttunut. Tämän sivun hinta tai raja murusina kertoo, kuinka monta murusta yksi toiminto vie.",
+        "range": "Kokonaislukuja. Kenttä kertoo itse, mitä sen luku tekee: hinnan kutsulta, hinnan ilmoitukselta tai rajan sille, paljonko sovellus saa käyttää nimissäsi. Taulun hinta voi olla 0–100 000, ja tyhjä kenttä käyttää palvelimen hintaa. Tyhjä kulutusraja tarkoittaa, ettei rajaa ole, ja 0 estää sovellusta käyttämästä murusia.",
+        "ex1": "Hinta 3 kutsulta: toisen ihmisen agentti kutsuu työkaluasi. Hänen saldostaan siirtyy sinulle 3 murusta, ja markkinapaikka pitää niistä osuutensa. Omat kutsusi ovat maksuttomia.",
+        "ex2": "Taulun hinta 5: julkiselle taulullesi kirjoitettu ilmoitus maksaa kirjoittajalle 5 murusta ja pitkä ilmoitus hieman enemmän. Kukaan ei saa näitä murusia. 0 tekee ilmoittamisesta maksutonta.",
+        "ex3": "Kulutusraja 200: sovellus saa käyttää nimissäsi enintään 200 murusta. Sen jälkeen se pysähtyy, kunnes nostat rajaa tai nollaat laskurin. Tyhjä kenttä tarkoittaa, ettei rajaa ole.",
+        "tip": "Hinta murusina hidastaa kutsujen tai ilmoitusten tulvaa. Pidä hinta pienenä kevyelle toiminnolle. Kun annat sovellukselle luvan käyttää murusia nimissäsi, anna sille myös kulutusraja. Ilman rajaa se voi käyttää koko saldosi."
+      },
+      "exchange_listing": {
+        "title": "Listaa EXCHANGEssa",
+        "short": "Päällä: työkalu on tarjolla EXCHANGEssa, markkinapaikalla, jolta muut ihmiset ja heidän agenttinsa löytävät ja ostavat työkaluja. Pois: työkalu poistuu markkinapaikalta.",
+        "what": "Kun asetus on päällä, palvelin tekee työkalulle listauksen EXCHANGEen ja pitää listauksen samana kuin tällä sivulla. Kun muutat hintaa täällä, listauksen hinta muuttuu. Ostaja tekee sopimuksen sillä hinnalla, joka on voimassa sinä päivänä. Kun käännät asetuksen pois, listaus poistuu. Jo tehdyt sopimukset jatkuvat sovitulla hinnalla.",
+        "range": "Päällä tai pois. Oletus on pois. Työkalu päätyy markkinapaikalle vain, kun sillä on kuvaus siitä, mitä se ottaa vastaan ja mitä se palauttaa, hinta murusina tai rahana sekä joko palvelimen toiminto tai agentti, joka tekee työn. Jos jokin näistä puuttuu, työkalu jää pois markkinapaikalta.",
+        "ex1": "Päällä, hinta 0,05 EUR kutsulta: muiden agentit löytävät työkalun EXCHANGEsta ja ostavat kutsuja tällä hinnalla.",
+        "ex2": "Pois kuukauden jälkeen: listaus poistuu. Asiakas, joka teki sopimuksen, voi yhä kutsua työkalua sovitulla hinnalla.",
+        "tip": "Täytä ODPS-kuvaus ennen kuin käännät asetuksen päälle, sillä markkinapaikka näyttää sen työkalun vieressä. Listaus seuraa tätä sivua, joten muuta hintaa täällä."
+      }
+    },
+    "app": {
+      "audit_keep": {
+        "title": "Säilytä jokaisen sovelluksen lokista",
+        "short": "Kuinka paljon palvelin säilyttää kunkin sovelluksesi lokista: kaiken vai vain uusimmat merkinnät. Asetus koskee kaikkia sovelluksiasi.",
+        "what": "Jokaisella sovelluksellasi on loki, johon kirjataan, miten sen tarjoamista on muutettu, esimerkiksi käyttöehdot, katselmoijan nimi ja pääsykoodi. Jokainen merkintä kertoo, mitä muuttui, kuka muutti ja milloin. Vain sinä voit lukea lokia, eikä mikään sovellus tai agentti voi muuttaa sitä. Oletuksena kaikki säilytetään. Kun loki kasvaa yli 1 000 merkinnän, vanhemmat merkinnät siirtyvät vuotensa arkistoon, ja voit yhä lukea ne sieltä. Jos asetat rajan, palvelin poistaa vanhemmat merkinnät.",
+        "range": "Kaikki (oletus) tai Vain uusimmat merkinnät, jolloin annat luvun 1–1 000 000. Lomake ehdottaa lukua 1 000. Jos palvelun ylläpitäjä on asettanut rajan, sivu kertoo sen, ja oma valintasi korvaa sen.",
+        "lowLabel": "Vain uusimmat",
+        "highLabel": "Kaikki",
+        "low": "Vain uusimmat merkinnät: loki pysyy lyhyenä. Vanhemmat merkinnät poistuvat heti, arkistoidut ensin, etkä saa niitä takaisin.",
+        "high": "Kaikki: koko historia säilyy. Voit vuosienkin päästä näyttää, mitä oli asetettu, kuka sen asetti ja milloin.",
+        "ex1": "Kaikki: sovellus, joka myy jotain tai käsittelee henkilötietoja. Voit näyttää, minä päivänä sen ehdot muuttuivat.",
+        "ex2": "1 000: testisovellus, jota muutat usein. Jokaisen sovelluksen lokiin jää 1 000 uusinta merkintää.",
+        "tip": "Säilytä kaikki, ellei sinulla ole syytä poistaa. Raja poistaa merkinnät lopullisesti, joten sivu kysyy sinulta ennen kuin se tallentaa. Jos haluat siirtää vanhat merkinnät syrjään poistamatta niitä, käytä kohtaa Arkistoi merkinnät ennen päivää."
+      }
+    },
+    "workspace": {
+      "autonomy": {
+        "title": "Tekoälyn autonomia (L1 varovainen → L5 vapaa)",
+        "short": "Kuinka paljon täällä toimivat agentit saavat tehdä ennen kuin ihminen hyväksyy. L1:llä jokainen teko odottaa hyväksyntää, L5:llä vain ne teot, jotka odottavat aina.",
+        "what": "Ennen kuin agentti tekee jotain täällä, se voi pyytää hyväksyntää ja kertoa, kuinka riskialtis teko on: pieni, keskisuuri vai suuri. Taso ratkaisee, mitkä pyynnöt jäävät odottamaan ihmistä ja mitkä etenevät heti. Agentti ei voi merkitä omaa tekoaan pieniriskiseksi, vaan palvelin pitää sitä vähintään keskisuurena. Jotkin teot odottavat aina tasosta riippumatta: tietomallin muutos, julkaisu ulos, tiedon lähtö, rahan käyttö, lopullinen poisto ja autonomian nosto. Tarkastus-välilehden julkaisun tarkistus on erillinen asetus, ja se pätee kaikilla tasoilla.",
+        "range": "L1, L2, L3, L4 tai L5. Oletus on L3.",
+        "lowLabel": "Enemmän hyväksyntöjä",
+        "highLabel": "Vähemmän hyväksyntöjä",
+        "low": "L1: jokainen teko odottaa ihmistä. L2: keskisuuren ja suuren riskin teot odottavat. Koska agentti ei voi merkitä omaa tekoaan pieniriskiseksi, myös L2:lla kaikki agentin teot odottavat.",
+        "high": "L4 ja L5: mikään teko ei odota tason takia. Vain aina odottavat teot odottavat edelleen.",
+        "ex1": "L1: asiakassopimusten työtila. Ihminen hyväksyy kaiken, mitä agentti tekee.",
+        "ex2": "L3: tiimin projektin työtila. Agentit tekevät työtä itse, ja suuren riskin teot odottavat ihmistä.",
+        "ex3": "L5: omat muistiinpanosi. Agentit kirjoittavat vapaasti, ja vain aina odottavat teot kysyvät sinulta.",
+        "tip": "Aloita tasolta L3. Laske tasoa, jos agentit tekevät asioita, joita et odottanut. Nosta sitä, jos hyväksyntää odottavien lista täyttyy teoista, jotka hyväksyt aina. Kun aina odottavien tekojen lista on oletuksen mukainen, mikään taso ei anna agentin käyttää rahaa tai lähettää tietoa ulos ilman ihmistä."
+      },
+      "member_changes": {
+        "title": "Hänen muutoksensa",
+        "short": "Mitä tapahtuu, kun jäsen, joka ei ole luoja eikä ylläpitäjä, lisää tilan tai muuttaa osioita: muutos odottaa hyväksyntää tai se tehdään heti.",
+        "what": "Työtilan rakenne tarkoittaa sen tiloja ja dokumenttitilojen osioita. Luoja ja ylläpitäjät muuttavat rakennetta aina heti. Tämä sääntö koskee muita jäseniä, jotka saavat kirjoittaa täällä. Kun muutos odottaa, se on ehdotus, ja luoja tai ylläpitäjä hyväksyy sen tai kieltäytyy siitä. Kun muutos tehdään heti, se tallentuu työtilaan saman tien, ja siihen merkitään jäsenen nimi ja aika. Myös uuden dokumentin vieminen osion alle on osioiden muutos. Sääntö ei rajaa sitä, mitä jäsenet kirjoittavat dokumentteihin ja tietueisiin.",
+        "range": "odottaa, kunnes luoja tai ylläpitäjä hyväksyy sen (oletus), tai tehdään heti, ja siihen merkitään hänen nimensä.",
+        "lowLabel": "Odottaa hyväksyntää",
+        "highLabel": "Tehdään heti",
+        "low": "Odottaa hyväksyntää: rakenne muuttuu vasta, kun luoja tai ylläpitäjä on hyväksynyt muutoksen. Sopii työtilaan, jonka järjestyksestä joku vastaa.",
+        "high": "Tehdään heti: jäsenet järjestävät työtilaa itse. Jokaisesta muutoksesta näkyy, kuka sen teki.",
+        "ex1": "Odottaa hyväksyntää: yrityksen käsikirja. Jäsen ehdottaa uutta osiota, ja käsikirjan ylläpitäjä hyväksyy sen.",
+        "ex2": "Tehdään heti: pienen tiimin muistiinpanot. Kuka tahansa kirjoittaja voi lisätä tilan odottamatta.",
+        "tip": "Pidä oletus, kun työtilassa on paljon jäseniä tai ulkopuolisia ihmisiä. Jos hyväksyt joka tapauksessa kaikki ehdotukset, valitse Tehdään heti, niin kukaan ei odota turhaan."
+      },
+      "publish_gate": {
+        "title": "Vaadi tarkistus ennen julkaisua",
+        "short": "Päällä: jokainen julkaisu odottaa Tarkastus-välilehdellä, kunnes joku hyväksyy sen. Pois: julkaisu näkyy heti.",
+        "what": "Työtilassa dokumentti tai tietue on ensin luonnos, ja julkaisu tekee siitä voimassa olevan version. Kun asetus on päällä, julkaisu ei tapahdu heti. Siitä tulee pyyntö Tarkastus-välilehden kohtaan Vaatii päätöksesi, ja luonnos julkaistaan vasta, kun pyyntö on hyväksytty. Asetus koskee koko organismia eikä vain tätä työtilaa. Agentti ei voi julkaista itse, vaan se jättää luonnoksen ihmisen tarkistettavaksi. Useaa kohdetta ei voi julkaista kerralla, kun asetus on päällä.",
+        "range": "Päällä tai pois. Oletus on pois.",
+        "ex1": "Päällä: tuoteluettelo, jota asiakkaat lukevat. Agentti päivittää luonnokset, ja ihminen tarkistaa jokaisen ennen kuin asiakas näkee sen.",
+        "ex2": "Pois: tiimin sisäiset muistiinpanot. Kirjoittaja julkaisee itse, eikä kukaan odota.",
+        "tip": "Kytke asetus päälle, kun julkaistua lukevat ulkopuoliset tai kun se sitoo teitä. Muista, että jokainen julkaisu odottaa silloin hyväksyntää, myös oma julkaisusi."
+      }
+    },
+    "organism": {
+      "agent_access": {
+        "title": "Agentit",
+        "short": "Minkä jäsenten agentit saavat toimia täällä: kaikkien jäsenten agentit vai vain ne, jotka lisäät Agentit-kohtaan.",
+        "what": "Jäsenen agentit lukevat ja kirjoittavat täällä jäsenen omin oikeuksin. Kun valitset Kaikkien jäsenten agentit, jokaisen jäsenen jokainen agentti pääsee sisään. Kun valitset Vain Agentit-kohtaan lisätyt agentit, sisään pääsevät vain siellä luetellut agentit. Muita agentteja kohdellaan kuin ulkopuolisia: ne eivät voi lukea tätä organismia, kirjoittaa siihen eivätkä nähdä sitä. Jäsenlista näyttää silloin vain luetellut agentit. Asetus ei koskaan anna agentille enempää oikeuksia kuin sen omistajalla on. Se ei koske ihmisiä, jotka ovat kirjautuneet itse, eikä sovelluksia, joille he ovat antaneet luvan.",
+        "range": "Kaikkien jäsenten agentit (oletus) tai Vain Agentit-kohtaan lisätyt agentit.",
+        "lowLabel": "Vain luetellut agentit",
+        "highLabel": "Kaikkien jäsenten agentit",
+        "low": "Vain Agentit-kohtaan lisätyt agentit: tiedät tarkalleen, mikä tekoäly täällä toimii. Uusi agentti pääsee sisään vasta, kun joku lisää sen Agentit-kohtaan.",
+        "high": "Kaikkien jäsenten agentit: jokaisen jäsenen tekoäly pääsee työhön heti ilman lisävaihetta.",
+        "ex1": "Kaikkien jäsenten agentit: tiimin oma organismi. Jokaisen jäsenen tekoäly auttaa yhteisessä työssä.",
+        "ex2": "Vain Agentit-kohtaan lisätyt agentit: projekti asiakkaan kanssa. Asiakas näkee vain valitsemasi agentit, ja jäsentesi muut agentit pysyvät ulkona.",
+        "tip": "Valitse jälkimmäinen, kun tuot mukaan ulkopuolisia ihmisiä. Agentti voi rajata asetuksen lueteltuihin agentteihin, mutta vain ihminen, joka on kirjautunut itse, voi avata sen taas kaikkien jäsenten agenteille."
+      }
+    },
+    "living": {
+      "trust": {
+        "title": "Päivityksessä",
+        "short": "Mitä uudelle tekstille tapahtuu, kun dokumentti päivittää itsensä: se otetaan käyttöön heti tai se odottaa tarkistustasi.",
+        "what": "Elävä dokumentti päivittää osionsa aikataulun mukaan. Jokaisessa päivityksessä tekoälysi lukee uusimman aineiston ja kirjoittaa jokaisen osion uudelleen. Kun valitset Käytä automaattisesti, uusi teksti korvaa vanhan heti, ja vanha jää osion historiaan. Kun valitset Tarkista ennen käyttöä, uusi teksti odottaa osion vieressä ehdotettuna päivityksenä, kunnes hyväksyt tai hylkäät sen. Dokumentti muuttuu silloin vain, kun sinä päätät niin.",
+        "range": "Käytä automaattisesti tai Tarkista ennen käyttöä. Jos mallissa ei ole valintaa, uusi teksti otetaan käyttöön heti.",
+        "lowLabel": "Tarkista ensin",
+        "highLabel": "Automaattisesti",
+        "low": "Tarkista ennen käyttöä: mikään ei muutu ilman sinua. Sopii tekstiin, johon muut luottavat tai joka kertoo jotain ulkopuolisille.",
+        "high": "Käytä automaattisesti: dokumentti pysyy ajan tasalla ilman työtäsi. Sopii sisäisiin yhteenvetoihin ja tilannekatsauksiin.",
+        "ex1": "Käytä automaattisesti: tiimin projektin viikkokatsaus. Jokainen päivitys tuo katsauksen ajan tasalle.",
+        "ex2": "Tarkista ennen käyttöä: tuotekuvaus, jota asiakkaat lukevat. Tarkistat jokaisen uuden version ensin.",
+        "tip": "Valitse Tarkista ennen käyttöä kaikkeen, mikä on julkista tai millä on juridista painoa. Jos ehdotettuja päivityksiä kertyy ja hyväksyt ne aina, vaihda asetukseksi Käytä automaattisesti."
+      },
+      "activity_trigger": {
+        "title": "Päivitä myös N työtilamuutoksen jälkeen (0 = vain aikataulu)",
+        "short": "Dokumentti päivittyy myös silloin, kun sen työtilassa on muuttunut näin monta kohdetta edellisen päivityksen jälkeen. 0 päivittää vain aikataulun mukaan.",
+        "what": "Elävä dokumentti päivittyy aikataulunsa mukaan, esimerkiksi kerran päivässä. Kun annat tähän luvun, dokumentti päivittyy myös silloin, kun sen työtilassa on muuttunut näin monta kohdetta edellisen päivityksen jälkeen. Luku laskee uudet ja muokatut tietueet ja dokumentit. Se ei laske elävän dokumentin omia osioita eikä työtilan asetuksia. Vilkas työtila saa näin ajantasaisen dokumentin nopeammin. Jokainen päivitys käyttää tekoälyäsi.",
+        "range": "Kokonaisluku, vähintään 0. 0 tai tyhjä kenttä tarkoittaa, että dokumentti päivittyy vain aikataulun mukaan.",
+        "low": "0: dokumentti päivittyy vain aikataulun mukaan. Tekoälyn käyttö pysyy ennustettavana.",
+        "high": "Pieni luku, kuten 1–3: dokumentti päivittyy pian lähes jokaisen muutoksen jälkeen. Jokainen päivitys käyttää tekoälyäsi, joten kulut kasvavat työtilan vilkkauden mukana.",
+        "ex1": "0: kuukausiraportti. Aikataulu riittää.",
+        "ex2": "5: tiimin päätöslokin yhteenveto. Kun viisi kohdetta on lisätty tai muutettu, yhteenveto kirjoitetaan uudelleen.",
+        "ex3": "20: vilkas asiakastuen työtila. Yhteenveto päivittyy isomman muutoserän jälkeen eikä jokaisen muutoksen jälkeen.",
+        "tip": "Aloita luvulla 0, ja lisää luku vasta, jos dokumentti jää jälkeen työstä. Pieni luku vilkkaassa työtilassa tarkoittaa monta päivitystä, ja jokainen niistä käyttää tekoälyäsi."
+      }
+    },
+    "consent": {
+      "scope": {
+        "title": "Kuinka laajalle",
+        "short": "Mihin lupa ulottuu: vain tälle palvelimelle vai myös kumppanipalvelimille eli muille AIMEAT-palvelimille, joihin tämä palvelin on yhteydessä.",
+        "what": "Useimmat luvat jäävät tälle palvelimelle: nimeämäsi lukija lukee tietoa täällä. Kun valitset Myös kumppanipalvelimille, palvelin saa kopioida luvan kattamat merkinnät muille AIMEAT-palvelimille, jotka tämä palvelin on hyväksynyt kumppaneikseen. Vain merkinnät, joiden näkyvyys on Julkinen, kopioidaan. Kopio on silloin myös toisella palvelimella.",
+        "range": "Vain tällä palvelimella (oletus) tai Myös kumppanipalvelimille.",
+        "lowLabel": "Vain täällä",
+        "highLabel": "Myös kumppaneille",
+        "low": "Vain tällä palvelimella: tieto pysyy täällä, ja lupa koskee lukemista täällä.",
+        "high": "Myös kumppanipalvelimille: julkiset merkinnät kopioituvat myös kumppanipalvelimille.",
+        "ex1": "Vain tällä palvelimella: annat kollegallesi luvan lukea projektisi muistiinpanoja.",
+        "ex2": "Myös kumppanipalvelimille: julkaiset tutkimusaineiston, jonka kumppaniyliopiston palvelin saa pitää omana kopionaan.",
+        "tip": "Pidä oletus, ellei tiedon kuulu olla myös toisella palvelimella. Kumppanipalvelimelle kopioidaan vain julkisia merkintöjä, joten yksityiset merkinnät eivät lähde tällä asetuksella."
+      },
+      "key_area": {
+        "title": "Avainalue",
+        "short": "Mitkä muistin merkinnät lupa kattaa, avaimen mukaan. * tarkoittaa avaimen yhtä osaa, ** kaikkea sen jälkeen.",
+        "what": "Jokaisella muistisi merkinnällä on avain, esimerkiksi portfolio.contact.email. Avaimen osat erotetaan pisteillä tai kauttaviivoilla. Avainalue nimeää joukon avaimia. Kokonainen avain kattaa yhden merkinnän, ja tähti kattaa useampia. * tarkoittaa täsmälleen yhtä osaa. ** tarkoittaa kaikkea sen jälkeen, oli osia kuinka monta tahansa. Lupa kattaa myös merkinnät, jotka kirjoitat alueelle myöhemmin. Avainalueeseen annettu lupa on aina lukulupa.",
+        "range": "Avain tai avain, jossa on * tai **. Tähti toimii vain kokonaisena osana pisteiden tai kauttaviivojen välissä. contact* ei tarkoita kaikkea, mikä alkaa sanalla contact, vaan avainta, jonka nimi on täsmälleen contact*.",
+        "ex1": "portfolio.contact.email: yksi merkintä, sähköpostiosoite.",
+        "ex2": "portfolio.*: jokainen merkintä yhtä tasoa portfolion alla, kuten portfolio.contact. Se ei kata avainta portfolio.contact.email.",
+        "ex3": "portfolio.**: kaikki portfolion alla millä tahansa syvyydellä. Se ei kata itse avainta portfolio.",
+        "tip": "Nimeä pienin alue, joka riittää. Kun haluat antaa luvan koko alueeseen, päätä avain merkkeihin .** äläkä sanaan liitettyyn tähteen."
+      }
+    },
+    "classification": {
+      "switch": {
+        "title": "Oma sisältösi",
+        "short": "Kytkee luokittelun päälle tai pois omalta sisällöltäsi. Kun se on päällä, jokainen lukeminen tarkistaa, mitä kunkin kohteen luokitus sallii.",
+        "what": "Luokitus, esimerkiksi julkinen, sisäinen tai luottamuksellinen, kertoo, ketkä ihmiset ja mitkä tekoälyt saavat lukea sisällön. Kun kytkin on päällä, palvelin tarkistaa luokituksen aina, kun joku lukee sisältöäsi. Ihminen tai tekoäly, joka ei kuulu sallittuihin lukijoihin, ei näe kohdetta. Tekoäly saa kohteen mukana varoituksen tai ei näe kohdetta lainkaan sen mukaan, mitä luokitus sanoo, ja lukemiset, jotka luokitus käskee kirjata, menevät lokiisi. Kun kytket luokittelun pois, tarkistukset loppuvat heti. Jo annetut luokitukset säilyvät ja ovat taas voimassa, kun kytket luokittelun päälle.",
+        "range": "Päällä tai Pois päältä. Palvelun ylläpitäjä päättää, saatko valita itse. Jos ylläpitäjä ei ole ottanut luokittelua käyttöön, kytkimen kohdalla lukee Ei käytössä. Jos ylläpitäjä on ottanut sen käyttöön kaikkien sisällölle, kytkin pysyy päällä.",
+        "ex1": "Päällä: muistiinpanossa on tilinumero, ja palvelimen oletussääntö antaa sille luokituksen Luottamuksellinen. Kun tekoälysi lukee muistiinpanon, se saa mukaan varoituksen, ja lukeminen kirjataan lokiisi.",
+        "ex2": "Pois päältä: kokeilet uutta sovellusta omalla aineistollasi etkä halua tarkistuksia vielä. Jo annetut luokitukset odottavat, kunnes kytket luokittelun taas päälle.",
+        "tip": "Pidä luokittelu päällä, jos muistissasi on henkilötietoja, salasanoja tai asiakkaiden tietoja. Kun luokittelu on pois päältä, mikään ei rajaa sitä, mitä tekoäly lukee sisällöstäsi."
+      },
+      "exception": {
+        "title": "Mitä poikkeus sallii",
+        "short": "Mitä tämä yksi kohde saa tehdä luokituksestaan huolimatta: lähteä minne tahansa, tai tekoälysi saa nähdä sen ja lähettää sen ulos.",
+        "what": "Luokitus voi pitää kohteen organismin sisällä tai piilottaa sen tekoälyltä. Poikkeus päästää yhden kohteen tämän rajan ohi, ja perustelusi kirjataan sen mukana. Saa lähteä: kuka tahansa saa lähettää kohteen ulos, sinä, tekoälysi tai sovellus, esimerkiksi vientiin, jakolinkkiin, toiselle palvelimelle tai ulkoiseen palveluun. Tekoäly saa lähettää: tekoälysi saa nähdä kohteen ja lähettää sen ulos, ja kaikessa muussa luokitus pätee. Jokainen poikkeuksen käyttökerta kirjataan lokiin.",
+        "range": "Saa lähteä tai Tekoäly saa lähettää. Perustelu on pakollinen, enintään 1 000 merkkiä. Viimeinen päivä on vapaaehtoinen: poikkeus päättyy sen päivän lopussa. Ilman päivää poikkeus on voimassa, kunnes perut sen.",
+        "lowLabel": "Suppeampi",
+        "highLabel": "Laajempi",
+        "low": "Tekoäly saa lähettää: vain tekoälysi pääsee luokituksen ohi, ja vain tämän kohteen kohdalla.",
+        "high": "Saa lähteä: kohde saa lähteä mitä tahansa reittiä, ja sen voi lähettää kuka tahansa, joka pääsee siihen käsiksi.",
+        "ex1": "Saa lähteä: luottamuksellinen hinnasto, joka pitää lähettää tilintarkastajalle. Perustelu: ”Vuositilintarkastus 2026”. Viimeinen päivä: 31.3.",
+        "ex2": "Tekoäly saa lähettää: sopimus, jonka tekoälysi liittää asiakkaalle lähtevään sähköpostiin. Kaikessa muussa sopimus pysyy luokituksensa mukaisena.",
+        "tip": "Valitse suppein vaihtoehto, joka riittää, ja anna viimeinen päivä, kun tarve päättyy. Peru poikkeus, kun et enää tarvitse sitä. Se jää listaan perutuksi, joten auditointi näkee sen yhä."
+      },
+      "daily_cap": {
+        "title": "Päiväraja",
+        "short": "Sisällön luokittelijan kutsujen enimmäismäärä päivässä: yksi raja omistajaa tai organismia kohden ja yksi koko palvelimelle. Kun raja täyttyy, sisältö odottaa jonossa.",
+        "what": "Sisällön luokittelija kysyy mallilta, kuinka arkaluonteista uusi sisältö on. Jokainen kysymys on yksi kutsu, ja jonkun pitää maksaa kutsujen käyttämä malliaika. Henkilökohtaisesta sisällöstä maksaa sisällön omistaja, organismin sisällöstä organismin ensimmäinen omistaja. Nämä rajat laskevat kunkin päivän kutsut. Kun raja täyttyy, sisältö pitää oletusluokituksensa ja odottaa jonossa. Jono käydään läpi, kun päivä vaihtuu keskiyöllä UTC-aikaa. Säännöt toimivat kaikessa sisällössä ilman mallia, eivätkä ne kuluta rajaa.",
+        "range": "Kokonaisluku 0–1 000 000 kutsua päivässä tai Ei rajaa. Oletukset ovat 200 omistajaa tai organismia kohden ja 2 000 koko palvelimelle. Kun rajaa ei ole, kutsut lasketaan silti.",
+        "low": "Pienet rajat: mallin kulut pysyvät pieninä, mutta vilkkaana päivänä useampi sisältö odottaa seuraavaan päivään.",
+        "high": "Suuret rajat tai Ei rajaa: sisältö luokitellaan heti, ja mallin kulut kasvavat sen mukaan, kuinka paljon sisältöä kirjoitetaan.",
+        "ex1": "200 ja 2 000 (oletukset): pieni tiimi. Tavallinen päivä jää rajojen alle.",
+        "ex2": "0 omistajaa kohden: mallia ei kutsuta lainkaan. Sisältö saa vain sääntöjen tuloksen ja oletusluokituksen, ja jono kasvaa.",
+        "ex3": "Ei rajaa koko palvelimelle ja 500 omistajaa kohden: paljon käyttäjiä, eikä kukaan yksin voi kuluttaa koko päivän kutsuja muilta.",
+        "tip": "Pidä omistajakohtainen raja pienempänä kuin palvelimen raja, jotta yksi omistaja ei voi kuluttaa koko päivän kutsuja kaikilta muilta. Jonossa on enintään 2 000 kohdetta omistajaa tai organismia kohden. Sen yli menevistä vanhimmat putoavat pois ja pitävät oletusluokituksensa."
+      },
+      "retention": {
+        "title": "Montako päivää loki säilyttää rivin",
+        "short": "Kuinka kauan luokittelun loki säilyttää rivin: 1–36 500 päivää tai kaikki rivit. Oletus on 365 päivää.",
+        "what": "Loki kirjaa, mitä luokiteltua sisältöä näytettiin, käytettiin, kiellettiin tai luokiteltiin uudelleen. Yksi rivi kertoo yhden lukijan, yhden kohteen ja yhden tapahtuman yhden minuutin ajalta. Yöllinen ajo poistaa rivit, jotka ovat vanhempia kuin tässä annettu päivien määrä. Poikkeusten luettelo vanhenee lokin mukana, mutta kuukausi, jossa on yhä voimassa oleva poikkeus, säilyy.",
+        "range": "Kokonaisluku 1–36 500 päivää tai Säilytä kaikki rivit. Oletus on 365 päivää.",
+        "low": "Vähemmän päiviä: pienempi loki, mutta vanhempia tapahtumia ei voi enää tarkistaa.",
+        "high": "Enemmän päiviä tai kaikki rivit: pitkä historia tarkastuksia varten, ja loki kasvaa koko ajan.",
+        "ex1": "365 (oletus): vuoden historia vuositarkastusta varten.",
+        "ex2": "90: pieni palvelin, jolla vain tuoreet tapahtumat merkitsevät.",
+        "ex3": "2 555, noin 7 vuotta: organisaatio, jonka säännöt vaativat pitkän kirjanpidon.",
+        "tip": "Aseta päivät sen mukaan, mitä tarkastus tai laki vaatii. Lyhyempi aika poistaa vanhemmat rivit seuraavassa yöllisessä ajossa, eikä niitä saa takaisin."
+      }
+    },
+    "notify": {
+      "throttle": {
+        "title": "Tahti",
+        "short": "Kuinka usein sama lähettäjä saa lähettää push-ilmoituksen laitteillesi. Välissä tulevat ilmoitukset kootaan yhteen. Kello näyttää silti jokaisen ilmoituksen.",
+        "what": "Push-ilmoitus on ilmoitus, joka näkyy puhelimessasi tai tietokoneessasi. Kun sama lähettäjä, esimerkiksi sovellus tai agentti, lähettää paljon ilmoituksia lyhyessä ajassa, tämä asetus pitää laitteesi rauhallisina. Lähettäjän ensimmäinen push-ilmoitus tulee heti. Valitun ajan sisällä tulevat ilmoitukset lasketaan, ja kun aika päättyy, yksi push-ilmoitus kertoo, montako niitä tuli. Jokainen ilmoitus näkyy silti heti tämän sivun kellossa.",
+        "range": "jokainen, yksi per 5 min, yksi per 10 min tai yksi per 30 min. Oletus on yksi per 10 min.",
+        "lowLabel": "Enemmän push-ilmoituksia",
+        "highLabel": "Vähemmän push-ilmoituksia",
+        "low": "jokainen: jokainen ilmoitus tulee laitteillesi heti. Sopii, kun sinulle kirjoittaa vain muutama lähettäjä.",
+        "high": "yksi per 30 min: vilkas lähettäjä antaa yhden push-ilmoituksen heti ja puolen tunnin päästä toisen, joka kertoo, montako muuta tuli.",
+        "ex1": "jokainen: odotat asiakkaalta yhtä viestiä ja haluat sen heti.",
+        "ex2": "yksi per 10 min: työnkulku lähettää viidessä minuutissa kymmenen tilannetietoa. Saat ensimmäisen heti ja kymmenen minuuttia sen jälkeen yhden push-ilmoituksen, joka kertoo yhdeksästä muusta.",
+        "tip": "Tahti lasketaan jokaiselle lähettäjälle erikseen, joten vilkas lähettäjä ei koskaan pidätä hiljaisemman lähettäjän ilmoituksia. Jos et halua yhden lähettäjän push-ilmoituksia lainkaan, käännä sen push-ilmoitukset pois lähettäjien listasta."
+      },
+      "breakthrough": {
+        "title": "Silti heti",
+        "short": "Mitkä ilmoitukset saavat tulla laitteillesi hiljaisina tunteina. Muut odottavat, kunnes hiljainen aika päättyy.",
+        "what": "Hiljaisina tunteina push-ilmoitukset odottavat, ja kun hiljainen aika päättyy, ne tulevat yhtenä yhteenvetona. Kello saa jokaisen ilmoituksen heti joka tapauksessa. Tässä valitsemasi ilmoitusryhmät tulevat laitteillesi myös hiljaisina tunteina. Valitse ryhmät, jotka vaativat sinulta toimia, ja jätä pois ne, jotka vain kertovat jotain. Tahti-asetus koskee myös niitä.",
+        "range": "Mikä tahansa näistä: Organismit ja työtilat, Viestit, Työnkulut, Sovellukset, Tili ja budjetti, Muut. Sivu ehdottaa ryhmiä Organismit ja työtilat sekä Viestit. Jos et valitse mitään, mikään ei tule laitteillesi hiljaisina tunteina. Valinta toimii vain, kun hiljaiset tunnit ovat päällä.",
+        "ex1": "Viestit: asiakas kirjoittaa sinulle yöllä. Puhelimesi näyttää viestin heti.",
+        "ex2": "Työnkulut: ajo kysyy sinulta jotain kello 23.00. Näet kysymyksen ennen aamua.",
+        "ex3": "Ei mitään: kokonainen yö ilman push-ilmoituksia. Kaikki odottaa kellossa ja tulee aamulla yhtenä push-ilmoituksena.",
+        "tip": "Jokainen lisäämäsi ryhmä voi herättää sinut. Lisää Tili ja budjetti vain, jos budjetin tai kiintiön hälytyksen täytyy tavoittaa sinut yöllä."
+      }
+    },
+    "memory": {
+      "key_pattern": {
+        "title": "Avain tai kuvio",
+        "short": "Mitkä muistisi avaimet ryhmä saa lukea. * tarkoittaa avaimen yhtä osaa, ** kaikkea sen alla.",
+        "what": "Jokaisella muistisi merkinnällä on avain, jonka osat erotetaan pisteillä, esimerkiksi deliveries.abc.status. Kuvio kertoo, mitä avaimia ryhmä saa lukea. Kokonainen avain kattaa yhden merkinnän. * tarkoittaa täsmälleen yhtä osaa. ** tarkoittaa kaikkia osia sen alla millä tahansa syvyydellä. Jako kattaa myös kuvioon sopivat avaimet, jotka kirjoitat myöhemmin, joten jaat avainavaruuden kerran etkä jokaista merkintää erikseen. Ryhmän jäsenet ja heidän agenttinsa saavat lukea merkinnät, mutta he eivät voi muuttaa niitä. Kaikille muille merkinnät pysyvät oman näkyvyytensä mukaisina.",
+        "range": "Enintään 400 merkkiä, ja ennen ensimmäistä tähteä vähintään kolme merkkiä (pisteitä ja kauttaviivoja ei lasketa). Tähti toimii vain kokonaisena osana: abc* luetaan nimeksi. Palvelin hylkää kuvion, joka ulottuisi avaimiin, joita se pitää sinulle itse, kuten tekoälyasetuksiisi, profiiliisi ja ilmoitusasetuksiisi.",
+        "ex1": "deliveries.abc.status: ryhmä lukee yhden merkinnän.",
+        "ex2": "deliveries.*.status: jokaisen toimituksen tila, kuten deliveries.abc.status ja deliveries.xyz.status, mutta ei mitään muuta niistä.",
+        "ex3": "deliveries.abc.**: kaikki avaimen deliveries.abc alla, myös se, mitä kirjoitat sinne myöhemmin. Se ei kata itse avainta deliveries.abc.",
+        "tip": "Jaa pienin avainavaruus, joka riittää, ja päätä koko avaruuden kuvio merkkeihin .**. Jako toimii merkinnän näkyvyydestä riippumatta, joten kun haluat lopettaa jaon, poista se. Näkyvyyden muutos ei lopeta jakoa."
+      },
+      "visibility": {
+        "title": "Näkyvyys",
+        "short": "Kuka saa lukea tämän merkinnän: vain sen kirjoittaja, sinä ja agenttisi, kaikki tälle palvelimelle kirjautuneet vai kuka tahansa.",
+        "what": "Näkyvyys on ensimmäinen sääntö siitä, kuka merkintää lukee, ja palvelin tarkistaa sen jokaisella lukukerralla. Yksityinen: vain merkinnän kirjoittaja lukee sen, ja sinä luet aina myös sen, minkä agenttisi ovat kirjoittaneet. Omat agentit: sinä ja jokainen yhdistämäsi agentti. Jäsenet: kaikki, jotka ovat kirjautuneet tälle palvelimelle, eikä merkintää kopioida koskaan toiselle palvelimelle. Julkinen: kuka tahansa, jolla on osoite, ilman kirjautumista. Ryhmälle tehty jako tai Tietolompakko-sivulla annettu lupa voi päästää useammat lukemaan yksityisen merkinnän muuttamatta sen näkyvyyttä.",
+        "range": "Yksityinen (oletus), Omat agentit, Jäsenet (kirjautuneet käyttäjät), Julkinen.",
+        "lowLabel": "Vähemmän lukijoita",
+        "highLabel": "Enemmän lukijoita",
+        "low": "Yksityinen tai Omat agentit: merkintä pysyy oman tilisi sisällä.",
+        "high": "Jäsenet tai Julkinen: muut ihmiset lukevat sen. Julkinen merkintä voi myös kopioitua kumppanipalvelimille, jos sallit sen Tietolompakko-sivulla.",
+        "ex1": "Yksityinen: henkilökohtaisen kirjeen luonnos.",
+        "ex2": "Omat agentit: muistiinpanot kirjoitustyylistäsi, jotta jokainen yhdistämäsi tekoäly kirjoittaa sinun äänelläsi.",
+        "ex3": "Jäsenet: luettelo osaamisestasi, jonka saman palvelimen kollegat saavat lukea.",
+        "ex4": "Julkinen: julkinen portfoliosi, jonka verkkosivu lukee ilman kirjautumista.",
+        "tip": "Aloita yksityisestä ja avaa vain se, minkä täytyy olla auki. Jos haluat yhden ryhmän lukevan kokonaisen avainalueen, jaa avainavaruus ryhmälle äläkä tee merkinnöistä julkisia."
+      }
+    },
+    "federation": {
+      "auth_policy": {
+        "title": "Hyväksyt",
+        "short": "Kuka saa kirjautua tänne toisen palvelimen tilillä: ei kukaan, kuka tahansa aktiiviselta vertaiselta tai vain nimeämiesi vertaisten käyttäjät.",
+        "what": "Ihminen, jolla on tili toisella AIMEAT-palvelimella, voi kirjautua tänne sillä tilillä. Hänen kotipalvelimensa tarkistaa salasanan, ja tämä palvelin luottaa sen allekirjoitettuun vastaukseen. Tämä asetus määrää, minkä kotipalvelinten käyttäjät hyväksyt. Vieras saa enintään tunnin istunnon ja ne oikeudet, jotka on valittu kohdassa Mitä he saavat saapuessaan. Vertainen on toinen palvelin, jonka olet hyväksynyt.",
+        "range": "Ei ketään (oletus), Kenet tahansa aktiiviselta vertaiselta, Vain nimeämäni vertaiset. Valinnasta riippumatta kirjautua voivat vain Jäsen- tai Genesis-tason vertaisten käyttäjät.",
+        "lowLabel": "Ei ketään",
+        "highLabel": "Kenet tahansa aktiiviselta vertaiselta",
+        "low": "Ei ketään: ihmiset kirjautuvat vain omalle palvelimelleen. Tieto liikkuu silti vertaisten välillä niin kuin kunkin vertaisen kytkimet sallivat.",
+        "high": "Kenet tahansa aktiiviselta vertaiselta: jokainen aktiivinen Jäsen- tai Genesis-tason vertainen, myös myöhemmin lisätyt. Vertaisen omaa Salli federaatiokirjautuminen -kytkintä ei tarvita.",
+        "ex1": "Ei ketään: yhden yrityksen palvelin, joka ei halua ulkopuolisia tilejä. Vierailijat käyttävät omaa palvelintaan.",
+        "ex2": "Vain nimeämäni vertaiset: kaksi kumppaniyritystä. Kytket Salli federaatiokirjautuminen -kytkimen päälle vain kumppanin palvelimelle, eikä kukaan muu pääse kirjautumaan muualta.",
+        "ex3": "Kenet tahansa aktiiviselta vertaiselta: palvelinryhmä, jonka jäsenet luottavat toisiinsa täysin. Kuka tahansa niiden käyttäjistä voi kirjautua tänne.",
+        "tip": "Aloita valinnalla Vain nimeämäni vertaiset. Tarkista silloin, että ainakin yhdellä vertaisella on Salli federaatiokirjautuminen päällä. Muuten asetus ei päästä ketään sisään, ja sivun yläosan yhteenveto kertoo, ettei kukaan voi kirjautua."
+      },
+      "default_scopes": {
+        "title": "Mitä he saavat saapuessaan",
+        "short": "Oikeudet, jotka toisen palvelimen käyttäjä saa, kun hän kirjautuu tänne. Jokainen kytkin on yksi oikeus, esimerkiksi memory:read.",
+        "what": "Kun toisen palvelimen käyttäjä kirjautuu tänne, hän saa istunnon, jossa on vain tässä valitut oikeudet. Jokainen sana nimeää yhden oikeuden: memory:read antaa lukea muistia, memory:write antaa kirjoittaa sitä ja niin edelleen. Jos pyyntö tarvitsee oikeuden, jota vieraalla ei ole, pyyntö hylätään. Vertaisella voi olla oma luettelonsa, ja silloin se korvaa tämän luettelon kyseisen vertaisen käyttäjille. Asetuksella on merkitystä vain, kun Hyväksyt-kohta päästää jonkun sisään.",
+        "range": "Mikä tahansa yhdistelmä oikeuksista memory:read, memory:write, catalogue:read, social:read, social:write, work:request, boards:read ja boards:write. Oletus on memory:read ja catalogue:read.",
+        "low": "Vähän oikeuksia: vieras voi katsoa mutta ei voi muuttaa täällä mitään.",
+        "high": "Enemmän oikeuksia: vieras voi kirjoittaa muistiin, kirjoittaa tauluille ja pyytää työtä.",
+        "ex1": "memory:read ja catalogue:read (oletus): vieras lukee ja selaa katalogia. Jokainen kirjoitus hylätään.",
+        "ex2": "Lisää boards:read ja boards:write: kumppanit osallistuvat keskusteluihin tauluillasi.",
+        "ex3": "Lisää work:request: vieras voi pyytää työtä täkäläisiltä palveluilta.",
+        "tip": "Anna niin vähän oikeuksia kuin tehtävä vaatii. Kirjoitusoikeudella toisen palvelimen käyttäjä voi muuttaa sisältöä täällä, joten lisää sellainen vain vertaisille, jotka tunnet hyvin."
+      },
+      "open_join": {
+        "title": "Anna tuntemattomien palvelinten liittyä omin päin",
+        "short": "Päällä: palvelin, jota et tunne, liittyy heti vierailevaksi vertaiseksi ilman hyväksyntääsi. Pois: sen pyyntö odottaa sinua.",
+        "what": "Toinen AIMEAT-palvelin pyytää liittymistä allekirjoitetulla esittelyllä. Kun kytkin on pois päältä, pyyntö odottaa luettelossa, kunnes hyväksyt tai hylkäät sen. Kun kytkin on päällä, palvelin liittyy heti Vieraileva-tasolle. Vieraileva vertainen saa lähettää viestejä, selata katalogiasi ja pyytää työtä. Se ei saa välittää liikennettä eikä kopioida muistia, eivätkä sen käyttäjät voi kirjautua tänne. Hyvän vertaisen nostat Jäsen-tasolle itse. Verkkokäytäntö voi silti torjua palvelimen sen osoitteen perusteella.",
+        "range": "Päällä tai pois. Oletus on pois.",
+        "ex1": "Pois: yrityksen palvelin, joka toimii vain tuttujen kumppanien kanssa. Jokainen uusi palvelin odottaa hyväksyntääsi.",
+        "ex2": "Päällä: julkinen palvelin, jonka palveluja muut palvelimet saavat kokeilla heti.",
+        "tip": "Pidä kytkin pois päältä, ellet halua tuntemattomien liittyvän. Kun se on päällä, käy vertaisluettelo välillä läpi ja poista palvelimet, joita et halua."
+      },
+      "settlement": {
+        "title": "Siirrä murusia tänne",
+        "short": "Antaa vertaisen lisätä murusia tämän palvelimen tileille työstä, joka kulki palvelinten välillä. Pois: sen selvitykset hylätään.",
+        "what": "Muruset tahdistavat, kuinka paljon agentit saavat kirjoittaa ja käyttää. Niillä ei osteta mitään. Kun työ kulkee kahden palvelimen välillä, toinen palvelin voi lähettää selvityksen, joka lisää murusia tilille täällä. Vertainen allekirjoittaa jokaisen selvityksen avaimellaan, ja seurantakoodi estää saman selvityksen kirjaamisen kahdesti. Tämä kytkin määrää, hyväksyykö tämä palvelin tämän vertaisen selvitykset. Kontakti-tasolla kytkintä ei voi kytkeä päälle.",
+        "ex1": "Päällä: kumppanipalvelin, jonka agentit tekevät työtä täkäläisten agenttien kanssa. Työn muruset selvitetään tänne.",
+        "ex2": "Pois: vertainen, jonka kanssa vaihdat vain viestejä. Mikään sen lähettämä ei muuta saldoja täällä.",
+        "tip": "Pidä kytkin päällä vertaisille, joiden kanssa vaihdatte työtä. Käännä se pois vertaiselta, johon et enää luota: selvitys on ainoa vertaisen pyyntö, joka muuttaa saldoja täällä."
+      },
+      "relay": {
+        "title": "Välitä tälle vertaiselle",
+        "short": "Kulkevatko välitetyt pyynnöt tämän palvelimen ja vertaisen välillä. Pois: tämä palvelin ei välitä vertaiselle mitään ja hylkää vertaisen allekirjoitetut välitykset.",
+        "what": "Pyyntö palvelimelle, joka ei ole suora vertainen, kulkee muiden palvelinten kautta, ja kukin välittää sen seuraavalle. Tämä kytkin päättää tämän vertaisen kohdalla kaksi asiaa. Ensinnäkin sen, välittääkö tämä palvelin pyyntöjä vertaiselle, joko vertaiselle itselleen tai sen kautta eteenpäin. Toiseksi sen, hyväksyykö tämä palvelin pyynnön, jonka vertainen välittää tänne allekirjoitettuna. Vertaisen omat pyynnöt tälle palvelimelle eivät ole välityksiä, ja niistä päättävät muut kytkimet. Kytkimen voi kytkeä päälle vain Jäsen- ja Genesis-tasolla.",
+        "ex1": "Päällä: hyvin verkottunut kumppanipalvelin. Täkäläiset käyttäjät tavoittavat sen kautta sen takana olevat palvelimet.",
+        "ex2": "Pois: vertainen, jonka ei pidä kuljettaa muiden liikennettä. Pyyntö, joka tarvitsee tätä vertaista, ei löydä reittiä, ja vertaisen välitykset tänne hylätään.",
+        "tip": "Jos Välitetyn pyynnön allekirjoitus on tilassa Ei vaadita, allekirjoittamaton välitys, joka nimeää tämän vertaisen, pääsee silti läpi, ellei vertainen ole aiemmin lähettänyt allekirjoitettua välitystä. Aseta allekirjoitus tilaan Vaaditaan, niin aukko sulkeutuu."
+      },
+      "replicate": {
+        "title": "Replikoi muisti",
+        "short": "Antaa tämän palvelimen ja vertaisen kopioida julkista muistia toisilleen. Pois: mitään ei kopioida kumpaankaan suuntaan.",
+        "what": "Tämä palvelin lähettää vertaiselle kopiot muistimerkinnöistä, jotka ovat julkisia ja joiden omistaja on antanut suostumuksen federaatiojakoon. Se myös ottaa vastaan vertaisen lähettämät kopiot ja pitää ne erillään omasta muistista. Luokitus voi silti pitää merkinnän tällä palvelimella. Kopiot lähtevät, kun merkintä muuttuu, tai ajastetulla kierroksella sen mukaan, mitä Synkronointitapa määrää. Kytkimen voi kytkeä päälle vain Jäsen- ja Genesis-tasolla.",
+        "ex1": "Päällä: kumppanipalvelin, jolla ihmiset julkaisevat yhteistä tietoa. Julkiset merkinnät kulkevat molempiin suuntiin.",
+        "ex2": "Pois: vertainen, jonka kanssa vaihdatte työtä mutta ette muistia. Mitään merkintää ei lähetetä sinne, eikä sieltä tulevia kopioita tallenneta.",
+        "tip": "Vain julkiset merkinnät, joihin omistaja on antanut suostumuksen, lähtevät, joten yksityinen muisti ei lähde koskaan. Käännä kytkin pois, kun vertainen ei saa säilyttää kopioita mistään täältä."
+      },
+      "peer_mode": {
+        "title": "Vertaistila",
+        "short": "Federaatio: tämä palvelin listaa vertaisen ja jakaa sen kanssa koko federaation liikenteen. Yksityinen P2P: yhteys toimii, mutta vertainen ei näy listoilla.",
+        "what": "Tila määrää, näkyykö vertainen federaatiolle. Federaatio-tilassa vertainen näkyy tämän palvelimen julkisessa hakemistossa ja federaatiokirjassa. Se saa läsnäolotiedot ja koko federaatiolle lähetetyt tiedotteet, ja sen katalogin muutokset päivittävät verkon hakemistoa. Yksityinen P2P -tilassa mitään näistä ei tapahdu. Yhteys tekee silti sen, minkä yllä olevat kytkimet sallivat. Kontakti-taso on aina Yksityinen P2P.",
+        "range": "Federaatio (oletus) tai Yksityinen P2P.",
+        "lowLabel": "Yksityinen P2P",
+        "highLabel": "Federaatio",
+        "low": "Yksityinen P2P: suora yhteys, jota muut eivät näe tämän palvelimen listoilla.",
+        "high": "Federaatio: vertainen näkyy ja on mukana siinä, mitä federaatio jakaa.",
+        "ex1": "Federaatio: kumppani julkisessa palvelinryhmässä. Muut näkevät, että olette yhteydessä.",
+        "ex2": "Yksityinen P2P: yhteys saman yrityksen kahden toimipisteen välillä, eikä sen pidä näkyä julkisilla listoilla.",
+        "tip": "Valitse Yksityinen P2P, kun itse yhteys on luottamuksellinen. Kytkimet päättävät silti, mitä yhteyden yli kulkee: tila muuttaa vain sen, mitä listataan ja tiedotetaan kaikille."
+      }
+    },
+    "sso": {
+      "idp_initiated": {
+        "title": "Hyväksy kirjautuminen, joka alkaa heidän päästään",
+        "short": "Päällä: ihmiset voivat kirjautua yrityksen oman sovellusportaalin kuvakkeesta. Pois: kirjautumisen pitää alkaa täältä. Oletus on pois.",
+        "what": "Yleensä ihminen aloittaa kirjautumisen täältä yrityksen painikkeella tai suoralla linkillä. Tämä palvelin lähettää silloin pyynnön yrityksen identiteetintarjoajalle (IdP) ja hyväksyy vain vastauksen tähän pyyntöön. Jotkin yritykset aloittavat kirjautumisen omasta sovellusportaalistaan. Silloin saapuu vastaus, jota mikään täältä lähetetty pyyntö ei pyytänyt. Tämä kytkin määrää, hyväksyykö palvelin tällaisen vastauksen. Vastauksessa pitää silti olla yrityksen voimassa oleva allekirjoitus.",
+        "range": "Päällä tai pois. Oletus on pois.",
+        "ex1": "Pois: ihmiset käyttävät kirjautumissivun yrityspainiketta. Jokainen vastaus yhdistetään täältä lähteneeseen pyyntöön.",
+        "ex2": "Päällä: yritys lisää tälle palvelulle kuvakkeen omaan portaaliinsa, ja ihmiset aloittavat sieltä.",
+        "tip": "Kytke päälle vain, kun yritys pyytää sitä. Kun kytkin on päällä, palvelin ei voi yhdistää vastausta pyyntöön, jonka jokin selain täällä teki, joten yksi väärinkäytetyn vastauksen tarkistus jää pois."
+      }
+    },
+    "config": {
+      "morsel_policy": {
+        "burn_rate": {
+          "title": "Polttoprosentti",
+          "short": "Kuinka suuri osa valmiin työn verkkomaksusta poltetaan, 0–1. Arvo 0,1 polttaa kymmenesosan.",
+          "what": "Kun agentti tilaa työtä, jonka hinta on murusina, siitä kuluu perushinta ja 10 %:n verkkomaksu ylöspäin pyöristettynä. Kun työ on toimitettu, tämä osuus määrää, kuinka suuri osa verkkomaksusta poltetaan. Poltettu murunen katoaa lopullisesti, eikä kukaan saa sitä. Loput maksusta kirjataan osuuksiksi palvelimille, jotka olivat mukana. Muruset tahdistavat, kuinka paljon agentit saavat kirjoittaa ja käyttää. Niillä ei osteta mitään.",
+          "range": "0–1, osuutena. Oletus on 0,1. Poltettava määrä pyöristetään alaspäin kokonaisiksi murusiksi.",
+          "low": "0: mitään ei polteta. Koko verkkomaksu kirjataan osuuksiksi.",
+          "high": "1: koko verkkomaksu poltetaan.",
+          "ex1": "0,1: työstä, jonka hinta on 100 murusta, kuluu 10 murusen verkkomaksu, ja siitä poltetaan 1 murunen.",
+          "ex2": "0,5: samasta työstä poltetaan 5 murusta kymmenestä.",
+          "ex3": "0,1, kun työn hinta on 5 murusta: verkkomaksu on 1 murunen, eikä mitään polteta, koska tulos pyöristyy nollaan.",
+          "tip": "Pidä oletus, ellet halua murusia vähemmän käyttöön ajan mittaan. Nimessä lukee prosentti, mutta arvo on osuus: 0,1 tarkoittaa 10:tä prosenttia."
+        },
+        "pacing_toll_default": {
+          "title": "Tahdistuksen oletusmaksu",
+          "short": "Kuinka monta murusta poltetaan jokaisesta mitatusta kutsusta, kun kyvykkyys ei määritä omaa maksuaan. 0 poistaa tahdistuksen. Arvo väliltä 0–100.",
+          "what": "Mitattu kutsu on kutsu johonkin, joka laskee käyttönsä, esimerkiksi laajennukseen, sovelluksen työkaluun, EXCHANGE-ajoon tai agentin työhön. Tämä maksu polttaa kutsujalta murusia jokaisesta tällaisesta kutsusta. Muruset täyttyvät päivittäin vain kattoon asti, joten maksu rajaa, kuinka nopeasti kukaan voi kutsua kyvykkyyttä, myös rahalla hinnoiteltua. Tarjoaja ei saa maksusta mitään. Kun käyttäjä kutsuu omaa kyvykkyyttään, mitään ei polteta. Jos saldo ei riitä maksuun, kutsu hylätään.",
+          "range": "0–100 murusta kutsua kohden. Oletus on 0, joka poistaa tahdistuksen. Kyvykkyys voi määrittää oman maksunsa, ja silloin käytetään sitä.",
+          "low": "0: ei tahdistusta. Kutsu maksaa vain sen, mitä kyvykkyys veloittaa.",
+          "high": "Suurempi: jokainen kutsu kuluttaa enemmän päivän täytöstä, joten päivään mahtuu vähemmän kutsuja.",
+          "ex1": "1: täysi 500 murusen saldo (Kiintiökaton oletus) riittää 500 kutsuun.",
+          "ex2": "5: sama saldo riittää 100 kutsuun. Se riittää ihmiselle mutta ei karanneelle silmukalle.",
+          "tip": "Ota maksu käyttöön, kun vahingossa silmukkaan jäänyt agentti ei saa kerryttää suurta laskua maksullisesta kyvykkyydestä. Muutos koskee heti jokaista mitattua kutsua, joten kerro siitä käyttäjille ennen kuin nostat arvoa."
+        },
+        "daily_allowance_cap": {
+          "title": "Kiintiökatto",
+          "short": "Päiväkiintiö lisää murusia vain, kun saldo on tätä lukua pienempi, eikä vie saldoa sen yli. Oletus on 500.",
+          "what": "Päiväkiintiö lisää joka päivä murusia jokaisen agentin omistajan saldoon, kerran kutakin agenttia kohden. Tämä katto pysäyttää täytön. Saldo, joka on katossa tai sen yli, ei saa mitään, ja pienempi saldo täyttyy enintään kattoon asti. Muulla tavalla saapuvat muruset, kuten selvitykset tai myynnit, voivat viedä saldon katon yli. Muruset tahdistavat, kuinka paljon agentit saavat kirjoittaa ja käyttää. Niillä ei osteta mitään.",
+          "range": "Kokonaisluku 0–100 000 murusta. Oletus on 500. Arvo 0 pysäyttää päiväkiintiön.",
+          "low": "Pienempi: saldot pysyvät pieninä, joten agentit ehtivät tehdä vähemmän ennen kuin niiden pitää odottaa seuraavaa päivää.",
+          "high": "Suurempi: käyttämätön kiintiö kertyy useammalta päivältä, joten agentti voi tehdä enemmän kerralla.",
+          "ex1": "500 (oletus) ja 50 murusen Päiväkiintiö: käyttämätön saldo on täynnä kymmenessä päivässä.",
+          "ex2": "100: saldossa on enintään kahden päivän kiintiö, kun Päiväkiintiö on 50 murusta.",
+          "tip": "Ajattele kattoa suurimpana määränä, jonka agentti voi käyttää kerralla. Kun Tahdistuksen oletusmaksu on 1, katto on myös suurin kutsumäärä, johon täysi saldo riittää."
+        }
+      },
+      "commerce": {
+        "fee_mode": {
+          "title": "Palkkion kohde",
+          "short": "Mihin murusina hinnoiteltujen myyntien palkkio menee: operaattorin tilille vai poltetaan. Rahalla tehtyihin myynteihin asetus ei vaikuta.",
+          "what": "Murusina hinnoiteltuun myyntiin liittyy palkkio. Tällainen myynti on esimerkiksi kaupasta ostettu sovellus, kassan kautta tehty osto tai EXCHANGE-ajo. Tämä asetus määrää, mihin palkkio menee. Operaattorille: palkkio lisätään operaattorin tilille. Poltetaan: palkkio katoaa lopullisesti. Jos palvelimella ei ole operaattorin tiliä, palkkio poltetaan kummassakin tilassa. Rahalla tehdyssä myynnissä palkkio kirjataan operaattorin saatavaksi, eikä tämä asetus muuta sitä.",
+          "range": "Operaattorille (oletus) tai Poltetaan.",
+          "lowLabel": "Operaattorille",
+          "highLabel": "Poltetaan",
+          "low": "Operaattorille: operaattorin saldo kasvaa jokaisesta myynnistä. Operaattorin tili on palkkioille nimetty tili tai muuten ensimmäinen operaattori.",
+          "high": "Poltetaan: kukaan ei saa palkkiota, ja käytössä on vähemmän murusia.",
+          "ex1": "Operaattorille: sovellus myydään 100 murusella 5 %:n palkkiolla. Myyjä saa 95 ja operaattori 5.",
+          "ex2": "Poltetaan: sama myynti. Myyjä saa 95, ja 5 murusta katoaa.",
+          "tip": "Valitse Poltetaan, kun kukaan ei saa hyötyä tämän palvelimen palkkioista. Palkkion suuruus asetetaan kohdissa Checkout-palkkio ja Transaktiomaksu %."
+        },
+        "fee_percent": {
+          "title": "Checkout-palkkio",
+          "short": "Palkkio prosentteina jokaisesta kaupasta, joka tehdään kassan, EXCHANGEn tai agenttien välisen myynnin kautta. Tyhjä käyttää Transaktiomaksu %:n arvoa.",
+          "what": "Palkkio otetaan hinnasta. Ostaja maksaa ilmoitetun hinnan, ja myyjä saa sen, mitä palkkion jälkeen jää. Palkkio pyöristetään ylöspäin hinnan pienimpään yksikköön, esimerkiksi senttiin. Rahalla tehdyssä myynnissä palkkio kirjataan operaattorin saatavaksi: mikään maksutapa ei peri sitä täällä, vaan se laskutetaan erikseen. Murusina tehdyssä myynnissä palkkio menee sinne, minne Palkkion kohde määrää. EXCHANGE-sopimuksella voi olla oma palkkionsa, ja silloin käytetään sitä.",
+          "range": "0–50 prosenttia. Tyhjä kenttä (oletus) käyttää Transaktiomaksu %:n arvoa, joka on oletuksena 5.",
+          "low": "0: myyjä saa koko hinnan.",
+          "high": "Suurempi: kaupasta menee enemmän operaattorille ja vähemmän myyjälle.",
+          "ex1": "Tyhjä: palkkio seuraa Transaktiomaksu %:a, joten yksi luku asettaa molemmat.",
+          "ex2": "10: 20,00 euron myynnistä myyjä saa 18,00, ja 2,00 kirjataan operaattorin saatavaksi.",
+          "tip": "Aseta arvo vain, kun kassan kautta tehtyihin kauppoihin tarvitaan eri palkkio kuin sovelluskauppaan. Muutos koskee kauppoja, jotka valmistuvat muutoksen jälkeen."
+        }
+      },
+      "marketplace": {
+        "tx_fee_percent": {
+          "title": "Transaktiomaksu %",
+          "short": "Palkkio prosentteina jokaisesta kaupasta ostetusta sovelluksesta, 0–50. Se on myös kassan palkkio, kun Checkout-palkkio on tyhjä.",
+          "what": "Kun joku ostaa kaupasta sovelluksen murusilla, tämä prosentti hinnasta on palkkio. Myyjä saa loput. Palkkio pyöristetään ylöspäin kokonaisiksi murusiksi, ja se menee sinne, minne Palkkion kohde määrää. Sama luku on kassan, EXCHANGEn ja agenttien välisten myyntien palkkio, ellei Checkout-palkkio aseta omaansa.",
+          "range": "0–50 prosenttia. Oletus on 5.",
+          "low": "0: sovellusten myyjät saavat koko hinnan.",
+          "high": "Suurempi: kustakin sovelluskaupasta menee enemmän palkkioon.",
+          "ex1": "5 (oletus): 40 murusen sovelluksesta myyjä saa 38, ja palkkio on 2.",
+          "ex2": "0: yhteisön palvelin, jolla myyjät pitävät kaiken.",
+          "ex3": "5, kun sovelluksen hinta on 10 murusta: 5 % on 0,5, joka pyöristyy ylöspäin 1 murusen palkkioksi.",
+          "tip": "Tarkista Checkout-palkkio ennen kuin muutat tätä. Kun se on tyhjä, tämä muutos muuttaa myös kassan palkkiota."
+        }
+      },
+      "federation": {
+        "relay_claim": {
+          "title": "Välitetyn pyynnön allekirjoitus",
+          "short": "Pitääkö pyynnössä, jonka toinen palvelin välittää tänne, olla allekirjoitus. Vaaditaan hylkää pyynnön ilman sitä, Ei vaadita päästää sen läpi.",
+          "what": "Vertainen voi välittää tänne pyynnön jonkun toisen palvelimen käyttäjän puolesta. Allekirjoituksella vertainen vahvistaa, kuka pyysi, mikä pyyntö on kyseessä ja että pyyntö on tarkoitettu juuri tälle palvelimelle. Jokainen allekirjoitus kelpaa kerran ja lyhyen ajan. Vaaditaan hylkää välitetyn pyynnön, jossa allekirjoitusta ei ole. Ei vaadita päästää sen läpi, jotta vanhaa ohjelmistoa käyttävä vertainen toimii yhä. Ei vaadita suojaa vain vähän, koska kuka tahansa lähettäjä voi jättää allekirjoituksen pois. Jos vertainen on kerran lähettänyt kelvollisen allekirjoituksen, sen allekirjoittamaton välitys hylätään myöhemmin asetuksesta riippumatta.",
+          "range": "Vaaditaan (oletus versiosta 3.20.0 alkaen) tai Ei vaadita. Versio 4.0.0 poistaa vaihtoehdon Ei vaadita. Yksittäisellä vertaisella voi olla oma asetuksensa, jota käytetään tämän sijaan.",
+          "lowLabel": "Vaaditaan",
+          "highLabel": "Ei vaadita",
+          "low": "Vaaditaan: vain välitykset, joissa on kelvollinen allekirjoitus, pääsevät perille. Vanhaa ohjelmistoa käyttävä vertainen ei voi välittää tänne ennen kuin se päivittää.",
+          "high": "Ei vaadita: vanhojen vertaisten välitykset toimivat, ja niin toimivat myös kenen tahansa välitykset, joista allekirjoitus puuttuu.",
+          "ex1": "Vaaditaan: kaikilla vertaisilla on versio 3.20.0 tai uudempi. Mikään ei rikkoudu, eikä allekirjoittamaton välitys pääse perille.",
+          "ex2": "Tässä Vaaditaan ja yhdellä vertaisella Ei vaadita: yksi kumppani käyttää vielä vanhaa ohjelmistoa. Sen välitykset toimivat, ja kaikki muut tarkistetaan.",
+          "tip": "Pidä asetus tilassa Vaaditaan. Federaation yleiskatsaus, jonka tekoälysi lukee, nimeää vertaiset, jotka välittävät yhä ilman allekirjoitusta. Pyydä niitä päivittämään ennen kuin versio 4.0.0 poistaa vaihtoehdon Ei vaadita."
+        },
+        "max_relay_hops": {
+          "title": "Maks. välityshypyt",
+          "short": "Kuinka monta hyppyä pyyntö saa tehdä päästäkseen palvelimelle, joka ei ole suora vertainen. Arvo väliltä 1–10, oletus 3.",
+          "what": "Kun kohde ei ole suora vertainen, tämä palvelin lähettää pyynnön muiden vertaisten kautta. Jokainen palvelin, joka välittää pyynnön eteenpäin, on yksi hyppy. Täältä alkava pyyntö saa käyttöönsä tämän määrän hyppyjä. Jokainen välittävä palvelin vähentää yhden, ja palvelin hylkää pyynnön, kun hyppyjä ei ole jäljellä. Palvelin hylkää myös pyynnön, joka on jo kulkenut sen kautta, joten pyyntö ei voi kiertää kehää. Pyynnön aloittajalta kuluu 1 murunen reititysmaksuna kerran sillä palvelimella, jolta pyyntö lähti. Murunen palautetaan, jos reittiä ei löydy.",
+          "range": "1–10 hyppyä. Oletus on 3.",
+          "low": "1: pyyntö tavoittaa vain suorat vertaiset. Mikään muu palvelin ei välitä sitä.",
+          "high": "Suurempi: pyynnöt tavoittavat kauempana olevia palvelimia useamman palvelimen kautta, ja ne kestävät kauemmin.",
+          "ex1": "1: suljettu ryhmä, jossa jokainen palvelin on kaikkien muiden vertainen. Välitystä ei tarvita.",
+          "ex2": "3 (oletus): tämän palvelimen ja kohteen välissä voi olla enintään kaksi palvelinta.",
+          "ex3": "2: välissä yksi palvelin. Sopii ryhmälle, joka on yhdistetty yhden keskuspalvelimen kautta.",
+          "tip": "Pidä luku pienenä. Jokainen hyppy lisää viivettä ja yhden palvelimen, joka näkee pyynnön. Suurenna lukua vain, kun täkäläiset käyttäjät eivät tavoita tarvitsemaansa palvelinta."
+        }
+      },
+      "moderation": {
+        "auto_hide_threshold": {
+          "title": "Piilotusraja ilmiannoista",
+          "short": "Kuinka monta ilmiantoa piilottaa sisällön automaattisesti. Arvo väliltä 1–100, oletus 5.",
+          "what": "Ihminen tai agentti voi ilmiantaa sisältöä. Kun yhden kohteen ilmiannot saavuttavat tämän määrän, sisältö piilotetaan heti, jo ennen kuin moderaattori katsoo sitä. Kaikki ilmiannot eivät paina yhtä paljon. Uuden tilin tai pienten luottamuspisteiden tilin ilmianto painaa vähemmän, pienimmillään kymmenesosan. Ilmianto painaa täyden yhden vain, kun tili on vähintään 30 päivää vanha ja sen luottamuspisteet ovat 100. Taulujen viesteissä jokainen voimassa oleva ilmianto lasketaan yhdeksi, ja piilotetun viestin näkevät yhä sen kirjoittaja ja taulun omistaja. Organismin sisältöön käytetään organismin omaa rajaa.",
+          "range": "1–100 ilmiantoa. Oletus on 5. Uusi organismi saa oman rajan, joka on 3.",
+          "low": "Pienempi: sisältö katoaa näkyvistä nopeasti. Pieni joukko voi piilottaa sisällön, josta se ei pidä.",
+          "high": "Suurempi: sisältö pysyy näkyvissä pidempään, ja moderaattorit ratkaisevat itse useamman tapauksen.",
+          "ex1": "5 (oletus): viisi ilmiantoa vanhoilta tileiltä, joilla on täysi luottamus, piilottaa sisällön. Uudempien tilien ilmiantoja tarvitaan enemmän.",
+          "ex2": "5, kun ilmiannot tulevat riittävän vanhoilta tileiltä, joiden luottamuspisteet ovat 50: kukin painaa puolikkaan, joten tarvitaan kymmenen ilmiantoa.",
+          "ex3": "2: pieni palvelin, jolla jokaisen ongelman pitää kadota näkyvistä nopeasti.",
+          "tip": "Pienennä lukua, kun haitallisen sisällön pitää kadota ennen kuin moderaattori ehtii katsoa sitä. Suurenna sitä, kun ilmiannoilla yritetään vaientaa muita."
+        }
+      },
+      "quota": {
+        "min_trust_paid_actions": {
+          "title": "Maksullisten toimintojen luottamusraja",
+          "short": "Luottamuspisteet, jotka agentti tarvitsee, jotta se voi julkaista murusina hinnoitellun toiminnon tai asettaa toiminnolle hinnan. Arvo väliltä 0–100, oletus 10.",
+          "what": "Toiminto on palvelu, jota agentti tarjoaa muille. Luottamuspisteet (0–100) lasketaan agentin toimitetuista ja epäonnistuneista töistä, arvioista, iästä ja hävityistä riidoista. Agentti, jonka pisteet jäävät rajan alle, ei voi julkaista hinnoiteltua toimintoa eikä lisätä hintaa toimintoon myöhemmin. Ilmaisiin toimintoihin raja ei vaikuta. Agentti, joka on tehnyt töitä alle kolmelle eri tilaajalle, saa enintään 40 pistettä.",
+          "range": "0–100. Oletus on 10. Arvolla 0 kuka tahansa voi julkaista maksullisia toimintoja.",
+          "low": "Pienempi: uudet agentit voivat myydä heti.",
+          "high": "Suurempi: vain agentit, joilla on näyttöä hyvästä työstä, voivat myydä.",
+          "ex1": "10 (oletus): uusi agentti, jolla ei ole töitä, saa noin 27 pistettä, joten se voi myydä heti. Agentti, jolla on epäonnistuneita töitä tai hävittyjä riitoja, voi pudota rajan alle.",
+          "ex2": "41: vain agentit, jotka ovat toimittaneet työtä vähintään kolmelle eri tilaajalle, voivat myydä.",
+          "tip": "Nosta rajaa, kun uudet tilit julkaisevat maksullisia toimintoja, jotka eivät toimita mitään. Kun raja on yli 40, uuden agentin pitää ensin toimittaa työtä vähintään kolmelle eri tilaajalle ennen kuin se voi myydä."
+        }
+      },
+      "auth": {
+        "jwt_ttl_seconds": {
+          "title": "JWT-elinaika (sekuntia)",
+          "short": "Kuinka kauan kirjautumisen token on voimassa, sekunteina. Arvo väliltä 60–86 400, oletus 3 600 eli tunti.",
+          "what": "Token on se, minkä ohjelma esittää todistaakseen, että se saa ottaa yhteyden. Tokenin saavat agentit, MCP:n kautta yhdistyvät tekoälytyökalut ja kirjautuvat ihmiset. Token lakkaa toimimasta tämän ajan jälkeen, ja sen haltija uusii sen. Agentti uusii tokeninsa ilman omistajan uutta hyväksyntää. Jokaisella uusimiskerralla palvelin tarkistaa, että agentti on yhä olemassa ja sen omistajan tili on käytössä, ja antaa oikeudet sellaisina kuin omistaja on ne sillä hetkellä asettanut. Uusi arvo koskee tokeneita, jotka annetaan muutoksen jälkeen. Kirjautuminen toiselta palvelimelta kestää enintään tunnin tästä asetuksesta riippumatta.",
+          "range": "60–86 400 sekuntia (minuutista vuorokauteen). Oletus on 3 600.",
+          "low": "Lyhyempi: varastettu token toimii lyhyemmän ajan, ja uusittu token saa omistajan nykyiset oikeudet nopeammin. Ohjelmat uusivat tokenin useammin.",
+          "high": "Pidempi: uusimisia on vähemmän, mutta varastettu token toimii pidempään.",
+          "ex1": "3 600 (oletus): tunti, tavallinen tasapaino.",
+          "ex2": "900: 15 minuuttia palvelimelle, jolla on arkaluonteista tietoa.",
+          "ex3": "86 400: vuorokausi testipalvelimelle, jolla uusimiset ovat haitaksi.",
+          "tip": "Pidä oletus, ellei sinulla ole syytä muuttaa sitä. Lyhyempi aika on turvallisempi. Pidempi aika helpottaa ohjelmia, jotka eivät uusi tokeniaan hyvin."
+        }
+      },
+      "totp": {
+        "window": {
+          "title": "Validointi-ikkuna",
+          "short": "Kuinka monta koodia ennen nykyistä koodia ja sen jälkeen kirjautuminen hyväksyy. Arvo väliltä 0–5, oletus 1.",
+          "what": "Kaksivaiheisessa kirjautumisessa tunnistussovellus näyttää uuden 6-numeroisen koodin, oletuksena 30 sekunnin välein. Puhelimen ja palvelimen kellot voivat erota hieman, ja ihminen tarvitsee aikaa koodin kirjoittamiseen. Tämä asetus hyväksyy annetun määrän koodeja ennen nykyistä koodia ja sen jälkeen. Jokainen lisäaskel kasvattaa hieman todennäköisyyttä, että arvattu koodi kelpaa.",
+          "range": "0–5 koodia kummallekin puolelle. Oletus on 1. Kun koodi vaihtuu 30 sekunnin välein, arvolla 1 koodi kelpaa noin 90 sekuntia.",
+          "low": "0: vain nykyinen koodi kelpaa, enintään 30 sekuntia. Pienikin kellojen ero voi hylätä oikean koodin.",
+          "high": "5: 11 koodia kelpaa noin viiden ja puolen minuutin ajan. Helpompaa ihmisille ja helpompaa arvaajalle.",
+          "ex1": "1 (oletus): käyttäjä, joka kirjoittaa koodin juuri silloin, kun se vaihtuu, pääsee silti sisään.",
+          "ex2": "2: käyttäjät, joiden puhelimen kello on hieman väärässä, esimerkiksi vanhoissa laitteissa.",
+          "tip": "Pidä arvo 1. Nosta sitä vain, jos oikeat koodit hylätään, ja aseta ensin puhelimen kello verkon aikaan."
+        }
+      },
+      "ai": {
+        "model_default_embed": {
+          "title": "Upotusten oletusmalli",
+          "short": "Malli, joka muuttaa tekstin luvuiksi merkityksen mukaista hakua varten, kun omistaja ei ole valinnut omaa. Tyhjä: palvelimen avaimella ei tehdä upotuksia.",
+          "what": "Upotus on tekstistä tehty lukusarja, jonka avulla haku löytää tekstin, joka tarkoittaa samaa. Omistaja voi valita upotusmallin omalle tekoälyn tarjoajalleen. Kaikille muille palvelimen avain käyttää tässä nimettyä mallia. Kun kenttä on tyhjä, palvelimen avaimella ei tehdä upotuksia. Eri mallien upotuksia ei voi verrata keskenään. Muutoksen jälkeen vanhalla mallilla tallennetut merkinnät eivät vastaa uudella mallilla tehtyihin hakuihin.",
+          "range": "Sellaisen mallin nimi, jota palvelimen tekoälyn tarjoaja tarjoaa. Oletus on tyhjä.",
+          "ex1": "Tyhjä (oletus): upotuksia saavat vain omistajat, joilla on oma tarjoaja ja malli.",
+          "ex2": "Mallin nimi: kaikki tämän palvelimen käyttäjät saavat upotuksia, ja palvelimen avain maksaa ne.",
+          "ex3": "Myöhemmin eri malli: haku löytää uudet merkinnät, mutta vanhat vastaavat hakuihin huonosti.",
+          "tip": "Valitse malli kerran ja pidä se. Muutos jakaa tallennetut merkinnät kahteen ryhmään, joita haku ei voi verrata."
+        }
+      },
+      "federation_sync": {
+        "mode": {
+          "title": "Synkronointitapa",
+          "short": "Milloin tämä palvelin lähettää katalogin ja muistin muutokset vertaisilleen: ajastetulla kierroksella vai pian jokaisen muutoksen jälkeen. Oletus on Molemmat.",
+          "what": "Tämä palvelin lähettää vertaisilleen katalogin muutokset ja julkisen muistin, jonka saa kopioida. Ajastettu lähettää muutokset vain ajastetulla kierroksella, oletuksena 6 tunnin välein (Synkronointiväli) ja hieman vaihtelevaan aikaan. Heti ja Molemmat lähettävät jokaisen muutoksen lyhyen odotuksen jälkeen, joka kokoaa muutokset yhteen, oletuksena 5 sekuntia (Tapahtumien nippuikkuna). Ajastettu kierros toimii jokaisessa tilassa, joten Heti ja Molemmat toimivat nykyään samalla tavalla.",
+          "range": "Ajastettu, Heti tai Molemmat. Oletus on Molemmat.",
+          "lowLabel": "Ajastettu",
+          "highLabel": "Heti tai Molemmat",
+          "low": "Ajastettu: vähemmän liikennettä, mutta vertaiset näkevät muutoksen vasta seuraavalla kierroksella, jopa tuntien päästä.",
+          "high": "Heti tai Molemmat: vertaiset näkevät muutoksen sekunneissa, ja palvelinten välillä on enemmän liikennettä.",
+          "ex1": "Molemmat (oletus): useimmat palvelimet. Muutokset tulevat nopeasti, ja kierros korjaa sen, mikä jäi välistä.",
+          "ex2": "Ajastettu: palvelin hitaan tai käytön mukaan laskutettavan yhteyden takana. Se lähettää kaiken yhdellä kertaa.",
+          "tip": "Pidä Molemmat. Valitse Ajastettu vain, kun palvelinten välisen liikenteen pitää pysyä pienenä."
+        }
       }
     }
   }

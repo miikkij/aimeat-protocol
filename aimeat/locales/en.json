@@ -4169,6 +4169,7 @@
   "decideRules.declined": "The proposal is declined.",
   "decideRules.sampleNotJson": "The sample is not valid JSON.",
   "decideRules.idMissing": "Give the rule an id.",
+  "decideRules.bandsMissing": "Fill in both bands with a number from 0 to 1 before you save the rule.",
   "decideRules.proposals": "Proposed by your agents",
   "decideRules.proposedBy": "Proposed by {who}",
   "decideRules.approve": "Approve",
@@ -22617,6 +22618,992 @@
         "ex2": "Medium: comparing three offers and recommending one.",
         "ex3": "Deep: finding the fault in a long piece of code.",
         "tip": "When an answer comes back empty, the thinking has used the whole longest-answer limit. Turn reasoning off, or raise the limit."
+      },
+      "max_cost_per_call": {
+        "title": "Most per call",
+        "short": "The most one AI call may cost, in US dollars. A provider whose price for the call is higher is skipped. An empty field means no limit.",
+        "what": "Before a call, this AIMEAT estimates the price of the call at each provider in turn, from the model catalogue. A provider whose estimate is over this limit is skipped, and the next one is tried. If no provider fits, the call is refused and says why. A model that has no price in the catalogue is not skipped. The limit applies to text, reading images, reading files and making images.",
+        "range": "0 to 100 US dollars. An empty field means no limit. A text call is estimated at 1,024 tokens of question and 1,024 tokens of answer. On a role, the limit can only be stricter than the one in your routing rules.",
+        "low": "A small limit: only cheap models answer, and more calls are refused when no provider fits.",
+        "high": "A large limit or an empty field: any model in your routing may answer, also an expensive one.",
+        "ex1": "Empty: no limit. Every provider in your routing may answer.",
+        "ex2": "0.01: a model priced at 3 dollars per million question tokens and 15 dollars per million answer tokens is estimated at about 0.018 dollars a call, so it is skipped.",
+        "ex3": "0.05 on a role and 0.01 in the routing rules: the role uses 0.01, because a role can only be stricter.",
+        "tip": "Set a limit when a fallback must never move a call to a much more expensive model. The estimate is not the bill: a long question or a long answer costs more than the estimate. To limit what you spend in a day, use the daily budget."
+      },
+      "fallback": {
+        "title": "When a provider fails",
+        "short": "Whether a call moves on to the next provider when the first one does not answer. On by default.",
+        "what": "When this is on and a provider does not answer, the call moves to the next provider in your routing. A timeout, a rate limit, a server error, a service that is down or a refused key moves the call on. A bad request, refused content or an empty answer does not. When this is off, the call stops at the first failure and shows the error. A provider that fails three times in a row waits behind the others for five minutes, and then one call tries it again.",
+        "range": "On or off. On by default. Providers per call sets how many providers one call may try.",
+        "ex1": "On: OpenAI answers with a rate limit. The call moves to your next text provider, and you get an answer.",
+        "ex2": "Off: the same rate limit stops the call, and the app shows the error.",
+        "ex3": "On, and a provider refuses your key: the call moves on, and that provider is skipped until you test it again or change its key.",
+        "tip": "Keep it on unless you must see a failure at once, for example while you try out a new provider. Some calls never move on: a call that names its provider, speech unless Another voice is on, and embeddings, except to the same model."
+      },
+      "fallback_attempts": {
+        "title": "Providers per call",
+        "short": "How many providers one call may try, the first one included. A whole number from 1 to 5. The default is 3.",
+        "what": "When a provider fails and the call moves on, this limits how many providers the call tries in all. The first provider counts as one. When the limit is reached, the call stops and shows the error. Each failed try takes time, so a high number can make a failing call slow. The setting does nothing while When a provider fails is off: then only one provider is tried.",
+        "range": "1 to 5, whole numbers. The default is 3. 1 means that the call does not fall back.",
+        "low": "1 or 2: a failing call stops soon. Good when an app must answer fast or not at all.",
+        "high": "4 or 5: more chances to get an answer when you have many providers. A call where all of them fail takes longer.",
+        "ex1": "1: the first provider only, as if When a provider fails were off.",
+        "ex2": "3: the first provider and two to fall back to. This is the default.",
+        "ex3": "5: you have five text providers, and a call gets an answer even when four of them are down.",
+        "tip": "The number counts only the providers in your routing and, when After your choices is on, your other providers. A number higher than the providers you have changes nothing."
+      },
+      "fallback_leaves_machine": {
+        "title": "Leaving this machine",
+        "short": "Whether a fallback from a provider on this machine may send the data to a cloud service. Off by default.",
+        "what": "A local AI server runs on the same machine as this AIMEAT, so the data does not leave the machine. When such a provider fails, the next provider in your routing can be a cloud service, such as OpenAI. With this setting off, that provider is skipped, and the data stays on the machine. With it on, the call moves to the cloud service, and the question and any files go there. The setting matters only when the first provider is local.",
+        "range": "On or off. Off by default.",
+        "ex1": "Off: LM Studio on this machine does not answer. The cloud provider after it is skipped, and the call shows the error.",
+        "ex2": "On: the same failure moves the call to OpenRouter, and the answer comes from there.",
+        "ex3": "Off, with OpenAI first: the setting does nothing, because the data leaves the machine in any case.",
+        "tip": "Keep it off when you use a local provider because the data must not leave the machine, for example personal data or confidential material. Turn it on when getting an answer matters more than where the answer is made. On a public AIMEAT, such as aimeat.io, this machine is the server, not your own computer."
+      },
+      "fallback_pool": {
+        "title": "After your choices",
+        "short": "Whether a call may try your other providers after the ones you chose for that work, and in which order. On by default.",
+        "what": "In the routing you choose up to three providers for each kind of work. With this on, the call then tries your other providers that have a model set for that work. With it off, only your choices are tried. Providers per call still limits how many are tried in all. When neither your choices nor your other providers give a provider, this AIMEAT's own default answers.",
+        "range": "On or off, on by default. The order: in the order they are listed (the default), cheapest first, or fastest first. Cheapest first uses the text price of the model catalogue and applies to text, reading images and reading files; a provider without a price comes last. Fastest first keeps the listed order for now, because this AIMEAT does not measure speed yet.",
+        "ex1": "On, in the order they are listed: you chose OpenAI for text. When it fails, your Mistral and OpenRouter providers are tried next, in the order the page shows them.",
+        "ex2": "On, cheapest first: the cheapest of your other text providers is tried first.",
+        "ex3": "Off: you chose only OpenAI for text. When it fails, the call stops, even if you have other providers.",
+        "tip": "Keep it on, so that a call has somewhere to go. Turn it off when only the providers you chose may see the data. A provider joins this group only when you set a model for that work on it."
+      },
+      "only_tested": {
+        "title": "Only tested providers",
+        "short": "Whether this AIMEAT skips your providers that have not been tested yet. On by default.",
+        "what": "When this AIMEAT picks a provider for a call, it skips your providers whose capability for that work has never been tested. This includes the providers you chose in the routing. A test is the Test now button on a provider, and a call that names the provider and works also counts. The rule does not apply when a call names its provider or its model, or runs as a role: then that choice is tried. This AIMEAT's own providers are not checked, because the people who run it answer for them. A provider that was tested but now fails is handled separately: it waits behind the providers that work.",
+        "range": "On or off. On by default.",
+        "ex1": "On: you add a Mistral provider and set a model, but you do not test it. Text calls skip it, and the page says that it has not been tested, with a Test now button.",
+        "ex2": "On, and the test works: the provider answers calls like the others.",
+        "ex3": "Off: a new provider answers calls at once. A wrong key then shows as a failed call, not as a skipped provider.",
+        "tip": "Keep it on, so that a new provider with a typing error in its key or model does not break your calls. Test each new provider once."
+      },
+      "embeddings": {
+        "title": "Embeddings",
+        "short": "Turns text into numbers, so that a search finds texts that mean the same thing, not only texts with the same words. Apps and agents ask for it.",
+        "what": "An embedding is a list of numbers that a model makes from a text. Texts with a similar meaning get similar numbers, so a search by meaning can compare them. Apps and agents use embeddings to find related notes, documents or answers. Only the numbers of one model can be compared with each other. For that reason, an embedding call falls back only to the same model on another provider, never to a different model.",
+        "range": "On or off for each provider, with one model. OpenRouter, OpenAI, Mistral, a local AI server, an OpenAI-compatible address and an extension can make embeddings; Anthropic and xAI cannot. One call takes at most 256 texts and 500,000 characters.",
+        "ex1": "You search for “holiday”, and a notes app also finds the note about a trip to Crete.",
+        "ex2": "You change the embedding model: the numbers that an app stored earlier no longer match the new ones, so the app must make them again.",
+        "tip": "Choose the embedding model once and keep it. A change makes every stored embedding useless next to new ones until they are made again. In the admin settings, the default embedding model is the one that the server's own key uses. An empty field there means that the server's key makes no embeddings."
+      },
+      "model_policy": {
+        "title": "Models allowed",
+        "short": "Which models your AI calls may use: any model, the recommended models, or your own list.",
+        "what": "The model policy sets which models may answer. Any model sets no limit. The recommended models are the list that the people who run this AIMEAT keep, and your policy follows their changes. With your own list, you name the models yourself. A call for a model outside the policy is refused, and the answer says which models are allowed. A call that names no model uses the provider's model when it is allowed, and otherwise the first allowed model. Whose calls says what the policy covers: your own calls, the chat, your agents and your apps.",
+        "range": "Any model (the default), the recommended models, or my own list. You can choose the recommended models only when this AIMEAT has some. Your own list takes at least 1 and at most 200 models, one per line, as type:model id. When you turn a policy on, it covers all four kinds of calls until you clear some of them.",
+        "lowLabel": "Open",
+        "highLabel": "Strict",
+        "low": "Any model: no call is refused because of its model. An app may still name its own shorter list.",
+        "high": "My own list: only the models you named answer. Every other model is refused, also in a fallback.",
+        "ex1": "Any model: an app asks for a model that you have never used, and the model answers.",
+        "ex2": "The recommended models, for my apps only: your apps use only the list that the people who run this AIMEAT keep, and your own chat may use any model.",
+        "ex3": "My own list with openai:gpt-5-mini: an agent asks for a more expensive model, and the call is refused. The answer names the allowed model.",
+        "tip": "Each layer can only make the rule stricter: both an app's own list and your list must allow a model. When you use your own list, write the models for every capability you use, also embeddings and speech. Otherwise those calls are refused."
+      },
+      "content_classifier": {
+        "title": "Content Classifier",
+        "short": "The model that gives your content a classification, such as public, internal or confidential: the decision model or a text model.",
+        "what": "A classification decides which people and which AI may read a piece of content, and whether it may leave an organism. Rules that recognise passwords and identity codes run first. Then the Content Classifier judges the rest. A decision model answers closed questions and writes no text. A text model reads the content and answers like any text call, through your text routing or through the provider you name. The classification policy sets whether a person confirms the result and how many calls a day the classifier may make.",
+        "range": "Decision model: the default, or a named decision provider. Text model: the text routing, or a named text provider. The operator chooses the default for this server; you may choose another one for your own content.",
+        "lowLabel": "Decision model",
+        "highLabel": "Text model",
+        "low": "Answers closed questions with a probability and writes no text. The operator must turn it on for this server.",
+        "high": "Uses your text providers and their prices. It works also when the decision model is off.",
+        "ex1": "Decision model: default. The decision provider that this AIMEAT uses by default classifies your content. Your text routing does not change.",
+        "ex2": "Text model: the text routing. The provider that answers your text calls also classifies your content, and the calls count toward your daily budget.",
+        "ex3": "Text model: a named provider, such as your local AI server. Your content is classified, and the text does not go to a cloud service.",
+        "tip": "Choose the text model when the decision model is off on this AIMEAT; the page then shows the classifier as off. Choose a local provider when your content must not leave this machine. The rules for passwords and identity codes run whichever model you choose."
+      },
+      "daily_budget": {
+        "title": "Daily budget",
+        "short": "The most your AI calls may cost in one day, in US dollars. When it is spent, further calls are refused until midnight UTC.",
+        "what": "The budget counts what all AI calls in your name cost today: your own, your agents' and your apps', whether your own key or the server's key pays. Before each call, this AIMEAT compares what is already spent with the budget. When the amount spent reaches the budget, the call is refused, and the asker is told why. One call can go a little over the budget, because the check comes before the call and the call's own cost is known only after it. The budget starts again at midnight UTC.",
+        "range": "0 to 1,000 US dollars. The default is 1 dollar a day. 0 refuses every call.",
+        "low": "A small budget: an app or an agent that goes wrong can spend only a little. Your own work can stop in the middle of the day.",
+        "high": "A large budget: work does not stop, but a fault in an app can cost more before you see it.",
+        "ex1": "1: the default. Enough for many ordinary answers, because one usually costs a fraction of a cent.",
+        "ex2": "0: no AI call runs, for example while you are away and want no spending at all.",
+        "ex3": "20, with a limit of 2 on one app: the app stops at 2 dollars, and the rest of the budget stays for other work.",
+        "tip": "Look at what your last 30 days cost, under the budget, and set the budget a little above a normal day. Give a new or busy app a limit of its own, so that it cannot use the whole budget."
+      },
+      "app_daily_cap": {
+        "title": "Limit a day",
+        "short": "The most one app may spend on AI in a day, in US dollars. Empty: the app may use the whole daily budget.",
+        "what": "Every app may use your whole daily budget unless it has a limit of its own. A limit stops one app before it uses the budget that your other work needs. Before each call from the app, this AIMEAT compares what the app has spent today with its limit. When the app reaches its limit, its calls are refused until midnight UTC, and your other apps go on. The daily budget still applies: a limit above the budget does not let the app spend more.",
+        "range": "0 to 1,000 US dollars, written on the app's row. Empty: no limit of its own. 0 stops the app's AI calls.",
+        "low": "A small limit: the app can try its AI features, but a fault in it costs little.",
+        "high": "A large limit or an empty field: the app may use what is left of the daily budget.",
+        "ex1": "Empty: a writing app that you use all day shares the whole budget.",
+        "ex2": "0.50: a new game that you are testing. A loop that calls the AI again and again stops at 50 cents.",
+        "ex3": "0: an app that you no longer trust. Its AI calls are refused, but the app still opens.",
+        "tip": "Set a limit on a new app, and on any app whose 30-day cost surprises you. The table is ordered by 30-day cost, so the most expensive apps are at the top."
+      },
+      "pdf_engine": {
+        "title": "PDF engine",
+        "short": "Who turns a PDF into text for a model that cannot read one itself. Only for the Reads files capability of an OpenRouter provider.",
+        "what": "Some models read a PDF themselves, and others read only text. OpenRouter can convert the PDF for such a model before the model reads it. This setting chooses the converter. This AIMEAT converts nothing itself. With no PDF engine or the model's own, a model that cannot read files is refused for a call with a file, and the call moves to the next provider. With Mistral OCR or Cloudflare AI, OpenRouter converts the PDF, and the model gets the text.",
+        "range": "No PDF engine (the default), the model's own, Mistral OCR, Cloudflare AI. The model catalogue says which models read files; a model that the catalogue does not know is trusted to read them.",
+        "ex1": "The model's own: your model reads PDFs itself. The PDF goes to it as it is.",
+        "ex2": "Mistral OCR: a scanned contract whose pages are pictures. OCR finds the text on them, and a model that reads only text can then read it.",
+        "ex3": "No PDF engine, with a model that reads only text: a call with a PDF skips this provider and moves to the next one that can read files.",
+        "tip": "Choose the model's own when your model reads files. Choose an engine when you use a model on OpenRouter that reads only text and you want it to read PDFs. For scanned pages, choose Mistral OCR."
+      },
+      "local_only": {
+        "title": "This machine",
+        "short": "Whether this role may use only providers on the same machine as this AIMEAT. The data then does not leave the machine.",
+        "what": "With this on, the role's calls skip every provider that would take the data off this machine: OpenRouter, OpenAI, Anthropic, Mistral, xAI, an address you gave, and extensions. Only a local AI server, such as LM Studio or Ollama, may answer. If the role has no such provider, its calls are refused and say why. An app can ask the same for its own role, and then the rule holds even when you leave this off.",
+        "range": "On or off. Off by default.",
+        "ex1": "On: a role “Diary summaries” with Ollama on this machine. The text of your diary never goes to a cloud service.",
+        "ex2": "On, with only OpenAI in the role: every call of the role is refused, because no provider is on this machine.",
+        "ex3": "Off: the role uses the providers you listed, wherever they run.",
+        "tip": "Turn it on for a role that handles personal data or confidential content. On a public AIMEAT, such as aimeat.io, this machine is the server, and you cannot add a local provider there. The setting then works only with a local AI server that the people who run that AIMEAT offer, or on an AIMEAT you run yourself."
+      },
+      "max_retries": {
+        "title": "Max retries",
+        "short": "How many times your AIMEAT asks the model again when its answer comes back empty. 1 to 10.",
+        "what": "Sometimes a model answers with nothing. A reasoning model does it most often, when its thinking uses the whole longest-answer limit. With automatic retry on, your AIMEAT asks the same question again, up to this many times. When every attempt is empty, the call fails and says why. Each new attempt is a new call, and the model can charge for it.",
+        "range": "1 to 10. The field starts at 3. With automatic retry off, an empty answer fails at once.",
+        "low": "1: a fault shows soon, and an empty answer costs at most one extra call.",
+        "high": "10: a model that sometimes answers empty gets many chances. When the fault is in the settings, all ten attempts fail and cost.",
+        "ex1": "3: the starting value. Enough for a short fault at the provider.",
+        "ex2": "1: you test new settings and want to see an empty answer at once.",
+        "tip": "When answers often come back empty, raise the longest-answer limit or turn thinking down. More retries only repeat the same fault."
+      }
+    },
+    "decide": {
+      "bands": {
+        "title": "Bands",
+        "short": "Two numbers from 0 to 1 that turn the rule's result into an outcome: act, ask a person, or stop.",
+        "what": "Each run of the rule gives a result: how sure the model is, from 0 to 1. The result is the weakest certainty among the questions that have a threshold. At or over the first number, the caller acts on its own. Under the first number but at or over the second, a person is asked. Under the second number, the caller stops. An answer under its own question's threshold stops the action before the bands are used.",
+        "range": "Two numbers from 0 to 1, decimals allowed. The second number must not be higher than the first. No number is filled in for you. When the model gives no certainty at all, a person is asked.",
+        "low": "The caller acts on its own more often, and a person sees fewer cases.",
+        "high": "The caller acts on its own only when the model is very sure. More cases go to a person or stop.",
+        "ex1": "Act 0.9, ask 0.6: with a result of 0.95 the caller acts, with 0.75 a person is asked, and with 0.4 the caller stops.",
+        "ex2": "Act 0.8, ask 0.8: nobody is asked. The caller acts at 0.8 or over and stops under it.",
+        "ex3": "Act 0.9, ask 0: the bands never stop the caller. Only an answer under its threshold stops it, and every result under 0.9 goes to a person.",
+        "tip": "Choose the numbers from your own examples. Try the rule on samples, read the latest decisions, and see where the right and the wrong answers fall. Start with a wide gap between the two numbers, so that a person sees the unclear cases. Make the gap narrower when the decisions show that the model is right. Fill in both numbers before you save the rule."
+      },
+      "question_threshold": {
+        "title": "Threshold",
+        "short": "The value one answer must reach, or the action stops. For a scale it is a level counted from 0. For the other question types it is a number from 0 to 1.",
+        "what": "Only a question with a threshold counts toward the outcome. A question without one is asked and recorded, but it does not change the outcome. What the number means depends on the question type. For yes or no, it is the lowest probability of yes. For pick one, it is how sure the model must be of its pick. For a scale, it is the lowest level the answer must reach. An answer under its threshold stops the action, whatever the bands say.",
+        "range": "Yes or no: 0 to 1. Pick one: 0 to 1. Scale: a level from 0, where 0 is the first level in your list and the highest allowed value is the last level. An empty field means the question does not count. A rule needs at least one question with a threshold.",
+        "low": "The question stops the action only when the answer is clearly against it.",
+        "high": "The answer must be clear, or the action stops. The action stops more often.",
+        "ex1": "Yes or no, 0.8: the statement is 'The reply answers the customer's question'. The model must give it at least 0.8, or the reply does not go out.",
+        "ex2": "Pick one, 0.7: a message is sorted into sales, support or billing. The model must be at least 0.7 sure of its pick, or the action stops.",
+        "ex3": "Scale, 2: the levels are poor, fair, good and excellent (0 to 3). The answer must be good or excellent.",
+        "tip": "Write every question so that a high value means go ahead. Then a threshold always works as a floor. Give a threshold only to the questions that must be able to stop the action. Tune the numbers from the latest decisions, not from a guess."
+      },
+      "gate": {
+        "title": "Gate",
+        "short": "Whether an agent must wait for you when the decision model is not sure enough. Off until you turn it on.",
+        "what": "A gate is a decision rule that guards an action that cannot be undone, such as sending a reply. With the gate on, the agent acts only when the outcome is Act. When the outcome is Ask a person or Stop, AIMEAT tells the agent not to act, gives you a task and sends you a notification. With the gate off, the agent may act whatever the outcome is, and the decision is still recorded. A gate holds only agents. An app reads the outcome, and its own code decides.",
+        "range": "In the rule editor: ticked or not ticked, not ticked by default. On the agent's page: As each rule says, On for every rule, or Off. The default is As each rule says, and then the tick of each rule decides.",
+        "lowLabel": "Gate off",
+        "highLabel": "Gate on",
+        "low": "Off: the agent acts on its own. You see afterwards what the model answered, and you can compare.",
+        "high": "On: the agent waits for you every time the model is not sure enough. This is safer, but you get more tasks.",
+        "ex1": "On: an agent sends replies to customers. A reply that the model is not sure of waits for you as a task.",
+        "ex2": "Off: the first weeks of a new rule. The agent acts, and the recorded decisions show how often the gate would have stopped it.",
+        "ex3": "As each rule says: the rule that guards deleting a record is ticked as a gate, and the rule that sorts messages is not.",
+        "tip": "Keep the gate off at first and read the decisions, so that you can compare how the agent does without it. Turn it on when a wrong action costs more than a short wait. AIMEAT does not do the action itself: it tells the agent not to act, and it records that instruction."
+      },
+      "price_per_mtok": {
+        "title": "Price in USD per million tokens",
+        "short": "What this provider charges for the text it reads, in US dollars per million tokens. AIMEAT uses it to count what your decisions cost.",
+        "what": "Models count text in tokens, which are pieces of words. A decision provider that is an online service charges for the tokens it reads. AIMEAT computes the cost of each decision from its tokens and this price, and records the cost with the decision. The cost counts toward your daily budget and toward an agent's daily cap. The price does not change what the provider bills you. Only an online service has a price: a local decision model costs nothing.",
+        "range": "0 to 1,000 US dollars per million tokens, decimals allowed. An empty field records no price: the provider shows 'no price given', and its decisions count as free.",
+        "ex1": "0.042: the price AIMEAT uses for TypeSafe's Jev, unless the operator changes it. A decision of about 4,000 characters then costs about 0.000042 USD.",
+        "ex2": "2: a provider that charges 2 US dollars per million tokens. A decision of 1,000 tokens costs 0.002 USD.",
+        "ex3": "Empty: you do not know the price yet. The decisions are recorded at no cost, so your daily budget does not limit them.",
+        "tip": "Copy the price from the provider's price list: the price for the text it reads (input). Leave the field empty only while you do not know the price. Without a price, your daily budget and an agent's daily cap do not count these decisions."
+      },
+      "provider_limits": {
+        "title": "What it can carry",
+        "short": "The most options this provider chooses among, and the most text it reads, in characters. AIMEAT refuses a question that does not fit, before anything is sent.",
+        "what": "Each decision model has limits. Some models read only the start of a long text and drop the rest without an error. Then the decision rests on part of the content. Here you tell AIMEAT the limits of this provider. AIMEAT checks every request against them before it sends anything. It also refuses a rule that names this provider when the rule's questions do not fit. The text that counts is the content and the questions together.",
+        "range": "Most options: a whole number from 2 to 10,000. An empty field means 20. Most text: 256 to 4,000,000 characters. AIMEAT counts about 4 characters as one token. An empty field means about 4,000 characters (4,096). These are the least a local model carries.",
+        "low": "AIMEAT refuses more questions, but no content is cut off without a word.",
+        "high": "Longer content and more options get through. If a limit is higher than the model really carries, the model can answer from part of the content.",
+        "ex1": "20 and 4,096: the built-in local example Laya. It reads about 4,000 characters, so AIMEAT refuses a longer message before it sends it.",
+        "ex2": "60 and 20,000: the built-in local example jeff, which chose well among 60 topics when it was measured. A pick-one question with 61 options is refused.",
+        "tip": "Take the numbers from the provider's documentation, or measure them: put a known fact at the end of a long text and see whether the answer uses it. When a question is refused, send fewer fields, or split a long list of options into parts."
+      },
+      "store_state": {
+        "title": "Keep the cleaned text with each decision",
+        "short": "When on, each decision keeps the text the model judged, after personal data was removed. When off, only a fingerprint of the text is kept. Off by default.",
+        "what": "AIMEAT removes personal data before it sends content to the decision model. This setting decides what the decision record keeps of that cleaned text. When on, the record keeps the whole text, so you can see later exactly what the model judged. When off, the record keeps only a fingerprint: a short code computed from the text. The fingerprint shows whether two decisions were about the same content, but the text cannot be read back from it. A decision record is deleted after a year, unless the operator set another period.",
+        "range": "Off by default. The setting applies to the decisions made after you change it.",
+        "tip": "Turn it on while you tune a rule, so that you can see what the model judged. Turn it off when the decisions go well, so that less of your content is kept. Content that an app or agent sent as public, without removing personal data, is kept as it was sent."
+      },
+      "public_opt_out": {
+        "title": "Let my apps and agents send content they mark as public without removing personal data",
+        "short": "When on, an app or agent may send content it marks as public without removing personal data. Off by default.",
+        "what": "By default, AIMEAT removes personal data from everything that goes to the decision model: e-mail addresses, phone numbers, Finnish identity codes, bank account numbers, street addresses and names. An app or agent can mark content as public, for example a published news article with nothing private in it. With this setting on, AIMEAT sends such content as it is. With this setting off, AIMEAT removes personal data from all content, whatever the app or agent says about it.",
+        "range": "Off by default. Content that you mark as public yourself is always sent as it is.",
+        "tip": "Turn it on only if you trust every app and agent that asks the decision model for you. An app can mark anything as public, and AIMEAT does not check the mark. With an online service, the content then leaves this machine with any personal data in it. TypeSafe runs in the United States and may keep what it receives."
+      }
+    },
+    "agent": {
+      "daily_cap": {
+        "title": "Daily cap",
+        "short": "The most this agent may spend on AI in one day, in US dollars. An empty field means no cap of its own.",
+        "what": "Every AI call the agent makes costs money: its decisions and the text it writes. This cap counts both together. Before each call, your AIMEAT compares what the agent spent today with the cap. When the agent has reached the cap, your AIMEAT refuses its next calls until the day changes. One call can go a little over the cap, because its cost is known only after the call. Your own daily budget still applies.",
+        "range": "0 to 10,000 US dollars. Empty: no cap of its own, and only your daily budget limits the agent. 0 stops every AI call of this agent. The day changes at midnight UTC.",
+        "low": "A low cap protects you when the agent goes wrong, for example in a loop. On a busy day the agent stops, and its work waits until the next day.",
+        "high": "A high cap lets the agent finish long work on the same day. A fault, such as a loop, costs more before the agent stops.",
+        "ex1": "0: you want the agent to stop using AI for now. Every call is refused at once.",
+        "ex2": "0.5: an agent that makes short decisions, such as sorting messages. A loop stops at 50 cents.",
+        "ex3": "5: an agent that writes long reports with a large model. It finishes a day's work, and a fault costs at most about 5 dollars.",
+        "tip": "Set a cap for every agent that works while nobody watches it. Look at the figure for today under the cap for a few days, and set the cap a little above a normal day. When the agent stops in the middle of the day, check the cap first."
+      },
+      "run_mode": {
+        "title": "How it runs",
+        "short": "Whether your connector starts this agent only when work arrives, or keeps it running all the time.",
+        "what": "An agent of your own is a program that runs on a machine. Your connector is the program on that machine that starts your agents. This setting tells your connector when to start this agent. Your AIMEAT stores the choice and shows it, and your connector acts on it. When no connector runs the agent, the setting changes nothing.",
+        "range": "Starts when work arrives, Always on, Not decided. A new agent made on this page starts with Starts when work arrives. An agent made another way starts as Not decided.",
+        "lowLabel": "Starts when work arrives",
+        "low": "Nothing of the agent runs while it waits. The first answer comes a few seconds later, because the program must start first. Good for work that comes now and then: reports, sorting, research.",
+        "highLabel": "Always on",
+        "high": "The agent answers at once, but its program runs on the machine all the time. Good for a front door that people talk to, where a wait of a few seconds is felt.",
+        "ex1": "Starts when work arrives: an agent that writes a news summary every morning. It runs for a few minutes a day.",
+        "ex2": "Always on: a customer service agent on your website. A visitor gets an answer without a wait.",
+        "ex3": "Not decided: an agent that you still test by hand. Your connector does not start it.",
+        "tip": "Pick Starts when work arrives unless a person waits for the answer. You can change between all three at any time. When an agent does not answer at all, check this setting first: Not decided means that your connector does not start it."
+      },
+      "concurrency": {
+        "title": "Max concurrent tasks",
+        "short": "How many tasks the agent works on at the same time. 1 to 20; 1 means one task after another.",
+        "what": "Tasks wait in the agent's queue. With 1, the agent finishes one task before it starts the next. With a higher number, it starts several tasks at once, so a long queue empties sooner. Your AIMEAT stores the number, and the program that runs the agent keeps to it. A number above 1 needs a program that can do several tasks at once, such as the CrewAI daemon of the aimeat-crewai package.",
+        "range": "1 to 20 tasks. The default is 1.",
+        "low": "1: one task at a time. It works with every program that runs agents.",
+        "high": "More than 1: a long queue empties sooner. The tasks use the same machine and the same daily cap, and a task can finish before one that came earlier.",
+        "ex1": "1: an agent that writes into the same document in every task. Two tasks at once could write over each other.",
+        "ex2": "3: an agent that answers separate customer questions. Three people get an answer at the same time.",
+        "ex3": "10: an agent that checks a hundred web pages, one page in each task.",
+        "tip": "Keep 1 unless the queue grows faster than the agent empties it. Raise the number only when the tasks do not depend on each other. First make sure that the program that runs the agent can do several tasks at once."
+      },
+      "token_budget": {
+        "title": "Token Budget",
+        "short": "A number of tokens that you set as the default for all your agents. An empty field means no limit.",
+        "what": "Models count text in tokens, which are pieces of words. This number is part of your agent defaults, which apply to all your agents unless an agent's own directives say otherwise. Your AIMEAT stores the number and shows it here. In this version, no part of your AIMEAT stops an agent when it reaches the number, and the number is not sent to your agents. To limit what an agent spends, use the daily cap on the agent's own page.",
+        "range": "A whole number from 0 up. Empty: unlimited.",
+        "tip": "When you want a limit that stops an agent, set the daily cap on the agent's own page."
+      },
+      "self_start": {
+        "title": "Starts work by itself",
+        "short": "On: work sent to the agent starts at once. Off: the work waits until you start it.",
+        "what": "Work reaches an agent as tasks: from you, from a schedule or from another agent. With this switch on, the agent starts each task at once, and you see afterwards what it did. With the switch off, each task waits in the queue until you press Start, or ask your AI to start it. An agent that can spend money, send mail or delete things in your name always waits for your OK, and the switch does not turn on. The agent cannot change this setting for itself.",
+        "range": "On or off. When nobody has set it, an agent made to run tasks starts by itself, and every other agent waits.",
+        "ex1": "On: an agent that writes a news summary every morning from a schedule. Nobody needs to be awake to start it.",
+        "ex2": "Off: a new agent that you do not know well yet. You read its plan and press Start.",
+        "ex3": "Always off: an agent that may pay invoices. Every payment waits for your OK, and the switch does not turn on.",
+        "tip": "Start with off, and turn the switch on when the agent has done the same kind of work well a few times. A task can carry its own word, such as \"check with me first\", and that word goes before this switch."
+      },
+      "purchase_limit": {
+        "title": "Most it may spend in a day",
+        "short": "How much money this agent may spend on purchases in one day, in the currency you pick. Without a limit, it spends nothing.",
+        "what": "An agent can buy things in your name, and the money comes from you. This limit sets how much it may spend in one day. Before each purchase, your AIMEAT adds the price to what the agent spent today. When the sum would go over the limit, the purchase is refused, and the agent is told where you can raise the limit. Each currency has its own limit. In a currency with no limit, the agent cannot spend money at all.",
+        "range": "0 to 1,000,000, in euros or US dollars. When you remove the limit, the agent spends nothing in that currency. The day changes at midnight UTC. A hold for a bid counts as spent, also when the hold is released later the same day.",
+        "low": "A low limit keeps a mistake small. The agent stops at the first purchase that does not fit.",
+        "high": "A high limit lets the agent make larger purchases by itself. A wrong purchase can cost up to the limit.",
+        "ex1": "20 EUR: an agent that buys single reports or data sets. A wrong purchase costs at most 20 euros a day.",
+        "ex2": "50 EUR and no limit in USD: the agent can pay in euros, and a purchase priced in dollars is refused.",
+        "ex3": "500 EUR: an agent that orders supplies for your company. Each day's orders stay under 500 euros.",
+        "tip": "Set the lowest limit that lets the agent do its job, and check on the card what it spent today. The limit does not apply to your own purchases or to morsel prices. Only you can change the limit, signed in yourself."
+      }
+    },
+    "access": {
+      "scopes": {
+        "title": "What it may do",
+        "short": "Which permissions the agent gets. Each permission lets it read or change one kind of thing in your name. You can narrow them later.",
+        "what": "A permission lets the agent read or change one kind of thing, for example read your memory or write to it. The agent can do only what its permissions allow. When it tries something else, your AIMEAT refuses and names the permission that is missing. The fewer permissions an agent has, the less harm a mistake or a stolen key can do. An agent that can spend money, send mail or delete things in your name never starts a task by itself.",
+        "range": "A new agent: Reading only, Read and write, Everything you can do. A token: Only these (you pick each permission), Everything you can, and for the operator of this server, Run the whole server.",
+        "lowLabel": "Fewer permissions",
+        "low": "Reading only: the agent reads your memory, your files, the public directory and the boards you can reach, and changes nothing. Read and write also lets it write to your memory and files, ask other agents to do work for you, and see the work in your queue.",
+        "highLabel": "More permissions",
+        "high": "Everything you can do: the agent can do all that you can, in every app and with every piece of data. A mistake or a stolen key reaches everything. After some days your AIMEAT knows which permissions the agent used. From then on, its tasks wait for your OK, and your AIMEAT offers to narrow its permissions to those.",
+        "ex1": "Reading only: an agent that answers questions about your notes in a chat. It cannot change or delete anything.",
+        "ex2": "Read and write: an agent that collects news and saves a summary in your memory.",
+        "ex3": "Only these, with memory writing only: a measuring device that saves its readings. If its token leaks, nobody can read your data with it.",
+        "tip": "Give the least that the job needs, and add a permission when the agent is refused. Use Everything you can do only for your own AI, which you trust as you trust yourself."
+      }
+    },
+    "crew": {
+      "process": {
+        "title": "Process",
+        "short": "Sequential: the tasks run one after another in the order of the list. Hierarchical: a manager gives the tasks to the members and checks their work.",
+        "what": "A crew is a group of members, and each task names the member that does it. With Sequential, the crew runs the tasks in the order of the list, and a task can read the results of earlier tasks. With Hierarchical, the crew adds a manager that plans the work, gives each task to the member it thinks fits, and checks the answer before it goes on. The manager is also a model, so a run makes more model calls and costs more.",
+        "range": "Sequential or Hierarchical. The default is Sequential.",
+        "lowLabel": "Sequential",
+        "low": "Predictable and cheaper. You decide the order and who does what. Right for most crews.",
+        "highLabel": "Hierarchical",
+        "high": "The manager can change the order and pick the member for each task. Slower and more expensive, and the result is harder to predict.",
+        "ex1": "Sequential: a researcher finds sources, a writer writes the article, and an editor checks it. The order never changes.",
+        "ex2": "Hierarchical: a support crew with a billing expert and a technical expert. The manager sends each question to the right one.",
+        "tip": "Start with Sequential. Change to Hierarchical only when the right order or the right member depends on the input. Then test the crew a few times, because the manager decides the path again on every run."
+      },
+      "llm_profile": {
+        "title": "Model profile",
+        "short": "Which model setup the crew uses, named as in the llm_providers.json file of the program that runs it. Empty uses that program's default.",
+        "what": "The program that runs the crew keeps its model setups in a file named llm_providers.json, on its own machine. Each setup has a name, a model and the address to reach it. This field names the setup that this crew uses. Three choices go before this field: a model pinned on that machine, the model chosen for this agent, and the machine's own list of crews. Your default for all agents, and the machine's default, come after it.",
+        "range": "A profile name of 1 to 64 characters, as it is written in llm_providers.json. Empty: the next choice in that order applies.",
+        "ex1": "fast: a profile that you named for a cheap, quick model. Good for a crew that sorts messages.",
+        "ex2": "Empty: the crew uses the model that you chose for all your agents, or the machine's default.",
+        "tip": "When the crew does not use the model you expect, check first whether a model is chosen for this agent itself. Copy the profile name exactly from the file."
+      },
+      "delegation": {
+        "title": "May delegate to other members",
+        "short": "On: this member may give part of its work to another member of the crew, or ask another member a question.",
+        "what": "With this on, the member gets two more tools: one gives a piece of work to another member, and one asks another member a question. The member decides itself when to use them. Each handover means more model calls, so a run takes longer and costs more. With this off, the member does its task alone, with its own tools. In a Hierarchical crew, the manager gives out the work whatever this setting says.",
+        "range": "On or off. The default is off.",
+        "ex1": "On: a writer who may ask the researcher to check a fact.",
+        "ex2": "Off: a member that formats the final text. It needs nobody else.",
+        "tip": "Turn it on for one member at a time, where a question to another member helps. When several members may delegate, they can pass work back and forth, and a run gets long and expensive."
+      },
+      "async": {
+        "title": "Runs alongside the previous task",
+        "short": "On: the crew starts this task and goes on without waiting for it, so it runs at the same time as the tasks next to it.",
+        "what": "Normally the crew finishes one task before it starts the next. With this on, the crew starts this task and goes on to the next task at once. Two neighbouring tasks with this on run at the same time, so the crew finishes sooner. A later task that reads the results of this task waits until this task is done.",
+        "range": "On or off. The default is off.",
+        "ex1": "On for two research tasks: one searches the news and one searches research papers, at the same time. The writing task after them reads both results, and waits for both.",
+        "ex2": "Off: a task that needs the result of the task before it.",
+        "tip": "Turn it on only for tasks that do not need each other's results. A task that needs an earlier result must name it under \"Reads the results of\". Otherwise it can start before that result exists."
+      },
+      "memory": {
+        "title": "Keeps memory between runs",
+        "short": "On: the crew remembers what it learned in earlier runs and uses it in the next run.",
+        "what": "With this off, every run starts with only the task and the input. With this on, the crew keeps notes from each run and finds the ones that fit in later runs. This is the crew's own memory, and the program that runs the crew keeps it. To remember, the crew makes extra model calls, which cost money and time.",
+        "range": "On or off.",
+        "ex1": "On: a crew that answers customers. It remembers that a customer asked about the same order last week.",
+        "ex2": "Off: a crew that writes a new news summary every morning. Old runs would only add old content.",
+        "tip": "Turn it on when later runs gain from earlier ones. Facts that must be correct and shared belong in your AIMEAT memory, where you can read and change them."
+      }
+    },
+    "schedule": {
+      "cron": {
+        "title": "Cron",
+        "short": "When it runs, in five fields: minute, hour, day of the month, month, day of the week. 0 7 * * * is every day at 7:00.",
+        "what": "Cron is the standard way to write a time that repeats. It has five fields with a space between them: minute, hour, day of the month, month and day of the week. A star means any value. Commas make a list, a dash makes a range, and */15 means every 15th value. Sunday is 0 and Monday is 1. The hour is read in the time zone of the field beside it. Your AIMEAT refuses a cron that it cannot read.",
+        "range": "Minute 0–59, hour 0–23, day 1–31, month 1–12, day of the week 0–7 (0 and 7 are Sunday). With an empty time zone, the hour is the server's own clock.",
+        "ex1": "0 7 * * *: every day at 7:00.",
+        "ex2": "*/15 * * * *: every 15 minutes, all day and night.",
+        "ex3": "0 9 * * 1: every Monday at 9:00.",
+        "ex4": "0 7 * * 1-5: Monday to Friday at 7:00.",
+        "ex5": "0 5 1 * *: the first day of every month at 5:00.",
+        "ex6": "30 8,16 * * *: every day at 8:30 and 16:30.",
+        "tip": "The line under the field says the cron in words. Read it before you save. A cron that runs every few minutes repeats its work and its cost every time."
+      },
+      "timezone": {
+        "title": "Time zone",
+        "short": "The time zone that the cron's hours are read in, as an IANA name such as Europe/Helsinki. Empty uses the server's own clock.",
+        "what": "The cron says \"7:00\", and this field says where it is 7:00. Write the zone as an IANA name: a region and a city, such as Europe/Helsinki or America/Bogota. Your AIMEAT moves the runs with summer time, so 7:00 stays 7:00 local time all year.",
+        "range": "An IANA time zone name. A new schedule starts with your own time zone, and a new workflow with Europe/Helsinki. Empty: the server's own clock, which may not be yours.",
+        "ex1": "Europe/Helsinki: 0 7 * * * runs at 7:00 Finnish time, in winter and in summer.",
+        "ex2": "America/Bogota: the same cron runs at 7:00 in Bogotá.",
+        "ex3": "UTC: 0 7 * * * runs at 9:00 or 10:00 in Finland, by the season.",
+        "tip": "Set the zone of the people who wait for the result. Leave the field empty only when you know which zone the server runs in."
+      },
+      "max_runs": {
+        "title": "Stop after N runs",
+        "short": "When ticked, the schedule turns itself off after this many successful runs. A run that fails or is skipped does not count.",
+        "what": "Some work must happen only a set number of times: a daily reminder for one week, or a test. With this ticked, your AIMEAT counts each run that succeeds. When the count reaches the number, the schedule turns itself off. On an agent's page, this is the default for every new schedule made for that agent, and a schedule's own setting goes before it.",
+        "range": "A whole number from 1 up. The form starts at 7. When the box is not ticked, the schedule runs until you stop it.",
+        "ex1": "7, with 0 7 * * *: a morning reminder for one week.",
+        "ex2": "1: work that must run once, at the next time the cron names.",
+        "ex3": "30: a daily report during a trial of 30 days.",
+        "tip": "Use it for everything that has an end date, so you do not need to remember to stop it. Failed runs do not count, so a schedule that fails every time runs on until you stop it."
+      },
+      "daily_limit": {
+        "title": "Daily AI spend limit (USD)",
+        "short": "When ticked, an AI schedule skips its run once your AI spending today has reached this many US dollars.",
+        "what": "The limit adds up all your AI spending today, from every schedule and every other use. Before each run, your AIMEAT compares that sum with the limit. When the sum has reached the limit, the run is skipped, and the run log says why. The schedule stays on and tries again at its next time. The limit works only on schedules of the kind AI. A schedule that gives an agent a task does not check it; use the agent's daily cap for that.",
+        "range": "US dollars, in steps of 0.1. The form starts at 1. 0 means no limit. The day changes at midnight UTC.",
+        "ex1": "1: an AI summary every hour. On a day when you already used 1 dollar of AI elsewhere, the summaries are skipped until midnight UTC.",
+        "ex2": "5: a nightly AI job that must not run when the day has already been expensive.",
+        "tip": "Set it a little above your normal day, so that it stops only an unusual day. The sum includes all your AI use, so a busy day elsewhere can also stop the schedule."
+      }
+    },
+    "workflow": {
+      "step_timeout": {
+        "title": "If it does not produce",
+        "short": "How long a step may go without producing a result before your AIMEAT gives up on it, and whether it tries the step again first.",
+        "what": "Each step must produce a result, for example an entry in your memory. Your AIMEAT waits for it. The time starts again each time the step produces part of its result, so a slow step that makes progress is not stopped. When the time passes with no progress and you chose a retry, the step is tried again 5 minutes later. When no retry is left, the step ends as timed out. The steps that need its result do not run, and the other steps finish.",
+        "range": "1 minute to 7 days, in minutes. Ready choices: 15 min, 1 h, 4 h and 24 h. The default is 1 h, and 24 h for a step that asks you a question. Retries: none, once or twice.",
+        "low": "15 min: a stuck step is found soon. A slow but healthy agent can be stopped too early.",
+        "high": "24 h: a slow agent has time to finish. A stuck step holds the run for a whole day.",
+        "ex1": "15 min, retry once: a step that fetches a web page. It normally takes a minute.",
+        "ex2": "1 h: a step in which an agent writes three articles.",
+        "ex3": "24 h: a step that waits for a person to answer a question.",
+        "tip": "Set the time to about twice what the step normally takes. A retry helps with a short fault such as a slow network, and it can make the step's AI calls again. When the agent is not connected, the step fails sooner, without the full wait."
+      },
+      "parallel": {
+        "title": "Let runs overlap",
+        "short": "No: a new start while a run is going starts nothing. Yes: every start runs, side by side with the others.",
+        "what": "The steps of a workflow write their results under keys in your memory. When two runs of the same workflow write to the same keys, one run writes over the results of the other. That is why, by default, a start while a run is going starts nothing and says so. With yes, every start runs. That is safe only when each run writes to keys of its own: a case reference in the variables, or {run} in the keys.",
+        "range": "Yes or no. The default is no. Yes cannot be saved together with Clear old results first.",
+        "ex1": "No: a morning news workflow. A second start by mistake does nothing.",
+        "ex2": "Yes: a support workflow that starts for each new support request, with the request number in a variable. Three requests run at the same time.",
+        "ex3": "Yes, with {run} in every key: a workflow that you start many times for tests. Each run keeps its own results.",
+        "tip": "Before you turn it on, check every key that the steps write. If one key has no case reference and no {run}, runs at the same time write over each other in that key."
+      },
+      "skip_done": {
+        "title": "Skip what is already done",
+        "short": "Yes: a step whose result is already in your memory is marked done and does not run again.",
+        "what": "Before a step starts, your AIMEAT checks whether its result is already in your memory. With yes, a step whose result is there is marked done, and its agent is not called. The steps after it go on as usual. So a run that stopped halfway can be started again, and it goes on from the first step that is not done. That saves time and AI costs.",
+        "range": "Yes or no. The default is no. When Clear old results first is also yes, the old results are gone when the run starts, so nothing is skipped.",
+        "ex1": "Yes: a workflow of five steps stopped at step four. A new run does only steps four and five.",
+        "ex2": "No: a daily report whose keys stay the same from day to day. With yes, the second day would find yesterday's result and skip the work.",
+        "tip": "Turn it on for workflows that you start again after a failure. To run one step again, delete its result first. Then this setting leaves the other steps alone."
+      },
+      "fresh": {
+        "title": "Clear old results first",
+        "short": "Yes: when a run starts, the results of the previous run are deleted, so every step produces its result again.",
+        "what": "Some agents skip their work when they find their result already in your memory. When the keys of a workflow stay the same from run to run, such an agent finds the result of the last run and does nothing. With yes, your AIMEAT deletes the results that the workflow produces, once, when the run starts and before any step runs. Then every step makes its result again.",
+        "range": "Yes or no. The default is no. Yes cannot be saved together with Let runs overlap, because a new run would delete the results of a run that is still going.",
+        "ex1": "Yes: a daily price list that uses the same keys every day. Each morning the list is made again from the start.",
+        "ex2": "No: a workflow whose keys carry the date. Each day writes new keys, and nothing old is in the way.",
+        "tip": "Use it only when you need just the newest result. To keep earlier results, put the date or {run} in the keys and leave this at no."
+      },
+      "llm_checks": {
+        "title": "Your model's judgement",
+        "short": "Yes lets your own AI model judge the worded checks of the workflow, such as \"is this article ready to publish?\". Each check costs AI.",
+        "what": "A step is checked before the next step starts. Most checks count or compare things, for example \"three articles exist\". A worded check asks a question in words, and a model must answer it. With yes, your own model answers these questions, on your AI budget, each time a check runs. The cost counts toward the workflow's spending limit. With no, a workflow that has a worded check cannot be saved.",
+        "range": "Yes or no. The default is no. When your AIMEAT has no AI model set up, a worded check passes without a judgement.",
+        "ex1": "Yes: a news workflow that asks \"is each article free of errors of fact?\" before it publishes.",
+        "ex2": "No: a workflow whose checks only count entries. Nothing in it needs a model.",
+        "tip": "Turn it on only for a workflow that has worded checks. Each one costs a model call on every run, so a workflow that runs every 15 minutes pays for its checks 96 times a day."
+      }
+    },
+    "commerce": {
+      "pacing_toll": {
+        "title": "Pacing burn per call (morsels)",
+        "short": "Morsels that each call of this tool burns, to limit how fast others can use it. A whole number from 0 to 100.",
+        "what": "When another person or their agent calls this tool, the call burns this many morsels from the caller's balance. Nobody gets these morsels, you included. The burn limits how often one caller can use the tool, because morsels refill slowly. When the caller's balance is too low, the server refuses the call before the tool starts. Your own calls are free. The burn applies also when you sell the tool for money.",
+        "range": "A whole number from 0 to 100. An empty field uses the server's default. The default is 0, which means no burn, unless the operator of this service changed it. 0 turns pacing off for this tool.",
+        "low": "0: no burn. 1 to 5: each call burns a few morsels. A caller who calls very often runs out first.",
+        "high": "50 to 100: each call burns many morsels. A caller can make only a few calls before the balance runs out.",
+        "ex1": "0: a tool that you sell for money. The price is enough of a brake.",
+        "ex2": "5: a summary tool on the marketplace. A caller who sends hundreds of calls in a row runs out of morsels and must wait until the balance refills.",
+        "ex3": "100: an expensive call, for example one that starts a long AI run. One caller can make only a few calls before the morsels run out.",
+        "tip": "Leave the field empty unless somebody uses the tool too much. The burn is not a price, and you get nothing from it. To get something back for the tool, set a price above. When you give a price both in money and in morsels and leave this field empty, the marketplace burns the morsel price on each call."
+      },
+      "morsels": {
+        "title": "Morsels",
+        "short": "A morsel paces use: how fast people and agents may post, write and call tools here. It is not money and does not turn into money.",
+        "what": "Every person has one morsel balance. Your agents and apps use the same balance and have none of their own. You get morsels when your account is made, and the balance refills a little every day, up to a ceiling that the server sets. Some acts cost morsels, for example a post on a public board or a call to another person's tool. When the balance is too low, the server refuses the act until the balance refills. A price or a limit in morsels on this page says how many morsels one act takes.",
+        "range": "Whole numbers. Each field says what its number does: a price per call, a price per post, or a limit on what an app may spend in your name. A board price goes from 0 to 100,000, and an empty board price uses the server's price. An empty spending limit means no limit, and 0 stops the app from spending.",
+        "ex1": "Price per call 3: another person's agent calls your tool. 3 morsels move from their balance to yours, and the marketplace keeps its share. Your own calls are free.",
+        "ex2": "Board price 5: a post on your public board costs its writer 5 morsels, and a long post a little more. Nobody gets these morsels. 0 makes posting free.",
+        "ex3": "Spending limit 200: an app may spend up to 200 morsels in your name. Then it stops until you raise the limit or clear the counter. An empty field means no limit.",
+        "tip": "A price in morsels slows down a flood of calls or posts. Keep it low for light acts. When you let an app spend in your name, give it a spending limit too: without a limit, it may spend your whole balance."
+      },
+      "exchange_listing": {
+        "title": "List in EXCHANGE",
+        "short": "On: the tool is offered on EXCHANGE, the marketplace where other people and their agents find and buy tools. Off: it is taken off the marketplace.",
+        "what": "When this is on, the server makes a listing for the tool on EXCHANGE and keeps the listing the same as this page. When you change the price here, the listing changes too. A buyer makes a contract at the price that is in force on that day. When you turn this off, the listing goes away. Contracts already made continue at their agreed price.",
+        "range": "On or off. Off is the default. The tool goes on the marketplace only when it has a description of what goes in and what comes out, a price in morsels or in money, and either a server action or an agent that does the work. When one of these is missing, the tool stays off the marketplace.",
+        "ex1": "On, price 0.05 EUR per call: other people's agents find the tool on EXCHANGE and buy calls at that price.",
+        "ex2": "Off after a month on: the listing goes away. A customer who made a contract can still call the tool at the agreed price.",
+        "tip": "Fill in the ODPS description below before you turn this on, because the marketplace shows it beside the tool. The listing follows this page, so change the price here."
+      }
+    },
+    "app": {
+      "audit_keep": {
+        "title": "Keep in each app's log",
+        "short": "How much of each app's log the server keeps: everything, or only the newest entries. The setting covers all your apps.",
+        "what": "Each of your apps has a log of the changes made to how it is offered, for example its terms, the reviewer's name and its access code. Each entry says what changed, who changed it and when. Only you can read the log, and no app or agent can change it. By default, everything is kept. When a log grows past 1,000 entries, its older entries move to an archive for their year, and you can still read them there. With a limit, the server deletes the older entries.",
+        "range": "Everything (the default), or Only the newest entries with a number from 1 to 1,000,000. The form suggests 1,000. When the operator of this service has set a limit, the page says so, and your own choice replaces it.",
+        "lowLabel": "Only the newest",
+        "highLabel": "Everything",
+        "low": "Only the newest entries: the log stays short. The older entries are deleted at once, archived ones first, and you cannot get them back.",
+        "high": "Everything: the whole history stays. Years later, you can still show what was set, by whom and when.",
+        "ex1": "Everything: an app that sells something or handles personal data. You can show the day its terms changed.",
+        "ex2": "1,000: a test app that you change often. Each app's log keeps its newest 1,000 entries.",
+        "tip": "Keep everything unless you have a reason to delete. A limit deletes entries for good, so the page asks you before it saves. To move old entries out of the way without deleting them, use Archive entries before."
+      }
+    },
+    "workspace": {
+      "autonomy": {
+        "title": "AI autonomy (L1 cautious → L5 free)",
+        "short": "How much the AI agents working here may do before a person approves. At L1 every act waits for approval; at L5 only the acts that always wait.",
+        "what": "Before an agent does something here, it can ask for approval and say how risky the act is: low, medium or high. This level decides which of those requests wait for a person and which go ahead at once. An agent cannot call its own act low risk: the server reads it as medium at least. Some acts always wait, at every level: a change to the data model, a release to the outside, data leaving, spending money, deleting for good, and raising the autonomy. The publish review on the Review tab is a separate setting and applies at every level.",
+        "range": "L1, L2, L3, L4 or L5. The default is L3.",
+        "lowLabel": "More approvals",
+        "highLabel": "Fewer approvals",
+        "low": "L1: every act waits for a person. L2: acts of medium and high risk wait. Because an agent cannot call its own act low risk, all of an agent's acts wait at L2 too.",
+        "high": "L4 and L5: no act waits because of the level. Only the acts that always wait still wait.",
+        "ex1": "L1: a workspace for customer contracts. A person approves everything an agent does.",
+        "ex2": "L3: a team's project workspace. Agents work on their own, and acts of high risk wait for a person.",
+        "ex3": "L5: your own notes. Agents write freely, and only the acts that always wait still ask you.",
+        "tip": "Start at L3. Lower the level when agents do things you did not expect. Raise it when the approval list fills with acts that you always approve. With the default list of acts that always wait, no level lets an agent spend money or send data out without a person."
+      },
+      "member_changes": {
+        "title": "Their change",
+        "short": "What happens when a member who is neither the creator nor an admin adds a space or changes sections: the change waits for approval, or it is made at once.",
+        "what": "A workspace's structure is its spaces and the sections of its document spaces. The creator and the admins always change the structure at once. This rule is for the other members who may write here. When the change waits, it is a suggestion, and the creator or an admin approves or declines it. When the change is made at once, it goes into the workspace immediately, with the member's name and the time on it. Filing a new document under a section is a change of sections too. The rule does not limit what members write into documents and records.",
+        "range": "waits until the creator or an admin approves it (the default), or is made at once, with their name on it.",
+        "lowLabel": "Waits for approval",
+        "highLabel": "Made at once",
+        "low": "Waits for approval: the structure changes only after the creator or an admin approves. Good for a workspace that somebody keeps in order.",
+        "high": "Made at once: members arrange the workspace themselves. Each change shows who made it.",
+        "ex1": "Waits for approval: a company handbook. A member suggests a new section, and the handbook's admin approves it.",
+        "ex2": "Made at once: a small team's notes. Any member who writes here can add a space without waiting.",
+        "tip": "Keep the default when the workspace has many members or people from outside. If you approve every suggestion anyway, choose Made at once, so nobody waits for nothing."
+      },
+      "publish_gate": {
+        "title": "Require review before publishing",
+        "short": "On: every publish waits on the Review tab until somebody approves it. Off: a publish goes live at once.",
+        "what": "In a workspace, a document or a record is first a draft, and publishing makes it the current version. When this is on, a publish does not happen at once. It becomes a request under Needs your decision on the Review tab, and the draft is published only when the request is approved. The setting covers the whole organism, not only this workspace. An agent cannot publish on its own: it leaves the draft for a person to review. Publishing several items at once is refused while this is on.",
+        "range": "On or off. The default is off.",
+        "ex1": "On: a product catalogue that customers read. An agent updates the drafts, and a person checks each one before customers see it.",
+        "ex2": "Off: a team's internal notes. The writer publishes, and nobody waits.",
+        "tip": "Turn it on when people outside read what is published, or when it binds you. Remember that every publish then waits for an approval, your own too."
+      }
+    },
+    "organism": {
+      "agent_access": {
+        "title": "Agents",
+        "short": "Which members' agents may work here: every member's agents, or only the agents you list in the Agents section.",
+        "what": "A member's agents read and write here with the member's own rights. With Every member's agents, any agent of any member gets in. With Only the agents in the Agents section, only the agents listed there get in. Every other agent is treated as an outsider: it cannot read, write or see this organism. The member list then shows only the listed agents. This setting never gives an agent more rights than its owner has. It does not affect people who signed in themselves, or the apps they allowed.",
+        "range": "Every member's agents (the default), or Only the agents in the Agents section.",
+        "lowLabel": "Only listed agents",
+        "highLabel": "Every member's agents",
+        "low": "Only the agents in the Agents section: you know exactly which AI works here. A new agent gets in only after somebody adds it to the Agents section.",
+        "high": "Every member's agents: each member's AI starts to work here at once, with no extra step.",
+        "ex1": "Every member's agents: a team's own organism. Each member's AI helps with the shared work.",
+        "ex2": "Only the agents in the Agents section: a project with a customer. The customer sees only the agents you chose, and your members' other agents stay out.",
+        "tip": "Choose the second option when you bring in people from outside. An agent can narrow this setting to the listed agents, but only a person who signed in themselves can open it again to every member's agents."
+      }
+    },
+    "living": {
+      "trust": {
+        "title": "On pulse",
+        "short": "What happens to the new text when the document refreshes itself: it goes in at once, or it waits for your review.",
+        "what": "A living document refreshes its sections on a schedule. At each refresh, called a pulse, your AI reads the newest material and writes each section again. With Apply automatically, the new text replaces the old one at once, and the old one stays in the section's history. With Review before applying, the new text waits beside the section as a proposed update until you accept or reject it. The document then changes only when you say so.",
+        "range": "Apply automatically or Review before applying. When a template has no choice, the new text goes in at once.",
+        "lowLabel": "Review first",
+        "highLabel": "Automatically",
+        "low": "Review before applying: nothing changes without you. Good for text that others rely on, or text that says something to people outside.",
+        "high": "Apply automatically: the document stays current with no work from you. Good for internal summaries and status pages.",
+        "ex1": "Apply automatically: the weekly status of a team project. Each pulse brings the status up to date.",
+        "ex2": "Review before applying: a product description that customers read. You check each new version first.",
+        "tip": "Choose Review before applying for anything public or anything with legal weight. When proposed updates pile up and you always accept them, switch to Apply automatically."
+      },
+      "activity_trigger": {
+        "title": "Also pulse after N workspace changes (0 = schedule only)",
+        "short": "Refresh the document also when this many items in its workspace have changed since the last refresh. 0 refreshes on the schedule only.",
+        "what": "A living document refreshes on its schedule, for example once a day. With a number here, it also refreshes when that many items in its workspace have changed since the last refresh. The count includes new and edited records and documents. It does not count the living document's own sections or the workspace's settings. A busy workspace then gets a current document sooner. Each refresh uses your AI.",
+        "range": "A whole number, 0 or more. 0 or an empty field means the schedule only.",
+        "low": "0: the document refreshes on its schedule only. Your AI use stays predictable.",
+        "high": "A small number, such as 1 to 3: the document refreshes soon after almost every change. Each refresh uses your AI, so the cost grows with the activity.",
+        "ex1": "0: a monthly report. The schedule is enough.",
+        "ex2": "5: a summary of a team's decision log. After five new or changed items, the summary is written again.",
+        "ex3": "20: a busy customer support workspace. The summary refreshes after a larger batch of changes, not after each one.",
+        "tip": "Start with 0, and add a number only when the document falls behind the work. A low number in a busy workspace means many refreshes, and each one uses your AI."
+      }
+    },
+    "consent": {
+      "scope": {
+        "title": "How far",
+        "short": "Where the permission reaches: only this server, or also the allied servers, which are the other AIMEAT servers this one is connected to.",
+        "what": "Most permissions stay on this server: the reader you name reads the data here. With Also to allied servers, the server may copy the entries the permission covers to other AIMEAT servers that this one has approved as partners. Only entries whose visibility is Public are copied. A copy then exists on the other server too.",
+        "range": "Only on this server (the default) or Also to allied servers.",
+        "lowLabel": "Only here",
+        "highLabel": "Also to allies",
+        "low": "Only on this server: the data stays here, and the permission is for reading here.",
+        "high": "Also to allied servers: public entries are copied to the allied servers as well.",
+        "ex1": "Only on this server: you let a colleague read the notes of your project.",
+        "ex2": "Also to allied servers: you publish research data that a partner university's server may keep as its own copy.",
+        "tip": "Keep the default unless the data must also exist on another server. Only public entries are copied to an allied server, so private entries do not leave with this setting."
+      },
+      "key_area": {
+        "title": "A key area",
+        "short": "Which memory entries the permission covers, named by their key. * stands for one part of the key, ** for everything after it.",
+        "what": "Every entry in your memory has a key, such as portfolio.contact.email. The parts of a key are separated by dots or slashes. A key area names a set of keys. A full key covers one entry, and a star covers more. * stands for exactly one part. ** stands for everything after it, however many parts. The permission also covers the entries that you write into the area later. A permission on a key area is always for reading.",
+        "range": "A key, or a key with * or **. A star works only as a whole part between dots or slashes. contact* does not mean everything that starts with contact: it means a key with the exact name contact*.",
+        "ex1": "portfolio.contact.email: one entry, the e-mail address.",
+        "ex2": "portfolio.*: each entry one level under portfolio, such as portfolio.contact. It does not cover portfolio.contact.email.",
+        "ex3": "portfolio.**: everything under portfolio, at any depth. It does not cover the key portfolio itself.",
+        "tip": "Name the smallest area that does the job. To give a whole area, end the key with .**, not with a star joined to a word."
+      }
+    },
+    "classification": {
+      "switch": {
+        "title": "Your content",
+        "short": "Turns classification on or off for your own content. When it is on, every read checks what each item's classification allows.",
+        "what": "A classification, such as public, internal or confidential, says which people and which AI may read a piece of content. When the switch is on, the server checks it every time someone reads your content. A person or an AI outside the allowed readers does not see the item. An AI gets a warning with the item, or does not see it, as its classification says, and the reads a classification asks to record go to your log. When you turn the switch off, the checks stop at once. The classifications already given stay stored and apply again when you turn the switch back on.",
+        "range": "On or Off. The operator of this service decides whether you choose. When they have not turned classification on, the switch says Not in use. When they have turned it on for everyone's content, it stays on.",
+        "ex1": "On: a note holds a bank account number, and the server's default rule gives it the classification Confidential. When your AI reads the note, it gets a warning with it, and the read goes to your log.",
+        "ex2": "Off: you try a new app on your own material and do not want the checks yet. The classifications already given wait until you turn classification on again.",
+        "tip": "Keep classification on when your memory holds personal data, passwords or customers' data. While it is off, nothing limits what an AI reads of your content."
+      },
+      "exception": {
+        "title": "What the exception allows",
+        "short": "What this one item may do despite its classification: leave for anywhere, or be seen and sent out by your AI.",
+        "what": "A classification can keep an item inside its organism or hide it from AI. An exception lets one item past that, and your reason is recorded with it. May leave: anyone may send the item out, you, your AI or an app, for example in an export, a share link, to another server or to an outside service. An AI may send it: your AI may see the item and send it out, and for everything else the classification still applies. Each use of the exception is written to the log.",
+        "range": "May leave or An AI may send it. The reason is required, up to 1,000 characters. The last day is optional: the exception ends at the end of that day. Without a day, it lasts until you withdraw it.",
+        "lowLabel": "Narrower",
+        "highLabel": "Wider",
+        "low": "An AI may send it: only your AI gets past the classification, and only for this item.",
+        "high": "May leave: the item may go out by any route, sent by anyone who can reach it.",
+        "ex1": "May leave: a confidential price list that you must send to an auditor. Reason: \"Annual audit 2026\". Last day: 31 March.",
+        "ex2": "An AI may send it: a contract that your AI attaches to an e-mail to the customer. In everything else, the contract keeps its classification.",
+        "tip": "Choose the narrower option that does the job, and give a last day when the need ends. Withdraw the exception when you no longer need it. It stays on the list as withdrawn, so an audit still shows it."
+      },
+      "daily_cap": {
+        "title": "Daily cap",
+        "short": "The most Content Classifier calls in a day: one cap per owner or organism, one for the whole server. Past a cap, content waits in a queue.",
+        "what": "The Content Classifier asks a model how sensitive new content is. Each question is one call, and calls use model time that someone pays for. The owner pays for personal content, and the first owner of the organism pays for organism content. These caps count the calls of each day. Past a cap, the content keeps its default classification and waits in a queue. The queue is worked through after the day turns at midnight UTC. The rules run on all content without a model and do not count toward the caps.",
+        "range": "A whole number from 0 to 1,000,000 calls a day, or No cap. The defaults are 200 per owner or organism and 2,000 for the whole server. With No cap, the calls are still counted.",
+        "low": "Lower caps: model costs stay small, but on a busy day more content waits until the next day.",
+        "high": "Higher caps or No cap: content is classified at once, and model costs follow the amount of content written.",
+        "ex1": "200 and 2,000 (the defaults): a small team. A normal day stays under the caps.",
+        "ex2": "0 per owner: no model calls at all. Content gets only the result of the rules and the default classification, and the queue grows.",
+        "ex3": "No cap for the whole server and 500 per owner: many people, and no one person can use up the day for the others.",
+        "tip": "Keep the cap per owner below the cap for the server, so that one owner cannot use up the calls of the day for everybody. A queue holds at most 2,000 items per owner or organism. Past that, the oldest items drop out and keep their default classification."
+      },
+      "retention": {
+        "title": "Days the log keeps a row",
+        "short": "How long the classification log keeps a row: 1 to 36,500 days, or every row. The default is 365 days.",
+        "what": "The log records which classified content was shown, used, refused or reclassified. One row stands for one reader, one item and one action in one minute. A nightly job deletes the rows that are older than this number of days. The list of exceptions ages with the log, but a month that still holds an exception in force stays.",
+        "range": "A whole number from 1 to 36,500 days, or Keep every row. The default is 365 days.",
+        "low": "Fewer days: a smaller log, but older events can no longer be checked.",
+        "high": "More days or every row: a long history for audits, and a log that keeps growing.",
+        "ex1": "365 (the default): a year of history for the yearly review.",
+        "ex2": "90: a small server where only recent events matter.",
+        "ex3": "2,555, about 7 years: an organisation whose rules require a long record.",
+        "tip": "Set the days to what your audit or the law asks for. A shorter time deletes the older rows at the next nightly run, and they cannot be brought back."
+      }
+    },
+    "notify": {
+      "throttle": {
+        "title": "Pace",
+        "short": "How often one sender may send a push to your devices. The pushes in between are gathered into one. The bell still shows every notification.",
+        "what": "A push is a notification that appears on your phone or computer. When one sender, such as an app or an agent, sends many notifications in a short time, this setting keeps your devices quiet. The first push from that sender comes at once. The notifications that follow within the chosen minutes are counted, and when the time ends, one push says how many more came. Every notification still arrives at once in the bell on this page.",
+        "range": "every one, one per 5 min, one per 10 min or one per 30 min. The default is one per 10 min.",
+        "lowLabel": "More pushes",
+        "highLabel": "Fewer pushes",
+        "low": "every one: each notification pushes at once. Good when only a few senders reach you.",
+        "high": "one per 30 min: a busy sender gives one push at once, and half an hour later one more push that says how many others came.",
+        "ex1": "every one: you wait for one message from a customer and want it at once.",
+        "ex2": "one per 10 min: a workflow sends ten progress notes in five minutes. You get the first one at once, and ten minutes after it one push about the other nine.",
+        "tip": "The pace counts each sender separately, so a busy sender never holds back a quiet one. To stop one sender's pushes completely, turn its push off in the list of senders."
+      },
+      "breakthrough": {
+        "title": "Still at once",
+        "short": "Which kinds of notification may still reach your devices during quiet hours. The others wait until the quiet time ends.",
+        "what": "During quiet hours, pushes to your devices wait, and when the quiet time ends, they come as one summary. The bell gets every notification at once in any case. The kinds that you choose here push during quiet hours too. Choose the kinds that need you to act, and leave out the kinds that only tell you something. The pace setting still applies to them.",
+        "range": "Any of: Organisms and workspaces, Messages, Workflows, Apps, Account and budget, Other. The page suggests Organisms and workspaces, and Messages. With nothing chosen, nothing pushes during quiet hours. The choice works only while quiet hours are on.",
+        "ex1": "Messages: a customer writes to you at night. Your phone shows the message at once.",
+        "ex2": "Workflows: a run asks you a question at 23:00. You see the question before the morning.",
+        "ex3": "Nothing chosen: a whole night without pushes. Everything waits in the bell and comes as one push in the morning.",
+        "tip": "Each kind that you add can wake you. Add Account and budget only when a budget or quota alert must reach you at night."
+      }
+    },
+    "memory": {
+      "key_pattern": {
+        "title": "Key or pattern",
+        "short": "Which of your memory keys the group may read. * stands for one part of a key, ** for everything below it.",
+        "what": "Every entry in your memory has a key, with parts separated by dots, such as deliveries.abc.status. The pattern says which keys the group may read. A full key covers one entry. * stands for exactly one part. ** stands for every part below, at any depth. The share also covers matching keys that you write later, so you share a space once and not each entry. The members of the group and their agents may read the entries, but they cannot change them. For everyone else, the entries keep their own visibility.",
+        "range": "Up to 400 characters, with at least three characters before the first star (dots and slashes do not count). A star works only as a whole part: abc* is read as a name. The server refuses a pattern that would reach the keys it keeps for you, such as your AI settings, your profile and your notification settings.",
+        "ex1": "deliveries.abc.status: the group reads one entry.",
+        "ex2": "deliveries.*.status: the status of each delivery, such as deliveries.abc.status and deliveries.xyz.status, and nothing else about them.",
+        "ex3": "deliveries.abc.**: everything under deliveries.abc, also what you write there later. It does not cover the key deliveries.abc itself.",
+        "tip": "Share the smallest space that does the job, and end a whole space with .**. A share works whatever the entry's visibility is, so to stop sharing, remove the share. A change of visibility does not stop it."
+      },
+      "visibility": {
+        "title": "Visibility",
+        "short": "Who may read this entry: only its writer, you and your agents, everyone signed in here, or anyone.",
+        "what": "Visibility is the first rule for who reads an entry, and the server checks it on every read. Private: only the one who wrote the entry reads it, and you always read what your agents wrote too. My Agents: you and every agent you connected. Members: everyone who is signed in on this server, and the entry is never copied to another server. Public: anyone who has the address, with no sign-in. A share with a group, or a permission on the Data Wallet page, can let more people read a private entry without changing its visibility.",
+        "range": "Private (the default), My Agents, Members (logged-in users), Public.",
+        "lowLabel": "Fewer readers",
+        "highLabel": "More readers",
+        "low": "Private or My Agents: the entry stays inside your own account.",
+        "high": "Members or Public: other people read it. A public entry can also be copied to allied servers when you allow it on the Data Wallet page.",
+        "ex1": "Private: the draft of a personal letter.",
+        "ex2": "My Agents: notes on your writing style, so that every AI you connected writes in your voice.",
+        "ex3": "Members: a list of your skills that colleagues on the same server may read.",
+        "ex4": "Public: your public portfolio, which a web page reads with no sign-in.",
+        "tip": "Start with Private, and open only what must be open. To let one group read a whole area of keys, share the key space with the group instead of making the entries public."
+      }
+    },
+    "federation": {
+      "auth_policy": {
+        "title": "You accept",
+        "short": "Who may sign in here with an account from another server: nobody, anyone from an active peer, or only the peers you name.",
+        "what": "A person with an account on another server can sign in here with that account. Their home server checks the password, and this server trusts its signed answer. This setting decides which home servers this server accepts. The visitor gets a session of at most one hour, with the permissions under What they get on arrival. A peer is another server that this server has approved.",
+        "range": "Nobody (the default), Anyone from an active peer, Only peers I name. Whatever you pick, only people from a peer at the Member or Genesis level can sign in.",
+        "lowLabel": "Nobody",
+        "highLabel": "Anyone from an active peer",
+        "low": "Nobody: people sign in only on their own server. Data still moves between peers as the switches of each peer allow.",
+        "high": "Anyone from an active peer: every active peer at the Member or Genesis level, also the peers you add later. The Allow Federated Login switch of the peer is not needed.",
+        "ex1": "Nobody: the server of one company that does not want outside accounts. Visitors use their own server.",
+        "ex2": "Only peers I name: two partner companies. You turn on Allow Federated Login for the partner's server only, and nobody else can sign in from elsewhere.",
+        "ex3": "Anyone from an active peer: a group of servers that trust each other fully. A person from any of them can sign in here.",
+        "tip": "Start with Only peers I name. Then check that at least one peer has Allow Federated Login on. Otherwise the setting lets nobody in, and the summary at the top of the page shows that nobody can sign in."
+      },
+      "default_scopes": {
+        "title": "What they get on arrival",
+        "short": "The permissions a person from another server gets when they sign in here. Each switch is one permission, such as memory:read.",
+        "what": "A person who signs in here from another server gets a session with only the permissions you switch on here. Each word names one permission: memory:read lets them read memory, memory:write lets them write it, and so on. A request that needs a permission they do not have is refused. A peer can have its own list, and then that list replaces this one for the people from that peer. The setting matters only when You accept lets somebody in.",
+        "range": "Any set of memory:read, memory:write, catalogue:read, social:read, social:write, work:request, boards:read and boards:write. The default is memory:read and catalogue:read.",
+        "low": "Fewer permissions: visitors can look, but they cannot change anything here.",
+        "high": "More permissions: visitors can write memory, post on boards and ask for work.",
+        "ex1": "memory:read and catalogue:read (the default): a visitor reads and browses the catalogue. Every write is refused.",
+        "ex2": "Add boards:read and boards:write: partners take part in the discussions on your boards.",
+        "ex3": "Add work:request: a visitor can ask the services here for work.",
+        "tip": "Give the fewest permissions that do the job. A write permission lets a person from another server change content here, so add one only for peers you know well."
+      },
+      "open_join": {
+        "title": "Let unknown servers join on their own",
+        "short": "On: a server you do not know joins at once as a visiting peer, without your approval. Off: its request waits for you.",
+        "what": "Another server asks to join with a signed introduction. When this switch is off, the request waits in the list until you approve or reject it. When it is on, the server joins at once at the Visiting level. A visiting peer may send messages, browse your catalogue and ask for work. It cannot relay traffic or copy memory, and its people cannot sign in here. You move a good peer up to Member yourself. The network policy can still refuse a server by its address.",
+        "range": "On or off. Off is the default.",
+        "ex1": "Off: the server of a company that works only with known partners. Each new server waits for your approval.",
+        "ex2": "On: a public server whose services other servers may try at once.",
+        "tip": "Leave it off unless you want strangers to connect. When it is on, look through the peer list now and then, and remove the servers you do not want."
+      },
+      "settlement": {
+        "title": "Move morsels onto this ledger",
+        "short": "Lets this peer add morsels to accounts here, for work that crossed between the two servers. Off: its settlements are refused.",
+        "what": "Morsels pace how much agents may write and use. They buy nothing. When work crosses between two servers, the other server can send a settlement that adds morsels to an account here. The peer signs each settlement with its key, and a tracking code stops the same settlement from landing twice. This switch decides whether this server accepts settlements from this peer. The Contact level cannot turn it on.",
+        "ex1": "On: a partner server whose agents exchange work with the agents here. The morsels for that work are settled here.",
+        "ex2": "Off: a peer you link with for messages only. Nothing it sends changes a balance here.",
+        "tip": "Keep it on for peers that exchange work with you. Turn it off for a peer you no longer trust: a settlement is the one request from a peer that changes balances here."
+      },
+      "relay": {
+        "title": "Relay to this peer",
+        "short": "Whether relayed requests pass between this server and this peer. Off: this server forwards nothing to the peer and refuses the peer's signed relays.",
+        "what": "A request to a server that is not a direct peer travels through other servers, and each one forwards it to the next. This switch decides two things for this peer. First, whether this server forwards requests to the peer, to the peer itself or through it to a server beyond. Second, whether this server accepts a request that the peer forwards here with a signed relay claim. The peer's own requests to this server are not relays, and the other switches decide them. Only the Member and Genesis levels can turn it on.",
+        "ex1": "On: a well-connected partner server. People here reach the servers behind it through it.",
+        "ex2": "Off: a peer that must not carry traffic for others. A request that needs this peer gets no route, and its relays to this server are refused.",
+        "tip": "When Signed relay claim is Optional, a relayed request without a claim that names this peer still passes, unless the peer has sent a signed claim before. Set Signed relay claim to Required to close that gap."
+      },
+      "replicate": {
+        "title": "Replicate Memory",
+        "short": "Lets this server and this peer copy public memory to each other. Off: nothing is copied in either direction.",
+        "what": "This server sends the peer copies of memory entries that are public and whose owner has consented to federation sharing. It also accepts the copies that the peer sends, and keeps them apart from local memory. A classification can still keep an entry on this server. Copies go when an entry changes or in the scheduled round, as Sync mode sets. Only the Member and Genesis levels can turn it on.",
+        "ex1": "On: a partner server where people publish shared knowledge. Public entries go both ways.",
+        "ex2": "Off: a peer you exchange work with but share no memory with. No entry goes there, and no copy from there is stored.",
+        "tip": "Only public entries with the owner's consent leave, so private memory never goes. Turn it off when a peer must not keep copies of anything from here."
+      },
+      "peer_mode": {
+        "title": "Peer Mode",
+        "short": "Federation: this server lists the peer and shares federation-wide traffic with it. Private P2P: the link works, but the peer stays unlisted.",
+        "what": "The mode decides whether this peer is part of what the federation sees. In Federation mode, the peer appears in this server's public directory and in the federation book. It gets presence updates and the announcements to the whole federation, and its catalogue changes feed the network directory. In Private P2P mode, none of that happens. The link still does what the switches above allow. The Contact level is always Private P2P.",
+        "range": "Federation (the default) or Private P2P.",
+        "lowLabel": "Private P2P",
+        "highLabel": "Federation",
+        "low": "Private P2P: a direct link that others cannot see in the lists of this server.",
+        "high": "Federation: the peer is visible and takes part in what the federation shares.",
+        "ex1": "Federation: a partner in a public group of servers. Others see that you are linked.",
+        "ex2": "Private P2P: a link between two offices of one company that must not appear in public lists.",
+        "tip": "Pick Private P2P when the link itself is confidential. The switches still decide what crosses: the mode changes only what is listed and announced to all."
+      }
+    },
+    "sso": {
+      "idp_initiated": {
+        "title": "Accept a sign-in that starts at their end",
+        "short": "On: people can sign in from a tile in the company's own app portal. Off: a sign-in must start here. Off is the default.",
+        "what": "Usually a person starts the sign-in here, with the company's button or a direct link. This server then sends a request to the company's identity provider (IdP), and accepts only an answer to that request. Some companies start the sign-in from their own app portal instead. Then an answer arrives that no request from here asked for. This switch decides whether this server accepts such an answer. The answer must still carry the company's valid signature.",
+        "range": "On or off. Off is the default.",
+        "ex1": "Off: people use the company button on the sign-in page. Each answer is matched to a request from here.",
+        "ex2": "On: the company puts a tile for this service in its own portal, and people start there.",
+        "tip": "Turn it on only when the company asks for it. With it on, this server cannot match the answer to a request that a browser here made, so one check against a misused answer is gone."
+      }
+    },
+    "config": {
+      "morsel_policy": {
+        "burn_rate": {
+          "title": "Burn Rate",
+          "short": "The part of the network fee on finished work that is burned, from 0 to 1. 0.1 burns a tenth.",
+          "what": "When an agent orders work priced in morsels, it spends the base price plus a network fee of 10%, rounded up. When the work is delivered, this rate decides which part of the network fee is burned. A burned morsel is gone for good, and nobody receives it. The rest of the fee is recorded as shares for the servers that took part. Morsels pace how much agents may write and use; they buy nothing.",
+          "range": "0 to 1, a fraction. The default is 0.1. The burned amount is rounded down to whole morsels.",
+          "low": "0: nothing is burned. The whole network fee is recorded as shares.",
+          "high": "1: the whole network fee is burned.",
+          "ex1": "0.1: work priced at 100 morsels has a network fee of 10, and 1 morsel is burned.",
+          "ex2": "0.5: the same work burns 5 of the 10 morsels.",
+          "ex3": "0.1 on work priced at 5 morsels: the network fee is 1, and nothing is burned, because the result rounds down to 0.",
+          "tip": "Keep the default unless you want fewer morsels in use over time. The value is a fraction: 0.1 means 10%."
+        },
+        "pacing_toll_default": {
+          "title": "Default pacing toll",
+          "short": "Morsels burned on each metered call when the capability sets no toll of its own. 0 turns pacing off. A value from 0 to 100.",
+          "what": "A metered call is a call to something that counts its use, such as an extension, an app tool, an EXCHANGE run or work by an agent. This toll burns morsels from the caller on each such call. Morsels refill each day only up to a cap, so the toll limits how fast anyone can call a capability, also one that is paid in money. The provider receives nothing from the toll. A person who calls their own capability burns nothing. When the balance cannot cover the toll, the call is refused.",
+          "range": "0 to 100 morsels per call. The default is 0, which turns pacing off. A capability can set its own toll, and then that toll applies.",
+          "low": "0: no pacing. A call costs only what the capability charges.",
+          "high": "Higher: each call uses more of the daily refill, so fewer calls fit in a day.",
+          "ex1": "1: a full balance of 500 morsels (the default Allowance Cap) covers 500 calls.",
+          "ex2": "5: the same balance covers 100 calls. That is enough for a person and too few for a runaway loop.",
+          "tip": "Turn it on when an agent that loops by mistake must not run up a large bill on a paid capability. The change applies to every metered call at once, so tell your users before you raise it."
+        },
+        "daily_allowance_cap": {
+          "title": "Allowance Cap",
+          "short": "The daily allowance adds morsels only while a balance is under this number, and never takes it past it. The default is 500.",
+          "what": "Each day, the daily allowance adds morsels to the balance of each agent's owner, once for each agent. This cap stops the refill. A balance at or above the cap gets nothing, and a balance below it fills up to the cap at most. Morsels that arrive in other ways, such as settlements or sales, can take a balance above the cap. Morsels pace how much agents may write and use; they buy nothing.",
+          "range": "A whole number from 0 to 100,000 morsels. The default is 500. 0 stops the daily allowance.",
+          "low": "Lower: balances stay small, so agents can do less before they must wait for the next day.",
+          "high": "Higher: unused allowance builds up over more days, so an agent can do more at one time.",
+          "ex1": "500 (the default) with a Daily Allowance of 50: an unused balance is full after ten days.",
+          "ex2": "100: a balance never holds more than two days of a 50-morsel allowance.",
+          "tip": "Think of the cap as the most an agent can use at one time. With a Default pacing toll of 1, the cap is also the largest number of calls that a full balance covers."
+        }
+      },
+      "commerce": {
+        "fee_mode": {
+          "title": "Fee destination",
+          "short": "Where the fee on sales priced in morsels goes: to the operator's account, or burned. Sales in money are not affected.",
+          "what": "A sale priced in morsels carries a fee: an app from the store, a checkout or an EXCHANGE run. This setting decides where that fee goes. To the operator: the fee is added to the operator's account. Burned: the fee is gone for good. When this server has no operator account, the fee is burned in both modes. On a sale in money, the fee is recorded as owed to the operator, and this setting does not change that.",
+          "range": "To the operator (the default) or Burned.",
+          "lowLabel": "To the operator",
+          "highLabel": "Burned",
+          "low": "To the operator: the operator's balance grows with every sale. The operator account is the one named for fees, or else the first operator.",
+          "high": "Burned: nobody receives the fee, and fewer morsels stay in use.",
+          "ex1": "To the operator: an app sells for 100 morsels with a fee of 5%. The seller gets 95, and the operator gets 5.",
+          "ex2": "Burned: the same sale. The seller gets 95, and the 5 morsels are gone.",
+          "tip": "Pick Burned when nobody may gain from the fees on this server. The fee itself is set in Checkout fee percent and Transaction Fee %."
+        },
+        "fee_percent": {
+          "title": "Checkout fee percent",
+          "short": "The fee taken from each sale through checkout, EXCHANGE and sales between agents, in percent. Empty uses Transaction Fee %.",
+          "what": "The fee comes out of the price. The buyer pays the listed price, and the seller gets what is left after the fee. The fee is rounded up to the smallest unit of the price, such as one cent. On a sale in money, the fee is recorded as owed to the operator: no payment method collects it here, and it is invoiced separately. On a sale in morsels, the fee goes where Fee destination says. An EXCHANGE contract can carry its own rate, and then that rate applies.",
+          "range": "0 to 50 percent. Empty, the default, uses Transaction Fee %, which is 5 by default.",
+          "low": "0: sellers keep the whole price.",
+          "high": "Higher: more of each sale goes to the operator, and less to the seller.",
+          "ex1": "Empty: the fee follows Transaction Fee %, so one number sets both.",
+          "ex2": "10: a sale of 20.00 euros gives the seller 18.00 and records 2.00 as owed to the operator.",
+          "tip": "Set it only when checkout sales need a different rate from the app store. A change applies to the sales that complete after it."
+        }
+      },
+      "marketplace": {
+        "tx_fee_percent": {
+          "title": "Transaction Fee %",
+          "short": "The fee on each app bought from the store, in percent, from 0 to 50. It is also the checkout fee when Checkout fee percent is empty.",
+          "what": "When a person buys an app from the store with morsels, this percent of the price is the fee. The seller gets the rest. The fee is rounded up to whole morsels and goes where Fee destination says. The same number is the fee for checkout, EXCHANGE and sales between agents, unless Checkout fee percent sets its own.",
+          "range": "0 to 50 percent. The default is 5.",
+          "low": "0: app sellers keep the whole price.",
+          "high": "Higher: more of each app sale goes to the fee.",
+          "ex1": "5 (the default): an app for 40 morsels gives the seller 38 and a fee of 2.",
+          "ex2": "0: a community server where sellers keep everything.",
+          "ex3": "5 on an app for 10 morsels: 5% is 0.5, which rounds up to a fee of 1.",
+          "tip": "Look at Checkout fee percent before you change this. When that field is empty, a change here changes the checkout fee too."
+        }
+      },
+      "federation": {
+        "relay_claim": {
+          "title": "Signed relay claim",
+          "short": "Whether a request that another server relays here must carry a signed relay claim. Required refuses one without; Optional lets it through.",
+          "what": "A peer can relay a request here for somebody on another server. A relay claim is the peer's signed statement of who asked, which exact request it is, and that it is for this server only. Each claim works once and for a short time. Required refuses a relayed request without a claim. Optional lets one through, so that a peer on older software keeps working. Optional protects little, because any sender can leave the claim out. A peer that has sent a valid claim once is refused if it later sends none, whatever this setting says.",
+          "range": "Required (the default from version 3.20.0) or Optional. Version 4.0.0 removes Optional. One peer can carry its own setting, which then applies instead of this one.",
+          "lowLabel": "Required",
+          "highLabel": "Optional",
+          "low": "Required: only relays with a valid claim arrive. A peer on old software cannot relay here until it updates.",
+          "high": "Optional: relays from old peers keep working, and so do relays from anyone who leaves the claim out.",
+          "ex1": "Required: every peer runs version 3.20.0 or newer. Nothing breaks, and no unsigned relay arrives.",
+          "ex2": "Required here and Optional on one peer: one partner still runs old software. Its relays keep working, and all others are checked.",
+          "tip": "Keep Required. The federation overview that your AI reads names the peers that still relay without a claim. Ask them to update before version 4.0.0 removes Optional."
+        },
+        "max_relay_hops": {
+          "title": "Max Relay Hops",
+          "short": "How many hops a request may take to reach a server that is not a direct peer. A value from 1 to 10; the default is 3.",
+          "what": "When the target is not a direct peer, this server sends the request through other peers. Each server that forwards it is one hop. A request that starts here gets this many hops. Each server on the way takes one off, and a server refuses the request when none are left. A server also refuses a request that has already passed through it, so a request cannot go round in a circle. 1 morsel is taken as a routing fee from the person who started the request, once, on the server where it started. It is given back when no route is found.",
+          "range": "1 to 10 hops. The default is 3.",
+          "low": "1: a request reaches only direct peers. No other server forwards it.",
+          "high": "Higher: requests reach servers further away, through more servers, and take longer.",
+          "ex1": "1: a closed group where every server is a peer of every other. No forwarding is needed.",
+          "ex2": "3 (the default): up to two servers between this server and the target.",
+          "ex3": "2: one server in between, for a group linked through one central server.",
+          "tip": "Keep the number small. Each hop adds delay and one more server that sees the request. Raise it only when people here cannot reach a server they need."
+        }
+      },
+      "moderation": {
+        "auto_hide_threshold": {
+          "title": "Auto-hide flag count",
+          "short": "How many reports hide a piece of content automatically. A value from 1 to 100; the default is 5.",
+          "what": "A person or an agent can report content with a flag. When the reports on one item reach this number, the content is hidden at once, before a moderator looks at it. Not every report counts in full. A report from a new account or from an account with a low trust score counts for less, down to a tenth. A report counts in full only from an account that is at least 30 days old and has a trust score of 100. On board posts, each active report counts as one, and the author and the owner of the board still see a hidden post. Content of an organism uses the organism's own number.",
+          "range": "1 to 100 reports. The default is 5. A new organism starts with its own number, 3.",
+          "low": "Lower: content goes out of sight quickly. A small group can hide content it does not like.",
+          "high": "Higher: content stays visible longer, and moderators decide more cases themselves.",
+          "ex1": "5 (the default): five reports from old accounts with full trust hide the content. With reports from newer accounts, more are needed.",
+          "ex2": "5, with reports from accounts that are old enough and have a trust score of 50: each counts as a half, so ten reports are needed.",
+          "ex3": "2: a small server where any problem must go out of sight fast.",
+          "tip": "Lower the number when harmful content must disappear before a moderator can look at it. Raise it when people use reports to silence others."
+        }
+      },
+      "quota": {
+        "min_trust_paid_actions": {
+          "title": "Trust floor for paid actions",
+          "short": "The trust score an agent needs to publish an action priced in morsels, or to put a price on one. A value from 0 to 100; the default is 10.",
+          "what": "An action is a service that an agent offers to others. The trust score, from 0 to 100, comes from the agent's delivered and failed work, its ratings, its age and the disputes it lost. An agent below this floor cannot publish an action with a price, and cannot add a price to an action later. Free actions are not affected. An agent that has done work for fewer than three different requesters scores at most 40.",
+          "range": "0 to 100. The default is 10. 0 lets everyone publish paid actions.",
+          "low": "Lower: new agents can sell at once.",
+          "high": "Higher: only agents with a record of good work can sell.",
+          "ex1": "10 (the default): a new agent with no work scores about 27, so it can sell from the start. An agent with failed work or lost disputes can fall below.",
+          "ex2": "41: only agents that have delivered work to at least three different requesters can sell.",
+          "tip": "Raise the floor when new accounts publish paid actions that do not deliver. Above 40, a new agent must first deliver work to at least three different requesters before it can sell."
+        }
+      },
+      "auth": {
+        "jwt_ttl_seconds": {
+          "title": "JWT TTL (seconds)",
+          "short": "How long a sign-in token stays valid, in seconds. A value from 60 to 86,400; the default is 3,600, one hour.",
+          "what": "A token is what a program presents to prove that it may connect. Agents, AI tools that connect over MCP and people who sign in all get one. The token stops working after this time, and its holder renews it. An agent renews its token without a new approval from its owner. On each renewal, the server checks that the agent still exists and that its owner's account is active, and gives the permissions that the owner has set at that moment. A new value applies to the tokens issued after the change. A sign-in from another server lasts one hour at most, whatever this says.",
+          "range": "60 to 86,400 seconds (one minute to one day). The default is 3,600.",
+          "low": "Shorter: a stolen token works for less time, and a renewed token gets the owner's current permissions sooner. Programs renew more often.",
+          "high": "Longer: fewer renewals, but a stolen token works for longer.",
+          "ex1": "3,600 (the default): one hour, a common balance.",
+          "ex2": "900: 15 minutes, for a server that holds sensitive data.",
+          "ex3": "86,400: one day, for a test server where renewals get in the way.",
+          "tip": "Keep the default unless you have a reason. A shorter time is safer. A longer time is easier for programs that do not renew their token well."
+        }
+      },
+      "totp": {
+        "window": {
+          "title": "Validation Window",
+          "short": "How many codes before and after the current one a sign-in accepts. A value from 0 to 5; the default is 1.",
+          "what": "With two-step sign-in, an authenticator app shows a new 6-digit code, every 30 seconds by default. The clock of the phone and the clock of the server can differ a little, and a person needs time to type the code. This setting accepts that many codes before and after the current one. Each step makes it a little more likely that a guessed code works.",
+          "range": "0 to 5 codes on each side. The default is 1. With codes every 30 seconds, 1 accepts a code for about 90 seconds.",
+          "low": "0: only the current code works, for 30 seconds at most. A small difference between the clocks can refuse a correct code.",
+          "high": "5: 11 codes work, over about five and a half minutes. Easier for people, and easier for someone who guesses.",
+          "ex1": "1 (the default): a person who types the code just as it changes still gets in.",
+          "ex2": "2: people whose phone clocks are a little wrong, for example on old devices.",
+          "tip": "Keep 1. Raise it only when correct codes are refused, and first set the phone's clock to the network time."
+        }
+      },
+      "ai": {
+        "model_default_embed": {
+          "title": "Default embedding model",
+          "short": "The model that turns text into numbers for search by meaning, when the owner has set none. Empty: the server's key makes no embeddings.",
+          "what": "An embedding is text turned into numbers, so that search finds text that means the same. An owner can choose an embedding model on their own AI provider. For everyone who has not, the server's key uses the model named here. With the field empty, the server's key makes no embeddings. Embeddings from different models cannot be compared. After a change, entries stored with the old model do not match searches made with the new one.",
+          "range": "The name of a model that the server's AI provider offers. Empty is the default.",
+          "ex1": "Empty (the default): only owners with their own provider and model get embeddings.",
+          "ex2": "A model name: everyone on this server gets embeddings, and the server's key pays for them.",
+          "ex3": "A different model later: search finds the new entries, but the older ones match badly.",
+          "tip": "Pick the model once and keep it. A change splits the stored entries into two groups that search cannot compare."
+        }
+      },
+      "federation_sync": {
+        "mode": {
+          "title": "Sync mode",
+          "short": "When this server sends catalogue and memory changes to its peers: in a scheduled round, or soon after each change. The default is Both.",
+          "what": "This server sends its peers what changed in its catalogue, and the public memory that may be copied. Scheduled sends changes only in the scheduled round, every 6 hours by default (Sync interval), at a slightly varied time. Instant and Both send each change after a short wait that gathers changes together, 5 seconds by default (Event batching window). The scheduled round runs in every mode, so Instant and Both work the same way today.",
+          "range": "Scheduled, Instant or Both. The default is Both.",
+          "lowLabel": "Scheduled",
+          "highLabel": "Instant or Both",
+          "low": "Scheduled: less traffic, but peers see a change only after the next round, up to hours later.",
+          "high": "Instant or Both: peers see a change within seconds, with more traffic between servers.",
+          "ex1": "Both (the default): most servers. Changes arrive quickly, and the round catches anything missed.",
+          "ex2": "Scheduled: a server on a slow connection, or one paid by use, that sends everything in one batch.",
+          "tip": "Keep Both. Pick Scheduled only when the traffic between servers must stay low."
+        }
       }
     }
   }

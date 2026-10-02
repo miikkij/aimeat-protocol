@@ -12,6 +12,8 @@
  * @structure secRoles · roleRow · roleOpen · appRoleRow
  * @usage import { secRoles } from './ai/roles-section.js';
  * @version-history
+ *   v1.2.0 — 2026-10-02 — The question marks that explain a role's this-machine-only and price ceiling
+ *     rows: ai.local_only, ai.max_cost_per_call (components/HelpTip.js).
  *   v1.1.0 — 2026-09-28 — The lifecycle and the fit: a role or a binding unused for 90 days is marked,
  *     an app no longer published is marked and its request can be dismissed, and a bound app role says
  *     where the owner's role does not meet its need (a missing capability, a model too small).
@@ -31,6 +33,7 @@ import { Note } from '/components/Note.js';
 import { Hint } from '/components/Hint.js';
 import { Action, Loud, Actions } from '/components/Action.js';
 import { Row as Line, Stack } from '/components/Layout.js';
+import { HelpLabel } from '/components/HelpTip.js';
 import { x, dateWord } from './frame.js';
 import { CAPS } from './use-providers.js';
 import { MAX_PLACES } from './use-roles.js';
@@ -119,8 +122,8 @@ function roleOpen(ctx, role) {
     { k: x('rl.purpose'), v: html`<${TextField} box value=${d.purpose} placeholder=${x('rl.purposePlaceholder')} ariaLabel=${x('rl.purpose')} onInput=${(v) => rl.setDraft({ purpose: v })} />` },
     ...CAPS.filter((c) => d.caps[c]).map(capRow),
     unused.length ? { k: x('rl.addCap'), v: html`<${Select} fit ariaLabel=${x('rl.addCap')} value="" onChange=${(v) => rl.addCapability(v)} options=${[['', x('rl.pickCap')], ...unused.map((c) => [c, x('cap.' + c)])]} />`, sub: x('rl.addCapHint') } : null,
-    { k: x('rl.local'), v: html`<${Check} inline checked=${d.local} onChange=${(v) => rl.setDraft({ local: v })}>${x('rl.localOn')}<//>` },
-    { k: x('rt.cost'), v: html`<${TextField} type="number" size="short" min="0" step="0.01" value=${d.maxCost} placeholder=${x('rt.costNone')} ariaLabel=${x('rt.cost')} onInput=${(v) => rl.setDraft({ maxCost: v })} />`, sub: x('rl.costSub') },
+    { key: 'local', k: html`<${HelpLabel} term="ai.local_only" label=${x('rl.local')}>${x('rl.local')}<//>`, v: html`<${Check} inline checked=${d.local} onChange=${(v) => rl.setDraft({ local: v })}>${x('rl.localOn')}<//>` },
+    { key: 'cost', k: html`<${HelpLabel} term="ai.max_cost_per_call" label=${x('rt.cost')}>${x('rt.cost')}<//>`, v: html`<${TextField} type="number" size="short" min="0" step="0.01" value=${d.maxCost} placeholder=${x('rt.costNone')} ariaLabel=${x('rt.cost')} onInput=${(v) => rl.setDraft({ maxCost: v })} />` },
   ];
   const doors = html`
     <${Loud} control disabled=${rl.busy === 'role'} onClick=${() => rl.save()}>${x('save')}<//>

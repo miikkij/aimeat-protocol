@@ -11,7 +11,8 @@
  * @structure renderBoardsView · renderCover · secFollowed · secRecent · secPublic · ownBoardForm · secApp
  * @usage import { renderBoardsView } from './boards/cover.js';
  * @version-history
- *   v1.14.0 -- 2026-09-26 -- On the component kit (page group G7): the frame is the SettingsPage (tags, loud action, rail as data), the strip the FigureStrip, the fold tabs the Tab and Tabs, "show the rest" the More line, the own-board form the Fields with the Choice and the TextField, the app fold the Beside with the Code block, the folds the Section fold with the long line cut. The file writes no class.
+ *   v1.15.0 -- 2026-10-02 -- The question mark that explains morsels: commerce.morsels on the price TextField (components/HelpTip.js).
+ *   v1.14.0 --2026-09-26 -- On the component kit (page group G7): the frame is the SettingsPage (tags, loud action, rail as data), the strip the FigureStrip, the fold tabs the Tab and Tabs, "show the rest" the More line, the own-board form the Fields with the Choice and the TextField, the app fold the Beside with the Code block, the folds the Section fold with the long line cut. The file writes no class.
  *   v1.13.0 -- 2026-09-26 -- The boards table's heading row is inside its Listing (boardRows with head), a unification: the look most tabs use.
  *   v1.12.0 -- 2026-09-26 -- The SDK example is the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
  *   v1.11.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
@@ -183,7 +184,7 @@ export function ownBoardForm(ctx) {
         <${TextField} id="bp-f-cats" label=${c('fCategories')} hint=${c('categoriesHint')} value=${f.categories} onInput=${(v) => set('categories', v)} placeholder=${c('categoriesPlaceholder')} />
         ${choice('ttl', c('fLifetime'), c('lifetimeHint'), [['72', c('life3')], ['168', c('life7')], ['720', c('life30')], ['8760', c('lifeYear')]])}
       <//>
-      ${f.visibility === 'public' ? html`<${TextField} id="bp-f-price" size="short" label=${c('fPrice')} hint=${c('priceHint')} type="number" min="0" step="1" value=${f.price} onInput=${(v) => set('price', v)} />` : null}
+      ${f.visibility === 'public' ? html`<${TextField} id="bp-f-price" size="short" label=${c('fPrice')} help="commerce.morsels" hint=${c('priceHint')} type="number" min="0" step="1" value=${f.price} onInput=${(v) => set('price', v)} />` : null}
       <${Actions}>
         <${Loud} control disabled=${ctx.creating || !f.name.trim()} onClick=${() => ctx.handleCreate()}>${c('create')}<//>
         <${Action} small soft onClick=${() => ctx.setFold('own', false)}>${t('profile.cancel')}<//>

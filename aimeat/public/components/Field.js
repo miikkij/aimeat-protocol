@@ -70,7 +70,7 @@ import { h } from 'preact';
 import { useId } from 'preact/hooks';
 import htm from 'htm';
 import { Note } from '/components/Note.js';
-import { HelpTip } from '/components/HelpTip.js';
+import { HelpLabel } from '/components/HelpTip.js';
 
 const html = htm.bind(h);
 const cx = (...parts) => parts.filter(Boolean).join(' ');
@@ -109,7 +109,7 @@ export function Field({ label, labelNote, help, hint, message, error, wide, inva
   // `help`: the question mark stands beside the label, outside it, because a button inside a
   // <label> would be a second control the label names.
   const lab = bare && help
-    ? html`<span class="field-label-row">${bare}<${HelpTip} term=${help} label=${typeof label === 'string' ? label : undefined} /></span>`
+    ? html`<${HelpLabel} term=${help} label=${typeof label === 'string' ? label : undefined}>${bare}<//>`
     : bare;
   return html`
     <div class=${cls} role=${group && lab ? 'group' : undefined} aria-labelledby=${group && lab ? labelId : undefined}>

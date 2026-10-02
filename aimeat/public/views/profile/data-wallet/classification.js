@@ -16,6 +16,7 @@
  * @structure acceptStep(policy, item, decision) · useClassification() → cls · secClassification(ctx, num)
  * @usage const cls = useClassification({ federated, confirm, toast }); … secClassification({ ...ctx, cls }, '05')
  * @version-history
+ *   v1.8.0 — 2026-10-02 — The question mark that explains the classification switch: classification.switch (components/HelpTip.js).
  *   v1.7.0 — 2026-09-30 — acceptStep counts a label of higher rank that protects less as a lowering,
  *     as the server does (protectsLess, a copy of levels.ts weakerFields), so the reason is asked for
  *     before the server refuses the accept with JUSTIFICATION_REQUIRED (TARGET-082 second review).
@@ -62,6 +63,7 @@ import { Space } from '/components/Layout.js';
 import { Section } from '/components/Section.js';
 import { Facts } from '/components/Facts.js';
 import { Switch } from '/components/Switch.js';
+import { HelpLabel } from '/components/HelpTip.js';
 import { List, Row, Name, Desc, Who, Num, When, Cell, Doors, More } from '/components/List.js';
 import { Tabs } from '/components/Tabs.js';
 import { Mark, Label } from '/components/Mark.js';
@@ -274,10 +276,11 @@ export function classificationCount(cls) {
 /** The switch as a row of facts: its state, and what the operator's setting leaves to the person. */
 function switchRow(cls) {
   const v = cls.view;
-  if (v.mode === 'off') return { key: 'switch', k: x('cls.switch'), v: x('cls.notInUse'), missing: true, sub: x('cls.modeOff') };
-  if (v.mode === 'all') return { key: 'switch', k: x('cls.switch'), v: html`<${Switch} on locked label=${x('cls.on')} />`, sub: x('cls.modeAll') };
+  const k = html`<${HelpLabel} term="classification.switch" label=${x('cls.switch')}>${x('cls.switch')}<//>`;
+  if (v.mode === 'off') return { key: 'switch', k, v: x('cls.notInUse'), missing: true, sub: x('cls.modeOff') };
+  if (v.mode === 'all') return { key: 'switch', k, v: html`<${Switch} on locked label=${x('cls.on')} />`, sub: x('cls.modeAll') };
   return {
-    key: 'switch', k: x('cls.switch'),
+    key: 'switch', k,
     v: html`<${Switch} on=${!!v.active} label=${x(v.active ? 'cls.on' : 'cls.off')} disabled=${cls.busy === 'switch'} onToggle=${cls.toggle} />`,
     sub: x(v.active ? 'cls.modeOwnerOn' : 'cls.modeOwnerOff'),
   };

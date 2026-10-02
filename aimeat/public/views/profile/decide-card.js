@@ -19,6 +19,7 @@
  * @structure DecideCard — the collapsible card, mounted in the profile AI tab
  * @usage import { DecideCard } from './decide-card.js'; html`<${DecideCard} />`
  * @version-history
+ *   v1.18.0 — 2026-10-02 — The question marks that explain the two policy switches: decide.store_state, decide.public_opt_out on their Checks (components/HelpTip.js). The policy's description stays.
  *   v1.17.0 — 2026-09-26 — Every part is a kit component (Touch keeps every control 44px, FoldSection, TextField, Check in BoxList and BoxLine rows, the verdict as the row's doors, SubHeading, Note, Action, Layout): the card writes no class; the anchor #decide-card and ?open=decide-card are unchanged (page group G8).
  *   v1.16.0 — 2026-09-26 — A decision's line beside its subject is the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
  *   v1.15.0 — 2026-09-26 — The decision classes and policies beside their check boxes are the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
@@ -254,11 +255,11 @@ export function DecideCard() {
                   <${Check} checked=${settings.policy.allow.includes(cls)} disabled=${!!busy} onChange=${() => toggleClass(cls)}>${t(`decideCard.class.${cls}`)}<//>
                 <//>`)}
               <${BoxLine} key="storeState">
-                <${Check} checked=${settings.policy.storeState} disabled=${!!busy}
+                <${Check} checked=${settings.policy.storeState} disabled=${!!busy} help="decide.store_state"
                   onChange=${() => save({ policy: { store_state: !settings.policy.storeState } }, 'decideCard.policySaved')}>${t('decideCard.storeState')}<//>
               <//>
               <${BoxLine} key="publicOptOut">
-                <${Check} checked=${settings.policy.allowPublicOptOut} disabled=${!!busy}
+                <${Check} checked=${settings.policy.allowPublicOptOut} disabled=${!!busy} help="decide.public_opt_out"
                   onChange=${() => save({ policy: { allow_public_opt_out: !settings.policy.allowPublicOptOut } }, 'decideCard.policySaved')}>${t('decideCard.publicOptOut')}<//>
               <//>
             <//>

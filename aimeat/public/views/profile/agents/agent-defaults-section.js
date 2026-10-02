@@ -5,7 +5,8 @@
  * @description Agent Defaults section — owner-level default rules and token
  *   budget for agents. Mounted at the foot of the Your agents page.
  * @version-history
- *   v1.11.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
+ *   v1.12.0 -- 2026-10-02 -- The question mark that explains the token budget: agent.token_budget on its TextField (components/HelpTip.js).
+ *   v1.11.1 --2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
  *     itself, so rules with a quote or an ampersand showed as &quot; / &amp;. A rule is the server's
  *     { id, description } object, so the rows show its description (they showed "[object Object]", and
  *     once escHtml was gone preact wrote into the object and Save failed on a circular structure), and
@@ -194,7 +195,7 @@ export function AgentDefaultsSection({ showToast, initial }) {
               actions=${html`<${Action} small onClick=${addRule}>${t('profile.access.adAddRule') || 'Add'}<//>`} />
           <//>
 
-          <${TextField} type="number" min="0" label=${t('profile.access.adTokenBudget') || 'Token Budget'}
+          <${TextField} type="number" min="0" label=${t('profile.access.adTokenBudget') || 'Token Budget'} help="agent.token_budget"
             placeholder=${t('profile.access.adBudgetPlaceholder') || 'Leave empty for unlimited'}
             value=${editBudget} onInput=${setEditBudget} />
 

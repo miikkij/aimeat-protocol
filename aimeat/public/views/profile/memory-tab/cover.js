@@ -17,6 +17,7 @@
  *   renderRecord · renderOther · renderPage · crumb · pageDoors · spaceTable · fileRows
  * @usage import { renderMemoryView } from './memory-tab/cover.js';
  * @version-history
+ *   v1.26.0 -- 2026-10-02 -- The question marks that explain a share pattern and a record's visibility: memory.key_pattern, memory.visibility (components/HelpTip.js).
  *   v1.25.0 -- 2026-09-26 -- Every part is a component call with data (the page kit, the List, the
  *     Folds, the Mark, the Action, the Note, the Field family, SettingBox, StoredValue); no class is
  *     written here. Put back from main what the previous branch lost: the dim tag (a private key,
@@ -394,7 +395,7 @@ function renderSpace(ctx, id) {
     ${sharePanelFor ? html`<${SettingBox} label=${c('shareGroup', 'Share with a group')}>
       ${groups.length === 0 ? html`<${Note} kind="hint">${t('profile.memory.shNoGroups') || 'No sharing groups yet.'}<//>` : html`
         <${Fields}>
-          <${TextField} label=${t('profile.access.shPattern') || 'Pattern'} hint=${t('profile.access.shPatternHelp') || ''} value=${sharePattern} onInput=${setSharePattern} />
+          <${TextField} label=${t('profile.access.shPattern') || 'Pattern'} help="memory.key_pattern" value=${sharePattern} onInput=${setSharePattern} />
           <${Select} label=${t('profile.memory.shPickGroup') || 'Group'} value=${shareGroupId} onChange=${setShareGroupId} options=${groups.map(g => [g.id, g.name])} />
           <${FormActions}>
             <${Loud} onClick=${submitShare}>${t('profile.access.shCreate') || 'Share'}<//>
@@ -434,7 +435,7 @@ function renderRecord(ctx, key) {
     <${Action} small onClick=${() => setEditModal({ key, value: typeof v === 'object' && v !== null ? JSON.stringify(v, null, 2) : String(v ?? ''), visibility: m.visibility || 'private', version: m.version, isJson: typeof v === 'object' && v !== null })}>${t('profile.memory.editBtn') || 'Edit'}<//>`;
   // The record's own settings stand in the side column, over its rail.
   const aside = html`
-    <${Choice} label=${c('visibility', 'Visibility')} hint=${c('visHint', 'Public: anyone with the address reads it. Sharing with a group is done per key space, not per key.')}
+    <${Choice} label=${c('visibility', 'Visibility')} help="memory.visibility"
       value=${m.visibility || 'private'} onChange=${(x) => handleQuickVis(m, x)}
       options=${VIS_OPTIONS.filter(x => x !== 'group').map(x => [x, t('knowledge.visibility.' + x) || x])} />
     <${Field} label=${c('tags', 'Tags')} group>
