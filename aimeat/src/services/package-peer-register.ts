@@ -40,6 +40,8 @@
  *   if (!link.ok) return link;                          // nothing was written
  *   await adoptPendingPeer({ storage, peers, timeoutMs }, headerNodeId);   // before verifyPackageNode
  * @version-history
+ *   v2.2.0 — 2026-10-02 — A new packages-only peer from a grant, a sale or a named seller counts against
+ *     the node's cap (`cap`, package-peer-limits.ts): beyond it 409 PACKAGE_PEER_CAP, nothing written.
  *   v2.1.0 — 2026-10-01 — With `thisNodeId` in the deps, a card that answers as another node or key and
  *     a node id held under another key (a peer, or a pending registration) are recorded on the Security
  *     page (peer-incidents.ts), so the operator learns of them.
@@ -57,6 +59,7 @@ import { stripTrailingSlashes } from '../utils/url-validator.js';
 import type { PeerInfo } from './federation.js';
 import { deriveTierFlags } from './federation-tiers.js';
 import { readNodeCard } from './node-card.js';
+import { capRefusal, PACKAGE_PEER_SOURCES, DEFAULT_PACKAGE_PEER_CAP } from './package-peer-limits.js';
 import {
     recordPeerOrigin, readPendingPeer, writePendingPeer, deletePendingPeer, pendingExpired, type PeerOriginSource,
 } from './peer-origin.js';
@@ -121,6 +124,8 @@ export interface PeerLinkDeps {
     storage: Storage; peers: Map<string, PeerInfo>; timeoutMs: number;
     /** This node's id. With it, a failed card check and a held id are recorded on the Security page. */
     thisNodeId?: string;
+    /** The most packages-only peers this node registers (config.packagePeerCap; package-peer-limits.ts). */
+    cap?: number;
 }
 
 /** Record a refusal on the Security page when the deps name this node. Never throws. */
@@ -157,6 +162,11 @@ export async function linkPackagePeer(
         await report(deps, { kind: 'id-held', nodeId, via: who.source, actor: who.by,
             presented: { key: add.publicKey, url: add.url }, other: { key: pending.publicKey, url: pending.url } });
         return { ok: false, status: 409, code: 'PEER_KEY_MISMATCH', message: `${nodeId} was already named under another key, and this node is waiting for it to answer. Check which key is right; nothing was granted.` };
+    }
+    // A new packages-only peer counts against the node's cap; one already waiting does not.
+    if (!pending && PACKAGE_PEER_SOURCES.has(who.source)) {
+        const refusal = await capRefusal(deps, deps.cap ?? DEFAULT_PACKAGE_PEER_CAP);
+        if (refusal) return refusal;
     }
     const proof = await proveNodeCard(nodeId, add.url, add.publicKey, deps.timeoutMs);
     if (proof.kind === 'refused') {

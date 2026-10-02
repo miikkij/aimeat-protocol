@@ -24,6 +24,8 @@
  *   · Subscription · subscriptionsOf() · subscriptionFor() · putSubscription() · setAutoRenew() ·
  *   allSubscriptions() · SaleRequest · readRequests() · putRequest()
  * @version-history
+ *   v1.1.0 — 2026-10-02 — A catalogue entry keeps the operator's review (`reviewed`, recordReview());
+ *     a price change keeps it (package sale design, phase 5).
  *   v1.0.0 — 2026-10-02 — Initial (package sale design, phase 3).
  */
 import { randomUUID } from 'node:crypto';
@@ -44,6 +46,11 @@ export interface CatalogueEntry {
     renewal: (Money & { period_days: number }) | null;
     title?: string;
     state: 'on_sale' | 'paused' | 'ended';
+    /**
+     * The operator's review of what the version on sale can do (package-offer.ts offerCapabilities):
+     * a new sale opens only while the repository's capability hash is the one reviewed.
+     */
+    reviewed?: { version: string; capabilities_hash: string; at: string; by: string };
     updatedAt: string;
 }
 
@@ -120,8 +127,23 @@ export async function setCatalogueEntry(
         price, renewal,
         ...(typeof input.title === 'string' && input.title ? { title: input.title.slice(0, 200) } : before?.title ? { title: before.title } : {}),
         state: (input.state as CatalogueEntry['state'] | undefined) ?? before?.state ?? 'on_sale',
+        ...(before?.reviewed ? { reviewed: before.reviewed } : {}),
         updatedAt: new Date().toISOString(),
     };
+    entries[entryKey(repository, groupId)] = entry;
+    await putRecord(storage, 'catalogue', { entries }, prev, 'package-sales-catalogue');
+    return { ok: true, entry };
+}
+
+/** Record the operator's review of the version on sale. The entry must exist: price it first. */
+export async function recordReview(
+    storage: Storage, repository: string, groupId: string, reviewed: NonNullable<CatalogueEntry['reviewed']>,
+): Promise<{ ok: true; entry: CatalogueEntry } | Fail> {
+    const { value, prev } = await getRecord<{ entries: Record<string, CatalogueEntry> }>(storage, 'catalogue');
+    const entries = { ...(value?.entries ?? {}) };
+    const before = entries[entryKey(repository, groupId)];
+    if (!before) return fail(404, 'NOT_FOR_SALE', `This node has not priced ${groupId}. Price it first (action price), then review it.`);
+    const entry: CatalogueEntry = { ...before, reviewed, updatedAt: new Date().toISOString() };
     entries[entryKey(repository, groupId)] = entry;
     await putRecord(storage, 'catalogue', { entries }, prev, 'package-sales-catalogue');
     return { ok: true, entry };

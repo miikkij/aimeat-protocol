@@ -9,6 +9,7 @@
  * @structure adminCliTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { adminCliTools } from './tool-call-defs-admin.js';
  * @version-history
+ *   v1.11.0 -- 2026-10-02 -- aimeat_package_sale action review (POST /v1/package-sales/catalogue/review).
  *   v1.10.0 -- 2026-10-02 -- aimeat_package_sale gains offer, claim, catalogue, price, requests and decide;
  *     aimeat_package_claim (POST /v1/package-claims). Package sale design, phase 3.
  *   v1.9.0 -- 2026-10-01 -- aimeat_admin_federation_peer_remove (DELETE /v1/federation/peers/:nodeId).
@@ -163,6 +164,7 @@ export const adminCliTools: ConnectCliToolDefinition[] = [
             }
             const repository = requiredString(input, 'repository');
             const groupId = requiredString(input, 'group_id');
+            if (action === 'review') return client.post('/v1/package-sales/catalogue/review', { repository, group_id: groupId });
             if (action === 'price') {
                 const body: Record<string, unknown> = { repository, group_id: groupId };
                 for (const k of ['price', 'renewal', 'title', 'state']) if (input[k] !== undefined) body[k] = input[k];

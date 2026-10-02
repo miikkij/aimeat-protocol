@@ -15,6 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.21.0 — 2026-10-02 — packagePeerCap (AIMEAT_PACKAGE_PEER_CAP, default 500).
  *   v1.20.0 — 2026-10-01 — appAuditKeepDefault (AIMEAT_APP_AUDIT_KEEP, default 0 = keep all).
  *   v1.19.0 — 2026-09-30 — updateCheckDefaults(): the npm version check (config-update-check.ts).
  *   2026-09-29 — siteLinks moves to siteLinksFromEnv() (config-site-contacts.ts) by pure extraction
@@ -671,6 +672,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     packageFederationEnabled: process.env.AIMEAT_PACKAGE_FEDERATION_ENABLED === 'true',
     packageFederationAutoAccept: process.env.AIMEAT_PACKAGE_FEDERATION_AUTO_ACCEPT === 'true',
     packageRepository: process.env.AIMEAT_PACKAGE_REPOSITORY === 'true',
+    packagePeerCap: parseInt(process.env.AIMEAT_PACKAGE_PEER_CAP ?? '500', 10),
     installSetPath: process.env.AIMEAT_INSTALL_SET || null,
     installSetSecretsPath: process.env.AIMEAT_INSTALL_SET_SECRETS || null,
 

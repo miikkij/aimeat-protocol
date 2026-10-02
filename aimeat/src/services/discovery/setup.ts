@@ -9,6 +9,8 @@
  * @structure buildDiscoveryRegistry(storage, config) → DiscoveryRegistry (memory + capabilities + apps + agent-tasks)
  * @usage const registry = buildDiscoveryRegistry(storage, config);
  * @version-history
+ *   v0.6.0 — 2026-10-02 — Register the `package-offers` source: the packages this node sells, as
+ *     `offering` entries with segment `package` (package sale design, phase 5).
  *   v0.5.0 — 2026-09-01 — Register the `node-capabilities` source: what THIS NODE can do, so an
  *     agent can find `aimeat_memory_write` in the directory instead of needing all 297 tool
  *     descriptions in its context to know it exists. Agent v2 V2.
@@ -31,6 +33,7 @@ import { createDesignbookSource } from './sources/designbook-source.js';
 import { createAppToolsSource } from './sources/app-tools-source.js';
 import { createNodeCapabilitiesSource } from './sources/node-capabilities-source.js';
 import { createRemoteMcpSource } from './sources/remote-mcp-source.js';
+import { createPackageOffersSource } from './sources/package-offers-source.js';
 
 export function buildDiscoveryRegistry(storage: Storage, config: AimeatConfig): DiscoveryRegistry {
   const registry = createRegistry();
@@ -43,5 +46,6 @@ export function buildDiscoveryRegistry(storage: Storage, config: AimeatConfig): 
   registry.register(createAppToolsSource(storage, config));      // published app tools (apps.*.tools), one entry per TOOL
   registry.register(createNodeCapabilitiesSource());              // the node's OWN capabilities — what `invoke` can run
   registry.register(createRemoteMcpSource(storage, config));      // tools on servers this caller has attached
+  registry.register(createPackageOffersSource(storage, config));  // packages this node sells (package-sales catalogue)
   return registry;
 }

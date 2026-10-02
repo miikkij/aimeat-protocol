@@ -6,6 +6,7 @@
  *   src/storage/types/apps.ts, which had passed the 800-line limit; re-exported from
  *   src/storage/interface.ts like every other types file.
  * @version-history
+ *   v1.2.0 — 2026-10-02 — PackageRecord status gains `withdrawn` (package sale design, phase 5: T6).
  *   v1.1.0 — 2026-09-30 — PackageComponentType gains `skill`: a package carries the skills bound to its
  *     apps (wish-a-package-carries-the-skills-bound-to-its-apps).
  *   v1.0.0 — 2026-09-28 — Pure extraction from src/storage/types/apps.ts (max-file-lines), in the
@@ -127,8 +128,12 @@ export interface PackageRecord {
   category: string;                // "signage" | "marketplace" | "iot" | "social" | "productivity" | "communication" | "other"
   tags: string[];                  // free-form tags for search
   visibility: 'private' | 'public';
-  /** `beta`: released on a repository's beta channel only (services/package-entitlements.ts). */
-  status: 'draft' | 'published' | 'beta' | 'archived';
+  /**
+   * `beta`: released on a repository's beta channel only (services/package-entitlements.ts).
+   * `withdrawn`: taken back by its author or an operator, with a reason; never served again
+   * (services/package-withdrawals.ts).
+   */
+  status: 'draft' | 'published' | 'beta' | 'archived' | 'withdrawn';
 
   components: PackageComponent[];  // all components in this version
   manifest: string;                // full package YAML manifest (human-readable)

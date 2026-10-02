@@ -30,10 +30,15 @@
  *   const offer = await readOffer(storage, groupId);
  *   const out = await setOffer(storage, { owner, isOperator }, groupId, { terms, state });
  * @version-history
+ *   v1.1.0 — 2026-10-02 — offerCapabilities(): what the version on sale can do, for a seller's review
+ *     (package sale design, phase 5).
  *   v1.0.0 — 2026-10-02 — Initial (package sale design, phase 3).
  */
-import type { Storage } from '../storage/interface.js';
+import type { Storage, PackageComponent } from '../storage/interface.js';
+import type { AimeatConfig } from '../config.js';
 import { NS_PACKAGE_ENTITLEMENTS } from './package-entitlements.js';
+import { packageCapabilities } from './package-capabilities.js';
+import { bundleOfComponents } from './install-set-spec.js';
 import { MONEY_CURRENCIES, integerMicros } from '../commerce/money.js';
 
 export type OfferGrant = 'payment' | 'approval' | 'automatic';
@@ -193,6 +198,29 @@ export async function setOffer(
         version: rec ? rec.version + 1 : 1, createdAt: rec?.createdAt ?? now, updatedAt: now,
     });
     return { ok: true, offer };
+}
+
+/**
+ * What the version on sale can do, for a seller's review (phase 5, review on a selling node): the
+ * newest published version and the capability summary of its parts. For an install bundle, the
+ * parts of the newest published version of every package it lists. The hash changes when a new
+ * version can do more or less, and only then.
+ */
+export async function offerCapabilities(
+    storage: Storage, config: AimeatConfig, groupId: string,
+): Promise<{ version: string; items: string[]; hash: string } | null> {
+    const pkg = await storage.getLatestPublished(groupId);
+    if (!pkg) return null;
+    const components: PackageComponent[] = [...pkg.components];
+    const bundle = bundleOfComponents(pkg.components);
+    if (bundle?.ok) {
+        for (const p of bundle.value.packages) {
+            const listed = await storage.getLatestPublished(p.groupId);
+            if (listed) components.push(...listed.components.map(c => ({ ...c, id: `${p.groupId}/${c.id}` })));
+        }
+    }
+    const summary = packageCapabilities(components, config, pkg.author);
+    return { version: pkg.version, items: summary.items, hash: summary.hash };
 }
 
 /** The offer as anyone may read it: the state and the current terms, with the earlier ones' ids. */

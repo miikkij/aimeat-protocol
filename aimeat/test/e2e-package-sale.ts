@@ -18,9 +18,15 @@
  *   - Phase 6: automatic renewal: charged and moved once; a declined card is told once
  *   - Phase 7: a grant the repository refuses refunds the payment
  *   - Phase 8: an offer granted on approval: refused, then approved, the buyer told each time
+ *   - Phase 8b: a version R withdraws reaches B's copy at B's check (phase 5, T6)
+ *   - Phase 8c: a new version that can do more waits for S's review; renewals go on (phase 5)
+ *   - Phase 8d: discovery finds the package for sale; the packages-only peer cap (phase 5, finding F)
  *   - Phase 9: a paused offer sells nothing new, and renewals go on
+ *   - Phase 10: an unused packages-only peer is removed after 30 days; a seller is kept (finding F)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=package-sale
  * @version-history
+ *   v1.1.0 — 2026-10-02 — Phase 5: S reviews before it sells, a withdrawn version on B, a new version
+ *     that waits for review, discovery, the peer cap and the cleanup.
  *   v1.0.0 — 2026-10-02 — Initial (package sale design, phase 3).
  */
 import { randomBytes } from 'node:crypto';
@@ -33,6 +39,7 @@ import type { Storage } from '../src/storage/interface.js';
 import type { PeerInfo } from '../src/services/federation.js';
 import { runAutoRenewals } from '../src/services/package-renewals.js';
 import { runAsNode } from '../src/utils/gaii.js';
+import { cleanupPackagePeers } from '../src/services/package-peer-limits.js';
 
 let passed = 0;
 let failed = 0;
@@ -255,6 +262,17 @@ await test('Only S\'s operator prices; the buyer sees S\'s price, the author\'s 
     assert(set.status === 200 && set.body.data.entry.seller_of_record === ops && set.body.data.entry.price.amount === 25_000_000, `price: ${set.status} ${JSON.stringify(set.body)}`);
     const deskSet = await price(opsToken, { group_id: desk, price: null, title: 'Desk' });
     assert(deskSet.status === 200, `desk: ${deskSet.status} ${JSON.stringify(deskSet.body)}`);
+    // Priced but not reviewed: nothing sells yet (phase 5, review on a selling node).
+    const unreviewed = await S.json(`/v1/package-sales/offer?repository=${encodeURIComponent(R.nodeId)}&group_id=${encodeURIComponent(kit)}`, { headers: auth(buyerToken) });
+    assert(unreviewed.body.data.state === 'needs_review', `needs review: ${JSON.stringify(unreviewed.body.data)}`);
+    const early = await buy({ app: kit });
+    assert(early.create.status === 409 && early.create.body.error?.code === 'NEEDS_REVIEW', `no sale before review: ${early.create.status} ${JSON.stringify(early.create.body)}`);
+    for (const g of [kit, desk]) {
+        const rev = await S.json('/v1/package-sales/catalogue/review', { method: 'POST', headers: auth(opsToken), body: JSON.stringify({ repository: R.nodeId, group_id: g }) });
+        assert(rev.status === 200 && rev.body.data.entry.reviewed?.capabilities_hash === rev.body.data.reviewed.hash && rev.body.data.reviewed.items.length > 0, `review ${g}: ${rev.status} ${JSON.stringify(rev.body)}`);
+    }
+    const buyerReview = await S.json('/v1/package-sales/catalogue/review', { method: 'POST', headers: auth(buyerToken), body: JSON.stringify({ repository: R.nodeId, group_id: kit }) });
+    assert(buyerReview.status === 403, `only the operator reviews: ${buyerReview.status}`);
     const view = await S.json(`/v1/package-sales/offer?repository=${encodeURIComponent(R.nodeId)}&group_id=${encodeURIComponent(kit)}`, { headers: auth(buyerToken) });
     const v = view.body.data;
     assert(view.status === 200 && v.price.amount === 25_000_000 && v.renewal.amount === 6_000_000 && v.updates_included_days === 2
@@ -429,6 +447,72 @@ await test('A request waits; refused, the buyer is told and nothing is granted; 
     assert((await notifsOf('package_sale_request_decided')).length === 2, 'the buyer is told each time');
 });
 
+console.log('\nPhase 8b — A withdrawn version reaches the customer node');
+
+const bLocalKit = () => `${kit.split('::')[0]}::bops${ts}`;
+await test('B installs the version it pulled; R withdraws it; B\'s check tells B\'s owner once, with the reason', async () => {
+    const inst = await B.json(`/v1/packages/${encodeURIComponent(bLocalKit())}/install`, { method: 'POST', headers: auth(bOpsToken), body: JSON.stringify({ label: 'Kit here' }) });
+    assert(inst.status === 201, `install on B: ${inst.status} ${JSON.stringify(inst.body)}`);
+    const versions = (await R.json(`/v1/packages/${encodeURIComponent(kit)}/versions`, { headers: auth(vendorToken) })).body.data.versions as any[];
+    const v1 = versions[0].version as string;
+    const w = await R.json(`/v1/packages/${encodeURIComponent(kit)}/versions/${encodeURIComponent(v1)}/withdraw`, {
+        method: 'POST', headers: auth(vendorToken), body: JSON.stringify({ reason: 'The first kit leaks its settings. A fixed version follows.' }),
+    });
+    assert(w.status === 200, `withdraw on R: ${w.status} ${JSON.stringify(w.body)}`);
+    for (let i = 0; i < 2; i++) {
+        const check = await B.json('/v1/instances/check-updates', { method: 'POST', headers: auth(bOpsToken), body: '{}' });
+        assert(check.status === 200, `check on B: ${check.status} ${JSON.stringify(check.body)}`);
+    }
+    const notes = ((await B.json('/v1/notifications?limit=100', { headers: auth(bOpsToken) })).body.data.notifications as any[]).filter(n => n.type === 'package_version_withdrawn');
+    assert(notes.length === 1 && String(notes[0].body).includes('leaks its settings'), `told once on B: ${JSON.stringify(notes)}`);
+});
+
+console.log('\nPhase 8c — A new version that can do more waits for the seller\'s review');
+
+await test('R publishes a version with a part more; new sales wait for S\'s review, renewals go on', async () => {
+    const v2 = await R.json(`/v1/packages/${encodeURIComponent(kit)}/versions`, {
+        method: 'POST', headers: auth(vendorToken),
+        body: JSON.stringify({ status: 'published', changelog: 'Fixed, and seeds a record', components: [
+            { id: 'app-kit', type: 'app', label: 'Kit', content: APP_HTML.replace('Kit</h1>', 'Kit 2</h1>'), dependencies: [] },
+            { id: 'seed', type: 'memory', label: 'Seed', content: JSON.stringify({ entries: [{ key: `kit.seed.${ts}`, value: { n: 1 } }] }), dependencies: [] },
+        ] }),
+    });
+    assert(v2.status === 201, `v2: ${v2.status} ${JSON.stringify(v2.body)}`);
+    const view = await S.json(`/v1/package-sales/offer?repository=${encodeURIComponent(R.nodeId)}&group_id=${encodeURIComponent(kit)}`, { headers: auth(buyerToken) });
+    assert(view.body.data.state === 'needs_review', `needs review again: ${JSON.stringify(view.body.data.state)}`);
+    const sale = await buy({ app: kit, input: { node: await fakeNode('n5') } });
+    assert(sale.create.status === 409 && sale.create.body.error?.code === 'NEEDS_REVIEW', `no new sale: ${sale.create.status} ${JSON.stringify(sale.create.body)}`);
+    const renew = await buy({ app: kit, offer_id: `renew:${n1.node_id}` });
+    assert(renew.create.status === 201 && renew.done.status === 200, `the renewal goes on: ${renew.create.status} ${JSON.stringify(renew.done?.body ?? renew.create.body)}`);
+    const rev = await S.json('/v1/package-sales/catalogue/review', { method: 'POST', headers: auth(opsToken), body: JSON.stringify({ repository: R.nodeId, group_id: kit }) });
+    assert(rev.status === 200 && (rev.body.data.reviewed.items as string[]).some(i => i.includes('kit.seed')), `reviewed with the new part: ${JSON.stringify(rev.body.data.reviewed)}`);
+    const after = await buy({ app: kit, input: { node: await fakeNode('n6') } });
+    assert(after.create.status === 201 && after.done.status === 200, `sells again: ${after.create.status} ${JSON.stringify(after.done?.body ?? after.create.body)}`);
+});
+
+console.log('\nPhase 8d — Discovery and the peer cap');
+
+await test('An agent searching S finds the package for sale, with its price and the tool that buys it', async () => {
+    const r = await S.json(`/v1/discover?scope=public&q=Kit&per_page=50`);
+    const e = (r.body.data.entries as any[]).find(x => x.type === 'offering' && x.segment === 'package' && x.id === `${R.nodeId}/${kit}`);
+    assert(!!e && /25\.00 EUR/.test(e.description) && /aimeat_package_buy/.test(e.description), `found: ${JSON.stringify(r.body.data.entries)}`);
+});
+
+await test('At the packages-only peer cap R refuses a new node, writes nothing, and a node already known still gets its grant', async () => {
+    const before = R.config.packagePeerCap;
+    R.config.packagePeerCap = 1;
+    try {
+        const nNew = await fakeNode('capped');
+        const refused = await buy({ app: kit, input: { node: nNew } });
+        assert(refused.done?.status === 502 && /PACKAGE_PEER_CAP|as many nodes/.test(JSON.stringify(refused.done.body)), `refused and refunded: ${JSON.stringify(refused.done?.body ?? refused.create.body)}`);
+        assert(!(await grantsOn(kit)).some(x => x.nodeId === nNew.node_id), 'no grant for the refused node');
+        const known = await buy({ app: kit, input: { node: { node_id: B.nodeId, url: B.baseUrl, public_key: (await B.json('/.well-known/aimeat')).body.data.public_key } } });
+        assert(known.done?.status === 200, `a known node is not refused: ${JSON.stringify(known.done?.body ?? known.create.body)}`);
+    } finally {
+        R.config.packagePeerCap = before;
+    }
+});
+
 console.log('\nPhase 9 — A paused offer');
 
 await test('Paused on S, no new sale opens, and a renewal still does', async () => {
@@ -440,6 +524,22 @@ await test('Paused on S, no new sale opens, and a renewal still does', async () 
     assert(sale.create.status === 404 && sale.create.body.error?.code === 'NOT_FOR_SALE', `no new sale: ${sale.create.status} ${JSON.stringify(sale.create.body)}`);
     const renew = await buy({ app: kit, offer_id: `renew:${n1.node_id}` });
     assert(renew.create.status === 201 && renew.done.status === 200, `renewal: ${renew.create.status} ${renew.done?.status} ${JSON.stringify(renew.done?.body ?? renew.create.body)}`);
+});
+
+console.log('\nPhase 10 — An unused packages-only peer is removed');
+
+await test('When B holds no grant any more, R\'s daily cleanup removes it after 30 days, and keeps S, its seller', async () => {
+    const del = await S.json(`/v1/package-sales/entitlements?repository=${encodeURIComponent(R.nodeId)}&group_id=${encodeURIComponent(kit)}&node_id=${encodeURIComponent(B.nodeId)}`, {
+        method: 'DELETE', headers: auth(opsToken),
+    });
+    assert(del.status === 200, `revoke B: ${del.status} ${JSON.stringify(del.body)}`);
+    const peers = await peersOf(R);
+    const soon = await cleanupPackagePeers({ storage: R.storage, config: R.config, peers }, Date.now() + 86_400_000);
+    assert(!soon.includes(B.nodeId), `not before 30 days: ${JSON.stringify(soon)}`);
+    const later = await cleanupPackagePeers({ storage: R.storage, config: R.config, peers: await peersOf(R) }, Date.now() + 31 * 86_400_000);
+    assert(later.includes(B.nodeId) && !later.includes(S.nodeId), `B removed, S kept: ${JSON.stringify(later)}`);
+    const left = (await R.storage.listFederationPeers()).map(p => p.nodeId);
+    assert(!left.includes(B.nodeId) && left.includes(S.nodeId), `stored peers: ${JSON.stringify(left)}`);
 });
 
 console.log('\nCleanup');

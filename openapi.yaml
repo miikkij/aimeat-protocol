@@ -44706,6 +44706,45 @@ paths:
         '413':
           description: Package exceeds size, component count or per-author limit
 
+  /v1/packages/{groupId}/versions/{version}/withdraw:
+    post:
+      operationId: withdrawPackageVersion
+      summary: Withdraw a bad version from every node that has it
+      description: >-
+        The package's author or an operator; requires packages:write. The version's status becomes
+        `withdrawn` and nothing serves it again: no install, no pull, no repository customer. Each
+        installed copy of it on this node has its extensions switched off and its owner told once, with
+        the reason; a customer node does the same at its daily check, which reads `withdrawn` on the
+        repository's listing. Apps and records stay as they are. It cannot be undone: publish a fixed
+        version. 409 ALREADY_WITHDRAWN for a version withdrawn before.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: groupId, in: path, required: true, schema: { type: string } }
+        - { name: version, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 10, maxLength: 1000, description: Every owner who has the version reads it. }
+      responses:
+        '200':
+          description: '`data` is `{ withdrawal: { version, reason, by, at }, copies_here }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
   /v1/packages/compose-set:
     post:
       operationId: composePackageSet
@@ -45103,7 +45142,9 @@ paths:
       summary: A seller node reads a package's terms, signed
       description: >-
         The offer of /v1/packages/{groupId}/offer with every terms version (`all_terms`), for a seller
-        node of the package's author, signed as described for the config-needs endpoint.
+        node of the package's author, signed as described for the config-needs endpoint. `latest` is
+        what the version on sale can do: `{ version, items, hash }`, the capability list of the newest
+        published version (for an install bundle, of every package it lists), which the seller reviews.
       tags: [Federation]
       parameters:
         - { name: groupId, in: path, required: true, schema: { type: string } }
@@ -45290,6 +45331,41 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/package-sales/catalogue/review:
+    post:
+      operationId: packageSaleReview
+      summary: Approve what the version on sale can do
+      description: >-
+        The selling node's operator reads, with this node's key, the newest published version and its
+        capability list (`latest` on the seller's offer read) and records it on the catalogue entry. New
+        sales open only while the repository's capability hash is the reviewed one; a new version that
+        can do more answers 409 NEEDS_REVIEW at checkout until the operator reviews again, and renewals
+        go on meanwhile. Price the package first. Operator only, as above.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [repository, group_id]
+              properties:
+                repository: { type: string }
+                group_id: { type: string }
+      responses:
+        '200':
+          description: '`data` is `{ entry, reviewed: { version, items, hash } }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
 
   /v1/package-sales/requests:
     get:
@@ -45574,7 +45650,9 @@ paths:
         '200':
           description: >-
             `data` is `{ node, packages: [{ group_id, name, version, published_at, description,
-            category, visibility, updates_until, channel }] }`.
+            category, visibility, updates_until, channel, sold_by?, sold_by_url?, withdrawn? }] }`.
+            `withdrawn` lists the group's withdrawn versions, each `{ version, reason, at }`; a node
+            holding one switches its extensions off and tells its owner.
           content:
             application/json:
               schema:

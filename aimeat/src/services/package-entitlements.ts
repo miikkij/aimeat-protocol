@@ -27,6 +27,8 @@
  * @usage
  *   const pkg = await entitledVersion(storage, groupId, nodeId, versionParam);
  * @version-history
+ *   v1.5.0 — 2026-10-02 — The repository listing names each group's withdrawn versions (`withdrawn`, with
+ *     the reason), for the customer node's daily check (package sale design, phase 5: T6).
  *   v1.4.0 — 2026-10-02 — An omitted `updates_until` keeps the grant's own date instead of resetting it
  *     to updates forever. A grant records the seller that sold it (`soldBy`, or the note of an older
  *     one); a seller changes and revokes only its own grants and may extend another's only to a later
@@ -54,6 +56,7 @@ import type { PeerInfo } from './federation.js';
 import { verifyPackageNode } from './package-node-auth.js';
 import { bundleOfPackage } from './install-set-spec.js';
 import { linkPackagePeer, adoptPendingPeer } from './package-peer-register.js';
+import { withdrawnVersions } from './package-withdrawals.js';
 
 export const NS_PACKAGE_ENTITLEMENTS = 'package-entitlements';
 
@@ -162,7 +165,7 @@ export async function grantEntitlement(
     caller: { owner: string; isOperator: boolean },
     input: { groupId: string; nodeId: string; updatesUntil?: unknown; note?: unknown; channel?: unknown; node?: unknown; terms?: PackageEntitlement['terms'] },
     peers?: Map<string, PeerInfo>,
-    peerOpts: { timeoutMs?: number; seller?: string; thisNodeId?: string } = {},
+    peerOpts: { timeoutMs?: number; seller?: string; thisNodeId?: string; peerCap?: number } = {},
 ): Promise<EntitlementResult> {
     const refused = await mayManage(storage, input.groupId, caller);
     if (refused) return refused;
@@ -188,7 +191,7 @@ export async function grantEntitlement(
     if (input.node !== undefined && input.node !== null) {
         if (!peers) return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'node cannot be registered on this path.' };
         const link = await linkPackagePeer(
-            { storage, peers, timeoutMs: peerOpts.timeoutMs ?? 10_000, thisNodeId: peerOpts.thisNodeId }, input.nodeId, input.node,
+            { storage, peers, timeoutMs: peerOpts.timeoutMs ?? 10_000, thisNodeId: peerOpts.thisNodeId, cap: peerOpts.peerCap }, input.nodeId, input.node,
             peerOpts.seller
                 ? { source: 'package-sale', by: peerOpts.seller, groupId: input.groupId }
                 : { source: 'package-grant', by: caller.owner, groupId: input.groupId },
@@ -372,6 +375,8 @@ export interface RepositoryListingEntry {
     /** The seller node that sold the entitlement, and its address when this node knows it: where to renew. */
     sold_by?: string;
     sold_by_url?: string;
+    /** The group's withdrawn versions, each with the reason its author gave. */
+    withdrawn?: Array<{ version: string; reason: string; at: string }>;
 }
 
 /**
@@ -395,7 +400,10 @@ export async function repositoryListing(
         });
     }
     for (const { groupId, entitlement } of await entitledGroupsOf(storage, nodeId)) {
-        const pkg = await entitledVersion(storage, groupId, nodeId);
+        // With every version withdrawn there is nothing to serve, and the row still goes out: it is
+        // how the customer node learns that the version it holds was withdrawn.
+        const pkg = await entitledVersion(storage, groupId, nodeId)
+            ?? (Object.keys(await withdrawnVersions(storage, groupId)).length ? (await storage.listVersions(groupId, 1, 0)).versions[0] ?? null : null);
         if (!pkg || seen.has(groupId)) continue;
         out.push({
             group_id: groupId, name: pkg.name, version: pkg.version, published_at: pkg.createdAt,
@@ -407,6 +415,12 @@ export async function repositoryListing(
                 return seller ? { sold_by: seller, ...(url ? { sold_by_url: url } : {}) } : {};
             })(),
         });
+    }
+    // The versions taken back, with why: a customer node's daily check acts on a copy of one
+    // (package-withdrawals.ts, package-upstream-refresh.ts).
+    for (const row of out) {
+        const w = Object.values(await withdrawnVersions(storage, row.group_id));
+        if (w.length) row.withdrawn = w.map(x => ({ version: x.version, reason: x.reason, at: x.at }));
     }
     return out;
 }

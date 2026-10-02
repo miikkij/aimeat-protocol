@@ -17,6 +17,7 @@
  * @structure packageTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { packageTools } from './tool-call-defs-packages.js';
  * @version-history
+ *   v1.13.0 -- 2026-10-02 -- aimeat_package_withdraw (POST /v1/packages/:groupId/versions/:version/withdraw).
  *   v1.12.0 -- 2026-10-02 -- aimeat_package_compose_set (POST /v1/packages/compose-set); aimeat_package_install
  *     forwards `organism_names` (package sale design, phase 4).
  *   v1.11.0 -- 2026-10-02 -- aimeat_package_offer (GET, PUT /v1/packages/:groupId/offer) and aimeat_package_buy
@@ -169,6 +170,13 @@ export const packageTools: ConnectCliToolDefinition[] = [
             if (prompts !== undefined) body.prompts = prompts;
             return client.post('/v1/packages/compose', body);
         },
+    },
+    {
+        // Taking a bad version back, with the reason every owner of it reads.
+        name: 'aimeat_package_withdraw',
+        handler: ({ client }, input) => client.post(
+            `/v1/packages/${encodeURIComponent(requiredString(input, 'group_id'))}/versions/${encodeURIComponent(requiredString(input, 'version'))}/withdraw`,
+            { reason: requiredString(input, 'reason') }),
     },
     {
         // A set to sell: every field forwarded under its REST name (POST /v1/packages/compose-set).

@@ -5,6 +5,7 @@
  * @description MCP tool registrations for app/package management -- publishing,
  *   listing, retrieving, archiving versions, version history, sanctioned forks, and drafts (staging).
  * @version-history
+ *   2026-10-02 — aimeat_package_withdraw (POST /v1/packages/:groupId/versions/:version/withdraw).
  *   2026-10-02 — aimeat_package_compose_set (POST /v1/packages/compose-set); aimeat_package_install
  *     forwards `organism_names` (a set's organisms).
  *   2026-10-02 — aimeat_package_offer (GET, PUT /v1/packages/:groupId/offer) and aimeat_package_buy
@@ -382,6 +383,14 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     const resp = await client.post('/v1/packages/compose', body);
     return envelopeResult(resp);
   });
+
+  // Taking a bad version back (POST /v1/packages/:groupId/versions/:version/withdraw).
+  mcp.tool('aimeat_package_withdraw', descriptionFor('aimeat_package_withdraw'), {
+    group_id: z.string().describe('Package group identifier'),
+    version: z.string().describe('The version to withdraw'),
+    reason: z.string().describe('Why, in 10 to 1000 characters: every owner who has the version reads it'),
+  }, annotationsFor('aimeat_package_withdraw'), async ({ group_id, version, reason }) =>
+    envelopeResult(await client.post(`/v1/packages/${encodeURIComponent(group_id)}/versions/${encodeURIComponent(version)}/withdraw`, { reason })));
 
   // A set to sell: one package per app and the install bundle (POST /v1/packages/compose-set).
   mcp.tool('aimeat_package_compose_set', descriptionFor('aimeat_package_compose_set'), {

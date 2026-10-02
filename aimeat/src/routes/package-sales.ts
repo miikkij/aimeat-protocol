@@ -18,6 +18,8 @@
  *   who could make it would sell the author's packages in the node's name.
  * @structure registerPackageSaleRoutes(router, config, storage, peers)
  * @version-history
+ *   v1.4.0 — 2026-10-02 — The seller's signed offer read carries `latest` (what the version on sale can
+ *     do); POST /v1/package-sales/catalogue/review records the operator's review (design phase 5).
  *   v1.3.0 — 2026-10-02 — The package sale (design phase 3). On the repository: the author's offer
  *     (GET, PUT /v1/packages/:groupId/offer), the seller's signed offer read and claim codes, the terms a
  *     grant names (`terms_id`), and a node redeeming a claim with its own key. On the selling node: its
@@ -41,12 +43,12 @@ import { listSellers, addSeller, removeSeller, isSellerFor } from '../services/p
 import { grantEntitlement, revokeEntitlement, type PackageEntitlement } from '../services/package-entitlements.js';
 import { packageConfigNeeds } from '../services/package-config-needs.js';
 import { saleConfigNeeds, saleGrant, saleRevoke, saleClaim, saleOffer, claimPackageHere } from '../services/package-sale-client.js';
-import { readOffer, setOffer, publicOffer, termsById } from '../services/package-offer.js';
+import { readOffer, setOffer, publicOffer, termsById, offerCapabilities } from '../services/package-offer.js';
 import { createClaim, redeemClaim } from '../services/package-claims.js';
 import {
     readCatalogue, setCatalogueEntry, readRequests, subscriptionsOf, setAutoRenew,
 } from '../services/package-sale-catalogue.js';
-import { buyerOfferView, decideSaleRequest } from '../services/package-sale-checkout.js';
+import { buyerOfferView, decideSaleRequest, reviewSale } from '../services/package-sale-checkout.js';
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 
 export function registerPackageSaleRoutes(
@@ -132,7 +134,8 @@ export function registerPackageSaleRoutes(
         if (!act) return;
         const offer = await readOffer(storage, act.groupId);
         if (!offer) { res.status(404).json(error(config.nodeId, 'NO_OFFER', 'The author of this package has not set the terms it is sold on. Ask them to set an offer first.')); return; }
-        res.json(success(config.nodeId, { ...publicOffer(offer), all_terms: offer.terms }));
+        // `latest`: what the version on sale can do, which the seller reviews before it sells it.
+        res.json(success(config.nodeId, { ...publicOffer(offer), all_terms: offer.terms, latest: await offerCapabilities(storage, config, act.groupId) }));
     });
 
     // A one-time code for a sale whose customer node does not exist yet (services/package-claims.ts).
@@ -162,7 +165,7 @@ export function registerPackageSaleRoutes(
         const groupId = decodeURIComponent(req.params.groupId as string);
         const pkg = (await storage.listVersions(groupId, 1, 0)).versions[0];
         if (!pkg) { res.status(404).json(error(config.nodeId, 'CLAIM_NOT_FOUND', 'No claim with that code waits for this package.')); return; }
-        const out = await redeemClaim({ storage, peers, timeoutMs: config.federationTimeoutMs, thisNodeId: config.nodeId }, {
+        const out = await redeemClaim({ storage, peers, timeoutMs: config.federationTimeoutMs, thisNodeId: config.nodeId, peerCap: config.packagePeerCap }, {
             groupId, author: pkg.author, code: body.code, nodeId: who.nodeId, node: { url: str(body.url), public_key: publicKey },
         });
         if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
@@ -187,7 +190,7 @@ export function registerPackageSaleRoutes(
         const out = await grantEntitlement(storage, { owner: act.author, isOperator: false }, {
             groupId: act.groupId, nodeId: req.params.nodeId as string,
             updatesUntil: body.updates_until, channel: body.channel, note, node: body.node, terms: terms ?? undefined,
-        }, peers, { timeoutMs: config.federationTimeoutMs, seller: act.seller, thisNodeId: config.nodeId });
+        }, peers, { timeoutMs: config.federationTimeoutMs, seller: act.seller, thisNodeId: config.nodeId, peerCap: config.packagePeerCap });
         if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
         res.json(success(config.nodeId, { entitlement: out.entitlement, peer_registered: out.peerRegistered === true, peer_pending: out.peerPending === true }));
     });
@@ -247,6 +250,14 @@ export function registerPackageSaleRoutes(
         const out = await setCatalogueEntry(storage, { owner: req.auth!.owner }, (req.body ?? {}) as Record<string, unknown>);
         if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
         res.json(success(config.nodeId, { entry: out.entry }));
+    });
+
+    // The operator reviews what the version on sale can do; new sales open while it stays that.
+    router.post('/v1/package-sales/catalogue/review', ...operatorOnly, async (req, res) => {
+        const body = (req.body ?? {}) as Record<string, unknown>;
+        const out = await reviewSale(deps, req.auth!.owner, str(body.repository), str(body.group_id));
+        if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
+        res.json(success(config.nodeId, { entry: out.entry, reviewed: out.latest }));
     });
 
     router.get('/v1/package-sales/requests', ...operatorOnly, async (_req, res) => {

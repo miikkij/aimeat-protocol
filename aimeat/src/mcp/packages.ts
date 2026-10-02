@@ -23,6 +23,7 @@
  *   aimeat_package_check_updates, aimeat_package_repository, aimeat_package_entitlements.
  * @usage import { registerPackageTools } from './packages.js';
  * @version-history
+ *   v1.13.0 — 2026-10-02 — aimeat_package_withdraw (package sale design, phase 5: T6).
  *   v1.12.0 — 2026-10-02 — aimeat_package_compose_set (a set to sell, with its dry run); aimeat_package_compose
  *     answers `new_version`; aimeat_package_install installs a set for the owner and takes
  *     `organism_names`. Package sale design, phase 4.
@@ -89,6 +90,7 @@ import { subscriptionsOf, readRequests, setAutoRenew } from '../services/package
 import { createSession } from '../commerce/session-service.js';
 import { bundleInstallOf, installSetForOwner } from '../services/install-bundle-owner.js';
 import { composeSet } from '../services/package-compose-set.js';
+import { withdrawVersion } from '../services/package-withdrawals.js';
 
 /** A package row as a conversation needs it: what it is, not every byte it holds. */
 function packageSummary(pkg: { packageGroupId: string; name: string; author: string; version: string; status: string; visibility: string; description: string; category: string; tags: string[]; components: { id: string; type: string; label: string }[] }) {
@@ -361,6 +363,17 @@ export function registerPackageTools(
         return { content: [{ type: 'text' as const, text: JSON.stringify(out.answer, null, 2) }] };
     });
 
+    // Taking a bad version back: the same service POST /v1/packages/:groupId/versions/:version/withdraw calls.
+    mcp.tool('aimeat_package_withdraw', descriptionFor('aimeat_package_withdraw'), {
+        group_id: z.string().describe('Package group identifier.'),
+        version: z.string().describe('The version to withdraw.'),
+        reason: z.string().describe('Why, in 10 to 1000 characters: every owner who has the version reads it.'),
+    }, annotationsFor('aimeat_package_withdraw'), async ({ group_id, version, reason }) => {
+        const out = await withdrawVersion({ storage, config, scheduler: getActiveScheduler() }, { owner: ownerOf(), isOperator: false }, { groupId: group_id, version, reason });
+        if (!out.ok) return { ...toolError(out.code, out.message) };
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ withdrawal: out.withdrawal, copies_here: out.copies_here, next_step: 'Publish a fixed version; managed copies receive it as an update.' }, null, 2) }] };
+    });
+
     mcp.tool('aimeat_package_status_set', descriptionFor('aimeat_package_status_set'), {
         group_id: z.string().describe('Package group identifier.'),
         version: z.string().optional().describe('Which version. Defaults to the newest one.'),
@@ -531,7 +544,7 @@ export function registerPackageTools(
             if (!out.ok) return { ...toolError(out.code, out.message) };
             return { content: [{ type: 'text' as const, text: JSON.stringify({ revoked: true, node_id }, null, 2) }] };
         }
-        const out = await grantEntitlement(storage, caller, { groupId: group_id, nodeId: node_id, updatesUntil: updates_until, note, channel, node }, peers, { timeoutMs: config.federationTimeoutMs, thisNodeId: config.nodeId });
+        const out = await grantEntitlement(storage, caller, { groupId: group_id, nodeId: node_id, updatesUntil: updates_until, note, channel, node }, peers, { timeoutMs: config.federationTimeoutMs, thisNodeId: config.nodeId, peerCap: config.packagePeerCap });
         if (!out.ok) return { ...toolError(out.code, out.message) };
         return { content: [{ type: 'text' as const, text: JSON.stringify({ entitlement: out.entitlement, peer_registered: out.peerRegistered === true, peer_pending: out.peerPending === true, repository_role: config.packageRepository }, null, 2) }] };
     });

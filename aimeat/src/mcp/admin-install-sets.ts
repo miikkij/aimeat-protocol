@@ -14,6 +14,7 @@
  * @structure registerAdminInstallSetTools(mcp, storage, config, peers, getAgentGaii, scopes)
  * @usage registered from src/mcp/register-all.ts
  * @version-history
+ *   v1.3.0 — 2026-10-02 — aimeat_package_sale action review (package sale design, phase 5).
  *   v1.2.0 — 2026-10-02 — aimeat_package_sale gains offer, claim, catalogue, price, requests and decide;
  *     aimeat_package_claim redeems a claim code on the buying node (package sale design, phase 3).
  *   v1.1.0 — 2026-09-29 — aimeat_package_sale: this node, as a seller, signs a sale request to a
@@ -33,7 +34,7 @@ import { applyInstallSet, listAppliedSets } from '../services/install-set-apply.
 import { getActiveScheduler } from '../services/scheduler.js';
 import { saleConfigNeeds, saleGrant, saleRevoke, saleOffer, saleClaim, claimPackageHere } from '../services/package-sale-client.js';
 import { readCatalogue, readRequests, setCatalogueEntry } from '../services/package-sale-catalogue.js';
-import { decideSaleRequest } from '../services/package-sale-checkout.js';
+import { decideSaleRequest, reviewSale } from '../services/package-sale-checkout.js';
 
 const text = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
 
@@ -63,7 +64,7 @@ export function registerAdminInstallSetTools(
 
     // A selling node's signed sale requests: the same services /v1/package-sales/... calls.
     mcp.tool('aimeat_package_sale', descriptionFor('aimeat_package_sale'), {
-        action: z.enum(['needs', 'grant', 'revoke', 'offer', 'claim', 'catalogue', 'price', 'requests', 'decide']).describe('needs: the questions to ask; grant: serve (or change, or end the updates of) a customer node; revoke: stop serving it; offer: the author\'s terms; claim: a code for a node not known yet; catalogue: what this node sells; price: put a package on sale here at this node\'s price, or change it; requests: sales waiting for approval; decide: approve or refuse one.'),
+        action: z.enum(['needs', 'grant', 'revoke', 'offer', 'claim', 'catalogue', 'price', 'review', 'requests', 'decide']).describe('needs: the questions to ask; grant: serve (or change, or end the updates of) a customer node; revoke: stop serving it; offer: the author\'s terms and what the version on sale can do; claim: a code for a node not known yet; catalogue: what this node sells; price: put a package on sale here at this node\'s price, or change it; review: approve what the version on sale can do, which opens new sales; requests: sales waiting for approval; decide: approve or refuse one.'),
         repository: z.string().optional().describe('The package repository\'s node id. Not for catalogue, requests or decide.'),
         repository_link: z.object({ url: z.string(), public_key: z.string() }).optional().describe('The first time only: { url, public_key } of the repository, to link it as a peer of this node.'),
         group_id: z.string().optional().describe('The package or install bundle group id on the repository.'),
@@ -89,6 +90,10 @@ export function registerAdminInstallSetTools(
         if (input.action === 'decide') {
             const done = await decideSaleRequest(deps, input.request_id ?? '', input.decision);
             return done.ok ? text({ request: done.request }) : { ...toolError(done.code, done.message) };
+        }
+        if (input.action === 'review') {
+            const done = await reviewSale(deps, agentName, input.repository ?? '', input.group_id ?? '');
+            return done.ok ? text({ entry: done.entry, reviewed: done.latest }) : { ...toolError(done.code, done.message) };
         }
         if (input.action === 'price') {
             // The operator account the agent acts for is the seller of record unless the call names another.

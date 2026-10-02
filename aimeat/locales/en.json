@@ -8594,6 +8594,8 @@
   "notiftext.package_sale_request_approved.body": "The seller approved it. Open your Packages page to see what comes next.",
   "notiftext.package_sale_request_refused.title": "Your request for {name} was not approved",
   "notiftext.package_sale_request_refused.body": "The seller did not approve it. Nothing was installed or charged.",
+  "notiftext.package_version_withdrawn.title": "The version of {label} you have was withdrawn",
+  "notiftext.package_version_withdrawn.body": "Its author withdrew version {version}: {reason} Any extensions it brought were switched off. Your apps and records stay as they are. Install the next version when it comes.",
   "notiftext.app_mail_read_consent.title": "Reading your mail now takes a permission of its own",
   "notiftext.app_mail_read_consent.body": "These apps have permission to publish and send through the accounts you have connected: {apps}. Until now that permission also let them read your mail. Reading has its own permission now: allow it for each app that should keep reading your mail.",
   "notiftext.app_mail_read_consent.allow": "Allow reading: {app}",

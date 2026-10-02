@@ -25,6 +25,9 @@
  * @usage
  *   const outcomes = await refreshInstalledPackages({ storage, config, peers }, { owner }, { notify: false });
  * @version-history
+ *   v1.4.0 — 2026-10-02 — A copy of a version the repository withdrew has its extensions switched off and
+ *     its owner told once (package-withdrawals.ts), on every check; firstNoticeFor moved to
+ *     package-notices.ts unchanged (package sale design, phase 5: T6).
  *   v1.3.0 — 2026-10-02 — The daily check tells the owner once, fourteen days before an install's
  *     updates end, where to renew (package_renewal_due), from the repository's listing.
  *   v1.2.0 — 2026-10-02 — An install with auto-update on is not updated to a version that can do more
@@ -46,9 +49,10 @@ import { emitChange } from './event-bus.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
 import { logger } from '../utils/logger.js';
 import { stripTrailingSlashes } from '../utils/url-validator.js';
+import { firstNoticeFor } from './package-notices.js';
+import { actOnWithdrawn } from './package-withdrawals.js';
+import { getActiveScheduler } from './scheduler.js';
 
-/** Where the owner was last told about a version, per install: one record per install, system namespace. */
-const NS_UPDATE_NOTICES = 'package-update-notices';
 
 /** What the owner reads when the update service has ended. */
 export const UPDATES_ENDED_SENTENCE = 'The update service for this package has ended. The app keeps working as it is. Renew the update service to get new versions.';
@@ -93,7 +97,8 @@ export async function refreshInstalledPackages(
         }
     }
     if (outcomes.some(o => o.pulled || o.result === 'updated')) emitChange('instances');
-    if (opts.notify) await renewalNotices(deps, instances);
+    // A withdrawn version is acted on whoever runs the check: its extensions are what runs by itself.
+    await repositoryNotices(deps, instances, opts);
     void config;
     return outcomes;
 }
@@ -102,24 +107,33 @@ export async function refreshInstalledPackages(
 export const RENEWAL_NOTICE_DAYS = 14;
 
 /**
- * Tell each owner once, fourteen days before an install's updates end, where to renew: the seller the
- * repository's listing names, with its address when the repository knows it (package sale design,
- * section 3). A repository that does not answer is skipped; the next night asks again.
+ * What the repository's listing says about each install, read once per repository node. A version
+ * of the install the repository withdrew: its extensions off and the owner told (package-withdrawals.ts),
+ * every run. Fourteen days before an install's updates end, with `notify`: the owner is told once where
+ * to renew, the seller the listing names with its address when the repository knows it (package sale
+ * design, section 3). A repository that does not answer is skipped; the next night asks again.
  */
-async function renewalNotices(deps: RefreshDeps, instances: PackageInstanceRecord[]): Promise<void> {
+async function repositoryNotices(deps: RefreshDeps, instances: PackageInstanceRecord[], opts: { notify: boolean }): Promise<void> {
     const { storage, config } = deps;
     const now = Date.now();
-    const byNode = new Map<string, Array<{ inst: PackageInstanceRecord; groupId: string }>>();
+    const byNode = new Map<string, Array<{ inst: PackageInstanceRecord; groupId: string; version: string }>>();
     for (const inst of instances) {
         if (inst.forkedAt) continue;
         const up = (await storage.getPackage(inst.packageRecordId))?.upstream;
         if (!up) continue;
-        byNode.set(up.node, [...(byNode.get(up.node) ?? []), { inst, groupId: up.groupId }]);
+        byNode.set(up.node, [...(byNode.get(up.node) ?? []), { inst, groupId: up.groupId, version: up.version }]);
     }
     for (const [node, installs] of byNode) {
         const listing = await listRepositoryPackages(deps, node);
         if (!listing.ok) continue;
-        for (const row of listing.packages as Array<{ group_id?: string; updates_until?: string | null; sold_by?: string; sold_by_url?: string }>) {
+        for (const row of listing.packages as Array<{ group_id?: string; updates_until?: string | null; sold_by?: string; sold_by_url?: string; withdrawn?: Array<{ version?: string; reason?: string }> }>) {
+            for (const w of Array.isArray(row.withdrawn) ? row.withdrawn : []) {
+                if (typeof w.version !== 'string' || typeof w.reason !== 'string') continue;
+                for (const { inst } of installs.filter(i => i.groupId === row.group_id && i.version === w.version)) {
+                    await actOnWithdrawn({ storage, config, scheduler: getActiveScheduler() }, inst, { version: w.version, reason: w.reason.slice(0, 1000) });
+                }
+            }
+            if (!opts.notify) continue;
             const until = row.updates_until ? Date.parse(row.updates_until) : NaN;
             if (!Number.isFinite(until) || until <= now || until - now > RENEWAL_NOTICE_DAYS * 86_400_000) continue;
             for (const { inst } of installs.filter(i => i.groupId === row.group_id)) {
@@ -223,15 +237,3 @@ async function refreshOne(
     return { ...base, pulled: didPull, version: inst.packageVersion, latest: latest.version, result: 'current', detail: 'An update is ready; auto-update is off.' };
 }
 
-/** True the first time this install is told about this version; false every time after. */
-async function firstNoticeFor(storage: Storage, instanceId: string, version: string): Promise<boolean> {
-    const prev = await storage.getMemory(NS_UPDATE_NOTICES, instanceId);
-    if ((prev?.value as { version?: string } | undefined)?.version === version) return false;
-    const now = new Date().toISOString();
-    await storage.setMemory({
-        key: instanceId, ownerGaii: NS_UPDATE_NOTICES, value: { version, noticedAt: now },
-        visibility: 'private', tags: ['package-update-notice'], ttlHours: null,
-        version: prev ? prev.version + 1 : 1, createdAt: prev?.createdAt ?? now, updatedAt: now,
-    });
-    return true;
-}
