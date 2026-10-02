@@ -201,18 +201,65 @@ def node_llm(
         headers = dict(llm_kwargs.pop("extra_headers", None) or {})
         headers[_ROLE_HEADER] = role
         llm_kwargs["extra_headers"] = headers
-    with _as_ai_errors():
-        node = _node(agent_name=agent_name, node_url=node_url, agent_token=agent_token)
     try:
         from crewai import LLM
     except ImportError as exc:  # pragma: no cover -- crewai is a dependency of this package
         raise AiError("node_llm() needs crewai (pip install crewai).") from exc
+    try:
+        with _as_ai_errors():
+            node = _node(agent_name=agent_name, node_url=node_url, agent_token=agent_token)
+    except AiError:
+        # No token or no address of its own. An agent made by the basic-agents button holds a key
+        # and no stored token, and the connector daemon mints its credential; the daemon's REST
+        # pass-through forwards /v1/llm over the agent's own connection with a current token.
+        via = None if (node_url or agent_token) else _through_daemon(agent_name)
+        if via is None:
+            raise
+        base_url, secret = via
+        headers = dict(llm_kwargs.pop("extra_headers", None) or {})
+        headers[_AGENT_HEADER] = agent_name or ""
+        llm_kwargs["extra_headers"] = headers
+        # The pass-through answers with the whole body: a streamed answer would arrive as one
+        # parsed object, not as events.
+        llm_kwargs["stream"] = False
+        return LLM(model=f"openai/{model or NODE_CHOOSES_MODEL}", base_url=base_url, api_key=secret, **llm_kwargs)
     return LLM(
         model=f"openai/{model or NODE_CHOOSES_MODEL}",
         base_url=f"{node.url}/v1/llm",
         api_key=node.token,
         **llm_kwargs,
     )
+
+
+#: The header the connector daemon reads to pick which of its agents a proxied call runs as.
+_AGENT_HEADER = "X-Aimeat-Agent"
+
+
+def _through_daemon(agent_name: str | None) -> tuple[str, str] | None:
+    """``(base_url, secret)`` for the connector daemon's /v1/llm pass-through, when this home's
+    serve.json names a live daemon that serves ``agent_name``; None otherwise.
+
+    The daemon answers ``ALL /v1/*`` for the agent named in ``X-Aimeat-Agent`` and attaches that
+    agent's current credential (aimeat/src/cli/connect/mcp/local-server.ts), so the crew never holds
+    a token and a key-based agent works the same as one with a stored token.
+    """
+    if not agent_name:
+        return None
+    from .mcp_client import _pid_alive, _read_discovery, serve_discovery_path, serve_secret
+
+    doc = _read_discovery(serve_discovery_path())
+    if doc is None:
+        return None
+    pid = doc.get("pid")
+    if isinstance(pid, int) and not _pid_alive(pid):
+        return None
+    rows = doc.get("agents") or []
+    served = any(
+        isinstance(r, dict) and agent_name in (r.get("agent"), r.get("gaii")) for r in rows
+    ) or any(isinstance(r, str) and r == agent_name for r in rows)
+    if not served:
+        return None
+    return f"http://127.0.0.1:{doc['port']}/v1/llm", serve_secret(doc) or "no-secret"
 
 
 # ── what the caller can do ────────────────────────────────────────────────────────────────────

@@ -218,6 +218,27 @@ that client's error. `capabilities()` raises `AiRefused` with the node's code wh
 the read, and a capability that is off is an answer with `on: false`, a `reason`, a `message`
 and a `fix`.
 
+**The owner chooses the node for a crew (0.32.0+).** The owner's model choice for an agent is a
+record on the node (`crews.llm.<agent>`, set with `aimeat_crew_llm_set`). `{kind: "node", role?}`
+says: think through the node, so the owner's own key pays before the node's. A runtime builds that
+LLM with `llm_for_choice(choice, agent_name=...)`, and checks a `model` choice with
+`unsafe_choice_reason(choice)` before it uses one: the key variable must be a provider key (ends in
+`_API_KEY`, does not start with `AIMEAT_`) and every address must be public https, the same rules
+the node applies when it stores a choice. A choice that fails is no choice; never fall back to
+another key in its place.
+
+```python
+from aimeat_crewai import llm_for_choice, unsafe_choice_reason
+
+llm = llm_for_choice(choice, agent_name="concierge")    # None unless choice is {kind: "node"}
+reason = unsafe_choice_reason(choice)                    # None, or why a model choice is refused
+```
+
+`node_llm()` finds the token where the hosted fleet writes it (`tokens/<agent>@<owner>.token` in
+the connector home) and the node address in the home's `config.yaml`. An agent that holds a key
+and no stored token goes through the connector daemon's `/v1/llm` pass-through, which attaches its
+current credential; the daemon answers whole bodies, so `stream` is off on that path.
+
 ## Restricting the toolset
 
 By default the liaison sees every `aimeat_*` tool the node exposes (currently ~90+). If you want a narrower surface -- e.g. only memory + knowledge, no wallet, no admin -- pass `tool_filter`:
@@ -713,6 +734,7 @@ environment variable it lives in (`agent.key_env`) and never the key itself.
 | 0.27.x | **Node 3.18.0+** for decision rules (`/v1/ai/decide`, `/v1/ai/decide/rules`, and `/v1/ai/decisions/stats` for `decision_stats()`), and an owner who has set a TypeSafe key. `settings()` says whether this owner can use it at all and why not — check it before building a path on it. A node below 3.18.0 has none of these doors. For the liaison to SEE the decide tools over MCP, the machine also needs the `aimeat` connector at 3.18.0+: an older CLI refuses an undeclared parameter, so check the CLI version before reporting a node fault. Direct mode needs no node at all. | 0.80+ |
 | 0.30.x | `node_llm()`: a node with `/v1/llm` (3.18.0+ for the owner's key order and budget, and the model policy on the release after 3.19.0). `capabilities()`: a node with `GET /v1/ai/capabilities`, which arrives in the release after 3.19.0. | 0.80+ (verified on 1.15 native and LiteLLM paths) |
 | 0.31.x | The run-refusal check needs `GET /v1/agents/{name}/refusals`, which arrives in the release after 3.20.0. Against an older node the check finds nothing and the daemon behaves as 0.30.x. | 0.80+ |
+| 0.32.x | `{kind: "node"}` crew choices and the `llm` field of the runtime report need the node release after 3.23.0; an older node refuses the choice with `INVALID_CHOICE`. `unsafe_choice_reason` needs no node. The agent needs `ai:use` for `/v1/llm`. | 0.80+ |
 
 ## License
 

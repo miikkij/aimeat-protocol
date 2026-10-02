@@ -48,6 +48,9 @@
  * @structure BASIC_AGENTS · BasicAgentTemplate · basicAgentByName
  * @usage import { BASIC_AGENTS } from '../data/basic-agents.js';
  * @version-history
+ *   v2.4.0 — 2026-10-02 — Both basic agents hold ai:use, so their crews can think through the node's
+ *     /v1/llm with their own token and the owner's own key pays before the node's. An agent created
+ *     before this keeps its scopes until the owner grants the word (Development note doc-muqrcqbt1fzx).
  *   v2.3.0 — 2026-10-02 — The runtime's own scopes come from data/crew-runtime-scopes.ts. No list
  *     changes: both held memory:write, and the tags call that failed every task now needs no word on
  *     the agent's own record, so neither gains agent:write.
@@ -184,6 +187,9 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
       'task:read', 'task:write',
       'organism:read',
       'catalogue:read',
+      // Its crew thinks through the node's /v1/llm with this agent's own token, so the owner's own
+      // key pays before the node's (crew choice {kind:'node'}, 2026-10-02).
+      'ai:use',
     ]),
     mode: 'interactive',
     // A customer who gives the front door a task expects it done, not parked behind a Start button
@@ -269,6 +275,9 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
       'work:request', 'work:read',
       'messages:read', 'messages:send',
       'catalogue:read',
+      // Its crew thinks through the node's /v1/llm with this agent's own token, so the owner's own
+      // key pays before the node's (crew choice {kind:'node'}, 2026-10-02).
+      'ai:use',
     ]),
     // `task-runner`, not `coordinator`. This one runs on `spawn`: nothing is sitting there to accept
     // work, so a queued task must activate on its own or it waits for a person who was never told.

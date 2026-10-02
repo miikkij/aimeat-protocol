@@ -10628,11 +10628,15 @@ paths:
                     definition_revision:
                       type: integer
                       description: 'For a JSON crew: which revision of the definition on this node was live.'
+                    llm:
+                      type: string
+                      enum: [node, machine]
+                      description: Where the crew's model calls go. `node` when they go through this node's `/v1/llm` with the agent's own token, so the node picks the key (the agent's own, the owner's own, then the node's); `machine` when the crew calls its provider with a key on the machine that runs it. The owner's `own_key` answer (GET /v1/chat/status, GET /v1/ai/capabilities) reads it per agent.
       responses:
         '200':
           description: What the node recorded, with its own `reported_at`
         '400':
-          description: Not an object with a `kind`, and not null
+          description: Not an object with a `kind`, and not null; or an `llm` other than `node` or `machine`
         '403':
           description: Not your agent
         '404':
@@ -11575,7 +11579,9 @@ paths:
             jobs, workflows, voice, images), `agent_calls_via_node` (an agent's AI calls through this
             node), `chat`, or `agent_runtimes` (an agent's crew, which calls its model with the key of
             the machine it runs on). A reason is `shared_chat_key` (the operator's key pays for every
-            chat turn) or `runtime_uses_machine_key`.
+            chat turn) or `runtime_uses_machine_key`. `own_key.agents` lists each of the owner's agents
+            with `llm`, the road its runtime reported (`node`, `machine`, or null when it has not said);
+            `agent_runtimes` is covered only when every agent reported `node`.
             `pays` is who pays a chat turn: `own` (the person's own provider key), `allowance` (the
             node's key, from the person's allowance), `node` (the operator's shared chat key, which is
             not metered per person), or null when a turn would be refused (the turn says why). Without
@@ -53550,7 +53556,11 @@ paths:
       description: |
         A choice is `{kind:'profile', profile:'<name>'}` or `{kind:'model', label, provider}` — the
         two shapes crewaimeat's own override store uses, so the runtime resolves them with the code
-        it already has. `{"choice": null}` clears it and the agent falls back to the owner's default.
+        it already has — or `{kind:'node', role?}`: the crew sends its model calls to this node's
+        `/v1/llm` with the agent's own token, and the node picks the model and the key (the agent's
+        own key, the owner's own, then the node's from the owner's allowance). `role` names one of the
+        owner's AI roles; the agent needs `ai:use`. `{"choice": null}` clears it and the agent falls
+        back to the owner's default.
 
         STORED AS A MEMORY RECORD at `crews.llm.<agent>` in the owner's own namespace, which is where
         their own tools already read and write. There is no table and no second permission: it needs
@@ -53558,7 +53568,10 @@ paths:
 
         A `provider` may NAME the environment variable holding a key (`api_key_env`) and must never
         carry the key itself; a field that looks like a credential is refused with `SECRET_IN_CHOICE`.
-        The key stays on the machine that runs the agent.
+        The key stays on the machine that runs the agent. `api_key_env` must name a provider key
+        variable (a name ending in `_API_KEY` that does not start with `AIMEAT_`, or `NVIDIA_KEY`),
+        and every address in the provider must be public https; anything else is refused with
+        `UNSAFE_CHOICE`, because the crew sends that variable's value to that address.
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -53594,7 +53607,7 @@ paths:
                         properties:
                           key: { type: string }
                           cleared: { type: boolean }
-        '400': { description: Not a choice this runtime could resolve, or it carried a credential }
+        '400': { description: Not a choice this runtime could resolve, it carried a credential, or it names a key variable or an address the guard refuses (UNSAFE_CHOICE) }
         '403': { description: Not this account's agent }
         '404': { description: No agent of this account by that name }
 

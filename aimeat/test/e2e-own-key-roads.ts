@@ -33,6 +33,9 @@
  *   cd aimeat && node --import tsx test/e2e-own-key-roads.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=own-key-roads
  * @version-history
+ *   v1.1.0 — 2026-10-02 — The crew model choice guard (UNSAFE_CHOICE on a secret variable, http, a
+ *     private or link-local address), the {kind:'node'} choice, and the crews read as covered once
+ *     every agent's runtime reports the node road.
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -315,7 +318,8 @@ async function nodeRoute(): Promise<void> {
         const s = (await json('/v1/chat/status', other)).body.data;
         assert(s.has_own_key === false && s.own_key?.set === false, `the second owner has no key, got ${s.has_own_key} / ${JSON.stringify(s.own_key)}`);
         const view = await json('/v1/agents/roads-agent/ai-keys', other);
-        assert(view.status === 403 || view.status === 404, `the second owner cannot read the first owner's agent key view, got ${view.status}`);
+        // The name is looked up inside the caller's own account, so another owner's agent is not found.
+        assert(view.status === 404, `the second owner cannot read the first owner's agent key view, got ${view.status}`);
         const scopeless = await mintAgent(owner, ownerName, 'roads-noai', ['memory:read']);
         const seen = stub!.requestsFor('chat').length;
         const r = await json('/v1/llm/chat/completions', scopeless, {
@@ -323,6 +327,51 @@ async function nodeRoute(): Promise<void> {
         });
         assert(r.status === 403, `an agent without ai:use is refused, got ${r.status}`);
         assert(stub!.requestsFor('chat').length === seen, 'and the provider was never called, so no key was spent');
+    });
+
+    await test('1g3. GUARD: a crew model choice that names a secret or a private address is refused, a provider key at a public https address is stored', async () => {
+        const put = (body: unknown) => json('/v1/agents/roads-agent/crew/llm', owner, { method: 'PUT', body: JSON.stringify({ choice: body }) });
+        const model = (provider: Record<string, unknown>) => ({ kind: 'model', label: 'x', provider: { type: 'openai', models: [{ id: 'm' }], ...provider } });
+        for (const [why, choice] of [
+            ['the node encryption key', model({ api_key_env: 'AIMEAT_ENCRYPTION_KEY', base_url: 'https://8.8.8.8/v1' })],
+            ['the database address', model({ api_key_env: 'DATABASE_URL', base_url: 'https://8.8.8.8/v1' })],
+            ['plain http', model({ api_key_env: 'OPENROUTER_API_KEY', base_url: 'http://8.8.8.8/v1' })],
+            ['a private address', model({ api_key_env: 'OPENROUTER_API_KEY', base_url: 'https://10.0.0.5/v1' })],
+            ['the cloud metadata address', model({ api_key_env: 'OPENROUTER_API_KEY', base_url: 'https://169.254.169.254/latest' })],
+        ] as const) {
+            const r = await put(choice);
+            assert(r.status === 400 && r.body?.error?.code === 'UNSAFE_CHOICE', `${why}: refused UNSAFE_CHOICE, got ${r.status} ${JSON.stringify(r.body?.error)}`);
+        }
+        const ok = await put(model({ api_key_env: 'OPENROUTER_API_KEY', base_url: 'https://8.8.8.8/v1' }));
+        assert(ok.status === 200, `a provider key at a public https address is stored, got ${ok.status} ${JSON.stringify(ok.body?.error)}`);
+        const keyless = await put({ kind: 'model', label: 'local', provider: { type: 'ollama', models: [{ id: 'llama3' }] } });
+        assert(keyless.status === 200, `a keyless provider with no address is stored, got ${keyless.status} ${JSON.stringify(keyless.body?.error)}`);
+        // The owner's default goes through the same guard.
+        const def = await json('/v1/agents/llm-default', owner, { method: 'PUT', body: JSON.stringify({ choice: model({ api_key_env: 'AIMEAT_ADMIN_PASSWORD' }) }) });
+        assert(def.status === 400 && def.body?.error?.code === 'UNSAFE_CHOICE', `the default is guarded too, got ${def.status}`);
+    });
+
+    await test('1g4. ROAD crew on the node: {kind:"node"} is stored, and the crews read as covered once every agent reports the node road', async () => {
+        const put = await json('/v1/agents/roads-agent/crew/llm', owner, { method: 'PUT', body: JSON.stringify({ choice: { kind: 'node', role: 'reasoning' } }) });
+        assert(put.status === 200, `the node choice is stored, got ${put.status} ${JSON.stringify(put.body?.error)}`);
+        const report = (tok: string, name: string) => json(`/v1/agents/${name}/runtime-source`, tok, { method: 'PATCH', body: JSON.stringify({ runtime_source: { kind: 'crew-def', runtime: 'crewaimeat test', llm: 'node' } }) });
+        // The report asks agent:write, which this agent was not given: the road cannot be claimed by
+        // an agent its owner did not let write agent records.
+        const fenced = await report(agent, 'roads-agent');
+        assert(fenced.status === 403, `an agent without agent:write cannot report, got ${fenced.status}`);
+        const bad = await json('/v1/agents/roads-agent/runtime-source', owner, { method: 'PATCH', body: JSON.stringify({ runtime_source: { kind: 'crew-def', llm: 'elsewhere' } }) });
+        assert(bad.status === 400, `an llm other than node or machine is refused, got ${bad.status}`);
+        const r1 = await report(owner, 'roads-agent');
+        assert(r1.status === 200, `the road is reported, got ${r1.status} ${JSON.stringify(r1.body?.error)}`);
+        let s = (await json('/v1/chat/status', owner)).body.data;
+        const road = (s.own_key.agents as any[]).find((a) => a.agent === 'roads-agent');
+        assert(road?.llm === 'node', `the agent's road is listed, got ${JSON.stringify(s.own_key.agents)}`);
+        assert(gapParts(s.own_key).includes('agent_runtimes'), `one agent (roads-noai) has not said, so the crews are not all covered, got ${JSON.stringify(s.own_key)}`);
+        const r2 = await report(owner, 'roads-noai');
+        assert(r2.status === 200, `the owner reports the second agent's road, got ${r2.status}`);
+        s = (await json('/v1/chat/status', owner)).body.data;
+        assert(s.own_key.covers.includes('agent_runtimes') && !gapParts(s.own_key).includes('agent_runtimes'),
+            `every agent on the node road: the own key reaches the crews, got ${JSON.stringify(s.own_key)}`);
     });
 
     await test('1h. no call on any road carried the place key or the shared chat key', async () => {

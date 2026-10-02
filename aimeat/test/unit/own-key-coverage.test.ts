@@ -6,6 +6,7 @@
  *   coverage per configuration, and whether a key counts as set, including the legacy copy that a
  *   deleted key leaves behind until the next providers read.
  * @version-history
+ *   v1.1.0 — 2026-10-02 — The crews are covered when every agent reported the node road.
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -53,6 +54,16 @@ describe('ownKeyCoverageOf', () => {
     ]);
   });
 
+  it('covers the crews only when EVERY agent reported the node road, and lists each agent', () => {
+    const all = ownKeyCoverageOf({ gooseProviderApiKey: '' }, true, [{ agent: 'a', llm: 'node' }, { agent: 'b', llm: 'node' }]);
+    expect(all.covers).toContain('agent_runtimes');
+    expect(all.not_covered).toEqual([]);
+    const some = ownKeyCoverageOf({ gooseProviderApiKey: '' }, true, [{ agent: 'a', llm: 'node' }, { agent: 'b', llm: null }]);
+    expect(some.covers).not.toContain('agent_runtimes');
+    expect(some.not_covered).toEqual([{ part: 'agent_runtimes', reason: 'runtime_uses_machine_key' }]);
+    expect(some.agents).toEqual([{ agent: 'a', llm: 'node' }, { agent: 'b', llm: null }]);
+  });
+
   it('says what a key WOULD reach when none is set, so the page can say it before one is saved', () => {
     const c = ownKeyCoverageOf({ gooseProviderApiKey: '' }, false);
     expect(c.set).toBe(false);
@@ -96,6 +107,7 @@ describe('ownKeyCoverage', () => {
   it('joins the configuration and the stored key', async () => {
     const s = await freshStorage();
     await put(s, 'openrouter.apikey', { encrypted: 'ciphertext' });
+    // getAgentsByOwner answers [] for an owner with no agents; the storage here has none.
     const c = await ownKeyCoverage(s, { gooseProviderApiKey: 'sk-shared' } as unknown as AimeatConfig, GAII);
     expect(c.set).toBe(true);
     expect(c.not_covered.map((g) => g.part)).toEqual(['chat', 'agent_runtimes']);

@@ -11,6 +11,8 @@
  *     a same-owner sibling's mode, so a device-authed crew self-sets task-runner at startup.
  *
  * @version-history
+ *   v1.7.0 -- 2026-10-02 -- aimeat_crew_llm_set's choice names the {kind:'node', role?} shape;
+ *     aimeat_agent_runtime_report takes `llm` ('node' | 'machine').
  *   v1.6.0 -- 2026-08-31 -- aimeat_agent_basics_get, parity with the server MCP surface: a thin
  *     proxy onto GET /v1/agents/v2/basic-agents. Read-only; the creating press stays the owner's.
  *   v1.5.0 -- 2026-08-28 -- The five aimeat_crew_* tools, parity with the server MCP surface: thin
@@ -151,6 +153,7 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
       commit: z.string().optional().describe('Commit the file came from.'),
       runtime: z.string().optional().describe("Which runtime read it, e.g. 'crewaimeat 0.7.0'."),
       definition_revision: z.number().optional().describe('For a JSON crew: which definition revision was live.'),
+      llm: z.enum(['node', 'machine']).optional().describe("Where the crew's model calls go: 'node' through the node's /v1/llm with the agent's token, 'machine' to its provider with a key on its own machine."),
     },
     async ({ agent_name, target_agent_name, ...src }) => {
       const { client } = pickAgent(registry, agent_name);
@@ -295,7 +298,7 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
     {
       agent_name: agentNameSchema,
       target_agent_name: z.string().optional().describe("The agent to set it for. Omit to set the owner's default for every agent."),
-      choice: z.record(z.string(), z.unknown()).nullish().describe("{kind:'profile', profile} or {kind:'model', label, provider}. Omit or null to clear."),
+      choice: z.record(z.string(), z.unknown()).nullish().describe("{kind:'node', role?} (think through the node, which picks the model and the key), {kind:'profile', profile} or {kind:'model', label, provider}. Omit or null to clear."),
     },
     annotationsFor('aimeat_crew_llm_set'),
     async ({ agent_name, target_agent_name, choice }) => {

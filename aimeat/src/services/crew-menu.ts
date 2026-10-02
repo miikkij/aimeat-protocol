@@ -20,9 +20,11 @@
  *     crews.llm.<agent>     one agent's own, when it differs
  *
  *   Each holds `{kind:'profile', profile}` or `{kind:'model', label, provider}` — the two shapes
- *   crewaimeat's own override store already uses, so the runtime resolves them with the code it has.
+ *   crewaimeat's own override store already uses, so the runtime resolves them with the code it has —
+ *   or `{kind:'node', role?}`, which sends the crew's model calls through this node's /v1/llm.
  *   A `model` carries `api_key_env`, the NAME of an environment variable on that machine. No
- *   credential is stored here, and this service refuses one that looks like a key.
+ *   credential is stored here, and this service refuses one that looks like a key, a variable that is
+ *   not a provider key, and an address that is not public https (crew-llm-guard.ts).
  *
  *   THE CATALOGUE IS THE RUNTIME'S TOO. It publishes `crews.llm.catalog` at start, into the AGENT's
  *   own namespace; this reads it so the page can offer what exists rather than a free-text box, and a
@@ -35,6 +37,10 @@
  * @structure CrewMenu · crewMenu() · readLlmChoice() · writeLlmChoice()
  * @usage const menu = await crewMenu(deps, caller, 'news-watcher');
  * @version-history
+ *   v1.3.0 — 2026-10-02 — A `model` choice is refused unless its api_key_env is a provider key variable
+ *     and every address in it is public https (crew-llm-guard.ts): a saved choice could send any secret
+ *     in the crew's environment to any address. A third shape, `{kind:'node', role?}`: the crew thinks
+ *     through this node's /v1/llm, which picks the model and the key (Jouni, 2026-10-02).
  *   v1.2.0 — 2026-09-28 — writeLlmChoice warns when the owner's model policy leaves the model out; it
  *     still saves, because the crew runs on its own machine (System 2 plan, V5).
  *   v1.1.0 — 2026-09-16 — The catalogue is read from the agent's own namespace. In the owner's it could
@@ -51,6 +57,7 @@ import { loadPolicyDecision } from './ai/policy-gate.js';
 import { isAllowed, parseModelRef } from './ai/policy.js';
 import { canonicalModelKey } from './ai/catalog/equivalence.js';
 import { AiCompletionError } from './ai/errors.js';
+import { crewChoiceProblem } from './crew-llm-guard.js';
 
 /** The owner's key for a default that covers every agent they have. */
 export const LLM_DEFAULT_KEY = 'crews.llm.default';
@@ -72,12 +79,25 @@ export interface CrewMenu {
 
 interface Deps { config: AimeatConfig; storage: Storage }
 
-/** A stored choice the runtime can resolve, or null. The same two shapes on both sides. */
+/** The longest AI role id a `node` choice may name; /v1/llm refuses a longer one (readCallRole). */
+const ROLE_MAX_CHARS = 300;
+
+/**
+ * A stored choice the runtime can resolve, or null. Three shapes:
+ * - `{kind:'profile', profile}` and `{kind:'model', label, provider}`: crewaimeat's own override store.
+ * - `{kind:'node', role?}`: the crew thinks through this node's /v1/llm with the agent's own token, and
+ *   the node picks the model and the key (the agent's own, the owner's own, then the node's from the
+ *   allowance). `role` is one of the owner's AI roles, sent in the X-AIMEAT-AI-Role header. Development
+ *   note doc-muqrcqbt1fzx (2026-10-02).
+ */
 export function validChoice(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object') return null;
   const v = value as Record<string, unknown>;
   if (v.kind === 'profile' && typeof v.profile === 'string' && v.profile.trim()) return v;
   if (v.kind === 'model' && v.provider && typeof v.provider === 'object') return v;
+  if (v.kind === 'node' && (v.role === undefined || (typeof v.role === 'string' && v.role.trim().length > 0 && v.role.length <= ROLE_MAX_CHARS))) {
+    return { kind: 'node', ...(typeof v.role === 'string' ? { role: v.role.trim() } : {}), ...(typeof v.label === 'string' ? { label: v.label.slice(0, 120) } : {}) };
+  }
   return null;
 }
 
@@ -130,12 +150,15 @@ export async function writeLlmChoice(
   if (!valid) {
     return {
       ok: false, status: 400, code: 'INVALID_CHOICE',
-      message: "A choice is either {kind:'profile', profile:'<name>'} or {kind:'model', label, provider}.",
+      message: "A choice is {kind:'node', role?:'<AI role id>'} (think through this node, which picks the model and the key), {kind:'profile', profile:'<name>'} or {kind:'model', label, provider}.",
     };
   }
   if (valid.kind === 'model') {
     const problem = looksLikeASecret(valid.provider as Record<string, unknown>);
     if (problem) return { ok: false, status: 400, code: 'SECRET_IN_CHOICE', message: problem };
+    // Refuse before writing: which variable the crew sends as its key, and where (crew-llm-guard.ts).
+    const unsafe = await crewChoiceProblem(valid.provider);
+    if (unsafe) return { ok: false, status: 400, code: 'UNSAFE_CHOICE', message: unsafe };
   }
 
   const ownerGhii = `${caller.owner}@${deps.config.nodeId}`;

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Identity + principal record types (owners, agents, ecosystem apps, GHII, sessions, personal nodes, agent activity). Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-10-02 — AgentRuntimeSource.llm: where the crew's model calls go ('node' | 'machine').
  *   v1.5.0 — 2026-10-02 — AgentRecord.taskStart: whether the agent's tasks start on their own,
  *     separate from `mode`, which also picks the Hello Integration flow.
  *   v1.4.0 — 2026-08-31 — Agent v2 identity: AgentRecord.runMode (spawn/resident, stored and shown,
@@ -63,6 +64,13 @@ export interface AgentRuntimeSource {
   runtime?: string;
   /** For a JSON crew: which revision of the definition on this node was live. */
   definitionRevision?: number;
+  /**
+   * Where the crew's model calls go: `node` when they go through this node's /v1/llm with the agent's
+   * own token (the node then picks the key: the agent's own, the owner's own, then the node's), or
+   * `machine` when the crew calls its provider itself with a key on the machine that runs it. Absent
+   * means the runtime has not said. services/own-key-coverage.ts reads it (2026-10-02).
+   */
+  llm?: 'node' | 'machine';
   /** When the node recorded this. The node's clock, not the runtime's. */
   reportedAt?: string;
 }

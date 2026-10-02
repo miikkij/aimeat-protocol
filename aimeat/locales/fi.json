@@ -6383,6 +6383,8 @@
   "aipage.consumerChatUnknown": "Chatin maksajaa ei saatu luettua juuri nyt.",
   "aipage.consumerChatSub": "Jos chat myöhemmin siirtyy kulkemaan tämän palvelimen kautta, se alkaa käyttää sinun avaintasi ja valitsemiasi malleja.",
   "aipage.consumerCrewsBody": "Eivät käytä avaintasi. Miehistö kysyy mallilta itse ja käyttää sen koneen avainta, jolla se toimii. Tänne tallentamasi avain ei ole siinä mukana.",
+  "aipage.consumerCrewsNodeBody": "Käyttävät avaintasi. Jokainen agenttisi kysyy mallilta tämän palvelimen kautta, joten avaimesi maksaa. Päiväbudjettisi ja kunkin agentin raja pätevät.",
+  "aipage.consumerCrewsMixed": "Miehistö käyttää avaintasi vain, kun se kysyy mallilta tämän palvelimen kautta. Näin tekevät: {agents}. Muut käyttävät sen koneen avainta, jolla ne toimivat.",
   "aipage.consumerAgentRuleBody": "Agentti ei muuta näitä: avain, mallit ja budjetti ovat sinun. Se näkee, onko tekoäly käytettävissä, ja saa selvän syyn, kun budjetti on käytetty.",
   "aipage.modelsEmpty": "Palvelu ei palauttanut yhtään mallia. Tarkista osoite.",
   "aipage.modelsError": "Malleja ei saatu. Tarkista osoite ja avain, tallenna ja päivitä.",

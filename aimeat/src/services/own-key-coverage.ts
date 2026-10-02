@@ -17,21 +17,24 @@
  *   - `chat`: on the node route the chat's model calls go through /v1/llm with the person's chat
  *     token, so the same order applies. On the shared chat key (AIMEAT_GOOSE_PROVIDER_API_KEY) the
  *     operator's key pays for every turn and the own key is never asked.
- *   - `agent_runtimes`: never covered today. A crew calls its model itself, with the key in the
- *     environment of the machine that runs it (agent-ai-keys.ts: the node never sends a key to an
- *     agent). On a hosted node that machine is the node's own container, whose environment only the
- *     fleet sets. The design that closes this is the Development workspace note "Design: an owner's
- *     own AI key for the agents that work for them" (doc-muqrcqbt1fzx): the crew sends its model
- *     calls to /v1/llm with its own token, and the node picks the key.
+ *   - `agent_runtimes`: covered only when every agent's runtime reported that its crew thinks through
+ *     this node (aimeat_agent_runtime_report `llm: 'node'`). A crew on its machine's key calls its
+ *     model itself (agent-ai-keys.ts: the node never sends a key to an agent); on a hosted node that
+ *     machine is the node's own container, whose environment only the fleet sets. A crew on the node
+ *     road sends its calls to /v1/llm with its own token, and the node picks the key (Development
+ *     note doc-muqrcqbt1fzx). `agents` lists each agent with the road it reported.
  *
  *   `pays` in /v1/chat/status stays the per-call answer (who pays the chat's next turn); this is the
  *   standing answer to "what does my key reach here".
- * @structure OwnKeyPart · OwnKeyGapReason · OwnKeyCoverage · ownKeyCoverageOf(config, set) ·
- *   hasOwnAiKey(storage, gaii) · ownKeyCoverage(storage, config, gaii)
+ * @structure OwnKeyPart · OwnKeyGapReason · AgentRoad · OwnKeyCoverage ·
+ *   ownKeyCoverageOf(config, set, agents) · agentRoadsOf(storage, gaii) · hasOwnAiKey(storage, gaii) ·
+ *   ownKeyCoverage(storage, config, gaii)
  * @usage
  *   const own_key = await ownKeyCoverage(storage, config, gaii);
  *   res.json(success(config.nodeId, { has_own_key: own_key.set, own_key }));
  * @version-history
+ *   v1.1.0 — 2026-10-02 — `agents`: each agent's crew road from its runtime report; `agent_runtimes`
+ *     is covered when every agent thinks through the node.
  *   v1.0.0 — 2026-10-02 — Initial. Served by GET /v1/chat/status and GET /v1/ai/capabilities
  *     (aimeat_ai_capabilities), and read by the chat's status line and the AI page.
  */
@@ -39,6 +42,8 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { chatUsesSharedKey } from './goose-env.js';
 import { ownerKeyIds, PROVIDER_KEY_PREFIX } from './ai/provider-store.js';
+import { CHAT_AGENT_NAME } from './chat-agent.js';
+import { localAccountOf } from '../utils/gaii.js';
 
 /** A part of the node that can spend AI on the owner's behalf. */
 export type OwnKeyPart = 'node_ai' | 'agent_calls_via_node' | 'chat' | 'agent_runtimes';
@@ -50,6 +55,14 @@ export type OwnKeyPart = 'node_ai' | 'agent_calls_via_node' | 'chat' | 'agent_ru
  */
 export type OwnKeyGapReason = 'shared_chat_key' | 'runtime_uses_machine_key';
 
+/** One of the owner's agents and where its crew's model calls go, as its runtime reported it. */
+export interface AgentRoad {
+  agent: string;
+  /** `node`: through this node's /v1/llm, so the own key reaches it. `machine`: its own machine's key.
+   *  null: the runtime has not said, which is read as `machine` (the crew's default). */
+  llm: 'node' | 'machine' | null;
+}
+
 export interface OwnKeyCoverage {
   /** Whether the owner has a key of their own: the legacy OpenRouter key or a key on one of their providers. */
   set: boolean;
@@ -57,21 +70,44 @@ export interface OwnKeyCoverage {
   covers: OwnKeyPart[];
   /** The parts it never reaches here, each with the reason. */
   not_covered: Array<{ part: OwnKeyPart; reason: OwnKeyGapReason }>;
+  /** The owner's agents with a crew road each (aimeat_agent_runtime_report `llm`). The chat agent is
+   *  not listed: its road is the `chat` part. */
+  agents: AgentRoad[];
 }
 
-/** The coverage for this node's configuration. Pure: `set` is passed in. */
+/**
+ * The coverage for this node's configuration and the owner's agents. Pure: `set` and the agents'
+ * roads are passed in. `agent_runtimes` is covered only when every agent reported the node road: one
+ * crew still on its machine's key is a part the own key does not reach, and `agents` names which.
+ */
 export function ownKeyCoverageOf(
-  config: Pick<AimeatConfig, 'gooseProviderApiKey'>, set: boolean,
+  config: Pick<AimeatConfig, 'gooseProviderApiKey'>, set: boolean, agents: AgentRoad[] = [],
 ): OwnKeyCoverage {
   const shared = chatUsesSharedKey(config);
+  const crewsOnNode = agents.length > 0 && agents.every(a => a.llm === 'node');
   return {
     set,
-    covers: shared ? ['node_ai', 'agent_calls_via_node'] : ['node_ai', 'agent_calls_via_node', 'chat'],
+    covers: [
+      'node_ai', 'agent_calls_via_node',
+      ...(shared ? [] : ['chat' as const]),
+      ...(crewsOnNode ? ['agent_runtimes' as const] : []),
+    ],
     not_covered: [
       ...(shared ? [{ part: 'chat' as const, reason: 'shared_chat_key' as const }] : []),
-      { part: 'agent_runtimes', reason: 'runtime_uses_machine_key' },
+      ...(crewsOnNode ? [] : [{ part: 'agent_runtimes' as const, reason: 'runtime_uses_machine_key' as const }]),
     ],
+    agents,
   };
+}
+
+/** The owner's agents and the road each runtime reported, the chat agent left out. */
+export async function agentRoadsOf(storage: Storage, gaii: string): Promise<AgentRoad[]> {
+  const owner = localAccountOf(gaii);
+  if (!owner) return [];
+  const agents = await storage.getAgentsByOwner(owner);
+  return agents
+    .filter(a => a.name !== CHAT_AGENT_NAME)
+    .map(a => ({ agent: a.name, llm: a.runtimeSource?.llm ?? null }));
 }
 
 const encryptedIn = (value: unknown): boolean => {
@@ -98,5 +134,6 @@ export async function hasOwnAiKey(storage: Storage, gaii: string): Promise<boole
 
 /** The whole answer for one owner. `gaii` is the payer: the owner, also when an agent asks. */
 export async function ownKeyCoverage(storage: Storage, config: AimeatConfig, gaii: string): Promise<OwnKeyCoverage> {
-  return ownKeyCoverageOf(config, await hasOwnAiKey(storage, gaii));
+  const [set, agents] = await Promise.all([hasOwnAiKey(storage, gaii), agentRoadsOf(storage, gaii)]);
+  return ownKeyCoverageOf(config, set, agents);
 }

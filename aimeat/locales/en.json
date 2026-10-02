@@ -6384,6 +6384,8 @@
   "aipage.consumerChatUnknown": "The chat's payer could not be read right now.",
   "aipage.consumerChatSub": "If the chat later moves to run through this server, it starts using your key and the models you chose.",
   "aipage.consumerCrewsBody": "Do not use your key. A crew calls its model itself, with the key on the machine that runs it, not with the key you saved here.",
+  "aipage.consumerCrewsNodeBody": "Use your key. Every one of your agents sends its model calls through this server, so your key pays, under your daily budget and each agent's cap.",
+  "aipage.consumerCrewsMixed": "A crew uses your key only when it sends its model calls through this server. These do: {agents}. The others use the key on the machine that runs them.",
   "aipage.consumerAgentRuleBody": "An agent does not change these: the key, the models and the budget are yours. It sees whether AI is available, and gets a plain reason when the budget is spent.",
   "aipage.modelsEmpty": "The provider returned no models. Check the address.",
   "aipage.modelsError": "Could not load the models. Check the address and the key, save, then refresh.",

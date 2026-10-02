@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-02 -- aimeat_agent_runtime_report forwards `llm` ('node' | 'machine').
  *   2026-10-02 -- aimeat_agent_scope_narrow: a `*` agent narrowed to the permissions it used.
  *   2026-10-02 -- aimeat_task_create forwards `start`; aimeat_task_start and aimeat_agent_task_start_set:
  *     whether a task starts on its own or waits for the owner's OK (services/agent-task-rules.ts).
@@ -203,10 +204,11 @@ export const agentTools: ConnectCliToolDefinition[] = [
             commit: { type: 'string', description: 'Commit the file came from.' },
             runtime: { type: 'string', description: "Which runtime read it, e.g. 'crewaimeat 0.7.0'." },
             definition_revision: { type: 'number', description: 'For a JSON crew: which definition revision was live.' },
+            llm: { type: 'string', description: "Where the crew's model calls go: 'node' (the node's /v1/llm with the agent's token) or 'machine' (its provider, with a key on its own machine)." },
         },
         handler: ({ client }, input) => {
             const src: JsonObject = { kind: requiredString(input, 'kind') };
-            for (const k of ['file', 'sha256', 'commit', 'runtime'] as const) {
+            for (const k of ['file', 'sha256', 'commit', 'runtime', 'llm'] as const) {
                 const v = optionalString(input, k); if (v) src[k] = v;
             }
             const rev = optionalNumber(input, 'definition_revision');
