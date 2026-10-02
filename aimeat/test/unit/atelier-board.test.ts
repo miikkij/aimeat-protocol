@@ -287,6 +287,19 @@ describe('board', () => {
     hc.onMove(-3000, -3000);
     hc.onEnd(true);
     expect(drops).toEqual([['c', 'r1']]);
+    // selecting the anchor lights the ring; a frame that leaves the ring loses the member mark
+    b.select('p');
+    expect(part(b.el, 'ring')[0].className).toContain('ak-board__ring--selected');
+    expect(frameEl(b.el, 'a').className).toContain('ak-board__frame--member');
+    b.set({ rings: [{ id: 'r1', title: 'Mine', anchor: 'p', members: ['p'] }] });
+    expect(frameEl(b.el, 'a').className).not.toContain('ak-board__frame--member');
+    // centerOn takes a rectangle as well as an id, and set({ camera, animate: false }) jumps
+    b.centerOn({ x: 0, y: 0, w: 100, h: 100 });
+    b.set({ camera: { x: 1, y: 2, k: 1 }, animate: false });
+    const tail = vpCalls.slice(-2);
+    expect(tail[0]).toEqual({ op: 'centerOn', args: { rect: { x: 0, y: 0, w: 100, h: 100 }, animated: true } });
+    expect(tail[1].op).toBe('setCamera');
+    expect(tail[1].args.animated).toBe(false);
   });
 
   it('nudges the selected frame with the arrow keys and clears the selection on Escape', () => {

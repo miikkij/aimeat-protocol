@@ -24495,6 +24495,9 @@
     }
     function drawRings() {
       const keep = /* @__PURE__ */ new Set();
+      shown.forEach(function(e) {
+        e.el.classList.remove("ak-board__frame--member");
+      });
       rings.forEach(function(ring2) {
         const g = ringGeom(ring2);
         if (!g) return;
@@ -24512,7 +24515,7 @@
         r.el.style.top = g.cy - g.r + "px";
         r.el.style.width = g.r * 2 + "px";
         r.el.style.height = g.r * 2 + "px";
-        const mine = selected != null && ((ring2.members || []).indexOf(selected) >= 0 || (ring2.borrowed || []).indexOf(selected) >= 0);
+        const mine = selected != null && (ring2.anchor != null && String(ring2.anchor) === selected || (ring2.members || []).indexOf(selected) >= 0 || (ring2.borrowed || []).indexOf(selected) >= 0);
         r.el.classList.toggle("ak-board__ring--selected", mine);
         (ring2.members || []).forEach(function(id) {
           const e = shown.get(String(id));
@@ -24575,7 +24578,8 @@
     return {
       el: root,
       world,
-      /** @param {{ frames?: BoardFrame[], rings?: BoardRing[], camera?: object|null, mode?: 'move'|'use' }} patch */
+      /** @param {{ frames?: BoardFrame[], rings?: BoardRing[], camera?: object|null, animate?: boolean, mode?: 'move'|'use' }} patch
+       *  `animate: false` jumps to the camera (a stored view on open); the default glides. */
       set: function(patch) {
         if (destroyed || !patch) return;
         if (patch.rings) {
@@ -24583,7 +24587,7 @@
         }
         if (patch.frames) reconcile(patch.frames);
         else if (patch.rings) drawRings();
-        if (patch.camera && vp) vp.setCamera(patch.camera, true);
+        if (patch.camera && vp) vp.setCamera(patch.camera, patch.animate !== false);
         if (patch.mode) setMode(patch.mode);
       },
       select,
@@ -24601,9 +24605,15 @@
       fit: function(animated) {
         if (vp) vp.fit(animated !== false);
       },
-      centerOn: function(id, animated) {
-        const e = shown.get(String(id));
-        if (e && vp) vp.centerOn(rectOf(e), animated !== false);
+      /** A frame id, or a world rectangle { x, y, w, h } (two frames side by side, say). */
+      centerOn: function(idOrRect, animated) {
+        if (!vp) return;
+        if (idOrRect && typeof idOrRect === "object") {
+          vp.centerOn(idOrRect, animated !== false);
+          return;
+        }
+        const e = shown.get(String(idOrRect));
+        if (e) vp.centerOn(rectOf(e), animated !== false);
       },
       camera: function() {
         return vp ? vp.cam() : null;
