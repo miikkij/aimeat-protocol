@@ -12,6 +12,8 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   v1.7.1 — 2026-10-02 — manage-my-agents: an agent's own tags need no agent:write, and an older
+ *     refusal of it for its own tags is declined, not granted.
  *   v1.7.0 — 2026-10-02 — manage-my-agents: "starts work by itself" is aimeat_agent_task_start_set, and
  *     a waiting task is started on the owner's word with aimeat_task_start.
  *   v1.6.0 — 2026-10-02 — manage-my-agents: a proposed worker is built on the workspaces it will use,
@@ -172,7 +174,11 @@ flowchart LR
   missing, in words, and that they give it in Profile → Agents → Manage access rights. A refusal
   goes away when the permission is given. Reading the owner's address book (\`aimeat_contact_list\`)
   needs its own permission, contacts:read, since 2026-10-01; an agent approved before then holds only
-  messages:read for it and is refused until the owner gives contacts:read.
+  messages:read for it and is refused until the owner gives contacts:read. An agent sets its OWN
+  tags without agent:write since 2026-10-02, so a refusal of agent:write for its own tags
+  (PATCH /v1/agents/:name/tags) from before then needs no grant: tell the owner to decline it.
+  agent:write lets an agent approve new agents and change other agents' settings, so it is given
+  only to an agent whose job is that.
 - **Inspect one:** \`aimeat_agent_profile\` — capabilities, trust, linked skills; pass the agent's GAII.
 - **Onboarding state:** \`aimeat_onboarding_status\` — which Hello-Integration steps remain. It
   reports the calling agent's own onboarding only.

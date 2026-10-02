@@ -22,6 +22,8 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.46.0 -- 2026-10-02 -- aimeat_agent_tags_set moves to SCOPE_EXEMPT_TOOLS: the crew runtime sets
+ *     an agent's own tags on every start, and an agent without agent:write finished no task.
  *   v1.45.0 -- 2026-10-02 -- aimeat_task_start -> task:write, aimeat_agent_task_start_set -> agent:write.
  *   v1.44.0 -- 2026-10-02 -- aimeat_package_withdraw -> packages:write, the word its route asks (phase 5).
  *   v1.43.0 -- 2026-10-02 -- aimeat_package_compose_set -> packages:write, as compose (phase 4).
@@ -169,7 +171,8 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_agent_run_mode_set:                'agent:write',
     aimeat_agent_runtime_report:              'agent:write',
     aimeat_agent_console_set:                 'agent:write',
-    aimeat_agent_tags_set:                    'agent:write',
+    // aimeat_agent_tags_set left this list on 2026-10-02 for SCOPE_EXEMPT_TOOLS: an agent's own tags
+    // need no word, a sibling's need agent:write, and the handler checks which (auth/self-or-scope.ts).
     // A crew definition is a memory record in the agent's namespace: reading it is memory:read,
     // and every step toward changing it (validate, try, draft, publish) is memory:write, the scope
     // the REST doors gate the writes on. Validate and try change nothing, but they are only ever

@@ -16,6 +16,8 @@
  *   that happen to read that place.
  * @usage cd aimeat && pnpm exec vitest run test/unit/agent-proposal-guidance.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-02 — The scope advice asks for memory:write only; an agent's own tags need no
+ *     agent:write.
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -73,7 +75,10 @@ describe('a request for a new agent leads to a proposal on this node', () => {
     // memory:read alone, as "only the scopes the job needs" suggested, read the deals and was then
     // refused its own result write (memory:write) and its tag report (agent:write), and the task
     // failed. With those two added, the same agent finished the task.
-    it('the scope advice names the two scopes the crew runtime writes with', () => {
+    // Since 2026-10-02 an agent's own tag report needs no agent:write (auth/self-or-scope.ts, ruled by
+    // Jouni): that word also lets an agent approve new agents. So the advice names memory:write as
+    // the runtime's, and where it mentions agent:write it says what that word does instead.
+    it('the scope advice names memory:write as the runtime\'s, and does not ask for agent:write', () => {
         const texts: Array<[string, string]> = [
             ['catalog description', descriptionFor('aimeat_agent_propose')],
             ['handbook paragraph', AGENT_HANDBOOK],
@@ -81,7 +86,7 @@ describe('a request for a new agent leads to a proposal on this node', () => {
         ];
         for (const [which, text] of texts) {
             expect(text, which).toMatch(/memory:write/);
-            expect(text, which).toMatch(/agent:write/);
+            expect(text, which).not.toMatch(/memory:write\W+(and|\+)\W+\\?`?agent:write/);
         }
     });
 

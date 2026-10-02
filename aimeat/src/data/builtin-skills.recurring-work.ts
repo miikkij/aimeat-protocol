@@ -141,7 +141,7 @@ workspace's record shape and design the agent for it.
 
 \`aimeat_agent_propose\` takes a name, a \`purpose\` the person can decide from (name their data in
 it), the scopes the agent needs (never more than you hold yourself; a crew runtime also needs
-\`memory:write\` and \`agent:write\` for its own writes) and a \`crew_def\`, the JSON
+\`memory:write\` for its own writes) and a \`crew_def\`, the JSON
 document that says what the agent is: its roles, its tasks and its tools. The call creates nothing.
 It puts one line on the person's open items, and their press on it creates the agent, gives it the
 definition and hands it to their connector to run. The answer carries \`approval_url\` and

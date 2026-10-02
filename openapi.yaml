@@ -11360,8 +11360,8 @@ paths:
       description: |
         Replace the tag list for a same-owner agent. Same-owner gated, not owner-role:
         the owner may tag any of their agents, and an agent may set tags on itself or a
-        same-owner sibling (parity with agent capability self-report). Cross-owner is
-        rejected with 403. Tags drive the profile Data Access view, agent instructions for
+        same-owner sibling (parity with agent capability self-report). An agent's own tags
+        need no scope; a sibling's need `agent:write`. Cross-owner is rejected with 403. Tags drive the profile Data Access view, agent instructions for
         same-owner shared memory areas under agents.tag.{tag}.*, and tag-based discovery.
       tags: [Identity]
       security:

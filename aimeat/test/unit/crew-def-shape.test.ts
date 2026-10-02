@@ -12,11 +12,13 @@
  *
  * @usage cd aimeat && pnpm exec vitest run test/unit/crew-def-shape.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-02 — Every shipped basic agent holds the runtime's own write scopes.
  *   v1.0.0 — 2026-09-02 — Initial, with the tag charset and the shape rules.
  */
 import { describe, it, expect } from 'vitest';
 import { collectProblems, type Shippable } from '../../scripts/check-crew-defs.js';
 import { BASIC_AGENTS } from '../../src/data/basic-agents.js';
+import { CREW_RUNTIME_SCOPES } from '../../src/data/crew-runtime-scopes.js';
 
 /** A definition that is correct in every way, so each test breaks exactly one thing. */
 function sound(): Shippable {
@@ -123,6 +125,17 @@ describe('the tools, which is a different question from the shape', () => {
             const t = structuredClone(template) as unknown as Shippable;
             t.crewDef.agents.forEach(a => { a.tools = (a.tools ?? []).filter(x => x !== 'memory'); });
             expect(rules(t)).toContain('must declare "memory"');
+        }
+    });
+
+    it('and every SHIPPED agent to hold the permissions its runtime writes with', () => {
+        // Measured 2026-10-02 on a hosted place: workflow-manager lacked agent:write, the runtime's
+        // tags call on every start was refused, and since aimeat-crewai 0.31.0 a run with any
+        // refusal ends as refused. So an agent without these finishes no task at all.
+        for (const template of BASIC_AGENTS) {
+            for (const scope of CREW_RUNTIME_SCOPES) {
+                expect(template.scopes, `${template.name} lacks ${scope}`).toContain(scope);
+            }
         }
     });
 
