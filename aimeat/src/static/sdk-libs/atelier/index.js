@@ -55,6 +55,10 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.63.1 — 2026-10-02 — The tour's note follows the element it marks while the page scrolls (it
+ *     was placed once, before the step's smooth scroll, so on a phone it covered its element and
+ *     stayed where it was when the reader scrolled), and it holds the keyboard focus for its step
+ *     and gives it back at the end.
  *   v0.63.0 — 2026-10-02 — THE GAPS THE APP MIGRATION FOUND: aiChat (a follow-up conversation about
  *     one document) and aiTask drawing a kept result; doc variant "plain"; decision with questions
  *     per run, names, chained rounds, the app's verdict and a stored decision; workspaceTeam
@@ -444,7 +448,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.63.0',
+  version: '0.63.1',
 
   /**
    * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
