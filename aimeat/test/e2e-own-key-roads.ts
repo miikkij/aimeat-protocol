@@ -35,7 +35,8 @@
  * @version-history
  *   v1.1.0 — 2026-10-02 — The crew model choice guard (UNSAFE_CHOICE on a secret variable, http, a
  *     private or link-local address), the {kind:'node'} choice, and the crews read as covered once
- *     every agent's runtime reports the node road.
+ *     every agent's runtime reports the node road. An agent reports its own road without agent:write
+ *     and is refused a sibling's.
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -355,14 +356,14 @@ async function nodeRoute(): Promise<void> {
         const put = await json('/v1/agents/roads-agent/crew/llm', owner, { method: 'PUT', body: JSON.stringify({ choice: { kind: 'node', role: 'reasoning' } }) });
         assert(put.status === 200, `the node choice is stored, got ${put.status} ${JSON.stringify(put.body?.error)}`);
         const report = (tok: string, name: string) => json(`/v1/agents/${name}/runtime-source`, tok, { method: 'PATCH', body: JSON.stringify({ runtime_source: { kind: 'crew-def', runtime: 'crewaimeat test', llm: 'node' } }) });
-        // The report asks agent:write, which this agent was not given: the road cannot be claimed by
-        // an agent its owner did not let write agent records.
-        const fenced = await report(agent, 'roads-agent');
-        assert(fenced.status === 403, `an agent without agent:write cannot report, got ${fenced.status}`);
-        const bad = await json('/v1/agents/roads-agent/runtime-source', owner, { method: 'PATCH', body: JSON.stringify({ runtime_source: { kind: 'crew-def', llm: 'elsewhere' } }) });
+        // A runtime reports about ITSELF with no permission word (auth/self-or-scope.ts): this agent
+        // holds only ai:use, like a basic agent holds no agent:write. A sibling's report needs the word.
+        const fenced = await report(agent, 'roads-noai');
+        assert(fenced.status === 403, `an agent without agent:write cannot report a sibling's runtime, got ${fenced.status}`);
+        const bad = await json('/v1/agents/roads-agent/runtime-source', agent, { method: 'PATCH', body: JSON.stringify({ runtime_source: { kind: 'crew-def', llm: 'elsewhere' } }) });
         assert(bad.status === 400, `an llm other than node or machine is refused, got ${bad.status}`);
-        const r1 = await report(owner, 'roads-agent');
-        assert(r1.status === 200, `the road is reported, got ${r1.status} ${JSON.stringify(r1.body?.error)}`);
+        const r1 = await report(agent, 'roads-agent');
+        assert(r1.status === 200, `the agent reports its own road without agent:write, got ${r1.status} ${JSON.stringify(r1.body?.error)}`);
         let s = (await json('/v1/chat/status', owner)).body.data;
         const road = (s.own_key.agents as any[]).find((a) => a.agent === 'roads-agent');
         assert(road?.llm === 'node', `the agent's road is listed, got ${JSON.stringify(s.own_key.agents)}`);

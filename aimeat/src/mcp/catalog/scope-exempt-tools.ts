@@ -7,6 +7,7 @@
  *   reading it from there.
  * @structure SCOPE_EXEMPT_TOOLS
  * @version-history
+ *   v1.2.0 — 2026-10-02 — aimeat_agent_runtime_report: its own report without a word, a sibling's with agent:write.
  *   v1.1.0 — 2026-10-02 — aimeat_agent_tags_set: own tags without a word, a sibling's with agent:write.
  *   v1.0.0 — 2026-09-29 — Moved from scopes.ts, unchanged.
  */
@@ -43,7 +44,10 @@ export const SCOPE_EXEMPT_TOOLS = new Set<string>([
     // from every agent without agent:write, which is how a crew runtime's tags call on every start
     // failed every task of the basic agents (2026-10-02).
     'aimeat_agent_tags_set',
-    'aimeat_agent_telemetry_report',                 // Every write is keyed to `agentGaii` from the session closure (agent-telemetry
+    // The same rule for the runtime report: an agent says what runs it and where its model calls go
+    // (`llm`) about ITSELF without a word, a sibling's report needs agent:write, the handler checks.
+    'aimeat_agent_runtime_report',
+    'aimeat_agent_telemetry_report',                // Every write is keyed to `agentGaii` from the session closure (agent-telemetry
     'aimeat_capabilities_vouch',                     // gated in the handler on the operator role, not by a scope
     'aimeat_instance_create',                        // owner comes from ownerName() derived from the session GAII (chat-instances
     'aimeat_message_send',                           // agentGaii and senderGaii are both the session identity (agent-messages

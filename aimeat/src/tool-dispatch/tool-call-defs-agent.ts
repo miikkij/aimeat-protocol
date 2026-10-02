@@ -195,7 +195,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_agent_runtime_report',
-        description: "Say what code runs this agent, so a run can be audited afterwards: the file, its hash, the commit and which runtime read it. A JSON crew is answerable through its definition on the node; a code-backed one has none, and without this nothing can say what ran. Recorded and never checked.",
+        description: "Say what code runs this agent, so a run can be audited afterwards: the file, its hash, the commit and which runtime read it. A JSON crew is answerable through its definition on the node; a code-backed one has none, and without this nothing can say what ran. Recorded and never checked. `llm` says where the crew's model calls go. Your own needs no permission word; a sibling's needs agent:write.",
         input: {
             target_agent_name: { type: 'string', required: true, description: 'Agent this is about.' },
             kind: { type: 'string', required: true, description: "e.g. 'python' or 'crew-def'." },
