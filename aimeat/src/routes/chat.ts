@@ -15,6 +15,8 @@
  *   - chatRouter(config, storage) — GET/POST/DELETE threads, POST .../turn (SSE), GET /v1/chat/status
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.10.0 — 2026-10-02 — A turn takes `lang`, the language of the lines the node writes into it
+ *     (progress, and the stopped line when the turn's ceiling ends it); Accept-Language otherwise.
  *   v1.9.0 — 2026-10-02 — /v1/chat/status answers `own_key`: what an own key pays for on this node
  *     and what it never reaches (the chat on the shared key, an agent's crew), with the reason.
  *     `has_own_key` counts a key on one of the owner's providers too.
@@ -56,6 +58,7 @@ import { readAllowance, remainingOf } from '../services/ai-allowance.js';
 import { ownKeyCoverage } from '../services/own-key-coverage.js';
 import { recordFirstChatTurn } from '../services/onboarding-funnel.js';
 import { logger } from '../utils/logger.js';
+import { LOCALES, detectLocale, toLocale, type Locale } from '../i18n.js';
 
 export function chatRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
@@ -185,7 +188,13 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
     // something, and a person watching a spinner for four minutes cannot tell work from a hang.
     router.post('/v1/chat/threads/:id/turn', requireAuth(), requireRole('owner'), async (req: Request, res: Response) => {
         const threadId = req.params.id as string;
-        const { text, attachments, images, starter } = req.body ?? {};
+        const { text, attachments, images, starter, lang } = req.body ?? {};
+        // The language of the lines the node itself writes into the turn (its progress lines and the
+        // stopped line): the page's own language when it sends one, which follows the platform's
+        // language switch, else the browser's.
+        const locale = LOCALES.includes(lang as Locale)
+            ? toLocale(lang)
+            : detectLocale(req.headers['accept-language'] as string | undefined);
         // Storage keys, never bytes: the browser has already uploaded through the presigned path,
         // which is the one place a file size is checked against the owner's quota. `images` is the
         // name this field had for a day and is still accepted, because a client in a tab that has
@@ -248,7 +257,7 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
         });
 
         try {
-            for await (const update of runChatTurn({ storage, config }, owner(req), threadId, text, abort.signal, attachmentKeys)) {
+            for await (const update of runChatTurn({ storage, config }, owner(req), threadId, text, abort.signal, attachmentKeys, { locale })) {
                 if (finished) break;
                 send(update);
             }

@@ -25,6 +25,9 @@
  *   const sessionId = await acp.newSession({ mcpServers: [aimeatMcpServer(base, token)] });
  *   for await (const u of acp.prompt(sessionId, 'build me a pong game')) { … }
  * @version-history
+ *   v2.7.0 — 2026-10-02 — cancel() sends `session/cancel` as the notification ACP defines. Sent as a
+ *     request it was refused by goose 1.50.0 ("-32601: Method not found"), so Stop, leaving the page
+ *     and the chat's turn ceiling never stopped a real agent.
  *   v2.6.0 — 2026-09-28 — System 2 plan, V5: start() takes the person whose turns this child runs, and
  *     their chat token then becomes the child's /v1/llm key (services/goose-env.ts). A child whose
  *     handshake fails is stopped rather than left running.
@@ -323,11 +326,15 @@ export class GooseAcpClient {
         }
     }
 
-    /** Ask the agent to stop the current turn. */
+    /**
+     * Ask the agent to stop the current turn. The agent answers by ending the turn's
+     * `session/prompt` with stopReason `cancelled`.
+     *
+     * A NOTIFICATION, as ACP defines it, not a request. Until 2026-10-02 this was sent with an id,
+     * goose 1.50.0 answered "-32601: Method not found", and no Stop had ever stopped real goose.
+     */
     async cancel(sessionId: string): Promise<void> {
-        await this.call('session/cancel', { sessionId }, 15_000).catch((e: Error) => {
-            logger.warn(`[goose] cancel failed: ${e.message}`);
-        });
+        this.write({ jsonrpc: '2.0', method: 'session/cancel', params: { sessionId } });
     }
 
     /** Stop the agent. SIGTERM first; a child that ignores it is killed after a grace period. */

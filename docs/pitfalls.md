@@ -138,6 +138,7 @@ and its shape. Symptom first in the section too, then cause, then the rule.
 | 103 | A peer "proven" by its /.well-known card, and still not the node its id names | 4 |
 | 104 | A ratchet check refuses a count you lowered, right after a rebase that said it succeeded | 1 |
 | 105 | A suite's own node gets EADDRINUSE on a number no file names, Postgres sweep only | 5 |
+| 106 | Stop is pressed and the agent keeps working; the cancel test is green | 5 |
 
 ---
 
@@ -1191,3 +1192,11 @@ Two SESSIONS in one checkout is forbidden now (`CLAUDE.md`), so the case below i
 - **The cause.** Linux gives out the local port of every outgoing TCP connection from 32768 to 60999. The Postgres sweep keeps many connections open to one address, and Linux picks local ports for connections to one address from a starting point derived from that address, so the same numbers come up night after night. A port in that range is free only until a connection takes it. The SQLite sweep opens far fewer connections, which is why it never failed.
 - **The rule.** A node a suite starts for itself takes a port from the operating system: `freePort()` in `aimeat/test/helpers/free-port.ts`, which binds port 0 on every address, as the node does (§77b). A fixed number between 32768 and 60999 is never safe on Linux, however carefully it is kept apart from the other suites.
 - **The tell.** `EADDRINUSE` on a number no file names, in one backend's sweep only.
+
+## 106. A fake peer that answers what the real one refuses
+
+*Symptoms: Stop is pressed, or the person leaves the page, and the agent goes on working and spending; the node logs `[goose] cancel failed: -32601: Method not found`; the suite that asserts the cancel is green.*
+
+- **The case.** `GooseAcpClient.cancel()` sent `session/cancel` as a JSON-RPC request, with an id. In ACP it is a notification, and goose 1.50.0 refuses the request form with "Method not found". The test peer (`test/helpers/fake-goose-acp.ts`) answered the request form with `{}` and cancelled the turn, so `e2e-chat-agent` passed from 2026-09-08 while no Stop had ever reached real goose. Found 2026-10-02 when the chat's turn ceiling cancelled a real turn and nothing stopped.
+- **The rule.** A fake peer refuses what the real one refuses, with the real one's error. Before a fake answers a method, check that method's message type in the protocol (request or notification) and what the real peer does with the other form. A test that asserts a call was SENT proves nothing; assert what the peer DID with it (the cancel test now asserts the stalled turn ended as cancelled).
+- **The tell.** A warning in the node log about a call the green suite exercises. Run the flow once against the real peer (`aimeat/scripts/chat-turn-measure.ts` for the chat) and read the log.

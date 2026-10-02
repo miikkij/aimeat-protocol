@@ -37,6 +37,9 @@
  *   cd aimeat && node --import tsx test/e2e-chat-agent.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=chat-agent
  * @version-history
+ *   v1.3.0 — 2026-10-02 — The cancel is counted as the notification goose obeys, and asserted to stop
+ *     the agent; the turn ceiling: asked for an answer past twelve tool calls, and ended by the node
+ *     in the person's language when even that does not answer.
  *   v1.2.0 — 2026-09-28 — System 2 plan, V5: phase 3, the node route.
  *   v1.1.0 — 2026-09-16 — The agent child receives no AIMEAT_* value and no DATABASE_URL.
  *   v1.0.0 — 2026-09-08 — Initial.
@@ -268,6 +271,10 @@ function peerEntries(): any[] {
 function peerRequests(method: string): any[] {
     return peerEntries().filter((e) => e.kind === 'request' && e.method === method);
 }
+/** What the node sent without an id. `session/cancel` is one of these in ACP, and goose refuses it as a request. */
+function peerNotifications(method: string): any[] {
+    return peerEntries().filter((e) => e.kind === 'notification' && e.method === method);
+}
 function lastPromptText(): string {
     const prompts = peerRequests('session/prompt');
     assert(prompts.length > 0, 'the agent was asked something');
@@ -309,7 +316,10 @@ async function run(): Promise<void> {
         assert(kinds.includes('tool_call'), `the tool calls are carried, got ${kinds.join(',')}`);
 
         const said = events.filter((e) => e.kind === 'text').map((e) => e.text).join('');
-        assert(said === 'Here is your game.', `the chunks arrive in order, got ${JSON.stringify(said)}`);
+        // The words after a round of tool calls are a new paragraph (chat-session.ts v1.8.0): a model
+        // asked to say what it is doing between its steps writes a sentence before each round, and
+        // without the break the next one is glued to its full stop.
+        assert(said === 'Here is \n\nyour game.', `the chunks arrive in order, got ${JSON.stringify(said)}`);
 
         const done = events.at(-1)!;
         assert(done.kind === 'done', `the turn ends with a verdict, got ${done.kind}`);
@@ -397,7 +407,7 @@ async function run(): Promise<void> {
         assert(mine[0].text === 'build me a pong game', `the person's own words, got ${mine[0].text}`);
 
         const last = theirs.at(-1);
-        assert(last.text === 'Here is your game.', `the answer as it was streamed, got ${JSON.stringify(last.text)}`);
+        assert(last.text === 'Here is \n\nyour game.', `the answer as it was streamed, got ${JSON.stringify(last.text)}`);
         assert(last.model === 'fake/model-1', `the model the node chose, got ${last.model}`);
         // One entry, not two: the call arrives twice and only the first carries a title, so a log
         // keyed by title leaves every call reading "starting" whatever happened to it.
@@ -505,18 +515,87 @@ async function run(): Promise<void> {
         // listened for `close` on the REQUEST, which on Express 5 fires once as soon as the body is
         // read, before the handler's awaits return, so the person leaving was never seen and the
         // agent went on for the whole turn. Fixed in routes/chat.ts v1.6.0 (`res.on('close')`).
-        const before = peerRequests('session/cancel').length;
+        //
+        // It asserted a second hole on 2026-10-02: the node sent `session/cancel` as a request, real
+        // goose 1.50.0 answers that with "-32601: Method not found", and the peer here had answered
+        // it as a request too, so this test passed while no cancel had ever reached goose. In ACP the
+        // cancel is a notification; the peer now refuses the request form the way goose does.
+        const before = peerNotifications('session/cancel').length;
+        const stalls = peerEntries().filter((e) => e.kind === 'stall-ended').length;
         await turnAndLeave(threadId, 'STALL: keep going until I stop you');
         const deadline = Date.now() + 6_000;
-        while (peerRequests('session/cancel').length === before && Date.now() < deadline) await sleep(250);
-        assert(peerRequests('session/cancel').length === before + 1,
-            `the agent is told to stop once the person has gone, cancels seen: ${peerRequests('session/cancel').length - before}`);
+        while (peerNotifications('session/cancel').length === before && Date.now() < deadline) await sleep(250);
+        assert(peerNotifications('session/cancel').length === before + 1,
+            `the agent is told to stop once the person has gone, cancels seen: ${peerNotifications('session/cancel').length - before}`);
+        while (peerEntries().filter((e) => e.kind === 'stall-ended').length === stalls && Date.now() < deadline + 4_000) await sleep(250);
+        const ended = peerEntries().filter((e) => e.kind === 'stall-ended').at(-1);
+        assert(ended?.cancelled === true, `and the agent stopped because of it, got ${JSON.stringify(ended)}`);
 
         await sleep(2_000);
         const thread = await readThread(threadId);
         const stalled = (thread.turns as any[]).filter((t) => t.role === 'agent').at(-1);
         assert(!stalled?.text?.includes('....'),
             `nothing keeps being written after the person left, got ${JSON.stringify(stalled?.text)}`);
+    });
+
+    // ── The turn ceiling (services/chat-turn-guard.ts) ──
+    //
+    // Measured 2026-10-02 on a real model (scripts/chat-turn-measure.ts): a request for a new agent
+    // ran 149 s, 12 tool calls and six model rounds, with its first word at 141.8 s and no proposal.
+    // These two hold what the node does about it with a model that never stops on its own.
+
+    await test('a turn that keeps calling tools is stopped, asked for an answer, and answers', async () => {
+        const created = await json('/v1/chat/threads', authed({ method: 'POST', body: JSON.stringify({ title: 'loop' }) }));
+        const loopThread = created.body.data.thread.id as string;
+        const prompts = peerRequests('session/prompt').length;
+        const events = await turn(loopThread, { text: 'LOOPTOOLS: find my CRM', lang: 'en' });
+        const kinds = events.map((e) => e.kind);
+
+        const firstText = kinds.indexOf('text');
+        const start = events.findIndex((e) => e.kind === 'progress' && e.step === 'start');
+        assert(start >= 0 && start < firstText, `the node speaks before the agent does, got ${kinds.slice(0, 8).join(',')}`);
+        assert(events[start].text === 'On it. I\'ll look at what you have here first.', `in the page's language, got ${JSON.stringify(events[start].text)}`);
+        assert(events.some((e) => e.kind === 'progress' && e.step === 'reading'), 'a reading call gets its line');
+        const guard = events.find((e) => e.kind === 'guard');
+        assert(guard?.phase === 'wrap_up' && guard.reason === 'tool_calls', `the ceiling is the tool calls, got ${JSON.stringify(guard)}`);
+        const calls = new Set(events.filter((e) => e.kind === 'tool_call').map((e) => e.id));
+        assert(calls.size >= 13 && calls.size <= 15, `it stops just past twelve calls, got ${calls.size}`);
+        assert(peerEntries().filter((e) => e.kind === 'loop-ended').at(-1)?.cancelled === true, 'the agent was cancelled, not left running');
+
+        const asked = peerRequests('session/prompt').slice(prompts).map((p) => (p.params.prompt as any[]).map((b) => b.text ?? '').join('\n'));
+        assert(asked.length === 2, `two prompts in this turn, the question and the request for an answer, got ${asked.length}`);
+        assert(asked[0].includes('[A note from this node, not from the person]'), 'the first prompt carries the turn note');
+        assert(asked[1].includes('stop looking for more') && asked[1].includes('aimeat_agent_propose'), 'the second asks for an answer and names the proposal');
+        assert(peerRequests('session/prompt').slice(prompts).every((p) => p.params.sessionId === peerRequests('session/prompt').at(-1)!.params.sessionId),
+            'both in the same session, so the answer is built on what the agent found');
+
+        const said = events.filter((e) => e.kind === 'text').map((e) => e.text).join('');
+        assert(said === 'I will look first.\n\nHere is what I found.', `the agent's words, a paragraph apart, got ${JSON.stringify(said)}`);
+        const done = events.at(-1)!;
+        assert(done.kind === 'done' && done.stopReason === 'end_turn', `one verdict, the answer's, got ${JSON.stringify(done)}`);
+        assert(kinds.filter((k) => k === 'done').length === 1, 'the cancelled first phase ends no turn of its own');
+
+        const thread = await readThread(loopThread);
+        const saved = (thread.turns as any[]).filter((t) => t.role === 'agent').at(-1);
+        assert(saved.text === said, `the record keeps the words and no progress line, got ${JSON.stringify(saved.text)}`);
+    });
+
+    await test('a turn that does not answer even when asked is ended by the node, in the person\'s language', async () => {
+        const created = await json('/v1/chat/threads', authed({ method: 'POST', body: JSON.stringify({ title: 'loop all' }) }));
+        const loopThread = created.body.data.thread.id as string;
+        const events = await turn(loopThread, { text: 'LOOPALL: find my CRM', lang: 'fi' });
+        const guards = events.filter((e) => e.kind === 'guard');
+        assert(guards.length === 2 && guards[0].phase === 'wrap_up' && guards[1].phase === 'stopped',
+            `asked once, then stopped, got ${JSON.stringify(guards)}`);
+        assert(events.find((e) => e.kind === 'progress' && e.step === 'start')?.text === 'Selvä. Katson ensin, mitä sinulla on täällä.',
+            'the progress lines are in Finnish');
+        const said = events.filter((e) => e.kind === 'text').map((e) => e.text).join('');
+        assert(said.startsWith('I will look first.') && said.includes('Lopetin tähän, koska tämä kesti liian kauan'),
+            `the turn ends in words, the node's own, got ${JSON.stringify(said)}`);
+        const done = events.at(-1)!;
+        assert(done.kind === 'done' && done.stopReason === 'max_turn_requests', `the verdict says why, got ${JSON.stringify(done)}`);
+        const ended = peerEntries().filter((e) => e.kind === 'loop-ended').slice(-2);
+        assert(ended.length === 2 && ended.every((e) => e.cancelled === true), `both phases were cancelled, got ${JSON.stringify(ended)}`);
     });
 
     await test('a reset makes the next turn open a fresh session, and keeps the conversation', async () => {
