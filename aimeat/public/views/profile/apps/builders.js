@@ -22,6 +22,10 @@
  * @structure secBuilders(ctx) — the section · rungRow · GrantForm
  * @usage import { secBuilders } from './builders.js';
  * @version-history
+ *   v2.1.0 — 2026-10-02 — The name field is the shared ContactPicker, owners only: typing a name
+ *     suggests the owner's contacts and the members who listed themselves in the directory, the
+ *     same picker the organism invitation and the sharing forms use. It was a plain text field, so
+ *     the person had to know the exact account name.
  *   v2.0.0 — 2026-09-26 — Every part is a component call that gets data (page group G6): Section,
  *     the lead, loading and empty lines Note, the two lists the List (the rung a Tag in a Cell), their
  *     labels Label, the invitation form Fields with a TextField and two Selects and its send the loud
@@ -57,8 +61,8 @@ import { List, Row, Name, Cell, Doors } from '/components/List.js';
 import { Action, Loud } from '/components/Action.js';
 import { Mark, Label } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
-import { Fields, FormActions } from '/components/Field.js';
-import { TextField } from '/components/TextField.js';
+import { Field, Fields, FormActions } from '/components/Field.js';
+import { ContactPicker } from '/components/ContactPicker.js';
 import { Select } from '/components/Select.js';
 import { Space } from '/components/Layout.js';
 import { a, nameOf } from './frame.js';
@@ -102,7 +106,9 @@ function GrantForm({ apps, onGrant, busy }) {
     <${Space} above="large">
       <form onSubmit=${submit}>
         <${Fields} cols=${2}>
-          <${TextField} label=${a('bldWho')} value=${who} onInput=${setWho} placeholder=${a('bldWhoHint')} autoComplete="off" />
+          <${Field} label=${a('bldWho')}>
+            <${ContactPicker} value=${who} onChange=${setWho} kinds=${['ghii']} placeholder=${a('bldWhoHint')} disabled=${busy} />
+          <//>
           <${Select} label=${a('bldRung')} value=${rung} onChange=${setRung} options=${RUNGS.map((r) => [r, a('bldRung_' + r) || r])} />
           <${Select} label=${a('bldWhere')} value=${scope} onChange=${setScope}
             options=${[['', a('bldWhereAll')], ...apps.map((x) => [`${x.owner}/${x.filename}`, nameOf(x)])]} />
