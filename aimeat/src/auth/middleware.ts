@@ -16,6 +16,7 @@
  *   - the refusal path itself (deny401/deny403 and the audit context) lives in ./deny.ts
  *
  * @version-history
+ *   2026-10-02 — requireScope notes the words it admitted a `*` agent for (services/scope-use.ts).
  *   2026-09-30 — requireAnyScope tells denyScope403 that any one scope would do (the agent refusal note).
  *   2026-09-29 — resolvePatToken marks the identity `via: 'pat'`, so classification reads it as an AI
  *     (TARGET-082 V4). What the token may do is unchanged.
@@ -115,6 +116,7 @@ import { deny401, deny403, denyScope403 } from './deny.js';
 import { madeAfter, ownerRefuses, recordIssuedAt, tokenIssuedAt } from './credential-age.js';
 import { withCurrentScopes } from './effective-scopes.js';
 import { askOperator } from '../services/operator-principal.js';
+import { noteScopeUse } from '../services/scope-use.js';
 import { getAnonymousCredentials, isAnonymousMode, registerSessionAuth, sessionConfig, sessionStorage } from './node-auth.js';
 
 export { enableAnonymousAuth, isAnonymousMode, getAnonymousCredentials } from './node-auth.js';
@@ -739,6 +741,8 @@ export function requireScope(...requiredScopes: string[]) {
         return;
       }
     }
+    // A `*` agent's admitted words feed the narrowing its owner is offered (services/scope-use.ts).
+    if (req.auth.roles.includes('agent') && agentScopes.includes('*')) noteScopeUse(req.auth.sub, requiredScopes);
 
     next();
   };

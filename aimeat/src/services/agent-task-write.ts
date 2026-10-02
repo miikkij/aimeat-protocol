@@ -66,6 +66,7 @@ import {
     decideTaskStart, taskWakeId, autoStartEvent, startedOnItsOwn, TASK_EFFECTS, type TaskStartDecision, type TaskEffect,
 } from './agent-task-rules.js';
 import { notifyTaskWaiting } from './task-start-notice.js';
+import { withWildcardFacts } from './scope-use.js';
 import { commissionFingerprint, isUniqueViolation } from '../routes/agent-tasks/dedupe.js';
 import { resumeIfStalled } from './task-resume.js';
 import { resolveTaskFileInputs } from './task-files.js';
@@ -192,7 +193,9 @@ export async function createTask(deps: TaskWriteDeps, args: CreateTaskArgs): Pro
     // then any effect a todo given with the task declares, then this task's own word, then the
     // agent's. A task that starts carries the same 'started' event an owner-approved one would.
     // Which route or tool delegated the task is not part of that decision.
-    const decision = decideTaskStart(args.agent, { policy: body.start, todos });
+    // `*` holds the agent once its usage record is ready (services/scope-use.ts).
+    const startAgent = await withWildcardFacts(storage, { ...args.agent, gaii: args.agentGaii, name: args.agentName });
+    const decision = decideTaskStart(startAgent, { policy: body.start, todos });
     const { autoActivated, effectiveStatus } = resolveAutoActivation(decision, body.status);
 
     const record: AgentTaskRecord = {
@@ -439,7 +442,7 @@ export async function applyProposedPlan(
     // Only a task the node started on its own can be sent back; its 'started' event says so.
     const autoStarted = task.status === 'active'
         && startedOnItsOwn((await storage.listTaskEvents(task.id, { perPage: 100 })).events);
-    const { nextStatus, autoActivated, heldBack, waits, decision } = await statusAfterProposal(g => storage.getAgent(g), task, newTodos, autoStarted);
+    const { nextStatus, autoActivated, heldBack, waits, decision } = await statusAfterProposal(g => storage.getAgent(g).then(a => withWildcardFacts(storage, a)), task, newTodos, autoStarted);
 
     const updated = await storage.updateAgentTask(task.id, {
         todos: [...preserved, ...newTodos],

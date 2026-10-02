@@ -17,6 +17,7 @@
  *   res.json(success(nodeId, { task, start: startAnswer(decision, task.status) }));
  *   void notifyTaskWaiting(storage, task, decision);
  * @version-history
+ *   v1.1.0 — 2026-10-02 — The reason for an agent held by `*` alone names the narrowing.
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import type { Storage, AgentTaskRecord } from '../storage/interface.js';
@@ -46,7 +47,10 @@ function joinWords(words: string[]): string {
 /** One sentence saying why this task waits, or that it does not. */
 export function waitReason(agentName: string, decision: Pick<TaskStartDecision, 'waitsBecause' | 'floorScopes' | 'effects'>): string {
     switch (decision.waitsBecause) {
-        case 'floor': return `${agentName} can ${joinWords(kindsOf(decision))}, so its tasks always wait for your OK.`;
+        // `*` alone: the agent may do anything. The way out is the narrowing, so the sentence names it.
+        case 'floor': return decision.floorScopes.includes('*') && kindsOf(decision).length === 0
+            ? `${agentName} may do anything, including spend money and send or delete things as you, so its tasks wait for your OK until you narrow it to what it uses.`
+            : `${agentName} can ${joinWords(kindsOf(decision))}, so its tasks always wait for your OK.`;
         case 'effects': return `The plan says it will ${joinWords(kindsOf(decision))}, so it waits for your OK.`;
         case 'setting': return 'It waits for your OK before it starts.';
         default: return 'It starts on its own. You see the plan, the progress and the result in Tasks.';

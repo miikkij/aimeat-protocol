@@ -7,6 +7,7 @@
  *   mode, each tool accepts an optional `agent_name` parameter; if omitted, the
  *   registry's primary agent is used.
  * @version-history
+ *   2026-10-02 — aimeat_agent_scope_narrow (ruling C).
  *   2026-10-02 — aimeat_task_create takes `start`, propose_todos takes `effects` per todo, and
  *     aimeat_task_start / aimeat_agent_task_start_set: parity with the server MCP surface.
  *   2026-08-16 — aimeat_task_complete takes `deliverable_key`. It had been on the REST route and the
@@ -140,6 +141,15 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
     const { client, agent } = pickAgent(registry, agent_name);
     // The route reads the task by id; the name segment is the caller's own and decides nothing.
     const resp = await client.post(`/v1/agents/${encodeURIComponent(agent)}/tasks/${encodeURIComponent(task_id)}/start`, {});
+    return envelopeResult(resp);
+  });
+
+  mcp.tool('aimeat_agent_scope_narrow', descriptionFor('aimeat_agent_scope_narrow'), {
+    agent_name: agentNameSchema,
+    target_agent_name: z.string().describe('The agent holding * to narrow (same owner).'),
+  }, annotationsFor('aimeat_agent_scope_narrow'), async ({ agent_name, target_agent_name }) => {
+    const { client } = pickAgent(registry, agent_name);
+    const resp = await client.post(`/v1/agents/${encodeURIComponent(target_agent_name)}/scope-narrowing`, {});
     return envelopeResult(resp);
   });
 

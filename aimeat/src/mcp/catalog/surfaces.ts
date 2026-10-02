@@ -221,7 +221,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_task_event', 'aimeat_task_todo', 'aimeat_task_complete', 'aimeat_task_fail',
         // The person's own AI starting a waiting task on their word, and setting whether an agent's
         // tasks start on their own at all.
-        'aimeat_task_start', 'aimeat_agent_task_start_set',
+        'aimeat_task_start', 'aimeat_agent_task_start_set', 'aimeat_agent_scope_narrow',
         'aimeat_schedule_create', 'aimeat_schedule_list', 'aimeat_schedule_update',
         'aimeat_schedule_delete', 'aimeat_schedule_trigger', 'aimeat_schedule_report_internal',
         'aimeat_workflow_save', 'aimeat_workflow_get', 'aimeat_workflow_run', 'aimeat_workflow_answer', 'aimeat_workflow_pending_inputs',

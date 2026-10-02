@@ -7485,6 +7485,9 @@
   "notiftext.task_waiting.open": "Abrir",
   "notiftext.task_waiting_held.title": "{agent} espera tu permiso: {title}",
   "notiftext.task_waiting_held.body": "El plan tiene {steps} pasos. Solo tú puedes empezar esta tarea, porque el agente puede gastar dinero, enviar correo o borrar cosas en tu nombre, o su plan dice que lo hará.",
+  "notiftext.basic_agents_start_on.title": "Tus agentes básicos ahora empiezan sus tareas por sí solos",
+  "notiftext.basic_agents_start_on.body": "{agents} ahora empiezan una tarea en cuanto llega: cada uno propone su plan y sigue, y tú ves lo que hizo. Una tarea que gasta dinero, envía correo en tu nombre o elimina algo para siempre sigue esperando tu permiso. Para cambiarlo, abre el agente en la página Agentes y usa el interruptor \"Empieza el trabajo por sí solo\".",
+  "notiftext.basic_agents_start_on.open": "Abrir Agentes",
   "contacts.cover.desc": "Tu libreta de direcciones: las personas en las que confías. Cuando invitas a alguien a un organismo, compartes un espacio de trabajo o envías un mensaje, eliges desde aquí. Los agentes y las aplicaciones aparecen bajo las personas a las que pertenecen, y alguien sin cuenta puede anotarse e invitarse.",
   "contacts.cover.add": "Agregar",
   "contacts.cover.addSub": "un nombre o un correo · alguien sin cuenta · en un chat",
@@ -13821,6 +13824,7 @@
         "open": "Abrir",
         "close": "Cerrar",
         "waitingCount": "{n} esperan tu decisión",
+        "wildcardWaiting": "Estos agentes pueden hacer cualquier cosa, así que sus tareas esperan tu permiso hasta que los limites a lo que usaron: {names}. Abre un agente y pulsa \"Limitar a estos\".",
         "basicHaveLine": "{names} son tuyos y están en marcha.",
         "basicMissingLine": "{n} por crear todavía.",
         "shapeHint": "Una definición con la que puede trabajar desde el primer día. Cámbiala después en la pestaña Crew.",
@@ -13835,7 +13839,7 @@
         "runs": {
           "spawn": "Arranca cuando llega trabajo y se detiene después.",
           "resident": "Tu conector lo mantiene en marcha.",
-          "unset": "Nadie lo ha decidido todavía, así que nada pone en marcha este agente por sí solo."
+          "unset": "Nadie ha elegido cómo se ejecuta su programa, así que tu conector no lo pone en marcha. Si sus tareas empiezan solas es otro ajuste: Empieza el trabajo por sí solo."
         },
         "runsChange": "Cambiar",
         "runsDecide": "Decidir: cuando llega trabajo o siempre activo",
@@ -14003,6 +14007,7 @@
           },
           "memory": {
             "delete": "Eliminar notas, registros y datos guardados.",
+            "purge": "Eliminar para siempre registros de espacios de trabajo compartidos. No se pueden recuperar, así que sus tareas siempre esperan tu permiso.",
             "read": "Leer las notas, los registros y los datos guardados en tu cuenta.",
             "write": "Guardar y actualizar notas, registros y datos en tu cuenta.",
             "write-as-owner": "Guardar registros con tu nombre en vez del suyo, de modo que aparezcan como tuyos.",
@@ -14178,12 +14183,12 @@
       "runMode": {
         "spawn": "Cuando llega trabajo",
         "resident": "Siempre activo",
-        "tooltip": "Cómo se ejecuta este agente. Cuando llega trabajo: espera aquí hasta que llega trabajo. Siempre activo: tu conector lo mantiene en marcha. Sin decidir: nadie lo ha dicho, así que nada lo inicia por su cuenta. Puedes cambiar entre los tres cuando quieras.",
+        "tooltip": "Cómo se ejecuta el programa de este agente. Cuando llega trabajo: espera aquí hasta que llega trabajo. Siempre activo: tu conector lo mantiene en marcha. Sin decidir: nadie lo ha dicho, así que tu conector no pone en marcha su programa. Puedes cambiar entre los tres cuando quieras.",
         "label": "Cómo se ejecuta",
         "saved": "Puesto en {mode}.",
         "failed": "No se ha podido guardar. Inténtalo otra vez.",
         "unset": "Sin decidir",
-        "cleared": "Queda sin decidir. Nada lo iniciará por su cuenta."
+        "cleared": "Queda sin decidir. Tu conector no pondrá en marcha su programa."
       },
       "new": {
         "title": "Un agente tuyo",
@@ -15079,6 +15084,12 @@
         "selfStartOffSaved": "Ahora su trabajo espera a que lo inicies.",
         "selfStartFailed": "No se pudo guardar. Inténtalo de nuevo.",
         "selfStartHeld": "Su trabajo siempre te espera, porque puede gastar dinero, enviar correo o borrar cosas en tu nombre.",
+        "wildcardLabel": "Todos los permisos",
+        "wildcardCollecting": "Puede hacer cualquier cosa. Tu AIMEAT anota qué permisos usa. Dentro de {days} días sus tareas empiezan a esperar tu permiso, hasta que lo limites a lo que usó.",
+        "wildcardReady": "Puede hacer cualquier cosa, así que sus tareas esperan tu permiso. Usó {n} permisos, para {areas}. Limítalo a esos y \"Empieza el trabajo por sí solo\" vuelve a decidir.",
+        "wildcardNarrow": "Limitar a estos {n}",
+        "wildcardNarrowed": "Ahora tiene los {n} permisos que usó.",
+        "wildcardFailed": "No se ha podido guardar. Inténtalo otra vez.",
         "buyLabel": "Compras por día",
         "buyLine": "{amount} {currency}, gastado hoy {spent}",
         "buyNone": "Ninguno: este agente no gasta dinero hasta que fijes un límite.",

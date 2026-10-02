@@ -17,6 +17,7 @@
  * @usage
  *   const { webhookDispatcher, stats } = await initProcessBuffers(config, storage);
  * @version-history
+ *   v1.1.0 — 2026-10-02 — initScopeUse: the record of the permissions each `*` agent uses.
  *   v1.0.0 — 2026-08-27 — Pure extraction from routes-loader.ts (which was at 799 of 800 lines).
  *   v1.0.1 — 2026-09-26 — The owner in the cache tag comes from localAccountName (utils/gaii.ts),
  *     which keeps an identity of another node whole, so it never names the local namesake
@@ -41,6 +42,7 @@ import { initWriteTallyBuffer } from '../services/data-map/write-tally-buffer.js
 import { initConsentAuditBuffer } from '../services/consent-audit-buffer.js';
 import { initClassificationAudit } from '../services/classification/audit.js';
 import { initAgentRefusals } from '../services/agent-refusals.js';
+import { initScopeUse } from '../services/scope-use.js';
 
 export interface ProcessBuffers {
   webhookDispatcher: ReturnType<typeof createWebhookDispatcher>;
@@ -68,6 +70,9 @@ export async function initProcessBuffers(config: AimeatConfig, storage: Storage)
   // The write tally starts collecting here. It fills only from now on: the writer was never
   // recorded before this, so there is no history to seed it from.
   initWriteTallyBuffer(storage);
+  // Which permissions each `*` agent uses, for the narrowing its owner is offered and for when `*`
+  // starts to hold its tasks (services/scope-use.ts). Like the tally, it fills only from now on.
+  initScopeUse(storage);
 
   // Off-request-path buffer for consent-audit writes (denials + grant/revoke mutations).
   initConsentAuditBuffer(storage);

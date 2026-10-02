@@ -39,6 +39,7 @@ import {
   resolveAutoActivation, autoStartEvent, decideTaskStart, taskWakeId,
 } from '../../services/agent-task-rules.js';
 import { startWaitingTask } from '../../services/task-start-op.js';
+import { withWildcardFacts } from '../../services/scope-use.js';
 import { resolveTaskFileInputs } from '../../services/task-files.js';
 import { requireReadiness } from '../../middleware/readiness-gate.js';
 import { startCallerOf, type TaskRouteHelpers } from './helpers.js';
@@ -277,7 +278,7 @@ export function registerTaskLifecycleRoutes(
       return;
     }
 
-    const targetAgent = await storage.getAgent(task.agentGaii);
+    const targetAgent = await withWildcardFacts(storage, await storage.getAgent(task.agentGaii));
     const decision = decideTaskStart(targetAgent, { policy: task.startPolicy, todos: task.todos });
     const { autoActivated, effectiveStatus } = resolveAutoActivation(decision, 'queued');
 

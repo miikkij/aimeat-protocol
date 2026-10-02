@@ -219,6 +219,13 @@ export const schedulesTasksMemoryTools: AimeatToolDefinition[] = [
         input: { task_id: { type: 'string', required: true, description: 'The waiting task to start.' } },
     },
     {
+        name: 'aimeat_agent_scope_narrow',
+        description: "Replace one of the owner's agents' \"all permissions\" (*) with the named permissions it actually used, as the node recorded them. Use it when the person agrees after you showed them the list (aimeat_agents_list: task_start_wildcard.proposal). An agent with * has every task wait for the owner's OK once two weeks of its use are on record; narrowed, it starts on its own again if its setting says so. Refused when nothing it used is on record yet. Needs agent:permissions.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: { target_agent_name: { type: 'string', required: true, description: 'The agent holding * to narrow (same owner as you).' } },
+    },
+    {
         name: 'aimeat_agent_task_start_set',
         description: "Set whether one of the owner's agents starts its tasks on its own ('automatic': it proposes its plan and goes on, and the owner sees what was done) or waits for the owner's OK on each ('confirm'). Use it when the person says so (\"let the concierge start its tasks by itself\"). null leaves it to the agent's mode again. Never for yourself. An agent that can spend money, send mail as the owner or delete as the owner always waits whatever this says; the answer's task_start_held_by names those permissions.",
         caller: 'agent',

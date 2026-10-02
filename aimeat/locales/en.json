@@ -8615,6 +8615,9 @@
   "notiftext.task_waiting.open": "Open",
   "notiftext.task_waiting_held.title": "{agent} waits for your OK: {title}",
   "notiftext.task_waiting_held.body": "The plan has {steps} steps. Only you can start this one, because the agent can spend money, send mail or delete things in your name, or its plan says it will.",
+  "notiftext.basic_agents_start_on.title": "Your basic agents now start their tasks by themselves",
+  "notiftext.basic_agents_start_on.body": "{agents} now start a task as soon as it arrives: each proposes its plan and goes on, and you see what it did. A task that spends money, sends mail in your name or deletes something for good still waits for your OK. To change it, open the agent on the Agents page and use the switch \"Starts work by itself\".",
+  "notiftext.basic_agents_start_on.open": "Open Agents",
   "contacts.cover.desc": "Your address book: the people you trust. When you invite someone into an organism, share a workspace or send a message, you pick from here. Agents and apps are listed under the people they belong to, and someone without an account can be written down and invited.",
   "contacts.cover.add": "Add",
   "contacts.cover.addSub": "a name or an email · someone without an account · in a chat",
@@ -15607,6 +15610,7 @@
         "open": "Open",
         "close": "Close",
         "waitingCount": "{n} waiting for you",
+        "wildcardWaiting": "These agents may do anything, so their tasks wait for your OK until you narrow them to what they used: {names}. Open an agent and press \"Narrow to these\".",
         "basicHaveLine": "{names} are yours and running.",
         "basicMissingLine": "{n} still to create.",
         "shapeHint": "A crew definition it can run from the first day. Change it later on the Crew tab.",
@@ -15621,7 +15625,7 @@
         "runs": {
           "spawn": "Starts when work arrives and stops after it.",
           "resident": "Your connector keeps it running.",
-          "unset": "Nobody has decided yet, so nothing starts this agent on its own."
+          "unset": "Nobody has chosen how its program runs, so your connector does not launch it. Whether its tasks start by themselves is a separate setting: Starts work by itself."
         },
         "runsChange": "Change",
         "runsDecide": "Decide: starts when work arrives, or always on",
@@ -15789,6 +15793,7 @@
           },
           "memory": {
             "delete": "Delete saved notes, records and data.",
+            "purge": "Delete shared workspace records for good. They cannot be restored, so its tasks always wait for your OK.",
             "read": "Read the notes, records and data saved in your account.",
             "write": "Save and update notes, records and data in your account.",
             "write-as-owner": "Save records under your name instead of its own, so they appear as yours.",
@@ -15964,12 +15969,12 @@
       "runMode": {
         "spawn": "Starts when work arrives",
         "resident": "Always on",
-        "tooltip": "How this agent is run. Starts when work arrives: it waits here until work comes. Always on: your connector keeps it running. Not decided: nobody has said, so nothing starts it on its own. You can move between all three at any time.",
+        "tooltip": "How this agent's program is run. Starts when work arrives: it waits here until work comes. Always on: your connector keeps it running. Not decided: nobody has said, so your connector does not launch its program. You can move between all three at any time.",
         "label": "How it runs",
         "saved": "Set to {mode}.",
         "failed": "That could not be saved. Try again.",
         "unset": "Not decided",
-        "cleared": "Left undecided. Nothing will start it on its own."
+        "cleared": "Left undecided. Your connector will not launch its program."
       },
       "new": {
         "title": "An agent of your own",
@@ -17045,6 +17050,12 @@
         "selfStartOffSaved": "Its work now waits for you to start it.",
         "selfStartFailed": "That could not be saved. Try again.",
         "selfStartHeld": "Its work always waits for you, because it can spend money, send mail or delete things in your name.",
+        "wildcardLabel": "All permissions",
+        "wildcardCollecting": "It may do anything. Your AIMEAT notes which permissions it uses. In {days} days its tasks start to wait for your OK, until you narrow it to what it used.",
+        "wildcardReady": "It may do anything, so its tasks wait for your OK. It used {n} permissions, for {areas}. Narrow it to those, and \"Starts work by itself\" decides again.",
+        "wildcardNarrow": "Narrow to these {n}",
+        "wildcardNarrowed": "It now has the {n} permissions it used.",
+        "wildcardFailed": "That could not be saved. Try again.",
         "buyLabel": "Purchases per day",
         "buyLine": "{amount} {currency}, spent today {spent}",
         "buyNone": "None: this agent does not spend money until you set a limit.",

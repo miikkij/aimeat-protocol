@@ -18,6 +18,7 @@
  *   const checked = expandScopes(agent.default_scopes ?? ['*']);
  *   await save(collapseScopes(checked));
  * @version-history
+ *   v1.16.0 — 2026-10-02 — memory:purge, inside the wildcard: deleting shared workspace records for good.
  *   v1.15.0 — 2026-10-01 — contacts:read, inside the wildcard: listing the owner's address book. It
  *     rode messages:read on the node's MCP tool while the REST endpoint refused every agent.
  *   v1.14.0 — 2026-09-24 — connections:read-through: reading what is in a connected account (a
@@ -191,7 +192,9 @@ export const SCOPE_DOMAINS = [
   // profile.*). For an agent that administers the account. Not in '*' on purpose — see
   // WRITE_RESERVED_SCOPE in src/routes/memory/owner-target.ts. It is a MODIFIER on write-as-owner:
   // on its own it lifts a block on writes the agent is not making.
-  { key: 'memory',    permissions: ['read', 'write', 'delete', 'write-as-owner', 'write-reserved'] },
+  // purge — delete shared workspace records for good (2026-10-02). `delete` can be undone for a grace
+  //   window and `purge` cannot, so they are two ticks; an agent holding `purge` has every task wait.
+  { key: 'memory',    permissions: ['read', 'write', 'delete', 'purge', 'write-as-owner', 'write-reserved'] },
   { key: 'storage',   permissions: ['read', 'write'] },
   { key: 'ai',        permissions: ['use'] },
   { key: 'work',      permissions: ['request', 'read', 'accept', 'publish'] },

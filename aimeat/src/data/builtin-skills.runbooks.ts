@@ -12,6 +12,8 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   v1.8.0 — 2026-10-02 — manage-my-agents: an agent with all permissions waits after two weeks of record,
+ *     and aimeat_agent_scope_narrow narrows it to what it used.
  *   v1.7.1 — 2026-10-02 — manage-my-agents: an agent's own tags need no agent:write, and an older
  *     refusal of it for its own tags is declined, not granted.
  *   v1.7.0 — 2026-10-02 — manage-my-agents: "starts work by itself" is aimeat_agent_task_start_set, and
@@ -140,6 +142,10 @@ Ask what the agent should do, then name the kind, where it runs and who pays:
   owner's OK. Say that in those words before you set it. An agent that can spend money, send mail
   or delete things in the owner's name always waits, whatever this says. When a task waits and the
   owner says "go ahead", start it with \`aimeat_task_start\`.
+- **All permissions (\`*\`)** counts as able to do anything: two weeks after the node starts noting
+  what such an agent uses, its tasks wait for the owner. \`aimeat_agents_list\` shows the permissions
+  it used (\`task_start_wildcard.proposal\`); read them to the owner, and when they agree, narrow the
+  agent to them with \`aimeat_agent_scope_narrow\`.
 
 Where agents run, for the owner:
 

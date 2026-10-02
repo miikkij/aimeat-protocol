@@ -342,6 +342,61 @@ await test('5c. Over MCP the propose answer says go on or wait', async () => {
   assert(!p.isError && JSON.parse(p.text).next === 'wait_for_owner', `next ${p.text}`);
 });
 
+console.log('\n6. Deleting shared records for good is its own permission (ruling B)');
+await test('6a. memory:delete alone no longer deletes workspace records for good; memory:purge passes that check', async () => {
+  const deleter = await newAgent(owner, 'deleter', ['memory:read', 'memory:delete']);
+  const purger = await newAgent(owner, 'purger', ['memory:read', 'memory:purge']);
+  const body = JSON.stringify({ namespace: 'shared.notes', ids: ['x'] });
+  const refused = await json('/v1/organisms/no-such-organism/workspace/records/delete', { method: 'POST', headers: auth(deleter.token), body });
+  assert(refused.status === 403, `memory:delete alone ${refused.status}`);
+  // Past the permission check, the request meets the next one: the organism does not exist.
+  const passed = await json('/v1/organisms/no-such-organism/workspace/records/delete', { method: 'POST', headers: auth(purger.token), body });
+  assert(passed.status === 404, `memory:purge ${passed.status}: ${JSON.stringify(passed.body?.error)}`);
+});
+
+await test('6b. An agent holding memory:purge has every task wait, whatever its setting', async () => {
+  const set = await setTaskStart(owner.token, 'purger', 'automatic');
+  assert(set.status === 200 && set.body.data.task_start_held_by.includes('memory:purge'), `held_by ${JSON.stringify(set.body.data)}`);
+  const r = await createTask(owner.token, 'purger', 'Tidy the workspace');
+  assert(r.body.data.task.status === 'queued' && r.body.data.start.waits_because === 'floor', `start ${JSON.stringify(r.body.data.start)}`);
+});
+
+console.log('\n7. An agent with all permissions, and the narrowing (ruling C)');
+let star!: Agent;
+await test('7a. A fresh `*` agent is still being observed: its tasks start, and there is nothing to narrow yet', async () => {
+  star = await newAgent(owner, 'star', ['*'], 'task-runner');
+  const a = await listAgent(owner.token, 'star');
+  assert(a.task_start_wildcard && a.task_start_wildcard.ready === false && a.task_start_wildcard.days_left === 14, `wildcard ${JSON.stringify(a.task_start_wildcard)}`);
+  const n = await json('/v1/agents/star/scope-narrowing', { method: 'POST', headers: auth(owner.token) });
+  assert(n.status === 409 && n.body.error?.code === 'NOTHING_RECORDED', `narrow ${n.status} ${n.body.error?.code}`);
+  const r = await createTask(owner.token, 'star', 'Still starts');
+  assert(r.body.data.task.status === 'active', `status ${r.body.data.task.status}`);
+});
+
+await test('7b. What it used is recorded, and the owner narrows it to that with one press', async () => {
+  const wrote = await json('/v1/memory', { method: 'POST', headers: auth(star.token), body: JSON.stringify({ key: 'star.note', value: { ok: true } }) });
+  assert(wrote.status === 201 || wrote.status === 200, `write ${wrote.status}`);
+  const read = await json('/v1/memory?prefix=star.', { headers: auth(star.token) });
+  assert(read.status === 200, `read ${read.status}`);
+  const a = await listAgent(owner.token, 'star');
+  const used = a.task_start_wildcard?.used ?? [];
+  assert(used.includes('memory:write') && used.includes('memory:read'), `used ${JSON.stringify(used)}`);
+  const other = await json('/v1/agents/star/scope-narrowing', { method: 'POST', headers: auth(chat.token) });
+  assert(other.status === 403, `an agent without agent:permissions ${other.status}`);
+  const n = await json('/v1/agents/star/scope-narrowing', { method: 'POST', headers: auth(owner.token) });
+  assert(n.status === 200, `narrow ${n.status}: ${JSON.stringify(n.body)}`);
+  const scopes: string[] = n.body.data.scopes;
+  assert(!scopes.includes('*') && scopes.includes('memory:read') && scopes.includes('memory:write'), `scopes ${JSON.stringify(scopes)}`);
+  const after = await listAgent(owner.token, 'star');
+  assert(after.task_start_wildcard === null, `no longer all permissions ${JSON.stringify(after.task_start_wildcard)}`);
+});
+
+await test('7c. A permission it never used is refused after the narrowing, on a fresh token', async () => {
+  const fresh = await agentToken(star.gaii, star.priv);
+  const refused = await json('/v1/contacts', { headers: auth(fresh) });
+  assert(refused.status === 403, `contacts after narrowing ${refused.status}`);
+});
+
 console.log('\nCleanup');
 await test('Cascade-delete both owners', async () => {
   for (const o of [owner, other]) {

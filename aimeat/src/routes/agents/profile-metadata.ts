@@ -53,7 +53,7 @@ import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import { refuseNeedsPermission } from '../../middleware/refusals.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII, isForeignPrincipal, resolveIdentity } from '../../utils/gaii.js';
-import { setAgentTaskStart, taskStartView } from '../../services/agent-task-start-write.js';
+import { setAgentTaskStart, taskStartView, scopeUseLookup } from '../../services/agent-task-start-write.js';
 import { readOwnerAgentAccess, agentAccessView } from '../../services/agent-refusals.js';
 import { calculateTrustScore } from '../../services/trust.js';
 import { emitChange } from '../../services/event-bus.js';
@@ -232,6 +232,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
       }
     }
 
+    const useOf = await scopeUseLookup(storage, agents);
     res.json(success(config.nodeId, {
       agents: agents.map(a => ({
         gaii: a.gaii,
@@ -281,7 +282,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
         run_mode: a.runMode ?? null,
         // Whether its tasks start on their own: the owner's setting, what applies, and the permissions
         // that make every task wait whatever the setting (services/agent-task-start-write.ts).
-        ...taskStartView(a),
+        ...taskStartView(a, useOf(a)),
         // What code backs it, as the runtime last said. The only answer this node has to "what was
         // running when this ran" for a crew whose definition lives on someone else's disk.
         runtime_source: a.runtimeSource ?? null,

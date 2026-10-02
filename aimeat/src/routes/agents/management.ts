@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, read-through, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.12.0 -- 2026-10-02 -- POST /v1/agents/:name/scope-narrowing: replace an agent's `*` with the
+ *     permissions it used, with one press (services/scope-use.ts, ruling C).
  *   v1.11.0 -- 2026-09-30 -- POST /v1/agents/:gaii/export: memory passes the classification reader
  *     and leave() like GET /v1/memory/export, and names what stayed behind in `left_out` (TARGET-082
  *     second review, finding S3).
@@ -42,7 +44,8 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { generateKeyPair } from '../../auth/keypair.js';
-import { requireAuth, requireRole, requireRoleOrScope, requireLocalSession, requireOwnerPrincipal } from '../../auth/middleware.js';
+import { requireAuth, requireRole, requireRoleOrScope, requireLocalSession, requireOwnerPrincipal, requireScope } from '../../auth/middleware.js';
+import { narrowAgent } from '../../services/scope-narrowing.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII, ownerGhiiOf } from '../../utils/gaii.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
@@ -352,6 +355,30 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
       { description: 'Export agent data', method: 'POST', url: `/v1/agents/${encodeURIComponent(gaii)}/export` },
     ]));
     emitChange('agents');
+  });
+
+  /**
+   * POST /v1/agents/:name/scope-narrowing — replace the agent's `*` with the named permissions it
+   * actually used, as its usage record has them (services/scope-use.ts). One press for the owner; the
+   * agent list says what the proposal is (`task_start_wildcard.proposal`). Ruling C, 2026-10-02: `*`
+   * holds an agent's tasks once its record is ready, and this is the way out the owner is offered.
+   *
+   * It only ever takes away, so it does not need the owner in person: the owner, or another of their
+   * agents holding `agent:permissions`, the word for changing a sibling's permissions (outside every
+   * wildcard). Refused with nothing on record, because an empty list would leave the agent unable to
+   * do anything; a word the agent needs later is offered back on its card when it is refused once.
+   */
+  router.post('/v1/agents/:name/scope-narrowing', requireAuth(), requireScope('agent:permissions'), async (req, res) => {
+    const owner = req.auth!.owner as string;
+    const agent = (await storage.getAgentsByOwner(owner)).find(a => a.name === (req.params.name as string)) ?? null;
+    const out = await narrowAgent(storage, `${owner}@${config.nodeId}`, agent);
+    if (!out.ok) {
+      res.status(out.code === 'NOT_FOUND' ? 404 : 409).json(error(config.nodeId, out.code, out.message));
+      return;
+    }
+    res.json(success(config.nodeId, {
+      gaii: out.agent.gaii, name: out.agent.name, scopes: out.agent.defaultScopes ?? [], used: out.status.used,
+    }));
   });
 
   // PATCH /v1/agents/:name/scopes — update agent scopes (owner only)
