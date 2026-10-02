@@ -24794,10 +24794,14 @@
       } }
     }, "✕");
     const head = el("div", { class: "ak-handbook__head", "data-ak-part": "head" }, [titleEl, closeBtn]);
-    const find = s.search === false ? null : searchBar({ onChange: function(q) {
-      query = String(q || "").trim().toLowerCase();
-      draw();
-    } });
+    const find = s.search === false ? null : searchBar({
+      placeholder: hb("search"),
+      label: hb("search"),
+      onChange: function(q) {
+        query = String(q || "").trim().toLowerCase();
+        draw();
+      }
+    });
     if (find) find.el.setAttribute("data-ak-part", "search");
     const toc = el("nav", { class: "ak-handbook__toc", "data-ak-part": "toc" });
     const article = el("article", { class: "ak-handbook__article", "data-ak-part": "article", "aria-live": "polite" });
@@ -24815,7 +24819,7 @@
       if (ev.target === root) close();
     });
     function chapters() {
-      const page = s.collect === false || sample ? [] : collect(s.collect && s.collect !== true ? s.collect : document);
+      const page = s.collect === false || sample && !s.collect ? [] : collect(s.collect && s.collect !== true ? s.collect : document);
       const byId = /* @__PURE__ */ new Map();
       own.forEach(function(c) {
         byId.set(c.id, Object.assign({}, c));
@@ -24936,6 +24940,13 @@
       closeBtn.setAttribute("aria-label", hb("close"));
       root.setAttribute("aria-label", wordsOf(s.title) || hb("title"));
       toc.setAttribute("aria-label", hb("contents"));
+      if (find) {
+        const box = find.el.querySelector("input");
+        if (box) {
+          box.setAttribute("placeholder", hb("search"));
+          box.setAttribute("aria-label", hb("search"));
+        }
+      }
       drawToc();
       drawArticle();
       buttons.forEach(paintButton);
@@ -24976,7 +24987,7 @@
       }
       if (!node || !node.isConnected || /** @type {HTMLElement} */
       node.offsetParent === null) return false;
-      if (mode === "dialog") close();
+      if (mode === "dialog" || panel.offsetWidth >= window.innerWidth * 0.75) close();
       mark(node);
       return true;
     }
