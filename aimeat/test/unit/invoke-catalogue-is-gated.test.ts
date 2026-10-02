@@ -16,6 +16,7 @@
  *   absent from the tables, or the reverse — this is the one that says so.
  *
  * @version-history
+ *   2026-10-02 — The exemption bound is 19, for aimeat_agent_runtime_report (its own report needs no word).
  *   2026-10-02 — The exemption bound is 18, for aimeat_agent_tags_set (own tags need no word).
  *   2026-09-27 — The exemption bound is 17, for aimeat_app_manage.
  *   v1.2.0 — 2026-09-24 — The bound falls to 16: the operator's writes left the exemptions for the
@@ -85,7 +86,11 @@ describe('the invoke catalogue is a gated surface', () => {
         // sibling's need agent:write; the handler checks which on the node, and through invoke the
         // REST endpoint does (auth/self-or-scope.ts). Ruled by Jouni after a crew runtime's tags call
         // on every start failed every task of the basic agents.
-        expect(exempt.length).toBeLessThanOrEqual(18);
+        // 19 since 2026-10-02: aimeat_agent_runtime_report, the same rule for the same reason. The
+        // report now says where the crew's model calls go (`llm`), a crew sends it about itself, and
+        // the basic agents hold no agent:write; a sibling's report still needs the word, checked by
+        // the handler on the node and by the REST endpoint through invoke.
+        expect(exempt.length).toBeLessThanOrEqual(19);
         expect(mutating.length).toBeGreaterThan(100);
     });
 });

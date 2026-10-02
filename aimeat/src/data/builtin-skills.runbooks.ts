@@ -13,7 +13,8 @@
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
  *   v1.9.0 — 2026-10-02 — manage-my-agents: a worker on the owner's computer uses their settings and
- *     their own key only when its model choice is this node; otherwise the computer's key.
+ *     their own key only when its model choice is this node; otherwise the computer's key. Its own
+ *     runtime report needs no agent:write, like its own tags.
  *   v1.8.0 — 2026-10-02 — manage-my-agents: an agent with all permissions waits after two weeks of record,
  *     and aimeat_agent_scope_narrow narrows it to what it used.
  *   v1.7.1 — 2026-10-02 — manage-my-agents: an agent's own tags need no agent:write, and an older
@@ -186,7 +187,8 @@ flowchart LR
   needs its own permission, contacts:read, since 2026-10-01; an agent approved before then holds only
   messages:read for it and is refused until the owner gives contacts:read. An agent sets its OWN
   tags without agent:write since 2026-10-02, so a refusal of agent:write for its own tags
-  (PATCH /v1/agents/:name/tags) from before then needs no grant: tell the owner to decline it.
+  (PATCH /v1/agents/:name/tags) from before then needs no grant: tell the owner to decline it. The
+  same holds for its own runtime report (PATCH /v1/agents/:name/runtime-source).
   agent:write lets an agent approve new agents and change other agents' settings, so it is given
   only to an agent whose job is that.
 - **Inspect one:** \`aimeat_agent_profile\` — capabilities, trust, linked skills; pass the agent's GAII.
