@@ -19,6 +19,7 @@
  * @structure PackageSheet · packageSheet(pkg) · sheetOfManifest(manifest)
  * @usage const sheet = packageSheet(pkg, config);
  * @version-history
+ *   v1.1.0 — 2026-10-02 — `tools`: what the apps offer to agents, as carried (no prices; package-app-tools.ts).
  *   v1.0.0 — 2026-10-01 — Initial.
  */
 import { parse as parseYaml } from 'yaml';
@@ -40,6 +41,8 @@ export interface PackageSheet {
     dataUnmapped: string[];
     /** Agents that come inside the apps; each waits for the person's approval after install. */
     agents: Array<{ app: string; name: string; purpose: string }>;
+    /** The tools the apps offer to agents, as the package carries them: without prices. */
+    tools: Array<{ app: string; name: string; description: string }>;
     /** Jobs an extension runs on its own once installed. */
     runsOnItsOwn: Array<{ component: string; what: string; when: string }>;
     /** Operating guides the person's AI gets with the apps. */
@@ -109,7 +112,7 @@ export function packageSheet(pkg: PackageRecord, config: AimeatConfig): PackageS
     const sheet: PackageSheet = {
         outcome: author.outcome || text(pkg.description, 300),
         prompts: author.prompts,
-        apps: [], data: [], dataUnmapped: [], agents: [], runsOnItsOwn: [], guides: [], asks: [],
+        apps: [], data: [], dataUnmapped: [], agents: [], tools: [], runsOnItsOwn: [], guides: [], asks: [],
         expects: expectsOf(pkg.manifest),
     };
     for (const c of pkg.components ?? []) {
@@ -129,6 +132,10 @@ export function packageSheet(pkg: PackageRecord, config: AimeatConfig): PackageS
                 });
             } else {
                 sheet.dataUnmapped.push(label);
+            }
+            for (const t of Array.isArray(app.tools) ? app.tools as Array<Record<string, unknown>> : []) {
+                const name = text(t.name, 80);
+                if (name) sheet.tools.push({ app: label, name, description: text(t.description, 300) });
             }
             for (const crew of parseBundledCrews(appHtml(c)) ?? []) {
                 const name = text(crew.agent_name, 60);

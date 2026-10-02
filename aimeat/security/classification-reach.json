@@ -1808,6 +1808,18 @@
       },
       "why": "Reviewed 2026-10-02 (package sale design, phase 5), the node's own read: the withdrawn versions of a package group and their reasons, in the system namespace package-withdrawals that no principal addresses."
     },
+    "src/services/package-compose.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-02, the node's own read: the composer's own tool list for an app they put in a package, copied into the package without prices. Tool names and schemas are the app's interface, not classified content, and the composer reads their own record."
+    },
+    "src/services/package-app-tools.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-02, the node's own read: whether the installer already has a tool list for the app, so an install never overwrites it. Only the presence is used; nothing is shown."
+    },
     "src/services/peer-incidents.ts": {
       "reads": {
         "getMemory": 1,

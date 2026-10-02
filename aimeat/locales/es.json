@@ -4855,6 +4855,8 @@
   "pkpage.sheetDataUnmapped": "{app}: nadie ha anotado qué guarda ni adónde van los datos.",
   "pkpage.sheetAgentsK": "Agentes que vienen con él",
   "pkpage.sheetAgentsSub": "Cada uno espera tu aprobación en tus pendientes después de instalar. Nada se ejecuta antes de que lo apruebes.",
+  "pkpage.sheetToolsK": "Herramientas para agentes",
+  "pkpage.sheetToolsSub": "Lo que las aplicaciones dejan llamar a un agente. Llegan sin precios; tú les pones precio si quieres venderlas.",
   "pkpage.sheetRunsK": "Funciona solo",
   "pkpage.sheetRunsSub": "Tareas que se inician solas una vez instalado.",
   "pkpage.sheetGuidesK": "Guías para tu IA",
@@ -15124,7 +15126,14 @@
         "buySave": "Guardar el límite",
         "buyRemove": "Quitar el límite en {currency}",
         "buySaved": "Ahora el agente puede gastar hasta {amount} {currency} al día.",
-        "buyCleared": "El agente ya no gasta {currency}."
+        "buyCleared": "El agente ya no gasta {currency}.",
+        "lastLabel": "Última tarea",
+        "lastTask": "{title}, pedida por {who}, {when}",
+        "lastTaskNoWho": "{title}, {when}",
+        "lastNone": "Todavía no hay tareas.",
+        "byYou": "ti",
+        "byAgent": "tu agente {name}",
+        "byApp": "la aplicación {name}"
       }
     },
     "scopes": {

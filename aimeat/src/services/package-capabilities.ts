@@ -24,6 +24,7 @@
  *   const caps = packageCapabilities(pkg.components, config, owner);
  *   if (caps.carriesCode) ...   // an extension, app, cortex or skill part
  * @version-history
+ *   v1.1.0 — 2026-10-02 — An app's carried tools are capabilities (`app:<c>:tool:<name>`): an update that adds one asks again.
  *   v1.0.0 — 2026-10-02 — Initial (package sale design, phase 2).
  */
 import { createHash } from 'node:crypto';
@@ -51,7 +52,8 @@ export interface ExtensionCapabilities {
 
 export interface PackageCapabilities {
   extensions: ExtensionCapabilities[];
-  apps: Array<{ component: string; name: string; scopes: string[]; declared: boolean }>;
+  /** `tools`: the tools the app offers agents, as the package carries them (package-app-tools.ts). */
+  apps: Array<{ component: string; name: string; scopes: string[]; declared: boolean; tools?: string[] }>;
   cortexes: Array<{ component: string; name: string; libs: number; schema_locks: string[] }>;
   skills: Array<{ component: string; name: string }>;
   memory: Array<{ component: string; keys: string[] }>;
@@ -120,8 +122,9 @@ export function packageCapabilities(components: PackageComponent[], config: Aime
         break;
       }
       case 'app': {
-        const meta = comp.meta as { app?: { name?: string } } | undefined;
-        caps.apps.push({ component: comp.id, name: meta?.app?.name ?? comp.label, ...appScopes(comp.content) });
+        const meta = comp.meta as { app?: { name?: string; tools?: Array<{ name?: unknown }> } } | undefined;
+        const tools = (Array.isArray(meta?.app?.tools) ? meta.app.tools : []).map(t => String(t?.name ?? '')).filter(Boolean).sort();
+        caps.apps.push({ component: comp.id, name: meta?.app?.name ?? comp.label, ...appScopes(comp.content), ...(tools.length ? { tools } : {}) });
         break;
       }
       case 'cortex': {
@@ -162,7 +165,12 @@ export function packageCapabilities(components: PackageComponent[], config: Aime
     for (const s of e.secrets) items.push(`extension:${e.component}:secret:${s}`);
     for (const s of e.schedules) items.push(`extension:${e.component}:schedule:${s}`);
   }
-  for (const a of caps.apps) { items.push(`app:${a.component}`); for (const s of a.scopes) items.push(`app:${a.component}:scope:${s}`); }
+  for (const a of caps.apps) {
+    items.push(`app:${a.component}`);
+    for (const s of a.scopes) items.push(`app:${a.component}:scope:${s}`);
+    // A tool an agent may call is a capability: an update that adds one asks the installer again.
+    for (const t of a.tools ?? []) items.push(`app:${a.component}:tool:${t}`);
+  }
   for (const c of caps.cortexes) { items.push(`cortex:${c.component}`); for (const k of c.schema_locks) items.push(`cortex:${c.component}:lock:${k}`); }
   for (const s of caps.skills) items.push(`skill:${s.name}`);
   for (const m of caps.memory) for (const k of m.keys) items.push(`memory:${k}`);
