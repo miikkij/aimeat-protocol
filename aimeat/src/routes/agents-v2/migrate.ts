@@ -31,6 +31,7 @@
  * @structure registerAgentV2MigrateRoutes(router, config, storage)
  * @usage registerAgentV2MigrateRoutes(router, config, storage);
  * @version-history
+ *   v1.1.0 — 2026-10-02 — The offer carries the node's public key, as the basic-agents offer does.
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, post-audit item 4).
  */
 import type { Router } from 'express';
@@ -249,10 +250,13 @@ export function registerAgentV2MigrateRoutes(router: Router, config: AimeatConfi
       usedBy: null,
     });
 
+    // The key lets the connector prove the node by its card at its own address (enrolment.ts).
+    const nodeKey = await storage.getNodeKey();
     const offer = {
       grant_id: grantId,
       node_url: config.baseUrl,
       node_id: config.nodeId,
+      node_public_key: nodeKey?.publicKey ?? null,
       owner,
       enrol_url: '/v1/agents/v2/enrol',
       token_url: '/v1/agents/v2/token',

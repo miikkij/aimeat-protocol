@@ -35,6 +35,8 @@
  *   const out = await offerEnrolment({ config, storage }, owner, candidates, { installId });
  *   if (!out.ok) res.status(out.status).json(error(config.nodeId, out.code, out.message));
  * @version-history
+ *   v1.1.0 — 2026-10-02 — The offer carries the node's public key, which the connector compares with
+ *     the card it reads at its own address (a hosted node's crew reaches it on loopback).
  *   v1.0.0 — 2026-09-08 — Extracted from routes/agents-v2/basic-agents.ts so the proposal approve
  *     route can give a newly created agent its credentials through the same sequence.
  */
@@ -135,10 +137,14 @@ export async function offerEnrolment(
     usedBy: null,
   });
 
+  // The node's key rides along so the connector can prove the offer by identity: it reads the card
+  // at the address IT reaches this node on, which on a hosted node is loopback and not baseUrl.
+  const nodeKey = await storage.getNodeKey();
   const offer = {
     grant_id: grantId,
     node_url: config.baseUrl,
     node_id: config.nodeId,
+    node_public_key: nodeKey?.publicKey ?? null,
     owner,
     enrol_url: '/v1/agents/v2/enrol',
     token_url: '/v1/agents/v2/token',
