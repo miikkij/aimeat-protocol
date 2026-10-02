@@ -366,6 +366,29 @@ await test('17e. The public copy door asks the same rule: C\'s agent cannot copy
     assert(copied.status === 200, `an ordinary public key still copies: ${copied.status} ${JSON.stringify(copied.body.error)}`);
 });
 
+await test('17f. The decision door asks organism:invite, the word grant, revoke and the MCP decide path ask: an agent of A without it is refused, one with it decides', async () => {
+    // Until 2026-10-02 this door was requireRole('agent'): any agent passed whatever its scopes, and an
+    // app's own token (role app) was refused even when it held organism:invite, so the kit's
+    // workspaceTeam Approve and Decline failed in every app.
+    const ask = await json(`/v1/organisms/${orgId}/workspace-access`, { method: 'POST', headers: auth(B.token), body: JSON.stringify({ ws: WS, message: 'once more' }) });
+    assert(ask.status === 201, `B asks ${ask.status}: ${JSON.stringify(ask.body.error)}`);
+    const agentOf = async (scopes: string[]) => {
+        const ag = await json('/v1/agents', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ name: `decider${Date.now() % 1000000}`, owner: A.name, scopes }) });
+        assert(ag.status === 201, `A's agent ${ag.status}: ${JSON.stringify(ag.body.error)}`);
+        const gaii = ag.body.data.agent.gaii as string;
+        const ts = new Date().toISOString();
+        const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: await sign(ag.body.data.private_key, gaii + ts) }) });
+        assert(tok.status === 200, `agent token ${tok.status}`);
+        return tok.body.data.token as string;
+    };
+    const plain = await agentOf(['memory:read']);
+    const refused = await json(`/v1/organisms/${orgId}/workspace-access/decision`, { method: 'POST', headers: auth(plain), body: JSON.stringify({ ws: WS, requester: B.name, decision: 'approve' }) });
+    assert(refused.status === 403, `an agent without organism:invite decided: ${refused.status} ${JSON.stringify(refused.body.data ?? refused.body.error)}`);
+    const inviter = await agentOf(['memory:read', 'organism:invite']);
+    const decided = await json(`/v1/organisms/${orgId}/workspace-access/decision`, { method: 'POST', headers: auth(inviter), body: JSON.stringify({ ws: WS, requester: B.name, decision: 'approve', role: 'viewer' }) });
+    assert(decided.status === 200, `an agent with organism:invite decides: ${decided.status} ${JSON.stringify(decided.body.error)}`);
+});
+
 await test('18. removing a member closes the question they left open', async () => {
     // B asks again, so there is a genuinely pending request at the moment the membership ends. An open
     // request outlives the roster: it is a record in B's own namespace, and the reviewer's panel read

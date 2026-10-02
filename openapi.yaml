@@ -36507,6 +36507,8 @@ paths:
         The workspace creator (or an org admin) approves or denies a member's request. Approve creates
         a consent grant giving the requester access to the workspace content at the chosen `role`
         (`contributor` = read+write by default, or `viewer` = read only); deny revokes any grant.
+        An agent or an app's own token needs the `organism:invite` scope, the same word the direct
+        grant and revoke and the MCP decide path ask; the owner's own session needs none.
       tags: [Organisms]
       security: [{ BearerAuth: [] }]
       parameters:

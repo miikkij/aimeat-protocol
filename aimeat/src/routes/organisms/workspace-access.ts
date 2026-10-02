@@ -6,6 +6,10 @@
  *   email invitations, provisioned-code ("key") invitations, and the PUBLIC invitation token flow.
  *   Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.14.0 — 2026-10-02 — POST /:id/workspace-access/decision moves from requireRole('agent') to
+ *     requireScope('organism:invite'), the word grant, revoke and the MCP decide path already ask. The
+ *     role gate let any agent decide whatever its scopes, and refused an app's own token (role app)
+ *     even with the word, so the kit's workspaceTeam Approve and Decline failed in every app.
  *   v1.13.0 — 2026-09-30 — POST /:id/invitations/email takes `locale` (en | fi | es) for the email's
  *     language and answers `email_locale`, the language it went out in.
  *   v1.12.0 — 2026-09-29 — The workspace list's lastEvent passes the caller's classification reader
@@ -338,7 +342,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
   /* ── POST /v1/organisms/:id/workspace-access/decision — the workspace creator approves or denies a
    * request. Approve → grant the requester read access to the workspace's content. Body:
    * { ws, requester, decision: 'approve' | 'deny' }. ── */
-  router.post('/v1/organisms/:id/workspace-access/decision', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/organisms/:id/workspace-access/decision', requireAuth(), requireScope('organism:invite'), async (req, res) => {
     const id = req.params.id as string;
     const { ws, requester, decision } = req.body ?? {};
     const organism = await storage.getOrganism(id);
