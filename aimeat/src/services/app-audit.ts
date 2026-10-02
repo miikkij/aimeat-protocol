@@ -38,6 +38,7 @@
  * @usage
  *   await recordAppAudit(storage, { ownerGhii, filename, by: actorGhii, action: 'legal.set', detail: { kind: 'terms' } });
  * @version-history
+ *   v1.5.0 — 2026-10-02 — design_spec.set and design_spec.cleared: the design spec beside the app.
  *   v1.4.0 — 2026-10-01 — Nothing falls off any more: the log was cut at 500 entries across every
  *     kind, so a busy roster pushed out legal, settings and development-right entries. The oldest
  *     entries now roll into a per-year archive (app-audit-archive.ts), the owner can archive before a
@@ -82,6 +83,8 @@ export type AppAuditAction =
   | 'protection'
   | 'name' | 'description'
   | 'dev.granted' | 'dev.revoked'
+  // The design spec beside the app (services/app-design-spec.ts): each write, and the owner's removal.
+  | 'design_spec.set' | 'design_spec.cleared'
   // The member roster (routes/app-members.ts): each decision about a person, the plan and the sweep.
   | 'member.approved' | 'member.role_changed' | 'member.removed'
   | 'request.declined' | 'visitor.dismissed'

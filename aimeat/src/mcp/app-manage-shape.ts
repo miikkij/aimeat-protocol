@@ -10,6 +10,7 @@
  * @structure appManageShape
  * @usage mcp.tool('aimeat_app_manage', description, { ...appManageShape, ...aiProvenanceInputs }, …)
  * @version-history
+ *   v1.6.0 — 2026-10-02 — markdown and expected_revision, for spec_set.
  *   v1.5.0 — 2026-10-02 — dev_level, for builder_set.
  *   v1.4.0 — 2026-10-01 — year (audit) and keep (audit_keep), for keeping the audit log.
  *   v1.3.0 — 2026-10-01 — IAM round 2: email, locale, q, offset, before, invite_id and manage_roles.
@@ -91,4 +92,6 @@ export const appManageShape = {
     keep: z.string().max(20).optional().describe(d('keep')),
     invite_id: z.string().optional().describe(d('invite_id')),
     dev_level: z.enum(['full', 'publisher', 'drafter']).optional().describe(d('dev_level')),
+    markdown: z.string().optional().describe(d('markdown')),
+    expected_revision: z.number().int().min(0).optional().describe(d('expected_revision')),
 };

@@ -5,6 +5,8 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-10-02 — The app's design spec: read it with aimeat_app_manage spec before changing a shared
+ *     app, write it back with spec_set after a publish (services/app-design-spec.ts).
  *   2026-10-02 — Somebody else builds it too: builder_set, builders and builder_remove, the page to
  *     hand the owner, and what the invited person's AI does.
  *   2026-10-02 — An AI that is off: the app shows the person `fix` and a link to `settingsUrl`, never
@@ -291,6 +293,17 @@ takes one back. Bob needs an account on this server; when the owner knows only h
 ask the owner for his account name. A right over EVERY app of the owner is the account holder's own act on that
 page, signed in, so send them there rather than looking for a tool. On Bob's side, his AI finds the app
 with \`aimeat_app_list\` \`{ building: true }\` and passes \`owner\` to the app tools.
+
+**The app's design spec.** One document beside the app says what it is for, its screens, where its
+data lives, what was decided and what is open, for everybody who builds it. Before you change an app
+somebody else owns or shares, read it: \`aimeat_app_manage\` \`spec\` with \`filename\` and \`owner\`.
+The answer says whether the app has moved past the version the spec was written against, and gives an
+outline when nobody has written one. After every publish, write it back with what changed:
+\`spec_set\` with \`markdown\` (the whole document; pass the \`expected_revision\` you read, and a
+refusal means somebody else wrote in between). The same text again marks it current for the new
+version. The publish answer carries \`design_spec_hint\` when the spec is missing on a shared app or
+has fallen behind. Only the owner removes it (\`spec_clear\`). The owner sees and edits it on the Apps
+page of their settings, under Roadmap and shared work.
 
 ### can() is a HINT, never a gate
 

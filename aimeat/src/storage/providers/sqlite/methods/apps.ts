@@ -20,6 +20,7 @@
  *     visitor's app keeps its owner's home name (secaudit 2026-09, A6-4).
  *   v1.8.0 — 2026-09-26 — revokeTokenIfAbsent: INSERT OR IGNORE, true when this call filed the hash
  *     (the one-time assertion spend, secaudit 2026-09 N5).
+ *   v1.9.0 — 2026-10-02 — updateAppMeta replaces or takes off `designSpec`, the design spec's stamp.
  */
 import { mergeLegal } from '../../../types/apps.js';
 import type {
@@ -162,6 +163,7 @@ export const appsMethods = {
       cortex?: AppManifestCortex | null; dataMap?: AppManifest['dataMap']; seo?: Partial<AppSeo>;
       marks?: Partial<AppMarks>; authorship?: AppAuthorship | null; authorshipLog?: AppAuthorshipLogEntry[];
       legal?: Partial<Record<AppLegalKind, AppLegalDoc | null>>;
+      designSpec?: AppManifest['designSpec'] | null;
     },
   ): Promise<boolean> {
     // Rename/re-describe in place on the LATEST version (the one the catalogue
@@ -195,6 +197,11 @@ export const appsMethods = {
     if (meta.cortex !== undefined) {
       if (meta.cortex === null || !meta.cortex.agents?.length) delete manifest.cortex;
       else manifest.cortex = meta.cortex;
+    }
+    // The design spec's stamp: replaced whole by every write of the spec, taken off with null.
+    if (meta.designSpec !== undefined) {
+      if (meta.designSpec === null) delete manifest.designSpec;
+      else manifest.designSpec = meta.designSpec;
     }
     const result = this.db.prepare(
       'UPDATE apps SET manifest = ? WHERE ownerGaii = ? AND filename = ? AND versionNumber = ?'

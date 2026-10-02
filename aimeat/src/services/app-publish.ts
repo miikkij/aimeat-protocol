@@ -40,6 +40,9 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-10-02 — The design spec's stamp is copied onto the new manifest, and `designSpecHint` says
+ *     when a shared app has no spec or this version moved past the one it was written against
+ *     (services/app-design-spec.ts). A hint, never a refusal.
  *   2026-10-02 — `<meta name="aimeat-format-md">` is read into `manifest.formatMd`, refused with
  *     APP_FORMAT_MD_INVALID when it names an extension the owner did not install or an action it lacks.
  *   2026-10-02 — The app's `aimeat-workspace` declaration is parsed into `manifest.workspaces`, each
@@ -104,6 +107,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { accountOf } from './app-members.js';
 import { effectiveDevLevel, mayAct, isSharedApp } from './app-dev-grant.js';
 import { roadmapGate, addRoadmapEntry, roadmapStamp } from './app-roadmap.js';
+import { readAppDesignSpec, designSpecStamp, designSpecHint } from './app-design-spec.js';
 import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AppManifest, AppManifestCortex, AppProtection } from '../storage/interface.js';
@@ -216,6 +220,8 @@ export interface PublishAppRefusal {
 
 export interface PublishAppResult {
   roadmapHint?: string;
+  /** The design spec is missing on a shared app, or this version moved past it (app-design-spec.ts). */
+  designSpecHint?: string;
   filename: string;
   versionNumber: number;
   isUpdate: boolean;
@@ -288,8 +294,12 @@ export async function publishApp(
   if (delegated && (!delegate || !mayAct(delegate.level, 'publish'))) {
     return { refusal: { status: 403, code: 'FORBIDDEN', message: 'You do not hold a right to publish this app.' } };
   }
-  const road = roadmapGate({ line: input.roadmap, shared: await isSharedApp(storage, ownerName, filename) });
+  const shared = await isSharedApp(storage, ownerName, filename);
+  const road = roadmapGate({ line: input.roadmap, shared });
   if (!road.ok) return { refusal: { status: 400, code: 'ROADMAP_REQUIRED', message: road.message } };
+  // The design spec's stamp as it stands before this version: copied onto the new manifest below,
+  // and compared with the new version number for the hint the response carries.
+  const designSpec = designSpecStamp(await readAppDesignSpec(storage, `${ownerName}/${filename}`));
 
   const existingVersion = await storage.getLatestVersionNumber(ownerGhii, filename);
   const isUpdate = existingVersion > 0;
@@ -574,6 +584,9 @@ export async function publishApp(
       });
       manifest.roadmap = roadmapStamp(updatedRoadmap);
     } else if (prev?.roadmap) manifest.roadmap = prev.roadmap;
+    // The spec's stamp follows the record, not the previous manifest: a spec removed since the last
+    // publish leaves no stamp behind.
+    if (designSpec) manifest.designSpec = designSpec;
     await storage.createApp({
       ownerGaii: ownerGhii,
       ownerName,
@@ -714,8 +727,11 @@ export async function publishApp(
   const steps = await buildPublishNextSteps(
     storage, config, ownerName, filename, data.length, track, declaredRegister, isHtml ? html : undefined);
 
+  const specHint = designSpecHint({ stamp: designSpec, newVersion, shared });
+
   return {
     ...('warning' in road ? { roadmapHint: road.warning } : {}),
+    ...(specHint ? { designSpecHint: specHint } : {}),
     filename,
     versionNumber: newVersion,
     isUpdate,

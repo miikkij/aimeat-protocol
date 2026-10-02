@@ -56,6 +56,9 @@
  *   wearLook reads the page's look for a dialog, a menu or a toast. Inside an app frame the
  *   frame's own data-ak-look wins.
  * @version-history
+ *   v0.64.0 — 2026-10-02 — board.css: the board family (board, requestPanel, shelf) from ORIGAMI
+ *     1.2.0 in the kit's tokens; --ak-board-h, --ak-board-head, --ak-board-frame-radius and
+ *     --ak-board-ring are the board's own (wish-origami-atelieriin-ja-laudan-osat-kitin-lohkoiksi-ja-design-).
  *   v0.63.0 — 2026-10-02 — The light and dark contract blocks sit in :where(:root), zero
  *     specificity, so `data-ak-look` on <html> takes effect: before, the contract's :root tied with
  *     the imported look block on the same element and won by coming later
@@ -398,6 +401,7 @@
 @import url('./aimeat-atelier/ambient.css');
 @import url('./aimeat-atelier/effects.css');
 @import url('./aimeat-atelier/workbench.css');
+@import url('./aimeat-atelier/board.css');
 @import url('./aimeat-atelier/controls.css');
 @import url('./aimeat-atelier/menu.css');
 @import url('./aimeat-atelier/island.css');
