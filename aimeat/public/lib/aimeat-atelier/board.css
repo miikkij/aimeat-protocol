@@ -1,0 +1,355 @@
+/*
+ * @file aimeat-atelier/board.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The board family's clothes — board (frames on an infinite plane, their chrome
+ *   the same size on screen at every zoom, the rings a request panel owns), requestPanel (a
+ *   prompt line, a plan with its gate, a console) and shelf (two tabs of pieces to use). Colours
+ *   ride the --ak-* contract; every literal here is a default an app may move with the board's
+ *   own tokens (--ak-board-h, --ak-board-head, --ak-board-frame-radius, --ak-board-ring).
+ *   Entrances are finite and reduced-motion drops them, like the rest of the kit.
+ * @structure .ak-board (host, world, frame, head, body, grip, ring, tools, empty, static
+ *   fallback) · .ak-request · .ak-shelf · coarse pointer · reduced-motion
+ * @version-history
+ *   v0.64.0 — 2026-10-02 — Initial (wish-origami-atelieriin-ja-laudan-osat-kitin-lohkoiksi-ja-design-): the board's
+ *     chrome from ORIGAMI 1.2.0, in the kit's tokens.
+ */
+
+/* ── The board: a host with a size, a world the camera moves ──────────────── */
+.ak-board {
+  --ak-board-h: 480px;
+  --ak-board-head: 32px;
+  --ak-board-frame-radius: var(--ak-radius);
+  --ak-board-ring: var(--ak-accent);
+  --ak-board-inv: 1;
+  position: relative;
+  height: var(--ak-board-h);
+  min-height: 160px;
+  border-radius: var(--ak-radius);
+  border: var(--ak-line-w) solid var(--ak-line);
+  background:
+    radial-gradient(color-mix(in oklab, var(--ak-ink) 10%, transparent) 1px, transparent 1px) 0 0 / 24px 24px,
+    var(--ak-bg);
+  overflow: hidden;
+  outline: none;
+  touch-action: none;
+  overscroll-behavior: none;
+}
+.ak-board:focus-visible { box-shadow: 0 0 0 3px var(--ak-focus); }
+.ak-board[data-ak-variant="fill"] { position: absolute; inset: 0; height: auto; border: 0; border-radius: 0; }
+.ak-board[data-ak-variant="plain"] { background: var(--ak-bg); }
+
+/* The viewport puts the world here; without the viewport the board scrolls instead. */
+.ak-board__world--static { position: relative; min-width: 100%; min-height: 100%; }
+.ak-board--static { overflow: auto; }
+.ak-board--static .ak-board__frame { cursor: default; }
+
+/* ── A frame: a card in world coordinates ─────────────────────────────────── */
+.ak-board__frame {
+  position: absolute;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  padding-top: calc(var(--ak-board-head) * var(--ak-board-inv));
+  background: var(--ak-surface);
+  background-image: var(--ak-surface-image);
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-board-frame-radius);
+  box-shadow: var(--ak-elev-1);
+  overflow: hidden;
+  cursor: grab;
+}
+.ak-board__frame--in { animation: ak-board-in var(--ak-motion) var(--ak-ease) both; }
+@keyframes ak-board-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.ak-board__frame[data-ak-live] {
+  border-color: color-mix(in oklab, var(--ak-ok) 70%, var(--ak-line));
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--ak-ok) 30%, transparent), var(--ak-elev-1);
+}
+.ak-board__frame--selected {
+  z-index: 2;
+  border-color: var(--ak-accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ak-accent) 25%, transparent), var(--ak-elev-2);
+}
+.ak-board__frame--member { box-shadow: 0 0 0 2px color-mix(in oklab, var(--ak-board-ring) 55%, transparent), var(--ak-elev-1); }
+.ak-board__frame--borrowed { box-shadow: 0 0 0 2px color-mix(in oklab, var(--ak-accent-2, var(--ak-accent)) 65%, transparent), var(--ak-elev-1); }
+.ak-board__frame[data-ak-tone="warn"] .ak-board__head { background: color-mix(in oklab, var(--ak-warn) 18%, var(--ak-surface-2)); }
+.ak-board__frame[data-ak-tone="err"] .ak-board__head { background: color-mix(in oklab, var(--ak-err) 16%, var(--ak-surface-2)); }
+.ak-board__frame[data-ak-tone="ok"] .ak-board__head { background: color-mix(in oklab, var(--ak-ok) 16%, var(--ak-surface-2)); }
+
+/* The head is out of flow and counter-scaled, so it reads the same size at any zoom; the frame's
+   padding-top above reserves exactly the room it draws in. It sits above the viewport's capture
+   overlay (z 5), because chrome is for the hand even in Move mode. */
+.ak-board__head {
+  position: absolute;
+  top: 0; left: 0;
+  z-index: 6;
+  box-sizing: border-box;
+  height: var(--ak-board-head);
+  width: calc(100% / var(--ak-board-inv));
+  transform: scale(var(--ak-board-inv));
+  transform-origin: 0 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border-bottom: var(--ak-line-w) solid var(--ak-line);
+  background: var(--ak-surface-2);
+  color: var(--ak-ink);
+  font-size: var(--ak-text-fine);
+  cursor: grab;
+  user-select: none;
+}
+.ak-board__frame:active .ak-board__head { cursor: grabbing; }
+.ak-board__title { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.ak-board__kind {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border-radius: var(--ak-radius-pill);
+  background: color-mix(in oklab, var(--ak-ink) 8%, transparent);
+  color: var(--ak-ink-dim);
+  font-size: var(--ak-text-micro);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.ak-board__kind:empty { display: none; }
+.ak-board__extra { flex: 0 1 auto; min-width: 0; color: var(--ak-ink-dim); font-size: var(--ak-text-micro); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ak-board__extra:empty { display: none; }
+.ak-board__actions { margin-left: auto; display: flex; gap: 2px; flex: 0 0 auto; }
+.ak-board__act {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--ak-ink);
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  border-radius: var(--ak-radius-sm);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+.ak-board__act:hover { background: color-mix(in oklab, var(--ak-ink) 10%, transparent); }
+.ak-board__act:focus-visible { box-shadow: 0 0 0 2px var(--ak-focus); outline: none; }
+.ak-board__act[aria-pressed="true"] { color: var(--ak-ok-text); }
+
+.ak-board__body { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.ak-board__frame[data-ak-kind="app"] .ak-board__body,
+.ak-board__frame[data-ak-kind="image"] .ak-board__body { overflow: hidden; }
+
+/* The grip: a tool, so at a distance it is counter-scaled like the head. */
+.ak-board__grip {
+  position: absolute;
+  right: 0; bottom: 0;
+  z-index: 6;
+  width: 18px; height: 18px;
+  transform: scale(var(--ak-board-inv));
+  transform-origin: 100% 100%;
+  cursor: nwse-resize;
+  opacity: .55;
+  background:
+    linear-gradient(135deg, transparent 0 55%, var(--ak-ink-dim) 55% 62%, transparent 62% 72%, var(--ak-ink-dim) 72% 79%, transparent 79%);
+}
+.ak-board__grip:hover { opacity: .95; }
+
+/* Far out you are reading the board, not operating it: the name stays, the tools come back on hover. */
+.ak-board--far .ak-board__actions { display: none; }
+.ak-board--far .ak-board__frame:hover .ak-board__actions { display: flex; }
+.ak-board--far .ak-board__extra { display: none; }
+
+/* ── A ring: a request panel's ground, drawn from its members, behind the frames and deaf ──── */
+.ak-board__ring {
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: 50%;
+  border: 1px dashed color-mix(in oklab, var(--ak-board-ring) 45%, transparent);
+  background: color-mix(in oklab, var(--ak-board-ring) 5%, transparent);
+  transition: left var(--ak-motion) linear, top var(--ak-motion) linear, width var(--ak-motion) linear, height var(--ak-motion) linear;
+}
+.ak-board__ring--selected {
+  border-color: var(--ak-board-ring);
+  background: color-mix(in oklab, var(--ak-board-ring) 9%, transparent);
+}
+.ak-board__ring-name {
+  position: absolute;
+  left: 50%; top: 10px;
+  transform: translateX(-50%) scale(var(--ak-board-inv));
+  transform-origin: top center;
+  font-size: var(--ak-text-micro);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ak-board-ring);
+  opacity: .85;
+  white-space: nowrap;
+}
+
+/* ── The mode switch: fixed to the host, never in the world ───────────────── */
+.ak-board__tools {
+  position: absolute;
+  top: 10px; right: 10px;
+  z-index: 20;
+  display: inline-flex;
+  border-radius: var(--ak-radius-pill);
+  background: color-mix(in oklab, var(--ak-surface) 92%, transparent);
+  border: var(--ak-line-w) solid var(--ak-line);
+  box-shadow: var(--ak-elev-1);
+  overflow: hidden;
+}
+.ak-board__tool {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--ak-ink);
+  min-height: 32px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: var(--ak-text-fine);
+  cursor: pointer;
+}
+.ak-board__tool[aria-pressed="true"] { background: var(--ak-accent); color: var(--ak-accent-ink); }
+.ak-board__tool:focus-visible { box-shadow: inset 0 0 0 2px var(--ak-focus); outline: none; }
+
+/* The empty board says so, in the middle, and lets the pointer pan around the words. */
+.ak-board__empty {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--ak-pad);
+  pointer-events: none;
+}
+.ak-board__empty > * { pointer-events: auto; max-width: 28rem; }
+.ak-board__note {
+  position: absolute;
+  left: 10px; bottom: 10px;
+  z-index: 20;
+  max-width: calc(100% - 20px);
+  padding: 4px 10px;
+  border-radius: var(--ak-radius-sm);
+  background: color-mix(in oklab, var(--ak-surface) 92%, transparent);
+  color: var(--ak-ink-dim);
+  font-size: var(--ak-text-micro);
+}
+.ak-board__sample {
+  position: absolute;
+  left: 10px; top: 10px;
+  z-index: 20;
+  padding: 2px 8px;
+  border-radius: var(--ak-radius-pill);
+  background: color-mix(in oklab, var(--ak-warn) 22%, var(--ak-surface));
+  color: var(--ak-ink);
+  font-size: var(--ak-text-micro);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+/* Sample bodies, so the Design Book shows a board with something in it. */
+.ak-board__srows { display: grid; gap: 1px; padding: 8px; font-size: var(--ak-text-fine); }
+.ak-board__srow { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 8px; padding: 6px 8px; border-radius: var(--ak-radius-sm); }
+.ak-board__srow:nth-child(odd) { background: color-mix(in oklab, var(--ak-ink) 4%, transparent); }
+.ak-board__srow--head { font-weight: 700; color: var(--ak-ink-dim); font-size: var(--ak-text-micro); text-transform: uppercase; }
+.ak-board__sbars { display: flex; align-items: flex-end; gap: 6px; height: 100%; padding: 12px; box-sizing: border-box; }
+.ak-board__sbar { flex: 1 1 0; border-radius: var(--ak-radius-sm) var(--ak-radius-sm) 0 0; background: linear-gradient(180deg, var(--ak-accent), color-mix(in oklab, var(--ak-accent) 60%, var(--ak-surface))); }
+.ak-board__snote { padding: 12px; font-size: var(--ak-text-body); line-height: 1.5; white-space: pre-wrap; }
+
+/* ── The request panel: a terminal, not a form ───────────────────────────── */
+.ak-request {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: var(--ak-section-pad);
+  border-radius: var(--ak-radius);
+  background: var(--ak-surface);
+  border: var(--ak-line-w) solid var(--ak-line);
+  box-shadow: var(--ak-elev-1);
+  font-family: var(--ak-font-mono);
+  font-size: var(--ak-text-fine);
+  color: var(--ak-ink);
+}
+.ak-request__line { display: flex; align-items: center; gap: 8px; }
+.ak-request__caret { color: var(--ak-accent-text); font-weight: 700; flex: 0 0 auto; }
+.ak-request__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  appearance: none;
+  border: 0;
+  border-bottom: var(--ak-line-w) solid var(--ak-line);
+  background: none;
+  color: inherit;
+  font: inherit;
+  padding: 6px 0;
+  outline: none;
+}
+.ak-request__input:focus { border-bottom-color: var(--ak-accent); }
+.ak-request__plan { display: grid; gap: 4px; padding: 8px 10px; border-radius: var(--ak-radius-sm); background: color-mix(in oklab, var(--ak-ink) 5%, transparent); }
+.ak-request__intent { font-weight: 700; }
+.ak-request__meta { color: var(--ak-ink-dim); font-size: var(--ak-text-micro); }
+.ak-request__step { display: grid; grid-template-columns: 1.2em 1fr; gap: 6px; align-items: baseline; }
+.ak-request__mark { text-align: center; color: var(--ak-ink-dim); }
+.ak-request__step--done .ak-request__mark { color: var(--ak-ok-text); }
+.ak-request__step--failed .ak-request__mark { color: var(--ak-err-text); }
+.ak-request__step--running .ak-request__mark { color: var(--ak-accent-text); }
+.ak-request__gate { padding: 6px 10px; border-radius: var(--ak-radius-sm); background: color-mix(in oklab, var(--ak-warn) 18%, var(--ak-surface)); font-size: var(--ak-text-micro); }
+.ak-request__row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.ak-request__spacer { flex: 1 1 auto; }
+.ak-request__loop { display: inline-flex; align-items: center; gap: 6px; color: var(--ak-ink-dim); font-size: var(--ak-text-micro); cursor: pointer; }
+/* The scanner: one light sweeping the top while something runs, and nothing at idle. */
+.ak-request__scan { position: relative; height: 4px; border-radius: 2px; overflow: hidden; background: color-mix(in oklab, var(--ak-accent) 12%, var(--ak-line)); }
+.ak-request__scan::before {
+  content: "";
+  position: absolute; top: 0; bottom: 0; left: 0; width: 30%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--ak-accent) 50%, transparent);
+  animation: ak-request-scan 1.6s cubic-bezier(.45, 0, .55, 1) infinite alternate;
+}
+@keyframes ak-request-scan { from { left: 0; } to { left: 70%; } }
+.ak-request__scan[hidden] { display: none; }
+.ak-request .ak-console { font-size: inherit; }
+
+/* ── The shelf: pieces to use, two tabs ──────────────────────────────────── */
+.ak-shelf { display: flex; flex-direction: column; gap: var(--ak-gap); }
+.ak-shelf__bar { display: flex; gap: var(--ak-gap); align-items: center; flex-wrap: wrap; }
+.ak-shelf__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--ak-card-min, 180px), 1fr)); gap: var(--ak-card-gap, 12px); }
+.ak-shelf__item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--ak-card-pad, 12px);
+  border-radius: var(--ak-radius);
+  background: var(--ak-surface);
+  border: var(--ak-line-w) solid var(--ak-line);
+  box-shadow: var(--ak-elev-1);
+  min-width: 0;
+}
+.ak-shelf { --ak-shelf-preview-h: 96px; }
+.ak-shelf__preview { height: var(--ak-shelf-preview-h); border-radius: var(--ak-radius-sm); overflow: hidden; background: color-mix(in oklab, var(--ak-ink) 5%, transparent); display: grid; place-items: center; color: var(--ak-ink-dim); font-size: var(--ak-text-micro); }
+.ak-shelf__preview[data-ak-wash="1"] { background: linear-gradient(135deg, color-mix(in oklab, var(--ak-accent) 22%, var(--ak-surface)), color-mix(in oklab, var(--ak-accent) 6%, var(--ak-surface))); }
+.ak-shelf__preview[data-ak-wash="2"] { background: linear-gradient(135deg, color-mix(in oklab, var(--ak-spectrum-2, var(--ak-accent-2, var(--ak-accent))) 22%, var(--ak-surface)), color-mix(in oklab, var(--ak-spectrum-2, var(--ak-accent)) 6%, var(--ak-surface))); }
+.ak-shelf__preview[data-ak-wash="3"] { background: linear-gradient(135deg, color-mix(in oklab, var(--ak-spectrum-3, var(--ak-ok)) 22%, var(--ak-surface)), color-mix(in oklab, var(--ak-spectrum-3, var(--ak-ok)) 6%, var(--ak-surface))); }
+.ak-shelf__monogram { font-family: var(--ak-font-display); font-weight: var(--ak-weight-display, 800); font-size: 2rem; color: var(--ak-ink); opacity: .7; letter-spacing: .04em; }
+.ak-verbs__said { opacity: .75; }
+.ak-verbs__bad { color: var(--ak-err-text); opacity: 1; }
+.ak-verbs__picture { max-width: 100%; border-radius: var(--ak-radius-sm); }
+.ak-shelf__preview img { width: 100%; height: 100%; object-fit: cover; }
+.ak-shelf__preview > .ak-shelf__html { transform: scale(.5); transform-origin: top left; width: 200%; height: 200%; pointer-events: none; }
+.ak-shelf__title { font-weight: 700; font-size: var(--ak-text-fine); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ak-shelf__sub { color: var(--ak-ink-dim); font-size: var(--ak-text-micro); }
+.ak-shelf__kind { align-self: flex-start; padding: 1px 6px; border-radius: var(--ak-radius-pill); background: color-mix(in oklab, var(--ak-ink) 8%, transparent); color: var(--ak-ink-dim); font-size: var(--ak-text-micro); text-transform: uppercase; }
+.ak-shelf__acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; }
+
+/* ── A finger needs 40 px: the frame chrome, the mode switch and the shelf's buttons ─────── */
+@media (pointer: coarse) {
+  .ak-board { --ak-board-head: 40px; }
+  .ak-board__act { min-width: 36px; height: 36px; }
+  .ak-board__tool { min-height: var(--ak-touch-min, 40px); }
+  .ak-board__grip { width: 24px; height: 24px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ak-board__frame--in { animation: none; }
+  .ak-board__ring { transition: none; }
+  .ak-request__scan::before { animation: none; width: 100%; opacity: .5; }
+}

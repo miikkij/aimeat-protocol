@@ -36,6 +36,14 @@ export const PARTS = {
     fork: "Copying it out means calling AIMEAT.ai.capabilities(), complete() or completeJson(), disclose() and AIMEAT.md.render() yourself, writing the no-AI, signed-out and error words in three languages, holding the button busy, and drawing a stored answer again with its label and date.",
     file: "ai-task.js",
   },
+  "board": {
+    parts: ["root","tools","tool","world","ring","ringName","frame","head","title","kind","extra","actions","act","body","grip","empty","note"],
+    slots: ["title(frame)","extra(frame)","empty()"],
+    variants: ["fill","plain"],
+    tokens: ["--ak-board-h","--ak-board-head","--ak-board-frame-radius","--ak-board-ring"],
+    fork: "Copy .ak-board* out of board.css and drive AIMEAT.viewport yourself; you keep the camera and give up the keyed frames, the ring geometry, the Move/Use overlay and the chrome that stays one size at every zoom.",
+    file: "board.js",
+  },
   "bottomNav": {
     parts: ["root","item"],
     slots: ["item(entry)"],
@@ -276,6 +284,14 @@ export const PARTS = {
     fork: "Copy .ak-rating* out of content.css; the clip trick is four rules.",
     file: "hero.js",
   },
+  "requestPanel": {
+    parts: ["root","line","caret","input","send","scan","plan","intent","meta","step","mark","gate","row","approve","cancel","loop","console"],
+    slots: ["plan(plan)","step(step)"],
+    variants: ["compact"],
+    tokens: ["--ak-request-console-h"],
+    fork: "Copy .ak-request* out of board.css and keep the console as AIMEAT.atelier.console; you give up the plan's states, the gate row and the scanner.",
+    file: "request-panel.js",
+  },
   "searchBar": {
     parts: ["root","input","clear"],
     slots: ["aside()"],
@@ -307,6 +323,14 @@ export const PARTS = {
     tokens: ["--ak-setgroup-help","--ak-setgroup-measure"],
     fork: "Two columns that fold to one; copy .ak-setgroup* out of workbench.css.",
     file: "workbench.js",
+  },
+  "shelf": {
+    parts: ["root","bar","tabs","search","grid","item","preview","monogram","title","sub","kind","acts","act","empty"],
+    slots: ["preview(item)","extra(item)"],
+    variants: ["dense","plain"],
+    tokens: ["--ak-shelf-preview-h"],
+    fork: "Copy .ak-shelf* out of board.css and build the cards yourself; you keep the tabs and the search bar as kit parts and give up the keyed grid and the designed empty state.",
+    file: "shelf.js",
   },
   "sideNav": {
     parts: ["root","group","item","dot","label","count","foot"],
@@ -387,6 +411,14 @@ export const PARTS = {
     tokens: [],
     fork: "",
     file: "menu.js",
+  },
+  "verbs": {
+    parts: ["(none: it renders nothing of its own; the words it writes go into the element the card names)"],
+    slots: [],
+    variants: [],
+    tokens: [],
+    fork: "Copy the run() switch out and keep the attribute names; you give up the on-sight reads, the picture detection and the sign-in wait.",
+    file: "verbs.js",
   },
   "workflowInput": {
     parts: ["root","title","intro","failure","notice","body","none","list","step","head","header","workflow","run","form","choices","question","how","choice","mark","other","error","bar","deadline","answer"],

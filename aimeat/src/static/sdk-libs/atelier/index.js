@@ -55,6 +55,16 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.64.0 — 2026-10-02 — THE BOARD (board.js, board-i18n.js, board.css): frames on an infinite
+ *     plane over AIMEAT.viewport, from ORIGAMI 1.2.0. Keyed frames (set() adds, moves, resizes,
+ *     removes, re-renders a body only on `rev`), a head and a grip counter-scaled so they read the
+ *     same size at every zoom, rings drawn from their member frames, Move/Use with the viewport's
+ *     capture overlay, a sample state, and a static layout with a note when the viewport library
+ *     is not on the page. With it: requestPanel (request-panel.js), the prompt line, the plan
+ *     with its states and gate row, the scanner and a console; shelf (shelf.js), pieces to use on
+ *     two tabs with a search; and verbs (verbs.js), the data-ak-do card runtime (data-og-do read
+ *     too) with the local verbs, read on sight, save, submit with no session, ai, and offer and
+ *     tool through the app's adapters (wish-origami-atelieriin-ja-laudan-osat-kitin-lohkoiksi-ja-design-).
  *   v0.63.1 — 2026-10-02 — The tour's note follows the element it marks while the page scrolls (it
  *     was placed once, before the step's smooth scroll, so on a phone it covered its element and
  *     stayed where it was when the reader scrolled), and it holds the keyboard focus for its step
@@ -406,6 +416,10 @@ import {
 import { members, joinRequest, accessState } from './members.js';
 import { workspaceTeam } from './workspace-team.js';
 import { workspacePicker } from './workspace-picker.js';
+import { board } from './board.js';
+import { requestPanel } from './request-panel.js';
+import { shelf } from './shelf.js';
+import { verbs } from './verbs.js';
 import { intakeForm, intakeAdmin } from './intake-form.js';
 import { connections } from './connections.js';
 import { workflowInput } from './workflow-input.js';
@@ -448,7 +462,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.63.1',
+  version: '0.64.0',
 
   /**
    * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
@@ -525,6 +539,11 @@ const atelier = {
 
   // ── An organism's workspace for the app: its people, and the first-run choice of where it lives ──
   workspaceTeam, workspacePicker,
+
+  // ── The board family: frames on an infinite plane over AIMEAT.viewport (board.js), the request
+  //    panel that is a terminal (request-panel.js), the shelf of pieces (shelf.js), and the card
+  //    verbs a control declares instead of a script (verbs.js) ──
+  board, requestPanel, shelf, verbs,
 
   // ── A Public Intake form and its admin list (AIMEAT.intake), the owner's outside accounts (AIMEAT.connect) ──
   intakeForm, intakeAdmin, connections,
