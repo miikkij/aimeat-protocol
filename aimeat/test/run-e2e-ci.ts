@@ -9,6 +9,7 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.75.0 -- 2026-10-02 -- e2e-task-start.ts joins the list.
  *   v1.74.0 -- 2026-10-02 -- e2e-package-withdraw.ts joins the list (package sale design, phase 5).
  *   v1.73.0 -- 2026-10-02 -- e2e-package-sets.ts joins the list (package sale design, phase 4).
  *   v1.72.0 -- 2026-10-02 -- e2e-package-sale.ts joins the list (package sale design, phase 3).
@@ -888,6 +889,9 @@ const ALL_SUITES = [
     'test/e2e-connect-tunnel.ts',
     'test/e2e-connect-tunnel-multiplex.ts',
     'test/e2e-connect-tunnel-delivery.ts',
+    // A task starts on its own or waits for the owner's OK: the agent's setting and the task's word,
+    // the notice with a Start button, the owner's own AI starting on their word, and the floor.
+    'test/e2e-task-start.ts',
     'test/e2e-connect-tunnel-records.ts',
     'test/e2e-agent-crew.ts',
     'test/e2e-connect-serve-loopback.ts',

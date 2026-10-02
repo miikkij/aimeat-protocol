@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.12.0 — 2026-10-02 — PATCH /v1/agents/:name/task-start, and `task_start`,
+ *     `task_start_effective` and `task_start_held_by` on the agent list.
  *   v1.11.0 — 2026-10-01 — `stats.tasks.doneWeek`: done tasks of the last 7 days, for the Fleet page.
  *   v1.10.0 — 2026-09-30 — GET /v1/agents gives each agent `refusals` (the calls the node refused it
  *     for a missing permission, still unresolved) and `scope_request` (what it asked for and was
@@ -47,7 +49,8 @@ import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import { refuseNeedsPermission } from '../../middleware/refusals.js';
 import { success, error } from '../../middleware/envelope.js';
-import { buildGAII, isForeignPrincipal } from '../../utils/gaii.js';
+import { buildGAII, isForeignPrincipal, resolveIdentity } from '../../utils/gaii.js';
+import { setAgentTaskStart, taskStartView } from '../../services/agent-task-start-write.js';
 import { readOwnerAgentAccess, agentAccessView } from '../../services/agent-refusals.js';
 import { calculateTrustScore } from '../../services/trust.js';
 import { emitChange } from '../../services/event-bus.js';
@@ -273,6 +276,9 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
         // recorded here and honoured by the runtime; the node never enforces either. `run_mode` is
         // null on an agent nobody has said anything about, which is not the same as 'spawn'.
         run_mode: a.runMode ?? null,
+        // Whether its tasks start on their own: the owner's setting, what applies, and the permissions
+        // that make every task wait whatever the setting (services/agent-task-start-write.ts).
+        ...taskStartView(a),
         // What code backs it, as the runtime last said. The only answer this node has to "what was
         // running when this ran" for a crew whose definition lives on someone else's disk.
         runtime_source: a.runtimeSource ?? null,
@@ -455,6 +461,21 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
     res.json(success(config.nodeId, {
       gaii: outcome.agent.gaii, name: outcome.agent.name, description: outcome.agent.description ?? '',
     }));
+  });
+
+  // PATCH /v1/agents/:name/task-start — whether this agent's tasks start on their own ('automatic':
+  // it proposes its plan and goes on) or wait for the owner's OK ('confirm'); null goes back to the
+  // mode's answer. `agent:write` and same-owner like run-mode below, plus one fence of its own: never
+  // the agent itself. The permission floor still holds every task of an agent that can spend, send
+  // or delete as the owner, and the answer says so (`task_start_held_by`).
+  router.patch('/v1/agents/:name/task-start', requireAuth(), requireScope('agent:write'), async (req, res) => {
+    const outcome = await setAgentTaskStart({ storage, config }, req.auth!.owner as string,
+      resolveIdentity(req.auth!, config.nodeId), decodeURIComponent(req.params.name as string), req.body?.task_start);
+    if (!outcome.ok) {
+      res.status(agentWriteStatus(outcome.code)).json(error(config.nodeId, outcome.code, outcome.message));
+      return;
+    }
+    res.json(success(config.nodeId, { gaii: outcome.agent.gaii, name: outcome.agent.name, ...taskStartView(outcome.agent) }));
   });
 
   router.patch('/v1/agents/:name/run-mode', requireAuth(), requireScope('agent:write'), async (req, res) => {

@@ -20,6 +20,8 @@
  * @structure BasicAgentsPanel({ session, showToast, onCreated, first })
  * @usage <${BasicAgentsPanel} session=${session} showToast=${showToast} onCreated=${loadData} />
  * @version-history
+ *   v2.15.0 — 2026-10-02 — "Starts on its own" reads `task_start`, the agent's own start setting,
+ *     instead of `mode === 'task-runner'`.
  *   v2.14.0 — 2026-10-01 — The words say the two agents run on the person's computer, and with no
  *     connector running the install commands stand inline (agent-guide.js ConnectorSteps); "you do
  *     not have to set anything up" was false for everyone without one. `num` sets the section number,
@@ -127,11 +129,12 @@ export default function BasicAgentsPanel({ session, showToast, onCreated, first 
   const connected = state.daemon_connected === true;
   const open = fold === null ? !allThere : fold;
   const toggle = () => { const next = !open; setFold(next); saveFold(session?.owner, 'basic', next); };
-  // `task-runner` is, in the node's own words, "the person saying start without asking me each
-  // time" — services/agent-task-rules.ts activates a queued task for one without the owner. That
-  // is the single most consequential thing about this button, so it is named rather than left in
-  // a mode string nobody outside the code reads.
-  const actsAlone = list.filter(a => a.mode === 'task-runner');
+  // `task_start: automatic` is the person saying "start without asking me each time":
+  // services/agent-task-rules.ts starts a task for such an agent without the owner. That is the
+  // single most consequential thing about this button, so it is named rather than left in a field
+  // nobody outside the code reads. An older node sends no task_start; its rule was the mode.
+  const startsAlone = (a) => (a.task_start ? a.task_start === 'automatic' : a.mode === 'task-runner');
+  const actsAlone = list.filter(startsAlone);
   const names = list.map(a => a.display_name || a.name).join(', ');
   const connectorWord = connected
     ? html`<${Mark} kind="status" tone="fine">✓ ${t('profile.agents.basic.connected')}<//>`
@@ -160,7 +163,7 @@ export default function BasicAgentsPanel({ session, showToast, onCreated, first 
               <${Marks}>
                 ${/* The run mode counts nothing yet, so its tag is dim, as main drew it (og-chip--dim). */''}
                 <${Mark} tone="dim">${t(`profile.agents.runMode.${a.run_mode}`)}<//>
-                ${a.mode === 'task-runner' && html`<${Mark} tone="coral" title=${t('profile.agents.basic.actsAloneWhy')}>${t('profile.agents.basic.actsAlone')}<//>`}
+                ${startsAlone(a) && html`<${Mark} tone="coral" title=${t('profile.agents.basic.actsAloneWhy')}>${t('profile.agents.basic.actsAlone')}<//>`}
               <//>
             <//>
           `)}

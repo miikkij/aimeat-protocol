@@ -7,6 +7,9 @@
  *   Supports special @activate trigger: runs on extension activation AND every server startup.
  *   Every execution creates an ExecutionLogEntry with timing, result, and memory I/O.
  * @version-history
+ *   v2.17.0 — 2026-10-02 — Both task makers read the start decision (services/agent-task-rules.ts)
+ *     instead of `mode === 'task-runner'`, mark the 'started' event of a task they start, and push
+ *     with a per-transition delivery id (taskWakeId). JobTrigger, JobRunResult and JobOutcome move to scheduler-types.ts.
  *   v2.16.0 — 2026-09-29 — registerKindExecutor(): boot registers the `refinery` kind's executor, whose
  *     imports reach back here, so this file does not import it.
  *   v2.15.2 — 2026-09-26 — A job's croner name is its id and this node's id. croner refuses a name
@@ -90,6 +93,7 @@ import type { PushService } from './push.js';
 import type { createWebhookDispatcher } from './webhook-dispatcher.js';
 import { evaluateConstraints, applyAfterRun } from './schedule-constraints.js';
 import { emitChange, emitDelivery } from './event-bus.js';
+import { decideTaskStart, taskWakeId, AUTO_START_MARK } from './agent-task-rules.js';
 import { emitResourceUpdated } from '../mcp/resource-events.js';
 import { logger } from '../utils/logger.js';
 import { localAccountName } from '../utils/gaii.js';
@@ -108,35 +112,9 @@ let _activeScheduler: Scheduler | null = null;
 export function setActiveScheduler(scheduler: Scheduler): void { _activeScheduler = scheduler; }
 export function getActiveScheduler(): Scheduler | null { return _activeScheduler; }
 
-export type JobTrigger = 'cron' | 'manual' | 'activate';
-
-/** Result returned by a kind-specific executor (memory I/O + optional spawned task). */
-export interface JobRunResult {
-  reads: string[];
-  writes: string[];
-  taskId?: string;
-  /** The executor deliberately did nothing (e.g. an occurrence is still running). */
-  skipped?: boolean;
-  /** Human-readable explanation for a skip, surfaced to manual-trigger callers. */
-  skipReason?: string;
-}
-
-/**
- * Outcome of one job execution, returned by triggerNow() so a manual "Run now"
- * can tell the owner what happened. `code` is a stable token the UI maps to a
- * localized message; `detail` carries the specific (English) explanation.
- *   created  — an agent_task occurrence was queued/activated (taskId set)
- *   ran      — a non-task job (ai/extension/core) executed successfully
- *   busy     — skipped: a previous occurrence is still running, or the job was
- *              already executing
- *   limited  — skipped by a constraint (daily_limit / max_runs / budget)
- *   error    — the job ran but failed (detail = error message)
- */
-export interface JobOutcome {
-  code: 'created' | 'ran' | 'busy' | 'limited' | 'error';
-  taskId?: string;
-  detail?: string;
-}
+// The result types live in scheduler-types.ts (max-file-lines); re-exported so importers stay as they are.
+import type { JobTrigger, JobRunResult, JobOutcome } from './scheduler-types.js';
+export type { JobTrigger, JobRunResult, JobOutcome } from './scheduler-types.js';
 
 export class Scheduler {
   private config: AimeatConfig;
@@ -601,7 +579,10 @@ export class Scheduler {
     }
 
     const agent = await this.storage.getAgent(agentGaii);
-    const autoActivated = agent?.mode === 'task-runner';
+    // The same start decision every created task gets (services/agent-task-rules.ts): the agent's
+    // own answer, never past the permission floor. It read `mode === 'task-runner'` inline until
+    // 2026-10-02, a copy of the old rule that would have kept a concierge's schedules waiting.
+    const autoActivated = decideTaskStart(agent).startsNow;
     const now = new Date().toISOString();
     const scheduleScope: AgentTaskScope = {
       name: 'schedule', value: job.cron, type: 'cron', description: job.displayName || job.name,
@@ -634,6 +615,7 @@ export class Scheduler {
         taskId: record.id,
         type: 'started',
         message: `Task auto-activated from schedule "${job.displayName || job.name}"`,
+        details: { started_by: AUTO_START_MARK },
         timestamp: now,
       });
     }
@@ -657,7 +639,7 @@ export class Scheduler {
     // claimed and did not deliver. A webhook subscriber heard about a scheduled task and an agent
     // holding a socket did not, so the task waited for whatever polled next. Same miss as the
     // workflow engine's, found in the same sweep. → pitfalls §58
-    emitDelivery({ target: agentGaii, kind: 'task_assigned', id: record.id, payload: created });
+    emitDelivery({ target: agentGaii, kind: 'task_assigned', id: taskWakeId(record.id, record.status, now), payload: created });
     try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/tasks`); } catch (err) { logger.warn('cfg: MCP not connected', { error: String(err) }); }
     emitChange('agent-tasks');
 
@@ -690,7 +672,7 @@ export class Scheduler {
     automation?: AgentTaskRecord['automation'];
   }): Promise<string> {
     const agent = await this.storage.getAgent(args.agentGaii);
-    const autoActivated = agent?.mode === 'task-runner';
+    const autoActivated = decideTaskStart(agent).startsNow;
     const now = new Date().toISOString();
     const record: AgentTaskRecord = {
       id: randomUUID(),
@@ -721,6 +703,7 @@ export class Scheduler {
         taskId: record.id,
         type: 'started',
         message: `Task auto-activated from automation recipe "${args.parentRef}"`,
+        details: { started_by: AUTO_START_MARK },
         timestamp: now,
       }).catch(err => { logger.warn('cfg: best-effort', { error: String(err) }); });
     }
@@ -740,7 +723,7 @@ export class Scheduler {
     }
     // Same pair. This method's own doc says callers reuse it to get "the exact wake path without
     // duplicating the dispatch machinery", so the path it hands them has to be the whole one.
-    emitDelivery({ target: args.agentGaii, kind: 'task_assigned', id: record.id, payload: created });
+    emitDelivery({ target: args.agentGaii, kind: 'task_assigned', id: taskWakeId(record.id, record.status, now), payload: created });
     try { emitResourceUpdated(args.agentGaii, `aimeat://agents/${args.agentName}/tasks`); } catch (err) { logger.warn('cfg: MCP not connected', { error: String(err) }); }
     emitChange('agent-tasks');
 

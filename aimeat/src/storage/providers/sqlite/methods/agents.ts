@@ -6,6 +6,8 @@
  *   row reader. Moved out of methods/owner.ts by pure extraction when that file reached the 800-line
  *   limit; bodies verbatim, bound to SqliteStorage via the prototype merge in sqlite/index.ts.
  * @version-history
+ *   v1.5.0 — 2026-10-02 — createAgent/updateAgent/deserializeAgent carry `taskStart` (whether the
+ *     agent's tasks start on their own), matching Postgres migration 0092.
  *   v1.4.0 — 2026-09-26 — deleteAgent settles the agent's work first (repos/work-erasure.ts): open work
  *     is cancelled and the held morsels go back, what stays keeps the agent's identity.
  *   v1.3.0 — 2026-09-26 — resolveGhii's body moved to repos/ghii-resolve.ts by pure extraction, for the
@@ -29,8 +31,8 @@ export const agentMethods = {
       this.db.prepare(
         `INSERT INTO agents (gaii, name, owner, displayName, description, capabilities, publicKey, trustScore, morselBalance, createdAt, lastSeen, semantic, allowedOrigins, defaultScopes, federate,
          webhookUrl, webhookSecret, webhookEnabled, webhookLastSuccess, webhookLastFailure, webhookFailCount, platform, platformVersion, platformDetectedBy, model, modelDetectedBy, tags, mode, maxConcurrentTasks, consoleUrl, registeredBy,
-         runMode, runtimeSource, identityVersion, cardJws, cardIssuedAt, enrolledAt, mcpClient, mcpLastSeen)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         runMode, runtimeSource, identityVersion, cardJws, cardIssuedAt, enrolledAt, mcpClient, mcpLastSeen, taskStart)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         agent.gaii, agent.name, agent.owner,
         agent.displayName ?? null, agent.description ?? null,
@@ -58,6 +60,7 @@ export const agentMethods = {
         agent.enrolledAt ?? null,
         agent.mcpClient ?? null,
         agent.mcpLastSeen ?? null,
+        agent.taskStart ?? null,
       );
       return agent;
     } catch (err: unknown) {
@@ -102,7 +105,7 @@ export const agentMethods = {
        platform = ?, platformVersion = ?, platformDetectedBy = ?, model = ?, modelDetectedBy = ?, tags = ?, mode = ?, maxConcurrentTasks = ?,
        dailySpendLimit = ?, scheduleConstraintDefaults = ?, consoleUrl = ?, registeredBy = ?,
        runMode = ?, runtimeSource = ?, identityVersion = ?, cardJws = ?, cardIssuedAt = ?, enrolledAt = ?,
-       mcpClient = ?, mcpLastSeen = ?
+       mcpClient = ?, mcpLastSeen = ?, taskStart = ?
        WHERE gaii = ?`
     ).run(
       updated.name, updated.owner,
@@ -143,6 +146,7 @@ export const agentMethods = {
       updated.enrolledAt ?? null,
       updated.mcpClient ?? null,
       updated.mcpLastSeen ?? null,
+      updated.taskStart ?? null,
       gaii,
     );
     return updated;
@@ -274,6 +278,7 @@ export const agentMethods = {
     if (row.enrolledAt) record.enrolledAt = row.enrolledAt as string;
     if (row.mcpClient) record.mcpClient = row.mcpClient as string;
     if (row.mcpLastSeen) record.mcpLastSeen = row.mcpLastSeen as string;
+    if (row.taskStart === 'automatic' || row.taskStart === 'confirm') record.taskStart = row.taskStart;
     return record;
   },
 };

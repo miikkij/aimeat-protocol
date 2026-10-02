@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Agent-task create + read routes (POST create, GET list, GET detail). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-10-02 — `start` on create, allowed as 'automatic' only to a caller who may loosen
+ *     the agent's start (mayLoosenStart); the answer carries `start`: does it run now or wait, and
+ *     why, in a sentence the person's AI can read out.
  *   v1.4.0 — 2026-09-29 — Attachments resolve with the caller's classification reader (TARGET-082).
  *   v1.3.0 — 2026-08-11 — The create WRITE moves to services/agent-task-write.ts, so aimeat_task_create
  *     stops building its own record. Behaviour here is unchanged; the tool gains this route's input
@@ -28,9 +31,11 @@ import { requireAuth, agentNotFoundResponse } from '../../auth/middleware.js';
 import { logger } from '../../utils/logger.js';
 import { emitResourceUpdated } from '../../mcp/index.js';
 import { createTask } from '../../services/agent-task-write.js';
+import { mayLoosenStart } from '../../services/agent-task-rules.js';
+import { startAnswer } from '../../services/task-start-notice.js';
 import { taskWithFileHandles } from '../../services/task-files.js';
 import { taskOutcome } from '../../services/task-outcome.js';
-import type { TaskRouteHelpers } from './helpers.js';
+import { startCallerOf, type TaskRouteHelpers } from './helpers.js';
 import { respondDeduplicated } from './dedupe.js';
 
 export function registerTaskCreateReadRoutes(
@@ -109,6 +114,7 @@ export function registerTaskCreateReadRoutes(
       creator: { gaii: resolve(req), sub: req.auth!.sub, owner: req.auth!.owner as string | undefined, reader: readerFor({ storage, config }, req.auth) },
       body: req.body,
       actor: resolve(req),
+      mayAskAutomatic: mayLoosenStart(startCallerOf(req.auth!, resolve(req)), agentGaii),
     });
     if (!result.ok) {
       res.status(result.status).json(error(config.nodeId, result.code, result.message));
@@ -124,7 +130,10 @@ export function registerTaskCreateReadRoutes(
       try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/tasks`); } catch (err) { logger.warn('POST /v1/agents/:name/tasks: MCP not connected', { error: String(err) }); }
     }
 
-    res.status(201).json(success(config.nodeId, { task: created }, [
+    res.status(201).json(success(config.nodeId, {
+      task: created,
+      start: startAnswer(agent.displayName || agentName, result.decision, created.status),
+    }, [
       { description: 'View task', method: 'GET', url: `/v1/agents/${agentName}/tasks/${created.id}` },
       { description: 'Start task', method: 'POST', url: `/v1/agents/${agentName}/tasks/${created.id}/start` },
       { description: 'List events', method: 'GET', url: `/v1/agents/${agentName}/tasks/${created.id}/events` },

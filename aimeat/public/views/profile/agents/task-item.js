@@ -7,6 +7,7 @@
  *   happened, details, memory entries, rating -- plus the actions row (start, request changes,
  *   triage, cancel, delete). The helpers it is built from live in ./task-item-parts.js.
  * @version-history
+ *   v2.22.0 — 2026-10-02 — A queued task with a plan says in words that it waits for the owner's OK.
  *   v2.21.0 — 2026-09-30 — A `scope_denied` event (the server refused the task's agent a permission) is
  *     said in the reader's language and wears the trouble dot.
  *   v2.20.0 — 2026-09-26 — Every part is a component that takes data (page group G1a): the task is the
@@ -452,6 +453,9 @@ export function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }
               `}
             `)}
 
+          ${/* The plan is in and the task waits for the owner: said in words, because a Start button
+               alone is what a new customer never found (hosted places, 2026-10-01). */''}
+          ${hasTodos && task.status === 'queued' && html`<${Note} kind="hint">${t('profile.agents.tasks.waitsForYou')}<//>`}
           ${!hasTodos && isQueued && html`<${Note} kind="quiet">${t('profile.agents.tasks.builder.waitingTodos')}<//>`}
           ${isRevisionRequested && html`<${Note} kind="quiet">${t('profile.agents.tasks.revisionWaiting')}<//>`}
 

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Shared types + input-coercion helpers for the connect-call REST tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 -- 2026-10-02 -- taskTodoPayload carries each todo's `effects` (spend, send_as_owner,
+ *     delete): a plan that declares one waits for the owner's OK.
  *   v1.0.0 -- 2026-07-13 -- Extracted from tool-call.ts (max-file-lines)
  */
 import type { ToolInputField } from '../mcp/catalog/definitions.js';
@@ -148,6 +150,7 @@ export function taskTodoPayload(input: JsonObject): JsonObject {
                 environment_reason: 'The connected agent can perform this step through AIMEAT tools.',
                 verification: typeof todo.verification === 'string' ? todo.verification : '',
                 estimate_minutes: typeof todo.estimate_minutes === 'number' ? todo.estimate_minutes : undefined,
+                ...(Array.isArray(todo.effects) ? { effects: todo.effects.filter((e): e is string => typeof e === 'string') } : {}),
                 status: 'pending',
             };
         }),

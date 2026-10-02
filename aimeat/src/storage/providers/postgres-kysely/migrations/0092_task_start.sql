@@ -1,0 +1,24 @@
+-- 0092_task_start.sql
+--
+-- Whether a task starts on its own or waits for the owner's OK, as its own field.
+--
+-- Until now the only thing that decided it was the agent's "mode": a queued task started without
+-- the owner if and only if the agent was a 'task-runner'. "mode" also picks the agent's Hello
+-- Integration flow, so the concierge, an 'interactive' front door, could not start a task without
+-- becoming something else. Measured on freshly sold hosted places on 2026-10-01: every task a
+-- customer gave it waited in 'queued' for good, because nobody tells a new customer to press Start.
+--
+--   "Agent"."taskStart"        'automatic' | 'confirm' | NULL. The owner's standing answer for this
+--                              agent. NULL = nobody has said, and the old rule applies (task-runner
+--                              starts, every other mode waits), so every existing agent is unchanged.
+--   "AgentTask"."startPolicy"  'automatic' | 'confirm' | NULL. How THIS task starts, when its
+--                              creator said so. NULL = the agent's setting decides, read when the
+--                              decision is made.
+--
+-- Neither column carries the safety floor (an agent that can spend money, send mail as the owner,
+-- or speak or delete as the owner always waits). That is read from the agent's permissions on every
+-- call, so a permission granted later takes effect at once. services/agent-task-rules.ts.
+--
+-- Mirrors the SQLite columns added in schema.ts.
+ALTER TABLE "Agent" ADD COLUMN IF NOT EXISTS "taskStart" TEXT;
+ALTER TABLE "AgentTask" ADD COLUMN IF NOT EXISTS "startPolicy" TEXT;

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Identity + principal record types (owners, agents, ecosystem apps, GHII, sessions, personal nodes, agent activity). Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-10-02 — AgentRecord.taskStart: whether the agent's tasks start on their own,
+ *     separate from `mode`, which also picks the Hello Integration flow.
  *   v1.4.0 — 2026-08-31 — Agent v2 identity: AgentRecord.runMode (spawn/resident, stored and shown,
  *     never enforced), identityVersion, cardJws/cardIssuedAt/enrolledAt, and the
  *     AgentEnrolmentGrantRecord one button press produces.
@@ -180,6 +182,19 @@ export interface AgentRecord {
    * read as "write nothing here". → docs/coding-guidelines/storage-sync.md
    */
   runMode?: 'spawn' | 'resident' | null;
+  /**
+   * Whether this agent's tasks start on their own: `automatic` (it proposes its plan and goes on)
+   * or `confirm` (each task waits for the owner's OK). The owner's standing answer; a task may
+   * override it when it is given, and the permission floor overrides both
+   * (services/agent-task-rules.ts).
+   *
+   * `null` = nobody has said, and the old rule applies: `task-runner` starts, every other mode
+   * waits. That keeps every agent created before 2026-10-02 exactly as it was. Null is also how a
+   * value goes back to nobody-has-said, for the same two-provider reason as `runMode` above.
+   *
+   * Set by the owner, or by a same-owner agent holding `agent:write`, and never by the agent itself.
+   */
+  taskStart?: 'automatic' | 'confirm' | null;
   /**
    * WHAT WAS RUNNING WHEN THIS AGENT RAN — the runtime's own answer, in its own words.
    *

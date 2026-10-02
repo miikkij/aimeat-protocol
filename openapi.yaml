@@ -4447,6 +4447,40 @@ components:
             Commission fingerprint (caller `idempotency_key` or a hash of agent + title +
             description). A partial unique index over the open statuses makes a second identical
             commission impossible while this one is still running.
+        startPolicy:
+          type: string
+          nullable: true
+          enum: [automatic, confirm, null]
+          description: >
+            How THIS task starts, when its creator said so (`start` on create): `automatic` (the
+            agent proposes its plan and goes on) or `confirm` (it waits for the owner's OK). Null
+            when they did not; the agent's `task_start` then decides, read when the plan arrives.
+            The permission floor is not part of it; see TaskStartAnswer.
+
+    TaskStartAnswer:
+      type: object
+      description: |
+        Whether a task runs now or waits for the owner, and why, in a sentence the person's AI can
+        read out as it is.
+
+        A task WAITS when (first match wins) the agent holds a permission that can spend money,
+        send mail or a message as the owner, or delete as the owner (`commerce:buy`,
+        `exchange:write`, `connections:use`, `outbound:send`, `messages:send-as-owner`,
+        `messages:delete-as-owner`): `floor`; a step of its plan declares such an effect:
+        `effects`; the task's own `start` or the agent's `task_start` is `confirm`: `setting`.
+        Otherwise it starts on its own.
+      properties:
+        policy: { type: string, enum: [automatic, confirm] }
+        starts: { type: string, enum: [now, after_your_ok, draft] }
+        waits_because: { type: string, nullable: true, enum: [setting, floor, effects, null] }
+        reason: { type: string }
+        who_can_start:
+          type: string
+          nullable: true
+          enum: [owner_or_their_ai, owner_in_person, null]
+          description: >
+            `owner_or_their_ai`: another of the owner's agents holding task:write may start it on the
+            owner's word (POST .../start, aimeat_task_start). `owner_in_person`: only the owner.
 
     AgentTaskRating:
       type: object
@@ -10416,6 +10450,68 @@ paths:
           description: Not your agent
         '404':
           description: No such agent
+  /v1/agents/{name}/task-start:
+    patch:
+      operationId: setAgentTaskStart
+      summary: Whether this agent's tasks start on their own
+      description: |
+        `automatic`: the agent proposes its plan and goes on, and the owner sees the plan, the
+        progress and the result. `confirm`: each task waits for the owner's OK. `null`: nobody has
+        said, and the old rule applies (`task-runner` starts, every other mode waits). A task can
+        override this when it is given (`start` on POST .../tasks).
+
+        **The permission floor wins.** An agent that holds a permission which can spend money,
+        send mail or a message as the owner, or delete as the owner always waits; the answer names
+        those permissions in `task_start_held_by`.
+
+        `agent:write` and same-owner, like `run-mode`, and never the agent itself.
+        Also `aimeat_agent_task_start_set`.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+          description: The agent's name, or its full identity url-encoded.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [task_start]
+              properties:
+                task_start:
+                  type: string
+                  nullable: true
+                  enum: [automatic, confirm, null]
+      responses:
+        '200':
+          description: The setting, what applies, and the permissions that hold every task
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          gaii: { type: string }
+                          name: { type: string }
+                          task_start: { type: string, nullable: true, enum: [automatic, confirm, null] }
+                          task_start_effective: { type: string, enum: [automatic, confirm] }
+                          task_start_held_by: { type: array, items: { type: string } }
+        '400':
+          description: task_start is not one of the two values or null
+        '403':
+          description: Not your agent, or the agent itself asked
+        '404':
+          description: No such agent
+
   /v1/agents/{name}/run-mode:
     patch:
       operationId: setAgentRunMode
@@ -11007,6 +11103,19 @@ paths:
                                 - $ref: '#/components/schemas/AgentProfile'
                                 - type: object
                                   properties:
+                                    task_start:
+                                      type: string
+                                      nullable: true
+                                      enum: [automatic, confirm, null]
+                                      description: Whether its tasks start on their own, as the owner set it; null = nobody has said.
+                                    task_start_effective:
+                                      type: string
+                                      enum: [automatic, confirm]
+                                      description: What applies, the setting or the one the mode gives.
+                                    task_start_held_by:
+                                      type: array
+                                      items: { type: string }
+                                      description: The permissions that make every task of this agent wait for the owner, whatever the setting.
                                     refusals:
                                       type: array
                                       description: |
@@ -49445,6 +49554,16 @@ paths:
                   description: >
                     Deliberately commission the same job again while one is still open (a genuine
                     parallel run). Skips the guard entirely.
+                start:
+                  type: string
+                  enum: [automatic, confirm]
+                  description: >
+                    How THIS task starts, overriding the agent's own `task_start`. `confirm` (it waits
+                    for the owner's OK) is open to every caller. `automatic` (the agent proposes its
+                    plan and goes on) is refused with 403 unless the caller is the owner, a same-owner
+                    app holding `task:write`, or another of the owner's agents holding `agent:write`,
+                    and never for an agent's own task. The permission floor holds a task whatever this
+                    says.
       responses:
         '201':
           description: Task created
@@ -49456,7 +49575,12 @@ paths:
                   - type: object
                     properties:
                       data:
-                        $ref: '#/components/schemas/AgentTask'
+                        type: object
+                        properties:
+                          task:
+                            $ref: '#/components/schemas/AgentTask'
+                          start:
+                            $ref: '#/components/schemas/TaskStartAnswer'
         '200':
           description: >
             Nothing was created — an identical commission for this agent is already open (draft,
@@ -49697,10 +49821,16 @@ paths:
         proposal as outdated history.
 
         Behaviour by current task status:
-          - queued: new todos are stored as pending. If the agent's mode is
-            'task-runner', the task is auto-activated on proposal (started
-            event + task_assigned push) -- the owner pre-authorized work to
-            start without per-task gating.
+          - queued: new todos are stored as pending. If the task starts on its
+            own (its `startPolicy`, else the agent's `task_start`, else mode
+            'task-runner'; never past the permission floor or a declared
+            effect), it becomes active on proposal (started event +
+            task_assigned push). Otherwise it stays queued and the owner gets a
+            notification with a Start button.
+          - active with no plan, started on its own by the node (its started
+            event says so): if the agent holds a floor
+            permission or a todo declares an effect, the task goes back to
+            queued and waits for the owner, who is notified.
           - revision_requested: existing pending todos are retired to
             'outdated', new todos are appended as pending, and the task
             transitions back to 'queued' for owner review (no auto-activation
@@ -49744,6 +49874,12 @@ paths:
                       environment_reason: { type: string }
                       verification: { type: string }
                       estimate_minutes: { type: integer }
+                      effects:
+                        type: array
+                        items: { type: string, enum: [spend, send_as_owner, delete] }
+                        description: >
+                          What this step does that the owner must see first. A plan with any of
+                          these waits for the owner's OK whatever the start setting says.
       responses:
         '200':
           description: TODO plan stored. Task moves back to 'queued' if it was 'revision_requested'.
@@ -49881,7 +50017,15 @@ paths:
     post:
       operationId: startAgentTask
       summary: Start a task
-      description: Transition a queued or paused task to active status.
+      description: |
+        Transition a queued, paused or stalled task to active, and wake the agent at once (a
+        `task_assigned` push with a delivery id of its own).
+
+        Callers: the owner, or a same-owner app holding `task:write`, for any such task. Since
+        2026-10-02 also another of the owner's agents holding `task:write` (the person's own AI,
+        acting on their word), for a QUEUED task that waits only because of the start setting:
+        never the task's own agent, and never a task held by the permission floor or a declared
+        effect, which answers 403 OWNER_MUST_START.
       tags: [Agent Tasks]
       security:
         - BearerAuth: []
@@ -49908,6 +50052,8 @@ paths:
                         $ref: '#/components/schemas/AgentTask'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Not your task, a permission is missing, or OWNER_MUST_START (only the owner in person can start this one)
         '404':
           $ref: '#/components/responses/NotFound'
         '409':

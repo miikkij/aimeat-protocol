@@ -75,6 +75,8 @@ export interface Agent {
   modelDetectedBy: string | null;
   publicKey: string;
   runMode: string | null;
+  /** 'automatic' | 'confirm' | null: whether this agent's tasks start on their own (migration 0092). */
+  taskStart: string | null;
   /** What code backs this agent, as its runtime reports it (AgentRuntimeSource). */
   runtimeSource: unknown | null;
   identityVersion: number | null;
@@ -220,6 +222,8 @@ export interface AgentTask {
   createdBy: string | null;
   /** Commission fingerprint; a partial unique index over the open statuses enforces one live run. */
   dedupeKey: string | null;
+  /** 'automatic' | 'confirm' | null: how this task was meant to start, decided when given (migration 0092). */
+  startPolicy: string | null;
   deliverableKey: string | null;
   description: Generated<string>;
   id: Generated<string>;

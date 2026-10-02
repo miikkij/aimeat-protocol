@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-02 -- aimeat_task_create forwards `start`; aimeat_task_start and aimeat_agent_task_start_set:
+ *     whether a task starts on its own or waits for the owner's OK (services/agent-task-rules.ts).
  *   2026-10-02 -- aimeat_agent_propose says when to use it, to read the person's workspaces first and
  *     to hand over approval_url, as the catalog description does.
  *   2026-10-01 -- `tier` names "features" and "features/<id>", the feature map in parts.
@@ -515,6 +517,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
             status: { type: 'string', enum: ['draft', 'queued'], description: 'Default "queued".' },
             scope: { type: 'array', description: 'Named parameters the receiving runner dispatches on: [{ name, value, type?, description? }]. A fleet runner recognises work by a `kind` entry here, not by the title.' },
             files: { type: 'array', description: 'Files the target agent needs, by REFERENCE: "<owner@node>/<storage key>" each (a bare key means a file the calling agent owns).' },
+            start: { type: 'string', enum: ['automatic', 'confirm'], description: "How THIS task starts: 'confirm' waits for the owner's OK, 'automatic' lets the agent go on (needs agent:write, never your own task). Omit for the agent's own setting." },
         },
         handler: ({ client }, input) => {
             const target = requiredString(input, 'target_agent');
@@ -531,6 +534,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
                 status: optionalString(input, 'status') ?? 'queued',
                 ...(scope.length ? { scope } : {}),
                 ...(files.length ? { resources: { files } } : {}),
+                ...(optionalString(input, 'start') ? { start: optionalString(input, 'start') } : {}),
                 verification: { user_expects: '', technical_checks: [] },
                 todos: [],
             });
@@ -547,9 +551,29 @@ export const agentTools: ConnectCliToolDefinition[] = [
         description: 'Propose TODOs for a queued task, or re-propose after the owner has requested changes. The server preserves prior proposals as outdated history.',
         input: {
             task_id: { type: 'string', required: true, description: 'Task identifier.' },
-            todos: { type: 'array', required: true, description: 'Array of TODOs with title, optional description, verification, and estimate_minutes.' },
+            todos: { type: 'array', required: true, description: "Array of TODOs with title, optional description, verification, estimate_minutes, and effects (any of 'spend', 'send_as_owner', 'delete'; such a plan waits for the owner's OK)." },
         },
         handler: ({ client, agentPath }, input) => client.post(`/v1/agents/${agentPath}/tasks/${encodeURIComponent(requiredString(input, 'task_id'))}/propose-todos`, taskTodoPayload(input)),
+    },
+    {
+        name: 'aimeat_task_start',
+        description: "Start a task that waits for the owner's OK, on the owner's word. Never your own task; a task held because its agent can spend, send or delete as the owner is refused, and only the owner can start it.",
+        input: { task_id: { type: 'string', required: true, description: 'The waiting task to start.' } },
+        // The route reads the task by id; the name segment is the caller's own and decides nothing.
+        handler: ({ client, agentPath }, input) => client.post(`/v1/agents/${agentPath}/tasks/${encodeURIComponent(requiredString(input, 'task_id'))}/start`, {}),
+    },
+    {
+        name: 'aimeat_agent_task_start_set',
+        description: "Set whether one of the owner's agents starts its tasks on its own ('automatic') or waits for the owner's OK on each ('confirm'); null leaves it to the agent's mode. Never for yourself.",
+        input: {
+            target_agent_name: { type: 'string', required: true, description: 'The agent this is about.' },
+            task_start: { type: 'string', required: true, enum: ['automatic', 'confirm'], description: "'automatic', 'confirm', or null." },
+        },
+        // null is a VALUE here, as with run_mode above: read explicitly, the route decides the vocabulary.
+        handler: ({ client }, input) => client.patch(
+            `/v1/agents/${encodeURIComponent(requiredString(input, 'target_agent_name'))}/task-start`,
+            { task_start: input.task_start === null ? null : requiredString(input, 'task_start') },
+        ),
     },
     {
         name: 'aimeat_task_request_changes',

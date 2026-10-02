@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Capability, agent-task, directive, sharing, usage-ledger, and messaging record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-10-02 — AgentTaskRecord.startPolicy and AgentTaskTodo.effects: how a task was meant
+ *     to start, and what a step declares it will do that the owner must see first.
  *   v1.4.0 — 2026-09-30 — AgentTaskEventRecord type 'scope_denied': the node refused the task's agent
  *     a call for a missing permission, noted on the task where the person who ordered it looks.
  *   v1.3.0 — 2026-08-23 — Direct-message types moved to ./direct-messages.ts (max-file-lines) and
@@ -46,6 +48,12 @@ export interface AgentTaskTodo {
   // but is not part of the current active plan.
   status: 'pending' | 'active' | 'done' | 'failed' | 'skipped' | 'outdated';
   completedAt?: string;
+  /**
+   * What this step will do that the owner must see first: spend money, send as the owner, delete.
+   * Declared by whoever proposed the plan. A live todo carrying one holds the task for the owner's
+   * OK whatever the start setting says (services/agent-task-rules.ts). Rides in the todos JSON.
+   */
+  effects?: Array<'spend' | 'send_as_owner' | 'delete'>;
 }
 
 /**
@@ -166,6 +174,15 @@ export interface AgentTaskRecord {
    * done/failed/stalled it drops out of the index and the same job is commissionable again.
    */
   dedupeKey?: string;
+  /**
+   * How THIS task starts, when its creator said so: `automatic` (the agent proposes and goes on)
+   * or `confirm` (it waits for the owner's OK). Absent when they did not, and then the agent's
+   * `taskStart` decides, read when the decision is made: a task given before the owner switched
+   * the agent follows the new answer when its plan arrives (a queued onboarding task once waited
+   * 43 minutes for a click because the switch came after it). The permission floor is never
+   * folded in here; it is read live (services/agent-task-rules.ts).
+   */
+  startPolicy?: 'automatic' | 'confirm' | null;
   parentTaskId?: string;
   workTrackingCode?: string;
   telemetry?: {

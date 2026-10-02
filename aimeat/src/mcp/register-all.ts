@@ -24,6 +24,8 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   v1.17.0 — 2026-10-02 — registerAgentTaskTools receives the session's scopes, which decide whether
+ *     the session may ask a task to start on its own.
  *   v1.16.0 — 2026-10-01 — registerAppManageTool receives getToken: its member actions call the
  *     member routes over loopback with the session's own bearer.
  *   v1.15.0 — 2026-09-29 — registerAiJobTools receives the session's scopes, recorded on a started job
@@ -206,7 +208,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerAppManageTool(mcp, storage, config, agentGaii, scopes, getToken);
     registerAiImageTool(mcp, storage, config, agentGaii);
     registerSharingGroupTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
-    registerAgentTaskTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
+    registerAgentTaskTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     registerAgentScheduleTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     registerWorkflowTools(mcp, storage, config, agentGaii, scopes);
     registerAiJobTools(mcp, storage, config, agentGaii, scopes);

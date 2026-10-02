@@ -36,6 +36,7 @@
  * @structure registerBasicAgentsRoutes(router, config, storage)
  * @usage registerBasicAgentsRoutes(router, config, storage);
  * @version-history
+ *   v1.4.0 — 2026-10-02 — A created basic agent carries its template's `taskStart`.
  *   v1.3.0 — 2026-09-08 — The grant, the offer and the read-back move to
  *     services/agent-enrolment-offer.ts. They lived here, so the one other path that creates an
  *     agent (an approved proposal) had none of it and produced records with no keys. The words this
@@ -183,6 +184,8 @@ export function registerBasicAgentsRoutes(router: Router, config: AimeatConfig, 
         createdAt: now,
         lastSeen: now,
         mode: template.mode,
+        // Whether its tasks start on their own: the template's answer, the owner's to change later.
+        taskStart: template.taskStart,
         tags: template.tags,
         runMode: template.runMode,
         identityVersion: 2,
