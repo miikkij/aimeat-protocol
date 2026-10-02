@@ -26,6 +26,8 @@
  *   (across all of them). The audit read and the invitation cancel are in routes/app-members-extra.ts.
  * @usage app.use(appMembersRouter(config, storage))
  * @version-history
+ *   v1.5.1 — 2026-10-02 — builderNext tells the invited person's AI to read the app's design spec
+ *     before changing anything and to write it back after a publish (services/app-design-spec.ts).
  *   v1.5.0 — 2026-10-02 — The per-app dev-grants answers are written for an agent working from a
  *     chat (aimeat_app_manage builders, builder_set): GET names the people who may build every app
  *     of the owner (`allApps`) and the settings page where the rights are seen (`page`); PUT says
@@ -532,7 +534,9 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
     `Tell ${account} the app is open to them; they were also notified on this server. `
     + `Their AI finds it with aimeat_app_list { building: true } and works on it with the app tools, `
     + `giving owner: "${owner}" and filename: "${filename}" (aimeat_app_get, the aimeat_app_draft_* tools, `
-    + `and aimeat_app_publish when the level carries publishing). What the level allows is in carries.`;
+    + `and aimeat_app_publish when the level carries publishing). What the level allows is in carries. `
+    + `Before it changes anything it reads the app's design spec, aimeat_app_manage { action: "spec", owner: "${owner}", `
+    + `filename: "${filename}" }, and after a publish it writes the spec back with { action: "spec_set" }.`;
 
   // ── GET .../dev-grants — who can build this app. Owner only. ──
   // app:write, not a read word: the app domain carries write and manage, and an agent that may

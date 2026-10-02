@@ -7,6 +7,8 @@
  * @structure PublishDialog({ app, busy, onPublish, onClose }) · CollaborationSection({ ctx })
  * @usage import { CollaborationSection, PublishDialog } from './collaboration.js';
  * @version-history
+ *   v2.1.0 — 2026-10-02 — The chosen app's design spec (design-spec.js) sits above its roadmap, under
+ *     its own heading, and the roadmap halves get a heading of their own.
  *   v2.0.0 — 2026-09-26 — Every part is a component call that gets data (page group G6): the dialog's
  *     form Fields with a TextArea and its submit the loud action naming the form, the section Section,
  *     "show the shared ones" a Check, the shared apps and a roadmap's entries the List (an entry's
@@ -50,6 +52,7 @@ import { apiGet, apiPost, apiPatch, apiDelete } from '/js/api.js';
 import { listApps } from '/js/services/apps.js';
 import { swallowed } from '/js/swallowed.js';
 import { a, nameOf, appRef, day } from './frame.js';
+import { DesignSpecBlock } from './design-spec.js';
 const html = htm.bind(h);
 const pathOf = app => `/v1/apps/${encodeURIComponent(app.owner)}/${encodeURIComponent(app.filename)}`;
 
@@ -135,6 +138,8 @@ export function CollaborationSection({ ctx }) {
     ${app && failed ? html`<${Note} kind="quiet" role="alert">${a('roadFailed')}<//>` : null}
     ${app && !loaded && !failed ? html`<${Note} kind="loading">${a('bldLoading')}<//>` : null}
     ${app && loaded ? html`
+      <${DesignSpecBlock} key=${selectedPath} ctx=${ctx} app=${app} path=${selectedPath} owner=${owner} />
+      <${Space} above="large"><${SubHeading} level=${3}>${a('roadHeading')}<//><//>
       <${Note}>${a(road?.wantedVisibility === 'everyone' ? 'roadPublicHint' : 'roadPrivateHint')}<//>
       ${owner ? html`<${Space} above="medium"><${Select} label=${a('roadVisibility')} disabled=${busy}
         value=${road?.wantedVisibility || 'developers'} onChange=${v => change(() => apiPatch(`${pathOf(app)}/roadmap`, { wanted_visibility: v }))}

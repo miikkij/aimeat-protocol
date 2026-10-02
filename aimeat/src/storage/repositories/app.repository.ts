@@ -40,6 +40,8 @@
  *     it is. Reading it through listAppVersions would cost a gigabyte on a long-lived app.
  *   v1.9.1 — 2026-09-26 — normalizeAppOwnerNames(nodeId) strips only this node's own suffix, so a
  *     visitor's app keeps its owner's home name (secaudit 2026-09, A6-4).
+ *   v1.10.0 — 2026-10-02 — updateAppMeta takes `designSpec` (whole-value, null takes it off): the
+ *     design spec's stamp follows every write of the spec (services/app-design-spec.ts).
  */
 import type { AppRecord, AppSummaryRecord, AppVersionSize, AppDraftRecord, AppListOptions, AppForkRecord } from '../interface.js';
 
@@ -143,6 +145,11 @@ export interface AppRepository {
              * that kind, null removes it, an absent kind is untouched.
              */
             legal?: Partial<Record<import('../types/apps.js').AppLegalKind, import('../types/apps.js').AppLegalDoc | null>>;
+            /**
+             * The design spec's stamp (services/app-design-spec.ts). Whole-value: every write of
+             * the spec sends the new stamp, and null takes it off when the spec is removed.
+             */
+            designSpec?: import('../types/apps.js').AppManifest['designSpec'] | null;
         },
     ): Promise<boolean>;
     /**

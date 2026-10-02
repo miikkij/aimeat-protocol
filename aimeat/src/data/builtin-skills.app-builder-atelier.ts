@@ -13,6 +13,13 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.30.0 — 2026-10-02 — Research first reads the design spec of an app that already exists, and
+ *     writes it back after the publish (services/app-design-spec.ts).
+ *   v1.29.1 — 2026-10-02 — The board's tow, anchored rings and onDrop, and requestPanel's extra host,
+ *     named in the board-family paragraph. Read against describe-data.js after they joined.
+ *   v1.29.0 — 2026-10-02 — The board family (kit board.js, request-panel.js, shelf.js, verbs.js):
+ *     board over aimeat-viewport, requestPanel, shelf and the data-ak-do card verbs, named beside the
+ *     other library blocks. Read against describe-data.js after the four joined it.
  *   v1.28.1 — 2026-10-02 — Kit 0.64.0: aiTask, when the person's AI is off, says why in their words
  *     with a button to their AI settings.
  *   v1.28.0 — 2026-10-02 — Kit 0.63.0: aiChat, a kept aiTask answer, and the props the app migration
@@ -202,6 +209,9 @@ moved under you says so.
    why. A fixed genre can be made to follow by moving its colours to the theme's \`--ak-*\` tokens,
    shown in both modes beside the original before the owner decides.
 2. **Research first** — \`aimeat_appdev_overview\`, existing apps and skills, the pitfalls, and
+   **on an app that already exists, its design spec** (\`aimeat_app_manage\` \`{ action: "spec",
+   owner, filename }\`: what it is for, its screens, where its data lives, what was decided and what
+   is open; after the publish, write it back with \`spec_set\`), and
    **the Design Book** (\`aimeat_designbook_search\`): layouts, fills, looks, motion, ambients and
    effects that each passed their own bench. Called with nothing, the search answers the WHOLE
    Book on one page, every part on a line under its kind, and part \`book\` of the
@@ -287,6 +297,18 @@ moved under you says so.
    \`AIMEAT.commerce\` (\`unit: 'micros'\` or \`currency: 'morsels'\` on priceTable, cart and
    checkout). A follow-up conversation about one document is \`aiChat({ target, appId, context,
    history, onTurn })\`; an AI answer you kept is drawn again with \`aiTask(...).show(result)\`.
+   A spatial surface, frames a person arranges on an infinite plane, is the board family:
+   \`board({ target, frames, rings, actions, render, onMove, onAction, tow, onDrop })\` draws keyed
+   frames with a head and a grip that stay one size at every zoom, rings around a request panel's
+   frames (a ring with an \`anchor\` is centred on that frame, \`tow\` names the frames that move with
+   a dragged one, and \`onDrop\` is asked once when a frame enters a ring it was not in) and the
+   Move/Use switch, over the camera of \`aimeat-viewport\` (the cortex library the page loads from
+   \`/v1/cortex/aimeat-viewport/libs/aimeat-viewport.js\`); \`requestPanel\` is the prompt line, the
+   plan with its states and gate, the console of a sentence being worked, and an \`extra\` host for
+   the app's own question (set({ extra: node })); \`shelf\` is the
+   pieces to use on two tabs with a search; and \`verbs({ root, adapters })\` runs a card's
+   \`data-ak-do\` controls (submit with no session, read on sight, save, ai, copy, now, count, and
+   offer and tool through the app's adapters). The app plans, routes and runs; these draw.
    Before you write your own version of one of these because "it does not quite fit", read its
    \`describe(id)\`: they take questions per run and a verdict (\`decision\`), invitations into
    several workspaces (\`workspaceTeam\` \`inviteInto\`), schemas, a private choice and a list
