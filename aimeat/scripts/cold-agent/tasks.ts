@@ -47,6 +47,8 @@ export interface TaskContext {
     /** Unique to this run of this task. */
     marker: string;
     metrics: RunMetrics;
+    /** `--keep`: verify leaves what the run made, so a person can carry on from it. */
+    keep?: boolean;
 }
 
 export interface Task {
@@ -358,10 +360,13 @@ export const TASKS: Task[] = [
             const hit = mine.find(p => JSON.stringify({ purpose: p.purpose, def: p.crew_def }).toLowerCase().includes(ctx.marker.toLowerCase()));
             const elsewhere = /crewai studio|hubspot|salesforce|pipedrive|zapier|make\.com|n8n/i.test(ctx.metrics.finalText);
             const toldWhere = /\/v1\/profile\?tab=agents/.test(ctx.metrics.finalText);
-            // Put it away: decline every proposal this run made, and archive the organism.
-            for (const p of mine) await api(ctx.baseUrl, `/v1/agents/v2/agent-proposals/${p.id}/decline`, ctx.ownerToken, { method: 'POST', body: {} });
-            const orgId = proposeOrgs.get(ctx.marker);
-            if (orgId) await api(ctx.baseUrl, `/v1/organisms/${orgId}/archive`, ctx.ownerToken, { method: 'POST', body: { level: 'organism' } });
+            // Put it away: decline every proposal this run made, and archive the organism. With
+            // --keep both stay, so the owner can approve the proposal and watch the agent run.
+            if (!ctx.keep) {
+                for (const p of mine) await api(ctx.baseUrl, `/v1/agents/v2/agent-proposals/${p.id}/decline`, ctx.ownerToken, { method: 'POST', body: {} });
+                const orgId = proposeOrgs.get(ctx.marker);
+                if (orgId) await api(ctx.baseUrl, `/v1/organisms/${orgId}/archive`, ctx.ownerToken, { method: 'POST', body: { level: 'organism' } });
+            }
             if (!hit) return { ok: false, detail: mine.length ? 'a proposal was written, and it does not name the sales workspace' : 'no proposal was written' };
             if (elsewhere) return { ok: false, detail: 'a proposal was written, and the answer also sends the person to an outside product' };
             const defined = !!hit.crew_def;
