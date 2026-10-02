@@ -19,6 +19,7 @@
  *
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-v2
  * @version-history
+ *   v1.4.0 — 2026-10-02 — With no connector connected a `resident` ask stands uncorrected.
  *   v1.3.0 — 2026-10-02 — A proposal answers with approval_url, a next_step that names it, and
  *     already_waiting.
  *   v1.2.0 — 2026-09-24 — A re-spelled copy of a spent assertion is refused as the same assertion
@@ -1253,6 +1254,20 @@ async function run() {
             }),
         });
         assert(r.status === 201, `expected 201, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    });
+
+    await test('with no connector connected, a `resident` ask stands: nothing can say it cannot run', async () => {
+        // The correction to spawn (services/agent-proposals.ts proposalRunModeFor) reads the connected
+        // connectors' run modes; this node has none connected, so the ask is stored as made.
+        const r = await json('/v1/agents/v2/agent-proposals', {
+            method: 'POST', headers: { Authorization: `Bearer ${writer.token}` },
+            body: JSON.stringify({ name: 'front-door', purpose: 'Answers people as they write, so it stays up.', scopes: ['memory:read'], run_mode: 'resident' }),
+        });
+        assert(r.status === 201, `expected 201, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        assert(r.body.data.proposal.run_mode === 'resident', `the ask stands, got ${r.body.data.proposal.run_mode}`);
+        assert(r.body.data.proposal.run_mode_corrected == null, `nothing was corrected, got ${JSON.stringify(r.body.data.proposal.run_mode_corrected)}`);
+        const d = await json(`/v1/agents/v2/agent-proposals/${r.body.data.proposal.id}/decline`, { method: 'POST', headers: authA });
+        assert(d.status === 200, `decline ${d.status}`);
     });
 
     await test('proposing a name that is already waiting returns the standing one', async () => {

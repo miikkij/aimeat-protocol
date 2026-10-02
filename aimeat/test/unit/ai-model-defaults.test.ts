@@ -9,6 +9,7 @@
  *   closes, so most of what follows pins the absence of behaviour.
  * @usage cd aimeat && pnpm vitest run test/unit/ai-model-defaults.test.ts
  * @version-history
+ *   v1.2.0 — 2026-10-02 — The free router a key-only save wrote is not a choice; a marked one is.
  *   v1.1.0 — 2026-09-28 — Speech and embeddings take only the node's default; the owner fields are not read.
  *   v1.0.0 — 2026-08-16 — initial: precedence per role, empty-string handling, the untouched-node
  *     case, and the speech language hint.
@@ -16,7 +17,7 @@
 import { describe, it, expect } from 'vitest';
 import type { AimeatConfig } from '../../src/config.js';
 import {
-  resolveModelFor, resolveSttLanguage, resolveTtsVoice, type ModelRole,
+  resolveModelFor, resolveSttLanguage, resolveTtsVoice, holdsImplicitFreeModel, type ModelRole,
 } from '../../src/services/ai-model-defaults.js';
 
 const ROLES: ModelRole[] = ['chat', 'reasoning', 'execution', 'vision', 'stt', 'image'];
@@ -56,6 +57,26 @@ describe('resolveModelFor', () => {
       const got = resolveModelFor(configuredNode, {}, role);
       assert(got === expected[role], `${role} falls back to ${expected[role]}, got ${got}`);
     }
+  });
+
+  it('the free router a key-only save wrote is NOT a choice: the node default comes first, and a chosen one stays', () => {
+    // Until 2026-10-02 PUT /v1/openrouter/settings with a key and no model wrote model 'openrouter/free'
+    // (no modelChosen mark), and an owner's own key then thought with a free model on a node that
+    // names a default. Ruled by Jouni: an own key uses the node's default unless the owner chose.
+    const implicit = { model: 'openrouter/free' };
+    expect(holdsImplicitFreeModel(implicit)).toBe(true);
+    expect(resolveModelFor(configuredNode, implicit, 'chat')).toBe('node/chat');
+    // On a node with no default nothing changes: nothing is chosen, and the completion path's last
+    // fallback is still the free router.
+    expect(resolveModelFor(bareNode, implicit, 'chat')).toBeUndefined();
+    // The owner who picked the free router on purpose keeps it.
+    const chosen = { model: 'openrouter/free', modelChosen: true };
+    expect(holdsImplicitFreeModel(chosen)).toBe(false);
+    expect(resolveModelFor(configuredNode, chosen, 'chat')).toBe('openrouter/free');
+    // Another model needs no mark: only the free router was ever written unasked.
+    expect(resolveModelFor(configuredNode, { model: 'owner/chat' }, 'chat')).toBe('owner/chat');
+    // The other roles are not touched by the mark.
+    expect(resolveModelFor(configuredNode, { ...implicit, reasoningModel: 'owner/reasoning' }, 'reasoning')).toBe('owner/reasoning');
   });
 
   it('the owner wins over the node, per role and independently', () => {

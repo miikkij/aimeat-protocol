@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.23.4 -- 2026-10-02 -- add-a-crew-agent: a resident proposal is stored as spawn where the connector
+ *     runs by spawning, and a proposal carries ai:use when the owner's crews think through the node.
  *   v1.23.3 -- 2026-10-02 -- add-a-crew-agent: a crew agent needs memory:read and memory:write, and
  *     the node adds both to every proposal and approval.
  *   v1.23.2 -- 2026-10-02 -- add-a-crew-agent: with nothing chosen, an agent holding ai:use thinks
@@ -413,6 +415,10 @@ queued work also needs \`work:read\` and \`work:accept\`; one that uses the owne
 transcription, embeddings, or the node's \`/v1/llm\` through \`node_llm()\`) needs \`ai:use\`. \`mode: "task-runner"\` lets a queued task
 start without asking the owner each time, so say that in the purpose. \`run_mode: "spawn"\` starts
 a worker per piece of work and suits bursty jobs; \`"resident"\` stays up and suits a front door.
+Ask for \`"resident"\` only when the owner's connector can keep an agent up: \`aimeat connect serve\`
+and a hosted place run every agent by spawning, so the node stores such a proposal as \`spawn\` and
+says so in \`run_mode_corrected\`. When the owner's crews think through the node (their default model
+choice is the node, or the node has a key to pay with), the proposal carries \`ai:use\` on its own.
 
 ## 2. A runtime of your own: device authorization
 

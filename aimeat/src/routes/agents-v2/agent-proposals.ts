@@ -23,6 +23,10 @@
  * @structure nextStep() · registerAgentProposalRoutes()
  * @usage registerAgentProposalRoutes(router, config, storage);
  * @version-history
+ *   v1.4.0 — 2026-10-02 — Approval decides the run mode again against the connected connector
+ *     (a `resident` proposal on a spawning connector is made as spawn, and the answer carries
+ *     `run_mode_corrected`), and adds ai:use when the owner's crews think through the node
+ *     (services/agent-proposals.ts proposalRunModeFor, proposalScopesFor).
  *   v1.3.0 — 2026-10-02 — Approval gives the agent the crew runtime's scopes (memory:read,
  *     memory:write) whatever the proposal says, so no proposal makes an agent that cannot start.
  *   v1.2.0 — 2026-10-02 — The proposal answer carries `approval_url` and `already_waiting`, and its
@@ -48,10 +52,9 @@ import { emitChange } from '../../services/event-bus.js';
 import { recordAccountEvent } from '../../services/account-events.js';
 import {
   proposeAgent, listProposals, readProposal, settleProposal, proposalApprovalUrl, proposalNextStep,
-  type ProposerPrincipal,
+  proposalRunModeFor, proposalScopesFor, type ProposerPrincipal,
 } from '../../services/agent-proposals.js';
 import { logger } from '../../utils/logger.js';
-import { withCrewRuntimeScopes } from '../../data/crew-runtime-scopes.js';
 
 const VALID_MODES = ['autonomous', 'interactive', 'task-runner', 'coordinator', 'workstation'];
 const VALID_RUN_MODES = ['resident', 'spawn'];
@@ -153,11 +156,17 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
 
     const now = new Date().toISOString();
     const gaii = buildGAII(proposal.name, owner, config.nodeId);
-    // What any crew agent needs to start, whatever the proposer wrote (data/crew-runtime-scopes.ts).
-    // A proposal stored before 2026-10-02 can lack them, and an agent approved with memory:write
-    // alone could not read its own definition and never ran. Proposing adds them too, so the owner
-    // sees them on the proposal; this is the same list again, not a widening of what was shown.
-    const scopes = withCrewRuntimeScopes(proposal.scopes);
+    // What any crew agent needs to start, whatever the proposer wrote (services/agent-proposals.ts
+    // proposalScopesFor: the runtime's words, and ai:use when the owner's crews think through the
+    // node). A proposal stored before 2026-10-02 can lack them, and an agent approved with
+    // memory:write alone could not read its own definition and never ran. Proposing adds them too,
+    // so the owner sees them on the proposal; this is the same list again.
+    const scopes = await proposalScopesFor({ config, storage }, owner, proposal.scopes);
+    // The run mode the connected connector can run, decided again now: the proposal may be older
+    // than the connector, and an approved `resident` agent on a spawning connector sits active and
+    // never runs (measured 2026-10-02 on a hosted place).
+    const runMode = proposalRunModeFor(owner, proposal.run_mode);
+    const runModeCorrected = runMode.corrected ?? proposal.run_mode_corrected ?? null;
     await storage.createAgent({
       name: proposal.name,
       owner,
@@ -175,7 +184,7 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
       lastSeen: now,
       mode: proposal.mode as never,
       tags: ['agent.proposed'],
-      runMode: proposal.run_mode as never,
+      runMode: runMode.run_mode as never,
       identityVersion: 2,
       // WHO ASKED, not who approved. `registeredBy` is the creation ledger and the fence the
       // sibling-delete gate reads; the owner approving is recorded as an account event below.
@@ -234,7 +243,7 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
       gaii,
       displayName: proposal.display_name,
       description: proposal.purpose,
-      runMode: proposal.run_mode,
+      runMode: runMode.run_mode,
       mode: proposal.mode,
       // From the record we just wrote: the proposal the owner approved, with the runtime's words.
       scopes,
@@ -257,7 +266,10 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
     });
     res.json(success(config.nodeId, {
       created: true,
-      agent: { name: proposal.name, gaii, mode: proposal.mode, run_mode: proposal.run_mode, scopes },
+      agent: { name: proposal.name, gaii, mode: proposal.mode, run_mode: runMode.run_mode, scopes },
+      // The run mode the proposer asked for and this account's connector cannot run, when the
+      // agent was made with the one it can; null when what was asked is what was made.
+      run_mode_corrected: runModeCorrected,
       seeded: !!proposal.crew_def,
       attached: enrolment.ok,
       // The reason, verbatim, when it is not attached: "unconnected" without a why sends the owner

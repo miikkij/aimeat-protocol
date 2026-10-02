@@ -6,14 +6,15 @@
  *   coverage per configuration, and whether a key counts as set, including the legacy copy that a
  *   deleted key leaves behind until the next providers read.
  * @version-history
+ *   v1.2.0 — 2026-10-02 — Only agents with a runtime are listed; the app principal is not one.
  *   v1.1.0 — 2026-10-02 — The crews are covered when every agent reported the node road.
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import { describe, it, expect } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
-import type { Storage, GHIIRecord } from '../../src/storage/interface.js';
+import type { Storage, GHIIRecord, AgentRecord } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
-import { ownKeyCoverageOf, hasOwnAiKey, ownKeyCoverage } from '../../src/services/own-key-coverage.js';
+import { ownKeyCoverageOf, hasOwnAiKey, ownKeyCoverage, hasRuntime } from '../../src/services/own-key-coverage.js';
 
 const NODE = 'node-test';
 const GAII = `alice@${NODE}`;
@@ -111,5 +112,34 @@ describe('ownKeyCoverage', () => {
     const c = await ownKeyCoverage(s, { gooseProviderApiKey: 'sk-shared' } as unknown as AimeatConfig, GAII);
     expect(c.set).toBe(true);
     expect(c.not_covered.map((g) => g.part)).toEqual(['chat', 'agent_runtimes']);
+  });
+
+  it('lists only agents that have a runtime: the app principal and a v1 MCP agent are not crews', async () => {
+    // Measured on a hosted place 2026-10-02: the `app` principal (made when an app signs in, never
+    // enrolled, no runtime) sat in the list with llm null, so agent_runtimes was never covered.
+    const s = await freshStorage();
+    const now = new Date().toISOString();
+    const base = { owner: 'alice', capabilities: [], publicKey: '', trustScore: 50, morselBalance: 0, createdAt: now, lastSeen: now };
+    await s.createAgent({ ...base, name: 'app', gaii: `app#${GAII}` } as AgentRecord);
+    await s.createAgent({ ...base, name: 'desktop', gaii: `desktop#${GAII}` } as AgentRecord);
+    await s.createAgent({ ...base, name: 'concierge', gaii: `concierge#${GAII}`, enrolledAt: now, runtimeSource: { kind: 'crew-def', llm: 'node' } } as AgentRecord);
+    await s.createAgent({ ...base, name: 'watcher', gaii: `watcher#${GAII}`, enrolledAt: now } as AgentRecord);
+    const c = await ownKeyCoverage(s, { gooseProviderApiKey: '' } as unknown as AimeatConfig, GAII);
+    expect(c.agents).toEqual([{ agent: 'concierge', llm: 'node' }, { agent: 'watcher', llm: null }]);
+    expect(c.covers).not.toContain('agent_runtimes');
+    // Once the enrolled agent that had not said reports the node road, the crews are covered.
+    await s.updateAgent(`watcher#${GAII}`, { runtimeSource: { kind: 'crew-def', llm: 'node' } });
+    const after = await ownKeyCoverage(s, { gooseProviderApiKey: '' } as unknown as AimeatConfig, GAII);
+    expect(after.covers).toContain('agent_runtimes');
+    expect(after.agents.map((a) => a.agent)).toEqual(['concierge', 'watcher']);
+  });
+});
+
+describe('hasRuntime', () => {
+  it('is an enrolled agent or one whose runtime reported, never the chat agent', () => {
+    expect(hasRuntime({ name: 'app' })).toBe(false);
+    expect(hasRuntime({ name: 'x', enrolledAt: 'now' })).toBe(true);
+    expect(hasRuntime({ name: 'x', runtimeSource: { kind: 'python' } })).toBe(true);
+    expect(hasRuntime({ name: 'chat', enrolledAt: 'now' })).toBe(false);
   });
 });

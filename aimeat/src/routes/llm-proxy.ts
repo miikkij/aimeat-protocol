@@ -27,6 +27,8 @@
  *   - llmProxyRouter(config, storage) — POST /v1/llm/chat/completions, GET /v1/llm/models
  * @usage mounted in server-bootstrap/routes-loader.ts; an agent uses <node>/v1/llm as its base URL
  * @version-history
+ *   v1.5.0 — 2026-10-02 — A spent own or agent key (402 from the provider) is retried once on the free
+ *     router before the first byte, as /v1/ai/complete does (route-run.ts noCreditRetry).
  *   v1.4.0 — 2026-09-28 — AI roles: a call may name the AI role it runs as, in the body's `role` or
  *     the X-AIMEAT-AI-Role header (what an OpenAI-compatible client can send), passed to prepareAiCall.
  *     The caller still names no model; the owner's role decides the providers and models.
@@ -194,6 +196,7 @@ export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
             const run = await runRoute({
                 storage, gaii, capability: plan.capability, candidates: plan.candidates, chosenBy: plan.chosenBy,
                 allowFallback: plan.allowFallback, rules: plan.rules, signal: controller.signal,
+                ...(plan.noCreditModel ? { noCreditModel: plan.noCreditModel } : {}),
             }, async (c) => {
                 // Through the openrouter service or the gateway, never straight out of this file:
                 // `pnpm check:llm-transport` holds that, because a second place speaking to a provider

@@ -4,6 +4,7 @@
  *   Tests save/retrieve/delete of encrypted API key and preferences,
  *   auth enforcement (401 without token), and validation errors on /complete.
  * @version-history
+ *   v1.2.0 — 2026-10-02 — A key-only save names no model; a chosen free router stays; '' clears.
  *   v1.1.0 — 2026-08-01 — Phase 5: speech-to-text settings (sttModel/sttLanguage round-trip, empty
  *     clears rather than falling back), the node limits served with the settings, and the
  *     ?modality= parameter on the model listing.
@@ -135,6 +136,36 @@ await test('POST /v1/openrouter/complete without auth → 401', async () => {
 
 // ─── Phase 2: Settings CRUD ───
 console.log('\nPhase 2 — Settings CRUD');
+
+await test('PUT /v1/openrouter/settings — a key on its own names NO model: the node default applies until one is chosen', async () => {
+  // Until 2026-10-02 this write created the record with model 'openrouter/free', which then came
+  // before the node's default: an owner who saved their own key thought with a free model.
+  const put = await json('/v1/openrouter/settings', {
+    method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ apiKey: 'sk-or-test-key-only' }),
+  });
+  assert(put.status !== 503, `encryption must be configured on the test node, got 503: ${JSON.stringify(put.body)}`);
+  assert(put.status === 200, `expected 200, got ${put.status}: ${JSON.stringify(put.body)}`);
+  const got = await json('/v1/openrouter/settings', { headers: { Authorization: `Bearer ${ownerToken}` } });
+  assert(got.body.data?.hasApiKey === true, 'the key is stored');
+  assert(got.body.data?.model === null, `a key-only save names no model, got ${JSON.stringify(got.body.data?.model)}`);
+  // Choosing the free router on purpose is kept, as any chosen model is.
+  const free = await json('/v1/openrouter/settings', {
+    method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ model: 'openrouter/free' }),
+  });
+  assert(free.status === 200, `choose the free router: ${free.status}`);
+  const got2 = await json('/v1/openrouter/settings', { headers: { Authorization: `Bearer ${ownerToken}` } });
+  assert(got2.body.data?.model === 'openrouter/free', `a chosen free router stays, got ${JSON.stringify(got2.body.data?.model)}`);
+  // And '' clears the choice.
+  const clear = await json('/v1/openrouter/settings', {
+    method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ model: '' }),
+  });
+  assert(clear.status === 200, `clear the model: ${clear.status}`);
+  const got3 = await json('/v1/openrouter/settings', { headers: { Authorization: `Bearer ${ownerToken}` } });
+  assert(got3.body.data?.model === null, `'' clears the choice, got ${JSON.stringify(got3.body.data?.model)}`);
+});
 
 await test('PUT /v1/openrouter/settings — save API key and preferences', async () => {
   const { status, body } = await json('/v1/openrouter/settings', {

@@ -34,9 +34,11 @@
  *   should hold that for a list of model names. A forged catalogue there is read only for the agent
  *   that wrote it, which already decides what its own runtime calls. It also gives each agent its own
  *   copy, where one owner key had agents on different machines overwrite each other's list.
- * @structure CrewMenu · crewMenu() · readLlmChoice() · effectiveLlmChoice() · writeLlmChoice()
+ * @structure CrewMenu · crewMenu() · readLlmChoice() · ownerDefaultIsNode() · effectiveLlmChoice() · writeLlmChoice()
  * @usage const menu = await crewMenu(deps, caller, 'news-watcher');
  * @version-history
+ *   v1.5.0 — 2026-10-02 — ownerDefaultIsNode(): whether the owner's crews think through the node by
+ *     default, read when an agent is proposed so the proposal carries ai:use.
  *   v1.4.0 — 2026-10-02 — effectiveLlmChoice(): thinking through the node is the default for an agent
  *     holding ai:use when the node has a key to pay with, and an owner default of `node` skips an
  *     agent without ai:use (Jouni, 2026-10-02). GET /v1/agents/:name/crew/llm answers it for the
@@ -159,6 +161,27 @@ async function nodePaysFor(deps: Deps, agent: AgentRecord): Promise<{ ok: true; 
     return { ok: true, source: plan.keyScope };
   } catch (e) {
     if (e instanceof AiCompletionError) return { ok: false, reason: e.code };
+    throw e;
+  }
+}
+
+/**
+ * Whether this owner's crews think through the node by default: the owner's stored default names
+ * the node, or nothing is stored and a text call in the owner's name would find a key here (the
+ * place's or the owner's own). Read when an agent is proposed, so the proposal carries ai:use, the
+ * word /v1/llm requires (Jouni, 2026-10-02): without it the agent is approved onto the node road
+ * and refused on its first model call.
+ */
+export async function ownerDefaultIsNode(deps: Deps, owner: string): Promise<boolean> {
+  const shared = validChoice(await readOwnerValue(deps, owner, LLM_DEFAULT_KEY));
+  if (shared) return shared.kind === 'node';
+  try {
+    await prepareAiCall(deps.storage, deps.config, `${owner}@${deps.config.nodeId}`, {
+      op: 'text', capability: 'text', caller: 'owner', appId: 'llm-proxy',
+    });
+    return true;
+  } catch (e) {
+    if (e instanceof AiCompletionError) return false;
     throw e;
   }
 }

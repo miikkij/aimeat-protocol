@@ -14,6 +14,10 @@
  *   - POST /v1/openrouter/test — test API key validity
  *   - POST /v1/openrouter/complete — run AI completion for generator step
  * @version-history
+ *   v1.16.0 — 2026-10-02 — A new settings record names no model, so the node's default model applies
+ *     to an owner's own key until they choose one; an explicit `model` is stored with `modelChosen`.
+ *     A key-only PUT wrote 'openrouter/free', which came before the node's default: measured on a
+ *     hosted place, one own-key task answered in broken Finnish and neither key spent anything.
  *   v1.15.0 — 2026-10-02 — The settings' `maxRetries` default is DEFAULT_EMPTY_RETRIES (2), the number
  *     the gateway uses when an owner never saved one; this route had said 3 in three places, so an
  *     owner who never saved was shown 3 while 2 applied.
@@ -90,6 +94,7 @@ import { recordAccountEvent } from '../services/account-events.js';
 import { listModels, DEFAULT_BASE_URLS, type ProviderType, type ModelModality } from '../services/openrouter.js';
 import { completeForOwner, AiCompletionError, assertProviderAllowed } from '../services/ai-completion.js';
 import { DEFAULT_EMPTY_RETRIES } from '../services/ai/gateway.js';
+import { holdsImplicitFreeModel } from '../services/ai-model-defaults.js';
 import { servedProvenanceOf, envelopeMeta, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
 
 /**
@@ -297,19 +302,26 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
         }, config);
       }
 
-      // Save preferences (plaintext)
+      // Save preferences (plaintext). A new record names NO model: the node's default applies until
+      // the owner chooses one (ai-model-defaults.ts). Until 2026-10-02 a key-only save wrote
+      // 'openrouter/free' here, and an owner's own key then thought with a free model.
       const existing = await storage.getMemory(gaii, 'openrouter.settings');
-      const base = existing
-        ? (existing.value as object)
-        // Vendor-neutral default: OpenRouter's free-models router (no specific vendor hardcoded).
-        : { model: 'openrouter/free', autoRetry: true, maxRetries: DEFAULT_EMPTY_RETRIES };
+      const base: Record<string, unknown> = existing
+        ? { ...(existing.value as Record<string, unknown>) }
+        : { autoRetry: true, maxRetries: DEFAULT_EMPTY_RETRIES };
+      if (holdsImplicitFreeModel(base)) delete base.model;
 
       const prefs: Record<string, unknown> = {
         ...base,
         provider: effectiveProvider,
         baseUrl: effectiveBaseUrl,
       };
-      if (model !== undefined) prefs.model = model;
+      // An explicit model is the owner's choice and is marked as one, so the free router counts when
+      // they picked it; '' or null clears the choice and the node's default applies again.
+      if (model !== undefined) {
+        if (typeof model === 'string' && model.trim()) { prefs.model = model; prefs.modelChosen = true; }
+        else { delete prefs.model; delete prefs.modelChosen; }
+      }
       if (reasoningModel !== undefined) prefs.reasoningModel = reasoningModel;
       if (executionModel !== undefined) prefs.executionModel = executionModel;
       // visionModel: a vision-capable model (e.g. qwen/qwen-2.5-vl-...) used for image inputs

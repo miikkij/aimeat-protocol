@@ -33,6 +33,10 @@
  *   const own_key = await ownKeyCoverage(storage, config, gaii);
  *   res.json(success(config.nodeId, { has_own_key: own_key.set, own_key }));
  * @version-history
+ *   v1.2.0 — 2026-10-02 — `agents` lists only agents that have a runtime: enrolled (a key pinned at
+ *     enrolment) or one that reported its runtime. The `app` principal and a v1 MCP agent run no
+ *     crew, and the one named `app` sat in the list with llm null on every hosted place, so
+ *     `agent_runtimes` could never be covered there.
  *   v1.1.0 — 2026-10-02 — `agents`: each agent's crew road from its runtime report; `agent_runtimes`
  *     is covered when every agent thinks through the node.
  *   v1.0.0 — 2026-10-02 — Initial. Served by GET /v1/chat/status and GET /v1/ai/capabilities
@@ -40,6 +44,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import type { AgentRecord } from '../storage/types/identity.js';
 import { chatUsesSharedKey } from './goose-env.js';
 import { ownerKeyIds, PROVIDER_KEY_PREFIX } from './ai/provider-store.js';
 import { CHAT_AGENT_NAME } from './chat-agent.js';
@@ -100,13 +105,22 @@ export function ownKeyCoverageOf(
   };
 }
 
-/** The owner's agents and the road each runtime reported, the chat agent left out. */
+/**
+ * An agent that has a runtime to report: one enrolled (its key pinned, so a connector serves it) or
+ * one whose runtime has reported. The `app` principal that signs an app in, a v1 agent that speaks
+ * over MCP from a desktop and the chat agent run no crew, so they have no road to report.
+ */
+export function hasRuntime(agent: Pick<AgentRecord, 'name' | 'enrolledAt' | 'runtimeSource'>): boolean {
+  return agent.name !== CHAT_AGENT_NAME && (!!agent.enrolledAt || !!agent.runtimeSource);
+}
+
+/** The owner's agents that have a runtime, and the road each one reported. */
 export async function agentRoadsOf(storage: Storage, gaii: string): Promise<AgentRoad[]> {
   const owner = localAccountOf(gaii);
   if (!owner) return [];
   const agents = await storage.getAgentsByOwner(owner);
   return agents
-    .filter(a => a.name !== CHAT_AGENT_NAME)
+    .filter(hasRuntime)
     .map(a => ({ agent: a.name, llm: a.runtimeSource?.llm ?? null }));
 }
 

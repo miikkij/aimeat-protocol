@@ -31,6 +31,8 @@
  * @usage
  *   import { RECURRING_WORK_SKILL_ENTRIES } from './builtin-skills.recurring-work.js';
  * @version-history
+ *   v1.6.1 — 2026-10-02 — Section 4: the node adds ai:use when the person's crews think through it,
+ *     and a resident ask is stored as spawn where the connector cannot keep an agent up.
  *   v1.5.0 — 2026-10-02 — Section 4: the agent is proposed here and never sent elsewhere, built on
  *     the organisms and workspaces the person keeps, and the person is given the approval address.
  *   v1.4.0 — 2026-09-29 — `kind: "refinery"`, one mail refinery batch each fire.
@@ -141,8 +143,11 @@ workspace's record shape and design the agent for it.
 
 \`aimeat_agent_propose\` takes a name, a \`purpose\` the person can decide from (name their data in
 it), the scopes the agent needs (never more than you hold yourself; the node adds \`memory:read\`
-and \`memory:write\`, which a crew runtime needs for itself) and a \`crew_def\`, the JSON
-document that says what the agent is: its roles, its tasks and its tools. The call creates nothing.
+and \`memory:write\`, which a crew runtime needs for itself, and \`ai:use\` when the person's crews
+think through this node) and a \`crew_def\`, the JSON document that says what the agent is: its
+roles, its tasks and its tools. Leave \`run_mode\` out: a worker per piece of work is what the
+person's connector runs, and a \`resident\` ask is stored as \`spawn\` with \`run_mode_corrected\`
+saying so wherever the connector cannot keep an agent up. The call creates nothing.
 It puts one line on the person's open items, and their press on it creates the agent, gives it the
 definition and hands it to their connector to run. The answer carries \`approval_url\` and
 \`next_step\`: give the person both, so they know where to press. Send the \`crew_def\` with the

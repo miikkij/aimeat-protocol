@@ -34,6 +34,8 @@
  * @usage
  *   import { CONVERSATION_SKILL_ENTRIES } from './builtin-skills.conversation.js';
  * @version-history
+ *   v1.3.0 — 2026-10-02 — aimeat-paying-for-the-ai: an own key thinks with the node's default model
+ *     until the person chooses one, and a spent OpenRouter key gets the free router once (402).
  *   v1.2.2 — 2026-09-28 — aimeat-paying-for-the-ai: the chat is paid like every other call, per person,
  *     except on an operator's shared chat key (System 2, V5).
  *   v1.2.1 — 2026-09-28 — aimeat-paying-for-the-ai: the node's key pays for a picture or a
@@ -448,7 +450,10 @@ not you:
 
 1. **The person's own key**, if they have set one. No allowance applies and no limit here touches it.
    It can be any provider of theirs, not only OpenRouter: their own OpenAI, Anthropic, Mistral or
-   xAI account, or a model on their own machine (\`aimeat_ai_providers\` lists them).
+   xAI account, or a model on their own machine (\`aimeat_ai_providers\` lists them). It thinks with
+   the model they chose, and with the node's default model until they choose one; a free model
+   answers on their key only when they chose it, or once when the key has no credit left (see
+   below).
 2. **The node's key**, while their allowance has something left, and only when the person has no
    provider of their own for what the call asks for. A person whose own provider cannot answer is
    told why; the node's key does not quietly step in.
@@ -482,7 +487,11 @@ Two things this does NOT cover, and you should not imply otherwise:
   the operator gave the chat a shared key of its own is it not metered per person: then a spent
   allowance neither stops it nor changes its model. \`GET /v1/chat/status\` says which (\`pays\`).
 - **A person's own OpenRouter account running out of credit is their account's business.** The node
-  cannot see it and has no fallback for it; the provider's error is what surfaces.
+  cannot see the balance. When OpenRouter refuses a call for it (402), a text call that named no
+  model is tried once more on the free router with the same key, and the answer carries
+  \`degradedToFreeModel: true\` like step 3: say so in one line, and that topping up their
+  OpenRouter credit is what brings their chosen model back. Any other provider's refusal surfaces as
+  that provider's error.
 
 ## What OpenRouter is, for somebody who has never heard of it
 

@@ -26,11 +26,15 @@
  *   (`uncoveredScopes`, the same helper the device-auth escalation check uses, so the two cannot
  *   disagree), and no proposal may exceed what this node allows at all. Neither is re-implemented
  *   here.
- * @structure AgentProposal · proposalApprovalUrl() · proposalNextStep() · proposerIsOwnerSession() · proposeAgent() ·
- *   listProposals() · readProposal() · settleProposal()
+ * @structure AgentProposal · RunModeCorrection · proposalApprovalUrl() · proposalNextStep() · proposalRunModeFor() ·
+ *   proposalScopesFor() · proposerIsOwnerSession() · proposeAgent() · listProposals() · readProposal() · settleProposal()
  * @usage
  *   const out = await proposeAgent({ config, storage }, principal, { name, purpose, scopes });
  * @version-history
+ *   v1.5.0 — 2026-10-02 — A `resident` ask on an account whose connected connectors all run by
+ *     spawning is stored as `spawn` with `run_mode_corrected` saying so (proposalRunModeFor), and a
+ *     proposal carries `ai:use` when the owner's crews think through the node (proposalScopesFor).
+ *     Both are what the approval re-applies to a proposal stored before this.
  *   v1.4.0 — 2026-10-02 — A proposal always carries the crew runtime's scopes (memory:read,
  *     memory:write), added after the proposer's ceiling. A proposal with memory:write only made an
  *     agent that could not read its own definition.
@@ -50,7 +54,8 @@ import type { CrewDefDoc } from '../data/basic-agents.js';
 import { uncoveredScopes } from '../utils/scope-coverage.js';
 import { withCrewRuntimeScopes } from '../data/crew-runtime-scopes.js';
 import { addItem, listItems, closeItem } from './open-items.js';
-import { basicAgentsApprovalUrl } from './basic-agents.js';
+import { basicAgentsApprovalUrl, residentRunnable } from './basic-agents.js';
+import { ownerDefaultIsNode } from './crew-menu.js';
 import { logger } from '../utils/logger.js';
 
 /** Where one proposal lives. The prefix is listable, so the owner's tools can find them all. */
@@ -77,6 +82,46 @@ export function proposalNextStep(displayName: string, approvalUrl: string, alrea
 
 export type ProposalState = 'proposed' | 'approved' | 'declined';
 
+/** A run mode the proposer asked for and no connected connector of the owner's could run. */
+export interface RunModeCorrection {
+  asked: string;
+  reason: string;
+}
+
+/**
+ * The run mode a proposal is stored and approved with, and the correction when it differs. A
+ * `resident` ask on an account whose connected connectors all run agents by spawning (every
+ * `aimeat connect serve`, and so every hosted place) is `spawn`: measured 2026-10-02 on a hosted
+ * place, a chat proposed `resident`, the owner approved, and the task stayed active for twelve
+ * minutes because nothing there keeps an agent up. With no connector connected nothing can be
+ * said, and the ask stands. Ruled by Jouni on 2026-10-02.
+ */
+export function proposalRunModeFor(owner: string, asked: string | undefined): { run_mode: string; corrected: RunModeCorrection | null } {
+  const wanted = String(asked ?? 'spawn');
+  if (wanted !== 'resident' || residentRunnable(owner) !== false) return { run_mode: wanted, corrected: null };
+  return {
+    run_mode: 'spawn',
+    corrected: {
+      asked: wanted,
+      reason: 'Your connector runs agents by starting a worker per job, so this agent runs as spawn; nothing on this account keeps an agent resident.',
+    },
+  };
+}
+
+/**
+ * The scopes an agent is proposed and approved with: the job's, the crew runtime's
+ * (data/crew-runtime-scopes.ts), and `ai:use` when the owner's crews think through this node
+ * (services/crew-menu.ts ownerDefaultIsNode), because /v1/llm requires that word and an agent
+ * approved onto the node road without it is refused on its first model call. Added after the
+ * proposer's ceiling, like the runtime's scopes: they are what the agent needs to run at all, and
+ * the owner sees the whole list before pressing. Ruled by Jouni on 2026-10-02.
+ */
+export async function proposalScopesFor(ctx: ProposalContext, owner: string, asked: readonly string[]): Promise<string[]> {
+  const scopes = withCrewRuntimeScopes(asked);
+  if (!scopes.includes('ai:use') && await ownerDefaultIsNode(ctx, owner)) scopes.push('ai:use');
+  return scopes;
+}
+
 export interface AgentProposal {
   id: string;
   /** The bare agent name the proposer suggests. The GAII is built at creation, never here. */
@@ -87,6 +132,11 @@ export interface AgentProposal {
   scopes: string[];
   mode: string;
   run_mode: string;
+  /**
+   * Set when the proposer asked for a run mode none of the owner's connected connectors can honour,
+   * and `run_mode` is the one they can: what was asked, and why it changed. Absent or null otherwise.
+   */
+  run_mode_corrected?: RunModeCorrection | null;
   /** What it would BE. Optional: an owner may approve a proposal and seed it later. */
   crew_def: CrewDefDoc | null;
   /** Who asked. A GAII, or the owner's own name when a person drafted it in their session. */
@@ -237,7 +287,9 @@ export async function proposeAgent(
   // said, and the approved agent could not read its own definition and never ran. The owner sees
   // the whole list on the proposal before pressing, and approving adds them again for a proposal
   // stored before this.
-  const scopes = withCrewRuntimeScopes(asked);
+  const scopes = await proposalScopesFor(ctx, owner, asked);
+  // A run mode nobody connected here can run is corrected now, so the owner approves what will run.
+  const runMode = proposalRunModeFor(owner, input.run_mode);
 
   const now = new Date().toISOString();
   const proposal: AgentProposal = {
@@ -247,7 +299,8 @@ export async function proposeAgent(
     purpose,
     scopes,
     mode: String(input.mode ?? 'task-runner'),
-    run_mode: String(input.run_mode ?? 'spawn'),
+    run_mode: runMode.run_mode,
+    run_mode_corrected: runMode.corrected,
     crew_def: input.crew_def ?? null,
     proposed_by: principal.sub,
     proposed_at: now,

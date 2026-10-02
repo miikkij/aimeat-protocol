@@ -33,6 +33,10 @@
  *   cd aimeat && node --import tsx test/e2e-own-key-roads.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=own-key-roads
  * @version-history
+ *   v1.2.0 — 2026-10-02 — 1b0: a key saved on its own is served the node's default model
+ *     (AIMEAT_MODEL_DEFAULT_CHAT) on the own key, and the free router only when chosen. 1g4: an
+ *     agent with no runtime is not listed among the crews; one on its machine's key keeps them
+ *     uncovered.
  *   v1.1.0 — 2026-10-02 — The crew model choice guard (UNSAFE_CHOICE on a secret variable, http, a
  *     private or link-local address), the {kind:'node'} choice, and the crews read as covered once
  *     every agent's runtime reports the node road. An agent reports its own road without agent:write
@@ -58,6 +62,7 @@ const STUB_PORT = PORT + 2;
 const NODE_ID = 'aimeat-local-001-dev';
 const PEER = pathToFileURL(resolvePath(process.cwd(), 'test/helpers/fake-goose-acp.ts')).href;
 const STUB_MODEL = 'stub/own-key-model';
+const NODE_DEFAULT_MODEL = 'stub/node-default-model';
 
 // The three keys, each a string no other key contains, so a header names exactly one of them.
 const PLACE_KEY = 'sk-or-place-e2e-7f3a91';
@@ -108,6 +113,8 @@ async function startNode(port: number, tag: string, sharedChatKey: string): Prom
             // A node configured as a hosted place is since 2026-10-02 (aimeat-commercial provision.ts).
             AIMEAT_OPENROUTER_INSTANCE_KEY: PLACE_KEY,
             AIMEAT_CHAT_FREE_ALLOWANCE_USD: '1000',
+            // The place names a default chat model, as the fleet does for every sold place.
+            AIMEAT_MODEL_DEFAULT_CHAT: NODE_DEFAULT_MODEL,
             // The stand-in provider is on loopback.
             AIMEAT_ALLOW_PRIVATE_EGRESS: 'true',
         },
@@ -244,6 +251,36 @@ async function nodeRoute(): Promise<void> {
         assert(JSON.stringify(gapParts(s.own_key)) === '["agent_runtimes"]', `only the crews are out of reach, got ${JSON.stringify(s.own_key.not_covered)}`);
     });
 
+    await test('1b0. a key saved on its own is served the NODE\'s default model, on the own key; the free router only when chosen', async () => {
+        // Measured 2026-10-02 on a hosted place: a key-only PUT created the settings with model
+        // 'openrouter/free', which came before the node's default, and one task answered in broken
+        // Finnish with neither key spending anything. Ruled by Jouni: an own key uses the node's
+        // default model unless the owner chose one, and a free model only when chosen.
+        const r = await json('/v1/openrouter/settings', owner, {
+            method: 'PUT', body: JSON.stringify({ apiKey: OWN_KEY, provider: 'custom', baseUrl: stub!.baseUrl }),
+        });
+        assert(r.status === 200, `save ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const settings = (await json('/v1/openrouter/settings', owner)).body.data;
+        assert(settings.model === null, `a key-only save names no model, got ${JSON.stringify(settings.model)}`);
+        const seen = stub!.requestsFor('chat').length;
+        const c = await json('/v1/ai/complete', owner, { method: 'POST', body: JSON.stringify({ prompt: 'DEFAULTMODEL-OWNKEY hello', app_id: 'own-key-roads' }) });
+        assert(c.status === 200, `complete ${c.status}: ${JSON.stringify(c.body?.error)}`);
+        const calls = stub!.requestsFor('chat').slice(seen);
+        assert(calls.length === 1 && keyOf(calls[0]) === 'own', `the call carried the owner's key, got ${calls.map(keyOf).join(',')}`);
+        assert(calls[0].json?.model === NODE_DEFAULT_MODEL, `the node's default model was served, got ${JSON.stringify(calls[0].json?.model)}`);
+        // Chosen on purpose, the free router is what runs.
+        // The legacy PUT always writes the provider and the address, so the choice names them too.
+        const pick = await json('/v1/openrouter/settings', owner, { method: 'PUT', body: JSON.stringify({ provider: 'custom', baseUrl: stub!.baseUrl, model: 'openrouter/free' }) });
+        assert(pick.status === 200, `choose ${pick.status}`);
+        const seen2 = stub!.requestsFor('chat').length;
+        const c2 = await json('/v1/ai/complete', owner, { method: 'POST', body: JSON.stringify({ prompt: 'CHOSENFREE-OWNKEY hello', app_id: 'own-key-roads' }) });
+        assert(c2.status === 200, `complete on the chosen free router ${c2.status}: ${JSON.stringify(c2.body?.error)}`);
+        const calls2 = stub!.requestsFor('chat').slice(seen2);
+        assert(calls2[0]?.json?.model === 'openrouter/free', `the chosen free router was served, got ${JSON.stringify(calls2[0]?.json?.model)}`);
+        const del = await json('/v1/openrouter/settings', owner, { method: 'DELETE' });
+        assert(del.status === 200, `delete ${del.status}`);
+    });
+
     await test('1b. the owner saves their own key the way the measurement did (PUT /v1/openrouter/settings); the node says it pays', async () => {
         const r = await json('/v1/openrouter/settings', owner, {
             method: 'PUT',
@@ -363,12 +400,20 @@ async function nodeRoute(): Promise<void> {
         assert(fenced.status === 403, `an agent without agent:write cannot report a sibling's runtime, got ${fenced.status}`);
         const bad = await json('/v1/agents/roads-agent/runtime-source', agent, { method: 'PATCH', body: JSON.stringify({ runtime_source: { kind: 'crew-def', llm: 'elsewhere' } }) });
         assert(bad.status === 400, `an llm other than node or machine is refused, got ${bad.status}`);
+        // Neither agent enrolled or reported yet: neither has a runtime, so neither is a crew to list
+        // (the `app` principal of a hosted place sat in this list with llm null, 2026-10-02).
+        let s = (await json('/v1/chat/status', owner)).body.data;
+        assert((s.own_key.agents as any[]).length === 0, `an agent with no runtime is not listed, got ${JSON.stringify(s.own_key.agents)}`);
         const r1 = await report(agent, 'roads-agent');
         assert(r1.status === 200, `the agent reports its own road without agent:write, got ${r1.status} ${JSON.stringify(r1.body?.error)}`);
-        let s = (await json('/v1/chat/status', owner)).body.data;
+        s = (await json('/v1/chat/status', owner)).body.data;
         const road = (s.own_key.agents as any[]).find((a) => a.agent === 'roads-agent');
         assert(road?.llm === 'node', `the agent's road is listed, got ${JSON.stringify(s.own_key.agents)}`);
-        assert(gapParts(s.own_key).includes('agent_runtimes'), `one agent (roads-noai) has not said, so the crews are not all covered, got ${JSON.stringify(s.own_key)}`);
+        assert(s.own_key.covers.includes('agent_runtimes'), `the only crew with a runtime is on the node road, so the crews are covered, got ${JSON.stringify(s.own_key)}`);
+        const machine = await json('/v1/agents/roads-noai/runtime-source', owner, { method: 'PATCH', body: JSON.stringify({ runtime_source: { kind: 'crew-def', runtime: 'crewaimeat test', llm: 'machine' } }) });
+        assert(machine.status === 200, `the owner reports the second agent on its machine's key, got ${machine.status}`);
+        s = (await json('/v1/chat/status', owner)).body.data;
+        assert(gapParts(s.own_key).includes('agent_runtimes'), `one crew (roads-noai) thinks with its machine's key, so the crews are not all covered, got ${JSON.stringify(s.own_key)}`);
         const r2 = await report(owner, 'roads-noai');
         assert(r2.status === 200, `the owner reports the second agent's road, got ${r2.status}`);
         s = (await json('/v1/chat/status', owner)).body.data;
