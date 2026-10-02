@@ -2438,10 +2438,10 @@
      "slug": "g-14-a-daily-purchase-limit-for-each-agent",
      "cells": [
       "<strong>A daily purchase limit for each agent</strong>",
-      "An agent of yours pays in money only within the daily limit you set on its card, per currency. With no limit it does not spend money, and a checkout it tries is refused with a link to the card. You set the limit yourself, signed in; an agent can read its limit and what it spent today, but cannot change it. Your own purchases and morsel prices are not limited. Limits: the limit covers checkouts; a hold for a bid is not counted.",
+      "An agent of yours pays in money only within the daily limit you set on its card, per currency. With no limit it does not spend money, and a checkout it tries is refused with a link to the card. You set the limit yourself, signed in; an agent can read its limit and what it spent today, but cannot change it. Your own purchases and morsel prices are not limited. A hold the agent places for a bid counts too, from the moment it is authorized. Limits: a released hold is not given back the same day.",
       "Profile › Agents (agent card), <code>/v1/agents/:name/purchase-limit</code>"
      ],
-     "plain": "A daily purchase limit for each agent An agent of yours pays in money only within the daily limit you set on its card, per currency. With no limit it does not spend money, and a checkout it tries is refused with a link to the card. You set the limit yourself, signed in; an agent can read its limit and what it spent today, but cannot change it. Your own purchases and morsel prices are not limited. Limits: the limit covers checkouts; a hold for a bid is not counted. Profile › Agents (agent card), /v1/agents/:name/purchase-limit"
+     "plain": "A daily purchase limit for each agent An agent of yours pays in money only within the daily limit you set on its card, per currency. With no limit it does not spend money, and a checkout it tries is refused with a link to the card. You set the limit yourself, signed in; an agent can read its limit and what it spent today, but cannot change it. Your own purchases and morsel prices are not limited. A hold the agent places for a bid counts too, from the moment it is authorized. Limits: a released hold is not given back the same day. Profile › Agents (agent card), /v1/agents/:name/purchase-limit"
     },
     {
      "slug": "g-14-agent-commerce-protocols",

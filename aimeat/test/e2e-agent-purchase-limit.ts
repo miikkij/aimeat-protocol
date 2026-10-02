@@ -16,6 +16,7 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-agent-purchase-limit
  * @version-history
+ *   v1.1.0 — 2026-10-02 — 5b/5c: an agent's hold for a bid is refused past the limit and counts within it.
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import * as ed from '@noble/ed25519';
@@ -76,7 +77,8 @@ const pub = await json('/v1/agents/vendor/offers', auth(seller.token, {
     }] }),
 }));
 assert(pub.status === 200, `offer ${pub.status}: ${JSON.stringify(pub.body.error)}`);
-const shopper = await agent(buyer.token, buyer.name, 'shopper', ['commerce:buy', 'memory:read']);
+// commerce:sell too: POST /v1/commerce/holds asks for it.
+const shopper = await agent(buyer.token, buyer.name, 'shopper', ['commerce:buy', 'commerce:sell', 'memory:read']);
 
 /** Open a 2 EUR session and complete it on the invoice rail, as `token`. */
 async function buy(token: string) {
@@ -124,6 +126,26 @@ await test('5. FAILURE: a purchase past the limit is refused, and the session st
     assert(done.status === 403 && done.body.error?.code === 'PURCHASE_LIMIT_REACHED', `${done.status} ${JSON.stringify(done.body.error)}`);
     const s = await json(`/v1/commerce/checkout-sessions/${id}`, auth(buyer.token));
     assert(s.body.data?.session?.status === 'open', `still open: ${JSON.stringify(s.body.data?.session?.status)}`);
+});
+
+/** An agent's hold for a bid toward the seller, on the test money rail. */
+const hold = (amountMicros: number) => json('/v1/commerce/holds', auth(shopper.token, {
+    method: 'POST', body: JSON.stringify({
+        seller: seller.name, amount: amountMicros, currency: 'EUR', purpose: 'bid',
+        reference: `limit-${amountMicros}`, payment: { handler: 'test.money', instrument: 'pm_test_hold' },
+    }),
+}));
+
+await test('5b. FAILURE: a hold for a bid past the limit is refused like a purchase', async () => {
+    const r = await hold(2_000_000);
+    assert(r.status === 403 && r.body.error?.code === 'PURCHASE_LIMIT_REACHED' && /This hold/.test(r.body.error.message), `${r.status} ${JSON.stringify(r.body.error)}`);
+});
+
+await test('5c. a hold within the limit is authorized and counts toward today', async () => {
+    const r = await hold(500_000);
+    assert(r.status === 201, `hold ${r.status}: ${JSON.stringify(r.body.error)}`);
+    const read = await json(limitPath, auth(shopper.token));
+    assert(read.body.data.limits[0]?.spent_today === 2.5, `2 bought + 0.5 held: ${JSON.stringify(read.body.data)}`);
 });
 
 await test('6. the owner\'s own purchase is not limited', async () => {
