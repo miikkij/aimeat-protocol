@@ -14,9 +14,12 @@
  *   THE VIEW NEVER WEARS THE NODE'S OWN CSS: while it is open the page wears the built-in theme
  *   (window.__aimeatLook.hold), so a theme that breaks pages cannot break the tool that repairs it.
  *   Built only from library parts, with no sheet of its own.
- * @structure ThemesTab (default) · ThemeRow · WhoChooses · NewThemeDialog
+ * @structure ThemesTab (default) · ThemeRow · WhoChooses · NewThemeDialog; the "Ask your AI" section
+ *   is themes-ai.js
  * @usage Mounted by the admin dashboard tab router (views/admin.js), group Design.
  * @version-history
+ *   v2.2.0 — 2026-10-02 — "Ask your AI" between the themes and who chooses: the prompts for an AI with
+ *     and without the MCP theme tools, and the paste box for a JSON answer (themes-ai.js).
  *   v2.1.0 — 2026-09-27 — No class written any more: the action links are Action, the loud actions
  *     Loud (control), the small grey facts and "saved" the meta Note (admin page group G8).
  *   v2.0.0 — 2026-09-24 — The two-level model of 07: S1 and S8 here, the theme's own screens in
@@ -43,6 +46,7 @@ import { Action, Loud, Actions } from '/components/Action.js';
 import { Note } from '/components/Note.js';
 import { Choice, StyleMarks, versionLabel } from './themes-bits.js';
 import ThemeScreen from './themes-theme.js';
+import { AskAiBand } from './themes-ai.js';
 
 const html = htm.bind(h);
 
@@ -197,6 +201,7 @@ export default function ThemesTab() {
           onOpen=${() => setOpen(th.id)} onCopy=${() => setMaking({ basedOn: th.id })}
           onRetire=${() => retire(th)} onRestore=${(v) => restore(th, v)} />`)}
     <//>
+    <${AskAiBand} data=${data} onMade=${(id) => { setOpen(id); load(); }} />
     <${WhoChooses} policy=${data.policy} themes=${data.themes} onSaved=${load} />
     ${making && html`<${NewThemeDialog} themes=${data.themes} basedOn=${making.basedOn} onClose=${() => setMaking(null)}
       onMade=${(id) => { setMaking(null); setOpen(id); load(); }} />`}`;

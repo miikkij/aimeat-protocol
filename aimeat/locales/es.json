@@ -18946,6 +18946,34 @@
     "builtWithout": "Construido sin una decisión: {title}"
   },
   "themes": {
+    "ai": {
+      "title": "Pregunta a tu IA",
+      "lead": "Tu propia IA puede crear un tema por ti. Escribe el aspecto que quieres, copia el prompt y dáselo a tu IA. El tema que crea tu IA no aparece en el selector de aspecto: primero lo abres aquí y decides cuándo puede elegirlo la gente.",
+      "langNote": "El prompt está en inglés porque las IA funcionan mejor así. Aun así puedes pedirle a la IA que te responda en tu idioma.",
+      "look": "El aspecto que quieres",
+      "lookHint": "Por ejemplo: tranquilo y verde, esquinas redondeadas, títulos con serifa. Si lo dejas vacío, tu IA te pregunta primero.",
+      "mcpLabel": "Tu IA está conectada a este sitio",
+      "mcpHint": "Tu IA crea el tema ella misma, y el tema aparece en la lista de arriba.",
+      "jsonLabel": "Tu IA no está conectada a este sitio",
+      "jsonHint": "Tu IA te devuelve el tema como texto. Pega su respuesta entera abajo y esta página crea el tema.",
+      "copy": "Copiar para tu IA",
+      "copied": "Copiado",
+      "pasteLabel": "Pega aquí lo que te dio tu IA",
+      "pastePh": "Vale todo lo que haya escrito, explicaciones incluidas.",
+      "make": "Crear el tema",
+      "making": "Creando el tema…",
+      "partly": "El tema {name} está creado, pero un paso falló: {error}. Abre el tema para terminarlo, o retíralo.",
+      "bad": {
+        "json": "La respuesta no contiene ningún tema. Pide a tu IA que dé el tema como un solo bloque de código JSON.",
+        "name": "El tema necesita un nombre de 1 a 60 caracteres.",
+        "styles": "El tema necesita de 1 a 12 estilos.",
+        "styleName": "Cada estilo necesita un nombre.",
+        "colours": "Los colores del estilo {style} no tienen la forma correcta. Cada color es un nombre y un valor.",
+        "faces": "Las fuentes del estilo {style} no tienen la forma correcta.",
+        "shapes": "Las formas no están bien escritas. Cada forma es un nombre y un valor.",
+        "css": "El CSS del tema tiene que ser texto."
+      }
+    },
     "intro": "Los aspectos de las páginas propias de este AIMEAT (el inicio, el chat, Configuración y controles, la administración). Un tema contiene estilos; un estilo tiene sus colores en claro y en oscuro. La gente elige en el selector de aspecto de la parte superior de la página y, en un teléfono, en el menú. Mientras esta vista está abierta muestra el aspecto incorporado, así que un tema no puede estropearla.",
     "loading": "Cargando…",
     "themes": "Temas",

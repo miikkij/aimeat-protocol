@@ -21164,6 +21164,34 @@
     "builtWithout": "Built without a decision: {title}"
   },
   "themes": {
+    "ai": {
+      "title": "Ask your AI",
+      "lead": "Your own AI can make a theme for you. Write the look you want, then copy the text and give it to your AI. A theme your AI makes stays off the look picker: you open it here first and choose when people can pick it.",
+      "langNote": "The text for your AI is in English, because AIs work best that way. Your AI can still answer you in your language.",
+      "look": "The look you want",
+      "lookHint": "For example: calm and green, round corners, a serif headline. Leave it empty, and your AI asks you first.",
+      "mcpLabel": "Your AI is connected to this site",
+      "mcpHint": "Your AI makes the theme itself, and the theme shows in the list above.",
+      "jsonLabel": "Your AI is not connected to this site",
+      "jsonHint": "Your AI gives the theme back as text. Paste its whole answer below, and this page makes the theme.",
+      "copy": "Copy for your AI",
+      "copied": "Copied",
+      "pasteLabel": "Paste what your AI gave back here",
+      "pastePh": "Everything it wrote is fine, explanation and all.",
+      "make": "Make the theme",
+      "making": "Making the theme…",
+      "partly": "The theme {name} is made, but one step failed: {error}. Open the theme to finish it, or retire it.",
+      "bad": {
+        "json": "The answer has no theme in it. Ask your AI to give the theme as one JSON code block.",
+        "name": "The theme needs a name of 1 to 60 characters.",
+        "styles": "The theme needs 1 to 12 styles.",
+        "styleName": "Each style needs a name.",
+        "colours": "The colours of the style {style} have the wrong form. Each colour is a name and a value.",
+        "faces": "The fonts of the style {style} have the wrong form.",
+        "shapes": "The shapes have the wrong form. Each shape is a name and a value.",
+        "css": "The theme CSS must be text."
+      }
+    },
     "intro": "The looks of this AIMEAT's own pages (the home, the chat, Settings & Controls, admin). A theme holds styles; a style has its colours in light and dark. People choose in the look picker at the top of the page, and on a phone in the menu. While this view is open it shows the built-in look, so a theme cannot break it.",
     "loading": "Loading…",
     "themes": "Themes",
