@@ -23,6 +23,10 @@
  * @structure nextStep() · registerAgentProposalRoutes()
  * @usage registerAgentProposalRoutes(router, config, storage);
  * @version-history
+ *   v1.2.0 — 2026-10-02 — The proposal answer carries `approval_url` and `already_waiting`, and its
+ *     `next_step` names the address (services/agent-proposals.ts proposalNextStep). The MCP tool
+ *     already said whether the name was waiting; the REST answer, which the connector and the fleet
+ *     daemon relay, did not.
  *   v1.1.0 — 2026-09-08 — Approve CREDENTIALS the agent too, through services/agent-enrolment-offer.
  *     It stopped at the seed and told the owner to start their connector, which mints no enrolment
  *     grant: the agent had no key, no token, never reached `serve.json` and never ran. A connector
@@ -41,7 +45,8 @@ import { offerEnrolment } from '../../services/agent-enrolment-offer.js';
 import { emitChange } from '../../services/event-bus.js';
 import { recordAccountEvent } from '../../services/account-events.js';
 import {
-  proposeAgent, listProposals, readProposal, settleProposal, type ProposerPrincipal,
+  proposeAgent, listProposals, readProposal, settleProposal, proposalApprovalUrl, proposalNextStep,
+  type ProposerPrincipal,
 } from '../../services/agent-proposals.js';
 import { logger } from '../../utils/logger.js';
 
@@ -91,11 +96,14 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
       res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;
     }
+    const approvalUrl = proposalApprovalUrl(config.baseUrl);
     res.status(201).json(success(config.nodeId, {
       proposal: out.proposal,
       created: false,
+      already_waiting: out.alreadyWaiting ?? false,
+      approval_url: approvalUrl,
       // Said plainly, because an agent relaying this to a person should be able to say it as-is.
-      next_step: `Nothing has been created. ${out.proposal.display_name} is waiting for you to approve it in your profile under Agents.`,
+      next_step: proposalNextStep(out.proposal.display_name, approvalUrl, out.alreadyWaiting ?? false),
     }, [
       { description: 'The owner approves it', method: 'POST', url: `/v1/agents/v2/agent-proposals/${out.proposal.id}/approve` },
       { description: 'See it in the profile', method: 'GET', url: '/v1/profile?tab=agents' },

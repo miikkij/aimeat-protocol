@@ -8,6 +8,8 @@
  *   every surface and with every optional part switched on, because each of those pushes text down.
  * @usage cd aimeat && pnpm exec vitest run test/unit/mcp-instructions-cut.test.ts
  * @version-history
+ *   v1.2.0 — 2026-10-02 — Holds the rule for a new agent (propose it here, never elsewhere) ahead of
+ *     the long form on the surfaces that reach the proposal tool, and off the three that do not.
  *   v1.1.0 — 2026-10-01 — Holds the sentence that "remember", "note" and "save" mean this node's
  *     memory inside the cut, on every surface.
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
@@ -41,6 +43,29 @@ describe('the MCP instructions, cut where a client cuts them', () => {
             for (const [what, pattern] of MUST_SURVIVE) expect(seen, `${role} lost ${what}`).toMatch(pattern);
         });
     }
+
+    // Measured 2026-10-02 on a hosted node: asked for "an agent that every morning gathers the
+    // CRM's open deals", the owner's agent recommended CrewAI Studio and three outside CRMs, and
+    // the owner's own CRM workspace and this node's proposal tool went unmentioned. CORE had no
+    // room left under the cut, so the rule sits right after it and the support line, ahead of the
+    // long form, where a client that shows about 2.3 kB still reads it.
+    const PROPOSES = ['all', 'full', 'agent', 'admin', 'primitives'] as const;
+    for (const role of PROPOSES) {
+        it(`${role}: a new agent is proposed on this node, ahead of the long form`, () => {
+            const t = instructionsFor(role as never, WORST);
+            const at = t.search(/new agent[^.]*aimeat_agent_propose/);
+            expect(at).toBeGreaterThan(-1);
+            expect(t).toMatch(/never send them to build one elsewhere/);
+            expect(at).toBeLessThan(t.indexOf('SPEAK TO THE PERSON'));
+            expect(at).toBeLessThan(INSTRUCTIONS_CUT_AT + 400);
+        });
+    }
+
+    it('a surface without the proposal tool is not told to use it', () => {
+        for (const role of ['appdev', 'service', 'commerce'] as const) {
+            expect(instructionsFor(role as never)).not.toMatch(/aimeat_agent_propose/);
+        }
+    });
 
     it('who answers support sits right after the core, not after the long form', () => {
         const t = instructionsFor('all', WORST);

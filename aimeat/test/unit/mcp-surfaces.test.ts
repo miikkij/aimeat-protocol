@@ -119,6 +119,19 @@ describe('v2 MCP surfaces', () => {
         expect(MCP_SURFACES.full.length).toBe(catalog.length - V2_EXCLUDED.length);
     });
 
+    /**
+     * The owner's own agent is who a person asks for a new agent. The proposal tools sat on the
+     * admin list only, under a comment saying they were on `agent`, so an agent connected to the
+     * agent surface could not propose one (found 2026-10-02, when a concierge asked for a CRM
+     * digest agent recommended an outside product instead).
+     */
+    it('the owner\'s own agent can propose a new agent', () => {
+        const s = toolsForSurface('agent');
+        for (const name of ['aimeat_agent_propose', 'aimeat_agent_basics_get', 'aimeat_agent_basics_request']) {
+            expect({ name, onAgent: s.has(name) }).toEqual({ name, onAgent: true });
+        }
+    });
+
     it('full carries every other surface, so it can never be the smaller answer', () => {
         const full = toolsForSurface('full');
         for (const role of V2_ROLES) {

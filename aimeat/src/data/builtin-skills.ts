@@ -11,6 +11,9 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.22.0 -- 2026-10-02 -- add-a-crew-agent: the node makes the agent, so never an outside builder;
+ *     read the organisms and workspaces it will work on before designing; hand the person the
+ *     approval address; a clock comes after, as an agent_task schedule.
  *   v1.21.0 -- 2026-10-01 -- aimeat-organisms (builtin-skills.organisms.ts): what an organism is for,
  *     the starting shapes, access, and how a place stays current.
  *   v1.20.0 -- 2026-10-01 -- aimeat-guided-journey (builtin-skills.guided-journey.ts): the path in seven
@@ -327,7 +330,7 @@ Everything is MEMORY records under the owner's identity (GHII) or their agents' 
     name: 'add-a-crew-agent',
     skillMd: `---
 name: add-a-crew-agent
-description: How a new agent comes into being on an AIMEAT node. You design it as a crew definition (a JSON document of roles, tasks and tools), propose it with aimeat_agent_propose, and the owner approves it with one press. Also covers the two agents every owner can create from a button, connecting a runtime of your own by device authorization, changing a running agent's definition, scopes, skills, tags, and checking that it came online. Use when the owner wants a new agent, a new crew, or a new AI runtime connected.
+description: How a new agent comes into being on an AIMEAT node, which makes it itself, so a request for one is never sent to an outside builder. You read the organisms and workspaces it will work on, design it as a crew definition (a JSON document of roles, tasks and tools), propose it with aimeat_agent_propose, and the owner approves it with one press at the address the answer gives. Also covers the two agents every owner can create from a button, connecting a runtime of your own by device authorization, changing a running agent's definition, scopes, skills, tags, and checking that it came online. Use when the owner wants a new agent, a new crew, or a new AI runtime connected.
 license: MIT
 metadata:
   audience: operator
@@ -338,6 +341,11 @@ metadata:
 An agent is never created implicitly, and never by another agent alone. Adding one changes the
 owner's account, so the last step is always the owner's own press. Everything before it is yours.
 
+**This node makes the agent.** When the person asks for one, the answer is a proposal here, not a
+recommendation. Never point them to an outside agent builder, tool or product for it: the node
+creates the agent, gives it its definition, credentials it and runs it on their own connector, and
+an agent built elsewhere cannot see what they keep here.
+
 ## 0. Look before you add
 
 \`aimeat_agents_list\` shows what the owner already has. \`aimeat_agent_basics_get\` says whether
@@ -345,6 +353,13 @@ the two basic agents exist: \`concierge\`, which answers what arrives, and \`wor
 which orders work from the owner's other agents. If they are missing and would do the job,
 \`aimeat_agent_basics_request\` puts one line on the owner's open items, and the button behind it
 creates both with their definitions. Design a new agent only for a job those two do not cover.
+
+Then look at the data the agent will work on. \`aimeat_organism_list\` and \`aimeat_workspace_list\`
+(or \`aimeat_discover\` with scope "shared") show the organisms and workspaces the person keeps:
+their CRM, their notes, their customers. Read the workspace the agent will use
+(\`aimeat_workspace_read\` without ids gives its spaces and record shapes), so the definition reads
+the records they actually have. "Gather my open deals" means the deals in their sales workspace,
+not a product they do not use.
 
 ## 1. The usual way: propose it, with its definition
 
@@ -359,20 +374,27 @@ creates both with their definitions. Design a new agent only for a job those two
    crew: it defaults to \`["tasks"]\`, and that is wrong for an agent whose work arrives as a
    message or a DM. The full shape is in the \`doc\` parameter of \`aimeat_crew_publish\`.
 3. **Propose it.** \`aimeat_agent_propose\` with \`name\`, a \`purpose\` the owner can decide from
-   (it is the sentence they read), \`scopes\`, \`mode\`, \`run_mode\` and the \`crew_def\`. The
-   definition is checked before the proposal is written, so a broken one is refused now. Nothing
-   is created. One line appears on the owner's open items.
-4. **The owner presses approve.** That one press creates the agent, gives it the definition and
-   hands it to the owner's connector, which runs it on the owner's own machine
-   (\`aimeat connect serve\`). The answer says which of four states it ended in. If the connector
-   could not be reached, the agent exists with its instructions and nothing runs it: the owner
-   starts the connector and presses Attach.
+   (it is the sentence they read, so name their data in it: "reads the open deals in your Sales
+   workspace each morning and lists what to act on"), \`scopes\`, \`mode\`, \`run_mode\` and the
+   \`crew_def\`. The definition is checked before the proposal is written, so a broken one is
+   refused now. Nothing is created. One line appears on the owner's open items.
+4. **Tell the owner where to approve.** The answer carries \`approval_url\`, the page where the
+   proposal waits, and \`next_step\`, a sentence written for them. Give them both in their own
+   words. Their one press there creates the agent, gives it the definition and hands it to their
+   connector, which runs it on their own machine (\`aimeat connect serve\`). The approval's answer
+   says which of four states it ended in. If the connector could not be reached, the agent exists
+   with its instructions and nothing runs it: the owner starts the connector and presses Attach.
+5. **Work on a clock comes after.** "Every morning" is a schedule of kind \`agent_task\` for the new
+   agent (\`aimeat_schedule_create\`), made once the agent exists. Say so when you propose it.
 
 Always send the \`crew_def\`. An agent approved without one exists and cannot start, and
 \`aimeat_crew_publish\` cannot repair that, because publishing asks the agent's own runtime to
 validate and a new agent has none.
 
 **Scopes and modes.** Name each scope, never \`*\`, and never more than you hold yourself. An agent
+run by a crew runtime needs \`memory:write\` and \`agent:write\` whatever its job: the runtime stores
+the result with the first and reports the agent's tags with the second, and without them the agent
+reads, works, and has its task fail at the end (measured 2026-10-02). An agent
 that reads and writes the owner's memory needs \`memory:read\` and \`memory:write\`; one that takes
 queued work also needs \`work:read\` and \`work:accept\`; one that uses the owner's AI (text, pictures,
 transcription, embeddings, or the node's \`/v1/llm\` through \`node_llm()\`) needs \`ai:use\`. \`mode: "task-runner"\` lets a queued task
@@ -417,6 +439,8 @@ it lands in YOUR namespace, where neither the runtime nor the Crew tab looks.
 - Never mint or paste credentials yourself; approval is the owner's own action.
 - One agent per purpose beats one agent with every scope.
 - The definition is the agent. Propose the two together.
+- Build on what the person keeps here. An outside tool or product is never the answer to a
+  request this node fulfils itself.
 `,
   },
   {

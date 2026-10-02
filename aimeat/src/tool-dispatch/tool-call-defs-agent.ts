@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-02 -- aimeat_agent_propose says when to use it, to read the person's workspaces first and
+ *     to hand over approval_url, as the catalog description does.
  *   2026-10-01 -- `tier` names "features" and "features/<id>", the feature map in parts.
  *   2026-09-27 -- Agent-facing texts use industry terms: door and surface became tool and interface (docs/coding-guidelines/shell-and-git.md).
  *   2026-09-19 — The `tier` description of aimeat_handbook_get names the Atelier specification
@@ -243,7 +245,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_agent_propose',
-        description: "Put a NEW agent in front of your owner for approval. Creates nothing: only their own press creates it, seeds its definition and hands it to their connector. Send crew_def with it whenever you can — an agent approved without one exists and cannot run.",
+        description: "How a new agent is made on this node: when the person asks for one, propose it here, never through an outside agent builder or another product. First read what it will work on (aimeat_organism_list, aimeat_workspace_list) and name that data in purpose and crew_def. Scopes: what the job needs plus memory:write and agent:write, which the crew runtime writes with. Creates nothing: only their own press creates it, seeds its definition and hands it to their connector. Then give them approval_url from the answer. Send crew_def with it whenever you can: an agent approved without one exists and cannot run.",
         input: {
             name: { type: 'string', required: true, description: 'The agent name: 3 to 40 characters, lowercase letters, digits and hyphens, starting with a letter.' },
             purpose: { type: 'string', required: true, description: 'What this agent is for, in a sentence the owner can decide from.' },

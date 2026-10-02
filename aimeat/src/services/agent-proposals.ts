@@ -26,10 +26,14 @@
  *   (`uncoveredScopes`, the same helper the device-auth escalation check uses, so the two cannot
  *   disagree), and no proposal may exceed what this node allows at all. Neither is re-implemented
  *   here.
- * @structure AgentProposal · proposeAgent() · listProposals() · readProposal() · settleProposal()
+ * @structure AgentProposal · proposalApprovalUrl() · proposalNextStep() · proposeAgent() ·
+ *   listProposals() · readProposal() · settleProposal()
  * @usage
  *   const out = await proposeAgent({ config, storage }, principal, { name, purpose, scopes });
  * @version-history
+ *   v1.2.0 — 2026-10-02 — proposalApprovalUrl() and proposalNextStep(): the REST answer and the MCP
+ *     tool give the person the address of the page where they approve, in one sentence written
+ *     once. Both said "in your profile under Agents", with no address to hand over.
  *   v1.1.0 — 2026-09-08 — A name already waiting comes back as the standing proposal instead of a
  *     second line on the owner's open items. Two agents reaching the same conclusion is normal.
  *   v1.0.0 — 2026-09-02 — Initial, replacing crew-forge as the way an agent comes into being.
@@ -40,10 +44,30 @@ import type { Storage } from '../storage/interface.js';
 import type { CrewDefDoc } from '../data/basic-agents.js';
 import { uncoveredScopes } from '../utils/scope-coverage.js';
 import { addItem, listItems, closeItem } from './open-items.js';
+import { basicAgentsApprovalUrl } from './basic-agents.js';
 import { logger } from '../utils/logger.js';
 
 /** Where one proposal lives. The prefix is listable, so the owner's tools can find them all. */
 export const PROPOSAL_KEY_PREFIX = 'agents.proposals.';
+
+/**
+ * Where the person approves a proposal: the Agents page, which lists what waits for them. The same
+ * address the basic-agents answer gives, because it is the same page and the same press.
+ */
+export function proposalApprovalUrl(baseUrl: string): string {
+  return basicAgentsApprovalUrl(baseUrl);
+}
+
+/**
+ * What a proposing agent tells the person, written once for the REST answer and the MCP tool. It
+ * names the address, because "in your profile under Agents" left an agent with nothing to hand
+ * over and a person with a page to look for.
+ */
+export function proposalNextStep(displayName: string, approvalUrl: string, alreadyWaiting: boolean): string {
+  return alreadyWaiting
+    ? `${displayName} is already waiting for your approval. Open ${approvalUrl} and approve it there; nothing is made until you do.`
+    : `Nothing has been created yet. Open ${approvalUrl} and approve ${displayName} there; your press makes it and gives it its instructions.`;
+}
 
 export type ProposalState = 'proposed' | 'approved' | 'declined';
 

@@ -22,6 +22,8 @@
  *   import { toolsForSurface } from '../catalog/surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
+ *   2026-10-02 — aimeat_agent_propose, aimeat_agent_basics_get and _request on `agent`: an owner's
+ *     own agent is who a person asks for a new agent, and these were on `admin` only.
  *   2026-10-01 — aimeat_admin_federation_peer_remove beside aimeat_admin_federation.
  *   2026-09-30 — aimeat_workspace_comment_delete beside the other comment tools.
  *   2026-09-30 — aimeat_admin_node_update on the admin surface.
@@ -275,6 +277,9 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_catalogue_agents', 'aimeat_catalogue_directory', 'aimeat_catalogue_boards',
         'aimeat_board_read',
         'aimeat_agent_profile', 'aimeat_agent_activity', 'aimeat_agent_capabilities_report', 'aimeat_agent_tags_set', 'aimeat_agent_telemetry_report', 'aimeat_agents_list',
+        // A person asks THEIR OWN agent for a new agent, so the proposal tools belong here. They sat
+        // on `admin` alone until 2026-10-02, under a comment saying they were on this list.
+        'aimeat_agent_basics_get', 'aimeat_agent_basics_request', 'aimeat_agent_propose',
         'aimeat_crew_get', 'aimeat_crew_validate', 'aimeat_crew_try', 'aimeat_crew_draft', 'aimeat_crew_publish', 'aimeat_crew_seed',
         'aimeat_crew_menu', 'aimeat_crew_llm_set',
         'aimeat_usage_report',
@@ -395,9 +400,9 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_secret_list', 'aimeat_secret_set', 'aimeat_secret_delete',
         'aimeat_agent_mode_set', 'aimeat_agent_run_mode_set', 'aimeat_agent_runtime_report', 'aimeat_agent_description_set',
         'aimeat_agent_tags_set', 'aimeat_agent_console_set',
-        // Read-only: what the one-press basic agents would give this account, and whether the
-        // owner's connector is up. On 'agent' beside the three above because its caller is one of
-        // the owner's own agents, telling the person where to press.
+        // What the one-press basic agents would give this account, and a proposal for a new one.
+        // On `agent` too, because their usual caller is one of the owner's own agents telling the
+        // person where to press; here for the owner-side agent management this surface carries.
         'aimeat_agent_basics_get', 'aimeat_agent_basics_request', 'aimeat_agent_propose',
         'aimeat_crew_get', 'aimeat_crew_validate', 'aimeat_crew_try', 'aimeat_crew_draft', 'aimeat_crew_publish', 'aimeat_crew_seed',
         'aimeat_crew_menu', 'aimeat_crew_llm_set',
