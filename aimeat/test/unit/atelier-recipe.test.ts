@@ -20,6 +20,8 @@
  *   variant table is held to atelier's.
  * @usage cd aimeat && pnpm exec vitest run test/unit/atelier-recipe.test.ts
  * @version-history
+ *   v1.2.0 — 2026-10-03 — The token count reads "sixty" words too (sixty-one to sixty-eight): the
+ *     board family and the handbook took it past fifty-nine.
  *   v1.1.0 — 2026-09-05 — The living section and the sixth pattern (the living document, stage
  *     3a): the node types named are exactly describe-data.js's, and the worked record validates,
  *     computes 4.8 L and crosses to two tins when the wall grows.
@@ -129,8 +131,11 @@ describe('the customisation section is held to describe-data.js', () => {
       'fifty-five': 55, 'fifty-six': 56, 'fifty-seven': 57,
       // aiTask, workflowInput, doc and decision added four widths on 2026-10-01.
       'fifty-eight': 58, 'fifty-nine': 59, 'sixty': 60,
+      // The board family added six and the handbook one on 2026-10-03.
+      'sixty-one': 61, 'sixty-two': 62, 'sixty-three': 63, 'sixty-four': 64, 'sixty-five': 65,
+      'sixty-six': 66, 'sixty-seven': 67, 'sixty-eight': 68,
     };
-    const said = [...text.matchAll(/and ((?:thirty|forty|fifty)-[a-z]+) more/g)].map((m) => WORDS[m[1]]);
+    const said = [...text.matchAll(/and ((?:thirty|forty|fifty|sixty)(?:-[a-z]+)?) more/g)].map((m) => WORDS[m[1]]);
     expect(said.length).toBe(1);
     expect(named.size + said[0]).toBe(perComponent.length);
   });

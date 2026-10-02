@@ -55,6 +55,11 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.65.0 — 2026-10-03 — THE HANDBOOK (handbook.js, handbook.css): an app's manual from its
+ *     header. A table of contents, one chapter at a time, a search, chapters from the app's list
+ *     and from every element on the page that carries data-ak-help, every word per language, and a
+ *     "Show me" that marks the chapter's place in the app. From the side or as a dialog; app({ help })
+ *     puts its button in the bar (wish-ohjekirja-komponentti-atelieriin-sis-llysluettelo-ohjeet-app).
  *   v0.64.0 — 2026-10-02 — THE BOARD (board.js, board-i18n.js, board.css): frames on an infinite
  *     plane over AIMEAT.viewport, from ORIGAMI 1.2.0. Keyed frames (set() adds, moves, resizes,
  *     removes, re-renders a body only on `rev`), a head and a grip counter-scaled so they read the
@@ -417,6 +422,7 @@ import { members, joinRequest, accessState } from './members.js';
 import { workspaceTeam } from './workspace-team.js';
 import { workspacePicker } from './workspace-picker.js';
 import { board } from './board.js';
+import { handbook } from './handbook.js';
 import { requestPanel } from './request-panel.js';
 import { shelf } from './shelf.js';
 import { verbs } from './verbs.js';
@@ -462,7 +468,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.64.0',
+  version: '0.65.0',
 
   /**
    * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
@@ -544,6 +550,10 @@ const atelier = {
   //    panel that is a terminal (request-panel.js), the shelf of pieces (shelf.js), and the card
   //    verbs a control declares instead of a script (verbs.js) ──
   board, requestPanel, shelf, verbs,
+
+  // ── An app's own manual from its header: contents, chapters from the app and the page, a
+  //    search, every word per language, and the place a chapter names marked in the app ──
+  handbook,
 
   // ── A Public Intake form and its admin list (AIMEAT.intake), the owner's outside accounts (AIMEAT.connect) ──
   intakeForm, intakeAdmin, connections,

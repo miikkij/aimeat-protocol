@@ -15,6 +15,8 @@
  * @version-history
  *   v1.30.0 — 2026-10-02 — Research first reads the design spec of an app that already exists, and
  *     writes it back after the publish (services/app-design-spec.ts).
+ *   v1.30.0 — 2026-10-03 — Kit 0.65.0: the handbook (handbook.js) and app({ help }), named beside the
+ *     board family. Read against describe-data.js after it joined.
  *   v1.29.1 — 2026-10-02 — The board's tow, anchored rings and onDrop, and requestPanel's extra host,
  *     named in the board-family paragraph. Read against describe-data.js after they joined.
  *   v1.29.0 — 2026-10-02 — The board family (kit board.js, request-panel.js, shelf.js, verbs.js):
@@ -309,6 +311,12 @@ moved under you says so.
    pieces to use on two tabs with a search; and \`verbs({ root, adapters })\` runs a card's
    \`data-ak-do\` controls (submit with no session, read on sight, save, ai, copy, now, count, and
    offer and tool through the app's adapters). The app plans, routes and runs; these draw.
+   An app's own manual is \`handbook({ title, chapters, mode: 'side'|'dialog' })\`: a table of
+   contents, one chapter at a time, a search, every word as a string or \`{ en, fi, es }\`, and on a
+   chapter with a \`target\` a "Show me" that marks that place in the app (\`onGo\` lets the app bring
+   it on screen first). It also collects every element carrying \`data-ak-help="<id>"\` with
+   \`data-ak-help-title\` and \`data-ak-help-text\`, so help written on the control is a chapter that
+   points at it. \`app({ help: book })\` puts its button in the header.
    Before you write your own version of one of these because "it does not quite fit", read its
    \`describe(id)\`: they take questions per run and a verdict (\`decision\`), invitations into
    several workspaces (\`workspaceTeam\` \`inviteInto\`), schemas, a private choice and a list
