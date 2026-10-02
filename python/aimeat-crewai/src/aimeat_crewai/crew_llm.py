@@ -12,6 +12,10 @@ The node stores the owner's choice for an agent's crew at ``crews.llm.<agent>`` 
   ``{kind: 'model', provider}``  one model, whose ``api_key_env`` names the variable on THIS machine
                                 that holds the key, sent to ``base_url``.
 
+WHICH CHOICE APPLIES (``effective_llm_choice``) is the node's decision, read from
+``GET /v1/agents/{name}/crew/llm``: the agent's own, the owner's default, then the node when the agent
+holds ``ai:use`` and the node can pay for its text, otherwise the machine's key (Jouni, 2026-10-02).
+
 THE GUARD (``unsafe_choice_reason``). A ``model`` choice makes the crew send
 ``os.environ[api_key_env]`` as a bearer to ``base_url``, and a crew run inherits the environment of
 the machine it runs on. Since 2026-10-02 the node refuses to store a choice whose key variable is
@@ -38,6 +42,7 @@ from urllib.parse import urlsplit
 __all__ = [
     "EXACT_KEY_ENV_NAMES",
     "KEY_ENV_RULE",
+    "effective_llm_choice",
     "is_node_choice",
     "llm_for_choice",
     "unsafe_choice_reason",
@@ -147,6 +152,37 @@ def unsafe_choice_reason(choice: Any) -> str | None:
 def is_node_choice(choice: Any) -> bool:
     """True for ``{kind: 'node', role?}``: the crew thinks through the node."""
     return isinstance(choice, dict) and choice.get("kind") == "node"
+
+
+def effective_llm_choice(*, agent_name: str, **node_kwargs: Any) -> dict[str, Any] | None:
+    """The choice that applies to this agent's crew, as the node decides it, or None.
+
+    ``GET /v1/agents/{name}/crew/llm`` (aimeat/src/services/crew-menu.ts effectiveLlmChoice) answers
+    ``{value, scope, key_source?, why}``: the agent's own saved choice, else the owner's default, else
+    ``{kind: 'node'}`` when the agent holds ``ai:use`` and the node can pay for its text now (the
+    agent's key, the owner's or the node's), else no choice. Ruled by Jouni on 2026-10-02. The node is
+    the one place that decides; this only reads it, so a runtime cannot drift from the rule.
+
+    A ``model`` choice is checked with ``unsafe_choice_reason`` before it is returned, and a refused
+    one is None. Any failure to ask (no token, the node unreachable or older, a refusal) is None too:
+    the crew keeps the key on its own machine, which is what it did before this existed.
+    ``node_kwargs`` go to the node client (``node_url``, ``agent_token``, ``session``).
+    """
+    from urllib.parse import quote
+
+    from .ai import AiError, _as_ai_errors
+    from .decide import _call, _node
+
+    try:
+        with _as_ai_errors():
+            node = _node(agent_name=agent_name, **node_kwargs)
+            data = _call(node, "get", f"/v1/agents/{quote(agent_name, safe='')}/crew/llm")
+    except AiError:
+        return None
+    value = (data or {}).get("value") if isinstance(data, dict) else None
+    if not isinstance(value, dict) or unsafe_choice_reason(value):
+        return None
+    return value
 
 
 def llm_for_choice(choice: Any, *, agent_name: str, **llm_kwargs: Any) -> Any:
