@@ -377,6 +377,27 @@
       } catch {
         return null;
       }
+    },
+    /**
+     * Where this installed copy's workspace for a contract the app declares in its
+     * `<script type="application/json" id="aimeat-workspace">` block is: `{ organism_id, workspace_id,
+     * name }`, made when a set was installed. Resolves null when no install made one (the app was not
+     * installed from a set, or the page is not a served app); the app then finds or creates its own.
+     * @param {string} contract e.g. "aimeat.backoffice/1"
+     * @returns {Promise<{ organism_id: string, workspace_id: string, name?: string }|null>}
+     */
+    async appWorkspace(contract) {
+      const ref = appRef();
+      if (!ref || typeof contract !== "string" || !contract) return null;
+      try {
+        const res = await fetch((APEX_URL || "") + "/v1/apps/" + encodeURIComponent(ref.owner) + "/" + encodeURIComponent(ref.filename) + "/config");
+        if (!res.ok) return null;
+        const body = await res.json();
+        const links = body && body.data && body.data.workspaces;
+        return links && links[contract] || null;
+      } catch {
+        return null;
+      }
     }
   };
   attach("data", data);

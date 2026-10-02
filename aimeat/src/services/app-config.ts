@@ -30,11 +30,14 @@
  *   const parsed = parseAppConfigSchema(html);   // null | { schema } | { error }
  *   const out = await setAppConfig(storage, { callerOwnerGhii, ownerName, filename, values: { currency: 'EUR' } });
  * @version-history
+ *   v1.1.0 — 2026-10-02 — getAppConfig answers `workspaces`: where an install made the workspaces the
+ *     app declares, by contract (app-workspaces.ts; package sale design, phase 4).
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 2).
  */
 import type { Storage } from '../storage/interface.js';
 import { validateValueAgainstSchema, validateSchemaItself } from './schema-validator.js';
 import { emitChange } from './event-bus.js';
+import { readAppWorkspaceLinks, type AppWorkspaceLink } from './app-workspaces.js';
 
 /** The declaration an app makes: a flat JSON Schema object of scalar fields. */
 export interface AppConfigSchema {
@@ -197,6 +200,8 @@ export interface AppConfigView {
     values: AppConfigValues;
     missing: Array<{ field: string; description?: string }>;
     updated_at: string | null;
+    /** Where the workspaces the app declares were made for this copy, by contract (app-workspaces.ts). */
+    workspaces?: Record<string, AppWorkspaceLink>;
 }
 
 export function appConfigView(app: string, schema: AppConfigSchema | null, values: AppConfigValues, updatedAt: string | null): AppConfigView {
@@ -219,7 +224,13 @@ export async function getAppConfig(storage: Storage, ownerName: string, filename
     if (!app) return { ok: false, status: 404, code: 'NOT_FOUND', message: `No published app "${filename}" under "${ownerName}".` };
     const schema = (app.manifest.configSchema as AppConfigSchema | undefined) ?? null;
     const { values, updatedAt } = await readAppConfigValues(storage, app.ownerGaii, filename);
-    return { ok: true, view: appConfigView(`${ownerName}/${filename}`, schema, values, updatedAt) };
+    // The workspace ids an install made for this copy travel with the config, on the one read an app
+    // already makes; an app that declares none gets no field.
+    const workspaces = app.manifest.workspaces?.length ? await readAppWorkspaceLinks(storage, app.ownerGaii, filename) : {};
+    return {
+        ok: true,
+        view: { ...appConfigView(`${ownerName}/${filename}`, schema, values, updatedAt), ...(Object.keys(workspaces).length ? { workspaces } : {}) },
+    };
 }
 
 /**

@@ -26,6 +26,7 @@
  *   2026-09-30 — aimeat_workspace_comment_delete beside the other comment tools.
  *   2026-09-30 — aimeat_admin_node_update on the admin surface.
  *   2026-09-29 — aimeat_refinery_classes, _run and _status on `agent`, beside the mail tools.
+ *   2026-10-02 — aimeat_package_compose_set on `appdev` and `agent`, beside compose (phase 4).
  *   2026-10-02 — aimeat_package_offer on `appdev` and `agent`, aimeat_package_buy on `agent`,
  *     aimeat_package_claim on the operator surface (package sale design, phase 3).
  *   2026-09-29 — aimeat_package_sellers on `appdev` and `agent`; aimeat_package_sale on the operator surface.
@@ -161,7 +162,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         // Four of them are registered on this node's /v1/mcp (mcp/packages.ts) and the v2 surface
         // must list exactly what is registered. Authoring by hand (publish) and pruning history
         // (versions, delete) stay on the connector doors; see V2_EXCLUDED for why.
-        'aimeat_package_list', 'aimeat_package_get', 'aimeat_package_compose',
+        'aimeat_package_list', 'aimeat_package_get', 'aimeat_package_compose', 'aimeat_package_compose_set',
         'aimeat_package_status_set', 'aimeat_package_install', 'aimeat_package_update',
         'aimeat_package_instances', 'aimeat_package_fork', 'aimeat_package_instance_set',
         'aimeat_package_check_updates', 'aimeat_package_repository', 'aimeat_package_entitlements',
@@ -235,7 +236,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         // turning something this node ships into a copy they own, which is this surface's business.
         // Finding and reading one comes with it, because an agent that cannot list cannot name the
         // group id install requires, and publishing because a package is created private.
-        'aimeat_package_list', 'aimeat_package_get', 'aimeat_package_compose',
+        'aimeat_package_list', 'aimeat_package_get', 'aimeat_package_compose', 'aimeat_package_compose_set',
         'aimeat_package_status_set', 'aimeat_package_install', 'aimeat_package_update',
         'aimeat_package_instances', 'aimeat_package_fork', 'aimeat_package_instance_set',
         'aimeat_package_check_updates', 'aimeat_package_repository', 'aimeat_package_entitlements',

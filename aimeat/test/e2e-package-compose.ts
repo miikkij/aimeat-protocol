@@ -556,13 +556,19 @@ await test('Composing without a token answers 401', async () => {
     assert(status === 401, `expected 401, got ${status}`);
 });
 
-await test('Composing twice under one name is a conflict', async () => {
-    const { status } = await json('/v1/packages/compose', {
+await test('Composing again under one name publishes the next version of that package', async () => {
+    // Until 2026-10-02 this was a 409, so an author could not ship a change to a composed package
+    // (wish-compose-can-make-a-second-version-keeps-the-data-map-and-pac).
+    const before = await json(`/v1/packages/${encodeURIComponent(`${PKG}::${ownerName}`)}/versions`, { headers: authed(ownerToken) });
+    const { status, body } = await json('/v1/packages/compose', {
         method: 'POST',
         headers: authed(ownerToken),
         body: JSON.stringify({ name: PKG, apps: [APP_A] }),
     });
-    assert(status === 409, `expected 409, got ${status}`);
+    assert(status === 201 && body.data.new_version === true && body.data.status === 'published', `expected a new published version: ${status} ${JSON.stringify(body)}`);
+    const after = await json(`/v1/packages/${encodeURIComponent(`${PKG}::${ownerName}`)}/versions`, { headers: authed(ownerToken) });
+    const count = (r: any) => (r.body.data.versions ?? r.body.data).length;
+    assert(count(after) === count(before) + 1, `one more version: ${count(before)} → ${count(after)}`);
 });
 
 console.log('\nPhase 7 — The skills bound to the apps travel with the package');

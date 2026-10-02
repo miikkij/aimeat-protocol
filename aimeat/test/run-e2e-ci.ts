@@ -9,6 +9,7 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.73.0 -- 2026-10-02 -- e2e-package-sets.ts joins the list (package sale design, phase 4).
  *   v1.72.0 -- 2026-10-02 -- e2e-package-sale.ts joins the list (package sale design, phase 3).
  *   v1.71.0 -- 2026-10-02 -- e2e-package-consent.ts joins the list (package sale design, phase 2).
  *   v1.70.0 -- 2026-10-02 -- e2e-package-guards.ts joins the list (package sale design, phase 1).
@@ -867,6 +868,9 @@ const ALL_SUITES = [
     // A package sold through a selling node's own checkout: the author's offer, the seller's price, a
     // claim code, a grant with the terms, renewal by hand and automatic, a refund, approval requests.
     'test/e2e-package-sale.ts',
+    // The set composer: the workspace an app declares, one package per app and an install bundle, a
+    // quiet mistake refused, and the buyer installing the set with each app told where its workspace is.
+    'test/e2e-package-sets.ts',
     // A peer a package path registers: only on the node's own card, packages-only, no sign-in and no
     // messages through it, a sale that waits for a node that is down, and the operator's release.
     'test/e2e-peer-registration-proof.ts',

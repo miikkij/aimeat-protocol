@@ -848,6 +848,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The app configuration values record."
     },
+    "src/services/app-workspaces.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-02 (package sale design, phase 4), the node's own read: the record of which organism and workspace ids an install made for an installed app's declared contracts. Ids only, served to the app beside its public config; no content of the workspace."
+    },
     "src/services/app-dev-grant.ts": {
       "reads": {
         "getMemory": 3

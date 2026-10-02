@@ -5,6 +5,7 @@
   and the trust checks that must exist before a node sells somebody else's code. Written from a
   verification of the package, repository, commerce and install code on main at 31603ae7f.
 @version-history
+  v0.5.0 — 2026-10-02 — Phase 4 built (section 9).
   v0.4.0 — 2026-10-02 — Phases 1 to 3 built on the API and MCP side (section 9); the status says so.
   v0.3.0 — 2026-10-02 — Questions 1, 4 and 5 answered. Renewal: the buyer starts it first, automatic
     renewal comes before a product with a monthly fee goes on sale. Offers may grant on approval or
@@ -17,8 +18,8 @@
 
 # Selling a package: verification and design
 
-Status: **every open question answered (section 10); phases 1, 2 and 3 built on the API and MCP side,
-phases 4 and 5 not yet (section 9).** No screen is built; screens wait for Jouni's look. The
+Status: **every open question answered (section 10); phases 1 to 4 built on the API and MCP side,
+phase 5 not yet (section 9).** No screen is built; screens wait for Jouni's look. The
 verification in section 1 was made against the code on `main` at `31603ae7f`.
 
 ## What a person gets
@@ -680,7 +681,15 @@ Each phase is usable on its own and is tested before the next starts.
    kept card and off-session charge, which only the test payment handler has exercised; it needs one
    run against Stripe's test mode before a monthly product goes on sale. No screen yet.*
 4. **The set composer:** the `aimeat-workspace` declaration, compose that adds a version, compose-set
-   with its dry run, and the owner part of the set install.
+   with its dry run, and the owner part of the set install. *Built 2026-10-02: the declaration parsed
+   and checked at publish (services/app-workspaces.ts, 422 APP_WORKSPACE_INVALID), compose publishing the
+   next version of a group the caller has, compose-set with its dry run (services/package-compose-set.ts,
+   POST /v1/packages/compose-set, aimeat_package_compose_set), and a set installed by its buyer through
+   the ordinary install (services/install-bundle-owner.ts), with each installed app told where its
+   workspace is (AIMEAT.data.appWorkspace). The install set calls the same parts for the owner it
+   names. The crews are proposed to the owner by each package install, as for any package, rather
+   than deployed through a runner as the install set does. Not built: splitting the declared
+   workspaces into more than one organism; the author renames the one organism.*
 5. **A repository open to strangers:** withdrawal (T6), review on a selling node, the scale
    measurement, and the offer in the Exchange's discovery for agents.
 

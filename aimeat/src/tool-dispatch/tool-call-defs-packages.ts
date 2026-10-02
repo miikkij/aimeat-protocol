@@ -17,6 +17,8 @@
  * @structure packageTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { packageTools } from './tool-call-defs-packages.js';
  * @version-history
+ *   v1.12.0 -- 2026-10-02 -- aimeat_package_compose_set (POST /v1/packages/compose-set); aimeat_package_install
+ *     forwards `organism_names` (package sale design, phase 4).
  *   v1.11.0 -- 2026-10-02 -- aimeat_package_offer (GET, PUT /v1/packages/:groupId/offer) and aimeat_package_buy
  *     (/v1/package-sales/offer, POST /v1/commerce/checkout-sessions, /v1/package-sales/subscriptions).
  *   v1.10.0 -- 2026-10-01 -- aimeat_package_compose forwards `outcome` and `prompts`.
@@ -169,6 +171,17 @@ export const packageTools: ConnectCliToolDefinition[] = [
         },
     },
     {
+        // A set to sell: every field forwarded under its REST name (POST /v1/packages/compose-set).
+        name: 'aimeat_package_compose_set',
+        handler: ({ client }, input) => {
+            const body: JsonObject = { name: requiredString(input, 'name'), apps: requiredArray(input, 'apps') };
+            for (const k of ['title', 'organism', 'defaults', 'description', 'category', 'tags', 'visibility', 'include_cortex', 'include_skills', 'allow_expectations', 'outcome', 'prompts', 'dry_run']) {
+                if (input[k] !== undefined) body[k] = input[k] as JsonObject[string];
+            }
+            return client.post('/v1/packages/compose-set', body);
+        },
+    },
+    {
         // A package is created private, and until this handler existed the only way to make one
         // installable was a PATCH that no MCP or CLI surface carried. So publish could succeed and
         // leave a package its own author could neither see nor install.
@@ -235,9 +248,12 @@ export const packageTools: ConnectCliToolDefinition[] = [
             dry_run: { type: 'boolean', description: 'Report what would be registered and register nothing.' },
             mode: { type: 'string', enum: ['managed', 'editable'], description: '"managed": the package owns the code and layout. "editable" (default): you may edit everything.' },
             config: { type: 'object', description: PACKAGE_CONFIG_PARAM },
+            organism_names: { type: 'object', description: 'For a set: your own names for its organisms, { <organism key>: name }.' },
         },
         handler: ({ client }, input) => {
             const body: JsonObject = {};
+            const organismNames = optionalRecord(input, 'organism_names');
+            if (organismNames !== undefined) body.organism_names = organismNames;
             const label = optionalString(input, 'label');
             if (label !== undefined) body.label = label;
             const version = optionalString(input, 'version');

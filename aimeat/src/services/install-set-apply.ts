@@ -32,6 +32,10 @@
  * @usage
  *   const out = await applyInstallSet({ storage, config, peers }, { installSet, secrets, dryRun: true });
  * @version-history
+ *   v1.7.0 — 2026-10-02 — After the workspaces are made, each installed app whose declaration names a
+ *     workspace's contract is told where it is (linkAppsToWorkspaces, app-workspaces.ts). The record
+ *     helpers, reach, createOrganisms and the link are exported for the owner's own set install
+ *     (install-bundle-owner.ts). Package sale design, phase 4.
  *   v1.6.1 — 2026-10-01 — Reads `task_id` only from a deploy view that has one (a deploy can now answer
  *     a proposal, though not to an install set, which passes no principal).
  *   v1.6.0 — 2026-10-01 — The repository the set names is linked only after its own card answers with
@@ -70,6 +74,7 @@ import { deriveTierFlags } from './federation-tiers.js';
 import { proveNodeCard } from './package-peer-register.js';
 import { recordPeerOrigin } from './peer-origin.js';
 import { NS_INSTALL_SETS } from './install-set-trust.js';
+import { writeAppWorkspaceLinks, type AppWorkspaceLink } from './app-workspaces.js';
 
 // The namespace lives with the trust check (install-set-trust.ts), which package-pull.ts reads
 // without importing this file back.
@@ -119,16 +124,22 @@ export type ApplyResult =
     | { ok: true; dry_run: false; record: AppliedRecord; owner_created: boolean; warnings: string[] }
     | { ok: false; status: number; code: string; message: string; problems?: string[] };
 
-const recordKey = (owner: string, localGroupId: string): string =>
+export const appliedRecordKey = (owner: string, localGroupId: string): string =>
     `install-sets.${owner}.${localGroupId.replace(/[^a-zA-Z0-9-]+/g, '-')}`;
 
-async function readRecord(storage: Storage, key: string): Promise<AppliedRecord | null> {
+/** A first record for an owner and a bundle, before anything is made. */
+export function newAppliedRecord(owner: string, bundle: AppliedRecord['bundle'], appliedBy: string): AppliedRecord {
+    const now = new Date().toISOString();
+    return { spec: RECORD_SPEC, owner, bundle, organisms: {}, packages: {}, members: {}, agents: {}, secrets_given: [], applied_by: appliedBy, created_at: now, applied_at: now, runs: 0 };
+}
+
+export async function readRecord(storage: Storage, key: string): Promise<AppliedRecord | null> {
     const rec = await storage.getMemory(NS_INSTALL_SETS, key);
     const value = rec?.value as AppliedRecord | undefined;
     return value?.spec === RECORD_SPEC ? value : null;
 }
 
-async function writeRecord(storage: Storage, key: string, value: AppliedRecord): Promise<void> {
+export async function writeRecord(storage: Storage, key: string, value: AppliedRecord): Promise<void> {
     const existing = await storage.getMemory(NS_INSTALL_SETS, key);
     await storage.setMemory({
         key, ownerGaii: NS_INSTALL_SETS, value, visibility: 'private', tags: ['install-set'], ttlHours: null,
@@ -158,10 +169,10 @@ function ownerCaller(owner: string, config: AimeatConfig): PackageInstallCaller 
     return { owner, sub: owner, ownerGhii: `${owner}@${config.nodeId}`, roles: ['owner'], scopes: [] };
 }
 
-const localGroupOf = (groupId: string, owner: string, remote: boolean): string =>
+export const localGroupOf = (groupId: string, owner: string, remote: boolean): string =>
     remote ? `${groupId.split('::')[0]}::${owner}` : groupId;
 
-async function installedInstanceOf(storage: Storage, owner: string, groupId: string) {
+export async function installedInstanceOf(storage: Storage, owner: string, groupId: string) {
     const { instances } = await storage.listInstances({ owner, packageGroupId: groupId, status: 'installed', limit: 1, offset: 0 });
     return instances[0] ?? null;
 }
@@ -171,7 +182,7 @@ async function installedInstanceOf(storage: Storage, owner: string, groupId: str
  * owner's packages. In a plan the pull is a preview and stores nothing; a copy already on this node
  * and current is read from here in both cases.
  */
-async function reach(
+export async function reach(
     deps: ApplyDeps, owner: string, remote: { nodeId: string } | null, groupId: string, preview: boolean, version?: string,
 ): Promise<{ ok: true; local: PackageRecord | null; components: PackageComponent[]; version: string } | { ok: false; message: string }> {
     const localGroup = localGroupOf(groupId, owner, !!remote);
@@ -345,14 +356,12 @@ export async function applyInstallSet(deps: ApplyDeps, input: ApplyInput): Promi
     const owner = await ensureOwner(storage, config, set.owner);
     if (!owner.ok) return owner;
     const localBundle = prep.bundleLocalGroup;
-    const key = recordKey(ownerName, localBundle);
+    const key = appliedRecordKey(ownerName, localBundle);
     const now = new Date().toISOString();
     const prev = await readRecord(storage, key);
-    const record: AppliedRecord = prev ?? {
-        spec: RECORD_SPEC, owner: ownerName,
-        bundle: { group_id: set.bundle.groupId, local_group_id: localBundle, node_id: set.bundle.nodeId ?? null, version: bundleVersion, name: bundle.name },
-        organisms: {}, packages: {}, members: {}, agents: {}, secrets_given: [], applied_by: input.appliedBy, created_at: now, applied_at: now, runs: 0,
-    };
+    const record: AppliedRecord = prev ?? newAppliedRecord(ownerName,
+        { group_id: set.bundle.groupId, local_group_id: localBundle, node_id: set.bundle.nodeId ?? null, version: bundleVersion, name: bundle.name },
+        input.appliedBy);
     record.bundle.version = bundleVersion;
     record.applied_by = input.appliedBy;
     record.applied_at = now;
@@ -368,7 +377,8 @@ export async function applyInstallSet(deps: ApplyDeps, input: ApplyInput): Promi
     // applying the set again continues from there instead of making it twice.
     try {
         await installPackages(deps, set, bundle, remote, secrets, record);
-        await createOrganisms(deps, set, bundle, record);
+        await createOrganisms(deps, ownerName, set.organismNames, bundle, record);
+        await linkAppsToWorkspaces(deps, ownerName, bundle, record);
         for (const user of set.members) {
             const outcome = await joinMember(storage, config, ownerName, user, record.organisms);
             record.members[user.email.toLowerCase()] = outcome;
@@ -433,15 +443,16 @@ async function installPackages(deps: ApplyDeps, set: InstallSet, bundle: Install
     }
 }
 
-async function createOrganisms(deps: ApplyDeps, set: InstallSet, bundle: InstallBundle, record: AppliedRecord): Promise<void> {
+/** Each organism of the bundle and its workspaces, under the owner's own names; one made before is reused. */
+export async function createOrganisms(deps: ApplyDeps, owner: string, organismNames: Record<string, string>, bundle: InstallBundle, record: AppliedRecord): Promise<void> {
     const { storage, config } = deps;
-    const owner = set.owner.name;
     const ownerGhii = `${owner}@${config.nodeId}`;
     for (const org of bundle.organisms) {
         let made = record.organisms[org.key];
         if (!made || !(await storage.getOrganism(made.id))) {
+            const named = organismNames[org.key];
             const out = await createOrganismRecord({ storage, config }, owner, {
-                name: set.organismNames[org.key] ?? org.name, description: org.description,
+                name: typeof named === 'string' && named.trim() ? named.trim() : org.name, description: org.description,
                 joinPolicy: 'invite_only', visibility: 'private',
             });
             if (!out.ok) throw new Error(`Organism "${org.key}": ${out.code}: ${out.message}`);
@@ -456,6 +467,36 @@ async function createOrganisms(deps: ApplyDeps, set: InstallSet, bundle: Install
                 ...(ws.schemas ? { schemas: ws.schemas } : {}), ...(ws.readme ? { readme: ws.readme } : {}),
             });
             made.workspaces[ws.key] = out.ws;
+        }
+    }
+}
+
+/**
+ * Tell every installed app of the set where the workspace its declared contract names was made
+ * (app-workspaces.ts): the app reads the ids by contract through AIMEAT.data.appWorkspace().
+ */
+export async function linkAppsToWorkspaces(deps: ApplyDeps, owner: string, bundle: InstallBundle, record: AppliedRecord): Promise<void> {
+    const { storage, config } = deps;
+    const made = new Map<string, AppWorkspaceLink>();
+    for (const org of bundle.organisms) {
+        const ids = record.organisms[org.key];
+        for (const ws of org.workspaces) {
+            const wsId = ids?.workspaces[ws.key];
+            if (ws.contract && ids && wsId) made.set(ws.contract, { organism_id: ids.id, workspace_id: wsId, name: ws.name });
+        }
+    }
+    if (made.size === 0) return;
+    const ownerGhii = `${owner}@${config.nodeId}`;
+    for (const step of Object.values(record.packages)) {
+        const instance = step.instance_id ? await storage.getInstance(step.instance_id) : null;
+        for (const comp of instance?.installedComponents.filter(c => c.type === 'app') ?? []) {
+            const app = await storage.getApp(ownerGhii, comp.registeredAs);
+            const links: Record<string, AppWorkspaceLink> = {};
+            for (const w of app?.manifest.workspaces ?? []) {
+                const link = made.get(w.contract);
+                if (link) links[w.contract] = link;
+            }
+            if (Object.keys(links).length) await writeAppWorkspaceLinks(storage, ownerGhii, comp.registeredAs, links);
         }
     }
 }

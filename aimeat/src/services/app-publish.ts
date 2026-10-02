@@ -40,6 +40,9 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-10-02 — The app's `aimeat-workspace` declaration is parsed into `manifest.workspaces`, each
+ *     manifest and schema checked as provisioning takes it; one that cannot be used is refused, 422
+ *     APP_WORKSPACE_INVALID (services/app-workspaces.ts).
  *   2026-09-28 — The app's `aimeat-config` declaration is parsed into `manifest.configSchema`, and one
  *     that cannot be used is refused, 422 APP_CONFIG_SCHEMA_INVALID (services/app-config.ts).
  *   2026-09-28 — An app a managed package install owns is refused a new version (409
@@ -132,6 +135,7 @@ import { logger } from '../utils/logger.js';
 import { refreshAppDependencies } from './dependency-map.js';
 import { managedChangeRefusal } from './package-managed.js';
 import { parseAppConfigSchema } from './app-config.js';
+import { parseAppWorkspaces, checkAppWorkspaces } from './app-workspaces.js';
 
 /**
  * The manifest fields a caller may state. **`undefined` means "not mentioned"** and is filled from
@@ -330,6 +334,13 @@ export async function publishApp(
   if (configDecl && 'error' in configDecl) {
     return { refusal: { status: 422, code: 'APP_CONFIG_SCHEMA_INVALID', message: `The app's config declaration cannot be used: ${configDecl.error}.` } };
   }
+  // The workspaces the app declares (services/app-workspaces.ts), checked as provisioning will take
+  // them, so a set built from this app never fails at the customer's install.
+  const workspaceDecl = isHtml ? parseAppWorkspaces(html) : null;
+  if (workspaceDecl) {
+    const why = 'error' in workspaceDecl ? workspaceDecl.error : await checkAppWorkspaces(storage, workspaceDecl.workspaces);
+    if (why) return { refusal: { status: 422, code: 'APP_WORKSPACE_INVALID', message: `The app's workspace declaration cannot be used: ${why}.` } };
+  }
 
   // Did whoever is publishing read the build spec that is in force NOW? This one only ever warns
   // (services/app-spec-gate.ts explains why), and an owner-declared skip is recorded on the change
@@ -434,6 +445,8 @@ export async function publishApp(
   if (cortex) manifest.cortex = cortex;
   // The config declaration is read from these bytes and never carried forward.
   if (configDecl) manifest.configSchema = configDecl.schema as unknown as Record<string, unknown>;
+  // So is the workspace declaration.
+  if (workspaceDecl && 'workspaces' in workspaceDecl) manifest.workspaces = workspaceDecl.workspaces;
   // Pricing: `0` unprices explicitly, silence keeps the price. An update that omits the field must
   // never silently turn a paid app free — which is what publishing a DRAFT used to do, because a
   // draft manifest cannot carry a price and the draft door published it verbatim.

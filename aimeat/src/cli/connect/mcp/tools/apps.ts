@@ -5,6 +5,8 @@
  * @description MCP tool registrations for app/package management -- publishing,
  *   listing, retrieving, archiving versions, version history, sanctioned forks, and drafts (staging).
  * @version-history
+ *   2026-10-02 — aimeat_package_compose_set (POST /v1/packages/compose-set); aimeat_package_install
+ *     forwards `organism_names` (a set's organisms).
  *   2026-10-02 — aimeat_package_offer (GET, PUT /v1/packages/:groupId/offer) and aimeat_package_buy
  *     (/v1/package-sales/offer, /v1/commerce/checkout-sessions, /v1/package-sales/subscriptions).
  *   2026-10-01 — aimeat_package_compose forwards `outcome` and `prompts` (the package sheet).
@@ -130,13 +132,15 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     dry_run: z.boolean().optional().describe('Report what would be registered and register nothing'),
     mode: z.enum(['managed', 'editable']).optional().describe('"managed": the package owns the code and layout. "editable" (default): you may edit everything'),
     config: z.record(z.string(), z.record(z.string(), z.unknown())).optional().describe(PACKAGE_CONFIG_PARAM),
-  }, annotationsFor('aimeat_package_install'), async ({ group_id, label, version, dry_run, mode, config }) => {
+    organism_names: z.record(z.string(), z.string()).optional().describe('For a set: your own names for its organisms, by the set\'s organism key'),
+  }, annotationsFor('aimeat_package_install'), async ({ group_id, label, version, dry_run, mode, config, organism_names }) => {
     const body: Record<string, unknown> = {};
     if (label !== undefined) body.label = label;
     if (version !== undefined) body.version = version;
     if (dry_run !== undefined) body.dry_run = dry_run;
     if (mode !== undefined) body.mode = mode;
     if (config !== undefined) body.config = config;
+    if (organism_names !== undefined) body.organism_names = organism_names;
     return out(await client.post(`/v1/packages/${encodeURIComponent(group_id)}/install`, body));
   });
 
@@ -377,6 +381,31 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     }
     const resp = await client.post('/v1/packages/compose', body);
     return envelopeResult(resp);
+  });
+
+  // A set to sell: one package per app and the install bundle (POST /v1/packages/compose-set).
+  mcp.tool('aimeat_package_compose_set', descriptionFor('aimeat_package_compose_set'), {
+    name: z.string().describe('The set\'s package name. With your owner name it forms the group id.'),
+    apps: z.array(z.string()).min(1).describe('Filenames of your own apps'),
+    title: z.string().optional().describe('The name a buyer sees. Defaults to name.'),
+    organism: z.object({ key: z.string().optional(), name: z.string().optional() }).optional().describe('The organism the declared workspaces go into'),
+    defaults: z.record(z.string(), z.record(z.string(), z.unknown())).optional().describe('The set\'s default config, { <app filename>: { <field>: value } }'),
+    description: z.string().optional().describe('What the set is for'),
+    category: z.string().optional().describe('Category for the package gallery'),
+    tags: z.array(z.string()).optional().describe('Tags for search'),
+    visibility: z.enum(['private', 'public']).optional().describe('Defaults to private'),
+    include_cortex: z.boolean().optional().describe('Package the cortexes you installed yourself. Default true.'),
+    include_skills: z.boolean().optional().describe('Package your own skills bound to these apps. Default true.'),
+    allow_expectations: z.boolean().optional().describe('Compose even when an app calls an extension a package cannot carry'),
+    outcome: z.string().optional().describe('What the set gives a person, in one sentence'),
+    prompts: z.array(z.string()).optional().describe('Up to three things a person can ask their AI once it is installed'),
+    dry_run: z.boolean().optional().describe('Write nothing; answer what the set would be and every problem'),
+  }, annotationsFor('aimeat_package_compose_set'), async (args) => {
+    const body: Record<string, unknown> = { name: args.name, apps: args.apps };
+    for (const key of ['title', 'organism', 'defaults', 'description', 'category', 'tags', 'visibility', 'include_cortex', 'include_skills', 'allow_expectations', 'outcome', 'prompts', 'dry_run'] as const) {
+      if (args[key] !== undefined) body[key] = args[key];
+    }
+    return envelopeResult(await client.post('/v1/packages/compose-set', body));
   });
 
   // Bringing a package in from another node, signature and digests checked before anything lands.

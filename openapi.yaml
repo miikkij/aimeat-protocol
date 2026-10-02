@@ -28856,7 +28856,9 @@ paths:
         publish), the owner's values with the declared defaults filled in, and the required fields
         still empty. Public: the app reads its owner's values in the browser of whoever opened it
         (`AIMEAT.data.appConfig()`), which is why a config field is never a secret. An app that
-        declares no config answers `schema: null`.
+        declares no config answers `schema: null`. An app that declares workspaces in its
+        `aimeat-workspace` block, installed as part of a set, also answers `workspaces`: by contract,
+        the `{ organism_id, workspace_id, name }` the install made (`AIMEAT.data.appWorkspace()`).
       tags: [Apps]
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string } }
@@ -44623,6 +44625,9 @@ paths:
         package could not work as installed. The
         caller's own skills bound to a chosen app (metadata.binding `app:{owner}/{filename}`) travel
         as `skill` components, never a skill the caller merely can read and never a node skill.
+        When the caller already has a package of this name, the call publishes its next version from
+        the apps as they are now (`new_version` true; `status` defaults to published, so managed
+        installs receive it); the group's description, visibility and listing stay as they are.
       tags: [Packages]
       security:
         - BearerAuth: []
@@ -44687,6 +44692,7 @@ paths:
                               extensions: { type: array, items: { type: string } }
                               packs: { type: array, items: { type: string } }
                           notes: { type: array, items: { type: string } }
+                          new_version: { type: boolean, description: True when this published the next version of a package the caller already had. }
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -44696,9 +44702,74 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: A package of this name exists, or a cortex could not be read back for packaging
+          description: A cortex could not be read back for packaging
         '413':
           description: Package exceeds size, component count or per-author limit
+
+  /v1/packages/compose-set:
+    post:
+      operationId: composePackageSet
+      summary: Compose a set to sell from apps you already published
+      description: >-
+        One package per app (or the next version of it), and an install bundle that lists them: the
+        organism and workspaces the apps declare in their `aimeat-workspace` block, joined on the
+        contract, one organism named after the set; the crews their `aimeat-crews` blocks carry; and the
+        set's default config. With `dry_run` nothing is written, and the answer says what a buyer will be
+        asked (`questions`), what the buyer's node must already have (`expects`), what stays behind
+        (`not_carried`), what the parts can do (`capabilities`), the bundle, and every `problem`. Without
+        `dry_run`, a set with any problem is refused (409 SET_HAS_PROBLEMS) and nothing is written.
+        Requires packages:write.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, apps]
+              properties:
+                name: { type: string, description: The set's package name; with the owner name it forms the bundle's group id. }
+                apps: { type: array, minItems: 1, maxItems: 20, items: { type: string } }
+                title: { type: string, description: The name a buyer sees. Defaults to name. }
+                organism:
+                  type: object
+                  properties:
+                    key: { type: string }
+                    name: { type: string }
+                defaults:
+                  type: object
+                  additionalProperties: { type: object, additionalProperties: true }
+                  description: The bundle's default config by app filename, then field. A field given here is not asked of the buyer.
+                description: { type: string }
+                category: { type: string }
+                tags: { type: array, items: { type: string } }
+                visibility: { type: string, enum: [private, public], default: private }
+                include_cortex: { type: boolean, default: true }
+                include_skills: { type: boolean, default: true }
+                allow_expectations: { type: boolean, default: false }
+                outcome: { type: string }
+                prompts: { type: array, maxItems: 3, items: { type: string } }
+                dry_run: { type: boolean, default: false }
+      responses:
+        '200':
+          description: The dry run's answer.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '201':
+          description: '`data` is `{ set, packages, bundle, questions, expects, not_carried, capabilities, problems }`, with the versions written.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
 
   /v1/packages/{groupId}/entitlements:
     get:
@@ -46140,7 +46211,15 @@ paths:
         keys), `capabilities_hash`, and `source` (the author, the node the package came from, and
         whether its signature was checked). The install records what it was approved to do; GET
         /v1/instances/{id} answers it as `approval`. A skill named like one of the node's own skills
-        is left out with a warning.
+        is left out with a warning. A package that carries an install bundle is a set, and installs
+        as one for the caller's owner (`set: true` in the answer): each package of the set by the rules
+        above (pulled from the repository first when the set came from one), then its organisms and
+        workspaces under the owner's own names (`organism_names`), and each installed app that declares
+        a workspace's contract is told where it was made. `config` is then keyed by package group id,
+        then component id. A set that makes organisms needs organism:write of an agent. A package that
+        waits for the owner stops the set there (202, `requests`); installing the set again continues
+        and makes nothing twice. A set with a problem is refused with 409 CANNOT_INSTALL_SET and its
+        `problems`, and nothing is made; the dry run lists them.
       tags: [Instances]
       security:
         - BearerAuth: []
@@ -46176,6 +46255,10 @@ paths:
                     INVALID_INPUT; a required app field left empty is 400 CONFIG_REQUIRED naming it.
                     A dry run answers `config`, each part's fields and what is still empty, without
                     refusing on the empty ones.
+                organism_names:
+                  type: object
+                  additionalProperties: { type: string }
+                  description: For a set, the owner's own names for its organisms, by the set's organism key.
       responses:
         '201':
           description: Package installed
