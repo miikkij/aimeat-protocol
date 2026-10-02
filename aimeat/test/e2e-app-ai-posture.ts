@@ -22,6 +22,8 @@
  *   lineage · the manifest all-or-nothing check · cross-owner and cross-scope refusals
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-ai-posture
  * @version-history
+ *   v1.1.0 — 2026-10-02 — An app whose only model use is an Atelier component that labels for it
+ *     (`K.aide(`, as happydude500001/design-book.html writes it) publishes with no gap.
  *   v1.0.1 -- 2026-09-08 -- Assert the shared-development refusal and hide draft existence.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 5.
  */
@@ -96,6 +98,19 @@ const DECLARED_APP = SILENT_APP.replace(
 const CALLING_APP = SILENT_APP.replace(
     '<h1>Ask the model</h1>',
     '<h1>Ask the model</h1><script>AIMEAT.ai.disclose(r.provenance, { target: "#l" });</script>',
+);
+
+/**
+ * An app whose only model use is an Atelier component that draws the label itself, the way
+ * design-book.html does: the library under a one-letter alias, and no disclose call of its own.
+ */
+const ATELIER_APP = SILENT_APP.replace(
+    '<meta name="aimeat-scopes"',
+    '<meta name="aimeat-track" content="atelier"><meta name="aimeat-register" content="custom:posture"><meta name="aimeat-scopes"',
+).replace(
+    '<h1>Ask the model</h1>',
+    '<h1>Ask the model</h1><main id="app"></main><script src="/v1/libs/aimeat-atelier.js"></script>'
+    + '<script>var K = AIMEAT.atelier; K.aide({ target: "#app", appName: "Atelier", sources: {}, actions: [] });</script>',
 );
 
 /** Read one app's posture back through the surface the catalogue actually reads. */
@@ -175,6 +190,18 @@ const b64 = (s: string) => Buffer.from(s, 'utf-8').toString('base64');
         assert(r.status === 201, `publish ${r.status}`);
         assert(!r.body.data.ai_posture?.gap, 'an app that labels owes no gap');
         assert(r.body.data.ai_posture?.disclosureCallFound === true, 'the disclosure call was not seen');
+        assert((r.body.data.ai_hints ?? []).join(' ').includes('declares no posture'), 'expected the catalogue nudge');
+    });
+
+    await test('an app whose only model use is an Atelier component (K.aide) gets no gap: the component labels for it', async () => {
+        const r = await json('/v1/apps', {
+            method: 'POST', headers: auth(o.token),
+            body: JSON.stringify({ filename: `postatelier${Date.now()}.html`, mime_type: 'text/html', content: b64(ATELIER_APP), name: 'Atelier', description: 'Aide.' }),
+        });
+        assert(r.status === 201, `publish ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        assert(r.body.data.ai_posture?.disclosureCallFound === true,
+            `the aide's own label was not seen: ${JSON.stringify(r.body.data.ai_posture)}`);
+        assert(!r.body.data.ai_posture?.gap, `an app that labels through aide owes no gap: ${JSON.stringify(r.body.data.ai_posture?.gap)}`);
         assert((r.body.data.ai_hints ?? []).join(' ').includes('declares no posture'), 'expected the catalogue nudge');
     });
 

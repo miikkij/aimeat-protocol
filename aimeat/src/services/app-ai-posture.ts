@@ -34,6 +34,11 @@
  *   const { posture, hints } = lintAppAiDisclosure(html, previous?.manifest.aiPosture);
  *   if (posture) manifest.aiPosture = posture;
  * @version-history
+ *   v1.6.0 — 2026-10-02 — DISCLOSURE_CALL also reads the Atelier components that call disclose() or
+ *     chatNotice() on the app's behalf: aide, aiChat and aiTask, called directly, through an alias or
+ *     as a mosaic block. happydude500001/design-book.html, whose only model use is `K.aide({...})`,
+ *     had been recorded with AI_DISCLOSURE_MISSING. The posture is computed at publish, so an app
+ *     published before this keeps its stored gap until it is published again.
  *   v1.5.0 — 2026-09-28 — `role.<name>=` in the meta: the AI roles the app declares (app-ai-roles.ts),
  *     kept on the posture and carried forward like the rest; an unreadable role is named in a hint.
  *   v1.4.0 — 2026-09-28 — `prefer.<capability>=` and `local.<capability>=yes` in the meta, kept on the
@@ -128,8 +133,17 @@ const SCAN_BYTES = 64 * 1024;
  * exactly the noise that trains people to ignore a warning; a false positive costs nothing, because
  * the posture is a statement the owner is responsible for either way. Both the SDK primitives and a
  * hand-rolled label built on the platform's own class names count.
+ *
+ * So do the Atelier components that make those calls on the app's behalf: aide (atelier/aide.js:
+ * chatNotice() for the panel, disclose() on every model message), aiChat (ai-chat.js: chatNotice()
+ * when the conversation opens, disclose() per answer) and aiTask (ai-task.js: disclose() on the
+ * answer). An app reaches them as `AIMEAT.atelier.aide(`, through an alias such as `K.aide(`, by name
+ * after taking them out of the library, or as a mosaic block (`component: 'aide'`, mosaic.js and
+ * mosaic-self.js). The list is the Atelier sources that call disclose() or chatNotice(); a new
+ * component that labels for the app joins it here, or every app that uses it is told to add a label
+ * it already shows (happydude500001/design-book.html, 2026-10-02).
  */
-const DISCLOSURE_CALL = /\bai\s*\.\s*(disclose|chatNotice|declare)\s*\(|["'`]ai-label|aimeat-ai-label|AiLabel\b|aiProvenance\b/;
+const DISCLOSURE_CALL = /\bai\s*\.\s*(disclose|chatNotice|declare)\s*\(|["'`]ai-label|aimeat-ai-label|AiLabel\b|aiProvenance\b|\b(?:aide|aiChat|aiTask)\s*\(|["'`]?component["'`]?\s*:\s*["'`](?:aide|aiChat|aiTask)["'`]/;
 
 /** Does the app request the AI scope? The one signal that it can generate anything at all. */
 export function appUsesAi(html: string): boolean {
