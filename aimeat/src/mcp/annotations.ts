@@ -23,6 +23,7 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   2026-10-02 — aimeat_tools_find (read-only: it changes which of the session's tools are listed).
  *   2026-10-02 — aimeat_task_start and aimeat_agent_task_start_set.
  *   2026-10-01 — aimeat_admin_federation_peer_remove (destructive: a link ends, its work is cancelled).
  *   2026-09-30 — aimeat_admin_node_update: read only, open world (it reads npm).
@@ -110,6 +111,8 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // NOT read-only and NOT idempotent: it runs whatever it was pointed at, and what that does is
     // the target capability's business. openWorld, because the set of what it can reach is data.
     aimeat_invoke: { title: 'Run a Node Capability', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    // Read-only for the person's data: what it changes is which of this session's tools are listed.
+    aimeat_tools_find: { title: 'Find and Add Tools', readOnlyHint: true, idempotentHint: true },
     aimeat_agent_profile: { title: 'View Agent Profile', readOnlyHint: true },
 
     // ── Onboarding ──

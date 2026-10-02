@@ -10,6 +10,9 @@
 // scope check: the narrow agent is handed all 148 tools of the agent surface, and e2e-mcp-scopes
 // stays green — that suite only drives /v1/mcp, where role is 'all' and there is no surface list to
 // short-circuit on.
+// 2026-10-02: the chat surface. It lists its small set, the finder adds tools to the session, a
+// switched-off tool runs by name, aimeat_invoke runs the session's own tools (one the dispatch table
+// does not carry among them), and a memory:read agent can neither find nor run memory_write.
 // Run: cd aimeat && pnpm exec tsx test/e2e-mcp-v2.ts
 
 import { MCP_SURFACES } from '../src/mcp/catalog/surfaces.js';
@@ -177,6 +180,73 @@ await test("handbook_get surface:'agent' returns the agent surface handbook", as
     const body = await call('tools/call', { name: 'aimeat_handbook_get', arguments: { surface: 'agent' } }, 2);
     const text = body.result?.content?.[0]?.text ?? '';
     assert(text.includes('Agent Surface Handbook'), `expected agent handbook, got: ${text.slice(0, 80)}`);
+});
+
+/** An open MCP session on one surface, for the tests that call tools in sequence on one session. */
+async function openSession(gaii: string, privKey: string, role: string) {
+    const reg = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: `v2-${role}-session` }) });
+    const ts = new Date().toISOString();
+    const auth = await json(`/v1/mcp/authorize?${new URLSearchParams({ response_type: 'code', client_id: reg.body.client_id, gaii, signature: await signMsg(privKey, gaii + NODE_ID + ts), timestamp: ts })}`);
+    const tok = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code: auth.body.code, client_id: reg.body.client_id, client_secret: reg.body.client_secret }) });
+    const token = tok.body.access_token as string;
+    let sid = '';
+    let id = 1;
+    const rpc = async (method: string, params: Record<string, unknown>): Promise<any> => {
+        const myId = id++;
+        const res = await fetch(`${BASE}/v2/mcp/${role}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: `Bearer ${token}`, ...(sid ? { 'mcp-session-id': sid, 'mcp-protocol-version': '2025-03-26' } : {}) }, body: JSON.stringify({ jsonrpc: '2.0', id: myId, method, params }) });
+        const s = res.headers.get('mcp-session-id'); if (s) sid = s;
+        const ct = res.headers.get('content-type') ?? '';
+        return ct.includes('text/event-stream') ? (parseSSE(await res.text()).find(m => m.id === myId) ?? {}) : await res.json();
+    };
+    await rpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'v2-e2e', version: '1.0.0' } });
+    await fetch(`${BASE}/v2/mcp/${role}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: `Bearer ${token}`, 'mcp-session-id': sid, 'mcp-protocol-version': '2025-03-26' }, body: JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) });
+    const names = async () => ((await rpc('tools/list', {})).result?.tools ?? []).map((t: any) => t.name as string);
+    const call = async (name: string, args: Record<string, unknown>) => (await rpc('tools/call', { name, arguments: args })).result ?? {};
+    return { names, call };
+}
+
+// ── The chat surface (2026-10-02) ──
+// The node chat listed every tool on /v1/mcp: 324, about 129 000 tokens, read on every model round.
+// /v2/mcp/chat lists a small core and keeps every other permitted tool registered and switched off.
+
+await test('/v2/mcp/chat lists exactly its small starting set', async () => {
+    const got = new Set(await listToolsForRole(agent.gaii, agent.key, 'chat'));
+    const want = new Set(MCP_SURFACES.chat);
+    const missing = [...want].filter(t => !got.has(t));
+    const extra = [...got].filter(t => !want.has(t));
+    assert(missing.length === 0 && extra.length === 0, `chat lists its own set: missing ${missing.join(', ')}; extra ${extra.join(', ')}`);
+});
+
+await test('on chat, aimeat_tools_find adds the tools for a purpose to this session', async () => {
+    const s = await openSession(agent.gaii, agent.key, 'chat');
+    assert(!(await s.names()).includes('aimeat_contact_add'), 'contact_add starts switched off');
+    const found = JSON.parse((await s.call('aimeat_tools_find', { purpose: 'add a contact' })).content?.[0]?.text ?? '{}');
+    assert(found.added?.includes('aimeat_contact_add'), `the finder adds contact_add, got ${JSON.stringify(found.added)}`);
+    assert((await s.names()).includes('aimeat_contact_add'), 'and the session now lists it');
+});
+
+await test('on chat, a switched-off tool runs by name, and aimeat_invoke runs one the dispatch table does not carry', async () => {
+    const s = await openSession(agent.gaii, agent.key, 'chat');
+    const wallet = await s.call('aimeat_wallet_balance', {});
+    assert(!wallet.isError, `a call by name runs, got ${JSON.stringify(wallet).slice(0, 200)}`);
+    assert((await s.names()).includes('aimeat_wallet_balance'), 'and switches the tool on');
+    // aimeat_contact_list is not in the shared dispatch table, so only the in-session path reaches it.
+    const viaInvoke = await s.call('aimeat_invoke', { capability: 'aimeat_contact_list', input: {} });
+    assert(!viaInvoke.isError, `invoke runs the session's own tool, got ${JSON.stringify(viaInvoke).slice(0, 200)}`);
+    assert((viaInvoke.content?.[0]?.text ?? '').includes('contacts'), `with that tool's own answer, got ${(viaInvoke.content?.[0]?.text ?? '').slice(0, 120)}`);
+});
+
+await test('on chat, a memory:read agent can neither find nor run memory_write', async () => {
+    const s = await openSession(narrow.gaii, narrow.key, 'chat');
+    const listed = await s.names();
+    assert(!listed.includes('aimeat_memory_write'), 'memory_write is not listed for a memory:read agent');
+    const found = JSON.parse((await s.call('aimeat_tools_find', { purpose: 'write memory' })).content?.[0]?.text ?? '{}');
+    assert(!(found.added ?? []).includes('aimeat_memory_write') && !(found.tools ?? []).some((t: any) => t.name === 'aimeat_memory_write'),
+        `the finder does not offer what the scopes withhold, got ${JSON.stringify(found.tools?.map((t: any) => t.name))}`);
+    const byName = await s.call('aimeat_memory_write', { key: 'x', value: 'y' });
+    const viaInvoke = await s.call('aimeat_invoke', { capability: 'aimeat_memory_write', input: { key: 'x', value: 'y' } });
+    assert(byName.isError === true, `a call by name is refused, got ${JSON.stringify(byName).slice(0, 200)}`);
+    assert(viaInvoke.isError === true, `invoke is refused, got ${JSON.stringify(viaInvoke).slice(0, 200)}`);
 });
 
 await test('unknown role → 400', async () => {

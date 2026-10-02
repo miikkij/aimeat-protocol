@@ -17,19 +17,28 @@
  *   deepseek/deepseek-v4-pro-0813). goose gets a GOOSE_PATH_ROOT of its own, so the developer's own
  *   goose configuration (its extensions, its provider) never reaches the turn.
  *
- *   IT SPENDS MONEY: one turn on the node's key. The key is read from OPENROUTER_API_KEY, or from
- *   scripts/.env in the main checkout (the file scripts/gen_image.py reads), and never printed.
- * @structure readKey · startNode · registerOwner · runTurn · main
+ *   IT SPENDS MONEY, and only from a CAPPED TEST KEY: OPENROUTER_TEST_KEY, from the environment or
+ *   from scripts/.env in the main checkout, never printed. A key without a spending limit is refused
+ *   before anything runs (asked of OpenRouter's /api/v1/key).
+ *
+ *   PER ROUND. Every model call passes a recording proxy on the next port, which forwards it to
+ *   OpenRouter unchanged except for asking for the cost, and notes the tools it carried, the tokens
+ *   in (and how many were cached), the tokens out and the cost.
+ * @structure readKey · assertCapped · startRecorder · startNode · registerOwner · runTurn · main
  * @usage
  *   cd aimeat && pnpm exec tsx scripts/chat-turn-measure.ts
  *   cd aimeat && pnpm exec tsx scripts/chat-turn-measure.ts --text "Mikä on Suomen pääkaupunki?"
- *   options: --port 40471 · --model deepseek/deepseek-v4-pro-0813 · --lang fi · --wait-s 240 · --out <file.json>
+ *   options: --port 40471 (the proxy takes the next) · --model deepseek/deepseek-v4-pro-0813 · --lang fi · --wait-s 240 · --out <file.json>
+ *     · --allow-uncapped (only when the key's owner said so)
  * @version-history
+ *   v1.1.0 — 2026-10-02 — A capped test key only (OPENROUTER_TEST_KEY); the cost and the tokens of
+ *     every model call, from a recording proxy.
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import { spawn, execFileSync, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -46,21 +55,90 @@ function arg(name: string, fallback: string): string {
 }
 const sleep = (ms: number) => new Promise<void>((r) => { setTimeout(r, ms); });
 
-/** The OpenRouter key: the environment first, then scripts/.env in the main checkout. */
+/** The variable the test key is read from. Never OPENROUTER_API_KEY: that one has no spending limit. */
+const KEY_VAR = 'OPENROUTER_TEST_KEY';
+
+/** The capped test key: the environment first, then scripts/.env in the main checkout. */
 function readKey(): string {
-    if (process.env.OPENROUTER_API_KEY) return process.env.OPENROUTER_API_KEY;
+    if (process.env[KEY_VAR]) return process.env[KEY_VAR]!;
     const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8' }).trim();
     const file = join(dirname(common), 'scripts', '.env');
-    if (!existsSync(file)) throw new Error(`no OPENROUTER_API_KEY in the environment and no ${file}`);
-    const line = readFileSync(file, 'utf8').split(/\r?\n/).find((l) => l.startsWith('OPENROUTER_API_KEY='));
-    const key = line?.slice('OPENROUTER_API_KEY='.length).trim().replace(/^["']|["']$/g, '');
-    if (!key) throw new Error(`OPENROUTER_API_KEY is empty in ${file}`);
+    if (!existsSync(file)) throw new Error(`no ${KEY_VAR} in the environment and no ${file}`);
+    const line = readFileSync(file, 'utf8').split(/\r?\n/).find((l) => l.startsWith(`${KEY_VAR}=`));
+    const key = line?.slice(KEY_VAR.length + 1).trim().replace(/^["']|["']$/g, '');
+    if (!key) throw new Error(`${KEY_VAR} is not set in ${file}. A measurement runs on a capped test key only.`);
     return key;
+}
+
+/**
+ * Refuse a key with no spending limit. Testing never runs on a production key (Jouni, 2026-10-02),
+ * and the key that sat in scripts/.env then had `limit: null`. OpenRouter's /api/v1/key says the
+ * limit without the key being shown anywhere.
+ */
+async function assertCapped(key: string): Promise<{ limit: number; remaining: number | null }> {
+    const res = await fetch('https://openrouter.ai/api/v1/key', { headers: { Authorization: `Bearer ${key}` } });
+    const body = await res.json() as { data?: { limit?: number | null; limit_remaining?: number | null } };
+    const limit = body.data?.limit;
+    if (typeof limit !== 'number') {
+        // Only by name, on the command line, so an uncapped key is never used without someone saying so.
+        if (process.argv.includes('--allow-uncapped')) return { limit: Number.POSITIVE_INFINITY, remaining: null };
+        throw new Error(`refused: the key in ${KEY_VAR} has no spending limit. Give it one at openrouter.ai, use another key, or pass --allow-uncapped when the owner of the key said so.`);
+    }
+    return { limit, remaining: body.data?.limit_remaining ?? null };
+}
+
+/** One model call, as the recording proxy saw it. */
+interface ModelCall { t: number; tools: number; requestChars: number; prompt?: number; cached?: number; completion?: number; cost?: number }
+
+/**
+ * A recording proxy between the node and OpenRouter. The node keeps only a day's total per owner, and
+ * the question is what each ROUND costs: how many tokens went in, how many were cached, what it cost.
+ * OpenRouter puts `usage` (with `cost`) in the last chunk of a streamed answer.
+ */
+function startRecorder(port: number, started: () => number): { calls: ModelCall[]; close: () => void } {
+    const calls: ModelCall[] = [];
+    const server = createServer((req, res) => {
+        const chunks: Buffer[] = [];
+        req.on('data', (c: Buffer) => chunks.push(c));
+        req.on('end', async () => {
+            const body = Buffer.concat(chunks);
+            let parsed: { tools?: unknown[]; usage?: unknown; stream?: boolean } = {};
+            try { parsed = JSON.parse(body.toString('utf8') || '{}'); } catch { /* not JSON */ }
+            // Ask for the cost in the answer; OpenRouter accepts it on any chat completion.
+            if (req.method === 'POST' && req.url?.endsWith('/chat/completions')) parsed.usage = { include: true };
+            const forwarded = req.method === 'POST' ? JSON.stringify(parsed) : undefined;
+            const call: ModelCall = { t: started(), tools: Array.isArray(parsed.tools) ? parsed.tools.length : 0, requestChars: body.length };
+            if (req.method === 'POST' && req.url?.endsWith('/chat/completions')) calls.push(call);
+            const headers: Record<string, string> = {};
+            for (const [k, v] of Object.entries(req.headers)) if (typeof v === 'string' && !['host', 'content-length', 'connection'].includes(k)) headers[k] = v;
+            const upstream = await fetch(`https://openrouter.ai${req.url}`, { method: req.method, headers, body: forwarded });
+            res.writeHead(upstream.status, { 'content-type': upstream.headers.get('content-type') ?? 'application/json' });
+            const reader = upstream.body?.getReader();
+            let tail = '';
+            while (reader) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                res.write(value);
+                tail = (tail + Buffer.from(value).toString('utf8')).slice(-8000);
+            }
+            res.end();
+            const usageMatch = tail.match(/"usage":(\{[^{}]*(\{[^{}]*\}[^{}]*)*\})/g);
+            if (usageMatch) {
+                try {
+                    const u = JSON.parse(usageMatch.at(-1)!.slice('"usage":'.length)) as { prompt_tokens?: number; completion_tokens?: number; cost?: number; prompt_tokens_details?: { cached_tokens?: number } };
+                    call.prompt = u.prompt_tokens; call.completion = u.completion_tokens; call.cost = u.cost;
+                    call.cached = u.prompt_tokens_details?.cached_tokens;
+                } catch { /* a usage block this script cannot read leaves the call without numbers */ }
+            }
+        });
+    });
+    server.listen(port, '127.0.0.1');
+    return { calls, close: () => server.close() };
 }
 
 interface Node { proc: ChildProcess; base: string; dir: string; output: () => string }
 
-async function startNode(port: number, model: string, key: string): Promise<Node> {
+async function startNode(port: number, model: string, key: string, recorderPort: number): Promise<Node> {
     const dir = mkdtempSync(join(tmpdir(), 'aimeat-chat-measure-'));
     const base = `http://127.0.0.1:${port}`;
     let output = '';
@@ -83,6 +161,9 @@ async function startNode(port: number, model: string, key: string): Promise<Node
             AIMEAT_OPENROUTER_INSTANCE_KEY: key,
             AIMEAT_MODEL_DEFAULT_CHAT: model,
             AIMEAT_CHAT_FREE_ALLOWANCE_USD: '1000',
+            // Every model call through the recording proxy, which forwards it to OpenRouter as it is.
+            AIMEAT_AI_FIXED_BASEURL_OVERRIDES: JSON.stringify({ openrouter: `http://127.0.0.1:${recorderPort}/api/v1` }),
+            AIMEAT_ALLOW_PRIVATE_EGRESS: 'true',
         },
         stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -173,12 +254,19 @@ async function main(): Promise<void> {
     const waitMs = Number(arg('wait-s', '240')) * 1000;
     const out = arg('out', '');
 
-    const node = await startNode(port, model, readKey());
+    const key = readKey();
+    const cap = await assertCapped(key);
+    console.log(`key: capped at ${cap.limit} USD, ${cap.remaining ?? '?'} USD left`);
+    let turnStart = 0;
+    const recorder = startRecorder(port + 1, () => (turnStart ? Date.now() - turnStart : -1));
+    const node = await startNode(port, model, key, port + 1);
     try {
         const token = await registerOwner(node.base, `measure${Date.now().toString(36)}`);
         const thread = await call(node.base, '/v1/chat/threads', { method: 'POST', body: '{}' }, token);
         const threadId = (thread.data.thread as { id: string }).id;
+        turnStart = Date.now();
         const { events, ended } = await runTurn(node.base, token, threadId, text, arg('lang', 'fi'), waitMs);
+        const spent = await call(node.base, '/v1/ai/usage', {}, token);
 
         const by = (k: string) => events.filter((e) => e.kind === k);
         const tools = new Map<string, { title: string; status: string; t: number }>();
@@ -206,6 +294,11 @@ async function main(): Promise<void> {
             progress: by('progress').map((e) => `${(e.t / 1000).toFixed(1)}s ${e.step}${e.detail ? ` (${e.detail})` : ''}`),
             guard: by('guard').map((e) => `${(e.t / 1000).toFixed(1)}s ${e.reason} ${e.phase}`),
             usage: events.filter((e) => e.usage).map((e) => `${(e.t / 1000).toFixed(1)}s ${JSON.stringify(e.usage)}`),
+            proposal_ready_ms: by('tool_call').find((e) => e.status === 'completed' && /agent propose/.test(String(tools.get(String(e.id || e.title))?.title ?? '')))?.t ?? null,
+            // Each model call: when it was sent, how many tools it carried, tokens in (cached of them), out, and its cost.
+            model_calls: recorder.calls.map((c) => `${(c.t / 1000).toFixed(1)}s tools ${c.tools} in ${c.prompt ?? '?'} (cached ${c.cached ?? '?'}) out ${c.completion ?? '?'} cost ${c.cost ?? '?'}`),
+            turn_cost_usd: recorder.calls.reduce((sum, c) => sum + (c.cost ?? 0), 0),
+            node_recorded_usd: spent?.data?.spent_today_usd ?? null,
             answer,
             proposals: (proposals?.data?.proposals ?? []).map((p) => ({ name: p.name, purpose: p.purpose, has_crew_def: !!p.crew_def, scopes: p.scopes })),
         };
@@ -214,6 +307,7 @@ async function main(): Promise<void> {
         const warnings = node.output().split('\n').filter((l) => /\[(chat|goose)\]/.test(l)).slice(-40);
         if (warnings.length) console.log(`\n--- node log ([chat]/[goose]) ---\n${warnings.join('\n')}`);
     } finally {
+        recorder.close();
         node.proc.kill();
         await Promise.race([once(node.proc, 'exit'), sleep(10_000)]);
         await sleep(1000);

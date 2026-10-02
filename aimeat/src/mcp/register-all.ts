@@ -24,6 +24,7 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   v1.19.0 — 2026-10-02 — aimeat_tools_find on the `chat` surface (mcp/tool-loader.ts).
  *   v1.18.0 — 2026-10-02 — registerWorkspaceTools receives the session's scopes: removing rows needs
  *     organism:write beside memory:purge, as the REST route asks.
  *   v1.17.0 — 2026-10-02 — registerAgentTaskTools receives the session's scopes, which decide whether
@@ -129,6 +130,7 @@ import { registerAgentOnboardingTools } from './agent-onboarding.js';
 import { registerAgentTelemetryTools } from './agent-telemetry.js';
 import { registerAgentManagementTools } from './agent-management.js';
 import { registerInvokeTool } from './invoke.js';
+import { registerToolLoader } from './tool-loader.js';
 import { registerAgentCrewTools } from './agent-crew.js';
 import { registerConnectionTools } from './connections.js';
 import { registerRefineryTools } from './refinery.js';
@@ -202,6 +204,9 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     // The second primitive, beside aimeat_discover: run what you found. Needs the session's
     // raw bearer, because the call is dispatched as the caller through the node's own routes.
     registerInvokeTool(mcp, config, getToken, agentGaii);
+    // The chat surface's way to the tools it registers switched off (mcp/tool-loader.ts). Only there:
+    // on every other surface everything registered is already on.
+    if (deps.role === 'chat') registerToolLoader(mcp);
     registerCortexTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     registerAppsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerAppDraftEditTools(mcp, storage, config, agentGaii);

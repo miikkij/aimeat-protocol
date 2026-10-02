@@ -16,6 +16,7 @@
  * @structure CapturedTool · captureServer() · captureConnector() · captureCliDispatch()
  * @usage const tools = captureServer(); tools.get('aimeat_company_update')?.inputKeys
  * @version-history
+ *   v1.1.0 — 2026-10-02 — captureServer() also captures aimeat_tools_find, which only `chat` registers.
  *   v1.0.0 — 2026-09-14 — Extracted from scripts/audit-mcp-schemas.ts (v1.3.1).
  */
 import type { AimeatConfig } from '../../src/config.js';
@@ -24,6 +25,7 @@ import type { AgentRegistry } from '../../src/cli/connect/agent-registry.js';
 
 // ── The server's own registration, not a copy of it ──
 import { registerAllServerTools } from '../../src/mcp/register-all.js';
+import { registerToolLoader } from '../../src/mcp/tool-loader.js';
 
 // ── Connector register entrypoint ──
 import { registerAllTools } from '../../src/cli/connect/mcp/tools/index.js';
@@ -105,6 +107,9 @@ export function captureServer(): Map<string, CapturedTool> {
         emitResourceUpdated: noop,
         emitResourceListChanged: noop,
     });
+    // The one tool only the `chat` surface registers (register-all.ts, CHAT_ONLY): the capture runs
+    // as `all`, and the server does register it, on that surface.
+    registerToolLoader(mcp);
     return sink;
 }
 

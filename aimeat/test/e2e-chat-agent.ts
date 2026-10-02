@@ -373,7 +373,8 @@ async function run(): Promise<void> {
         assert(!!created, 'a session was created');
         const server = (created.params.mcpServers ?? [])[0];
         assert(server?.name === 'aimeat' && server.type === 'http', `the node's own MCP surface is handed over, got ${JSON.stringify(server)}`);
-        assert(server.url === `${BASE}/v1/mcp`, `at this node's address, got ${server.url}`);
+        // The chat surface (2026-10-02): a small core listed, the rest switched on by purpose.
+        assert(server.url === `${BASE}/v2/mcp/chat`, `at this node's chat surface, got ${server.url}`);
         const auth = (server.headers ?? []).find((h: any) => h.name === 'Authorization');
         assert(!!auth && auth.value.startsWith('Bearer ') && auth.value.length > 40, `with a bearer token, got ${JSON.stringify(auth)}`);
         assert(auth.value !== `Bearer ${token}`, 'and it is the agent\'s token, never the owner\'s browser session');

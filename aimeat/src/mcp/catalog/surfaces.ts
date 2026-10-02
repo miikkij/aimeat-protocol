@@ -10,6 +10,8 @@
  *     - service  : marketplace/provider (board/work/action/wallet/capabilities/organism)
  *     - admin    : operator + owner governance (admin/flag/group/consent/agent-mgmt)
  *     - commerce : selling and getting paid (credentials, priced manifests, checkout, receipts)
+ *     - primitives: a handful, everything else through aimeat_discover + aimeat_invoke
+ *     - chat     : the node's own chat: a small core on, the rest switched on by purpose
  *     - full     : everything v2 may carry, computed as catalog minus V2_EXCLUDED
  *   v1/mcp stays full and frozen; these are opt-in. Surfaces are ALLOWLISTS over the same catalog —
  *   no forked handlers. instance_* is intentionally absent from v2 (auto-created session meta).
@@ -22,6 +24,9 @@
  *   import { toolsForSurface } from '../catalog/surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
+ *   2026-10-02 — An eighth surface, `chat`, for the node's own chat: 19 tools on at the start, every
+ *     other tool registered and switched off until aimeat_tools_find (CHAT_ONLY) or a call by name
+ *     switches it on. toolsRegisteredOn(role) says what a session registers.
  *   2026-10-02 — aimeat_task_start and aimeat_agent_task_start_set on `agent`, beside the task tools.
  *   2026-10-02 — aimeat_agent_propose, aimeat_agent_basics_get and _request on `agent`: an owner's
  *     own agent is who a person asks for a new agent, and these were on `admin` only.
@@ -103,8 +108,15 @@
  */
 import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
 
-export type SurfaceRole = 'appdev' | 'agent' | 'service' | 'admin' | 'commerce' | 'primitives' | 'full';
-export const V2_ROLES: readonly SurfaceRole[] = ['appdev', 'agent', 'service', 'admin', 'commerce', 'primitives', 'full'];
+export type SurfaceRole = 'appdev' | 'agent' | 'service' | 'admin' | 'commerce' | 'primitives' | 'chat' | 'full';
+export const V2_ROLES: readonly SurfaceRole[] = ['appdev', 'agent', 'service', 'admin', 'commerce', 'primitives', 'chat', 'full'];
+
+/**
+ * Tools that exist only on the `chat` surface. aimeat_tools_find switches on tools the session
+ * registered and kept off, so on every other surface, where everything registered is on, it has
+ * nothing to do. Kept off `full` (and so off nothing else, since no other list names it).
+ */
+export const CHAT_ONLY: readonly string[] = ['aimeat_tools_find'];
 
 /**
  * Catalog tools intentionally NOT exposed on any v2 server surface:
@@ -156,6 +168,34 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_storage_upload', 'aimeat_storage_download',
         // And the pair that reaches everything else.
         'aimeat_discover', 'aimeat_invoke',
+    ],
+    /**
+     * The CHAT surface (/v2/mcp/chat): what the node's own chat starts every turn with.
+     *
+     * WHY. The node chat used /v1/mcp and so read every tool the agent may use on every model round:
+     * 324 tools, about 515 000 characters, about 129 000 tokens (measured 2026-10-02). A one-line
+     * question cost 0.033 USD on a hosted place, and every round waited 15 to 30 s for its first
+     * token. Tool descriptions were most of what each message paid for.
+     *
+     * HOW. This list is what is ON when the session opens: the tools the handbook's common jobs need.
+     * Every other tool the agent's permissions allow is still REGISTERED on the session, switched
+     * off (mcp/tool-loader.ts). aimeat_tools_find searches them by purpose and switches the matches
+     * on for the rest of the session, and a call to a switched-off tool by name switches it on and
+     * runs it. Nothing is unreachable; it is only not in every round's prompt.
+     */
+    chat: [
+        // Where to start, what exists, and the door to everything else.
+        'aimeat_handbook_get', 'aimeat_discover', 'aimeat_tools_find', 'aimeat_invoke',
+        // What the person knows.
+        'aimeat_memory_read', 'aimeat_memory_write', 'aimeat_memory_search', 'aimeat_memory_list',
+        // What their groups know. Writing to a workspace is found when it is needed: its description
+        // alone is 6 500 characters, which every round would pay for.
+        'aimeat_organism_list', 'aimeat_workspace_list', 'aimeat_workspace_read',
+        // Their apps and skills.
+        'aimeat_app_list', 'aimeat_skill_list', 'aimeat_skill_get',
+        // Their agents, a new one, and work for them. A schedule is found when it is needed.
+        'aimeat_agents_list', 'aimeat_agent_propose',
+        'aimeat_task_create', 'aimeat_task_get', 'aimeat_task_list',
     ],
     appdev: [
         'aimeat_storage_upload', 'aimeat_storage_download', 'aimeat_storage_delete',
@@ -449,11 +489,12 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
      */
     full: CLI_FALLBACK_TOOL_DEFINITIONS
         .map(d => d.name)
-        .filter(name => !V2_EXCLUDED.includes(name)),
+        .filter(name => !V2_EXCLUDED.includes(name) && !CHAT_ONLY.includes(name)),
 };
 
 const _surfaceSets: Record<SurfaceRole, Set<string>> = {
     primitives: new Set(MCP_SURFACES.primitives),
+    chat: new Set(MCP_SURFACES.chat),
     appdev: new Set(MCP_SURFACES.appdev),
     agent: new Set(MCP_SURFACES.agent),
     service: new Set(MCP_SURFACES.service),
@@ -462,9 +503,17 @@ const _surfaceSets: Record<SurfaceRole, Set<string>> = {
     full: new Set(MCP_SURFACES.full),
 };
 
-/** The set of tool names exposed on a given v2 surface. */
+/** The set of tool names exposed on a given v2 surface. On `chat`, the ones that are on at the start. */
 export function toolsForSurface(role: SurfaceRole): Set<string> {
     return _surfaceSets[role];
+}
+
+/**
+ * The tools a session of this surface REGISTERS. The same as toolsForSurface, except on `chat`,
+ * which registers everything `full` carries and switches off what its own list does not name.
+ */
+export function toolsRegisteredOn(role: SurfaceRole): Set<string> {
+    return role === 'chat' ? new Set([..._surfaceSets.full, ..._surfaceSets.chat]) : _surfaceSets[role];
 }
 
 export function isV2Role(role: string): role is SurfaceRole {

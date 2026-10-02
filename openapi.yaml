@@ -12701,7 +12701,7 @@ paths:
     get:
       operationId: getAgentSurfaceHandbook
       summary: v2 surface handbook
-      description: Returns the operating handbook for a v2 purpose-scoped MCP surface (appdev, agent, service, admin).
+      description: Returns the operating handbook for a v2 purpose-scoped MCP surface (appdev, agent, service, admin, commerce, primitives, chat, full).
       tags:
         - Agent Integration
       parameters:
@@ -12710,7 +12710,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [appdev, agent, service, admin]
+            enum: [appdev, agent, service, admin, commerce, primitives, chat, full]
       security:
         - BearerAuth: []
       responses:
@@ -31957,15 +31957,18 @@ paths:
         description: Purpose-scoped MCP surface — exposes only the tools relevant to that role.
         schema:
           type: string
-          enum: [appdev, agent, service, admin]
+          enum: [appdev, agent, service, admin, commerce, primitives, chat, full]
     post:
       operationId: mcpExecuteV2
       summary: Execute MCP tool call on a purpose-scoped surface
       description: >
         Same Streamable HTTP MCP transport and OAuth as /v1/mcp, but tools/list is restricted to the
         named surface's allowlist (appdev = build apps/extensions/cortex; agent = owner's agent;
-        service = marketplace/provider; admin = operator/governance). Scope enforcement still applies
-        on top. Unknown role → 400.
+        service = marketplace/provider; admin = operator/governance; commerce = selling and getting
+        paid; primitives = a handful, the rest through aimeat_discover and aimeat_invoke; chat = what
+        the node's own chat uses: about twenty tools listed, every other permitted tool registered and
+        switched off until aimeat_tools_find adds it by purpose or a call names it; full = everything).
+        Scope enforcement still applies on top. Unknown role → 400.
       tags: [MCP]
       security:
         - BearerAuth: []

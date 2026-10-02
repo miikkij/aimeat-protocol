@@ -4,10 +4,12 @@
  *   role allowlists are catalog-valid, every catalog tool is placed (or explicitly excluded), and the
  *   purpose boundaries hold (e.g. agent has no marketplace tools, appdev is build-only).
  * @version-history
+ *   v1.1.0 -- 2026-10-02 -- The chat surface: small, carries the finder, registers what full does;
+ *     its CHAT_ONLY finder is the one tool full does not carry.
  *   v1.0.0 -- 2026-05-30 -- MCP audit v2 S1
  */
 import { describe, it, expect } from 'vitest';
-import { MCP_SURFACES, toolsForSurface, validateSurfaces, V2_EXCLUDED, V2_ROLES, isV2Role } from '../../src/mcp/catalog/surfaces.js';
+import { MCP_SURFACES, toolsForSurface, toolsRegisteredOn, validateSurfaces, V2_EXCLUDED, CHAT_ONLY, V2_ROLES, isV2Role } from '../../src/mcp/catalog/surfaces.js';
 import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../../src/mcp/catalog/definitions.js';
 
 describe('v2 MCP surfaces', () => {
@@ -112,11 +114,32 @@ describe('v2 MCP surfaces', () => {
 
     it('full is the catalog minus the exclusions, and is computed rather than listed', () => {
         const catalog = CLI_FALLBACK_TOOL_DEFINITIONS.map(d => d.name);
-        const expected = catalog.filter(n => !V2_EXCLUDED.includes(n));
+        // CHAT_ONLY: aimeat_tools_find switches on what a chat session keeps off, so on full,
+        // where everything registered is on, it would have nothing to do.
+        const expected = catalog.filter(n => !V2_EXCLUDED.includes(n) && !CHAT_ONLY.includes(n));
         expect(MCP_SURFACES.full).toEqual(expected);
         // The property that makes it computed: nothing in the catalog can be missing from it by
-        // accident, because the only filter is the exclusion list.
-        expect(MCP_SURFACES.full.length).toBe(catalog.length - V2_EXCLUDED.length);
+        // accident, because the only filters are the two exclusion lists.
+        expect(MCP_SURFACES.full.length).toBe(catalog.length - V2_EXCLUDED.length - CHAT_ONLY.length);
+    });
+
+    /**
+     * The chat surface (2026-10-02): what the node's own chat starts with. On /v1/mcp it listed 324
+     * tools, about 129 000 tokens, on every model round. The list is small, it carries what proposing
+     * an agent needs, and it REGISTERS everything full does, so nothing is out of reach.
+     */
+    it('chat starts small, carries the proposal and the finder, and registers everything full does', () => {
+        const chat = toolsForSurface('chat');
+        expect(MCP_SURFACES.chat.length).toBeLessThanOrEqual(20);
+        for (const name of ['aimeat_tools_find', 'aimeat_invoke', 'aimeat_handbook_get', 'aimeat_discover',
+            'aimeat_organism_list', 'aimeat_workspace_list', 'aimeat_agent_propose', 'aimeat_memory_write']) {
+            expect(chat.has(name), name).toBe(true);
+        }
+        const registered = toolsRegisteredOn('chat');
+        for (const name of toolsForSurface('full')) expect(registered.has(name), name).toBe(true);
+        expect(registered.has('aimeat_tools_find')).toBe(true);
+        // Every other surface registers exactly what it lists.
+        expect(toolsRegisteredOn('agent')).toBe(toolsForSurface('agent'));
     });
 
     /**
@@ -136,7 +159,7 @@ describe('v2 MCP surfaces', () => {
         const full = toolsForSurface('full');
         for (const role of V2_ROLES) {
             if (role === 'full') continue;
-            const missing = MCP_SURFACES[role].filter(t => !full.has(t));
+            const missing = MCP_SURFACES[role].filter(t => !full.has(t) && !CHAT_ONLY.includes(t));
             expect({ role, missing }).toEqual({ role, missing: [] });
         }
     });
