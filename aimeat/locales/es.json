@@ -3112,6 +3112,7 @@
   "decideRules.declined": "La propuesta fue rechazada.",
   "decideRules.sampleNotJson": "El ejemplo no es JSON válido.",
   "decideRules.idMissing": "Ponle un identificador a la regla.",
+  "decideRules.bandsMissing": "Pon un número de 0 a 1 en las dos bandas antes de guardar la regla.",
   "decideRules.proposals": "Propuestas de tus agentes",
   "decideRules.proposedBy": "La propone {who}",
   "decideRules.approve": "Aprobar",
@@ -10095,7 +10096,19 @@
     "prev": "Anterior",
     "next": "Siguiente",
     "delete": "Eliminar",
-    "themes": "Temas y estilos"
+    "themes": "Temas y estilos",
+    "fedTier_contact": "Contacto",
+    "fedAllowMessaging": "Entregar mensajes aquí",
+    "fedAllowBroadcast": "Anunciar a todos aquí",
+    "fedAllowSettlement": "Mover morsels a este registro",
+    "fedTierLadderTitle": "Qué deja hacer cada nivel a un par",
+    "fedTierLocked": "El nivel de este par no lo permite. Cambia el nivel para permitir más.",
+    "fedTierMeaning_contact": "Solo mensajes. Sin catálogo, sin memoria, sin enrutado, y ninguno aparece en las listas públicas del otro.",
+    "fedTierMeaning_visiting": "Mensajes, además de leer el catálogo de aquí y encargar trabajo de pago. Nunca es proveedor ni retransmite, y su gente no puede entrar aquí.",
+    "fedTierMeaning_member": "Un par completo. El acceso desde la federación sigue desactivado hasta que lo actives.",
+    "fedTierMeaning_genesis": "La relación de anclaje. El mismo alcance que un miembro.",
+    "fedSupportUpstream": "Responde al soporte de aquí",
+    "fedSupportUpstreamOn": "Quien escriba aquí a support@operators llega a este par en lugar de a tus propios operadores."
   },
   "dev": {
     "crumb": "Para desarrolladores",
@@ -20387,6 +20400,992 @@
         "ex2": "Medio: comparar tres ofertas y recomendar una.",
         "ex3": "Profundo: encontrar el fallo en un código largo.",
         "tip": "Si una respuesta llega vacía, el razonamiento ha gastado todo el límite de la respuesta más larga. Desactiva el razonamiento o sube el límite."
+      },
+      "max_cost_per_call": {
+        "title": "Máximo por llamada",
+        "short": "Lo máximo que puede costar una llamada de IA, en dólares estadounidenses. Se omite un proveedor cuyo precio para la llamada es mayor. Un campo vacío significa sin límite.",
+        "what": "Antes de una llamada, este AIMEAT estima su precio con cada proveedor por turno, a partir del catálogo de modelos. Si la estimación supera este límite, el proveedor se omite y se prueba el siguiente. Si ningún proveedor cabe en el límite, la llamada se rechaza y dice por qué. Un modelo sin precio en el catálogo no se omite. El límite se aplica al texto, a leer imágenes, a leer archivos y a crear imágenes.",
+        "range": "De 0 a 100 dólares. Un campo vacío significa sin límite. Una llamada de texto se estima con 1024 tokens de pregunta y 1024 de respuesta. En un rol, el límite solo puede ser más estricto que el de tus reglas de enrutamiento.",
+        "low": "Un límite pequeño: solo responden modelos baratos, y se rechazan más llamadas cuando ningún proveedor cabe en el límite.",
+        "high": "Un límite grande o un campo vacío: puede responder cualquier modelo de tu enrutamiento, también uno caro.",
+        "ex1": "Vacío: sin límite. Cualquier proveedor de tu enrutamiento puede responder.",
+        "ex2": "0,01: un modelo que cuesta 3 dólares por millón de tokens de pregunta y 15 por millón de tokens de respuesta se estima en unos 0,018 dólares por llamada, así que se omite.",
+        "ex3": "0,05 en un rol y 0,01 en las reglas de enrutamiento: el rol usa 0,01, porque un rol solo puede ser más estricto.",
+        "tip": "Pon un límite cuando el respaldo nunca deba llevar una llamada a un modelo mucho más caro. La estimación no es la factura: una pregunta o una respuesta larga cuesta más que la estimación. Para limitar el gasto del día, usa el presupuesto diario."
+      },
+      "fallback": {
+        "title": "Cuando un proveedor falla",
+        "short": "Si una llamada pasa al respaldo cuando el primer proveedor no responde. Activado por defecto.",
+        "what": "Con este ajuste activado, si un proveedor no responde, la llamada pasa al siguiente proveedor de tu enrutamiento. Un tiempo de espera agotado, un límite de uso, un error del servidor, un servicio caído o una clave rechazada pasan la llamada al siguiente. Una petición incorrecta, un contenido rechazado o una respuesta vacía no la pasan. Con el ajuste desactivado, la llamada se detiene en el primer fallo y muestra el error. Un proveedor que falla tres veces seguidas queda detrás de los demás durante cinco minutos, y después una llamada lo prueba de nuevo.",
+        "range": "Activado o desactivado. Activado por defecto. Proveedores por llamada fija cuántos proveedores puede probar una llamada.",
+        "ex1": "Activado: OpenAI responde con un límite de uso. La llamada pasa a tu siguiente proveedor de texto y recibes una respuesta.",
+        "ex2": "Desactivado: el mismo límite de uso detiene la llamada, y la aplicación muestra el error.",
+        "ex3": "Activado, y un proveedor rechaza tu clave: la llamada pasa al siguiente, y ese proveedor se omite hasta que lo pruebes de nuevo o cambies la clave.",
+        "tip": "Mantenlo activado salvo que necesites ver un fallo enseguida, por ejemplo mientras pruebas un proveedor nuevo. Algunas llamadas nunca pasan al respaldo: una llamada que nombra su proveedor, la voz salvo que Otra voz esté activado, y las incrustaciones, salvo al mismo modelo."
+      },
+      "fallback_attempts": {
+        "title": "Proveedores por llamada",
+        "short": "Cuántos proveedores puede probar una llamada, contando el primero. Un número entero de 1 a 5. El valor por defecto es 3.",
+        "what": "Cuando un proveedor falla y la llamada pasa al respaldo, esto limita cuántos proveedores prueba la llamada en total. El primero cuenta como uno. Al llegar al límite, la llamada se detiene y muestra el error. Cada intento fallido lleva tiempo, así que un número alto puede hacer lenta una llamada que no sale bien. El ajuste no hace nada mientras Cuando un proveedor falla está desactivado: entonces solo se prueba un proveedor.",
+        "range": "De 1 a 5, en números enteros. El valor por defecto es 3. Con 1, la llamada no pasa al respaldo.",
+        "low": "1 o 2: una llamada que falla se detiene pronto. Sirve cuando una aplicación debe responder rápido o no responder.",
+        "high": "4 o 5: más ocasiones de obtener respuesta cuando tienes muchos proveedores. Una llamada en la que todos fallan tarda más.",
+        "ex1": "1: solo el primer proveedor, como si Cuando un proveedor falla estuviera desactivado.",
+        "ex2": "3: el primer proveedor y dos de respaldo. Es el valor por defecto.",
+        "ex3": "5: tienes cinco proveedores de texto, y una llamada recibe respuesta aunque cuatro de ellos estén caídos.",
+        "tip": "El número solo cuenta los proveedores de tu enrutamiento y, cuando Después de tus opciones está activado, tus otros proveedores. Un número mayor que los proveedores que tienes no cambia nada."
+      },
+      "fallback_leaves_machine": {
+        "title": "Salir de esta máquina",
+        "short": "Si el respaldo desde un proveedor de esta máquina puede enviar los datos a un servicio en la nube. Desactivado por defecto.",
+        "what": "Un servidor de IA local funciona en la misma máquina que este AIMEAT, así que los datos no salen de ella. Cuando ese proveedor falla, el siguiente de tu enrutamiento puede ser un servicio en la nube, como OpenAI. Con el ajuste desactivado, ese proveedor se omite y los datos se quedan en la máquina. Con el ajuste activado, la llamada pasa al servicio en la nube, y la pregunta y los archivos van allí. El ajuste solo importa cuando el primer proveedor es local.",
+        "range": "Activado o desactivado. Desactivado por defecto.",
+        "ex1": "Desactivado: LM Studio en esta máquina no responde. El proveedor en la nube que va después se omite, y la llamada muestra el error.",
+        "ex2": "Activado: el mismo fallo pasa la llamada a OpenRouter, y la respuesta viene de allí.",
+        "ex3": "Desactivado, con OpenAI primero: el ajuste no hace nada, porque los datos salen de la máquina de todos modos.",
+        "tip": "Déjalo desactivado cuando usas un proveedor local para que los datos no salgan de la máquina, por ejemplo con datos personales o material confidencial. Actívalo cuando obtener una respuesta importe más que dónde se hace. En un AIMEAT público, como aimeat.io, esta máquina es el servidor, no tu propio ordenador."
+      },
+      "fallback_pool": {
+        "title": "Después de tus opciones",
+        "short": "Si una llamada puede probar tus otros proveedores después de los que elegiste para ese trabajo, y en qué orden. Activado por defecto.",
+        "what": "En el enrutamiento eliges hasta tres proveedores para cada tipo de trabajo. Con el ajuste activado, la llamada prueba después tus otros proveedores que tienen un modelo para ese trabajo. Con el ajuste desactivado, solo se prueban tus opciones. Proveedores por llamada sigue limitando cuántos se prueban en total. Si ni tus opciones ni tus otros proveedores dan ningún proveedor, responde el valor por defecto de este AIMEAT.",
+        "range": "Activado o desactivado, activado por defecto. El orden: en el orden de la lista (por defecto), el más barato primero o el más rápido primero. El más barato primero usa el precio de texto del catálogo de modelos y se aplica al texto, a leer imágenes y a leer archivos; un proveedor sin precio va al final. El más rápido primero usa por ahora el orden de la lista, porque este AIMEAT aún no mide la velocidad.",
+        "ex1": "Activado, en el orden de la lista: elegiste OpenAI para el texto. Si falla, se prueban después tus proveedores Mistral y OpenRouter, en el orden en que la página los muestra.",
+        "ex2": "Activado, el más barato primero: se prueba primero el más barato de tus otros proveedores de texto.",
+        "ex3": "Desactivado: elegiste solo OpenAI para el texto. Si falla, la llamada se detiene, aunque tengas otros proveedores.",
+        "tip": "Mantenlo activado para que la llamada tenga adónde ir. Desactívalo cuando solo los proveedores que elegiste puedan ver los datos. Un proveedor entra en este grupo solo cuando le pones un modelo para ese trabajo."
+      },
+      "only_tested": {
+        "title": "Solo proveedores probados",
+        "short": "Si este AIMEAT omite tus proveedores que aún no se han probado. Activado por defecto.",
+        "what": "Cuando este AIMEAT elige un proveedor para una llamada, omite tus proveedores cuya capacidad para ese trabajo nunca se ha probado. Esto incluye los proveedores que elegiste en el enrutamiento. Una prueba es el botón Probar ahora de un proveedor, y también cuenta una llamada que nombra al proveedor y sale bien. La regla no se aplica cuando una llamada nombra su proveedor o su modelo, o funciona como un rol: entonces se prueba esa elección. Los proveedores propios de este AIMEAT no se comprueban, porque quien gestiona este servicio responde de ellos. Un proveedor probado que ahora falla se trata aparte: queda detrás de los que funcionan.",
+        "range": "Activado o desactivado. Activado por defecto.",
+        "ex1": "Activado: añades un proveedor de Mistral y le pones un modelo, pero no lo pruebas. Las llamadas de texto lo omiten, y la página dice que no se ha probado, con el botón Probar ahora.",
+        "ex2": "Activado, y la prueba sale bien: el proveedor responde a las llamadas como los demás.",
+        "ex3": "Desactivado: un proveedor nuevo responde enseguida. Una clave incorrecta aparece entonces como una llamada fallida, no como un proveedor omitido.",
+        "tip": "Mantenlo activado, para que un proveedor nuevo con un error en la clave o en el modelo no rompa tus llamadas. Prueba una vez cada proveedor nuevo."
+      },
+      "embeddings": {
+        "title": "Incrustaciones",
+        "short": "Convierte el texto en números, para que una búsqueda encuentre textos que significan lo mismo y no solo textos con las mismas palabras. Lo piden las aplicaciones y los agentes.",
+        "what": "Una incrustación es una lista de números que un modelo hace a partir de un texto. Los textos con un significado parecido reciben números parecidos, así que una búsqueda por significado puede compararlos. Las aplicaciones y los agentes usan incrustaciones para encontrar notas, documentos o respuestas relacionados. Solo se pueden comparar entre sí los números de un mismo modelo. Por eso, una llamada de incrustación solo pasa al respaldo con el mismo modelo en otro proveedor, nunca con otro modelo.",
+        "range": "Activado o desactivado en cada proveedor, con un modelo. Hacen incrustaciones OpenRouter, OpenAI, Mistral, un servidor de IA local, una dirección compatible con OpenAI y una extensión; Anthropic y xAI no. Una llamada admite como máximo 256 textos y 500 000 caracteres.",
+        "ex1": "Buscas «vacaciones», y una aplicación de notas también encuentra la nota sobre un viaje a Creta.",
+        "ex2": "Cambias el modelo de incrustaciones: los números que una aplicación guardó antes ya no coinciden con los nuevos, así que la aplicación debe hacerlos de nuevo.",
+        "tip": "Elige el modelo de incrustaciones una vez y mantenlo. Tras un cambio, las incrustaciones guardadas no se pueden comparar con las nuevas hasta que se hagan de nuevo. En la configuración de administración, el modelo de incrustaciones predeterminado es el que usa la clave propia del servidor. Si ese campo está vacío, la clave del servidor no hace incrustaciones."
+      },
+      "model_policy": {
+        "title": "Modelos permitidos",
+        "short": "Qué modelos pueden usar tus llamadas de IA: cualquier modelo, los modelos recomendados o tu propia lista.",
+        "what": "La restricción de modelos decide qué modelos pueden responder. Cualquier modelo no limita nada. Los modelos recomendados son la lista que mantiene quien gestiona este AIMEAT, y tu restricción sigue sus cambios. Con tu propia lista, nombras tú los modelos. Una llamada a un modelo fuera de la restricción se rechaza, y la respuesta dice qué modelos se permiten. Si una llamada no nombra ningún modelo, usa el modelo del proveedor cuando está permitido y, si no, el primer modelo permitido. Llamadas de quién indica a qué se aplica: tus propias llamadas, el chat, tus agentes y tus aplicaciones.",
+        "range": "Cualquier modelo (por defecto), los modelos recomendados o mi propia lista. Solo puedes elegir los modelos recomendados cuando este AIMEAT tiene alguno. Tu propia lista lleva al menos 1 y como máximo 200 modelos, uno por línea, con la forma tipo:identificador del modelo. Al activar una restricción, se aplica a los cuatro tipos de llamadas hasta que desmarques alguno.",
+        "lowLabel": "Abierta",
+        "highLabel": "Estricta",
+        "low": "Cualquier modelo: ninguna llamada se rechaza por su modelo. Una aplicación aún puede indicar su propia lista más corta.",
+        "high": "Mi propia lista: solo responden los modelos que nombraste. Todos los demás se rechazan, también en un respaldo.",
+        "ex1": "Cualquier modelo: una aplicación pide un modelo que nunca has usado, y el modelo responde.",
+        "ex2": "Los modelos recomendados, solo para mis aplicaciones: tus aplicaciones usan solo la lista de quien gestiona este servicio, y tu propio chat puede usar cualquier modelo.",
+        "ex3": "Mi propia lista con openai:gpt-5-mini: un agente pide un modelo más caro, y la llamada se rechaza. La respuesta nombra el modelo permitido.",
+        "tip": "Cada capa solo puede hacer la regla más estricta: tanto la lista propia de una aplicación como la tuya deben permitir un modelo. Si usas tu propia lista, escribe los modelos de cada capacidad que usas, también las incrustaciones y la voz. Si no, esas llamadas se rechazan."
+      },
+      "content_classifier": {
+        "title": "Clasificador de contenido",
+        "short": "El modelo que da a tu contenido una clasificación, como pública, interna o confidencial: el modelo de decisión o un modelo de texto.",
+        "what": "Una clasificación decide qué personas y qué IA pueden leer un contenido, y si puede salir de un organismo. Primero se aplican las reglas que reconocen contraseñas y números de identidad. Después, el clasificador de contenido juzga el resto. Un modelo de decisión responde a preguntas cerradas y no escribe texto. Un modelo de texto lee el contenido y responde como cualquier llamada de texto, a través de tu enrutamiento de texto o del proveedor que nombres. La política de clasificación decide si una persona confirma el resultado y cuántas llamadas al día puede hacer el clasificador.",
+        "range": "Modelo de decisión: el predeterminado o un proveedor del modelo de decisión con nombre. Modelo de texto: el enrutamiento de texto o un proveedor de texto con nombre. Quien gestiona este servicio elige el predeterminado del servidor; tú puedes elegir otro para tu propio contenido.",
+        "lowLabel": "Modelo de decisión",
+        "highLabel": "Modelo de texto",
+        "low": "Responde a preguntas cerradas con una probabilidad y no escribe texto. Quien gestiona este servicio debe activarlo en el servidor.",
+        "high": "Usa tus proveedores de texto y sus precios. Funciona también cuando el modelo de decisión está desactivado.",
+        "ex1": "Modelo de decisión: predeterminado. El proveedor del modelo de decisión que este AIMEAT usa por defecto clasifica tu contenido. Tu enrutamiento de texto no cambia.",
+        "ex2": "Modelo de texto: el enrutamiento de texto. El proveedor que responde a tus llamadas de texto también clasifica tu contenido, y las llamadas cuentan para tu presupuesto diario.",
+        "ex3": "Modelo de texto: un proveedor con nombre, como tu servidor de IA local. Tu contenido se clasifica, y el texto no va a un servicio en la nube.",
+        "tip": "Elige el modelo de texto cuando el modelo de decisión está desactivado en este AIMEAT; entonces la página muestra el clasificador desactivado. Elige un proveedor local cuando tu contenido no deba salir de esta máquina. Las reglas que reconocen contraseñas y números de identidad se aplican sea cual sea el modelo."
+      },
+      "daily_budget": {
+        "title": "Presupuesto diario",
+        "short": "Lo máximo que pueden costar tus llamadas de IA en un día, en dólares estadounidenses. Una vez gastado, las siguientes llamadas se rechazan hasta la medianoche UTC.",
+        "what": "El presupuesto cuenta lo que cuestan hoy todas las llamadas de IA hechas en tu nombre: las tuyas, las de tus agentes y las de tus aplicaciones, pague tu propia clave o la del servidor. Antes de cada llamada, este AIMEAT compara lo ya gastado con el presupuesto. Cuando lo gastado llega al presupuesto, la llamada se rechaza y quien pidió recibe el motivo. Una llamada puede pasarse un poco del presupuesto, porque la comprobación se hace antes de la llamada y su coste solo se conoce después. El presupuesto vuelve a empezar a la medianoche UTC.",
+        "range": "De 0 a 1000 dólares. El valor por defecto es 1 dólar al día. Con 0 se rechaza toda llamada.",
+        "low": "Un presupuesto pequeño: una aplicación o un agente que funciona mal solo puede gastar poco. Tu propio trabajo puede detenerse a mitad del día.",
+        "high": "Un presupuesto grande: el trabajo no se detiene, pero un fallo en una aplicación puede costar más antes de que lo notes.",
+        "ex1": "1: el valor por defecto. Basta para muchas respuestas corrientes, porque una suele costar una fracción de céntimo.",
+        "ex2": "0: ninguna llamada de IA funciona, por ejemplo cuando estás fuera y no quieres ningún gasto.",
+        "ex3": "20, con un límite de 2 en una aplicación: la aplicación se detiene en 2 dólares, y el resto del presupuesto queda para otro trabajo.",
+        "tip": "Mira lo que costaron tus últimos 30 días, debajo del presupuesto, y pon el presupuesto un poco por encima de un día normal. Da a una aplicación nueva o muy usada un límite propio, para que no pueda gastar todo el presupuesto."
+      },
+      "app_daily_cap": {
+        "title": "Límite al día",
+        "short": "Lo máximo que puede gastar una aplicación en IA en un día, en dólares estadounidenses. Vacío: la aplicación puede usar todo el presupuesto diario.",
+        "what": "Cada aplicación puede usar todo tu presupuesto diario salvo que tenga un límite propio. Un límite detiene una aplicación antes de que gaste el presupuesto que necesita el resto de tu trabajo. Antes de cada llamada de la aplicación, este AIMEAT compara lo que la aplicación ha gastado hoy con su límite. Cuando la aplicación llega a su límite, sus llamadas se rechazan hasta la medianoche UTC, y tus otras aplicaciones siguen. El presupuesto diario sigue valiendo: un límite mayor que el presupuesto no deja gastar más a la aplicación.",
+        "range": "De 0 a 1000 dólares, en la fila de la aplicación. Vacío: sin límite propio. Con 0 se detienen las llamadas de IA de la aplicación.",
+        "low": "Un límite pequeño: la aplicación puede probar sus funciones de IA, pero un fallo en ella cuesta poco.",
+        "high": "Un límite grande o un campo vacío: la aplicación puede usar lo que quede del presupuesto diario.",
+        "ex1": "Vacío: una aplicación de escritura que usas todo el día comparte todo el presupuesto.",
+        "ex2": "0,50: un juego nuevo que estás probando. Un bucle que llama a la IA una y otra vez se detiene en 50 céntimos.",
+        "ex3": "0: una aplicación en la que ya no confías. Sus llamadas de IA se rechazan, pero la aplicación se sigue abriendo.",
+        "tip": "Pon un límite a una aplicación nueva y a cualquier aplicación cuyo gasto de 30 días te sorprenda. La tabla está ordenada por gasto en 30 días, así que las aplicaciones más caras están arriba."
+      },
+      "pdf_engine": {
+        "title": "Motor de PDF",
+        "short": "Quién convierte un PDF en texto para un modelo que no puede leerlo por sí mismo. Solo en la capacidad Lee archivos de un proveedor de OpenRouter.",
+        "what": "Algunos modelos leen un PDF por sí mismos, y otros solo leen texto. OpenRouter puede convertir el PDF para ese modelo antes de que lo lea. Este ajuste elige el conversor. Este AIMEAT no convierte nada por sí mismo. Sin motor de PDF o con el del modelo, un modelo que no lee archivos se rechaza en una llamada con un archivo, y la llamada pasa al siguiente proveedor. Con Mistral OCR o Cloudflare AI, OpenRouter convierte el PDF y el modelo recibe el texto.",
+        "range": "Sin motor de PDF (por defecto), el del modelo, Mistral OCR, Cloudflare AI. El catálogo de modelos dice qué modelos leen archivos; a un modelo que el catálogo no conoce se le supone capaz de leerlos.",
+        "ex1": "El del modelo: tu modelo lee los PDF por sí mismo. El PDF le llega tal cual.",
+        "ex2": "Mistral OCR: un contrato escaneado, cuyas páginas son imágenes. El OCR reconoce el texto en ellas, y un modelo que solo lee texto puede leerlo.",
+        "ex3": "Sin motor de PDF, con un modelo que solo lee texto: una llamada con un PDF omite este proveedor y pasa al siguiente que lee archivos.",
+        "tip": "Elige el del modelo cuando tu modelo lee archivos. Elige un motor cuando usas en OpenRouter un modelo que solo lee texto y quieres que lea PDF. Para páginas escaneadas, elige Mistral OCR."
+      },
+      "local_only": {
+        "title": "Esta máquina",
+        "short": "Si este rol solo puede usar proveedores de la misma máquina que este AIMEAT. Así los datos no salen de la máquina.",
+        "what": "Con el ajuste activado, las llamadas del rol omiten cada proveedor que sacaría los datos de esta máquina: OpenRouter, OpenAI, Anthropic, Mistral, xAI, una dirección que diste y las extensiones. Solo puede responder un servidor de IA local, como LM Studio u Ollama. Si el rol no tiene un proveedor así, sus llamadas se rechazan y dicen por qué. Una aplicación puede pedir lo mismo para su propio rol, y entonces la regla vale aunque dejes esto desactivado.",
+        "range": "Activado o desactivado. Desactivado por defecto.",
+        "ex1": "Activado: un rol «Resúmenes del diario» con Ollama en esta máquina. El texto de tu diario nunca va a un servicio en la nube.",
+        "ex2": "Activado, con solo OpenAI en el rol: cada llamada del rol se rechaza, porque ningún proveedor está en esta máquina.",
+        "ex3": "Desactivado: el rol usa los proveedores que pusiste, funcionen donde funcionen.",
+        "tip": "Actívalo para un rol que trata datos personales o contenido confidencial. En un AIMEAT público, como aimeat.io, esta máquina es el servidor y no puedes añadir allí un proveedor local. Entonces el ajuste solo funciona con un servidor de IA local que ofrezca quien gestiona ese AIMEAT, o en un AIMEAT que gestionas tú."
+      },
+      "max_retries": {
+        "title": "Reintentos máximos",
+        "short": "Cuántas veces tu AIMEAT le pregunta otra vez al modelo cuando la respuesta llega vacía. De 1 a 10.",
+        "what": "A veces un modelo responde con nada. Un modelo de razonamiento lo hace más a menudo, cuando su razonamiento gasta todo el límite de la respuesta más larga. Con el reintento automático activado, tu AIMEAT hace la misma pregunta otra vez, como mucho este número de veces. Si todos los intentos llegan vacíos, la llamada falla y dice por qué. Cada intento nuevo es una llamada nueva, y el modelo puede cobrarla.",
+        "range": "De 1 a 10. El campo empieza en 3. Con el reintento automático desactivado, una respuesta vacía falla de inmediato.",
+        "low": "1: un fallo se ve pronto, y una respuesta vacía cuesta como mucho una llamada extra.",
+        "high": "10: un modelo que a veces responde vacío tiene muchas oportunidades. Si el fallo está en los ajustes, los diez intentos fallan y cuestan.",
+        "ex1": "3: el valor inicial. Basta para un fallo pasajero del proveedor.",
+        "ex2": "1: pruebas ajustes nuevos y quieres ver una respuesta vacía de inmediato.",
+        "tip": "Si las respuestas llegan vacías a menudo, sube el límite de la respuesta más larga o reduce el razonamiento. Más reintentos solo repiten el mismo fallo."
+      }
+    },
+    "decide": {
+      "bands": {
+        "title": "Bandas",
+        "short": "Dos números de 0 a 1 que convierten el resultado de la regla en lo que pasa: actuar, preguntar a una persona o detenerse.",
+        "what": "Cada vez que se ejecuta la regla, da un resultado: cuánta certeza tiene el modelo, de 0 a 1. El resultado es la certeza más débil entre las preguntas que tienen umbral. Si llega al primer número, quien llama actúa por su cuenta. Si queda por debajo del primero pero llega al segundo, se pregunta a una persona. Por debajo del segundo, quien llama se detiene. Si la respuesta a una pregunta queda por debajo de su propio umbral, la acción se detiene antes de llegar a las bandas.",
+        "range": "Dos números de 0 a 1, con decimales. El segundo no puede ser mayor que el primero. Ningún número viene puesto. Si el modelo no da ninguna certeza, se pregunta a una persona.",
+        "low": "Quien llama actúa más a menudo por su cuenta, y una persona ve menos casos.",
+        "high": "Quien llama solo actúa por su cuenta cuando el modelo está muy seguro. Más casos van a una persona o se detienen.",
+        "ex1": "Actuar 0,9, preguntar 0,6: con un resultado de 0,95, quien llama actúa; con 0,75, se pregunta a una persona; con 0,4, quien llama se detiene.",
+        "ex2": "Actuar 0,8, preguntar 0,8: nunca se pregunta a nadie. Quien llama actúa con 0,8 o más y se detiene por debajo.",
+        "ex3": "Actuar 0,9, preguntar 0: las bandas nunca detienen a quien llama. Solo lo detiene una respuesta por debajo de su umbral, y todo resultado por debajo de 0,9 va a una persona.",
+        "tip": "Elige los números a partir de tus propios ejemplos. Prueba la regla con ejemplos, lee las últimas decisiones y mira dónde caen las respuestas correctas y las equivocadas. Al principio, deja mucha distancia entre los dos números, para que una persona vea los casos dudosos. Acércalos cuando las decisiones muestren que el modelo acierta. Rellena los dos números antes de guardar la regla."
+      },
+      "question_threshold": {
+        "title": "Umbral",
+        "short": "El valor que debe alcanzar una respuesta; si no, la acción se detiene. En una escala es un nivel desde 0. En los otros tipos de pregunta es un número de 0 a 1.",
+        "what": "Solo cuenta para el resultado una pregunta que tiene umbral. Una pregunta sin umbral se pregunta y se registra, pero no cambia el resultado. Lo que significa el número depende del tipo de pregunta. En sí o no, es la probabilidad mínima de que la respuesta sea sí. En elegir una opción, es la seguridad mínima que debe tener el modelo en su elección. En una escala, es el nivel más bajo que debe alcanzar la respuesta. Si una respuesta queda por debajo de su umbral, la acción se detiene, digan lo que digan las bandas.",
+        "range": "Sí o no: de 0 a 1. Elegir una opción: de 0 a 1. Escala: un nivel desde 0, donde 0 es el primer nivel de tu lista y el valor más alto permitido es el último nivel. Un campo vacío significa que la pregunta no cuenta. Una regla necesita al menos una pregunta con umbral.",
+        "low": "La pregunta solo detiene la acción cuando la respuesta está claramente en contra.",
+        "high": "La respuesta debe ser clara; si no, la acción se detiene. La acción se detiene más a menudo.",
+        "ex1": "Sí o no, 0,8: la afirmación es «The reply answers the customer's question». El modelo debe darle al menos 0,8; si no, la respuesta no sale.",
+        "ex2": "Elegir una opción, 0,7: un mensaje se clasifica en ventas, soporte o facturación. La seguridad del modelo en su elección debe ser al menos 0,7; si no, la acción se detiene.",
+        "ex3": "Escala, 2: los niveles son poor, fair, good y excellent (de 0 a 3). La respuesta debe ser good o excellent.",
+        "tip": "Escribe cada pregunta de modo que un valor alto signifique que se puede actuar. Así el umbral funciona siempre como un mínimo. Pon umbral solo a las preguntas que deben poder detener la acción. Ajusta los números a partir de las últimas decisiones, no a ojo."
+      },
+      "gate": {
+        "title": "Compuerta",
+        "short": "Si un agente debe esperarte cuando el modelo de decisión no está lo bastante seguro. Está apagada hasta que la enciendas.",
+        "what": "Una compuerta es una regla de decisión que protege una acción que no se puede deshacer, como enviar una respuesta. Con la compuerta encendida, el agente solo actúa cuando el resultado es Actuar. Cuando es Preguntar a una persona o Detenerse, AIMEAT le dice al agente que no actúe, te crea una tarea y te envía una notificación. Con la compuerta apagada, el agente puede actuar sea cual sea el resultado, y la decisión queda registrada igual. La compuerta solo afecta a los agentes. Una aplicación lee el resultado, y decide su propio código.",
+        "range": "En el editor de reglas: marcada o sin marcar; sin marcar por defecto. En la página del agente: Como diga cada regla, Encendida para todas las reglas o Apagada. Por defecto es Como diga cada regla, y entonces decide la marca de cada regla.",
+        "lowLabel": "Compuerta apagada",
+        "highLabel": "Compuerta encendida",
+        "low": "Apagada: el agente actúa por su cuenta. Después ves lo que respondió el modelo y puedes comparar.",
+        "high": "Encendida: el agente te espera cada vez que el modelo no está lo bastante seguro. Es más seguro, pero recibes más tareas.",
+        "ex1": "Encendida: un agente responde a clientes. Una respuesta de la que el modelo no está seguro te espera como tarea.",
+        "ex2": "Apagada: las primeras semanas de una regla nueva. El agente actúa, y las decisiones registradas muestran cuántas veces lo habría detenido la compuerta.",
+        "ex3": "Como diga cada regla: la regla que protege el borrado de un registro está marcada como compuerta, y la que clasifica mensajes no lo está.",
+        "tip": "Al principio, deja la compuerta apagada y lee las decisiones, para comparar cómo le va al agente sin ella. Enciéndela cuando una acción equivocada cueste más que una breve espera. AIMEAT no realiza la acción: le dice al agente que no actúe y registra esa instrucción."
+      },
+      "price_per_mtok": {
+        "title": "Precio en USD por millón de tokens",
+        "short": "Lo que cobra este proveedor por el texto que lee, en dólares estadounidenses por millón de tokens. AIMEAT lo usa para calcular cuánto cuestan tus decisiones.",
+        "what": "Los modelos cuentan el texto en tokens, que son trozos de palabras. Un proveedor del modelo de decisión que es un servicio en línea cobra por los tokens que lee. AIMEAT calcula el coste de cada decisión con sus tokens y este precio, y lo registra con la decisión. El coste cuenta para tu presupuesto diario y para el tope diario de un agente. El precio no cambia lo que te factura el proveedor. Solo un servicio en línea tiene precio: un modelo de decisión local no cuesta nada.",
+        "range": "De 0 a 1000 dólares estadounidenses por millón de tokens, con decimales. Si dejas el campo vacío, no se registra ningún precio: el proveedor muestra «sin precio indicado» y sus decisiones cuentan como gratuitas.",
+        "ex1": "0,042: el precio que AIMEAT usa para Jev, de TypeSafe, salvo que quien gestiona este servicio lo cambie. Una decisión de unos 4000 caracteres cuesta entonces unos 0,000042 USD.",
+        "ex2": "2: un proveedor que cobra 2 dólares por millón de tokens. Una decisión de 1000 tokens cuesta 0,002 USD.",
+        "ex3": "Vacío: todavía no sabes el precio. Las decisiones se registran sin coste, así que tu presupuesto diario no las limita.",
+        "tip": "Copia de la lista de precios del proveedor el precio del texto que lee (input). Deja el campo vacío solo mientras no sepas el precio. Sin precio, ni tu presupuesto diario ni el tope diario de un agente cuentan estas decisiones."
+      },
+      "provider_limits": {
+        "title": "Lo que puede procesar",
+        "short": "Entre cuántas opciones elige este proveedor como máximo y cuánto texto lee como máximo, en caracteres. AIMEAT rechaza una pregunta que no cabe antes de enviar nada.",
+        "what": "Cada modelo de decisión tiene sus límites. Algunos modelos leen solo el principio de un texto largo y descartan el resto sin dar ningún error. Entonces la decisión se basa solo en una parte del contenido. Aquí le indicas a AIMEAT los límites de este proveedor. AIMEAT comprueba cada petición con ellos antes de enviar nada. También rechaza una regla que nombra este proveedor si las preguntas de la regla no caben. El texto que cuenta es el contenido junto con las preguntas.",
+        "range": "Opciones como máximo: un número entero de 2 a 10 000. Un campo vacío significa 20. Texto como máximo: de 256 a 4 000 000 caracteres. AIMEAT cuenta unos 4 caracteres como un token. Un campo vacío significa unos 4000 caracteres (4096). Son los valores mínimos que procesa un modelo local.",
+        "low": "AIMEAT rechaza más preguntas, pero ningún contenido se corta sin avisar.",
+        "high": "Pasan contenidos más largos y más opciones. Si un límite es más alto de lo que el modelo procesa de verdad, el modelo puede responder a partir de una parte del contenido.",
+        "ex1": "20 y 4096: Laya, el ejemplo local incluido. Lee unos 4000 caracteres, así que AIMEAT rechaza un mensaje más largo antes de enviarlo.",
+        "ex2": "60 y 20 000: jeff, el ejemplo local incluido que en las mediciones eligió bien entre 60 temas. Una pregunta de elegir una opción con 61 opciones se rechaza.",
+        "tip": "Toma los números de la documentación del proveedor o mídelos: pon un dato conocido al final de un texto largo y mira si la respuesta lo usa. Si se rechaza una pregunta, envía menos campos o divide una lista larga de opciones en partes."
+      },
+      "store_state": {
+        "title": "Guardar el texto ya limpio con cada decisión",
+        "short": "Si está activado, cada decisión guarda el texto que evaluó el modelo, sin los datos personales. Si está desactivado, solo se guarda una huella del texto. Desactivado por defecto.",
+        "what": "AIMEAT elimina los datos personales antes de enviar el contenido al modelo de decisión. Este ajuste decide qué guarda de ese texto limpio el registro de la decisión. Si está activado, el registro guarda el texto entero, y después puedes ver exactamente qué evaluó el modelo. Si está desactivado, el registro guarda solo una huella: un código corto calculado a partir del texto. La huella muestra si dos decisiones trataron el mismo contenido, pero el texto no se puede recuperar a partir de ella. El registro de una decisión se borra al cabo de un año, salvo que quien gestiona este servicio haya fijado otro plazo.",
+        "range": "Desactivado por defecto. El ajuste se aplica a las decisiones que se tomen después del cambio.",
+        "tip": "Actívalo mientras ajustas una regla, para ver qué evaluó el modelo. Desactívalo cuando las decisiones vayan bien, para que se guarde menos de tu contenido. El contenido que una aplicación o un agente envió como público, sin eliminar los datos personales, se guarda tal como se envió."
+      },
+      "public_opt_out": {
+        "title": "Permitir que mis aplicaciones y agentes envíen sin limpiar el contenido que marquen como público",
+        "short": "Si está activado, una aplicación o un agente puede enviar el contenido que marque como público sin eliminar los datos personales. Desactivado por defecto.",
+        "what": "Por defecto, AIMEAT elimina los datos personales de todo lo que va al modelo de decisión: direcciones de correo electrónico, números de teléfono, números de identidad finlandeses, números de cuenta bancaria, direcciones postales y nombres. Una aplicación o un agente puede marcar un contenido como público, por ejemplo una noticia publicada que no tiene nada privado. Con este ajuste activado, AIMEAT envía ese contenido tal cual. Con el ajuste desactivado, AIMEAT elimina los datos personales de todo el contenido, diga lo que diga la aplicación o el agente.",
+        "range": "Desactivado por defecto. El contenido que marques tú como público se envía siempre tal cual.",
+        "tip": "Actívalo solo si confías en todas las aplicaciones y agentes que consultan el modelo de decisión por ti. Una aplicación puede marcar cualquier cosa como pública, y AIMEAT no comprueba esa marca. Con un servicio en línea, el contenido sale entonces de esta máquina con los datos personales que tenga. TypeSafe funciona en Estados Unidos y puede conservar lo que recibe."
+      }
+    },
+    "agent": {
+      "daily_cap": {
+        "title": "Tope diario",
+        "short": "Lo máximo que este agente puede gastar en IA en un día, en dólares estadounidenses. Un campo vacío significa que no tiene un tope propio.",
+        "what": "Cada llamada a la IA que hace el agente cuesta dinero: sus decisiones y el texto que escribe. Este tope cuenta las dos cosas juntas. Antes de cada llamada, tu AIMEAT compara lo que el agente gastó hoy con el tope. Cuando el agente llega al tope, tu AIMEAT rechaza sus llamadas siguientes hasta que cambia el día. Una llamada puede pasarse un poco del tope, porque su costo se conoce solo después. Tu propio presupuesto diario se sigue aplicando.",
+        "range": "De 0 a 10 000 dólares estadounidenses. Vacío: sin tope propio, y solo tu presupuesto diario limita al agente. Con 0, el agente no puede hacer ninguna llamada a la IA. El día cambia a medianoche UTC.",
+        "low": "Un tope bajo te protege si el agente falla, por ejemplo si se queda en un bucle. En un día con mucho trabajo, el agente se detiene y su trabajo espera al día siguiente.",
+        "high": "Un tope alto deja que el agente termine un trabajo largo el mismo día. Un fallo, como un bucle, cuesta más antes de que el agente se detenga.",
+        "ex1": "0: quieres que el agente no use la IA por ahora. Cada llamada se rechaza de inmediato.",
+        "ex2": "0,5: un agente que toma decisiones cortas, como ordenar mensajes. Un bucle se detiene en 50 centavos.",
+        "ex3": "5: un agente que escribe informes largos con un modelo grande. Termina el trabajo del día, y un fallo cuesta como mucho unos 5 dólares.",
+        "tip": "Pon un tope a cada agente que trabaja sin que nadie lo vigile. Mira durante unos días la cifra de lo gastado hoy bajo el tope, y fija el tope un poco por encima de un día normal. Si el agente se detiene a mitad del día, revisa primero el tope."
+      },
+      "run_mode": {
+        "title": "Cómo se ejecuta",
+        "short": "Si tu conector pone en marcha este agente solo cuando llega trabajo o lo mantiene en marcha todo el tiempo.",
+        "what": "Un agente propio es un programa que funciona en una computadora. Tu conector es el programa de esa computadora que pone en marcha tus agentes. Este ajuste le dice a tu conector cuándo poner en marcha este agente. Tu AIMEAT guarda la elección y la muestra, y tu conector actúa según ella. Si ningún conector ejecuta el agente, el ajuste no cambia nada.",
+        "range": "Cuando llega trabajo, Siempre activo, Sin decidir. Un agente nuevo creado en esta página empieza con Cuando llega trabajo. Un agente creado de otra manera empieza como Sin decidir.",
+        "lowLabel": "Cuando llega trabajo",
+        "low": "Nada del agente está en marcha mientras espera. La primera respuesta tarda unos segundos, porque el programa tiene que arrancar antes. Va bien para el trabajo que llega de vez en cuando: informes, ordenar mensajes, investigar.",
+        "highLabel": "Siempre activo",
+        "high": "El agente responde de inmediato, pero su programa está en marcha todo el tiempo en la computadora. Va bien para una puerta de entrada con la que hablan las personas, donde una espera de unos segundos se nota.",
+        "ex1": "Cuando llega trabajo: un agente que escribe un resumen de noticias cada mañana. Está en marcha unos minutos al día.",
+        "ex2": "Siempre activo: un agente de atención al cliente en tu sitio web. Quien te visita recibe la respuesta sin esperar.",
+        "ex3": "Sin decidir: un agente que todavía pruebas a mano. Tu conector no lo pone en marcha.",
+        "tip": "Elige Cuando llega trabajo, salvo que una persona espere la respuesta. Puedes cambiar entre los tres cuando quieras. Si un agente no responde nada, revisa primero este ajuste: Sin decidir significa que tu conector no lo pone en marcha."
+      },
+      "concurrency": {
+        "title": "Tareas simultáneas máximas",
+        "short": "Cuántas tareas hace el agente al mismo tiempo. De 1 a 20; 1 significa una tarea detrás de otra.",
+        "what": "Las tareas esperan en la cola del agente. Con 1, el agente termina una tarea antes de empezar la siguiente. Con un número mayor, empieza varias tareas a la vez, así que una cola larga se vacía antes. Tu AIMEAT guarda el número, y el programa que ejecuta el agente lo respeta. Un número mayor que 1 necesita un programa capaz de hacer varias tareas a la vez, como el demonio de CrewAI del paquete aimeat-crewai.",
+        "range": "De 1 a 20 tareas. El valor por defecto es 1.",
+        "low": "1: una tarea a la vez. Funciona con cualquier programa que ejecute agentes.",
+        "high": "Más de 1: una cola larga se vacía antes. Las tareas usan la misma computadora y el mismo tope diario, y una tarea puede terminar antes que otra que llegó primero.",
+        "ex1": "1: un agente que escribe en el mismo documento en cada tarea. Dos tareas a la vez podrían escribir una encima de la otra.",
+        "ex2": "3: un agente que responde preguntas de clientes distintos. Tres personas reciben respuesta al mismo tiempo.",
+        "ex3": "10: un agente que revisa cien páginas web, una página en cada tarea.",
+        "tip": "Deja 1, salvo que la cola crezca más rápido de lo que el agente la vacía. Sube el número solo cuando las tareas no dependan unas de otras. Antes, comprueba que el programa que ejecuta el agente puede hacer varias tareas a la vez."
+      },
+      "token_budget": {
+        "title": "Presupuesto de tokens",
+        "short": "Una cantidad de tokens que fijas por defecto para todos tus agentes. Un campo vacío significa sin límite.",
+        "what": "Los modelos cuentan el texto en tokens, que son trozos de palabras. Este número forma parte de los valores por defecto de tus agentes, que se aplican a todos salvo que una directriz del propio agente diga otra cosa. Tu AIMEAT guarda el número y lo muestra aquí. En esta versión, ninguna parte de tu AIMEAT detiene a un agente cuando llega al número, y el número no se envía a tus agentes. Para limitar lo que gasta un agente, usa el tope diario en la página del propio agente.",
+        "range": "Un número entero desde 0. Vacío: sin límite.",
+        "tip": "Cuando quieras un límite que detenga a un agente, fija el tope diario en la página del propio agente."
+      },
+      "self_start": {
+        "title": "Empieza el trabajo por sí solo",
+        "short": "Activado: el trabajo que recibe el agente empieza de inmediato. Desactivado: el trabajo espera hasta que lo inicies.",
+        "what": "El trabajo llega al agente en forma de tareas: de ti, de una programación o de otro agente. Con el interruptor activado, el agente empieza cada tarea de inmediato, y después ves lo que hizo. Con el interruptor desactivado, cada tarea espera en la cola hasta que presionas Empezar o le pides a tu IA que la inicie. Un agente que puede gastar dinero, enviar correo o borrar cosas en tu nombre siempre espera tu permiso, y el interruptor no se activa. El agente no puede cambiar este ajuste por sí mismo.",
+        "range": "Activado o desactivado. Si nadie lo ha fijado, un agente hecho para ejecutar tareas empieza por sí solo, y los demás agentes esperan.",
+        "ex1": "Activado: un agente que escribe cada mañana un resumen de noticias según una programación. Nadie tiene que estar despierto para iniciarlo.",
+        "ex2": "Desactivado: un agente nuevo que aún no conoces bien. Lees su plan y presionas Empezar.",
+        "ex3": "Siempre desactivado: un agente que puede pagar facturas. Cada pago espera tu permiso, y el interruptor no se activa.",
+        "tip": "Empieza con el interruptor desactivado, y actívalo cuando el agente haya hecho bien el mismo tipo de trabajo unas cuantas veces. Una tarea puede llevar su propia indicación, como \"consúltame primero\", y esa indicación va antes que este interruptor."
+      },
+      "purchase_limit": {
+        "title": "Lo máximo que puede gastar en un día",
+        "short": "Cuánto dinero puede gastar este agente en compras en un día, en la moneda que elijas. Sin límite, no gasta nada.",
+        "what": "Un agente puede comprar cosas en tu nombre, y el dinero sale de ti. Este límite fija cuánto puede gastar en un día. Antes de cada compra, tu AIMEAT suma el precio a lo que el agente gastó hoy. Si la suma pasa del límite, la compra se rechaza, y el agente recibe el aviso de dónde puedes subir el límite. Cada moneda tiene su propio límite. En una moneda sin límite, el agente no puede gastar dinero.",
+        "range": "De 0 a 1 000 000, en euros o en dólares estadounidenses. Si quitas el límite, el agente no gasta nada en esa moneda. El día cambia a medianoche UTC. Una retención para una puja cuenta como gastada, aunque se libere más tarde el mismo día.",
+        "low": "Un límite bajo mantiene pequeño un error. El agente se detiene en la primera compra que no cabe.",
+        "high": "Un límite alto deja que el agente haga compras más grandes por sí solo. Una compra equivocada puede costar hasta el límite.",
+        "ex1": "20 EUR: un agente que compra informes o conjuntos de datos sueltos. Una compra equivocada cuesta como mucho 20 euros al día.",
+        "ex2": "50 EUR y ningún límite en dólares: el agente puede pagar en euros, y se rechaza una compra con precio en dólares.",
+        "ex3": "500 EUR: un agente que pide materiales para tu empresa. Los pedidos de cada día quedan por debajo de 500 euros.",
+        "tip": "Fija el límite más bajo con el que el agente pueda hacer su trabajo, y mira en la tarjeta cuánto ha gastado hoy. El límite no afecta a tus propias compras ni a los precios en morsels. Solo tú puedes cambiar el límite, con tu propia sesión iniciada."
+      }
+    },
+    "access": {
+      "scopes": {
+        "title": "Qué puede hacer",
+        "short": "Qué permisos recibe el agente. Cada permiso le deja leer o cambiar un tipo de cosa en tu nombre. Puedes reducirlos después.",
+        "what": "Un permiso deja al agente leer o cambiar un tipo de cosa, por ejemplo leer tu memoria o escribir en ella. El agente solo puede hacer lo que sus permisos le dejan. Si intenta otra cosa, tu AIMEAT se niega y nombra el permiso que falta. Cuantos menos permisos tiene un agente, menos daño puede hacer un error o una llave robada. Un agente que puede gastar dinero, enviar correo o borrar cosas en tu nombre nunca empieza una tarea por sí solo.",
+        "range": "Un agente nuevo: Solo lectura, Leer y escribir, Todo lo que puedes tú. Un token: Solo esto (eliges cada permiso), Todo lo que tú puedes y, para el operador de este servidor, Administrar todo el servidor.",
+        "lowLabel": "Menos permisos",
+        "low": "Solo lectura: el agente lee tu memoria, tus archivos, el directorio público y los tableros a los que tienes acceso, y no cambia nada. Leer y escribir le deja además escribir en tu memoria y tus archivos, pedir a otros agentes que trabajen para ti y ver tu cola de trabajo.",
+        "highLabel": "Más permisos",
+        "high": "Todo lo que puedes tú: el agente puede hacer lo mismo que tú, en cada aplicación y con cada dato. Un error o una llave robada llega a todo. Después de unos días, tu AIMEAT sabe qué permisos usó el agente. Desde entonces, sus tareas esperan tu permiso, y tu AIMEAT te ofrece reducir los permisos a esos.",
+        "ex1": "Solo lectura: un agente que responde en un chat preguntas sobre tus notas. No puede cambiar ni borrar nada.",
+        "ex2": "Leer y escribir: un agente que reúne noticias y guarda un resumen en tu memoria.",
+        "ex3": "Solo esto, con solo escribir en la memoria: un aparato de medición que guarda sus lecturas. Si su token se filtra, nadie puede leer tus datos con él.",
+        "tip": "Da lo mínimo que el trabajo necesita, y agrega un permiso cuando el agente reciba una negativa. Elige Todo lo que puedes tú solo para tu propia IA, en la que confías como en ti."
+      }
+    },
+    "crew": {
+      "process": {
+        "title": "Proceso",
+        "short": "Secuencial: las tareas se ejecutan una tras otra en el orden de la lista. Jerárquico: un coordinador reparte las tareas entre los miembros y revisa su trabajo.",
+        "what": "Un equipo es un grupo de miembros, y cada tarea nombra al miembro que la hace. Con Secuencial, el equipo ejecuta las tareas en el orden de la lista, y una tarea puede leer los resultados de las anteriores. Con Jerárquico, el equipo agrega un coordinador que planifica el trabajo, da cada tarea al miembro que le parece adecuado y revisa la respuesta antes de seguir. El coordinador también es un modelo, así que una ejecución hace más llamadas al modelo y cuesta más.",
+        "range": "Secuencial o Jerárquico. El valor por defecto es Secuencial.",
+        "lowLabel": "Secuencial",
+        "low": "Previsible y más barato. Tú decides el orden y quién hace qué. Sirve para la mayoría de los equipos.",
+        "highLabel": "Jerárquico",
+        "high": "El coordinador puede cambiar el orden y elegir el miembro de cada tarea. Más lento y más caro, y el resultado es más difícil de prever.",
+        "ex1": "Secuencial: un investigador busca fuentes, un redactor escribe el artículo y un editor lo revisa. El orden no cambia nunca.",
+        "ex2": "Jerárquico: un equipo de soporte con un experto en facturación y un experto técnico. El coordinador envía cada pregunta al experto que corresponde.",
+        "tip": "Empieza con Secuencial. Cambia a Jerárquico solo cuando el orden correcto o el miembro correcto dependan de la entrada. Entonces prueba el equipo unas cuantas veces, porque el coordinador decide el camino de nuevo en cada ejecución."
+      },
+      "llm_profile": {
+        "title": "Perfil de modelo",
+        "short": "Qué configuración de modelo usa el equipo, con el nombre que tiene en el archivo llm_providers.json del programa que lo ejecuta. Vacío usa el valor por defecto de ese programa.",
+        "what": "El programa que ejecuta el equipo guarda sus configuraciones de modelo en un archivo llamado llm_providers.json, en su propia computadora. Cada configuración tiene un nombre, un modelo y la dirección para llegar a él. Este campo nombra la configuración que usa este equipo. Tres elecciones van antes que este campo: un modelo fijado en esa computadora, el modelo elegido para este agente y la lista de equipos de la propia computadora. Tu valor por defecto para todos los agentes y el de la computadora vienen después.",
+        "range": "Un nombre de perfil de 1 a 64 caracteres, tal como está escrito en llm_providers.json. Vacío: se aplica la siguiente elección de ese orden.",
+        "ex1": "fast: un perfil al que pusiste nombre para un modelo barato y rápido. Sirve para un equipo que ordena mensajes.",
+        "ex2": "Vacío: el equipo usa el modelo que elegiste para todos tus agentes, o el de la computadora.",
+        "tip": "Si el equipo no usa el modelo que esperas, revisa primero si hay un modelo elegido para el propio agente. Copia el nombre del perfil del archivo tal cual."
+      },
+      "delegation": {
+        "title": "Puede delegar en otros miembros",
+        "short": "Activado: este miembro puede pasar parte de su trabajo a otro miembro del equipo o hacerle una pregunta.",
+        "what": "Con esto activado, el miembro recibe dos herramientas más: una pasa una parte del trabajo a otro miembro y otra le hace una pregunta a otro miembro. El miembro decide solo cuándo usarlas. Cada traspaso son más llamadas al modelo, así que la ejecución tarda más y cuesta más. Con esto desactivado, el miembro hace su tarea solo, con sus propias herramientas. En un equipo Jerárquico, el coordinador reparte el trabajo diga lo que diga este ajuste.",
+        "range": "Activado o desactivado. Por defecto está desactivado.",
+        "ex1": "Activado: un redactor que puede pedirle al investigador que compruebe un dato.",
+        "ex2": "Desactivado: un miembro que da formato al texto final. No necesita a nadie más.",
+        "tip": "Actívalo en un miembro a la vez, donde una pregunta a otro miembro ayude. Si varios miembros pueden delegar, pueden pasarse el trabajo de un lado a otro, y una ejecución se vuelve larga y cara."
+      },
+      "async": {
+        "title": "Se ejecuta junto a la tarea anterior",
+        "short": "Activado: el equipo empieza esta tarea y sigue sin esperarla, así que se ejecuta al mismo tiempo que las tareas vecinas.",
+        "what": "Normalmente el equipo termina una tarea antes de empezar la siguiente. Con esto activado, el equipo empieza esta tarea y pasa de inmediato a la siguiente. Dos tareas seguidas con esto activado se ejecutan al mismo tiempo, así que el equipo termina antes. Una tarea posterior que lee los resultados de esta tarea espera hasta que esté hecha.",
+        "range": "Activado o desactivado. Por defecto está desactivado.",
+        "ex1": "Activado en dos tareas de investigación: una busca noticias y otra artículos científicos, al mismo tiempo. La tarea de redacción que viene después lee los dos resultados y espera a los dos.",
+        "ex2": "Desactivado: una tarea que necesita el resultado de la anterior.",
+        "tip": "Actívalo solo en tareas que no necesitan los resultados de las otras. Una tarea que necesita un resultado anterior tiene que nombrarlo en \"Lee los resultados de\". Si no, puede empezar antes de que ese resultado exista."
+      },
+      "memory": {
+        "title": "Guarda memoria entre ejecuciones",
+        "short": "Activado: el equipo recuerda lo que aprendió en ejecuciones anteriores y lo usa en la siguiente.",
+        "what": "Con esto desactivado, cada ejecución empieza solo con la tarea y la entrada. Con esto activado, el equipo guarda notas de cada ejecución y busca las que vienen al caso en las siguientes. Es la memoria propia del equipo, y la guarda el programa que ejecuta el equipo. Para recordar, el equipo hace llamadas extra al modelo, que cuestan dinero y tiempo.",
+        "range": "Activado o desactivado.",
+        "ex1": "Activado: un equipo que atiende a clientes. Recuerda que un cliente preguntó por el mismo pedido la semana pasada.",
+        "ex2": "Desactivado: un equipo que escribe cada mañana un resumen de noticias nuevo. Las ejecuciones viejas solo agregarían contenido pasado.",
+        "tip": "Actívalo cuando las ejecuciones siguientes ganen con las anteriores. Los datos que deben ser correctos y compartidos van en la memoria de tu AIMEAT, donde puedes leerlos y cambiarlos."
+      }
+    },
+    "schedule": {
+      "cron": {
+        "title": "Cron",
+        "short": "Cuándo se ejecuta, en cinco campos: minuto, hora, día del mes, mes, día de la semana. 0 7 * * * es todos los días a las 7:00.",
+        "what": "Cron es la forma estándar de escribir un momento que se repite. Tiene cinco campos separados por espacios: minuto, hora, día del mes, mes y día de la semana. Un asterisco significa cualquier valor. Las comas forman una lista, un guion forma un rango y */15 significa cada 15 valores. El domingo es 0 y el lunes es 1. La hora se lee en la zona horaria del campo de al lado. Tu AIMEAT rechaza un cron que no puede leer.",
+        "range": "Minuto 0–59, hora 0–23, día 1–31, mes 1–12, día de la semana 0–7 (0 y 7 son domingo). Con la zona horaria vacía, la hora es la del reloj del propio servidor.",
+        "ex1": "0 7 * * *: todos los días a las 7:00.",
+        "ex2": "*/15 * * * *: cada 15 minutos, de día y de noche.",
+        "ex3": "0 9 * * 1: todos los lunes a las 9:00.",
+        "ex4": "0 7 * * 1-5: de lunes a viernes a las 7:00.",
+        "ex5": "0 5 1 * *: el primer día de cada mes a las 5:00.",
+        "ex6": "30 8,16 * * *: todos los días a las 8:30 y a las 16:30.",
+        "tip": "La línea bajo el campo dice el cron en palabras. Léela antes de guardar. Un cron que se ejecuta cada pocos minutos repite su trabajo y su costo cada vez."
+      },
+      "timezone": {
+        "title": "Zona horaria",
+        "short": "La zona horaria en la que se leen las horas del cron, con un nombre IANA como Europe/Helsinki. Vacío usa el reloj del propio servidor.",
+        "what": "El cron dice \"7:00\", y este campo dice dónde son las 7:00. Escribe la zona con un nombre IANA: una región y una ciudad, como America/Bogota o Europe/Helsinki. Tu AIMEAT mueve las ejecuciones con el horario de verano, así que las 7:00 siguen siendo las 7:00 locales todo el año.",
+        "range": "Un nombre de zona horaria IANA. Una programación nueva empieza con tu propia zona horaria, y un flujo de trabajo nuevo con Europe/Helsinki. Vacío: el reloj del propio servidor, que puede no ser el tuyo.",
+        "ex1": "America/Bogota: 0 7 * * * se ejecuta a las 7:00 en Bogotá.",
+        "ex2": "Europe/Helsinki: el mismo cron se ejecuta a las 7:00 de Finlandia, en invierno y en verano.",
+        "ex3": "UTC: 0 7 * * * se ejecuta a las 2:00 en Bogotá, todo el año.",
+        "tip": "Pon la zona de las personas que esperan el resultado. Deja el campo vacío solo si sabes en qué zona funciona el servidor."
+      },
+      "max_runs": {
+        "title": "Parar después de N ejecuciones",
+        "short": "Si está marcado, la programación se apaga sola después de este número de ejecuciones correctas. Una ejecución que falla o se omite no cuenta.",
+        "what": "Algunos trabajos deben hacerse solo un número fijo de veces: un recordatorio diario durante una semana, o una prueba. Con esto marcado, tu AIMEAT cuenta cada ejecución que sale bien. Cuando la cuenta llega al número, la programación se apaga sola. En la página de un agente, es el valor por defecto de cada programación nueva para ese agente, y el ajuste propio de una programación va antes que él.",
+        "range": "Un número entero desde 1. El formulario empieza en 7. Sin marcar, la programación sigue hasta que la detengas.",
+        "ex1": "7, con 0 7 * * *: un recordatorio por la mañana durante una semana.",
+        "ex2": "1: un trabajo que debe hacerse una sola vez, en el siguiente momento que indica el cron.",
+        "ex3": "30: un informe diario durante una prueba de 30 días.",
+        "tip": "Úsalo para todo lo que tiene fecha de fin, así no tienes que acordarte de detenerlo. Las ejecuciones que fallan no cuentan, así que una programación que falla siempre sigue hasta que la detengas."
+      },
+      "daily_limit": {
+        "title": "Límite diario de gasto en IA (USD)",
+        "short": "Si está marcado, una programación de IA omite su ejecución cuando tu gasto en IA de hoy llega a esta cantidad de dólares estadounidenses.",
+        "what": "El límite suma todo tu gasto en IA de hoy, de cada programación y de cualquier otro uso. Antes de cada ejecución, tu AIMEAT compara esa suma con el límite. Cuando la suma lo alcanza, la ejecución se omite, y el registro de ejecuciones dice por qué. La programación sigue activa y lo intenta otra vez a su hora siguiente. El límite solo funciona en programaciones del tipo IA. Una programación que da una tarea a un agente no lo revisa; para eso usa el tope diario del agente.",
+        "range": "Dólares estadounidenses, de 0,1 en 0,1. El formulario empieza en 1. 0 significa sin límite. El día cambia a medianoche UTC.",
+        "ex1": "1: un resumen con IA cada hora. Un día en que ya gastaste 1 dólar de IA en otra cosa, los resúmenes se omiten hasta la medianoche UTC.",
+        "ex2": "5: un trabajo nocturno de IA que no debe ejecutarse si el día ya salió caro.",
+        "tip": "Fíjalo un poco por encima de tu día normal, para que solo detenga un día fuera de lo común. La suma incluye todo tu uso de IA, así que un día con mucho uso en otra parte también puede detener la programación."
+      }
+    },
+    "workflow": {
+      "step_timeout": {
+        "title": "Si no produce",
+        "short": "Cuánto tiempo puede pasar un paso sin producir un resultado antes de que tu AIMEAT se dé por vencido con él, y si antes lo intenta otra vez.",
+        "what": "Cada paso debe producir un resultado, por ejemplo una entrada en tu memoria. Tu AIMEAT lo espera. El tiempo vuelve a empezar cada vez que el paso produce una parte de su resultado, así que un paso lento que avanza no se detiene. Si el tiempo pasa sin avances y elegiste reintentar, el paso se intenta otra vez 5 minutos después. Cuando no quedan reintentos, el paso termina por tiempo agotado. Los pasos que necesitan su resultado no se ejecutan, y los demás pasos terminan.",
+        "range": "De 1 minuto a 7 días, en minutos. Opciones listas: 15 min, 1 h, 4 h y 24 h. El valor por defecto es 1 h, y 24 h para un paso que te hace una pregunta. Reintentos: ninguno, uno o dos.",
+        "low": "15 min: un paso atascado se nota pronto. Un agente lento pero sano puede detenerse demasiado pronto.",
+        "high": "24 h: un agente lento tiene tiempo para terminar. Un paso atascado retiene la ejecución un día entero.",
+        "ex1": "15 min, reintentar una vez: un paso que trae una página web. Normalmente tarda un minuto.",
+        "ex2": "1 h: un paso en el que un agente escribe tres artículos.",
+        "ex3": "24 h: un paso que espera la respuesta de una persona a una pregunta.",
+        "tip": "Pon como tiempo el doble de lo que el paso tarda normalmente. Un reintento ayuda con un fallo pasajero, como una red lenta, y puede volver a hacer las llamadas a la IA del paso. Si el agente no está conectado, el paso falla antes, sin esperar todo el tiempo."
+      },
+      "parallel": {
+        "title": "Permitir ejecuciones en paralelo",
+        "short": "No: un inicio nuevo con una ejecución en curso no inicia nada. Sí: cada inicio se ejecuta, en paralelo con los demás.",
+        "what": "Los pasos de un flujo de trabajo escriben sus resultados bajo claves en tu memoria. Si dos ejecuciones del mismo flujo escriben en las mismas claves, una escribe encima de los resultados de la otra. Por eso, por defecto, un inicio con una ejecución en curso no inicia nada y lo dice. Con sí, cada inicio se ejecuta. Es seguro solo cuando cada ejecución escribe en claves propias: una referencia de caso en las variables o {run} en las claves.",
+        "range": "Sí o no. Por defecto es no. Sí no se puede guardar junto con Borrar primero los resultados viejos.",
+        "ex1": "No: un flujo de noticias de la mañana. Un segundo inicio por error no hace nada.",
+        "ex2": "Sí: un flujo de soporte que empieza con cada solicitud nueva, con el número de la solicitud en una variable. Tres solicitudes se ejecutan al mismo tiempo.",
+        "ex3": "Sí, con {run} en cada clave: un flujo que inicias muchas veces para probarlo. Cada ejecución guarda sus propios resultados.",
+        "tip": "Antes de activarlo, revisa cada clave en la que escriben los pasos. Si una sola clave no tiene referencia de caso ni {run}, las ejecuciones simultáneas escriben una encima de la otra en esa clave."
+      },
+      "skip_done": {
+        "title": "Omitir lo ya hecho",
+        "short": "Sí: un paso cuyo resultado ya está en tu memoria se marca como hecho y no se ejecuta otra vez.",
+        "what": "Antes de que empiece un paso, tu AIMEAT revisa si su resultado ya está en tu memoria. Con sí, un paso cuyo resultado está ahí se marca como hecho, y no se llama a su agente. Los pasos siguientes continúan como siempre. Así, una ejecución que se detuvo a la mitad puede iniciarse otra vez, y sigue desde el primer paso sin hacer. Ahorra tiempo y gasto en IA.",
+        "range": "Sí o no. Por defecto es no. Si Borrar primero los resultados viejos también es sí, los resultados viejos se borran al empezar, así que no se omite nada.",
+        "ex1": "Sí: un flujo de cinco pasos se detuvo en el paso cuatro. Una ejecución nueva hace solo los pasos cuatro y cinco.",
+        "ex2": "No: un informe diario cuyas claves no cambian de un día a otro. Con sí, el segundo día encontraría el resultado de ayer y se saltaría el trabajo.",
+        "tip": "Actívalo en los flujos que vuelves a iniciar después de un fallo. Para ejecutar otra vez un solo paso, borra antes su resultado. Así este ajuste deja en paz los demás pasos."
+      },
+      "fresh": {
+        "title": "Borrar primero los resultados viejos",
+        "short": "Sí: al empezar una ejecución se borran los resultados de la anterior, así que cada paso produce su resultado de nuevo.",
+        "what": "Algunos agentes no hacen su trabajo si ya encuentran su resultado en tu memoria. Si las claves de un flujo no cambian de una ejecución a otra, ese agente encuentra el resultado anterior y no hace nada. Con sí, tu AIMEAT borra una vez los resultados que produce el flujo, al empezar la ejecución y antes de que empiece ningún paso. Después, cada paso hace su resultado otra vez.",
+        "range": "Sí o no. Por defecto es no. Sí no se puede guardar junto con Permitir ejecuciones en paralelo, porque una ejecución nueva borraría los resultados de otra que sigue en curso.",
+        "ex1": "Sí: una lista de precios diaria que usa las mismas claves cada día. Cada mañana la lista se hace otra vez desde el principio.",
+        "ex2": "No: un flujo cuyas claves llevan la fecha. Cada día escribe claves nuevas, y nada viejo estorba.",
+        "tip": "Úsalo solo cuando necesites únicamente el resultado más nuevo. Si quieres conservar los resultados anteriores, pon la fecha o {run} en las claves y deja esto en no."
+      },
+      "llm_checks": {
+        "title": "El juicio de tu modelo",
+        "short": "Sí deja que tu propio modelo juzgue las verificaciones en palabras del flujo, como \"¿este artículo se puede publicar?\". Cada verificación gasta IA.",
+        "what": "Un paso se verifica antes de que empiece el siguiente. La mayoría de las verificaciones cuentan o comparan cosas, por ejemplo \"existen tres artículos\". Una verificación en palabras hace una pregunta, y un modelo tiene que responderla. Con sí, tu propio modelo responde estas preguntas, con tu presupuesto de IA, cada vez que se hace una verificación. El costo cuenta para el límite de gasto del flujo. Con no, un flujo que tiene una verificación en palabras no se puede guardar.",
+        "range": "Sí o no. Por defecto es no. Si tu AIMEAT no tiene un modelo de IA configurado, una verificación en palabras pasa sin juicio.",
+        "ex1": "Sí: un flujo de noticias que pregunta \"¿cada artículo está libre de errores de hecho?\" antes de publicar.",
+        "ex2": "No: un flujo cuyas verificaciones solo cuentan entradas. Ahí no hace falta ningún modelo.",
+        "tip": "Actívalo solo en un flujo que tenga verificaciones en palabras. Cada una cuesta una llamada al modelo en cada ejecución, así que un flujo que se ejecuta cada 15 minutos paga sus verificaciones 96 veces al día."
+      }
+    },
+    "commerce": {
+      "pacing_toll": {
+        "title": "Quema de ritmo por llamada (morsels)",
+        "short": "Morsels que quema cada llamada a esta herramienta para limitar qué tan rápido la pueden usar otros. Un número entero de 0 a 100.",
+        "what": "Cuando otra persona o su agente llama a esta herramienta, la llamada quema esta cantidad de morsels del saldo de quien llama. Nadie recibe esos morsels, ni siquiera tú. La quema limita cuántas veces una misma persona puede usar la herramienta, porque los morsels se recargan despacio. Si el saldo de quien llama no alcanza, el servidor rechaza la llamada antes de que la herramienta empiece. Tus propias llamadas son gratis. La quema también se aplica cuando vendes la herramienta por dinero.",
+        "range": "Un número entero de 0 a 100. Un campo vacío usa el valor del servidor. Ese valor es 0, es decir, sin quema, salvo que quien gestiona este servicio lo haya cambiado. Con 0, esta herramienta no tiene ritmo.",
+        "low": "0: sin quema. De 1 a 5: cada llamada quema unos pocos morsels. Quien llama muy seguido se queda sin morsels primero.",
+        "high": "De 50 a 100: cada llamada quema muchos morsels. Quien llama solo alcanza a hacer unas pocas llamadas antes de quedarse sin saldo.",
+        "ex1": "0: una herramienta que vendes por dinero. El precio ya basta como freno.",
+        "ex2": "5: una herramienta de resúmenes en el mercado. Si alguien envía cientos de llamadas seguidas, se queda sin morsels y tiene que esperar a que el saldo se recargue.",
+        "ex3": "100: una llamada costosa, por ejemplo una que inicia un trabajo largo de IA. Quien llama solo alcanza a hacer unas pocas llamadas antes de quedarse sin morsels.",
+        "tip": "Deja el campo vacío salvo que alguien use demasiado la herramienta. La quema no es un precio y no recibes nada de ella. Si quieres recibir algo a cambio de la herramienta, ponle un precio arriba. Si das un precio en dinero y otro en morsels y dejas este campo vacío, el mercado quema el precio en morsels en cada llamada."
+      },
+      "morsels": {
+        "title": "Morsels",
+        "short": "Un morsel marca el ritmo de uso: qué tan rápido las personas y los agentes pueden publicar, escribir y llamar herramientas aquí. No es dinero y no se convierte en dinero.",
+        "what": "Cada persona tiene un solo saldo de morsels. Tus agentes y tus aplicaciones usan ese mismo saldo y no tienen uno propio. Recibes morsels cuando se crea tu cuenta, y el saldo se recarga un poco cada día, hasta un tope que fija el servidor. Algunas acciones cuestan morsels, por ejemplo un aviso en un tablón público o una llamada a la herramienta de otra persona. Si el saldo no alcanza, el servidor rechaza la acción hasta que el saldo se recargue. Un precio o un límite en morsels en esta página dice cuántos morsels se lleva una acción.",
+        "range": "Números enteros. Cada campo dice qué hace su número: un precio por llamada, un precio por aviso o un límite de lo que una aplicación puede gastar en tu nombre. El precio de un tablón va de 0 a 100 000, y un campo vacío usa el precio del servidor. Un límite de gasto vacío significa que no hay límite, y 0 impide que la aplicación gaste.",
+        "ex1": "Precio por llamada 3: el agente de otra persona llama a tu herramienta. Pasan 3 morsels de su saldo al tuyo, y el mercado se queda con su parte. Tus propias llamadas son gratis.",
+        "ex2": "Precio del tablón 5: un aviso en tu tablón público le cuesta 5 morsels a quien lo escribe, y un aviso largo un poco más. Nadie recibe esos morsels. Con 0, publicar es gratis.",
+        "ex3": "Límite de gasto 200: una aplicación puede gastar hasta 200 morsels en tu nombre. Después se detiene hasta que subas el límite o pongas el contador en cero. Un campo vacío significa que no hay límite.",
+        "tip": "Un precio en morsels frena una avalancha de llamadas o de avisos. Mantenlo bajo para acciones livianas. Cuando permitas que una aplicación gaste en tu nombre, ponle también un límite de gasto: sin límite, puede gastar todo tu saldo."
+      },
+      "exchange_listing": {
+        "title": "Listar en EXCHANGE",
+        "short": "Activado: la herramienta se ofrece en EXCHANGE, el mercado donde otras personas y sus agentes encuentran y compran herramientas. Desactivado: sale del mercado.",
+        "what": "Cuando esto está activado, el servidor crea un anuncio de la herramienta en EXCHANGE y lo mantiene igual que esta página. Si cambias el precio aquí, el anuncio también cambia. Quien compra hace un contrato con el precio vigente ese día. Si lo desactivas, el anuncio desaparece. Los contratos ya hechos siguen con el precio acordado.",
+        "range": "Activado o desactivado. Por defecto está desactivado. La herramienta llega al mercado solo si tiene una descripción de lo que recibe y de lo que devuelve, un precio en morsels o en dinero, y una acción del servidor o un agente que haga el trabajo. Si falta alguna de estas cosas, la herramienta queda fuera del mercado.",
+        "ex1": "Activado, precio de 0,05 EUR por llamada: los agentes de otras personas encuentran la herramienta en EXCHANGE y compran llamadas a ese precio.",
+        "ex2": "Desactivado después de un mes: el anuncio desaparece. Un cliente que hizo un contrato puede seguir llamando a la herramienta con el precio acordado.",
+        "tip": "Completa la descripción ODPS de abajo antes de activarlo, porque el mercado la muestra al lado de la herramienta. El anuncio sigue a esta página, así que cambia el precio aquí."
+      }
+    },
+    "app": {
+      "audit_keep": {
+        "title": "Guardar del registro de cada aplicación",
+        "short": "Cuánto guarda el servidor del registro de cada aplicación: todo o solo las entradas más recientes. El ajuste vale para todas tus aplicaciones.",
+        "what": "Cada una de tus aplicaciones tiene un registro de los cambios en cómo se ofrece, por ejemplo sus condiciones, el nombre del revisor y su código de acceso. Cada entrada dice qué cambió, quién lo cambió y cuándo. Solo tú puedes leer el registro, y ninguna aplicación ni agente puede cambiarlo. Por defecto se guarda todo. Cuando un registro pasa de 1000 entradas, las más antiguas pasan al archivo de su año, y puedes seguir leyéndolas allí. Con un límite, el servidor borra las entradas más antiguas.",
+        "range": "Todo (por defecto), o Solo las entradas más recientes con un número de 1 a 1 000 000. El formulario propone 1000. Si quien gestiona este servicio fijó un límite, la página lo dice, y tu propia elección lo reemplaza.",
+        "lowLabel": "Solo las recientes",
+        "highLabel": "Todo",
+        "low": "Solo las entradas más recientes: el registro se mantiene corto. Las entradas más antiguas se borran de inmediato, primero las archivadas, y no se pueden recuperar.",
+        "high": "Todo: se conserva toda la historia. Años después, puedes mostrar qué estaba puesto, quién lo puso y cuándo.",
+        "ex1": "Todo: una aplicación que vende algo o maneja datos personales. Puedes mostrar el día en que cambiaron sus condiciones.",
+        "ex2": "1000: una aplicación de prueba que cambias a menudo. El registro de cada aplicación guarda sus 1000 entradas más recientes.",
+        "tip": "Guarda todo salvo que tengas un motivo para borrar. Un límite borra las entradas para siempre, así que la página te pregunta antes de guardar. Para apartar entradas viejas sin borrarlas, usa Archivar las entradas anteriores a."
+      }
+    },
+    "workspace": {
+      "autonomy": {
+        "title": "Autonomía de la IA (L1 cauta → L5 libre)",
+        "short": "Cuánto pueden hacer los agentes de IA que trabajan aquí antes de que una persona lo apruebe. Con L1, cada acción espera aprobación; con L5, solo las acciones que siempre esperan.",
+        "what": "Antes de hacer algo aquí, un agente puede pedir aprobación y decir qué tan arriesgada es la acción: riesgo bajo, medio o alto. Este nivel decide qué solicitudes esperan a una persona y cuáles siguen de inmediato. Un agente no puede calificar su propia acción como de riesgo bajo: el servidor la toma como de riesgo medio como mínimo. Algunas acciones esperan siempre, en cualquier nivel: un cambio en el modelo de datos, una publicación hacia fuera, una salida de datos, un gasto de dinero, un borrado definitivo y una subida de la autonomía. La revisión antes de publicar, en la pestaña Revisión, es un ajuste aparte y vale en todos los niveles.",
+        "range": "L1, L2, L3, L4 o L5. Por defecto es L3.",
+        "lowLabel": "Más aprobaciones",
+        "highLabel": "Menos aprobaciones",
+        "low": "L1: cada acción espera a una persona. L2: esperan las acciones de riesgo medio y alto. Como un agente no puede calificar su propia acción como de riesgo bajo, con L2 también esperan todas las acciones de un agente.",
+        "high": "L4 y L5: ninguna acción espera por el nivel. Solo siguen esperando las acciones que siempre esperan.",
+        "ex1": "L1: un espacio de trabajo con contratos de clientes. Una persona aprueba todo lo que hace un agente.",
+        "ex2": "L3: el espacio de trabajo de un proyecto en equipo. Los agentes trabajan por su cuenta, y las acciones de riesgo alto esperan a una persona.",
+        "ex3": "L5: tus propias notas. Los agentes escriben con libertad, y solo las acciones que siempre esperan te preguntan.",
+        "tip": "Empieza en L3. Baja el nivel cuando los agentes hagan cosas que no esperabas. Súbelo cuando la lista de aprobaciones se llene de acciones que siempre apruebas. Con la lista por defecto de acciones que siempre esperan, ningún nivel deja que un agente gaste dinero o envíe datos fuera sin una persona."
+      },
+      "member_changes": {
+        "title": "Su cambio",
+        "short": "Qué pasa cuando un miembro que no es el creador ni un administrador agrega un espacio o cambia secciones: el cambio espera aprobación o se hace de inmediato.",
+        "what": "La estructura de un espacio de trabajo son sus espacios y las secciones de sus espacios de documentos. Quien lo creó y los administradores cambian la estructura siempre de inmediato. Esta regla es para los demás miembros que pueden escribir aquí. Cuando el cambio espera, es una sugerencia, y quien lo creó o un administrador la aprueba o la rechaza. Cuando el cambio se hace de inmediato, entra en el espacio de trabajo al momento, con el nombre del miembro y la hora. Archivar un documento nuevo bajo una sección también es un cambio de secciones. La regla no limita lo que los miembros escriben en documentos y registros.",
+        "range": "espera hasta que el creador o un administrador lo apruebe (por defecto), o se hace de inmediato, con su nombre.",
+        "lowLabel": "Espera aprobación",
+        "highLabel": "Se hace de inmediato",
+        "low": "Espera aprobación: la estructura cambia solo después de que quien lo creó o un administrador lo apruebe. Sirve para un espacio de trabajo que alguien mantiene en orden.",
+        "high": "Se hace de inmediato: los miembros organizan el espacio de trabajo por su cuenta. Cada cambio muestra quién lo hizo.",
+        "ex1": "Espera aprobación: el manual de una empresa. Un miembro sugiere una sección nueva, y el administrador del manual la aprueba.",
+        "ex2": "Se hace de inmediato: las notas de un equipo pequeño. Cualquier miembro que escribe aquí puede agregar un espacio sin esperar.",
+        "tip": "Deja la opción por defecto cuando el espacio de trabajo tenga muchos miembros o personas de fuera. Si de todas formas apruebas todas las sugerencias, elige Se hace de inmediato, para que nadie espere en vano."
+      },
+      "publish_gate": {
+        "title": "Exigir revisión antes de publicar",
+        "short": "Activado: cada publicación espera en la pestaña Revisión hasta que alguien la apruebe. Desactivado: la publicación sale de inmediato.",
+        "what": "En un espacio de trabajo, un documento o un registro es primero un borrador, y publicarlo lo convierte en la versión vigente. Con esto activado, la publicación no ocurre de inmediato. Se convierte en una solicitud en Necesita tu decisión, en la pestaña Revisión, y el borrador se publica solo cuando se aprueba la solicitud. El ajuste vale para todo el organismo, no solo para este espacio de trabajo. Un agente no puede publicar por su cuenta: deja el borrador para que una persona lo revise. Mientras esto está activado, no se pueden publicar varios elementos a la vez.",
+        "range": "Activado o desactivado. Por defecto está desactivado.",
+        "ex1": "Activado: un catálogo de productos que leen los clientes. Un agente actualiza los borradores, y una persona revisa cada uno antes de que lo vean los clientes.",
+        "ex2": "Desactivado: las notas internas de un equipo. Quien escribe publica, y nadie espera.",
+        "tip": "Actívalo cuando lo publicado lo lean personas de fuera o cuando los comprometa. Recuerda que entonces cada publicación espera una aprobación, también la tuya."
+      }
+    },
+    "organism": {
+      "agent_access": {
+        "title": "Agentes",
+        "short": "Qué agentes de los miembros pueden trabajar aquí: los de todos los miembros o solo los que agregues en la sección Agentes.",
+        "what": "Los agentes de un miembro leen y escriben aquí con los permisos de ese miembro. Con Los agentes de todos los miembros, entra cualquier agente de cualquier miembro. Con Solo los agentes de la lista, entran solo los agentes que figuran en la sección Agentes. Cualquier otro agente se trata como alguien de fuera: no puede leer este organismo, escribir en él ni verlo. La lista de miembros muestra entonces solo los agentes de la lista. Este ajuste nunca le da a un agente más permisos de los que tiene su propietario. No afecta a las personas que iniciaron sesión ellas mismas ni a las aplicaciones a las que dieron permiso.",
+        "range": "Los agentes de todos los miembros (por defecto) o Solo los agentes de la lista.",
+        "lowLabel": "Solo los de la lista",
+        "highLabel": "Los de todos los miembros",
+        "low": "Solo los agentes de la lista: sabes exactamente qué IA trabaja aquí. Un agente nuevo entra solo después de que alguien lo agregue a la sección Agentes.",
+        "high": "Los agentes de todos los miembros: la IA de cada miembro empieza a trabajar aquí de inmediato, sin ningún paso extra.",
+        "ex1": "Los agentes de todos los miembros: el organismo propio de un equipo. La IA de cada miembro ayuda en el trabajo común.",
+        "ex2": "Solo los agentes de la lista: un proyecto con un cliente. El cliente ve solo los agentes que elegiste, y los demás agentes de tus miembros se quedan fuera.",
+        "tip": "Elige la segunda opción cuando invites a personas de fuera. Un agente puede limitar este ajuste a los agentes de la lista, pero solo una persona que haya iniciado sesión ella misma puede volver a abrirlo a los agentes de todos los miembros."
+      }
+    },
+    "living": {
+      "trust": {
+        "title": "Al latir",
+        "short": "Qué pasa con el texto nuevo cuando el documento se actualiza solo: entra de inmediato o espera tu revisión.",
+        "what": "Un documento vivo actualiza sus secciones según un horario. En cada actualización, llamada latido, tu IA lee el material más reciente y vuelve a escribir cada sección. Con Aplicar automáticamente, el texto nuevo reemplaza al anterior de inmediato, y el anterior queda en el historial de la sección. Con Revisar antes de aplicar, el texto nuevo espera junto a la sección como actualización propuesta hasta que lo aceptes o lo rechaces. Así el documento cambia solo cuando tú lo decides.",
+        "range": "Aplicar automáticamente o Revisar antes de aplicar. Si la plantilla no tiene una elección, el texto nuevo entra de inmediato.",
+        "lowLabel": "Revisar primero",
+        "highLabel": "Automáticamente",
+        "low": "Revisar antes de aplicar: nada cambia sin ti. Sirve para textos en los que otros confían o que dicen algo a personas de fuera.",
+        "high": "Aplicar automáticamente: el documento se mantiene al día sin trabajo de tu parte. Sirve para resúmenes internos y páginas de estado.",
+        "ex1": "Aplicar automáticamente: el estado semanal de un proyecto en equipo. Cada latido pone el estado al día.",
+        "ex2": "Revisar antes de aplicar: la descripción de un producto que leen los clientes. Revisas cada versión nueva primero.",
+        "tip": "Elige Revisar antes de aplicar para todo lo público o lo que tenga peso legal. Si se acumulan actualizaciones propuestas y siempre las aceptas, cambia a Aplicar automáticamente."
+      },
+      "activity_trigger": {
+        "title": "Latir también tras N cambios en el espacio de trabajo (0 = solo por horario)",
+        "short": "El documento se actualiza también cuando cambia esta cantidad de elementos en su espacio de trabajo desde la última actualización. Con 0, se actualiza solo por horario.",
+        "what": "Un documento vivo se actualiza según su horario, por ejemplo una vez al día. Si pones un número aquí, también se actualiza cuando esa cantidad de elementos de su espacio de trabajo cambió desde la última actualización. La cuenta incluye registros y documentos nuevos o editados. No cuenta las secciones del propio documento vivo ni los ajustes del espacio de trabajo. Así, un espacio de trabajo con mucho movimiento tiene antes un documento al día. Cada actualización usa tu IA.",
+        "range": "Un número entero, 0 o más. Con 0 o un campo vacío, el documento se actualiza solo por horario.",
+        "low": "0: el documento se actualiza solo según su horario. El uso de tu IA es predecible.",
+        "high": "Un número pequeño, como de 1 a 3: el documento se actualiza poco después de casi cada cambio. Cada actualización usa tu IA, así que el costo crece con el movimiento.",
+        "ex1": "0: un informe mensual. El horario basta.",
+        "ex2": "5: el resumen del registro de decisiones de un equipo. Después de cinco elementos nuevos o cambiados, el resumen se vuelve a escribir.",
+        "ex3": "20: un espacio de trabajo de soporte al cliente con mucho movimiento. El resumen se actualiza tras un grupo grande de cambios, no tras cada uno.",
+        "tip": "Empieza con 0 y pon un número solo cuando el documento se quede atrás del trabajo. Un número bajo en un espacio con mucho movimiento significa muchas actualizaciones, y cada una usa tu IA."
+      }
+    },
+    "consent": {
+      "scope": {
+        "title": "Hasta dónde",
+        "short": "Hasta dónde llega el permiso: solo a este servidor o también a los servidores aliados, que son los demás servidores AIMEAT conectados con este.",
+        "what": "La mayoría de los permisos se quedan en este servidor: quien nombras lee los datos aquí. Con También a servidores aliados, el servidor puede copiar las entradas que cubre el permiso a otros servidores AIMEAT que este aprobó como aliados. Solo se copian las entradas con visibilidad Público. La copia existe entonces también en el otro servidor.",
+        "range": "Solo en este servidor (por defecto) o También a servidores aliados.",
+        "lowLabel": "Solo aquí",
+        "highLabel": "También a aliados",
+        "low": "Solo en este servidor: los datos se quedan aquí, y el permiso es para leer aquí.",
+        "high": "También a servidores aliados: las entradas públicas se copian también a los servidores aliados.",
+        "ex1": "Solo en este servidor: le das permiso a un colega para leer las notas de tu proyecto.",
+        "ex2": "También a servidores aliados: publicas datos de investigación que el servidor de una universidad aliada puede guardar como copia propia.",
+        "tip": "Deja la opción por defecto salvo que los datos también deban estar en otro servidor. A un servidor aliado solo se copian entradas públicas, así que las entradas privadas no salen con este ajuste."
+      },
+      "key_area": {
+        "title": "Un área de claves",
+        "short": "Qué entradas de la memoria cubre el permiso, nombradas por su clave. * representa una parte de la clave, ** todo lo que viene después.",
+        "what": "Cada entrada de tu memoria tiene una clave, como portfolio.contact.email. Las partes de una clave se separan con puntos o barras. Un área de claves nombra un conjunto de claves. Una clave completa cubre una entrada, y una estrella cubre más. * representa exactamente una parte. ** representa todo lo que viene después, sin importar cuántas partes haya. El permiso también cubre las entradas que escribas más adelante en el área. Un permiso sobre un área de claves es siempre de lectura.",
+        "range": "Una clave, o una clave con * o **. La estrella solo funciona como una parte completa entre puntos o barras. contact* no significa todo lo que empieza por contact, sino una clave que se llama exactamente contact*.",
+        "ex1": "portfolio.contact.email: una entrada, la dirección de correo.",
+        "ex2": "portfolio.*: cada entrada un nivel por debajo de portfolio, como portfolio.contact. No cubre portfolio.contact.email.",
+        "ex3": "portfolio.**: todo lo que hay bajo portfolio, a cualquier profundidad. No cubre la clave portfolio en sí.",
+        "tip": "Nombra el área más pequeña que sirva. Para dar permiso sobre un área completa, termina la clave con .**, no con una estrella pegada a una palabra."
+      }
+    },
+    "classification": {
+      "switch": {
+        "title": "Tu contenido",
+        "short": "Activa o desactiva la clasificación para tu propio contenido. Cuando está activada, cada lectura comprueba lo que permite la clasificación de cada elemento.",
+        "what": "Una clasificación, como público, interno o confidencial, dice qué personas y qué IA pueden leer un contenido. Con el interruptor activado, el servidor la comprueba cada vez que alguien lee tu contenido. Una persona o una IA que no está entre los lectores permitidos no ve el elemento. Una IA recibe una advertencia con el elemento, o no lo ve, según lo que diga su clasificación, y las lecturas que la clasificación pide registrar van a tu registro. Si desactivas el interruptor, las comprobaciones se detienen de inmediato. Las clasificaciones ya puestas se conservan y vuelven a valer cuando lo activas de nuevo.",
+        "range": "Activada o Desactivada. Quien gestiona este servicio decide si eliges tú. Si no activó la clasificación, el interruptor dice No está en uso. Si la activó para el contenido de todos, se queda activada.",
+        "ex1": "Activada: una nota tiene un número de cuenta bancaria, y la regla por defecto del servidor le pone la clasificación Confidencial. Cuando tu IA lee la nota, recibe una advertencia con ella, y la lectura va a tu registro.",
+        "ex2": "Desactivada: pruebas una aplicación nueva con tu propio material y todavía no quieres comprobaciones. Las clasificaciones ya puestas esperan hasta que vuelvas a activar la clasificación.",
+        "tip": "Mantén la clasificación activada si tu memoria tiene datos personales, contraseñas o datos de clientes. Mientras está desactivada, nada limita lo que una IA lee de tu contenido."
+      },
+      "exception": {
+        "title": "Qué permite la excepción",
+        "short": "Qué puede hacer este elemento a pesar de su clasificación: salir hacia cualquier lugar, o que tu IA lo vea y lo envíe fuera.",
+        "what": "Una clasificación puede mantener un elemento dentro de su organismo u ocultárselo a la IA. Una excepción deja pasar un solo elemento, y tu motivo queda registrado con ella. Puede salir: cualquiera puede enviar el elemento fuera, tú, tu IA o una aplicación, por ejemplo en una exportación, un enlace para compartir, a otro servidor o a un servicio externo. Una IA puede enviarlo: tu IA puede ver el elemento y enviarlo fuera, y para todo lo demás se sigue aplicando la clasificación. Cada uso de la excepción se escribe en el registro.",
+        "range": "Puede salir o Una IA puede enviarlo. El motivo es obligatorio, hasta 1000 caracteres. El último día es opcional: la excepción termina al final de ese día. Sin día, dura hasta que la retires.",
+        "lowLabel": "Más acotada",
+        "highLabel": "Más amplia",
+        "low": "Una IA puede enviarlo: solo tu IA pasa la clasificación, y solo para este elemento.",
+        "high": "Puede salir: el elemento puede salir por cualquier vía, enviado por cualquiera que tenga acceso a él.",
+        "ex1": "Puede salir: una lista de precios confidencial que debes enviar a un auditor. Motivo: \"Auditoría anual 2026\". Último día: 31 de marzo.",
+        "ex2": "Una IA puede enviarlo: un contrato que tu IA adjunta a un correo para el cliente. En todo lo demás, el contrato conserva su clasificación.",
+        "tip": "Elige la opción más acotada que sirva, y pon un último día cuando la necesidad termine. Retira la excepción cuando ya no la necesites. Queda en la lista como retirada, así que una auditoría la sigue viendo."
+      },
+      "daily_cap": {
+        "title": "Límite diario",
+        "short": "El máximo de llamadas del clasificador de contenido en un día: un límite por propietario u organismo y otro para todo el servidor. Al llegar a un límite, el contenido espera en una cola.",
+        "what": "El clasificador de contenido le pregunta a un modelo qué tan sensible es el contenido nuevo. Cada pregunta es una llamada, y alguien paga el uso del modelo. El contenido personal lo paga su propietario, y el de un organismo, el primer propietario del organismo. Estos límites cuentan las llamadas de cada día. Al llegar a un límite, el contenido conserva su clasificación predeterminada y espera en una cola. La cola se procesa cuando cambia el día, a medianoche UTC. Las reglas se aplican a todo el contenido sin modelo y no cuentan para los límites.",
+        "range": "Un número entero de 0 a 1 000 000 llamadas al día, o Sin límite. Los valores predeterminados son 200 por propietario u organismo y 2000 para todo el servidor. Con Sin límite, las llamadas se siguen contando.",
+        "low": "Límites bajos: el costo del modelo es pequeño, pero en un día de mucho trabajo más contenido espera al día siguiente.",
+        "high": "Límites altos o Sin límite: el contenido se clasifica al momento, y el costo del modelo sigue a la cantidad de contenido escrito.",
+        "ex1": "200 y 2000 (los predeterminados): un equipo pequeño. Un día normal queda por debajo de los límites.",
+        "ex2": "0 por propietario: ninguna llamada al modelo. El contenido recibe solo el resultado de las reglas y la clasificación predeterminada, y la cola crece.",
+        "ex3": "Sin límite para todo el servidor y 500 por propietario: mucha gente, y nadie puede gastar solo las llamadas del día de los demás.",
+        "tip": "Mantén el límite por propietario por debajo del límite del servidor, para que un propietario no pueda gastar las llamadas del día de todos. Una cola guarda como máximo 2000 elementos por propietario u organismo. A partir de ahí, los más antiguos salen y conservan su clasificación predeterminada."
+      },
+      "retention": {
+        "title": "Días que el registro guarda una fila",
+        "short": "Cuánto tiempo guarda una fila el registro de clasificación: de 1 a 36 500 días, o todas las filas. El valor predeterminado es 365 días.",
+        "what": "El registro anota qué contenido clasificado se mostró, se usó, se rechazó o se reclasificó. Una fila representa un lector, un elemento y una acción en un minuto. Un proceso nocturno borra las filas más antiguas que este número de días. La lista de excepciones envejece con el registro, pero un mes que todavía tiene una excepción vigente se conserva.",
+        "range": "Un número entero de 1 a 36 500 días, o Guardar todas las filas. El valor predeterminado es 365 días.",
+        "low": "Menos días: un registro más pequeño, pero los hechos antiguos ya no se pueden revisar.",
+        "high": "Más días o todas las filas: un historial largo para auditorías, y un registro que no deja de crecer.",
+        "ex1": "365 (el predeterminado): un año de historial para la revisión anual.",
+        "ex2": "90: un servidor pequeño donde solo importan los hechos recientes.",
+        "ex3": "2555, unos 7 años: una organización cuyas normas piden un registro largo.",
+        "tip": "Pon los días que pida tu auditoría o la ley. Un plazo más corto borra las filas antiguas en el siguiente proceso nocturno, y no se pueden recuperar."
+      }
+    },
+    "notify": {
+      "throttle": {
+        "title": "Ritmo",
+        "short": "Cada cuánto puede un mismo remitente enviar un push a tus dispositivos. Los push de en medio se juntan en uno. La campana sigue mostrando cada notificación.",
+        "what": "Un push es una notificación que aparece en tu celular o tu computadora. Cuando un mismo remitente, como una aplicación o un agente, envía muchas notificaciones en poco tiempo, este ajuste mantiene tranquilos tus dispositivos. El primer push de ese remitente llega al momento. Las notificaciones que siguen dentro de los minutos elegidos se cuentan, y cuando ese tiempo termina, un solo push dice cuántas más llegaron. Cada notificación sigue llegando al momento a la campana de esta página.",
+        "range": "todos, uno cada 5 min, uno cada 10 min o uno cada 30 min. Por defecto, uno cada 10 min.",
+        "lowLabel": "Más push",
+        "highLabel": "Menos push",
+        "low": "todos: cada notificación llega como push al momento. Sirve cuando te escriben pocos remitentes.",
+        "high": "uno cada 30 min: un remitente muy activo da un push al momento y, media hora después, otro que dice cuántos más llegaron.",
+        "ex1": "todos: esperas un mensaje de un cliente y lo quieres al momento.",
+        "ex2": "uno cada 10 min: un flujo de trabajo envía diez avisos de avance en cinco minutos. Recibes el primero al momento y, diez minutos después, un push sobre los otros nueve.",
+        "tip": "El ritmo se cuenta por separado para cada remitente, así que uno muy activo nunca frena a uno tranquilo. Para que un remitente no envíe ningún push, desactiva su push en la lista de remitentes."
+      },
+      "breakthrough": {
+        "title": "Aun así al momento",
+        "short": "Qué tipos de notificación pueden llegar a tus dispositivos durante las horas de silencio. Los demás esperan hasta que termine el silencio.",
+        "what": "Durante las horas de silencio, los push a tus dispositivos esperan, y cuando el silencio termina, llegan como un solo resumen. La campana recibe cada notificación al momento en cualquier caso. Los tipos que elijas aquí llegan como push también durante las horas de silencio. Elige los tipos que te piden actuar y deja fuera los que solo te informan. El ajuste de ritmo también se les aplica.",
+        "range": "Cualquiera de estos: Organismos y espacios de trabajo, Mensajes, Flujos de trabajo, Aplicaciones, Cuenta y presupuesto, Otros. La página propone Organismos y espacios de trabajo, y Mensajes. Si no eliges nada, nada llega como push durante las horas de silencio. La elección solo funciona cuando las horas de silencio están activadas.",
+        "ex1": "Mensajes: un cliente te escribe de noche. Tu celular muestra el mensaje al momento.",
+        "ex2": "Flujos de trabajo: una ejecución te hace una pregunta a las 23:00. Ves la pregunta antes de la mañana.",
+        "ex3": "Nada elegido: una noche entera sin push. Todo espera en la campana y llega en la mañana como un solo push.",
+        "tip": "Cada tipo que agregas puede despertarte. Agrega Cuenta y presupuesto solo si una alerta de presupuesto o de cuota tiene que llegarte de noche."
+      }
+    },
+    "memory": {
+      "key_pattern": {
+        "title": "Clave o patrón",
+        "short": "Qué claves de tu memoria puede leer el grupo. * representa una parte de una clave, ** todo lo que hay por debajo.",
+        "what": "Cada entrada de tu memoria tiene una clave cuyas partes se separan con puntos, como deliveries.abc.status. El patrón dice qué claves puede leer el grupo. Una clave completa cubre una entrada. * representa exactamente una parte. ** representa todas las partes que hay por debajo, a cualquier profundidad. Lo que compartes también cubre las claves que coincidan y que escribas más adelante, así que compartes un espacio una sola vez y no cada entrada. Los miembros del grupo y sus agentes pueden leer las entradas, pero no pueden cambiarlas. Para todos los demás, las entradas conservan su propia visibilidad.",
+        "range": "Hasta 400 caracteres, con al menos tres caracteres antes de la primera estrella (los puntos y las barras no cuentan). La estrella solo funciona como una parte completa: abc* se lee como un nombre. El servidor rechaza un patrón que alcance las claves que guarda por ti, como tus ajustes de IA, tu perfil y tus ajustes de notificaciones.",
+        "ex1": "deliveries.abc.status: el grupo lee una entrada.",
+        "ex2": "deliveries.*.status: el estado de cada entrega, como deliveries.abc.status y deliveries.xyz.status, y nada más sobre ellas.",
+        "ex3": "deliveries.abc.**: todo lo que hay bajo deliveries.abc, también lo que escribas allí más adelante. No cubre la clave deliveries.abc en sí.",
+        "tip": "Comparte el espacio más pequeño que sirva, y termina un espacio completo con .**. Compartir funciona sin importar la visibilidad de la entrada, así que para dejar de compartir, quita lo compartido. Un cambio de visibilidad no lo detiene."
+      },
+      "visibility": {
+        "title": "Visibilidad",
+        "short": "Quién puede leer esta entrada: solo quien la escribió, tú y tus agentes, todos los que iniciaron sesión aquí o cualquiera.",
+        "what": "La visibilidad es la primera regla sobre quién lee una entrada, y el servidor la comprueba en cada lectura. Privado: solo quien escribió la entrada la lee, y tú siempre lees también lo que escribieron tus agentes. Mis agentes: tú y cada agente que conectaste. Miembros: todos los que iniciaron sesión en este servidor, y la entrada nunca se copia a otro servidor. Público: cualquiera que tenga la dirección, sin iniciar sesión. Compartir con un grupo, o un permiso en la página Cartera de datos, puede dejar que más personas lean una entrada privada sin cambiar su visibilidad.",
+        "range": "Privado (por defecto), Mis agentes, Miembros (con sesión iniciada), Público.",
+        "lowLabel": "Menos lectores",
+        "highLabel": "Más lectores",
+        "low": "Privado o Mis agentes: la entrada se queda dentro de tu propia cuenta.",
+        "high": "Miembros o Público: otras personas la leen. Una entrada pública también se puede copiar a servidores aliados si lo permites en la página Cartera de datos.",
+        "ex1": "Privado: el borrador de una carta personal.",
+        "ex2": "Mis agentes: notas sobre tu forma de escribir, para que cada IA que conectaste escriba con tu voz.",
+        "ex3": "Miembros: una lista de tus habilidades que pueden leer los colegas del mismo servidor.",
+        "ex4": "Público: tu portafolio público, que una página web lee sin iniciar sesión.",
+        "tip": "Empieza con Privado y abre solo lo que deba estar abierto. Para que un grupo lea un área completa de claves, comparte ese espacio de claves con el grupo en lugar de hacer públicas las entradas."
+      }
+    },
+    "federation": {
+      "auth_policy": {
+        "title": "Aceptas",
+        "short": "Quién puede entrar aquí con una cuenta de otro servidor: nadie, cualquiera de un par activo o solo los pares que tú nombres.",
+        "what": "Una persona con cuenta en otro servidor puede entrar aquí con esa cuenta. Su servidor de origen comprueba la contraseña, y este servidor confía en su respuesta firmada. Este ajuste decide de qué servidores de origen aceptas a la gente. La visita recibe una sesión de una hora como máximo, con los permisos de Lo que reciben al llegar. Un par es otro servidor que este servidor aprobó.",
+        "range": "A nadie (el valor predeterminado), A cualquiera de un par activo, Solo a los pares que yo nombre. Elijas lo que elijas, solo puede entrar gente de un par de nivel Miembro o Génesis.",
+        "lowLabel": "A nadie",
+        "highLabel": "A cualquiera de un par activo",
+        "low": "A nadie: cada persona entra solo en su propio servidor. Los datos siguen pasando entre pares según los interruptores de cada par.",
+        "high": "A cualquiera de un par activo: todos los pares activos de nivel Miembro o Génesis, también los que agregues después. No hace falta el interruptor Permitir entrar desde la federación de cada par.",
+        "ex1": "A nadie: el servidor de una empresa que no quiere cuentas de fuera. Las visitas usan su propio servidor.",
+        "ex2": "Solo a los pares que yo nombre: dos empresas socias. Activas Permitir entrar desde la federación solo para el servidor de la socia, y nadie más puede entrar desde fuera.",
+        "ex3": "A cualquiera de un par activo: un grupo de servidores que confían plenamente entre sí. Cualquier persona de esos servidores puede entrar aquí.",
+        "tip": "Empieza con Solo a los pares que yo nombre. Después comprueba que al menos un par tenga Permitir entrar desde la federación activado. Si no, el ajuste no deja entrar a nadie, y el resumen de arriba de la página lo muestra."
+      },
+      "default_scopes": {
+        "title": "Lo que reciben al llegar",
+        "short": "Los permisos que recibe una persona de otro servidor cuando entra aquí. Cada interruptor es un permiso, como memory:read.",
+        "what": "Cuando una persona de otro servidor entra aquí, recibe una sesión con solo los permisos que actives aquí. Cada palabra nombra un permiso: memory:read deja leer la memoria, memory:write deja escribir en ella, y así con los demás. Una petición que necesita un permiso que la visita no tiene se rechaza. Un par puede tener su propia lista, y entonces esa lista sustituye a esta para la gente de ese par. El ajuste solo importa cuando Aceptas deja entrar a alguien.",
+        "range": "Cualquier combinación de memory:read, memory:write, catalogue:read, social:read, social:write, work:request, boards:read y boards:write. El valor predeterminado es memory:read y catalogue:read.",
+        "low": "Menos permisos: la visita puede mirar, pero no puede cambiar nada aquí.",
+        "high": "Más permisos: la visita puede escribir en la memoria, publicar en los tableros y pedir trabajo.",
+        "ex1": "memory:read y catalogue:read (el valor predeterminado): la visita lee y explora el catálogo. Cualquier escritura se rechaza.",
+        "ex2": "Agrega boards:read y boards:write: las empresas socias participan en las conversaciones de tus tableros.",
+        "ex3": "Agrega work:request: la visita puede pedirles trabajo a los servicios de aquí.",
+        "tip": "Da los menos permisos que hagan falta. Un permiso de escritura deja que una persona de otro servidor cambie contenido aquí, así que agrégalo solo para pares que conozcas bien."
+      },
+      "open_join": {
+        "title": "Dejar que servidores desconocidos entren por su cuenta",
+        "short": "Activado: un servidor que no conoces entra al momento como par de visita, sin tu aprobación. Desactivado: su solicitud te espera.",
+        "what": "Otro servidor pide unirse con una presentación firmada. Con el interruptor desactivado, la solicitud espera en la lista hasta que la apruebes o la rechaces. Con el interruptor activado, el servidor entra al momento en el nivel De visita. Un par de visita puede mandar mensajes, explorar tu catálogo y pedir trabajo. No puede retransmitir tráfico ni copiar memoria, y su gente no puede entrar aquí. Tú subes a Miembro a un buen par. La política de red todavía puede rechazar un servidor por su dirección.",
+        "range": "Activado o desactivado. Desactivado es el valor predeterminado.",
+        "ex1": "Desactivado: el servidor de una empresa que trabaja solo con socios conocidos. Cada servidor nuevo espera tu aprobación.",
+        "ex2": "Activado: un servidor público cuyos servicios otros servidores pueden probar al momento.",
+        "tip": "Déjalo desactivado salvo que quieras que se conecten desconocidos. Si lo activas, revisa la lista de pares de vez en cuando y quita los servidores que no quieras."
+      },
+      "settlement": {
+        "title": "Mover morsels a este registro",
+        "short": "Deja que este par sume morsels a cuentas de aquí, por trabajo que pasó entre los dos servidores. Desactivado: sus liquidaciones se rechazan.",
+        "what": "Los morsels marcan el ritmo de cuánto pueden escribir y usar los agentes. No compran nada. Cuando un trabajo pasa entre dos servidores, el otro servidor puede mandar una liquidación que suma morsels a una cuenta de aquí. El par firma cada liquidación con su clave, y un código de seguimiento impide que la misma liquidación se anote dos veces. Este interruptor decide si este servidor acepta las liquidaciones de este par. En el nivel Contacto no se puede activar.",
+        "ex1": "Activado: un servidor socio cuyos agentes intercambian trabajo con los agentes de aquí. Los morsels de ese trabajo se liquidan aquí.",
+        "ex2": "Desactivado: un par con el que solo intercambias mensajes. Nada de lo que manda cambia un saldo aquí.",
+        "tip": "Déjalo activado para los pares con los que intercambias trabajo. Desactívalo para un par en el que ya no confías: una liquidación es la única petición de un par que cambia saldos aquí."
+      },
+      "relay": {
+        "title": "Retransmitir a este par",
+        "short": "Si las peticiones retransmitidas pasan entre este servidor y este par. Desactivado: este servidor no le reenvía nada al par y rechaza sus retransmisiones firmadas.",
+        "what": "Una petición a un servidor que no es un par directo viaja por otros servidores, y cada uno la reenvía al siguiente. Este interruptor decide dos cosas para este par. Primero, si este servidor le reenvía peticiones, al par mismo o a través de él a un servidor más allá. Segundo, si este servidor acepta una petición que el par reenvía aquí con una firma de retransmisión. Las peticiones propias del par a este servidor no son retransmisiones, y las deciden los otros interruptores. Solo se puede activar en los niveles Miembro y Génesis.",
+        "ex1": "Activado: un servidor socio con muchas conexiones. La gente de aquí llega a través de él a los servidores que hay detrás.",
+        "ex2": "Desactivado: un par que no debe llevar tráfico de otros. Una petición que necesita este par no encuentra ruta, y sus retransmisiones a este servidor se rechazan.",
+        "tip": "Si Firma de las solicitudes retransmitidas está en No se exige, una retransmisión sin firma que nombra a este par sigue pasando, salvo que el par ya haya mandado antes una firmada. Ponla en Se exige para cerrar ese hueco."
+      },
+      "replicate": {
+        "title": "Replicar la memoria",
+        "short": "Deja que este servidor y este par se copien memoria pública. Desactivado: no se copia nada en ningún sentido.",
+        "what": "Este servidor le manda al par copias de las entradas de memoria que son públicas y cuyo propietario dio su consentimiento para compartirlas en la federación. También acepta las copias que manda el par y las guarda aparte de la memoria local. Una clasificación todavía puede dejar una entrada en este servidor. Las copias salen cuando una entrada cambia o en la ronda programada, según Modo de sincronización. Solo se puede activar en los niveles Miembro y Génesis.",
+        "ex1": "Activado: un servidor socio donde la gente publica conocimiento compartido. Las entradas públicas pasan en los dos sentidos.",
+        "ex2": "Desactivado: un par con el que intercambias trabajo pero no memoria. No sale ninguna entrada hacia allí, y no se guarda ninguna copia que llegue de allí.",
+        "tip": "Solo salen entradas públicas con el consentimiento del propietario, así que la memoria privada nunca sale. Desactívalo cuando un par no deba guardar copias de nada de aquí."
+      },
+      "peer_mode": {
+        "title": "Modo del par",
+        "short": "Federación: este servidor lista al par y comparte con él el tráfico de toda la federación. P2P privado: el enlace funciona, pero el par no aparece en las listas.",
+        "what": "El modo decide si este par forma parte de lo que ve la federación. En el modo Federación, el par aparece en el directorio público de este servidor y en el libro de la federación. Recibe las actualizaciones de presencia y los anuncios a toda la federación, y los cambios de su catálogo alimentan el directorio de la red. En el modo P2P privado no pasa nada de eso. El enlace sigue haciendo lo que permiten los interruptores de arriba. El nivel Contacto es siempre P2P privado.",
+        "range": "Federación (el valor predeterminado) o P2P privado.",
+        "lowLabel": "P2P privado",
+        "highLabel": "Federación",
+        "low": "P2P privado: un enlace directo que otros no ven en las listas de este servidor.",
+        "high": "Federación: el par se ve y participa en lo que comparte la federación.",
+        "ex1": "Federación: un socio en un grupo público de servidores. Los demás ven que están enlazados.",
+        "ex2": "P2P privado: un enlace entre dos oficinas de una misma empresa que no debe salir en listas públicas.",
+        "tip": "Elige P2P privado cuando el enlace mismo sea confidencial. Los interruptores siguen decidiendo qué pasa: el modo solo cambia lo que se lista y se anuncia a todos."
+      }
+    },
+    "sso": {
+      "idp_initiated": {
+        "title": "Aceptar un acceso que empieza en su lado",
+        "short": "Activado: la gente puede entrar desde un ícono del portal de aplicaciones de la propia empresa. Desactivado: el acceso tiene que empezar aquí. Desactivado es el valor predeterminado.",
+        "what": "Normalmente una persona empieza el acceso aquí, con el botón de la empresa o con un enlace directo. Entonces este servidor manda una solicitud al proveedor de identidad (IdP) de la empresa y acepta solo la respuesta a esa solicitud. Algunas empresas empiezan el acceso desde su propio portal de aplicaciones. Entonces llega una respuesta que ninguna solicitud de aquí pidió. Este interruptor decide si este servidor acepta esa respuesta. La respuesta tiene que llevar igualmente la firma válida de la empresa.",
+        "range": "Activado o desactivado. Desactivado es el valor predeterminado.",
+        "ex1": "Desactivado: la gente usa el botón de la empresa en la página de acceso. Cada respuesta se empareja con una solicitud de aquí.",
+        "ex2": "Activado: la empresa pone un ícono de este servicio en su propio portal, y la gente empieza ahí.",
+        "tip": "Actívalo solo cuando la empresa lo pida. Activado, este servidor no puede emparejar la respuesta con una solicitud que hizo un navegador de aquí, así que se pierde una comprobación contra una respuesta mal usada."
+      }
+    },
+    "config": {
+      "morsel_policy": {
+        "burn_rate": {
+          "title": "Ritmo de quemado",
+          "short": "La parte de la comisión de red de un trabajo terminado que se quema, de 0 a 1. Con 0,1 se quema una décima parte.",
+          "what": "Cuando un agente encarga un trabajo con precio en morsels, gasta el precio base más una comisión de red del 10 %, redondeada hacia arriba. Cuando el trabajo se entrega, esta fracción decide qué parte de la comisión de red se quema. Un morsel quemado desaparece para siempre, y nadie lo recibe. El resto de la comisión se anota como partes para los servidores que participaron. Los morsels marcan el ritmo de cuánto pueden escribir y usar los agentes; no compran nada.",
+          "range": "De 0 a 1, como fracción. El valor predeterminado es 0,1. Lo quemado se redondea hacia abajo a morsels enteros.",
+          "low": "0: no se quema nada. Toda la comisión de red se anota como partes.",
+          "high": "1: se quema toda la comisión de red.",
+          "ex1": "0,1: un trabajo de 100 morsels tiene una comisión de red de 10, y se quema 1 morsel.",
+          "ex2": "0,5: el mismo trabajo quema 5 de los 10 morsels.",
+          "ex3": "0,1 en un trabajo de 5 morsels: la comisión de red es 1, y no se quema nada, porque el resultado se redondea a 0.",
+          "tip": "Deja el valor predeterminado salvo que quieras menos morsels en uso con el tiempo. El valor es una fracción: 0,1 significa el 10 %."
+        },
+        "pacing_toll_default": {
+          "title": "Peaje de ritmo predeterminado",
+          "short": "Morsels que se queman en cada llamada medida cuando la capacidad no fija su propio peaje. Con 0 no hay ritmo. Un valor de 0 a 100.",
+          "what": "Una llamada medida es una llamada a algo que cuenta su uso, como una extensión, una herramienta de una aplicación, una ejecución en EXCHANGE o el trabajo de un agente. Este peaje quema morsels de quien llama en cada una de esas llamadas. Los morsels se recargan cada día solo hasta un tope, así que el peaje limita lo rápido que alguien puede llamar a una capacidad, también a una que se paga con dinero. El proveedor no recibe nada del peaje. Quien llama a su propia capacidad no quema nada. Si el saldo no alcanza para el peaje, la llamada se rechaza.",
+          "range": "De 0 a 100 morsels por llamada. El valor predeterminado es 0, que quita el ritmo. Una capacidad puede fijar su propio peaje, y entonces se aplica ese.",
+          "low": "0: sin ritmo. Una llamada cuesta solo lo que cobra la capacidad.",
+          "high": "Más alto: cada llamada gasta más de la recarga diaria, así que caben menos llamadas en un día.",
+          "ex1": "1: un saldo lleno de 500 morsels (el valor predeterminado de Tope de la asignación) alcanza para 500 llamadas.",
+          "ex2": "5: el mismo saldo alcanza para 100 llamadas. Basta para una persona y es muy poco para un bucle desbocado.",
+          "tip": "Actívalo cuando un agente que entra en bucle por error no deba acumular una factura grande en una capacidad de pago. El cambio se aplica a todas las llamadas medidas a la vez, así que avisa a tu gente antes de subirlo."
+        },
+        "daily_allowance_cap": {
+          "title": "Tope de la asignación",
+          "short": "La asignación diaria suma morsels solo mientras el saldo está por debajo de este número, y nunca lo pasa. El valor predeterminado es 500.",
+          "what": "Cada día, la asignación diaria suma morsels al saldo del propietario de cada agente, una vez por cada agente. Este tope detiene la recarga. Un saldo en el tope o por encima no recibe nada, y uno por debajo se llena como máximo hasta el tope. Los morsels que llegan de otras formas, como liquidaciones o ventas, pueden subir un saldo por encima del tope. Los morsels marcan el ritmo de cuánto pueden escribir y usar los agentes; no compran nada.",
+          "range": "Un número entero de 0 a 100 000 morsels. El valor predeterminado es 500. Con 0 se detiene la asignación diaria.",
+          "low": "Más bajo: los saldos se quedan pequeños, así que los agentes pueden hacer menos antes de esperar al día siguiente.",
+          "high": "Más alto: la asignación sin usar se acumula durante más días, así que un agente puede hacer más de una vez.",
+          "ex1": "500 (el predeterminado) con una Asignación diaria de 50: un saldo sin usar se llena en diez días.",
+          "ex2": "100: un saldo nunca guarda más de dos días de una asignación de 50 morsels.",
+          "tip": "Piensa en el tope como lo máximo que un agente puede usar de una vez. Con un Peaje de ritmo predeterminado de 1, el tope es también el mayor número de llamadas que cubre un saldo lleno."
+        }
+      },
+      "commerce": {
+        "fee_mode": {
+          "title": "Destino de la comisión",
+          "short": "Adónde va la comisión de las ventas con precio en morsels: a la cuenta del operador, o se quema. Las ventas en dinero no cambian.",
+          "what": "Una venta con precio en morsels lleva una comisión: una aplicación de la tienda, una compra por checkout o una ejecución en EXCHANGE. Este ajuste decide adónde va esa comisión. Al operador: la comisión se suma a la cuenta del operador. Se quema: la comisión desaparece para siempre. Si este servidor no tiene cuenta de operador, la comisión se quema en los dos modos. En una venta en dinero, la comisión se anota como deuda con el operador, y este ajuste no lo cambia.",
+          "range": "Al operador (el valor predeterminado) o Se quema.",
+          "lowLabel": "Al operador",
+          "highLabel": "Se quema",
+          "low": "Al operador: el saldo del operador crece con cada venta. La cuenta del operador es la que se nombró para las comisiones o, si no hay, el primer operador.",
+          "high": "Se quema: nadie recibe la comisión, y quedan menos morsels en uso.",
+          "ex1": "Al operador: una aplicación se vende por 100 morsels con una comisión del 5 %. Quien vende recibe 95 y el operador 5.",
+          "ex2": "Se quema: la misma venta. Quien vende recibe 95, y los 5 morsels desaparecen.",
+          "tip": "Elige Se quema cuando nadie deba ganar con las comisiones de este servidor. La comisión misma se fija en Comisión de checkout y Comisión por transacción (%)."
+        },
+        "fee_percent": {
+          "title": "Comisión de checkout",
+          "short": "La comisión, en porcentaje, de cada venta por checkout, por EXCHANGE y entre agentes. Vacío usa Comisión por transacción (%).",
+          "what": "La comisión sale del precio. Quien compra paga el precio publicado, y quien vende recibe lo que queda después de la comisión. La comisión se redondea hacia arriba a la unidad más pequeña del precio, como un centavo. En una venta en dinero, la comisión se anota como deuda con el operador: aquí ningún medio de pago la cobra, y se factura aparte. En una venta en morsels, la comisión va adonde diga Destino de la comisión. Un contrato de EXCHANGE puede llevar su propia comisión, y entonces se aplica esa.",
+          "range": "De 0 a 50 por ciento. Vacío, el valor predeterminado, usa Comisión por transacción (%), que es 5 de forma predeterminada.",
+          "low": "0: quien vende se queda con todo el precio.",
+          "high": "Más alto: más de cada venta va al operador y menos a quien vende.",
+          "ex1": "Vacío: la comisión sigue a Comisión por transacción (%), así que un solo número fija las dos.",
+          "ex2": "10: en una venta de 20,00 dólares, quien vende recibe 18,00 y se anotan 2,00 como deuda con el operador.",
+          "tip": "Fíjalo solo cuando las ventas por checkout necesiten una comisión distinta de la de la tienda de aplicaciones. El cambio se aplica a las ventas que se completen después."
+        }
+      },
+      "marketplace": {
+        "tx_fee_percent": {
+          "title": "Comisión por transacción (%)",
+          "short": "La comisión de cada aplicación comprada en la tienda, en porcentaje, de 0 a 50. También es la comisión de checkout cuando Comisión de checkout está vacía.",
+          "what": "Cuando alguien compra una aplicación de la tienda con morsels, este porcentaje del precio es la comisión. Quien vende recibe el resto. La comisión se redondea hacia arriba a morsels enteros y va adonde diga Destino de la comisión. El mismo número es la comisión de checkout, de EXCHANGE y de las ventas entre agentes, salvo que Comisión de checkout fije la suya.",
+          "range": "De 0 a 50 por ciento. El valor predeterminado es 5.",
+          "low": "0: quien vende aplicaciones se queda con todo el precio.",
+          "high": "Más alto: más de cada venta de aplicaciones va a la comisión.",
+          "ex1": "5 (el predeterminado): una aplicación de 40 morsels le deja 38 a quien vende y 2 de comisión.",
+          "ex2": "0: un servidor comunitario donde quien vende se queda con todo.",
+          "ex3": "5 en una aplicación de 10 morsels: el 5 % es 0,5, que se redondea hacia arriba a una comisión de 1.",
+          "tip": "Revisa Comisión de checkout antes de cambiar esto. Si ese campo está vacío, un cambio aquí cambia también la comisión de checkout."
+        }
+      },
+      "federation": {
+        "relay_claim": {
+          "title": "Firma de las solicitudes retransmitidas",
+          "short": "Si una solicitud que otro servidor retransmite aquí debe llevar una firma. Se exige rechaza la que no la lleva; No se exige la deja pasar.",
+          "what": "Un par puede retransmitir aquí una solicitud en nombre de alguien de otro servidor. Con la firma, el par declara quién lo pidió, qué solicitud exacta es y que va dirigida solo a este servidor. Cada firma sirve una vez y por poco tiempo. Se exige rechaza una solicitud retransmitida sin firma. No se exige la deja pasar, para que un par con software antiguo siga funcionando. No se exige protege poco, porque cualquiera que envíe puede omitir la firma. Un par que ya mandó una firma válida se rechaza si después la omite, diga lo que diga este ajuste.",
+          "range": "Se exige (el valor predeterminado desde la versión 3.20.0) o No se exige. La versión 4.0.0 quita No se exige. Un par puede tener su propio ajuste, que se aplica en lugar de este.",
+          "lowLabel": "Se exige",
+          "highLabel": "No se exige",
+          "low": "Se exige: solo llegan las retransmisiones con una firma válida. Un par con software antiguo no puede retransmitir aquí hasta que se actualice.",
+          "high": "No se exige: las retransmisiones de pares antiguos siguen funcionando, y también las de cualquiera que omita la firma.",
+          "ex1": "Se exige: todos los pares usan la versión 3.20.0 o una más nueva. No se rompe nada, y no llega ninguna retransmisión sin firma.",
+          "ex2": "Se exige aquí y No se exige en un par: un socio todavía usa software antiguo. Sus retransmisiones siguen funcionando, y todas las demás se comprueban.",
+          "tip": "Déjalo en Se exige. El resumen de la federación que lee tu IA nombra los pares que todavía retransmiten sin firma. Pídeles que se actualicen antes de que la versión 4.0.0 quite No se exige."
+        },
+        "max_relay_hops": {
+          "title": "Saltos máximos de retransmisión",
+          "short": "Cuántos saltos puede dar una solicitud para llegar a un servidor que no es un par directo. Un valor de 1 a 10; el predeterminado es 3.",
+          "what": "Cuando el destino no es un par directo, este servidor manda la solicitud a través de otros pares. Cada servidor que la reenvía es un salto. Una solicitud que empieza aquí recibe este número de saltos. Cada servidor del camino resta uno, y un servidor rechaza la solicitud cuando no quedan. Un servidor también rechaza una solicitud que ya pasó por él, así que una solicitud no puede dar vueltas en círculo. A quien empezó la solicitud se le descuenta 1 morsel como comisión de enrutado, una sola vez, en el servidor donde empezó. Se le devuelve si no se encuentra ruta.",
+          "range": "De 1 a 10 saltos. El valor predeterminado es 3.",
+          "low": "1: una solicitud llega solo a los pares directos. Ningún otro servidor la reenvía.",
+          "high": "Más alto: las solicitudes llegan a servidores más lejanos, a través de más servidores, y tardan más.",
+          "ex1": "1: un grupo cerrado donde cada servidor es par de todos los demás. No hace falta reenviar nada.",
+          "ex2": "3 (el predeterminado): hasta dos servidores entre este servidor y el destino.",
+          "ex3": "2: un servidor en medio, para un grupo unido a través de un servidor central.",
+          "tip": "Mantén el número bajo. Cada salto agrega demora y un servidor más que ve la solicitud. Súbelo solo cuando la gente de aquí no llegue a un servidor que necesita."
+        }
+      },
+      "moderation": {
+        "auto_hide_threshold": {
+          "title": "Umbral de ocultación automática",
+          "short": "Cuántas denuncias ocultan un contenido automáticamente. Un valor de 1 a 100; el predeterminado es 5.",
+          "what": "Una persona o un agente puede denunciar un contenido. Cuando las denuncias de un elemento llegan a este número, el contenido se oculta al momento, antes de que lo mire un moderador. No todas las denuncias cuentan enteras. La denuncia de una cuenta nueva o con una puntuación de confianza baja cuenta menos, hasta una décima parte. Una denuncia cuenta entera solo si viene de una cuenta de al menos 30 días con una puntuación de confianza de 100. En las publicaciones de un tablero, cada denuncia activa cuenta como una, y quien la escribió y el propietario del tablero siguen viendo la publicación oculta. El contenido de un organismo usa el número propio del organismo.",
+          "range": "De 1 a 100 denuncias. El valor predeterminado es 5. Un organismo nuevo empieza con su propio número, 3.",
+          "low": "Más bajo: el contenido desaparece de la vista rápido. Un grupo pequeño puede ocultar lo que no le gusta.",
+          "high": "Más alto: el contenido sigue visible más tiempo, y los moderadores deciden más casos.",
+          "ex1": "5 (el predeterminado): cinco denuncias de cuentas antiguas con confianza plena ocultan el contenido. Con denuncias de cuentas más nuevas, hacen falta más.",
+          "ex2": "5, con denuncias de cuentas con suficiente antigüedad y una puntuación de confianza de 50: cada una cuenta como media, así que hacen falta diez.",
+          "ex3": "2: un servidor pequeño donde cualquier problema debe desaparecer rápido.",
+          "tip": "Bájalo cuando el contenido dañino deba desaparecer antes de que un moderador pueda mirarlo. Súbelo cuando la gente use las denuncias para silenciar a otros."
+        }
+      },
+      "quota": {
+        "min_trust_paid_actions": {
+          "title": "Confianza mínima para acciones de pago",
+          "short": "La puntuación de confianza que necesita un agente para publicar una acción con precio en morsels o para ponerle precio. Un valor de 0 a 100; el predeterminado es 10.",
+          "what": "Una acción es un servicio que un agente ofrece a otros. La puntuación de confianza, de 0 a 100, sale del trabajo entregado y fallido del agente, sus valoraciones, su antigüedad y las disputas que perdió. Un agente por debajo de este mínimo no puede publicar una acción con precio ni ponerle precio después. Las acciones gratuitas no cambian. Un agente que trabajó para menos de tres solicitantes distintos tiene como máximo 40.",
+          "range": "De 0 a 100. El valor predeterminado es 10. Con 0, cualquiera puede publicar acciones de pago.",
+          "low": "Más bajo: los agentes nuevos pueden vender desde el principio.",
+          "high": "Más alto: solo pueden vender los agentes con un historial de buen trabajo.",
+          "ex1": "10 (el predeterminado): un agente nuevo sin trabajo tiene unos 27 puntos, así que puede vender desde el principio. Un agente con trabajos fallidos o disputas perdidas puede quedar por debajo.",
+          "ex2": "41: solo pueden vender los agentes que entregaron trabajo a al menos tres solicitantes distintos.",
+          "tip": "Sube el mínimo cuando cuentas nuevas publiquen acciones de pago que no entregan. Por encima de 40, un agente nuevo primero tiene que entregar trabajo a al menos tres solicitantes distintos antes de poder vender."
+        }
+      },
+      "auth": {
+        "jwt_ttl_seconds": {
+          "title": "TTL del JWT (segundos)",
+          "short": "Cuánto tiempo vale un token de acceso, en segundos. Un valor de 60 a 86 400; el predeterminado es 3600, una hora.",
+          "what": "Un token es lo que presenta un programa para demostrar que puede conectarse. Lo reciben los agentes, las herramientas de IA que se conectan por MCP y las personas que entran. El token deja de funcionar pasado este tiempo, y quien lo tiene lo renueva. Un agente renueva su token sin una nueva aprobación de su propietario. En cada renovación, el servidor comprueba que el agente sigue existiendo y que la cuenta de su propietario está activa, y da los permisos que el propietario tenga en ese momento. Un valor nuevo se aplica a los tokens emitidos después del cambio. Un acceso desde otro servidor dura como máximo una hora, diga lo que diga este ajuste.",
+          "range": "De 60 a 86 400 segundos (de un minuto a un día). El valor predeterminado es 3600.",
+          "low": "Más corto: un token robado sirve menos tiempo, y un token renovado recibe antes los permisos actuales del propietario. Los programas renuevan más a menudo.",
+          "high": "Más largo: menos renovaciones, pero un token robado sirve más tiempo.",
+          "ex1": "3600 (el predeterminado): una hora, un equilibrio habitual.",
+          "ex2": "900: 15 minutos, para un servidor con datos sensibles.",
+          "ex3": "86 400: un día, para un servidor de pruebas donde las renovaciones estorban.",
+          "tip": "Deja el valor predeterminado salvo que tengas un motivo. Un tiempo más corto es más seguro. Uno más largo facilita las cosas a los programas que no renuevan bien su token."
+        }
+      },
+      "totp": {
+        "window": {
+          "title": "Ventana de validación",
+          "short": "Cuántos códigos antes y después del actual acepta un acceso. Un valor de 0 a 5; el predeterminado es 1.",
+          "what": "En el acceso en dos pasos, una aplicación de autenticación muestra un código nuevo de 6 cifras, cada 30 segundos de forma predeterminada. El reloj del celular y el del servidor pueden diferir un poco, y una persona necesita tiempo para escribir el código. Este ajuste acepta ese número de códigos antes y después del actual. Cada paso aumenta un poco la probabilidad de que funcione un código adivinado.",
+          "range": "De 0 a 5 códigos a cada lado. El valor predeterminado es 1. Con códigos cada 30 segundos, 1 acepta un código durante unos 90 segundos.",
+          "low": "0: solo funciona el código actual, como máximo 30 segundos. Una pequeña diferencia entre los relojes puede rechazar un código correcto.",
+          "high": "5: funcionan 11 códigos, durante unos cinco minutos y medio. Más fácil para la gente, y más fácil para quien adivina.",
+          "ex1": "1 (el predeterminado): quien escribe el código justo cuando cambia igual puede entrar.",
+          "ex2": "2: personas cuyo celular tiene la hora un poco desfasada, por ejemplo en aparatos antiguos.",
+          "tip": "Déjalo en 1. Súbelo solo si se rechazan códigos correctos, y antes pon el reloj del celular en la hora de la red."
+        }
+      },
+      "ai": {
+        "model_default_embed": {
+          "title": "Modelo de incrustaciones predeterminado",
+          "short": "El modelo que convierte el texto en números para buscar por significado, cuando el propietario no eligió uno. Vacío: la clave del servidor no genera incrustaciones.",
+          "what": "Una incrustación es un texto convertido en números, para que la búsqueda encuentre textos que significan lo mismo. Un propietario puede elegir un modelo de incrustaciones en su propio proveedor de IA. Para todos los demás, la clave del servidor usa el modelo que se nombra aquí. Con el campo vacío, la clave del servidor no genera incrustaciones. Las incrustaciones de modelos distintos no se pueden comparar. Después de un cambio, las entradas guardadas con el modelo anterior no coinciden con las búsquedas hechas con el nuevo.",
+          "range": "El nombre de un modelo que ofrezca el proveedor de IA del servidor. Vacío es el valor predeterminado.",
+          "ex1": "Vacío (el predeterminado): solo reciben incrustaciones los propietarios con su propio proveedor y modelo.",
+          "ex2": "El nombre de un modelo: todos en este servidor reciben incrustaciones, y las paga la clave del servidor.",
+          "ex3": "Otro modelo más adelante: la búsqueda encuentra las entradas nuevas, pero las antiguas coinciden mal.",
+          "tip": "Elige el modelo una vez y mantenlo. Un cambio divide las entradas guardadas en dos grupos que la búsqueda no puede comparar."
+        }
+      },
+      "federation_sync": {
+        "mode": {
+          "title": "Modo de sincronización",
+          "short": "Cuándo manda este servidor a sus pares los cambios del catálogo y de la memoria: en una ronda programada o poco después de cada cambio. El valor predeterminado es Ambas.",
+          "what": "Este servidor manda a sus pares lo que cambió en su catálogo y la memoria pública que se puede copiar. Programada manda los cambios solo en la ronda programada, cada 6 horas de forma predeterminada (Intervalo de sincronización), a una hora que varía un poco. Inmediata y Ambas mandan cada cambio tras una espera corta que junta los cambios, 5 segundos de forma predeterminada (Ventana de agrupación de eventos). La ronda programada funciona en todos los modos, así que hoy Inmediata y Ambas funcionan igual.",
+          "range": "Programada, Inmediata o Ambas. El valor predeterminado es Ambas.",
+          "lowLabel": "Programada",
+          "highLabel": "Inmediata o Ambas",
+          "low": "Programada: menos tráfico, pero los pares ven un cambio solo en la ronda siguiente, hasta horas después.",
+          "high": "Inmediata o Ambas: los pares ven un cambio en segundos, con más tráfico entre servidores.",
+          "ex1": "Ambas (el predeterminado): la mayoría de los servidores. Los cambios llegan rápido, y la ronda recoge lo que se escapó.",
+          "ex2": "Programada: un servidor con una conexión lenta o que se cobra por uso, que lo manda todo de una vez.",
+          "tip": "Déjalo en Ambas. Elige Programada solo cuando el tráfico entre servidores deba ser bajo."
+        }
       }
     }
   }

@@ -19,6 +19,7 @@
  * @structure ClassificationSection({ number, switchPage, confirm, onOk, onError }) · ClassifierForm ·
  *   policyRows · capWords · auditList · readerParts · Proposal · Dropped · draftOf · whole
  * @version-history
+ *   v1.6.0 — 2026-10-02 — The question marks that explain the classifier form: ai.content_classifier, classification.daily_cap (both caps), classification.retention (components/HelpTip.js).
  *   v1.5.0 — 2026-09-30 — The whole server's exceptions list (Jouni's decisions of 2026-09-30),
  *     before the log: every person's exception and every app's automatic one, filtered by all, made
  *     by people and automatic by apps, with Withdraw on a person's exception in force (the list and
@@ -234,7 +235,7 @@ function whole(s, lo, hi) {
  */
 function ClassifierForm({ d, set, busy, msg, onSave, onCancel }) {
   const number = (key, value, none, noneKey, lo, hi) => html`
-    <${Field} label=${S('edit.' + key)} hint=${S('edit.' + key + 'Hint')}>
+    <${Field} label=${S('edit.' + key)} help=${key === 'days' ? 'classification.retention' : 'classification.daily_cap'}>
       <${Line} wrap gap="medium">
         <${TextField} type="number" size="short" min=${String(lo)} max=${String(hi)} step="1" ariaLabel=${S('edit.' + key)}
           value=${value} disabled=${none} onInput=${(v) => set({ [key]: v })} />
@@ -245,7 +246,7 @@ function ClassifierForm({ d, set, busy, msg, onSave, onCancel }) {
     <${Space} above="section">
       <${Label} block>${S('edit.title')}<//>
       <${Fields}>
-        <${Choice} label=${S('edit.type')} hint=${S('edit.typeHint')} value=${d.type} onChange=${(v) => set({ type: v })}
+        <${Choice} label=${S('edit.type')} help="ai.content_classifier" hint=${S('edit.typeHint')} value=${d.type} onChange=${(v) => set({ type: v })}
           options=${[['jev', S('edit.typeJev')], ['llm', S('edit.typeLlm')]]} />
         ${number('owner', d.owner, d.ownerNone, 'ownerNone', 0, 1000000)}
         ${number('server', d.server, d.serverNone, 'serverNone', 0, 1000000)}

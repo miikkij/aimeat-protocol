@@ -26,6 +26,7 @@
  *   - WhoMaySignIn (02) — the policy, the scopes, and what this node offers
  * @usage Imported by views/admin/federation-tab.js.
  * @version-history
+ *   v2.1.0 — 2026-10-02 — The question marks that explain federated sign-in: federation.auth_policy, federation.default_scopes, federation.open_join (components/HelpTip.js).
  *   v2.0.0 — 2026-09-27 — Library components, no class: the standing is the Verdict with the needs
  *     as Readings (each need's door at the row's end), the strip is the FigureStrip (the waiting
  *     count in coral, the sign-in word in capitals and in coral when it reaches nobody), the policy
@@ -50,6 +51,7 @@ import { Action, Actions } from '/components/Action.js';
 import { Beside, Stack, Split } from '/components/Layout.js';
 import { Note } from '/components/Note.js';
 import { Label } from '/components/Mark.js';
+import { HelpLabel } from '/components/HelpTip.js';
 
 const S = (key, params) => t('admin.fed.' + key, params);
 
@@ -172,20 +174,20 @@ export function WhoMaySignIn({ data, saving, onPolicy, onScope, onOpenJoin, onGo
       <${Beside} wide side=${offered}>
         <${Stack} gap="large">
           <${Stack} gap="none">
-            <${Label} block>${S('signin.accepts')}<//>
+            <${Label} block><${HelpLabel} term="federation.auth_policy" label=${S('signin.accepts')}>${S('signin.accepts')}<//><//>
             ${choice('disabled', S('signin.policyWhy_disabled'))}
             ${choice('all_peers', S('signin.policyWhy_all_peers', { n: num(data.peers.active) }))}
             ${choice('specific_peers', S('signin.policyWhy_specific_peers', { n: num(signin.named), total: num(data.peers.active) }))}
           <//>
 
           <${Stack} gap="none">
-            <${Label} block>${S('signin.scopes')}<//>
+            <${Label} block><${HelpLabel} term="federation.default_scopes" label=${S('signin.scopes')}>${S('signin.scopes')}<//><//>
             <${Tabs} kind="toggle" tone="filter" value=${signin.scopes} disabled=${!!saving} label=${S('signin.scopes')}
               onSelect=${onScope} items=${SCOPES.map((s) => ({ value: s, label: s }))} />
           <//>
 
           <${Split}>
-            <${Check} checked=${signin.open_join} disabled=${!!saving} hint=${S('signin.openJoinWhy')}
+            <${Check} checked=${signin.open_join} disabled=${!!saving} help="federation.open_join"
               onChange=${(checked) => onOpenJoin(checked)}>
               <b>${S('signin.openJoin')}</b>
             <//>

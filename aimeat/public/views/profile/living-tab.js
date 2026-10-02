@@ -11,6 +11,7 @@
  * @structure LivingTab (default export) — templates list/editor + deploy + instances list/viewer
  * @usage html`<${LivingTab} session=${session} showToast=${showToast} />`
  * @version-history
+ *   v1.23.0 -- 2026-10-02 -- The question marks that explain the automation fields: living.trust, living.activity_trigger (components/HelpTip.js).
  *   v1.22.2 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
  *     itself, so a template or instance title, a section name, an organism name or the charter YAML
  *     with a quote or an ampersand showed as &quot; / &amp;.
@@ -345,9 +346,9 @@ export default function LivingTab({ session, showToast }) {
 
         <${Label} block>${t('profile.living.automation')}<//>
         <${Line} wrap gap="large" align="end">
-          <${Select} label=${t('profile.living.trust')} fit value=${editing.charter?.trust?.derive || 'auto'} onChange=${v => setTrust(v)}
+          <${Select} label=${t('profile.living.trust')} help="living.trust" fit value=${editing.charter?.trust?.derive || 'auto'} onChange=${v => setTrust(v)}
             options=${[['auto', t('profile.living.trustAuto')], ['gated', t('profile.living.trustGated')]]} />
-          <${TextField} label=${t('profile.living.activityTrigger')} type="number" min="0" size="short"
+          <${TextField} label=${t('profile.living.activityTrigger')} help="living.activity_trigger" type="number" min="0" size="short"
             value=${activityThreshold(editing)} onInput=${v => setActivityTrigger(v)} />
         <//>
 

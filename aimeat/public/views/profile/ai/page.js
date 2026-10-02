@@ -12,6 +12,7 @@
  *   secConsumers
  * @usage import { renderPage } from './ai/page.js';
  * @version-history
+ *   v1.31.0 -- 2026-10-02 -- The question marks that explain the daily budget and an app's daily limit: ai.daily_budget on the budget row, ai.app_daily_cap on the spend table's limit column (components/HelpTip.js); the grey line about the app limits under the table goes, the explanation carries it. The budget's line with the live figures stays.
  *   v1.30.0 -- 2026-10-02 -- The crews' row follows own_key.agents: the key pays when every agent's crew thinks through this server; when only some do, the row names them; otherwise none do.
  *   v1.29.0 -- 2026-10-02 -- 07 says what the own key does not reach, from the server's own_key: a row for the agents' crews (they call their model with the key of the machine that runs them), and the chat's line about moving onto this server only while the operator's shared chat key pays for it. The lead and the agents' row no longer say that everything here spends the key.
  *   v1.28.0 -- 2026-09-28 -- AI roles (wish-tekoalyn-roolit): the six fixed model roles (05) and the fine-tuning (07) leave the page, since a capability's model and fine-tuning are set on its provider and what a model is for is a role; 04 is the roles and the apps' roles (ai/roles-section.js), the model policy is 05, the budget 06, the consumers 07. The strip's fourth figure counts the roles and says how many app roles wait for a binding.
@@ -76,7 +77,7 @@ import { x, money, compact, dateWord, crumb, pageLinks } from './frame.js';
 import { appRow } from './rows.js';
 import { secProviders, secRouting, secPolicy } from './providers.js';
 import { secRoles, roleTitle } from './roles-section.js';
-import { Hint } from '/components/Hint.js';
+import { HelpLabel } from '/components/HelpTip.js';
 
 const SHOWN = 8;
 /** The line a form says after it acted; a refusal in its error tone. */
@@ -209,20 +210,19 @@ function secBudget(ctx) {
   return html`
     <${PageSection} id="ai-budget" num="06" title=${x('secBudget')} count=${x('secBudgetSub', { n: money(budget), today: money(spent) })}>
       <${Facts} rows=${[
-        { k: x('dailyBudget'), v: budgetValue },
+        { key: 'budget', k: html`<${HelpLabel} term="ai.daily_budget" label=${x('dailyBudget')}>${x('dailyBudget')}<//>`, v: budgetValue },
         { k: x('monthLabel'), v: r && r.days ? x('monthBody', { cost: money(r.cost), calls: r.calls, tokens: compact(r.tokens), apps: r.apps.length, big: r.apps.filter((a) => a.cost >= 0.1).length }) : x('monthNone'), sub: x('monthSub') },
       ]} />
       ${rows.length ? html`
         <${Label} block>${x('whatSpent', { shown: shown.length, total: rows.length })}<//>
-        <${List} cols="name-n-n-cap-n" keepCols apart head=${[x('colApp'), { label: x('colMonth'), num: true }, { label: x('colToday'), num: true }, { label: x('colCap'), num: true }, { label: x('colCalls'), num: true }]}>
+        <${List} cols="name-n-n-cap-n" keepCols apart head=${[x('colApp'), { label: x('colMonth'), num: true }, { label: x('colToday'), num: true }, { label: html`<${HelpLabel} term="ai.app_daily_cap" label=${x('colCap')}>${x('colCap')}<//>`, num: true }, { label: x('colCalls'), num: true }]}>
           ${shown.map((row) => appRow(ctx, row, editing))}
         <//>
         <${More} wrap label=${ctx.showAllApps ? x('showFewer') : x('showAllApps', { n: rows.length })} onMore=${rows.length > SHOWN ? () => ctx.setShowAllApps(!ctx.showAllApps) : null}>
           ${capDoors}
           <small>${editing ? x('capsEditingHint') : x('capsHint')}</small>
         <//>
-        ${msg(ctx.capsMsg)}
-        <${Hint}>${x('hintCaps')}<//>` : html`<${Note} kind="quiet">${x('noSpend')}<//>`}
+        ${msg(ctx.capsMsg)}` : html`<${Note} kind="quiet">${x('noSpend')}<//>`}
       ${history && Array.isArray(history.days) && history.days.length ? chart(ctx, history, r) : null}
     <//>`;
 }

@@ -11,6 +11,7 @@
  * @structure renderCover · secInbox · secSenders · secDevices · quietFold · howFold
  * @usage import { renderCover } from './notifications/cover.js';
  * @version-history
+ *   v1.16.0 -- 2026-10-02 -- The question marks that explain the quiet hours: notify.throttle, notify.breakthrough (components/HelpTip.js).
  *   v1.15.0 -- 2026-09-26 -- Every part is a kit component (SettingsPage with its head, strip and rail as data; FigureStrip; Tabs in the fold tone; List via frame.js; More; the groups under the AIMEAT row on the sun edge Box; the devices as framed Cards, the one you are on current, a switched-off digest off; the quiet hours as Fields with Switch, TextField, Choice; Roads; Note; Action): the page passes data and writes no class (page group G8).
  *   v1.14.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.13.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -209,9 +210,9 @@ function quietFold(ctx) {
           <${TextField} size="medium" ariaLabel=${c('quietWhen')} value=${f.tz} disabled=${!f.enabled} placeholder="Europe/Helsinki" onInput=${(v) => set({ tz: v })} />
         <//>
       <//>
-      <${Choice} multi label=${c('breakthrough')} hint=${c('breakthroughHint')} disabled=${!f.enabled}
+      <${Choice} multi label=${c('breakthrough')} help="notify.breakthrough" disabled=${!f.enabled}
         value=${f.breakthrough} options=${GROUPS.map(g => [g, groupWord(g)])} onChange=${(list) => set({ breakthrough: list })} />
-      <${Choice} label=${c('throttle')} hint=${c('throttleHint')} value=${f.throttleMinutes}
+      <${Choice} label=${c('throttle')} help="notify.throttle" value=${f.throttleMinutes}
         options=${[0, 5, 10, 30].map(m => [m, m ? c('throttleN', { n: m }) : c('throttleOff')])} onChange=${(m) => set({ throttleMinutes: m })} />
     <//>
     <${FormActions}>

@@ -409,7 +409,7 @@ export const OPERATOR_ENTRIES: UiEntryWritten[] = [
         summary: 'A long list of settings a person searches and edits: a row of tools pinned under the page\'s bar (the search with its magnifier, the filters, and while something is unsaved the words and actions that say so), the index of the groups beside the settings that stays in sight while they scroll, one line per setting, and the unsaved changes as old, struck through, then → and the new value.',
         module: '/components/SettingsIndex.js', sheet: '/css/components/settings-index.css',
         data: {
-            shape: 'SettingsIndex({ search, filters, status, before, index, indexLabel, empty, children }) · SettingLine({ id, name, flag, flagTitle, code, desc, source, editor, end }) · ChangeList({ items })',
+            shape: 'SettingsIndex({ search, filters, status, before, index, indexLabel, empty, children }) · SettingLine({ id, name, help, flag, flagTitle, code, desc, source, editor, end }) · ChangeList({ items })',
             fields: {
                 search: '{ value, onInput(value), placeholder, label }: the pinned search field',
                 filters: 'the filters beside it (a Tabs row)',
@@ -418,7 +418,7 @@ export const OPERATOR_ENTRIES: UiEntryWritten[] = [
                 index: '[{ key, label, items: [{ key, label, count, onClick }] }]: the groups of the index (the contents rail); with none the settings are not drawn',
                 indexLabel: 'the index\'s name for a screen reader', empty: 'the words when nothing matches',
                 children: 'the settings, grouped by the page (Section, SubHeading)',
-                name: 'SettingLine: the setting\'s name', flag: 'SettingLine: the mark that it is edited and not saved', flagTitle: 'SettingLine: the flag\'s tooltip',
+                name: 'SettingLine: the setting\'s name', help: 'SettingLine: a term whose question mark (HelpTip) stands after the name', flag: 'SettingLine: the mark that it is edited and not saved', flagTitle: 'SettingLine: the flag\'s tooltip',
                 code: 'SettingLine: its key, in typewriter letters', desc: 'SettingLine: what it does',
                 source: 'SettingLine: where its value comes from (a status mark)', editor: 'SettingLine: the field that edits it',
                 end: 'SettingLine: what stands at the end (a reset)',

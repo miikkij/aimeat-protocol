@@ -9,10 +9,13 @@
  *   (components/Field.js) draws a HelpTip after its row label when given `help`, so the controls of
  *   the field family take `help="ai.temperature"` and nothing else. On a touch screen a tap opens
  *   the dialog. The look is css/components/help-tip.css (the button's size, the label row).
- * @structure HelpTip({ term, label })
+ * @structure HelpTip({ term, label }) · HelpLabel({ term, label, children })
  * @usage html`<${HelpTip} term="ai.temperature" />`
  *        html`<${TextField} label=${x('param.temperature')} help="ai.temperature" … />`
+ *        Facts row: { k: html`<${HelpLabel} term="ai.fallback" label=${x('rt.fallback')}>${x('rt.fallback')}<//>`, v }
  * @version-history
+ *   v1.1.0 — 2026-10-02 — HelpLabel: a label with its question mark, for the places that are not a
+ *     field (a Facts row's name, a Check, a SettingLine, a heading).
  *   v1.0.0 — 2026-10-02 — Initial (wish "Ohjenappi ja vihjeteksti asetuksille"): the AI fine-tuning
  *     fields are its first use.
  */
@@ -50,6 +53,18 @@ export function HelpTip({ term, label }) {
       <//>
       <${ExplainDialog} term=${term} label=${label} open=${open} onClose=${close} />
     </span>`;
+}
+
+/**
+ * A label with its question mark beside it: the row Field, Check, SettingLine and a Facts row's name
+ * draw a HelpTip in. The question mark stands after the label and outside it, because a button inside
+ * a <label> would be a second control the label names. Without a term it gives the label back alone.
+ * @param {{ term?: string, label?: string, children: any }} props `children` the label as drawn;
+ *   `label` its words, the dialog's title when the locale gives none.
+ */
+export function HelpLabel({ term, label, children }) {
+  if (!term) return children;
+  return html`<span class="field-label-row">${children}<${HelpTip} term=${term} label=${label} /></span>`;
 }
 
 export default HelpTip;

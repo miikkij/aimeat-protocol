@@ -13,6 +13,11 @@
  *   secRouting · secPolicy
  * @usage import { secProviders, secRouting, secPolicy } from './ai/providers.js';
  * @version-history
+ *   v1.5.0 — 2026-10-02 — The question marks that explain the routing rules, the embeddings row, the
+ *     model policy, the Content Classifier and the PDF engine: ai.fallback, ai.fallback_attempts,
+ *     ai.fallback_pool, ai.only_tested, ai.fallback_leaves_machine, ai.max_cost_per_call,
+ *     ai.embeddings, ai.model_policy, ai.content_classifier, ai.pdf_engine (components/HelpTip.js);
+ *     the rules' grey lines that the explanations now carry are gone.
  *   v1.4.0 — 2026-10-02 — The fine-tuning fields (temperature, top P, longest answer, reasoning) carry
  *     a question mark that explains each one: what it does, its range, examples (components/HelpTip.js).
  *   v1.3.1 — 2026-10-02 — Above the providers, a line for each capability that is off for a reason the
@@ -50,6 +55,7 @@ import { Note } from '/components/Note.js';
 import { Hint } from '/components/Hint.js';
 import { Action, Loud, Actions } from '/components/Action.js';
 import { Row as Line, Space } from '/components/Layout.js';
+import { HelpLabel } from '/components/HelpTip.js';
 import { x, dateWord } from './frame.js';
 import { CAPS, PROVIDER_TYPES, slug, capPatchOf, testableCapOf } from './use-providers.js';
 import { t } from '/js/i18n.js';
@@ -57,6 +63,10 @@ import { t } from '/js/i18n.js';
 const msg = (m) => (m ? html`<${Note} kind="message" error=${!!m.error}>${m.text}<//>` : null);
 const HEALTH_STATE = { ok: 'fine', degraded: 'attention', failing: 'danger', untested: 'off' };
 const enabledCaps = (p) => CAPS.filter((c) => p.capabilities?.[c]?.enabled);
+/** A Facts row name with the HelpTip of `term` after it (components/HelpTip.js). */
+const named = (term, words) => html`<${HelpLabel} term=${term} label=${words}>${words}<//>`;
+/** A capability's row name; the 'embed' capability carries the ai.embeddings explanation. */
+const capName = (c) => (c === 'embed' ? named('ai.embeddings', x('cap.embed')) : x('cap.' + c));
 
 /** What the row says about the key: set, missing, the node's, or none needed. */
 function keyWords(p) {
@@ -178,7 +188,7 @@ function providerOpen(ctx, p) {
     ].filter(Boolean).join(' · ');
     rows.push({
       key: 'cap-' + c,
-      k: x('cap.' + c),
+      k: capName(c),
       state: status ? HEALTH_STATE[status] : 'off',
       v: html`
         <${Line} wrap gap="medium">
@@ -235,7 +245,7 @@ function capEditor(pv, p, c) {
       ${c === 'speech' ? html`<${TextField} value=${d.voice ?? ''} placeholder=${x('pv.voicePlaceholder')} ariaLabel=${x('pv.voice')} onInput=${(v) => set({ voice: v })} />` : null}
       ${c === 'transcription' ? html`<${Select} fit ariaLabel=${x('pv.language')} value=${d.language ?? ''} onChange=${(v) => set({ language: v })}
           options=${STT_LANGS.map((code) => [code, code ? t('profile.openrouter.stt.lang_' + code) : x('sttLangDetect')])} />` : null}
-      ${c === 'files' && p.type === 'openrouter' ? html`<${Select} fit ariaLabel=${x('pv.parser')} value=${d.parser ?? ''} onChange=${(v) => set({ parser: v })}
+      ${c === 'files' && p.type === 'openrouter' ? html`<${Select} fit label=${x('pv.parser')} help="ai.pdf_engine" value=${d.parser ?? ''} onChange=${(v) => set({ parser: v })}
           options=${[['', x('pv.parserNone')], ['native', x('pv.parserNative')], ['mistral-ocr', 'Mistral OCR'], ['cloudflare-ai', 'Cloudflare AI']]} />` : null}
     <//>
     ${tuning ? html`
@@ -328,10 +338,10 @@ function classifierRow(cc, pv, e, textServers) {
   if (cc.on) {
     const mode = x('cc.mode.' + (cc.aiMode || 'suggest'));
     const sub = cc.dailyPerOwner == null ? x('cc.onSubNoCap', { mode }) : x('cc.onSub', { n: cc.dailyPerOwner, mode });
-    return { key: 'classifier', k: x('cc.name'), v, sub };
+    return { key: 'classifier', k: named('ai.content_classifier', x('cc.name')), v, sub };
   }
   const fix = CLASSIFIER_FIX[cc.reason] ? x(CLASSIFIER_FIX[cc.reason]) : cc.fix || '';
-  return { key: 'classifier', k: x('cc.name'), v, missing: !e, sub: fix, subTone: 'notice' };
+  return { key: 'classifier', k: named('ai.content_classifier', x('cc.name')), v, missing: !e, sub: fix, subTone: 'notice' };
 }
 
 export function secRouting(ctx, num) {
@@ -352,20 +362,20 @@ export function secRouting(ctx, num) {
             <${Select} fit key=${c + i} ariaLabel=${x('rt.place', { cap: x('cap.' + c), n: i + 1 })} value=${list[i] || ''} onChange=${(id) => pv.setRoute(c, i, id)} options=${options} />`)}
         <//>`
       : (list.length ? list.map(titleOf).join(' → ') : x('rt.auto'));
-    return { key: c, k: x('cap.' + c), v, missing: !e && !list.length, sub: servers(c).length ? '' : x('rt.noServer') };
+    return { key: c, k: capName(c), v, missing: !e && !list.length, sub: servers(c).length ? '' : x('rt.noServer') };
   };
   const r = e ? pv.rulesDraft : routing.rules;
   const rules = [
-    { k: x('rt.fallback'), v: e ? html`<${Check} inline checked=${!!r.fallback} onChange=${(v) => pv.setRule({ fallback: v })}>${x('rt.fallbackOn')}<//>` : (r.fallback ? x('rt.fallbackYes', { n: r.maxAttempts }) : x('rt.fallbackNo')), sub: x('rt.fallbackSub') },
-    e ? { k: x('rt.attempts'), v: html`<${TextField} type="number" size="short" min="1" max="5" step="1" value=${String(r.maxAttempts ?? 3)} ariaLabel=${x('rt.attempts')} onInput=${(v) => pv.setRule({ maxAttempts: v })} />` } : null,
-    { k: x('rt.pool'), v: e ? html`<${Check} inline checked=${!!r.extendToPool} onChange=${(v) => pv.setRule({ extendToPool: v })}>${x('rt.poolOn')}<//>` : (r.extendToPool ? x('rt.poolYes', { order: x('rt.order.' + (r.poolOrder || 'priority')) }) : x('rt.poolNo')), sub: x('rt.poolSub') },
+    { key: 'fallback', k: named('ai.fallback', x('rt.fallback')), v: e ? html`<${Check} inline checked=${!!r.fallback} onChange=${(v) => pv.setRule({ fallback: v })}>${x('rt.fallbackOn')}<//>` : (r.fallback ? x('rt.fallbackYes', { n: r.maxAttempts }) : x('rt.fallbackNo')) },
+    e ? { key: 'attempts', k: named('ai.fallback_attempts', x('rt.attempts')), v: html`<${TextField} type="number" size="short" min="1" max="5" step="1" value=${String(r.maxAttempts ?? 3)} ariaLabel=${x('rt.attempts')} onInput=${(v) => pv.setRule({ maxAttempts: v })} />` } : null,
+    { key: 'pool', k: named('ai.fallback_pool', x('rt.pool')), v: e ? html`<${Check} inline checked=${!!r.extendToPool} onChange=${(v) => pv.setRule({ extendToPool: v })}>${x('rt.poolOn')}<//>` : (r.extendToPool ? x('rt.poolYes', { order: x('rt.order.' + (r.poolOrder || 'priority')) }) : x('rt.poolNo')) },
     e && r.extendToPool ? { k: x('rt.orderLabel'), v: html`<${Select} fit ariaLabel=${x('rt.orderLabel')} value=${r.poolOrder || 'priority'} onChange=${(v) => pv.setRule({ poolOrder: v })}
         options=${['priority', 'cheapest', 'fastest'].map((k) => [k, x('rt.order.' + k)])} />` } : null,
-    { k: x('rt.tested'), v: e ? html`<${Check} inline checked=${!!r.onlyTested} onChange=${(v) => pv.setRule({ onlyTested: v })}>${x('rt.testedOn')}<//>` : (r.onlyTested ? x('yes') : x('no')), sub: x('rt.testedSub') },
-    { k: x('rt.leave'), v: e ? html`<${Check} inline checked=${!!r.fallbackMayLeaveMachine} onChange=${(v) => pv.setRule({ fallbackMayLeaveMachine: v })}>${x('rt.leaveOn')}<//>` : (r.fallbackMayLeaveMachine ? x('yes') : x('no')), sub: x('rt.leaveSub') },
+    { key: 'tested', k: named('ai.only_tested', x('rt.tested')), v: e ? html`<${Check} inline checked=${!!r.onlyTested} onChange=${(v) => pv.setRule({ onlyTested: v })}>${x('rt.testedOn')}<//>` : (r.onlyTested ? x('yes') : x('no')) },
+    { key: 'leave', k: named('ai.fallback_leaves_machine', x('rt.leave')), v: e ? html`<${Check} inline checked=${!!r.fallbackMayLeaveMachine} onChange=${(v) => pv.setRule({ fallbackMayLeaveMachine: v })}>${x('rt.leaveOn')}<//>` : (r.fallbackMayLeaveMachine ? x('yes') : x('no')) },
     { k: x('rt.voice'), v: e ? html`<${Check} inline checked=${!!r.speechVoiceMayChange} onChange=${(v) => pv.setRule({ speechVoiceMayChange: v })}>${x('rt.voiceOn')}<//>` : (r.speechVoiceMayChange ? x('yes') : x('no')), sub: x('rt.voiceSub') },
-    { k: x('rt.cost'), v: e ? html`<${TextField} type="number" size="short" min="0" step="0.01" value=${r.maxCostPerCallUsd ?? ''} placeholder=${x('rt.costNone')} ariaLabel=${x('rt.cost')} onInput=${(v) => pv.setRule({ maxCostPerCallUsd: v })} />`
-      : (r.maxCostPerCallUsd != null ? `$${r.maxCostPerCallUsd}` : x('rt.costNone')), missing: !e && r.maxCostPerCallUsd == null, sub: x('rt.costSub') },
+    { key: 'cost', k: named('ai.max_cost_per_call', x('rt.cost')), v: e ? html`<${TextField} type="number" size="short" min="0" step="0.01" value=${r.maxCostPerCallUsd ?? ''} placeholder=${x('rt.costNone')} ariaLabel=${x('rt.cost')} onInput=${(v) => pv.setRule({ maxCostPerCallUsd: v })} />`
+      : (r.maxCostPerCallUsd != null ? `$${r.maxCostPerCallUsd}` : x('rt.costNone')), missing: !e && r.maxCostPerCallUsd == null },
   ];
   return html`
     <${PageSection} id="ai-routing" num=${num} title=${x('rt.title')} count=${x('rt.count', { n: set, total: CAPS.length })}>
@@ -401,7 +411,7 @@ export function secPolicy(ctx, num) {
     ? html`${['open', 'recommended', 'custom'].map((m) => html`<${Check} radio inline name="ai-policy-mode" key=${m} checked=${d.mode === m} disabled=${m === 'recommended' && !recCaps.length} onChange=${() => pv.setPolicyField({ mode: m })}>${x('pol.mode.' + m)}<//>`)}`
     : x('pol.mode.' + pol.mode);
   const rows = [
-    { k: x('pol.modeLabel'), v: modeV, sub: x('pol.modeSub.' + mode) },
+    { key: 'mode', k: named('ai.model_policy', x('pol.modeLabel')), v: modeV, sub: x('pol.modeSub.' + mode) },
     mode === 'custom' ? { k: x('pol.allow'), v: e
       ? html`<${TextArea} rows="5" value=${d.allow} placeholder=${'openai:gpt-5-mini\nopenrouter:anthropic/claude-sonnet-5'} ariaLabel=${x('pol.allow')} onInput=${(v) => pv.setPolicyField({ allow: v })} />`
       : html`<${Marks}>${(pol.allow || []).map((a) => html`<${Mark} key=${a}>${a}<//>`)}<//>`, sub: x('pol.allowSub') } : null,

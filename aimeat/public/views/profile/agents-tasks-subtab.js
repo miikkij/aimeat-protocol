@@ -13,7 +13,8 @@
  *   - TaskItem + its helpers (status labels, JSON tree, memory entry, RequestChangesModal,
  *     blur preference) now live in ./agents/task-item.js (extracted for max-file-lines)
  * @version-history
- *   v5.13.0 -- 2026-09-26 -- Every part is a component that takes data (page group G1a): the create
+ *   v5.14.0 -- 2026-10-02 -- The question mark that explains how many tasks run at a time: agent.concurrency, after the sentence; the grey hint moved into it (components/HelpTip.js).
+ *   v5.13.0 --2026-09-26 -- Every part is a component that takes data (page group G1a): the create
  *     form is the section card with TextArea, TextField and FormActions (the count at the right under
  *     the text area is the Mark count), "Runs [n] task at a time" a short number TextField inside the
  *     sentence, the buckets the Tabs with their counts and the find toggle a fold Tab after them, the
@@ -131,6 +132,7 @@ import { Action, Loud } from '/components/Action.js';
 import { Note } from '/components/Note.js';
 import { Tabs, Tab } from '/components/Tabs.js';
 import { List, SearchLine } from '/components/List.js';
+import { HelpTip } from '/components/HelpTip.js';
 
 // Tasks-tab triage buckets (server-derived) + on-demand search time chips.
 const BUCKETS = ['recent', 'keep', 'archive'];
@@ -315,7 +317,7 @@ export default function AgentTasksSubtab({ agent, agentName, showToast, openTask
           ariaLabel=${t('profile.agents.tasks.concurrency.label')}
           onChange=${handleSaveConcurrency} />
         <span>${tOr('profile.agents.tasks.concurrency.runsAfter', 'task at a time.')}</span>
-        <${Note} inline>${t('profile.agents.tasks.concurrency.hint')}<//>
+        <${HelpTip} term="agent.concurrency" label=${t('profile.agents.tasks.concurrency.label')} />
       <//>
 
       ${showCreate && html`

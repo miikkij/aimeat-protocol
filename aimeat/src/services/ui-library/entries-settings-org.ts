@@ -119,10 +119,11 @@ export const ORG_SETTINGS_ENTRIES: UiEntryWritten[] = [
         summary: 'A check box or a radio dot with its words beside it, at the size and colour of the page\'s own text: a row, the box level with the words, the whole line pressable. A grey hint can stand under the words; several checks can stand side by side in a line. Three more faces: a small framed pill on the sun while ticked, a line of a list with a thin rule under it and grey words, and bold words with a larger box for the choice that decides what a form does.',
         module: '/components/Check.js', sheet: '/css/components/check-line.css',
         data: {
-            shape: 'Check({ checked, onChange, radio, name, value, hint, inline, pill, ruled, strong, disabled, title, id, ariaLabel, onFocus, onBlur, onMouseEnter, onMouseLeave, children })',
+            shape: 'Check({ checked, onChange, radio, name, value, hint, help, inline, pill, ruled, strong, disabled, title, id, ariaLabel, onFocus, onBlur, onMouseEnter, onMouseLeave, children })',
             fields: {
                 checked: 'the box is ticked, or the dot is picked', onChange: '(checked, event); a radio calls it only when it is picked, with true',
                 radio: 'a radio dot instead of a box; `name` (and `value`) group the dots', hint: 'a grey line under the words',
+                help: 'a term: the question mark of HelpTip after the line, outside its label, explaining what ticking it does (explain.<term>.* in the locale)',
                 inline: 'several checks side by side in a line of words', disabled: 'it cannot change now: dimmed',
                 pill: 'one of several small framed choices side by side, bold words, on the sun while ticked',
                 ruled: 'one choice of a list: a thin rule under it, the words a step smaller in grey with their bold part (<strong>) in ink, the 18px box in ink at the first line',

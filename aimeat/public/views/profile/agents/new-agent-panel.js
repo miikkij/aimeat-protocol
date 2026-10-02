@@ -25,7 +25,8 @@
  * @structure NewAgentPanel({ session, showToast, onCreated, agents, open, setOpen, onWaiting })
  * @usage <${NewAgentPanel} session=${session} showToast=${showToast} onCreated=${loadData} />
  * @version-history
- *   v2.13.0 -- 2026-10-01 -- A `draft` from the page's examples fills the form; the section is 03, under
+ *   v2.14.0 -- 2026-10-02 -- The question marks that explain what the agent reaches and how it runs: access.scopes, agent.run_mode (components/HelpTip.js).
+ *   v2.13.0 --2026-10-01 -- A `draft` from the page's examples fills the form; the section is 03, under
  *     the new "What should an agent do?" (guided journey P4).
  *   v2.12.0 -- 2026-09-26 -- Every part is a component that takes data (page group G1a): the fields
  *     are TextField and TextArea with their label and hint (the label stands over the field, as on
@@ -230,11 +231,11 @@ export default function NewAgentPanel({ session, showToast, onCreated, agents, o
             options=${shapes.map(s => ({ value: s.id, label: s.name, hint: s.desc }))} />
           ${/* The wildcard has no areas to name — areaLine renders it as a bare asterisk, which
                 tells the reader nothing about what they are handing over. */''}
-          <${Choice} label=${t('profile.agents.new.reaches')}
+          <${Choice} label=${t('profile.agents.new.reaches')} help="access.scopes"
             hint=${form.scopes === 'full' ? t('profile.agents.new.scopesFullHint') : areaLine(scopeList, t)}
             value=${form.scopes} onChange=${pick('scopes')}
             options=${[['readonly', 'scopesReadonly'], ['standard', 'scopesStandard'], ['full', 'scopesFull']].map(([v, key]) => ({ value: v, label: t('profile.agents.new.' + key) }))} />
-          <${Choice} label=${t('profile.agents.new.runModeLabel')}
+          <${Choice} label=${t('profile.agents.new.runModeLabel')} help="agent.run_mode"
             hint=${form.runMode === 'spawn' ? t('profile.agents.new.runModeSpawnHint') : t('profile.agents.new.runModeResidentHint')}
             value=${form.runMode} onChange=${pick('runMode')}
             options=${['spawn', 'resident'].map(v => ({ value: v, label: t('profile.agents.runMode.' + v) }))} />

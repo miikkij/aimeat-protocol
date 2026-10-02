@@ -20,6 +20,7 @@
  * @structure DecideRules({ available, providers }) · toRule / fromRule (the editor's draft ↔ the record)
  * @usage import { DecideRules } from './decide-rules.js'; html`<${DecideRules} available=${true} providers=${view} />`
  * @version-history
+ *   v1.19.0 — 2026-10-02 — The question marks that explain the bands, a question's threshold and the gate: decide.bands and decide.question_threshold on their headings, decide.gate on the Check (components/HelpTip.js); the bands' grey line goes, the explanation carries it. An empty or non-numeric band refuses the save (toRule): Number('') was 0, and the rule then acted on everything.
  *   v1.18.0 — 2026-09-26 — Every part is a kit component (Touch keeps every control 44px; BoxList and BoxLine for the proposals and the rules, the message each door caused after it; the editor in the dashed field Box with TextField, TextArea, Select, Check and Fields, a question in a row Box; SubHeading; Note with a refusal kept one problem per line; Action; Layout): the part writes no class (page group G8).
  *   v1.17.0 — 2026-09-26 — A rule's lines beside its title are the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
  *   v1.16.0 — 2026-09-26 — "Gate" is the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
@@ -55,6 +56,7 @@ import { apiGet, apiPut, apiPost, apiDelete } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { providerTitle } from './decide-providers.js';
 import { Hint } from '/components/Hint.js';
+import { HelpLabel } from '/components/HelpTip.js';
 import { IndexList, IndexStep } from '/components/NumberedIndex.js';
 import { Box, BoxList, BoxLine } from '/components/Box.js';
 import { SubHeading } from '/components/SubHeading.js';
@@ -112,8 +114,18 @@ export function fromRule(rule) {
   };
 }
 
-/** The editor draft as the body of PUT /v1/ai/decide/rules/:id. Throws on a sample that is not JSON. */
+/** A band as the editor holds it: its number, or null when the field is empty or not a number. */
+const bandOf = (v) => (String(v ?? '').trim() === '' || !Number.isFinite(Number(v)) ? null : Number(v));
+
+/**
+ * The editor draft as the body of PUT /v1/ai/decide/rules/:id. Throws on a band that is empty or not
+ * a number (the error's `key` names the message) and on a sample that is not JSON.
+ */
 export function toRule(d) {
+  // Number('') is 0, and a rule whose act band is 0 acts on everything: an empty band refuses the save.
+  const act = bandOf(d.act);
+  const ask = bandOf(d.ask);
+  if (act === null || ask === null) throw Object.assign(new Error('A band is empty or not a number'), { key: 'decideRules.bandsMissing' });
   const questions = {};
   const thresholds = {};
   for (const q of d.questions) {
@@ -127,7 +139,7 @@ export function toRule(d) {
   return {
     title: d.title.trim(), decides: d.decides.trim(),
     sends: d.sendsText.split(',').map(s => s.trim()).filter(Boolean),
-    questions, thresholds, bands: { act: Number(d.act), ask: Number(d.ask) },
+    questions, thresholds, bands: { act, ask },
     use: d.use, gate: !!d.gate, sample,
     // Empty is "whoever the caller would get": the agent's, the owner's default, the server's.
     ...(d.provider ? { provider: d.provider } : {}),
@@ -189,15 +201,14 @@ function RuleEditor({ draft, isNew, busy, providers, msg, onChange, onSave, onCa
         <${TextField} code label=${t('decideRules.f.sends')} value=${draft.sendsText} disabled=${busy} placeholder="draft, question"
           onInput=${(v) => set('sendsText', v)} />
 
-        ${sub5(t('decideRules.questions'))}
+        ${sub5(html`<${HelpLabel} term="decide.question_threshold" label=${t('decideRules.questions')}>${t('decideRules.questions')}<//>`)}
         <${Hint}>${t('decideRules.questionsHelp')}<//>
         ${draft.questions.map((q, i) => html`<${QuestionBox} key=${i} q=${q} i=${i} busy=${busy} count=${draft.questions.length} setQ=${setQ} onRemove=${() => removeQ(i)} />`)}
         <${Actions}>
           <${Action} small soft disabled=${busy} onClick=${() => onChange({ ...draft, questions: [...draft.questions, { ...EMPTY_Q }] })}>${t('decideRules.q.add')}<//>
         <//>
 
-        ${sub5(t('decideRules.bands'))}
-        <${Hint}>${t('decideRules.bandsHelp')}<//>
+        ${sub5(html`<${HelpLabel} term="decide.bands" label=${t('decideRules.bands')}>${t('decideRules.bands')}<//>`)}
         <${Fields} cols=${2}>
           <${TextField} type="number" step="any" min="0" max="1" label=${t('decideRules.f.act')} value=${draft.act} disabled=${busy}
             onInput=${(v) => set('act', v)} />
@@ -211,7 +222,7 @@ function RuleEditor({ draft, isNew, busy, providers, msg, onChange, onSave, onCa
           <${Select} label=${t('decideRules.f.provider')} value=${draft.provider} disabled=${busy} onChange=${(v) => set('provider', v)}
             options=${[['', t('decideRules.provider.any')], ...providers.providers.map(p => [p.id, p.title])]} />
           <${Hint}>${t('decideRules.providerHelp')}<//>`}
-        <${Check} checked=${draft.gate} disabled=${busy} onChange=${() => set('gate', !draft.gate)}>${t('decideRules.f.gate')}<//>
+        <${Check} checked=${draft.gate} disabled=${busy} help="decide.gate" onChange=${() => set('gate', !draft.gate)}>${t('decideRules.f.gate')}<//>
         <${TextArea} code rows=${4} label=${t('decideRules.f.sample')} value=${draft.sampleText} disabled=${busy}
           placeholder='{ "draft": "…", "question": "…" }'
           onInput=${(v) => set('sampleText', v)} />
@@ -290,6 +301,7 @@ export function DecideRules({ available, providers }) {
   const save = async () => {
     let body;
     try { body = toRule(draft); } catch (err) {
+      if (err?.key) { setMsg({ key: err.key, error: true, at: 'editor' }); return; }
       swallowed('decide-rules: the sample is not JSON', err);
       setMsg({ key: 'decideRules.sampleNotJson', error: true, at: 'editor' });
       return;

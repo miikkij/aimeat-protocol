@@ -27,7 +27,8 @@
  *   tokenFold · secAccounts · secMcp · secSecrets · secretFold · secGroups · secAddresses · secRoads
  * @usage import { renderPage } from './access/page.js';
  * @version-history
- *   v1.27.0 -- 2026-09-26 -- Every part is a component that takes data, and the file writes no class
+ *   v1.28.0 -- 2026-10-02 -- The question mark that explains a key's level: access.scopes on the level Field group (components/HelpTip.js).
+ *   v1.27.0 --2026-09-26 -- Every part is a component that takes data, and the file writes no class
  *     (component plan, page group G3): the frame is SettingsPage, the sections Section (the two forms
  *     its fold), the strip FigureStrip, the sign-in rows one List whose rows carry their panel or
  *     block under them (Row below), the keys and the secrets List rows, the filters Tabs in their
@@ -300,7 +301,7 @@ function tokenFold(ctx) {
       <${Note} kind="lead">${x('form.intro')}<//>
       <${Fields}>
         <${TextField} label=${x('form.name')} hint=${x('form.nameHint')} maxLength=${120} value=${f.label} placeholder=${x('form.namePlaceholder')} onInput=${(v) => ctx.setForm({ label: v })} />
-        <${Field} group label=${x('form.level')} hint=${scoped ? x('form.levelHintScoped') : f.level === 'owner' ? x('level.ownerText') : x('level.operatorText')}>
+        <${Field} group label=${x('form.level')} help="access.scopes" hint=${scoped ? x('form.levelHintScoped') : f.level === 'owner' ? x('level.ownerText') : x('level.operatorText')}>
           <${Tabs} tone="tile" label=${x('form.level')} value=${f.level} onSelect=${(v) => ctx.setForm({ level: v })}
             items=${[opt('scoped', x('level.scopedOpt')), opt('owner', x('level.ownerOpt'), true), ctx.isOperator ? opt('operator', x('level.operatorOpt'), true) : null]} />
           ${scoped ? html`<${Tabs} tone="tile" kind="toggle" value=${chosen} onSelect=${(s) => ctx.toggleScope(s)}

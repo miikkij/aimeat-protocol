@@ -10,7 +10,8 @@
  * @structure CRON_PRESETS · CreateForm
  * @usage <${CreateForm} agents=${agents} showToast=${showToast} onCreated=${reload} lockedAgent=${name} />
  * @version-history
- *   v2.13.0 -- 2026-09-26 -- The form is the Field family (page group G5): who does it is the boxed Choice, the cadences the Choice's filter tone, each field a TextField, TextArea or Select with its row label over it (the label beside the field, .sc-form-k, becomes the label over it, as on every other form), the limits the Check with its number field, the foot FormActions; it writes no class. The agent picker keeps its first "choose" line (Select placeholder).
+ *   v2.14.0 -- 2026-10-02 -- The question marks that explain the schedule and its limits: schedule.cron, schedule.timezone on their TextFields, schedule.max_runs, schedule.daily_limit on their Checks (components/HelpTip.js).
+ *   v2.13.0 --2026-09-26 -- The form is the Field family (page group G5): who does it is the boxed Choice, the cadences the Choice's filter tone, each field a TextField, TextArea or Select with its row label over it (the label beside the field, .sc-form-k, becomes the label over it, as on every other form), the limits the Check with its number field, the foot FormActions; it writes no class. The agent picker keeps its first "choose" line (Select placeholder).
  *   v2.12.0 -- 2026-09-26 -- The run limits beside their check boxes are the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
  *   v2.11.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v2.10.0 -- 2026-09-26 -- A grey line that explains is the Hint (.poster-hint); the rule that drew it here goes and its place stays (a unification: the look most tabs use).
@@ -141,8 +142,8 @@ export function CreateForm({ agents = [], showToast, onCreated, onCancel = null,
             options=${CRON_PRESETS.map(p => ({ value: p.key, label: t('profile.scheduler.preset.' + p.key) }))} />
           <${Row} wrap gap="large" align="end">
             <${TextField} type="time" size="short" label=${c('kTime')} value=${time} disabled=${!time} onInput=${(v) => onTime(v)} />
-            <${TextField} label=${c('kZone')} value=${form.timezone} onInput=${v => set('timezone', v)} placeholder=${t('profile.scheduler.ph.timezone')} />
-            <${TextField} code label=${c('kCron')} value=${form.cron} onInput=${v => { set('cron', v); setPreset('custom'); }} placeholder="0 7 * * *" />
+            <${TextField} label=${c('kZone')} help="schedule.timezone" value=${form.timezone} onInput=${v => set('timezone', v)} placeholder=${t('profile.scheduler.ph.timezone')} />
+            <${TextField} code label=${c('kCron')} help="schedule.cron" value=${form.cron} onInput=${v => { set('cron', v); setPreset('custom'); }} placeholder="0 7 * * *" />
           <//>
           ${words && words !== form.cron ? html`<${Note}>${words}${form.timezone ? ` · ${form.timezone}` : ''}<//>` : null}
         <//>
@@ -169,11 +170,11 @@ export function CreateForm({ agents = [], showToast, onCreated, onCancel = null,
 
       <${Field} label=${t('profile.scheduler.constraints')} group>
         <${Row} wrap gap="large">
-          <${Check} checked=${maxRuns.enabled} onChange=${on => setMaxRuns(s => ({ ...s, enabled: on }))}>
+          <${Check} checked=${maxRuns.enabled} help="schedule.max_runs" onChange=${on => setMaxRuns(s => ({ ...s, enabled: on }))}>
             ${t('profile.scheduler.maxRuns')}
             <${TextField} type="number" size="short" min="1" value=${maxRuns.limit} disabled=${!maxRuns.enabled} ariaLabel=${t('profile.scheduler.maxRuns')} onInput=${v => setMaxRuns(s => ({ ...s, limit: v }))} />
           <//>
-          <${Check} checked=${dailyLimit.enabled} onChange=${on => setDailyLimit(s => ({ ...s, enabled: on }))}>
+          <${Check} checked=${dailyLimit.enabled} help="schedule.daily_limit" onChange=${on => setDailyLimit(s => ({ ...s, enabled: on }))}>
             ${t('profile.scheduler.dailyLimit')}
             <${TextField} type="number" size="short" min="0" step="0.1" value=${dailyLimit.limit} disabled=${!dailyLimit.enabled} ariaLabel=${t('profile.scheduler.dailyLimit')} onInput=${v => setDailyLimit(s => ({ ...s, limit: v }))} />
           <//>

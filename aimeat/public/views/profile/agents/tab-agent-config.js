@@ -6,7 +6,8 @@
  *   and two-way sync. Shows files pushed by the agent (soul.md, AGENTS.md, etc).
  *   Supports edit, copy, download, and upload actions.
  * @version-history
- *   v1.17.1 -- 2026-09-26 -- The file's text scrolls after 300px again, as main's
+ *   v1.18.0 -- 2026-10-02 -- The question marks that explain the run budget: schedule.max_runs, schedule.daily_limit on their Checks (components/HelpTip.js).
+ *   v1.17.1 --2026-09-26 -- The file's text scrolls after 300px again, as main's
  *     .pf-agd-config-preview did (Code scroll="medium"; fix pass).
  *   v1.17.0 -- 2026-09-26 -- Onto the components: the budget guards are the section Card with two
  *     Checks (the number stays inside each check line, as on main) and the Loud save in FormActions;
@@ -108,12 +109,12 @@ function ScheduleBudgetSection({ agent, agentName, showToast }) {
     <${Card} tone="section" title=${t('profile.scheduler.budgetTitle')}>
       <${HeadDesc}>${t('profile.scheduler.budgetDesc')}<//>
       <${Split} gap="small">
-        <${Check} checked=${maxRuns.enabled} onChange=${(on) => setMaxRuns(s => ({ ...s, enabled: on }))}>
+        <${Check} checked=${maxRuns.enabled} help="schedule.max_runs" onChange=${(on) => setMaxRuns(s => ({ ...s, enabled: on }))}>
           ${t('profile.scheduler.maxRuns')}
           <${TextField} type="number" size="short" min="1" value=${maxRuns.limit} disabled=${!maxRuns.enabled}
             ariaLabel=${t('profile.scheduler.maxRuns')} onInput=${(v) => setMaxRuns(s => ({ ...s, limit: v }))} />
         <//>
-        <${Check} checked=${dailyLimit.enabled} onChange=${(on) => setDailyLimit(s => ({ ...s, enabled: on }))}>
+        <${Check} checked=${dailyLimit.enabled} help="schedule.daily_limit" onChange=${(on) => setDailyLimit(s => ({ ...s, enabled: on }))}>
           ${t('profile.scheduler.dailyLimit')}
           <${TextField} type="number" size="short" min="0" step="0.1" value=${dailyLimit.limit} disabled=${!dailyLimit.enabled}
             ariaLabel=${t('profile.scheduler.dailyLimit')} onInput=${(v) => setDailyLimit(s => ({ ...s, limit: v }))} />

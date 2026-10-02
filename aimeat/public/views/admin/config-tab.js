@@ -29,6 +29,7 @@
  *   - fieldEditor — one field's editor by its type (a Select when the field has choices)
  *   - ConfigTab (default)
  * @version-history
+ *   v3.3.0 -- 2026-10-02 -- The question mark that explains a setting: a SettingLine gets `help` ('config.' + path) when the locale has explain.config.<path> (hasExplain), so far the fourteen config.* terms, ai.model_default_embed among them (components/HelpTip.js).
  *   v3.2.0 -- 2026-09-30 -- `?q=` in the address opens the page with that search, so a link names one
  *     setting (the header's new-version notice links to node.update_check).
  *   v3.1.0 -- 2026-09-29 -- A string setting with `choices` (the API names its fixed values) is a Select:
@@ -132,6 +133,11 @@ function label(path) {
 /** The description a person reads: translated where a translation exists, the schema's English otherwise. */
 function descOf(path, entry) {
   return tr('dashboard.cfgDesc_' + path.replace(/\./g, '_'), entry.description || '');
+}
+/** Whether the locale has an explanation for the setting (explain.config.<path>), so its SettingLine gets the question mark. */
+function hasExplain(path) {
+  const key = 'explain.config.' + path + '.title';
+  return t(key) !== key;
 }
 function groupLabel(g) {
   const key = 'dashboard.cfgGroup_' + g;
@@ -390,7 +396,7 @@ export default function ConfigTab({ data, reload }) {
                   const edited = p in pending;
                   const val = edited ? pending[p] : e.value;
                   return html`<${SettingLine} key=${p} id=${'cfgf-' + p.replace(/\./g, '-')}
-                    name=${label(p)} flag=${edited ? '●' : null} flagTitle=${tr('dashboard.cfgEdited', 'Edited, not saved')}
+                    name=${label(p)} help=${hasExplain(p) ? 'config.' + p : undefined} flag=${edited ? '●' : null} flagTitle=${tr('dashboard.cfgEdited', 'Edited, not saved')}
                     code=${p} desc=${descOf(p, e)}
                     source=${e.source && html`<${Badge} type=${SOURCE_BADGE[e.source] || 'idle'} label=${sourceWord(e.source)} />`}
                     editor=${fieldEditor(p, e, val, editable, pending, onChange)}

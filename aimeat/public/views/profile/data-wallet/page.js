@@ -14,6 +14,7 @@
  *   secRoads
  * @usage import { renderPage } from './data-wallet/page.js';
  * @version-history
+ *   v1.23.0 — 2026-10-02 — The question marks that explain the grant form: consent.scope, consent.key_area (components/HelpTip.js). The key area's example is portfolio.** (portfolio/contact* matched only a key of that exact name).
  *   v1.22.0 — 2026-09-29 — Section 05 is classification (TARGET-082 V5, data-wallet/classification.js),
  *     and how your AI uses the wallet moves to 06.
  *   v1.21.0 — 2026-09-26 — On the component kit (page group G7): the frame, crumb, head, rail and
@@ -73,6 +74,7 @@ import { Field, Fields, FormActions } from '/components/Field.js';
 import { Choice } from '/components/Choice.js';
 import { Select } from '/components/Select.js';
 import { TextField } from '/components/TextField.js';
+import { HelpTip } from '/components/HelpTip.js';
 import { x, n, crumb, pageLinks, whoOf } from './frame.js';
 import { targetRow, personRow, revokedRow, groupRow, eventRow, groupId } from './rows.js';
 import { secClassification, classificationCount } from './classification.js';
@@ -217,7 +219,7 @@ function secGrant(ctx) {
   const whoIsPicker = f.whoKind === 'contact';
   const ready = (whoIsPicker ? !!f.who.trim() : true) && (f.what === 'key' ? !!f.key.trim() : !!f.orgId && (f.what !== 'ws' || !!f.wsId)) && !!f.why.trim();
   const whoHint = f.whoKind === 'all' ? x('form.whoAllHint') : f.whoKind === 'orgMembers' ? x('form.whoOrgMembersHint') : f.whoKind === 'nodeUsers' ? x('form.whoNodeUsersHint') : x('form.whoHint');
-  const whatHint = f.what === 'key' ? x('form.keyHint') : f.what === 'ws' ? x('form.wsHint') : x('form.orgHint');
+  const whatHint = f.what === 'key' ? undefined : f.what === 'ws' ? x('form.wsHint') : x('form.orgHint');
   return html`
     <${Section} fold id="dw-grant" num="03" title=${x('secGrant')} sub=${`${ctx.active.length} / ${ctx.quota}`} open=${f.open} onToggle=${() => ctx.toggleForm()}>
       <${Note} kind="lead">${x('grantIntro')}<//>
@@ -228,7 +230,7 @@ function secGrant(ctx) {
         <//>
         <${Field} label=${x('form.what')} hint=${whatHint} group>
           ${opt(ctx, 'what', x('form.what'), [['ws', x('form.whatWs')], ['org', x('form.whatOrg')], ['key', x('form.whatKey')]])}
-          ${f.what === 'key' ? html`<${TextField} ariaLabel=${x('form.whatKey')} value=${f.key} placeholder="portfolio/contact*" onInput=${(v) => ctx.setForm({ key: v })} />` : html`
+          ${f.what === 'key' ? html`<${Line}><${TextField} ariaLabel=${x('form.whatKey')} value=${f.key} placeholder="portfolio.**" onInput=${(v) => ctx.setForm({ key: v })} /><${HelpTip} term="consent.key_area" label=${x('form.whatKey')} /><//>` : html`
             <${Select} ariaLabel=${x('form.whatOrg')} value=${f.orgId} placeholder=${ctx.orgs.length ? x('form.pickOrg') : x('form.noOrgs')}
               options=${ctx.orgs.map((o) => [o.id, o.name])} onChange=${(v) => ctx.setForm({ orgId: v, wsId: '' })} />
             ${f.what === 'ws' ? html`<${Select} ariaLabel=${x('form.whatWs')} value=${f.wsId} disabled=${!f.orgId}
@@ -238,7 +240,7 @@ function secGrant(ctx) {
         <${Choice} label=${x('form.may')} hint=${x('form.mayHint')} value=${f.may} onChange=${(v) => ctx.setForm({ may: v })}
           options=${[['read', x('form.mayRead')], canWrite ? ['write', x('form.mayWrite')] : null].filter(Boolean)} />
         <${TextField} label=${x('form.why')} value=${f.why} placeholder=${x('form.whyPlaceholder')} onInput=${(v) => ctx.setForm({ why: v })} />
-        <${Choice} label=${x('form.scope')} hint=${x('form.scopeHint')} value=${f.scope} onChange=${(v) => ctx.setForm({ scope: v })}
+        <${Choice} label=${x('form.scope')} help="consent.scope" value=${f.scope} onChange=${(v) => ctx.setForm({ scope: v })}
           options=${[['private', x('form.scopePrivate')], ['federation', x('form.scopeFederation')]]} />
         <${Field} label=${x('form.until')} group>
           ${opt(ctx, 'untilKind', x('form.until'), [['never', x('form.untilNever')], ['date', x('form.untilDate')]])}

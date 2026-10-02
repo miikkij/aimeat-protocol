@@ -12,7 +12,8 @@
  * @structure keyRow · keyOpen · secretRow · sessionsBlock · federationBlock
  * @usage import { keyRow, secretRow, sessionsBlock, federationBlock } from './rows.js';
  * @version-history
- *   v1.17.0 -- 2026-09-26 -- Every part is a component that takes data, and the file writes no class
+ *   v1.18.0 -- 2026-10-02 -- The question mark that explains morsels: commerce.morsels on the spending ceiling's Label (components/HelpTip.js).
+ *   v1.17.0 --2026-09-26 -- Every part is a component that takes data, and the file writes no class
  *     (component plan, page group G3): a key and a secret are List rows (Name, Desc, Who, When, Doors)
  *     with the opened Panel, an opened key's rights a dense List (a base package's line dim), the
  *     spending ceiling and the replaced value a TextField with its actions, the sessions a dense List
@@ -54,6 +55,7 @@ import { Label } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Figure, Tinted } from '/components/Figure.js';
 import { TextField } from '/components/TextField.js';
+import { HelpLabel } from '/components/HelpTip.js';
 
 const doorWord = (open) => (open ? x('close') : x('open'));
 
@@ -103,7 +105,7 @@ function keyOpen(ctx, row) {
           <//>`)}
       <//>
       ${row.canSpend ? html`
-        <${Label} block>${x('spend.title')}<//>
+        <${Label} block><${HelpLabel} term="commerce.morsels" label=${x('spend.title')}>${x('spend.title')}<//><//>
         <${Note}>${row.spendCap == null ? x('spend.noLimit') : x('spend.used', { spent: n(row.spent), cap: n(row.spendCap) })}<//>
         <${TextField} type="number" size="short" min="0" step="1" inputMode="numeric" ariaLabel=${x('spend.title')}
           placeholder=${x('spend.placeholder')} value=${ctx.spendDraft[row.id] ?? ''} onInput=${(v) => ctx.setSpendDraft(row.id, v)}

@@ -23,6 +23,7 @@
  *   - PeerPolicyCell — the per-peer control group
  * @usage <${PeerPolicyCell} peer=${p} onUpdate=${(field, value) => doUpdatePolicy(p.node_id, field, value)} />
  * @version-history
+ *   v2.1.0 — 2026-10-02 — The question marks that explain a peer's policy: federation.settlement, federation.relay, federation.replicate on their Check lines (a `help` term per CAPABILITIES entry), federation.peer_mode on the mode Select, which now has its visible label (dashboard.fedPeerMode) (components/HelpTip.js).
  *   v2.0.0 — 2026-09-27 — Library components, no class: each capability is a Check line (a
  *     tier-locked one dimmed and disabled, its ✗ keeping the tooltip that says why), the routing
  *     switch's direction is the Check's own grey line, the mode is a Select, the ladder is the
@@ -62,13 +63,13 @@ const CAPABILITIES = [
   { field: 'allow_messaging', label: 'fedAllowMessaging' },
   { field: 'share_catalogue', label: 'fedShareCatalogue' },
   { field: 'allow_broadcast', label: 'fedAllowBroadcast' },
-  { field: 'allow_settlement', label: 'fedAllowSettlement' },
-  { field: 'replicate_memory', label: 'fedReplicateMemory' },
+  { field: 'allow_settlement', label: 'fedAllowSettlement', help: 'federation.settlement' },
+  { field: 'replicate_memory', label: 'fedReplicateMemory', help: 'federation.replicate' },
   // The only one that needs its direction spelled out. Every other switch here answers "may this
   // peer do X on my node"; this one says whether MY node forwards to them. An operator who turns it
   // off expecting to shut that peer out has changed nothing about what arrives — measured on two
   // local nodes 2026-09-02.
-  { field: 'allow_routing', label: 'fedAllowRouting', hint: 'fedAllowRoutingHint' },
+  { field: 'allow_routing', label: 'fedAllowRouting', hint: 'fedAllowRoutingHint', help: 'federation.relay' },
   { field: 'allow_federated_auth', label: 'fedAllowAuth' },
 ];
 
@@ -102,14 +103,14 @@ export default function PeerPolicyCell({ peer, onUpdate }) {
     const allowed = ceiling[cap.field];
     return html`
           <${Check} key=${cap.field} checked=${on && allowed} disabled=${!allowed}
-            hint=${cap.hint ? t(`dashboard.${cap.hint}`) : undefined}
+            hint=${cap.hint ? t(`dashboard.${cap.hint}`) : undefined} help=${cap.help}
             onChange=${(checked) => onUpdate(cap.field, checked)}>
             ${t(`dashboard.${cap.label}`)}
             ${!allowed && html` <${Note} kind="meta" inline title=${t('dashboard.fedTierLocked')}>✗<//>`}
           <//>`;
   })}
 
-      <${Select} fit value=${peer.peer_mode || 'federation'} disabled=${!!ceiling.peer_mode}
+      <${Select} fit label=${t('dashboard.fedPeerMode')} help="federation.peer_mode" value=${peer.peer_mode || 'federation'} disabled=${!!ceiling.peer_mode}
         onChange=${(v) => onUpdate('peer_mode', v)}
         options=${[['federation', t('dashboard.fedPeerModeFederation')], ['private', t('dashboard.fedPeerModePrivate')]]} />
 

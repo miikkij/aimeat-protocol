@@ -8,6 +8,7 @@
  *   memory-tab.js as a ctx-consuming plain render function (all state/handlers passed in via ctx).
  *   Every part is a component of the kit that gets data; the file writes no class.
  * @version-history
+ *   v2.1.0 -- 2026-10-02 -- The question mark that explains a share pattern: memory.key_pattern (components/HelpTip.js).
  *   v2.0.2 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
  *     itself, so a key, a share pattern or an organism group name with an ampersand or a quote showed
  *     as &amp; / &quot;.
@@ -207,7 +208,7 @@ export function renderEntries(ctx) {
         <//>
       ` : html`
         <${Fields}>
-          <${TextField} label=${t('profile.access.shPattern')} hint=${t('profile.access.shPatternHelp')}
+          <${TextField} label=${t('profile.access.shPattern')} help="memory.key_pattern"
             value=${sharePattern} onInput=${setSharePattern} />
           <${Select} label=${t('profile.memory.shPickGroup')} value=${shareGroupId} onChange=${setShareGroupId}
             options=${groups.map(g => [g.id, g.name])} />

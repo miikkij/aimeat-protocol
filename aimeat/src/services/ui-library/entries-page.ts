@@ -76,10 +76,11 @@ export const PAGE_ENTRIES: UiEntryWritten[] = [
         module: '/components/HelpTip.js', sheet: '/css/components/help-tip.css',
         classes: ['help-tip', 'help-tip-button', 'field-label-row'],
         data: {
-            shape: 'HelpTip({ term, label }) · a field of the family: TextField({ label, help: term, … })',
+            shape: 'HelpTip({ term, label }) · HelpLabel({ term, label, children }) · a field of the family: TextField({ label, help: term, … }) · Check({ help }) · SettingLine({ help })',
             fields: {
                 term: 'the explanation\'s name: the words are the locale\'s explain.<term>.* (title, short, what, range, low, high, lowLabel, highLabel, ex1 … ex6, tip)',
                 label: 'the setting\'s name on the page, used when the locale gives no title',
+                children: 'HelpLabel: the label as drawn (a Facts row\'s name, a heading\'s words, a Label block); the question mark stands after it',
             },
         },
         useFor: ['Explain a setting whose name says nothing to a person who is not an expert: temperature, top P, a token limit.', 'Any field of a form, by giving the field `help`: the question mark stands after its row label.'],

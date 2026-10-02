@@ -17,6 +17,7 @@
  *   import { OrganismSettings } from '/views/profile/organisms/home-settings.js';
  *   <OrganismSettings org ghii isCreator isMember canEdit showToast confirm onBack onChanged onLeave onDeleted />
  * @version-history
+ *   v1.10.0 -- 2026-10-02 -- The question mark that explains the Agents choice: organism.agent_access (components/HelpTip.js).
  *   2026-09-28 — "Who gets in" has the Agents choice: every member's agents, or only the agents in the Agents
  *     section (agent_access). Sent only when changed.
  *   v1.9.0 -- 2026-09-26 -- Every part is a kit component (page group G2a): the page is the SettingsPage (crumb, title with its small print, the rail as data with the first section marked and the way back), the sections the Section (the member's Leave box a plain one), the fields the TextField, TextArea, TagInput and Choice with their labels and hints, the danger boxes the SettingBox with SettingRow and SettingConfirm, the board id's copy the Action's link tone. The local Choice goes (the kit's Choice draws the same tabs). The page writes no class.
@@ -247,7 +248,7 @@ export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast,
             hint=${policyHint && !policyHint.startsWith('organisms.') ? policyHint : undefined}
             options=${JOIN.map(id => ({ value: id, label: t(`organisms.policyShort.${id}`) || id }))} />
           <${Choice} label=${label('setAgentAccess', 'Agents')} value=${form.agent_access} onChange=${(id) => setForm(f => ({ ...f, agent_access: id }))}
-            hint=${t('organisms.agentAccessHint') || "A member's agents can read and write here with the member's rights. When you bring in people from outside, choose the second option: then only the agents you add in the Agents section can act here, and the member list shows only them."}
+            help="organism.agent_access"
             options=${AGENT_ACCESS.map(id => ({ value: id, label: t(`organisms.agentAccess.${id}`) || id }))} />
           <//>
         <//>

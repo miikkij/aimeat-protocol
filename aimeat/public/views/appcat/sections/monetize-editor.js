@@ -13,7 +13,8 @@
  * @structure ToolEditor({ d, m, index }) · readEditor(base, form, odpsOpen)
  * @usage html`<${ToolEditor} key=${m.editing} d=${d} m=${m} index=${m.editing} />`
  * @version-history
- *   v1.1.0 — 2026-09-27 — Parity with the old page (appcat sections-d): the form under the heavy rule
+ *   v1.2.0 — 2026-10-02 — The question marks that explain the price and the market: commerce.morsels, commerce.pacing_toll (TextField help), commerce.exchange_listing (Check help); the toll and exchange hints moved into them (components/HelpTip.js).
+ *   v1.1.0 —2026-09-27 — Parity with the old page (appcat sections-d): the form under the heavy rule
  *     (Fields `plain chapter ruled`), each question a StepCard `question`, the fields in the old grids
  *     (two wide and a short currency; two), "List in EXCHANGE" a Check `strong`, the chapter's door
  *     row and the status line that keeps its room.
@@ -167,7 +168,7 @@ export function ToolEditor({ d, m, index }) {
     <//>
     <${Question} n="2" title=${x('mz.group.price')} lede=${x('mz.priceLede')}>
       <${Fields} plain chapter cols=${3}>
-        <${TextField} type="number" min=${0} step=${1} label=${x('monetize.priceMorsels')} value=${form.morsels} placeholder="0" onInput=${(v) => set({ morsels: v })} />
+        <${TextField} type="number" min=${0} step=${1} label=${x('monetize.priceMorsels')} help="commerce.morsels" value=${form.morsels} placeholder="0" onInput=${(v) => set({ morsels: v })} />
         <${TextField} inputMode="decimal" label=${x('monetize.priceMoney')} value=${form.money} placeholder="0.002" onInput=${(v) => set({ money: v })} />
         <${Select} label=${x('monetize.currency')} options=${currencies} value=${form.currency} onChange=${(v) => set({ currency: v })} />
       <//>
@@ -180,12 +181,11 @@ export function ToolEditor({ d, m, index }) {
           <${Select} label=${x('monetize.currency2')} options=${currencies} value=${form.currency2} onChange=${(v) => set({ currency2: v })} />
         <//>
         <${Note} kind="hint">${x('monetize.money2Hint')}<//>
-        <${TextField} type="number" min=${0} max=${100} step=${1} label=${x('monetize.toll')} value=${form.toll} placeholder="0" hint=${x('monetize.tollHint')} onInput=${(v) => set({ toll: v })} />
+        <${TextField} type="number" min=${0} max=${100} step=${1} label=${x('monetize.toll')} help="commerce.pacing_toll" value=${form.toll} placeholder="0" onInput=${(v) => set({ toll: v })} />
       <//>` : null}
     <//>
     <${Question} n="3" title=${x('mz.group.market')} lede=${x('mz.marketLede')}>
-      <${Check} strong checked=${form.exchange} onChange=${(on) => set({ exchange: on })}>${x('monetize.exchange')}<//>
-      <${Note} kind="hint">${x('monetize.exchangeHint')}<//>
+      <${Check} strong checked=${form.exchange} help="commerce.exchange_listing" onChange=${(on) => set({ exchange: on })}>${x('monetize.exchange')}<//>
       <${OdpsToolBlock} d=${d} m=${m} tool=${base} form=${form} set=${set} />
     <//>
     <${Question} n="4" title=${x('mz.group.delivery')} lede=${x('mz.deliveryLede')}>

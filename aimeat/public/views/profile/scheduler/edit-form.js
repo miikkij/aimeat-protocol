@@ -9,7 +9,8 @@
  * @structure ScheduleEditForm
  * @usage <${ScheduleEditForm} schedule=${s} showToast=${showToast} onSaved=${reload} onClose=${close} />
  * @version-history
- *   v1.7.0 — 2026-09-26 — The form is the Field family (Fields, TextField and TextArea with their labels, FormActions at the right) and the Action family; it writes no class (page group G5).
+ *   v1.8.0 — 2026-10-02 — The question marks that explain the schedule: schedule.cron, schedule.timezone on their TextFields (components/HelpTip.js).
+ *   v1.7.0 —2026-09-26 — The form is the Field family (Fields, TextField and TextArea with their labels, FormActions at the right) and the Action family; it writes no class (page group G5).
  *   v1.6.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.5.0 — 2026-09-25 — The last labels over a field or a group wear .poster-label: the classic AI settings, the presence dialog, the scope groups, the ecosystem's trigger and sample, the scheduler's edit form, P&L's fields, the task runner's name; a place keeps its layout (Jouni's decision "Row label", a unification).
  *   v1.4.0 — 2026-09-25 — Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
@@ -71,8 +72,8 @@ export function ScheduleEditForm({ schedule: s, showToast, onSaved, onClose }) {
   return html`
     <${Fields}>
       <${TextField} label=${t('profile.scheduler.field.displayName')} value=${f.display_name} onInput=${v => set('display_name', v)} />
-      <${TextField} label=${`${t('profile.scheduler.field.schedule')} (cron)`} value=${f.cron} onInput=${v => set('cron', v)} placeholder="0 7 * * *" />
-      <${TextField} label=${t('profile.scheduler.ph.timezone')} value=${f.timezone} onInput=${v => set('timezone', v)} placeholder="Europe/Helsinki" />
+      <${TextField} label=${`${t('profile.scheduler.field.schedule')} (cron)`} help="schedule.cron" value=${f.cron} onInput=${v => set('cron', v)} placeholder="0 7 * * *" />
+      <${TextField} label=${t('profile.scheduler.ph.timezone')} help="schedule.timezone" value=${f.timezone} onInput=${v => set('timezone', v)} placeholder="Europe/Helsinki" />
 
       ${s.type === 'agent_task' && html`
         <${TextField} label=${t('profile.scheduler.field.taskTitle')} value=${f.task_title} onInput=${v => set('task_title', v)} />

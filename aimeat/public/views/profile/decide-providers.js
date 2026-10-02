@@ -20,6 +20,7 @@
  * @usage import { DecideProviders } from './decide-providers.js';
  *   html`<${DecideProviders} view=${settings.providers} onSaved=${load} />`
  * @version-history
+ *   v1.14.0 — 2026-10-02 — The question marks that explain the price and what a provider can carry: decide.price_per_mtok on the price field, decide.provider_limits on the limits heading (components/HelpTip.js); the limits' grey line goes, the explanation carries it.
  *   v1.13.0 — 2026-09-26 — Every part is a kit component (Touch keeps every control 44px; BoxList and BoxLine for the providers, their address never translated; the form in the dashed field Box with TextField, Select, Check and Fields; SubHeading; Note with a refusal kept one problem per line; Action; Layout): the part writes no class (page group G8).
  *   v1.12.0 — 2026-09-26 — A provider's lines beside its name are the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
  *   v1.11.0 — 2026-09-26 — "Takes a key" is the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
@@ -50,6 +51,7 @@ import { t } from '/js/i18n.js';
 import { num, money } from '/js/format.js';
 import { apiPut, apiDelete } from '/js/api.js';
 import { Hint } from '/components/Hint.js';
+import { HelpLabel } from '/components/HelpTip.js';
 import { Box, BoxList, BoxLine } from '/components/Box.js';
 import { SubHeading } from '/components/SubHeading.js';
 import { Fields } from '/components/Field.js';
@@ -153,10 +155,9 @@ function ProviderForm({ draft, busy, msg, onChange, onSave, onCancel }) {
         ${draft.takesKey && html`
           <${TextField} unmanaged label=${t('decideProviders.f.key')} value=${draft.apiKey} disabled=${busy} onInput=${(v) => set('apiKey', v)} />`}
         ${draft.kind === 'hosted' && html`
-          <${TextField} type="number" min="0" step="any" label=${t('decideProviders.f.price')} value=${draft.price} disabled=${busy} placeholder="0.042"
+          <${TextField} type="number" min="0" step="any" label=${t('decideProviders.f.price')} help="decide.price_per_mtok" value=${draft.price} disabled=${busy} placeholder="0.042"
             onInput=${(v) => set('price', v)} />`}
-        ${sub5(t('decideProviders.limitsTitle'))}
-        <${Hint}>${t('decideProviders.limitsHelp')}<//>
+        ${sub5(html`<${HelpLabel} term="decide.provider_limits" label=${t('decideProviders.limitsTitle')}>${t('decideProviders.limitsTitle')}<//>`)}
         <${Fields} cols=${2}>
           <${TextField} type="number" min="2" step="1" label=${t('decideProviders.f.maxOptions')} value=${draft.maxOptions} disabled=${busy} placeholder="20"
             onInput=${(v) => set('maxOptions', v)} />

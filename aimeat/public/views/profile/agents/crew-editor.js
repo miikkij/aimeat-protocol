@@ -14,6 +14,9 @@
  *     bundle, and its verbs behind a "pick verbs" toggle
  *   - IdentitySection · CrewSection · RunSection · ContractSection
  * @version-history
+ *   v1.18.0 -- 2026-10-02 -- The question marks that explain the crew settings: crew.process, crew.llm_profile and
+ *     ai.temperature on their fields, crew.delegation, crew.async and crew.memory on their Checks (components/HelpTip.js);
+ *     the model profile's grey line goes, the explanation carries it.
  *   v1.17.0 -- 2026-09-26 -- Every part is a component that takes data (page group G1a): the fields are
  *     TextField, TextArea and Select with their own label and hint (this file's Field goes), the grids
  *     are Fields in two or three columns, a member or a task is the Box (its place as the code in its
@@ -304,7 +307,7 @@ export function CrewSection({ doc, onChange, errors, runtimeTools, decideTools }
             <${Field} label=${t(`${K}.fields.memberTools`)} group>
               <${ToolMenu} selected=${a.tools} runtimeTools=${runtimeTools} decideTools=${decideTools} onChange=${v => patchAgent(i, { tools: v })} />
             <//>
-            <${Check} checked=${!!a.allow_delegation} onChange=${on => patchAgent(i, { allow_delegation: on })}>
+            <${Check} checked=${!!a.allow_delegation} help="crew.delegation" onChange=${on => patchAgent(i, { allow_delegation: on })}>
               ${t(`${K}.fields.allowDelegation`)}
             <//>
           <//>
@@ -344,7 +347,7 @@ export function CrewSection({ doc, onChange, errors, runtimeTools, decideTools }
                 </div>
               <//>
             `}
-            <${Check} checked=${!!task.async} onChange=${on => patchTask(i, { async: on })}>
+            <${Check} checked=${!!task.async} help="crew.async" onChange=${on => patchTask(i, { async: on })}>
               ${t(`${K}.fields.taskAsync`)}
             <//>
           <//>
@@ -379,11 +382,11 @@ export function RunSection({ doc, onChange, errors }) {
     <${Part} title=${t(`${K}.sections.run`)} lines=${errors.run}>
       <${Fields}>
         <${Fields} cols=${3}>
-          <${TextField} id="crew-llm" label=${t(`${K}.fields.llmProfile`)} hint=${t(`${K}.fields.llmProfileHint`)}
+          <${TextField} id="crew-llm" label=${t(`${K}.fields.llmProfile`)} help="crew.llm_profile"
             type="text" value=${doc.llm_profile || ''} onInput=${v => set({ llm_profile: v || undefined })} />
-          <${TextField} id="crew-temp" label=${t(`${K}.fields.temperature`)} type="number" min="0" max="2" step="0.1"
+          <${TextField} id="crew-temp" label=${t(`${K}.fields.temperature`)} help="ai.temperature" type="number" min="0" max="2" step="0.1"
             value=${doc.temperature ?? ''} onInput=${v => set({ temperature: v === '' ? undefined : Number(v) })} />
-          <${Select} id="crew-process" label=${t(`${K}.fields.process`)} value=${doc.process || 'sequential'} onChange=${v => set({ process: v })}
+          <${Select} id="crew-process" label=${t(`${K}.fields.process`)} help="crew.process" value=${doc.process || 'sequential'} onChange=${v => set({ process: v })}
             options=${[['sequential', t(`${K}.fields.processSequential`)], ['hierarchical', t(`${K}.fields.processHierarchical`)]]} />
         <//>
         <${Field} label=${t(`${K}.fields.listenFor`)} group>
@@ -391,7 +394,7 @@ export function RunSection({ doc, onChange, errors }) {
             ${LISTEN.map(k => html`<${Check} key=${k} inline checked=${listen.has(k)} onChange=${() => toggleListen(k)}>${t(`${K}.fields.${LISTEN_KEY[k]}`)}<//>`)}
           </div>
         <//>
-        <${Check} checked=${!!doc.memory} onChange=${on => set({ memory: on })}>${t(`${K}.fields.memory`)}<//>
+        <${Check} checked=${!!doc.memory} help="crew.memory" onChange=${on => set({ memory: on })}>${t(`${K}.fields.memory`)}<//>
         <${Check} checked=${!!doc.discover} onChange=${on => set({ discover: on })}>${t(`${K}.fields.discover`)}<//>
       <//>
     <//>
