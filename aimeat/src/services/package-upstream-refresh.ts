@@ -25,6 +25,9 @@
  * @usage
  *   const outcomes = await refreshInstalledPackages({ storage, config, peers }, { owner }, { notify: false });
  * @version-history
+ *   v1.2.0 — 2026-10-02 — An install with auto-update on is not updated to a version that can do more
+ *     than the owner approved: the owner is told once (package_update_needs_approval) and the outcome is
+ *     needs_owner (package sale design, T7).
  *   v1.1.0 — 2026-09-30 — The end of updates is said for the owner (UPDATES_ENDED_SENTENCE) and, from
  *     the daily check, notified once (package_updates_ended); the owner read the repository's words.
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 3).
@@ -34,6 +37,8 @@ import type { Storage, PackageInstanceRecord } from '../storage/interface.js';
 import type { PeerInfo } from './federation.js';
 import { pullPackage } from './package-pull.js';
 import { updateInstanceToLatest } from './package-migrate.js';
+import { packageCapabilities, widenedItems } from './package-capabilities.js';
+import { approvedItems } from './package-approvals.js';
 import { notify } from './notify.js';
 import { emitChange } from './event-bus.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
@@ -124,6 +129,27 @@ async function refreshOne(
 
     if (inst.autoUpdate) {
         const ownerGhii = await resolveGhii(storage, inst.owner, config);
+        // A version that can do more than the owner approved is not applied by a job nobody watches
+        // (package sale design, T7). The owner is told once, and applies it with the Update button,
+        // which is them approving it.
+        const widened = widenedItems(await approvedItems(storage, config, inst), packageCapabilities(latest.components, config, inst.owner).items);
+        if (widened.length > 0) {
+            if (opts.notify && await firstNoticeFor(storage, inst.id, `approval:${latest.version}`)) {
+                await notify(storage, ownerGhii, {
+                    type: 'package_update_needs_approval',
+                    title: `The update of ${inst.label} waits for you`,
+                    body: `Version ${latest.version} of ${latest.name} can do more than you approved before. It is not installed until you update it yourself.`,
+                    link: '/v1/profile?tab=packages',
+                    i18n: { key: 'package_update_needs_approval', vars: { label: inst.label, version: latest.version, name: latest.name } },
+                    actions: [{ id: 'update', label: 'Update', kind: 'api', method: 'POST', endpoint: `/v1/instances/${inst.id}/update`, body: {}, style: 'primary' }],
+                });
+                emitChange('notifications', ownerGhii);
+            }
+            return {
+                ...base, pulled: didPull, version: inst.packageVersion, latest: latest.version, result: 'needs_owner',
+                detail: `The new version can do more than the owner approved (${widened.slice(0, 6).join(', ')}${widened.length > 6 ? ', …' : ''}), so it waits for them.`,
+            };
+        }
         const out = await updateInstanceToLatest({ storage, config },
             { owner: inst.owner, ownerGhii, sub: ownerGhii, roles: ['owner'], scopes: [] }, { instanceId: inst.id });
         if (!out.ok) return { ...base, pulled: didPull, version: inst.packageVersion, latest: latest.version, result: 'error', detail: `${out.code}: ${out.message}` };

@@ -6,6 +6,8 @@
  *   check-update diff, instance details, and instance removal (optional component cleanup).
  *   Extracted from src/routes/instances.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-10-02 — GET /v1/instances/:id carries `approval`: what the install was approved to do
+ *     and by whom (services/package-approvals.ts). DELETE removes that record with the install.
  *   v1.5.0 — 2026-09-30 — DELETE with removeComponents removes a skill component only when this
  *     instance published it (services/package-skill-component.ts).
  *   v1.4.0 — 2026-09-28 — PATCH /v1/instances/:id (label, auto_update) and POST /v1/instances/check-updates
@@ -42,6 +44,7 @@ import { forkPackageInstance, setPackageInstance } from '../../services/package-
 import { refreshInstalledPackages } from '../../services/package-upstream-refresh.js';
 import type { PeerInfo } from '../../services/federation.js';
 import { listInstancesFor } from '../../services/package-read.js';
+import { approvalOf, forgetApproval } from '../../services/package-approvals.js';
 
 // ── Register instance management routes ───────────────────────────────
 
@@ -165,7 +168,10 @@ export function registerManageRoutes(
       return;
     }
 
-    res.json(success(config.nodeId, instance, [
+    // What the install was approved to do, and by whom (services/package-approvals.ts); null for an
+    // install made before approvals were recorded.
+    const approval = await approvalOf(storage, id);
+    res.json(success(config.nodeId, { ...instance, approval }, [
       { description: 'Check component status', method: 'GET', url: `/v1/instances/${id}/status` },
       { description: 'Check for updates', method: 'GET', url: `/v1/instances/${id}/check-update` },
     ]));
@@ -242,6 +248,7 @@ export function registerManageRoutes(
       res.status(500).json(error(config.nodeId, 'DELETE_FAILED', 'Failed to remove instance'));
       return;
     }
+    await forgetApproval(storage, id);
 
     emitChange('instances');
 

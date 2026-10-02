@@ -31,6 +31,8 @@
  *   const out = await installOrRequest({ storage, config, scheduler }, caller, { groupId, label });
  *   if (out.ok && out.kind === 'requested') res.status(202).json(success(nodeId, requestedBody(out)));
  * @version-history
+ *   v1.3.0 — 2026-10-02 — A request records what the package version can do (`capabilities`), so a
+ *     request about code shows the owner what they approve (package sale design, T1).
  *   v1.2.0 — 2026-09-30 — A skill component is one of the `memory_parts` the owner is asked about:
  *     it writes their skill registry, and it costs memory:write (package-memory-component.ts).
  *   v1.1.0 — 2026-09-28 — An install request keeps the `mode` and the `config` it asked for, and the
@@ -43,6 +45,7 @@ import type { Storage, PackageRecord, PackageInstanceRecord } from '../storage/i
 import type { Scheduler } from './scheduler.js';
 import { installPackage, type PackageInstallCaller, type PackageInstallInput, type PackageInstallResult } from './package-install.js';
 import { planPackageConfig } from './package-config.js';
+import { packageCapabilities } from './package-capabilities.js';
 import {
     applyInstanceMigration, updateInstanceToLatest, MIGRATION_ACTIONS,
     type MigrationRequest, type PackageMigrateInput, type PackageMigrateResult, type InstanceUpdateResult,
@@ -105,7 +108,10 @@ export function requestedBody(out: RequestedAnswer) {
         missing: r.missing,
         expires_at: r.expires_at,
         already_waiting: out.alreadyWaiting,
-        next_step: `Nothing was ${r.act === 'install' ? 'installed' : 'changed'} yet. It writes into the owner's memory, which takes ${words}, `
+        next_step: `Nothing was ${r.act === 'install' ? 'installed' : 'changed'} yet. `
+            + (r.missing.includes('packages:install-code')
+                ? `It brings code the owner has not approved, which takes ${words}, `
+                : `It writes into the owner's memory, which takes ${words}, `)
             + `and this session does not hold ${r.missing.length === 1 ? 'it' : 'them'}, so it waits for the owner: they approve or decline it from their notifications. `
             + 'An agent of theirs that holds the words may approve it with aimeat_package_install_requests. '
             + `You are told when it is decided; until then read it at GET /v1/package-install-requests/${r.id}. It expires ${r.expires_at}.`,
@@ -133,7 +139,10 @@ async function fileFrom(
     options: PackageInstallRequest['options'], memoryParts: string[],
 ): Promise<RequestedAnswer | InstallRequestFail> {
     const actions = options.actions ?? [];
+    // What the version can do, so the owner approves the same list the install records.
+    const caps = packageCapabilities(target.components, deps.config, caller.owner);
     const filed = await fileInstallRequest(deps, caller.ownerGhii, {
+        capabilities: { hash: caps.hash, items: caps.items },
         act,
         package: { group_id: target.packageGroupId, name: target.name, version: target.version, record_id: target.id, digest: packageDigest(target) },
         instance: instance ? {

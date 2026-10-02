@@ -7530,6 +7530,7 @@
   "accesspage.scope.organism.write": "luo jaettuja tiloja ja kirjoittaa niihin",
   "accesspage.scope.organism.invite": "kutsuu ihmisiä jaettuihin tiloihisi",
   "accesspage.scope.packages.write": "asentaa paketteja puolestasi",
+  "accesspage.scope.packages.install-code": "asentaa koodia sisältäviä paketteja kysymättä sinulta joka kerta",
   "dwpage.titleSub": "mitä omistat ja kuka siihen pääsee",
   "dwpage.loading": "Ladataan…",
   "dwpage.loadFailed": "Tietolompakkoa ei saatu luettua. Yritä hetken päästä uudelleen.",
@@ -8572,6 +8573,12 @@
   "notiftext.package_updates_ended.body": "{label} toimii edelleen sellaisenaan. Uudet versiot tulevat taas, kun uusit päivityspalvelun.",
   "notiftext.package_update_request.title": "{who} pyytää lupaa päivittää paketin {name}",
   "notiftext.package_update_request.body": "Uusi versio kirjoittaa merkintöjä muistiisi. {who} ei saa tehdä sitä ilman lupaasi. Kun hyväksyt, kopiosi päivitetään.",
+  "notiftext.package_install_request_code.title": "{who} pyytää lupaa asentaa paketin {name}",
+  "notiftext.package_install_request_code.body": "Paketissa on koodia: sovelluksia, laajennuksia tai ohjeita tekoälyllesi. Katso Paketit-sivulta, mitä se voi tehdä, ennen kuin hyväksyt. Kun hyväksyt, paketti asennetaan sinulle.",
+  "notiftext.package_update_request_code.title": "{who} pyytää lupaa päivittää paketin {name}",
+  "notiftext.package_update_request_code.body": "Uusi versio voi tehdä enemmän kuin hyväksyit aiemmin. Katso Paketit-sivulta, mitä se lisää, ennen kuin hyväksyt. Kun hyväksyt, kopiosi päivitetään.",
+  "notiftext.package_update_needs_approval.title": "Asennuksen {label} päivitys odottaa sinua",
+  "notiftext.package_update_needs_approval.body": "Paketin {name} versio {version} voi tehdä enemmän kuin hyväksyit aiemmin. Sitä ei asenneta, ennen kuin päivität sen itse.",
   "notiftext.package_request_approved_by_agent.title": "{by} hyväksyi pyynnön, joka koskee pakettia {name}",
   "notiftext.package_request_approved_by_agent.body": "Pyynnön teki {who}. {by} hyväksyi sen sinun nimissäsi.",
   "notiftext.package_request_declined_by_agent.title": "{by} hylkäsi pyynnön, joka koskee pakettia {name}",
@@ -15832,7 +15839,8 @@
             "admin": "Ylläpidä tätä asennusta tämän agentin kautta. Se voi esimerkiksi sulkea tilejä, poistaa jonkun kaksivaiheisen kirjautumisen ja muuttaa organisaatiokirjautumista, sallittuja alkuperiä, koukkuja ja kaikille tileille tarjottuja MCP-palvelimia. Toimii vain sille, joka pyörittää tätä asennusta; millä tahansa muulla tilillä tämä lupa ei tee mitään. \"Täydet oikeudet\" ei sisällä sitä."
           },
           "packages": {
-            "write": "Asenna puolestasi paketteja. Se ottaa käyttöön paketin sovelluksen, laajennukset ja mahdolliset ajastetut työt sinun nimissäsi."
+            "write": "Asenna puolestasi paketteja. Se ottaa käyttöön paketin sovelluksen, laajennukset ja mahdolliset ajastetut työt sinun nimissäsi.",
+            "install-code": "Asenna paketti, jossa on koodia (sovellus, laajennus, selainkirjasto tai ohjeita tekoälyllesi), kysymättä sinulta ensin. Ilman tätä oikeutta asennus odottaa hyväksyntääsi, ja näet ennen hyväksymistä, mitä paketti voi tehdä."
           },
           "compliance": {
             "read": "Lukea vaatimustenmukaisuusraportin: jokaisen tilin tekoälytoiminta täällä yhtenä asiakirjana, mukaan lukien kenen agentit julkaisivat ilman merkintää. Toimii vain sille, joka pyörittää tätä asennusta; millä tahansa muulla tilillä tämä lupa ei tee mitään. \"Täydet oikeudet\" ei sisällä sitä.",

@@ -6445,6 +6445,7 @@
   "accesspage.scope.organism.write": "crea espacios compartidos y escribe en ellos",
   "accesspage.scope.organism.invite": "invita personas a tus espacios compartidos",
   "accesspage.scope.packages.write": "instala paquetes por ti",
+  "accesspage.scope.packages.install-code": "instala paquetes con código sin preguntarte cada vez",
   "dwpage.titleSub": "qué posees y quién llega a ello",
   "dwpage.loading": "Cargando…",
   "dwpage.loadFailed": "No se pudo leer la cartera. Inténtalo de nuevo en un momento.",
@@ -7443,6 +7444,12 @@
   "notiftext.package_updates_ended.body": "{label} sigue funcionando tal como está. Las versiones nuevas vuelven cuando renuevas el servicio de actualizaciones.",
   "notiftext.package_update_request.title": "{who} pide permiso para actualizar el paquete {name}",
   "notiftext.package_update_request.body": "La nueva versión escribe entradas en tu memoria. {who} no puede hacerlo sin tu permiso. Si lo apruebas, tu copia se actualiza.",
+  "notiftext.package_install_request_code.title": "{who} pide permiso para instalar el paquete {name}",
+  "notiftext.package_install_request_code.body": "El paquete trae código: aplicaciones, extensiones o instrucciones para tu IA. Antes de aprobarlo, ábrelo en tu página de Paquetes para ver lo que puede hacer. Si lo apruebas, el paquete se instala para ti.",
+  "notiftext.package_update_request_code.title": "{who} pide permiso para actualizar el paquete {name}",
+  "notiftext.package_update_request_code.body": "La nueva versión puede hacer más de lo que aprobaste antes. Antes de aprobarla, ábrela en tu página de Paquetes para ver lo que agrega. Si la apruebas, tu copia se actualiza.",
+  "notiftext.package_update_needs_approval.title": "La actualización de {label} te espera",
+  "notiftext.package_update_needs_approval.body": "La versión {version} de {name} puede hacer más de lo que aprobaste antes. No se instala hasta que la actualices tú.",
   "notiftext.package_request_approved_by_agent.title": "{by} aprobó la solicitud sobre el paquete {name}",
   "notiftext.package_request_approved_by_agent.body": "La hizo {who} y {by} la aprobó en tu nombre.",
   "notiftext.package_request_declined_by_agent.title": "{by} rechazó la solicitud sobre el paquete {name}",
@@ -14059,7 +14066,8 @@
             "admin": "Administrar esta instalación a través de este agente. Puede, por ejemplo, desactivar cuentas, quitarle a alguien la verificación en dos pasos y cambiar el inicio de sesión de organización, los orígenes permitidos, los hooks y los servidores MCP que se ofrecen a todas las cuentas. Solo funciona para quien administra esta instalación; en cualquier otra cuenta este permiso no hace nada. \"Acceso total\" no lo incluye."
           },
           "packages": {
-            "write": "Instalar paquetes por ti. Eso pone en marcha la aplicación del paquete, sus extensiones y las tareas programadas que traiga, a tu nombre."
+            "write": "Instalar paquetes por ti. Eso pone en marcha la aplicación del paquete, sus extensiones y las tareas programadas que traiga, a tu nombre.",
+            "install-code": "Instalar un paquete que trae código (una aplicación, una extensión, una biblioteca del navegador o instrucciones para tu IA) sin preguntarte antes. Sin este permiso, esa instalación espera tu aprobación, y ves lo que el paquete puede hacer antes de decir que sí."
           },
           "compliance": {
             "read": "Leer el informe de cumplimiento: la actividad de IA de todas las cuentas aquí, en un solo documento, incluyendo qué agentes publicaron sin etiqueta. Solo funciona para quien administra esta instalación; en cualquier otra cuenta este permiso no hace nada. \"Acceso total\" no lo incluye.",

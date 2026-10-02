@@ -12,6 +12,8 @@
  * @structure packagesTools[] -- catalog entries, folded into definitions.ts
  * @usage import { packagesTools } from './packages.js';
  * @version-history
+ *   v1.11.0 -- 2026-10-02 -- aimeat_package_install names packages:install-code, and the dry run's
+ *     `capabilities` and `source` (package sale design, phase 2).
  *   v1.10.0 -- 2026-09-30 -- aimeat_package_compose: `include_skills`, the composer's own skills bound to the apps.
  *   v1.9.0 -- 2026-09-29 -- aimeat_package_sellers: the nodes that sell your packages with no token.
  *   v1.9.0 -- 2026-10-01 -- aimeat_package_config_needs answers anyone for a public package;
@@ -171,7 +173,7 @@ export const packagesTools: AimeatToolDefinition[] = [
         // reaches for by name ("install the company brain"), and until 2026-08-23 it existed on the
         // HTTP route alone, so an agent could list a package and not install it.
         name: 'aimeat_package_install',
-        description: 'Install a component package as your own copy. Each component is registered under your identity. With mode "editable" (the default) what you get is yours to edit; with mode "managed" the package owns the code and layout, an update replaces them, and you change only the settings (name, description, access code, parking, search visibility, legal texts) until you fork the install. A package that seeds memory records writes them into your owner\'s memory, which takes the memory:write and memory:write-as-owner permissions; without them the install becomes a request your owner approves (status awaiting_owner, with a request_id), and nothing is installed until then.',
+        description: 'Install a component package as your own copy. Each component is registered under your identity. With mode "editable" (the default) what you get is yours to edit; with mode "managed" the package owns the code and layout, an update replaces them, and you change only the settings (name, description, access code, parking, search visibility, legal texts) until you fork the install. A package that seeds memory records writes them into your owner\'s memory, which takes the memory:write and memory:write-as-owner permissions; without them the install becomes a request your owner approves (status awaiting_owner, with a request_id), and nothing is installed until then. A package that carries code (an app, an extension, a cortex, a skill) takes packages:install-code in the same way. Run dry_run first: it answers `capabilities` (what each part will be able to do) and `source` (who made it and where it came from), which is what you tell your owner before they approve.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {

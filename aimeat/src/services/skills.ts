@@ -32,6 +32,7 @@
  * @usage
  *   import { publishSkill, resolveSkillRef, listSkillLibrary } from '../services/skills.js';
  * @version-history
+ *   v1.6.0 -- 2026-10-02 -- `fromPackage` may carry the package's `author` and `originNode`.
  *   v1.5.0 -- 2026-09-30 -- `fromPackage` on the manifest and the summary: the package install that
  *     published a user skill (package-skill-component.ts). A republish without it keeps the tag.
  *   v1.4.0 -- 2026-09-29 -- TARGET-082 V4: every user and workspace record a list or a resolve returns
@@ -75,7 +76,12 @@ interface SkillVersionSnapshot {
 }
 
 /** Which package install published a skill: the package group and the installed copy. */
-export interface SkillPackageTag { groupId: string; instanceId: string }
+/**
+ * The package install that published a skill. `author` and `originNode` say who wrote the package and
+ * which node it came from (package sale design, T5): the skill is instructions the owner's AI follows,
+ * and its reader is told whose. Absent on a skill a package installed before 2026-10-02.
+ */
+export interface SkillPackageTag { groupId: string; instanceId: string; author?: string; originNode?: string }
 
 
 // ── Stored shapes ──

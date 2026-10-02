@@ -33,6 +33,9 @@
  *   const filed = await fileInstallRequest({ storage, config }, ownerGhii, draft);
  *   await settleInstallRequest({ storage, config }, ownerGhii, request, 'declined', { by: decider });
  * @version-history
+ *   v1.2.0 — 2026-10-02 — A request carries `capabilities` (what the package version can do). A request
+ *     about code (packages:install-code missing) says so on the open item and in the notification
+ *     (notiftext.package_install_request_code, package_update_request_code).
  *   v1.1.0 — 2026-09-28 — `options.mode` and `options.config`: a request carries the install's mode and
  *     its config, and its summary shows both.
  *   v1.0.1 — 2026-09-26 — The key builder is installRequestKey: check:trusted-keys resolves a builder by
@@ -52,6 +55,7 @@ import { serialByKey } from '../utils/serial-by-key.js';
 import { localAccountName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { INSTALL_REQUEST_DAYS, requestExpired } from './package-install-request-policy.js';
+import { INSTALL_CODE_SCOPE } from './package-approvals.js';
 
 /** Where one request lives. The prefix is listable, so the owner's list finds them all. */
 export const INSTALL_REQUEST_PREFIX = 'packages.install-requests.';
@@ -97,6 +101,11 @@ export interface PackageInstallRequest {
     options: { label?: string; actions?: MigrationRequest[]; mode?: 'managed' | 'editable'; config?: Record<string, unknown> };
     /** The components that write into the owner's memory: what the owner is asked about. */
     memory_parts: string[];
+    /**
+     * What the package version will be able to do (package-capabilities.ts): its items and their hash.
+     * The owner approves this when the request is about code (packages:install-code missing).
+     */
+    capabilities?: { hash: string; items: string[] };
     requested_by: InstallRequester;
     /** The words the requester lacked. */
     missing: string[];
@@ -172,6 +181,7 @@ export function summarizeRequest(request: PackageInstallRequest, now = Date.now(
         config: request.options.config ?? null,
         actions: request.options.actions?.map(a => ({ componentId: a.componentId, action: a.action, has_content: typeof a.content === 'string' })) ?? null,
         memory_parts: request.memory_parts,
+        ...(request.capabilities ? { capabilities: request.capabilities } : {}),
         requested_by: {
             principal: request.requested_by.principal, kind: request.requested_by.kind,
             ...(request.requested_by.app ? { app: request.requested_by.app } : {}),
@@ -233,7 +243,7 @@ function outcomeSentence(request: PackageInstallRequest, state: InstallRequestSt
 
 /** The draft a door hands over: everything but the bookkeeping. */
 export type InstallRequestDraft = Pick<PackageInstallRequest,
-    'act' | 'package' | 'instance' | 'options' | 'memory_parts' | 'requested_by' | 'missing'>;
+    'act' | 'package' | 'instance' | 'options' | 'memory_parts' | 'requested_by' | 'missing' | 'capabilities'>;
 
 /**
  * Put a request in front of the owner. CREATES NOTHING of the package. Returns the standing request
@@ -277,8 +287,13 @@ export async function fileInstallRequest(
             fingerprint,
         };
         const who = requesterName(draft.requested_by);
+        // About code when the word missing is packages:install-code: the owner then approves what the
+        // package can do, which the request carries in `capabilities`.
+        const code = draft.missing.includes(INSTALL_CODE_SCOPE);
         const item = await addItem(storage, ownerGhii, {
-            title: `${who} asks to ${verb(draft.act)} ${draft.package.name}, which writes entries into your memory`.slice(0, 200),
+            title: (code
+                ? `${who} asks to ${verb(draft.act)} ${draft.package.name}, which brings code`
+                : `${who} asks to ${verb(draft.act)} ${draft.package.name}, which writes entries into your memory`).slice(0, 200),
             kind: 'decision',
             origin: draft.requested_by.principal,
             object: { type: 'package-install-request', id: request.id },
@@ -290,14 +305,18 @@ export async function fileInstallRequest(
         // The owner's one tap. `api` actions run with the clicker's session, and the door re-checks
         // everything, so a stale tap answers 409 or 410 rather than acting.
         const door = `/v1/package-install-requests/${request.id}/decision`;
-        const i18nKey = draft.act === 'install' ? 'package_install_request' : 'package_update_request';
+        const i18nKey = `${draft.act === 'install' ? 'package_install_request' : 'package_update_request'}${code ? '_code' : ''}`;
         // The English here is the fallback and what a push carries; the page says it from the i18n key.
         await notify(storage, ownerGhii, {
             type: 'package_install_request',
             title: `${who} asks to ${verb(draft.act)} the package ${draft.package.name}`,
-            body: draft.act === 'install'
-                ? `The package writes entries into your memory, and ${who} may not do that on its own. If you approve, it is installed as yours.`
-                : `The new version writes entries into your memory, and ${who} may not do that on its own. If you approve, your copy is updated.`,
+            body: code
+                ? (draft.act === 'install'
+                    ? 'The package brings code: apps, extensions or instructions for your AI. Open it on your Packages page to see what it can do before you approve. If you approve, it is installed as yours.'
+                    : 'The new version can do more than you approved before. Open it on your Packages page to see what it adds before you approve. If you approve, your copy is updated.')
+                : draft.act === 'install'
+                    ? `The package writes entries into your memory, and ${who} may not do that on its own. If you approve, it is installed as yours.`
+                    : `The new version writes entries into your memory, and ${who} may not do that on its own. If you approve, your copy is updated.`,
             link: '/v1/profile#packages',
             i18n: { key: i18nKey, vars: { who, name: draft.package.name } },
             actions: [

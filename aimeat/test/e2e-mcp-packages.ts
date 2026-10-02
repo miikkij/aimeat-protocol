@@ -20,6 +20,9 @@
  *   that builds the wrong body cannot be hidden by an install that never needed it.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-packages
  * @version-history
+ *   v1.1.0 — 2026-10-02 — The package carries an app, so the installing agent holds packages:install-code,
+ *     and 6b proves an agent without it gets a request (package sale design, T1). Cases 7 and 8 went red
+ *     because their setup no longer matched the rule, not because the source broke.
  *   v1.0.0 — 2026-08-23 — Initial: install on the node MCP, publish + install on the CLI dispatch,
  *     and the scope fence on both.
  */
@@ -205,7 +208,10 @@ console.log('═══ E2E: package tools on the MCP surfaces ═══');
 console.log(`Base: ${BASE}`);
 
 const owner = await makeOwner('pkgmcp');
-const agentToken = await makeAgent(owner, ['packages:write', 'app:write', 'memory:read']);
+// The package carries an app, which is code: an agent installs it on its own only with
+// packages:install-code (package sale design, T1). One agent holds it, one does not.
+const agentToken = await makeAgent(owner, ['packages:write', 'packages:install-code', 'app:write', 'memory:read']);
+const askingToken = await makeAgent(owner, ['packages:write', 'app:write', 'memory:read']);
 const narrowToken = await makeAgent(owner, ['memory:read']);
 
 const PKG_NAME = `e2e-mcp-pkg-${Date.now().toString(36).slice(-6)}`;
@@ -275,6 +281,15 @@ await test('6. a dry run reports what would be registered and registers nothing'
 });
 
 let instanceId = '';
+
+await test('6b. an agent without packages:install-code gets a request for the owner, not an install', async () => {
+    const out = toolJson(await mcpRpc(await openSession(askingToken), 'tools/call', {
+        name: 'aimeat_package_install',
+        arguments: { group_id: groupId, label: 'Asked for' },
+    }));
+    assert(out.status === 'awaiting_owner' && (out.missing ?? []).includes('packages:install-code'),
+        `expected a request naming packages:install-code, got ${JSON.stringify(out).slice(0, 300)}`);
+});
 
 await test('7. installing gives the owner their own copy, with the addresses it registered', async () => {
     const out = toolJson(await mcpRpc(session, 'tools/call', {

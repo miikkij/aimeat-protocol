@@ -22,6 +22,8 @@
  *   v1.5.0 — 2026-09-26 — Phase 6: a page of the node asks by name (`?app=`), as the App Catalog's
  *     preview now does on every node: the owner's own app gets a grant scoped to it, another
  *     person's app nothing, an app origin is refused, and the app's own path is a bound redirect.
+ *   v1.6.0 — 2026-10-02 — Phase 6: an app a package installed for the owner asks for consent instead of
+ *     approving itself (package sale design, T2).
  *   v1.2.0 — 2026-08-11 — The subdomain-serve check addresses a real Host in the app family
  *     (helpers/host-request.ts). `x-app-origin` on its own stopped being an app origin when
  *     subdomain.ts v1.5.0 began requiring the Host to belong to the family it claims.
@@ -540,6 +542,23 @@ async function main() {
             assert(r.ok === true && r.own === true && r.app === `${a}/app-a.html`, `expected the app's grant, got ${JSON.stringify(r)}`);
             const claims = JSON.parse(Buffer.from(r.access_token!.split('.')[1], 'base64url').toString('utf8'));
             assert(JSON.stringify(claims.roles) === '["app"]', `an app grant, not the session, got ${JSON.stringify(claims.roles)}`);
+        });
+        await test('an app a package installed for the owner is not their own: it asks for consent (package sale design, T2)', async () => {
+            const pkg = await json('/v1/packages', {
+                method: 'POST', headers: { Authorization: `Bearer ${A.token}` },
+                body: JSON.stringify({
+                    name: 'silentpkg', description: 'A package with an app', category: 'utility', visibility: 'private',
+                    components: [{ id: 'pkg-app.html', type: 'app', label: 'Packaged', dependencies: [], content: '<!DOCTYPE html><html><head><title>P</title></head><body><h1>P</h1></body></html>' }],
+                }),
+            });
+            assert(pkg.status === 201, `publish package: ${pkg.status} ${JSON.stringify(pkg.body)}`);
+            const inst = await json(`/v1/packages/${encodeURIComponent(pkg.body.data.packageGroupId)}/install`, {
+                method: 'POST', headers: { Authorization: `Bearer ${A.token}` }, body: JSON.stringify({ label: 'silent' }),
+            });
+            assert(inst.status === 201, `install: ${inst.status} ${JSON.stringify(inst.body)}`);
+            const filename = (inst.body.data.installedComponents as any[]).find(c => c.type === 'app').registeredAs;
+            const r = await byName(`${a}/${filename}`, A.rt);
+            assert(r.ok === false && r.error === 'consent_required' && !r.access_token, `expected consent_required, got ${JSON.stringify(r)}`);
         });
         await test('another person\'s app gets nothing until they agree', async () => {
             const r = await byName(`${bn}/app-b.html`, A.rt);
