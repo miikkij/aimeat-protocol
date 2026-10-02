@@ -119,6 +119,7 @@ everywhere at once, and say so in the Changes section.
 | an AI model server on the node's own machine | LM Studio, Ollama or llama.cpp on the machine the node runs on; the data does not leave it | local AI server | paikallinen tekoälypalvelin | servidor de IA local |
 | cleaning what leaves for a decision | e-mails, phones, identity codes, account numbers, street addresses and names are taken out before anything is sent, and put back into the answer | remove personal data | henkilötietojen poisto / poistaa henkilötiedot | eliminar los datos personales |
 | permission a person grants | revocable, per agent, per area | permission | oikeus | permiso |
+| the design spec of an app | the one document beside an app that says what it is for, its screens, where its data lives, what was decided and what is open; read and written by the owner and everybody holding a development right, never shown outside the build; kept in English in Finnish, as *roadmap* is | design spec | design spec | especificación de diseño |
 | sign-in from elsewhere | another AIMEAT vouching that a sign-in is really them | federation | federaatio | federación |
 | the account holder | the human who owns everything here | owner | omistaja | propietario |
 | this product's settings area | where a person changes their own things | Settings & Controls | Asetukset ja hallinta | Configuración y controles |
