@@ -36,7 +36,9 @@
  *   cd aimeat && pnpm cold-agent --model sonnet --runs 3 --max-total-usd 15
  *   cd aimeat && pnpm cold-agent --tasks remember,build-app --arm arms/calm-build-app.json
  *   cd aimeat && pnpm cold-agent --compare .cold-agent/<a> .cold-agent/<b>
+ *   cd aimeat && pnpm cold-agent --tasks propose-agent --runs 1 --keep   # leave the proposal to approve
  * @version-history
+ *   v1.1.0 — 2026-10-02 — `--keep`: a task's verify leaves what the run made on the sandbox.
  *   v1.0.0 — 2026-09-18 — Initial (wish-kylm-agentti-ja-oikea-teht-v-mittaus-...).
  */
 import { spawn } from 'node:child_process';
@@ -71,6 +73,8 @@ interface Args {
     /** The ceiling for ONE session. The CLI stops the session when it is reached. */
     maxBudgetUsd: number;
     maxTotalUsd: number;
+    /** `--keep`: a task's verify leaves what the run made on the sandbox. */
+    keep: boolean;
     /** The `claude` program. A path when it is not on PATH, as with the VS Code extension's copy. */
     claudeCmd: string;
     compare: [string, string] | null;
@@ -95,6 +99,9 @@ function parseArgs(argv: string[]): Args {
         maxBudgetUsd: Number(get('max-budget-usd') ?? (suite === 'skills' ? 0.5 : 1.5)),
         claudeCmd: get('claude-cmd') ?? process.env.AIMEAT_CLAUDE_CMD ?? 'claude',
         maxTotalUsd: Number(get('max-total-usd') ?? 10),
+        // Leave what a run made on the sandbox (a task's verify skips its clean-up), to carry on
+        // from it by hand: approve the proposal a propose-agent run wrote, and watch the agent run.
+        keep: argv.includes('--keep'),
         compare: ci >= 0 ? [argv[ci + 1], argv[ci + 2]] : null,
     };
 }
@@ -207,7 +214,7 @@ async function runOne(task: Task, run: number, s: Sandbox, args: Args, outDir: s
     writeFileSync(join(outDir, `${fileId}.${run}.jsonl`), raw);
 
     const metrics: RunMetrics = parseTranscript(raw);
-    const ctx: TaskContext = { ...base, metrics };
+    const ctx: TaskContext = { ...base, metrics, keep: args.keep };
     const verdict = await task.verify(ctx);
     const wandered = metrics.distinctTools.filter(t => t !== 'ToolSearch' && !task.goodTools.includes(t));
     return { task: task.id, run, marker, ok: verdict.ok, detail: verdict.detail, ...(verdict.note ? { note: verdict.note } : {}), wandered, metrics: { ...metrics, toolCalls: metrics.toolCalls.map(c => ({ ...c, input: undefined })) } };
