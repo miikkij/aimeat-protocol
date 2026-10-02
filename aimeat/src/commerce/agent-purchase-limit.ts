@@ -25,11 +25,13 @@
  *   agentPurchaseRefusal · recordAgentPurchase
  * @usage const refusal = await agentPurchaseRefusal(storage, config, session, caller); if (refusal) throw refusal;
  * @version-history
+ *   v1.1.0 — 2026-10-02 — A hold for a bid counts too (commerce/hold-book.ts createHold): it is refused past
+ *     the limit like a purchase, and its amount counts toward today when it is authorized. A release
+ *     does not give the amount back the same day: the limit guards what the agent committed to.
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import type { CheckoutSessionRecord } from './types.js';
 import { CommerceError } from './errors.js';
 import { isMoneyCurrency } from './money.js';
 
@@ -38,6 +40,8 @@ export const SPEND_KEY = 'commerce.agent-spend';
 
 /** agent GAII → currency → micro-units per day. */
 export type PurchaseLimits = Record<string, Record<string, number>>;
+/** What the limit is asked about: a checkout session, or a hold for a bid (kind 'hold'). Amounts in micro-units. */
+export interface Spend { buyerGhii: string; currency: string; total: number; kind?: 'purchase' | 'hold' }
 interface SpendRecord { day: string; spent: Record<string, Record<string, number>> }
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -84,7 +88,7 @@ const cardUrl = (config: AimeatConfig, gaii: string) =>
 
 /** Null when the purchase may go ahead; otherwise the refusal to throw, before anything is collected. */
 export async function agentPurchaseRefusal(
-  storage: Storage, config: AimeatConfig, session: CheckoutSessionRecord,
+  storage: Storage, config: AimeatConfig, session: Spend,
   caller: { sub?: string; roles: string[] } | null | undefined,
 ): Promise<CommerceError | null> {
   const gaii = agentOf(caller);
@@ -97,14 +101,14 @@ export async function agentPurchaseRefusal(
   const spent = (await spentToday(storage, session.buyerGhii))[gaii]?.[session.currency] ?? 0;
   if (spent + session.total > limit) {
     return new CommerceError('PURCHASE_LIMIT_REACHED', 403,
-      `This purchase would take the agent past its daily limit in ${session.currency} (spent today ${spent / 1e6}, this purchase ${session.total / 1e6}, limit ${limit / 1e6}). The owner can change the limit on the agent's card: ${cardUrl(config, gaii)}`);
+      `This ${session.kind === 'hold' ? 'hold' : 'purchase'} would take the agent past its daily limit in ${session.currency} (spent today ${spent / 1e6}, this ${session.kind === 'hold' ? 'hold' : 'purchase'} ${session.total / 1e6}, limit ${limit / 1e6}). The owner can change the limit on the agent's card: ${cardUrl(config, gaii)}`);
   }
   return null;
 }
 
-/** Add a completed purchase to today's spending. Called only after the collect succeeded. */
+/** Add a completed purchase, or an authorized hold, to today's spending. Called only after the money moved or was authorized. */
 export async function recordAgentPurchase(
-  storage: Storage, session: CheckoutSessionRecord, caller: { sub?: string; roles: string[] } | null | undefined,
+  storage: Storage, session: Spend, caller: { sub?: string; roles: string[] } | null | undefined,
 ): Promise<void> {
   const gaii = agentOf(caller);
   if (!gaii || !isMoneyCurrency(session.currency) || session.total <= 0) return;

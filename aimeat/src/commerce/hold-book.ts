@@ -14,6 +14,8 @@
  * @structure HoldRecord · createHold · getHold · listHolds · captureHold · releaseHold
  * @usage import { createHold, captureHold, releaseHold } from '../commerce/hold-book.js';
  * @version-history
+ *   v1.1.0 — 2026-10-02 — An agent's hold is held to the daily purchase limit its owner set on its card:
+ *     refused past it before the rail authorizes, and counted toward today once authorized.
  *   v1.0.0 — 2026-08-06 — Initial hold book (TINKI phase 1)
  */
 import { randomUUID } from 'node:crypto';
@@ -26,6 +28,7 @@ import { isMoneyCurrency } from './money.js';
 import { STRIPE_HANDLER_ID } from './stripe-handler.js';
 import { TEST_MONEY_HANDLER_ID } from './test-money-handler.js';
 import { logger } from '../utils/logger.js';
+import { agentPurchaseRefusal, recordAgentPurchase } from './agent-purchase-limit.js';
 
 /** Holds expire safely inside Stripe's ~7-day uncaptured-card-intent window. */
 const HOLD_TTL_MS = 6 * 24 * 60 * 60 * 1000;
@@ -113,6 +116,13 @@ export async function createHold(storage: Storage, config: AimeatConfig, args: {
     throw new CommerceError('SELF_HOLD', 422, 'A hold toward yourself has no meaning');
   }
   const handler = holdHandler(config, args.currency, args.handlerId);
+  // An agent's hold is money it commits in the owner's name, so the daily purchase limit the owner set
+  // on its card applies here as it does to a checkout (commerce/agent-purchase-limit.ts). Refused
+  // before the rail is asked to authorize anything.
+  const spend = { buyerGhii, currency: args.currency, total: args.amount, kind: 'hold' as const };
+  const holder = { sub: args.buyerIdentity, roles: args.buyerIdentity.includes('#') ? ['agent'] : ['owner'] };
+  const limitRefusal = await agentPurchaseRefusal(storage, config, spend, holder);
+  if (limitRefusal) throw limitRefusal;
   const ctx: PaymentContext = { config, storage };
   const id = `hold-${randomUUID()}`;
   const seller = await sellerFor(storage, { sellerGhii, sellerOwner: args.sellerOwner });
@@ -131,6 +141,7 @@ export async function createHold(storage: Storage, config: AimeatConfig, args: {
     expiresAt: new Date(Date.now() + HOLD_TTL_MS).toISOString(),
   };
   await saveHold(storage, hold);
+  await recordAgentPurchase(storage, spend, holder);
   return hold;
 }
 
