@@ -139,6 +139,7 @@ and its shape. Symptom first in the section too, then cause, then the rule.
 | 104 | A ratchet check refuses a count you lowered, right after a rebase that said it succeeded | 1 |
 | 105 | A suite's own node gets EADDRINUSE on a number no file names, Postgres sweep only | 5 |
 | 106 | Stop is pressed and the agent keeps working; the cancel test is green | 5 |
+| 107 | An app's record read beside it comes back empty, though the app has one | 1 |
 
 ---
 
@@ -1200,3 +1201,12 @@ Two SESSIONS in one checkout is forbidden now (`CLAUDE.md`), so the case below i
 - **The case.** `GooseAcpClient.cancel()` sent `session/cancel` as a JSON-RPC request, with an id. In ACP it is a notification, and goose 1.50.0 refuses the request form with "Method not found". The test peer (`test/helpers/fake-goose-acp.ts`) answered the request form with `{}` and cancelled the turn, so `e2e-chat-agent` passed from 2026-09-08 while no Stop had ever reached real goose. Found 2026-10-02 when the chat's turn ceiling cancelled a real turn and nothing stopped.
 - **The rule.** A fake peer refuses what the real one refuses, with the real one's error. Before a fake answers a method, check that method's message type in the protocol (request or notification) and what the real peer does with the other form. A test that asserts a call was SENT proves nothing; assert what the peer DID with it (the cancel test now asserts the stalled turn ended as cancelled).
 - **The tell.** A warning in the node log about a call the green suite exercises. Run the flow once against the real peer (`aimeat/scripts/chat-turn-measure.ts` for the chat) and read the log.
+
+## 107. An app's tool list and its data map are keyed by two different names
+
+*Symptoms: a read of a record that sits beside an app (`apps.<x>.datamap`, `apps.<x>.tools`) returns nothing for an app that has one; the code path goes on without it, and nothing logs or fails.*
+
+- **The case.** On 2026-10-02 (`973ecc8e9`) package compose learned to put an app's data map and its tool list into the package. Its first data-map read used `appDataMapKey(filename)`, the same name the tool-list read beside it used, so it asked for `apps.notes.html.datamap`. The map store writes the map under the app id without the extension (`appIdOf` in `services/data-map/data-map-access.ts`), as `apps.notes.datamap`. The read missed, and compose would have shipped every package without its map while the installer (`component-registrar` v1.6.0, 2026-09-14) waited for one. The tool list is the other way round: `services/app-tools-key.ts` puts it under the filename WITH `.html`, as `apps.notes.html.tools`, and moved the old bare-id manifests there on 2026-09-27. Caught only because the new compose case failed first.
+- **Why it hides.** Both key builders take one string called `appId`, and each is correct for its own store. A missing record is a real answer in both places (`readAppDataMap` returns null for "no map"), so a wrong key looks the same as an app without a record, and nothing logs or fails. Only a test that starts from an app which HAS the record can tell the two apart.
+- **The rule.** Read a record beside an app through its own store's reader, with the name that store's writer uses: `readAppDataMap(storage, owner, filename.replace(/\.html$/i, ''))` for the data map, `appToolsKey(filename)` for the tool list. Never build one of these keys from whatever name is in scope. A test for a code path that reads one of them starts from an app that has the record, and asserts the record arrived.
+- **The tell.** A filename ending in `.html` passed to `appDataMapKey`, a bare id passed to `appToolsKey`, or a new `` `apps.${…}.` `` key in a code path that does not import its store's reader.
