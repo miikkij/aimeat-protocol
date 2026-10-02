@@ -91,6 +91,7 @@ const home = resolve(process.cwd(), `test/.tmp-enrol-loopback-${stamp}`);
 const ownerName = `enrolloop${stamp}`;
 const firstAgent = 'loop-first';
 let ownerToken = '';
+let agentToken = '';
 let daemon: ChildProcess | null = null;
 let daemonOut = '';
 let daemonBase = '';
@@ -121,7 +122,7 @@ await test('setup: an owner, one agent connected the way the sale connects one, 
     body: JSON.stringify({ name: firstAgent, owner: ownerName, capabilities: ['memory', 'actions'], scopes: ['*'] }),
   });
   assert(ag.status === 201, `agent ${ag.status}: ${JSON.stringify(ag.body)}`);
-  const agentToken = await tokenFor(ag.body.data.agent.gaii, ag.body.data.private_key, true);
+  agentToken = await tokenFor(ag.body.data.agent.gaii, ag.body.data.private_key, true);
 
   mkdirSync(join(home, 'tokens'), { recursive: true });
   mkdirSync(join(home, 'agents', firstAgent), { recursive: true });
@@ -147,6 +148,15 @@ await test('setup: an owner, one agent connected the way the sale connects one, 
   daemonSecret = disc.secret;
   const row = await waitOnline(`${firstAgent}#${ownerName}@${NODE_ID}`);
   assert(row?.tunnel_status === 'online', `the first agent should be online, got ${JSON.stringify(row)}\n--- daemon output ---\n${daemonOut}`);
+});
+
+await test('the connected agent, acting in the owner\'s name, cannot press the button itself', async () => {
+  // The fence stays where it was: the enrolment path is the owner's, whichever address the
+  // connector uses. Pressed by the agent whose socket would carry the offer, it is refused.
+  const r = await json(BASE, '/v1/agents/v2/basic-agents', { method: 'POST', headers: { Authorization: `Bearer ${agentToken}` } });
+  assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  const list = await json(BASE, `/v1/agents?owner=${ownerName}`, { headers: authOwner() });
+  assert((list.body.data.agents as any[]).length === 1, 'a refused press creates nothing');
 });
 
 let basicNames: string[] = [];
