@@ -224,9 +224,63 @@
         var res = await h.authFetch(orgPath(orgId) + "/invitations/email", post(body));
         if (!res || res.ok === false) throw h.fail(res, "Failed to send the invitation");
         return res.data !== void 0 ? res.data : res;
+      },
+      /**
+       * The organism's open email invitations: GET /v1/organisms/:id/invitations/email. Organism owner
+       * or admin only, and the organism:invite scope on an app session; anyone else gets the node's
+       * refusal (ACCESS_DENIED). The route also lists the provisioned-code invitations, which are left
+       * out here: a code invitation carries an account and is cancelled through its own route.
+       * `ws` (one workspace id or a list) keeps the invitations that name at least one of them.
+       * @param {string} orgId
+       * @param {{ ws?: string|string[] }} [opts]
+       * @returns {Promise<EmailInvitation[]>}
+       */
+      async invitations(orgId, opts) {
+        opts = opts || {};
+        var res = await h.authFetch(orgPath(orgId) + "/invitations/email");
+        if (!res || res.ok === false) throw h.fail(res, "Failed to list the invitations");
+        var d = res.data !== void 0 ? res.data : res;
+        var only = opts.ws == null ? null : (Array.isArray(opts.ws) ? opts.ws : [opts.ws]).filter(Boolean);
+        return (d && d.invitations || []).filter(function(i) {
+          return i && i.id && (!i.type || i.type === "link") && (!i.status || i.status === "pending");
+        }).map(invitationRow).filter(function(i) {
+          return !only || i.workspaces.some(function(w) {
+            return only.indexOf(w.ws) >= 0;
+          });
+        });
+      },
+      /**
+       * Cancel an open email invitation, so its link no longer works: POST
+       * /v1/organisms/:id/invitations/email/:invId/cancel. Organism owner or admin only. An invitation
+       * already accepted or cancelled is refused by the node (INVALID_STATE).
+       * @param {string} orgId
+       * @param {string} invId
+       * @returns {Promise<{ status: 'cancelled' }>}
+       */
+      async cancelInvitation(orgId, invId) {
+        var res = await h.authFetch(orgPath(orgId) + "/invitations/email/" + encodeURIComponent(invId) + "/cancel", post({}));
+        if (!res || res.ok === false) throw h.fail(res, "Failed to cancel the invitation");
+        return res.data !== void 0 ? res.data : res;
       }
     };
     return api;
+  }
+  function invitationRow(i) {
+    return {
+      id: i.id,
+      email: i.email || "",
+      orgRole: i.org_role === "admin" ? "admin" : "member",
+      workspaces: (Array.isArray(i.workspaces) ? i.workspaces : []).filter(function(w) {
+        return w && w.ws;
+      }).map(function(w) {
+        return { ws: w.ws, role: w.role === "contributor" ? "contributor" : "viewer" };
+      }),
+      status: i.status || "pending",
+      invitedBy: i.invited_by || null,
+      message: i.message || null,
+      createdAt: i.created_at || void 0,
+      expiresAt: i.expires_at || void 0
+    };
   }
 
   // src/static/sdk-libs/organism/first-run.js
@@ -248,6 +302,20 @@
   function asChoice(v) {
     return v && typeof v === "object" && typeof v.orgId === "string" && v.orgId && typeof v.wsId === "string" && v.wsId ? { orgId: v.orgId, wsId: v.wsId } : null;
   }
+  function isPrivate(v) {
+    return !!v && typeof v === "object" && v.private === true && !asChoice(v);
+  }
+  function listOf(v) {
+    var raw = v && typeof v === "object" && Array.isArray(v.list) ? v.list : [v];
+    var out = [];
+    raw.forEach(function(x) {
+      var c = asChoice(x);
+      if (c && !out.some(function(o) {
+        return o.orgId === c.orgId && o.wsId === c.wsId;
+      })) out.push(c);
+    });
+    return out;
+  }
   function firstRun(h, organism2) {
     function myAccounts() {
       var s = h.getSession();
@@ -258,6 +326,43 @@
       if (at >= 0 && ghii && ghii.slice(ghii.indexOf("@")) === owner.slice(at)) out.push(owner.slice(0, at));
       if (at < 0 && ghii) out.push(ghii);
       return out.filter(Boolean);
+    }
+    async function store(appKey, value) {
+      var key = choiceKey(appKey);
+      var lib = dataLib();
+      if (lib) {
+        await lib.set(key, value, { visibility: "owner" });
+        return;
+      }
+      var res = await h.authFetch("/v1/memory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, value, visibility: "owner" })
+      });
+      if (!res || res.ok === false) throw h.fail(res, "Failed to save the workspace choice");
+    }
+    async function stored(appKey) {
+      var key = choiceKey(appKey);
+      var lib = dataLib();
+      if (lib) return lib.get(key);
+      var res = await h.authFetch("/v1/memory/" + encodeURIComponent(key) + "?soft=1");
+      if (!res || res.ok === false) throw h.fail(res, "Failed to read the workspace choice");
+      var d = dataOf(res);
+      return d ? d.value : null;
+    }
+    async function readableIn(orgId) {
+      var listed = await h.authFetch(orgPath2(orgId) + "/workspaces");
+      if (!listed || listed.ok === false) {
+        var code = listed && listed.error && listed.error.code;
+        if (code === "ACCESS_DENIED" || code === "NOT_FOUND") return null;
+        throw h.fail(listed, "Failed to list workspaces");
+      }
+      var lw = dataOf(listed);
+      var ids = /* @__PURE__ */ new Set();
+      (lw && lw.workspaces || []).forEach(function(w) {
+        if (w && w.id && !w.archived && w.access !== "none") ids.add(w.id);
+      });
+      return ids;
     }
     async function listWorkspaces(orgId) {
       var res = await h.authFetch(orgPath2(orgId) + "/workspaces");
@@ -362,27 +467,18 @@
       },
       /**
        * Keep the app's workspace choice in the owner's memory under `<appKey>.workspace`, as
-       * { orgId, wsId } with visibility 'owner' (the owner and their own agents read it). Writes
-       * through AIMEAT.data.set when aimeat-data is loaded, else POST /v1/memory.
+       * { orgId, wsId } with visibility 'owner' (the owner and their own agents read it). `{ private:
+       * true }` keeps the choice of no shared workspace instead. Writes through AIMEAT.data.set when
+       * aimeat-data is loaded, else POST /v1/memory.
        * @param {string} appKey  The app's key prefix, e.g. 'cadence'.
-       * @param {WorkspaceChoice} choice
-       * @returns {Promise<WorkspaceChoice>}
+       * @param {WorkspaceChoice | { private: true }} choice
+       * @returns {Promise<WorkspaceChoice | { private: true }>}
        */
       async remember(appKey, choice) {
-        var key = choiceKey(appKey);
-        var value = asChoice(choice);
-        if (!value) throw new Error("remember needs { orgId, wsId }");
-        var lib = dataLib();
-        if (lib) {
-          await lib.set(key, value, { visibility: "owner" });
-          return value;
-        }
-        var res = await h.authFetch("/v1/memory", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ key, value, visibility: "owner" })
-        });
-        if (!res || res.ok === false) throw h.fail(res, "Failed to save the workspace choice");
+        choiceKey(appKey);
+        var value = asChoice(choice) || (isPrivate(choice) ? { private: true } : null);
+        if (!value) throw new Error("remember needs { orgId, wsId } or { private: true }");
+        await store(appKey, value);
         return value;
       },
       /**
@@ -390,36 +486,77 @@
        * else GET /v1/memory/<key>?soft=1. With `{ verify: true }` it also lists the organism's
        * workspaces and answers null when the workspace is gone, archived or no longer readable, or the
        * node answers ACCESS_DENIED or NOT_FOUND for the organism; any other refusal is thrown.
+       * A kept private choice answers null, or `{ private: true }` when `{ private: true }` is passed.
+       * A list kept by rememberList() answers its current workspace.
        * @param {string} appKey
-       * @param {{ verify?: boolean }} [opts]
-       * @returns {Promise<WorkspaceChoice | null>}
+       * @param {{ verify?: boolean, private?: boolean }} [opts]
+       * @returns {Promise<WorkspaceChoice | { private: true } | null>}
        */
       async recall(appKey, opts) {
         opts = opts || {};
-        var key = choiceKey(appKey);
-        var lib = dataLib();
-        var stored;
-        if (lib) {
-          stored = await lib.get(key);
-        } else {
-          var res = await h.authFetch("/v1/memory/" + encodeURIComponent(key) + "?soft=1");
-          if (!res || res.ok === false) throw h.fail(res, "Failed to read the workspace choice");
-          var d = dataOf(res);
-          stored = d ? d.value : null;
-        }
-        var choice = asChoice(stored);
+        var value = await stored(appKey);
+        if (isPrivate(value)) return opts.private ? { private: true } : null;
+        var choice = asChoice(value);
         if (!choice || !opts.verify) return choice;
-        var listed = await h.authFetch(orgPath2(choice.orgId) + "/workspaces");
-        if (!listed || listed.ok === false) {
-          var code = listed && listed.error && listed.error.code;
-          if (code === "ACCESS_DENIED" || code === "NOT_FOUND") return null;
-          throw h.fail(listed, "Failed to list workspaces");
+        var ids = await readableIn(choice.orgId);
+        return ids && ids.has(choice.wsId) ? choice : null;
+      },
+      /**
+       * Keep several workspaces for an app that switches between them, under the same
+       * `<appKey>.workspace` key: { orgId, wsId, list } with the current one in orgId and wsId, so
+       * recall() and the blocks that follow the app's choice read the current one. `current` may be
+       * `{ private: true }` (no shared workspace in use) or null (none in use).
+       * @param {string} appKey
+       * @param {WorkspaceChoice[]} list
+       * @param {WorkspaceChoice | { private: true } | null} [current]  Default: the first of the list.
+       * @returns {Promise<WorkspaceList>}
+       */
+      async rememberList(appKey, list, current) {
+        choiceKey(appKey);
+        var all = listOf({ list: Array.isArray(list) ? list : [] });
+        var now = current === void 0 ? all[0] || null : asChoice(current) || (isPrivate(current) ? { private: true } : null);
+        var cur = asChoice(now);
+        if (cur && !all.some(function(c) {
+          return c.orgId === cur.orgId && c.wsId === cur.wsId;
+        })) all.unshift(cur);
+        var value = cur ? { orgId: cur.orgId, wsId: cur.wsId } : now ? { private: true } : {};
+        value.list = all;
+        await store(appKey, value);
+        return { list: all, current: cur, private: !cur && !!now };
+      },
+      /**
+       * The list rememberList() kept, or null when the app kept nothing. A single choice kept by
+       * remember() reads as a list of one. With `{ verify: true }` each organism's workspaces are listed
+       * once, and a workspace that is gone, archived or no longer readable leaves the list (and stops
+       * being current); ACCESS_DENIED or NOT_FOUND for an organism drops its workspaces, any other
+       * refusal is thrown.
+       * @param {string} appKey
+       * @param {{ verify?: boolean }} [opts]
+       * @returns {Promise<WorkspaceList | null>}
+       */
+      async recallList(appKey, opts) {
+        opts = opts || {};
+        var value = await stored(appKey);
+        if (!value || typeof value !== "object") return null;
+        var list = listOf(value);
+        var cur = asChoice(value);
+        var priv = isPrivate(value);
+        if (!list.length && !cur && !priv) return null;
+        if (opts.verify && list.length) {
+          var orgs = [];
+          list.forEach(function(c) {
+            if (orgs.indexOf(c.orgId) < 0) orgs.push(c.orgId);
+          });
+          var seen = await Promise.all(orgs.map(readableIn));
+          list = list.filter(function(c) {
+            var ids = seen[orgs.indexOf(c.orgId)];
+            return !!ids && ids.has(c.wsId);
+          });
+          if (cur && !list.some(function(c) {
+            return c.orgId === cur.orgId && c.wsId === cur.wsId;
+          })) cur = null;
         }
-        var lw = dataOf(listed);
-        var row = (lw && lw.workspaces || []).filter(function(w) {
-          return w && w.id === choice.wsId;
-        })[0];
-        return row && !row.archived && row.access !== "none" ? choice : null;
+        return { list, current: cur, private: priv };
       }
     };
     return api;

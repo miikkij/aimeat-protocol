@@ -26,6 +26,10 @@
  *   import { UI_COMPONENTS, componentById } from './registry.js';
  *   import { buildUiCatalogue } from './catalogue.js';   // the catalogue reads this registry
  * @version-history
+ *   v1.25.0 — 2026-10-02 — The types and prop helpers move to registry-defs.ts and the
+ *     library-drawn components to registry-library-blocks.ts, unchanged (800-line cap). Append-only: aiChat over AIMEAT.ai; doc takes `variant` ("plain") and
+ *     decision takes `decisionId` (a decision recorded earlier); workspaceTeam takes `inviteInto` and
+ *     workspacePicker `allowPrivate` and `multiple`; connections and decision take `via`.
  *   v1.24.0 — 2026-10-01 — Append-only: workflowInput over AIMEAT.workflows, aiTask over AIMEAT.ai, doc
  *     over AIMEAT.md and decision over AIMEAT.decide.
  *   v1.23.0 — 2026-10-01 — `workspacePicker` joins the components, and workspaceTeam, intakeForm and
@@ -110,7 +114,6 @@
  *   v1.0.0 — 2026-08-27 — Initial: eleven mosaic components mirroring the served kit
  *     (TARGET-074 phase 2).
  */
-import type { BlockPropDef } from '../surface-layout/registry-types.js';
 import { LOOKS as LOOK_REGISTRY } from '../../data/atelier-looks.js';
 // The signature tokens live in signature-tokens.ts since 2026-09-05 (a pure move under the
 // 800-line cap) and are re-exported here so every importer keeps the address it had. The
@@ -118,23 +121,11 @@ import { LOOKS as LOOK_REGISTRY } from '../../data/atelier-looks.js';
 // re-exported, because that would be an import cycle, and its two doors import from there.
 import { SIGNATURE_TOKENS } from './signature-tokens.js';
 export { SIGNATURE_TOKENS };
-
-/** A mosaic prop: the shared grammar, plus whether a layout must supply it. */
-export type AppUiPropDef = BlockPropDef & {
-  /** The validator refuses a block that omits this prop. Most props default instead. */
-  required?: true;
-};
-
-export interface AppUiComponentDef {
-  /** Stable id — the kit's own component name (AIMEAT.atelier.<id>). */
-  id: string;
-  /** One sentence for the catalogue and the picker. */
-  summary: string;
-  /** The declared settings. Append-only once a layout is stored. */
-  props: Record<string, AppUiPropDef>;
-  /** At most this many instances per layout (the hero rule: one focal point). */
-  maxPerLayout?: number;
-}
+// The two types and the prop helpers live in registry-defs.ts, and the library-drawn components in
+// registry-library-blocks.ts, since 2026-10-02 (a pure move under the 800-line cap).
+import { text, requiredText, type AppUiPropDef, type AppUiComponentDef } from './registry-defs.js';
+import { LIBRARY_BLOCK_COMPONENTS } from './registry-library-blocks.js';
+export type { AppUiPropDef, AppUiComponentDef };
 
 /** Every navigation projection a layout may ask for — all supported on every screen size
  *  (decided 2026-08-27); the renderer carries each mode's own ergonomics. `rail` is the
@@ -159,8 +150,6 @@ export const BLOCK_SPANS = ['full', 'main', 'side', 'half'] as const;
  *  read, so the three can never disagree. check:atelier verifies every one arithmetically. */
 export const LOOKS: readonly string[] = LOOK_REGISTRY.map((l) => l.id);
 
-const text = (description: string, maxLength = 200): AppUiPropDef => ({ type: 'string', maxLength, description });
-const requiredText = (description: string, maxLength = 200): AppUiPropDef => ({ type: 'string', maxLength, description, required: true });
 /** A memory-key prefix the app binds this block to; the app resolves it to rows. */
 const source = (): AppUiPropDef => ({
   type: 'string', maxLength: 120, required: true,
@@ -643,139 +632,7 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
       emptyHint: text('The line under it.', 160),
     },
   },
-  // ── The app's own members (2026-10-01, append-only): self-sourced over AIMEAT.iam, so they bind
-  //    no memory source. The page loads aimeat-auth.js and aimeat-iam.js; the node keeps the roster.
-  {
-    id: 'members',
-    summary: "The owner's member screen: who asked for access (approve with a role, decline), who opened the app and holds no role (approve, seen it), the members with a role select and Remove (confirmed), add someone by account name, and what a stranger gets. One click on Approve grants the role with the least power. A non-owner is told only the owner manages members. A refused action shows the node's reason. Needs aimeat-iam.js on the page.",
-    maxPerLayout: 1,
-    props: {
-      app: requiredText('The app whose roster this is, "owner/file.html".', 120),
-      roles: text("The app's roles, a comma list, least power first, e.g. \"member, admin\". Leave empty when the page already called AIMEAT.iam.init.", 200),
-      approveRole: text('The role one click on Approve grants, when it is not the least powerful one.', 40),
-      variant: text('"list" (the default: tabs, faces and rows), "table" (one dense table of members) or "dense" (for a side panel).', 10),
-      title: text("The section title, when the kit's own is not wanted.", 120),
-    },
-  },
-  {
-    id: 'joinRequest',
-    summary: "The visitor's side: ask the owner for access with a note, or see \"you asked on …\", \"declined, you can ask again\" or \"you are a member\". Renders nothing for the app's owner. Needs aimeat-iam.js on the page.",
-    maxPerLayout: 1,
-    props: {
-      app: requiredText('The app to ask for, "owner/file.html".', 120),
-      roles: text("The app's roles, a comma list, least power first. Leave empty when the page already called AIMEAT.iam.init.", 200),
-      title: text("The section title, when the kit's own is not wanted.", 120),
-    },
-  },
-  {
-    id: 'workspaceTeam',
-    summary: "A workspace's people: requests to approve as viewer or contributor or decline, the people with their role (raising to contributor asks first, the creator stays), and add by account name or invite by email. Give org and ws, or leave them empty and give app to open on the workspace a workspacePicker block chose. Needs aimeat-organism.js on the page.",
-    maxPerLayout: 1,
-    props: {
-      org: text('The organism id. Leave empty, with app given, to follow the workspacePicker.', 80),
-      ws: text('The workspace id. Leave empty, with app given, to follow the workspacePicker.', 80),
-      title: text("The section title, when the kit's own is not wanted.", 120),
-      variant: text('"list" (the default) or "table".', 10),
-      app: text('The app key the workspacePicker on this page uses. Used only when org and ws are empty.', 120),
-    },
-  },
-  {
-    id: 'workspacePicker',
-    summary: "An app's first run: which organism and which workspace of it keep the app's records. A choice made before is used at once and shown as one line with Change; otherwise the person picks an organism or creates one, and the workspace is found or created and remembered. The blocks below that name the same app (workspaceTeam, intakeForm, intakeAdmin with org and ws left empty) open on the choice. Needs aimeat-organism.js on the page.",
-    maxPerLayout: 1,
-    props: {
-      app: requiredText('The app key the choice is remembered under, e.g. "cadence" (no spaces).', 120),
-      name: text('The workspace name to find or create. Defaults to the app key.', 120),
-      kind: text('The workspace kind written into its manifest.', 60),
-      purpose: text('One line saying what the workspace holds.', 200),
-      title: text("The section title, when the kit's own is not wanted.", 120),
-      variant: text('"dense" for a side panel; empty for the full block.', 10),
-    },
-  },
-  {
-    id: 'intakeForm',
-    summary: 'A Public Intake form drawn from its public descriptor: every field type, a hidden spam trap, the error on the field it names, and the thank-you line after sending. Without formId it reads ?form= from the page address. Needs aimeat-intake.js on the page.',
-    maxPerLayout: 2,
-    props: {
-      org: text('The organism id. Leave empty to read ?org= from the page address, or, with app given, to follow the workspacePicker.', 80),
-      ws: text('The workspace id. Leave empty to read ?ws= from the page address, or, with app given, to follow the workspacePicker.', 80),
-      formId: text('The form id. Leave empty to read ?form= from the page address.', 80),
-      title: text('The section title, when the form title is not wanted.', 120),
-      hint: text('One line under the title.', 300),
-      app: text('The app key the workspacePicker on this page uses. Used only when org and ws are empty.', 120),
-    },
-  },
-  {
-    id: 'intakeAdmin',
-    summary: 'The owner list of Public Intake forms in one workspace: title, id and flags per form, copy link, delete after a confirm, and a create form with labelled fields. Needs aimeat-intake.js on the page.',
-    maxPerLayout: 1,
-    props: {
-      org: text('The organism id. Leave empty, with app given, to follow the workspacePicker.', 80),
-      ws: text('The workspace id. Leave empty, with app given, to follow the workspacePicker.', 80),
-      namespace: text('The row space new forms write into. Leave empty to let the owner type it.', 80),
-      title: text("The section title, when the kit's own is not wanted.", 120),
-      app: text('The app key the workspacePicker on this page uses. Used only when org and ws are empty.', 120),
-    },
-  },
-  {
-    id: 'connections',
-    summary: 'The owner outside accounts (mail, social): status per account, what each can do, sign in again, disconnect after a confirm, and connect a new one. need narrows the list to the services that can do it. Needs aimeat-connect.js on the page.',
-    maxPerLayout: 1,
-    props: {
-      title: text("The section title, when the kit's own is not wanted.", 120),
-      need: text('"readMail", "sendMail" or "publish": show only the services that can do it.', 20),
-    },
-  },
-  {
-    id: 'workflowInput',
-    summary: 'The steps a workflow waits on a person for: workflow and run, the question, options as radio buttons or checkboxes, an own answer when the step accepts one, the due time and Answer. An answered step leaves the list. run keeps to one run. Needs aimeat-workflows.js on the page.',
-    maxPerLayout: 1,
-    props: {
-      run: text('One run id: show only that run\'s waiting steps. Leave empty for every run.', 80),
-      title: text("The section title, when the kit's own is not wanted.", 120),
-      variant: text('"dense" for a side panel; leave empty for the default.', 10),
-    },
-  },
-  {
-    id: 'aiTask',
-    summary: "Ask the person's own AI once and show the answer: a prompt box, a run button held busy, the answer with the AI label, the model and today's cost, words for each refusal, and an optional copy-the-prompt route. Needs aimeat-ai.js on the page.",
-    maxPerLayout: 2,
-    props: {
-      appId: requiredText('The app id the AI call is made under.', 80),
-      prompt: requiredText('The prompt sent to the AI; {input} is replaced with what the person wrote.', 2000),
-      title: text("The section title, when the kit's own is not wanted.", 120),
-      hint: text('One line under the title.', 300),
-      placeholder: text('The grey text in the empty prompt box.', 200),
-      minChars: text('The fewest characters before the run button turns on, e.g. "10".', 4),
-      input: text('"none" for a run button with no prompt box.', 4),
-      systemPrompt: text('Instructions to the model that the person does not see.', 2000),
-      runLabel: text("The run button's words, when the kit's own are not wanted.", 60),
-      render: text('"markdown" (the default) or "text".', 10),
-      copyPrompt: text('"true" adds the route to copy the prompt into any AI chat and paste the answer back.', 5),
-      variant: text('"compact" for a side panel or a card.', 10),
-    },
-  },
-  {
-    id: 'doc',
-    summary: "One markdown document in the kit's box: headings, lists, code, tables, quotes and links in the app's colours, light and dark. Without aimeat-markdown.js on the page it shows the text as written; an empty text shows an empty card.",
-    maxPerLayout: 4,
-    props: {
-      markdown: text('The document, in markdown.', 8000),
-      title: text('The section title.', 120),
-      rich: text('"true" uses the full renderer (task lists, footnotes, highlighted code, diagrams).', 5),
-    },
-  },
-  {
-    id: 'decision',
-    summary: "Runs one of the owner's decision rules on the given text when the person presses Ask: each answer with its number and threshold, the personal data taken out before sending, the cost and who answered. Under the threshold the person confirms or overrides. Needs aimeat-decide.js.",
-    maxPerLayout: 2,
-    props: {
-      appId: requiredText('The app id the decision is recorded under.', 120),
-      rule: requiredText('The id of the owner decision rule to run.', 80),
-      state: text('The text to judge. Without it the block shows an empty card.', 4000),
-      title: text("The section title, when the kit's own is not wanted.", 120),
-    },
-  },
+  ...LIBRARY_BLOCK_COMPONENTS,
 ];
 
 const byId = new Map(UI_COMPONENTS.map((c) => [c.id, c]));

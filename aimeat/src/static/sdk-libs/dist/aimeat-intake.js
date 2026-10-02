@@ -36,6 +36,20 @@
   var KNOWN_TYPES = ["text", "textarea", "email", "tel", "url", "number", "date", "select", "radio", "checkbox"];
   var TEXT_TYPES = ["text", "textarea", "email", "tel", "url"];
   var CHOICE_TYPES = ["select", "radio"];
+  function labelText(label) {
+    if (label == null) return "";
+    if (typeof label !== "object") return String(label);
+    const byLang = (
+      /** @type {Record<string, unknown>} */
+      label
+    );
+    if (typeof byLang.en === "string" && byLang.en) return byLang.en;
+    for (const k of Object.keys(byLang)) if (typeof byLang[k] === "string" && byLang[k]) return (
+      /** @type {string} */
+      byLang[k]
+    );
+    return "";
+  }
   function options(raw) {
     if (!Array.isArray(raw)) return [];
     const out = [];
@@ -72,7 +86,7 @@
       if (CHOICE_TYPES.indexOf(type) !== -1 && !opts.length) type = "text";
       const field = {
         name,
-        label: raw.label != null && String(raw.label) !== "" ? String(raw.label) : name,
+        label: labelText(raw.label) || name,
         type,
         required: raw.required === true || required.has(name)
       };

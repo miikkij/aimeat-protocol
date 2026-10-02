@@ -55,6 +55,13 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.63.0 — 2026-10-02 — THE GAPS THE APP MIGRATION FOUND: aiChat (a follow-up conversation about
+ *     one document) and aiTask drawing a kept result; doc variant "plain"; decision with questions
+ *     per run, names, chained rounds, the app's verdict and a stored decision; workspaceTeam
+ *     inviting into several workspaces with an Invitations tab; workspacePicker with schemas,
+ *     manifest, a private choice and a list; intakeForm labels per language and intakeAdmin
+ *     create(name) and row actions; connections opening the node's accounts page inside an app;
+ *     dropzone type families; refusals in the page's language; a look on <html> or <body>.
  *   v0.62.0 — 2026-10-01 — LIBRARY BLOCKS, ROUND 2: workflowInput (a workflow step waiting for a
  *     person, over AIMEAT.workflows), aiTask (ask the person's own AI once, over AIMEAT.ai), doc (one
  *     markdown document over AIMEAT.md), decision (one decision rule and its review, AIMEAT.decide), and
@@ -399,6 +406,7 @@ import { intakeForm, intakeAdmin } from './intake-form.js';
 import { connections } from './connections.js';
 import { workflowInput } from './workflow-input.js';
 import { aiTask } from './ai-task.js';
+import { aiChat } from './ai-chat.js';
 import { doc } from './doc.js';
 import { decision } from './decision.js';
 import { copy } from './copy.js';
@@ -436,7 +444,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.62.0',
+  version: '0.63.0',
 
   /**
    * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
@@ -518,7 +526,7 @@ const atelier = {
   intakeForm, intakeAdmin, connections,
 
   // ── A workflow step waiting for a person (AIMEAT.workflows), and one question to the person's own AI (AIMEAT.ai) ──
-  workflowInput, aiTask,
+  workflowInput, aiTask, aiChat,
   // ── One markdown document (AIMEAT.md), and one decision rule with its review (AIMEAT.decide) ──
   doc, decision,
 

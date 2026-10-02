@@ -12,6 +12,8 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   2026-10-02 — track-mixing: a Classic page may load the kit for its library blocks; the mix is the
+ *     shell drawn, or the kit loaded and nothing in it called (the publish lint says the same).
  *   2026-10-01 — iam-decide-at-framing points at the node roster and a gate from aimeat_iam_define,
  *     not at the aimeat-iam pack, which keeps its own roster in ctx.memory.
  *   2026-09-26 — provenance-without-model: a declaration that names no model, and the publish hint.
@@ -146,8 +148,8 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   E({
     id: 'track-mixing',
     title: 'An app built from two guides at once',
-    symptom: 'The app declares one build track and carries the other track\'s vocabulary: Classic declared with the Atelier kit loaded, Atelier declared with the kit missing or with raw daisyUI class markup outside a section escape hatch, or the Atelier kit loaded with no track declared at all. Publishing warns; the visible cost comes later, when an edit session loads the declared track\'s guide and half-understands the file.',
-    fix: 'Pick the track first and stay on it. `<meta name="aimeat-track" content="classic">` means daisyUI classes and the Classic build guide; `content="atelier"` means the Atelier kit is the vocabulary, and raw markup lives only inside a section body the app fills itself (`AIMEAT.atelier.section`). The declaration is what routes every later improve session to the right guide, so it must match what the page actually does.',
+    symptom: 'The app declares one build track and carries the other track\'s vocabulary: Classic declared with the Atelier shell drawn (atelier.app()) or with the kit loaded and nothing in it called, Atelier declared with the kit missing or with raw daisyUI class markup outside a section escape hatch, or the Atelier kit loaded with no track declared at all. Publishing warns; the visible cost comes later, when an edit session loads the declared track\'s guide and half-understands the file.',
+    fix: 'Pick the track first and stay on it. `<meta name="aimeat-track" content="classic">` means daisyUI classes and the Classic build guide; `content="atelier"` means the Atelier kit is the vocabulary, and raw markup lives only inside a section body the app fills itself (`AIMEAT.atelier.section`). The declaration is what routes every later improve session to the right guide, so it must match what the page actually does. A Classic page may load the kit for the library blocks it uses (AIMEAT.atelier.members, joinRequest, aiTask, copy, workspaceTeam); that is not a mix.',
     appliesTo: ['app', 'publish'],
     severity: 'warn',
     source: 'curated',

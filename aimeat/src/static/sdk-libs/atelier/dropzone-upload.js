@@ -14,11 +14,13 @@
  *   WHAT FETCHES. Nothing here fetches itself: AIMEAT.storage.upload, uploadChunked and viewUrl do,
  *   over the signed-in session. Signed out, the storage library refuses and the row says so.
  * @structure storageLib() · uploader({ zone, upload, lib, onUploaded, onUploadError })
- * @parts dropzone files · file · name · state · bar · open
+ * @parts dropzone root · label · hint · error · input · files · file · name · state · bar · open
  * @usage
- *   AIMEAT.atelier.dropzone({ target, accept: ['.png'], upload: { visibility: 'public', chunkedOver: 4e6 },
+ *   AIMEAT.atelier.dropzone({ target, accept: ['image/*'], upload: { visibility: 'public', chunkedOver: 4e6 },
  *     onUploaded(file, answer) { photos.push(answer.key); } });
  * @version-history
+ *   v0.63.0 — 2026-10-02 — The @parts line names the zone's own parts too (root, label, hint, error,
+ *     input), which parts.js now marks with data-ak-part.
  *   v0.62.0 — 2026-10-01 — Initial: dropzone uploads through AIMEAT.storage.
  */
 import { el, resolve } from './dom.js';

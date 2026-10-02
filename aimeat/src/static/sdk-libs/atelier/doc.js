@@ -18,20 +18,29 @@
  *   no throw); rendered.
  *
  *   NOTHING FETCHES HERE. The markdown is the app's; AIMEAT.md loads its own rich pipeline.
+ *
+ *   THE PLAIN VARIANT. `variant: 'plain'` (data-ak-variant="plain" on the root) draws only the
+ *   typeset text: no border, no padding, no background and no readable-width cap, for text that sits
+ *   inside a card the app already draws. Asked for 2026-10-02: BUDJETTI undid the box by hand with
+ *   --ak-doc-width: none and a rule removing the border, the padding and the background.
  * @parts doc root · title · body · md · text · empty · sources · source
+ * @variants doc plain
  * @tokens doc --ak-doc-width
  * @fork doc Copying it out means calling AIMEAT.md.render() or renderRich() yourself, catching a failure into pre-wrapped text, and colouring .md-body's headings, lists, code, tables, quotes and links with the --ak-* tokens.
  * @structure doc(spec) (helpers: mdOf · blank)
  * @usage
  *   const d = AIMEAT.atelier.doc({ target: '#notes', markdown: text, rich: true });
  *   d.set({ markdown: next });
+ *   AIMEAT.atelier.doc({ target: card, markdown: story, variant: 'plain' });
  * @version-history
+ *   v0.63.0 — 2026-10-02 — variant: 'plain', the typeset text without the box.
  *   v0.62.0 — 2026-10-01 — Initial.
  */
 import { el, clear, resolve, uid } from './dom.js';
 import { emptyState } from './state.js';
 import { td } from './decision-i18n.js';
 import { isPlaceholder, sampleBadge, watch } from './members-shared.js';
+import { applyVariant } from './parts-model.js';
 
 /** The page's AIMEAT.md, or null. */
 function mdOf() {
@@ -47,7 +56,8 @@ function blank(v) {
 /**
  * One markdown document in the kit's box.
  * @param {{ target?: string|Element, markdown?: string, rich?: boolean, citations?: boolean,
- *   empty?: { title?: string, hint?: string }, sample?: boolean, title?: string }} spec
+ *   empty?: { title?: string, hint?: string }, sample?: boolean, title?: string,
+ *   variant?: 'plain' }} spec
  * @returns {{ el: HTMLElement, set: (patch: { markdown?: string, title?: string }) => void,
  *   destroy: () => void }}
  */
@@ -56,6 +66,7 @@ export function doc(spec) {
   let markdown = s.markdown == null ? '' : String(s.markdown);
   let title = s.title || '';
   const root = el('section', { class: 'ak-root ak-doc', 'data-ak-part': 'root' });
+  applyVariant(root, s, ['plain']);
   const head = el('h3', { class: 'ak-doc__title', 'data-ak-part': 'title', hidden: true });
   const body = el('div', { class: 'ak-doc__body', 'data-ak-part': 'body' });
   const sources = el('div', { class: 'ak-doc__sources', 'data-ak-part': 'sources', hidden: true });

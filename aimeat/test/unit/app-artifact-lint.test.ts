@@ -19,6 +19,10 @@
  *   is about a destination and nothing short of a listening socket proves it.
  * @usage cd aimeat && pnpm test -- app-artifact-lint
  * @version-history
+ *   v1.7.0 — 2026-10-02 — Classic with kit blocks: a Classic page that loads the kit and calls a
+ *     library block publishes with no finding at all; one that loads the kit and calls nothing, or
+ *     draws the Atelier shell, is still told; the kit with no track line is still refused and the
+ *     refusal names the Classic line. Each seen failing first against the old checkTrackMixing.
  *   v1.6.0 — 2026-09-13 — The served-copy warning is replaced by the publish-time strip (the
  *     developer's decision): its two cases now assert the lint says nothing about serve marks, and
  *     failed against the warning before it was removed. The strip itself is proven in
@@ -491,5 +495,52 @@ describe('lintAppArtifact — the two tracks never mix', () => {
     const html = ATELIER.replace('<meta name="aimeat-track" content="atelier">', '');
     const { messages } = await findings(html);
     expect(messages.join(' ')).toContain('declares no build track');
+  });
+
+  describe('Classic with kit blocks: a Classic page that loads the kit for the library blocks it uses', () => {
+    const KIT = '<link rel="stylesheet" href="/lib/aimeat-atelier.css">\n  <script src="/v1/libs/aimeat-atelier.js"></script>';
+    /** The suite's CLEAN Classic app, declaring Classic, loading the kit and drawing one block. */
+    const withKit = (call: string) => CLEAN
+      .replace('<meta name="aimeat-scopes"', '<meta name="aimeat-track" content="classic">\n  <meta name="aimeat-scopes"')
+      .replace('</head>', `${KIT}\n  </head>`)
+      .replace('async function start() {', `${call}\n    async function start() {`);
+    const BLOCKS = withKit("AIMEAT.atelier.members({ target: '#members', app: 'me/clean.html' });");
+
+    it('finds nothing at all: no register refusal and no track-mixing warning', async () => {
+      const { blocking, warnings } = await lintAppArtifact(BLOCKS, config);
+      expect({ blocking, warnings }).toEqual({ blocking: [], warnings: [] });
+    });
+
+    it('is silent on copy() alone and on the namespace held in a name of its own', async () => {
+      for (const call of ['AIMEAT.atelier.copy(location.href);', "const K = AIMEAT.atelier; K.joinRequest({ target: '#join', app: 'me/clean.html' });"]) {
+        const r = await findings(withKit(call));
+        expect(r.ids, call).not.toContain('track-mixing');
+        expect(r.blocking, call).toEqual([]);
+      }
+    });
+
+    it('still tells a Classic page that loads the kit and calls nothing in it', async () => {
+      const r = await findings(withKit(''));
+      expect(r.ids).toContain('track-mixing');
+      expect(r.messages.join(' ')).toContain('without calling anything in it');
+      expect(r.blocking).toEqual([]);
+    });
+
+    it('tells a Classic page that draws the Atelier shell that it is an Atelier app', async () => {
+      const r = await findings(withKit("AIMEAT.atelier.app({ title: 'Clean' });"));
+      const msg = r.warnings.find(f => f.pitfall === 'track-mixing')?.message ?? '';
+      expect(msg).toContain('draws the Atelier app shell');
+      expect(msg).not.toContain('drop the aimeat-atelier');
+    });
+
+    it('keeps the register refusal for the kit with no track line, and names the Classic line as the way out', async () => {
+      const noTrack = BLOCKS.replace('<meta name="aimeat-track" content="classic">', '');
+      const r = await findings(noTrack);
+      const msg = r.blocking.find(f => f.pitfall === 'atelier-register')?.message ?? '';
+      expect(msg).toContain('content="classic"');
+      // A declared Atelier app is not offered the Classic line: it is an Atelier app by its own word.
+      const ate = await findings(ATELIER.replace('<meta name="aimeat-register" content="genre-nightfloor">', ''));
+      expect(ate.blocking.find(f => f.pitfall === 'atelier-register')?.message).not.toContain('content="classic"');
+    });
   });
 });

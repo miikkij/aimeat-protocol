@@ -10,13 +10,19 @@
  *               kit uploads through AIMEAT.storage (dropzone-upload.js)
  *   The behaviour-shaped four (toast, palette, compare, tour) live in parts-ui.js. Nothing here
  *   fetches itself; every component renders what it is given and reports what happens.
- * @structure ring · crew · poll · keys · dropzone
+ * @structure ring · crew · poll · keys · acceptsFile · dropzone
  * @usage
  *   AIMEAT.atelier.ring({ target, data: { value: 5, total: 7, label: 'Pages written' } });
  *   AIMEAT.atelier.dropzone({ target, accept: ['.html', '.png'], maxBytes: 5e6, onFiles(files) {} });
+ *   AIMEAT.atelier.dropzone({ target, accept: ['image/*'], onFiles(photos) {} });  // the phone offers the camera
  *   const zone = AIMEAT.atelier.dropzone({ target, upload: { visibility: 'public' }, onUploaded(f, a) {} });
  *   if (zone.pending()) return;  // hold the app's own submit while files are still going up
  * @version-history
+ *   v0.63.0 — 2026-10-02 — dropzone: an accept entry ending in '/*' ('image/*') takes every type
+ *     with that start, as the browser's accept attribute does; before, it refused every photo
+ *     (wish-dropzone-accept-image-and-other-type-wildcards). The same list goes onto the hidden
+ *     input, so a phone's picker offers the camera. Extensions and whole types work as before. The
+ *     zone's root, label, hint, refusal line and input carry data-ak-part.
  *   v0.62.2 — 2026-10-01 — crew: the default line after the live count comes from the kit
  *     dictionary (crewLive: "3 here now", "3 paikalla nyt", "Aquí ahora: 3"); `liveLabel` still
  *     replaces it, drawn after the count as before.
@@ -34,6 +40,28 @@ import { emptyState } from './state.js';
 import { storageLib, uploader } from './dropzone-upload.js';
 import { tu } from './copy-upload-i18n.js';
 import { t } from './i18n.js';
+
+/**
+ * Whether a file is a kind the zone takes, read the way the browser reads an accept attribute: an
+ * entry starting with a dot is an extension ('.png'), one ending in '/*' takes every type with that
+ * start ('image/*'), and any other is a whole type ('application/pdf'). '*' or '*\/*' takes anything;
+ * an empty list takes anything.
+ * @param {{ name?: string, type?: string }} f
+ * @param {string[]} accept  lower-cased entries
+ * @returns {boolean}
+ */
+export function acceptsFile(f, accept) {
+  if (!accept.length) return true;
+  const name = String((f && f.name) || '');
+  const ext = name.indexOf('.') === -1 ? '' : '.' + name.split('.').pop().toLowerCase();
+  const type = String((f && f.type) || '').toLowerCase();
+  return accept.some(function (a) {
+    if (a === '*' || a === '*/*') return true;
+    if (a.charAt(0) === '.') return a === ext;
+    if (a.slice(-2) === '/*') return !!type && type.indexOf(a.slice(0, -1)) === 0;
+    return a === type;
+  });
+}
 
 function rowsOf(data) {
   if (Array.isArray(data)) return data;
@@ -190,7 +218,9 @@ export function keys(spec) {
  * `upload` the kit never uploads and the app owns that. With `upload` and aimeat-storage.js on the
  * page, the kit uploads each accepted file through AIMEAT.storage (dropzone-upload.js), shows its
  * state under the zone, and calls `onUploaded`; `pending()` says how many are still waiting or
- * running, so the app can hold its own submit.
+ * running, so the app can hold its own submit. `accept` takes extensions ('.png'), whole types
+ * ('application/pdf') and type families ('image/*'), and the same list is the hidden input's
+ * accept attribute.
  * @param {{ target?: string|Element, accept?: string[], maxBytes?: number, multiple?: boolean,
  *   label?: string, hint?: string, onFiles?: (files: File[]) => void,
  *   upload?: import('./dropzone-upload.js').DropzoneUpload,
@@ -201,12 +231,13 @@ export function keys(spec) {
 export function dropzone(spec) {
   const s = spec || /** @type {any} */ ({});
   const accept = (s.accept || []).map(function (a) { return String(a).toLowerCase(); });
-  const input = /** @type {HTMLInputElement} */ (el('input', { type: 'file', multiple: s.multiple ? true : null, accept: accept.length ? accept.join(',') : null }));
+  // The same list is the picker's accept attribute: 'image/*' there makes a phone offer the camera.
+  const input = /** @type {HTMLInputElement} */ (el('input', { type: 'file', 'data-ak-part': 'input', multiple: s.multiple ? true : null, accept: accept.length ? accept.join(',') : null }));
   // role="alert" from the start, so a screen reader announces the refusal when its text changes.
-  const err = el('div', { class: 'ak-dropzone__err', role: 'alert', hidden: true });
-  const root = el('div', { class: 'ak-root ak-dropzone', role: 'button', tabindex: '0' }, [
-    el('div', { class: 'ak-dropzone__label' }, s.label || tu('drop.label')),
-    s.hint ? el('div', { class: 'ak-dropzone__hint' }, s.hint) : null,
+  const err = el('div', { class: 'ak-dropzone__err', 'data-ak-part': 'error', role: 'alert', hidden: true });
+  const root = el('div', { class: 'ak-root ak-dropzone', 'data-ak-part': 'root', role: 'button', tabindex: '0' }, [
+    el('div', { class: 'ak-dropzone__label', 'data-ak-part': 'label' }, s.label || tu('drop.label')),
+    s.hint ? el('div', { class: 'ak-dropzone__hint', 'data-ak-part': 'hint' }, s.hint) : null,
     err, input,
   ].filter(Boolean));
   if (s.target) resolve(s.target).appendChild(root);
@@ -217,8 +248,7 @@ export function dropzone(spec) {
   function take(list) {
     const files = Array.prototype.slice.call(list || []);
     const bad = files.find(function (f) {
-      const ext = '.' + String(f.name).split('.').pop().toLowerCase();
-      if (accept.length && accept.indexOf(ext) < 0 && accept.indexOf(f.type) < 0) return true;
+      if (!acceptsFile(f, accept)) return true;
       return s.maxBytes ? f.size > s.maxBytes : false;
     });
     if (bad) {

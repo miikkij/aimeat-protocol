@@ -196,7 +196,7 @@ export function benchPageHtml(body: Record<string, unknown>, theme: 'light' | 'd
   const partJson = JSON.stringify(body).replace(/<\//g, '<\\/');
   // The kit's markdown blocks render through AIMEAT.md when it is on the page and fall back to the
   // raw text when it is not, so a preview without it showed their samples as markup.
-  const needsMarkdown = /"component":"(doc|aiTask)"/.test(partJson);
+  const needsMarkdown = /"component":"(doc|aiTask|aiChat)"/.test(partJson);
   return [
     `<!DOCTYPE html><html lang="en" data-theme="${theme === 'dark' ? 'dark' : 'light'}"><head><meta charset="utf-8">`,
     '<meta name="viewport" content="width=device-width, initial-scale=1.0">',

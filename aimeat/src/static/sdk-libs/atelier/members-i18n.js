@@ -8,6 +8,12 @@
  *   import { tm } from './members-i18n.js';
  *   tm('members.title');
  * @version-history
+ *   v0.62.0 — 2026-10-02 — The node's refusal codes in words (refuse.<CODE>), so a Finnish or a
+ *     Spanish page no longer prints the node's English sentence: REASK_TOO_SOON with its date,
+ *     SEATS_FULL, TOO_MANY_INVITES, RATE_LIMITED with its wait, FORBIDDEN (ACCESS_DENIED shares it),
+ *     SCOPE_DENIED, AUTH_REQUIRED, NOT_FOUND, INVALID_INPUT, OWNER_CANNOT_ASK and MEMBER_IS_OWNER.
+ *     A `.later` key is the sentence for a refusal that came without its date
+ *     (wish-joinrequest-shows-the-node-s-english-refusal-on-a-finnish-or).
  *   v0.61.1 — 2026-10-01 — Spanish addHint says "libreta de direcciones", the address book's settled
  *     word (aimeat-writing language context); it said "libreta de contactos".
  *   v0.61.0 — 2026-10-01 — Initial; with the words of the tabs, the history, the plan, adding by
@@ -111,6 +117,19 @@ const STRINGS = {
     'plan.saved': 'The plan is saved. It applies to approvals from now on.',
     'settings.on': 'On',
     'settings.off': 'Off',
+    'refuse.REASK_TOO_SOON': 'The owner declined your earlier request. You can ask again from {d}.',
+    'refuse.REASK_TOO_SOON.later': 'The owner declined your earlier request. You can ask again one week after that decision.',
+    'refuse.SEATS_FULL': 'All seats for this role are taken. Remove somebody, add seats in the plan, or choose another role.',
+    'refuse.TOO_MANY_INVITES': 'This app has as many open invitations as it can hold. Cancel one, or wait until they expire.',
+    'refuse.RATE_LIMITED': 'Too many tries in a short time. Try again in {t}.',
+    'refuse.RATE_LIMITED.later': 'Too many tries in a short time. Try again in a few minutes.',
+    'refuse.FORBIDDEN': 'Your role does not allow this in this app.',
+    'refuse.SCOPE_DENIED': 'This app does not have permission to do this.',
+    'refuse.AUTH_REQUIRED': 'Sign in first, then try again.',
+    'refuse.NOT_FOUND': 'That was not found. Check the name, or reload the page.',
+    'refuse.INVALID_INPUT': 'Something you entered is not valid. Check it and try again.',
+    'refuse.OWNER_CANNOT_ASK': 'You own this app, so you already have access.',
+    'refuse.MEMBER_IS_OWNER': 'That is the owner of this app. The owner already has access to everything.',
   },
   fi: {
     'members.title': 'Jäsenet',
@@ -207,6 +226,19 @@ const STRINGS = {
     'plan.saved': 'Ehdot on tallennettu. Ne koskevat tästä eteenpäin tehtäviä hyväksyntöjä.',
     'settings.on': 'Päällä',
     'settings.off': 'Pois',
+    'refuse.REASK_TOO_SOON': 'Omistaja hylkäsi aiemman pyyntösi. Voit pyytää uudelleen {d} alkaen.',
+    'refuse.REASK_TOO_SOON.later': 'Omistaja hylkäsi aiemman pyyntösi. Voit pyytää uudelleen, kun hylkäyksestä on kulunut viikko.',
+    'refuse.SEATS_FULL': 'Tämän roolin kaikki paikat ovat käytössä. Poista joku, lisää paikkoja ehtoihin tai valitse toinen rooli.',
+    'refuse.TOO_MANY_INVITES': 'Sovelluksella on jo niin monta avointa kutsua kuin sillä voi olla. Peru jokin kutsu tai odota, kunnes kutsut vanhenevat.',
+    'refuse.RATE_LIMITED': 'Liian monta yritystä lyhyessä ajassa. Yritä uudelleen {t} kuluttua.',
+    'refuse.RATE_LIMITED.later': 'Liian monta yritystä lyhyessä ajassa. Yritä uudelleen muutaman minuutin kuluttua.',
+    'refuse.FORBIDDEN': 'Roolisi ei salli tätä tässä sovelluksessa.',
+    'refuse.SCOPE_DENIED': 'Tällä sovelluksella ei ole lupaa tehdä tätä.',
+    'refuse.AUTH_REQUIRED': 'Kirjaudu ensin sisään ja yritä sitten uudelleen.',
+    'refuse.NOT_FOUND': 'Tätä ei löytynyt. Tarkista nimi tai lataa sivu uudelleen.',
+    'refuse.INVALID_INPUT': 'Jokin antamasi tieto ei kelpaa. Tarkista se ja yritä uudelleen.',
+    'refuse.OWNER_CANNOT_ASK': 'Omistat tämän sovelluksen, joten sinulla on jo pääsy.',
+    'refuse.MEMBER_IS_OWNER': 'Hän on tämän sovelluksen omistaja. Omistajalla on jo pääsy kaikkeen.',
   },
   es: {
     'members.title': 'Miembros',
@@ -303,6 +335,19 @@ const STRINGS = {
     'plan.saved': 'Las condiciones están guardadas. Se aplican a las aprobaciones desde ahora.',
     'settings.on': 'Activado',
     'settings.off': 'Desactivado',
+    'refuse.REASK_TOO_SOON': 'El propietario rechazó tu solicitud anterior. Puedes pedirlo de nuevo a partir del {d}.',
+    'refuse.REASK_TOO_SOON.later': 'El propietario rechazó tu solicitud anterior. Puedes pedirlo de nuevo una semana después de esa decisión.',
+    'refuse.SEATS_FULL': 'Todas las plazas de este rol están ocupadas. Quita a alguien, agrega plazas en las condiciones o elige otro rol.',
+    'refuse.TOO_MANY_INVITES': 'Esta aplicación ya tiene todas las invitaciones abiertas que puede tener. Cancela alguna o espera a que venzan.',
+    'refuse.RATE_LIMITED': 'Demasiados intentos en poco tiempo. Vuelve a intentarlo en {t}.',
+    'refuse.RATE_LIMITED.later': 'Demasiados intentos en poco tiempo. Vuelve a intentarlo en unos minutos.',
+    'refuse.FORBIDDEN': 'Tu rol no permite hacer esto en esta aplicación.',
+    'refuse.SCOPE_DENIED': 'Esta aplicación no tiene permiso para hacer esto.',
+    'refuse.AUTH_REQUIRED': 'Primero inicia sesión y luego vuelve a intentarlo.',
+    'refuse.NOT_FOUND': 'No se encontró. Revisa el nombre o vuelve a cargar la página.',
+    'refuse.INVALID_INPUT': 'Algo de lo que escribiste no es válido. Revísalo y vuelve a intentarlo.',
+    'refuse.OWNER_CANNOT_ASK': 'Eres el propietario de esta aplicación, así que ya tienes acceso.',
+    'refuse.MEMBER_IS_OWNER': 'Es el propietario de esta aplicación. El propietario ya tiene acceso a todo.',
   },
 };
 

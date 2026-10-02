@@ -23,6 +23,10 @@
  *   const sent = await AIMEAT.connect.history({ limit: 50 });
  *   await AIMEAT.connect.measure(sent[0].id);   // costs a provider request, and money on X
  * @version-history
+ *   v1.3.1 — 2026-10-02 — start() raises the node's refusal with its code, as attach() and revoke()
+ *     do, so an app holding no connections:write sees SCOPE_DENIED instead of "no authorization URL".
+ *     settingsUrl(): the owner's accounts page on the node, so a page (the kit's connections block)
+ *     can send the person there without naming a node path.
  *   v1.3.0 — 2026-10-01 — capabilities(provider | providerEntry | connection): what a provider can
  *     do (read mail, send mail, publish, read metrics, read items) as booleans, from the node's
  *     provider list. An app had matched /mail/ on the provider name, which cannot tell the reading
@@ -40,6 +44,7 @@
  *   v1.0.0 — 2026-08-02 — Initial (TARGET-057 phase 3).
  */
 import { makeSession } from '../_core/session.js';
+import { APEX_URL, NODE_URL } from '../_core/config.js';
 import { attach } from '../_core/namespace.js';
 import { mountConnectPanel } from './panel.js';
 import { PROVIDER_NOTES } from './notes.js';
@@ -334,7 +339,7 @@ async function start(provider, opts = {}) {
       return_url: '/connection-done.html',
     }),
   });
-  const url = res?.data?.authorize_url;
+  const url = must(res, 'the connection could not be started').authorize_url;
   if (!url) throw new Error('the node did not return an authorization URL');
 
   const win = window.open(url, 'aimeat-connect', 'width=620,height=760,noopener=no');
@@ -442,8 +447,17 @@ function on(fn) {
 
 function off(fn) { listeners.delete(fn); }
 
+/**
+ * The owner's own accounts page on the node (the profile's access tab). An app is never granted
+ * connections:write, so inside an app this is where the person connects and disconnects. The apex
+ * is the node itself; on an app origin NODE_URL is the app's own host, so it is the fallback only.
+ */
+function settingsUrl() {
+  return String(APEX_URL || NODE_URL || '').replace(/\/+$/, '') + '/v1/profile?tab=access';
+}
+
 const connect = {
-  list, providers, capabilities, start, attach: attachAccount, revoke, publish, on, off,
+  list, providers, capabilities, start, attach: attachAccount, revoke, publish, on, off, settingsUrl,
   clients, setClient, removeClient,
   history, measure, series,
   /** Per-provider things a user must be told BEFORE they try. See notes.js. */

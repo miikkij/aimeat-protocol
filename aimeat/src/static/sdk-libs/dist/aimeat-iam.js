@@ -797,7 +797,10 @@
       body: JSON.stringify(note ? { note } : {})
     }));
     if (r && r.ok === false) {
-      throw new Error(r.error && typeof r.error.message === "string" && r.error.message || "The request was refused.");
+      throw Object.assign(
+        new Error(r.error && typeof r.error.message === "string" && r.error.message || "The request was refused."),
+        { code: r.error && r.error.code, details: r.error && r.error.details }
+      );
     }
     return { recorded: !!r && r.recorded !== false, passive: false, alreadyMember: !!(r && r.alreadyMember) };
   }

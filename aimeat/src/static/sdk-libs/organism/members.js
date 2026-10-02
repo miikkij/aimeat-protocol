@@ -5,13 +5,18 @@
  *   an email invitation into the organism with workspace grants. Every method calls one existing node
  *   route under /v1/organisms/:id (workspace-access, workspace-access/grant, workspace-access/revoke,
  *   workspace-access/decision, invitations/email), so three apps that wrote this list by hand
- *   (cadence, lahetin, experience-center) can call it instead. A refusal throws the node's own
- *   message through the `fail` the caller passes in.
- * @structure workspaceMembers(h) → { access, members, requests, grant, revoke, decide, inviteByEmail };
- *   displayNames() resolves account names through the public profile route, cached per page.
+ *   (cadence, lahetin, experience-center) can call it instead. The open email invitations are
+ *   listed and cancelled here too. A refusal throws the node's own message through the `fail` the
+ *   caller passes in.
+ * @structure workspaceMembers(h) → { access, members, requests, grant, revoke, decide, inviteByEmail,
+ *   invitations, cancelInvitation }; displayNames() resolves account names through the public
+ *   profile route, cached per page; invitationRow() shapes one invitation.
  * @usage Object.assign(organism, workspaceMembers({ authFetch, fail, getSession }));
  *   const team = await AIMEAT.organism.members(orgId, wsId);
+ *   const open = await AIMEAT.organism.invitations(orgId, { ws: [wsA, wsB] });
  * @version-history
+ *   v1.1.0 — 2026-10-02 — invitations(orgId, { ws? }) and cancelInvitation(orgId, invId), over GET
+ *     /invitations/email and POST /invitations/email/:invId/cancel (the Experience Center list).
  *   v1.0.0 — 2026-10-01 — Initial (IAM plan Phase D block 2).
  */
 
@@ -267,6 +272,72 @@ export function workspaceMembers(h) {
       if (!res || res.ok === false) throw h.fail(res, 'Failed to send the invitation');
       return res.data !== undefined ? res.data : res;
     },
+
+    /**
+     * The organism's open email invitations: GET /v1/organisms/:id/invitations/email. Organism owner
+     * or admin only, and the organism:invite scope on an app session; anyone else gets the node's
+     * refusal (ACCESS_DENIED). The route also lists the provisioned-code invitations, which are left
+     * out here: a code invitation carries an account and is cancelled through its own route.
+     * `ws` (one workspace id or a list) keeps the invitations that name at least one of them.
+     * @param {string} orgId
+     * @param {{ ws?: string|string[] }} [opts]
+     * @returns {Promise<EmailInvitation[]>}
+     */
+    async invitations(orgId, opts) {
+      opts = opts || {};
+      var res = await h.authFetch(orgPath(orgId) + '/invitations/email');
+      if (!res || res.ok === false) throw h.fail(res, 'Failed to list the invitations');
+      var d = res.data !== undefined ? res.data : res;
+      var only = opts.ws == null ? null : (Array.isArray(opts.ws) ? opts.ws : [opts.ws]).filter(Boolean);
+      return ((d && d.invitations) || []).filter(function (i) {
+        return i && i.id && (!i.type || i.type === 'link') && (!i.status || i.status === 'pending');
+      }).map(invitationRow).filter(function (i) {
+        return !only || i.workspaces.some(function (w) { return only.indexOf(w.ws) >= 0; });
+      });
+    },
+
+    /**
+     * Cancel an open email invitation, so its link no longer works: POST
+     * /v1/organisms/:id/invitations/email/:invId/cancel. Organism owner or admin only. An invitation
+     * already accepted or cancelled is refused by the node (INVALID_STATE).
+     * @param {string} orgId
+     * @param {string} invId
+     * @returns {Promise<{ status: 'cancelled' }>}
+     */
+    async cancelInvitation(orgId, invId) {
+      var res = await h.authFetch(orgPath(orgId) + '/invitations/email/' + encodeURIComponent(invId) + '/cancel', post({}));
+      if (!res || res.ok === false) throw h.fail(res, 'Failed to cancel the invitation');
+      return res.data !== undefined ? res.data : res;
+    },
   };
   return api;
+}
+
+/**
+ * One open email invitation into an organism.
+ * @typedef {Object} EmailInvitation
+ * @property {string} id
+ * @property {string} email
+ * @property {'member'|'admin'} orgRole       The role in the organism the invitation gives.
+ * @property {Array<{ ws: string, role: 'viewer'|'contributor' }>} workspaces  The workspace roles it gives.
+ * @property {string} status                    'pending' for an open invitation.
+ * @property {string|null} invitedBy
+ * @property {string|null} message
+ * @property {string} [createdAt]               ISO time.
+ * @property {string} [expiresAt]               ISO time; the link stops working then.
+ */
+
+/**
+ * The node's invitation as the library answers it.
+ * @param {any} i
+ * @returns {EmailInvitation}
+ */
+function invitationRow(i) {
+  return {
+    id: i.id, email: i.email || '', orgRole: i.org_role === 'admin' ? 'admin' : 'member',
+    workspaces: (Array.isArray(i.workspaces) ? i.workspaces : []).filter(function (w) { return w && w.ws; })
+      .map(function (w) { return { ws: w.ws, role: w.role === 'contributor' ? 'contributor' : 'viewer' }; }),
+    status: i.status || 'pending', invitedBy: i.invited_by || null, message: i.message || null,
+    createdAt: i.created_at || undefined, expiresAt: i.expires_at || undefined,
+  };
 }

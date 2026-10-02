@@ -25,6 +25,7 @@ let session: any;
 let available: boolean;
 let askAnswer: () => Promise<any>;
 let reviewAnswer: () => Promise<any>;
+let storedAnswer: () => Promise<any>;
 let mdRender: (text: string) => any;
 let mdRich: ((text: string) => Promise<any>) | null;
 
@@ -55,6 +56,19 @@ const ANSWER = {
   provider: { id: 'typesafe', kind: 'hosted', chosen_by: 'owner' },
 };
 
+/** A decision row as GET /v1/ai/decisions/:id gives it: the record keeps the thresholds, not `passed`. */
+const ROW = {
+  id: 'dec_9', ownerGhii: 'alice@node', principal: 'eco:postinjalostamo#alice@node', appId: 'postinjalostamo',
+  subject: 'mail:42', model: 'jev-1', createdAt: '2026-09-30T10:00:00.000Z', rule: null, ruleVersion: null, outcome: null,
+  keyScope: 'own', provider: 'typesafe', providerKind: 'hosted',
+  record: {
+    spec: 'aimeat.decision/v1', model: 'jev-1', provider: 'typesafe', questions: {}, answers: ANSWER.answers,
+    thresholds: { urgent: 0.8, topic: 0.7 }, gates: 'which queue the mail goes to', subject: 'mail:42',
+    stateHash: 'sha256:x', scrub: { removed: { person: 1 }, total: 1 }, usage: { inputTokens: 200, costUsd: 0.0002 },
+    requestId: null, keyScope: 'own',
+  },
+};
+
 beforeAll(async () => {
   restore = installGlobals({ motion: 'less' });
   (window as any).AIMEAT = {
@@ -77,6 +91,7 @@ beforeAll(async () => {
         return { id, title: 'Urgent mail', thresholds: { urgent: 0.8 }, ask: async (state: any, opts: any) => { calls.push({ op: 'ruleAsk', args: { state, opts } }); return askAnswer(); } };
       },
       review: async (id: string, outcome: string, extra: any) => { calls.push({ op: 'review', args: { id, outcome, extra } }); return reviewAnswer(); },
+      decisions: async (q: any) => { calls.push({ op: 'decisions', args: q }); return storedAnswer(); },
       providers: async () => ({ providers: [
         { id: 'typesafe', title: 'TypeSafe', kind: 'hosted', data_statement: 'Your text goes to TypeSafe in the EU.' },
         { id: 'home', title: 'Home box', kind: 'local', data_statement: 'Your text stays on your machine.' },
@@ -97,6 +112,7 @@ beforeEach(() => {
   available = true;
   askAnswer = async () => JSON.parse(JSON.stringify(ANSWER));
   reviewAnswer = async () => ({ ok: true });
+  storedAnswer = async () => JSON.parse(JSON.stringify(ROW));
   mdRender = (text: string) => { const d = document.createElement('div'); d.setAttribute('class', 'md-body'); d.textContent = 'MD:' + text; return d; };
   mdRich = null;
   kitI18n.setLang('en');
@@ -199,6 +215,17 @@ describe('doc', () => {
     expect(items[0].children[0].attrs.href).toBe('https://example.com/a');
     expect(items[0].children[0].attrs.rel).toContain('noopener');
     expect(items[1].textContent).toContain('shortened link');
+  });
+  it('stamps the plain variant on the root, and nothing without it', () => {
+    const host = document.createElement('div');
+    const boxed = docMod.doc({ target: host, markdown: 'boxed' });
+    expect(boxed.el.getAttribute('data-ak-variant')).toBe(null);
+    const plain = docMod.doc({ target: host, markdown: 'story', variant: 'plain' });
+    expect(plain.el.getAttribute('data-ak-variant')).toBe('plain');
+    expect(part(plain.el, 'md')[0].textContent).toBe('MD:story');
+    const warn = console.warn;
+    console.warn = () => {};
+    try { expect(docMod.doc({ target: host, markdown: 'x', variant: 'boxless' }).el.getAttribute('data-ak-variant')).toBe(null); } finally { console.warn = warn; }
   });
 });
 
@@ -311,8 +338,10 @@ describe('decision', () => {
     expect(part(e.el, 'recorded')[0].textContent).toBe('Saved: you changed the answer to meeting.');
   });
 
-  it('keeps the buttons and says why when review() is refused', async () => {
-    reviewAnswer = async () => { const err: any = new Error('Not yours'); err.code = 'FORBIDDEN'; throw err; };
+  it('keeps the buttons and says why when review() is refused, and sends OWN_DECISION to the node page', async () => {
+    // A code the kit has no words for keeps the node's sentence. OWN_DECISION (the principal that
+    // asked may not review) switches the block to the node's own page (Jouni, 2026-10-02).
+    reviewAnswer = async () => { const err: any = new Error('Not yours'); err.code = 'NOT_A_KNOWN_CODE'; throw err; };
     const host = document.createElement('div');
     const d = decMod.decision({ target: host, appId: 'app1', questions: Q, thresholds: { topic: 0.7 }, state: 'x' });
     await d.ask();
@@ -320,6 +349,40 @@ describe('decision', () => {
     await settle();
     expect(part(d.el, 'failure')[0].textContent).toBe('Your answer was not saved: Not yours');
     expect(part(d.el, 'confirm').length).toBe(1);
+    reviewAnswer = async () => { const err: any = new Error('An agent does not review a decision it asked for itself.'); err.code = 'OWN_DECISION'; throw err; };
+    click(part(d.el, 'confirm')[0]);
+    await settle();
+    expect(part(d.el, 'confirm')).toEqual([]);
+    expect(part(d.el, 'reviewLink')[0].attrs.href).toBe('https://node.test/v1/profile?tab=ai&open=decide-card');
+  });
+
+  it('inside an app sends the review to the node page and reads the decision again on the way back', async () => {
+    const auth = (window as any).AIMEAT.auth;
+    (window as any).AIMEAT.auth = { ...auth, isAppOrigin: () => true };
+    try {
+      const host = document.createElement('div');
+      const d = decMod.decision({ target: host, appId: 'app1', questions: Q, thresholds: { topic: 0.7 }, state: 'x' });
+      await d.ask();
+      expect(part(d.el, 'confirm')).toEqual([]);
+      expect(part(d.el, 'override')).toEqual([]);
+      const link = part(d.el, 'reviewLink')[0];
+      expect(link.tagName).toBe('A');
+      expect(link.attrs.href).toBe('https://node.test/v1/profile?tab=ai&open=decide-card');
+      expect(link.attrs.target).toBe('_blank');
+      expect(part(d.el, 'reviewOnNode')[0].textContent).toContain('This app asked for the decision');
+      // A focus without the trip reads nothing; after the trip the decision is read by its id.
+      (window as any).dispatchEvent({ type: 'focus' });
+      await settle();
+      expect(calls.some((x) => x.op === 'decisions')).toBe(false);
+      click(link);
+      (window as any).dispatchEvent({ type: 'focus' });
+      await settle();
+      expect(calls.find((x) => x.op === 'decisions')!.args).toEqual({ id: 'dec_1' });
+      expect(calls.some((x) => x.op === 'review')).toBe(false);
+      d.destroy();
+    } finally {
+      (window as any).AIMEAT.auth = auth;
+    }
   });
 
   it('runs a rule by id with only the state, and draws its outcome and thresholds', async () => {
@@ -360,6 +423,142 @@ describe('decision', () => {
     expect(f.attrs.role).toBe('alert');
     expect(f.textContent).toBe('Kysymys ei mennyt perille: Tekoälybudjettisi on nyt käytetty.');
     expect(part(d.el, 'retry').length).toBe(1);
+  });
+
+  it('takes questions built per run, through ask() and set(), and passes the names to scrub', async () => {
+    const host = document.createElement('div');
+    const d = decMod.decision({ target: host, appId: 'app1', state: 'first' });
+    await settle();
+    expect(d.el.getAttribute('data-ak-state')).toBe('failed');
+    const Q2 = { urgent: Q.urgent };
+    await d.ask('Call Kim', Q2, { names: ['Kim'] });
+    expect(calls.find((x) => x.op === 'ask')!.args).toEqual({ state: 'Call Kim', questions: Q2, opts: { app_id: 'app1', names: ['Kim'] } });
+    calls = [];
+    await d.set({ questions: Q, state: 'Pay by Friday' });
+    expect(d.el.getAttribute('data-ak-state')).toBe('ready');
+    expect(part(d.el, 'answer').length).toBe(0);
+    expect(calls.some((x) => x.op === 'ask')).toBe(false);
+    click(part(d.el, 'ask')[0]);
+    await settle();
+    expect(calls.find((x) => x.op === 'ask')!.args).toEqual({ state: 'Pay by Friday', questions: Q, opts: { app_id: 'app1', names: ['Kim'] } });
+    calls = [];
+    const r = decMod.decision({ target: host, appId: 'app1', rule: 'urgent-mail', names: ['Aino'] });
+    await r.ask({ text: 'hi Aino' });
+    expect(calls.find((x) => x.op === 'ruleAsk')!.args.opts).toEqual({ app_id: 'app1', names: ['Aino'] });
+  });
+
+  it('asks again with the set onAnswered returns, and draws each round in order', async () => {
+    const host = document.createElement('div');
+    const seen: Array<[string, number]> = [];
+    let outcome: any = null;
+    const second = { topic: Q.topic };
+    const d = decMod.decision({
+      target: host, appId: 'app1', questions: { urgent: Q.urgent }, state: 'x', onOutcome: (o: any) => { outcome = o; },
+      onAnswered: (res: any, round: number) => { seen.push([res.decision_id, round]); return round === 0 ? second : null; },
+    });
+    let n = 0;
+    askAnswer = async () => ({ ...JSON.parse(JSON.stringify(ANSWER)), decision_id: 'dec_r' + (++n) });
+    const r = await d.ask();
+    expect(seen).toEqual([['dec_r1', 0], ['dec_r2', 1]]);
+    const asks = calls.filter((x) => x.op === 'ask');
+    expect(asks.map((x) => x.args.questions)).toEqual([{ urgent: Q.urgent }, second]);
+    expect(asks[1].args.state).toBe('x');
+    expect(r.decision_id).toBe('dec_r2');
+    expect(r.steps.map((x: any) => x.decision_id)).toEqual(['dec_r1', 'dec_r2']);
+    expect(outcome.steps.length).toBe(2);
+    const steps = part(d.el, 'step');
+    expect(steps.map((x: any) => x.attrs['data-step'])).toEqual(['1', '2']);
+    expect(part(steps[0], 'stepTitle')[0].textContent).toBe('Questions, round 1');
+    expect(part(steps[1], 'cost').length).toBe(1);
+  });
+
+  it('stops a chain at MAX_ROUNDS calls', async () => {
+    const host = document.createElement('div');
+    const d = decMod.decision({ target: host, appId: 'app1', questions: Q, state: 'x', onAnswered: () => Q });
+    await d.ask();
+    expect(calls.filter((x) => x.op === 'ask').length).toBe(5);
+  });
+
+  it('draws the app verdict in the verdict part, in place of the threshold words', async () => {
+    const host = document.createElement('div');
+    let got: any = null;
+    const d = decMod.decision({ target: host, appId: 'app1', questions: Q, thresholds: { urgent: 0.8, topic: 0.7 }, state: 'x', verdict: (res: any) => { got = res; return 'Goes to the invoice queue'; } });
+    await d.ask();
+    expect(got.decision_id).toBe('dec_1');
+    const v = part(d.el, 'verdict');
+    expect(v.length).toBe(1);
+    expect(v[0].attrs.class).toBe('ak-dec__stamp');
+    expect(v[0].textContent).toBe('Goes to the invoice queue');
+    expect(part(part(d.el, 'answer')[0], 'threshold')[0].textContent).toBe('threshold 0.80');
+    const node = document.createElement('strong');
+    node.textContent = 'HOLD';
+    const e = decMod.decision({ target: host, appId: 'app1', questions: Q, thresholds: { topic: 0.7 }, state: 'x', verdict: () => node });
+    await e.ask();
+    expect(part(e.el, 'verdict')[0].children[0]).toBe(node);
+    const warn = console.warn;
+    console.warn = () => {};
+    const f = decMod.decision({ target: host, appId: 'app1', questions: Q, thresholds: { topic: 0.7 }, state: 'x', verdict: () => { throw new Error('bad'); } });
+    try { await f.ask(); } finally { console.warn = warn; }
+    expect(part(f.el, 'verdict').map((x: any) => x.textContent)).toEqual(['reaches the threshold', 'under the threshold']);
+  });
+
+  it('draws a stored decision with its record, never asks, and records a review', async () => {
+    const host = document.createElement('div');
+    const d = decMod.decision({ target: host, decisionId: 'dec_9' });
+    expect(d.el.getAttribute('data-ak-state')).not.toBe('sample');
+    await settle();
+    expect(d.el.getAttribute('data-ak-state')).toBe('stored');
+    expect(calls.find((x) => x.op === 'decisions')!.args).toEqual({ id: 'dec_9' });
+    expect(calls.some((x) => x.op === 'ask' || x.op === 'gate' || x.op === 'isAvailable')).toBe(false);
+    expect(part(d.el, 'decidedAt')[0].textContent).toBe('Decided on 2026-09-30.');
+    expect(part(d.el, 'subject')[0].textContent).toBe('About: mail:42');
+    expect(part(d.el, 'gates')[0].textContent).toBe('What it decides: which queue the mail goes to');
+    expect(part(d.el, 'verdict').map((x: any) => x.textContent)).toEqual(['reaches the threshold', 'under the threshold']);
+    expect(part(d.el, 'who')[0].textContent).toBe('Answered by typesafe (an outside service). Model: jev-1.');
+    expect(part(d.el, 'cost')[0].textContent).toBe('Cost $0.0002, paid with your own key.');
+    expect(part(d.el, 'askPerson')[0].textContent).toBe('You can confirm this answer or change it.');
+    expect(part(d.el, 'again').length).toBe(0);
+    expect(await d.ask('anything')).toBe(null);
+    click(part(d.el, 'override')[0]);
+    part(d.el, 'overridePick')[0].value = 'meeting';
+    click(part(d.el, 'record')[0]);
+    await settle();
+    expect(calls.find((x) => x.op === 'review')!.args).toEqual({ id: 'dec_9', outcome: 'overridden', extra: { override: 'meeting' } });
+    expect(part(d.el, 'recorded')[0].textContent).toBe('Saved: you changed the answer to meeting.');
+    expect(calls.some((x) => x.op === 'ask' || x.op === 'gate')).toBe(false);
+  });
+
+  it('says an earlier review, offers a new one, and says when the decision is gone', async () => {
+    storedAnswer = async () => {
+      const row = JSON.parse(JSON.stringify(ROW));
+      row.record.review = { outcome: 'overridden', by: 'alice@node', at: '2026-10-01T08:00:00.000Z', override: false, note: 'Not urgent' };
+      row.rule = 'decide.rules.urgent-mail';
+      row.ruleVersion = 3;
+      row.outcome = 'act';
+      return row;
+    };
+    const host = document.createElement('div');
+    const d = decMod.decision({ target: host, appId: 'app1', decisionId: 'dec_9' });
+    await settle();
+    expect(part(d.el, 'reviewed')[0].textContent).toBe('Reviewed on 2026-10-01: the answer was changed to No. Note: Not urgent');
+    expect(part(d.el, 'askPerson')[0].textContent).toBe('You can still confirm the answer or change it.');
+    expect(part(d.el, 'ruleRun')[0].textContent).toBe('Decision rule urgent-mail, version 3.');
+    expect(part(d.el, 'outcome')[0].textContent).toBe('The answer is sure enough to act on.');
+    click(part(d.el, 'confirm')[0]);
+    await settle();
+    expect(calls.find((x) => x.op === 'review')!.args).toEqual({ id: 'dec_9', outcome: 'confirmed', extra: {} });
+
+    storedAnswer = async () => { const err: any = new Error('No such decision.'); err.code = 'NOT_FOUND'; throw err; };
+    calls = [];
+    await d.set({ decisionId: 'dec_gone' });
+    await settle();
+    expect(calls.find((x) => x.op === 'decisions')!.args).toEqual({ id: 'dec_gone' });
+    expect(d.el.getAttribute('data-ak-state')).toBe('failed');
+    expect(part(d.el, 'failure')[0].textContent).toBe('This decision was not found. It may have been removed.');
+    storedAnswer = async () => JSON.parse(JSON.stringify(ROW));
+    click(part(d.el, 'retry')[0]);
+    await settle();
+    expect(d.el.getAttribute('data-ak-state')).toBe('stored');
   });
 
   it('drops an answer that arrives after destroy', async () => {

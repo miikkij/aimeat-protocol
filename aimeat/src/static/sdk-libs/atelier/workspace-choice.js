@@ -7,13 +7,17 @@
  *   changes. workspaceTeam, intakeForm and intakeAdmin given `app` and no org or ws follow it: they
  *   say "choose above" until a choice exists, then mount on that workspace, and mount again when the
  *   person picks another. A page without a picker still opens on the choice the app made before
- *   (AIMEAT.organism.recall, the same `<app>.workspace` record the picker writes).
- * @structure WORKSPACE_EVENT · announceWorkspace(app, choice) · chosenWorkspace(app) ·
- *   pickerOpened(app) · followsWorkspace(spec) · followWorkspace(spec, factory)
+ *   (AIMEAT.organism.recall, the same `<app>.workspace` record the picker writes). When the person
+ *   keeps the app private (workspacePicker allowPrivate), the event carries `private: true` with
+ *   orgId and wsId null, and a following block says there is nothing to share instead.
+ * @structure WORKSPACE_EVENT · announceWorkspace(app, choice) · announcePrivate(app) ·
+ *   chosenWorkspace(app) · pickerOpened(app) · followsWorkspace(spec) · followWorkspace(spec, factory)
  * @usage
  *   if (followsWorkspace(spec)) return followWorkspace(spec, workspaceTeam);   // first line of a block
  *   window.addEventListener('aimeat-workspace-change', (e) => console.log(e.detail.wsId));
  * @version-history
+ *   v0.63.0 — 2026-10-02 — announcePrivate(app): the choice of no shared workspace reaches the
+ *     following blocks, which show one line (follow.private) instead of the last workspace.
  *   v0.62.0 — 2026-10-01 — Initial (workspacePicker as a mosaic block).
  */
 import { el, clear, resolve } from './dom.js';
@@ -23,7 +27,7 @@ import { isPlaceholder, watch } from './members-shared.js';
 /** The window event a choice sends. */
 export const WORKSPACE_EVENT = 'aimeat-workspace-change';
 
-/** @type {Map<string, { orgId: string, wsId: string }>} the last choice per app on this page */
+/** @type {Map<string, { orgId: string, wsId: string } | { private: true }>} the last choice per app on this page */
 const CHOSEN = new Map();
 
 /** @type {Map<string, number>} how many pickers per app are on the page */
@@ -52,19 +56,36 @@ export function pickerOpened(app) {
  */
 export function announceWorkspace(app, choice) {
   if (!app || !choice || !choice.orgId || !choice.wsId) return;
-  const before = CHOSEN.get(app);
+  const before = /** @type {any} */ (CHOSEN.get(app));
   if (before && before.orgId === choice.orgId && before.wsId === choice.wsId) return;
   CHOSEN.set(app, { orgId: choice.orgId, wsId: choice.wsId });
+  send({ app: app, orgId: choice.orgId, wsId: choice.wsId, name: choice.name, orgName: choice.orgName, recalled: !!choice.recalled });
+}
+
+/**
+ * Keep an app's choice of no shared workspace and tell the page, once per change. The event's
+ * detail is { app, orgId: null, wsId: null, private: true, recalled }.
+ * @param {string} app
+ * @param {boolean} [recalled]
+ */
+export function announcePrivate(app, recalled) {
+  if (!app) return;
+  const before = /** @type {any} */ (CHOSEN.get(app));
+  if (before && before.private) return;
+  CHOSEN.set(app, { private: true });
+  send({ app: app, orgId: null, wsId: null, private: true, recalled: !!recalled });
+}
+
+/** One `aimeat-workspace-change` event on the window. @param {Record<string, any>} detail */
+function send(detail) {
   try {
-    window.dispatchEvent(new CustomEvent(WORKSPACE_EVENT, {
-      detail: { app: app, orgId: choice.orgId, wsId: choice.wsId, name: choice.name, orgName: choice.orgName, recalled: !!choice.recalled },
-    }));
+    window.dispatchEvent(new CustomEvent(WORKSPACE_EVENT, { detail: detail }));
   } catch (e) {
     console.debug('aimeat-atelier: workspace choice not announced', e);
   }
 }
 
-/** The app's choice on this page, or null. @param {string} app */
+/** The app's choice on this page ({ orgId, wsId }, or { private: true }), or null. @param {string} app */
 export function chosenWorkspace(app) {
   return CHOSEN.get(app) || null;
 }
@@ -98,16 +119,28 @@ export function followWorkspace(spec, factory) {
   let at = '';
   let stopped = false;
 
-  function waiting() {
+  /** One line in place of the block: `key` is follow.wait before a choice, follow.private after the private one. */
+  function line(key) {
     clear(root);
     root.appendChild(el('section', { class: 'ak-root ak-mem ak-ws', 'data-ak-part': 'root' }, [
-      el('p', { class: 'ak-mem__none', role: 'status', 'data-ak-part': 'wait' }, tw('follow.wait')),
+      el('p', { class: 'ak-mem__none', role: 'status', 'data-ak-part': key === 'follow.wait' ? 'wait' : 'private' }, tw(key)),
     ]));
   }
+  function waiting() { line('follow.wait'); }
 
-  /** @param {{ orgId: string, wsId: string }} c */
+  /** @param {any} c  { orgId, wsId }, or { private: true } for no shared workspace */
   function mount(c) {
-    if (stopped || !c || !c.orgId || !c.wsId) return;
+    if (stopped || !c) return;
+    if (c.private) {
+      // The app keeps its records out of every workspace: the block has nothing to open on.
+      if (at === 'private') return;
+      at = 'private';
+      if (inner) inner.destroy();
+      inner = null;
+      line('follow.private');
+      return;
+    }
+    if (!c.orgId || !c.wsId) return;
     const key = c.orgId + '/' + c.wsId;
     if (key === at) return;
     at = key;
@@ -143,6 +176,7 @@ export function followWorkspace(spec, factory) {
   else { waiting(); recall(); }
   // Before a choice, a sign-in may bring one and a language change redraws the sentence.
   const stopWatch = watch(function () {
+    if (at === 'private') { line('follow.private'); return; }
     if (at) return;
     waiting();
     recall();

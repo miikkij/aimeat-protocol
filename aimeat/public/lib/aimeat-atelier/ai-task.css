@@ -7,22 +7,30 @@
  *   line. Everything rides the --ak-* token contract, so the block wears the app's look and mode; no
  *   colour of its own. The block keeps to a readable width (--ak-ai-width), long words and model
  *   names wrap instead of scrolling sideways at 390px, and every control keeps the touch floor.
- * @structure .ak-aitask (shared lines) · the box and the reason · the run bar and the busy line ·
- *   the refusal · the answer · the copy route · variant compact
+ *
+ *   The follow-up chat (atelier/ai-chat.js: aiChat) wears the same sheet: its title, notice, refusal,
+ *   label, body and meta lines share these rules, and its own section draws the conversation (the
+ *   question on an accent tint at the end of the line, the answer on the surface with its label)
+ *   and the box with Ask and Start over, which wrap under each other at 390px.
+ * @structure .ak-aitask, .ak-aichat (shared lines) · the box and the reason · the run bar and the
+ *   busy line · the refusal · the answer · the copy route · the conversation · the chat box ·
+ *   variant compact
  * @version-history
+ *   v0.63.0 — 2026-10-02 — The date in the meta line (.ak-aitask__made) and aiChat.
  *   v0.62.0 — 2026-10-01 — Initial.
  */
 
 /* ── Shared lines: title, hint, notice ─────────────────────────────────────────────────────── */
-.ak-aitask { display: block; max-width: var(--ak-ai-width, 48rem); min-width: 0; }
-.ak-aitask[hidden] { display: none; }
+.ak-aitask, .ak-aichat { display: block; max-width: var(--ak-ai-width, 48rem); min-width: 0; }
+.ak-aitask[hidden], .ak-aichat[hidden] { display: none; }
 /* A field stands on the block's own surface. The kit's .ak-input takes the page colour (--ak-bg) so
    it reads as sunk inside a card; this block is not a card, so on the page that colour hid the
    field (members.css and intake-connect.css say the same). */
-.ak-aitask .ak-input:not(.ak-input--range) { background: var(--ak-surface); }
-.ak-aitask__title { margin: 0 0 4px; font-size: 1.05rem; color: var(--ak-ink); overflow-wrap: anywhere; }
-.ak-aitask__hint { margin: 0 0 10px; font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); max-width: 70ch; }
-.ak-aitask__notice, .ak-aitask__failure {
+.ak-aitask .ak-input:not(.ak-input--range),
+.ak-aichat .ak-input:not(.ak-input--range) { background: var(--ak-surface); }
+.ak-aitask__title, .ak-aichat__title { margin: 0 0 4px; font-size: 1.05rem; color: var(--ak-ink); overflow-wrap: anywhere; }
+.ak-aitask__hint, .ak-aichat__hint { margin: 0 0 10px; font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); max-width: 70ch; }
+.ak-aitask__notice, .ak-aitask__failure, .ak-aichat__notice, .ak-aichat__failure {
   margin: 0 0 12px;
   padding: 8px 12px;
   border-radius: var(--ak-radius-sm);
@@ -31,7 +39,7 @@
   max-width: 70ch;
   overflow-wrap: anywhere;
 }
-.ak-aitask__notice {
+.ak-aitask__notice, .ak-aichat__notice {
   border: 1px solid color-mix(in oklab, var(--ak-accent) 35%, var(--ak-line));
   background: color-mix(in oklab, var(--ak-accent) 8%, var(--ak-surface));
 }
@@ -39,20 +47,20 @@
 /* ── The box and the reason ────────────────────────────────────────────────────────────────── */
 .ak-aitask__field { margin: 0 0 6px; }
 .ak-aitask__field .ak-input--area { min-height: 96px; resize: vertical; }
-.ak-aitask__reason { margin: 0 0 8px; font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); }
-.ak-aitask__reason[hidden] { display: none; }
+.ak-aitask__reason, .ak-aichat__reason { margin: 0 0 8px; font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); }
+.ak-aitask__reason[hidden], .ak-aichat__reason[hidden] { display: none; }
 
 /* ── The run bar and the busy line ─────────────────────────────────────────────────────────── */
-.ak-aitask__bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 12px; }
-.ak-aitask .ak-btn { min-height: var(--ak-touch, 40px); }
-.ak-aitask__status { margin: 0; font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); }
+.ak-aitask__bar, .ak-aichat__bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 12px; }
+.ak-aitask .ak-btn, .ak-aichat .ak-btn { min-height: var(--ak-touch, 40px); }
+.ak-aitask__status, .ak-aichat__status { margin: 0; font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); }
 
 /* ── The refusal ───────────────────────────────────────────────────────────────────────────── */
-.ak-aitask__failure {
+.ak-aitask__failure, .ak-aichat__failure {
   border: 1px solid color-mix(in oklab, var(--ak-err, var(--ak-warn)) 55%, var(--ak-line));
   background: color-mix(in oklab, var(--ak-err, var(--ak-warn)) 10%, var(--ak-surface));
 }
-.ak-aitask__failure[hidden] { display: none; }
+.ak-aitask__failure[hidden], .ak-aichat__failure[hidden] { display: none; }
 
 /* ── The answer: label, body, meta line, the cut-off note ──────────────────────────────────── */
 .ak-aitask__answer {
@@ -64,11 +72,12 @@
   min-width: 0;
 }
 .ak-aitask__answer[hidden] { display: none; }
-.ak-aitask__label:empty { display: none; }
-.ak-aitask__label { margin: 0 0 8px; }
-.ak-aitask__body { color: var(--ak-ink); line-height: 1.55; overflow-wrap: anywhere; min-width: 0; }
-.ak-aitask__body pre, .ak-aitask__body table { max-width: 100%; overflow-x: auto; }
-.ak-aitask__text { white-space: pre-wrap; }
+.ak-aitask__label:empty, .ak-aichat__label:empty { display: none; }
+.ak-aitask__label, .ak-aichat__label { margin: 0 0 8px; }
+.ak-aitask__body, .ak-aichat__body { color: var(--ak-ink); line-height: 1.55; overflow-wrap: anywhere; min-width: 0; }
+.ak-aitask__body pre, .ak-aitask__body table,
+.ak-aichat__body pre, .ak-aichat__body table { max-width: 100%; overflow-x: auto; }
+.ak-aitask__text, .ak-aichat__text { white-space: pre-wrap; }
 .ak-aitask__json {
   margin: 0;
   padding: 12px 14px;
@@ -79,7 +88,7 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.ak-aitask__meta {
+.ak-aitask__meta, .ak-aichat__meta {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 14px;
@@ -88,7 +97,7 @@
   color: var(--ak-ink-dim);
   overflow-wrap: anywhere;
 }
-.ak-aitask__truncated {
+.ak-aitask__truncated, .ak-aichat__truncated {
   margin: 10px 0 0;
   padding: 6px 10px;
   border-left: 3px solid var(--ak-warn);
@@ -100,8 +109,40 @@
 .ak-aitask__copy { margin: 16px 0 0; padding: 16px 0 0; border-top: var(--ak-line-w, 1px) solid var(--ak-line); min-width: 0; }
 .ak-aitask__copy-title { margin: 0 0 10px; font-size: 0.95rem; color: var(--ak-ink); }
 
+/* ── aiChat: the conversation ──────────────────────────────────────────────────────────────── */
+.ak-aichat__chatnotice { margin: 0 0 10px; }
+.ak-aichat__chatnotice:empty { display: none; }
+.ak-aichat__log { display: flex; flex-direction: column; gap: 10px; margin: 0 0 12px; min-width: 0; }
+.ak-aichat__log[hidden] { display: none; }
+.ak-aichat__empty { margin: 0; font-size: var(--ak-text-fine, 0.85rem); color: var(--ak-ink-dim); max-width: 70ch; }
+.ak-aichat__turn {
+  min-width: 0;
+  max-width: 100%;
+  padding: 10px 14px;
+  border-radius: var(--ak-radius-sm);
+  overflow-wrap: anywhere;
+}
+.ak-aichat__turn--user {
+  align-self: flex-end;
+  max-width: min(85%, 40rem);
+  border: var(--ak-line-w, 1px) solid color-mix(in oklab, var(--ak-accent) 30%, var(--ak-line));
+  background: color-mix(in oklab, var(--ak-accent) 10%, var(--ak-surface));
+}
+.ak-aichat__turn--ai { border: var(--ak-line-w, 1px) solid var(--ak-line); background: var(--ak-surface); }
+.ak-aichat__who { display: block; margin: 0 0 4px; font-size: var(--ak-text-fine, 0.85rem); font-weight: 600; color: var(--ak-ink-dim); }
+.ak-aichat__question { margin: 0; color: var(--ak-ink); white-space: pre-wrap; }
+
+/* ── aiChat: the box, Ask and Start over ───────────────────────────────────────────────────── */
+.ak-aichat__form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 12px; min-width: 0; }
+.ak-aichat__field { flex: 1 1 16rem; min-width: 0; margin: 0 0 6px; }
+.ak-aichat__form .ak-aichat__bar { margin: 0 0 6px; }
+.ak-aichat__bar .ak-btn[hidden] { display: none; }
+
 /* ── Variant: compact, for a side panel or a card ──────────────────────────────────────────── */
 .ak-aitask[data-ak-variant="compact"] .ak-aitask__title { font-size: 0.95rem; }
 .ak-aitask[data-ak-variant="compact"] .ak-aitask__field .ak-input--area { min-height: 64px; }
 .ak-aitask[data-ak-variant="compact"] .ak-aitask__answer { padding: 10px 12px; }
 .ak-aitask[data-ak-variant="compact"] .ak-aitask__bar { margin-bottom: 8px; }
+.ak-aichat[data-ak-variant="compact"] .ak-aichat__title { font-size: 0.95rem; }
+.ak-aichat[data-ak-variant="compact"] .ak-aichat__turn { padding: 8px 10px; }
+.ak-aichat[data-ak-variant="compact"] .ak-aichat__log { gap: 8px; }
