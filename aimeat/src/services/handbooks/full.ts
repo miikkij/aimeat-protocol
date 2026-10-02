@@ -8,6 +8,8 @@
  * @structure FULL_HANDBOOK — markdown, served by GET /v1/agents/me/handbook?surface=full
  * @usage import { FULL_HANDBOOK } from './full.js';
  * @version-history
+ *   v1.7.0 — 2026-10-02 — Says where the setting explanations are (tier "settings"), for when the
+ *     person asks what a setting means.
  *   v1.6.0 — 2026-10-02 — When the person asks for a new agent (new-agent.ts), between the grounds and
  *     the surfaces: a request this node answers itself, and the one an agent had sent elsewhere.
  *   v1.5.0 — 2026-10-01 — Ends with where the feature map is, and the actions a person does on the
@@ -96,5 +98,10 @@ not in what you tell them.
 **What this node can do**, once you know what the person needs: \`aimeat_handbook_get { tier:
 "features" }\` lists the areas, and \`"features/<id>"\` is one of them. Offer the one thing that
 fits; do not recite the list.
+
+**What a setting means**, when the person asks what a setting does or which value to pick:
+\`aimeat_handbook_get { tier: "settings" }\` lists the settings the pages explain behind a question
+mark, and \`"settings/<term>"\` is one of them in English, Finnish and Spanish. Answer in the
+person's language with the matching section.
 
 ${SCREEN_ONLY_MD}`;

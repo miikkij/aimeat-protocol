@@ -17,6 +17,7 @@
  *       share their group, and prompts/get returns a body with the node values already filled.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-mcp-orientation.ts
  * @version-history
+ *   2026-10-02 — 17l/17m: the setting explanations (tier "settings"), on MCP and REST, in three languages.
  *   2026-10-01 — 17j/17k: the feature map in parts (tier "features"), on MCP and REST, and the
  *     handbook's screen-only list.
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
@@ -594,6 +595,32 @@ async function main() {
             assert(body.result?.isError === true && /NOT_FOUND/.test(toolText(body)) && /start, g-1/.test(toolText(body)), `MCP: ${toolText(body).slice(0, 160)}`);
             const r = await json('/v1/prompts/features/sections/g-999');
             assert(r.status === 404 && r.body.error?.code === 'NOT_FOUND', `REST: ${r.status}`);
+        });
+
+        // The setting explanations the pages show behind a question mark (explain.<term>.* in the
+        // locales): an AI reads the same words, in all three languages, to answer what a setting does.
+        await test('17l. tier "settings" lists the terms by area; one term arrives in English, Finnish and Spanish and equals its REST part', async () => {
+            const start = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'settings' } }, 423)).body);
+            const rest = await fetch(`${BASE}/v1/prompts/settings/sections/start?format=txt`).then(r => r.text());
+            assert(start === rest && start.includes('`settings/ai.temperature`') && start.includes('**Temperature**'), `the index names the terms and equals REST: ${start.slice(0, 200)}`);
+            const list = await json('/v1/prompts/settings/sections');
+            const parts = list.body.data.parts as Array<{ id: string; chars: number }>;
+            assert(parts.length > 50 && parts[0].id === 'start' && parts.some(p => p.id === 'ai.temperature'), `the parts: ${parts.length}`);
+            for (const p of parts) assert(p.chars > 0 && p.chars < 24_000, `${p.id} fits one tool result: ${p.chars}`);
+            const temp = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'settings/ai.temperature' } }, 424)).body);
+            assert(temp.includes('Temperature') && temp.includes('Lämpötila') && temp.includes('Temperatura'), `English, Finnish and Spanish: ${temp.slice(0, 200)}`);
+            assert(temp.includes('Arvoalue') && temp.includes('Ejemplos'), 'each language uses its own section words');
+            const restTerm = await json('/v1/prompts/settings/sections/ai.temperature');
+            assert(restTerm.status === 200 && restTerm.body.data.prompt === temp && restTerm.body.data.id === 'settings/ai.temperature', `REST equals MCP: ${restTerm.status}`);
+            const handbook = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: {} }, 425)).body);
+            assert(handbook.includes('"settings"'), 'the handbook says where the explanations are');
+        });
+
+        await test('17m. FAILURE: a setting the explanations do not have is an error that lists the terms, on both doors', async () => {
+            const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'settings/ai.no_such_setting' } }, 426);
+            assert(body.result?.isError === true && /NOT_FOUND/.test(toolText(body)) && /start, ai\.temperature/.test(toolText(body)), `MCP: ${toolText(body).slice(0, 160)}`);
+            const r = await json('/v1/prompts/settings/sections/ai.no_such_setting');
+            assert(r.status === 404 && r.body.error?.code === 'NOT_FOUND' && /ai\.temperature/.test(r.body.error?.message ?? ''), `REST: ${r.status}`);
         });
 
         await test('17e. the Classic first part says it is Classic and where a new app is built', async () => {
