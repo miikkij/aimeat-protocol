@@ -12,6 +12,8 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   v1.9.0 — 2026-10-02 — manage-my-agents: a worker on the owner's computer uses their settings and
+ *     their own key only when its model choice is this node; otherwise the computer's key.
  *   v1.8.0 — 2026-10-02 — manage-my-agents: an agent with all permissions waits after two weeks of record,
  *     and aimeat_agent_scope_narrow narrows it to what it used.
  *   v1.7.1 — 2026-10-02 — manage-my-agents: an agent's own tags need no agent:write, and an older
@@ -131,7 +133,9 @@ Ask what the agent should do, then name the kind, where it runs and who pays:
     \`aimeat_agent_propose\` (a name, its purpose naming that data, a crew definition); the owner
     approves it at the \`approval_url\` the answer gives (the Agents page, also in their open
     items), and approving creates it. This node makes and runs it, so an outside agent builder is
-    never the answer. It thinks with the model in their settings and they pay with their own AI key.
+    never the answer. With its model choice set to this node (\`aimeat_crew_llm_set\` with
+    \`{kind: "node"}\`, and the agent holding \`ai:use\`), it thinks with the model in their settings
+    and their own AI key pays; otherwise it uses the key on the computer it runs on.
   - On this AIMEAT: a scheduled AI job (\`aimeat_schedule_create\`). Nothing to install, it runs
     with their own AI key, and the computer can be off.
 - **The same thing on a timetable:** a schedule (\`aimeat_schedule_create\`).
