@@ -28,6 +28,7 @@
  *   const r = await createOrganismRecord({ storage, config }, ownerName, { name, visibility });
  *   if (!r.ok) { res.status(r.status).json(error(config.nodeId, r.code, r.message)); return; }
  * @version-history
+ *   2026-10-02 — resolveShape() answers { shape, error }; the refusal reads `error`.
  *   2026-10-01 — createOrganismRecord takes a starting `shape` (data/organism-shapes.ts) and its
  *     `lang`: the shape's type, policy and visibility unless given, and its workspaces afterwards
  *     (services/organism-shape-apply.ts). An unknown shape is refused before anything is written.
@@ -119,8 +120,8 @@ export async function createOrganismRecord(
   const name = typeof input.name === 'string' ? input.name.trim() : '';
   if (name.length < 2) return refuse(400, 'INVALID_INPUT', 'Name is required (min 2 characters)');
   // Refuse an unknown shape before anything is written.
-  const shape = resolveShape(input.shape);
-  if (typeof shape === 'string') return refuse(400, 'INVALID_INPUT', shape);
+  const { shape, error: shapeError } = resolveShape(input.shape);
+  if (shapeError) return refuse(400, 'INVALID_INPUT', shapeError);
 
   const description = typeof input.description === 'string' ? input.description : '';
   // The type is the owner's own word (the presets are suggestions the UI translates); empty means

@@ -9,6 +9,8 @@
  * @structure resolveShape(input) · applyOrganismShape(deps, orgId, owner, shape, lang)
  * @usage const created = await applyOrganismShape({ storage, config }, org.id, owner, shape, 'fi');
  * @version-history
+ *   v1.0.1 — 2026-10-02 — resolveShape() answers { shape } or { error } instead of one value that was
+ *     either, so the error's quoted request text never shares a variable with the shape.
  *   v1.0.0 — 2026-10-01 — Initial (guided journey P5).
  */
 import type { AimeatConfig } from '../config.js';
@@ -20,13 +22,16 @@ import { logger } from '../utils/logger.js';
 export interface ShapedWorkspace { ws: string; name: string }
 
 /**
- * The shape a create call asked for. Undefined when it asked for none; a string error when it named
- * one that does not exist, so the caller can refuse before it writes anything.
+ * The shape a create call asked for: `shape` from the catalogue, `error` when the call named one that
+ * does not exist (so the caller can refuse before it writes anything), neither when it asked for none.
+ * The two are separate fields because the error quotes the request: one return value for both let the
+ * request's text reach the loop over a shape's workspaces (CodeQL js/loop-bound-injection, alert 1695).
  */
-export function resolveShape(shape: unknown): OrganismShape | undefined | string {
-    if (shape === undefined || shape === null || shape === '') return undefined;
+export function resolveShape(shape: unknown): { shape?: OrganismShape; error?: string } {
+    if (shape === undefined || shape === null || shape === '') return {};
     const found = shapeById(shape);
-    return found ?? `Unknown shape "${String(shape)}". The shapes are: ${ORGANISM_SHAPES.map(s => s.id).join(', ')}.`;
+    if (found) return { shape: found };
+    return { error: `Unknown shape "${String(shape)}". The shapes are: ${ORGANISM_SHAPES.map(s => s.id).join(', ')}.` };
 }
 
 /**

@@ -6,6 +6,7 @@
  *   refusal together with the ones that exist.
  * @usage cd aimeat && pnpm exec vitest run test/unit/organism-shapes.test.ts
  * @version-history
+ *   v1.0.1 — 2026-10-02 — resolveShape() answers { shape } or { error }.
  *   v1.0.0 — 2026-10-01 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -47,9 +48,11 @@ describe('organism shapes', () => {
     });
 
     it('resolveShape: none, a known one, and an unknown one named with the list', () => {
-        expect(resolveShape(undefined)).toBeUndefined();
-        expect(resolveShape('')).toBeUndefined();
-        expect((resolveShape('team') as { id: string }).id).toBe('team');
-        expect(resolveShape('castle')).toMatch(/Unknown shape "castle".*own-work, team, company, family, club, project/);
+        expect(resolveShape(undefined)).toEqual({});
+        expect(resolveShape('')).toEqual({});
+        expect(resolveShape('team').shape?.id).toBe('team');
+        expect(resolveShape('team').error).toBeUndefined();
+        expect(resolveShape('castle').shape).toBeUndefined();
+        expect(resolveShape('castle').error).toMatch(/Unknown shape "castle".*own-work, team, company, family, club, project/);
     });
 });

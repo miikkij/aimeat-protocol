@@ -6,7 +6,9 @@
  * @usage
  *   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-capabilities
  * @version-history
- *   v1.1.0 — 2026-08-14 — Phase 11: the webhook policy gate. A body carrying a webhookUrl and no
+ *   v1.1.1 — 2026-10-02 — The allowlist node listens on a port the operating system picks
+ *     (helpers/free-port.ts) instead of 41000 + lane % 100.
+ *   v1.1.0 — 2026-08-14 —Phase 11: the webhook policy gate. A body carrying a webhookUrl and no
  *     `source` at all used to skip both WEBHOOKS_DISABLED and the domain allowlist, and was then
  *     stored as the manual webhook capability the gate would have refused (August 2026 audit,
  *     NEW-1). The allowlist half runs against a node this suite spawns itself, because
@@ -55,6 +57,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { waitForServer } from './helpers/wait-for-server.js';
+import { freePort } from './helpers/free-port.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -961,15 +964,13 @@ await test('Webhooks disabled: refused with AND without `source`, and nothing is
     }
 });
 
-// The allowlist branch is a boot-time setting, so it needs a node of its own, and its port is
-// derived from this suite's so that two lanes cannot land on the same one.
-//
-// A BLOCK OF ITS OWN, NOT AN OFFSET. `+ 500` and e2e-capability-webhook-update's `+ 501` looked
-// separate and were not: lane ports are consecutive, so lane 1 (40501 + 501) and lane 2
-// (40502 + 500) both came out 41002 and raced for it. That is the EADDRINUSE the sweep of
-// 2026-09-20 reported at last, after the boot wait learned to say why a node exited. 41000-41099
-// belongs to this suite alone and 41100-41199 to that one, whatever port each lane was given.
-const ALT_PORT = String(41000 + Number(new URL(BASE).port || '80') % 100);
+// The allowlist branch is a boot-time setting, so it needs a node of its own, on a port the operating
+// system picks. Two derived schemes failed in turn: offsets one apart (`+ 500` here, `+ 501` in
+// e2e-capability-webhook-update) put lanes 1 and 2 on 41002 on the sweep of 2026-09-20, and the
+// fixed blocks that replaced them sit where Linux gives out the local ports of outgoing connections,
+// which is how 41104 was taken on the Postgres sweeps of 2026-09-30 and 2026-10-02
+// (helpers/free-port.ts).
+const ALT_PORT = String(await freePort());
 const ALT_BASE = `http://127.0.0.1:${ALT_PORT}`;
 const ALT_DB = resolve(process.cwd(), `test/.caps-allowlist-${ALT_PORT}.db`);
 let altNode: ChildProcess | null = null;
