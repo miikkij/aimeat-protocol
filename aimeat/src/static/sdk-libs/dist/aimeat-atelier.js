@@ -801,8 +801,8 @@
       })
     );
   }
-  function keyOf(kid, attr) {
-    const k = kid.getAttribute(attr);
+  function keyOf(kid, attr2) {
+    const k = kid.getAttribute(attr2);
     return k == null ? kid : k;
   }
   function fadeIn(kid, pace3, index) {
@@ -867,17 +867,17 @@
       return;
     }
     const o = opts || {};
-    const attr = o.keyed || "data-ak-id";
+    const attr2 = o.keyed || "data-ak-id";
     const pace3 = paceOf(node);
     const before = /* @__PURE__ */ new Map();
     kidsOf(node, o.rows).forEach(function(kid) {
-      before.set(keyOf(kid, attr), { el: kid, box: kid.getBoundingClientRect() });
+      before.set(keyOf(kid, attr2), { el: kid, box: kid.getBoundingClientRect() });
     });
     run();
     const seen = /* @__PURE__ */ new Set();
     let arrivals = 0;
     kidsOf(node, o.rows).forEach(function(kid) {
-      const key = keyOf(kid, attr);
+      const key = keyOf(kid, attr2);
       seen.add(key);
       const was = before.get(key);
       if (!was) {
@@ -904,7 +904,7 @@
       /** @type {HTMLElement} */
       resolve(container)
     );
-    const attr = spec.keyed || "data-ak-id";
+    const attr2 = spec.keyed || "data-ak-id";
     let kept = KEPT.get(node);
     if (!kept) {
       kept = /* @__PURE__ */ new Map();
@@ -918,7 +918,7 @@
         let row = kept.get(key);
         if (!row || row.parentNode !== node) {
           row = spec.build(item, i);
-          row.setAttribute(attr, key);
+          row.setAttribute(attr2, key);
         } else if (spec.update) {
           spec.update(row, item, i);
         }
@@ -941,7 +941,7 @@
       next.forEach(function(row, key) {
         kept.set(key, row);
       });
-    }, { keyed: attr, rows: spec.rows });
+    }, { keyed: attr2, rows: spec.rows });
     return order;
   }
   function viewSwap(run, opts) {
@@ -23879,6 +23879,1414 @@
     return dialog({ ...spec, from: "bottom" });
   }
 
+  // src/static/sdk-libs/atelier/board-i18n.js
+  var STRINGS9 = {
+    en: {
+      "board.move": "Move",
+      "board.use": "Use",
+      "board.moveHint": "A frame is a piece of canvas: drag it from anywhere, pan the background, zoom with the wheel.",
+      "board.useHint": "A frame is the product: click inside it as you would in its own tab. Pan from empty canvas.",
+      "board.empty": "Nothing on the board yet.",
+      "board.emptyHint": "Add a frame, or ask for one.",
+      "board.noViewport": "Pan and zoom need the aimeat-viewport library on this page; the frames are laid out as they are.",
+      "board.frame": "Frame",
+      "board.resize": "Resize",
+      "board.ring": "Ring",
+      "board.borrowed": "Borrowed",
+      "board.selected": "Selected",
+      "board.sample": "Sample",
+      "board.kind.table": "table",
+      "board.kind.chart": "chart",
+      "board.kind.html": "card",
+      "board.kind.app": "app",
+      "board.kind.note": "note",
+      "board.kind.image": "image",
+      "board.kind.request": "request",
+      "board.kind.pending": "working",
+      "request.prompt": "What do you want to see?",
+      "request.send": "Ask",
+      "request.plan": "The plan",
+      "request.approve": "Do it",
+      "request.cancel": "Cancel",
+      "request.working": "Working",
+      "request.done": "Done",
+      "request.failed": "Did not finish",
+      "request.gate": "This step waits for your approval before anything runs.",
+      "request.risk.low": "low risk",
+      "request.risk.medium": "medium risk",
+      "request.risk.high": "high risk",
+      "request.route.local": "the board",
+      "request.route.agent": "your agent",
+      "request.route.tool": "a priced tool",
+      "request.route.prompt": "your own AI",
+      "request.loop": "Keep going until it answers",
+      "request.empty": "Type what you want at the prompt.",
+      "shelf.search": "Search the shelf",
+      "shelf.use": "Use",
+      "shelf.board": "On the board",
+      "shelf.empty": "Nothing on this shelf yet.",
+      "shelf.emptyHint": "What you make lands here.",
+      "shelf.library": "Library",
+      "shelf.made": "Made",
+      "verbs.sending": "sending",
+      "verbs.sent": "Thank you, that is sent.",
+      "verbs.saved": "Thank you, that is saved.",
+      "verbs.nothing": "nothing to send",
+      "verbs.noTarget": "this control has nowhere to send to",
+      "verbs.thinking": "thinking",
+      "verbs.working": "working",
+      "verbs.failed": "that did not work",
+      "verbs.copied": "copied",
+      "verbs.signIn": "sign in first",
+      "verbs.notHere": "this is not available here"
+    },
+    fi: {
+      "board.move": "Siirrä",
+      "board.use": "Käytä",
+      "board.moveHint": "Kehys on pala kangasta: raahaa sitä mistä tahansa, liikuta taustaa, lähennä rullalla.",
+      "board.useHint": "Kehys on tuote: käytä sitä kuten omassa välilehdessään. Liikuta lautaa tyhjästä kohdasta.",
+      "board.empty": "Laudalla ei ole vielä mitään.",
+      "board.emptyHint": "Lisää kehys, tai pyydä sellainen.",
+      "board.noViewport": "Liikuttaminen ja lähentäminen tarvitsevat aimeat-viewport-kirjaston tälle sivulle. Kehykset näkyvät paikoillaan.",
+      "board.frame": "Kehys",
+      "board.resize": "Muuta kokoa",
+      "board.ring": "Tutka",
+      "board.borrowed": "Lainassa",
+      "board.selected": "Valittu",
+      "board.sample": "Esimerkki",
+      "board.kind.table": "taulukko",
+      "board.kind.chart": "kaavio",
+      "board.kind.html": "kortti",
+      "board.kind.app": "appi",
+      "board.kind.note": "muistiinpano",
+      "board.kind.image": "kuva",
+      "board.kind.request": "pyyntö",
+      "board.kind.pending": "kesken",
+      "request.prompt": "Mitä haluat nähdä?",
+      "request.send": "Pyydä",
+      "request.plan": "Suunnitelma",
+      "request.approve": "Tee se",
+      "request.cancel": "Peru",
+      "request.working": "Tekee",
+      "request.done": "Valmis",
+      "request.failed": "Ei valmistunut",
+      "request.gate": "Tämä askel odottaa hyväksyntääsi ennen kuin mitään ajetaan.",
+      "request.risk.low": "pieni riski",
+      "request.risk.medium": "keskiriski",
+      "request.risk.high": "suuri riski",
+      "request.route.local": "lauta itse",
+      "request.route.agent": "agenttisi",
+      "request.route.tool": "hinnoiteltu työkalu",
+      "request.route.prompt": "oma tekoälysi",
+      "request.loop": "Jatka kunnes vastaus löytyy",
+      "request.empty": "Kirjoita kehotteeseen, mitä haluat.",
+      "shelf.search": "Hae hyllyltä",
+      "shelf.use": "Käytä",
+      "shelf.board": "Laudalle",
+      "shelf.empty": "Tällä hyllyllä ei ole vielä mitään.",
+      "shelf.emptyHint": "Se mitä teet, tulee tänne.",
+      "shelf.library": "Kirjasto",
+      "shelf.made": "Tehdyt",
+      "verbs.sending": "lähetetään",
+      "verbs.sent": "Kiitos, se lähti.",
+      "verbs.saved": "Kiitos, se on tallessa.",
+      "verbs.nothing": "ei mitään lähetettävää",
+      "verbs.noTarget": "tällä painikkeella ei ole osoitetta",
+      "verbs.thinking": "miettii",
+      "verbs.working": "tekee",
+      "verbs.failed": "se ei onnistunut",
+      "verbs.copied": "kopioitu",
+      "verbs.signIn": "kirjaudu ensin",
+      "verbs.notHere": "tämä ei ole käytettävissä täällä"
+    },
+    es: {
+      "board.move": "Mover",
+      "board.use": "Usar",
+      "board.moveHint": "Un marco es un trozo de lienzo: arrástralo desde cualquier punto, desplaza el fondo, acerca con la rueda.",
+      "board.useHint": "Un marco es el producto: úsalo como en su propia pestaña. Desplaza el tablero desde el lienzo vacío.",
+      "board.empty": "Todavía no hay nada en el tablero.",
+      "board.emptyHint": "Añade un marco, o pide uno.",
+      "board.noViewport": "Desplazar y acercar necesitan la biblioteca aimeat-viewport en esta página; los marcos se muestran donde están.",
+      "board.frame": "Marco",
+      "board.resize": "Cambiar tamaño",
+      "board.ring": "Radar",
+      "board.borrowed": "Prestado",
+      "board.selected": "Seleccionado",
+      "board.sample": "Ejemplo",
+      "board.kind.table": "tabla",
+      "board.kind.chart": "gráfico",
+      "board.kind.html": "tarjeta",
+      "board.kind.app": "app",
+      "board.kind.note": "nota",
+      "board.kind.image": "imagen",
+      "board.kind.request": "petición",
+      "board.kind.pending": "en curso",
+      "request.prompt": "¿Qué quieres ver?",
+      "request.send": "Pedir",
+      "request.plan": "El plan",
+      "request.approve": "Hazlo",
+      "request.cancel": "Cancelar",
+      "request.working": "En curso",
+      "request.done": "Hecho",
+      "request.failed": "No terminó",
+      "request.gate": "Este paso espera tu aprobación antes de ejecutar nada.",
+      "request.risk.low": "riesgo bajo",
+      "request.risk.medium": "riesgo medio",
+      "request.risk.high": "riesgo alto",
+      "request.route.local": "el tablero",
+      "request.route.agent": "tu agente",
+      "request.route.tool": "una herramienta con precio",
+      "request.route.prompt": "tu propia IA",
+      "request.loop": "Seguir hasta que responda",
+      "request.empty": "Escribe en la línea de petición lo que quieres.",
+      "shelf.search": "Buscar en la estantería",
+      "shelf.use": "Usar",
+      "shelf.board": "Al tablero",
+      "shelf.empty": "Todavía no hay nada en esta estantería.",
+      "shelf.emptyHint": "Lo que hagas llega aquí.",
+      "shelf.library": "Biblioteca",
+      "shelf.made": "Hechos",
+      "verbs.sending": "enviando",
+      "verbs.sent": "Gracias, enviado.",
+      "verbs.saved": "Gracias, guardado.",
+      "verbs.nothing": "nada que enviar",
+      "verbs.noTarget": "este control no tiene destino",
+      "verbs.thinking": "pensando",
+      "verbs.working": "en curso",
+      "verbs.failed": "eso no funcionó",
+      "verbs.copied": "copiado",
+      "verbs.signIn": "inicia sesión primero",
+      "verbs.notHere": "esto no está disponible aquí"
+    }
+  };
+  function tb(key, vars) {
+    const hosted = i18n.t("board." + key, vars);
+    if (hosted !== "board." + key) return hosted;
+    const lang = i18n.lang();
+    const table2 = (
+      /** @type {Record<string, string>} */
+      STRINGS9[
+        /** @type {'en'|'fi'|'es'} */
+        lang
+      ] || STRINGS9.en
+    );
+    const text = table2[key] || STRINGS9.en[key] || key;
+    if (!vars) return text;
+    return text.replace(/\{(\w+)\}/g, function(whole, name) {
+      return vars[name] == null ? whole : String(vars[name]);
+    });
+  }
+
+  // src/static/sdk-libs/atelier/board.js
+  var VARIANTS = ["fill", "plain"];
+  var FRAME_W = 480;
+  var FRAME_MIN_W = 160;
+  var FRAME_MIN_H = 120;
+  var RING_PAD = 60;
+  var FAR = 0.55;
+  var NUDGE = 10;
+  function rectOf(entry) {
+    const f = entry.frame;
+    return { x: f.x || 0, y: f.y || 0, w: f.w || FRAME_W, h: f.h || entry.el.offsetHeight || 240 };
+  }
+  function sampleFrames() {
+    return [
+      { id: "s-tbl", x: 0, y: 0, w: 420, h: 250, kind: "table", title: "Contacts", rev: 1 },
+      { id: "s-chart", x: 460, y: 0, w: 360, h: 250, kind: "chart", title: "Per month", rev: 1 },
+      { id: "s-note", x: 0, y: 300, w: 300, kind: "note", title: "Note", rev: 1 }
+    ];
+  }
+  function sampleRings() {
+    return [{ id: "s-ring", title: "Who is coming", members: ["s-tbl", "s-chart"] }];
+  }
+  function renderSample(f, body) {
+    if (f.kind === "table") {
+      const rows = [["Anna", "Virtanen", "coming"], ["Mikko", "Korhonen", "coming"], ["Sari", "Nieminen", "maybe"]];
+      body.appendChild(el("div", { class: "ak-board__srows" }, [
+        el("div", { class: "ak-board__srow ak-board__srow--head" }, [el("span", { text: "First" }), el("span", { text: "Last" }), el("span", { text: "Status" })])
+      ].concat(rows.map(function(r) {
+        return el("div", { class: "ak-board__srow" }, r.map(function(c) {
+          return el("span", { text: c });
+        }));
+      }))));
+      return;
+    }
+    if (f.kind === "chart") {
+      body.appendChild(el("div", { class: "ak-board__sbars" }, [38, 52, 61, 48, 75, 90].map(function(h) {
+        return el("div", { class: "ak-board__sbar", style: "height:" + h + "%" });
+      })));
+      return;
+    }
+    body.appendChild(el("div", { class: "ak-board__snote", text: "Every frame is a live product, not a picture of one." }));
+  }
+  function board(spec) {
+    const sample = spec.sample === true;
+    const root = el("div", {
+      class: "ak-root ak-board",
+      "data-ak-part": "root",
+      tabindex: "0",
+      role: "application",
+      "aria-label": spec.label || tb("frame")
+    });
+    applyVariant(root, spec, VARIANTS);
+    if (spec.target) resolve(spec.target).appendChild(root);
+    const ns = (
+      /** @type {any} */
+      window.AIMEAT
+    );
+    const vpLib = ns && ns.viewport && typeof ns.viewport.create === "function" ? ns.viewport : null;
+    const shown = /* @__PURE__ */ new Map();
+    const ringEls = /* @__PURE__ */ new Map();
+    let rings = sample ? sampleRings() : spec.rings || [];
+    let selected = null;
+    let mode = spec.mode === "use" ? "interact" : "navigate";
+    let emptyCard = null;
+    let destroyed = false;
+    const parts = spec.parts || {};
+    const actions = spec.actions || [];
+    let vp = null;
+    let world;
+    if (vpLib) {
+      vp = vpLib.create(root, {
+        classPrefix: "akb",
+        minZoom: spec.minZoom || 0.05,
+        maxZoom: spec.maxZoom || 3,
+        fitMaxZoom: 1,
+        initial: spec.camera || void 0,
+        captureSelector: "[data-ak-frame]:not([data-ak-live])",
+        contentBBox: bbox,
+        onClaimPointer: claim,
+        onTap: function() {
+          select(null);
+        },
+        onCameraChange: onCamera,
+        mode
+      });
+      world = vp.world;
+      world.setAttribute("data-ak-part", "world");
+    } else {
+      root.classList.add("ak-board--static");
+      world = el("div", { class: "ak-board__world ak-board__world--static", "data-ak-part": "world" });
+      root.appendChild(world);
+      root.appendChild(el("p", { class: "ak-board__note", "data-ak-part": "note", text: tb("noViewport") }));
+    }
+    if (sample) root.appendChild(el("span", { class: "ak-board__sample", text: tb("sample") }));
+    let toolMove = null, toolUse = null;
+    if (vp && spec.tools !== false) {
+      toolMove = el("button", { type: "button", class: "ak-board__tool", "data-ak-part": "tool", "data-ak-noguard": true, text: tb("move"), title: tb("moveHint"), on: { click: function() {
+        setMode("move");
+      } } });
+      toolUse = el("button", { type: "button", class: "ak-board__tool", "data-ak-part": "tool", "data-ak-noguard": true, text: tb("use"), title: tb("useHint"), on: { click: function() {
+        setMode("use");
+      } } });
+      root.appendChild(el("div", { class: "ak-board__tools", "data-ak-part": "tools", role: "group", "aria-label": tb("move") + " / " + tb("use") }, [toolMove, toolUse]));
+      paintMode();
+    }
+    function bbox() {
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      shown.forEach(function(entry) {
+        const r = rectOf(entry);
+        x0 = Math.min(x0, r.x);
+        y0 = Math.min(y0, r.y);
+        x1 = Math.max(x1, r.x + r.w);
+        y1 = Math.max(y1, r.y + r.h);
+      });
+      if (x0 === Infinity) return { x: 0, y: 0, w: 1, h: 1 };
+      return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+    }
+    function onCamera(cam) {
+      const k = cam && cam.k || 1;
+      root.style.setProperty("--ak-board-inv", String(Math.max(1, 1 / k)));
+      root.classList.toggle("ak-board--far", k < FAR);
+      if (spec.onCamera) spec.onCamera({ x: cam.x, y: cam.y, k: cam.k });
+    }
+    function paintMode() {
+      if (toolMove) toolMove.setAttribute("aria-pressed", mode === "navigate" ? "true" : "false");
+      if (toolUse) toolUse.setAttribute("aria-pressed", mode === "interact" ? "true" : "false");
+      root.setAttribute("data-ak-mode", mode === "interact" ? "use" : "move");
+    }
+    function setMode(m) {
+      const next = m === "use" ? "interact" : "navigate";
+      if (next === mode) return;
+      mode = next;
+      if (vp) vp.setMode(mode);
+      paintMode();
+      if (spec.onMode) spec.onMode(m === "use" ? "use" : "move");
+    }
+    function swallow() {
+      return { onMove: function() {
+      }, onEnd: function() {
+      } };
+    }
+    function claim(ev) {
+      const t2 = (
+        /** @type {Element} */
+        ev.target
+      );
+      if (!t2 || !t2.closest) return null;
+      if (t2.closest(".ak-board__tools, .ak-board__empty")) return swallow();
+      const node = t2.closest("[data-ak-frame]");
+      if (!node) return null;
+      const entry = shown.get(node.getAttribute("data-ak-id") || "");
+      if (!entry) return null;
+      if (t2.closest("button, input, select, textarea, a, [contenteditable], [data-ak-noclaim]")) return swallow();
+      const onGrip = !!t2.closest(".ak-board__grip");
+      const onHead = !!t2.closest(".ak-board__head");
+      if (!onGrip && !onHead && (mode === "interact" || node.hasAttribute("data-ak-live"))) return swallow();
+      select(entry.frame.id);
+      const f = entry.frame;
+      const start = rectOf(entry);
+      let moved = false;
+      if (onGrip) {
+        return {
+          onMove: function(dx, dy) {
+            moved = true;
+            f.w = Math.max(FRAME_MIN_W, Math.round(start.w + dx));
+            f.h = Math.max(FRAME_MIN_H, Math.round(start.h + dy));
+            place2(entry);
+            drawRings();
+          },
+          onEnd: function() {
+            if (moved && spec.onMove) spec.onMove(f, rectOf(entry));
+          }
+        };
+      }
+      return {
+        onMove: function(dx, dy) {
+          moved = true;
+          f.x = Math.round(start.x + dx);
+          f.y = Math.round(start.y + dy);
+          place2(entry);
+          drawRings();
+        },
+        onEnd: function() {
+          if (!moved) return;
+          dropCheck(entry);
+          if (spec.onMove) spec.onMove(f, rectOf(entry));
+        }
+      };
+    }
+    function dropCheck(entry) {
+      if (!spec.onDrop) return;
+      const r = rectOf(entry), cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+      for (const ring2 of rings) {
+        if ((ring2.members || []).indexOf(entry.frame.id) >= 0 || (ring2.borrowed || []).indexOf(entry.frame.id) >= 0) continue;
+        const g = ringGeom(ring2);
+        if (!g) continue;
+        const d = Math.hypot(cx - g.cx, cy - g.cy);
+        if (d <= g.r) {
+          spec.onDrop(entry.frame, ring2);
+          return;
+        }
+      }
+    }
+    function buildFrame(f) {
+      const node = el("div", { class: "ak-board__frame ak-board__frame--in", "data-ak-part": "frame", "data-ak-frame": true, "data-ak-id": f.id });
+      const head = el("div", { class: "ak-board__head", "data-ak-part": "head" });
+      const title = el("span", { class: "ak-board__title", "data-ak-part": "title" });
+      const kind = el("span", { class: "ak-board__kind", "data-ak-part": "kind" });
+      const extra = el("span", { class: "ak-board__extra", "data-ak-part": "extra" });
+      const acts = el("div", { class: "ak-board__actions", "data-ak-part": "actions" });
+      head.appendChild(title);
+      head.appendChild(kind);
+      head.appendChild(extra);
+      head.appendChild(acts);
+      const body = el("div", { class: "ak-board__body", "data-ak-part": "body" });
+      const grip = el("div", { class: "ak-board__grip", "data-ak-part": "grip", title: tb("resize"), "aria-hidden": "true" });
+      node.appendChild(head);
+      node.appendChild(body);
+      node.appendChild(grip);
+      head.addEventListener("click", function(e) {
+        if (
+          /** @type {Element} */
+          e.target.closest("button")
+        ) return;
+        select(f.id);
+      });
+      node.addEventListener("dblclick", function(e) {
+        if (
+          /** @type {Element} */
+          e.target.closest("button, input, textarea, select, a")
+        ) return;
+        const entry = shown.get(f.id);
+        if (entry && spec.onActivate) spec.onActivate(entry.frame);
+      });
+      node.addEventListener("animationend", function() {
+        node.classList.remove("ak-board__frame--in");
+      });
+      return { el: node, frame: f, head, title, kind, extra, acts, body, rev: void 0, sig: "" };
+    }
+    function place2(entry) {
+      const f = entry.frame;
+      entry.el.style.left = (f.x || 0) + "px";
+      entry.el.style.top = (f.y || 0) + "px";
+      entry.el.style.width = (f.w || FRAME_W) + "px";
+      entry.el.style.height = f.h ? f.h + "px" : "";
+    }
+    function fillSlot(host, value) {
+      clear(host);
+      if (value == null || value === false) return;
+      if (value instanceof Node) host.appendChild(value);
+      else if (Array.isArray(value)) value.forEach(function(v) {
+        fillSlot(host, v);
+      });
+      else host.textContent = String(value);
+    }
+    function chrome(entry) {
+      const f = entry.frame;
+      const titleVal = parts.title ? parts.title(f) : f.title || "";
+      fillSlot(entry.title, titleVal);
+      const kindKey = f.kind ? "kind." + f.kind : "";
+      const kindText = kindKey ? tb(kindKey) : "";
+      entry.kind.textContent = kindText === kindKey ? String(f.kind) : kindText;
+      fillSlot(entry.extra, parts.extra ? parts.extra(f) : f.extra || "");
+      if (f.kind) entry.el.setAttribute("data-ak-kind", String(f.kind));
+      else entry.el.removeAttribute("data-ak-kind");
+      if (f.live) entry.el.setAttribute("data-ak-live", "");
+      else entry.el.removeAttribute("data-ak-live");
+      if (f.tone) entry.el.setAttribute("data-ak-tone", String(f.tone));
+      else entry.el.removeAttribute("data-ak-tone");
+      entry.el.classList.toggle("ak-board__frame--borrowed", !!f.borrowed);
+      const visible = actions.filter(function(a) {
+        return !a.when || a.when(f);
+      });
+      const sig = visible.map(function(a) {
+        return a.id + (a.pressed && a.pressed(f) ? "*" : "");
+      }).join("|");
+      if (sig !== entry.sig) {
+        entry.sig = sig;
+        clear(entry.acts);
+        visible.forEach(function(a) {
+          const b = el("button", {
+            type: "button",
+            class: "ak-board__act",
+            "data-ak-part": "act",
+            "data-ak-act": a.id,
+            "data-ak-noguard": true,
+            "aria-label": a.label || a.id,
+            title: a.label || a.id,
+            "aria-pressed": a.pressed ? a.pressed(f) ? "true" : "false" : null,
+            text: a.glyph || a.label || a.id,
+            on: { click: function(e) {
+              e.stopPropagation();
+              const now2 = shown.get(f.id);
+              if (now2 && spec.onAction) spec.onAction(a.id, now2.frame);
+            } }
+          });
+          entry.acts.appendChild(b);
+        });
+      }
+    }
+    function renderBody(entry, fresh) {
+      const f = entry.frame;
+      if (!fresh && entry.rev === f.rev) return;
+      entry.rev = f.rev;
+      clear(entry.body);
+      if (sample) {
+        renderSample(f, entry.body);
+        return;
+      }
+      if (spec.render) spec.render(f, entry.body, { el: entry.el });
+    }
+    function reconcile(frames) {
+      const next = /* @__PURE__ */ new Map();
+      (frames || []).forEach(function(f) {
+        if (f && f.id != null) next.set(String(f.id), f);
+      });
+      shown.forEach(function(entry, id) {
+        if (next.has(id)) return;
+        entry.el.remove();
+        shown.delete(id);
+        if (selected === id) selected = null;
+      });
+      next.forEach(function(f, id) {
+        let entry = shown.get(id);
+        const fresh = !entry;
+        if (!entry) {
+          entry = buildFrame(f);
+          shown.set(id, entry);
+          world.appendChild(entry.el);
+        } else {
+          entry.frame = f;
+        }
+        place2(entry);
+        chrome(entry);
+        renderBody(entry, fresh);
+        entry.el.classList.toggle("ak-board__frame--selected", selected === id);
+      });
+      paintEmpty();
+      drawRings();
+      if (vp && vp.refreshCaptures) vp.refreshCaptures();
+    }
+    function paintEmpty() {
+      const bare = shown.size === 0;
+      if (!bare) {
+        if (emptyCard) {
+          emptyCard.remove();
+          emptyCard = null;
+        }
+        return;
+      }
+      if (emptyCard) return;
+      emptyCard = el("div", { class: "ak-board__empty", "data-ak-part": "empty" });
+      if (parts.empty) fillSlot(emptyCard, parts.empty());
+      else {
+        const e = spec.empty || {};
+        emptyState({ target: emptyCard, tone: "quiet", title: e.title || tb("empty"), hint: e.hint || tb("emptyHint"), action: e.action || null });
+      }
+      root.appendChild(emptyCard);
+    }
+    function ringGeom(ring2) {
+      const members2 = (ring2.members || []).concat(ring2.borrowed || []).map(function(id) {
+        return shown.get(String(id));
+      }).filter(Boolean);
+      if (!members2.length) return null;
+      let cx = 0, cy = 0;
+      const rects = members2.map(rectOf);
+      rects.forEach(function(r) {
+        cx += r.x + r.w / 2;
+        cy += r.y + r.h / 2;
+      });
+      cx /= rects.length;
+      cy /= rects.length;
+      let rad = 0;
+      rects.forEach(function(r) {
+        [[r.x, r.y], [r.x + r.w, r.y], [r.x, r.y + r.h], [r.x + r.w, r.y + r.h]].forEach(function(p) {
+          rad = Math.max(rad, Math.hypot(p[0] - cx, p[1] - cy));
+        });
+      });
+      return { cx, cy, r: rad + RING_PAD };
+    }
+    function drawRings() {
+      const keep = /* @__PURE__ */ new Set();
+      rings.forEach(function(ring2) {
+        const g = ringGeom(ring2);
+        if (!g) return;
+        keep.add(ring2.id);
+        let r = ringEls.get(ring2.id);
+        if (!r) {
+          const name = el("span", { class: "ak-board__ring-name", "data-ak-part": "ringName" });
+          const node = el("div", { class: "ak-board__ring", "data-ak-part": "ring", "data-ak-id": ring2.id, "aria-hidden": "true" }, [name]);
+          world.insertBefore(node, world.firstChild);
+          r = { el: node, name };
+          ringEls.set(ring2.id, r);
+        }
+        r.name.textContent = ring2.title || "";
+        r.el.style.left = g.cx - g.r + "px";
+        r.el.style.top = g.cy - g.r + "px";
+        r.el.style.width = g.r * 2 + "px";
+        r.el.style.height = g.r * 2 + "px";
+        const mine = selected != null && ((ring2.members || []).indexOf(selected) >= 0 || (ring2.borrowed || []).indexOf(selected) >= 0);
+        r.el.classList.toggle("ak-board__ring--selected", mine);
+        (ring2.members || []).forEach(function(id) {
+          const e = shown.get(String(id));
+          if (e) e.el.classList.add("ak-board__frame--member");
+        });
+      });
+      ringEls.forEach(function(r, id) {
+        if (keep.has(id)) return;
+        r.el.remove();
+        ringEls.delete(id);
+      });
+    }
+    function select(id) {
+      const next = id == null ? null : String(id);
+      if (next !== null && !shown.has(next)) return;
+      if (next === selected) return;
+      selected = next;
+      shown.forEach(function(entry, key) {
+        entry.el.classList.toggle("ak-board__frame--selected", key === selected);
+        if (key === selected) entry.el.setAttribute("aria-current", "true");
+        else entry.el.removeAttribute("aria-current");
+      });
+      drawRings();
+      if (spec.onSelect) spec.onSelect(selected ? shown.get(selected).frame : null);
+    }
+    root.addEventListener("keydown", function(ev) {
+      const target = (
+        /** @type {Element} */
+        ev.target
+      );
+      if (target && target !== root && target.closest && target.closest("input, textarea, select, [contenteditable]")) return;
+      if (ev.key === "Escape") {
+        select(null);
+        setMode("move");
+        return;
+      }
+      if (!selected) return;
+      const entry = shown.get(selected);
+      if (!entry) return;
+      const step = ev.shiftKey ? NUDGE * 5 : NUDGE;
+      const f = entry.frame;
+      let moved = true;
+      if (ev.key === "ArrowLeft") f.x = (f.x || 0) - step;
+      else if (ev.key === "ArrowRight") f.x = (f.x || 0) + step;
+      else if (ev.key === "ArrowUp") f.y = (f.y || 0) - step;
+      else if (ev.key === "ArrowDown") f.y = (f.y || 0) + step;
+      else moved = false;
+      if (!moved) return;
+      ev.preventDefault();
+      place2(entry);
+      drawRings();
+      if (spec.onMove) spec.onMove(f, rectOf(entry));
+    });
+    reconcile(sample ? sampleFrames() : spec.frames || []);
+    if (vp) {
+      if (spec.camera) vp.setCamera(spec.camera, false);
+      else if (shown.size) vp.fit(false);
+      onCamera(vp.cam());
+    }
+    return {
+      el: root,
+      world,
+      /** @param {{ frames?: BoardFrame[], rings?: BoardRing[], camera?: object|null, mode?: 'move'|'use' }} patch */
+      set: function(patch) {
+        if (destroyed || !patch) return;
+        if (patch.rings) {
+          rings = patch.rings;
+        }
+        if (patch.frames) reconcile(patch.frames);
+        else if (patch.rings) drawRings();
+        if (patch.camera && vp) vp.setCamera(patch.camera, true);
+        if (patch.mode) setMode(patch.mode);
+      },
+      select,
+      selected: function() {
+        return selected;
+      },
+      frameEl: function(id) {
+        const e = shown.get(String(id));
+        return e ? e.el : null;
+      },
+      bodyEl: function(id) {
+        const e = shown.get(String(id));
+        return e ? e.body : null;
+      },
+      fit: function(animated) {
+        if (vp) vp.fit(animated !== false);
+      },
+      centerOn: function(id, animated) {
+        const e = shown.get(String(id));
+        if (e && vp) vp.centerOn(rectOf(e), animated !== false);
+      },
+      camera: function() {
+        return vp ? vp.cam() : null;
+      },
+      mode: function() {
+        return mode === "interact" ? "use" : "move";
+      },
+      setMode,
+      clientToWorld: function(cx, cy) {
+        return vp ? vp.clientToWorld(cx, cy) : { x: cx, y: cy };
+      },
+      nextSlot: function() {
+        const b = bbox();
+        return shown.size ? { x: b.x, y: b.y + b.h + 40 } : { x: 0, y: 0 };
+      },
+      destroy: function() {
+        destroyed = true;
+        if (vp) vp.destroy();
+        shown.clear();
+        ringEls.clear();
+        root.remove();
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/request-panel.js
+  var VARIANTS2 = ["compact"];
+  var MARKS = { pending: "·", running: "→", done: "✓", failed: "✗" };
+  var STATES = ["pending", "running", "done", "failed"];
+  function samplePlan() {
+    const plan2 = {
+      intent: "Show my AI spend per day, and draw a chart of the same numbers",
+      route: "local",
+      risk: "low",
+      gated: false,
+      steps: [
+        { id: "s1", text: "AI usage, by day: a table", state: "done" },
+        { id: "s2", text: "the same numbers, as a chart", state: "running" },
+        { id: "s3", text: "one line on what stands out", state: "pending" }
+      ]
+    };
+    return plan2;
+  }
+  function sampleLines() {
+    const base = Date.now() - 4e4;
+    return [
+      { ts: base, tone: "plain", text: "reading ai-usage. (23 keys, fields: date, total_calls, total_tokens)" },
+      { ts: base + 12e3, tone: "ok", text: "choice: ai-usage, because the request names spend per day (high)" },
+      { ts: base + 3e4, tone: "ok", text: "table: 23 rows" }
+    ];
+  }
+  function requestPanel(spec) {
+    const sample = spec.sample === true;
+    const parts = spec.parts || {};
+    const root = el("div", { class: "ak-root ak-request", "data-ak-part": "root" });
+    applyVariant(root, spec, VARIANTS2);
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let plan2 = sample ? samplePlan() : spec.plan || null;
+    let destroyed = false;
+    const placeholder = spec.placeholder || tb("request.prompt");
+    const input = (
+      /** @type {HTMLInputElement} */
+      el("input", {
+        class: "ak-request__input",
+        "data-ak-part": "input",
+        type: "text",
+        autocomplete: "off",
+        placeholder,
+        "aria-label": placeholder
+      })
+    );
+    input.value = sample ? samplePlan().intent : spec.value || "";
+    const send2 = el("button", {
+      type: "button",
+      class: "ak-btn ak-btn--primary ak-request__send",
+      "data-ak-part": "send",
+      "data-ak-noguard": true,
+      text: tb("request.send"),
+      on: { click: ask2 }
+    });
+    input.addEventListener("keydown", function(e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        ask2();
+      }
+    });
+    root.appendChild(el("div", { class: "ak-request__line", "data-ak-part": "line" }, [
+      el("span", { class: "ak-request__caret", "data-ak-part": "caret", "aria-hidden": "true", text: ">" }),
+      input,
+      send2
+    ]));
+    const scan = el("div", { class: "ak-request__scan", "data-ak-part": "scan", role: "status", "aria-label": tb("request.working") });
+    root.appendChild(scan);
+    const planHost = el("div", { class: "ak-request__plan", "data-ak-part": "plan" });
+    root.appendChild(planHost);
+    const log = konsole({ target: root, cap: spec.cap, data: { lines: sample ? sampleLines() : spec.lines || [] }, empty: { title: tb("request.empty"), hint: "" } });
+    log.el.setAttribute("data-ak-part", "console");
+    root.style.setProperty("--ak-request-console-h", "var(--ak-request-console-h, 160px)");
+    let loopBox = null;
+    if (spec.loop !== void 0 || sample) {
+      loopBox = /** @type {HTMLInputElement} */
+      el("input", { type: "checkbox", "data-ak-noguard": true });
+      loopBox.checked = !!spec.loop;
+      loopBox.addEventListener("change", function() {
+        if (spec.onLoop) spec.onLoop(!!loopBox.checked);
+      });
+      root.appendChild(el("label", { class: "ak-request__loop", "data-ak-part": "loop" }, [loopBox, el("span", { text: tb("request.loop") })]));
+    }
+    function ask2() {
+      const text = String(input.value || "").trim();
+      if (!text || !spec.onAsk) return;
+      spec.onAsk(text);
+    }
+    function setBusy(on2) {
+      scan.hidden = !on2;
+    }
+    setBusy(sample ? true : !!spec.busy);
+    function routeWord(route) {
+      const key = "request.route." + route;
+      const w = tb(key);
+      return w === key ? String(route) : w;
+    }
+    function riskWord(risk) {
+      const key = "request.risk." + risk;
+      const w = tb(key);
+      return w === key ? String(risk) : w;
+    }
+    function fillSlot(host, value) {
+      clear(host);
+      if (value == null || value === false) return;
+      if (value instanceof Node) host.appendChild(value);
+      else if (Array.isArray(value)) value.forEach(function(v) {
+        fillSlot(host, v);
+      });
+      else host.textContent = String(value);
+    }
+    function renderPlan() {
+      clear(planHost);
+      planHost.hidden = !plan2;
+      if (!plan2) return;
+      if (parts.plan) {
+        fillSlot(planHost, parts.plan(plan2));
+        return;
+      }
+      planHost.appendChild(el("div", { class: "ak-request__intent", "data-ak-part": "intent", text: plan2.intent || "" }));
+      const meta = [];
+      if (plan2.route) meta.push(routeWord(plan2.route) + (plan2.via ? " (" + plan2.via + ")" : ""));
+      if (plan2.risk) meta.push(riskWord(plan2.risk));
+      if (meta.length) planHost.appendChild(el("div", { class: "ak-request__meta", "data-ak-part": "meta", text: meta.join(" · ") }));
+      (plan2.steps || []).forEach(function(step) {
+        const state = STATES.indexOf(step.state || "") >= 0 ? step.state : "pending";
+        const row = el("div", { class: "ak-request__step ak-request__step--" + state, "data-ak-part": "step", "data-ak-id": step.id, "data-ak-state": state });
+        if (parts.step) {
+          fillSlot(row, parts.step(step));
+          planHost.appendChild(row);
+          return;
+        }
+        row.appendChild(el("span", { class: "ak-request__mark", "data-ak-part": "mark", "aria-hidden": "true", text: MARKS[state] }));
+        row.appendChild(el("span", { class: "ak-request__text", text: step.text || "" }));
+        planHost.appendChild(row);
+      });
+      if (plan2.gated) {
+        planHost.appendChild(el("div", { class: "ak-request__gate", "data-ak-part": "gate", text: plan2.gateWhy || tb("request.gate") }));
+        planHost.appendChild(el("div", { class: "ak-request__row", "data-ak-part": "row" }, [
+          el("button", {
+            type: "button",
+            class: "ak-btn ak-btn--primary",
+            "data-ak-part": "approve",
+            "data-ak-noguard": true,
+            text: tb("request.approve"),
+            on: { click: function() {
+              if (spec.onApprove && plan2) spec.onApprove(plan2);
+            } }
+          }),
+          el("button", {
+            type: "button",
+            class: "ak-btn ak-btn--ghost",
+            "data-ak-part": "cancel",
+            "data-ak-noguard": true,
+            text: tb("request.cancel"),
+            on: { click: function() {
+              if (spec.onCancel && plan2) spec.onCancel(plan2);
+            } }
+          })
+        ]));
+      }
+    }
+    renderPlan();
+    return {
+      el: root,
+      /** @param {{ plan?: RequestPlan|null, lines?: any[], busy?: boolean, value?: string, loop?: boolean }} patch */
+      set: function(patch) {
+        if (destroyed || !patch) return;
+        if ("plan" in patch) {
+          plan2 = patch.plan || null;
+          renderPlan();
+        }
+        if (patch.lines) log.set({ data: { lines: patch.lines } });
+        if ("busy" in patch) setBusy(!!patch.busy);
+        if (typeof patch.value === "string") input.value = patch.value;
+        if ("loop" in patch && loopBox) loopBox.checked = !!patch.loop;
+      },
+      append: function(lines) {
+        if (!destroyed) log.append(lines);
+      },
+      focus: function() {
+        input.focus();
+      },
+      value: function() {
+        return String(input.value || "");
+      },
+      destroy: function() {
+        destroyed = true;
+        log.destroy();
+        root.remove();
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/shelf.js
+  var VARIANTS3 = ["dense", "plain"];
+  function sampleItems() {
+    return [
+      { id: "l1", tab: "library", title: "RSVP form", sub: "four fields, posts without an account", kind: "form" },
+      { id: "l2", tab: "library", title: "Stat strip", sub: "three figures with a label each", kind: "stats" },
+      { id: "l3", tab: "library", title: "Picture maker", sub: "describe it, an agent draws it", kind: "ask" },
+      { id: "m1", tab: "made", title: "AI usage, by day", sub: "23 rows", kind: "table" },
+      { id: "m2", tab: "made", title: "Tokens per day", sub: "bar chart", kind: "chart" },
+      { id: "m3", tab: "made", title: "Invitation", sub: "published at its own address", kind: "card" }
+    ];
+  }
+  function washOf3(id) {
+    let h = 0;
+    const s = String(id);
+    for (let i = 0; i < s.length; i++) h = h * 31 + s.charCodeAt(i) >>> 0;
+    return h % 3 + 1;
+  }
+  function monogramOf(title) {
+    const words = String(title || "").trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return "";
+    return words.slice(0, 2).map(function(w) {
+      return w.charAt(0).toUpperCase();
+    }).join("");
+  }
+  function shelf(spec) {
+    const sample = spec.sample === true;
+    const parts = spec.parts || {};
+    const root = el("div", { class: "ak-root ak-shelf", "data-ak-part": "root" });
+    applyVariant(root, spec, VARIANTS3);
+    if (spec.target) resolve(spec.target).appendChild(root);
+    const tabList = spec.tabs || [{ id: "library", label: tb("shelf.library") }, { id: "made", label: tb("shelf.made") }];
+    const actions = spec.actions || [{ id: "use", label: tb("shelf.use"), kind: "primary" }, { id: "board", label: tb("shelf.board"), kind: "ghost" }];
+    let items = sample ? sampleItems() : spec.items || [];
+    let value = spec.value || tabList[0] && tabList[0].id || "";
+    let query = "";
+    let emptyCard = null;
+    let destroyed = false;
+    const shown = /* @__PURE__ */ new Map();
+    const bar2 = el("div", { class: "ak-shelf__bar", "data-ak-part": "bar" });
+    root.appendChild(bar2);
+    const tabHandle = tabList.length > 1 ? tabs({ target: bar2, items: tabList, value, onChange: function(id) {
+      value = id;
+      if (spec.onTab) spec.onTab(id);
+      render();
+    } }) : null;
+    if (tabHandle) tabHandle.el.setAttribute("data-ak-part", "tabs");
+    const searchHandle = spec.search === false ? null : searchBar({ target: bar2, placeholder: tb("shelf.search"), onChange: function(q) {
+      query = String(q || "").trim().toLowerCase();
+      render();
+    } });
+    if (searchHandle) searchHandle.el.setAttribute("data-ak-part", "search");
+    const grid2 = el("div", { class: "ak-shelf__grid", "data-ak-part": "grid", role: "list" });
+    root.appendChild(grid2);
+    function matches(item) {
+      if (tabList.length > 1 && (item.tab || tabList[0].id) !== value) return false;
+      if (!query) return true;
+      return [item.title, item.sub, item.kind].join(" ").toLowerCase().indexOf(query) >= 0;
+    }
+    function fillSlot(host, v) {
+      clear(host);
+      if (v == null || v === false) return;
+      if (v instanceof Node) host.appendChild(v);
+      else if (Array.isArray(v)) v.forEach(function(x) {
+        fillSlot(host, x);
+      });
+      else host.textContent = String(v);
+    }
+    function preview(item) {
+      const box = el("div", { class: "ak-shelf__preview", "data-ak-part": "preview", "data-ak-wash": String(washOf3(item.id)) });
+      if (parts.preview) {
+        fillSlot(box, parts.preview(item));
+        return box;
+      }
+      if (item.image) {
+        box.appendChild(el("img", { src: item.image, alt: "", loading: "lazy" }));
+        return box;
+      }
+      box.appendChild(el("span", { class: "ak-shelf__monogram", "data-ak-part": "monogram", "aria-hidden": "true", text: monogramOf(item.title) }));
+      return box;
+    }
+    function card(item) {
+      const node = el("div", { class: "ak-shelf__item", "data-ak-part": "item", "data-ak-id": item.id, role: "listitem" });
+      node.appendChild(preview(item));
+      node.appendChild(el("div", { class: "ak-shelf__title", "data-ak-part": "title", text: item.title || "" }));
+      if (item.sub) node.appendChild(el("div", { class: "ak-shelf__sub", "data-ak-part": "sub", text: item.sub }));
+      if (item.kind) node.appendChild(el("span", { class: "ak-shelf__kind", "data-ak-part": "kind", text: String(item.kind) }));
+      if (parts.extra) {
+        const extra = el("div", { class: "ak-shelf__extra" });
+        fillSlot(extra, parts.extra(item));
+        node.appendChild(extra);
+      }
+      const acts = el("div", { class: "ak-shelf__acts", "data-ak-part": "acts" });
+      actions.forEach(function(a) {
+        acts.appendChild(el("button", {
+          type: "button",
+          class: "ak-btn ak-btn--sm " + (a.kind === "primary" ? "ak-btn--primary" : "ak-btn--ghost"),
+          "data-ak-part": "act",
+          "data-ak-act": a.id,
+          "data-ak-noguard": true,
+          text: a.label,
+          on: { click: function() {
+            if (spec.onUse) spec.onUse(item, a.id);
+          } }
+        }));
+      });
+      node.appendChild(acts);
+      return node;
+    }
+    function render() {
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      const want = items.filter(matches);
+      const keep = /* @__PURE__ */ new Set();
+      let previous = null;
+      want.forEach(function(item) {
+        keep.add(item.id);
+        let node = shown.get(item.id);
+        if (!node) {
+          node = card(item);
+          shown.set(item.id, node);
+        }
+        if (previous) {
+          if (previous.nextSibling !== node) previous.after(node);
+        } else if (grid2.firstChild !== node) grid2.prepend(node);
+        previous = node;
+      });
+      shown.forEach(function(node, id) {
+        if (!keep.has(id) && node.parentNode === grid2) node.remove();
+      });
+      if (!want.length) {
+        const e = spec.empty || {};
+        emptyCard = emptyState({ target: grid2, tone: "quiet", title: e.title || tb("shelf.empty"), hint: e.hint || tb("shelf.emptyHint") });
+        emptyCard.el.setAttribute("data-ak-part", "empty");
+      }
+    }
+    render();
+    return {
+      el: root,
+      /** @param {{ items?: ShelfItem[], value?: string }} patch */
+      set: function(patch) {
+        if (destroyed || !patch) return;
+        if (patch.items) {
+          const byId = new Map(items.map(function(i) {
+            return [i.id, i];
+          }));
+          const next = new Set(patch.items.map(function(i) {
+            return i.id;
+          }));
+          patch.items.forEach(function(i) {
+            if (byId.get(i.id) !== i) {
+              const old = shown.get(i.id);
+              if (old) {
+                old.remove();
+                shown.delete(i.id);
+              }
+            }
+          });
+          shown.forEach(function(node, id) {
+            if (!next.has(id)) {
+              node.remove();
+              shown.delete(id);
+            }
+          });
+          items = patch.items;
+        }
+        if (patch.value && patch.value !== value) {
+          value = patch.value;
+          if (tabHandle) tabHandle.set({ value });
+        }
+        render();
+      },
+      value: function() {
+        return value;
+      },
+      destroy: function() {
+        destroyed = true;
+        if (tabHandle) tabHandle.destroy();
+        if (searchHandle) searchHandle.destroy();
+        if (emptyCard) emptyCard.destroy();
+        root.remove();
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/verbs.js
+  var PREFIXES = ["ak", "og"];
+  var READ_MIN_S = 5;
+  var READ_DEFAULT_S = 20;
+  function attr(elm, name) {
+    for (const p of PREFIXES) {
+      const v = elm.getAttribute("data-" + p + "-" + name);
+      if (v != null) return v;
+    }
+    return null;
+  }
+  function pictureIn(v) {
+    const text = typeof v === "string" ? v : JSON.stringify(v || "");
+    const m = text.match(/https?:\/\/[^\s"')<>]+\.(?:png|jpe?g|gif|webp|svg)/i) || text.match(/https?:\/\/[^\s"')<>]*\/v1\/pub\/[^\s"')<>]+/i);
+    return m ? m[0] : null;
+  }
+  function splitTarget(target, selfOwner) {
+    const at = String(target || "").trim();
+    const cut = at.indexOf("/");
+    return cut < 0 ? { gaii: selfOwner || "", key: at } : { gaii: at.slice(0, cut), key: at.slice(cut + 1) };
+  }
+  function verbs(spec) {
+    const root = (
+      /** @type {HTMLElement} */
+      resolve(spec.root)
+    );
+    const adapters = spec.adapters || {};
+    const ns = (
+      /** @type {any} */
+      window.AIMEAT || {}
+    );
+    const timers = /* @__PURE__ */ new Map();
+    let destroyed = false;
+    function ref(sel) {
+      if (!sel) return null;
+      const id = String(sel).replace(/^#/, "");
+      for (const p of PREFIXES) {
+        const hit = root.querySelector("[data-" + p + '-el="' + id.replace(/"/g, "") + '"]');
+        if (hit) return hit;
+      }
+      const byId = root.querySelector("#" + id.replace(/[^A-Za-z0-9_-]/g, ""));
+      return byId || document.getElementById(id);
+    }
+    function readArgs(elm) {
+      const out = {};
+      String(attr(elm, "in") || "").split(",").forEach(function(part) {
+        const eq = part.indexOf("=");
+        if (eq < 0) return;
+        const name = part.slice(0, eq).trim(), from = part.slice(eq + 1).trim();
+        if (!name) return;
+        if (from.charAt(0) === "#") {
+          const src = (
+            /** @type {any} */
+            ref(from)
+          );
+          out[name] = src ? src.value !== void 0 ? src.value : src.textContent : "";
+        } else out[name] = from;
+      });
+      return out;
+    }
+    function clearInputs(elm) {
+      String(attr(elm, "in") || "").split(",").forEach(function(part) {
+        const eq = part.indexOf("=");
+        if (eq < 0) return;
+        const src = (
+          /** @type {any} */
+          ref(part.slice(eq + 1).trim())
+        );
+        if (src && src.value !== void 0) src.value = "";
+      });
+    }
+    function outOf(elm) {
+      return ref(attr(elm, "out"));
+    }
+    function say(out, text, bad) {
+      if (!out) return;
+      out.textContent = text;
+      out.classList.toggle("ak-verbs__said", true);
+      out.classList.toggle("ak-verbs__bad", !!bad);
+    }
+    function show(out, value) {
+      if (!out) return;
+      out.classList.remove("ak-verbs__bad");
+      const url = pictureIn(value);
+      if (out.tagName === "IMG") {
+        if (url) {
+          out.setAttribute("src", url);
+          out.removeAttribute("hidden");
+        } else {
+          out.setAttribute("hidden", "");
+        }
+        return;
+      }
+      if (url) {
+        out.textContent = "";
+        const im = document.createElement("img");
+        im.setAttribute("src", url);
+        im.setAttribute("alt", "");
+        im.className = "ak-verbs__picture";
+        out.appendChild(im);
+        return;
+      }
+      const anyOut = (
+        /** @type {any} */
+        out
+      );
+      if (anyOut.value !== void 0 && out.tagName === "INPUT") {
+        anyOut.value = typeof value === "string" ? value : JSON.stringify(value);
+        return;
+      }
+      out.textContent = typeof value === "string" ? value : JSON.stringify(value, null, 1);
+    }
+    function pick(value, path) {
+      if (!path) return value;
+      return String(path).split(".").reduce(function(v, k) {
+        return v === null || v === void 0 ? v : v[k];
+      }, value);
+    }
+    function signedIn2() {
+      if (spec.signedIn) return !!spec.signedIn();
+      try {
+        const s = ns.auth && ns.auth.getSession && ns.auth.getSession();
+        return !!(s && s.jwt);
+      } catch {
+        return false;
+      }
+    }
+    async function run(elm) {
+      const kind = attr(elm, "do");
+      const target = attr(elm, "target") || "";
+      const out = outOf(elm);
+      const input = readArgs(elm);
+      try {
+        if (kind === "random") {
+          const n = Math.max(1, Math.min(100, parseInt(attr(elm, "count") || "6", 10) || 6));
+          let lo = parseInt(attr(elm, "min") || "1", 10) || 0, hi = parseInt(attr(elm, "max") || "40", 10) || 40;
+          if (hi < lo) {
+            const sw = lo;
+            lo = hi;
+            hi = sw;
+          }
+          const nums = [];
+          for (let i = 0; i < n; i++) nums.push(lo + Math.floor(Math.random() * (hi - lo + 1)));
+          show(out, nums.join(", "));
+          return;
+        }
+        if (kind === "now") {
+          const d = /* @__PURE__ */ new Date(), f = attr(elm, "format") || "datetime";
+          show(out, f === "date" ? date(d) : f === "time" ? time(d) : dateTime(d));
+          return;
+        }
+        if (kind === "count") {
+          const step = parseInt(attr(elm, "step") || "1", 10) || 1;
+          const was = parseInt(String(out && out.textContent || "0").replace(/[^\-0-9]/g, ""), 10);
+          show(out, String((isNaN(was) ? 0 : was) + step));
+          return;
+        }
+        if (kind === "copy") {
+          const what = Object.keys(input).map(function(k) {
+            return input[k];
+          }).join(" ").trim() || out && out.textContent || "";
+          const ok = await copy(what);
+          if (out && out !== elm) say(out, ok ? tb("verbs.copied") : tb("verbs.failed"), !ok);
+          return;
+        }
+        if (kind === "read") {
+          const where = splitTarget(target, spec.owner);
+          if (!where.key) {
+            say(out, tb("verbs.noTarget"), true);
+            return;
+          }
+          const reader = adapters.read || function(g, k) {
+            return ns.data && ns.data.getPublic ? ns.data.getPublic(g, k) : Promise.reject(new Error(tb("verbs.notHere")));
+          };
+          const got = await reader(where.gaii, where.key);
+          const val = pick(got, attr(elm, "pick"));
+          show(out, val === null || val === void 0 ? "-" : val);
+          return;
+        }
+        if (kind === "submit") {
+          const url = String(target).trim();
+          if (!url) {
+            say(out, tb("verbs.noTarget"), true);
+            return;
+          }
+          if (!Object.keys(input).length) {
+            say(out, tb("verbs.nothing"), true);
+            return;
+          }
+          say(out, tb("verbs.sending"));
+          const poster = adapters.submit || async function(u, body) {
+            const res = await fetch(u, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+            const got = await res.json().catch(function() {
+              return {};
+            });
+            if (!res.ok || got.ok === false) throw new Error(got.error && (got.error.message || got.error.code) || "HTTP " + res.status);
+            return got;
+          };
+          await poster(url, input);
+          say(out, tb("verbs.sent"));
+          clearInputs(elm);
+          return;
+        }
+        if (kind === "save") {
+          const where = String(target).replace(/\.+$/, "");
+          if (!where) {
+            say(out, tb("verbs.noTarget"), true);
+            return;
+          }
+          if (!Object.keys(input).length) {
+            say(out, tb("verbs.nothing"), true);
+            return;
+          }
+          if (!signedIn2()) {
+            say(out, tb("verbs.signIn"), true);
+            return;
+          }
+          const body = Object.assign({}, input, { at: (/* @__PURE__ */ new Date()).toISOString() });
+          const key = where + "." + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+          const saver = adapters.save || function(k, b) {
+            return ns.data && ns.data.set ? ns.data.set(k, b) : Promise.reject(new Error(tb("verbs.notHere")));
+          };
+          await saver(key, body);
+          say(out, tb("verbs.saved"));
+          clearInputs(elm);
+          return;
+        }
+        if (!signedIn2()) {
+          say(out, tb("verbs.signIn"), true);
+          return;
+        }
+        if (kind === "ai") {
+          const ask2 = attr(elm, "prompt") || target || "";
+          const vals = Object.keys(input).map(function(k) {
+            return k + ": " + input[k];
+          }).join("\n");
+          say(out, tb("verbs.thinking"));
+          const lang = (spec.lang || document.documentElement.lang || "en").slice(0, 2);
+          const prompt2 = ask2 + (vals ? "\n\n" + vals : "") + "\n\nAnswer in " + (lang === "fi" ? "Finnish" : lang === "es" ? "Spanish" : "English") + ", plainly, with no preamble. Just the answer.";
+          const asker = adapters.ai || async function(p) {
+            if (!ns.ai || !ns.ai.complete) throw new Error(tb("verbs.notHere"));
+            const a = await ns.ai.complete({ prompt: p });
+            return a && (a.text || a.content || a.output) || String(a || "");
+          };
+          show(out, await asker(prompt2));
+          return;
+        }
+        if (kind === "offer" || kind === "tool") {
+          const adapter = adapters[kind];
+          if (!adapter) {
+            say(out, tb("verbs.notHere"), true);
+            return;
+          }
+          say(out, kind === "offer" ? tb("verbs.working") : tb("verbs.thinking"));
+          const result = await adapter(target, input, function(text, bad) {
+            say(out, text, bad);
+          });
+          if (result !== void 0) show(out, result);
+          return;
+        }
+      } catch (err) {
+        say(out, err && err.message || tb("verbs.failed"), true);
+        if (spec.onError) spec.onError(err, elm);
+      }
+    }
+    function scan() {
+      if (destroyed) return;
+      const found = root.querySelectorAll('[data-ak-do="read"], [data-og-do="read"]');
+      Array.prototype.forEach.call(found, function(elm) {
+        if (timers.has(elm)) return;
+        run(elm).catch(function() {
+        });
+        const every = Math.max(READ_MIN_S, parseInt(attr(elm, "every") || String(READ_DEFAULT_S), 10) || READ_DEFAULT_S);
+        const id = window.setInterval(function() {
+          if (destroyed || !elm.isConnected) {
+            window.clearInterval(id);
+            timers.delete(elm);
+            return;
+          }
+          run(elm).catch(function() {
+          });
+        }, every * 1e3);
+        timers.set(elm, id);
+      });
+    }
+    function onClick(ev) {
+      const target = (
+        /** @type {Element} */
+        ev.target
+      );
+      const elm = target && target.closest ? target.closest("[data-ak-do], [data-og-do]") : null;
+      if (!elm || !root.contains(elm)) return;
+      if (attr(elm, "do") === "read") return;
+      ev.preventDefault();
+      run(elm).catch(function() {
+      });
+    }
+    root.addEventListener("click", onClick);
+    scan();
+    return {
+      run,
+      scan,
+      destroy: function() {
+        destroyed = true;
+        root.removeEventListener("click", onClick);
+        timers.forEach(function(id) {
+          window.clearInterval(id);
+        });
+        timers.clear();
+      }
+    };
+  }
+
   // src/static/sdk-libs/atelier/island.js
   var SHAPES = ["pill", "bar", "card", "circle"];
   var TONES13 = ["ink", "surface", "accent", "ok", "err"];
@@ -26375,7 +27783,7 @@
     const v = safeImage2(url);
     return v ? 'url("' + v.replace(/"/g, "%22") + '")' : null;
   }
-  function washOf3(id) {
+  function washOf4(id) {
     let h = 0;
     const s = String(id);
     for (let i = 0; i < s.length; i++) h = h * 31 + s.charCodeAt(i) | 0;
@@ -26574,7 +27982,7 @@
     function buildCard2(item) {
       const layer = layerOf2(item.image);
       const art = el("span", {
-        class: "ak-swipe__art ak-swipe__art--w" + washOf3(item.id) + (layer ? " ak-swipe__art--image" : ""),
+        class: "ak-swipe__art ak-swipe__art--w" + washOf4(item.id) + (layer ? " ak-swipe__art--image" : ""),
         "aria-hidden": "true",
         vars: layer ? { "--ak-card-image": layer } : null
       }, layer ? null : el(
@@ -26876,6 +28284,14 @@
       fork: "Copying it out means calling AIMEAT.ai.capabilities(), complete() or completeJson(), disclose() and AIMEAT.md.render() yourself, writing the no-AI, signed-out and error words in three languages, holding the button busy, and drawing a stored answer again with its label and date.",
       file: "ai-task.js"
     },
+    "board": {
+      parts: ["root", "tools", "tool", "world", "ring", "ringName", "frame", "head", "title", "kind", "extra", "actions", "act", "body", "grip", "empty", "note"],
+      slots: ["title(frame)", "extra(frame)", "empty()"],
+      variants: ["fill", "plain"],
+      tokens: ["--ak-board-h", "--ak-board-head", "--ak-board-frame-radius", "--ak-board-ring"],
+      fork: "Copy .ak-board* out of board.css and drive AIMEAT.viewport yourself; you keep the camera and give up the keyed frames, the ring geometry, the Move/Use overlay and the chrome that stays one size at every zoom.",
+      file: "board.js"
+    },
     "bottomNav": {
       parts: ["root", "item"],
       slots: ["item(entry)"],
@@ -27116,6 +28532,14 @@
       fork: "Copy .ak-rating* out of content.css; the clip trick is four rules.",
       file: "hero.js"
     },
+    "requestPanel": {
+      parts: ["root", "line", "caret", "input", "send", "scan", "plan", "intent", "meta", "step", "mark", "gate", "row", "approve", "cancel", "loop", "console"],
+      slots: ["plan(plan)", "step(step)"],
+      variants: ["compact"],
+      tokens: ["--ak-request-console-h"],
+      fork: "Copy .ak-request* out of board.css and keep the console as AIMEAT.atelier.console; you give up the plan's states, the gate row and the scanner.",
+      file: "request-panel.js"
+    },
     "searchBar": {
       parts: ["root", "input", "clear"],
       slots: ["aside()"],
@@ -27147,6 +28571,14 @@
       tokens: ["--ak-setgroup-help", "--ak-setgroup-measure"],
       fork: "Two columns that fold to one; copy .ak-setgroup* out of workbench.css.",
       file: "workbench.js"
+    },
+    "shelf": {
+      parts: ["root", "bar", "tabs", "search", "grid", "item", "preview", "monogram", "title", "sub", "kind", "acts", "act", "empty"],
+      slots: ["preview(item)", "extra(item)"],
+      variants: ["dense", "plain"],
+      tokens: ["--ak-shelf-preview-h"],
+      fork: "Copy .ak-shelf* out of board.css and build the cards yourself; you keep the tabs and the search bar as kit parts and give up the keyed grid and the designed empty state.",
+      file: "shelf.js"
     },
     "sideNav": {
       parts: ["root", "group", "item", "dot", "label", "count", "foot"],
@@ -27228,6 +28660,14 @@
       fork: "",
       file: "menu.js"
     },
+    "verbs": {
+      parts: ["(none: it renders nothing of its own; the words it writes go into the element the card names)"],
+      slots: [],
+      variants: [],
+      tokens: [],
+      fork: "Copy the run() switch out and keep the attribute names; you give up the on-sight reads, the picture detection and the sign-in wait.",
+      file: "verbs.js"
+    },
     "workflowInput": {
       parts: ["root", "title", "intro", "failure", "notice", "body", "none", "list", "step", "head", "header", "workflow", "run", "form", "choices", "question", "how", "choice", "mark", "other", "error", "bar", "deadline", "answer"],
       slots: ["onAnswered(input, answer)"],
@@ -27261,7 +28701,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.63.1",
+    version: "0.64.0",
     /**
      * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
      * named parts (every one carries `data-ak-part`, so an app's own CSS reaches it), the slots
@@ -27378,6 +28818,13 @@
     // ── An organism's workspace for the app: its people, and the first-run choice of where it lives ──
     workspaceTeam,
     workspacePicker,
+    // ── The board family: frames on an infinite plane over AIMEAT.viewport (board.js), the request
+    //    panel that is a terminal (request-panel.js), the shelf of pieces (shelf.js), and the card
+    //    verbs a control declares instead of a script (verbs.js) ──
+    board,
+    requestPanel,
+    shelf,
+    verbs,
     // ── A Public Intake form and its admin list (AIMEAT.intake), the owner's outside accounts (AIMEAT.connect) ──
     intakeForm,
     intakeAdmin,
