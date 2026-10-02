@@ -32,10 +32,16 @@
  *     detail masthead: `picture` { glyph, src, alt } in a framed box at the start (the screenshot
  *     when `src` loads, the glyph when it does not), the title, the `line`, the description in ink,
  *     the tags, and the column at the right, all on their foot; stacked on a phone.
- * @structure PageHead({ label, title, sub, marks, desc, actions, page, asKey, line, low, thing, picture })
+ *   - help: a term (`explain.<term>.*` in the locale): the question mark of components/HelpTip.js
+ *     after the title words, which explains the page's concept (help="concept.organism"). It stands
+ *     outside the <h1>, so its dialog does not take the headline's letters; the small line `sub`
+ *     follows it.
+ * @structure PageHead({ label, title, sub, marks, desc, actions, page, asKey, line, low, thing, picture, help })
  * @usage html`<${PageHead} title=${t('skills.tabLabel')} sub=${x('titleSub')} marks=${[{ label: '3 own', tone: 'sun' }]}
  *          desc=${x('desc')} actions=${html`<${Loud} …/><${Actions}>…<//>`} />`
  * @version-history
+ *   v1.5.0 — 2026-10-03 — `help`: the question mark after the title words that explains the page's
+ *     concept (guidance for normal people, part B); additive.
  *   v1.4.0 — 2026-09-27 — `thing` and `picture`: the app catalogue's app detail masthead (appcat
  *     detail); additive.
  *   v1.3.0 — 2026-09-27 — `line` and `low`: the app catalogue's masthead (appcat); additive.
@@ -49,6 +55,7 @@ import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import htm from 'htm';
 import { Mark } from '/components/Mark.js';
+import { HelpTip } from '/components/HelpTip.js';
 
 const html = htm.bind(h);
 const cx = (...parts) => parts.filter(Boolean).join(' ');
@@ -73,10 +80,20 @@ function Picture({ glyph, src, alt = '' }) {
 
 /**
  * @param {{ label?: any, title: any, sub?: any, marks?: Array<any>, desc?: any, actions?: any, page?: boolean, asKey?: boolean,
- *   edit?: any, line?: any, low?: boolean, thing?: boolean, picture?: { glyph?: any, src?: string, alt?: string } }} props
+ *   edit?: any, line?: any, low?: boolean, thing?: boolean, picture?: { glyph?: any, src?: string, alt?: string }, help?: string }} props
  */
-export function PageHead({ label, title, sub, marks, desc, actions, page, asKey, edit, line, low, thing, picture }) {
+export function PageHead({ label, title, sub, marks, desc, actions, page, asKey, edit, line, low, thing, picture, help }) {
   const tags = (marks || []).filter((m) => m !== null && m !== undefined && m !== false && m !== '');
+  const hasSub = sub !== null && sub !== undefined && sub !== '';
+  const titleCls = cx('og-title poster-page-title', asKey && 'og-title--key');
+  // help (added by guidance part B): the question mark after the title words, outside the <h1>.
+  const heading = help
+    ? html`<div class="og-title-row">
+        <h1 class=${titleCls}>${title}</h1>
+        <${HelpTip} term=${help} label=${typeof title === 'string' ? title : undefined} />
+        ${hasSub ? html`<small class="og-title-sub">${sub}</small>` : null}
+      </div>`
+    : html`<h1 class=${titleCls}>${title}${hasSub ? html`<small>${sub}</small>` : null}</h1>`;
   // thing (added for appcat): the head of one thing's own page (an app's detail): the picture at the
   // start, the words beside it on their foot, the description in ink and a step larger.
   if (thing) {
@@ -98,7 +115,7 @@ export function PageHead({ label, title, sub, marks, desc, actions, page, asKey,
     <div class=${cx('og-mast', page && 'og-mast--page', low && 'og-mast--low')}>
       <div class="og-mast-words">
         ${label ? html`<div class="poster-label">${label}</div>` : null}
-        ${edit || html`<h1 class=${cx('og-title poster-page-title', asKey && 'og-title--key')}>${title}${sub !== null && sub !== undefined && sub !== '' ? html`<small>${sub}</small>` : null}</h1>`}
+        ${edit || heading}
         ${line !== undefined ? html`<div class="og-mast-line">${line}</div>` : null}
         ${marks ? html`<div class="poster-chips">${tags.map(markOf)}</div>` : null}
         ${desc ? html`<p class=${cx('og-desc', page && 'og-desc--page')}>${desc}</p>` : null}

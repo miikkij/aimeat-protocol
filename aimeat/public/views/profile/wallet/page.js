@@ -13,6 +13,7 @@
  *   secRoads
  * @usage import { renderPage } from './wallet/page.js';
  * @version-history
+ *   v1.22.0 — 2026-10-03 — The page's start (components/PageStart.js: the first prompt asks the person's AI about their morsels, its button opens the history) and the title's question mark, concept.morsel (guidance part B).
  *   v1.21.0 — 2026-09-26 — On the component kit (page group G7): the frame, crumb, head, rail and
  *     strip are SettingsPage and FigureStrip; the sections are Section; where the morsels came from and
  *     went to and the pace are the new MorselFlow and MorselPace (components/MorselFlow.js, the bar the
@@ -55,6 +56,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { SettingsPage } from '/components/SettingsPage.js';
+import { PageStart } from '/components/PageStart.js';
 import { Section } from '/components/Section.js';
 import { scrollToSection } from '/components/Rail.js';
 import { Tabs } from '/components/Tabs.js';
@@ -90,6 +92,7 @@ export function renderPage(ctx) {
   ];
   return html`
     <${SettingsPage} name="wal" crumb=${crumb()} ...${head(ctx)} strip=${strip(ctx)}
+      start=${html`<${PageStart} id="wallet" action=${{ onClick: () => scrollToSection('wal-ledger') }} />`}
       railTitle=${x('railTitle')} sections=${sections} pagesLabel=${x('pages')} pages=${pageLinks()}
       after=${html`<${ctx.ConfirmUI} />`}>
       ${!w ? html`<${Note} kind="loading">${x('loading')}<//>` : html`
@@ -130,7 +133,7 @@ function head(ctx) {
       ${w ? html`<${Action} small copy=${copy}>${x('copyBalance')}<//>` : null}
       <${Action} small soft onClick=${() => scrollToSection('wal-roads')}>${x('toAi')}<//>
     <//>`;
-  return { title: t('profile.tabs.wallet'), sub: x('titleSub'), marks, desc: html`${x('desc')}${msg(ctx.requestMsg)}`, actions };
+  return { title: t('profile.tabs.wallet'), sub: x('titleSub'), help: 'concept.morsel', marks, desc: html`${x('desc')}${msg(ctx.requestMsg)}`, actions };
 }
 
 function strip(ctx) {

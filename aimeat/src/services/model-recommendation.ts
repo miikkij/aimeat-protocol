@@ -16,12 +16,12 @@
  *   `pnpm check:prompt-refs` fails once it is older than MODEL_REVIEW_MAX_AGE_DAYS: the same rule,
  *   and the same 90 days, as the protocol version ledger.
  *
- *   NOT covered, on purpose: the conversation skill aimeat-first-conversation names the same two
- *   models in its text. It is kept byte for byte equal to the copy on aimeat.io and a digest test
- *   holds that, so it is changed there first. check:prompt-refs lists it as a place to update.
+ *   The skills aimeat-first-conversation and aimeat-guided-journey read these names too (since
+ *   2026-10-03; the first had been pinned to the aimeat.io copy by a digest until then).
  * @structure MODEL_RECOMMENDATION · MODEL_REVIEW_MAX_AGE_DAYS · modelReviewAgeDays()
  * @usage import { MODEL_RECOMMENDATION as M } from './model-recommendation.js';   // M.claude → 'Opus 5'
  * @version-history
+ *   v1.0.1 — 2026-10-03 — The comment names the two skills that read it now. No value changed.
  *   v1.0.0 — 2026-09-18 — Initial. The date is the one ai-tool-setup.ts already carried for its
  *     sources; nothing was re-checked against the vendors today, so it was not moved.
  */

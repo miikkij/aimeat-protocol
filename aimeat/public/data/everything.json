@@ -96,10 +96,19 @@
      "slug": "g-1-your-path-from-your-ai-to-what-others-use",
      "cells": [
       "<strong>Your path, from your AI to what others use</strong>",
-      "Your home shows where you are on seven stages: a good AI, connected here, a first result, a place for your work, apps, agents at work, and shared with others. A stage is ticked when the account really holds it. Until your AI has connected, the home asks which AI you use and opens one of three roads: a paid AI over MCP, the free Claude plan or your own OpenRouter credit, or a prompt to copy into an AI that cannot connect, with its answer pasted back as a note every AI you connect later reads. The first task offered is a shared place: an organism with a workspace that every AI you connect, from any vendor, and the people you invite read and write. Your own AI reads the same path at the end of its handbook and walks you along it one stage per conversation; what you want and the stages you decline are kept in one memory record your AI writes.",
-      "Home · <code>GET /v1/home/state</code> (<code>journey</code>) · <code>journey.state</code> · skill <code>aimeat-guided-journey</code>"
+      "Your home shows where you are on seven stages, and the first is your profile: your AI interviews you about your work, what you need, what is hard, what you repeat and what is unclear, and turns the answers into a one-page business card that people open and other AIs read (a schema.org profile in the page). Then: a good AI, connected here, a place for your work, apps, agents at work, and shared with others. A stage is ticked when the account really holds it. The interview works on every road: over MCP, or as a prompt to copy into an AI that cannot connect, with the card pasted back; either way your answers stay private in your own record, and every later offer (a shared place, an app, an agent that takes the repetitive work) is read from them. The help page, the settings overview and the chat offer the same next step. Your own AI reads the same path at the end of its handbook and walks you along it one stage per conversation.",
+      "Home · <code>GET /v1/home/state</code> (<code>journey</code>) · <code>journey.state</code> · <code>/v1/prompts/welcome-mat</code> · skills <code>aimeat-guided-journey</code>, <code>aimeat-first-conversation</code>"
      ],
-     "plain": "Your path, from your AI to what others use Your home shows where you are on seven stages: a good AI, connected here, a first result, a place for your work, apps, agents at work, and shared with others. A stage is ticked when the account really holds it. Until your AI has connected, the home asks which AI you use and opens one of three roads: a paid AI over MCP, the free Claude plan or your own OpenRouter credit, or a prompt to copy into an AI that cannot connect, with its answer pasted back as a note every AI you connect later reads. The first task offered is a shared place: an organism with a workspace that every AI you connect, from any vendor, and the people you invite read and write. Your own AI reads the same path at the end of its handbook and walks you along it one stage per conversation; what you want and the stages you decline are kept in one memory record your AI writes. Home · GET /v1/home/state (journey) · journey.state · skill aimeat-guided-journey"
+     "plain": "Your path, from your AI to what others use Your home shows where you are on seven stages, and the first is your profile: your AI interviews you about your work, what you need, what is hard, what you repeat and what is unclear, and turns the answers into a one-page business card that people open and other AIs read (a schema.org profile in the page). Then: a good AI, connected here, a place for your work, apps, agents at work, and shared with others. A stage is ticked when the account really holds it. The interview works on every road: over MCP, or as a prompt to copy into an AI that cannot connect, with the card pasted back; either way your answers stay private in your own record, and every later offer (a shared place, an app, an agent that takes the repetitive work) is read from them. The help page, the settings overview and the chat offer the same next step. Your own AI reads the same path at the end of its handbook and walks you along it one stage per conversation. Home · GET /v1/home/state (journey) · journey.state · /v1/prompts/welcome-mat · skills aimeat-guided-journey, aimeat-first-conversation"
+    },
+    {
+     "slug": "g-1-start-here-on-every-main-page",
+     "cells": [
+      "<strong>Start here, on every main page</strong>",
+      "The main pages (memory, shared places, agents, connect your AI, wallet, access, packages, apps, notebook, AI) open with what the page is for, the one thing to do first as a prompt to copy into your AI or a button, and what happens next. Fold it away once you know the page. Each page title has a question mark that explains its word in plain language.",
+      "Settings &amp; Controls"
+     ],
+     "plain": "Start here, on every main page The main pages (memory, shared places, agents, connect your AI, wallet, access, packages, apps, notebook, AI) open with what the page is for, the one thing to do first as a prompt to copy into your AI or a button, and what happens next. Fold it away once you know the page. Each page title has a question mark that explains its word in plain language. Settings & Controls"
     },
     {
      "slug": "g-1-capability-hints",
@@ -2691,10 +2700,10 @@
      "slug": "g-16-portfolio",
      "cells": [
       "<strong>Portfolio</strong>",
-      "Publish your own public page, built with your AI in the house style or your own.",
-      "<code>/v1/portfolio/*</code>, <code>aimeat_portfolio_publish</code>"
+      "Publish your own public page, built with your AI in the house style or your own. It is your profile's business card: made from the interview, readable by other AIs, and switched on by your AI once you say yes.",
+      "<code>/v1/portfolio/*</code>, <code>aimeat_portfolio_publish</code> (<code>enable</code>)"
      ],
-     "plain": "Portfolio Publish your own public page, built with your AI in the house style or your own. /v1/portfolio/*, aimeat_portfolio_publish"
+     "plain": "Portfolio Publish your own public page, built with your AI in the house style or your own. It is your profile's business card: made from the interview, readable by other AIs, and switched on by your AI once you say yes. /v1/portfolio/*, aimeat_portfolio_publish (enable)"
     },
     {
      "slug": "g-16-install-the-node-as-an-app",
@@ -2718,10 +2727,10 @@
      "slug": "g-16-pages-an-ai-can-read",
      "cells": [
       "<strong>Pages an AI can read</strong>",
-      "<code>/llms.txt</code> is a one-page map, <code>/llms-full.txt</code> the builder's manual, and every public page has a markdown twin. <code>/AGENTS.md</code>, <code>/sitemap.md</code> and a glossary say what the words mean.",
-      "<code>/llms.txt</code>, <code>.md</code> mirrors, <code>/v1/glossary</code>"
+      "<code>/llms.txt</code> is a one-page map, <code>/llms-full.txt</code> the builder's manual, and every public page has a markdown twin. <code>/AGENTS.md</code>, <code>/sitemap.md</code> and a glossary say what the words mean; the glossary gives each word a plain sentence in English, Finnish or Spanish beside its technical definition.",
+      "<code>/llms.txt</code>, <code>.md</code> mirrors, <code>/v1/glossary</code> (<code>?lang=</code>)"
      ],
-     "plain": "Pages an AI can read /llms.txt is a one-page map, /llms-full.txt the builder's manual, and every public page has a markdown twin. /AGENTS.md, /sitemap.md and a glossary say what the words mean. /llms.txt, .md mirrors, /v1/glossary"
+     "plain": "Pages an AI can read /llms.txt is a one-page map, /llms-full.txt the builder's manual, and every public page has a markdown twin. /AGENTS.md, /sitemap.md and a glossary say what the words mean; the glossary gives each word a plain sentence in English, Finnish or Spanish beside its technical definition. /llms.txt, .md mirrors, /v1/glossary (?lang=)"
     },
     {
      "slug": "g-16-search-engine-setup",
@@ -3718,6 +3727,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-09-15 against node 3.15.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 370
+  "rows": 371
  }
 }

@@ -9,6 +9,8 @@
  *   tokens only.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.1.0 — 2026-10-03 — The wrapper resets the inherited text styles, so the tooltip and the dialog
+ *     read as body text inside an uppercase coral label (a Facts row's name, a column head).
  *   v1.0.0 — 2026-10-02 — Initial (wish "Ohjenappi ja vihjeteksti asetuksille").
  */
 
@@ -16,6 +18,18 @@
   display: inline-flex;
   align-items: center;
   vertical-align: middle;
+  /* The tooltip and the dialog are children of this span, and a native <dialog> inherits the text
+     styles of its parent: inside an uppercase coral label (a Facts row's name, a column head) the
+     whole explanation would read as coral capitals. The span gives them the body's text instead;
+     the button sets its own face. */
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--text-body);
+  font-weight: var(--weight-regular);
+  line-height: 1.6;
+  letter-spacing: normal;
+  text-transform: none;
+  text-align: left;
 }
 
 /* This sheet sets only the size and the mark's face; the frame, the corner and the sun under the

@@ -25,6 +25,9 @@
  *   import { recordFirstMcpCall } from '../services/onboarding-funnel.js';
  *   void recordFirstMcpCall(storage, config, owner, platform);   // fire-and-forget at MCP init
  * @version-history
+ *   v1.5.0 — 2026-10-03 — The return email names the welcome-mat page as the person's profile, a
+ *     one-page business card written from an interview, and says "your profile is up" only when the
+ *     card is published (it said "your welcome mat is up" to everyone on the first-agent step).
  *   v1.4.2 — 2026-09-23 — The return email's "better-app" text is gone (Jouni's decision): the home
  *     state has not returned that step since 07f7040c5 (2026-09-09). needsBetterApp stays.
  *   v1.4.1 — 2026-09-18 — An asked answer naming a different app replaces an earlier asked answer
@@ -608,23 +611,29 @@ export async function readOnboardingFunnel(
  */
 function rescueEmailContent(
     config: AimeatConfig, locale: string, step: 'welcome-mat' | 'first-agent' | null,
+    /** The person's profile card is published (home-state `mat.done`). */
+    profileDone = false,
 ): { subject: string; heading: string; paragraphs: string[]; checklist: string[]; closing: string } {
     const link = `${config.baseUrl}/v1/profile?tab=mcp`;
 
     // ── The remake path: continue from the step they stopped on, and link straight to it. ──
+    // The page the welcome-mat prompt makes is the person's profile: a one-page business card
+    // written from an interview (journey-state.ts). The mail says so in those words.
     if (step) {
         const home = `${config.baseUrl}/v1/home`;
         if (locale === 'fi') {
             const byStep: Record<string, { subject: string; heading: string; body: string }> = {
                 'welcome-mat': {
-                    subject: 'Kotisi odottaa tervetuloamattoa',
+                    subject: 'Tee profiilisi tekoälysi kanssa',
                     heading: 'Yksi asia kesken',
-                    body: 'Aloitit kodin tekemisen mutta tervetuloamatto jäi tekemättä. Se on se yksi kehote jonka viet omaan tekoälychattiisi ja liität vastauksen takaisin. Sen jälkeen sinulla on oikea sivu omalla osoitteellaan.',
+                    body: 'Loit tilin, mutta profiilisi on vielä tekemättä. Profiili on yhden sivun käyntikortti: tekoälysi haastattelee sinua työstäsi ja kirjoittaa sen vastauksistasi. Vie kehote omaan tekoälykeskusteluusi ja liitä vastaus takaisin. Sen jälkeen käyntikorttisi on omassa osoitteessaan.',
                 },
                 'first-agent': {
                     subject: 'Kotisi odottaa ensimmäistä agenttiasi',
                     heading: 'Yksi asia kesken',
-                    body: 'Tervetuloamattosi on paikallaan. Jäljellä on enää yksi asia: kytke tekoälysi agentiksi kotiisi, niin se pääsee lukemaan ja kirjoittamaan asioita puolestasi.',
+                    body: profileDone
+                        ? 'Profiilisi on valmis: käyntikortti, jonka tekoälysi kirjoitti haastattelusi pohjalta. Jäljellä on enää yksi asia: kytke tekoälysi agentiksi kotiisi, niin se pääsee lukemaan ja kirjoittamaan asioita puolestasi.'
+                        : 'Jäljellä on enää yksi asia: kytke tekoälysi agentiksi kotiisi, niin se pääsee lukemaan ja kirjoittamaan asioita puolestasi. Siellä tekoälysi voi myös tehdä profiilisi: se haastattelee sinua työstäsi ja kirjoittaa yhden sivun käyntikortin, jota ihmiset ja heidän tekoälynsä voivat lukea.',
                 },
             };
             const c = byStep[step];
@@ -638,14 +647,16 @@ function rescueEmailContent(
         }
         const byStep: Record<string, { subject: string; heading: string; body: string }> = {
             'welcome-mat': {
-                subject: 'Your home is waiting for its welcome mat',
+                subject: 'Make your profile with your AI',
                 heading: 'One thing left',
-                body: 'You started making a home and the welcome mat is still to do. It is one prompt you take to your own AI chat, and you paste the answer back. After that you have a real page with its own address.',
+                body: 'You created an account, and your profile is still to do. Your profile is a one-page business card: your AI interviews you about your work and writes it from your answers. You take one prompt to your own AI chat and paste the answer back. After that your card has its own address.',
             },
             'first-agent': {
                 subject: 'Your home is waiting for your first agent',
                 heading: 'One thing left',
-                body: 'Your welcome mat is up. There is one thing left: connect your AI as an agent to your home, so it can read and write things for you.',
+                body: profileDone
+                    ? 'Your profile is up: the business card your AI wrote from your interview. There is one thing left: connect your AI as an agent to your home, so it can read and write things for you.'
+                    : 'There is one thing left: connect your AI as an agent to your home, so it can read and write things for you. Your AI can also make your profile there: it interviews you about your work and writes a one-page business card that people and their AIs can read.',
             },
         };
         const c = byStep[step];
@@ -739,14 +750,16 @@ export async function runMcpOnboardingRescueJob(
         // wording written for the screens it will actually see.
         const trackVal = (await storage.getMemory(g.ghii, ONBOARDING_KEYS.track))?.value as { track?: string } | undefined;
         let step: 'welcome-mat' | 'first-agent' | null = null;
+        let profileDone = false;
         if (trackVal?.track === 'remake') {
             const { readHomeState } = await import('./home-state.js');
             const st = await readHomeState(storage, config, g.ownerName);
             // An initialized home needs no reminder at all — skip it entirely.
             if (st.initialized) continue;
             step = st.step;
+            profileDone = st.mat.done;
         }
-        const c = rescueEmailContent(config, locale, step);
+        const c = rescueEmailContent(config, locale, step, profileDone);
         const bodyHtml = c.paragraphs.map(p => `<p>${p}</p>`).join('')
             + (c.checklist.length ? `<ul>${c.checklist.map(i => `<li>${i}</li>`).join('')}</ul>` : '')
             + `<p>${c.closing}</p>`;

@@ -11,6 +11,7 @@
  *   - NotebookTab (default export) — capture box, trust toggles, librarian search, inbox list → NoteCard
  * @usage html`<${NotebookTab} session=${session} showToast=${showToast} onStats=${onStats} />`
  * @version-history
+ *   v1.17.0 -- 2026-10-03 -- The page's start (components/PageStart.js: the first prompt saves a note through the person's own AI; the capture box under it is this page's way) and the title's question mark, concept.knowledge (guidance part B).
  *   v1.16.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
  *     itself, so a search hit's title, snippet or organism name with a quote or an ampersand showed
  *     as &quot; / &amp;.
@@ -63,6 +64,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { SettingsPage } from '/components/SettingsPage.js';
+import { PageStart } from '/components/PageStart.js';
 import { Section } from '/components/Section.js';
 import { Tabs } from '/components/Tabs.js';
 import { List, Row as ListRow, Name, Desc, Who, Doors, SearchLine } from '/components/List.js';
@@ -280,7 +282,8 @@ export default function NotebookTab({ session, showToast, onStats }) {
   return html`
     <${SettingsPage}
       crumb=${[t('nav.profile'), t('profile.landing.menuInformation'), t('profile.tabs.notebook')]}
-      title=${t('profile.notebook.title')} desc=${t('profile.notebook.desc')}
+      title=${t('profile.notebook.title')} help="concept.knowledge" desc=${t('profile.notebook.desc')}
+      start=${html`<${PageStart} id="notebook" done=${inbox === null ? null : inbox.length > 0} />`}
       after=${html`<${ConfirmUI} />`}>
 
     <${Stack} gap="medium" below="section">

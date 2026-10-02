@@ -19,6 +19,7 @@
  *   import OrganismsTab from '/views/profile/organisms-tab.js';
  *   <OrganismsTab session={session} showToast={showToast} onStats={onStats} />
  * @version-history
+ *   v2.34.0 -- 2026-10-03 -- The page's start (components/PageStart.js: what a shared place is for, the first prompt with Create organism as its button, what happens next) and the title's question mark, concept.organism (guidance part B).
  *   v2.33.0 -- 2026-10-01 -- The create form starts from a shape (own work, team, company, family, club,
  *     project; GET /v1/organisms/shapes): the shape sets the type, policy and visibility and the create
  *     call makes its workspaces. Type presets add company and family (guided journey P5).
@@ -95,6 +96,7 @@ const html = htm.bind(h);
 import { t, tOr } from '/js/i18n.js';
 import { useConfirm } from '/components/Modal.js';
 import { SettingsPage } from '/components/SettingsPage.js';
+import { PageStart } from '/components/PageStart.js';
 import { Section } from '/components/Section.js';
 import { List, Row as ListRow, Lead, Name, Cell, Stats, Stat, Doors, Group, SearchLine } from '/components/List.js';
 import { Action, Loud } from '/components/Action.js';
@@ -585,8 +587,9 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   return html`
     <${SettingsPage}
       crumb=${[t('nav.profile'), t('profile.landing.menuInformation'), t('profile.tabs.organisms')]}
-      title=${t('organisms.title') || 'Organisms'}
+      title=${t('organisms.title') || 'Organisms'} help="concept.organism"
       desc=${t('organisms.desc') || 'Organisms are groups — communities, teams, clubs, or projects. Create one or join existing ones to share knowledge, coordinate work, and build together.'}
+      start=${html`<${PageStart} id="organisms" done=${myOrganisms.length > 0} action=${{ onClick: () => setShowCreate(true) }} />`}
       after=${html`<${ConfirmUI} />`}>
 
     ${/* Create form (opened from the topbar button) */ ''}

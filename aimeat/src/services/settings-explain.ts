@@ -18,6 +18,8 @@
  * @structure settingsExplainPieceIds() · settingsExplainParts() · settingsExplainPiece(id)
  * @usage const piece = settingsExplainPiece('ai.temperature'); piece?.text
  * @version-history
+ *   v1.1.0 — 2026-10-03 — The `concept` area (explain.concept.<id>.*: the system's own words in plain
+ *     language) is listed first, and the start part's lead says what it is for.
  *   v1.0.0 — 2026-10-02 — Initial (wish "Ohjenappi ja vihjeteksti asetuksille").
  */
 import { LOCALES, resolveFlat, type Locale } from '../i18n.js';
@@ -25,8 +27,12 @@ import { LOCALES, resolveFlat, type Locale } from '../i18n.js';
 /** The language headings of a term's part, in each language's own name. */
 const LANGUAGE_NAME: Record<Locale, string> = { en: 'English', fi: 'Suomi', es: 'Español' };
 
-/** Areas in the order the start part lists them; an area not named here follows in locale order. */
-const AREA_ORDER = ['ai', 'decide', 'agent', 'crew', 'schedule', 'workflow', 'commerce', 'app', 'workspace',
+/**
+ * Areas in the order the start part lists them; an area not named here follows in locale order.
+ * `concept` comes first: the system's own words (organism, agent, morsel …) in plain language, which
+ * an AI needs before any single setting makes sense to the person.
+ */
+const AREA_ORDER = ['concept', 'ai', 'decide', 'agent', 'crew', 'schedule', 'workflow', 'commerce', 'app', 'workspace',
     'organism', 'living', 'consent', 'classification', 'notify', 'memory', 'access', 'federation', 'sso', 'config'];
 
 const EXAMPLE_PARTS = ['ex1', 'ex2', 'ex3', 'ex4', 'ex5', 'ex6'];
@@ -69,11 +75,13 @@ function startText(): string {
         ...TERMS.filter(t => areaOf(t) === area).map(t =>
             `- \`settings/${t}\` **${part('en', t, 'title') || t}**: ${part('en', t, 'short')}`),
     ]);
+    const concepts = TERMS.filter(t => areaOf(t) === 'concept').length;
     return [
-        `# What a setting means (${TERMS.length} settings)`,
+        `# What a word or a setting means (${concepts} concepts, ${TERMS.length - concepts} settings)`,
         '',
-        'These are the explanations a page shows behind the question mark next to a setting. Read one when the person asks what a setting means or which value to pick.',
-        'Ask for one with aimeat_handbook_get { tier: "settings/<term>" }: it holds the full explanation in English, Finnish and Spanish. Answer in the person\'s language with the matching section. Do not recite this list.',
+        'The `concept` area comes first: the words this system uses (shared place or organism, workspace, agent, memory, morsel, connecting your AI, permission, package, app, AI provider, knowledge), each explained in plain words for a person who is not technical. Read one before you use the word with the person, or when they ask what it is. Use these words and these meanings, in their language, so that you and the pages say the same thing.',
+        'The other areas are the explanations a page shows behind the question mark next to a setting. Read one when the person asks what a setting means or which value to pick.',
+        'Ask for one with aimeat_handbook_get { tier: "settings/<term>" }, for example "settings/concept.organism": it holds the full explanation in English, Finnish and Spanish. Answer in the person\'s language with the matching section. Do not recite this list.',
         ...sections,
     ].join('\n');
 }
@@ -115,7 +123,7 @@ export function settingsExplainPiece(id: string): { id: string; text: string } |
 export function settingsExplainParts(): Array<{ id: string; what: string; chars: number }> {
     return settingsExplainPieceIds().map(id => ({
         id,
-        what: id === 'start' ? 'The settings by area, with their part ids' : (part('en', id, 'title') || id),
+        what: id === 'start' ? 'The concepts in plain words, then the settings by area, with their part ids' : (part('en', id, 'title') || id),
         chars: settingsExplainPiece(id)?.text.length ?? 0,
     }));
 }

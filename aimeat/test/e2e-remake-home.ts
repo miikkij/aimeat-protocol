@@ -19,6 +19,9 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-remake-home
  * @version-history
+ *   v1.2.0 — 2026-10-03 — Phase 1b: the pasted card's private profile block fills journey.state
+ *     (merged, never overwritten with an empty answer) and is removed from the published page; a
+ *     paste without the block, or with a broken one, writes nothing.
  *   2026-09-09: Home journey starts with a connected AI; useful prompts and account settings are within reach.
  *   v1.1.0 — 2026-08-10 — Cover the JSON door on PUT /v1/portfolio/upload (happy path read back
  *     through the public endpoint, plus the missing-field refusal). It is the only shape an MCP
@@ -200,6 +203,88 @@ await test('FIXTURE 6 — plain prose is REFUSED, and the refusal says what was 
     assert(missing.includes('doctype') && missing.includes('html-tag') && missing.includes('body-tag'),
         `the refusal must name what was missing, got ${JSON.stringify(missing)}`);
     assert(r.error.details?.attempts === 1, `attempts must be counted, got ${JSON.stringify(r.error.details)}`);
+});
+
+console.log('\nPhase 1b: the interview answers in the pasted card go to journey.state');
+
+/** The private profile block the welcome-mat prompt asks for, inside the page's <head>. */
+const profileBlock = (answers: Record<string, unknown>) =>
+    `<script type="application/json" id="aimeat-profile">${JSON.stringify(answers)}</script>`;
+const pageWith = (headExtra: string) => page('ChatGPT').replace('</head>', `  ${headExtra}\n</head>`);
+const journeyRecord = async (token: string) => {
+    const { status, body } = await json('/v1/memory/journey.state?soft=1', auth(token));
+    assert(status === 200, `journey.state read ${status}: ${JSON.stringify(body.error)}`);
+    return body.data;
+};
+const ownerProfile = `hmprof${stamp}`;
+let tokenProfile = '';
+
+await test('A paste with the profile block fills journey.state, merged with what is there', async () => {
+    tokenProfile = await registerOwner(ownerProfile);
+    // What the home page and the person's AI wrote before: the road, a want, and one answer.
+    const seed = await json('/v1/memory', auth(tokenProfile, { method: 'POST', body: JSON.stringify({
+        key: 'journey.state', visibility: 'private',
+        value: { road: 'prompt', want: 'less phone work', unclear: 'VAT on catering', work: 'old words' },
+    }) }));
+    assert(seed.status === 201, `seed ${seed.status}: ${JSON.stringify(seed.body.error)}`);
+    const block = profileBlock({
+        work: 'I run a bakery\nwith two staff', needs: 'take orders without the phone',
+        challenges: ['orders get lost', 'no time for the books'], repetitive: 'typing order confirmations',
+        unclear: '   ', extra: 'ignored',
+    });
+    const { status, body: r } = await paste(tokenProfile, pageWith(block));
+    assert(status === 200, `paste ${status}: ${JSON.stringify(r.error)}`);
+    assert(JSON.stringify(r.data.profile_saved) === JSON.stringify(['work', 'needs', 'challenges', 'repetitive']),
+        `the answer names what it saved: ${JSON.stringify(r.data.profile_saved)}`);
+    const s = await json('/v1/home/state', auth(tokenProfile));
+    const p = s.body.data.journey.profile;
+    assert(p.work === 'I run a bakery with two staff', `work, on one line and replacing the old words: ${p.work}`);
+    assert(p.needs === 'take orders without the phone', `needs: ${p.needs}`);
+    assert(p.challenges === 'orders get lost; no time for the books', `a list is joined: ${p.challenges}`);
+    assert(p.repetitive === 'typing order confirmations', `repetitive: ${p.repetitive}`);
+    assert(p.unclear === 'VAT on catering', `an empty answer never overwrites a stored one: ${p.unclear}`);
+    const rec = await journeyRecord(tokenProfile);
+    assert(rec.value.road === 'prompt' && rec.value.want === 'less phone work',
+        `the other fields are kept: ${JSON.stringify(rec.value)}`);
+    assert(!('extra' in rec.value), `an unknown field from the paste is not stored: ${JSON.stringify(rec.value)}`);
+});
+
+await test('...and the private answers never reach the published page', async () => {
+    const { status, body } = await json(`/v1/portfolio/data/${ownerProfile}`);
+    assert(status === 200, `portfolio ${status}: ${JSON.stringify(body.error)}`);
+    const stored = String(body.data.portfolio_html);
+    assert(stored.includes('<h1>Moi</h1>'), 'the page itself is stored');
+    assert(!stored.includes('aimeat-profile') && !stored.includes('orders get lost'),
+        'the profile block is removed before the page is stored');
+});
+
+await test('FAILURE MODE: a paste without the block changes nothing in journey.state', async () => {
+    const before = await journeyRecord(tokenProfile);
+    const { status } = await paste(tokenProfile, page('ChatGPT'));
+    assert(status === 200, `paste ${status}`);
+    const after = await journeyRecord(tokenProfile);
+    assert(after.version === before.version, `no write without the block: v${before.version} → v${after.version}`);
+    assert(JSON.stringify(after.value) === JSON.stringify(before.value), 'the record is unchanged');
+});
+
+await test('FAILURE MODE: a broken block changes nothing, and still never reaches the page', async () => {
+    const before = await journeyRecord(tokenProfile);
+    const broken = '<script type="application/json" id="aimeat-profile">{"work": "secret words",</script>';
+    const { status } = await paste(tokenProfile, pageWith(broken));
+    assert(status === 200, `a page with a broken block is still a page: ${status}`);
+    const after = await journeyRecord(tokenProfile);
+    assert(after.version === before.version, `no write from a broken block: v${before.version} → v${after.version}`);
+    const { body } = await json(`/v1/portfolio/data/${ownerProfile}`);
+    assert(!String(body.data.portfolio_html).includes('secret words'), 'the broken block is removed too');
+});
+
+await test('A first paste with the block makes the record when none exists', async () => {
+    const t = await registerOwner(`hmprof2${stamp}`);
+    const { status } = await paste(t, pageWith(profileBlock({ work: 'Teacher', needs: '' })));
+    assert(status === 200, `paste ${status}`);
+    const rec = await journeyRecord(t);
+    assert(rec.exists !== false && rec.value?.work === 'Teacher', `record made: ${JSON.stringify(rec)}`);
+    assert(!('needs' in rec.value), `an empty answer is not stored: ${JSON.stringify(rec.value)}`);
 });
 
 console.log('\nPhase 2: there is no way past the gate');

@@ -5,6 +5,8 @@
  *   consumer read), cross-owner visibility, MCP aimeat_skill_* tools, and the presigned
  *   skill-directory ZIP upload including traversal/symlink rejection.
  * @version-history
+ *   v1.4.0 -- 2026-10-03 -- 27b2b checks that aimeat-first-conversation starts at the profile
+ *     interview, in place of the digest that pinned it to the aimeat.io text of 2026-09-18.
  *   v1.3.0 -- 2026-08-16 -- August 2026 test-quality audit: test 27 said node-scope publish is
  *     operator-gated but accepted 201 OR 403 and only ever tried it as owner A, who is the first
  *     owner on a freshly cleared E2E database and therefore the bootstrap operator — so the 403
@@ -811,16 +813,19 @@ await test('27b2. seeded aimeat-node-guide serves anonymously and its bytes hash
 // unknown (services/skill-seeds.ts). Since 2026-09-19 the repository is their source: the content
 // audit corrected aimeat-welcome-pages and aimeat-mail-to-data here, so those two no longer equal
 // what aimeat.io served that day, and a node takes the corrections on its next start. The digest
-// below pins aimeat-first-conversation, which the audit found nothing wrong in; when that text is
-// corrected, this string moves with it.
-await test('27b2b. a fresh node carries the six conversation skills, and the untouched one is still the text aimeat.io served', async () => {
+// that pinned aimeat-first-conversation to the aimeat.io text went on 2026-10-03, when its first
+// move became the profile interview and its model names began to come from
+// services/model-recommendation.ts; what it must say is checked instead.
+await test('27b2b. a fresh node carries the six conversation skills, and the first conversation starts at the profile', async () => {
     const idx = await (await rawFetch('/.well-known/agent-skills/index.json')).json() as any;
     const names = ['aimeat-first-conversation', 'aimeat-welcome-pages', 'aimeat-activating-a-person',
         'aimeat-offering-choices', 'aimeat-paying-for-the-ai', 'aimeat-mail-to-data'];
     for (const n of names) assert(idx.skills.some((s: any) => s.name === n), `${n} is not on a fresh node`);
-    const first = idx.skills.find((s: any) => s.name === 'aimeat-first-conversation');
-    assert(first.digest === 'sha256:3a67c66d0f38235c0c7a460c88fc78a8bc83dac87c6a300e0fb2e99b2e129a6e',
-        `aimeat-first-conversation is not the text aimeat.io published: ${first.digest}`);
+    const first = await (await rawFetch('/.well-known/agent-skills/aimeat-first-conversation/SKILL.md')).text();
+    assert(first.includes('Move one: their profile') && first.includes('aimeat-guided-journey'),
+        'the first move is the profile interview, done with the guided-journey skill');
+    assert(!first.includes('Profile › Agents') && !first.includes('Profile › OpenRouter'), 'an old page name is left in it');
+    assert(!first.includes('${'), 'a model name was left as a template expression');
     const res = await rawFetch('/.well-known/agent-skills/aimeat-welcome-pages/SKILL.md');
     assert(res.status === 200, `a moved skill serves anonymously, got ${res.status}`);
     assert((await res.text()).includes('aimeat_portfolio_publish'), 'and it is the welcome-page skill');

@@ -15,6 +15,7 @@
     "!dist/public/lib/ffmpeg-core*/**",
     "scripts/vendor-libs.mjs",
     "docs/AIMEAT_Help_Prompt.md",
+    "docs/AIMEAT_Help_Prompt_Person.md",
     "docs/csm-examples/"
   ],
   "scripts": {

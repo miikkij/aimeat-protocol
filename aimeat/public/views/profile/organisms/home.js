@@ -13,6 +13,7 @@
  * @structure OrganismHome
  * @usage import { OrganismHome } from '/views/profile/organisms/home.js';
  * @version-history
+ *   v3.10.0 -- 2026-10-03 -- The question mark that explains a workspace, concept.workspace, after the line under the workspace list (components/HelpTip.js; guidance part B).
  *   v3.9.0 -- 2026-09-26 -- Every part is a kit component (page group G2a): the page is the SettingsPage (crumb, title, the tags as data, the description, the For your AI slab and the two ways, the FigureStrip, the rail as data whose folds open before they scroll), the sections the Section (open and folded), the hints the Note. The join policy and the creation date are the dim tag again, as main drew them (og-chip--dim). The page writes no class.
  *   v3.8.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v3.7.0 -- 2026-09-25 -- Every word that says a state is the Status (.poster-status fine, attention, danger, off), a unification: Jouni's decision Status.
@@ -65,6 +66,8 @@ import { railSection, scrollToSection } from '/components/Rail.js';
 import { FigureStrip } from '/components/FigureStrip.js';
 import { Action, Actions, Loud } from '/components/Action.js';
 import { Note } from '/components/Note.js';
+import { Row } from '/components/Layout.js';
+import { HelpTip } from '/components/HelpTip.js';
 import { tr } from '/views/profile/organisms/poster-parts.js';
 
 export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, onBack, onChanged, onLeave }) {
@@ -211,7 +214,10 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
       after=${html`<${ConfirmUI} />`}>
       <${Section} id="og-workspaces" num="01" first=${true} title=${tr('organisms.tabWorkspaces', 'Workspaces')} count=${wsCount}>
         <${WorkspaceList} org=${org} showToast=${showToast} onOpen=${onOpenWs} onCount=${setWsCount} />
-        <${Note}>${tr('organisms.workspacesDesc', 'Each workspace is an independent space with its own documents, records and history.')}<//>
+        <${Row} align="end">
+          <${Note}>${tr('organisms.workspacesDesc', 'Each workspace is an independent space with its own documents, records and history.')}<//>
+          <${HelpTip} term="concept.workspace" label=${tr('organisms.tabWorkspaces', 'Workspaces')} />
+        <//>
       <//>
 
       <${Section} id="og-members" num="02" title=${tr('organisms.tabMembers', 'Members')} count=${memberCount}>

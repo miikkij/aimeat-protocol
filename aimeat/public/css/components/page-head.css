@@ -9,6 +9,8 @@
  *   that draws the kit writes them. Corners, frames, shadows and letter case read the shape tokens.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.6.0 — 2026-10-03 — .og-title-row and .og-title-sub: the title with its question mark (PageHead
+ *     `help`, guidance for normal people part B); additive.
  *   v1.5.0 — 2026-09-27 — .og-mast--thing as the old page drew it (appcat parity): the picture on the
  *     card ground, the fainter line and hint, the chips alike, the 52px Launch slab and the smaller
  *     quiet word. Only the thing head changes (appcat's detail is its one user).
@@ -26,7 +28,11 @@
 .og-mast { display: flex; align-items: flex-start; justify-content: space-between; gap: 2rem; margin-top: .6rem; }
 .og-mast-words { display: flex; flex-direction: column; gap: .75rem; min-width: 0; }
 .og-title { margin: 0; overflow-wrap: anywhere; }
-.og-title small { display: inline-flex; flex-wrap: wrap; gap: .8rem; margin-left: .8rem; font-family: var(--font-mono); font-size: .8rem; text-transform: none; letter-spacing: 0; color: var(--text-dim); vertical-align: middle; }
+.og-title small, .og-title-row > .og-title-sub { display: inline-flex; flex-wrap: wrap; gap: .8rem; margin-left: .8rem; font-family: var(--font-mono); font-size: .8rem; text-transform: none; letter-spacing: 0; color: var(--text-dim); vertical-align: middle; }
+/* The title with its question mark (PageHead `help`): the mark after the title words, outside the
+   <h1>, and the small line after it. */
+.og-title-row { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; min-width: 0; }
+.og-title-row > .og-title-sub { margin-left: .2rem; }
 .og-chips { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
 .og-desc { margin: 0; font-size: .95rem; line-height: 1.6; font-weight: 600; color: var(--text-dim); max-width: 64ch; }
 .og-mast-actions { display: flex; flex-direction: column; align-items: flex-end; gap: .75rem; flex: none; padding-top: .5rem; }

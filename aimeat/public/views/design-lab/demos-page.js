@@ -9,6 +9,8 @@
  * @structure PAGE_DEMOS — { [id]: { variants: [{ name, render(ex) }] } }
  * @usage import { PAGE_DEMOS } from './demos-page.js';
  * @version-history
+ *   v1.5.0 — 2026-10-03 — PageStart: open with the page's button, with a link after the purpose, and
+ *     folded.
  *   v1.4.0 — 2026-10-02 — HelpTip (the question mark alone and beside a field's label), Tooltip and
  *     ExplainDialog.
  *   v1.3.0 — 2026-09-27 — SettingsStack's sections are SettingsSection (no hand-written section), and
@@ -28,6 +30,7 @@ import { Hint } from '/components/Hint.js';
 import { HelpTip } from '/components/HelpTip.js';
 import { Tooltip } from '/components/Tooltip.js';
 import { ExplainDialog } from '/components/ExplainDialog.js';
+import { PageStart } from '/components/PageStart.js';
 import { TextField } from '/components/TextField.js';
 import { Masthead, MastheadButton, MastheadCog } from '/components/Masthead.js';
 import { LinkLine } from '/components/LinkLine.js';
@@ -105,6 +108,13 @@ export const PAGE_DEMOS = {
   ] },
   'explain-dialog': { variants: [
     { name: 'from a link', render: (ex) => html`<${ExplainDemo} term=${ex.term} />` },
+  ] },
+  'page-start': { variants: [
+    { name: 'open, with the page\'s button', render: (ex) => html`<${PageStart} id="design-lab-open" purpose=${ex.purpose} prompt=${ex.prompt} next=${ex.next}
+        action=${{ onClick: noop, label: 'New entry' }} />` },
+    { name: 'with a link after the purpose', render: (ex) => html`<${PageStart} id="design-lab-link" purpose=${ex.purpose} prompt=${ex.prompt} next=${ex.next}
+        link=${{ onClick: noop, label: 'Connect your AI' }} />` },
+    { name: 'folded (the first action is done)', render: (ex) => html`<${PageStart} id="design-lab-folded" done=${true} purpose=${ex.purpose} prompt=${ex.prompt} next=${ex.next} />` },
   ] },
   'masthead': { variants: [
     { name: 'default', render: (ex) => html`<${Masthead} avatarSvg=${AVATAR} name=${ex.name} identity=${ex.identity}>

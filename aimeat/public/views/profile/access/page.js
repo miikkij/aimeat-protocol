@@ -27,6 +27,7 @@
  *   tokenFold · secAccounts · secMcp · secSecrets · secretFold · secGroups · secAddresses · secRoads
  * @usage import { renderPage } from './access/page.js';
  * @version-history
+ *   v1.29.0 -- 2026-10-03 -- The page's start (components/PageStart.js: the first prompt asks the person's AI what each key may do, its button opens the keys) and the title's question mark, concept.scope (guidance part B).
  *   v1.28.0 -- 2026-10-02 -- The question mark that explains a key's level: access.scopes on the level Field group (components/HelpTip.js).
  *   v1.27.0 --2026-09-26 -- Every part is a component that takes data, and the file writes no class
  *     (component plan, page group G3): the frame is SettingsPage, the sections Section (the two forms
@@ -86,6 +87,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { SettingsPage } from '/components/SettingsPage.js';
+import { PageStart } from '/components/PageStart.js';
 import { Section } from '/components/Section.js';
 import { scrollToSection } from '/components/Rail.js';
 import { Tabs } from '/components/Tabs.js';
@@ -129,10 +131,11 @@ export function renderPage(ctx) {
   return html`
     <${SettingsPage} name="ac"
       crumb=${crumb()}
-      title=${t('profile.tabs.access')} sub=${x('titleSub')}
+      title=${t('profile.tabs.access')} sub=${x('titleSub')} help="concept.scope"
       marks=${marks(ctx)}
       desc=${x('desc')}
       actions=${mastActions(ctx)}
+      start=${html`<${PageStart} id="access" action=${{ onClick: () => scrollToSection('ac-keys') }} />`}
       strip=${strip(ctx)}
       railTitle=${x('railTitle')}
       sections=${rail.map(([num, id, label, count]) => ({ id, num, label, count }))}

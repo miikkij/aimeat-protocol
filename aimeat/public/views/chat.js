@@ -16,6 +16,10 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   2026-10-03: The empty screen says what this chat does with the person's things here, not "Your
+ *     first agent"; the first starter is the person's next stage on their path (a newcomer's is "Let's
+ *     make your profile", an interview that becomes their business card), and the welcome-page
+ *     starter goes, since the profile is that page (guidance A2).
  *   2026-10-02: A `progress` event (the node's line about what the agent is doing) is kept in the
  *     live turn and shown before the agent's first words.
  *   2026-09-27: The page writes no class: the copy of the conversation is ConversationCopy (the
@@ -88,6 +92,7 @@ import {
 } from '/components/ConversationFrame.js';
 import { InstallCta } from '/components/InstallCta.js';
 import { storeHref } from '/js/site.js';
+import { useJourney } from './home/journey-steps.js';
 
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -111,18 +116,15 @@ function conversationAsText(title, turns) {
 /**
  * The openings offered on an empty conversation.
  *
- * Each one is a request a person could have typed. The first ends with an address they own — a page
- * at /p/<their name> that did not exist a minute ago. The second starts the conversation this place
- * is actually for: what they are trying to get done, in their words, which is the thing everything
- * else attaches to. A person who reads a feature list has told the agent nothing; a person who says
+ * Each one is a request a person could have typed. The first is their next stage (STAGE_STARTERS
+ * below); "take something off my plate" starts the conversation this place is actually for: what
+ * they are trying to get done, in their words, which is the thing everything else attaches to. A person who reads a feature list has told the agent nothing; a person who says
  * what keeps slipping has told it enough to build the whole thing.
  *
  * The button sends the sentence rather than filling the box with it — a half-written prompt waiting
  * to be edited is one more decision, and the point of these is to remove decisions.
  */
 const STARTERS = [
-    { id: 'page', key: 'chat.starterPageAsk', fallback: 'Put up my welcome page — keep it simple, and tell me the address when it is live.',
-      label: 'chat.starterPage', labelFallback: 'Make my welcome page' },
     { id: 'work', key: 'chat.starterWorkAsk', fallback: 'Something on my plate keeps slipping. Ask me about it, then suggest one thing you could take over.',
       label: 'chat.starterWork', labelFallback: 'Take something off my plate' },
     { id: 'connect', key: 'chat.starterConnectAsk', fallback: 'I already pay for an AI subscription. How do I connect it here so it can do this work?',
@@ -133,6 +135,31 @@ const STARTERS = [
     { id: 'company', key: 'chat.starterCompanyAsk', fallback: 'Set up my company here, and give it a memory of its own.',
       label: 'chat.starterCompany', labelFallback: 'Set up my company' },
 ];
+
+/**
+ * The first starter is the person's next stage on their path (GET /v1/home/state `journey`, the same
+ * step the home, Settings and the help page show). A newcomer's is the profile: their AI interviews
+ * them, and the answers become their business card on their own page (Jouni, 2026-10-03). The id is
+ * what the funnel records (routes/chat.ts, /^[a-z-]{1,32}$/).
+ */
+const STAGE_STARTERS = {
+    'first-result': { id: 'profile', key: 'chat.starterProfileAsk', label: 'chat.starterProfile' },
+    ai: { id: 'ai', key: 'chat.starterAiAsk', label: 'chat.starterAi' },
+    connect: STARTERS[1],
+    organise: { id: 'place', key: 'chat.starterPlaceAsk', label: 'chat.starterPlace' },
+    apps: { id: 'apps', key: 'chat.starterAppsAsk', label: 'chat.starterApps' },
+    agents: { id: 'agents', key: 'chat.starterAgentsAsk', label: 'chat.starterAgents' },
+    share: { id: 'share', key: 'chat.starterShareAsk', label: 'chat.starterShare' },
+};
+
+/** The next stage's starter first, then the standing ones it does not repeat; four at most. */
+function startersFor(journey) {
+    const next = journey ? journey.next : 'first-result';
+    const first = next ? STAGE_STARTERS[next] : null;
+    const connected = !!journey?.stages?.find((s) => s.id === 'connect')?.done;
+    const rest = STARTERS.filter((st) => st !== first && !(st.id === 'connect' && connected));
+    return (first ? [first, ...rest] : rest).slice(0, 4);
+}
 
 /**
  * The free ride has a ceiling. A chat turn runs on the node's own key (status.pays === 'node'),
@@ -167,6 +194,7 @@ const BOTTOM_SLACK_PX = 48;
 const SCROLL_GRACE_MS = 15_000;
 
 export default function ChatView() {
+    const { journey, ready: journeyReady } = useJourney();
     const [status, setStatus] = useState(null);
     const [threads, setThreads] = useState([]);
     const [thread, setThread] = useState(null);
@@ -578,7 +606,7 @@ export default function ChatView() {
         return html`
             <${ConversationFrame} signin=${true}>
                 <h1>${tr('chat.title', 'Chat')}</h1>
-                <p>${tr('chat.signIn', 'Sign in and your first agent is waiting here.')}</p>
+                <p>${t('chat.signIn')}</p>
             <//>`;
     }
 
@@ -649,21 +677,22 @@ export default function ChatView() {
                 <${ConversationScroll} onScroll=${onScrollArea}>
                     ${turns.length === 0 && !busy ? html`
                         <${ConversationWelcome}
-                            title=${tr('chat.welcomeTitle', 'Your first agent')}
-                            body=${tr('chat.welcomeBody', 'It works here the way your own AI tool would, with the same permissions and the same record of what it did. Ask it for something.')}
+                            title=${t('chat.welcomeTitle')}
+                            body=${t('chat.welcomeBody')}
                             trust=${tr('chat.welcomeTrust', 'Everything you make here lands in your own account, and nothing becomes public until you publish it yourself.')}>
                             <!-- One concrete thing to ask for, not a menu. An empty box asks a person
                                  to invent a task for a system they have not used; a first request
                                  that ends in a real address they can open answers "what is this for"
-                                 better than any paragraph on this screen could. -->
-                            <${Suggestions}>
-                                ${STARTERS.map((st) => html`
+                                 better than any paragraph on this screen could. The starters wait for
+                                 the person's path, so the first one does not change under the cursor. -->
+                            ${journeyReady && html`<${Suggestions}>
+                                ${startersFor(journey).map((st) => html`
                                     <${Suggestion} key=${st.key}
                                         disabled=${disabled}
                                         onClick=${() => send(tr(st.key, st.fallback), st.id)}>
                                         ${tr(st.label, st.labelFallback)}
                                     <//>`)}
-                            <//>
+                            <//>`}
                         <//>` : ''}
 
                     ${turns.map((turn, i) => html`<${Turn} key=${i} id=${`${thread?.id}-${i}`} turn=${turn} />`)}

@@ -14,6 +14,7 @@
  *   import { BOOTSTRAP_ENDPOINT_CATALOGUE } from '../data/bootstrap-endpoints.js';
  *   res.json(success(nodeId, { ...rest, ...BOOTSTRAP_ENDPOINT_CATALOGUE }));
  * @version-history
+ *   v1.1.0 — 2026-10-03 — help_prompt_person: /v1/help/prompt/person.
  *   v1.0.0 — 2026-09-18 — Extracted verbatim from src/routes/bootstrap.ts, which had reached the
  *     800-line limit. A pure move: the JSON the route answers is byte-identical.
  */
@@ -123,6 +124,7 @@ export const BOOTSTRAP_ENDPOINT_CATALOGUE = {
       profile: { method: 'GET', url: '/v1/profile', description: 'User profile with data wallet, agents, and consent management', tier: 0 },
       validate: { method: 'POST', url: '/v1/validate', description: 'Validate a request body against endpoint schemas', tier: 1 },
       help_prompt: { method: 'GET', url: '/v1/help/prompt', description: 'AI help prompt — paste to your AI assistant if it needs guidance working with this node', tier: 0 },
+      help_prompt_person: { method: 'GET', url: '/v1/help/prompt/person', description: 'Help prompt for a person who is not a developer: paste it into any AI chat; it needs no fetch and starts a newcomer at the profile interview', tier: 0 },
     },
   },
 };

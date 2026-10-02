@@ -12,6 +12,7 @@
  * @structure renderPage · secWaiting · secKunto · secNewest · secFirst
  * @usage import { renderPage } from './apps/page.js';
  * @version-history
+ *   v2.1.0 -- 2026-10-03 -- The page's start (components/PageStart.js: the first prompt asks the person's AI for an app, the build prompt's copy is its button) and the title's question mark, concept.app (guidance part B).
  *   v2.0.0 -- 2026-09-26 -- Every part is a component call that gets data (page group G6): the frame
  *     is SettingsPage (crumb, head, marks, strip, rail as data), the strip FigureStrip; what waits
  *     is the List (a draft's Status, a grant's sun Tag, the doors; the diff and the permissions open
@@ -54,6 +55,7 @@ const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
 import { num as fmtNum } from '/js/format.js';
 import { SettingsPage } from '/components/SettingsPage.js';
+import { PageStart } from '/components/PageStart.js';
 import { Section } from '/components/Section.js';
 import { FigureStrip } from '/components/FigureStrip.js';
 import { Figure } from '/components/Figure.js';
@@ -112,8 +114,9 @@ export function renderPage(ctx) {
     : [{ id: 'ap-waiting', num: '01', label: a('secWaiting'), count: waiting }, { id: 'ap-kunto', num: '02', label: a('secKunto'), count: '' }, { id: 'ap-newest', num: '03', label: a('secNewest'), count: Math.min(apps.length, 6) }, { id: 'ap-agents', num: '04', label: a('secAgents'), count: '' }, { id: 'ap-build', num: '05', label: a('secBuild'), count: '' }, { id: 'ap-builders', num: '06', label: a('secBuilders'), count: '' }];
 
   return html`
-    <${SettingsPage} name="apps" crumb=${crumb()} title=${t('profile.tabs.apps')} sub=${a('titleSub')} marks=${marks}
+    <${SettingsPage} name="apps" crumb=${crumb()} title=${t('profile.tabs.apps')} sub=${a('titleSub')} help="concept.app" marks=${marks}
       desc=${none ? a('descEmpty') : a('desc')} actions=${actions} strip=${strip}
+      start=${html`<${PageStart} id="apps" done=${loading ? null : !none} action=${ctx.buildPrompt ? { copy: ctx.buildPrompt } : null} />`}
       railTitle=${a('railTitle')} sections=${sections} pagesLabel=${a('pages')} pages=${pageLinks()}
       after=${html`<${ctx.ConfirmUI} />
         ${ctx.publishApp ? html`<${PublishDialog} key=${appRef(ctx.publishApp)} app=${ctx.publishApp} busy=${!!ctx.busy} onPublish=${ctx.submitPublish} onClose=${ctx.closePublish} />` : null}`}>

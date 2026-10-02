@@ -6,6 +6,7 @@
  * @structure Git file inventory, catalog validation, links and data syntax, duplicate check.
  * @usage pnpm check:docs
  * @version-history
+ *   v1.1.0 - 2026-10-03 - The person help prompt's two copies must agree too.
  *   v1.0.0 - 2026-09-16 - Track both documentation trees and distinguish history from guidance.
  */
 import { execFileSync } from 'node:child_process';
@@ -77,8 +78,11 @@ for (const path of files) {
   }
 }
 
-if (read('docs/AIMEAT_Help_Prompt.md') !== read('aimeat/docs/AIMEAT_Help_Prompt.md')) {
-  errors.push('Help prompt differs between docs/ and aimeat/docs/. Update both copies together.');
+// The node reads its help prompts from docs/ in the repository and from aimeat/docs/ in the package.
+for (const file of ['AIMEAT_Help_Prompt.md', 'AIMEAT_Help_Prompt_Person.md']) {
+  if (read(`docs/${file}`) !== read(`aimeat/docs/${file}`)) {
+    errors.push(`${file} differs between docs/ and aimeat/docs/. Update both copies together.`);
+  }
 }
 if (errors.length) {
   console.error(errors.join('\n'));

@@ -15,6 +15,7 @@
  * @structure companyTools: AimeatToolDefinition[]
  * @usage import { companyTools } from './definitions/companies.js';
  * @version-history
+ *   v1.1.0 — 2026-10-03 — aimeat_portfolio_publish takes `enable`: switches the person's page on.
  *   v1.0.0 — 2026-08-08 — Initial: list/get/create/update/front_page/portfolio_publish.
  */
 import type { AimeatToolDefinition } from './types.js';
@@ -102,6 +103,7 @@ export const companyTools: AimeatToolDefinition[] = [
         visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
         input: {
             html: { type: 'string', required: true, description: "The complete HTML document to serve as this person's welcome page." },
+            enable: { type: 'boolean', required: false, description: 'true when the person approved the page and wants it public now: switches their page on, unless they switched it off themselves. Without it the page is stored and stays as switched as it was.' },
         },
     },
 ];

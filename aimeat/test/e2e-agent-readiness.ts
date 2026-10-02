@@ -10,6 +10,8 @@
  *   The suite grows with the programme in docs/internal/agentscanner/ — sitemap.md, AGENTS.md,
  *   llms.txt structure and llms-full.txt land here as their phases ship.
  * @version-history
+ *   v0.5.0 - 2026-10-03 - Glossary plain layer: ?lang=fi gives Finnish plain sentences, an unknown lang is English.
+ *   v0.4.0 - 2026-10-03 - The person help prompt at /v1/help/prompt/person, and 404 for an unknown one.
  *   v0.3.0 - 2026-09-15 - Full Everything guide across JSON, Markdown and initial HTML.
  *   v0.1.0 — 2026-07-28 — Phase 02: sitemap.xml from the public-page registry
  *   v0.2.0 — 2026-08-11 — The two app-origin guard checks moved to e2e-app-origin.ts. They asked
@@ -386,6 +388,48 @@ function locs(xml: string): string[] {
         assert(r.status === 404, `expected 404, got ${r.status}`);
     });
 
+    // The plain layer: a term a person meets carries one plain sentence from the locales
+    // (glossary.plain.<id>) in the language ?lang= names, beside the English technical definition.
+    await test('?lang=fi gives each term a person meets a plain sentence in Finnish; the definition stays English', async () => {
+        const fi = await (await fetch(`${BASE}/v1/glossary.json?lang=fi`)).json() as any;
+        assert(fi.data.lang === 'fi', `lang ${fi.data.lang}`);
+        const terms = fi.data.terms as Array<{ id: string; term: string; definition: string; plain?: string }>;
+        const org = terms.find(t => t.term === 'Organism');
+        assert(org?.id === 'organism', `Organism id ${org?.id}`);
+        assert(typeof org?.plain === 'string' && /yhteinen paikka/i.test(org.plain), `Organism plain is not Finnish: ${org?.plain}`);
+        assert(org!.definition.startsWith('Where work lives'), 'the technical definition must stay English');
+        const morsel = terms.find(t => t.term === 'Morsel');
+        assert(/rahaa/.test(morsel?.plain ?? ''), `Morsel plain does not say it is not money, in Finnish: ${morsel?.plain}`);
+        // GAII is where the registry defines an agent.
+        for (const term of ['GAII', 'Workspace', 'Scope', 'Consent', 'Visibility', 'Federation', 'Peer', 'Memory', 'App', 'Member', 'MCP']) {
+            const t = terms.find(x => x.term === term);
+            assert(typeof t?.plain === 'string' && t.plain.length >= 20, `${term} has no plain sentence`);
+        }
+        const ns = terms.find(t => t.term === 'Namespace');
+        assert(ns && !('plain' in ns), 'a builder-only term carries no plain sentence');
+        const economy = (fi.data.areas as Array<{ id: string; title: string; label: string }>).find(a => a.id === 'economy');
+        assert(economy?.title === 'Economy' && /muruset/i.test(economy.label), `area label is not Finnish: ${economy?.label}`);
+
+        const one = await (await fetch(`${BASE}/v1/glossary.json?term=morsel&lang=fi`)).json() as any;
+        assert(one.data.term.plain === morsel!.plain, 'one term carries the same plain sentence as the list');
+        const md = await text('/v1/glossary.md?lang=fi');
+        assert(md.status === 200 && md.body.includes(`_${org!.plain}_`), 'the markdown carries the Finnish plain sentence');
+    });
+
+    await test('FAILURE: an unknown ?lang= falls back to English, not to an error or a missing sentence', async () => {
+        const en = await (await fetch(`${BASE}/v1/glossary.json?lang=en`)).json() as any;
+        const r = await fetch(`${BASE}/v1/glossary.json?lang=xx`);
+        assert(r.status === 200, `expected 200, got ${r.status}`);
+        const xx = await r.json() as any;
+        assert(xx.data.lang === 'en', `lang ${xx.data.lang}`);
+        const orgEn = (en.data.terms as any[]).find(t => t.term === 'Organism');
+        const orgXx = (xx.data.terms as any[]).find(t => t.term === 'Organism');
+        assert(/shared place/i.test(orgEn?.plain ?? ''), `English plain: ${orgEn?.plain}`);
+        assert(orgXx?.plain === orgEn.plain, `unknown lang must give the English sentence: ${orgXx?.plain}`);
+        const none = await (await fetch(`${BASE}/v1/glossary.json`)).json() as any;
+        assert(none.data.lang === 'en', 'no ?lang= is English');
+    });
+
     // P14: the link has to be in the markup a reader sees WITHOUT running JavaScript. The SPA nav
     // is rendered by Preact, so a nav entry alone would be invisible to every crawler.
     await test('every public page links to the glossary in its static HTML', async () => {
@@ -703,6 +747,31 @@ function locs(xml: string): string[] {
         // The node names ITSELF here. A second node used to serve aimeat.io's operator in this
         // block, so asserting only that the block exists would have passed on the bug.
         assert(compact.includes('"@type":"SoftwareApplication"'), 'no SoftwareApplication JSON-LD');
+    });
+
+    // Two help prompts: the builder's manual at /v1/help/prompt, and the one a person pastes into a
+    // consumer AI at /v1/help/prompt/person. The person's prompt has to work in an AI that cannot
+    // fetch anything, so it carries this node's address already filled in and asks for no fetch.
+    await test('the person help prompt is served as filled-in markdown, without auth', async () => {
+        const r = await text('/v1/help/prompt/person');
+        assert(r.status === 200, `status ${r.status}`);
+        assert(r.ct.includes('text/markdown'), `content-type ${r.ct}`);
+        assert(!r.body.includes('{{'), 'a template variable was left unfilled');
+        assert(/https?:\/\/\S+\/v1\/home\b/.test(r.body), 'the home page address is not filled in');
+        assert(/profile/i.test(r.body) && /interview/i.test(r.body), 'the prompt does not start a newcomer at the profile interview');
+        assert(!r.body.includes('Paste this to your AI'), 'the preamble for the reader of the file was served too');
+        assert(!/RFC 8628|device-authorize|GET \S+\/v1\//.test(r.body), 'the person prompt carries the builder manual');
+    });
+
+    await test('the builder help prompt stays where it was', async () => {
+        const r = await text('/v1/help/prompt');
+        assert(r.status === 200 && r.ct.includes('text/markdown'), `status ${r.status} ${r.ct}`);
+        assert(r.body.includes('RFC 8628'), 'the builder prompt lost its content');
+    });
+
+    await test('FAILURE: an unknown help prompt answers 404', async () => {
+        const r = await text('/v1/help/prompt/nobody');
+        assert(r.status === 404, `unknown help prompt → ${r.status}, expected 404`);
     });
 
     console.log(`\n  ${passed} passed, ${failed} failed`);

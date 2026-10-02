@@ -11,10 +11,16 @@
  *   memory record `journey.state` beside what their AI wrote there, never over it.
  *
  *   Composed only from the existing parts: NamedRow and CheckItem (the tried-so-far row), the
- *   Chooser, the setup guide, PromptCard and PasteBox. Nothing here writes a class of its own.
+ *   Chooser, the setup guide, PromptCard, PasteBox and ErrorNote. Nothing here writes a class of
+ *   its own.
  * @structure JourneyPath · RoadChooser · ConnectBox (moved from journey.js) · PromptRoad
  * @usage html`<${JourneyPath} journey=${journey} />  <${RoadChooser} journey=${journey} />`
  * @version-history
+ *   v1.3.0 — 2026-10-03 — The road for an AI that cannot connect makes the profile: it offers the
+ *     served welcome-mat interview prompt in the page's language (with its shorter fallback after a
+ *     refused paste) and sends the answer to POST /v1/home/welcome-mat, which publishes the card and
+ *     keeps the interview answers. The note prompt (buildPastePrompt) is no longer offered here.
+ *   v1.2.0 — 2026-10-03 — The first result (the profile) links to the home's own task, not to Memory.
  *   v1.1.0 — 2026-10-01 — Jouni's review: the free road's claude.ai line names the free plan's model
  *     instead of Opus; the road is held by the home (it hides the task chooser on the prompt road);
  *     the prompt road shows the saved note itself, since the task chooser no longer has a note task.
@@ -23,19 +29,21 @@
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import htm from 'htm';
-import { t } from '/js/i18n.js';
+import { t, getLocale } from '/js/i18n.js';
 import { api } from '/js/api.js';
 import { useShared, invalidateShared } from '/views/surface/shared-read.js';
+import { useHomeState } from '/views/surface/home-state.js';
 import { NamedRow } from '/components/NamedRow.js';
 import { CheckItem } from '/components/CheckItem.js';
 import { PromptCard } from '/components/PromptCard.js';
 import { PasteBox } from '/components/PasteBox.js';
+import { ErrorNote, ErrorNoteFallback } from '/components/ErrorNote.js';
 import { Hint } from '/components/Hint.js';
 import { Action } from '/components/Action.js';
 import { ChooserChoices, ChooserChoice, ChooserBox, ChooserFold, ChooserLinks, ChooserResult } from '/components/Chooser.js';
 import { McpSetupGuide } from '/views/profile/ai-setup-guide.js';
 import { StepAgent } from './step-agent.js';
-import { buildPastePrompt, parsePastedNote, FIRST_NOTE_KEY } from './journey-prompts.js';
+import { FIRST_NOTE_KEY } from './journey-prompts.js';
 import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
@@ -47,7 +55,7 @@ const ROAD_LABEL = { subscription: 'roadSubscription', free: 'roadFree', prompt:
 const STAGE_HREF = {
   ai: '/v1/home#home-roads',
   connect: '/v1/profile?tab=mcp',
-  'first-result': '/v1/profile?tab=memory',
+  'first-result': '/v1/home#home-journey-title',
   organise: '/v1/profile?tab=organisms',
   apps: '/v1/appcat',
   agents: '/v1/profile?tab=agents',
@@ -98,40 +106,65 @@ export function ConnectBox({ onMessage, claudeNote = null }) {
   <//>`;
 }
 
-/** The road for an AI that cannot connect: a prompt out, the answer pasted back as the first note. */
+/** A refused paste in words, from the reason POST /v1/home/welcome-mat gives. */
+function pasteRefusal(reason) {
+  if (reason === 'empty') return t('home.mat.errEmpty');
+  if (reason === 'empty_page') return t('home.mat.errEmptyPage');
+  return t('home.mat.errGeneric');
+}
+
+/**
+ * The road for an AI that cannot connect: the profile interview. The prompt is the served
+ * GET /v1/prompts/welcome-mat in the page's language; the AI's answer (the card, with the private
+ * answers block) is pasted back to POST /v1/home/welcome-mat, which publishes the card and keeps
+ * the answers in `journey.state`. A refused paste keeps the text in the box.
+ */
 function PromptRoad() {
+  const lang = getLocale();
+  const { data: served } = useShared('home-profile-prompt-' + lang, `/v1/prompts/welcome-mat?lang=${encodeURIComponent(lang)}`, []);
+  const { state } = useHomeState();
   const [text, setText] = useState('');
   const [status, setStatus] = useState('');
-  const { data: record, ready } = useShared('home-first-note', `/v1/memory/${FIRST_NOTE_KEY}?soft=1`, ['memory']);
-  const note = record?.exists === false ? null : record?.value;
-  const saved = typeof note?.text === 'string' && !!note.text.trim();
+  const [refusal, setRefusal] = useState('');
+  const [shorter, setShorter] = useState(false);
+  const [busy, setBusy] = useState(false);
   const save = async () => {
-    const note = parsePastedNote(text);
-    if (!note) { setStatus(t('homeJourney.pasteEmpty')); return; }
+    if (!text.trim()) { setStatus(t('homeJourney.pasteEmpty')); return; }
+    setBusy(true); setStatus(''); setRefusal('');
     try {
-      await api('/v1/memory', { method: 'POST', body: JSON.stringify({ key: FIRST_NOTE_KEY, value: note, visibility: 'private' }) });
+      const r = await api('/v1/home/welcome-mat', { method: 'POST', body: JSON.stringify({ paste: text }) });
       setText('');
-      setStatus(t('homeJourney.pasteSaved'));
+      const answers = Array.isArray(r?.data?.profile_saved) && r.data.profile_saved.length > 0;
+      setStatus(t('homeJourney.profilePasteSaved') + (answers ? ' ' + t('homeJourney.profileAnswersSaved') : ''));
       refreshHome();
     } catch (e) {
-      setStatus(t('homeJourney.pasteFailed', { error: e?.message || String(e) }));
+      // The text stays in the box: the person's AI may not write the same answer twice.
+      setRefusal(pasteRefusal(e?.response?.error?.details?.reason));
+    } finally {
+      setBusy(false);
     }
   };
+  const prompt = (shorter && served?.fallback_prompt) || served?.prompt || '';
+  const mat = state?.mat;
   return html`<${ChooserBox}>
-    <p>${t('homeJourney.promptIntro')}</p>
-    <${PromptCard} label=${t('homeJourney.note')} prompt=${buildPastePrompt()} quiet
+    <p>${t('homeJourney.profilePromptIntro')}</p>
+    <${PromptCard} label=${t('homeJourney.profile')} prompt=${prompt} quiet
       copyLabel=${t('common.copyPrompt')} copiedLabel=${t('common.copied')} />
-    <${PasteBox} id="home-paste-note" label=${t('homeJourney.pasteLabel')} rows="4" value=${text}
+    <${PasteBox} id="home-paste-profile" label=${t('homeJourney.pasteLabel')} rows="4" value=${text}
+      placeholder=${t('home.mat.pastePlaceholder')}
       onInput=${(e) => setText(e.currentTarget.value)} />
+    ${refusal && html`<${ErrorNote} text=${refusal} hint=${t('home.mat.errKept')}>
+      ${served?.fallback_prompt && !shorter && html`<${ErrorNoteFallback} onClick=${() => setShorter(true)}>
+        ${t('home.mat.tryShorter')}
+      <//>`}
+    <//>`}
     <${ChooserLinks}>
-      <${Action} onClick=${save}>${t('homeJourney.pasteSave')}<//>
+      <${Action} onClick=${save} disabled=${busy}>${busy ? t('home.mat.sending') : t('homeJourney.profilePasteSave')}<//>
     <//>
     ${status && html`<p role="status">${status}</p>`}
-    ${ready && saved && html`<${ChooserResult}>
-      <h3>${t('homeJourney.saved')}</h3>
-      ${typeof note.title === 'string' && html`<strong>${note.title}</strong>`}
-      <p>${note.text}</p>
-      <${Hint}>${t('homeJourney.noteLifecycle')}<//>
+    ${mat?.done && html`<${ChooserResult}>
+      <h3>${t('homeJourney.profileSaved')}</h3>
+      <p><${Action} href=${mat.standaloneUrl || mat.url}>${t('home.mat.view')} →<//></p>
     <//>`}
     <${Hint}>${t('homeJourney.promptOther')}<//>
   <//>`;

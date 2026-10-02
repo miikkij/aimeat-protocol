@@ -17,6 +17,7 @@
  *   renderRecord · renderOther · renderPage · crumb · pageDoors · spaceTable · fileRows
  * @usage import { renderMemoryView } from './memory-tab/cover.js';
  * @version-history
+ *   v1.27.0 -- 2026-10-03 -- The page's start (components/PageStart.js: what memory is for, the first prompt with the New entry form as its button, what happens next) and the title's question mark, concept.memory (guidance part B).
  *   v1.26.0 -- 2026-10-02 -- The question marks that explain a share pattern and a record's visibility: memory.key_pattern, memory.visibility (components/HelpTip.js).
  *   v1.25.0 -- 2026-09-26 -- Every part is a component call with data (the page kit, the List, the
  *     Folds, the Mark, the Action, the Note, the Field family, SettingBox, StoredValue); no class is
@@ -68,6 +69,7 @@ import { date as fmtDate, num as fmtNum } from '/js/format.js';
 import TagEditor from '/js/components/tag-editor.js';
 import AuthImage from '/js/components/auth-image.js';
 import { SettingsPage } from '/components/SettingsPage.js';
+import { PageStart } from '/components/PageStart.js';
 import { scrollToSection, openTab } from '/components/Rail.js';
 import { Section } from '/components/Section.js';
 import { Folds, FoldRow } from '/components/Folds.js';
@@ -310,10 +312,14 @@ function renderCover(ctx) {
   const railTitle = c('railTitle', 'In your memory');
   const shownStale = staleAll ? stale : stale.slice(0, 8);
 
+  // The start (guidance part B): what memory is for, the first prompt, and the page's own form for it.
+  const start = html`<${PageStart} id="memory" done=${memories ? cls.own.length > 0 : null}
+    action=${{ onClick: () => { setShowFileForm(false); setShowMemForm(true); } }} />`;
+
   return html`
-    <${SettingsPage} name="mp" crumb=${crumb(ctx, [])} title=${t('profile.memory.title') || 'Memory'} marks=${marks}
+    <${SettingsPage} name="mp" crumb=${crumb(ctx, [])} title=${t('profile.memory.title') || 'Memory'} help="concept.memory" marks=${marks}
       desc=${c('desc', 'What you and your agents have written here: notes, settings, research and the organisms’ content. Yours, and yours to decide about.')}
-      actions=${actions} strip=${strip} railTitle=${railTitle} sections=${sections} pages=${pageDoors(ctx, null)}>
+      actions=${actions} start=${start} strip=${strip} railTitle=${railTitle} sections=${sections} pages=${pageDoors(ctx, null)}>
       ${resultRows}
       <${Section} id="mp-own" num=${nOwn} first=${searchResults === null} title=${c('own', 'Mine')} count=${cls.own.reduce((n, s) => n + s.items.length, 0)}
         doors=${html`<${Action} small soft onClick=${() => pickView({ kind: 'page', id: 'all' })}>${c('allKeys', 'All as keys')}<//>`}>

@@ -598,13 +598,13 @@
     },
     "src/routes/portfolio.ts": {
       "reads": {
-        "getMemory": 3,
+        "getMemory": 5,
         "getStorageFile": 1,
         "listStorageFilesForOwners": 1,
         "listMemoryForOwners": 1,
         "getStorageFileMeta": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 review), checked: the builder's memory previews pass presentMemories and its images pass reader.show; the published page, its enabled gate, sizes and the config merge are the owner's published page and settings."
+      "why": "Reviewed 2026-09-29 (TARGET-082 review), checked: the builder's memory previews pass presentMemories and its images pass reader.show; the published page, its enabled gate, sizes and the config merge are the owner's published page and settings. 2026-10-03: the two reads added for `enable` on the upload read the same portfolio config record (PORTFOLIO_CONFIG_KEY), to switch the page on unless the owner switched it off."
     },
     "src/routes/public-stats.ts": {
       "reads": {

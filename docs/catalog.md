@@ -24,6 +24,7 @@ The source column identifies the implementation or rule to read at the next chan
 | File | Status | Purpose and validity | Check against |
 |---|---|---|---|
 | [aimeat/docs/AIMEAT_Help_Prompt.md](../aimeat/docs/AIMEAT_Help_Prompt.md) | runtime | Served help prompt; root and packaged copies must agree | `aimeat/src/routes/bootstrap.ts` |
+| [aimeat/docs/AIMEAT_Help_Prompt_Person.md](../aimeat/docs/AIMEAT_Help_Prompt_Person.md) | runtime | Served person help prompt; root and packaged copies must agree | `aimeat/src/routes/bootstrap.ts` |
 | [aimeat/docs/README.md](../aimeat/docs/README.md) | entry | Navigation to the maintained guide or current contract | `docs/README.md` |
 | [aimeat/docs/agent-scheduler-guide.md](../aimeat/docs/agent-scheduler-guide.md) | maintained | Agent scheduling guide; use current scheduler and constraint handlers | `aimeat/src/services/scheduler.ts` |
 | [aimeat/docs/aimeat-dmz-architecture.md](../aimeat/docs/aimeat-dmz-architecture.md) | entry | Navigation to the maintained guide or current contract | `docs/README.md` |
@@ -48,6 +49,7 @@ The source column identifies the implementation or rule to read at the next chan
 | [docs/AIMEAT-RFC-v4.0-Core-full.md](AIMEAT-RFC-v4.0-Core-full.md) | maintained | Canonical Core concepts; implementation version is separate | `openapi.yaml` |
 | [docs/AIMEAT-RFC-v4.0-Platform-full.md](AIMEAT-RFC-v4.0-Platform-full.md) | maintained | Platform contract; retired scopes and directives corrected | `aimeat/src/routes` |
 | [docs/AIMEAT_Help_Prompt.md](AIMEAT_Help_Prompt.md) | runtime | Served help prompt; root and packaged copies must agree | `aimeat/src/routes/bootstrap.ts` |
+| [docs/AIMEAT_Help_Prompt_Person.md](AIMEAT_Help_Prompt_Person.md) | runtime | Help prompt a person pastes into a consumer AI, served at /v1/help/prompt/person; root and packaged copies must agree | `aimeat/src/routes/bootstrap.ts` |
 | [docs/README.md](README.md) | entry | Navigation to the maintained guide or current contract | `docs/README.md` |
 | [docs/a-endpoints.md](a-endpoints.md) | entry | Navigation to the maintained guide or current contract | `docs/README.md` |
 | [docs/agent-workspace-contracts.md](agent-workspace-contracts.md) | maintained | Current feature or operating guide; verify against implementation when changing it | `aimeat/src` |

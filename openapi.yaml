@@ -13564,6 +13564,12 @@ paths:
         hard it has to be fixable from the server — including for the copies people have already
         carried into their chats.
 
+        Since 2026-10-03 the full prompt is the profile interview: the AI asks about the person's
+        work, needs, challenges, repeated work and what is unclear, and writes a business card with
+        a schema.org Person block. It also puts the answers in a private
+        `<script type="application/json" id="aimeat-profile">` block, which the paste reads into the
+        person's `journey.state` and removes before the page is stored.
+
         `variant=short` asks only for a heading and a few paragraphs; it is what a person is offered
         after a failed paste, so a weaker model still has a way through. The full response also
         carries `fallback_prompt` (the short variant) so that offer costs no second round trip.
@@ -13574,7 +13580,7 @@ paths:
       parameters:
         - name: lang
           in: query
-          schema: { type: string, enum: [en, fi] }
+          schema: { type: string, enum: [en, fi, es] }
           description: Prompt language (default en)
         - name: variant
           in: query
@@ -13697,27 +13703,40 @@ paths:
                           journey:
                             type: object
                             description: >-
-                              The seven stages of the path from having a good AI to sharing what the
-                              person built. Whether a stage is done is derived from what the account
-                              holds; `want`, `road` and the declined stages are the person's own words,
-                              kept in the owner-scope memory record `journey.state`, which their AI
-                              writes with aimeat_memory_write and the home page writes for the road.
+                              The seven stages of the path, starting from the person's profile (a
+                              short interview made into a business card published as their welcome
+                              page) and ending with sharing what they built. Whether a stage is done
+                              is derived from what the account holds; `want`, `road`, `profile` and
+                              the declined stages are the person's own words, kept in the owner-scope
+                              memory record `journey.state`, which their AI writes with
+                              aimeat_memory_write and the home page writes for the road.
                             properties:
                               stages:
                                 type: array
                                 items:
                                   type: object
                                   properties:
-                                    id: { type: string, enum: [ai, connect, first-result, organise, apps, agents, share] }
+                                    id: { type: string, enum: [first-result, ai, connect, organise, apps, agents, share] }
                                     done: { type: boolean }
                                     declined: { type: boolean }
                               next:
                                 type: string
                                 nullable: true
-                                enum: [ai, connect, first-result, organise, apps, agents, share]
+                                enum: [first-result, ai, connect, organise, apps, agents, share]
                                 description: The first stage neither done nor declined. Null once the path is walked.
                               want: { type: string, nullable: true }
                               road: { type: string, enum: [subscription, free, prompt], nullable: true }
+                              profile:
+                                type: object
+                                description: >-
+                                  The profile interview's answers in the person's words, one line
+                                  each; null where they have not answered.
+                                properties:
+                                  work: { type: string, nullable: true, description: What they do. }
+                                  needs: { type: string, nullable: true, description: What they need to get done. }
+                                  challenges: { type: string, nullable: true, description: What gets in their way. }
+                                  repetitive: { type: string, nullable: true, description: Work they do again and again. }
+                                  unclear: { type: string, nullable: true, description: What is unclear or complicated to them. }
                           steps:
                             type: array
                             items: { type: string }
@@ -13769,6 +13788,14 @@ paths:
         is decided from `ai-client` — MCP capability belongs to the client app, not to the model, and
         the model's own `ai-can-mcp` claim is recorded but deliberately not obeyed.
 
+        When the page carries the private profile block
+        (`<script type="application/json" id="aimeat-profile">` with `work`, `needs`, `challenges`,
+        `repetitive`, `unclear`), the answers are written into the person's `journey.state` memory
+        record: each cleaned to one line of at most 300 characters (a list is joined with "; "),
+        merged over the stored record, and an empty answer never replaces a stored one. The block is
+        removed from the page before it is stored, readable or not, so the answers are never
+        published. `profile_saved` names the fields this paste changed.
+
         A refused paste is a 400 whose `details.missing` NAMES what was looked for and not found,
         with `details.attempts`. The text is never echoed back and never cleared: the box keeps it
         client-side. There is no skip — no field, no value and no route grants a home without a mat.
@@ -13815,6 +13842,10 @@ paths:
                           meta:
                             type: object
                             description: The ai-* fields as the page stated them (every one optional).
+                          profile_saved:
+                            type: array
+                            description: The interview answers this paste wrote into journey.state; empty when the page had no readable profile block or nothing changed.
+                            items: { type: string, enum: [work, needs, challenges, repetitive, unclear] }
                           branch: { type: string, enum: [A, B, ask] }
                           question: { type: string, enum: [which-client, paid-plan, which-variant], nullable: true }
                           tool_id: { type: string, nullable: true }
@@ -24353,6 +24384,9 @@ paths:
         returns one entry (404 for an unknown term); the name matches the term or any of its
         aliases, case-insensitively. Public and CORS-open — a reader who needs the vocabulary has
         not authenticated yet. Same registry as /v1/glossary.md and the page's JSON-LD.
+        Each term carries its `id` (the page anchor); a term a person meets also carries `plain`,
+        one sentence in plain words in the language `?lang=` names, beside the English technical
+        `definition`. Each area carries its English `title` and its `label` in that language.
       tags: [Catalogue]
       parameters:
         - name: term
@@ -24360,6 +24394,13 @@ paths:
           required: false
           schema: { type: string }
           description: Return a single entry by term or alias.
+        - name: lang
+          in: query
+          required: false
+          schema: { type: string, enum: [en, fi, es], default: en }
+          description: >-
+            The language of `plain` and of the area labels. An unknown or missing value is English,
+            and a sentence a language lacks falls back to English.
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
@@ -24372,8 +24413,15 @@ paths:
       summary: The AIMEAT vocabulary (markdown)
       description: >-
         The same registry as /v1/glossary.json rendered as markdown with frontmatter, one H2 per
-        area and one H3 per term. This is the form an agent reads.
+        area and one H3 per term. A term a person meets opens with its plain sentence in italics,
+        in the language `?lang=` names. This is the form an agent reads.
       tags: [Catalogue]
+      parameters:
+        - name: lang
+          in: query
+          required: false
+          schema: { type: string, enum: [en, fi, es], default: en }
+          description: The language of the plain sentences and the area headings; an unknown value is English.
       responses:
         '200':
           description: Glossary
@@ -26662,6 +26710,35 @@ paths:
             text/markdown:
               schema:
                 type: string
+
+  /v1/help/prompt/{reader}:
+    get:
+      operationId: getHelpPromptForReader
+      summary: Help prompt for one kind of reader
+      description: >-
+        Returns a help prompt as raw markdown text, written for one kind of reader. `person` is the
+        prompt a person who is not a developer pastes into their own AI chat: what AIMEAT gives
+        them, what each main page is for, the copy-prompt road for an AI that cannot connect, and
+        the profile interview a newcomer starts with. It needs no fetch, so it works in an AI that
+        cannot open addresses; this node's address is filled in. /v1/help/prompt stays the
+        builder's manual. No authentication required (Tier 0).
+      tags: [Bootstrap]
+      parameters:
+        - name: reader
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [person]
+      responses:
+        '200':
+          description: Help prompt markdown
+          content:
+            text/markdown:
+              schema:
+                type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /v1/health:
     get:
@@ -61980,6 +62057,12 @@ paths:
                 html:
                   type: string
                   description: The complete HTML document to serve as the welcome page.
+                enable:
+                  type: boolean
+                  description: >-
+                    true when the person approved the page and wants it public now: switches their
+                    page on, unless they switched it off themselves. Without it the page is stored
+                    and the switch stays as it was.
       responses:
         '200':
           description: File uploaded
@@ -61995,6 +62078,12 @@ paths:
                         properties:
                           uploaded: { type: boolean }
                           sizeKb: { type: integer }
+                          served:
+                            type: boolean
+                            description: >-
+                              Only on a JSON upload (the agent's way in): whether the page is
+                              public now. False means it is stored and the address shows nothing
+                              yet, because `enable` was not sent or the owner switched the page off.
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
