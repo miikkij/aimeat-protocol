@@ -4457,6 +4457,28 @@ components:
             when they did not; the agent's `task_start` then decides, read when the plan arrives.
             The permission floor is not part of it; see TaskStartAnswer.
 
+    AgentCrewLlmEffective:
+      type: object
+      description: |
+        The model choice that applies to one agent's crew now (GET /v1/agents/{name}/crew/llm, and
+        `effective` in the crew menu).
+      required: [value, scope, why]
+      properties:
+        value:
+          type: object
+          nullable: true
+          description: The choice the runtime uses; null means the machine's own providers decide.
+        scope:
+          type: string
+          nullable: true
+          enum: [agent, default, node]
+          description: The agent's own choice, the owner's default, or this node's default.
+        key_source:
+          type: string
+          enum: [agent, own, node]
+          description: Who pays when the node is used, as a call planned now would find it.
+        why: { type: string, description: One sentence on which case applied. }
+
     TaskStartAnswer:
       type: object
       description: |
@@ -31271,7 +31293,10 @@ paths:
         With no `runner_agent` given and no `crew-forge` agent of the owner's, the agent becomes an
         agent proposal instead (POST /v1/agents/v2/agent-proposals): the answer has `kind: proposed`,
         `proposal_id` and `proposed_name`, and the owner approves it on their open items, which creates
-        the agent and seeds its definition. crew-forge is no longer one of the basic agents, so this is
+        the agent and seeds its definition. The proposal asks for the `scopes` the app declares for the
+        agent, plus memory:write for its crew runtime, capped by what the caller may grant;
+        `scopes_left_out` names the rest. `*` and the scopes only an exact grant confers are never
+        taken from an app. crew-forge is no longer one of the basic agents, so this is
         what a new account gets.
       tags: [Apps]
       security:
@@ -35766,6 +35791,8 @@ paths:
         object instances — drafts, `.latest`, and `.version.N` history) and unregisters the
         workspace's schema locks. The organism itself (membership, etc.) is kept — it returns to
         "no workspace yet". Creator/admin only. The deliberate typed-confirmation lives in the UI.
+        An agent needs `memory:purge` beside `organism:write`, because nothing of it can be
+        restored; an agent holding `memory:purge` has every task wait for the owner.
       tags: [Organisms]
       security:
         - BearerAuth: []
@@ -37413,6 +37440,9 @@ paths:
 
         `before` is required. A collection DELETE that emptied the space when the parameter was
         forgotten would be one typo away from destroying it.
+
+        Needs `memory:purge` beside `organism:write`: a row space keeps no version history, so a
+        removed row cannot be restored.
       tags: [Organisms]
       security: [{ bearerAuth: [] }]
       parameters:
@@ -37466,6 +37496,9 @@ paths:
     delete:
       operationId: deleteWorkspaceRow
       summary: Remove one row
+      description: |
+        Needs `memory:purge` beside `organism:write`: a row space keeps no version history, so a
+        removed row cannot be restored.
       tags: [Organisms]
       security: [{ bearerAuth: [] }]
       parameters:
@@ -46501,8 +46534,10 @@ paths:
         with `status: would_await_owner` and `missing`. A translation component writes only the
         installed copy's own `i18n.<registered name>` record and costs nothing beyond packages:write.
         The agents the package's apps bring are proposed to the owner after the install and named in
-        `agents_proposed` ({ agent_name, proposed_name, proposal_id, already_waiting }); each waits on
-        the owner's open items, and approving it creates the agent with its definition.
+        `agents_proposed` ({ agent_name, proposed_name, proposal_id, already_waiting, scopes,
+        scopes_left_out }); each waits on the owner's open items, and approving it creates the agent
+        with its definition and the scopes the app declares for it, capped by what the installer may
+        grant (`scopes_left_out` names the rest).
         An ecosystem app is refused. The owner in person passes. With `mode: managed` the package owns
         the code and layout of every component: a local change to them is refused with 409
         MANAGED_BY_PACKAGE, an update replaces them, and the owner changes only the settings (name,
@@ -53578,10 +53613,50 @@ paths:
                             properties:
                               scope: { type: string, enum: [agent, default] }
                               value: { type: object }
+                          effective:
+                            $ref: '#/components/schemas/AgentCrewLlmEffective'
         '403': { description: Not this account's agent }
         '404': { description: No agent of this account by that name }
 
   /v1/agents/{name}/crew/llm:
+    get:
+      operationId: getAgentCrewLlm
+      summary: The model choice that applies to this agent's crew now
+      description: |
+        What the crew runtime uses for this agent, decided on the node: the agent's own choice
+        (`crews.llm.<agent>`), then the owner's default (`crews.llm.default`), then this node.
+        Thinking through the node (`{kind:'node'}`) is the default for an agent that holds `ai:use`
+        when the node has a key to pay with: the place's own key or the owner's own key (the agent's
+        own key counts too), found by planning one text call as `/v1/llm` would, with nothing spent.
+        Without one, `value` is null and the machine that runs the agent uses its own providers. An
+        owner default of `{kind:'node'}` does not apply to an agent without `ai:use`, which would be
+        refused on its first model call; that agent also gets null. `why` says which case applied.
+
+        For the owner; for the agent itself with no permission word, as with its own tags; for a
+        same-owner agent holding `memory:read`.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+          description: The agent's bare name, or its full identity url-encoded.
+      responses:
+        '200':
+          description: The choice that applies
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentCrewLlmEffective'
+        '403': { description: Not this account's agent, or memory:read missing }
+        '404': { description: No agent of this account by that name }
     put:
       operationId: setAgentCrewLlm
       summary: Which model this one agent thinks with

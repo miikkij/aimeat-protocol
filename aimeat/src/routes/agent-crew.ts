@@ -22,8 +22,11 @@
  *   - POST   /v1/agents/:name/crew/publish    validate on the runtime, then write revision N+1
  *   - POST   /v1/agents/:name/crew/seed       a FIRST definition, validated by a sibling if needed
  *   - POST   /v1/agents/:name/crew/restore    republish a kept revision through the same gate
+ *   - GET    /v1/agents/:name/crew/llm        the model choice that applies now, for the runtime
  * @usage app.use(agentCrewRouter(config, storage));
  * @version-history
+ *   v1.3.0 — 2026-10-02 — GET .../crew/llm: the choice that applies to the agent's crew now, with
+ *     thinking through the node as the default for an agent holding ai:use when the node can pay.
  *   v1.2.0 — 2026-09-01 — POST .../crew/seed. An agent the basic-agents button just created has no
  *     runtime, and what it would load is the definition being published, so publish answers
  *     AGENT_OFFLINE forever and crew-forge cannot give it anything to be. Seed refuses an agent
@@ -42,13 +45,14 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
+import { requireScopeUnlessSelf } from '../auth/self-or-scope.js';
 import { validateBody } from '../models/schemas.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import {
   crewState, crewValidate, crewTryStart, crewTryPoll, crewDraftSave, crewDraftDiscard, crewPublish, crewRestore, crewSeed, crewData,
   resolveCrewAgent, type CrewCaller, type CrewRefusal,
 } from '../services/crew-ops.js';
-import { crewMenu, writeLlmChoice } from '../services/crew-menu.js';
+import { crewMenu, writeLlmChoice, effectiveLlmChoice } from '../services/crew-menu.js';
 
 /** A crew definition as the request carries it. Shape only; the rules are the runtime's. */
 const DocSchema = z.record(z.string(), z.unknown());
@@ -153,6 +157,18 @@ export function agentCrewRouter(config: AimeatConfig, storage: Storage): Router 
     const out = await crewMenu(deps, callerOf(req, 'rest.agent-crew.menu'), name(req));
     if (!out.ok) return refuse(res, out);
     res.json(success(config.nodeId, out.menu));
+  });
+
+  // GET /v1/agents/:name/crew/llm — the choice that applies to this agent's crew now, for the
+  // runtime: its own, the owner's default, this node (ai:use and a key to pay), or null for the
+  // machine's own providers (services/crew-menu.ts effectiveLlmChoice). A route rather than two memory
+  // reads, because the answer depends on the agent's permissions and on whether the node can pay,
+  // which no record holds. The agent itself reads its own with no word, as with its own tags (Jouni,
+  // 2026-10-02): a crew agent may hold ai:use and nothing else.
+  router.get('/v1/agents/:name/crew/llm', requireAuth(), requireScopeUnlessSelf('memory:read', config.nodeId), async (req, res) => {
+    const target = await resolveCrewAgent(deps, callerOf(req, 'rest.agent-crew.llm-read'), name(req));
+    if (!target.ok) return refuse(res, target);
+    res.json(success(config.nodeId, await effectiveLlmChoice(deps, target.agent)));
   });
 
   // PUT /v1/agents/:name/crew/llm — which model this ONE agent thinks with. Body: the choice, or

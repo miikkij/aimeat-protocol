@@ -79,6 +79,9 @@ const crewDef = (agentName = 'demo-joker') => ({
     llm_profile: 'content',
     temperature: 0.7,
     tags: ['demo'],
+    // What the agent's job needs, as an app declares it beside agent_name (aimeat-apps CADENCE does
+    // this). `*` and account:security are here to be left out: an app never grants either.
+    scopes: ['organism:read', 'memory:read', '*', 'account:security'],
     agents: [
         { role: 'Joker', goal: 'Tell one excellent joke', backstory: 'A stand-up comedian.', tools: ['memory'], allow_delegation: false },
     ],
@@ -253,6 +256,13 @@ async function main() {
         const theirs = (await json('/v1/agents/v2/agent-proposals', { headers: { Authorization: `Bearer ${owner1Token}` } })).body.data?.proposals ?? [];
         assert(mine.some((p: any) => p.id === r1.body.data.proposal_id), 'the proposal is owner2\'s');
         assert(!theirs.some((p: any) => p.id === r1.body.data.proposal_id), 'and never owner1\'s');
+        // The proposal asks for what the definition declares, plus the crew runtime's memory:write.
+        // It asked for nothing until 2026-10-02, so an approved agent could not read its own app's data.
+        const asked = mine.find((p: any) => p.id === r1.body.data.proposal_id)?.scopes ?? [];
+        assert(['organism:read', 'memory:read', 'memory:write'].every(s => asked.includes(s)), `declared scopes on the proposal: ${JSON.stringify(asked)}`);
+        assert(!asked.includes('*') && !asked.includes('account:security'), `an app grants neither * nor an exact-grant scope: ${JSON.stringify(asked)}`);
+        assert(JSON.stringify(r1.body.data.scopes_left_out) === JSON.stringify(['*', 'account:security']), `left out: ${JSON.stringify(r1.body.data.scopes_left_out)}`);
+        assert(!('scopes' in (mine.find((p: any) => p.id === r1.body.data.proposal_id)?.crew_def ?? {})), 'scopes do not ride into the crew definition');
         // With a runner, the task is created under owner2 — and stays invisible to owner1.
         await registerAgent(owner2Token, owner2, RUNNER, 'interactive', ['task:read', 'task:write']);
         const r2 = await json(`/v1/apps/${owner1}/${FILENAME}/agents/demo-joker/deploy`, {

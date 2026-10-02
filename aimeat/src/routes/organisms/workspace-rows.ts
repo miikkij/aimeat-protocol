@@ -18,6 +18,8 @@
  * @structure registerOrganismWorkspaceRowRoutes(router, config, storage)
  * @usage registerOrganismWorkspaceRowRoutes(router, config, storage) in routes/organisms.ts
  * @version-history
+ *   v1.3.0 — 2026-10-02 — The two DELETE routes need memory:purge beside organism:write: a removed
+ *     row has no version history to come back from (Jouni, 2026-10-02).
  *   v1.2.0 — 2026-09-29 — Reading rows passes the caller's classification reader (TARGET-082).
  *   v1.1.0 — 2026-08-29 — The app path: `organism:rows` accepted beside organism:write/read, and
  *     the caller carries the grant's `app` claim for the space's `apps` list to match.
@@ -186,7 +188,7 @@ export function registerOrganismWorkspaceRowRoutes(
 
   /** Retention by age: everything that LANDED here before the cutoff. */
   router.delete('/v1/organisms/:id/workspace/rows/:space',
-    requireAuth(), requireScope('organism:write'),
+    requireAuth(), requireScope('organism:write', 'memory:purge'),
     async (req: Request, res: Response) => {
       const ws = wsOf(req);
       if (!needWs(res, ws)) return;
@@ -208,7 +210,7 @@ export function registerOrganismWorkspaceRowRoutes(
 
   /** One row. */
   router.delete('/v1/organisms/:id/workspace/rows/:space/:rowId',
-    requireAuth(), requireScope('organism:write'),
+    requireAuth(), requireScope('organism:write', 'memory:purge'),
     async (req: Request, res: Response) => {
       const ws = wsOf(req);
       if (!needWs(res, ws)) return;

@@ -12,20 +12,32 @@
  *   (routes/agents-v2/agent-proposals.ts). So a new account had no runner, and every "deploy" ended
  *   in RUNNER_NOT_FOUND. This turns a bundled agent into that proposal, from an installed package and
  *   from the app's own "deploy" button alike.
- * @structure proposeBundledAgent(ctx, principal, app, agentName) · proposeBundledAgentsOfApps(...)
+ * @structure proposeBundledAgent(ctx, principal, app, agentName) · proposeBundledAgentsOfApps(...) ·
+ *   bundledAgentScopes(declared, principal)
  * @usage const r = await proposeBundledAgent({ storage, config }, principal, app, 'researcher');
  * @version-history
+ *   v1.1.0 — 2026-10-02 — The proposal carries the scopes the definition declares, plus the crew
+ *     runtime's own, capped by what the proposer may grant (bundledAgentScopes). It carried none, so
+ *     an approved CADENCE crm agent could not read the CRM. `scopes` no longer rides into crew_def.
  *   v1.0.0 — 2026-10-01 — Initial.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { AppRecord } from '../storage/types/apps.js';
 import type { CrewDefDoc } from '../data/basic-agents.js';
-import { proposeAgent, type ProposerPrincipal } from './agent-proposals.js';
+import { proposeAgent, proposerIsOwnerSession, type ProposerPrincipal } from './agent-proposals.js';
 import { deployedAgentName } from '../models/crew-def-schemas.js';
+import { withCrewRuntimeScopes } from '../data/crew-runtime-scopes.js';
+import { isOutsideWildcard, scopeIsCovered } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
 
-export interface BundledAgentProposal { agent_name: string; proposed_name: string; proposal_id: string; already_waiting: boolean }
+export interface BundledAgentProposal {
+    agent_name: string; proposed_name: string; proposal_id: string; already_waiting: boolean;
+    /** What the proposal asks for. A standing proposal answers with the scopes it was made with. */
+    scopes: string[];
+    /** Declared by the app and not in the proposal: beyond the proposer, or never from an app. */
+    scopes_left_out: string[];
+}
 
 const text = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 
@@ -48,8 +60,14 @@ export async function proposeBundledAgent(
         return { ok: false, status: 404, code: 'AGENT_NOT_DECLARED', message: `The app ${app.filename} does not list an agent called "${agentName}".` };
     }
     const appId = `${app.ownerName}/${app.filename}`;
-    const { description, ...rest } = declared;
+    const { description, scopes: declaredScopes, ...rest } = declared;
     delete rest.agent_name;
+    const { scopes, dropped } = bundledAgentScopes(declaredScopes, principal);
+    if (dropped.length > 0) {
+        logger.info('proposeBundledAgent: declared scopes left out of the proposal', {
+            app: app.filename, agent: agentName, by: principal.sub, dropped,
+        });
+    }
     // The bundled crew-def is the flat shape the publish route validates (models/crew-def-schemas.ts);
     // the two fields a seeded definition states and a bundled one may leave out get their defaults.
     const crewDef = {
@@ -62,10 +80,52 @@ export async function proposeBundledAgent(
         // The app's own name where it has one: an installed copy's filename carries the instance id.
         display_name: `${agentName} (${text((app.manifest as { name?: unknown } | undefined)?.name) || app.filename})`,
         purpose: purpose.length >= 10 ? purpose : `${purpose}: the agent that came with the app ${app.filename}.`,
-        mode: 'task-runner', run_mode: 'spawn', crew_def: crewDef,
+        mode: 'task-runner', run_mode: 'spawn', crew_def: crewDef, scopes,
     });
     if (!r.ok) return r;
-    return { ok: true, proposal: { agent_name: agentName, proposed_name: r.proposal.name, proposal_id: r.proposal.id, already_waiting: !!r.alreadyWaiting } };
+    return {
+        ok: true,
+        proposal: {
+            agent_name: agentName, proposed_name: r.proposal.name, proposal_id: r.proposal.id,
+            already_waiting: !!r.alreadyWaiting, scopes: r.proposal.scopes, scopes_left_out: dropped,
+        },
+    };
+}
+
+/**
+ * The scopes a bundled agent is proposed with: the ones its definition declares (`scopes` beside
+ * `agent_name` in the app's `aimeat-crews` block), plus the ones its crew runtime writes with, capped
+ * by what the proposer may grant.
+ *
+ * WHY. Until 2026-10-02 the proposal carried no scopes at all, so an approved agent held none: the
+ * CADENCE crm agent could not read the CRM it came with. Reported by aimeat-apps.
+ *
+ * WHY CAP AND NOT REFUSE. proposeAgent refuses a proposal beyond the proposer, which is right for an
+ * agent writing one by hand. Here the scope list is the app author's, not the proposer's, and an
+ * install must not fail because the agent installing it holds less than the app asks for. So what
+ * the proposer cannot grant is left out and named in the answer; the owner can grant it later on the
+ * agent's page.
+ *
+ * THE WILDCARD AND THE EXACT-GRANT SCOPES NEVER COME FROM AN APP, whoever proposes. `*` and the
+ * scopes outside it (scope-coverage.ts SCOPES_OUTSIDE_WILDCARD) are what an owner grants on purpose,
+ * one by one; an app's HTML is a third party's text and an approval press is not that decision.
+ */
+export function bundledAgentScopes(
+    declared: unknown, principal: ProposerPrincipal,
+): { scopes: string[]; dropped: string[] } {
+    const words = Array.isArray(declared)
+        ? [...new Set(declared.filter((s): s is string => typeof s === 'string').map(s => s.trim()).filter(Boolean))]
+        : [];
+    const wanted = withCrewRuntimeScopes(words);
+    const owner = proposerIsOwnerSession(principal);
+    const scopes: string[] = [];
+    const dropped: string[] = [];
+    for (const s of wanted) {
+        const fromAppAllowed = s !== '*' && !isOutsideWildcard(s);
+        const proposerMayGrant = owner || scopeIsCovered(principal.scopes, s);
+        (fromAppAllowed && proposerMayGrant ? scopes : dropped).push(s);
+    }
+    return { scopes, dropped };
 }
 
 /**

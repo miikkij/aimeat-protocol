@@ -227,6 +227,7 @@ async function nodeRoute(): Promise<void> {
     let owner = '';
     let thread = '';
     let agent = '';
+    let noai = '';
     const allowance = async () => Number((await json('/v1/chat/status', owner)).body.data.allowance_remaining_usd);
 
     await test('1a. setup: an owner with no key of their own; the node names the place key and what an own key would reach', async () => {
@@ -321,7 +322,7 @@ async function nodeRoute(): Promise<void> {
         const view = await json('/v1/agents/roads-agent/ai-keys', other);
         // The name is looked up inside the caller's own account, so another owner's agent is not found.
         assert(view.status === 404, `the second owner cannot read the first owner's agent key view, got ${view.status}`);
-        const scopeless = await mintAgent(owner, ownerName, 'roads-noai', ['memory:read']);
+        const scopeless = noai = await mintAgent(owner, ownerName, 'roads-noai', ['memory:read']);
         const seen = stub!.requestsFor('chat').length;
         const r = await json('/v1/llm/chat/completions', scopeless, {
             method: 'POST', body: JSON.stringify({ messages: [{ role: 'user', content: 'NOSCOPE hi' }] }),
@@ -373,6 +374,40 @@ async function nodeRoute(): Promise<void> {
         s = (await json('/v1/chat/status', owner)).body.data;
         assert(s.own_key.covers.includes('agent_runtimes') && !gapParts(s.own_key).includes('agent_runtimes'),
             `every agent on the node road: the own key reaches the crews, got ${JSON.stringify(s.own_key)}`);
+    });
+
+    await test('1g5. DEFAULT crew on the node: an agent with ai:use thinks through the node when a key pays; one without it keeps the machine\'s key', async () => {
+        const read = (tok: string, name: string) => json(`/v1/agents/${name}/crew/llm`, tok);
+        // The agent reads its own answer with ai:use alone, as the runtime does; its own choice wins.
+        let r = await read(agent, 'roads-agent');
+        assert(r.status === 200, `the agent reads its own choice without memory:read, got ${r.status} ${JSON.stringify(r.body?.error)}`);
+        assert(r.body.data.scope === 'agent' && r.body.data.value?.kind === 'node', `its own choice applies, got ${JSON.stringify(r.body.data)}`);
+        // Nothing stored: the node is the default, because the agent holds ai:use and a key pays.
+        const cleared = await json('/v1/agents/roads-agent/crew/llm', owner, { method: 'PUT', body: JSON.stringify({ choice: null }) });
+        assert(cleared.status === 200, `clear ${cleared.status}`);
+        r = await read(owner, 'roads-agent');
+        assert(r.body.data.scope === 'node' && r.body.data.value?.kind === 'node', `the node is the default, got ${JSON.stringify(r.body.data)}`);
+        assert(['agent', 'own', 'node'].includes(r.body.data.key_source), `the payer is named, got ${JSON.stringify(r.body.data)}`);
+        // Without ai:use the machine's key, and the reason names the word.
+        r = await read(noai, 'roads-noai');
+        assert(r.status === 200 && r.body.data.value === null && r.body.data.scope === null && /ai:use/.test(r.body.data.why),
+            `an agent without ai:use keeps the machine's key, got ${r.status} ${JSON.stringify(r.body.data ?? r.body.error)}`);
+        // The fleet's owner default {kind:'node'} applies to the agent that can use it, and skips the one that cannot.
+        const def = await json('/v1/agents/llm-default', owner, { method: 'PUT', body: JSON.stringify({ choice: { kind: 'node' } }) });
+        assert(def.status === 200, `default ${def.status}`);
+        r = await read(owner, 'roads-agent');
+        assert(r.body.data.scope === 'default' && r.body.data.value?.kind === 'node', `the owner's default applies, got ${JSON.stringify(r.body.data)}`);
+        r = await read(owner, 'roads-noai');
+        assert(r.body.data.value === null, `the owner's node default skips an agent without ai:use, got ${JSON.stringify(r.body.data)}`);
+        // The menu carries the same answer as `effective`.
+        const menu = await json('/v1/agents/roads-noai/crew/menu', owner);
+        assert(menu.status === 200 && menu.body.data.effective?.value === null && menu.body.data.choice?.scope === 'default',
+            `the menu shows the stored default and the effective answer, got ${JSON.stringify(menu.body.data ?? menu.body.error)}`);
+        // Another owner's agent is not found inside the caller's own account.
+        const otherOwner = await registerOwner(`oky${Date.now() % 100000}`);
+        r = await read(otherOwner, 'roads-agent');
+        assert(r.status === 404, `a second owner cannot read the first owner's answer, got ${r.status}`);
+        await json('/v1/agents/llm-default', owner, { method: 'PUT', body: JSON.stringify({ choice: null }) });
     });
 
     await test('1h. no call on any road carried the place key or the shared chat key', async () => {

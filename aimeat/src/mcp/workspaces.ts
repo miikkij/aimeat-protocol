@@ -12,11 +12,12 @@
  *   what the owner's UI sees. Cross-owner member edits (another owner's agent in a shared org) are a
  *   deferred edge case. Publish honours the publish gate: if it's on, the tool refuses and tells the
  *   agent to leave the draft for human review (it does not create the approval here).
- * @structure registerWorkspaceTools(mcp, storage, config, getAgentGaii, emitU, emitL)
+ * @structure registerWorkspaceTools(mcp, storage, config, getAgentGaii, emitU, emitL, scopes)
  *   - aimeat_workspace_list / _read / _write_draft / _publish / _add_document / _delete / _create
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   v1.27.0 -- 2026-10-02 -- Takes the session's scopes and hands them to the row tools.
  *   v1.26.0 -- 2026-09-29 -- aimeat_workspace_read and the two overviews pass the agent's classification
  *     reader (TARGET-082).
  *   v1.25.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
@@ -184,6 +185,7 @@ export function registerWorkspaceTools(
     getAgentGaii: () => string,
     _emitResourceUpdated: (agentGaii: string, uri: string) => void,
     _emitResourceListChanged: (agentGaii: string) => void,
+    scopes: string[],
 ): void {
     // The organism route helpers, built from the same factory routes/organisms/organisms.ts uses.
     // Publishing a draft, reopening one and appending the gate's decision entry are the SAME
@@ -482,7 +484,7 @@ export function registerWorkspaceTools(
     // The four ROW-space tools live in ./workspace-rows.ts — a pure extraction at the
     // max-file-lines boundary. They call services/workspace-rows/row-service.ts, which is what
     // the REST routes call too, so neither door can answer differently from the other.
-    registerWorkspaceRowTools(mcp, { storage, config, agentGaii, writerGaii, ownerName });
+    registerWorkspaceRowTools(mcp, { storage, config, agentGaii, writerGaii, ownerName, scopes });
     // The two in-place DOCUMENT edits, extracted for the same reason and calling the same service
     // the REST routes call: services/workspace-doc-edit.ts.
     registerWorkspaceDocumentTools(mcp, { storage, config, agentGaii, ownerName });

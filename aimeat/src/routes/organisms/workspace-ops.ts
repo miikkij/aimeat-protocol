@@ -7,6 +7,8 @@
  *   export/import, workspace wipe, and archive/unarchive. Extracted from src/routes/organisms.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.12.0 -- 2026-10-02 -- DELETE /v1/organisms/:id/workspace asks memory:purge beside organism:write:
+ *     it removes every record and its history for good (Jouni, 2026-10-02).
  *   v1.11.0 -- 2026-10-02 -- POST .../workspace/records/delete asks memory:purge: it removes for good.
  *   v1.10.0 -- 2026-09-29 -- TARGET-082 review: the three public share reads answer the 404
  *     no-disclosure check and the share gate BEFORE the classification reader runs, so a visitor the
@@ -593,8 +595,9 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
   /* ── DELETE /v1/organisms/:id/workspace — wipe the workspace (manifest + readme + config + ALL
    * object data: drafts, latest, version history) and unregister its schema locks. The organism
    * itself (membership, etc.) stays — it returns to "no workspace yet". Creator/admin only; the
-   * deliberate typed-confirmation lives in the UI. Memory under organism.{id}.* is removed entirely. */
-  router.delete('/v1/organisms/:id/workspace', requireAuth(), requireRole('agent'), requireScope('organism:write'), async (req, res) => {
+   * deliberate typed-confirmation lives in the UI. Memory under organism.{id}.* is removed entirely.
+   * memory:purge beside organism:write, because nothing of it can come back (Jouni, 2026-10-02). */
+  router.delete('/v1/organisms/:id/workspace', requireAuth(), requireRole('agent'), requireScope('organism:write', 'memory:purge'), async (req, res) => {
     const id = req.params.id as string;
     const organism = await storage.getOrganism(id);
     if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }

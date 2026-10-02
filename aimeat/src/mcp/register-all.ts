@@ -24,6 +24,8 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   v1.18.0 — 2026-10-02 — registerWorkspaceTools receives the session's scopes: removing rows needs
+ *     organism:write beside memory:purge, as the REST route asks.
  *   v1.17.0 — 2026-10-02 — registerAgentTaskTools receives the session's scopes, which decide whether
  *     the session may ask a task to start on its own.
  *   v1.16.0 — 2026-10-01 — registerAppManageTool receives getToken: its member actions call the
@@ -169,7 +171,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerCoreTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers);
     registerBoardsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     registerOrganismsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
-    registerWorkspaceTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
+    registerWorkspaceTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     registerConnectionTools(mcp, storage, config, agentGaii, scopes);
     registerRefineryTools(mcp, storage, config, agentGaii, scopes);
     registerMcpProxyTools(mcp, storage, config, agentGaii, scopes);
