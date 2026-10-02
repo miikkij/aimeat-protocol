@@ -7,6 +7,7 @@
  *   come from an app.
  * @usage pnpm test -- app-agent-propose-scopes
  * @version-history
+ *   v1.1.0 — 2026-10-02 — The runtime's words (memory:read, memory:write) are never left out.
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import { describe, expect, it } from 'vitest';
@@ -36,10 +37,12 @@ describe('a bundled agent\'s proposed scopes', () => {
         expect(bundledAgentScopes(['account:security'], agent(['*'])).dropped).toContain('account:security');
     });
 
-    it('nothing declared, or not a list: the runtime\'s word alone, within the proposer\'s reach', () => {
-        expect(bundledAgentScopes(undefined, ownerSession)).toEqual({ scopes: ['memory:write'], dropped: [] });
-        expect(bundledAgentScopes('memory:read', ownerSession)).toEqual({ scopes: ['memory:write'], dropped: [] });
-        expect(bundledAgentScopes([], agent(['memory:read']))).toEqual({ scopes: [], dropped: ['memory:write'] });
+    it('nothing declared, or not a list: the runtime\'s words alone, whoever proposes', () => {
+        // Never capped: every proposal carries them, or the approved agent cannot read its own
+        // definition and never starts (measured on a hosted place, 2026-10-02).
+        expect(bundledAgentScopes(undefined, ownerSession)).toEqual({ scopes: ['memory:read', 'memory:write'], dropped: [] });
+        expect(bundledAgentScopes('memory:read', ownerSession)).toEqual({ scopes: ['memory:read', 'memory:write'], dropped: [] });
+        expect(bundledAgentScopes([], agent([]))).toEqual({ scopes: ['memory:read', 'memory:write'], dropped: [] });
     });
 
     it('junk entries and repeats are dropped before the cap', () => {

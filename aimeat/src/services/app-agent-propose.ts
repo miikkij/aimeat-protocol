@@ -16,6 +16,8 @@
  *   bundledAgentScopes(declared, principal)
  * @usage const r = await proposeBundledAgent({ storage, config }, principal, app, 'researcher');
  * @version-history
+ *   v1.2.0 — 2026-10-02 — The crew runtime's own scopes are never left out, whoever proposes:
+ *     proposeAgent adds them to every proposal (memory:read since today).
  *   v1.1.0 — 2026-10-02 — The proposal carries the scopes the definition declares, plus the crew
  *     runtime's own, capped by what the proposer may grant (bundledAgentScopes). It carried none, so
  *     an approved CADENCE crm agent could not read the CRM. `scopes` no longer rides into crew_def.
@@ -27,7 +29,7 @@ import type { AppRecord } from '../storage/types/apps.js';
 import type { CrewDefDoc } from '../data/basic-agents.js';
 import { proposeAgent, proposerIsOwnerSession, type ProposerPrincipal } from './agent-proposals.js';
 import { deployedAgentName } from '../models/crew-def-schemas.js';
-import { withCrewRuntimeScopes } from '../data/crew-runtime-scopes.js';
+import { withCrewRuntimeScopes, CREW_RUNTIME_SCOPES } from '../data/crew-runtime-scopes.js';
 import { isOutsideWildcard, scopeIsCovered } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
 
@@ -122,7 +124,10 @@ export function bundledAgentScopes(
     const dropped: string[] = [];
     for (const s of wanted) {
         const fromAppAllowed = s !== '*' && !isOutsideWildcard(s);
-        const proposerMayGrant = owner || scopeIsCovered(principal.scopes, s);
+        // The runtime's own words are never capped: proposeAgent adds them to every proposal, because
+        // an agent without them cannot start (data/crew-runtime-scopes.ts). Naming one as "left out"
+        // here would say the opposite of what the owner is then shown.
+        const proposerMayGrant = owner || CREW_RUNTIME_SCOPES.includes(s) || scopeIsCovered(principal.scopes, s);
         (fromAppAllowed && proposerMayGrant ? scopes : dropped).push(s);
     }
     return { scopes, dropped };

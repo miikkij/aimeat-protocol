@@ -38,9 +38,16 @@
  *     - every start-up call of every basic agent answers ok;
  *     - workflow-manager's first task ends completed, with its result where the completion names it;
  *     - the node recorded no refusal for either agent since the run started;
- *     - the concierge setting workflow-manager's tags is still refused for agent:write.
+ *     - the concierge setting workflow-manager's tags is still refused for agent:write;
+ *     - an agent a chat proposed with NO scopes, once approved, holds memory:read and memory:write,
+ *       reads its own definition, and finishes its first task with nothing refused (hosted defect
+ *       2026-10-02, cc7364a8c: memory:write alone, and the agent never started);
+ *     - narrowed back to memory:write, the owner's card names memory:read, and giving it lets the
+ *       same read through with no restart of the connector.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=basic-agents-first-task
  * @version-history
+ *   v1.1.0 — 2026-10-02 — An agent a chat proposed with no scopes, approved, and run to done; the
+ *     owner's way out for one approved with memory:write alone.
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import * as ed from '@noble/ed25519';
@@ -286,6 +293,112 @@ await test('another agent\'s tags still need agent:write: the concierge cannot r
   const list = (await json(BASE, `/v1/agents?owner=${ownerName}`, { headers: authOwner() })).body.data.agents as any[];
   const tags = (list.find(a => a.name === 'workflow-manager')?.tags ?? []) as string[];
   assert(!tags.includes('taken.over'), `workflow-manager's tags changed: ${JSON.stringify(tags)}`);
+});
+
+// ─── An agent a chat proposed, with the smallest scopes ───
+//
+// Measured 2026-10-02 on a hosted place (cc7364a8c): the chat proposed an agent with memory:write
+// only, as the guidance then said, the owner approved it, and its runtime could not read its own
+// definition (aimeat_memory_read of crews.registry.<name> needs memory:read). It exited on every
+// wake and its first task stayed active. The basic agents above hold memory:read, so they could not
+// show it.
+
+const PROPOSED = 'tiny-proposed';
+const PROPOSED_DEF = {
+  readme_md: '# Tiny', tags: ['crew.proposed'], process: 'sequential' as const, listen_for: ['tasks'],
+  agents: [{ role: 'Worker', goal: 'Do the job.', backstory: 'You do the job.', allow_delegation: false, tools: ['memory'] }],
+  tasks: [{ id: 'work', description: 'Do this: {{ctx.prompt}}', expected_output: 'A short answer.', agent: 'Worker' }],
+};
+let proposedStart = '';
+
+await test('a chat proposes an agent asking for NO scopes, and the owner approves it', async () => {
+  const p = await json(BASE, '/v1/agents/v2/agent-proposals', {
+    method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+    body: JSON.stringify({ name: PROPOSED, purpose: 'Does one small job the owner asks for.', scopes: [], crew_def: PROPOSED_DEF }),
+  });
+  assert(p.status === 201, `propose ${p.status}: ${JSON.stringify(p.body?.error)}`);
+  const r = await json(BASE, `/v1/agents/v2/agent-proposals/${p.body.data.proposal.id}/approve`, { method: 'POST', headers: authOwner() });
+  assert(r.status === 200, `approve ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  assert(r.body.data.attached === true, `expected attached, got ${JSON.stringify(r.body.data.attach_problem ?? r.body.data)}`);
+  const row = await waitOnline(`${PROPOSED}#${ownerName}@${NODE_ID}`);
+  assert(row?.tunnel_status === 'online', `${PROPOSED} should be online, got ${JSON.stringify(row)}`);
+});
+
+await test('whatever the proposal asked for, the approved agent holds the runtime\'s scopes', async () => {
+  const list = (await json(BASE, `/v1/agents?owner=${ownerName}`, { headers: authOwner() })).body.data.agents as any[];
+  const scopes = (list.find(a => a.name === PROPOSED)?.default_scopes ?? []) as string[];
+  for (const s of ['memory:read', 'memory:write']) {
+    assert(scopes.includes(s), `${PROPOSED} should hold ${s}, holds ${JSON.stringify(scopes)}`);
+  }
+});
+
+await test('its runtime reads its own definition and makes its start-up calls', async () => {
+  proposedStart = new Date(Date.now() - 2000).toISOString();
+  // crewaimeat json_agent.load_def -> memory_tools.read_owner_key: the definition is in the owner's
+  // namespace, so the read carries owner_scope.
+  const def = await runtimeCall(PROPOSED, 'aimeat_memory_read', { key: `crews.registry.${PROPOSED}`, owner_scope: true });
+  assert(JSON.stringify(def).includes('Do this: {{ctx.prompt}}'), `the definition should come back, got ${JSON.stringify(def).slice(0, 300)}`);
+  await runtimeCall(PROPOSED, 'aimeat_agent_tags_set', { target_agent_name: PROPOSED, tags: PROPOSED_DEF.tags });
+  await runtimeCall(PROPOSED, 'aimeat_memory_write', { key: `agents.${PROPOSED}.readme`, value: '# Tiny', visibility: 'owner' });
+  await runtimeCall(PROPOSED, 'aimeat_memory_write', {
+    key: `crews.runtime.${PROPOSED}`, visibility: 'owner', tags: ['crew-runtime'],
+    value: { loadedAt: new Date().toISOString(), ok: true, errors: [], runtime: 'crewaimeat e2e' },
+  });
+});
+
+await test('its first task ends done, and the node refused it nothing', async () => {
+  const created = await json(BASE, `/v1/agents/${PROPOSED}/tasks`, {
+    method: 'POST', headers: authOwner(),
+    body: JSON.stringify({ title: 'First task', description: 'Say hello.', status: 'queued', verification: { user_expects: '', technical_checks: [] }, todos: [] }),
+  });
+  assert(created.status === 201, `task create ${created.status}: ${JSON.stringify(created.body?.error)}`);
+  const id = (created.body.data.task?.id ?? created.body.data.id) as string;
+  const listed = await runtimeCall(PROPOSED, 'aimeat_task_list', {});
+  const mine = ((listed.tasks ?? listed) as any[]).find(t => t.id === id);
+  assert(!!mine, 'the task should be in the agent\'s own list');
+  if (mine.status === 'queued') {
+    await runtimeCall(PROPOSED, 'aimeat_task_propose_todos', { task_id: id, todos: [{ title: 'Say hello', verification: 'A greeting is written' }] });
+  }
+  const got = await runtimeCall(PROPOSED, 'aimeat_task_get', { task_id: id });
+  assert((got.task ?? got).status === 'active', `the task should be active before the crew runs, got ${(got.task ?? got).status}`);
+  const key = `agents.${PROPOSED}.results.first-task`;
+  await runtimeCall(PROPOSED, 'aimeat_memory_write', { key, value: 'Hello.', visibility: 'owner' });
+  await runtimeCall(PROPOSED, 'aimeat_task_complete', { task_id: id, message: 'Done.', deliverable_key: key });
+  const after = await json(BASE, `/v1/agents/${PROPOSED}/tasks/${id}`, { headers: authOwner() });
+  assert((after.body.data.task ?? after.body.data).status === 'done', `the task should be done, got ${(after.body.data.task ?? after.body.data).status}`);
+  const refused = await refusalsSince(PROPOSED, proposedStart);
+  assert(refused.length === 0, `${PROPOSED} was refused: ${JSON.stringify(refused)}`);
+});
+
+await test('an agent approved before the fix, with memory:write only: the owner sees memory:read missing, gives it, and the read goes through', async () => {
+  // The owner narrows the agent back to what the hosted place's agent holds, so the runtime meets
+  // the same refusal. The owner's card lists it; giving it is PATCH /v1/agents/:name/scopes, which
+  // the card's dialog sends, and the connector mints a fresh credential on scopes_changed.
+  const narrowed = await json(BASE, `/v1/agents/${PROPOSED}/scopes`, { method: 'PATCH', headers: authOwner(), body: JSON.stringify({ scopes: ['memory:write'] }) });
+  assert(narrowed.status === 200, `narrow ${narrowed.status}: ${JSON.stringify(narrowed.body?.error)}`);
+  const before = new Date(Date.now() - 2000).toISOString();
+  const read = () => json(daemonBase, '/local/call/aimeat_memory_read', {
+    method: 'POST', headers: { 'X-Aimeat-Agent': PROPOSED }, body: JSON.stringify({ key: `crews.registry.${PROPOSED}`, owner_scope: true }),
+  });
+  const refused = await read();
+  assert(refused.body?.ok !== true && refused.body?.error?.code === 'SCOPE_DENIED', `memory:write only must be refused the read, got ${refused.status} ${JSON.stringify(refused.body)}`);
+  const list = (await json(BASE, `/v1/agents?owner=${ownerName}`, { headers: authOwner() })).body.data.agents as any[];
+  const onCard = (list.find(a => a.name === PROPOSED)?.refusals ?? []) as any[];
+  assert(onCard.some(r => (r.needed ?? []).includes('memory:read')), `the owner's card should name memory:read, got ${JSON.stringify(onCard)}`);
+  assert((await refusalsSince(PROPOSED, before)).length > 0, 'the runtime\'s refusal check sees it too');
+
+  const given = await json(BASE, `/v1/agents/${PROPOSED}/scopes`, { method: 'PATCH', headers: authOwner(), body: JSON.stringify({ scopes: ['memory:write', 'memory:read'] }) });
+  assert(given.status === 200, `grant ${given.status}: ${JSON.stringify(given.body?.error)}`);
+  const start = Date.now();
+  let last: any = null;
+  while (Date.now() - start < 15_000) {
+    last = await read();
+    if (last.body?.ok === true) break;
+    await sleep(300);
+  }
+  assert(last?.body?.ok === true, `after the grant the read should go through without a restart, got ${last?.status} ${JSON.stringify(last?.body?.error)}`);
+  const after = (await json(BASE, `/v1/agents?owner=${ownerName}`, { headers: authOwner() })).body.data.agents as any[];
+  assert(((after.find(a => a.name === PROPOSED)?.refusals ?? []) as any[]).length === 0, 'the card closes when the permission is given');
 });
 
 // ─── Cleanup ───

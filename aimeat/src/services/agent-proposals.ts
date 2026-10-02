@@ -31,6 +31,9 @@
  * @usage
  *   const out = await proposeAgent({ config, storage }, principal, { name, purpose, scopes });
  * @version-history
+ *   v1.4.0 — 2026-10-02 — A proposal always carries the crew runtime's scopes (memory:read,
+ *     memory:write), added after the proposer's ceiling. A proposal with memory:write only made an
+ *     agent that could not read its own definition.
  *   v1.3.0 — 2026-10-02 — proposerIsOwnerSession() exported, so the bundled-agent proposal caps its
  *     declared scopes by the same test that lifts the ceiling here.
  *   v1.2.0 — 2026-10-02 — proposalApprovalUrl() and proposalNextStep(): the REST answer and the MCP
@@ -45,6 +48,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { CrewDefDoc } from '../data/basic-agents.js';
 import { uncoveredScopes } from '../utils/scope-coverage.js';
+import { withCrewRuntimeScopes } from '../data/crew-runtime-scopes.js';
 import { addItem, listItems, closeItem } from './open-items.js';
 import { basicAgentsApprovalUrl } from './basic-agents.js';
 import { logger } from '../utils/logger.js';
@@ -212,7 +216,7 @@ export async function proposeAgent(
     }
   }
 
-  const scopes = Array.isArray(input.scopes) ? input.scopes.filter(s => typeof s === 'string') : [];
+  const asked = Array.isArray(input.scopes) ? input.scopes.filter(s => typeof s === 'string') : [];
 
   // THE CEILING. An agent may not propose a principal that can do more than the agent proposing
   // it — otherwise a narrow agent becomes a way to mint a wide one, and the owner approving it is
@@ -220,12 +224,20 @@ export async function proposeAgent(
   // device-auth escalation check. An OWNER session holds no scopes because its session IS the
   // permission, so the ceiling does not apply to it.
   if (!proposerIsOwnerSession(principal)) {
-    const beyond = uncoveredScopes(principal.scopes, scopes);
+    const beyond = uncoveredScopes(principal.scopes, asked);
     if (beyond.length > 0) {
       return fail(403, 'SCOPE_ESCALATION',
         `You cannot propose an agent that would hold more than you do. Beyond yours: ${beyond.join(', ')}.`);
     }
   }
+
+  // THE RUNTIME'S OWN WORDS ARE ADDED, NOT ASKED FOR, and after the ceiling, because they are not
+  // the proposer's grant: they are what any crew agent needs to start (data/crew-runtime-scopes.ts).
+  // Measured 2026-10-02 on a hosted place: a chat proposed memory:write only, as the guidance then
+  // said, and the approved agent could not read its own definition and never ran. The owner sees
+  // the whole list on the proposal before pressing, and approving adds them again for a proposal
+  // stored before this.
+  const scopes = withCrewRuntimeScopes(asked);
 
   const now = new Date().toISOString();
   const proposal: AgentProposal = {
