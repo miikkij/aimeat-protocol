@@ -11435,8 +11435,15 @@ paths:
       responses:
         '200':
           description: |
-            `{ enabled, agent_name, allowance_remaining_usd, has_own_key, pays, model, push_devices, note? }`.
+            `{ enabled, agent_name, allowance_remaining_usd, has_own_key, own_key, pays, model, push_devices, note? }`.
             `note` is present only when `enabled` is false, and names what an operator has to set.
+            `has_own_key` is true when the owner has a key of their own (the OpenRouter key or a key on
+            one of their AI providers). `own_key` is what that key reaches on this node:
+            `{ set, covers, not_covered: [{ part, reason }] }`. A part is `node_ai` (apps, scheduled
+            jobs, workflows, voice, images), `agent_calls_via_node` (an agent's AI calls through this
+            node), `chat`, or `agent_runtimes` (an agent's crew, which calls its model with the key of
+            the machine it runs on). A reason is `shared_chat_key` (the operator's key pays for every
+            chat turn) or `runtime_uses_machine_key`.
             `pays` is who pays a chat turn: `own` (the person's own provider key), `allowance` (the
             node's key, from the person's allowance), `node` (the operator's shared chat key, which is
             not metered per person), or null when a turn would be refused (the turn says why). Without
@@ -16244,7 +16251,9 @@ paths:
         same gate a call runs, for this caller (an owner, an agent with its own key and lists, an app
         with its grant and its meta), and nothing is spent. Also the owner's model policy mode and
         whether it binds this caller, today's budget, the catalogue's snapshot, and `guide`, the skill
-        to read next (node:aimeat-ai-capabilities).
+        to read next (node:aimeat-ai-capabilities). For an owner or an agent, `own_key`: what the
+        owner's own key reaches on this node, `{ set, covers, not_covered: [{ part, reason }] }`, the
+        same answer as GET /v1/chat/status.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -16257,7 +16266,7 @@ paths:
             type: string
       responses:
         '200':
-          description: data.capabilities, data.policy { mode, appliesToCaller }, data.budget { dailyBudgetUsd, spentTodayUsd, keySource? }, data.catalog { refreshedAt, snapshot }, data.guide.
+          description: data.capabilities, data.policy { mode, appliesToCaller }, data.budget { dailyBudgetUsd, spentTodayUsd, keySource? }, data.own_key? { set, covers, not_covered }, data.catalog { refreshedAt, snapshot }, data.guide.
           content:
             application/json:
               schema:

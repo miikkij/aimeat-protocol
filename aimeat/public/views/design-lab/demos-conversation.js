@@ -9,6 +9,7 @@
  * @structure CONVERSATION_DEMOS — { [id]: { variants: [{ name, render(ex) }], height? } }
  * @usage import { CONVERSATION_DEMOS } from './demos-conversation.js';
  * @version-history
+ *   v1.7.0 — 2026-10-02 — agent-status: a variant for a saved own key on the shared chat key.
  *   v1.6.0 — 2026-09-27 — The cap's ways (no hand-written button), ConversationCopy, AiNotice main, Panes framed and a
  *     board notice whose title opens nothing; the operator pages' parts in the operator's frame.
  *   v1.5.0 — 2026-09-27 — Messages on components: Message, MessageFile, MessageQuestions, MessageComposer and
@@ -133,6 +134,7 @@ export const CONVERSATION_DEMOS = {
     { name: 'the house pays', render: (ex) => html`<${StatusBar} status=${ex.status} onReset=${noop} />` },
     { name: 'own key', render: (ex) => html`<${StatusBar} status=${{ ...ex.status, pays: 'own', has_own_key: true }} onReset=${noop} />` },
     { name: 'allowance', render: (ex) => html`<${StatusBar} status=${{ ...ex.status, pays: 'allowance' }} onReset=${null} />` },
+    { name: 'own key saved, the house pays the chat', render: (ex) => html`<${StatusBar} status=${{ ...ex.status, pays: 'node', has_own_key: true, own_key: { set: true, covers: ['node_ai', 'agent_calls_via_node'], not_covered: [{ part: 'chat', reason: 'shared_chat_key' }, { part: 'agent_runtimes', reason: 'runtime_uses_machine_key' }] } }} onReset=${noop} />` },
   ] },
   'rail-action': { variants: [
     { name: 'default', render: (ex) => html`<button type="button" class="btn-ghost poster-rail-action">${ex.children}</button>` },

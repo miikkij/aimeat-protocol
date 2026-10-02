@@ -12,6 +12,7 @@
  *
  *   Design: docs/internal/telemetria/02-design.md
  * @version-history
+ *   v1.1.0 -- 2026-10-02 -- chat_agent.metered_here is true on a node without the shared chat key.
  *   v1.0.0 -- 2026-08-14 -- Initial: the ingest → fold → serve chain plus its authorization gates.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-usage-telemetry
@@ -124,9 +125,10 @@ await test('GET /v1/admin/usage/house answers the money question, chat agent inc
     assert(typeof d.free_allowance_usd === 'number', 'states the per-person grant');
     assert(typeof d.by_key_scope?.node?.cost_usd === 'number', 'splits spend by whose key paid');
     assert(typeof d.by_key_scope?.own?.cost_usd === 'number', 'and reports the own-key side too');
-    // The half nobody could see: the chat agent is reported and explicitly NOT part of the totals.
-    assert(d.chat_agent && d.chat_agent.metered_here === false,
-        `the chat agent must be reported as unmetered here, got ${JSON.stringify(d.chat_agent)}`);
+    // The chat agent is reported, and whether it is in the totals follows the route: the runner's
+    // node has no shared chat key, so the chat goes through /v1/llm and IS metered here.
+    assert(d.chat_agent && d.chat_agent.metered_here === true,
+        `the chat agent on the node route must be reported as metered here, got ${JSON.stringify(d.chat_agent)}`);
 });
 
 await test('CROSS-ROLE: a non-operator owner is refused the house figures', async () => {

@@ -3,9 +3,10 @@
  * @description E2E for the Usage page's read: that it says whose money each figure is, that it
  *   refuses a half-stated period, and that it never claims to have counted the key it cannot count.
  *
- *   THE ASSERTION THAT MATTERS MOST is the one about the chat agent. Every chat turn on this node
- *   is spent from a key handed to a child process, so no total the node computes contains any of
- *   it. A payload that omitted `keys.chat.metered_here: false` would read as a complete bill, and
+ *   THE ASSERTION THAT MATTERS MOST is the one about the chat agent. On the shared chat key every
+ *   chat turn is spent from a key handed to a child process, so no total the node computes contains
+ *   any of it (on the node route, which this runner's node takes, the chat is metered and the flag is
+ *   true). A payload that omitted `keys.chat.metered_here: false` there would read as a complete bill, and
  *   an operator acting on a complete-looking bill that is missing its largest item is the failure
  *   this whole page was rebuilt around.
  *
@@ -20,6 +21,8 @@
  *   `spend` is null by construction.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-admin-usage-page
  * @version-history
+ *   v1.1.0 — 2026-10-02 — keys.chat.metered_here is true on a node without the shared chat key (the
+ *     node route meters the chat); it is false only on the shared key.
  *   v1.0.0 — 2026-09-12 — Initial, with the Usage page's rebuild.
  */
 
@@ -105,10 +108,13 @@ await test('The ceiling is the grant times the accounts, done rather than implie
     assert(m.drawn_usd === m.house.cost_usd, 'what is drawn is what the house key was spent on');
 });
 
-await test('The chat agent is reported as NOT metered here', async () => {
+await test('Without the shared chat key the chat is reported as metered here', async () => {
+    // The runner's node sets no AIMEAT_GOOSE_PROVIDER_API_KEY, so the chat takes the node route:
+    // its calls go through /v1/llm and are in the house and own figures. Only the shared key is
+    // spent outside the metering (e2e-own-key-roads runs a node with it).
     const keys = (await page()).body.data.keys;
-    assert(keys.chat.metered_here === false,
-        'keys.chat.metered_here is false — every chat turn is spent outside the metering');
+    assert(keys.chat.metered_here === true,
+        `keys.chat.metered_here is true on the node route, got ${JSON.stringify(keys.chat.metered_here)}`);
     assert(keys.chat.node_counted_usd === null,
         'and the node offers no number of its own for it, rather than a zero that reads as "nothing"');
     assert(keys.house.metered_here === true, 'the house key IS metered per call');

@@ -29,6 +29,9 @@
  *   - UsageTab (default) — the reads, and the six sections
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v3.1.0 — 2026-10-02 — The chat row says "metered" when the chat runs through the node (no shared
+ *     chat key): its calls are in the server's and people's own figures. It said "not measured" on
+ *     every node with a chat, which turned false when hosted places moved off the shared key.
  *   v3.0.0 — 2026-09-27 — Library components only: Section, Verdict and Readings, FigureStrip, the
  *     filter Tabs for the period, Action for the doors and the copy, SettingBox for the paste,
  *     Beside for the checks and the paste; admin-usage.css goes.
@@ -113,6 +116,8 @@ function WhatItCostsYou({ data, control, onAskProvider, asking }) {
   const chat = keys.chat || {};
   const house = keys.house || {};
   const blind = chat.enabled && chat.metered_here === false;
+  // The node route: the chat has no key of its own, its calls are in the rows below.
+  const chatMetered = chat.enabled && chat.metered_here === true;
 
   const stamp = [
     `${data.from} → ${data.to}`,
@@ -139,11 +144,13 @@ function WhatItCostsYou({ data, control, onAskProvider, asking }) {
         <${Readings} rows=${[
     {
       key: 'chat', name: S('now.chatKey'),
-      why: chat.enabled ? S('now.chatKeyWhy') : S('now.chatKeyOffWhy'),
-      mark: chat.enabled
-        ? html`<${Badge} type="danger" label=${S('now.notMeasured')} />`
-        : html`<${Badge} type="muted" label=${S('now.off')} />`,
-      value: chat.spend ? spendValue(chat) : (chat.model || S('now.notAsked')),
+      why: chatMetered ? S('now.chatKeyMeteredWhy') : chat.enabled ? S('now.chatKeyWhy') : S('now.chatKeyOffWhy'),
+      mark: chatMetered
+        ? html`<${Badge} type="success" label=${S('now.metered')} />`
+        : chat.enabled
+          ? html`<${Badge} type="danger" label=${S('now.notMeasured')} />`
+          : html`<${Badge} type="muted" label=${S('now.off')} />`,
+      value: chatMetered ? S('now.chatInRows') : chat.spend ? spendValue(chat) : (chat.model || S('now.notAsked')),
     },
     {
       key: 'house', name: S('now.houseKey'), why: S('now.houseKeyWhy'),
