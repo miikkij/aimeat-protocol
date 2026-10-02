@@ -10,6 +10,7 @@
  * @structure CRON_PRESETS · CreateForm
  * @usage <${CreateForm} agents=${agents} showToast=${showToast} onCreated=${reload} lockedAgent=${name} />
  * @version-history
+ *   v2.15.0 -- 2026-10-02 -- The daily AI spend limit shows, and goes into the request, only for the AI kind: the server checks it on no other kind (src/services/schedule-constraints.ts).
  *   v2.14.0 -- 2026-10-02 -- The question marks that explain the schedule and its limits: schedule.cron, schedule.timezone on their TextFields, schedule.max_runs, schedule.daily_limit on their Checks (components/HelpTip.js).
  *   v2.13.0 --2026-09-26 -- The form is the Field family (page group G5): who does it is the boxed Choice, the cadences the Choice's filter tone, each field a TextField, TextArea or Select with its row label over it (the label beside the field, .sc-form-k, becomes the label over it, as on every other form), the limits the Check with its number field, the foot FormActions; it writes no class. The agent picker keeps its first "choose" line (Select placeholder).
  *   v2.12.0 -- 2026-09-26 -- The run limits beside their check boxes are the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
@@ -91,7 +92,9 @@ export function CreateForm({ agents = [], showToast, onCreated, onCancel = null,
   const buildConstraints = () => {
     const out = [];
     if (maxRuns.enabled) out.push({ type: 'max_runs', enabled: true, params: { limit: Number(maxRuns.limit) } });
-    if (dailyLimit.enabled) out.push({ type: 'daily_limit', enabled: true, params: { limit: Number(dailyLimit.limit) } });
+    // The server checks daily_limit only on an ai-kind fire (schedule-constraints.ts), so the
+    // form offers and sends it only for that kind.
+    if (kind === 'ai' && dailyLimit.enabled) out.push({ type: 'daily_limit', enabled: true, params: { limit: Number(dailyLimit.limit) } });
     return out;
   };
 
@@ -174,10 +177,10 @@ export function CreateForm({ agents = [], showToast, onCreated, onCancel = null,
             ${t('profile.scheduler.maxRuns')}
             <${TextField} type="number" size="short" min="1" value=${maxRuns.limit} disabled=${!maxRuns.enabled} ariaLabel=${t('profile.scheduler.maxRuns')} onInput=${v => setMaxRuns(s => ({ ...s, limit: v }))} />
           <//>
-          <${Check} checked=${dailyLimit.enabled} help="schedule.daily_limit" onChange=${on => setDailyLimit(s => ({ ...s, enabled: on }))}>
+          ${kind === 'ai' ? html`<${Check} checked=${dailyLimit.enabled} help="schedule.daily_limit" onChange=${on => setDailyLimit(s => ({ ...s, enabled: on }))}>
             ${t('profile.scheduler.dailyLimit')}
             <${TextField} type="number" size="short" min="0" step="0.1" value=${dailyLimit.limit} disabled=${!dailyLimit.enabled} ariaLabel=${t('profile.scheduler.dailyLimit')} onInput=${v => setDailyLimit(s => ({ ...s, limit: v }))} />
-          <//>
+          <//>` : null}
         <//>
       <//>
 

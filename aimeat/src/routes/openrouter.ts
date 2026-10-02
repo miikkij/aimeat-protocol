@@ -14,6 +14,9 @@
  *   - POST /v1/openrouter/test — test API key validity
  *   - POST /v1/openrouter/complete — run AI completion for generator step
  * @version-history
+ *   v1.15.0 — 2026-10-02 — The settings' `maxRetries` default is DEFAULT_EMPTY_RETRIES (2), the number
+ *     the gateway uses when an owner never saved one; this route had said 3 in three places, so an
+ *     owner who never saved was shown 3 while 2 applied.
  *   v1.14.0 — 2026-09-28 — DEPRECATED (System 2 plan, V3): the settings, models and test routes carry
  *     Deprecation, a successor Link and X-AIMEAT-Removed-In: 4.0.0, and answer 410 when the operator
  *     sets AIMEAT_AI_LEGACY_SETTINGS_ROUTES=false (legacyAiSettingsRoute). What they write still
@@ -86,6 +89,7 @@ import { logger } from '../utils/logger.js';
 import { recordAccountEvent } from '../services/account-events.js';
 import { listModels, DEFAULT_BASE_URLS, type ProviderType, type ModelModality } from '../services/openrouter.js';
 import { completeForOwner, AiCompletionError, assertProviderAllowed } from '../services/ai-completion.js';
+import { DEFAULT_EMPTY_RETRIES } from '../services/ai/gateway.js';
 import { servedProvenanceOf, envelopeMeta, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
 
 /**
@@ -298,7 +302,7 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
       const base = existing
         ? (existing.value as object)
         // Vendor-neutral default: OpenRouter's free-models router (no specific vendor hardcoded).
-        : { model: 'openrouter/free', autoRetry: true, maxRetries: 3 };
+        : { model: 'openrouter/free', autoRetry: true, maxRetries: DEFAULT_EMPTY_RETRIES };
 
       const prefs: Record<string, unknown> = {
         ...base,
@@ -323,7 +327,7 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
       // a hint measurably helps a single known language (Finnish in particular).
       if (sttLanguage !== undefined) prefs.sttLanguage = (sttLanguage === null || sttLanguage === '') ? null : String(sttLanguage).slice(0, 8);
       if (autoRetry !== undefined) prefs.autoRetry = !!autoRetry;
-      if (maxRetries !== undefined) prefs.maxRetries = Math.max(1, Math.min(10, Number(maxRetries) || 3));
+      if (maxRetries !== undefined) prefs.maxRetries = Math.max(1, Math.min(10, Number(maxRetries) || DEFAULT_EMPTY_RETRIES));
       // null = clear (use model default), number = set explicit value, undefined = don't change
       if (temperature !== undefined) prefs.temperature = (temperature === null || isNaN(Number(temperature))) ? null : Math.max(0, Math.min(2, Number(temperature)));
       if (top_p !== undefined) prefs.top_p = (top_p === null || isNaN(Number(top_p))) ? null : Math.max(0, Math.min(1, Number(top_p)));
@@ -363,7 +367,7 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
         imageModel: prefs.imageModel ?? null,
         sttLanguage: prefs.sttLanguage ?? null,
         autoRetry: prefs.autoRetry ?? true,
-        maxRetries: prefs.maxRetries ?? 3,
+        maxRetries: prefs.maxRetries ?? DEFAULT_EMPTY_RETRIES,
         provider: prefs.provider ?? 'openrouter',
         baseUrl: prefs.baseUrl ?? DEFAULT_BASE_URLS.openrouter,
         temperature: prefs.temperature ?? null,

@@ -10,9 +10,11 @@
  *   which is the owner's classification policy; the model policy and whose calls it covers). Every
  *   write is the owner's and applies at once. The render is ai/providers.js.
  * @structure useProviders() → pv (state + handlers) · CAPS · PROVIDER_TYPES · slug · classifierValue ·
- *   askedFor · testableCapOf
+ *   askedFor · testableCapOf · untestedIn
  * @usage const pv = useProviders(); … renderProviders(ctx) reads ctx.pv
  * @version-history
+ *   v1.5.0 — 2026-10-02 — untestedIn: the providers of one capability's routing list that "Only tested
+ *     providers" skips (an owner's, on, never tested), for the routing row's warning and its Test now.
  *   v1.4.0 — 2026-10-02 — The way to a test (Jouni: the person was not led to it): a settingsUrl
  *     (`?open=ai-provider-<id>&test=<capability>`) opens that provider at its test and scrolls to it;
  *     testNow runs an untested or failing provider's test from its row; `off` lists the capabilities
@@ -165,6 +167,19 @@ export function testableCapOf(p) {
   const on = CAPS.filter((c) => p.capabilities?.[c]?.enabled);
   const status = (c) => p.health?.[c]?.status || 'untested';
   return on.find((c) => status(c) === 'untested') || on.find((c) => status(c) === 'failing') || null;
+}
+
+/**
+ * The providers in one capability's routing list that the node skips under "Only tested providers":
+ * an owner's provider whose capability is on and has never been tested (services/ai/route-plan.ts
+ * rejects exactly those, 'untested'; a failing one is still tried). Empty when the rule is off.
+ * @param {any} pv @param {string[]} list provider ids in routing order @param {string} cap @param {boolean} onlyTested
+ * @returns {any[]} the providers, in the list's order
+ */
+export function untestedIn(pv, list, cap, onlyTested) {
+  if (!onlyTested) return [];
+  return (list || []).map((id) => pv.find(id)).filter((p) => p && p.source === 'owner'
+    && p.capabilities?.[cap]?.enabled && (p.health?.[cap]?.status || 'untested') === 'untested');
 }
 
 /** Why a capability is off, worth a line above the providers. Text is the AI, so any reason is. For

@@ -11,6 +11,9 @@
  * @structure ConfigChange · ConfigApplyResult · applyConfigChanges(deps, changes)
  * @usage const r = await applyConfigChanges({ config, storage, provenance }, [{ path, value }]);
  * @version-history
+ *   v1.1.0 — 2026-10-02 — The four settings in RANGE_ENFORCED are refused outside their stated
+ *     `range` (withinStatedRange), with the range named in the reason. The rows' checks enforced the
+ *     minimum only, so a value above the maximum the Config tab shows was stored and applied.
  *   v1.0.0 — 2026-09-24 — Moved from routes/admin-config.ts (a pure move of its loop).
  */
 import type { AimeatConfig } from '../config.js';
@@ -18,6 +21,7 @@ import type { Storage } from '../storage/interface.js';
 import type { ConfigProvenance } from './config-provenance.js';
 import { MUTABLE_CONFIG_MAP, serializeConfigValue, readConfigField, writeConfigField } from './config-schema.js';
 import { isSecretField } from './config-sealing.js';
+import { withinStatedRange, RANGE_ENFORCED } from './config-schema-validators.js';
 import { logger } from '../utils/logger.js';
 
 export interface ConfigChange { path?: unknown; value?: unknown }
@@ -45,8 +49,10 @@ export async function applyConfigChanges(
             errors.push({ path, reason: `Unknown or immutable config path. Valid mutable paths: ${Object.keys(MUTABLE_CONFIG_MAP).join(', ')}` });
             continue;
         }
-        if (!mapping.validate(value)) {
-            errors.push({ path, reason: `Invalid value for ${path}` });
+        // `validate` checks the type and mostly only the lower bound; for the settings in
+        // RANGE_ENFORCED the row's `range` is a limit, so a value outside it is refused here too.
+        if (!mapping.validate(value) || (RANGE_ENFORCED.has(path) && !withinStatedRange(mapping, value))) {
+            errors.push({ path, reason: `Invalid value for ${path}${mapping.range ? ` (range ${mapping.range})` : ''}` });
             continue;
         }
         const oldValue = readConfigField(config, mapping);

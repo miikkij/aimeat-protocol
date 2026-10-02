@@ -6,6 +6,9 @@
  *   publish-gate + change-guard), revert-to-draft, and human approval resolution. Extracted from
  *   src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-10-02 — POST /approvals decides with the workspace's own policy when the action names
+ *     a workspace the caller may read (`arguments.ws`): its autonomy level replaces the organism's, and
+ *     the always-gate list is the union of both. The workspace autonomy setting had no effect before.
  *   v1.3.0 — 2026-09-25 — A member's suggested workspace change (services/workspace-suggestions.ts) is
  *     an approval of its own kind: this route refuses to create one, the inbox lists one only to
  *     someone who may read its workspace or made it, and resolving one runs the suggestion's own
@@ -27,7 +30,8 @@ import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { emitChange } from '../../services/event-bus.js';
-import { shouldGate, gatePolicyFromManifest, type Risk } from '../../services/gate-policy.js';
+import { shouldGate, gatePolicyFromManifest, DEFAULT_ALWAYS_GATE, type GatePolicy, type Risk } from '../../services/gate-policy.js';
+import { readWorkspaceMetaRecord } from '../../services/workspace-meta.js';
 import { expireOverdueApprovals } from '../../services/gate-expiry.js';
 import { isKeyArchived } from '../../services/archive.js';
 import { updateOrganismStructure } from '../../services/structure-snapshot.js';
@@ -36,6 +40,21 @@ import { readPublishSpace, type UndeclaredSpaceRefusal } from '../../services/wo
 import { roleSatisfies, type OrganismHelpers } from './shared.js';
 import { decideSuggestion, isMemberChangeAction, visibleApprovals } from '../../services/workspace-suggestions.js';
 import { logger } from '../../utils/logger.js';
+
+/**
+ * The policy for an action in a workspace: the workspace manifest's autonomy when it sets one, else the
+ * organism's. The always-gate list is the UNION of the organism's floor (its own list, or the default
+ * when it declares none) and the workspace's list, so a workspace can add classes to the floor and can
+ * never remove one, an empty `alwaysGate: []` included. A workspace that declares no list leaves the
+ * organism's value as it is.
+ */
+function mergeWorkspaceGatePolicy(org: GatePolicy, ws: GatePolicy): GatePolicy {
+  const autonomy = ws.autonomy ?? org.autonomy;
+  const alwaysGate = ws.alwaysGate === undefined
+    ? org.alwaysGate
+    : [...new Set([...(org.alwaysGate ?? DEFAULT_ALWAYS_GATE), ...ws.alwaysGate])];
+  return { ...(autonomy ? { autonomy } : {}), ...(alwaysGate ? { alwaysGate } : {}) };
+}
 
 export function registerOrganismGateRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const { memberRole, readManifest, writeDecision, readConfig, canWriteNamespace, publishDraft, publishDraftsBatch, revertToDraft } = H;
@@ -77,7 +96,19 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
     const riskVal: Risk = ['low', 'medium', 'high'].includes(risk) ? risk : 'medium';
     const approverRoleVal = ['owner', 'admin', 'member'].includes(approverRole) ? approverRole : 'owner';
 
-    const policy = gatePolicyFromManifest(await readManifest(id));
+    const orgPolicy = gatePolicyFromManifest(await readManifest(id));
+    // An action names its workspace in `arguments.ws`, the field the publish approval below stores.
+    // The workspace manifest's policy (the autonomy level the workspace settings save) applies only
+    // when the caller may read that workspace: a workspace the caller cannot read lends it no policy,
+    // so naming another workspace's L5 cannot loosen the gate. The manifest is the copy that counts
+    // (readWorkspaceMetaRecord), the same one the workspace read takes.
+    const wsArg = (actionArgs as { ws?: unknown } | null | undefined)?.ws;
+    let policy = orgPolicy;
+    if (typeof wsArg === 'string' && wsArg
+      && await canReadWorkspace(storage, config, organism, req.auth!.sub, req.auth!.owner, resolveIdentity(req.auth!, config.nodeId), wsArg)) {
+      const wsManifest = await readWorkspaceMetaRecord(storage, id, wsArg, 'meta.manifest', config.nodeId);
+      if (wsManifest) policy = mergeWorkspaceGatePolicy(orgPolicy, gatePolicyFromManifest(wsManifest.value));
+    }
     // Whose word `risk` is. A human member describing what they are about to do is the party the
     // policy protects; an agent, an app grant or an ecosystem token describing its OWN action is the
     // party it constrains, and its word cannot lower the gate below the default. Same test the rest

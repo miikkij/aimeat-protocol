@@ -15,6 +15,7 @@
  *   components/ModelPicker.js · openrouter/pricing.js · openrouter/budget-panel.js
  * @usage import { OpenRouterSettings } from './openrouter-settings.js';
  * @version-history
+ *   v3.21.0 -- 2026-10-02 -- The number of times an empty answer is asked again starts at 2, the server's own default (DEFAULT_EMPTY_RETRIES, src/services/ai/gateway.ts), on load, save and reset; it was 3.
  *   v3.20.0 -- 2026-10-02 -- The question marks that explain the fine-tuning fields: ai.max_retries, ai.temperature, ai.top_p,
  *     ai.max_tokens on their fields (components/HelpTip.js); the grey lines under temperature, top P and the longest answer
  *     go, the explanations carry them.
@@ -144,7 +145,9 @@ export function OpenRouterSettings({ onSettingsChange, startOpen = false }) {
 
   // params
   const [autoRetry, setAutoRetry] = useState(false);
-  const [maxRetries, setMaxRetries] = useState(3);
+  // 2 is the server's own default for an empty answer asked again (DEFAULT_EMPTY_RETRIES in
+  // src/services/ai/gateway.ts); a provider error is never retried.
+  const [maxRetries, setMaxRetries] = useState(2);
   const [temperature, setTemperature] = useState('');
   const [topP, setTopP] = useState('');
   const [maxTokens, setMaxTokens] = useState('');
@@ -168,7 +171,7 @@ export function OpenRouterSettings({ onSettingsChange, startOpen = false }) {
         setSttModel(resp.data.sttModel || '');
         setSttLanguage(resp.data.sttLanguage || '');
         setAutoRetry(!!resp.data.autoRetry);
-        setMaxRetries(resp.data.maxRetries || 3);
+        setMaxRetries(resp.data.maxRetries || 2);
         setProvider(resp.data.provider || 'openrouter');
         setBaseUrl(resp.data.baseUrl || '');
         if (resp.data.temperature != null) setTemperature(String(resp.data.temperature));
@@ -271,7 +274,7 @@ export function OpenRouterSettings({ onSettingsChange, startOpen = false }) {
     try {
       const resp = await apiPut('/v1/openrouter/settings', {
         autoRetry,
-        maxRetries: parseInt(maxRetries) || 3,
+        maxRetries: parseInt(maxRetries) || 2,
         temperature: temperature !== '' ? parseFloat(temperature) : null,
         top_p: topP !== '' ? parseFloat(topP) : null,
         max_tokens: maxTokens !== '' ? parseInt(maxTokens) : null,
@@ -318,7 +321,7 @@ export function OpenRouterSettings({ onSettingsChange, startOpen = false }) {
         setModel(''); setReasoningModel(''); setExecutionModel('');
         setVisionModel(''); setSttModel(''); setSttLanguage('');
         setModels([]); setSttModels([]); setModelsError(null);
-        setAutoRetry(false); setMaxRetries(3);
+        setAutoRetry(false); setMaxRetries(2);
         setTemperature(''); setTopP(''); setMaxTokens('');
         flash(setConnMsg, t('profile.openrouter.deleted'));
       } catch (e) {

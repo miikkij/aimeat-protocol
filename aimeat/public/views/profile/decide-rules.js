@@ -20,6 +20,7 @@
  * @structure DecideRules({ available, providers }) · toRule / fromRule (the editor's draft ↔ the record)
  * @usage import { DecideRules } from './decide-rules.js'; html`<${DecideRules} available=${true} providers=${view} />`
  * @version-history
+ *   v1.20.0 — 2026-10-02 — A question's threshold that is filled in but not a number refuses the save (toRule, decideRules.thresholdInvalid at the editor); it had gone out as null and come back as the server's BAD_THRESHOLD. An empty threshold stays allowed: the question then has none.
  *   v1.19.0 — 2026-10-02 — The question marks that explain the bands, a question's threshold and the gate: decide.bands and decide.question_threshold on their headings, decide.gate on the Check (components/HelpTip.js); the bands' grey line goes, the explanation carries it. An empty or non-numeric band refuses the save (toRule): Number('') was 0, and the rule then acted on everything.
  *   v1.18.0 — 2026-09-26 — Every part is a kit component (Touch keeps every control 44px; BoxList and BoxLine for the proposals and the rules, the message each door caused after it; the editor in the dashed field Box with TextField, TextArea, Select, Check and Fields, a question in a row Box; SubHeading; Note with a refusal kept one problem per line; Action; Layout): the part writes no class (page group G8).
  *   v1.17.0 — 2026-09-26 — A rule's lines beside its title are the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
@@ -119,7 +120,8 @@ const bandOf = (v) => (String(v ?? '').trim() === '' || !Number.isFinite(Number(
 
 /**
  * The editor draft as the body of PUT /v1/ai/decide/rules/:id. Throws on a band that is empty or not
- * a number (the error's `key` names the message) and on a sample that is not JSON.
+ * a number and on a question's threshold that is filled in but not a number (the error's `key` names
+ * the message, `params` its words), and on a sample that is not JSON.
  */
 export function toRule(d) {
   // Number('') is 0, and a rule whose act band is 0 acts on everything: an empty band refuses the save.
@@ -133,7 +135,14 @@ export function toRule(d) {
     if (!id) continue;
     const criteria = textToCriteria(q.type, q.criteriaText);
     questions[id] = { type: q.type, instructions: q.instructions.trim(), ...(criteria !== undefined ? { criteria } : {}) };
-    if (String(q.threshold).trim() !== '') thresholds[id] = Number(q.threshold);
+    // An empty threshold is a question without one, which the server accepts (rule-validate.ts needs
+    // at least one across the rule). A threshold that is not a number became NaN, went out as null
+    // and came back as BAD_THRESHOLD: it refuses the save here, as an empty band does.
+    if (String(q.threshold ?? '').trim() !== '') {
+      const threshold = bandOf(q.threshold);
+      if (threshold === null) throw Object.assign(new Error(`The threshold of '${id}' is not a number`), { key: 'decideRules.thresholdInvalid', params: { question: id } });
+      thresholds[id] = threshold;
+    }
   }
   const sample = d.sampleText.trim() ? JSON.parse(d.sampleText) : null;
   return {
@@ -301,7 +310,7 @@ export function DecideRules({ available, providers }) {
   const save = async () => {
     let body;
     try { body = toRule(draft); } catch (err) {
-      if (err?.key) { setMsg({ key: err.key, error: true, at: 'editor' }); return; }
+      if (err?.key) { setMsg({ key: err.key, params: err.params, error: true, at: 'editor' }); return; }
       swallowed('decide-rules: the sample is not JSON', err);
       setMsg({ key: 'decideRules.sampleNotJson', error: true, at: 'editor' });
       return;

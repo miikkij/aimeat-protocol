@@ -8,6 +8,10 @@
  *   consent access (403 paths), and GENERICITY — a second `kind:'research-study'` manifest
  *   with different object types reads through the SAME engine.
  * @version-history
+ *   v1.1.0 -- 2026-10-02 -- Workspace autonomy: a workspace at L5 auto-runs what the organism's L3
+ *     gates, one at L1 gates what L3 auto-runs, the organism's always-gate floor holds in an L5
+ *     workspace that empties its own list, a workspace with no level follows the organism, and a
+ *     workspace the caller cannot read lends no policy.
  *   v1.0.0 -- 2026-06-07 -- Initial Phase 3 project-core suite.
  */
 // Run: cd aimeat && pnpm exec node --import tsx test/run-e2e-ci.ts --test=projects
@@ -448,6 +452,100 @@ await test('Always-gate action pauses even at low risk', async () => {
   assert(r.body.data.gated === true && r.body.data.approval.status === 'pending', 'always-gate floor held');
 });
 
+// ─── Workspace autonomy (the workspace manifest's policy decides for an action in that workspace) ───
+console.log('\nWorkspace autonomy (policy.agentAutonomy in the workspace manifest)');
+
+// Creates a workspace, then saves its policy exactly as the profile page's settings form does
+// (public/views/profile/organisms/workspace.js saveSettings): the whole manifest back through
+// POST /v1/memory with `policy` changed. `policy` undefined leaves the manifest without one.
+async function workspaceWithPolicy(name: string, policy?: Record<string, unknown>, token = u1.ownerToken): Promise<string> {
+  const w = await json(`/v1/organisms/${orgId}/workspaces`, {
+    method: 'POST', headers: bearer(token),
+    body: JSON.stringify({ name, manifest: { objectTypes: [
+      { name: 'note', namespace: 'shared.notes', mode: 'document', backing: 'memory', writeRole: 'member', schemaRef: 'schema:note@1' },
+    ] } }),
+  });
+  assert(w.status === 201, `workspace ${w.status}: ${JSON.stringify(w.body.error)}`);
+  const ws = w.body.data.ws as string;
+  return policy ? saveWorkspacePolicy(ws, policy, token) : ws;
+}
+
+async function saveWorkspacePolicy(ws: string, policy: Record<string, unknown>, token: string): Promise<string> {
+  const read = await json(`/v1/organisms/${orgId}/workspace?ws=${ws}`, { headers: bearer(token) });
+  assert(read.status === 200 && read.body.data.manifest, `read workspace ${read.status}`);
+  const m = { ...read.body.data.manifest, policy: { ...(read.body.data.manifest.policy || {}), ...policy } };
+  const s = await writeMemory(token, `organism.${orgId}.w.${ws}.meta.manifest`, m);
+  assert(s.body.ok === true, `save manifest ${s.status}: ${JSON.stringify(s.body)}`);
+  return ws;
+}
+
+const requestApproval = (body: Record<string, unknown>) =>
+  json(`/v1/organisms/${orgId}/approvals`, { method: 'POST', headers: bearer(u1.ownerToken), body: JSON.stringify(body) });
+
+let wsL5 = '';
+let wsL1 = '';
+let wsNone = '';
+await test('Setup: three workspaces — L5 (and an empty floor of its own), L1, and no level', async () => {
+  // alwaysGate: [] on the L5 workspace tries to empty the floor; the organism's floor must survive it.
+  wsL5 = await workspaceWithPolicy('Autonomy L5', { agentAutonomy: 'L5', alwaysGate: [] });
+  wsL1 = await workspaceWithPolicy('Autonomy L1', { agentAutonomy: 'L1' });
+  wsNone = await workspaceWithPolicy('Autonomy none');
+  assert(!!wsL5 && !!wsL1 && !!wsNone && new Set([wsL5, wsL1, wsNone]).size === 3, 'three distinct workspaces');
+});
+
+await test('Control: a high-risk action with no workspace is gated (organism L3)', async () => {
+  const r = await requestApproval({ action: 'flow:advance', risk: 'high' });
+  assert(r.status === 201, `create ${r.status}`);
+  assert(r.body.data.gated === true, `organism L3 gates high: ${r.body.data.reason}`);
+});
+
+await test('Workspace at L5 auto-runs a high-risk action the organism L3 would gate', async () => {
+  const r = await requestApproval({ action: 'flow:advance', risk: 'high', arguments: { ws: wsL5 } });
+  assert(r.status === 201, `create ${r.status}`);
+  assert(r.body.data.gated === false && r.body.data.approval.status === 'approved', `L5 auto-runs, got ${r.body.data.reason}`);
+  assert(r.body.data.reason === 'autonomy_L5', `reason ${r.body.data.reason}`);
+});
+
+await test('Workspace at L1 gates a low-risk action the organism L3 would auto-run', async () => {
+  const r = await requestApproval({ action: 'flow:advance', risk: 'low', arguments: { ws: wsL1 } });
+  assert(r.status === 201, `create ${r.status}`);
+  assert(r.body.data.gated === true && r.body.data.approval.status === 'pending', `L1 gates low, got ${r.body.data.reason}`);
+  assert(r.body.data.reason === 'autonomy_L1_risk_low', `reason ${r.body.data.reason}`);
+});
+
+await test('An always-gate class still gates in the L5 workspace (its empty floor does not remove the organism floor)', async () => {
+  const r = await requestApproval({ action: 'external-release', risk: 'low', arguments: { ws: wsL5 } });
+  assert(r.status === 201, `create ${r.status}`);
+  assert(r.body.data.gated === true && r.body.data.reason === 'always_gate', `floor held, got ${r.body.data.reason}`);
+});
+
+await test('A workspace with no level follows the organism (L3: high gated, low auto-run)', async () => {
+  const hi = await requestApproval({ action: 'flow:advance', risk: 'high', arguments: { ws: wsNone } });
+  assert(hi.status === 201 && hi.body.data.gated === true, `high gated, got ${hi.body.data.reason}`);
+  assert(hi.body.data.reason === 'autonomy_L3_risk_high', `reason ${hi.body.data.reason}`);
+  const lo = await requestApproval({ action: 'flow:advance', risk: 'low', arguments: { ws: wsNone } });
+  assert(lo.status === 201 && lo.body.data.gated === false, `low auto-run, got ${lo.body.data.reason}`);
+});
+
+let u3: Awaited<ReturnType<typeof registerOwnerAndAgent>>;
+await test('A workspace the caller cannot read lends no policy: a third member naming member 2\'s L5 workspace is gated at L3', async () => {
+  // Member 2 creates a workspace at L5. Its manifest is private to member 2 and member 2 has given
+  // no organism read consent on their own identity, so member 3 (a plain member) cannot read it, and
+  // its L5 must not decide member 3's action.
+  const wsU2 = await workspaceWithPolicy('Member 2 L5', { agentAutonomy: 'L5' }, u2.ownerToken);
+  u3 = await registerOwnerAndAgent('projthird');
+  const j = await json(`/v1/organisms/${orgId}/join`, { method: 'POST', headers: bearer(u3.ownerToken), body: JSON.stringify({}) });
+  assert(j.status === 201, `join ${j.status}: ${JSON.stringify(j.body)}`);
+  const own = await json(`/v1/organisms/${orgId}/approvals`, { method: 'POST', headers: bearer(u2.ownerToken), body: JSON.stringify({ action: 'flow:advance', risk: 'high', arguments: { ws: wsU2 } }) });
+  assert(own.status === 201 && own.body.data.gated === false, `member 2's own L5 applies to member 2, got ${own.body.data?.reason}`);
+  const read = await json(`/v1/organisms/${orgId}/workspace?ws=${wsU2}`, { headers: bearer(u3.ownerToken) });
+  // The workspace read answers a member who may not read it 200 without the manifest.
+  assert(read.status === 200 && !read.body.data?.manifest, `premise: member 3 cannot read the manifest, got ${read.status} ${read.body.data?.manifest ? 'with' : 'without'} a manifest`);
+  const r = await json(`/v1/organisms/${orgId}/approvals`, { method: 'POST', headers: bearer(u3.ownerToken), body: JSON.stringify({ action: 'flow:advance', risk: 'high', arguments: { ws: wsU2 } }) });
+  assert(r.status === 201, `create ${r.status}: ${JSON.stringify(r.body.error)}`);
+  assert(r.body.data.gated === true && r.body.data.reason === 'autonomy_L3_risk_high', `unreadable workspace ignored, got ${r.body.data.reason}`);
+});
+
 // ─── Manifest Architect prompt (the generator "good prompt") ───
 console.log('\nManifest Architect prompt (managed, public)');
 
@@ -473,6 +571,11 @@ await test('Delete creator (cascade)', async () => {
 await test('Delete member (cascade)', async () => {
   const { status } = await json(`/v1/owners/${u2.ownerName}`, { method: 'DELETE', headers: bearer(u2.ownerToken) });
   assert(status === 200, `delete u2 ${status}`);
+});
+await test('Delete third member (cascade)', async () => {
+  if (!u3) return;
+  const { status } = await json(`/v1/owners/${u3.ownerName}`, { method: 'DELETE', headers: bearer(u3.ownerToken) });
+  assert(status === 200, `delete u3 ${status}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);
