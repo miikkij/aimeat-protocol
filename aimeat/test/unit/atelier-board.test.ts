@@ -302,6 +302,15 @@ describe('board', () => {
     expect(tail[1].args.animated).toBe(false);
   });
 
+  it('writes its own words, not its keys: the tools, the kind chip and the empty state', () => {
+    const host = document.createElement('div');
+    const b = kit.board({ target: host, frames: frames() });
+    expect(part(b.el, 'tool').map((n: any) => n.textContent)).toEqual(['Move', 'Use']);
+    expect(part(frameEl(b.el, 'a'), 'kind')[0].textContent).toBe('table');
+    b.set({ frames: [] });
+    expect(part(b.el, 'empty')[0].textContent).toContain('Nothing on the board yet.');
+  });
+
   it('nudges the selected frame with the arrow keys and clears the selection on Escape', () => {
     const host = document.createElement('div');
     const moves: any[] = [];
