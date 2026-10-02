@@ -40,6 +40,8 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-10-02 — `<meta name="aimeat-format-md">` is read into `manifest.formatMd`, refused with
+ *     APP_FORMAT_MD_INVALID when it names an extension the owner did not install or an action it lacks.
  *   2026-10-02 — The app's `aimeat-workspace` declaration is parsed into `manifest.workspaces`, each
  *     manifest and schema checked as provisioning takes it; one that cannot be used is refused, 422
  *     APP_WORKSPACE_INVALID (services/app-workspaces.ts).
@@ -136,6 +138,7 @@ import { refreshAppDependencies } from './dependency-map.js';
 import { managedChangeRefusal } from './package-managed.js';
 import { parseAppConfigSchema } from './app-config.js';
 import { parseAppWorkspaces, checkAppWorkspaces } from './app-workspaces.js';
+import { parseFormatMdMeta, formatMdRefusal } from './app-format-md.js';
 
 /**
  * The manifest fields a caller may state. **`undefined` means "not mentioned"** and is filled from
@@ -334,6 +337,17 @@ export async function publishApp(
   if (configDecl && 'error' in configDecl) {
     return { refusal: { status: 422, code: 'APP_CONFIG_SCHEMA_INVALID', message: `The app's config declaration cannot be used: ${configDecl.error}.` } };
   }
+  // The app's own answer to ?format=md (services/app-format-md.ts): an action of the owner's own
+  // extension. Refused here, before anything is written, when it names an extension the owner did
+  // not install or an action it lacks; otherwise every ?format=md would quietly fall back.
+  const formatMdDecl = isHtml ? parseFormatMdMeta(html) : null;
+  if (formatMdDecl && 'error' in formatMdDecl) {
+    return { refusal: { status: 422, code: 'APP_FORMAT_MD_INVALID', message: `The app's aimeat-format-md declaration cannot be used: ${formatMdDecl.error}.` } };
+  }
+  if (formatMdDecl) {
+    const why = await formatMdRefusal(storage, ownerName, formatMdDecl);
+    if (why) return { refusal: { status: 422, code: 'APP_FORMAT_MD_INVALID', message: `The app's aimeat-format-md declaration cannot be used: ${why}.` } };
+  }
   // The workspaces the app declares (services/app-workspaces.ts), checked as provisioning will take
   // them, so a set built from this app never fails at the customer's install.
   const workspaceDecl = isHtml ? parseAppWorkspaces(html) : null;
@@ -447,6 +461,8 @@ export async function publishApp(
   if (configDecl) manifest.configSchema = configDecl.schema as unknown as Record<string, unknown>;
   // So is the workspace declaration.
   if (workspaceDecl && 'workspaces' in workspaceDecl) manifest.workspaces = workspaceDecl.workspaces;
+  // And the ?format=md handler: a version that stops declaring it stops having it.
+  if (formatMdDecl) manifest.formatMd = formatMdDecl;
   // Pricing: `0` unprices explicitly, silence keeps the price. An update that omits the field must
   // never silently turn a paid app free — which is what publishing a DRAFT used to do, because a
   // draft manifest cannot carry a price and the draft door published it verbatim.

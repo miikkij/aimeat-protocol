@@ -25,6 +25,8 @@
  *     if (await serveAppAgentFace(res, config, storage, app)) return;
  *   }
  * @version-history
+ *   v1.4.0 — 2026-10-02 — An app that declares aimeat-format-md answers itself: the owner's extension
+ *     action runs first (services/app-format-md.ts), the stored face and the converted page after it.
  *   v1.3.1 — 2026-09-29 — The app catalogue line points to /v1/appcat instead of /app-catalog.html (Jouni).
  *   v1.3.0 — 2026-08-01 — TARGET-058: the face carries AI provenance on both layers — YAML
  *     frontmatter with the whole record and the response headers on the served document, plus ONE
@@ -44,6 +46,7 @@ import type { Storage, AppRecord } from '../storage/interface.js';
 import { sendMarkdown, htmlToMarkdown } from './markdown-negotiation.js';
 import { cached, TTL } from './cache.js';
 import { getOwnerScopePublicMemory } from './owner-memory.js';
+import { renderAppMarkdown } from './app-format-md.js';
 import {
   loadServedProvenance, provenanceFrontmatter, provenanceMarkdownNote, setProvenanceHeaders,
 } from './ai-provenance-marks.js';
@@ -126,7 +129,11 @@ export async function buildAppAgentFace(
     `agentface:${app.ownerName}/${app.filename}:v${app.versionNumber}`,
     TTL.public,
     async (): Promise<{ markdown: string; fromFace: boolean } | null> => {
-      const face = await loadPublicAgentFace(storage, config.nodeId, app.ownerName, app.filename);
+      // The app's own answer comes first (services/app-format-md.ts): an action of the owner's
+      // extension, declared with aimeat-format-md. Null when the app declares none or the run
+      // gave nothing, and then the stored face or the converted page answers as before.
+      const face = await renderAppMarkdown({ storage, config }, app)
+        ?? await loadPublicAgentFace(storage, config.nodeId, app.ownerName, app.filename);
       if (face === null && !isHtml) return null;
       const footer = buildAgentAffordances(config, app.ownerName, app.filename);
       const body = face ?? htmlToMarkdown(appHtml(app)).trimEnd();

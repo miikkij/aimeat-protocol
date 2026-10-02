@@ -532,6 +532,7 @@ const ALL_SUITES = [
     // A package's "what you get" sheet, its questions for an installer, and its agents as proposals.
     'test/e2e-package-sheet.ts',
     'test/e2e-agent-purchase-limit.ts',
+    'test/e2e-app-format-md.ts',
     // The account's own record, and the mount-order collision that made its window unreadable.
     'test/e2e-account-events.ts',
     'test/e2e-operator-welcome.ts',

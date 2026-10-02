@@ -3983,7 +3983,12 @@ components:
         owner: { type: string }
         filename: { type: string }
         version_number: { type: integer }
-        manifest: { type: object }
+        manifest:
+          type: object
+          description: >-
+            The app's manifest. Among its fields, `formatMd` ({ extension, action }) names the action
+            of the owner's own extension that answers `?format=md`, read from
+            `<meta name="aimeat-format-md">` at publish.
         size: { type: integer }
         mime_type: { type: string }
         protected: { type: boolean, description: True when an access code gates downloads }

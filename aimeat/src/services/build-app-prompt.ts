@@ -15,6 +15,7 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-10-02 — The agent-face part names aimeat-format-md: the app's own extension action answers ?format=md.
  *   2026-10-01 — Public Intake: the link to share is the app page with ?form=<form id>. The code
  *     comment called defineForm's answer "a shareable link", and its submit_url is an API address.
  *   2026-10-01 — Own users/roles: init({ app, roles }) with what each role may do, and a gate from
@@ -554,7 +555,7 @@ function composeAppPrompt(
   body += '}, { app: "my-app.html" });\n';
   body += '// A plain markdown string works too: AIMEATAgentFace.publish("# My App\\n...", { app: "my-app.html" })\n';
   body += '```\n';
-  body += 'Pass { app: "my-app.html" } (your published filename) explicitly — on per-app subdomain origins the filename cannot be derived from the URL (alternatively add <meta name="aimeat-app" content="my-app.html"> to the page). publish() requires a signed-in session (aimeat-auth), and the node serves ONLY the record written by the APP OWNER — a visitor\'s publish lands in their own namespace and is never served, so it is safe to call on every save.\n\n';
+  body += 'Pass { app: "my-app.html" } (your published filename) explicitly — on per-app subdomain origins the filename cannot be derived from the URL (alternatively add <meta name="aimeat-app" content="my-app.html"> to the page). publish() requires a signed-in session (aimeat-auth), and the node serves ONLY the record written by the APP OWNER — a visitor\'s publish lands in their own namespace and is never served, so it is safe to call on every save.\n' + 'When the app\'s content changes outside its own saves (records other people or agents edit), let the app answer ?format=md itself instead: declare <meta name="aimeat-format-md" content="/v1/ext/<your-extension>/<action>"> in the head, where the extension is your own and its action returns { markdown }. The node runs that action as you on each ?format=md request (cached for a few seconds) and serves its markdown with the footer, so the page is always current and nothing has to be republished. The publish refuses an extension you did not install or an action it lacks.\n\n';
 
   // Design guidelines
   body += 'A third-party library that runs `eval()` or `new Function()` (spreadsheet formula engines, some template libraries) fails silently here: the app origin\'s Content-Security-Policy has no `unsafe-eval`. Turn its eval path off (Jspreadsheet: `parseFormulas: false`) or pick another library.\n\n';
