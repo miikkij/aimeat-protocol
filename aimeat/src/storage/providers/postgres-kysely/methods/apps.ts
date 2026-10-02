@@ -22,6 +22,7 @@
  *   v1.4.0 — 2026-08-29 — updateAppMeta merges `legal` per kind (mergeLegal).
  *   v1.4.1 — 2026-09-26 — normalizeAppOwnerNames strips only this node's own `@nodeId` suffix, so a
  *     visitor's app keeps its owner's home name (secaudit 2026-09, A6-4).
+ *   v1.5.0 — 2026-10-02 — updateAppMeta replaces or takes off `designSpec`, the design spec's stamp.
  */
 import { sql } from 'kysely';
 import { mergeLegal } from '../../../types/apps.js';
@@ -320,6 +321,7 @@ export const appMethods = {
       cortex?: AppManifestCortex | null; dataMap?: AppManifest['dataMap']; seo?: Partial<AppSeo>;
       marks?: Partial<AppMarks>; authorship?: AppAuthorship | null; authorshipLog?: AppAuthorshipLogEntry[];
       legal?: Partial<Record<AppLegalKind, AppLegalDoc | null>>;
+      designSpec?: AppManifest['designSpec'] | null;
     },
   ): Promise<boolean> {
     // Rename/re-describe in place on the LATEST version (the one the catalogue shows). Read the current
@@ -349,6 +351,11 @@ export const appMethods = {
     if (meta.cortex !== undefined) {
       if (meta.cortex === null || !meta.cortex.agents?.length) delete manifest.cortex;
       else manifest.cortex = meta.cortex;
+    }
+    // The design spec's stamp: replaced whole by every write of the spec, taken off with null.
+    if (meta.designSpec !== undefined) {
+      if (meta.designSpec === null) delete manifest.designSpec;
+      else manifest.designSpec = meta.designSpec;
     }
     await this.db.updateTable('App')
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

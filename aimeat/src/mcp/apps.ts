@@ -11,6 +11,7 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.19.0 — 2026-10-02 — design_spec_hint in the publish and draft-publish answers (services/app-design-spec.ts).
  *   v1.18.0 — 2026-09-27 — aimeat_app_versions moved into aimeat_app_manage (action "versions"), which
  *     calls services/app-versions.ts like the REST endpoint; this file read storage for it.
  *   v1.17.4 — 2026-09-27 — aimeat_app_draft_save builds its preview link with mintDraftPreview
@@ -312,6 +313,7 @@ export function registerAppsTools(
                             mode: 'inline',
                             filename,
                             ...('warning' in road ? { roadmap_hint: road.warning } : {}),
+                            ...(out.designSpecHint ? { design_spec_hint: out.designSpecHint } : {}),
                             version_number: out.versionNumber,
                             name: out.manifest.name,
                             size: out.size,
@@ -466,6 +468,7 @@ export function registerAppsTools(
                             parked: out.parked, download_url: out.downloadUrl, inline_url: `${out.downloadUrl}?mode=inline`,
                             note: 'Draft published as the new live version; the draft slot is cleared.',
                             ...(out.roadmapHint ? { roadmap_hint: out.roadmapHint } : {}),
+                            ...(out.designSpecHint ? { design_spec_hint: out.designSpecHint } : {}),
                             ...(out.aiLint ? { ai_posture: out.aiLint.posture } : {}),
                             ...(out.aiLint?.hints.length ? { ai_hints: out.aiLint.hints } : {}),
                             ...(out.manifest.dataMap ? { data_map: out.manifest.dataMap } : {}),

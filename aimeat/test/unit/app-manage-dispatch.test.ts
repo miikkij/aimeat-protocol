@@ -6,6 +6,7 @@
  *   end by test/e2e-app-manage.ts.
  * @usage pnpm test -- app-manage-dispatch
  * @version-history
+ *   v1.6.0 — 2026-10-02 — spec, spec_set and spec_clear, and the markdown and expected_revision fields.
  *   v1.5.0 — 2026-10-02 — builders, builder_set and builder_remove, and the dev_level field.
  *   v1.4.0 — 2026-10-01 — year on audit, and audit_archive and audit_keep.
  *   v1.3.0 — 2026-10-01 — IAM round 2: email on member_set, q/limit/offset on members, manage_roles
@@ -56,6 +57,7 @@ const VALUE: Record<string, unknown> = {
     access: 'members-only', roster_visibility: 'members',
     email: 'zqx@example.com', locale: 'fi', q: 'zqxq', offset: 11, before: '2026-09-01T00:00:00Z', invite_id: 'zqxinv',
     manage_roles: ['zqxmgr'], year: '2026', keep: '12345', dev_level: 'publisher',
+    markdown: '# zqxspec', expected_revision: 4,
 };
 
 /** Where each action goes: method and path. The body is checked field by field below. */
@@ -106,6 +108,10 @@ const EXPECT: Record<string, [string, string]> = {
     builders: ['GET', '/v1/apps/me-owner/shop.html/dev-grants'],
     builder_set: ['PUT', '/v1/apps/me-owner/shop.html/dev-grants/zqxacct'],
     builder_remove: ['DELETE', '/v1/apps/me-owner/shop.html/dev-grants/zqxacct'],
+    // The design spec takes an owner: a builder reads and writes it on somebody else's app.
+    spec: ['GET', '/v1/apps/alice/shop.html/design-spec'],
+    spec_set: ['PUT', '/v1/apps/alice/shop.html/design-spec'],
+    spec_clear: ['DELETE', '/v1/apps/alice/shop.html/design-spec'],
 };
 
 /** A field that travels in the path or query, or shapes the request rather than appearing in it. */

@@ -1907,6 +1907,15 @@
      "plain": "App roadmap Record completed changes and proposed improvements. The completed changes are public; the owner chooses whether requested improvements are public. People who can use the app can submit wishes when signed in. /v1/apps/:owner/:filename/roadmap"
     },
     {
+     "slug": "g-10-app-design-spec",
+     "cells": [
+      "<strong>App design spec</strong>",
+      "One document beside the app that says what it is for, its screens, where its data lives, what was decided and what is open. The owner and everybody with a development right read and write it; an AI reads it before changing the app and writes it back after a publish, and the publish answer says when the spec has fallen behind the app's version. Writing the same text again marks it current. A write may name the revision it read, so two builders' AIs cannot overwrite each other unseen. Only the owner removes it. Settings &gt; Apps shows and edits it beside the roadmap, with a prompt for an AI connected over MCP and a paste box for any other AI. Not visible outside the build.",
+      "<code>/v1/apps/:owner/:filename/design-spec</code>, <code>aimeat_app_manage</code> actions <code>spec</code>, <code>spec_set</code> and <code>spec_clear</code>, Settings &gt; Apps &gt; Roadmap and shared work"
+     ],
+     "plain": "App design spec One document beside the app that says what it is for, its screens, where its data lives, what was decided and what is open. The owner and everybody with a development right read and write it; an AI reads it before changing the app and writes it back after a publish, and the publish answer says when the spec has fallen behind the app's version. Writing the same text again marks it current. A write may name the revision it read, so two builders' AIs cannot overwrite each other unseen. Only the owner removes it. Settings > Apps shows and edits it beside the roadmap, with a prompt for an AI connected over MCP and a paste box for any other AI. Not visible outside the build. /v1/apps/:owner/:filename/design-spec, aimeat_app_manage actions spec, spec_set and spec_clear, Settings > Apps > Roadmap and shared work"
+    },
+    {
      "slug": "g-10-bound-operating-skills",
      "cells": [
       "<strong>Bound operating skills</strong>",
@@ -3709,6 +3718,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-09-15 against node 3.15.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 369
+  "rows": 370
  }
 }

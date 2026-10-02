@@ -6,6 +6,7 @@
  *   preview-token, DELETE .../draft, POST .../publish-draft. Edit + test the next version without
  *   touching the live one. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v2.8.0 -- 2026-10-02 -- design_spec_hint in the publish-draft answer (services/app-design-spec.ts).
  *   v2.7.2 -- 2026-09-27 -- POST .../draft/preview-token calls mintDraftPreview
  *     (services/app-draft-preview.ts), shared with aimeat_app_draft_save. The answer is unchanged.
  *   v2.7.1 -- 2026-09-24 -- POST .../frame-token refuses a delegated caller with 403 before any other
@@ -495,6 +496,7 @@ export function registerDraftRoutes(
         res.status(201).json(success(config.nodeId, {
             filename,
             ... (out.roadmapHint ? { roadmap_hint: out.roadmapHint } : {}),
+            ...(out.designSpecHint ? { design_spec_hint: out.designSpecHint } : {}),
             version_number: out.versionNumber,
             manifest: out.manifest,
             size: out.size,

@@ -14,6 +14,8 @@
  * @structure appManageCall · MEMBER_ACTIONS
  * @usage return out(await appManageCall(client, owner, input));
  * @version-history
+ *   2026-10-02 -- spec, spec_set and spec_clear over GET, PUT and DELETE .../design-spec, with the
+ *     member actions (the route decides who is inside the build).
  *   2026-10-02 -- builders, builder_set and builder_remove over GET, PUT and DELETE
  *     /v1/apps/:owner/:filename/dev-grants; dev_level is sent as the route's `level`.
  *   2026-10-01 -- Keeping the audit log: audit sends year as ?archive=, audit_archive and audit_keep go
@@ -61,6 +63,8 @@ export const MEMBER_ACTIONS: ReadonlySet<string> = new Set([
     'audit_archive', 'audit_keep',
     // The development right: the dev-grants routes hold the owner test, the notification and the audit row.
     'builders', 'builder_set', 'builder_remove',
+    // The design spec: the design-spec routes decide who is inside the build and stamp the manifest.
+    'spec', 'spec_set', 'spec_clear',
 ]);
 
 /**
@@ -205,6 +209,12 @@ export async function appManageCall(client: AimeatClient, owner: string, input: 
                 { level: input.dev_level, ...pick(input, ['note']) });
         case 'builder_remove':
             return client.delete(`/v1/apps/${enc(ownerName)}/${file}/dev-grants/${enc(String(input.account))}`);
+        case 'spec':
+            return client.get(`/v1/apps/${enc(ownerName)}/${file}/design-spec`);
+        case 'spec_set':
+            return client.put(`/v1/apps/${enc(ownerName)}/${file}/design-spec`, pick(input, ['markdown', 'expected_revision']));
+        case 'spec_clear':
+            return client.delete(`/v1/apps/${enc(ownerName)}/${file}/design-spec`);
         default:
             return { ok: false, error: { code: 'INVALID_INPUT', message: `Unknown action "${checked.action}".` } };
     }

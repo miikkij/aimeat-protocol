@@ -8,6 +8,7 @@
  *   own business: validating the payload, decoding the base64, the optional screenshot, and this
  *   route's response document.
  * @version-history
+ *   v2.9.0 -- 2026-10-02 -- design_spec_hint in the answer (services/app-design-spec.ts).
  *   v2.8.2 -- 2026-09-24 -- A GIF or AVIF screenshot is a picture too, and is accepted.
  *   v2.8.1 -- 2026-09-24 -- The optional screenshot is checked before the publish rather than after
  *     it, and must be a PNG, JPEG or WebP image, stored as the type its bytes are (A7-2). It was
@@ -313,6 +314,7 @@ export function registerPublishRoutes(
         res.status(201).json(success(config.nodeId, {
             filename,
             ...('warning' in road ? { roadmap_hint: road.warning } : {}),
+            ...(out.designSpecHint ? { design_spec_hint: out.designSpecHint } : {}),
             version_number: out.versionNumber,
             manifest: out.manifest,
             size: out.size,

@@ -24,6 +24,7 @@
  *   import { uploadRouter } from '../routes/upload.js';
  *   app.use(uploadRouter(config, storage));
  * @version-history
+ *   v1.22.0 — 2026-10-02 — design_spec_hint in the app answer (services/app-design-spec.ts).
  *   v1.21.0 — 2026-09-28 — The extension ZIP refuses other code for an extension a managed package install owns.
  *   v1.20.0 — 2026-09-26 — A ZIP under the name of a cortex the uploader installed goes through
  *     upsertCortex, the redeploy PUT /v1/cortex/:name and aimeat_cortex_install update:true run. An
@@ -372,6 +373,7 @@ async function handleAppUpload(
         type: 'app',
         filename,
         ...(out.roadmapHint ? { roadmap_hint: out.roadmapHint } : {}),
+        ...(out.designSpecHint ? { design_spec_hint: out.designSpecHint } : {}),
         version_number: out.versionNumber,
         name: out.manifest.name,
         size: out.size,
