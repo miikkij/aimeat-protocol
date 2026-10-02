@@ -22550,5 +22550,65 @@
       "wrappingUp": "This is taking a while, so I'll answer now with what I have."
     },
     "stopped": "I stopped here because this took too long, and my answer is not finished. Say \"continue\" and I go on from here, or ask again in smaller parts."
+  },
+  "explain": {
+    "open": "Explain: {term}",
+    "more": "Click for examples.",
+    "range": "Range",
+    "low": "Lower value",
+    "high": "Higher value",
+    "examples": "Examples",
+    "when": "When to change it",
+    "ai": {
+      "temperature": {
+        "title": "Temperature",
+        "short": "How much the answers vary. 0 gives the same answer to the same question, 2 gives the freest answers. A value from 0 to 2.",
+        "what": "The model writes its answer one word at a time, and at each point it has several possible next words. Temperature sets how boldly the model picks among them. With a low value, it nearly always picks the most likely word. With a high value, it also picks less likely words, so the text varies more and surprises more. It also makes more mistakes.",
+        "range": "0 to 2. An empty field uses the model's own default, usually 1.",
+        "low": "0 to 0.3: the same question gets nearly the same answer. Good for facts, extracting data, code and classification.",
+        "high": "1.2 to 2: varied and surprising text. Above 1.5, the text often loses its thread.",
+        "ex1": "0: a summary of meeting notes. Two runs give the same summary.",
+        "ex2": "0.7: a reply to an e-mail. The tone is natural, and the content stays on the subject.",
+        "ex3": "1.2: ten names for a new product. Each run gives different ideas.",
+        "tip": "Leave the field empty unless you have a reason. Lower the value when the same question must always get the same answer. Raise it when the answers feel too alike. Change either temperature or top P, not both. Some reasoning models ignore this setting."
+      },
+      "top_p": {
+        "title": "Top P",
+        "short": "How wide a choice of words the model picks from. 0.1 is narrow, 1 is the whole choice. A value from 0 to 1.",
+        "what": "At each point, the model ranks the possible next words by how likely they are. Top P keeps only the most likely words, until their likelihoods add up to the value, and the model picks from those. At 0.1, the model picks only from the few most likely words. At 1, every word stays possible. The setting does nearly the same thing as temperature, in a different way.",
+        "range": "0 to 1. An empty field uses the model's own default, usually 1.",
+        "low": "0.1 to 0.5: safe, predictable wording. The model seldom wanders.",
+        "high": "0.9 to 1: the whole vocabulary is in use, and the text is richer.",
+        "ex1": "0.3: customer service answers that must keep to the facts.",
+        "ex2": "0.95: a blog post or a story, where varied wording helps.",
+        "tip": "You seldom need to change this. To change how much the answers vary, use temperature and leave top P empty."
+      },
+      "max_tokens": {
+        "title": "Longest answer",
+        "short": "How much the model may write in one answer, in tokens. 1,000 tokens is about 750 English words.",
+        "what": "Models count text in tokens, which are pieces of words. The model stops when it reaches this limit, even in the middle of a sentence. The limit itself costs nothing: you pay only for what the model actually writes. The thinking of a reasoning model counts toward the same limit.",
+        "range": "From 1 up to what the model allows, often 4,000 to 128,000. An empty field uses the model's own limit.",
+        "low": "Short answers, and a long answer is cut off.",
+        "high": "Room for long texts and for a reasoning model to think.",
+        "ex1": "300: an answer of one paragraph, about 200 English words.",
+        "ex2": "2,000: a summary of one page, or a short report.",
+        "ex3": "16,000: a reasoning model that thinks before a long answer.",
+        "tip": "Raise the limit when answers stop in the middle. Lower it to stop answers that run too long. With a reasoning model, keep the limit high or turn reasoning off. Otherwise the thinking can use the whole limit, and the answer is empty."
+      },
+      "reasoning": {
+        "title": "Thinking",
+        "short": "How long a reasoning model thinks before it answers: off, light, medium or deep.",
+        "what": "A reasoning model works through the problem step by step before it writes the answer. Longer thinking gives a better answer to a hard question. But the answer comes more slowly and costs more, because the thinking is paid for in tokens. A model without reasoning ignores this setting.",
+        "range": "Model default, Off, Light, Medium, Deep.",
+        "lowLabel": "Less thinking",
+        "highLabel": "More thinking",
+        "low": "Off or Light: fast and cheap. Enough for simple questions, rewriting and summaries.",
+        "high": "Deep: slow and expensive, but strongest at mathematics, code, planning and analysis in many steps.",
+        "ex1": "Off: translating a paragraph. Thinking adds nothing to it.",
+        "ex2": "Medium: comparing three offers and recommending one.",
+        "ex3": "Deep: finding the fault in a long piece of code.",
+        "tip": "When an answer comes back empty, the thinking has used the whole longest-answer limit. Turn reasoning off, or raise the limit."
+      }
+    }
   }
 }

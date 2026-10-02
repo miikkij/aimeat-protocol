@@ -104,7 +104,7 @@ export const USE_OF: Record<string, UiUse[]> = {
     'step-list': ['explain'], 'waiting-note': ['wait', 'explain'], 'front-door': ['navigate', 'act'],
     // Page parts
     'page-frame': ['layout'], 'page-intro': ['explain'], 'error-note': ['status', 'explain'], 'action-row': ['layout', 'act'],
-    hint: ['explain'], masthead: ['view', 'navigate'], 'link-line': ['navigate'], 'stat-line': ['count', 'status'],
+    hint: ['explain'], 'help-tip': ['explain', 'open'], tooltip: ['explain'], 'explain-dialog': ['explain', 'open'], masthead: ['view', 'navigate'], 'link-line': ['navigate'], 'stat-line': ['count', 'status'],
     band: ['layout'], 'line-list': ['list', 'navigate'], 'named-row': ['layout', 'view'], 'thing-link': ['navigate', 'count'],
     'star-toggle': ['pick'], 'fold-button': ['open', 'pick'], 'mode-switch': ['pick'], 'quiet-note': ['explain'],
     'numbered-index': ['list', 'open'], 'ink-foot': ['explain', 'navigate'], 'check-item': ['status', 'list'],
