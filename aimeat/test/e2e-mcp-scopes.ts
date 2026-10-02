@@ -5,6 +5,8 @@
  *   the words no wildcard carries, which is the half this file used to leave out.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-mcp-scopes
  * @version-history
+ *   v1.4.0 — 2026-10-02 — aimeat_agent_tags_set: an agent's own tags without agent:write, a
+ *     sibling's refused without it and allowed with it.
  *   v1.3.0 — 2026-09-24 — The operator's reach inside ordinary tools (security audit A8-1, second
  *     half). Seven paths asked whether the ACCOUNT runs the node, so an operator's agent holding only
  *     the tool's own word deleted another owner's board, published a public capability past the
@@ -202,6 +204,30 @@ await test('Narrow agent cannot call a filtered tool (memory_write)', async () =
     const back = await client.call('aimeat_memory_read', { key: 'x' });
     const text = back.body.result?.content?.[0]?.text ?? '';
     assert(!text.includes('"value": "y"') && !text.includes('"value":"y"'), 'filtered write must not persist');
+});
+
+// An agent's OWN tags need no word; a sibling's need agent:write (auth/self-or-scope.ts, ruled
+// 2026-10-02). A crew runtime sets the agent's tags on every start, and with the tool behind
+// agent:write an agent without the word failed every task. The sibling half is the fence that stays.
+await test('Narrow agent sets its OWN tags over MCP, and is refused a sibling\'s', async () => {
+    const client = await connectMcp(narrow.gaii, narrow.key);
+    const tools = await client.list();
+    assert(tools.includes('aimeat_agent_tags_set'), 'aimeat_agent_tags_set is offered without agent:write');
+    const own = await client.call('aimeat_agent_tags_set', { target_agent_name: 'narrowagent', tags: ['role.narrow'] });
+    assert(own.ok, `its own tags: ${JSON.stringify(own.body).slice(0, 300)}`);
+    const sibling = await client.call('aimeat_agent_tags_set', { target_agent_name: 'broadagent', tags: ['taken.over'] });
+    const text = sibling.body.result?.content?.[0]?.text ?? '';
+    assert(!sibling.ok && text.startsWith('SCOPE_DENIED'), `a sibling's tags must be refused: ${text}`);
+    const list = await json('/v1/agents', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const agents = list.body.data.agents as any[];
+    assert((agents.find(a => a.name === 'narrowagent')?.tags ?? []).includes('role.narrow'), 'its own tags were written');
+    assert(!(agents.find(a => a.name === 'broadagent')?.tags ?? []).includes('taken.over'), 'the sibling\'s tags were not');
+});
+
+await test('…and an agent holding agent:write may tag a sibling', async () => {
+    const client = await connectMcp(broad.gaii, broad.key);
+    const r = await client.call('aimeat_agent_tags_set', { target_agent_name: 'narrowagent', tags: ['role.narrow', 'set.by.broad'] });
+    assert(r.ok, `broad agent tagging its sibling: ${JSON.stringify(r.body).slice(0, 300)}`);
 });
 
 await test('Broad agent (*) sees the full tool surface', async () => {

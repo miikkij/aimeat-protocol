@@ -7,6 +7,7 @@
  *   reading it from there.
  * @structure SCOPE_EXEMPT_TOOLS
  * @version-history
+ *   v1.1.0 — 2026-10-02 — aimeat_agent_tags_set: own tags without a word, a sibling's with agent:write.
  *   v1.0.0 — 2026-09-29 — Moved from scopes.ts, unchanged.
  */
 
@@ -37,6 +38,11 @@ export const SCOPE_EXEMPT_TOOLS = new Set<string>([
     // operator role; no scope word narrows an operator". The role was the ACCOUNT's, so every agent
     // an operator connected was handed all of it (security audit A8-1). They are in TOOL_SCOPES now.
     'aimeat_agent_capabilities_report',              // Identity is resolved once from the session at agent-capabilities
+    // An agent's OWN tags need no word, a sibling's need agent:write, and the handler checks which
+    // (mcp/agent-management.ts, the rule in auth/self-or-scope.ts). In TOOL_SCOPES it hid the tool
+    // from every agent without agent:write, which is how a crew runtime's tags call on every start
+    // failed every task of the basic agents (2026-10-02).
+    'aimeat_agent_tags_set',
     'aimeat_agent_telemetry_report',                 // Every write is keyed to `agentGaii` from the session closure (agent-telemetry
     'aimeat_capabilities_vouch',                     // gated in the handler on the operator role, not by a scope
     'aimeat_instance_create',                        // owner comes from ownerName() derived from the session GAII (chat-instances

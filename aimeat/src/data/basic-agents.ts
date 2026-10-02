@@ -31,6 +31,13 @@
  *   its owner, so it carries agent:write and agent:delete, and deliberately not agent:permissions
  *   (rewriting a sibling's permission set stays with the person) and not the wildcard.
  *
+ *   EACH LIST IS THE JOB'S, AND THE RUNTIME'S OWN ARE ADDED. `withCrewRuntimeScopes` adds what the
+ *   crew runtime writes with on every run whatever the job is (data/crew-runtime-scopes.ts says
+ *   which calls). NEITHER BASIC AGENT HOLDS agent:write, and that is deliberate: it would let them
+ *   approve new agents by themselves (routes/agents/device-auth.ts). The runtime's tags call on
+ *   every start needs no word on the agent's own record (auth/self-or-scope.ts); until 2026-10-02 it
+ *   needed agent:write, and every task of workflow-manager failed on a hosted place.
+ *
  *   WHAT DOES NOT BELONG IN THIS FILE. `BASIC_AGENTS` is the set a node gives EVERY owner on day
  *   one, before they have chosen anything. A third-party or vendor agent — something the owner
  *   picks — is not that, and putting one here would make the node maintain a catalogue on somebody
@@ -41,6 +48,9 @@
  * @structure BASIC_AGENTS · BasicAgentTemplate · basicAgentByName
  * @usage import { BASIC_AGENTS } from '../data/basic-agents.js';
  * @version-history
+ *   v2.3.0 — 2026-10-02 — The runtime's own scopes come from data/crew-runtime-scopes.ts. No list
+ *     changes: both held memory:write, and the tags call that failed every task now needs no word on
+ *     the agent's own record, so neither gains agent:write.
  *   v2.2.0 — 2026-10-02 — Both basic agents start their tasks on their own (`taskStart: automatic`),
  *     and the concierge listens for tasks as well. Measured on freshly sold hosted places: the
  *     concierge is `interactive`, so every task a customer gave it waited in `queued` for a Start
@@ -71,6 +81,7 @@
  *   v1.0.0 — 2026-08-31 — Initial: concierge, crew-forge, workflow-manager (Agent v2, V1).
  */
 import type { RunMode } from '../models/agent-card.js';
+import { withCrewRuntimeScopes } from './crew-runtime-scopes.js';
 
 export interface BasicAgentTemplate {
   /** The bare agent name, and the second half of its GAII. */
@@ -165,7 +176,7 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
     name: 'concierge',
     displayName: 'Concierge',
     description: 'The front door. Takes what arrives, works out what it is about, answers what it can, and hands the rest to whoever should have it.',
-    scopes: [
+    scopes: withCrewRuntimeScopes([
       'memory:read', 'memory:write',
       'messages:read', 'messages:send',
       // The front door answers people, so it looks them up in the owner's address book.
@@ -173,7 +184,7 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
       'task:read', 'task:write',
       'organism:read',
       'catalogue:read',
-    ],
+    ]),
     mode: 'interactive',
     // A customer who gives the front door a task expects it done, not parked behind a Start button
     // they were never shown. `mode` stays `interactive` (it also picks the Hello Integration flow).
@@ -251,14 +262,14 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
     name: 'workflow-manager',
     displayName: 'Workflow manager',
     description: 'Orders work from your other agents and keeps track of what came back.',
-    scopes: [
+    scopes: withCrewRuntimeScopes([
       'memory:read', 'memory:write',
       'task:read', 'task:write',
       'workflow:read', 'workflow:write',
       'work:request', 'work:read',
       'messages:read', 'messages:send',
       'catalogue:read',
-    ],
+    ]),
     // `task-runner`, not `coordinator`. This one runs on `spawn`: nothing is sitting there to accept
     // work, so a queued task must activate on its own or it waits for a person who was never told.
     // Seeded as `coordinator`, every task for the three basic agents stayed `queued` — the node

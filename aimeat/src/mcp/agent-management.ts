@@ -17,6 +17,9 @@
  *   import { registerAgentManagementTools } from './agent-management.js';
  *   registerAgentManagementTools(mcp, storage, config, getAgentGaii);
  * @version-history
+ *   v1.8.0 -- 2026-10-02 -- aimeat_agent_tags_set: an agent sets its own tags without agent:write,
+ *     and another agent's still need it. The tool moves to SCOPE_EXEMPT_TOOLS so an agent without
+ *     the word sees it, and the sibling check sits in the handler.
  *   v1.7.0 -- 2026-10-02 -- aimeat_agent_propose answers with `approval_url` and the service's own
  *     next_step sentence, the same two the REST answer gives.
  *   v1.6.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
@@ -47,7 +50,9 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { parseGAII, localAccountName } from '../utils/gaii.js';
+import { parseGAII, localAccountName, agentGaiiFromIdentifier } from '../utils/gaii.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { toolError } from './tool-error.js';
 import { setAgentTags, setAgentMode, setAgentRunMode, setAgentRuntimeSource, setAgentDescription, setAgentConsoleUrl } from '../services/agent-profile-write.js';
 import { describeBasicAgents, requestBasicAgents } from '../services/basic-agents.js';
 import { proposeAgent, proposalApprovalUrl, proposalNextStep } from '../services/agent-proposals.js';
@@ -84,6 +89,13 @@ export function registerAgentManagementTools(
             const callerParsed = parseGAII(agentGaii);
             if (!callerParsed) {
                 return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
+            }
+            // Its own tags need no agent:write; a sibling's do (auth/self-or-scope.ts, the same rule
+            // as PATCH /v1/agents/:name/tags). The tool is scope-exempt so an agent without the word
+            // still sees it, which puts the sibling check here.
+            const self = agentGaiiFromIdentifier(target_agent_name, localAccountName(agentGaii), config.nodeId) === agentGaii;
+            if (!self && !scopeIsCovered(sessionScopes, 'agent:write')) {
+                return toolError('SCOPE_DENIED', 'Scope "agent:write" required to set another agent\'s tags. An agent may set its own without it.');
             }
 
             const outcome = await setAgentTags({ storage, config }, localAccountName(agentGaii), target_agent_name, tags);

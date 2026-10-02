@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.13.0 — 2026-10-02 — PATCH /v1/agents/:name/tags: an agent sets its own tags without
+ *     agent:write; a sibling's still need it (auth/self-or-scope.ts).
  *   v1.12.0 — 2026-10-02 — PATCH /v1/agents/:name/task-start, and `task_start`,
  *     `task_start_effective` and `task_start_held_by` on the agent list.
  *   v1.11.0 — 2026-10-01 — `stats.tasks.doneWeek`: done tasks of the last 7 days, for the Fleet page.
@@ -46,6 +48,7 @@ import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
+import { requireScopeUnlessSelf } from '../../auth/self-or-scope.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import { refuseNeedsPermission } from '../../middleware/refusals.js';
 import { success, error } from '../../middleware/envelope.js';
@@ -311,7 +314,10 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
   // an agent may set tags on itself or a same-owner sibling (mirrors how agents
   // self-report capabilities, and matches the server-MCP aimeat_agent_tags_set
   // handler). Cross-owner is rejected by the ownership check below.
-  router.patch('/v1/agents/:name/tags', requireAuth(), requireScope('agent:write'), async (req, res) => {
+  // An agent's OWN tags need no agent:write (auth/self-or-scope.ts, ruled 2026-10-02): a crew
+  // runtime sets them on every start, and an agent without the word finished no task. A sibling's
+  // tags still need it.
+  router.patch('/v1/agents/:name/tags', requireAuth(), requireScopeUnlessSelf('agent:write', config.nodeId), async (req, res) => {
     const identifier = decodeURIComponent(req.params.name as string);
     // Ownership, normalisation and the write are services/agent-profile-write.ts, shared with
     // aimeat_agent_tags_set.

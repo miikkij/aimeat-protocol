@@ -19,6 +19,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=agent-refusals
  * @version-history
+ *   v1.2.0 — 2026-10-02 — The refused call is the agent's own mode. Its own tags need no
+ *     agent:write any more, so the tags call the suite used no longer refuses.
  *   v1.1.0 — 2026-09-30 — The owner's decline (POST /v1/agents/:name/refusals/decline).
  *   v1.0.0 — 2026-09-30 — Initial, with the feature.
  */
@@ -33,7 +35,7 @@ const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const owner = `rfs${Date.now() % 100000}`;
 const stranger = `rfx${Date.now() % 100000}`;
 const AGENT = 'refused-runner';
-/** A task runner's set with no agent:write, the permission PATCH /v1/agents/:name/tags needs. */
+/** A task runner's set with no agent:write, the permission PATCH /v1/agents/:name/mode needs. */
 const WANTED = ['task:read', 'task:write', 'memory:read', 'memory:write'];
 
 let passed = 0;
@@ -148,7 +150,7 @@ await test('The owner\'s agent list says what the agent asked for and what it go
 
 await test('The owner gives the agent a task, which waits on the agent', async () => {
     const r = await json(`/v1/agents/${AGENT}/tasks`, auth(ownerToken, {
-        method: 'POST', body: JSON.stringify({ title: 'Tag yourself', description: 'Set your own tags.' }),
+        method: 'POST', body: JSON.stringify({ title: 'Set your mode', description: 'Set your own mode.' }),
     }));
     assert(r.status === 201, `create task ${r.status}: ${JSON.stringify(r.body.error)}`);
     taskId = r.body.data.task?.id as string;
@@ -160,7 +162,9 @@ console.log('\nPhase 2: a refused call is kept');
 const since = new Date(Date.now() - 1000).toISOString();
 
 await test('The agent\'s write that needs agent:write is refused with SCOPE_DENIED', async () => {
-    const r = await json(`/v1/agents/${AGENT}/tags`, auth(agentToken, { method: 'PATCH', body: JSON.stringify({ tags: ['x'] }) }));
+    // Its mode, not its tags: since 2026-10-02 an agent sets its OWN tags without agent:write
+    // (auth/self-or-scope.ts), and the mode is the owner's standing instruction, so it still needs it.
+    const r = await json(`/v1/agents/${AGENT}/mode`, auth(agentToken, { method: 'PATCH', body: JSON.stringify({ mode: 'interactive' }) }));
     assert(r.status === 403 && r.body.error?.code === 'SCOPE_DENIED', `expected 403 SCOPE_DENIED, got ${r.status} ${JSON.stringify(r.body.error)}`);
 });
 
@@ -168,7 +172,7 @@ await test('The owner\'s agent list shows the refusal: the permission and the ro
     const a = await eventually(listedAgent, (x) => (x?.refusals?.length ?? 0) > 0, 'refusal on the agent list');
     const f = a.refusals[0];
     assert(sorted(f.needed) === 'agent:write', `needed: ${JSON.stringify(f)}`);
-    assert(f.call === 'PATCH /v1/agents/:name/tags', `call: ${JSON.stringify(f)}`);
+    assert(f.call === 'PATCH /v1/agents/:name/mode', `call: ${JSON.stringify(f)}`);
     assert(f.count === 1 && f.any_of === false, `count/any_of: ${JSON.stringify(f)}`);
 });
 
@@ -189,7 +193,7 @@ await test('A second run refused within a minute of the first sees its own refus
     // first run's time and completed. Found by crewaimeat-dev on 2026-09-30.
     const run2 = new Date().toISOString();
     await new Promise(r => setTimeout(r, 20));
-    const p = await json(`/v1/agents/${AGENT}/tags`, auth(agentToken, { method: 'PATCH', body: JSON.stringify({ tags: ['y'] }) }));
+    const p = await json(`/v1/agents/${AGENT}/mode`, auth(agentToken, { method: 'PATCH', body: JSON.stringify({ mode: 'interactive' }) }));
     assert(p.status === 403, `expected 403, got ${p.status}`);
     const r = await json(`/v1/agents/${AGENT}/refusals?since=${encodeURIComponent(run2)}`, auth(agentToken));
     const f = (r.body.data.refusals as any[]).find(x => x.needed[0] === 'agent:write');

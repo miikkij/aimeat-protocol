@@ -898,6 +898,9 @@ const ALL_SUITES = [
     // The real daemon on a loopback address that is not the node's base URL (a hosted node's crew):
     // the basic-agents button and an approved proposal both enrol through it.
     'test/e2e-connect-enrol-loopback.ts',
+    // An agent the button made finishes its first task with the crew runtime's own node calls:
+    // the tags call needs agent:write, and a run with any refused call ends as refused.
+    'test/e2e-basic-agents-first-task.ts',
     // Every `aimeat connect` subcommand but serve, plus config, config export/import, validate,
     // skill install and the screenshot worker's dry run, each spawned as the real binary against
     // the shared node. Eight to ten minutes, nearly all of it tsx cold-starting fifty-five children.

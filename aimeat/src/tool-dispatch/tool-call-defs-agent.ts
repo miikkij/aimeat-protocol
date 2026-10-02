@@ -149,7 +149,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_agent_tags_set',
-        description: "Owner-only. Replace the tag list on an agent. Convention: 'crew:<name>', 'source:<name>', 'role:<name>', 'project:<name>'.",
+        description: "Replace the tag list on an agent: your own with no permission word, a same-owner sibling's with agent:write. Convention: 'crew:<name>', 'source:<name>', 'role:<name>', 'project:<name>'.",
         input: {
             target_agent_name: { type: 'string', description: 'Agent whose tags to update.' },
             tags: { type: 'array', description: 'Replacement tag list. Empty array clears all tags. Max 20.' },
@@ -247,7 +247,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_agent_propose',
-        description: "How a new agent is made on this node: when the person asks for one, propose it here, never through an outside agent builder or another product. First read what it will work on (aimeat_organism_list, aimeat_workspace_list) and name that data in purpose and crew_def. Scopes: what the job needs plus memory:write and agent:write, which the crew runtime writes with. Creates nothing: only their own press creates it, seeds its definition and hands it to their connector. Then give them approval_url from the answer. Send crew_def with it whenever you can: an agent approved without one exists and cannot run.",
+        description: "How a new agent is made on this node: when the person asks for one, propose it here, never through an outside agent builder or another product. First read what it will work on (aimeat_organism_list, aimeat_workspace_list) and name that data in purpose and crew_def. Scopes: what the job needs plus memory:write, which the crew runtime writes its result with; no agent:write unless the job is making or changing agents. Creates nothing: only their own press creates it, seeds its definition and hands it to their connector. Then give them approval_url from the answer. Send crew_def with it whenever you can: an agent approved without one exists and cannot run.",
         input: {
             name: { type: 'string', required: true, description: 'The agent name: 3 to 40 characters, lowercase letters, digits and hyphens, starting with a letter.' },
             purpose: { type: 'string', required: true, description: 'What this agent is for, in a sentence the owner can decide from.' },
