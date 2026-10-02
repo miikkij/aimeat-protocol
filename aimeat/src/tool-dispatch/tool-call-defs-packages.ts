@@ -17,6 +17,8 @@
  * @structure packageTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { packageTools } from './tool-call-defs-packages.js';
  * @version-history
+ *   v1.11.0 -- 2026-10-02 -- aimeat_package_offer (GET, PUT /v1/packages/:groupId/offer) and aimeat_package_buy
+ *     (/v1/package-sales/offer, POST /v1/commerce/checkout-sessions, /v1/package-sales/subscriptions).
  *   v1.10.0 -- 2026-10-01 -- aimeat_package_compose forwards `outcome` and `prompts`.
  *   v1.9.0 -- 2026-09-30 -- aimeat_package_compose forwards `include_skills`.
  *   v1.8.0 -- 2026-09-29 -- aimeat_package_sellers (GET, PUT, DELETE /v1/package-sellers).
@@ -339,6 +341,45 @@ export const packageTools: ConnectCliToolDefinition[] = [
             const note = optionalString(input, 'note');
             if (note !== undefined) body.note = note;
             return client.put(path, body);
+        },
+    },
+    {
+        // The author's terms on a repository (GET, PUT /v1/packages/:groupId/offer).
+        name: 'aimeat_package_offer',
+        handler: ({ client }, input) => {
+            const groupId = encodeURIComponent(requiredString(input, 'group_id'));
+            if (requiredString(input, 'action') === 'get') return client.get(`/v1/packages/${groupId}/offer`);
+            const body: JsonObject = {};
+            if (input.terms !== undefined) body.terms = input.terms as JsonObject;
+            const state = optionalString(input, 'state');
+            if (state !== undefined) body.state = state;
+            return client.put(`/v1/packages/${groupId}/offer`, body);
+        },
+    },
+    {
+        // A purchase on the node that sells: the offer read gives the currency the checkout is opened in.
+        name: 'aimeat_package_buy',
+        handler: async ({ client }, input) => {
+            const action = requiredString(input, 'action');
+            const repository = optionalString(input, 'repository') ?? '';
+            const groupId = optionalString(input, 'group_id') ?? '';
+            const nodeId = optionalString(input, 'node_id');
+            if (action === 'subscriptions') return client.get('/v1/package-sales/subscriptions');
+            if (action === 'auto_renew') {
+                return client.put('/v1/package-sales/subscriptions/auto-renew', {
+                    repository, group_id: groupId, node_id: nodeId ?? '', auto_renew: optionalBoolean(input, 'auto_renew') ?? false,
+                });
+            }
+            const view = await client.get(`/v1/package-sales/offer?${new URLSearchParams({ repository, group_id: groupId }).toString()}`);
+            if (action === 'offer' || view.ok === false) return view;
+            const currency = ((view.data ?? {}) as { buy?: { currency?: string } }).buy?.currency;
+            const lineInput: JsonObject = {};
+            if (input.node !== undefined) lineInput.node = input.node as JsonObject;
+            if (optionalBoolean(input, 'auto_renew')) lineInput.auto_renew = true;
+            return client.post('/v1/commerce/checkout-sessions', {
+                ...(currency ? { currency } : {}),
+                items: [{ kind: 'package', agent: repository, app: groupId, offer_id: action === 'renew' ? `renew:${nodeId ?? ''}` : 'buy', input: lineInput }],
+            });
         },
     },
     {

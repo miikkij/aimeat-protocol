@@ -390,7 +390,7 @@ export function registerCommerceTools(
     // ── Buyer: checkout sessions (src/commerce/session-service.ts — same core as REST/UCP/ACP) ──
 
     const itemShape = z.array(z.object({
-        kind: z.enum(['offer', 'app-tool', 'ext-call']).optional(),
+        kind: z.enum(['offer', 'app-tool', 'ext-call', 'package']).optional(),
         agent: z.string().max(300).optional(),
         offer_id: z.string().max(100).optional(),
         org: z.string().max(200).optional(),

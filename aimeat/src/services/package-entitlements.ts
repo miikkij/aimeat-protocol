@@ -75,6 +75,11 @@ export interface PackageEntitlement {
      * from its note ("sold by <node>"), which every seller grant has carried.
      */
     soldBy?: string;
+    /**
+     * The author's terms the sale was made on (package-offer.ts): what the seller accepted to pay the
+     * author, kept so a later price change reaches only new sales. Absent for a grant made by hand.
+     */
+    terms?: { offerTermsId: string; price: { amount: number; currency: string } | null; renewal: { amount: number; currency: string; period_days: number } | null; acceptedAt: string };
     grantedAt: string;
     grantedBy: string;
     updatedAt: string;
@@ -155,7 +160,7 @@ function notYourGrant(prev: PackageEntitlement | undefined, seller: string | und
 export async function grantEntitlement(
     storage: Storage,
     caller: { owner: string; isOperator: boolean },
-    input: { groupId: string; nodeId: string; updatesUntil?: unknown; note?: unknown; channel?: unknown; node?: unknown },
+    input: { groupId: string; nodeId: string; updatesUntil?: unknown; note?: unknown; channel?: unknown; node?: unknown; terms?: PackageEntitlement['terms'] },
     peers?: Map<string, PeerInfo>,
     peerOpts: { timeoutMs?: number; seller?: string; thisNodeId?: string } = {},
 ): Promise<EntitlementResult> {
@@ -201,6 +206,7 @@ export async function grantEntitlement(
         channel: (input.channel as PackageChannel | undefined) ?? prev?.channel ?? 'stable',
         ...(typeof input.note === 'string' && input.note ? { note: input.note.slice(0, 500) } : prev?.note ? { note: prev.note } : {}),
         ...(soldBy ? { soldBy } : {}),
+        ...(input.terms ? { terms: input.terms } : prev?.terms ? { terms: prev.terms } : {}),
         grantedAt: prev?.grantedAt ?? now,
         grantedBy: prev?.grantedBy ?? caller.owner,
         updatedAt: now,
@@ -363,13 +369,18 @@ export interface RepositoryListingEntry {
     visibility: 'public' | 'private';
     updates_until: string | null;
     channel: PackageChannel;
+    /** The seller node that sold the entitlement, and its address when this node knows it: where to renew. */
+    sold_by?: string;
+    sold_by_url?: string;
 }
 
 /**
  * What `nodeId` may pull here: every published public package (its latest version), and each private
  * one it is entitled to (the latest version its entitlement reaches).
  */
-export async function repositoryListing(storage: Storage, nodeId: string, opts: { includePublic?: boolean } = {}): Promise<RepositoryListingEntry[]> {
+export async function repositoryListing(
+    storage: Storage, nodeId: string, opts: { includePublic?: boolean; urlOf?: (nodeId: string) => string | undefined } = {},
+): Promise<RepositoryListingEntry[]> {
     const out: RepositoryListingEntry[] = [];
     const { packages } = opts.includePublic === false
         ? { packages: [] }
@@ -390,6 +401,11 @@ export async function repositoryListing(storage: Storage, nodeId: string, opts: 
             group_id: groupId, name: pkg.name, version: pkg.version, published_at: pkg.createdAt,
             description: pkg.description, category: pkg.category, visibility: 'private', updates_until: entitlement.updatesUntil,
             channel: entitlement.channel ?? 'stable',
+            ...(() => {
+                const seller = sellerOf(entitlement);
+                const url = seller ? opts.urlOf?.(seller) : undefined;
+                return seller ? { sold_by: seller, ...(url ? { sold_by_url: url } : {}) } : {};
+            })(),
         });
     }
     return out;

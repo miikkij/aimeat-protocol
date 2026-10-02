@@ -25,6 +25,8 @@
  * @usage
  *   const outcomes = await refreshInstalledPackages({ storage, config, peers }, { owner }, { notify: false });
  * @version-history
+ *   v1.3.0 — 2026-10-02 — The daily check tells the owner once, fourteen days before an install's
+ *     updates end, where to renew (package_renewal_due), from the repository's listing.
  *   v1.2.0 — 2026-10-02 — An install with auto-update on is not updated to a version that can do more
  *     than the owner approved: the owner is told once (package_update_needs_approval) and the outcome is
  *     needs_owner (package sale design, T7).
@@ -35,7 +37,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage, PackageInstanceRecord } from '../storage/interface.js';
 import type { PeerInfo } from './federation.js';
-import { pullPackage } from './package-pull.js';
+import { pullPackage, listRepositoryPackages } from './package-pull.js';
 import { updateInstanceToLatest } from './package-migrate.js';
 import { packageCapabilities, widenedItems } from './package-capabilities.js';
 import { approvedItems } from './package-approvals.js';
@@ -43,6 +45,7 @@ import { notify } from './notify.js';
 import { emitChange } from './event-bus.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
 import { logger } from '../utils/logger.js';
+import { stripTrailingSlashes } from '../utils/url-validator.js';
 
 /** Where the owner was last told about a version, per install: one record per install, system namespace. */
 const NS_UPDATE_NOTICES = 'package-update-notices';
@@ -90,8 +93,50 @@ export async function refreshInstalledPackages(
         }
     }
     if (outcomes.some(o => o.pulled || o.result === 'updated')) emitChange('instances');
+    if (opts.notify) await renewalNotices(deps, instances);
     void config;
     return outcomes;
+}
+
+/** How long before the end of updates the owner is told where to renew. */
+export const RENEWAL_NOTICE_DAYS = 14;
+
+/**
+ * Tell each owner once, fourteen days before an install's updates end, where to renew: the seller the
+ * repository's listing names, with its address when the repository knows it (package sale design,
+ * section 3). A repository that does not answer is skipped; the next night asks again.
+ */
+async function renewalNotices(deps: RefreshDeps, instances: PackageInstanceRecord[]): Promise<void> {
+    const { storage, config } = deps;
+    const now = Date.now();
+    const byNode = new Map<string, Array<{ inst: PackageInstanceRecord; groupId: string }>>();
+    for (const inst of instances) {
+        if (inst.forkedAt) continue;
+        const up = (await storage.getPackage(inst.packageRecordId))?.upstream;
+        if (!up) continue;
+        byNode.set(up.node, [...(byNode.get(up.node) ?? []), { inst, groupId: up.groupId }]);
+    }
+    for (const [node, installs] of byNode) {
+        const listing = await listRepositoryPackages(deps, node);
+        if (!listing.ok) continue;
+        for (const row of listing.packages as Array<{ group_id?: string; updates_until?: string | null; sold_by?: string; sold_by_url?: string }>) {
+            const until = row.updates_until ? Date.parse(row.updates_until) : NaN;
+            if (!Number.isFinite(until) || until <= now || until - now > RENEWAL_NOTICE_DAYS * 86_400_000) continue;
+            for (const { inst } of installs.filter(i => i.groupId === row.group_id)) {
+                if (!await firstNoticeFor(storage, `${inst.id}:renew`, row.updates_until!)) continue;
+                const ownerGhii = await resolveGhii(storage, inst.owner, config);
+                const where = row.sold_by_url ? `${stripTrailingSlashes(row.sold_by_url)}/v1/profile?tab=packages` : '/v1/profile?tab=packages';
+                await notify(storage, ownerGhii, {
+                    type: 'package_renewal_due',
+                    title: `The updates of ${inst.label} end on ${row.updates_until!.slice(0, 10)}`,
+                    body: `${inst.label} keeps working after that, but gets no new versions. ${row.sold_by ? `Renew with ${row.sold_by}.` : 'Renew with the seller you bought it from.'}`,
+                    link: where,
+                    i18n: { key: 'package_renewal_due', vars: { label: inst.label, date: row.updates_until!.slice(0, 10), seller: row.sold_by ?? '' } },
+                });
+                emitChange('notifications', ownerGhii);
+            }
+        }
+    }
 }
 
 async function refreshOne(

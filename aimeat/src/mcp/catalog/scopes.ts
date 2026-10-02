@@ -22,6 +22,8 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.42.0 -- 2026-10-02 -- aimeat_package_offer -> packages:write, aimeat_package_buy -> commerce:buy,
+ *     the words their REST endpoints ask (package sale design, phase 3).
  *   v1.41.0 -- 2026-10-01 -- aimeat_contact_list -> contacts:read, the word GET /v1/contacts now asks of
  *     anything acting for the owner (the developer's ruling of 2026-10-01). It rode messages:read here
  *     while the REST endpoint refused every agent, so the connector's copy of the tool never worked.
@@ -242,6 +244,8 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_package_entitlements:              'packages:write',
     aimeat_package_config_needs:              'packages:write',
     aimeat_package_sellers:                   'packages:write',
+    aimeat_package_offer:                     'packages:write',
+    aimeat_package_buy:                       'commerce:buy',
     aimeat_package_pull:                      'packages:write',
 
     // Installing registers an app, a cortex, an extension and any @activate cron the manifest

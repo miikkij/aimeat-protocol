@@ -12,6 +12,9 @@
  *   CheckoutSessionRecord · PaymentContext · PaymentResult · PaymentHandler
  * @usage import type { CheckoutSessionRecord, PaymentHandler } from '../commerce/types.js';
  * @version-history
+ *   v1.2.0 — 2026-10-02 — SavedPayment: collect may keep the payment method for later charges
+ *     (`saveForLater`), and the optional chargeSaved charges it without the buyer; fulfilment sees
+ *     what was saved (package sale design: automatic renewal).
  *   v1.1.0 — 2026-07-14 — Fulfill seam (Sellable.fulfill) + app-tool line-item fields (app, input)
  *     + per-item fulfillment results on the session record (TARGET-034 phase A)
  *   v1.0.0 — 2026-07-13 — Initial commerce core types (TARGET-033 phase 1)
@@ -64,12 +67,20 @@ export interface Sellable {
   fulfill?: (ctx: PaymentContext, args: FulfillArgs) => Promise<FulfillOutcome>;
 }
 
+/**
+ * A payment method the PSP keeps for later charges without the buyer present: its reference ids on
+ * the SELLER's own PSP account, never the card itself (package sale design: automatic renewal).
+ */
+export interface SavedPayment { customer?: string; payment_method?: string }
+
 /** What a custom fulfillment sees for one line item. */
 export interface FulfillArgs {
   session: CheckoutSessionRecord;
   item: CheckoutLineItem;
   /** The buyer's bearer token, threaded from the completing request (capability invokes need it). */
   callerJwt?: string;
+  /** The handler that collected, and the payment it saved for later charges when one was asked for. */
+  payment?: { handler: string; saved?: SavedPayment };
 }
 
 /** A custom fulfillment yields a TASK id and/or an inline result (surfaced on the session). */
@@ -192,6 +203,23 @@ export interface PaymentHandler {
     resource?: string;
     /** The line a receipt should carry. Same reasoning as `resource`; the handler has a default. */
     description?: string;
+    /**
+     * The buyer turned automatic renewal on: keep the payment method for later charges without them
+     * present, on the seller's own account. A handler that cannot simply ignores it, and returns no
+     * `saved`, so the renewal stays the buyer's to start.
+     */
+    saveForLater?: boolean;
+  }): Promise<{ trackingCode: string; saved?: SavedPayment }>;
+  /**
+   * OPTIONAL: charge a payment method saved at an earlier collect, with the buyer not present (an
+   * automatic renewal). Throws when the charge fails or the bank asks the buyer to confirm it.
+   */
+  chargeSaved?(ctx: PaymentContext, args: {
+    amount: number;
+    currency: string;
+    reference: string;
+    saved: SavedPayment;
+    seller?: { ghii: string; owner: string; psp?: unknown };
   }): Promise<{ trackingCode: string }>;
   /** Pay one recipient their share of an already-collected amount. */
   payout(ctx: PaymentContext, args: {

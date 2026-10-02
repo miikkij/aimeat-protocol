@@ -5,6 +5,8 @@
  * @description MCP tool registrations for app/package management -- publishing,
  *   listing, retrieving, archiving versions, version history, sanctioned forks, and drafts (staging).
  * @version-history
+ *   2026-10-02 — aimeat_package_offer (GET, PUT /v1/packages/:groupId/offer) and aimeat_package_buy
+ *     (/v1/package-sales/offer, /v1/commerce/checkout-sessions, /v1/package-sales/subscriptions).
  *   2026-10-01 — aimeat_package_compose forwards `outcome` and `prompts` (the package sheet).
  *   2026-09-30 — aimeat_package_compose forwards `include_skills` (the composer's own bound skills travel).
  *   2026-09-29 — aimeat_package_sellers (GET, PUT, DELETE /v1/package-sellers).
@@ -221,6 +223,49 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     if (node !== undefined) body.node = node;
     if (note !== undefined) body.note = note;
     return out(await client.put(path, body));
+  });
+
+  // The author's terms on a repository (GET, PUT /v1/packages/:groupId/offer).
+  mcp.tool('aimeat_package_offer', descriptionFor('aimeat_package_offer'), {
+    group_id: z.string().describe('The package group id on this repository.'),
+    action: z.enum(['get', 'set']).describe('get: the offer as it stands; set: new terms, a new state, or both.'),
+    terms: z.record(z.string(), z.unknown()).optional().describe('For set: { grant, price, updates: { included_days, renewal }, channel, licence, tax, support }. Appended; buyers keep the terms they accepted.'),
+    state: z.enum(['on_sale', 'paused', 'ended']).optional().describe('For set: on_sale, paused (renewals only) or ended.'),
+  }, annotationsFor('aimeat_package_offer'), async ({ group_id, action, terms, state }) => {
+    if (action === 'get') return out(await client.get(`/v1/packages/${encodeURIComponent(group_id)}/offer`));
+    const body: Record<string, unknown> = {};
+    if (terms !== undefined) body.terms = terms;
+    if (state !== undefined) body.state = state;
+    return out(await client.put(`/v1/packages/${encodeURIComponent(group_id)}/offer`, body));
+  });
+
+  // A purchase on the node that sells (GET /v1/package-sales/offer, POST /v1/commerce/checkout-sessions,
+  // GET /v1/package-sales/subscriptions, PUT /v1/package-sales/subscriptions/auto-renew).
+  mcp.tool('aimeat_package_buy', descriptionFor('aimeat_package_buy'), {
+    action: z.enum(['offer', 'checkout', 'renew', 'subscriptions', 'auto_renew']).describe('offer: what you would buy and at what price; checkout: open the checkout; renew: open the checkout of the next update period; subscriptions: what you hold and the requests you made; auto_renew: turn automatic renewal on or off.'),
+    repository: z.string().optional().describe('The package repository\'s node id.'),
+    group_id: z.string().optional().describe('The package group id on the repository.'),
+    node: z.object({ node_id: z.string(), url: z.string(), public_key: z.string() }).optional().describe('For checkout: the AIMEAT that is to receive the package (its /.well-known/aimeat). Leave out to get a claim code instead.'),
+    node_id: z.string().optional().describe('For renew and auto_renew: the node the package was bought for.'),
+    auto_renew: z.boolean().optional().describe('For checkout: keep the card for automatic renewals. For auto_renew: on or off.'),
+  }, annotationsFor('aimeat_package_buy'), async (input) => {
+    const repository = input.repository ?? '';
+    const groupId = input.group_id ?? '';
+    if (input.action === 'subscriptions') return out(await client.get('/v1/package-sales/subscriptions'));
+    if (input.action === 'auto_renew') {
+      return out(await client.put('/v1/package-sales/subscriptions/auto-renew', { repository, group_id: groupId, node_id: input.node_id, auto_renew: input.auto_renew }));
+    }
+    const view = await client.get(`/v1/package-sales/offer?${new URLSearchParams({ repository, group_id: groupId }).toString()}`);
+    if (input.action === 'offer' || view.ok === false) return out(view);
+    const currency = ((view.data ?? {}) as { buy?: { currency?: string } }).buy?.currency;
+    return out(await client.post('/v1/commerce/checkout-sessions', {
+      ...(currency ? { currency } : {}),
+      items: [{
+        kind: 'package', agent: repository, app: groupId,
+        offer_id: input.action === 'renew' ? `renew:${input.node_id ?? ''}` : 'buy',
+        input: { ...(input.node ? { node: input.node } : {}), ...(input.auto_renew ? { auto_renew: true } : {}) },
+      }],
+    }));
   });
 
   mcp.tool('aimeat_package_config_needs', descriptionFor('aimeat_package_config_needs'), {

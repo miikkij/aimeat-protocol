@@ -5,6 +5,7 @@
   and the trust checks that must exist before a node sells somebody else's code. Written from a
   verification of the package, repository, commerce and install code on main at 31603ae7f.
 @version-history
+  v0.4.0 — 2026-10-02 — Phases 1 to 3 built on the API and MCP side (section 9); the status says so.
   v0.3.0 — 2026-10-02 — Questions 1, 4 and 5 answered. Renewal: the buyer starts it first, automatic
     renewal comes before a product with a monthly fee goes on sale. Offers may grant on approval or
     at once, with no money. The checkout line follows the seller-of-record ruling. Session
@@ -16,8 +17,9 @@
 
 # Selling a package: verification and design
 
-Status: **design with every open question answered (section 10).** Of the build, only finding F is
-done (section 6). The verification in section 1 was made against the code on `main` at `31603ae7f`.
+Status: **every open question answered (section 10); phases 1, 2 and 3 built on the API and MCP side,
+phases 4 and 5 not yet (section 9).** No screen is built; screens wait for Jouni's look. The
+verification in section 1 was made against the code on `main` at `31603ae7f`.
 
 ## What a person gets
 
@@ -124,8 +126,12 @@ The listing shows the current terms by reading the offer. The offer never reads 
 One memory record per package group, `offer.<groupId>`, in the system namespace
 `package-entitlements`, beside `entitlements.<groupId>` and `sellers.<author>`. No principal can
 address that namespace, so the record is written only through its own endpoint, by the package's
-author or an operator (the same `mayManage` rule entitlements use). It is readable by anyone through
-`GET /v1/packages/:groupId/offer`, because a price is public information.
+author or an operator (the same `mayManage` rule entitlements use). *Changed while building,
+2026-10-02:* `GET /v1/packages/:groupId/offer` answers only the author and an operator, a seller node
+reads the offer with a signed request, and a buyer reads it through the selling node. A public read
+was planned because a price is public information, but an offer exists only for a private package,
+so a public read tells a stranger that the package exists and who wrote it, which the seller route
+was built to hide. The selling node shows its own price to its buyers.
 
 One record per group, not one per sale, so the key count does not grow with sales.
 
@@ -664,7 +670,15 @@ Each phase is usable on its own and is tested before the next starts.
    renewal the buyer starts and its notice, and the order's seller of record, supplier and amounts.
    Then, in this order: **grants on approval and at once** (the request, its approval, the order at
    0), and **automatic renewal**, which must be done before a product with a monthly fee goes on sale
-   through the platform.
+   through the platform. *Built 2026-10-02, all of it, on the API and MCP side: the offer
+   (services/package-offer.ts, author and operator only, its read hidden from everyone else), the
+   seller's signed read, the catalogue, subscriptions and requests (package-sale-catalogue.ts), the
+   `package` line and the sale carried out after payment (package-sale-checkout.ts), claim codes
+   (package-claims.ts), the renewal notice, and automatic renewal (package-renewals.ts, a daily job).
+   The subject stays open as section 3 says: the licence names `subject: 'node'` and the entitlement
+   keeps its `nodes` map, so an owner subject is a second map later. Not proven: the Stripe handler's
+   kept card and off-session charge, which only the test payment handler has exercised; it needs one
+   run against Stripe's test mode before a monthly product goes on sale. No screen yet.*
 4. **The set composer:** the `aimeat-workspace` declaration, compose that adds a version, compose-set
    with its dry run, and the owner part of the set install.
 5. **A repository open to strangers:** withdrawal (T6), review on a selling node, the scale

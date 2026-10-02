@@ -26,6 +26,8 @@
  *   on the fleet door with this suite green.
  * @usage pnpm test -- cli-tool-param-forwarding
  * @version-history
+ *   2026-10-02 — aimeat_package_sale is probed on its grant branch and aimeat_package_buy on its renew
+ *     branch; the sale's price and decide branches are measured in package-sale-dispatch.test.ts.
  *   2026-09-29 — aimeat_classification: every field of every action reaches its /v1/classification
  *     route under its REST name, on the CLI dispatch and on the connector MCP (TARGET-082 V5).
  *   2026-09-28 — aimeat_mail_read probes with an attachment_id, beside which store, filename, mime_type and key travel.
@@ -128,6 +130,13 @@ const PROBE_SETUP: Record<string, { shaped?: Record<string, unknown>; always?: J
     // action='list' (the enum sentinel) reads the records and takes no set; plan and apply post the
     // set and the secrets, so the probe holds action at plan for the other two.
     aimeat_admin_install_set: { always: { action: 'plan' } },
+    // action='decide' (the enum sentinel) reads only request_id and decision. Held at 'grant', the
+    // branch that carries the repository, the customer node and every field of the grant; the price
+    // and decide branches are measured in test/unit/package-sale-dispatch.test.ts.
+    aimeat_package_sale: { always: { action: 'grant', repository: 'zqxrepositoryzqx', group_id: 'zqxgroup_idzqx', node_id: 'zqxnode_idzqx' } },
+    // action='auto_renew' (the enum sentinel) carries no `node`. 'renew' carries all five fields:
+    // node_id in the offer id, node and auto_renew in the checkout line.
+    aimeat_package_buy: { always: { action: 'renew' } },
     // include_source reads the source of ONE cortex, so it only travels beside `name`.
     aimeat_cortex_list: { always: { name: 'zqxnamezqx' } },
     // store, filename, mime_type and key are about ONE attachment: without attachment_id the call is
@@ -183,6 +192,15 @@ const UNREACHABLE: Record<string, Record<string, string>> = {
             + "sentinel 'decide' so that `decision` and `note` are measurable at all. The list branch sends it "
             + 'as a query parameter, covered end to end by test/e2e-workspace-member-changes.ts.',
         status: 'Same condition: it picks which suggestions action=\'list\' returns.',
+    },
+    aimeat_package_sale: {
+        price: "Conditional, not dropped: it rides only on action='price', and the probe holds `action` at 'grant'. "
+            + 'The price branch is measured in test/unit/package-sale-dispatch.test.ts.',
+        renewal: 'Same condition and the same test.',
+        title: 'Same condition and the same test.',
+        state: 'Same condition and the same test.',
+        request_id: "Conditional, not dropped: it rides only on action='decide'; measured in test/unit/package-sale-dispatch.test.ts.",
+        decision: 'Same condition and the same test.',
     },
     aimeat_knowledge_contribute: {
         package_id: 'This tool is deliberately unreachable from the connector — see knowledgeContributeUnreachable().',

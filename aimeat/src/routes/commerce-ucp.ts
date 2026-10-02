@@ -45,7 +45,7 @@ const LineItemSchema = z.object({
   item: z.union([
     z.object({ id: z.string().min(1).max(500) }),
     z.object({
-      kind: z.enum(['offer', 'app-tool']).optional(),
+      kind: z.enum(['offer', 'app-tool', 'package']).optional(),
       agent: z.string().max(300).optional(),
       offer_id: z.string().min(1).max(100).optional(),
       tool: z.string().min(1).max(100).optional(),
@@ -77,7 +77,12 @@ function parseItemId(id: string): SellableRef {
   if (parts[0] === 'app-tool' && parts.length >= 3) {
     return { kind: 'app-tool', app: parts[1] as string, tool: parts.slice(2).join(':') };
   }
-  throw new CommerceError('INVALID_ITEM', 400, `Unparseable item id: ${id} (use "offer:<agentGaii>:<offerId>" or "app-tool:<owner>/<appId>:<tool>")`);
+  // A group id carries "::", so a package id separates its parts with "|".
+  if (id.startsWith('package:')) {
+    const [repository, groupId, offerId] = id.slice('package:'.length).split('|');
+    if (repository && groupId) return { kind: 'package', agent: repository, app: groupId, offer_id: offerId || 'buy' };
+  }
+  throw new CommerceError('INVALID_ITEM', 400, `Unparseable item id: ${id} (use "offer:<agentGaii>:<offerId>", "app-tool:<owner>/<appId>:<tool>" or "package:<repository>|<group id>|buy")`);
 }
 
 function toRefs(lineItems: z.infer<typeof CreateSchema>['line_items']): SellableRef[] {
@@ -90,7 +95,8 @@ function toRefs(lineItems: z.infer<typeof CreateSchema>['line_items']): Sellable
 
 const itemId = (i: CheckoutSessionRecord['items'][number]) =>
   i.kind === 'app-tool' ? `app-tool:${i.app ?? i.agent}:${i.offerId}`
-    : `offer:${i.agent}:${i.offerId}`;
+    : i.kind === 'package' ? `package:${i.agent}|${i.app ?? ''}|${i.offerId}`
+      : `offer:${i.agent}:${i.offerId}`;
 
 /** Map our session record onto a UCP-shaped checkout_session. */
 function toUcpSession(s: CheckoutSessionRecord) {

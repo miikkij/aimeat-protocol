@@ -15,6 +15,8 @@
  *   updateSessionItems · cancelSession · completeSession
  * @usage import { createSession, completeSession } from '../commerce/session-service.js';
  * @version-history
+ *   v2.7.0 — 2026-10-02 — A line whose buyer turned automatic renewal on asks the handler to keep the
+ *     payment method (`saveForLater`), and the fulfilment sees what was kept (package sale design).
  *   v2.6.0 — 2026-10-02 — An agent pays money only within the daily purchase limit its owner set on
  *     its card (agent-purchase-limit.ts): refused before the collect, counted after the completion.
  *     The caller now carries `sub`, the principal the limit is about.
@@ -475,8 +477,10 @@ export async function completeSession(
   // The single-seller rule guarantees every sellable shares the seller; money handlers charge on
   // the SELLER's own PSP credentials (loaded by the resolver) — never on node-level keys.
   const seller = { ghii: session.sellerGhii, owner: session.sellerOwner, psp: sellables[0]?.psp };
-  const collected = session.total > 0
-    ? await handler.collect(ctx, { buyerGhii: session.buyerGhii, amount: session.total, currency: session.currency, reference: session.id, fee: totalFee, instrument, seller })
+  // A line whose buyer turned automatic renewal on asks the handler to keep the payment method.
+  const saveForLater = session.items.some(i => (i.input as { auto_renew?: unknown } | undefined)?.auto_renew === true);
+  const collected: { trackingCode: string; saved?: import('./types.js').SavedPayment } = session.total > 0
+    ? await handler.collect(ctx, { buyerGhii: session.buyerGhii, amount: session.total, currency: session.currency, reference: session.id, fee: totalFee, instrument, seller, ...(saveForLater ? { saveForLater } : {}) })
     : { trackingCode: `comtx_free_${session.id}` };
 
   // 2) Fulfillment — a failure here refunds the collect and leaves the session open.
@@ -491,7 +495,7 @@ export async function completeSession(
       const item = session.items[i]!;
       const sellable = sellables[i]!;
       if (sellable.fulfill) {
-        const outcome = await sellable.fulfill(ctx, { session, item, callerJwt });
+        const outcome = await sellable.fulfill(ctx, { session, item, callerJwt, payment: { handler: handler.id, ...(collected.saved ? { saved: collected.saved } : {}) } });
         if (outcome.taskId) taskIds.push(outcome.taskId);
         if (outcome.result !== undefined) {
           // The capability may name who shares this sale, the same way it does on a contracted
