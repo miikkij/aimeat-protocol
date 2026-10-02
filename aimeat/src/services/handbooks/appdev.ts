@@ -15,6 +15,7 @@
  *     nothing on the node refuses a stranger without an extension, and aimeat_iam_define for the gate.
  *   2026-09-30 — Classified content in an app: one paragraph pointing at aimeat-labels.js (TARGET-082).
  *   2026-09-30 — The package line says a composed package carries your skills bound to its apps.
+ *   2026-10-02 — aimeat_package_offer: the terms a seller sells your private package on.
  *   2026-09-29 — aimeat_package_sellers: a shop's node sells your packages with no token.
  *   2026-09-28 — aimeat_package_config_needs: the settings a shop asks before the sale.
  *   2026-09-28 — A grant with `node` registers an unknown customer node (install packages, phase 5).
@@ -91,7 +92,10 @@ with \`node\` ({ url, public_key }) registers a node this repository does not kn
 pull only what it is entitled to. \`aimeat_package_config_needs\` lists the settings a package or bundle
 of yours needs the customer to give, so a shop asks them before the sale. \`aimeat_package_sellers\` names
 a shop's own AIMEAT a seller of your packages: it then sells them with requests signed by its own key,
-and nobody copies a token.
+and nobody copies a token. \`aimeat_package_offer\` sets the terms they sell a private package on: paid,
+approved one request at a time, or granted at once; the days of updates included and the renewal; the
+licence, tax and support (a paid offer names a security contact). A new price is new terms, and a buyer
+keeps the terms they accepted.
 
 **App config.** An app that needs values to work declares them as a JSON Schema in
 \`<script type="application/json" id="aimeat-config">\` (string, number, integer and boolean fields, never a

@@ -24727,7 +24727,7 @@ paths:
                     type: object
                     description: Needs offer_id (offers), tool (app-tools), or app+tool (ext-call).
                     properties:
-                      kind: { type: string, enum: [offer, app-tool, ext-call], default: offer }
+                      kind: { type: string, enum: [offer, app-tool, ext-call, package], default: offer, description: 'package: agent is the repository node id, app the package group id, offer_id "buy" or "renew:<node id>", input { node: { node_id, url, public_key }, auto_renew }.' }
                       agent: { type: string, description: Provider agent GAII (or bare name for own agent) }
                       offer_id: { type: string }
                       tool: { type: string, description: 'app-tool: the tool name from apps.{appId}.tools; ext-call: the action id' }
@@ -44854,6 +44854,7 @@ paths:
                 updates_until: { type: string, format: date-time, nullable: true }
                 channel: { type: string, enum: [stable, beta] }
                 note: { type: string }
+                terms_id: { type: string, description: The author's terms the sale was made on; 404 TERMS_NOT_FOUND when the offer has none by that id. }
       responses:
         '200':
           description: '`data` is `{ entitlement, peer_registered, peer_pending }`.'
@@ -44936,6 +44937,7 @@ paths:
                 updates_until: { type: string, format: date-time, nullable: true }
                 channel: { type: string, enum: [stable, beta] }
                 note: { type: string }
+                terms_id: { type: string, description: The author's terms the sale was made on; the grant keeps a copy. }
       responses:
         '200':
           description: The repository's envelope.
@@ -44955,6 +44957,422 @@ paths:
         - { name: repository, in: query, required: true, schema: { type: string } }
         - { name: group_id, in: query, required: true, schema: { type: string } }
         - { name: node_id, in: query, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The repository's envelope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/packages/{groupId}/offer:
+    get:
+      operationId: getPackageOffer
+      summary: The terms a package is sold on
+      description: >-
+        On a package repository, for the package's author or an operator; requires packages:write. The
+        current terms and the state. Anyone else, and a package with no offer, gets 404 NO_OFFER, so the
+        answer does not tell that a private package exists. A seller reads the offer with a signed
+        request (/v1/federation/package-sales/{groupId}/offer); a buyer reads it through the selling node.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: groupId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: '`data` is `{ group_id, author, state, terms, earlier_terms, updated_at }`: `terms` are the current ones, `earlier_terms` the ids of the ones before.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      operationId: setPackageOffer
+      summary: Set the terms a package is sold on
+      description: >-
+        The package's author (or an operator). Terms are appended, never replaced: a buyer keeps the terms
+        they accepted, so a new price reaches only new sales. `grant` is payment (with `price`, EUR or USD
+        in micro-units), approval or automatic; `updates` { included_days, renewal { amount, currency,
+        period_days } or null }; `licence` { spdx, terms_url, text_sha256 }; `tax` { prices_include_tax,
+        category }; `support` { email, security_email }, and a paid offer must name security_email.
+        `state` on_sale, paused (no new sales, renewals go on) or ended. Only a private package has an
+        offer. Requires packages:write.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: groupId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                terms: { type: object, additionalProperties: true }
+                state: { type: string, enum: [on_sale, paused, ended] }
+      responses:
+        '200':
+          description: '`data` is the offer, with `all_terms`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/federation/package-sales/{groupId}/offer:
+    get:
+      operationId: sellerReadPackageOffer
+      summary: A seller node reads a package's terms, signed
+      description: >-
+        The offer of /v1/packages/{groupId}/offer with every terms version (`all_terms`), for a seller
+        node of the package's author, signed as described for the config-needs endpoint.
+      tags: [Federation]
+      parameters:
+        - { name: groupId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: '`data` is the offer, with `all_terms`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/federation/package-sales/{groupId}/claims:
+    put:
+      operationId: sellerCreatePackageClaim
+      summary: A seller node makes a claim code, signed
+      description: >-
+        A sale to a node that does not exist yet. The repository keeps a pending grant under the hash of a
+        one-time code (pkgc_…, valid 30 days) and answers the code once. The node that redeems it gets the
+        grant with this seller as its seller.
+      tags: [Federation]
+      parameters:
+        - { name: groupId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                updates_until: { type: string, format: date-time, nullable: true }
+                channel: { type: string, enum: [stable, beta] }
+                note: { type: string }
+                terms_id: { type: string }
+      responses:
+        '200':
+          description: '`data` is `{ claim_code, expires_at }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/federation/package-claims/{groupId}:
+    post:
+      operationId: redeemPackageClaim
+      summary: A node redeems a claim code, signed with its own key
+      description: >-
+        No token. The request is signed (purpose "package-claim") with the key the body names, which proves
+        the node holds it. The repository registers the node under that key once its public card answers
+        with it, and grants it the package as the claim says. The code works once; 404 CLAIM_NOT_FOUND for
+        an unknown, used or expired code.
+      tags: [Federation]
+      parameters:
+        - { name: groupId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, node_id, url, public_key]
+              properties:
+                code: { type: string }
+                node_id: { type: string }
+                url: { type: string }
+                public_key: { type: string }
+      responses:
+        '200':
+          description: '`data` is `{ entitlement, peer_registered, peer_pending }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/package-sales/author-offer:
+    get:
+      operationId: packageSaleAuthorOffer
+      summary: This node, as a seller, reads the author's terms from a repository
+      description: Signed with this node's key; the repository's answer comes back as it said it. Operator only, as above.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: repository, in: query, required: true, schema: { type: string } }
+        - { name: group_id, in: query, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The repository's envelope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/package-sales/claims:
+    put:
+      operationId: packageSaleClaim
+      summary: This node, as a seller, gets a claim code from a repository
+      description: For a sale to a node that does not exist yet; the buyer redeems the code there. Operator only, as above.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [repository, group_id]
+              properties:
+                repository: {}
+                group_id: { type: string }
+                updates_until: { type: string, format: date-time, nullable: true }
+                channel: { type: string, enum: [stable, beta] }
+                note: { type: string }
+                terms_id: { type: string }
+      responses:
+        '200':
+          description: The repository's envelope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/package-sales/catalogue:
+    get:
+      operationId: packageSaleCatalogue
+      summary: The packages this node sells, at its own prices
+      description: Operator only, as above.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: '`data` is `{ entries: [{ repository, group_id, seller_of_record, price, renewal, title, state }] }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      operationId: packageSaleSetCatalogueEntry
+      summary: Put a package on sale on this node, or change its price
+      description: >-
+        This node's own one-time `price` and `renewal` ({ amount, currency, period_days }), EUR or USD in
+        micro-units; null for an offer that grants without money. The operator is the seller of record
+        unless `seller_of_record` names another account. `state` on_sale, paused (renewals go on) or ended.
+        A price change reaches new sales only. Operator only, as above.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [repository, group_id]
+              properties:
+                repository: { type: string }
+                group_id: { type: string }
+                price: { type: object, nullable: true, properties: { amount: { type: integer }, currency: { type: string } } }
+                renewal: { type: object, nullable: true, properties: { amount: { type: integer }, currency: { type: string }, period_days: { type: integer } } }
+                title: { type: string }
+                state: { type: string, enum: [on_sale, paused, ended] }
+                seller_of_record: { type: string }
+      responses:
+        '200':
+          description: '`data` is `{ entry }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/package-sales/requests:
+    get:
+      operationId: packageSaleRequests
+      summary: Sales that wait for this node's approval
+      description: An offer granted on approval files each sale here. Operator only, as above.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: '`data` is `{ requests }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/package-sales/requests/{id}/decision:
+    post:
+      operationId: packageSaleDecideRequest
+      summary: Approve or refuse a sale request
+      description: >-
+        approve carries out the sale (a grant, or a claim code when the buyer named no node); refuse ends
+        it. The buyer is told either way. 409 ALREADY_DECIDED for a request decided before. Operator only, as above.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [approve, refuse] }
+      responses:
+        '200':
+          description: '`data` is `{ request }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/package-sales/offer:
+    get:
+      operationId: packageSaleBuyerOffer
+      summary: What a buyer would get, and at what price
+      description: >-
+        On the selling node, for a signed-in buyer: this node's price and renewal, the days of updates
+        included, the licence, tax, support, the author and the seller of record. This node reads the
+        author's terms from the repository; the buyer needs no account there. Buy with
+        POST /v1/commerce/checkout-sessions and a line of kind "package". Requires commerce:buy.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: repository, in: query, required: true, schema: { type: string } }
+        - { name: group_id, in: query, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The offer as the buyer sees it.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/package-sales/subscriptions:
+    get:
+      operationId: packageSaleSubscriptions
+      summary: The update services a buyer holds here, and the requests they made
+      description: The saved card is never returned, only which payment handler holds it. Requires commerce:buy.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: '`data` is `{ subscriptions, requests }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/package-sales/subscriptions/auto-renew:
+    put:
+      operationId: packageSaleSetAutoRenew
+      summary: Turn automatic renewal on or off
+      description: >-
+        For one package on one node. On needs a card saved at purchase (409 NO_SAVED_PAYMENT otherwise).
+        Automatic renewal charges the card three days before the update service ends. Requires commerce:buy.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [repository, group_id, node_id, auto_renew]
+              properties:
+                repository: { type: string }
+                group_id: { type: string }
+                node_id: { type: string }
+                auto_renew: { type: boolean }
+      responses:
+        '200':
+          description: '`data` is `{ auto_renew, updates_until }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/package-claims:
+    post:
+      operationId: claimPackageHere
+      summary: This node redeems a claim code on a repository
+      description: >-
+        On the node that is to receive the package. The node signs the request with its own key; the
+        repository registers it and grants it the package. This node then takes packages from that
+        repository even with package exchange switched off. Pull the package and install it next.
+        Operator only: the operator in person, or an agent of the operator holding operator:admin.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [repository, group_id, code]
+              properties:
+                repository: {}
+                group_id: { type: string }
+                code: { type: string }
       responses:
         '200':
           description: The repository's envelope.

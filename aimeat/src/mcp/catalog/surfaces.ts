@@ -26,6 +26,8 @@
  *   2026-09-30 — aimeat_workspace_comment_delete beside the other comment tools.
  *   2026-09-30 — aimeat_admin_node_update on the admin surface.
  *   2026-09-29 — aimeat_refinery_classes, _run and _status on `agent`, beside the mail tools.
+ *   2026-10-02 — aimeat_package_offer on `appdev` and `agent`, aimeat_package_buy on `agent`,
+ *     aimeat_package_claim on the operator surface (package sale design, phase 3).
  *   2026-09-29 — aimeat_package_sellers on `appdev` and `agent`; aimeat_package_sale on the operator surface.
  *   2026-09-28 — aimeat_package_config_needs on `appdev` and `agent`, beside the entitlements.
  *   2026-09-28 — aimeat_admin_install_set on the operator surface.
@@ -163,7 +165,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_package_status_set', 'aimeat_package_install', 'aimeat_package_update',
         'aimeat_package_instances', 'aimeat_package_fork', 'aimeat_package_instance_set',
         'aimeat_package_check_updates', 'aimeat_package_repository', 'aimeat_package_entitlements',
-        'aimeat_package_config_needs', 'aimeat_package_sellers',
+        'aimeat_package_config_needs', 'aimeat_package_sellers', 'aimeat_package_offer',
         'aimeat_package_pull', 'aimeat_package_install_requests',
         'aimeat_app_draft_write', 'aimeat_app_draft_replace', 'aimeat_app_draft_read', 'aimeat_app_draft_seed',
         'aimeat_seo_status',
@@ -237,10 +239,12 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_package_status_set', 'aimeat_package_install', 'aimeat_package_update',
         'aimeat_package_instances', 'aimeat_package_fork', 'aimeat_package_instance_set',
         'aimeat_package_check_updates', 'aimeat_package_repository', 'aimeat_package_entitlements',
-        'aimeat_package_config_needs', 'aimeat_package_sellers',
+        'aimeat_package_config_needs', 'aimeat_package_sellers', 'aimeat_package_offer',
         'aimeat_package_pull',
         // An install that lacked the words becomes a request; the person's own agent answers it here.
         'aimeat_package_install_requests',
+        // Buying a package this node sells, for the person: the offer, the checkout, the renewals.
+        'aimeat_package_buy',
         // The person's own welcome page, beside the company one: same act, different owner.
         'aimeat_portfolio_publish',
         'aimeat_contact_list', 'aimeat_contact_add', 'aimeat_contact_remove', 'aimeat_contact_resolve_email', 'aimeat_contact_invite',
@@ -364,8 +368,9 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_admin_federation', 'aimeat_admin_federation_relay_claim_set', 'aimeat_admin_federation_peer_remove',
         // Setting this node up from an install set: owner, packages, organisms, users, crew agents.
         'aimeat_admin_install_set',
-        // Selling a repository's packages from this node, signed by its own key.
-        'aimeat_package_sale',
+        // Selling a repository's packages from this node, signed by its own key, and redeeming a
+        // package claim code for this node with that key.
+        'aimeat_package_sale', 'aimeat_package_claim',
         // Arranging this node's front page and the page its members land on.
         'aimeat_surface_layout_get', 'aimeat_surface_layout_set',
         // ...and the parts those pages are drawn from, and the themes they wear.

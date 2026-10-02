@@ -48,6 +48,8 @@
  *     (services/package-upstream-refresh.ts).
  *   v1.12.0 — 2026-09-28 — The install set named by AIMEAT_INSTALL_SET is applied after the peers load
  *     (services/install-set-startup.ts).
+ *   v1.13.0 — 2026-10-02 — The `package-renewals` core handler, after the peers load
+ *     (services/package-renewals.ts).
  *   v1.13.0 — 2026-09-29 — The `refinery` schedule kind's executor is registered on the scheduler
  *     (services/refinery/scheduled-job.ts), which the scheduler cannot import without a cycle.
  *   v1.13.1 — 2026-09-29 — The daily package check also runs with package federation off when an
@@ -383,6 +385,14 @@ export async function initializeServices(
     const outcomes = await refreshInstalledPackages({ storage, config, peers }, {}, { notify: true });
     const moved = outcomes.filter(o => o.pulled || o.result === 'updated' || o.result === 'notified').length;
     if (moved > 0) logger.info(`Package update check: ${moved} of ${outcomes.length} installs moved or were told`);
+  });
+
+  // Automatic renewals of the package update services this node sold: they reach the repository by
+  // the signed seller request, so the handler needs the peers too (services/package-renewals.ts).
+  scheduler.registerCoreHandler('package-renewals', async () => {
+    const { runAutoRenewals } = await import('../services/package-renewals.js');
+    const outcomes = await runAutoRenewals({ storage, config, peers });
+    if (outcomes.length > 0) logger.info(`Package renewals: ${outcomes.filter(o => o.result === 'renewed').length} renewed, ${outcomes.filter(o => o.result === 'failed').length} failed`);
   });
 
   // The install set a new customer node applies at start-up (AIMEAT_INSTALL_SET). It needs the peers

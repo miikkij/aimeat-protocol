@@ -91,6 +91,8 @@ export function registerPackageEntitlementRoutes(
         if (!who) { res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'The listing is for peer nodes: sign the request as your node.')); return; }
         if (!who.ok) { res.status(who.status).json(error(config.nodeId, who.code, who.message)); return; }
         const includePublic = peers.get(who.nodeId)?.shareCatalogue !== false;
-        res.json(success(config.nodeId, { node: config.nodeId, packages: await repositoryListing(storage, who.nodeId, { includePublic }) }));
+        // A seller's address, from this node's peer table, tells the customer node where to renew.
+        const urlOf = (nodeId: string): string | undefined => peers.get(nodeId)?.url;
+        res.json(success(config.nodeId, { node: config.nodeId, packages: await repositoryListing(storage, who.nodeId, { includePublic, urlOf }) }));
     });
 }

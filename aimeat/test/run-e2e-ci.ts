@@ -9,6 +9,7 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.72.0 -- 2026-10-02 -- e2e-package-sale.ts joins the list (package sale design, phase 3).
  *   v1.71.0 -- 2026-10-02 -- e2e-package-consent.ts joins the list (package sale design, phase 2).
  *   v1.70.0 -- 2026-10-02 -- e2e-package-guards.ts joins the list (package sale design, phase 1).
  *   v1.69.0 -- 2026-09-30 -- e2e-classification.ts joins GUARD_SUITES (139 → 140), measured alone on
@@ -863,6 +864,9 @@ const ALL_SUITES = [
     // An install set applied to a customer node: a bundle from a repository, the owner, the members
     // (an account now or an email invitation), the organism, the config, and the crew agent.
     'test/e2e-install-sets.ts',
+    // A package sold through a selling node's own checkout: the author's offer, the seller's price, a
+    // claim code, a grant with the terms, renewal by hand and automatic, a refund, approval requests.
+    'test/e2e-package-sale.ts',
     // A peer a package path registers: only on the node's own card, packages-only, no sign-in and no
     // messages through it, a sale that waits for a node that is down, and the operator's release.
     'test/e2e-peer-registration-proof.ts',

@@ -33,6 +33,10 @@
       "count": 1,
       "why": "linkRepository, behind the operator check (requireOperatorPrincipal with operator:admin, or the operator's own start-up file): the repository the set names is written only after its own card answers with the same node id and key (2026-10-01)."
     },
+    "src/services/package-sale-client.ts": {
+      "count": 1,
+      "why": "claimPackageHere, behind requireOperatorPrincipal with operator:admin on POST /v1/package-claims and resolveOperatorAgentName on MCP: after the repository accepted this node's signed claim, the repository's existing peer record is saved with shareCatalogue true, so pulls reach it. Only that flag changes; the url and key are the ones linkPackagePeer pinned after the repository's own card answered with them (2026-10-02)."
+    },
     "src/services/package-peer-register.ts": {
       "count": 1,
       "why": "registerPackagePeer, from linkPackagePeer and adoptPendingPeer only: a package author, an operator or a seller node of the author asked, and the node's own card answered with the same id and key. Written packages-only (contact tier, messaging off). The card does not prove the id is the asker's (docs/pitfalls.md section 103); the readers below keep such a peer to packages."

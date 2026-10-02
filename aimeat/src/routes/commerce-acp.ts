@@ -72,7 +72,10 @@ function handlerFor(paymentData?: { provider?: string; handler?: string }): stri
   return undefined; // default handler (morsels)
 }
 
-function parseSku(id: string): { kind: 'offer'; agent: string; offer_id: string } | { kind: 'app-tool'; app: string; tool: string } {
+function parseSku(id: string):
+  | { kind: 'offer'; agent: string; offer_id: string }
+  | { kind: 'app-tool'; app: string; tool: string }
+  | { kind: 'package'; agent: string; app: string; offer_id: string } {
   const parts = id.split(':');
   if (parts[0] === 'offer' && parts.length >= 3) {
     return { kind: 'offer', agent: parts[1] as string, offer_id: parts.slice(2).join(':') };
@@ -80,7 +83,12 @@ function parseSku(id: string): { kind: 'offer'; agent: string; offer_id: string 
   if (parts[0] === 'app-tool' && parts.length >= 3) {
     return { kind: 'app-tool', app: parts[1] as string, tool: parts.slice(2).join(':') };
   }
-  throw new CommerceError('INVALID_ITEM', 400, `Unparseable sku: ${id} (use "offer:<agentGaii>:<offerId>" or "app-tool:<owner>/<appId>:<tool>")`);
+  // A group id carries "::", so a package sku separates its parts with "|".
+  if (id.startsWith('package:')) {
+    const [repository, groupId, offerId] = id.slice('package:'.length).split('|');
+    if (repository && groupId) return { kind: 'package', agent: repository, app: groupId, offer_id: offerId || 'buy' };
+  }
+  throw new CommerceError('INVALID_ITEM', 400, `Unparseable sku: ${id} (use "offer:<agentGaii>:<offerId>", "app-tool:<owner>/<appId>:<tool>" or "package:<repository>|<group id>|buy")`);
 }
 
 /** ACP status vocabulary over our lifecycle. */
@@ -101,7 +109,8 @@ function toAcpSession(s: CheckoutSessionRecord) {
     status: ACP_STATUS[s.status] ?? s.status,
     currency: s.currency,
     line_items: s.items.map((i) => ({
-      id: i.kind === 'app-tool' ? `app-tool:${i.app ?? i.agent}:${i.offerId}` : `offer:${i.agent}:${i.offerId}`,
+      id: i.kind === 'app-tool' ? `app-tool:${i.app ?? i.agent}:${i.offerId}`
+        : i.kind === 'package' ? `package:${i.agent}|${i.app ?? ''}|${i.offerId}` : `offer:${i.agent}:${i.offerId}`,
       title: i.title, quantity: i.quantity,
       unit_price: i.unitPrice, total: i.unitPrice * i.quantity,
     })),

@@ -57,7 +57,7 @@ import { sealPspRecord, pspSecretHint } from '../commerce/psp-secrets.js';
 import { getEncryptionKey } from '../services/encryption.js';
 
 const ItemsSchema = z.array(z.object({
-  kind: z.enum(['offer', 'app-tool', 'ext-call']).optional(),
+  kind: z.enum(['offer', 'app-tool', 'ext-call', 'package']).optional(),
   agent: z.string().min(1).max(300).optional(),
   offer_id: z.string().min(1).max(100).optional(),
   /** app-tool: the tool name (alias for offer_id) — from the app's apps.{appId}.tools manifest. */

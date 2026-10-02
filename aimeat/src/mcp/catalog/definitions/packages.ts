@@ -12,6 +12,7 @@
  * @structure packagesTools[] -- catalog entries, folded into definitions.ts
  * @usage import { packagesTools } from './packages.js';
  * @version-history
+ *   v1.12.0 -- 2026-10-02 -- aimeat_package_offer and aimeat_package_buy (package sale design, phase 3).
  *   v1.11.0 -- 2026-10-02 -- aimeat_package_install names packages:install-code, and the dry run's
  *     `capabilities` and `source` (package sale design, phase 2).
  *   v1.10.0 -- 2026-09-30 -- aimeat_package_compose: `include_skills`, the composer's own skills bound to the apps.
@@ -285,6 +286,32 @@ export const packagesTools: AimeatToolDefinition[] = [
         input: {
             request_id: { type: 'string', description: 'One request. Omit to list them all.' },
             decision: { type: 'string', enum: ['approve', 'decline'], description: 'Decide the request named by request_id.' },
+        },
+    },
+    {
+        name: 'aimeat_package_offer',
+        description: 'On a package repository, for a package\'s author: the terms seller nodes sell it on. action "get" reads the offer; "set" appends new terms, changes the state, or both. Terms: `grant` "payment" (with `price` { amount, currency }, EUR or USD in micro-units, 1 EUR = 1000000), "approval" (the seller approves each request, no money) or "automatic" (granted at once, no money); `updates` { included_days, renewal: { amount, currency, period_days } or null }; `channel` stable or beta; `licence` { spdx, terms_url, text_sha256 }; `tax` { prices_include_tax, category }; `support` { email, security_email }, and a paid offer must name security_email. A price change is new terms: a buyer keeps the terms they accepted, so a new price reaches only new sales, and a new package version changes no price. `state` on_sale, paused (no new sales, renewals go on) or ended. Only a private package has an offer. Name your sellers with aimeat_package_sellers. The same as GET and PUT /v1/packages/:groupId/offer.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            group_id: { type: 'string', required: true, description: 'The package group id on this repository.' },
+            action: { type: 'string', required: true, enum: ['get', 'set'], description: 'get: the offer as it stands; set: new terms, a new state, or both.' },
+            terms: { type: 'object', description: 'For set: { grant, price, updates: { included_days, renewal }, channel, licence, tax, support }. Appended; buyers keep the terms they accepted.' },
+            state: { type: 'string', enum: ['on_sale', 'paused', 'ended'], description: 'For set: on_sale, paused (renewals only) or ended.' },
+        },
+    },
+    {
+        name: 'aimeat_package_buy',
+        description: 'Buy a package this node sells, for your owner. This node reads the author\'s terms from the package repository for you; you never need an account there. action "offer": what you would get and at what price (this node\'s price, the renewal price and period, how many days of updates come with it, the licence, how tax is to be read, the support and security contacts, the author and the seller of record). Tell your owner before buying. action "checkout": open the checkout; give `node` ({ node_id, url, public_key } from the receiving AIMEAT\'s /.well-known/aimeat) to have it granted at once, or leave it out to get a claim code the receiving node redeems with aimeat_package_claim; `auto_renew` true keeps the card for automatic renewals. action "renew": open the checkout of the next update period for `node_id`, at the renewal price your owner accepted. Then pay with aimeat_checkout_complete; the sale is carried out when it is paid, and a failure there refunds it. An offer granted on approval waits for the seller instead. action "subscriptions": what your owner holds here, and the requests they made. action "auto_renew": turn automatic renewal on or off for `node_id`. The same as GET /v1/package-sales/offer, POST /v1/commerce/checkout-sessions with a package line, and GET and PUT /v1/package-sales/subscriptions.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            action: { type: 'string', required: true, enum: ['offer', 'checkout', 'renew', 'subscriptions', 'auto_renew'], description: 'offer: what you would buy and at what price; checkout: open the checkout; renew: open the checkout of the next update period; subscriptions: what you hold and the requests you made; auto_renew: turn automatic renewal on or off.' },
+            repository: { type: 'string', description: 'The package repository\'s node id.' },
+            group_id: { type: 'string', description: 'The package group id on the repository.' },
+            node: { type: 'object', description: 'For checkout: { node_id, url, public_key } of the AIMEAT that is to receive the package. Leave out to get a claim code instead.' },
+            node_id: { type: 'string', description: 'For renew and auto_renew: the node the package was bought for.' },
+            auto_renew: { type: 'boolean', description: 'For checkout: keep the card for automatic renewals. For auto_renew: on or off.' },
         },
     },
 ];

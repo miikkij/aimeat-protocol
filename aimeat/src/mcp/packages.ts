@@ -29,6 +29,8 @@
  *     bound to the apps travel, default true); aimeat_package_install answers `warnings`, naming a
  *     skill left out because the owner has one of that name of their own.
  *   v1.9.0 — 2026-09-29 — aimeat_package_check_updates runs with federation off when an install set named a repository.
+ *   v1.9.0 — 2026-10-02 — aimeat_package_offer (the author's terms) and aimeat_package_buy (a purchase on
+ *     the selling node: offer, checkout, renew, subscriptions, auto_renew). Package sale design, phase 3.
  *   v1.8.0 — 2026-09-29 — aimeat_package_sellers: the nodes that sell your packages with no token.
  *   v1.7.0 — 2026-09-28 — aimeat_package_config_needs: the questions a shop asks before payment.
  *   v1.6.0 — 2026-09-28 — aimeat_package_entitlements takes `node` and registers an unknown node as a
@@ -78,6 +80,10 @@ import type { PeerInfo } from '../services/federation.js';
 import { getActiveScheduler } from '../services/scheduler.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
 import { localAccountName } from '../utils/gaii.js';
+import { readOffer, setOffer, publicOffer } from '../services/package-offer.js';
+import { buyerOfferView } from '../services/package-sale-checkout.js';
+import { subscriptionsOf, readRequests, setAutoRenew } from '../services/package-sale-catalogue.js';
+import { createSession } from '../commerce/session-service.js';
 
 /** A package row as a conversation needs it: what it is, not every byte it holds. */
 function packageSummary(pkg: { packageGroupId: string; name: string; author: string; version: string; status: string; visibility: string; description: string; category: string; tags: string[]; components: { id: string; type: string; label: string }[] }) {
@@ -95,6 +101,79 @@ function packageSummary(pkg: { packageGroupId: string; name: string; author: str
     };
 }
 
+/**
+ * The package sale tools (package sale design, phase 3): the author's offer on a repository, and a
+ * buyer's purchase on the node that sells. The same services GET/PUT /v1/packages/:groupId/offer,
+ * GET /v1/package-sales/offer, POST /v1/commerce/checkout-sessions and /v1/package-sales/subscriptions call.
+ */
+function registerPackageSaleTools(
+    mcp: McpServer, storage: Storage, config: AimeatConfig, getAgentGaii: () => string, ownerOf: () => string,
+    peers: Map<string, PeerInfo>,
+): void {
+    const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v, null, 2) }] });
+
+    mcp.tool('aimeat_package_offer', descriptionFor('aimeat_package_offer'), {
+        group_id: z.string().describe('The package group id on this repository.'),
+        action: z.enum(['get', 'set']).describe('get: the offer as it stands; set: new terms, a new state, or both.'),
+        terms: z.record(z.string(), z.unknown()).optional().describe('For set: { grant, price, updates: { included_days, renewal }, channel, licence, tax, support }. Appended; buyers keep the terms they accepted.'),
+        state: z.enum(['on_sale', 'paused', 'ended']).optional().describe('For set: on_sale, paused (renewals only) or ended.'),
+    }, annotationsFor('aimeat_package_offer'), async ({ group_id, action, terms, state }) => {
+        if (action === 'get') {
+            // The author's own read, as on GET /v1/packages/:groupId/offer: anyone else learns nothing.
+            const offer = await readOffer(storage, group_id);
+            return offer && offer.author === ownerOf() ? text({ ...publicOffer(offer), all_terms: offer.terms }) : { ...toolError('NO_OFFER', 'This package has no offer. Ask its author to set the terms it is sold on.') };
+        }
+        const out = await setOffer(storage, { owner: ownerOf(), isOperator: false }, group_id, { terms, state });
+        if (!out.ok) return { ...toolError(out.code, out.message) };
+        return text({ ...publicOffer(out.offer), all_terms: out.offer.terms });
+    });
+
+    mcp.tool('aimeat_package_buy', descriptionFor('aimeat_package_buy'), {
+        action: z.enum(['offer', 'checkout', 'renew', 'subscriptions', 'auto_renew']).describe('offer: what you would buy and at what price; checkout: open the checkout; renew: open the checkout of the next update period; subscriptions: what you hold and the requests you made; auto_renew: turn automatic renewal on or off.'),
+        repository: z.string().optional().describe('The package repository\'s node id.'),
+        group_id: z.string().optional().describe('The package group id on the repository.'),
+        node: z.object({ node_id: z.string(), url: z.string(), public_key: z.string() }).optional().describe('For checkout: the AIMEAT that is to receive the package (its /.well-known/aimeat). Leave out to get a claim code instead.'),
+        node_id: z.string().optional().describe('For renew and auto_renew: the node the package was bought for.'),
+        auto_renew: z.boolean().optional().describe('For checkout: keep the card for automatic renewals. For auto_renew: on or off.'),
+    }, annotationsFor('aimeat_package_buy'), async (input) => {
+        const deps = { storage, config, peers };
+        const owner = ownerOf();
+        const repository = input.repository ?? '';
+        const groupId = input.group_id ?? '';
+        if (input.action === 'subscriptions') {
+            const subs = await subscriptionsOf(storage, owner);
+            return text({ subscriptions: subs.map(s => ({ ...s, payment: s.payment ? { handler: s.payment.handler } : undefined })), requests: (await readRequests(storage)).filter(r => r.buyer === owner) });
+        }
+        if (input.action === 'auto_renew') {
+            const out = await setAutoRenew(storage, owner, { repository, group_id: groupId, node_id: input.node_id, auto_renew: input.auto_renew });
+            return out.ok ? text(out) : { ...toolError(out.code, out.message) };
+        }
+        const view = await buyerOfferView(deps, repository, groupId);
+        if (!view.ok) return { ...toolError(view.code, view.message) };
+        if (input.action === 'offer') return text(view.view);
+        const buy = view.view.buy as { currency: string };
+        try {
+            const session = await createSession(storage, config, {
+                buyerOwner: owner, buyerIdentity: getAgentGaii(), currency: buy.currency,
+                items: [{
+                    kind: 'package', agent: repository, app: groupId,
+                    offer_id: input.action === 'renew' ? `renew:${input.node_id ?? ''}` : 'buy',
+                    input: { ...(input.node ? { node: input.node } : {}), ...(input.auto_renew ? { auto_renew: true } : {}) },
+                }],
+            });
+            return text({
+                session_id: session.id, total: session.total, currency: session.currency, expires_at: session.expiresAt,
+                next_step: session.total > 0
+                    ? `Complete the payment with aimeat_checkout_complete (session_id ${session.id}); the sale is carried out when it is paid.`
+                    : `Nothing to pay: complete it with aimeat_checkout_complete (session_id ${session.id}).`,
+            });
+        } catch (err) {
+            const e = err as { code?: string; message?: string };
+            return { ...toolError(e.code ?? 'CHECKOUT_FAILED', e.message ?? String(err)) };
+        }
+    });
+}
+
 export function registerPackageTools(
     mcp: McpServer,
     storage: Storage,
@@ -108,6 +187,7 @@ export function registerPackageTools(
         const gaii = getAgentGaii();
         return localAccountName(gaii);
     };
+    registerPackageSaleTools(mcp, storage, config, getAgentGaii, ownerOf, peers);
     /** What this session answers for when a component writes into the owner's memory. */
     const grant = { roles: ['agent'], scopes: sessionScopes };
 

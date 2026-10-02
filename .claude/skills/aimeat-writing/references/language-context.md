@@ -154,6 +154,9 @@ everywhere at once, and say so in the Changes section.
 | an install the customer cannot edit | code and look come from the package and its updates; the settings are the owner's | managed install | hallittu asennus | instalación gestionada |
 | the customer's own copy of a managed install | free to change, and gets no more updates | fork | fork (oma kopio) | copia propia |
 | who gets a new version first | stable: published versions; beta: beta versions too | release channel | julkaisukanava | canal de publicación |
+| the code a buyer gets when the receiving AIMEAT does not exist yet | works once and for 30 days; the receiving AIMEAT redeems it and is then served the package | claim code | lunastuskoodi | código de canje |
+| renewing the update service with the card kept at purchase | the selling AIMEAT charges the card a few days before the update service ends; the buyer can switch it off | automatic renewal | automaattinen uusiminen | renovación automática |
+| who sells to the buyer in law | the operator of the AIMEAT the buyer bought on; the package's author is that operator's supplier | seller of record | myyjä (seller of record) | vendedor (seller of record) |
 | a link in an email that signs a person in | works once and needs no password; asked for on the sign-in dialog (15 minutes), or sent with the welcome mail when an install set creates the account (7 days) | sign-in link | kirjautumislinkki | enlace de acceso |
 | where an app runs on a shared server with no app addresses | a frame on the server's own address whose origin is opaque: the app reads nobody's sign-in and gets only its own permissions | isolated frame | eristetty kehys | marco aislado |
 | sorting content by how sensitive it is (the act) | a person, a rule or an AI gives a piece of content its classification; the verb is classify | classification; verb classify | luokittelu; verbi luokitella | clasificación; verbo clasificar |
@@ -406,3 +409,7 @@ service, the directory, the token, the identifier and the username: the test nam
 - **2026-10-01** — seller and seller node (the Federation page's "how this peer arrived" line). *Myyjä* is
   the word of the package-sale design and the developer's marketplace brief; Spanish *vendedor*. The
   line says *lisättiin, kun ... myi sille paketin* and *asennussetti lisäsi*, from the rows above.
+- **2026-10-02** — claim code, automatic renewal and seller of record (package sale design, phase 3). The
+  notifications renew the *update service* (*päivityspalvelu*, *servicio de actualizaciones*), the word the
+  package_updates_ended notice already used, and the verb is *uusia* / *renovar*. *Código de canje* is the
+  usual Latin American word for a code redeemed once.

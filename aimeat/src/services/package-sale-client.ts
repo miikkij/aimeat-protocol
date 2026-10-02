@@ -14,8 +14,12 @@
  *   { node_id, url, public_key } and this node links it as a packages-only peer under that key, the
  *   same registration a repository makes for its customer nodes (package-peer-register.ts): only
  *   when the repository's own card answers with that id and key, and with how it arrived recorded.
- * @structure SaleRepositoryRef · saleRequest() · saleConfigNeeds() · saleGrant() · saleRevoke()
+ * @structure SaleRepositoryRef · saleRequest() · saleConfigNeeds() · saleGrant() · saleRevoke() ·
+ *   saleOffer() · saleClaim() · redeemClaimAt()
  * @version-history
+ *   v1.2.0 — 2026-10-02 — saleOffer (the author's terms), saleClaim (a code for a node not known yet),
+ *     redeemClaimAt (a node claims with its own key); a grant may carry `terms_id` (package sale
+ *     design, phase 3).
  *   v1.1.0 — 2026-10-01 — A repository linked from the request is registered only after its card answers
  *     with the same id and key (linkPackagePeer), and its origin is recorded (the peer-registration
  *     incident, finding F). A repository that does not answer is REPOSITORY_UNREACHABLE, as the sale
@@ -25,10 +29,11 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from './federation.js';
-import { signedSaleHeaders } from './package-sale-auth.js';
+import { signedSaleHeaders, CLAIM_PURPOSE } from './package-sale-auth.js';
 import { linkPackagePeer } from './package-peer-register.js';
 import { safeFetch, stripTrailingSlashes } from '../utils/url-validator.js';
 import { readBodyCapped } from '../utils/read-capped.js';
+import { rememberClaimedRepository } from './install-set-trust.js';
 
 export type SaleRepositoryRef = string | { node_id?: unknown; url?: unknown; public_key?: unknown };
 
@@ -63,12 +68,12 @@ async function repositoryUrl(deps: SaleDeps, ref: unknown): Promise<Refusal | { 
  */
 export async function saleRequest(
     deps: { storage: Storage; config: AimeatConfig; peers: Map<string, PeerInfo> },
-    input: { repository: unknown; method: 'GET' | 'PUT' | 'DELETE'; path: string; body?: Record<string, unknown> },
+    input: { repository: unknown; method: 'GET' | 'PUT' | 'POST' | 'DELETE'; path: string; body?: Record<string, unknown>; purpose?: string },
 ): Promise<Refusal | { ok: true; status: number; body: unknown; repository: string }> {
     const repo = await repositoryUrl(deps, input.repository);
     if (!repo.ok) return repo;
-    const body = input.method === 'PUT' ? (input.body ?? {}) : undefined;
-    const headers = await signedSaleHeaders(deps.storage, deps.config, input.method, input.path, body);
+    const body = input.method === 'PUT' || input.method === 'POST' ? (input.body ?? {}) : undefined;
+    const headers = await signedSaleHeaders(deps.storage, deps.config, input.method, input.path, body, input.purpose);
     if (!headers['x-signature']) return { ok: false, status: 503, code: 'NODE_KEY_MISSING', message: 'This node has no key yet, so it cannot sign a sale.' };
     let res: Response;
     try {
@@ -106,8 +111,58 @@ export async function saleGrant(
 ): Promise<SaleAnswer> {
     if (!groupId || !nodeId) return missing('group_id and node_id are');
     const body: Record<string, unknown> = {};
-    for (const k of ['node', 'updates_until', 'channel', 'note']) if (fields[k] !== undefined) body[k] = fields[k];
+    for (const k of ['node', 'updates_until', 'channel', 'note', 'terms_id']) if (fields[k] !== undefined) body[k] = fields[k];
     return saleRequest(deps, { repository, method: 'PUT', path: salePath(groupId, `entitlements/${encodeURIComponent(nodeId)}`), body });
+}
+
+/** The author's offer for `groupId`, read by this node as a seller (package-offer.ts). */
+export async function saleOffer(deps: SaleDeps, repository: unknown, groupId: string): Promise<SaleAnswer> {
+    if (!groupId) return missing('group_id is');
+    return saleRequest(deps, { repository, method: 'GET', path: salePath(groupId, 'offer') });
+}
+
+/** A one-time claim code for a sale whose customer node is not known yet (package-claims.ts). */
+export async function saleClaim(deps: SaleDeps, repository: unknown, groupId: string, fields: Record<string, unknown>): Promise<SaleAnswer> {
+    if (!groupId) return missing('group_id is');
+    const body: Record<string, unknown> = {};
+    for (const k of ['updates_until', 'channel', 'note', 'terms_id']) if (fields[k] !== undefined) body[k] = fields[k];
+    return saleRequest(deps, { repository, method: 'PUT', path: salePath(groupId, 'claims'), body });
+}
+
+/**
+ * Redeem a claim code for this node and take packages from that repository from now on: the act of
+ * POST /v1/package-claims and aimeat_package_claim. Redeeming is the operator's decision to take
+ * packages from the repository, as an install set's is, so the repository joins the trusted ones
+ * (install-set-trust.ts) and this node's peer record of it shares the catalogue, which pulls and the
+ * listing ask of it (install-set-apply.ts links its repository the same way).
+ */
+export async function claimPackageHere(deps: SaleDeps, repository: unknown, groupId: string, code: string): Promise<SaleAnswer> {
+    const out = await redeemClaimAt(deps, repository, groupId, code);
+    if (out.ok && out.status < 300) {
+        await rememberClaimedRepository(deps.storage, out.repository);
+        const peer = deps.peers.get(out.repository);
+        if (peer && peer.shareCatalogue === false) {
+            const shared = { ...peer, shareCatalogue: true };
+            deps.peers.set(out.repository, shared);
+            await deps.storage.saveFederationPeer(shared);
+        }
+    }
+    return out;
+}
+
+/**
+ * This node redeems a claim code at the repository, signed with its own key, which the body names:
+ * the repository registers the node under that key once its card answers with it. The repository is
+ * named as a peer, or linked the first time with { node_id, url, public_key }.
+ */
+export async function redeemClaimAt(deps: SaleDeps, repository: unknown, groupId: string, code: string): Promise<SaleAnswer> {
+    if (!groupId || !code) return missing('group_id and code are');
+    const key = await deps.storage.getNodeKey();
+    if (!key?.publicKey) return { ok: false, status: 503, code: 'NODE_KEY_MISSING', message: 'This node has no key yet, so it cannot claim a package.' };
+    const body = { code, node_id: deps.config.nodeId, url: stripTrailingSlashes(deps.config.baseUrl), public_key: key.publicKey };
+    return saleRequest(deps, {
+        repository, method: 'POST', path: `/v1/federation/package-claims/${encodeURIComponent(groupId)}`, body, purpose: CLAIM_PURPOSE,
+    });
 }
 
 /** Revoke `nodeId`'s grant. */

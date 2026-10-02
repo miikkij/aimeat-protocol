@@ -11,6 +11,8 @@
  *   `config.testMoneyHandler` (env AIMEAT_TEST_MONEY_HANDLER='true'); NEVER in production, where
  *   the Stripe handler (`com.stripe.spt`) is the real money rail.
  * @version-history
+ *   v1.2.0 — 2026-10-02 — saveForLater and chargeSaved: a saved method named after the instrument, and
+ *     the instrument "decline" fails a later charge (automatic renewal in E2E).
  *   v1.1.0 — 2026-08-06 — Hold rail double (TINKI phase 1): stateful authorize/capture/release
  *   v1.0.0 — 2026-07-17 — Initial (Phase 3 — E2E money rail double)
  */
@@ -29,8 +31,14 @@ export function testMoneyPaymentHandler(): PaymentHandler {
     id: TEST_MONEY_HANDLER_ID,
     title: 'Test money (E2E only — no real PSP)',
     currencies: ['EUR', 'USD'],
-    async collect(_ctx, { reference }) {
-      return { trackingCode: `testmoney_${randomUUID()}:${reference}` };
+    async collect(_ctx, { reference, instrument, saveForLater }) {
+      // A saved method is named after the instrument, so a test can save one that will be declined.
+      const saved = saveForLater ? { customer: `testcus_${randomUUID()}`, payment_method: typeof instrument === 'string' && instrument ? instrument : 'testpm' } : undefined;
+      return { trackingCode: `testmoney_${randomUUID()}:${reference}`, ...(saved ? { saved } : {}) };
+    },
+    async chargeSaved(_ctx, { reference, saved }) {
+      if (saved.payment_method === 'decline') throw new PaymentError('CARD_DECLINED', 402, 'The saved card was declined (test).');
+      return { trackingCode: `testmoney_saved_${randomUUID()}:${reference}` };
     },
     async payout() { /* simulate paying the seller's connected account — off-ledger */ },
     async refund() { /* simulate reversing the charge — off-ledger */ },

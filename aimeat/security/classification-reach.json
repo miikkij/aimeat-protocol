@@ -1483,9 +1483,10 @@
     },
     "src/services/install-set-trust.ts": {
       "reads": {
-        "listMemory": 1
+        "listMemory": 1,
+        "getMemory": 2
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Applied install-set records, read for repository node ids."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Applied install-set records, read for repository node ids. 2026-10-02 (package sale design, phase 3): the claimed-repositories record in the same install-sets system namespace, a list of repository node ids the operator redeemed a claim at."
     },
     "src/services/invitations.ts": {
       "reads": {
@@ -1750,6 +1751,37 @@
         "getMemory": 2
       },
       "why": "Reviewed 2026-10-02 (package sale design, phase 2), the node's own read: the approval record of an install, in the system namespace package-approvals that no principal addresses, read to answer GET /v1/instances/:id and to tell whether an update adds to what was approved. It holds capability names, not the owner's content."
+    },
+    "src/services/package-offer.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-02 (package sale design, phase 3), the node's own read: a package's offer (prices, update period, licence reference, support contacts) in the package-entitlements system namespace that no principal addresses, written by the package's author to be read by seller nodes and buyers. Commercial terms, not anybody's content."
+    },
+    "src/services/package-claims.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-02 (package sale design, phase 3), the node's own read: pending claim codes of one package, keyed by the hash of the code, in the package-entitlements system namespace that no principal addresses. Grant terms, not anybody's content."
+    },
+    "src/services/package-sale-catalogue.ts": {
+      "reads": {
+        "getMemory": 1,
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-10-02 (package sale design, phase 3), the node's own read: this node's catalogue, its sale requests and its buyers' subscriptions, in the package-sales system namespace that no principal addresses. Prices, dates and payment-handler references; a buyer's subscription is shown only to that buyer and the saved card reference never leaves the node."
+    },
+    "src/services/package-sale-checkout.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-02 (package sale design, phase 3), the node's own read: the catalogue entry of the package being sold, in the package-sales system namespace that no principal addresses."
+    },
+    "src/services/package-renewals.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-02 (package sale design, phase 3), the node's own read: the subscriptions due for automatic renewal and their catalogue entries, in the package-sales system namespace that no principal addresses. The saved payment reference goes only to the payment handler that issued it."
     },
     "src/services/package-upstream-refresh.ts": {
       "reads": {

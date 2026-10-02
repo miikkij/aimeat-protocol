@@ -9,6 +9,8 @@
  * @structure adminCliTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { adminCliTools } from './tool-call-defs-admin.js';
  * @version-history
+ *   v1.10.0 -- 2026-10-02 -- aimeat_package_sale gains offer, claim, catalogue, price, requests and decide;
+ *     aimeat_package_claim (POST /v1/package-claims). Package sale design, phase 3.
  *   v1.9.0 -- 2026-10-01 -- aimeat_admin_federation_peer_remove (DELETE /v1/federation/peers/:nodeId).
  *   v1.8.0 -- 2026-09-30 -- aimeat_admin_node_update (GET /v1/admin/node-update, refresh forwarded).
  *   v1.7.0 -- 2026-09-29 -- aimeat_package_sale (GET, PUT, DELETE /v1/package-sales/...), every field forwarded.
@@ -148,19 +150,48 @@ export const adminCliTools: ConnectCliToolDefinition[] = [
     {
         // THE THIRD SURFACE forwards every field: `action` picks the route, and `repository_link` folds
         // into `repository` as { node_id, url, public_key }, the shape the grant route reads.
+        // The node's own records (catalogue, requests, decide) need no repository; price writes the
+        // catalogue entry; claim is the grant's PUT without a node.
         name: 'aimeat_package_sale',
         handler: ({ client }, input) => {
             const action = requiredString(input, 'action');
+            if (action === 'catalogue') return client.get('/v1/package-sales/catalogue');
+            if (action === 'requests') return client.get('/v1/package-sales/requests');
+            if (action === 'decide') {
+                return client.post(`/v1/package-sales/requests/${encodeURIComponent(requiredString(input, 'request_id'))}/decision`,
+                    { decision: requiredString(input, 'decision') });
+            }
             const repository = requiredString(input, 'repository');
             const groupId = requiredString(input, 'group_id');
+            if (action === 'price') {
+                const body: Record<string, unknown> = { repository, group_id: groupId };
+                for (const k of ['price', 'renewal', 'title', 'state']) if (input[k] !== undefined) body[k] = input[k];
+                return client.put('/v1/package-sales/catalogue', body);
+            }
             const q = (extra: Record<string, string>) => new URLSearchParams({ repository, group_id: groupId, ...extra }).toString();
             if (action === 'needs') return client.get(`/v1/package-sales/config-needs?${q({})}`);
+            if (action === 'offer') return client.get(`/v1/package-sales/author-offer?${q({})}`);
+            const link = input.repository_link as Record<string, unknown> | undefined;
+            const body: Record<string, unknown> = { repository: link ? { node_id: repository, ...link } : repository, group_id: groupId };
+            for (const k of ['updates_until', 'channel', 'note', 'terms_id']) if (input[k] !== undefined) body[k] = input[k];
+            if (action === 'claim') return client.put('/v1/package-sales/claims', body);
             const nodeId = requiredString(input, 'node_id');
             if (action === 'revoke') return client.delete(`/v1/package-sales/entitlements?${q({ node_id: nodeId })}`);
-            const link = input.repository_link as Record<string, unknown> | undefined;
-            const body: Record<string, unknown> = { repository: link ? { node_id: repository, ...link } : repository, group_id: groupId, node_id: nodeId };
-            for (const k of ['node', 'updates_until', 'channel', 'note']) if (input[k] !== undefined) body[k] = input[k];
+            body.node_id = nodeId;
+            if (input.node !== undefined) body.node = input.node;
             return client.put('/v1/package-sales/entitlements', body);
+        },
+    },
+    {
+        // The buying node's operator redeems a claim code; repository_link folds into repository.
+        name: 'aimeat_package_claim',
+        handler: ({ client }, input) => {
+            const repository = requiredString(input, 'repository');
+            const link = input.repository_link as Record<string, unknown> | undefined;
+            return client.post('/v1/package-claims', {
+                repository: link ? { node_id: repository, ...link } : repository,
+                group_id: requiredString(input, 'group_id'), code: requiredString(input, 'code'),
+            });
         },
     },
 ];

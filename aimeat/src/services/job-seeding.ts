@@ -11,6 +11,8 @@
  *   - seedCoreScheduledJobs(config, storage): builds the job list and createScheduledJob() for missing ones
  *
  * @version-history
+ *   v1.8.0 — 2026-10-02 — Seed core:package-renewals (daily, 05:13): automatic renewals of the package
+ *     update services this node sold (package-renewals.ts).
  *   v1.7.0 — 2026-09-30 — Seed core:classification-audit-prune (nightly, 03:35) on every node; the
  *     prune had run inside core:consent-audit-prune, which exists only with consent on.
  *   v1.6.0 — 2026-09-29 — Seed core:classification-queue (hourly, :25): the Content Classifier's queue
@@ -56,6 +58,9 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
     // Installed packages brought up to what their source node serves now (package-upstream-refresh.ts).
     // Daily at 04:41; the handler does nothing while package federation is off.
     { id: 'core:package-upstream-check', name: 'Package Update Check', coreHandler: 'package-upstream-check', cron: '41 4 * * *' },
+    // Automatic renewals of the package update services this node sold (package-renewals.ts). Daily at
+    // 05:13; three days before a date, once per period; nothing to do on a node that sells nothing.
+    { id: 'core:package-renewals', name: 'Package Automatic Renewals', coreHandler: 'package-renewals', cron: '13 5 * * *' },
     // Mark still-pending email invitations expired once their TTL passes (lazy checks also enforce this).
     { id: 'core:invitation-expiry', name: 'Invitation Expiry', coreHandler: 'invitation-expiry', cron: '*/10 * * * *' },
     // Operator storage-growth telemetry: capture a per-table row-count snapshot every hour.

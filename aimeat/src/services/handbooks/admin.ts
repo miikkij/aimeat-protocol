@@ -16,6 +16,7 @@
  *     policy at level node, the audit log, and the Content Classifier's daily caps.
  *   v1.10.1 -- 2026-09-29 -- The federation paragraph says the relay-claim default is required from
  *     3.20.0.
+ *   v1.11.0 -- 2026-10-02 -- aimeat_package_sale offer, price, catalogue, requests, decide and claim; aimeat_package_claim.
  *   v1.10.0 -- 2026-09-29 -- aimeat_package_sale: sell a repository's packages with no token.
  *   v1.9.0 -- 2026-09-28 -- aimeat_admin_install_set: plan first, ask for the missing values, apply.
  *   v1.8.0 -- 2026-09-25 -- The federation paragraph names relay_claims.not_ready and
@@ -129,7 +130,11 @@ deploys it and creates nothing twice.
 packages from this node with no token: this node signs each request with its own key, once the
 package's author has named this node a seller there. \`needs\` gives the questions to ask the customer
 before payment, \`grant\` serves a customer node (with \`node\` for a new one, \`updates_until\` when the
-monthly updates end), \`revoke\` stops it.
+monthly updates end), \`revoke\` stops it. \`offer\` reads the author's terms; \`price\` puts the package on
+sale here at this node's own price and renewal (this node's operator is the seller of record), and
+a person's own AI then buys it for them through this node's checkout; \`catalogue\` lists what this node sells; \`requests\` and
+\`decide\` handle an offer granted on approval; \`claim\` gives a one-time code for a node that does not
+exist yet. On the node that is to receive a package, \`aimeat_package_claim\` redeems such a code.
 
 **Moderation.** \`aimeat_admin_knowledge\` (EVERY knowledge package on the node, not just the
 catalogued ones — the public knowledge catalogue is a subset. Lead with

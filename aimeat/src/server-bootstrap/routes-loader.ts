@@ -9,6 +9,7 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   v1.22.0 — 2026-10-02 — The `package` sellable kind (services/package-sale-checkout.ts).
  *   v1.21.1 — 2026-09-30 — robotsHeader() moved to server.ts, ahead of the static files.
  *   v1.21.0 — 2026-09-29 — Mounts refineryRouter (/v1/refinery/classes, /v1/refinery/runs). The
  *     connections, refinery and mcp-servers mounts moved to routes-loader-outbound.ts in their order (a pure move, max-file-lines).
@@ -75,6 +76,7 @@ import { invoicePaymentHandler } from '../commerce/invoice-handler.js';
 import { getWebBotAuthState, signOutboundRequest, resetWebBotAuth } from '../services/web-bot-auth.js';
 import { setOutboundRequestSigner } from '../utils/url-validator.js';
 import { registerSellableResolver, resetSellableResolvers, offerSellableResolver, appToolSellableResolver, extCallSellableResolver } from '../commerce/sellable-resolvers.js';
+import { packageSellableResolver } from '../services/package-sale-checkout.js';
 import { commerceRouter } from '../routes/commerce.js';
 import { commerceUcpRouter } from '../routes/commerce-ucp.js';
 import { commerceAcpRouter } from '../routes/commerce-acp.js';
@@ -421,6 +423,7 @@ export async function mountRoutes(
   registerSellableResolver(offerSellableResolver());
   registerSellableResolver(appToolSellableResolver());
   registerSellableResolver(extCallSellableResolver());   // priced raw-call money channel (rm-commercial-raw-calls)
+  registerSellableResolver(packageSellableResolver(peers));   // a package this node sells, priced from its catalogue
   // TEST ONLY: a fake EUR/USD rail so the money chain is E2E-provable without a real PSP. Off in prod.
   if (config.testMoneyHandler) {
     const { testMoneyPaymentHandler } = await import('../commerce/test-money-handler.js');

@@ -27,6 +27,7 @@
  *   2026-09-30 — aimeat_admin_node_update: read only, open world (it reads npm).
  *   2026-09-29 — aimeat_refinery_classes and _status (read only), aimeat_refinery_run (writes rows,
  *     reads an outside mailbox, spends the model allowance).
+ *   2026-10-02 — aimeat_package_offer, aimeat_package_buy and aimeat_package_claim (a purchase and a claim reach other nodes).
  *   2026-09-29 — aimeat_package_sellers and aimeat_package_sale (a revoke is destructive; the sale reaches the repository).
  *   2026-09-28 — aimeat_package_config_needs (read only).
  *   2026-09-28 — aimeat_admin_install_set (idempotent, reaches the package repository).
@@ -418,6 +419,9 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_package_sellers: { title: 'Package Sellers', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     // Reaches the package repository, and a revoke stops a customer's updates.
     aimeat_package_sale: { title: 'Sell a Package', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+    aimeat_package_offer: { title: 'Package Offer', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    aimeat_package_buy: { title: 'Buy a Package', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    aimeat_package_claim: { title: 'Claim a Package', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     // Destructive: the updates it gives up do not come back to this copy. Not idempotent: a second
     // call is refused because the copy is no longer managed.
     aimeat_package_fork: { title: 'Fork Managed Package Install', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },

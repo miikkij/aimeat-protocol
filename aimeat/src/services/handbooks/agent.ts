@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/mcp/catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.22.0 -- 2026-10-02 -- Buying a package for the owner: aimeat_package_buy (package sale design, phase 3).
  *   v1.21.1 -- 2026-09-30 -- The classification action list names explorer.
  *   v1.21.0 -- 2026-09-30 -- An AI sees everything by default; what an AI's send-out leaves behind; the owner's exception with a reason (exception_list, exception_set refused).
  *   v1.20.0 -- 2026-09-30 -- human_said: a stricter classification applies at once; a lowering or a change to a person's waits for the owner (PERSON_APPROVES).
@@ -136,6 +137,12 @@ knowledge package over ad-hoc memory keys when the output is reusable.
 
 **Capabilities (use, don't publish).** \`aimeat_capabilities_list\` · \`aimeat_capabilities_get\`
 (read the input schema first) · \`aimeat_capabilities_invoke\`.
+
+**Buying a package for your owner (scope commerce:buy).** \`aimeat_package_buy\` with action \`offer\`
+shows what this node sells it for, the renewal, the days of updates, the licence and who sells; tell
+your owner before you buy. \`checkout\` opens the checkout (give \`node\` to have their AIMEAT granted at
+once, or get a claim code), then \`aimeat_checkout_complete\` pays. \`renew\`, \`subscriptions\` and
+\`auto_renew\` keep the update service going. Your owner needs no account on the package repository.
 
 **Organisms — collaborate.** \`aimeat_organism_list\` · \`_get\` · \`_members\` · \`_join\` · \`_leave\`.
 

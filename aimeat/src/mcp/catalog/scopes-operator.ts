@@ -7,6 +7,7 @@
  *   where they stood, so the table reads the same.
  * @structure OPERATOR_TOOL_SCOPES
  * @version-history
+ *   v1.3.0 — 2026-10-02 — aimeat_package_claim: operator:admin (package sale design, phase 3).
  *   v1.2.0 — 2026-10-01 — aimeat_admin_federation_peer_remove: operator:admin.
  *   v1.1.0 — 2026-09-30 — aimeat_admin_node_update: operator:admin.
  *   v1.0.0 — 2026-09-29 — Moved from scopes.ts, unchanged.
@@ -53,6 +54,7 @@ export const OPERATOR_TOOL_SCOPES: Record<string, string> = {
     aimeat_admin_federation_peer_remove:      'operator:admin',
     aimeat_admin_install_set:                 'operator:admin',
     aimeat_package_sale:                      'operator:admin',
+    aimeat_package_claim:                     'operator:admin',
     // What this node's own MCP registry offers every owner, to whom, and at what price.
     aimeat_mcp_registry_list:                 'operator:admin',
     aimeat_mcp_registry_set:                  'operator:admin',

@@ -16,8 +16,10 @@
  *   WHERE IT IS READ. The apply's own pulls say so explicitly (package-pull.ts `installSet`); a later
  *   pull from the same repository, the daily update check among them, is allowed when an applied
  *   install set on this node names that repository (the records in the system namespace below).
- * @structure NS_INSTALL_SETS · installSetRepositories()
+ * @structure NS_INSTALL_SETS · installSetRepositories() · rememberClaimedRepository()
  * @version-history
+ *   v1.1.0 — 2026-10-02 — A repository the operator redeemed a package claim at is trusted the same way
+ *     (package sale design, phase 3).
  *   v1.0.0 — 2026-09-29 — Initial (install packages: the named repository needs no federation switch).
  */
 import type { Storage } from '../storage/interface.js';
@@ -25,7 +27,10 @@ import type { Storage } from '../storage/interface.js';
 /** The system namespace of the applied install set records (install-set-apply.ts). */
 export const NS_INSTALL_SETS = 'install-sets';
 
-/** The repositories the applied install sets on this node name. */
+/** The record of the repositories this node's operator redeemed a package claim at. */
+const CLAIMED_KEY = 'claimed-repositories';
+
+/** The repositories the applied install sets on this node name, and those its operator claimed a package at. */
 export async function installSetRepositories(storage: Storage): Promise<Set<string>> {
     const rows = await storage.listMemory(NS_INSTALL_SETS, { prefix: 'install-sets.' });
     const out = new Set<string>();
@@ -33,5 +38,24 @@ export async function installSetRepositories(storage: Storage): Promise<Set<stri
         const node = (row.value as { bundle?: { node_id?: unknown } } | undefined)?.bundle?.node_id;
         if (typeof node === 'string' && node) out.add(node);
     }
+    const claimed = (await storage.getMemory(NS_INSTALL_SETS, CLAIMED_KEY))?.value as { nodes?: unknown } | undefined;
+    for (const n of Array.isArray(claimed?.nodes) ? claimed!.nodes as unknown[] : []) if (typeof n === 'string' && n) out.add(n);
     return out;
+}
+
+/**
+ * Trust a repository the operator redeemed a claim at (package-claims.ts), as an applied install set
+ * does: redeeming a code for this node is the same deliberate decision to take packages from it.
+ */
+export async function rememberClaimedRepository(storage: Storage, nodeId: string): Promise<void> {
+    const prev = await storage.getMemory(NS_INSTALL_SETS, CLAIMED_KEY);
+    const nodes = new Set(((prev?.value as { nodes?: string[] } | undefined)?.nodes) ?? []);
+    if (nodes.has(nodeId)) return;
+    nodes.add(nodeId);
+    const now = new Date().toISOString();
+    await storage.setMemory({
+        key: CLAIMED_KEY, ownerGaii: NS_INSTALL_SETS, value: { nodes: [...nodes] },
+        visibility: 'private', tags: ['claimed-repositories'], ttlHours: null,
+        version: prev ? prev.version + 1 : 1, createdAt: prev?.createdAt ?? now, updatedAt: now,
+    });
 }

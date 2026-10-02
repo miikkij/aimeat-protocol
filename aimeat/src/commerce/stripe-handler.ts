@@ -20,6 +20,9 @@
  * @structure STRIPE_HANDLER_ID · stripePaymentHandler · stripeApi (module-local)
  * @usage registerPaymentHandler(stripePaymentHandler(config));
  * @version-history
+ *   v1.3.0 — 2026-10-02 — collect with saveForLater keeps the card at Stripe on the seller's account (a
+ *     customer and setup_future_usage off_session) and returns its ids; chargeSaved charges it for an
+ *     automatic renewal, off_session. Not yet run against Stripe itself: the E2E uses the test handler.
  *   v1.2.1 — 2026-10-01 — The missing-credentials message names only the Wallet tab: the MCP tool is screen-only now.
  *   v1.2.0 — 2026-09-16 — Takes the node config and opens the sealed Stripe key (commerce/psp-secrets.ts).
  *   v1.1.0 — 2026-08-06 — Hold rail (TINKI phase 1): authorize = manual-capture PaymentIntent
@@ -102,7 +105,7 @@ export function stripePaymentHandler(config: EncryptionConfig): PaymentHandler {
     title: 'Card payment on the seller\'s own Stripe account',
     currencies: [...MONEY_CURRENCIES],
 
-    async collect(_ctx, { amount, currency, reference, instrument, seller }) {
+    async collect(_ctx, { amount, currency, reference, instrument, seller, saveForLater }) {
       if (typeof instrument !== 'string' || !instrument) {
         throw new PaymentError(
           'PAYMENT_INSTRUMENT_REQUIRED', 402,
@@ -114,7 +117,14 @@ export function stripePaymentHandler(config: EncryptionConfig): PaymentHandler {
       if (stripeAmount < 1) {
         throw new PaymentError('AMOUNT_TOO_SMALL', 422, 'Card charge below one minor unit — aggregate sub-cent calls before settling');
       }
-      const intent = await stripeApi(sellerKey(config, seller), 'POST', 'payment_intents', {
+      const key = sellerKey(config, seller);
+      // Automatic renewal: the card is kept at Stripe for charges without the buyer present, on the
+      // seller's own account. Stripe needs a customer to attach it to, and setup_future_usage tells the
+      // bank at this first charge, with the buyer present, that later ones will come.
+      const customer = saveForLater
+        ? String((await stripeApi(key, 'POST', 'customers', { description: `AIMEAT buyer, checkout ${reference}` })).id)
+        : null;
+      const intent = await stripeApi(key, 'POST', 'payment_intents', {
         amount: String(stripeAmount),
         currency: currency.toLowerCase(),
         payment_method: instrument,
@@ -124,6 +134,31 @@ export function stripePaymentHandler(config: EncryptionConfig): PaymentHandler {
         'automatic_payment_methods[enabled]': 'true',
         'automatic_payment_methods[allow_redirects]': 'never',
         description: `AIMEAT checkout ${reference}`,
+        ...(customer ? { customer, setup_future_usage: 'off_session' } : {}),
+      });
+      if (intent.status !== 'succeeded') {
+        throw new PaymentError('PAYMENT_NOT_CAPTURED', 402, `Stripe payment intent status: ${String(intent.status)}`);
+      }
+      return { trackingCode: String(intent.id), ...(customer ? { saved: { customer, payment_method: instrument } } : {}) };
+    },
+
+    // An automatic renewal: the card saved at the first payment, charged with the buyer not present.
+    // A card that needs the buyer to confirm (requires_action) is a failure here: the owner is told and
+    // renews by hand, which is the rule for any failed renewal.
+    async chargeSaved(_ctx, { amount, currency, reference, saved, seller }) {
+      if (!saved.customer || !saved.payment_method) {
+        throw new PaymentError('NO_SAVED_PAYMENT', 402, 'No card was kept for this renewal.');
+      }
+      const stripeAmount = microsToStripeMinor(amount);
+      if (stripeAmount < 1) throw new PaymentError('AMOUNT_TOO_SMALL', 422, 'Card charge below one minor unit');
+      const intent = await stripeApi(sellerKey(config, seller), 'POST', 'payment_intents', {
+        amount: String(stripeAmount),
+        currency: currency.toLowerCase(),
+        customer: saved.customer,
+        payment_method: saved.payment_method,
+        off_session: 'true',
+        confirm: 'true',
+        description: `AIMEAT renewal ${reference}`,
       });
       if (intent.status !== 'succeeded') {
         throw new PaymentError('PAYMENT_NOT_CAPTURED', 402, `Stripe payment intent status: ${String(intent.status)}`);
