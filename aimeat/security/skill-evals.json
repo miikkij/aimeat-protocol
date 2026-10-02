@@ -2,10 +2,10 @@
   "about": "For each skill with an eval suite under .claude/evals/<skill>/: the digest of the skill and its suite at the last decision, and whether the eval ran (with scores) or was skipped (with the reason and who decided). pnpm check:skill-evals fails when the digest changes. The eval costs money, so the developer decides: run it, or record a skip. Reasoning: aimeat/scripts/check-skill-evals.ts.",
   "skills": {
     "aimeat-writing": {
-      "digest": "sha256:30e50cf4f5bb68276055c4cd",
+      "digest": "sha256:74666fc3fe1473d20bb89b6a",
       "decision": "skipped",
       "on": "2026-10-02",
-      "note": "five rows added to the language-context term table (temperature, top P, longest answer, thinking, explanation); they add terms and change no writing rule; Jouni decided: 'Skip: I recommend this. The new rows only add terms.', 2026-10-02"
+      "note": "the never-translated line now says morsel stays English and Spanish only, Finnish says murunen (it contradicted the table row); a correction of a contradiction, no new rule; Jouni decided 'skip test.', 2026-10-03"
     },
     "aimeat-ai-capabilities": {
       "digest": "sha256:485bf557e6f87ddc278c013e",

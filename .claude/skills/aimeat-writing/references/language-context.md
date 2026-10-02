@@ -176,7 +176,7 @@ everywhere at once, and say so in the Changes section.
 
 ## Never translated, in any language
 
-`AIMEAT` · `morsel` / `morsels` · `MCP` · `GHII` / `GAII` / `GEAI` · `cortex` · `EXCHANGE` ·
+`AIMEAT` · `morsel` / `morsels` (English and Spanish; Finnish says *murunen*, the write pacer row above, Jouni 2026-10-02) · `MCP` · `GHII` / `GAII` / `GEAI` · `cortex` · `EXCHANGE` ·
 `TURBO` · product names · and machine tokens a person reads as the machine's own vocabulary
 (`done`, `failed`, `AUTH`, `DELIVR`, `FRESH`).
 
@@ -281,6 +281,11 @@ service, the directory, the token, the identifier and the username: the test nam
 
 ## Changes
 
+- **2026-10-02** — morsel in Finnish is *murunen*, everywhere. The table row said so and the
+  never-translated list said the opposite; the Finnish pages said *murunen* about 110 times and
+  *morseli* in 29 strings (prices, wallet, boards, the app catalogue's pricing). Jouni ruled for
+  *murunen*; the 29 strings were rewritten, and the never-translated line now covers English and
+  Spanish only. Also: the burn rate is *polttoosuus* (the value is a 0–1 fraction, not a percent).
 - **2026-10-01** — viewer, contributor, creator and address book (IAM round 2 leftovers). The role
   words are what the organisms page and the kit's workspaceTeam already ship: *lukija*,
   *kirjoittaja*, *luoja*; *lector*, *colaborador*, *quien lo creó*. The data wallet page
