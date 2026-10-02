@@ -52,7 +52,7 @@ const NUDGE = 10;
  * @typedef {{ id: string, x: number, y: number, w?: number, h?: number, title?: string,
  *   kind?: string, live?: boolean, tone?: string, rev?: string|number, borrowed?: boolean,
  *   [k: string]: any }} BoardFrame
- * @typedef {{ id: string, title?: string, members: string[], borrowed?: string[] }} BoardRing
+ * @typedef {{ id: string, title?: string, members: string[], borrowed?: string[], anchor?: string }} BoardRing
  */
 
 /** A frame's rectangle in world units, the drawn height when the frame does not name one. */
@@ -101,6 +101,7 @@ function renderSample(f, body) {
  *   actions?: Array<{ id: string, glyph?: string, label?: string, when?: (f: BoardFrame) => boolean, pressed?: (f: BoardFrame) => boolean }>,
  *   render?: (frame: BoardFrame, body: HTMLElement, api: { el: HTMLElement }) => void,
  *   onMove?: (frame: BoardFrame, rect: { x: number, y: number, w: number, h: number }) => void,
+ *   tow?: (frame: BoardFrame) => string[],
  *   onSelect?: (frame: BoardFrame|null) => void,
  *   onAction?: (id: string, frame: BoardFrame) => void,
  *   onActivate?: (frame: BoardFrame) => void,
@@ -225,6 +226,15 @@ export function board(spec) {
     const f = entry.frame;
     const start = rectOf(entry);
     let moved = false;
+    // The rings this frame already sits in: only ENTERING new ground is offered at the end, so a
+    // nudge inside a circle the frame was declined for never asks again.
+    const wasIn = ringsUnder(entry);
+    // The frames that travel with this one (a request panel tows its members), with where they
+    // started, so a drag moves them all by the same hand.
+    const towed = (!onGrip && spec.tow ? (spec.tow(f) || []) : [])
+      .map(function (id) { return shown.get(String(id)); })
+      .filter(function (e) { return e && e !== entry; })
+      .map(function (e) { return { entry: e, x0: e.frame.x || 0, y0: e.frame.y || 0 }; });
     if (onGrip) {
       return {
         onMove: function (dx, dy) {
@@ -243,26 +253,43 @@ export function board(spec) {
         f.x = Math.round(start.x + dx);
         f.y = Math.round(start.y + dy);
         place(entry);
+        towed.forEach(function (tw) {
+          tw.entry.frame.x = Math.round(tw.x0 + dx);
+          tw.entry.frame.y = Math.round(tw.y0 + dy);
+          place(tw.entry);
+        });
         drawRings();
       },
       onEnd: function () {
         if (!moved) return;
-        dropCheck(entry);
-        if (spec.onMove) spec.onMove(f, rectOf(entry));
+        dropCheck(entry, wasIn);
+        if (spec.onMove) {
+          spec.onMove(f, rectOf(entry));
+          towed.forEach(function (tw) { spec.onMove(tw.entry.frame, rectOf(tw.entry)); });
+        }
       },
     };
   }
 
-  /** A frame dropped inside a ring it does not belong to is offered to that ring. */
-  function dropCheck(entry) {
-    if (!spec.onDrop) return;
+  /** The ids of the rings whose circle holds this frame's centre. */
+  function ringsUnder(entry) {
     const r = rectOf(entry), cx = r.x + r.w / 2, cy = r.y + r.h / 2;
-    for (const ring of rings) {
-      if ((ring.members || []).indexOf(entry.frame.id) >= 0 || (ring.borrowed || []).indexOf(entry.frame.id) >= 0) continue;
+    return rings.filter(function (ring) {
       const g = ringGeom(ring);
-      if (!g) continue;
-      const d = Math.hypot(cx - g.cx, cy - g.cy);
-      if (d <= g.r) { spec.onDrop(entry.frame, ring); return; }
+      return !!g && Math.hypot(cx - g.cx, cy - g.cy) <= g.r;
+    }).map(function (ring) { return ring.id; });
+  }
+
+  /** A frame dropped inside a ring it was not in and does not belong to is offered to that ring. */
+  function dropCheck(entry, wasIn) {
+    if (!spec.onDrop) return;
+    const id = entry.frame.id;
+    const now = ringsUnder(entry);
+    for (const ring of rings) {
+      if (now.indexOf(ring.id) < 0 || (wasIn || []).indexOf(ring.id) >= 0) continue;
+      if ((ring.members || []).indexOf(id) >= 0 || (ring.borrowed || []).indexOf(id) >= 0) continue;
+      spec.onDrop(entry.frame, ring);
+      return;
     }
   }
 
@@ -393,22 +420,36 @@ export function board(spec) {
     root.appendChild(emptyCard);
   }
 
-  /** The circle that holds a ring's members, from their rectangles. */
+  /**
+   * The circle that holds a ring's members, from their rectangles. With an `anchor` frame the
+   * circle is centred on it (a request panel's ring reaches out from the panel), and only the
+   * members stretch it: a borrowed frame may sit on the far side of the board, and reaching it
+   * would claim ground this ring does not hold.
+   */
   function ringGeom(ring) {
-    const members = (ring.members || []).concat(ring.borrowed || [])
+    const anchor = ring.anchor != null ? shown.get(String(ring.anchor)) : null;
+    const members = (ring.members || [])
       .map(function (id) { return shown.get(String(id)); }).filter(Boolean);
-    if (!members.length) return null;
-    let cx = 0, cy = 0;
-    const rects = members.map(rectOf);
-    rects.forEach(function (r) { cx += r.x + r.w / 2; cy += r.y + r.h / 2; });
-    cx /= rects.length; cy /= rects.length;
-    let rad = 0;
-    rects.forEach(function (r) {
+    const all = anchor ? [anchor].concat(members.filter(function (m) { return m !== anchor; })) : members;
+    if (!all.length) return null;
+    let cx = 0, cy = 0, rad = 0;
+    if (anchor) {
+      const a = rectOf(anchor);
+      cx = a.x + a.w / 2; cy = a.y + a.h / 2;
+      rad = Math.max(a.w, a.h) / 2 + RING_PAD;
+    } else {
+      const rects = all.map(rectOf);
+      rects.forEach(function (r) { cx += r.x + r.w / 2; cy += r.y + r.h / 2; });
+      cx /= rects.length; cy /= rects.length;
+    }
+    all.forEach(function (e) {
+      if (e === anchor) return;
+      const r = rectOf(e);
       [[r.x, r.y], [r.x + r.w, r.y], [r.x, r.y + r.h], [r.x + r.w, r.y + r.h]].forEach(function (p) {
-        rad = Math.max(rad, Math.hypot(p[0] - cx, p[1] - cy));
+        rad = Math.max(rad, Math.hypot(p[0] - cx, p[1] - cy) + (anchor ? 28 : RING_PAD));
       });
     });
-    return { cx: cx, cy: cy, r: rad + RING_PAD };
+    return { cx: cx, cy: cy, r: rad };
   }
 
   function drawRings() {

@@ -285,7 +285,7 @@ export const PARTS = {
     file: "hero.js",
   },
   "requestPanel": {
-    parts: ["root","line","caret","input","send","scan","plan","intent","meta","step","mark","gate","row","approve","cancel","loop","console"],
+    parts: ["root","line","caret","input","send","scan","plan","intent","meta","step","mark","gate","row","approve","cancel","extra","loop","console"],
     slots: ["plan(plan)","step(step)"],
     variants: ["compact"],
     tokens: ["--ak-request-console-h"],

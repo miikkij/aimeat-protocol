@@ -10,7 +10,7 @@
  *
  *   THE SAMPLE STATE. `sample: true` shows a plan with one step done, one running and one
  *   waiting, three console lines and the scanner on, and changes nothing.
- * @parts requestPanel root · line · caret · input · send · scan · plan · intent · meta · step · mark · gate · row · approve · cancel · loop · console
+ * @parts requestPanel root · line · caret · input · send · scan · plan · intent · meta · step · mark · gate · row · approve · cancel · extra · loop · console
  * @slots requestPanel plan(plan) · step(step)
  * @variants requestPanel compact
  * @tokens requestPanel --ak-request-console-h
@@ -101,6 +101,10 @@ export function requestPanel(spec) {
   root.appendChild(scan);
   const planHost = el('div', { class: 'ak-request__plan', 'data-ak-part': 'plan' });
   root.appendChild(planHost);
+  // The app's own question, when the plan alone cannot ask it: a clarification with options, a
+  // split into jobs, a worker's question. One host, filled through set({ extra }).
+  const extraHost = el('div', { class: 'ak-request__extra', 'data-ak-part': 'extra', hidden: true });
+  root.appendChild(extraHost);
   const log = konsole({ target: root, cap: spec.cap, data: { lines: sample ? sampleLines() : (spec.lines || []) }, empty: { title: tb('request.empty'), hint: '' } });
   log.el.setAttribute('data-ak-part', 'console');
   root.style.setProperty('--ak-request-console-h', 'var(--ak-request-console-h, 160px)');
@@ -174,10 +178,15 @@ export function requestPanel(spec) {
 
   return {
     el: root,
-    /** @param {{ plan?: RequestPlan|null, lines?: any[], busy?: boolean, value?: string, loop?: boolean }} patch */
+    /** @param {{ plan?: RequestPlan|null, extra?: Node|null, lines?: any[], busy?: boolean, value?: string, loop?: boolean }} patch */
     set: function (patch) {
       if (destroyed || !patch) return;
       if ('plan' in patch) { plan = patch.plan || null; renderPlan(); }
+      if ('extra' in patch) {
+        clear(extraHost);
+        if (patch.extra instanceof Node) extraHost.appendChild(patch.extra);
+        extraHost.hidden = !extraHost.firstChild;
+      }
       if (patch.lines) log.set({ data: { lines: patch.lines } });
       if ('busy' in patch) setBusy(!!patch.busy);
       if (typeof patch.value === 'string') input.value = patch.value;

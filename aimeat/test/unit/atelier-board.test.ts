@@ -237,13 +237,56 @@ describe('board', () => {
     const r = parseFloat(ring.style.width) / 2;
     expect(r).toBeGreaterThan(400);
     expect(frameEl(b.el, 'a').className).toContain('ak-board__frame--member');
+    // c starts inside the circle (centroid geometry reaches it): a nudge asks nothing
     const head = part(frameEl(b.el, 'c'), 'head')[0];
-    const h = vpOpts.onClaimPointer({ target: head });
-    h.onMove(250, -300);
+    const nudge = vpOpts.onClaimPointer({ target: head });
+    nudge.onMove(10, 10);
+    nudge.onEnd(true);
+    expect(drops).toEqual([]);
+    // moved out and back in, it is new ground: asked once
+    b.set({ frames: frames().map((f) => (f.id === 'c' ? { ...f, x: 0, y: 2400 } : f)) });
+    const h = vpOpts.onClaimPointer({ target: part(frameEl(b.el, 'c'), 'head')[0] });
+    h.onMove(250, -2300);
     h.onEnd(true);
     expect(drops).toEqual([['c', 'r1']]);
     b.set({ rings: [] });
     expect(part(b.el, 'ring').length).toBe(0);
+  });
+
+  it('centres an anchored ring on its anchor, tows the frames the app names, and asks only on entering new ground', () => {
+    const host = document.createElement('div');
+    const drops: any[] = [];
+    const moves: string[] = [];
+    const b = kit.board({
+      target: host,
+      frames: frames().map((f) => (f.id === 'c' ? { ...f, x: 4000, y: 4000 } : f))
+        .concat([{ id: 'p', x: 1000, y: 1000, w: 200, h: 100, kind: 'request', title: 'Panel', rev: 1 }]),
+      rings: [{ id: 'r1', title: 'Mine', anchor: 'p', members: ['p', 'a'] }],
+      tow: (f: any) => (f.kind === 'request' ? ['a'] : []),
+      onDrop: (f: any, ring: any) => drops.push([f.id, ring.id]),
+      onMove: (f: any) => moves.push(f.id),
+    });
+    const ring = part(b.el, 'ring')[0];
+    const r = parseFloat(ring.style.width) / 2;
+    // centred on the panel (1100, 1050), wide enough to reach frame a's far corner
+    expect(Math.round(parseFloat(ring.style.left) + r)).toBe(1100);
+    expect(r).toBeGreaterThan(1400);
+    // dragging the panel tows a
+    const h = vpOpts.onClaimPointer({ target: part(frameEl(b.el, 'p'), 'head')[0] });
+    h.onMove(100, 0);
+    expect(frameEl(b.el, 'a').style.left).toBe('100px');
+    h.onEnd(true);
+    expect(moves).toEqual(['p', 'a']);
+    // b was inside the ring already (within reach of its geometry): nudging it asks nothing
+    const hb = vpOpts.onClaimPointer({ target: part(frameEl(b.el, 'b'), 'head')[0] });
+    hb.onMove(5, 5);
+    hb.onEnd(true);
+    expect(drops).toEqual([]);
+    // c starts far outside: moving it inside asks once
+    const hc = vpOpts.onClaimPointer({ target: part(frameEl(b.el, 'c'), 'head')[0] });
+    hc.onMove(-3000, -3000);
+    hc.onEnd(true);
+    expect(drops).toEqual([['c', 'r1']]);
   });
 
   it('nudges the selected frame with the arrow keys and clears the selection on Escape', () => {

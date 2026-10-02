@@ -292,6 +292,8 @@
 .ak-request__step--done .ak-request__mark { color: var(--ak-ok-text); }
 .ak-request__step--failed .ak-request__mark { color: var(--ak-err-text); }
 .ak-request__step--running .ak-request__mark { color: var(--ak-accent-text); }
+.ak-request__extra { display: grid; gap: 6px; padding: 8px 10px; border-radius: var(--ak-radius-sm); background: color-mix(in oklab, var(--ak-accent) 8%, var(--ak-surface)); }
+.ak-request__extra[hidden] { display: none; }
 .ak-request__gate { padding: 6px 10px; border-radius: var(--ak-radius-sm); background: color-mix(in oklab, var(--ak-warn) 18%, var(--ak-surface)); font-size: var(--ak-text-micro); }
 .ak-request__row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .ak-request__spacer { flex: 1 1 auto; }
