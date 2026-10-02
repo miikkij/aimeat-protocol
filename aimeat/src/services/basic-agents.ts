@@ -22,6 +22,8 @@
  *   import { describeBasicAgents } from '../services/basic-agents.js';
  *   const view = await describeBasicAgents(config, storage, req.auth!.owner);
  * @version-history
+ *   v1.2.0 — 2026-10-02 — A connected daemon carries the run modes its connector presented, and
+ *     residentRunnable() says whether any of the owner's daemons can keep an agent up.
  *   v1.1.0 — 2026-10-02 — Each basic agent in the view carries `task_start`.
  *   v1.0.0 — 2026-08-31 — Extracted from routes/agents-v2/basic-agents.ts so the MCP surface can
  *     answer the same question without a second implementation of it.
@@ -74,6 +76,19 @@ export interface ConnectedDaemon {
   principals: string[];
   /** The principal an offer is handed to. First by sorted name, so a retry picks the same one. */
   target: string;
+  /** The run modes the connector presented at connect; null from one older than 2026-10-02. */
+  runModes: string[] | null;
+}
+
+/**
+ * Whether one of the owner's connected daemons can keep an agent resident: true when one says so
+ * or does not say (an older connector, given the benefit of the doubt), false when every one of
+ * them runs by spawning, null when none is connected, so nothing can be said.
+ */
+export function residentRunnable(owner: string): boolean | null {
+  const daemons = connectedDaemons(owner);
+  if (daemons.length === 0) return null;
+  return daemons.some(d => d.runModes === null || d.runModes.includes('resident'));
 }
 
 /**
@@ -94,7 +109,7 @@ export function connectedDaemons(owner: string): ConnectedDaemon[] {
   return tunnels.daemonsForOwner(owner)
     .map(d => ({ ...d, principals: d.principals.filter(p => !p.startsWith('eco:')) }))
     .filter(d => d.principals.length > 0)
-    .map(d => ({ installId: d.installId, principals: d.principals, target: d.principals[0] }));
+    .map(d => ({ installId: d.installId, principals: d.principals, target: d.principals[0], runModes: d.runModes }));
 }
 
 /**

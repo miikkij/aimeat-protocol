@@ -46,6 +46,8 @@
  *       same read through with no restart of the connector.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=basic-agents-first-task
  * @version-history
+ *   v1.2.0 — 2026-10-02 — The chat's proposal asks for `resident` and is stored and approved as spawn,
+ *     with the correction in both answers, and carries ai:use since the owner's default is the node.
  *   v1.1.0 — 2026-10-02 — An agent a chat proposed with no scopes, approved, and run to done; the
  *     owner's way out for one approved with memory:write alone.
  *   v1.0.0 — 2026-10-02 — Initial.
@@ -311,15 +313,31 @@ const PROPOSED_DEF = {
 };
 let proposedStart = '';
 
-await test('a chat proposes an agent asking for NO scopes, and the owner approves it', async () => {
+await test('a chat proposes an agent asking for NO scopes and for `resident`; it is stored as spawn, carries ai:use, and the owner approves it', async () => {
+  // Measured 2026-10-02 on a hosted place: the chat proposed run_mode resident with memory:read and
+  // memory:write; approved, the task stayed active for twelve minutes, because `aimeat connect serve`
+  // (and the fleet's) runs every agent by spawning, and the agent held no ai:use although the owner's
+  // crews think through the node. Ruled by Jouni: such a proposal is spawn, and it carries ai:use.
+  const def = await json(BASE, '/v1/agents/llm-default', { method: 'PUT', headers: authOwner(), body: JSON.stringify({ choice: { kind: 'node' } }) });
+  assert(def.status === 200, `the owner's default is the node: ${def.status} ${JSON.stringify(def.body?.error)}`);
   const p = await json(BASE, '/v1/agents/v2/agent-proposals', {
     method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
-    body: JSON.stringify({ name: PROPOSED, purpose: 'Does one small job the owner asks for.', scopes: [], crew_def: PROPOSED_DEF }),
+    body: JSON.stringify({ name: PROPOSED, purpose: 'Does one small job the owner asks for.', scopes: [], run_mode: 'resident', crew_def: PROPOSED_DEF }),
   });
   assert(p.status === 201, `propose ${p.status}: ${JSON.stringify(p.body?.error)}`);
-  const r = await json(BASE, `/v1/agents/v2/agent-proposals/${p.body.data.proposal.id}/approve`, { method: 'POST', headers: authOwner() });
+  const proposal = p.body.data.proposal;
+  assert(proposal.run_mode === 'spawn', `the connected connector spawns, so the proposal is spawn, got ${proposal.run_mode}`);
+  assert(proposal.run_mode_corrected?.asked === 'resident' && /spawn/.test(String(proposal.run_mode_corrected?.reason)),
+    `the proposal says what was asked and why it changed, got ${JSON.stringify(proposal.run_mode_corrected)}`);
+  assert((proposal.scopes as string[]).includes('ai:use'), `the proposal carries ai:use, got ${JSON.stringify(proposal.scopes)}`);
+  const r = await json(BASE, `/v1/agents/v2/agent-proposals/${proposal.id}/approve`, { method: 'POST', headers: authOwner() });
   assert(r.status === 200, `approve ${r.status}: ${JSON.stringify(r.body?.error)}`);
   assert(r.body.data.attached === true, `expected attached, got ${JSON.stringify(r.body.data.attach_problem ?? r.body.data)}`);
+  assert(r.body.data.agent.run_mode === 'spawn' && r.body.data.run_mode_corrected?.asked === 'resident',
+    `the approval made it spawn and says so, got ${JSON.stringify({ agent: r.body.data.agent, corrected: r.body.data.run_mode_corrected })}`);
+  const rec = (await json(BASE, `/v1/agents?owner=${ownerName}`, { headers: authOwner() })).body.data.agents.find((a: any) => a.name === PROPOSED);
+  assert(rec?.run_mode === 'spawn', `the record runs as spawn, got ${JSON.stringify(rec?.run_mode)}`);
+  assert((rec?.default_scopes as string[]).includes('ai:use'), `the agent holds ai:use, holds ${JSON.stringify(rec?.default_scopes)}`);
   const row = await waitOnline(`${PROPOSED}#${ownerName}@${NODE_ID}`);
   assert(row?.tunnel_status === 'online', `${PROPOSED} should be online, got ${JSON.stringify(row)}`);
 });

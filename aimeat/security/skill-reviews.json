@@ -36,7 +36,7 @@
         "aimeat/src/mcp/agent-schedules.ts",
         "aimeat/src/routes/agents-v2/agent-proposals.ts"
       ],
-      "digest": "sha256:edcd2a116f8eb116a60de14c"
+      "digest": "sha256:68dddee04dacaa49d80b8022"
     },
     "node:aimeat-first-conversation": {
       "reviewedOn": "2026-09-19",
@@ -92,7 +92,7 @@
       "watches": [
         "aimeat/src/services/ai-completion.ts"
       ],
-      "digest": "sha256:3ed0307b1d3b7b424d74ff4f"
+      "digest": "sha256:d6eab38a23b30a8f922f1b85"
     },
     "node:aimeat-mail-to-data": {
       "reviewedOn": "2026-09-28",
@@ -262,7 +262,7 @@
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/data/basic-agents.ts"
       ],
-      "digest": "sha256:bbb178c665cf1905b2403290"
+      "digest": "sha256:36f603a82c93944edfad5b0e"
     },
     "node:set-up-content-pipeline": {
       "reviewedOn": "2026-09-28",
@@ -416,7 +416,7 @@
       "aimeat/public/components/Suggestion.js": "c8ca8af7c09e778a"
     },
     "node:aimeat-paying-for-the-ai": {
-      "aimeat/src/services/ai-completion.ts": "bdbc9d941358b327"
+      "aimeat/src/services/ai-completion.ts": "1f912b9292c0a0bd"
     },
     "node:aimeat-mail-to-data": {
       "aimeat/src/mcp/catalog/definitions/connections.ts": "774105847fbe84e3",
@@ -514,7 +514,7 @@
       "aimeat/src/routes/agents/device-auth.ts": "a27cfc4e28469cf5",
       "aimeat/src/mcp/catalog/scopes.ts": "c88e7511ddfedcca",
       "aimeat/src/mcp/catalog/definitions/crew.ts": "ba94ec309cb43232",
-      "aimeat/src/routes/agents-v2/agent-proposals.ts": "46ed798763032e61",
+      "aimeat/src/routes/agents-v2/agent-proposals.ts": "26be98a71d067631",
       "aimeat/src/data/basic-agents.ts": "42e260bfa070b0e6"
     },
     "node:set-up-content-pipeline": {
@@ -574,7 +574,7 @@
     "node:aimeat-recurring-work": {
       "aimeat/src/services/schedule-gate.ts": "2d2b0c4d911f6bbc",
       "aimeat/src/mcp/agent-schedules.ts": "3af26ae08452607b",
-      "aimeat/src/routes/agents-v2/agent-proposals.ts": "46ed798763032e61"
+      "aimeat/src/routes/agents-v2/agent-proposals.ts": "26be98a71d067631"
     },
     "node:aimeat-decide": {
       "aimeat/src/static/sdk-libs/decide/index.js": "70648a36df720ca1",

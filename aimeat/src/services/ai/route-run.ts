@@ -13,9 +13,17 @@
  *   content would be a way round the refusal), a cancel by the caller, and a stream that has already
  *   sent its first byte (the proxy and the voice stream decide that themselves: they call this only
  *   before the first byte).
+ *   ONE RETRY ON THE SAME PROVIDER: a key with no credit left. OpenRouter answers 402 when the key's
+ *   balance is spent. For a key the owner or the agent brought (never the node's, whose allowance
+ *   prepareAiCall decides before the call), a text call that named no model is tried once more on
+ *   the free router, marked `degradedToFree`, so the answer says which model answered. Ruled by
+ *   Jouni on 2026-10-02: an own key uses the node's default model, and a free model only when the
+ *   key has no money left.
  * @structure
- *   AttemptRecord · AiRoute · classifyFailure · runRoute · routeOf
+ *   AttemptRecord · AiRoute · classifyFailure · noCreditRetry · runRoute · routeOf
  * @version-history
+ *   v1.1.0 — 2026-10-02 — `noCreditModel` on the context: a 402 from a provider on the owner's or the
+ *     agent's key is retried once on that model, on the same provider, before any fallback.
  *   v1.0.0 — 2026-09-28 — Initial (V3 of the System 2 plan).
  */
 import type { Storage } from '../../storage/interface.js';
@@ -73,6 +81,24 @@ export interface RunContext {
   allowFallback: boolean;
   rules: RoutingRules;
   signal?: AbortSignal;
+  /**
+   * The model a candidate on the owner's or the agent's key is retried on when the provider answers
+   * 402 (the key has no credit left): the node's free router, when the call named no model and the
+   * owner's policy allows it (prepareAiCall decides and sets it). Absent means no such retry.
+   */
+  noCreditModel?: string;
+}
+
+/**
+ * The candidate that answers a spent key, or null: the same provider on the free router. Only a key
+ * the owner or the agent brought (the node's allowance is decided before the call), only OpenRouter
+ * (the free router is its), and only when the failed attempt was not already on that model.
+ */
+export function noCreditRetry(ctx: Pick<RunContext, 'noCreditModel'>, c: AiCandidate, e: unknown): AiCandidate | null {
+  const status = (e as { status?: unknown } | null)?.status;
+  if (status !== 402 || !ctx.noCreditModel) return null;
+  if (c.keyScope === 'node' || c.provider.type !== 'openrouter' || c.model === ctx.noCreditModel) return null;
+  return { ...c, model: ctx.noCreditModel, degradedToFree: true, policyChoseModel: false };
 }
 
 export interface RunOutcome<T> {
@@ -131,6 +157,14 @@ export async function runRoute<T>(
       noteHealth(ctx, c, { error: cls, message: e instanceof Error ? e.message : String(e) });
       attempts.push({ provider: c.provider.id, model: c.model, error: cls, costUsd });
       failed.push({ candidate: c, error: cls, costUsd });
+      // A spent key is tried once more on the free router before anything else moves: the same
+      // provider, so the owner's fallback rules are not the question.
+      const retry = noCreditRetry(ctx, c, e);
+      if (retry) {
+        list.splice(i + 1, 0, retry);
+        logger.warn(`[ai] ${c.provider.id} answered 402 on the ${c.keyScope} key for ${ctx.capability}; trying ${retry.model}`, { owner: ctx.gaii });
+        continue;
+      }
       const next = list[i + 1];
       if (!next || !ctx.rules.fallbackOn.includes(cls)) {
         throw Object.assign(e instanceof Error ? e : new Error(String(e)), { route: routeOf(ctx, attempts), failed });

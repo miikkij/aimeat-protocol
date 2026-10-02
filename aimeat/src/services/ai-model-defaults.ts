@@ -23,6 +23,12 @@
  * @usage
  *   const model = resolveModelFor(config, prefs, 'vision') ?? resolveModelFor(config, prefs, 'chat');
  * @version-history
+ *   v1.3.0 — 2026-10-02 — An owner's `model` of 'openrouter/free' counts only when the owner chose it
+ *     (`modelChosen: true`, written by PUT /v1/openrouter/settings with an explicit model). Until this
+ *     version a key-only save wrote the free router as the default, and it then came before the
+ *     node's default: an owner who saved their own key had every call downgraded to a free model.
+ *     Ruled by Jouni on 2026-10-02: an own key uses the node's default model unless the owner chose
+ *     one, and a free model only when chosen.
  *   v1.2.0 — 2026-09-28 — The owner's `ttsModel`, `embedModel` and `ttsVoice` are no longer read: no page
  *     or route wrote them, and the owner sets speech and embeddings on a provider (AI roles, plan
  *     brief-tekoalyn-roolit). The node's defaults for both stay.
@@ -68,6 +74,19 @@ function usable(value: unknown): string | undefined {
     return typeof value === 'string' && value.trim() ? value : undefined;
 }
 
+/** The model a key-only save wrote as the chat default until 2026-10-02 (routes/openrouter.ts). */
+export const IMPLICIT_FREE_MODEL = 'openrouter/free';
+
+/**
+ * Whether the record's `model` is the free router NOBODY chose: written by a key-only save before
+ * 2026-10-02, with no `modelChosen` mark. The same test the boot migration uses to clear it
+ * (services/openrouter-settings-migration.ts), so a record the migration has not reached yet
+ * resolves the same way.
+ */
+export function holdsImplicitFreeModel(prefs: OwnerModelPrefs | undefined): boolean {
+    return prefs?.model === IMPLICIT_FREE_MODEL && prefs?.modelChosen !== true;
+}
+
 /**
  * The model for one role, or undefined when neither layer names one.
  *
@@ -80,7 +99,10 @@ export function resolveModelFor(
     config: AimeatConfig, prefs: OwnerModelPrefs | undefined, role: ModelRole,
 ): string | undefined {
     const pref = PREF_KEY[role];
-    return (pref ? usable(prefs?.[pref]) : undefined) ?? usable(config[CONFIG_KEY[role]]);
+    const own = pref ? usable(prefs?.[pref]) : undefined;
+    // The free router an old key-only save wrote is not a choice: the node's default comes first.
+    const chosen = role === 'chat' && own !== undefined && holdsImplicitFreeModel(prefs) ? undefined : own;
+    return chosen ?? usable(config[CONFIG_KEY[role]]);
 }
 
 /**

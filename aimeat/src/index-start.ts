@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description `aimeat start` / `serve` runtime: asset self-heal, server listen + banner, WebSocket upgrade routing (personal tunnel / connector tunnel / realtime P2P + echat), and graceful shutdown. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-10-02 — The connect tunnel upgrade reads X-AIMEAT-Run-Modes, the run modes the
+ *     connector can honour, and hands them to the tunnel manager beside the install id.
  *   v1.5.0 — 2026-10-02 — Graceful shutdown flushes the scope-use record (services/scope-use.ts).
  *   v1.4.0 — 2026-09-29 — Graceful shutdown flushes the classification audit buffer (TARGET-082 V4).
  *   v1.3.0 — 2026-09-26 — A WebSocket upgrade runs as this node (runAsNode, utils/gaii.ts), so it
@@ -332,8 +334,12 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
           // daemons an offer goes to, and nothing else.
           const installHeader = request.headers['x-aimeat-install'];
           const installId = Array.isArray(installHeader) ? installHeader[0] : installHeader;
+          // How the connector runs agents (`spawn`, `resident`), comma-separated. Also unsigned: it
+          // decides only whether a proposed run mode is corrected to one the connector can run.
+          const modesHeader = request.headers['x-aimeat-run-modes'];
+          const runModes = Array.isArray(modesHeader) ? modesHeader[0] : modesHeader;
           connectWss.handleUpgrade(request, socket, head, (ws) => {
-            connectTunnelManager.handleConnection(ws, payload, token, installId ?? null);
+            connectTunnelManager.handleConnection(ws, payload, token, installId ?? null, runModes ?? null);
           });
         } catch (err) {
           logger.warn('index-start: suppressed failure, continuing', { error: String(err) });

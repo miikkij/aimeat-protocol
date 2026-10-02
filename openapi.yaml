@@ -8765,6 +8765,11 @@ paths:
                 run_mode:
                   type: string
                   enum: [resident, spawn]
+                  description: |
+                    `resident` is stored as `spawn` when every connector connected for this owner
+                    runs agents by spawning (every `aimeat connect serve`, so every hosted place):
+                    the proposal's `run_mode_corrected` then says what was asked and why. With no
+                    connector connected the ask stands.
                 crew_def:
                   type: object
                   nullable: true
@@ -8776,7 +8781,10 @@ paths:
         '201':
           description: |
             The proposal is waiting for the owner. Nothing was created. A name that is already
-            waiting answers with the standing proposal and `already_waiting: true`.
+            waiting answers with the standing proposal and `already_waiting: true`. The proposal's
+            `scopes` carry the crew runtime's words (memory:read, memory:write) and `ai:use` when the
+            owner's crews think through this node; its `run_mode_corrected` is set when the run mode
+            asked for was changed to one the connector can run.
           content:
             application/json:
               schema:
@@ -8882,6 +8890,16 @@ paths:
                               message: { type: string }
                           next_step: { type: string }
                           agent: { type: object }
+                          run_mode_corrected:
+                            type: object
+                            nullable: true
+                            description: |
+                              Set when the agent was made with a run mode other than the one
+                              proposed, because no connected connector of this owner can run that
+                              one (a `resident` proposal on a spawning connector is made as spawn).
+                            properties:
+                              asked: { type: string }
+                              reason: { type: string }
         '403': { description: Not the account holder in person }
         '404': { description: No such proposal on this account }
         '409': { description: Already settled, or the name has been taken since }
@@ -47942,7 +47960,12 @@ paths:
                   description: OpenRouter API key
                 model:
                   type: string
-                  description: Default model to use (e.g. openai/gpt-4o)
+                  description: |
+                    The model the owner chose (e.g. openai/gpt-4o). Omitted on a save, the node's
+                    default chat model applies to the owner's own key until one is chosen; '' or
+                    null clears the choice. A free model answers only when chosen here, or when the
+                    owner's key has no credit left (the provider answers 402), in which case a text
+                    call that named no model is retried once on the free router.
                 visionModel:
                   type: string
                   nullable: true

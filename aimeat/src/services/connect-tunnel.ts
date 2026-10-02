@@ -25,6 +25,9 @@
  *   mgr.startHeartbeatMonitor();
  *   mgr.handleConnection(ws, verifiedToken, rawToken);
  * @version-history
+ *   v2.3.0 -- 2026-10-02 -- A connection carries the run modes its connector presented at upgrade
+ *     (X-AIMEAT-Run-Modes), and daemonsForOwner reports them per daemon. The ConnectConnection type
+ *     moved to ./connect-tunnel-connection.ts, verbatim (max-file-lines).
  *   v2.2.0 -- 2026-09-26 -- The memory-write listener and the frame handler run as this node (runAsNode,
  *     utils/gaii.ts), also in a process that serves more than one node. One node per process in production.
  *   v1.14.0 -- 2026-09-06 -- notifyScopesChanged(): tell one live identity its permissions changed,
@@ -105,6 +108,7 @@ import { logger } from '../utils/logger.js';
 import {
   principalsForOwner as rosterPrincipalsForOwner,
   daemonsForOwner as rosterDaemonsForOwner,
+  parseRunModes,
 } from './connect-tunnel-roster.js';
 import {
   onDeliveryEvent, offDeliveryEvent, type DeliveryEvent,
@@ -122,34 +126,8 @@ export type { ConnectFrame, WorkspaceSpaceRef, ConnectTunnelStats } from './conn
 import type { ConnectFrame, WorkspaceSpaceRef, ConnectTunnelStats } from './connect-tunnel-wire.js';
 import { spaceKeyOf, coerceSpaceRef } from './connect-tunnel-wire.js';
 import { revokeByToken, revokeByGaii, revokeByOwner } from './connect-tunnel-revocation.js';
-
-
-interface ConnectConnection {
-  principal: string;
-  ws: WebSocket;
-  /**
-   * Which physical socket this identity rides.
-   *
-   * `connections` is still keyed by principal, so every lookup in this file is unchanged — what is
-   * new is that several entries may now share one `ws`. This id is how the close path finds the
-   * others, and how a frame is checked against the identities its socket actually proved.
-   */
-  socketId: string;
-  identity: VerifiedToken;
-  /**
-   * Which INSTALLATION this socket belongs to, or null from a connector that does not say.
-   *
-   * One `connect serve` holds one socket per agent, so an owner's sockets used to be one
-   * undifferentiated set and two machines were indistinguishable from one. The daemon presents a
-   * stable id it minted once, and that is what turns "this owner's principals" into "this owner's
-   * daemons". Null is a connector older than 2026-09-01, and every one of those is grouped as a
-   * single legacy daemon — exactly the behaviour they had before, and no worse.
-   */
-  installId: string | null;
-  /** The raw agent JWT verified at upgrade, reused verbatim as the forward bearer. */
-  rawToken: string;
-  lastHeartbeat: number;
-}
+// One identity's entry in the connection map: a pure extraction (max-file-lines, 2026-10-02).
+import type { ConnectConnection } from './connect-tunnel-connection.js';
 
 
 /**
@@ -255,7 +233,7 @@ export class ConnectTunnelManager {
    * connection for the same principal replaces the first — enforcing the
    * single-socket-per-principal invariant.
    */
-  handleConnection(ws: WebSocket, identity: VerifiedToken, rawToken: string, installId?: string | null): void {
+  handleConnection(ws: WebSocket, identity: VerifiedToken, rawToken: string, installId?: string | null, runModes?: string | null): void {
     const principal = identity.sub;
     const socketId = this.sockets.open(ws, principal);
     this.replaceIdentity(principal);
@@ -263,6 +241,7 @@ export class ConnectTunnelManager {
     const conn: ConnectConnection = {
       principal, ws, socketId, identity, rawToken, lastHeartbeat: Date.now(),
       installId: installId && installId.trim() !== '' ? installId.trim().slice(0, 64) : null,
+      runModes: parseRunModes(runModes),
     };
     this.connections.set(principal, conn);
     this.stats.connectionsTotal++;
@@ -417,6 +396,7 @@ export class ConnectTunnelManager {
         // upgrade declared. It answers "which of this owner's machines", and the machine is the
         // same machine for every identity on one socket.
         installId: this.connections.get(rec.primary)?.installId ?? null,
+        runModes: this.connections.get(rec.primary)?.runModes ?? null,
       };
       this.connections.set(payload.sub, conn);
       this.stats.activeConnections = this.connections.size;
@@ -712,7 +692,7 @@ export class ConnectTunnelManager {
    * An owner's connected DAEMONS, one entry per machine, grouped on the install id each connector
    * presents. Body in connect-tunnel-roster.ts.
    */
-  daemonsForOwner(owner: string): Array<{ installId: string | null; principals: string[] }> {
+  daemonsForOwner(owner: string): Array<{ installId: string | null; principals: string[]; runModes: string[] | null }> {
     return rosterDaemonsForOwner(this.connections.values(), owner);
   }
 

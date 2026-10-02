@@ -1674,6 +1674,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Items reach callers through showItems; the other reads are read-modify-write and existence checks."
     },
+    "src/services/openrouter-settings-migration.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-02, the node's own read: the run-once marker under the node's system identity, and each owner's openrouter.settings record, read to clear the free router a key-only save wrote. No content is shown to anyone."
+    },
     "src/services/operator-admin-migration.ts": {
       "reads": {
         "getMemory": 1

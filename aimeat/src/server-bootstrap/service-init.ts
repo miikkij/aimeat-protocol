@@ -11,6 +11,8 @@
  *   shared service handles consumed by route mounting.
  * @usage const services = await initializeServices(config, storage);
  * @version-history
+ *   v1.15.0 — 2026-10-02 — migrateImplicitFreeModelOnce(): once per node, the free router a key-only
+ *     save wrote as the owner's chat model is cleared (services/openrouter-settings-migration.ts).
  *   v1.0.0 — pre-2026-06 — Initial service bootstrap extraction
  *   v1.1.0 — 2026-06-05 — Run storage.normalizeAppOwnerNames() at startup to
  *     reunite agent-published apps with the owner's "Published Apps".
@@ -87,6 +89,7 @@ import { seedExamplePackages } from '../services/package-seeder.js';
 import { migrateScopeVocabulary } from '../services/scope-vocabulary-migration.js';
 import { migrateMailReadConsent } from '../services/mail-read-consent.js';
 import { migrateBasicAgentsTaskStartOnce, grantPurgeToAppGrantsOnce } from '../services/task-start-migrations.js';
+import { migrateImplicitFreeModelOnce } from '../services/openrouter-settings-migration.js';
 import { migrateOperatorAdminOnce } from '../services/operator-admin-migration.js';
 import { migrateAppToolsKeysOnce } from '../services/app-tools-key.js';
 import { sealStoredPspRecords } from '../commerce/psp-secrets.js';
@@ -299,6 +302,10 @@ export async function initializeServices(
     .catch(err => logger.error('Failed to switch the basic agents to start on their own; the next boot tries again', { error: String(err) }));
   grantPurgeToAppGrantsOnce(storage, config.nodeId)
     .catch(err => logger.error('Failed to give memory:purge to app grants; the next boot tries again', { error: String(err) }));
+  // The own-key model ruling of 2026-10-02 (services/openrouter-settings-migration.ts): the free
+  // router a key-only save wrote as the owner's model is cleared, so the node's default applies.
+  migrateImplicitFreeModelOnce(storage, config.nodeId)
+    .catch(err => logger.error('Failed to clear the implicit free model from AI settings; the next boot tries again', { error: String(err) }));
 
   // Encrypt the payment secrets of every seller record written before they were stored sealed.
   // Until this runs, a plain Stripe key is readable through the generic memory doors

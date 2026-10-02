@@ -39,6 +39,12 @@
  *     that existed before keep their code and wording. nodeKeyPaysFor() moved into the node's
  *     provider record (image and transcription enabled only with a node default model, J4);
  *     the host allowlist is checked per candidate.
+ *   v3.7.0 — 2026-10-02 — `noCreditModel` on the plan: a text call that named no model is retried once
+ *     on the free router when the owner's or the agent's key answers 402 (route-run.ts). Ruled by
+ *     Jouni on 2026-10-02: an own key uses the node's default model, and a free model only when
+ *     the key has no money left. The default itself comes from ai-model-defaults.ts, which no longer
+ *     reads the free router a key-only save wrote. AiCallPlan, planFor and targetOf moved to
+ *     ai-call-plan.ts, verbatim, and are re-exported here (max-file-lines).
  *   v3.6.0 — 2026-09-28 — The owner's model policy (System 2 plan, V2; services/ai/policy-gate.ts): the
  *     model is chosen under it BEFORE the key, a named model the rules leave out is refused 403
  *     AI_MODEL_NOT_ALLOWED, lists with nothing in common 403 AI_MODEL_POLICY_EMPTY, a model the
@@ -131,16 +137,15 @@ import {
 } from './ai-call-guards.js';
 import { appAiMetaOf } from './ai/policy-store.js';
 import { text as gatewayText, type TextFile } from './ai/gateway.js';
-import type { AiAdapterType, AiCapability, AiOp, AiTarget, CostSource } from './ai/types.js';
-import { loadPolicyDecision } from './ai/policy-gate.js';
+import type { AiCapability, AiOp, CostSource } from './ai/types.js';
+import { loadPolicyDecision, freeModelAllowed } from './ai/policy-gate.js';
 import type { CallerClass } from './ai/policy.js';
 import { AiCompletionError } from './ai/errors.js';
 import { providersForOwner } from './ai/provider-store.js';
-import { readRouting, rulesFor, type RoutingRules } from './ai/routing.js';
+import { readRouting, rulesFor } from './ai/routing.js';
 import { readRoles, rolesWithLegacy, resolveRole, noteRoleUsed, noteRoleRequest, bindingKey, type ResolvedRole } from './ai/roles.js';
 import { NODE_OPENROUTER_ID, type ProviderParams } from './ai/providers.js';
-import type { AppAiRoleParams } from './app-ai-roles.js';
-import { planRoute, refusalFor, type AiCandidate, type ChosenBy, type RejectedCandidate } from './ai/route-plan.js';
+import { planRoute, refusalFor, type AiCandidate } from './ai/route-plan.js';
 import { runRoute, type AiRoute } from './ai/route-run.js';
 import { callCost } from './ai/catalog/price.js';
 import { mintProvenance } from './ai-provenance.js';
@@ -274,73 +279,10 @@ export interface CompleteForOwnerResult {
  * given), calls the provider, and records usage. Throws AiCompletionError on any
  * gated/failure condition.
  */
-/**
- * Everything decided BEFORE a model is called, for one owner and one call.
- *
- * Which pocket pays, which model answers, whether the allowance has run out and the answer has to
- * come from a free model instead of a refusal: those are one decision, and this is where it is made.
- * `completeForOwner` runs it and then calls the provider itself; the chat proxy runs the same one
- * and then streams the provider's own bytes back. Two call shapes, one set of rules — the alternative
- * was a second implementation of the key choice and the budget, which is how a paywall ends up
- * enforced on one door and not the other.
- */
-export interface AiCallPlan {
-  prefs: Record<string, unknown>;
-  /** The id of the provider the first candidate calls (services/ai/providers.ts). */
-  provider: string;
-  baseUrl: string;
-  /** The decrypted key that will pay. Never logged, never returned to a caller. */
-  key: string | undefined;
-  keyScope: 'agent' | 'own' | 'node';
-  /** The owner's agent that asked, by bare name, so the settle step adds the spend to its cap. */
-  agent?: string;
-  /** What is left on the node's allowance, when the node is paying. */
-  allowanceRemainingUsd?: number;
-  /** Today's usage record, read once so the settle step does not read it again. */
-  usage: UsageRecord;
-  dailyBudgetUsd: number;
-  model: string;
-  /** True when the allowance was spent and a free model is answering instead of nothing. */
-  degradedToFree: boolean;
-  /** What this call does. */
-  op: AiOp;
-  /** Which adapter builds the model for this provider (services/ai/adapters/). */
-  providerType: AiAdapterType;
-  /** True when the owner's model policy chose the model because the one that would have answered
-   *  is not allowed, or nobody chose one (services/ai/policy-gate.ts). */
-  policyChoseModel: boolean;
-  /** The references this call's policy allows, or 'any'. A model list shown to the caller is
-   *  filtered by it, so nobody picks a model the node would then refuse. */
-  allowedModels: string[] | 'any';
-  /** The first candidate's destination; the plan's own fields mirror it. */
-  target: AiTarget;
-  /** What the call asks for. */
-  capability: AiCapability;
-  /** Every provider that may answer, in order, and the ones that may not with their reason. */
-  candidates: AiCandidate[];
-  rejected: RejectedCandidate[];
-  chosenBy: ChosenBy;
-  /** Whether a failure may move to the next candidate (the owner's rules and the call's own word). */
-  allowFallback: boolean;
-  rules: RoutingRules;
-  /** The role the call ran as: the owner's role, the app's binding, and the app's fine-tuning for it. */
-  role?: { id: string; binding?: string; params?: AppAiRoleParams };
-}
-
-/** Where the gateway sends a planned call: the adapter, the address and the key that pays. */
-export function targetOf(plan: AiCallPlan): AiTarget {
-  return plan.target;
-}
-
-/** The plan as the candidate that answered it: its provider, key, model and pocket. */
-export function planFor(plan: AiCallPlan, c: AiCandidate): AiCallPlan {
-  return {
-    ...plan, provider: c.provider.id, providerType: c.provider.type, baseUrl: c.target.baseUrl, key: c.target.key,
-    keyScope: c.keyScope, model: c.model, degradedToFree: !!c.degradedToFree, policyChoseModel: c.policyChoseModel,
-    target: c.target,
-    ...(c.allowanceRemainingUsd !== undefined ? { allowanceRemainingUsd: c.allowanceRemainingUsd } : { allowanceRemainingUsd: undefined }),
-  };
-}
+// The plan and its two readers: a pure extraction to ai-call-plan.ts (max-file-lines, 2026-10-02),
+// re-exported here so every importer of this file is untouched.
+export { planFor, targetOf, type AiCallPlan } from './ai-call-plan.js';
+import { planFor, type AiCallPlan } from './ai-call-plan.js';
 
 /** The operations whose model is a role of its own, and never the text model. */
 const OP_ROLE: Partial<Record<AiOp, ModelRole>> = { image: 'image', transcribe: 'stt', speak: 'tts', embed: 'embed' };
@@ -513,9 +455,14 @@ async function planAiCall(
 
   const first = route.candidates[0];
   if (role) noteRoleUsed(storage, gaii, [role.role.id, ...(role.binding ? [role.binding] : [])]);
+  // A spent own key gets the free router once (route-run.ts noCreditRetry): a text call that named
+  // no model, when the owner's policy allows the free model on OpenRouter.
+  const free = config.modelFreeFallback;
+  const noCreditModel = op === 'text' && !requested && free && freeModelAllowed(policy, free, 'openrouter') ? free : undefined;
   return planFor({
     prefs, provider: first.provider.id, baseUrl: first.target.baseUrl, key: first.target.key, keyScope: first.keyScope,
     ...(opts.agent ? { agent: opts.agent } : {}),
+    ...(noCreditModel ? { noCreditModel } : {}),
     usage, dailyBudgetUsd, model: first.model, degradedToFree: false,
     op, providerType: first.provider.type, policyChoseModel: false, allowedModels: policy.decision.allowed,
     target: first.target, capability, candidates: route.candidates, rejected: route.rejected,
@@ -721,6 +668,7 @@ export async function completeForOwner(
     const run = await runRoute({
       storage, gaii, capability: plan.capability, candidates: plan.candidates, chosenBy: plan.chosenBy,
       allowFallback: plan.allowFallback, rules: plan.rules, ...(opts.signal ? { signal: opts.signal } : {}),
+      ...(plan.noCreditModel ? { noCreditModel: plan.noCreditModel } : {}),
     }, (c) => {
       const t = tuningFor(c);
       return gatewayText({

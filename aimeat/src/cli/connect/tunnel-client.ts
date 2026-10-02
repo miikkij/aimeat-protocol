@@ -30,6 +30,8 @@
  *   if (outcome === 'online') { const { status, body } = await client.forward('GET', '/v1/memory'); }
  *   await client.close();
  * @version-history
+ *   v1.11.0 -- 2026-10-02 -- The upgrade carries X-AIMEAT-Run-Modes (./run-modes.ts): how this
+ *     connector runs agents, so the node corrects a proposal nobody here could run.
  *   v1.10.0 -- 2026-09-24 -- Counts what the socket carries (./tunnel-traffic.ts), for `aimeat connect tui`.
  *   v1.9.2 -- 2026-09-06 -- The socket's OWN identity reconnects only when a reconnect would produce a
  *     DIFFERENT credential. An agent on a stored bearer gets the same string back, so bouncing the
@@ -86,6 +88,7 @@ import { WebSocket } from 'ws';
 import { randomUUID } from 'node:crypto';
 import { logger } from '../../utils/logger.js';
 import { getInstallId } from './install-id.js';
+import { CONNECTOR_RUN_MODES } from './run-modes.js';
 import { onScopesChanged } from './tunnel-scopes-changed.js';
 import { TunnelTraffic, type TrafficSnapshot } from './tunnel-traffic.js';
 
@@ -419,7 +422,12 @@ export class ConnectTunnelClient {
         // is two daemons to the node rather than one ambiguous answer. Not a credential: the
         // token beside it is still what authenticates.
         ws = new WebSocket(this.opts.wsUrl ?? wsUrl(this.opts.nodeUrl), {
-          headers: { Authorization: `Bearer ${token}`, 'X-AIMEAT-Install': getInstallId() },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'X-AIMEAT-Install': getInstallId(),
+            // How this connector runs agents, so the node corrects a proposal it could not run.
+            'X-AIMEAT-Run-Modes': CONNECTOR_RUN_MODES.join(','),
+          },
         });
       } catch {
         this.setStatus('offline');
