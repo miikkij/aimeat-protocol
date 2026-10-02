@@ -26,11 +26,13 @@
  *   (`uncoveredScopes`, the same helper the device-auth escalation check uses, so the two cannot
  *   disagree), and no proposal may exceed what this node allows at all. Neither is re-implemented
  *   here.
- * @structure AgentProposal · proposalApprovalUrl() · proposalNextStep() · proposeAgent() ·
+ * @structure AgentProposal · proposalApprovalUrl() · proposalNextStep() · proposerIsOwnerSession() · proposeAgent() ·
  *   listProposals() · readProposal() · settleProposal()
  * @usage
  *   const out = await proposeAgent({ config, storage }, principal, { name, purpose, scopes });
  * @version-history
+ *   v1.3.0 — 2026-10-02 — proposerIsOwnerSession() exported, so the bundled-agent proposal caps its
+ *     declared scopes by the same test that lifts the ceiling here.
  *   v1.2.0 — 2026-10-02 — proposalApprovalUrl() and proposalNextStep(): the REST answer and the MCP
  *     tool give the person the address of the page where they approve, in one sentence written
  *     once. Both said "in your profile under Agents", with no address to hand over.
@@ -108,6 +110,16 @@ export interface ProposerPrincipal {
   owner: string;
   roles: string[];
   scopes: string[];
+}
+
+/**
+ * The account holder in person: an owner or operator session that is not an agent. Its session IS
+ * the permission, so the proposal ceiling does not apply to it. One copy, read by proposeAgent and
+ * by the bundled-agent proposal, which caps rather than refuses (app-agent-propose.ts).
+ */
+export function proposerIsOwnerSession(principal: ProposerPrincipal): boolean {
+  return (principal.roles.includes('owner') || principal.roles.includes('operator'))
+    && !principal.roles.includes('agent');
 }
 
 /**
@@ -207,9 +219,7 @@ export async function proposeAgent(
   // reading a name and a purpose, not a scope diff. The same helper and the same rule as the
   // device-auth escalation check. An OWNER session holds no scopes because its session IS the
   // permission, so the ceiling does not apply to it.
-  const isOwnerSession = (principal.roles.includes('owner') || principal.roles.includes('operator'))
-    && !principal.roles.includes('agent');
-  if (!isOwnerSession) {
+  if (!proposerIsOwnerSession(principal)) {
     const beyond = uncoveredScopes(principal.scopes, scopes);
     if (beyond.length > 0) {
       return fail(403, 'SCOPE_ESCALATION',

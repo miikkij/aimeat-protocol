@@ -10,6 +10,7 @@
  * @usage import { workspaceSpaceTools } from './workspace-spaces.js';  // spread in place
  * @version-history
  *   v1.0.0 — 2026-09-02 — Initial: the extraction, plus the two document tools that caused it.
+ *   v1.1.0 — 2026-10-02 — aimeat_workspace_rows_delete names memory:purge and organism:write.
  */
 
 import type { AimeatToolDefinition } from './types.js';
@@ -90,7 +91,7 @@ export const workspaceSpaceTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_workspace_rows_delete',
-        description: 'Remove rows from a workspace ROW space: one row by `row_id`, or everything that LANDED before `before` (retention by age). Retention keys on when the row was written to this node, never on when the event happened, so a five-year-old message ingested today is not swept on arrival. Pass exactly one of `row_id` or `before` — there is deliberately no "delete everything" form. Irreversible; a row space keeps no version history to restore from.',
+        description: 'Remove rows from a workspace ROW space: one row by `row_id`, or everything that LANDED before `before` (retention by age). Retention keys on when the row was written to this node, never on when the event happened, so a five-year-old message ingested today is not swept on arrival. Pass exactly one of `row_id` or `before` — there is deliberately no "delete everything" form. Irreversible; a row space keeps no version history to restore from. Needs memory:purge and organism:write.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {

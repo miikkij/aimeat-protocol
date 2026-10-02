@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.23.2 -- 2026-10-02 -- add-a-crew-agent: with nothing chosen, an agent holding ai:use thinks
+ *     through the node when the node can pay; the menu's `effective` says which choice applies.
  *   v1.23.1 -- 2026-10-02 -- diagnose-a-workflow: an AI refusal carries `fix` and `settingsUrl` for
  *     the owner.
  *   v1.23.0 -- 2026-10-02 -- add-a-crew-agent: aimeat_crew_llm_set's {kind:"node"} choice and the
@@ -429,7 +431,10 @@ stored), \`aimeat_crew_publish\` (live within seconds, the last ten revisions st
 \`aimeat_crew_draft\` keeps half-finished edits. \`aimeat_crew_llm_set\` chooses the model for one
 agent or the owner's default; \`{kind: "node"}\` makes the crew think through this node, so the
 owner's own key pays before the node's (the agent needs \`ai:use\`), and a pinned \`model\` may name
-only a provider key variable and a public https address. Never write \`crews.registry.<agent>\` with \`aimeat_memory_write\`:
+only a provider key variable and a public https address. With nothing chosen, an agent holding
+\`ai:use\` thinks through this node when the node has a key to pay with; without \`ai:use\`, or with no
+key, it uses the key on the machine that runs it, even when the owner's default says the node.
+\`aimeat_crew_menu\` answers which choice applies as \`effective\`. Never write \`crews.registry.<agent>\` with \`aimeat_memory_write\`:
 it lands in YOUR namespace, where neither the runtime nor the Crew tab looks.
 
 ## 4. After it exists

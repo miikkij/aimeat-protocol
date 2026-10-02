@@ -34,9 +34,13 @@
  *   should hold that for a list of model names. A forged catalogue there is read only for the agent
  *   that wrote it, which already decides what its own runtime calls. It also gives each agent its own
  *   copy, where one owner key had agents on different machines overwrite each other's list.
- * @structure CrewMenu · crewMenu() · readLlmChoice() · writeLlmChoice()
+ * @structure CrewMenu · crewMenu() · readLlmChoice() · effectiveLlmChoice() · writeLlmChoice()
  * @usage const menu = await crewMenu(deps, caller, 'news-watcher');
  * @version-history
+ *   v1.4.0 — 2026-10-02 — effectiveLlmChoice(): thinking through the node is the default for an agent
+ *     holding ai:use when the node has a key to pay with, and an owner default of `node` skips an
+ *     agent without ai:use (Jouni, 2026-10-02). GET /v1/agents/:name/crew/llm answers it for the
+ *     runtime; the menu carries it as `effective`.
  *   v1.3.0 — 2026-10-02 — A `model` choice is refused unless its api_key_env is a provider key variable
  *     and every address in it is public https (crew-llm-guard.ts): a saved choice could send any secret
  *     in the crew's environment to any address. A third shape, `{kind:'node', role?}`: the crew thinks
@@ -58,6 +62,9 @@ import { isAllowed, parseModelRef } from './ai/policy.js';
 import { canonicalModelKey } from './ai/catalog/equivalence.js';
 import { AiCompletionError } from './ai/errors.js';
 import { crewChoiceProblem } from './crew-llm-guard.js';
+import { prepareAiCall } from './ai-completion.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
+import type { AgentRecord } from '../storage/types/identity.js';
 
 /** The owner's key for a default that covers every agent they have. */
 export const LLM_DEFAULT_KEY = 'crews.llm.default';
@@ -75,6 +82,19 @@ export interface CrewMenu {
   models: Array<Record<string, unknown>>;
   /** What is chosen for this agent now, and whether it is the agent's own or the owner's default. */
   choice: { scope: 'agent' | 'default'; value: Record<string, unknown> } | null;
+  /** What the runtime uses: the stored choice, this node's default, or the machine's (effectiveLlmChoice). */
+  effective: EffectiveLlmChoice;
+}
+
+export interface EffectiveLlmChoice {
+  /** The choice the runtime uses, or null: the machine's own providers decide. */
+  value: Record<string, unknown> | null;
+  /** Where it came from: the agent's own record, the owner's default, or this node's default. */
+  scope: 'agent' | 'default' | 'node' | null;
+  /** Who pays a node choice that applies: the agent's own key, the owner's own, or the node's. */
+  key_source?: 'agent' | 'own' | 'node';
+  /** One sentence for a log line or the agent's page: why this answer. */
+  why: string;
 }
 
 interface Deps { config: AimeatConfig; storage: Storage }
@@ -128,6 +148,56 @@ export async function readLlmChoice(deps: Deps, owner: string, agentName: string
   const shared = validChoice(await readOwnerValue(deps, owner, LLM_DEFAULT_KEY));
   if (shared) return { scope: 'default', value: shared };
   return null;
+}
+
+/** Whether a text call for this agent would find a key, a provider and a model now. Nothing is spent. */
+async function nodePaysFor(deps: Deps, agent: AgentRecord): Promise<{ ok: true; source: 'agent' | 'own' | 'node' } | { ok: false; reason: string }> {
+  try {
+    const plan = await prepareAiCall(deps.storage, deps.config, `${agent.owner}@${deps.config.nodeId}`, {
+      op: 'text', capability: 'text', caller: 'agent', agent: agent.name, appId: 'llm-proxy',
+    });
+    return { ok: true, source: plan.keyScope };
+  } catch (e) {
+    if (e instanceof AiCompletionError) return { ok: false, reason: e.code };
+    throw e;
+  }
+}
+
+/**
+ * The choice that applies to `agent`'s crew now: the answer of GET /v1/agents/:name/crew/llm, which
+ * the runtime reads, and the menu's `effective`.
+ *
+ * THE RULE (Jouni, 2026-10-02). Thinking through the node is the default for every agent that holds
+ * ai:use, when the node has a key to pay with: the place's own key or the owner's own key (the
+ * agent's own key counts too). Without one, the machine the agent runs on uses its own key, as
+ * before. A stored choice wins: the agent's own first, then the owner's default.
+ *
+ * ONE EXCEPTION, THE CASE THAT CAME UP. An owner default of `{kind:'node'}` does not apply to an agent
+ * that cannot use it. The fleet writes that default for every new place, and an agent without ai:use
+ * (the CADENCE crm agent declares none) would be refused on its first model call and fail every task;
+ * it gets the machine's key instead. An agent's OWN node choice is the owner's explicit word about
+ * that agent and stays.
+ *
+ * "PAYS" IS THE DECISION A CALL MAKES: prepareAiCall plans a text call for this agent as /v1/llm would,
+ * and spends nothing. A second copy of the key rules here would drift from the real one.
+ */
+export async function effectiveLlmChoice(deps: Deps, agent: AgentRecord): Promise<EffectiveLlmChoice> {
+  const stored = await readLlmChoice(deps, agent.owner, agent.name);
+  if (stored?.scope === 'agent') return { value: stored.value, scope: 'agent', why: 'The owner chose this for the agent.' };
+  if (stored && stored.value.kind !== 'node') return { value: stored.value, scope: 'default', why: 'The owner\'s default for every agent.' };
+
+  // From here the answer is the node or the machine, and the node needs two things whether the
+  // owner's default named it or nothing did: the word to call /v1/llm, and something that pays.
+  if (!scopeIsCovered(agent.defaultScopes ?? [], 'ai:use')) {
+    return { value: null, scope: null, why: 'The agent does not hold ai:use, so it thinks with the machine\'s own key.' };
+  }
+  const pays = await nodePaysFor(deps, agent);
+  if (!pays.ok) {
+    return { value: null, scope: null, why: `This node has no key to pay for the agent's model calls (${pays.reason}), so it thinks with the machine's own key.` };
+  }
+  return stored
+    ? { value: stored.value, scope: 'default', key_source: pays.source, why: 'The owner\'s default: think through this node.' }
+    : { value: { kind: 'node' }, scope: 'node', key_source: pays.source, why: 'Nothing is chosen, the agent holds ai:use and this node has a key, so it thinks through this node.' };
 }
 
 /**
@@ -223,7 +293,9 @@ export async function crewMenu(deps: Deps, caller: CrewCaller, identifier: strin
   const target = await resolveCrewAgent(deps, caller, identifier);
   if (!target.ok) return target;
 
-  const choice = await readLlmChoice(deps, caller.owner, target.agent.name);
+  const [choice, effective] = await Promise.all([
+    readLlmChoice(deps, caller.owner, target.agent.name), effectiveLlmChoice(deps, target.agent),
+  ]);
 
   const asked = await askCrew(
     deps.config, target.agent, 'crew.menu', {}, caller.principal, deps.config.connectTunnelRequestTimeoutMs,
@@ -242,6 +314,7 @@ export async function crewMenu(deps: Deps, caller: CrewCaller, identifier: strin
           profiles: Array.isArray(r.llm?.profiles) ? r.llm!.profiles as string[] : [],
           models: Array.isArray(r.llm?.models) ? r.llm!.models as Array<Record<string, unknown>> : [],
           choice,
+          effective,
         },
       };
     }
@@ -259,6 +332,7 @@ export async function crewMenu(deps: Deps, caller: CrewCaller, identifier: strin
       profiles: Array.isArray(cat?.profiles) ? cat!.profiles as string[] : [],
       models: Array.isArray(cat?.models) ? cat!.models as Array<Record<string, unknown>> : [],
       choice,
+      effective,
     },
   };
 }

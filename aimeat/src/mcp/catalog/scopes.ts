@@ -25,6 +25,7 @@
  *   v1.48.0 -- 2026-10-02 -- aimeat_agent_runtime_report moves to SCOPE_EXEMPT_TOOLS, as tags did: an
  *     agent reports its own runtime and model road without agent:write.
  *   v1.47.0 -- 2026-10-02 -- aimeat_workspace_object_delete -> memory:purge (removes for good).
+ *   v1.48.0 -- 2026-10-02 -- aimeat_workspace_rows_delete -> memory:purge (removes rows for good).
  *   v1.46.0 -- 2026-10-02 -- aimeat_agent_tags_set moves to SCOPE_EXEMPT_TOOLS: the crew runtime sets
  *     an agent's own tags on every start, and an agent without agent:write finished no task.
  *   v1.45.0 -- 2026-10-02 -- aimeat_task_start -> task:write, aimeat_agent_task_start_set -> agent:write.
@@ -315,7 +316,9 @@ export const TOOL_SCOPES: Record<string, string> = {
     // enforce for the same capability — a tool gated on one word while its route enforces another is
     // the drift invariant 15 exists for.
     aimeat_workspace_rows_append:             'organism:write',
-    aimeat_workspace_rows_delete:             'organism:write',
+    // Removes rows for good: memory:purge since 2026-10-02, held on the task-start floor. The
+    // handler also asks organism:write, as the REST DELETE routes do (mcp/workspace-rows.ts).
+    aimeat_workspace_rows_delete:             'memory:purge',
 
     // These write memory records underneath, whatever the tool is called: a workspace
     // document, a skill manifest, a schedule report, a knowledge contribution.

@@ -22,6 +22,7 @@
  *   const r = await deployAppAgent(storage, config, { callerOwner, appOwner, filename, agentName, undeploy: false });
  *   if (!r.ok) return res.status(r.status).json(error(config.nodeId, r.code, r.message));
  * @version-history
+ *   v1.3.0 — 2026-10-02 — The `proposed` answer names the proposal's `scopes` and `scopes_left_out`.
  *   v1.2.0 — 2026-10-01 — A deploy that names no runner, from a caller who has no crew-forge, becomes
  *     an agent proposal the owner approves (kind `proposed`), when the caller passed its principal.
  *     An install set passes none and keeps its pending state.
@@ -194,6 +195,10 @@ export interface AppAgentProposalView {
   agent_name: string;
   proposed_name: string;
   proposal_id: string;
+  /** What the proposal asks for: the definition's scopes, capped by what the proposer may grant. */
+  scopes: string[];
+  /** Declared by the app and left out of the proposal. */
+  scopes_left_out: string[];
   note: string;
 }
 
@@ -264,6 +269,7 @@ export async function deployAppAgent(
       view: {
         kind: 'proposed', app_id: ctx.appId, agent_name: args.agentName,
         proposed_name: proposed.proposal.proposed_name, proposal_id: proposed.proposal.proposal_id,
+        scopes: proposed.proposal.scopes, scopes_left_out: proposed.proposal.scopes_left_out,
         note: proposed.proposal.already_waiting
           ? 'This agent already waits for your approval on your open items.'
           : 'This agent now waits for your approval on your open items. Approving it creates the agent with its definition.',

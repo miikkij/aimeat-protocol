@@ -343,9 +343,11 @@ await test('5c. Over MCP the propose answer says go on or wait', async () => {
 });
 
 console.log('\n6. Deleting shared records for good is its own permission (ruling B)');
+let purgerAgent!: Agent;
+let wsPurger!: Agent;
 await test('6a. memory:delete alone no longer deletes workspace records for good; memory:purge passes that check', async () => {
   const deleter = await newAgent(owner, 'deleter', ['memory:read', 'memory:delete']);
-  const purger = await newAgent(owner, 'purger', ['memory:read', 'memory:purge']);
+  const purger = purgerAgent = await newAgent(owner, 'purger', ['memory:read', 'memory:purge']);
   const body = JSON.stringify({ namespace: 'shared.notes', ids: ['x'] });
   const refused = await json('/v1/organisms/no-such-organism/workspace/records/delete', { method: 'POST', headers: auth(deleter.token), body });
   assert(refused.status === 403, `memory:delete alone ${refused.status}`);
@@ -359,6 +361,39 @@ await test('6b. An agent holding memory:purge has every task wait, whatever its 
   assert(set.status === 200 && set.body.data.task_start_held_by.includes('memory:purge'), `held_by ${JSON.stringify(set.body.data)}`);
   const r = await createTask(owner.token, 'purger', 'Tidy the workspace');
   assert(r.body.data.task.status === 'queued' && r.body.data.start.waits_because === 'floor', `start ${JSON.stringify(r.body.data.start)}`);
+});
+
+await test('6c. Removing rows or a whole workspace needs memory:purge beside organism:write (REST)', async () => {
+  const writer = await newAgent(owner, 'ws-writer', ['organism:read', 'organism:write']);
+  const both = wsPurger = await newAgent(owner, 'ws-purger', ['organism:read', 'organism:write', 'memory:purge']);
+  const rows = '/v1/organisms/no-such-organism/workspace/rows/notes';
+  const calls: Array<[string, string]> = [
+    ['one row', `${rows}/r1?ws=ws-none`],
+    ['rows before a date', `${rows}?ws=ws-none&before=2026-01-01T00:00:00.000Z`],
+    ['the whole workspace', '/v1/organisms/no-such-organism/workspace'],
+  ];
+  for (const [what, url] of calls) {
+    const refused = await json(url, { method: 'DELETE', headers: auth(writer.token) });
+    assert(refused.status === 403, `${what}, organism:write alone: ${refused.status}`);
+    assert(JSON.stringify(refused.body).includes('memory:purge'), `${what}: the refusal names memory:purge: ${JSON.stringify(refused.body?.error)}`);
+    // Past the permission check, the request meets the next one: the organism does not exist.
+    const passed = await json(url, { method: 'DELETE', headers: auth(both.token) });
+    assert(passed.status === 404, `${what}, with memory:purge: ${passed.status}: ${JSON.stringify(passed.body?.error)}`);
+  }
+});
+
+await test('6d. Over MCP, rows_delete is not offered without memory:purge and asks organism:write beside it', async () => {
+  const args = { organism_id: 'no-such-organism', ws: 'ws-none', space: 'notes', row_id: 'r1' };
+  const writerMcp = await mcpSessionFor(await newAgent(owner, 'ws-writer-mcp', ['organism:read', 'organism:write']));
+  const hidden = await callTool(writerMcp, 'aimeat_workspace_rows_delete', args);
+  assert(hidden.isError, `organism:write alone reached the tool: ${hidden.text}`);
+  // `purger` holds memory:purge and no organism:write (6a).
+  const purgerMcp = await mcpSessionFor(purgerAgent);
+  const denied = await callTool(purgerMcp, 'aimeat_workspace_rows_delete', args);
+  assert(denied.isError && denied.text.startsWith('SCOPE_DENIED') && denied.text.includes('organism:write'), `purge alone: ${denied.text}`);
+  const bothMcp = await mcpSessionFor(wsPurger);
+  const passed = await callTool(bothMcp, 'aimeat_workspace_rows_delete', args);
+  assert(passed.isError && !passed.text.startsWith('SCOPE_DENIED'), `both words: past the permission check, ${passed.text}`);
 });
 
 console.log('\n7. An agent with all permissions, and the narrowing (ruling C)');

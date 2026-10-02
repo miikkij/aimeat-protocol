@@ -11,10 +11,12 @@
  *   was fixed three separate times inside one MCP tool because a rule lived in one door and not the
  *   other.
  * @structure registerWorkspaceRowTools(mcp, deps)
- * @usage registerWorkspaceRowTools(mcp, { storage, config, agentGaii, writerGaii, ownerName });
+ * @usage registerWorkspaceRowTools(mcp, { storage, config, agentGaii, writerGaii, ownerName, scopes });
  * @version-history
  *   v1.0.0 — 2026-08-26 — Initial: extracted from mcp/workspaces.ts.
  *   v1.1.0 — 2026-09-29 — aimeat_workspace_rows_read passes the agent's classification reader (TARGET-082).
+ *   v1.2.0 — 2026-10-02 — aimeat_workspace_rows_delete needs memory:purge (its catalog gate) and
+ *     organism:write, the two words the REST DELETE routes ask (Jouni, 2026-10-02).
  */
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -22,6 +24,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { annotationsFor } from './annotations.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { descriptionFor } from './catalog/shape.js';
 import {
     appendRows, readRows, spaceStats, deleteRow, deleteRowsBefore,
@@ -38,10 +41,12 @@ export interface WorkspaceRowToolDeps {
     /** The identity that AUTHORS: an agent's own GAII when an agent is calling, else the owner GHII. */
     writerGaii: string;
     ownerName: string;
+    /** The session's scopes. Removing rows needs organism:write beside the tool's memory:purge. */
+    scopes: string[];
 }
 
 export function registerWorkspaceRowTools(mcp: McpServer, deps: WorkspaceRowToolDeps): void {
-    const { storage, config, agentGaii, writerGaii, ownerName } = deps;
+    const { storage, config, agentGaii, writerGaii, ownerName, scopes } = deps;
     const rowDeps = { storage, config };
 
     const ok = (obj: unknown): TextResult => ({ content: [{ type: 'text', text: JSON.stringify(obj, null, 2) }] });
@@ -125,6 +130,12 @@ export function registerWorkspaceRowTools(mcp: McpServer, deps: WorkspaceRowTool
             // parameter was forgotten is the shape this refusal exists to prevent.
             if (!!row_id === !!before) {
                 return fail('Pass exactly one of `row_id` (remove that row) or `before` (remove everything created before that ISO timestamp).');
+            }
+            // TWO WORDS, AS ON REST. The tool's own gate is memory:purge (catalog/scopes.ts), because
+            // a removed row cannot come back; organism:write is what the DELETE routes asked before
+            // that, and an app grant holds purge without it (routes/organisms/workspace-rows.ts).
+            if (!scopeIsCovered(scopes, 'organism:write')) {
+                return fail('SCOPE_DENIED: removing rows changes a workspace, which needs the organism:write permission beside memory:purge. Ask the owner for it.');
             }
             try {
                 if (row_id) {
