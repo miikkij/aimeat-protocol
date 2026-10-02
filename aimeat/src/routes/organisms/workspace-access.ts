@@ -6,6 +6,8 @@
  *   email invitations, provisioned-code ("key") invitations, and the PUBLIC invitation token flow.
  *   Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.14.1 — 2026-10-02 — PATCH and cancel on /:id/invitations/email/:invId answer 404 for a
+ *     provisioned-code key, which has its own cancel that also deletes the account it provisioned.
  *   v1.14.0 — 2026-10-02 — POST /:id/workspace-access/decision moves from requireRole('agent') to
  *     requireScope('organism:invite'), the word grant, revoke and the MCP decide path already ask. The
  *     role gate let any agent decide whatever its scopes, and refused an app's own token (role app)
@@ -468,7 +470,9 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     const organism = await requireOrgAdmin(req, res, id);
     if (!organism) return;
     const inv = await storage.getInvitation(invId);
-    if (!inv || inv.organismId !== id) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Invitation not found')); return; }
+    // A provisioned-code key's grants were applied at mint; its cancel revokes the grants the record
+    // names, so editing them here would leave the applied ones behind.
+    if (!inv || inv.organismId !== id || inv.type === 'code') { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Invitation not found')); return; }
     if (inv.status !== 'pending') { res.status(409).json(error(config.nodeId, 'INVALID_STATE', `Invitation is already ${inv.status}`)); return; }
     const { orgRole, workspaces } = req.body ?? {};
     if (orgRole === undefined && workspaces === undefined) {

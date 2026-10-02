@@ -43572,7 +43572,8 @@ paths:
       description: >-
         Creator/admin edits a PENDING email invitation's organism role and/or workspace grants
         before it is accepted — mirroring PATCH /v1/organisms/{id}/invitations/{ghii} for name
-        invites. 409 INVALID_STATE when the invitation is no longer pending.
+        invites. 409 INVALID_STATE when the invitation is no longer pending. A provisioned-code key
+        answers 404: its grants were applied when it was minted.
       tags: [Organisms]
       security:
         - BearerAuth: []
@@ -43607,7 +43608,11 @@ paths:
     post:
       operationId: cancelOrganismEmailInvitation
       summary: Cancel a pending email invitation
-      description: Creator/admin cancels a pending email invitation, invalidating its link before use.
+      description: >-
+        Creator/admin cancels a pending email invitation, invalidating its link before use. A
+        provisioned-code key answers 404: it is cancelled through
+        POST /v1/organisms/{id}/invitations/code/{invId}/cancel, which also deletes the account it
+        provisioned.
       tags: [Organisms]
       security:
         - BearerAuth: []
