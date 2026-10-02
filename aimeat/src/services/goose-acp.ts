@@ -25,6 +25,8 @@
  *   const sessionId = await acp.newSession({ mcpServers: [aimeatMcpServer(base, token)] });
  *   for await (const u of acp.prompt(sessionId, 'build me a pong game')) { … }
  * @version-history
+ *   v2.8.0 — 2026-10-02 — The chat's tool surface is /v2/mcp/chat: a small core, the rest found by
+ *     purpose. On /v1/mcp a one-line question paid for about 129 000 tokens of tool descriptions.
  *   v2.7.0 — 2026-10-02 — cancel() sends `session/cancel` as the notification ACP defines. Sent as a
  *     request it was refused by goose 1.50.0 ("-32601: Method not found"), so Stop, leaving the page
  *     and the chat's turn ceiling never stopped a real agent.
@@ -384,12 +386,18 @@ function normalise(update: Record<string, unknown>): SessionUpdate {
     }
 }
 
-/** The aimeat MCP server, as one session's tool surface, carrying that person's own agent token. */
+/**
+ * The aimeat MCP server, as one session's tool surface, carrying that person's own agent token.
+ *
+ * THE CHAT SURFACE, not /v1/mcp. /v1/mcp lists every tool the agent may use, and the model reads that
+ * list on every round: 324 tools, about 129 000 tokens, measured 2026-10-02. /v2/mcp/chat lists a
+ * small core and switches the rest on by purpose (mcp/tool-loader.ts), so nothing is out of reach.
+ */
 export function aimeatMcpServer(baseUrl: string, agentToken: string): AcpMcpServer {
     return {
         name: 'aimeat',
         type: 'http',
-        url: `${baseUrl.replace(/\/+$/, '')}/v1/mcp`,
+        url: `${baseUrl.replace(/\/+$/, '')}/v2/mcp/chat`,
         headers: [{ name: 'Authorization', value: `Bearer ${agentToken}` }],
     };
 }

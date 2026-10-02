@@ -5,6 +5,7 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.14.0 — 2026-10-02 — aimeat_tools_find: the chat surface's door to the tools it keeps off.
  *   v1.13.0 — 2026-10-01 — aimeat_admin_federation_peer_remove: remove a peer, or free a node id held
  *     under another key, from chat (follow-up to the peer-registration incident, item 5).
  *   v1.12.0 — 2026-09-30 — aimeat_admin_node_update: a newer AIMEAT on npm, and the update prompt.
@@ -91,6 +92,16 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
         input: {
             capability: { type: 'string', required: true, description: "The capability id, e.g. aimeat_memory_write. Get it from aimeat_discover or GET /v1/capabilities/node." },
             input: { type: 'object', description: "That capability's own parameters, as an object." },
+        },
+    },
+    {
+        name: 'aimeat_tools_find',
+        description: "Your tool list starts small, and this node has many more tools. When the job needs one you do not see, say what you want to do and this finds the tools for it and adds them to your list for the rest of this conversation. Then call them by name; a tool your list does not show yet (some clients read it again only on the next message) runs now through aimeat_invoke, with its name as `capability`. Search in English with plain words for the action and the thing (\"add a contact\", \"publish an app\", \"read my mail\", \"schedule a task\"). The answer names each tool, what it does and what it needs. Tools already in your list are named too, so a search never sends you looking for one you have.",
+        caller: 'agent',
+        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        input: {
+            purpose: { type: 'string', required: true, description: 'What you want to do, in a few words.' },
+            limit: { type: 'number', description: 'How many tools to add at most (default 6, max 12).' },
         },
     },
     {

@@ -15,6 +15,9 @@
  *   import { instructionsFor } from './instructions.js';
  *   new McpServer({ name, version }, { capabilities, instructions: instructionsFor(role, { guidance }) });
  * @version-history
+ *   v1.7.0 — 2026-10-02 — The `chat` surface: its line says the tool list starts small and that
+ *     aimeat_tools_find adds what the job needs. It carries the new-agent paragraph and the keep
+ *     sentence, as the owner's own agent.
  *   v1.6.0 — 2026-10-02 — A request for a new agent is a proposal on this node, built on the
  *     person's own organisms and workspaces, never a referral elsewhere. Right after the core and the
  *     support line, on the surfaces that reach aimeat_agent_propose; CORE itself had no room.
@@ -58,6 +61,7 @@ export const SURFACE_INTROS: Record<SurfaceRole, string> = {
     admin: 'This interface is for governance: operator settings, flags, groups, consent and agent management.',
     commerce: 'This interface is for selling and getting paid: credentials, priced manifests, checkout and receipts.',
     primitives: 'This interface is a handful of tools, and everything else is data: search what this node can do with aimeat_discover (type="capability"), then run what you found with aimeat_invoke. It runs as you, so it can do what you can do and nothing more.',
+    chat: 'This interface is the owner\'s own chat, and its tool list starts small: the tools most jobs need. This node has many more, and none is out of reach. When the job needs a tool you do not see, call aimeat_tools_find with what you want to do; the tools it finds join your list for the rest of this conversation, and until your list shows them, aimeat_invoke runs them by name. Do that before you tell the person something cannot be done.',
     full: 'This interface carries everything the node offers, so nothing here is narrowed to one kind of work. If your work does have a shape — building apps, running the owner\'s own agent, offering a service, governing the node, selling — the surface named after it is smaller to hold and harder to misfire from. Start with aimeat_handbook_get either way.',
 };
 
@@ -76,7 +80,7 @@ const KEEP_SENTENCE = ' When they say one turned out well, record it: aimeat_des
  * the handbook and the tool's own description carry the same rule for that client.
  */
 const AGENT_PARAGRAPH = 'When the person asks for a new agent, read the organisms and workspaces it will work on, propose it with aimeat_agent_propose, and give them the approval address from the answer. This node makes and runs the agent, so never send them to build one elsewhere.';
-const PROPOSING_ROLES: ReadonlySet<SurfaceRole | 'all'> = new Set(['all', 'full', 'agent', 'admin', 'primitives']);
+const PROPOSING_ROLES: ReadonlySet<SurfaceRole | 'all'> = new Set(['all', 'full', 'agent', 'admin', 'primitives', 'chat']);
 
 /**
  * What an agent has to act on, in the first 1 500 characters. Several clients cut the instructions
@@ -167,7 +171,9 @@ export function instructionsFor(role: SurfaceRole | 'all', opts: InstructionsOpt
     // form. The owner's proactive guidance comes last because it is the longest part by far and
     // aimeat_handbook_get carries it as well, so an agent that reads the handbook has it anyway.
     // The sentence about an app that turned out well names a tool, and only these surfaces carry it.
-    const hasKeep = role === 'all' || role === 'full' || role === 'agent';
+    // The chat reaches aimeat_designbook_keep through aimeat_tools_find, and it is the owner's own
+    // agent, which is who hears that an app turned out well.
+    const hasKeep = role === 'all' || role === 'full' || role === 'agent' || role === 'chat';
     const parts: string[] = [hasKeep ? CORE : CORE.replace(KEEP_SENTENCE, '')];
 
     // The address is unchanged and the agent does the same thing with it. What this adds is only

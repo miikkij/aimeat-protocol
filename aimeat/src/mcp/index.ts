@@ -11,6 +11,9 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   2026-10-02 — /v2/mcp/chat registers every permitted tool, switches off what the chat's list does
+ *     not name, and adds aimeat_tools_find; a call by name switches a tool back on
+ *     (mcp/tool-loader.ts).
  *   2026-09-28 — Every tool that takes organism_id refuses an agent the organism does not admit
  *     (mcp/organism-agent-gate.ts).
  *   2026-09-27 — answerMovedTools(): a call to one of the ten tools aimeat_app_manage replaced answers TOOL_MOVED.
@@ -128,7 +131,8 @@ import { scopeAllowsTool } from './catalog/scopes.js';
 import { wrapToolHandler } from './tool-usage-wrap.js';
 import { withOrganismAgentGate } from './organism-agent-gate.js';
 import { withErrorNextStep } from './error-next-step.js';
-import { toolsForSurface, isV2Role, V2_ROLES, type SurfaceRole } from './catalog/surfaces.js';
+import { toolsForSurface, toolsRegisteredOn, isV2Role, V2_ROLES, type SurfaceRole } from './catalog/surfaces.js';
+import { keepOnly, answerSwitchedOffTools } from './tool-loader.js';
 import { instructionsFor } from './instructions.js';
 import { proactiveGuidance } from '../services/proactive-mode.js';
 import { registerManagedPrompts } from './prompts-managed.js';
@@ -265,7 +269,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // requireScope gates). Owner-attached agents with a '*' scope get everything. Warn-only
         // mode (config.mcpEnforceScopes=false) registers all tools but logs what WOULD be filtered.
         const enforce = config.mcpEnforceScopes;
-        const surfaceTools = role === 'all' ? null : toolsForSurface(role);
+        // On `chat` this is everything `full` carries: what is not on the chat's own list is
+        // registered and then switched off below (mcp/tool-loader.ts).
+        const surfaceTools = role === 'all' ? null : toolsRegisteredOn(role);
         const filteredTools: string[] = [];
         type ToolFn = (...args: unknown[]) => unknown;
         const patchable = mcp as unknown as { tool: ToolFn; registerTool: ToolFn };
@@ -314,6 +320,14 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // A tool that became an action of another answers with the call that replaces it, and stays
         // out of tools/list (mcp/moved-tools-answer.ts).
         answerMovedTools(mcp);
+        // THE CHAT STARTS SMALL. Everything permitted is registered above; what the chat's own list
+        // does not name is switched off here, before the client first lists the tools, and comes
+        // back on by purpose (aimeat_tools_find) or when it is called by name.
+        if (role === 'chat') {
+            const off = keepOnly(mcp, toolsForSurface('chat'));
+            answerSwitchedOffTools(mcp);
+            logger.info(`[mcp-chat] ${agentGaii}: ${off} tool(s) registered and switched off until needed`);
+        }
 
         // The node's managed prompts, as the primitive the PERSON picks from (a slash command in
         // Claude Code) rather than one the model has to think of calling. Registered after the

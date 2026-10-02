@@ -8,6 +8,7 @@
  *   The GET / response includes AI-facing guidance sections (for_ai_assistants, for_ai_agents)
  *   and the full endpoint catalogue grouped by capability domain.
  * @version-history
+ *   v1.4.3 — 2026-10-02 — The surfaces list names `chat`, the node chat's small starting set.
  *   v1.4.2 — 2026-09-24 — The root's SPA shell carries the live page body: the apps whose owners
  *     asked to be found, and the latest changes (services/page-body-live.ts), for Bing.
  *   v1.4.1 — 2026-09-18 — The instruction review's factual corrections. Gone: matches (the engine was
@@ -539,6 +540,7 @@ export function bootstrapRouter(
                 admin: `${base}/v2/mcp/admin — operator/owner governance: node admin, moderation, groups, consent`,
                 commerce: `${base}/v2/mcp/commerce — selling and getting paid: priced manifests, checkout, receipts, beneficiary splits`,
                 primitives: `${base}/v2/mcp/primitives — a handful of tools; everything else found with aimeat_discover and run with aimeat_invoke`,
+                chat: `${base}/v2/mcp/chat — what this node's own chat uses: about twenty tools listed, every other one you may use added by purpose with aimeat_tools_find`,
                 full: `${base}/v2/mcp/full — everything this node offers, for work that does not fit one of the focused surfaces`,
               },
             },

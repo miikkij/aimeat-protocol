@@ -32,6 +32,8 @@
  *   cd aimeat && pnpm check:surface-focus            # report
  *   cd aimeat && pnpm check:surface-focus --strict   # the hook/CI gate
  * @version-history
+ *   v1.1.0 — 2026-10-02 — The `chat` surface is seeded, and left out of the spread count
+ *     (NOT_A_PLACEMENT): its list is what a session starts with, not where a tool lives.
  *   v1.0.0 — 2026-09-03 — Initial, with the `full` surface it measures against.
  */
 import { MCP_SURFACES, V2_ROLES, type SurfaceRole } from '../src/mcp/catalog/surfaces.js';
@@ -47,7 +49,16 @@ const DISTANCE_SEED: Record<Exclude<SurfaceRole, 'full'>, number> = {
     admin: 244,
     commerce: 263,
     primitives: 279,
+    // 2026-10-02: the node chat's starting set, 19 tools (catalog/surfaces.ts MCP_SURFACES.chat).
+    chat: 376,
 };
+
+/**
+ * Surfaces left out of the spread count. `chat` names what is ON when a session opens, and registers
+ * every other permitted tool switched off, so a tool on its list has not been placed there the way a
+ * tool on `agent` has; counting it would put every core tool one surface closer to the limit.
+ */
+const NOT_A_PLACEMENT: ReadonlySet<string> = new Set(['chat']);
 
 /** Tools carried by four or more surfaces — placed everywhere is placed nowhere. */
 const SPREAD_SEED = 12;
@@ -70,7 +81,7 @@ export function focusReport(
     const full = (surfaces.full ?? []).length;
     const carriedBy = new Map<string, number>();
     for (const [role, tools] of Object.entries(surfaces)) {
-        if (role === 'full') continue;
+        if (role === 'full' || NOT_A_PLACEMENT.has(role)) continue;
         for (const name of tools) carriedBy.set(name, (carriedBy.get(name) ?? 0) + 1);
     }
     const spread = [...carriedBy.values()].filter(n => n >= spreadAt).length;
@@ -96,7 +107,7 @@ function main(): void {
 
     const carriedBy = new Map<string, number>();
     for (const role of V2_ROLES) {
-        if (role === 'full') continue;
+        if (role === 'full' || NOT_A_PLACEMENT.has(role)) continue;
         for (const name of MCP_SURFACES[role]) carriedBy.set(name, (carriedBy.get(name) ?? 0) + 1);
     }
     const spread = [...carriedBy.values()].filter(n => n >= SPREAD_AT).length;

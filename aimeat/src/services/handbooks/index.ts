@@ -7,6 +7,7 @@
  *   Served via GET /v1/agents/me/handbook/surface/:role and the MCP aimeat_handbook_get(surface=...).
  * @structure SURFACE_HANDBOOKS (role -> markdown) + handbookForRole()
  * @version-history
+ *   v1.3.0 -- 2026-10-02 -- The chat surface's handbook (handbooks/chat.ts)
  *   v1.2.0 -- 2026-07-28 -- The enterprise handbook becomes the commerce handbook (edition seam removed)
  *   v1.1.0 -- 2026-07-14 -- Add the enterprise surface handbook (company commerce)
  *   v1.0.0 -- 2026-05-30 -- Aggregate the 4 v2 surface handbooks
@@ -19,9 +20,11 @@ import { ADMIN_HANDBOOK } from './admin.js';
 import { COMMERCE_HANDBOOK } from './commerce.js';
 import { PRIMITIVES_HANDBOOK } from './primitives.js';
 import { FULL_HANDBOOK } from './full.js';
+import { CHAT_HANDBOOK } from './chat.js';
 
 export const SURFACE_HANDBOOKS: Record<SurfaceRole, string> = {
     agent: AGENT_HANDBOOK,
+    chat: CHAT_HANDBOOK,
     appdev: APPDEV_HANDBOOK,
     service: SERVICE_HANDBOOK,
     admin: ADMIN_HANDBOOK,
