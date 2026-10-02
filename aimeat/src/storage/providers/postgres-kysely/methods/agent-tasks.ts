@@ -10,6 +10,7 @@
  *   groups by agent then folds status/doneToday/lastTaskUpdateAt/lastFailedAt, findStalledTasks compares
  *   lastEventAt to a now-threshold. Delete cascades the event log and refuses an 'active' task.
  * @version-history
+ *   2026-10-02 — startPolicy on insert, update and read (migration 0092).
  *   2026-10-01 — countTasksByOwner also returns doneWeek, done tasks of the last 7 days.
  *   2026-08-15 — createdBy on insert and read (migration 0037).
  *   v1.0.0 — 2026-07-15 — Phase 5: agent-task domain on Postgres+Kysely.
@@ -42,6 +43,7 @@ function toTask(r: Selectable<AgentTask>): AgentTaskRecord {
     updatedAt: iso(r.updatedAt),
   };
   if (r.dedupeKey != null) rec.dedupeKey = r.dedupeKey;
+  if (r.startPolicy === 'automatic' || r.startPolicy === 'confirm') rec.startPolicy = r.startPolicy;
   if (r.resources != null) rec.resources = r.resources as AgentTaskRecord['resources'];
   if (r.parentTaskId != null) rec.parentTaskId = r.parentTaskId;
   if (r.workTrackingCode != null) rec.workTrackingCode = r.workTrackingCode;
@@ -83,6 +85,7 @@ export const agentTaskMethods = {
       todos: jsonb(record.todos),
       status: record.status,
       dedupeKey: record.dedupeKey ?? null,
+      startPolicy: record.startPolicy ?? null,
       parentTaskId: record.parentTaskId ?? null,
       workTrackingCode: record.workTrackingCode ?? null,
       telemetry: jsonb(record.telemetry ?? null),
@@ -156,6 +159,7 @@ export const agentTaskMethods = {
       resources: jsonb(merged.resources ?? null),
       todos: jsonb(merged.todos),
       status: merged.status,
+      startPolicy: merged.startPolicy ?? null,
       parentTaskId: merged.parentTaskId ?? null,
       workTrackingCode: merged.workTrackingCode ?? null,
       telemetry: jsonb(merged.telemetry ?? null),

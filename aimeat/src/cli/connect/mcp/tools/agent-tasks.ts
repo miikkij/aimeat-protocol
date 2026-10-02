@@ -7,6 +7,8 @@
  *   mode, each tool accepts an optional `agent_name` parameter; if omitted, the
  *   registry's primary agent is used.
  * @version-history
+ *   2026-10-02 — aimeat_task_create takes `start`, propose_todos takes `effects` per todo, and
+ *     aimeat_task_start / aimeat_agent_task_start_set: parity with the server MCP surface.
  *   2026-08-16 — aimeat_task_complete takes `deliverable_key`. It had been on the REST route and the
  *     server MCP tool and missing here, so zod stripped it from every connector call: the completion
  *     succeeded and the pointer to the agent's own output was gone. Found by crewaimeat-dev, who
@@ -69,9 +71,10 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
         type: z.enum(['text', 'url', 'memory_key', 'number', 'cron']).optional().describe('How to read the value. Defaults to "text".'),
         description: z.string().optional(),
       })).max(20).optional().describe('Named parameters the receiving runner DISPATCHES on, as opposed to the description, which is prose for a model. A fleet runner recognises work by a `kind` entry here and takes its pointers from the others.'),
+      start: z.enum(['automatic', 'confirm']).optional().describe("How THIS task starts: 'confirm' waits for the owner's OK, 'automatic' lets the agent go on (needs agent:write, never your own task). Omit for the agent's own setting."),
     },
     annotationsFor('aimeat_task_create'),
-    async ({ agent_name, target_agent, title, description, status, files, scope }) => {
+    async ({ agent_name, target_agent, title, description, status, files, scope, start }) => {
       const { client } = pickAgent(registry, agent_name);
       const body: Record<string, unknown> = {
         title,
@@ -84,6 +87,7 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
       };
       if (scope?.length) body.scope = scope.map(sc => ({ ...sc, type: sc.type ?? 'text' }));
       if (files?.length) body.resources = { files: files.map(ref => ({ ref })) };
+      if (start) body.start = start;
       const resp = await client.post(`/v1/agents/${encodeURIComponent(target_agent)}/tasks`, body);
       return envelopeResult(resp);
     },
@@ -107,6 +111,7 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
       description: z.string().optional().describe('TODO details'),
       verification: z.string().optional().describe('How completion can be verified'),
       estimate_minutes: z.number().optional().describe('Estimated work time in minutes'),
+      effects: z.array(z.enum(['spend', 'send_as_owner', 'delete'])).optional().describe("What this step does that the owner must see first; such a plan waits for the owner's OK."),
     })).describe('Proposed TODO plan'),
   }, annotationsFor('aimeat_task_propose_todos'), async ({ agent_name, task_id, todos }) => {
     const { client, agent } = pickAgent(registry, agent_name);
@@ -121,9 +126,30 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
         environment: 'agent',
         verification: todo.verification ?? '',
         estimate_minutes: todo.estimate_minutes,
+        ...(todo.effects?.length ? { effects: todo.effects } : {}),
       })),
     };
     const resp = await client.post(`/v1/agents/${enc}/tasks/${encodeURIComponent(task_id)}/propose-todos`, payload);
+    return envelopeResult(resp);
+  });
+
+  mcp.tool('aimeat_task_start', descriptionFor('aimeat_task_start'), {
+    agent_name: agentNameSchema,
+    task_id: z.string().describe('The waiting task to start.'),
+  }, annotationsFor('aimeat_task_start'), async ({ agent_name, task_id }) => {
+    const { client, agent } = pickAgent(registry, agent_name);
+    // The route reads the task by id; the name segment is the caller's own and decides nothing.
+    const resp = await client.post(`/v1/agents/${encodeURIComponent(agent)}/tasks/${encodeURIComponent(task_id)}/start`, {});
+    return envelopeResult(resp);
+  });
+
+  mcp.tool('aimeat_agent_task_start_set', descriptionFor('aimeat_agent_task_start_set'), {
+    agent_name: agentNameSchema,
+    target_agent_name: z.string().describe('The agent this is about (same owner, never yourself).'),
+    task_start: z.enum(['automatic', 'confirm']).nullable().describe("'automatic', 'confirm', or null to leave it to the agent's mode."),
+  }, annotationsFor('aimeat_agent_task_start_set'), async ({ agent_name, target_agent_name, task_start }) => {
+    const { client } = pickAgent(registry, agent_name);
+    const resp = await client.patch(`/v1/agents/${encodeURIComponent(target_agent_name)}/task-start`, { task_start });
     return envelopeResult(resp);
   });
 

@@ -22,6 +22,7 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.45.0 -- 2026-10-02 -- aimeat_task_start -> task:write, aimeat_agent_task_start_set -> agent:write.
  *   v1.44.0 -- 2026-10-02 -- aimeat_package_withdraw -> packages:write, the word its route asks (phase 5).
  *   v1.43.0 -- 2026-10-02 -- aimeat_package_compose_set -> packages:write, as compose (phase 4).
  *   v1.42.0 -- 2026-10-02 -- aimeat_package_offer -> packages:write, aimeat_package_buy -> commerce:buy,
@@ -421,6 +422,10 @@ export const TOOL_SCOPES: Record<string, string> = {
     // Running a schedule now creates the same work its cron would, only sooner.
     aimeat_schedule_trigger:                  'task:write',
     aimeat_task_create:                       'task:write',
+    // Starts work that was waiting for the owner's OK, on the owner's word.
+    aimeat_task_start:                        'task:write',
+    // Changes whether an agent's work starts without asking: the agent:write word, like its mode.
+    aimeat_agent_task_start_set:              'agent:write',
 
     // Asks somebody else to do work, which can cost.
     aimeat_capabilities_invoke:               'work:request',

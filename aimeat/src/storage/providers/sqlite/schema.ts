@@ -12,6 +12,7 @@
  *   block 1), or upgrades crash with "no such column" before the ALTER runs.
  * @usage initializeSchema(db) from sqlite/index.ts constructor.
  * @version-history
+ *   2026-10-02 — agent_tasks.startPolicy, agents.taskStart: how a task starts (migration 0092 says why).
  *   2026-09-26 — The move to the GHII is the half of migration 0086, on positive evidence only; the
  *     half of 0085 no longer runs (schema-identity-backfill.ts).
  *   2026-09-26 — The move to the GHII runs once for each database, as its Postgres migration does,
@@ -215,6 +216,8 @@ export function initializeSchema(db: Database.Database): void {
   // Who ORDERED the task, as opposed to agentGaii who receives it. Without it the party that
   // placed a commission could not read it back. See migration 0037.
   safeAddColumn('agent_tasks', 'createdBy', 'TEXT');
+  safeAddColumn('agent_tasks', 'startPolicy', 'TEXT');
+  safeAddColumn('agents', 'taskStart', 'TEXT');
   db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS ux_agent_tasks_live_dedupe ON agent_tasks(agentGaii, dedupeKey)
            WHERE dedupeKey IS NOT NULL AND status IN ('draft','queued','revision_requested','active','paused')`);
 

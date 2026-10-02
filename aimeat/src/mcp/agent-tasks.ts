@@ -9,6 +9,11 @@
  *   import { registerAgentTaskTools } from './agent-tasks.js';
  *   registerAgentTaskTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.11.0 — 2026-10-02 — Whether a task starts on its own or waits for the owner's OK.
+ *     aimeat_task_create takes `start` and answers with `start` (runs now, or waits and why);
+ *     aimeat_task_propose_todos takes `effects` per todo and says whether to go on or stop;
+ *     aimeat_task_start lets the owner's own AI start a waiting task on their word;
+ *     aimeat_agent_task_start_set sets an agent's standing answer. services/agent-task-rules.ts.
  *   v1.10.0 — 2026-09-29 — Attachments resolve with the agent's classification reader (TARGET-082).
  *   v1.9.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
@@ -74,6 +79,11 @@ import type { Storage, AgentTaskRecord } from '../storage/interface.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { readinessRefusal } from '../middleware/readiness-gate.js';
 import { createTask, recordTaskEvent, applyProposedPlan, setTodoStatus } from '../services/agent-task-write.js';
+import { mayLoosenStart, type StartCaller } from '../services/agent-task-rules.js';
+import { startAnswer } from '../services/task-start-notice.js';
+import { startWaitingTask } from '../services/task-start-op.js';
+import { setAgentTaskStart, taskStartView } from '../services/agent-task-start-write.js';
+import { toolError } from './tool-error.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { parseGAII, buildGAII, localAccountName } from '../utils/gaii.js';
@@ -90,8 +100,11 @@ export function registerAgentTaskTools(
     getAgentGaii: () => string,
     emitResourceUpdated: (agentGaii: string, uri: string) => void,
     _emitResourceListChanged: (agentGaii: string) => void,
+    sessionScopes: string[] = [],
 ): void {
     const agentGaii = getAgentGaii();
+    /** This session as the start rules read it: always an agent over MCP, never the owner in person. */
+    const startCaller: StartCaller = { ownerInPerson: false, app: false, principal: agentGaii, scopes: sessionScopes };
 
     /** Check if a task belongs to the current agent. */
     function isOwnTask(task: AgentTaskRecord): boolean {
@@ -137,9 +150,11 @@ export function registerAgentTaskTools(
                 description: z.string().optional().describe('What this field is for, for whoever reads the task.'),
             })).max(20).optional()
                 .describe('Named parameters the receiving runner DISPATCHES on, as opposed to the description, which is prose for a model to read. A fleet runner recognises work by a `kind` entry here and takes its pointers (a memory key, an app id) from the others — putting those in the title instead is the standard way to build a task nothing picks up.'),
+            start: z.enum(['automatic', 'confirm']).optional()
+                .describe("How THIS task starts. 'confirm' = it waits for the owner's OK (\"check with me first\"); 'automatic' = the agent proposes its plan and goes on (\"just do it\"), which needs agent:write and is never allowed for your own task. Leave it out to use the agent's own setting."),
         },
         annotationsFor('aimeat_task_create'),
-        async ({ target_agent, title, description, status, files, scope }) => {
+        async ({ target_agent, title, description, status, files, scope, start }) => {
             const callerParsed = parseGAII(agentGaii);
             if (!callerParsed) {
                 return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
@@ -175,8 +190,10 @@ export function registerAgentTaskTools(
                     // common case to satisfy a schema.
                     ...(scope?.length ? { scope: scope.map(s => ({ ...s, type: s.type ?? 'text' as const })) } : {}),
                     ...(files?.length ? { resources: { files: files.map(ref => ({ ref })) } } : {}),
+                    ...(start ? { start } : {}),
                 },
                 actor: agentGaii,
+                mayAskAutomatic: mayLoosenStart(startCaller, targetGaii),
             });
             if (!result.ok) {
                 return { content: [{ type: 'text' as const, text: `${result.code}: ${result.message}` }], isError: true };
@@ -197,6 +214,10 @@ export function registerAgentTaskTools(
                         task_id: created.id,
                         target_agent,
                         status: created.status,
+                        // Does it run now, or wait for the owner, and why: tell the person in your
+                        // own words. A task that waits only because of the setting is one you may
+                        // start with aimeat_task_start when they say so.
+                        start: startAnswer(targetAgent.displayName || target_agent, result.decision, created.status),
                         files: created.resources?.files?.length ?? 0,
                         created_at: created.createdAt,
                     }, null, 2),
@@ -301,7 +322,9 @@ export function registerAgentTaskTools(
                             estimate_minutes: t.estimateMinutes,
                             status: t.status,
                             completed_at: t.completedAt,
+                            ...(t.effects?.length ? { effects: t.effects } : {}),
                         })),
+                        start_policy: task.startPolicy ?? null,
                         parent_task_id: task.parentTaskId,
                         telemetry: task.telemetry,
                         // WHAT IT PRODUCED. Absent until now, which made a finished task
@@ -329,6 +352,8 @@ export function registerAgentTaskTools(
                 description: z.string().optional().describe('TODO details'),
                 verification: z.string().optional().describe('How completion can be verified'),
                 estimate_minutes: z.number().optional().describe('Estimated work time in minutes'),
+                effects: z.array(z.enum(['spend', 'send_as_owner', 'delete'])).optional()
+                    .describe("Declare what this step does that the owner must see first: 'spend' (money), 'send_as_owner' (mail or a message in the owner's name), 'delete' (removes the owner's data). A plan with any of these waits for the owner's OK."),
             })).describe('Proposed TODO plan'),
         },
         annotationsFor('aimeat_task_propose_todos'),
@@ -349,6 +374,7 @@ export function registerAgentTaskTools(
                 description: todo.description,
                 verification: todo.verification,
                 estimate_minutes: todo.estimate_minutes,
+                effects: todo.effects,
                 // Work proposed through this tool is by definition the connected agent's own, and
                 // this is the reason it states for that.
                 environment: 'agent' as const,
@@ -367,6 +393,10 @@ export function registerAgentTaskTools(
                         updated: true,
                         task_id,
                         status: result.task?.status ?? task.status,
+                        // What to do now. `go_on`: the task is active, carry out the plan.
+                        // `wait_for_owner`: the owner has been told; do nothing until it is active.
+                        next: (result.task?.status ?? task.status) === 'active' ? 'go_on' : 'wait_for_owner',
+                        ...(result.heldBack ? { held_back: true } : {}),
                         todo_count: result.todos.length,
                         outdated_count: result.outdatedCount,
                         todos: result.todos.map(todo => ({
@@ -378,6 +408,44 @@ export function registerAgentTaskTools(
                     }, null, 2),
                 }],
             };
+        },
+    );
+
+    // ── Tool 3a: aimeat_task_start ──
+    // The owner's own AI starting a task that waits for their OK, on their word. The same rule as
+    // POST /v1/agents/:name/tasks/:id/start for an agent caller: never your own task, never one the
+    // permission floor or a declared effect holds. services/task-start-op.ts is the one implementation.
+    mcp.tool(
+        'aimeat_task_start',
+        descriptionFor('aimeat_task_start'),
+        {
+            task_id: z.string().describe('The waiting task to start.'),
+        },
+        annotationsFor('aimeat_task_start'),
+        async ({ task_id }) => {
+            const out = await startWaitingTask({ storage, config }, startCaller, localAccountName(agentGaii), task_id);
+            if (!out.ok) return { ...toolError(out.code, out.message) };
+            emitResourceUpdated(out.task.agentGaii, `aimeat://agents/${out.task.agentGaii.split('#')[0]}/tasks`);
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ started: true, task_id: out.task.id, status: out.task.status }, null, 2) }] };
+        },
+    );
+
+    // ── Tool 3b: aimeat_agent_task_start_set ──
+    // The agent's standing answer, set from the chat ("let the concierge start its tasks by itself").
+    // Same implementation as PATCH /v1/agents/:name/task-start; never the calling agent's own.
+    mcp.tool(
+        'aimeat_agent_task_start_set',
+        descriptionFor('aimeat_agent_task_start_set'),
+        {
+            target_agent_name: z.string().describe('Agent whose tasks this is about (same owner as you, never yourself).'),
+            task_start: z.enum(['automatic', 'confirm']).nullable()
+                .describe("'automatic' = it proposes its plan and goes on; 'confirm' = each task waits for the owner's OK; null = leave it to the agent's mode."),
+        },
+        annotationsFor('aimeat_agent_task_start_set'),
+        async ({ target_agent_name, task_start }) => {
+            const out = await setAgentTaskStart({ storage, config }, localAccountName(agentGaii), agentGaii, target_agent_name, task_start);
+            if (!out.ok) return { ...toolError(out.code, out.message) };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ name: out.agent.name, ...taskStartView(out.agent) }, null, 2) }] };
         },
     );
 

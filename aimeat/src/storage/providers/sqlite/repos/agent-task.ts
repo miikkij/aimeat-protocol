@@ -5,6 +5,7 @@
  * @description SQLite implementation for agent task CRUD, events, and stall detection
  * @version-history
  *   2026-10-01 — countTasksByOwner also returns doneWeek, done tasks of the last 7 days.
+ *   2026-10-02 — startPolicy on insert, update and read (migration 0092).
  *   2026-08-15 — createdBy on insert and read (migration 0037).
  *   v1.3.0 -- 2026-07-31 -- Persist dedupeKey + findLiveTaskByDedupeKey (one live commission per agent+fingerprint)
  *   v1.2.0 -- 2026-06-15 -- Persist the `automation` field (ecosystem-app recipe provenance/routing, B5/B6)
@@ -35,6 +36,7 @@ function deserializeTask(row: Record<string, unknown>): AgentTaskRecord {
     updatedAt: row.updatedAt as string,
   };
   if (row.dedupeKey) record.dedupeKey = row.dedupeKey as string;
+  if (row.startPolicy === 'automatic' || row.startPolicy === 'confirm') record.startPolicy = row.startPolicy;
   if (row.resources) record.resources = JSON.parse(row.resources as string);
   if (row.parentTaskId) record.parentTaskId = row.parentTaskId as string;
   if (row.workTrackingCode) record.workTrackingCode = row.workTrackingCode as string;
@@ -67,8 +69,8 @@ export function createAgentTask(db: Database.Database, record: AgentTaskRecord):
     `INSERT INTO agent_tasks
      (id, agentGaii, ownerGaii, title, description, scope, rules, verification,
       resources, todos, status, dedupeKey, parentTaskId, workTrackingCode, telemetry,
-      lastEventAt, createdAt, updatedAt, completedAt, deliverableKey, rating, triage, automation, createdBy)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      lastEventAt, createdAt, updatedAt, completedAt, deliverableKey, rating, triage, automation, createdBy, startPolicy)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     record.id,
     record.agentGaii,
@@ -94,6 +96,7 @@ export function createAgentTask(db: Database.Database, record: AgentTaskRecord):
     record.triage ?? null,
     record.automation ? JSON.stringify(record.automation) : null,
     record.createdBy ?? null,
+    record.startPolicy ?? null,
   );
   return record;
 }
@@ -194,7 +197,7 @@ export function updateAgentTask(
        resources = ?, todos = ?, status = ?, parentTaskId = ?,
        workTrackingCode = ?, telemetry = ?, lastEventAt = ?,
        updatedAt = ?, completedAt = ?, deliverableKey = ?, rating = ?, triage = ?,
-       automation = ?
+       automation = ?, startPolicy = ?
      WHERE id = ?`
   ).run(
     merged.title,
@@ -215,6 +218,7 @@ export function updateAgentTask(
     merged.rating ? JSON.stringify(merged.rating) : null,
     merged.triage ?? null,
     merged.automation ? JSON.stringify(merged.automation) : null,
+    merged.startPolicy ?? null,
     id,
   );
 

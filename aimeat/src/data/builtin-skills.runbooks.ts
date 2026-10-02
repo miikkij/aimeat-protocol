@@ -12,6 +12,8 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   v1.7.0 — 2026-10-02 — manage-my-agents: "starts work by itself" is aimeat_agent_task_start_set, and
+ *     a waiting task is started on the owner's word with aimeat_task_start.
  *   v1.6.0 — 2026-10-02 — manage-my-agents: a proposed worker is built on the workspaces it will use,
  *     the owner approves at the approval_url the answer gives, and an outside builder is never the answer.
  *   v1.5.0 — 2026-10-01 — manage-my-agents: which agent the owner needs, asked by what it should do, with
@@ -131,8 +133,11 @@ Ask what the agent should do, then name the kind, where it runs and who pays:
 - **The same thing on a timetable:** a schedule (\`aimeat_schedule_create\`).
 - **Work for an app:** the app's own agent. Installing the app's package proposes it, and it waits
   for the owner's approval in their open items. Nothing runs before they approve it.
-- **Starts work by itself** is the mode \`task-runner\` (\`aimeat_agent_mode_set\`): work sent to the
-  agent starts without asking the owner. Say that in those words before you set it.
+- **Starts work by itself** is \`aimeat_agent_task_start_set\` with \`automatic\`: the agent proposes
+  its plan and goes on, and the owner sees what was done. \`confirm\` makes each task wait for the
+  owner's OK. Say that in those words before you set it. An agent that can spend money, send mail
+  or delete things in the owner's name always waits, whatever this says. When a task waits and the
+  owner says "go ahead", start it with \`aimeat_task_start\`.
 
 Where agents run, for the owner:
 

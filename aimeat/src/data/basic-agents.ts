@@ -41,6 +41,10 @@
  * @structure BASIC_AGENTS · BasicAgentTemplate · basicAgentByName
  * @usage import { BASIC_AGENTS } from '../data/basic-agents.js';
  * @version-history
+ *   v2.2.0 — 2026-10-02 — Both basic agents start their tasks on their own (`taskStart: automatic`),
+ *     and the concierge listens for tasks as well. Measured on freshly sold hosted places: the
+ *     concierge is `interactive`, so every task a customer gave it waited in `queued` for a Start
+ *     press nobody had told them about. `mode` stays what it is; the start answer has its own field.
  *   v2.1.0 — 2026-10-01 — The concierge holds contacts:read: the contact list now asks for that word
  *     instead of messages:read.
  *   v2.0.0 — 2026-09-02 — TWO basic agents. `crew-forge` leaves the set; the tombstone where its
@@ -95,6 +99,14 @@ export interface BasicAgentTemplate {
    * (`PATCH /v1/agents/:name/mode`), not a start-up side effect.
    */
   mode: 'autonomous' | 'interactive' | 'task-runner' | 'coordinator' | 'workstation';
+  /**
+   * Whether its tasks start on their own ('automatic': it proposes its plan and goes on, and the
+   * owner sees what was done) or wait for the owner's OK ('confirm'). The owner's answer from the
+   * first day, changeable on the agent card or from the chat. Neither basic agent holds a permission
+   * on the safety floor (services/agent-task-rules.ts), so 'automatic' actually starts their work;
+   * a template that ever adds one would wait whatever this says, which is the point of the floor.
+   */
+  taskStart: 'automatic' | 'confirm';
   /** How it is meant to be run. Stored and shown; the runtime is what honours it. */
   runMode: RunMode;
   tags: string[];
@@ -126,10 +138,10 @@ export interface CrewDefDoc {
    * WHICH WAKE STARTS THIS CREW: any of `tasks`, `messages`, `records`, `dms`.
    *
    * Stated on every definition here, never left to the default, because the default is `["tasks"]`
-   * and a wrong default is silent. `concierge` is `interactive` — its tasks deliberately stay
-   * queued, because a resident front door takes work as messages — and it was shipped listening
-   * for tasks and nothing else. It waited for the one thing that would never arrive and not for
-   * the one that would, and the mode and the definition disagreed about how work reaches it.
+   * and a wrong default is silent. `concierge` was shipped listening for tasks and nothing else,
+   * while its tasks stayed queued and work reached it as messages: it waited for the one thing
+   * that would never arrive. Since 2026-10-02 its tasks start on their own, so it listens for
+   * messages, DMs AND tasks.
    */
   listen_for: string[];
   agents: Array<{ name?: string; role: string; goal: string; backstory: string; allow_delegation: boolean; tools?: string[] }>;
@@ -163,16 +175,18 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
       'catalogue:read',
     ],
     mode: 'interactive',
+    // A customer who gives the front door a task expects it done, not parked behind a Start button
+    // they were never shown. `mode` stays `interactive` (it also picks the Hello Integration flow).
+    taskStart: 'automatic',
     runMode: 'resident',
     tags: ['crew.basic', 'role.concierge'],
     crewDef: {
       readme_md: '# Concierge\\n\\nThe front door.\\n\\nIt reads what arrives, works out what it is about, answers what it can from what you already keep, and hands the rest to whoever should have it. It says who it passed something to, so nothing disappears into a queue you cannot see.\\n\\n**It answers and it routes. It does not decide anything on your behalf** — a request that needs a person waits for you, named.',
       tags: ['crew.basic', 'role.concierge'],
       process: 'sequential',
-      // NOT tasks. Its mode is `interactive`, which means the node does NOT auto-activate its
-      // queued tasks — deliberately, because it is resident and user-facing. Work reaches it as a
-      // message or a DM, so those are what it waits on.
-      listen_for: ['messages', 'dms'],
+      // Messages and DMs, as a front door. And tasks: its tasks start on their own
+      // (`taskStart: automatic`), so a task given to it is work that is ready to run.
+      listen_for: ['messages', 'dms', 'tasks'],
       agents: [
         {
           role: 'Triager',
@@ -251,6 +265,7 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
     // auto-activates only for `task-runner` (services/agent-task-rules.ts). `coordinator` describes
     // what it DOES; this field decides whether its work starts.
     mode: 'task-runner',
+    taskStart: 'automatic',
     runMode: 'spawn',
     tags: ['crew.basic', 'role.workflow-manager'],
     crewDef: {

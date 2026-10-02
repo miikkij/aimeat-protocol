@@ -11,6 +11,8 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.33.0 — 2026-10-02 — aimeat_agents_list carries task_start, task_start_effective and
+ *     task_start_held_by, like GET /v1/agents.
  *   v1.32.0 — 2026-09-30 — registerAdminNodeUpdateTools: is a newer AIMEAT on npm, and the update prompt.
  *   v1.31.0 — 2026-09-30 — aimeat_agents_list carries default_scopes, refusals and scope_request, as
  *     GET /v1/agents does (services/agent-refusals.ts).
@@ -167,6 +169,7 @@ import { createWorkItem } from '../routes/work.js';
 import { MEMORY_LIST_MAX_LIMIT } from '../routes/memory/shared.js';
 import { acceptWork, deliverWork } from '../services/work-lifecycle.js';
 import type { PeerInfo } from '../services/federation.js';
+import { taskStartView } from '../services/agent-task-start-write.js';
 
 
 // F3: bound aimeat_memory_list so a default (and especially owner_scope) call cannot return an
@@ -382,6 +385,8 @@ export function registerCoreTools(
                     // said, which is NOT the same as 'spawn' — a runtime filtering for what it
                     // should serve has to be able to tell those apart.
                     run_mode: a.runMode ?? null,
+                    // Whether its tasks start on their own, and what holds them for the owner.
+                    ...taskStartView(a),
                     default_scopes: a.defaultScopes ?? ['*'],
                     ...agentAccessView(a.defaultScopes ?? ['*'], access.get(a.name)),
                 })),

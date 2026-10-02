@@ -42,6 +42,10 @@
  *   const r = await createTask({ storage, config, webhook }, { agent, agentGaii, agentName, creator, body, actor });
  *   if (!r.ok) return res.status(r.status).json(error(config.nodeId, r.code, r.message));
  * @version-history
+ *   2026-10-02 — The start decision (services/agent-task-rules.ts): createTask stamps `startPolicy`,
+ *     takes `start` from a caller allowed to ask for it, and answers with the decision; a plan's
+ *     declared `effects` can hold a task back for the owner, who is notified when a plan waits
+ *     (task-start-notice.ts). Every runnable push gets its own delivery id (taskWakeId).
  *   2026-08-15 — The record carries `createdBy`. Both doors already knew the actor and neither
  *     stored it.
  *   v1.0.0 — 2026-08-11 — Extracted from routes/agent-tasks/{create-read,completion,lifecycle}.ts and
@@ -58,8 +62,10 @@ import type {
 import type { createWebhookDispatcher } from './webhook-dispatcher.js';
 import { AgentTaskCreateSchema, AgentTaskEventSchema, AgentTaskTodoUpdateSchema } from '../models/agent-task-schemas.js';
 import {
-    resolveAutoActivation, AUTO_ACTIVATED_EVENT_MESSAGE, canProposeTodos, todoProposeRefusal, statusAfterProposal,
+    resolveAutoActivation, canProposeTodos, todoProposeRefusal, statusAfterProposal,
+    decideTaskStart, taskWakeId, autoStartEvent, startedOnItsOwn, TASK_EFFECTS, type TaskStartDecision, type TaskEffect,
 } from './agent-task-rules.js';
+import { notifyTaskWaiting } from './task-start-notice.js';
 import { commissionFingerprint, isUniqueViolation } from '../routes/agent-tasks/dedupe.js';
 import { resumeIfStalled } from './task-resume.js';
 import { resolveTaskFileInputs } from './task-files.js';
@@ -101,7 +107,7 @@ function invalidInput(issues: { path: (string | number | symbol)[]; message: str
 
 export interface CreateTaskArgs {
     /** The target agent, already fetched and authorized by the door. */
-    agent: Pick<AgentRecord, 'owner' | 'mode'>;
+    agent: Pick<AgentRecord, 'owner' | 'mode'> & Partial<Pick<AgentRecord, 'taskStart' | 'defaultScopes'>>;
     agentGaii: string;
     /** The name segment, for the webhook payload and the door's own resource notification. */
     agentName: string;
@@ -111,12 +117,19 @@ export interface CreateTaskArgs {
     body: unknown;
     /** The principal whose live view this write belongs to, for SSE owner scoping. */
     actor?: string;
+    /**
+     * May this caller ask for `start: 'automatic'`? The route or tool decides, because only it
+     * knows the session: the owner in person, a same-owner app holding task:write, or a same-owner
+     * agent holding agent:write that is not the task's own agent. Absent = no; `confirm` is always
+     * allowed, because asking for more care loosens nothing.
+     */
+    mayAskAutomatic?: boolean;
 }
 
 export type CreateTaskResult =
     | TaskWriteRefusal
     | { ok: true; deduplicated: true; task: AgentTaskRecord }
-    | { ok: true; deduplicated: false; task: AgentTaskRecord; autoActivated: boolean };
+    | { ok: true; deduplicated: false; task: AgentTaskRecord; autoActivated: boolean; decision: TaskStartDecision };
 
 /**
  * Create a task for `agent`.
@@ -131,6 +144,15 @@ export async function createTask(deps: TaskWriteDeps, args: CreateTaskArgs): Pro
     const parsed = AgentTaskCreateSchema.safeParse(args.body);
     if (!parsed.success) return invalidInput(parsed.error.issues);
     const body = parsed.data;
+
+    // Refuse before anything is written: a task asking to start on its own from a caller who could
+    // not have set that for the agent would be a way round the owner's setting.
+    if (body.start === 'automatic' && !args.mayAskAutomatic) {
+        return {
+            ok: false, status: 403, code: 'FORBIDDEN',
+            message: "Only the owner, an app they gave task:write, or another of their agents holding agent:write can ask a task to start on its own, and never an agent for its own task. Leave out `start`, or ask for 'confirm'.",
+        };
+    }
 
     // Attachments are validated against the CREATOR's own read access — a task must not be a way to
     // slip a reference to data the creator cannot see into somebody's work queue.
@@ -163,12 +185,15 @@ export async function createTask(deps: TaskWriteDeps, args: CreateTaskArgs): Pro
         verification: t.verification,
         estimateMinutes: t.estimate_minutes,
         status: t.status,
+        ...(t.effects?.length ? { effects: t.effects } : {}),
     }));
 
-    // 'task-runner' is the owner saying "start without asking me each time", so a queued task for
-    // such an agent starts on its own and carries the same 'started' event an owner-approved one
-    // would. Which door delegated the task is not part of that instruction.
-    const { autoActivated, effectiveStatus } = resolveAutoActivation(args.agent, body.status);
+    // Starts on its own, or waits for the owner (services/agent-task-rules.ts): the permission floor,
+    // then any effect a todo given with the task declares, then this task's own word, then the
+    // agent's. A task that starts carries the same 'started' event an owner-approved one would.
+    // Which route or tool delegated the task is not part of that decision.
+    const decision = decideTaskStart(args.agent, { policy: body.start, todos });
+    const { autoActivated, effectiveStatus } = resolveAutoActivation(decision, body.status);
 
     const record: AgentTaskRecord = {
         id,
@@ -194,6 +219,9 @@ export async function createTask(deps: TaskWriteDeps, args: CreateTaskArgs): Pro
         } : undefined,
         todos,
         status: effectiveStatus,
+        // The creator's own word only. Without one the agent's setting decides, read when the plan
+        // arrives, so a task given before the owner changed the setting follows the new answer.
+        ...(body.start ? { startPolicy: body.start } : {}),
         ...(dedupeKey ? { dedupeKey } : {}),
         parentTaskId: body.parent_task_id,
         createdAt: now,
@@ -222,7 +250,7 @@ export async function createTask(deps: TaskWriteDeps, args: CreateTaskArgs): Pro
             id: randomUUID(),
             taskId: record.id,
             type: 'started',
-            message: AUTO_ACTIVATED_EVENT_MESSAGE,
+            ...autoStartEvent(decision),
             timestamp: now,
         });
     }
@@ -243,7 +271,7 @@ export async function createTask(deps: TaskWriteDeps, args: CreateTaskArgs): Pro
         });
         // Connector forward tunnel: if the agent holds an open tunnel the full task goes down the
         // socket now; if it is offline the task stays in the store and is replayed on connect.
-        emitDelivery({ target: args.agentGaii, kind: 'task_assigned', id: record.id, payload: created });
+        emitDelivery({ target: args.agentGaii, kind: 'task_assigned', id: taskWakeId(record.id, record.status, now), payload: created });
     }
 
     emitChange('agent-tasks', args.actor);
@@ -257,7 +285,7 @@ export async function createTask(deps: TaskWriteDeps, args: CreateTaskArgs): Pro
             .catch(e => logger.error('workflow event trigger (offer.ordered) failed', { offerId: orderedOfferId, error: String(e) }));
     }
 
-    return { ok: true, deduplicated: false, task: created, autoActivated };
+    return { ok: true, deduplicated: false, task: created, autoActivated, decision };
 }
 
 // ── Event ───────────────────────────────────────────────────────────────────────────────────────
@@ -335,6 +363,8 @@ export interface ProposedTodoInput {
     environment_reason?: string;
     verification?: string;
     estimate_minutes?: number;
+    /** What the step will do that the owner must see first. Anything outside TASK_EFFECTS is dropped. */
+    effects?: string[];
 }
 
 export type ProposePlanResult =
@@ -346,6 +376,11 @@ export type ProposePlanResult =
         todos: AgentTaskTodo[];
         outdatedCount: number;
         autoActivated: boolean;
+        /** The plan arrived and the task now waits for the owner's OK (they have been told). */
+        waits: boolean;
+        /** An automatically started task the plan sent back to wait (floor or declared effect). */
+        heldBack: boolean;
+        decision: TaskStartDecision | null;
     };
 
 /**
@@ -394,12 +429,17 @@ export async function applyProposedPlan(
         verification: t.verification ?? '',
         estimateMinutes: t.estimate_minutes,
         status: 'pending',
+        ...(effectsOf(t.effects).length ? { effects: effectsOf(t.effects) } : {}),
     }));
 
     // A revision_requested task returns to queued: the agent answered, so it waits for the owner
-    // again. A queued task belonging to a task-runner agent starts on its own, for the same reason as
-    // on creation. Active (plan-less) stays active.
-    const { nextStatus, autoActivated } = await statusAfterProposal(g => storage.getAgent(g), task);
+    // again. A queued task starts when the start decision says so, for the same reason as on
+    // creation. A plan-less task that started on its own goes back to waiting when the plan says it
+    // will spend, send or delete as the owner, or the agent can. statusAfterProposal says which.
+    // Only a task the node started on its own can be sent back; its 'started' event says so.
+    const autoStarted = task.status === 'active'
+        && startedOnItsOwn((await storage.listTaskEvents(task.id, { perPage: 100 })).events);
+    const { nextStatus, autoActivated, heldBack, waits, decision } = await statusAfterProposal(g => storage.getAgent(g), task, newTodos, autoStarted);
 
     const updated = await storage.updateAgentTask(task.id, {
         todos: [...preserved, ...newTodos],
@@ -425,7 +465,7 @@ export async function applyProposedPlan(
             id: randomUUID(),
             taskId: task.id,
             type: 'started',
-            message: 'Task auto-activated on TODO proposal (agent mode: task-runner)',
+            ...autoStartEvent(decision ?? { source: 'mode' }, ' when the plan arrived'),
             timestamp: now,
         });
         await recordTaskStarted(storage, task.agentGaii);
@@ -438,8 +478,25 @@ export async function applyProposedPlan(
             approved_at: now,
             auto_activated: true,
         });
-        emitDelivery({ target: task.agentGaii, kind: 'task_assigned', id: task.id, payload: updated });
+        emitDelivery({ target: task.agentGaii, kind: 'task_assigned', id: taskWakeId(task.id, 'active', now), payload: updated });
     }
+
+    if (heldBack) {
+        // The node started this task on its own and the plan is the first moment it can see the task
+        // will spend, send or delete as the owner. Nobody has said yes to that, so it waits.
+        await storage.appendTaskEvent({
+            id: randomUUID(),
+            taskId: task.id,
+            type: 'message',
+            message: "Task waits for the owner's OK: the plan says it will spend, send or delete as the owner",
+            details: { effects: decision?.effects ?? [], floor_scopes: decision?.floorScopes ?? [] },
+            timestamp: now,
+        });
+    }
+    // The plan is in and the task waits: the one moment the owner is owed a word, whether or not
+    // they ever opened the Tasks view.
+    // An owner who wrote the plan themselves is not told about it.
+    if (waits && updated && actor !== task.ownerGaii) void notifyTaskWaiting(storage, updated, decision);
 
     deps.webhook?.dispatchWebhookEvent(task.agentGaii, 'task.updated', {
         task_id: task.id,
@@ -452,7 +509,13 @@ export async function applyProposedPlan(
     });
 
     emitChange('agent-tasks', actor);
-    return { ok: true, task: updated ?? null, todos: newTodos, outdatedCount: preserved.length, autoActivated };
+    return { ok: true, task: updated ?? null, todos: newTodos, outdatedCount: preserved.length, autoActivated, waits, heldBack, decision };
+}
+
+/** The declared effects a door handed in, kept only where they name one of TASK_EFFECTS. */
+function effectsOf(raw: unknown): TaskEffect[] {
+    if (!Array.isArray(raw)) return [];
+    return [...new Set(raw.filter((e): e is TaskEffect => (TASK_EFFECTS as readonly unknown[]).includes(e)))];
 }
 
 // ── One todo ────────────────────────────────────────────────────────────────────────────────────

@@ -22,6 +22,7 @@
  *   import { toolsForSurface } from '../catalog/surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
+ *   2026-10-02 — aimeat_task_start and aimeat_agent_task_start_set on `agent`, beside the task tools.
  *   2026-10-02 — aimeat_agent_propose, aimeat_agent_basics_get and _request on `agent`: an owner's
  *     own agent is who a person asks for a new agent, and these were on `admin` only.
  *   2026-10-01 — aimeat_admin_federation_peer_remove beside aimeat_admin_federation.
@@ -218,6 +219,9 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         // server /v1/mcp), so it cannot appear on a server v2 surface — intentionally omitted here.
         'aimeat_task_create', 'aimeat_task_list', 'aimeat_task_get', 'aimeat_task_propose_todos',
         'aimeat_task_event', 'aimeat_task_todo', 'aimeat_task_complete', 'aimeat_task_fail',
+        // The person's own AI starting a waiting task on their word, and setting whether an agent's
+        // tasks start on their own at all.
+        'aimeat_task_start', 'aimeat_agent_task_start_set',
         'aimeat_schedule_create', 'aimeat_schedule_list', 'aimeat_schedule_update',
         'aimeat_schedule_delete', 'aimeat_schedule_trigger', 'aimeat_schedule_report_internal',
         'aimeat_workflow_save', 'aimeat_workflow_get', 'aimeat_workflow_run', 'aimeat_workflow_answer', 'aimeat_workflow_pending_inputs',

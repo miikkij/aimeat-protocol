@@ -22,6 +22,7 @@
  *   import { describeBasicAgents } from '../services/basic-agents.js';
  *   const view = await describeBasicAgents(config, storage, req.auth!.owner);
  * @version-history
+ *   v1.1.0 — 2026-10-02 — Each basic agent in the view carries `task_start`.
  *   v1.0.0 — 2026-08-31 — Extracted from routes/agents-v2/basic-agents.ts so the MCP surface can
  *     answer the same question without a second implementation of it.
  */
@@ -45,6 +46,8 @@ export interface BasicAgentsView {
     description: string;
     scopes: string[];
     mode: string;
+    /** Whether its tasks start on their own ('automatic') or wait for the owner ('confirm'). */
+    task_start: string;
     run_mode: string;
     exists: boolean;
     enrolled: boolean;
@@ -165,6 +168,7 @@ export async function describeBasicAgents(
       description: t.description,
       scopes: [...t.scopes],
       mode: t.mode as string,
+      task_start: t.taskStart as string,
       run_mode: t.runMode as string,
       exists: !!have,
       enrolled: !!have?.enrolledAt,

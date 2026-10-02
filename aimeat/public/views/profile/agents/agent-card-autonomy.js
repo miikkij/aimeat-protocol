@@ -6,15 +6,18 @@
  *   thinks with and who pays), and whether it starts work by itself (guided journey P4, brief
  *   doc-mupor242l3cq).
  *
- *   WHY A SWITCH FOR THE MODE. The node starts a queued task without asking only for an agent whose
- *   mode is `task-runner` (services/agent-task-rules.ts). That is the most consequential setting an
- *   agent has, and it sat in a five-value mode word with a tooltip. Here it is one switch with the
- *   sentence of what it does. The five modes stay in the API; the switch moves a worker between
- *   `task-runner` and `autonomous` only, and is not shown for a chat connection (`interactive`,
- *   `workstation`) or a coordinator, whose mode means something else.
+ *   WHY A SWITCH. Whether an agent starts work without asking is the most consequential setting it
+ *   has. Since 2026-10-02 it is its own field, `task_start` (PATCH /v1/agents/:name/task-start,
+ *   services/agent-task-rules.ts), so the switch works for every agent that takes tasks, the
+ *   concierge included; until then it flipped `mode` between `task-runner` and `autonomous`, and an
+ *   `interactive` front door could not have it at all. It is not shown for a chat connection, which
+ *   is the person's own AI and is not given tasks. When the agent can spend money, send mail or
+ *   delete as the owner, its work always waits, and the switch says so instead of moving.
  * @structure FactsLine({ agent }) · PurchaseLimitLine({ agent, showToast }) · AutonomyLine({ agent, showToast })
  * @usage <${FactsLine} agent=${agent} /> <${PurchaseLimitLine} agent=${agent} showToast=${showToast} />
  * @version-history
+ *   v1.2.0 — 2026-10-02 — AutonomyLine writes `task_start` instead of `mode`, is shown for every
+ *     agent that takes tasks, and says why when the permission floor holds its work.
  *   v1.1.0 — 2026-10-02 — PurchaseLimitLine: the agent's daily money limit for purchases, set here
  *     (decision D5, Jouni 2026-10-02).
  *   v1.0.0 — 2026-10-01 — Initial.
@@ -113,32 +116,33 @@ export function PurchaseLimitLine({ agent, showToast }) {
   `;
 }
 
-/** The two modes the switch moves between; it never writes any other, so pressing twice returns. */
-const SWITCHABLE = new Set(['task-runner', 'autonomous']);
+/** What applies when the node has not said (an older node): the old rule, `task-runner` starts. */
+const effectiveOf = (agent) => agent.task_start_effective || (agent.mode === 'task-runner' ? 'automatic' : 'confirm');
 
 /**
- * "Starts work by itself": on is `task-runner`, off is `autonomous`. Shown only for a worker: a chat
- * connection (`interactive`, `workstation`) answers while the person talks, and changing its mode
- * also changes its onboarding steps, which a browser check measured on 2026-10-01.
+ * "Starts work by itself": on is `task_start: automatic`, off is `confirm`. Not shown for a chat
+ * connection or a workstation, the person's own AI, which is not given tasks. When the permission
+ * floor holds the agent's work (`task_start_held_by`), the switch stays off and the line says why.
  */
 export function AutonomyLine({ agent, showToast }) {
-  const [mode, setMode] = useState(agent.mode || 'interactive');
+  const [start, setStart] = useState(effectiveOf(agent));
   const [saving, setSaving] = useState(false);
-  if (!SWITCHABLE.has(mode) || placeOf(agent) === 'chat') return null;
-  const on = mode === 'task-runner';
+  if (agent.mode === 'workstation' || placeOf(agent) === 'chat') return null;
+  const held = (agent.task_start_held_by ?? []).length > 0;
+  const on = !held && start === 'automatic';
 
   async function toggle() {
-    if (saving) return;
-    const next = on ? 'autonomous' : 'task-runner';
-    const previous = mode;
+    if (saving || held) return;
+    const next = on ? 'confirm' : 'automatic';
+    const previous = start;
     setSaving(true);
-    setMode(next);
+    setStart(next);
     try {
-      await apiPatch(`/v1/agents/${encodeURIComponent(agent.name)}/mode`, { mode: next });
-      showToast?.(next === 'task-runner' ? f('selfStartOnSaved') : f('selfStartOffSaved'), 'success');
+      await apiPatch(`/v1/agents/${encodeURIComponent(agent.name)}/task-start`, { task_start: next });
+      showToast?.(next === 'automatic' ? f('selfStartOnSaved') : f('selfStartOffSaved'), 'success');
     } catch (err) {
       // Put it back: a switch that disagrees with the node is worse than the failed write.
-      setMode(previous);
+      setStart(previous);
       swallowed('agent-card: self-start', err);
       showToast?.(f('selfStartFailed'), 'error');
     } finally {
@@ -148,8 +152,8 @@ export function AutonomyLine({ agent, showToast }) {
 
   return html`
     <${CardLine} label=${f('selfStart')}>
-      <${Switch} on=${on} onToggle=${toggle} label=${on ? f('yes') : f('no')} />
-      <span>${on ? f('selfStartOn') : f('selfStartOff')}</span>
+      <${Switch} on=${on} disabled=${held} onToggle=${toggle} label=${on ? f('yes') : f('no')} ariaLabel=${f('selfStart')} />
+      <span>${held ? f('selfStartHeld') : on ? f('selfStartOn') : f('selfStartOff')}</span>
     <//>
   `;
 }

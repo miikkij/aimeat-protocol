@@ -5,6 +5,9 @@
 // on queue within a tight bound), no-loss-on-disconnect invariant (task queued
 // while offline arrives via backlog exactly once on reconnect), id-dedup (live
 // deliver id == backlog task id), and ack-drops-from-next-backlog.
+// 2026-10-02: the delivery id is the transition's own (`<task id>:<status>:<time>`); the task id
+// rides in the payload, which is what the connector dedups on. Test 8 is the hosted-places case:
+// the create push acknowledged, a plan proposed, then Start, which the tunnel used to drop.
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
@@ -98,7 +101,7 @@ await test('1. Push-latency invariant — queued task delivered within budget', 
   assert(d!.kind === 'task_assigned', `kind: ${d!.kind}`);
   assert((d!.payload as any)?.id === pushTaskId, `deliver payload id ${(d!.payload as any)?.id} != ${pushTaskId}`);
   assert((d!.payload as any)?.title === 'Push latency task', 'full task payload delivered');
-  assert(d!.id === pushTaskId, `deliver frame id == task id (for dedup): ${d!.id}`);
+  assert(d!.id.startsWith(`${pushTaskId}:`), `deliver frame id names the task: ${d!.id}`);
   assert(latency < PUSH_LATENCY_BUDGET_MS, `push latency ${latency}ms exceeds ${PUSH_LATENCY_BUDGET_MS}ms budget`);
   await t.close();
 });
@@ -201,6 +204,36 @@ await test('7. Owner /start pushes a live task_assigned to a connected agent', a
   assert((d!.payload as any)?.id === startTaskId, `deliver payload id ${(d!.payload as any)?.id} != ${startTaskId}`);
   assert((d!.payload as any)?.status === 'active', `approved task delivered as active, got ${(d!.payload as any)?.status}`);
   assert(latency < PUSH_LATENCY_BUDGET_MS, `approval push latency ${latency}ms exceeds ${PUSH_LATENCY_BUDGET_MS}ms budget`);
+  await t.close();
+});
+
+await test('8. Start on a task the agent already took and proposed for wakes it at once', async () => {
+  // The hosted-places measurement (2026-10-01): the create push went down the socket and was
+  // acknowledged, the agent proposed its plan, the owner pressed Start, and nothing arrived: the
+  // tunnel skipped the Start push because it reused the task id the agent had already acknowledged.
+  // The runtime found the task on its own re-list about 90 s later.
+  const t = await TunnelClient.connect(BASE, agentToken);
+  await t.waitForBacklog(1500);
+  const taskId = await createQueuedTask('Proposed then started');
+  const first = await t.waitForDeliver(1000);
+  assert(first !== null && (first.payload as any)?.id === taskId, 'the create push arrived');
+  t.ack(first!.id!);
+  await sleep(100);
+  const propose = await json(`/v1/agents/${agentName}/tasks/${taskId}/propose-todos`, {
+    method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+    body: JSON.stringify({ todos: [{ title: 'Do it' }] }),
+  });
+  assert(propose.status === 200, `propose status ${propose.status}: ${JSON.stringify(propose.body)}`);
+  assert(propose.body.data.task.status === 'queued', `an interactive agent's task waits, got ${propose.body.data.task.status}`);
+  const t0 = Date.now();
+  const start = await json(`/v1/agents/${agentName}/tasks/${taskId}/start`, { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` } });
+  assert(start.status === 200, `start status ${start.status}: ${JSON.stringify(start.body)}`);
+  const d = await t.waitForDeliver(1000);
+  const latency = Date.now() - t0;
+  assert(d !== null, 'Start pushed a second deliver after the first was acknowledged');
+  assert((d!.payload as any)?.id === taskId && (d!.payload as any)?.status === 'active', 'the active task arrived');
+  assert(d!.id !== first!.id, 'the second push has its own delivery id');
+  assert(latency < PUSH_LATENCY_BUDGET_MS, `Start push latency ${latency}ms exceeds ${PUSH_LATENCY_BUDGET_MS}ms budget`);
   await t.close();
 });
 

@@ -14,6 +14,7 @@
  *   dispatch are private inside larger state machines and carry the same one line, unasserted.
  * @usage pnpm test -- task-producers-wake
  * @version-history
+ *   v1.1.0 -- 2026-10-02 -- The scheduler's delivery id is `<task id>:<status>:<time>` (taskWakeId).
  *   v1.0.0 -- 2026-09-08 -- Initial. Both cases fail on the pre-fix tree with zero deliveries.
  */
 import { describe, expect, it } from 'vitest';
@@ -88,6 +89,8 @@ describe('the scheduler wakes the agent it materialised a task for', () => {
         const wake = seen.filter(s => s.kind === 'task_assigned');
         expect(wake).toHaveLength(1);
         expect(wake[0].target).toBe(AGENT);
-        expect(wake[0].id).toBe(created[0].id);
+        // The delivery id is the transition's own (taskWakeId), so a later Start push is not taken
+        // for one the agent already acknowledged; it names the task it is about.
+        expect(wake[0].id.startsWith(`${created[0].id}:`)).toBe(true);
     });
 });

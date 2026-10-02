@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Agent-task lifecycle routes (update, delete, queue, start, propose-todos, request-changes, pause). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-10-02 — /start: every push carries its own delivery id (taskWakeId), so Start on a
+ *     proposed task wakes the agent at once; another of the owner's agents holding task:write may
+ *     start a task that waits only because of the setting. /queue reads the start decision.
  *   v1.4.0 — 2026-09-29 — Attachments resolve with the caller's classification reader (TARGET-082).
  *   v1.3.0 — 2026-08-16 — POST .../queue: the exit a draft never had. Reported by crewaimeat-dev,
  *     who created a task over REST, got 'draft' from the body-schema default, and found nothing
@@ -32,10 +35,13 @@ import { emitChange, emitDelivery } from '../../services/event-bus.js';
 import { emitResourceUpdated } from '../../mcp/index.js';
 import { recordTaskStarted } from '../../services/activity-recorder.js';
 import { AgentTaskUpdateSchema, AgentTaskRequestChangesSchema } from '../../models/agent-task-schemas.js';
-import { resolveAutoActivation, AUTO_ACTIVATED_EVENT_MESSAGE } from '../../services/agent-task-rules.js';
+import {
+  resolveAutoActivation, autoStartEvent, decideTaskStart, taskWakeId,
+} from '../../services/agent-task-rules.js';
+import { startWaitingTask } from '../../services/task-start-op.js';
 import { resolveTaskFileInputs } from '../../services/task-files.js';
 import { requireReadiness } from '../../middleware/readiness-gate.js';
-import type { TaskRouteHelpers } from './helpers.js';
+import { startCallerOf, type TaskRouteHelpers } from './helpers.js';
 import { logger } from '../../utils/logger.js';
 
 export function registerTaskLifecycleRoutes(
@@ -122,6 +128,7 @@ export function registerTaskLifecycleRoutes(
         estimateMinutes: t.estimate_minutes,
         status: t.status,
         completedAt: t.completed_at,
+        ...(t.effects?.length ? { effects: t.effects } : {}),
       }));
     }
 
@@ -231,10 +238,10 @@ export function registerTaskLifecycleRoutes(
    * same authority as starting it, and the agent the task is FOR must not be able to let itself off
    * the leash.
    *
-   * A task-runner agent goes straight to 'active' here, for the same reason it does at create time —
-   * the owner has already pre-authorised that agent to begin without per-task gating, and making the
-   * release path the one exception would mean a draft released to a runner sat waiting for a second
-   * click that no other route asks for.
+   * A task whose start decision says start (services/agent-task-rules.ts) goes straight to 'active'
+   * here, for the same reason it does at create time — the owner has already said this agent (or
+   * this task) begins without asking, and making the release path the one exception would mean a
+   * released draft sat waiting for a second click that no other route asks for.
    */
   // The scope sits in MIDDLEWARE rather than in the handler, unlike its neighbours. requireScope
   // waves an owner session straight through (owners act for all their agents), so this costs the
@@ -271,7 +278,8 @@ export function registerTaskLifecycleRoutes(
     }
 
     const targetAgent = await storage.getAgent(task.agentGaii);
-    const { autoActivated, effectiveStatus } = resolveAutoActivation(targetAgent, 'queued');
+    const decision = decideTaskStart(targetAgent, { policy: task.startPolicy, todos: task.todos });
+    const { autoActivated, effectiveStatus } = resolveAutoActivation(decision, 'queued');
 
     const now = new Date().toISOString();
     const updated = await storage.updateAgentTask(id, {
@@ -283,7 +291,7 @@ export function registerTaskLifecycleRoutes(
     if (autoActivated) {
       await storage.appendTaskEvent({
         id: randomUUID(), taskId: id, type: 'started',
-        message: AUTO_ACTIVATED_EVENT_MESSAGE, timestamp: now,
+        ...autoStartEvent(decision), timestamp: now,
       });
       await recordTaskStarted(storage, task.agentGaii);
     }
@@ -293,91 +301,40 @@ export function registerTaskLifecycleRoutes(
     try { emitResourceUpdated(task.agentGaii, `aimeat://agents/${req.params.name as string}/tasks`); } catch (err) { logger.warn('POST /v1/agents/:name/tasks/:id/queue: MCP not connected', { error: String(err) }); }
     // Only a task that is RUNNABLE wakes the daemon. A plain queued task is waiting for the owner's
     // /start, and pushing it would have the agent pick up work nobody released to it yet.
-    if (autoActivated) emitDelivery({ target: task.agentGaii, kind: 'task_assigned', id: updated!.id, payload: updated });
+    if (autoActivated) emitDelivery({ target: task.agentGaii, kind: 'task_assigned', id: taskWakeId(updated!.id, 'active', now), payload: updated });
   });
 
-  /* ── POST /v1/agents/:name/tasks/:id/start -- Start task (queued|paused|stalled -> active) ── */
+  /* ── POST /v1/agents/:name/tasks/:id/start -- Start task (queued|paused|stalled -> active) ──
+   *
+   * The owner in person, a same-owner app grant holding task:write, or (since 2026-10-02) another of
+   * the owner's agents holding task:write: the person's own chat AI starting a waiting task on their
+   * word. The rules and the wake are services/task-start-op.ts, shared with aimeat_task_start.
+   */
   router.post('/v1/agents/:name/tasks/:id/start', requireAuth(), async (req, res) => {
-    // Owner OR a same-owner app grant holding task:write may start a task; agents must not
-    // self-start (propose-before-start rule).
     const startRoles = req.auth!.roles;
     const isOwner = startRoles.includes('owner') && !startRoles.includes('agent');
     const isApp = startRoles.includes('app');
-    if (!isOwner && !isApp) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the owner or a granted app can start tasks'));
+    const isAgent = startRoles.includes('agent') && !isApp;
+    if (!isOwner && !isApp && !isAgent) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the owner, a granted app, or another of the owner\'s agents can start tasks'));
       return;
     }
-    if (isApp && !tokenHasScope(req, 'task:write')) {
+    if ((isApp || isAgent) && !tokenHasScope(req, 'task:write')) {
       res.status(403).json(refuseNeedsPermission(config, { want: 'start work for your agents', scope: 'task:write' }));
       return;
     }
 
-    const id = req.params.id as string;
-
-    const task = await storage.getAgentTask(id);
-    if (!task) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Task not found'));
+    const out = await startWaitingTask({ storage, config, webhook: webhookDispatcher },
+      startCallerOf(req.auth!, resolve(req)), req.auth!.owner as string, req.params.id as string);
+    if (!out.ok) {
+      if (out.code === 'FORBIDDEN') {
+        res.status(403).json(refuseNotYours(config, { thing: 'task', action: 'open', listUrl: '/v1/agents' }));
+        return;
+      }
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;
     }
-
-    // Owner-match: an app (task:write) may only start its OWN owner's task.
-    const appOwnsTask = isApp && task.ownerGaii === `${req.auth!.owner}@${config.nodeId}`;
-    if (!appOwnsTask && !canAccessTask(req, task)) {
-      res.status(403).json(refuseNotYours(config, { thing: 'task', action: 'open', listUrl: '/v1/agents' }));
-      return;
-    }
-
-    // Allow recovery from 'stalled': the stall detector marks tasks as stalled
-    // when they go quiet for too long, but a stalled task is not a failed task
-    // -- the agent may have crashed, been killed, or have lost its tokens. The
-    // owner can re-start a stalled task to give the agent another chance
-    // (typical scenario: onboarding test task stalls because the agent
-    // subprocess died mid-flow; the owner fixes the subprocess and re-starts).
-    if (task.status !== 'queued' && task.status !== 'paused' && task.status !== 'stalled') {
-      res.status(409).json(error(config.nodeId, 'INVALID_STATE',
-        `Only queued, paused, or stalled tasks can be started (current: ${task.status})`));
-      return;
-    }
-
-    const now = new Date().toISOString();
-    const updated = await storage.updateAgentTask(id, {
-      status: 'active',
-      lastEventAt: now,
-      updatedAt: now,
-    });
-
-    // Append 'started' event
-    await storage.appendTaskEvent({
-      id: randomUUID(),
-      taskId: id,
-      type: 'started',
-      message: 'Task started',
-      timestamp: now,
-    });
-
-    await recordTaskStarted(storage, task.agentGaii);
-
-    // Push: webhook + MCP notification (parallel, fire-and-forget)
-    if (webhookDispatcher) {
-      webhookDispatcher.dispatchWebhookEvent(task.agentGaii, 'task.approved', {
-        task_id: task.id,
-        title: task.title,
-        status: 'active',
-        todo_count: task.todos?.length ?? 0,
-        pending_todo_count: (task.todos ?? []).filter((t: AgentTaskTodo) => t.status === 'pending').length,
-        approved_at: now,
-      });
-    }
-    try { emitResourceUpdated(task.agentGaii, `aimeat://agents/${req.params.name as string}/tasks`); } catch (err) { logger.warn('pending_todo_count: MCP not connected', { error: String(err) }); }
-    // Connector forward tunnel: realtime reverse delivery of the now-active task. Owner approval
-    // (queued -> active) is a runnable-state transition just like create-time auto-activation, so it
-    // must push the same `task_assigned` wake — otherwise a daemon parked on the /local/tasks/next
-    // long-poll only picks the task up on its ~5-min safety-net re-list (the "waits for polling" gap).
-    // If the agent is offline the task stays 'active' in the store and is replayed via backlog-on-connect.
-    emitDelivery({ target: task.agentGaii, kind: 'task_assigned', id: updated!.id, payload: updated });
-
-    res.json(success(config.nodeId, { task: updated }));
-    emitChange('agent-tasks', resolve(req));
+    res.json(success(config.nodeId, { task: out.task }));
   });
 
   /* ── POST /v1/agents/:name/tasks/:id/propose-todos -- Agent proposes (or re-proposes) a TODO plan ──

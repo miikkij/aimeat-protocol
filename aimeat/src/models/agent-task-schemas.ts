@@ -11,6 +11,9 @@
  *     alongside knowledge packages and memory keys. File-shaped work is naturally a task, and the only
  *     way to hand an agent a document used to be a DM. Input is a reference plus an optional name; mime
  *     and size are resolved server-side from the stored file.
+ *   v1.4.0 -- 2026-10-02 -- `start` on create ('automatic' | 'confirm'): how this one task starts,
+ *     overriding the agent's own setting; `effects` on a todo: what the step will do that the owner
+ *     must see first (spend, send_as_owner, delete). services/agent-task-rules.ts decides with both.
  */
 import { z } from 'zod';
 
@@ -26,6 +29,9 @@ export const TaskFileRefSchema = z.object({
 });
 
 const TodoStatusSchema = z.enum(['pending', 'active', 'done', 'failed', 'skipped', 'outdated']);
+
+/** What a step declares it will do that the owner must see first. Mirrors TASK_EFFECTS. */
+export const TodoEffectsSchema = z.array(z.enum(['spend', 'send_as_owner', 'delete'])).max(3);
 
 export const AgentTaskCreateSchema = z.object({
   title: z.string().min(1).max(256),
@@ -57,6 +63,7 @@ export const AgentTaskCreateSchema = z.object({
     verification: z.string().optional().default(''),
     estimate_minutes: z.number().optional(),
     status: TodoStatusSchema.optional().default('pending'),
+    effects: TodoEffectsSchema.optional(),
   })).optional().default([]),
   // 'queued', because that is what the OTHER TWO DOORS have always defaulted to and because 'draft'
   // was, until POST .../queue existed, a state with no exit at all. A caller who omitted `status`
@@ -66,10 +73,15 @@ export const AgentTaskCreateSchema = z.object({
   // was REQUIRED — which is what a wrong default looks like from the outside.
   //
   // This does not loosen the owner's review gate. 'queued' means visible to the agent, not started:
-  // resolveAutoActivation() only runs the task on its own when the target agent's mode is
-  // 'task-runner', which is the owner's own standing pre-authorisation. Every other mode still waits
-  // for POST .../start. 'draft' remains available, now as an explicit choice rather than a trap.
+  // resolveAutoActivation() only runs the task on its own when the start decision says so: the
+  // owner's standing answer for the agent (or for this task), never past the permission floor.
+  // Everything else still waits for POST .../start. 'draft' remains available, now as an explicit choice rather than a trap.
   status: z.enum(['draft', 'queued']).optional().default('queued'),
+  // How THIS task starts: 'automatic' (the agent proposes its plan and goes on) or 'confirm' (it
+  // waits for the owner's OK). Absent = the agent's own setting. 'automatic' is refused unless the
+  // caller may loosen the agent's leash (services/agent-task-write.ts), and the permission floor
+  // holds a task for the owner whatever this says.
+  start: z.enum(['automatic', 'confirm']).optional(),
   parent_task_id: z.string().optional(),
   // One-live-commission guard. A caller that knows which job this is (a form submit id, a row id)
   // sends its own key; everyone else gets a server-derived fingerprint over agent + title +
@@ -111,6 +123,7 @@ export const AgentTaskUpdateSchema = z.object({
     estimate_minutes: z.number().optional(),
     status: TodoStatusSchema.optional().default('pending'),
     completed_at: z.string().optional(),
+    effects: TodoEffectsSchema.optional(),
   })).optional(),
 });
 

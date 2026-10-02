@@ -7,6 +7,7 @@
  *   RevokedToken tables. These are the methods the server's anonymous-identity bootstrap and the
  *   register→token→request path exercise. Mappers are module-local (row → *Record).
  * @version-history
+ *   2026-10-02 — taskStart on create and read (migration 0092). updateAgent passes it through.
  *   2026-09-26 — deleteAgent settles the agent's work first (settleDeletedAgentWorkDb in
  *     owner-cascade.ts): open work is cancelled and the held morsels go back, what stays keeps the
  *     agent's identity.
@@ -75,6 +76,7 @@ function toAgentRecord(r: Selectable<Agent>): AgentRecord {
     identityVersion: (r.identityVersion ?? undefined) as AgentRecord['identityVersion'],
     cardJws: r.cardJws ?? null, cardIssuedAt: r.cardIssuedAt ?? null, enrolledAt: r.enrolledAt ?? null,
     mcpClient: r.mcpClient ?? null, mcpLastSeen: r.mcpLastSeen ?? null,
+    ...(r.taskStart === 'automatic' || r.taskStart === 'confirm' ? { taskStart: r.taskStart } : {}),
     scheduleConstraintDefaults: (r.scheduleConstraintDefaults ?? undefined) as AgentRecord['scheduleConstraintDefaults'],
     createdAt: iso(r.createdAt), lastSeen: iso(r.lastSeen),
   };
@@ -168,7 +170,7 @@ export const identityMethods = {
       runMode: a.runMode ?? null, runtimeSource: a.runtimeSource ? JSON.stringify(a.runtimeSource) : null,
       identityVersion: a.identityVersion ?? null,
       cardJws: a.cardJws ?? null, cardIssuedAt: a.cardIssuedAt ?? null, enrolledAt: a.enrolledAt ?? null,
-      mcpClient: a.mcpClient ?? null, mcpLastSeen: a.mcpLastSeen ?? null,
+      mcpClient: a.mcpClient ?? null, mcpLastSeen: a.mcpLastSeen ?? null, taskStart: a.taskStart ?? null,
       tags: a.tags ?? [], createdAt: new Date(a.createdAt), lastSeen: new Date(a.lastSeen),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any).returningAll().execute();

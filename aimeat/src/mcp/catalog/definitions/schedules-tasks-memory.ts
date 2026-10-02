@@ -5,6 +5,8 @@
  * @description Schedule, workflow, task lifecycle, and agent memory (read/write/list/search) tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-02 — aimeat_task_create takes `start`, propose_todos takes `effects` and says what to do
+ *     next; aimeat_task_start and aimeat_agent_task_start_set.
  *   2026-09-29 — aimeat_schedule_create takes kind "refinery" (one mail refinery batch each fire, input { prefix }).
  *   2026-09-27 — aimeat_schedule_list takes detail (each schedule's prompt); aimeat_schedule_update takes prompt.
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
@@ -189,6 +191,7 @@ export const schedulesTasksMemoryTools: AimeatToolDefinition[] = [
             status: { type: 'string', enum: ['draft', 'queued'], description: 'Default "queued" (visible to target immediately). Use "draft" for owner-review-first.' },
             files: { type: 'array', description: 'Up to 20 file REFERENCES the target agent needs: "<owner@node>/<storage key>" each (a bare key means one of your own files). You must be able to read each file yourself.' },
             scope: { type: 'array', description: 'Named parameters the receiving runner DISPATCHES on, each { name, value, type?, description? }. A fleet runner recognises work by a `kind` entry here and takes its pointers (a memory key, an app id) from the others; the description is prose for a model, and a pointer put in the title is the standard way to build a task nothing picks up.' },
+            start: { type: 'string', enum: ['automatic', 'confirm'], description: "How THIS task starts. 'confirm' = it waits for the owner's OK; 'automatic' = the agent proposes its plan and goes on (needs agent:write, never for your own task). Leave it out to use the agent's own setting. The answer's `start` says whether it runs now or waits, and why: tell the person." },
         },
     },
     {
@@ -200,12 +203,29 @@ export const schedulesTasksMemoryTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_task_propose_todos',
-        description: 'Propose TODOs for a queued task, an auto-activated task that has no plan yet (e.g. the Hello Integration test task), or re-propose after the owner has requested changes. The server preserves the prior proposal as outdated history. For task-runner mode agents a proposal on a queued task auto-activates it (no owner click needed).',
+        description: "Propose TODOs for a queued task, a task that started on its own and has no plan yet (e.g. the Hello Integration test task), or re-propose after the owner has requested changes. The server preserves the prior proposal as outdated history. Mark each step that spends money, sends mail or a message in the owner's name, or deletes the owner's data with `effects`: such a plan waits for the owner's OK whatever the agent's setting. The answer's `next` says what to do: 'go_on' (the task is active, carry out the plan) or 'wait_for_owner' (the owner has been told; do nothing until the task is active).",
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
             task_id: { type: 'string', required: true, description: 'Task identifier.' },
-            todos: { type: 'array', required: true, description: 'Array of TODOs with title, optional description, verification, and estimate_minutes.' },
+            todos: { type: 'array', required: true, description: "Array of TODOs with title, optional description, verification, estimate_minutes, and effects (any of 'spend', 'send_as_owner', 'delete')." },
+        },
+    },
+    {
+        name: 'aimeat_task_start',
+        description: "Start a task that waits for the owner's OK, because the owner told you to (\"go ahead\", \"start it\"). Only on the owner's word, and only for another of their agents: never your own task. A task held because its agent can spend money, send mail as the owner or delete as the owner, or because its plan says it will, is refused: tell the person to press Start in the notification they got or in Tasks.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: { task_id: { type: 'string', required: true, description: 'The waiting task to start.' } },
+    },
+    {
+        name: 'aimeat_agent_task_start_set',
+        description: "Set whether one of the owner's agents starts its tasks on its own ('automatic': it proposes its plan and goes on, and the owner sees what was done) or waits for the owner's OK on each ('confirm'). Use it when the person says so (\"let the concierge start its tasks by itself\"). null leaves it to the agent's mode again. Never for yourself. An agent that can spend money, send mail as the owner or delete as the owner always waits whatever this says; the answer's task_start_held_by names those permissions.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            target_agent_name: { type: 'string', required: true, description: 'The agent this is about (same owner as you, never yourself).' },
+            task_start: { type: 'string', required: true, enum: ['automatic', 'confirm'], description: "'automatic' or 'confirm'; null = leave it to the agent's mode." },
         },
     },
     {
