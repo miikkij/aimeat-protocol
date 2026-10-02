@@ -27,6 +27,8 @@
  *   - saveComplianceSnapshot(config, storage, opts) — keep the report as it stands right now
  * @usage registered as the core handler `compliance-report-monthly` in services/core-jobs.ts
  * @version-history
+ *   v1.1.1 — 2026-10-02 — The notification linked to /admin, which the SPA has no route for, so it
+ *     opened the front page. It links to /v1/admin now.
  *   v1.1.0 — 2026-08-23 — saveComplianceSnapshot: the schedule was the only thing that could keep a
  *     report, so a person who wanted this moment had to wait for the first of next month.
  *   v1.0.0 — 2026-08-23 — BR-02, ring 1 (node-wide).
@@ -75,7 +77,8 @@ export async function runComplianceMonthlyReport(
       body: report.gaps.length
         ? `${report.gaps.length} thing(s) need a look: activity nobody wrote down, or a use case with unanswered questions.`
         : 'Nothing in it needs a decision. It also names what it does not cover — read that part.',
-      link: `/admin?tab=compliance&month=${month}`,
+      // The admin page is the SPA route /v1/admin; /admin is no route and opens the front page.
+      link: `/v1/admin?tab=compliance&month=${month}`,
     });
   }
 
