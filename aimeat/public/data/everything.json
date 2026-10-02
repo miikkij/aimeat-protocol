@@ -2679,6 +2679,15 @@
      "plain": "Install the node as an app Install aimeat.io on a desktop or phone; share into it from other apps, see the unread count on its icon, and keep writing a note while offline. PWA"
     },
     {
+     "slug": "g-16-an-app-answers-format-md-itself",
+     "cells": [
+      "<strong>An app answers ?format=md itself</strong>",
+      "An app whose content is built from records names an action of its owner's own extension in its head (<code>&lt;meta name=&quot;aimeat-format-md&quot; content=&quot;/v1/ext/&lt;extension&gt;/&lt;action&gt;&quot;&gt;</code>). A request for the app with <code>?format=md</code>, or one that prefers markdown, then gets what that action returns, always current, with the node's footer of tools and skills. The app's page in the catalogue says who answers. Without the declaration, or when the action fails, the stored page or the app's page converted answers as before. Limits: only the owner's own extension; the action runs as the owner with nobody present, within the extension's time limit.",
+      "<code>aimeat-format-md</code>, <code>/v1/apps/:owner/:filename?format=md</code>, <code>/v1/appcat</code>"
+     ],
+     "plain": "An app answers ?format=md itself An app whose content is built from records names an action of its owner's own extension in its head (<meta name=\"aimeat-format-md\" content=\"/v1/ext/<extension>/<action>\">). A request for the app with ?format=md, or one that prefers markdown, then gets what that action returns, always current, with the node's footer of tools and skills. The app's page in the catalogue says who answers. Without the declaration, or when the action fails, the stored page or the app's page converted answers as before. Limits: only the owner's own extension; the action runs as the owner with nobody present, within the extension's time limit. aimeat-format-md, /v1/apps/:owner/:filename?format=md, /v1/appcat"
+    },
+    {
      "slug": "g-16-pages-an-ai-can-read",
      "cells": [
       "<strong>Pages an AI can read</strong>",
@@ -3682,6 +3691,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-09-15 against node 3.15.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 366
+  "rows": 367
  }
 }

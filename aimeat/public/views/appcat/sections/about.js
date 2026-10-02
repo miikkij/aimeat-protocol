@@ -15,6 +15,8 @@
  * @structure meta (with doors) · AboutSection({ d })
  * @usage loaded by the detail view: import('./sections/about.js')
  * @version-history
+ *   v1.1.0 — 2026-10-02 — A fact says who answers ?format=md: the app's own extension action
+ *     (manifest.formatMd, from aimeat-format-md) or the node's stored page and converted HTML.
  *   v1.0.0 — 2026-09-27 — Initial (appcat detail builder A): the old catalogue's detail.js aboutHtml,
  *     detailAboutEdit/Cancel/Save and detailTranslateDesc.
  */
@@ -133,6 +135,7 @@ export default function AboutSection({ d }) {
   const shown = (m.descriptions && m.descriptions[d.lang]) || m.description || '';
   const bytes = d.work.b64 ? Math.round(d.work.b64.length * 0.75) : 0;
   const f = m.forkedFrom;
+  const fmd = (d.manifest && d.manifest.formatMd) || m.formatMd;
   const rows = [
     { k: x('detail.category'), v: m.category || 'utility' },
     { k: x('detail.tags'), v: m.tags && m.tags.length ? m.tags.join(', ') : '—' },
@@ -142,6 +145,8 @@ export default function AboutSection({ d }) {
     { k: x('detail.created'), v: d.work.shotAt ? dateTime(d.work.shotAt) : '—' },
     { k: x('detail.usesCortex'), v: m.usesCortex && m.usesCortex.length ? m.usesCortex.join(', ') : '—' },
     f && f.owner && f.filename ? { k: x('detail.forkedFrom'), v: f.owner + '/' + f.filename + (f.version ? ' v' + f.version : '') } : null,
+    // Who answers ?format=md: the app's own extension action (aimeat-format-md), or the node's fallback.
+    { k: x('detail.formatMd'), v: fmd ? x('detail.formatMdApp', { extension: fmd.extension, action: fmd.action }) : x('detail.formatMdNode') },
   ];
   return html`
     ${shown ? html`<${Note} kind="lead" chapter>${shown}<//>` : null}

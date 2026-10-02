@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description App, subdomain, CSM/MSM/schema and system-prompt record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.14.0 — 2026-10-02 — AppManifest gains `formatMd`: the owner's extension action that answers ?format=md.
  *   v1.13.0 — 2026-10-02 — AppManifest gains `workspaces`: the workspaces an app declares it needs.
  *   v1.12.0 — 2026-09-28 — AppManifest gains `configSchema`: the config an app declares it needs.
  *   v1.11.0 — 2026-09-28 — The package, template-listing and package-instance types moved unchanged
@@ -179,6 +180,12 @@ export interface AppManifest {
    * app has. See services/app-ai-posture.ts.
    */
   aiPosture?: AppAiPosture;
+  /**
+   * The app's own answer to `?format=md`: an action of the owner's own extension that returns the
+   * markdown (services/app-format-md.ts). Read from `<meta name="aimeat-format-md">` on every
+   * publish and never carried forward; a fork drops it, because the extension stays its owner's.
+   */
+  formatMd?: { extension: string; action: string };
   /**
    * Which build track made this app (TARGET-074): `atelier` when the app declared
    * `<meta name="aimeat-track" content="atelier">` in its head, `classic` when it declared that,

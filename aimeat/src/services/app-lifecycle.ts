@@ -40,6 +40,7 @@
  *   const out = await forkApp(storage, config, { source, callerOwner, callerGhii, callerGaii, newFilename });
  *   if ('refusal' in out) { res.status(out.refusal.status).json(error(...)); return; }
  * @version-history
+ *   v1.0.2 — 2026-10-02 — A fork drops `formatMd`: the ?format=md handler is the source owner's extension.
  *   v1.0.1 — 2026-09-20 — resolveAppOwnerScope and AppOwnerScope moved whole to app-owner-scope.ts
  *     and are re-exported from here: two services that needed only them depended, through this
  *     file, on the publish, which became a cycle the day a publish needed the Design Book.
@@ -382,6 +383,9 @@ export async function forkApp(
   // fork, and it is owner-only besides — copying it hands one owner's note about their own working
   // habits to whoever forked them, which is what the MCP fork did.
   delete forkedManifest.specCheck;
+  // The ?format=md handler is an action of the SOURCE owner's extension, which the forker does not
+  // own; their own publish of the fork declares one of their own, or none.
+  delete forkedManifest.formatMd;
   // Search visibility is NOT inherited, and this is the one place it could have been. The manifest
   // spread above would otherwise hand a brand-new fork the source's `index: true` — and, on a node
   // in review mode, the operator's approval of a different app along with it. Whoever forked this
