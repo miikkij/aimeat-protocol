@@ -21,6 +21,9 @@
  *   const checked = checkAppManageInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
+ *   2026-10-02 — The design spec beside the app: spec, spec_set and spec_clear over the design-spec
+ *     routes, and the markdown and expected_revision fields. A second builder had nothing that said
+ *     what the app was (wish-sovelluksen-design-speksi-sovelluksen-l-helle-settings-contr).
  *   2026-10-02 — The development right from a chat: builders, builder_set and builder_remove over the
  *     dev-grants routes, and the dev_level field. An owner who asks their AI to let somebody develop
  *     an app got no tool for it and no address of the page that does it
@@ -130,6 +133,9 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     year: { type: 'string', description: 'For audit: read that year\'s archived entries (four digits, e.g. "2026") instead of the active log. The audit answer lists the archived years.' },
     keep: { type: 'string', description: 'For audit_keep: "all" keeps every entry of every app\'s audit log (nothing deleted), a whole number such as "1000" keeps that many newest entries per app and deletes the rest, "default" returns to the node default. Omit it to read the setting. A number is the account holder\'s own decision: it is refused here and set on the app page, signed in.' },
     invite_id: { type: 'string', description: 'For member_invite_cancel: the invitation id, from the invites list of members.' },
+    // design spec (routes/apps/design-spec.ts)
+    markdown: { type: 'string', description: 'For spec_set: the WHOLE design spec as one markdown document, at most 64 KB. It replaces what is there. Sending the text that is there marks the spec current for the app\'s version without a new revision.' },
+    expected_revision: { type: 'number', description: 'For spec_set: the revision you read (spec answers it). When the stored revision differs the write is refused with REVISION_MISMATCH and the current document, so read again and write from that. Omit it to replace whatever is there.' },
 };
 
 /** One action: its fields (true = required), its permission word (null = none), and one line. */
@@ -195,6 +201,21 @@ const BUILDER_ACTION_SPECS: Record<string, AppManageAction> = {
         summary: 'take the right to build the app back. A membership the person holds stays. Owner only' },
 };
 
+/**
+ * The design spec beside the app (services/app-design-spec.ts): what the app is for, its screens,
+ * where its data lives, what was decided and what is open, for everybody who builds it. Over the
+ * route like the member actions, which decides who is inside the build (the owner, the owner's
+ * agents, and everybody holding a development right) and that only the owner removes it.
+ */
+const SPEC_ACTION_SPECS: Record<string, AppManageAction> = {
+    spec: { fields: F(['filename'], ['owner']), scope: 'app:write',
+        summary: 'read the app\'s design spec: the document that says what the app is for, its screens, where its data lives, what was decided and what is open. Read it BEFORE you change an app somebody else owns or shares. The answer says whether the app has moved past the version the spec was written against (stale), and gives an outline to start from when nobody has written one. The owner and everybody who may build the app' },
+    spec_set: { fields: F(['filename', 'markdown'], ['owner', 'expected_revision']), scope: 'app:write',
+        summary: 'write the whole design spec (read it first with spec). Keep what is still true, change what is not, and write it back after every publish with what changed; the publish answer says when it has fallen behind. The same text again marks it current for the app\'s version. The owner and everybody who may build the app' },
+    spec_clear: { fields: F(['filename'], ['owner']), scope: 'app:write',
+        summary: 'remove the design spec. Owner only: a builder corrects it with spec_set instead' },
+};
+
 export const APP_MANAGE_ACTIONS: Record<string, AppManageAction> = {
     settings: { fields: F(['filename'], ['owner', ...SETTINGS_FIELDS]), oneOf: SETTINGS_FIELDS, scope: 'app:write',
         summary: 'change name, description, per-language descriptions, parked (hidden from the public catalogue), forkable, access code or copy protection, without a new version' },
@@ -248,6 +269,7 @@ export const APP_MANAGE_ACTIONS: Record<string, AppManageAction> = {
         summary: 'whether it is registered, when it was last seen, and its deploy state' },
     ...MEMBER_ACTION_SPECS,
     ...BUILDER_ACTION_SPECS,
+    ...SPEC_ACTION_SPECS,
     grants: { fields: F([], []), scope: 'consent:manage',
         summary: 'the apps your owner has granted permissions to, with their permissions and spend; revoking one is the owner\'s own act on the Access page' },
     backup_export: { fields: F([], []), scope: 'app:write',

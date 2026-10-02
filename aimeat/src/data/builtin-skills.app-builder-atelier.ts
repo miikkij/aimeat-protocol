@@ -13,6 +13,8 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.30.0 — 2026-10-02 — Research first reads the design spec of an app that already exists, and
+ *     writes it back after the publish (services/app-design-spec.ts).
  *   v1.29.1 — 2026-10-02 — The board's tow, anchored rings and onDrop, and requestPanel's extra host,
  *     named in the board-family paragraph. Read against describe-data.js after they joined.
  *   v1.29.0 — 2026-10-02 — The board family (kit board.js, request-panel.js, shelf.js, verbs.js):
@@ -207,6 +209,9 @@ moved under you says so.
    why. A fixed genre can be made to follow by moving its colours to the theme's \`--ak-*\` tokens,
    shown in both modes beside the original before the owner decides.
 2. **Research first** — \`aimeat_appdev_overview\`, existing apps and skills, the pitfalls, and
+   **on an app that already exists, its design spec** (\`aimeat_app_manage\` \`{ action: "spec",
+   owner, filename }\`: what it is for, its screens, where its data lives, what was decided and what
+   is open; after the publish, write it back with \`spec_set\`), and
    **the Design Book** (\`aimeat_designbook_search\`): layouts, fills, looks, motion, ambients and
    effects that each passed their own bench. Called with nothing, the search answers the WHOLE
    Book on one page, every part on a line under its kind, and part \`book\` of the

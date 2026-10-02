@@ -24,6 +24,8 @@
  * @structure APP_BUILDER_SKILL_ENTRY
  * @usage import { APP_BUILDER_SKILL_ENTRY } from './builtin-skills.app-builder.js';
  * @version-history
+ *   v1.8.0 — 2026-10-02 — The app's design spec: read it in the research step on an app that exists,
+ *     write it back as the fourth step of the finish (services/app-design-spec.ts).
  *   v1.7.0 — 2026-10-01 — "Which model builds it": on any model but Claude Opus or Fable, the first
  *     message about the app says once that those build the better app. Cold-agent build-app on
  *     2026-10-01: Opus 5.5 3/3, Sonnet 5.5 (claude.ai's free plan) 1/3.
@@ -152,7 +154,11 @@ patterns), library packs with per-model proofs, T1/T2/T3 templates, and the pitf
 (curated + learned) for the areas you will touch. Drill down from there:
 \`GET /v1/library-packs/{id}\` (per-pack AI doc), \`GET /v1/appdev/pitfalls\` (curated
 registry), \`aimeat_appdev_pitfall_list\` (learned, model-filterable), \`aimeat_skill_list\`
-\`binding=app:{owner}/{file}\` (how existing apps want to be driven).
+\`binding=app:{owner}/{file}\` (how existing apps want to be driven). **On an app that already
+exists, read its design spec first:** \`aimeat_app_manage\` \`{ action: "spec", owner, filename }\`
+says what the app is for, its screens, where its data lives, what was decided and what is open,
+and whether the app has moved past the version it was written against. Change the app from what
+it says, and change the spec where the app no longer matches it.
 
 Frame the build from the research (tier T1/T2/T3, packs, whether the app needs its own
 users → the node roster + AIMEAT.iam for the panel, and a gate from aimeat_iam_define when the
@@ -219,6 +225,12 @@ After a successful publish (the publish response's \`next_steps\` shows what is 
    (your own model id required — self-identify) — the next build starts from it.
 3. Report what bit you: \`aimeat_appdev_pitfall_report\` (model required; upserts by slug;
    \`share: true\` publishes it platform-wide) — the next builder skips your mistake.
+4. Write the app's **design spec** back: \`aimeat_app_manage\` \`{ action: "spec_set", owner,
+   filename, markdown, expected_revision }\`, the whole document (\`spec\` answers an outline when
+   there is none): what the app is for, its screens, where its data lives, the decisions and why,
+   the AI and agents it uses, what is open, and what bit you. The next builder, and your own next
+   session, reads it before touching the app; the publish answer's \`design_spec_hint\` says when it
+   has fallen behind, and the same text again marks it current.
 
 ## Workflow
 

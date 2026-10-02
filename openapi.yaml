@@ -3999,6 +3999,7 @@ components:
         dev_level_name: { type: string, enum: [full, publisher, drafter] }
         building_for: { type: string, description: Owner whose app the caller helps build. }
         roadmap_hint: { type: string, description: Publication warning when an unshared app was published without a roadmap line. }
+        design_spec_hint: { type: string, description: Publication hint when a shared app has no design spec, or this version moved past the version the spec was written against. Never a refusal. }
         operator_hidden: { type: boolean, description: True when an operator has hidden the app from every public surface (visible only to its owner, who cannot lift it) }
         operator_hide_reason: { type: string, nullable: true, description: Optional operator-supplied reason, shown to the owner }
         has_screenshot: { type: boolean }
@@ -30413,6 +30414,102 @@ paths:
         - { name: owner, in: path, required: true, schema: { type: string } }
         - { name: filename, in: path, required: true, schema: { type: string } }
         - { name: entryId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/apps/{owner}/{filename}/design-spec:
+    get:
+      operationId: appDesignSpecGet
+      summary: The app's design spec, and whether the app has moved past it
+      description: >
+        One markdown document beside the app: what it is for, its screens, where its data lives,
+        what was decided and what is open. For the owner, the owner's agents and everybody holding a
+        development right at any rung; nobody else, because it names data keys, decisions and open
+        questions. Returns `{ app, app_version, design_spec, stale, template?, meaning }`:
+        `design_spec` is null when nobody has written one and `template` then carries the outline
+        to start from; `stale` is true when the spec was written against an older version than the
+        app's. The record carries `markdown`, `updatedBy`, `updatedByPrincipal`, `updatedAt`,
+        `version` (the app version it was written or confirmed against) and `revision`. Needs
+        `app:write`, the word the dev-grants list asks, because the app domain has no read word.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      operationId: appDesignSpecWrite
+      summary: Write the whole design spec
+      description: >
+        Body `{ markdown, expected_revision? }`. `markdown` is the whole document, at most 64 KB; it
+        replaces what is there. Sending the text that is there marks the spec current for the app's
+        version without a new revision, which is how a builder confirms it after a publish. With
+        `expected_revision` the write is refused (409 `REVISION_MISMATCH`, with the current document
+        in `details`) when the stored revision differs, so two builders' AIs cannot overwrite each
+        other unseen. The manifest's `designSpec` stamp follows every write. Needs `app:write` and
+        the owner, one of the owner's agents, or a development right.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [markdown]
+              properties:
+                markdown: { type: string, minLength: 3, maxLength: 65536 }
+                expected_revision: { type: integer, minimum: 0 }
+      responses:
+        '200':
+          description: Replaced, or confirmed. Returns `{ design_spec, stale, replaced_revision, unchanged, meaning }`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '201':
+          description: Created. The first spec of this app.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: >
+            `REVISION_MISMATCH`: the caller named a revision that is not the stored one. `details.design_spec`
+            is the document as it stands; read it and write from that.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+    delete:
+      operationId: appDesignSpecRemove
+      summary: Remove the design spec
+      description: >
+        Owner-only (the owner or one of their agents); a builder holding a development right is
+        refused with 403 and corrects the document instead. Returns `{ removed }`.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
       responses:
         '200':
           description: OK

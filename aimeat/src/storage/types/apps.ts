@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description App, subdomain, CSM/MSM/schema and system-prompt record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.15.0 — 2026-10-02 — AppManifest gains `designSpec`: the design spec's stamp (services/app-design-spec.ts).
  *   v1.14.0 — 2026-10-02 — AppManifest gains `formatMd`: the owner's extension action that answers ?format=md.
  *   v1.13.0 — 2026-10-02 — AppManifest gains `workspaces`: the workspaces an app declares it needs.
  *   v1.12.0 — 2026-09-28 — AppManifest gains `configSchema`: the config an app declares it needs.
@@ -130,6 +131,12 @@ export function mergeLegal(
 export interface AppManifest {
   /** Summary of the roadmap committed with this app version. */
   roadmap?: { at: string; version: number; done: number; wanted: number };
+  /**
+   * The design spec's stamp (services/app-design-spec.ts): when it was last written, by whom, against
+   * which app version, at which revision, and how big it is. Never the prose. Refreshed by every
+   * write of the spec and copied forward by every publish.
+   */
+  designSpec?: { at: string; by: string; version: number; revision: number; bytes: number };
   name: string;
   description: string;
   // Per-locale descriptions (BCP-47-ish keys, e.g. 'en', 'fi'), extensible to more languages.

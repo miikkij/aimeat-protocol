@@ -105,6 +105,7 @@
  *   2026-09-24 -- canonicalOwner and appTarget shorten the caller's `owner` claim with
  *     localAccountName: `name@node` of THIS node is still the bare name, and a visitor's home GHII
  *     stays whole, so it no longer lands in the local namesake's app bucket (secaudit 2026-09, F-1).
+ *   2026-10-02 -- registerDesignSpecRoutes: the design spec beside the app (apps/design-spec.ts).
  */
 import { Router } from 'express';
 import { localAccountName } from '../utils/gaii.js';
@@ -121,6 +122,7 @@ import { registerDraftRoutes } from './apps/drafts.js';
 import { registerForkManageRoutes } from './apps/fork-manage.js';
 import { registerLegalRoutes } from './apps/legal.js';
 import { registerRoadmapRoutes } from './apps/roadmap.js';
+import { registerDesignSpecRoutes } from './apps/design-spec.js';
 import { registerAppAgentRoutes } from './apps/agents-deploy.js';
 import { registerAppConfigRoutes } from './apps/app-config.js';
 import { registerAdminSeoRoutes } from './admin-seo.js';
@@ -185,6 +187,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     registerForkManageRoutes(router, config, storage, canonicalOwner, appTarget);
     registerLegalRoutes(router, config, storage, canonicalOwner);
     registerRoadmapRoutes(router, config, storage, appTarget);
+    registerDesignSpecRoutes(router, config, storage, appTarget);
     registerAppAgentRoutes(router, config, storage);
     registerAppConfigRoutes(router, config, storage);
     // The operator's search-visibility surface: the node's own status, and the per-app block and

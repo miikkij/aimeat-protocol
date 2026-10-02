@@ -9,6 +9,7 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.76.0 -- 2026-10-02 -- e2e-app-design-spec.ts joins the list.
  *   v1.75.0 -- 2026-10-02 -- e2e-task-start.ts joins the list.
  *   v1.74.0 -- 2026-10-02 -- e2e-package-withdraw.ts joins the list (package sale design, phase 5).
  *   v1.73.0 -- 2026-10-02 -- e2e-package-sets.ts joins the list (package sale design, phase 4).
@@ -329,6 +330,7 @@ const ALL_SUITES = [
     'test/e2e-members-only-payments.ts',
     'test/e2e-app-dev-grant.ts',
     'test/e2e-app-roadmap.ts',
+    'test/e2e-app-design-spec.ts',
     'test/e2e-app-silent.ts',
     // Self-spawns with the app origin OFF on a fresh database: one owner first, then a second, which
     // is the moment every app moves into the isolated frame (audit A7-1).
