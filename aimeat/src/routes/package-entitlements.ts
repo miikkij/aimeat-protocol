@@ -10,6 +10,7 @@
  *   GET /v1/packages/:groupId/entitlements · PUT and DELETE /v1/packages/:groupId/entitlements/:nodeId
  *   GET /v1/federation/packages (signed by the calling node) · GET /v1/packages/:groupId/config-needs
  * @version-history
+ *   v1.3.0 — 2026-10-02 — A grant's new node counts against the packages-only peer cap (config.packagePeerCap).
  *   v1.2.0 — 2026-09-28 — GET /v1/packages/:groupId/config-needs: the questions a shop asks before payment.
  *   v1.1.0 — 2026-09-28 — The grant takes `node` ({ url, public_key }) and registers an unknown node as
  *     a packages-only peer; the listing serves such a peer only what it holds (install packages, phase 5).
@@ -49,7 +50,7 @@ export function registerPackageEntitlementRoutes(
             note: body.note,
             channel: body.channel,
             node: body.node,
-        }, peers, { timeoutMs: config.federationTimeoutMs, thisNodeId: config.nodeId });
+        }, peers, { timeoutMs: config.federationTimeoutMs, thisNodeId: config.nodeId, peerCap: config.packagePeerCap });
         if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
         res.json(success(config.nodeId, {
             entitlement: out.entitlement, peer_registered: out.peerRegistered === true, peer_pending: out.peerPending === true,

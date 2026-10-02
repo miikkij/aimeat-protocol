@@ -12,6 +12,8 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   v1.21.0 — 2026-10-02 — federation.package_peer_cap (AIMEAT_PACKAGE_PEER_CAP): the most packages-only
+ *     peers a repository registers (package sale design, finding F).
  *   v1.20.0 — 2026-10-01 — apps.audit_keep_default (AIMEAT_APP_AUDIT_KEEP): the node's default limit
  *     on each app's audit log, 0 = keep all. The morsel policy rows moved unchanged to
  *     config-schema-morsels.ts (max-file-lines).
@@ -310,6 +312,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'webBotAuthSign', dotPath: 'federation.web_bot_auth_sign', envVar: 'AIMEAT_WEB_BOT_AUTH_SIGN', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Sign outbound HTTP with the node Ed25519 key (RFC 9421 Web Bot Auth); the key directory is always served' },
   { key: 'installSetPath', dotPath: 'packages.install_set', envVar: 'AIMEAT_INSTALL_SET', type: 'string', validate: v => v === null || typeof v === 'string', immutable: true, description: 'An install set file (JSON, spec aimeat.install-set/1) this node applies at start-up: the owner user, a bundle\'s packages, its organisms, the other users and the crew agents. Applying again creates nothing twice, so the file may stay. Unset: nothing is applied' },
   { key: 'installSetSecretsPath', dotPath: 'packages.install_set_secrets', envVar: 'AIMEAT_INSTALL_SET_SECRETS', type: 'string', validate: v => v === null || typeof v === 'string', immutable: true, description: 'A JSON file of the secret config values for that install set; read at start-up and never stored in the record of the apply' },
+  { key: 'packagePeerCap', dotPath: 'federation.package_peer_cap', envVar: 'AIMEAT_PACKAGE_PEER_CAP', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 100000, immutable: false, description: 'On a package repository: the most nodes registered as packages-only peers through grants, sales and named sellers. Beyond it a new node is refused and the operator is told once', range: '1-100000' },
   { key: 'packageRepository', dotPath: 'federation.package_repository', envVar: 'AIMEAT_PACKAGE_REPOSITORY', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Package repository role: serve a private package to the peer nodes entitled to it (signed requests; entitlements per package). Off: private packages reach their author only' },
 
   // ── Search-engine presence (mutable) ── config-schema-seo.ts

@@ -48,6 +48,8 @@
  *     (services/package-upstream-refresh.ts).
  *   v1.12.0 — 2026-09-28 — The install set named by AIMEAT_INSTALL_SET is applied after the peers load
  *     (services/install-set-startup.ts).
+ *   v1.14.0 — 2026-10-02 — The `package-peer-cleanup` core handler, on a package repository
+ *     (services/package-peer-limits.ts).
  *   v1.13.0 — 2026-10-02 — The `package-renewals` core handler, after the peers load
  *     (services/package-renewals.ts).
  *   v1.13.0 — 2026-09-29 — The `refinery` schedule kind's executor is registered on the scheduler
@@ -393,6 +395,14 @@ export async function initializeServices(
     const { runAutoRenewals } = await import('../services/package-renewals.js');
     const outcomes = await runAutoRenewals({ storage, config, peers });
     if (outcomes.length > 0) logger.info(`Package renewals: ${outcomes.filter(o => o.result === 'renewed').length} renewed, ${outcomes.filter(o => o.result === 'failed').length} failed`);
+  });
+
+  // Unused packages-only peers removed, on a package repository (services/package-peer-limits.ts).
+  scheduler.registerCoreHandler('package-peer-cleanup', async () => {
+    if (!config.packageRepository) return;
+    const { cleanupPackagePeers } = await import('../services/package-peer-limits.js');
+    const removed = await cleanupPackagePeers({ storage, config, peers });
+    if (removed.length > 0) logger.info(`Package peer cleanup: removed ${removed.length} unused packages-only peer(s): ${removed.join(', ')}`);
   });
 
   // The install set a new customer node applies at start-up (AIMEAT_INSTALL_SET). It needs the peers

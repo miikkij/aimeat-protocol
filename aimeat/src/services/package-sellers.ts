@@ -24,6 +24,7 @@
  *   `sellers.<author>`: no principal can address it.
  * @structure SellerRecord · listSellers() · addSeller() · removeSeller() · isSellerFor()
  * @version-history
+ *   v1.2.0 — 2026-10-02 — A new seller node counts against the packages-only peer cap (package-peer-limits.ts).
  *   v1.1.0 — 2026-10-01 — A new seller is registered only after its card answers with the same id and
  *     key; adding one needs the repository role and an author with a package here. Until then any
  *     owner with packages:write could register any node id as a peer through this route (the
@@ -73,7 +74,7 @@ export async function isSellerFor(storage: Storage, author: string, nodeId: stri
  * same id and key (package-peer-register.ts); a known peer must be active and under the same key.
  */
 export async function addSeller(
-    deps: { storage: Storage; peers: Map<string, PeerInfo>; config: { packageRepository: boolean; federationTimeoutMs: number; nodeId: string } },
+    deps: { storage: Storage; peers: Map<string, PeerInfo>; config: { packageRepository: boolean; federationTimeoutMs: number; nodeId: string; packagePeerCap?: number } },
     caller: { owner: string },
     input: { nodeId: string; node?: unknown; note?: unknown },
 ): Promise<Refusal | { ok: true; seller: SellerRecord; peerRegistered: boolean }> {
@@ -87,7 +88,7 @@ export async function addSeller(
     }
     let peerRegistered = false;
     if (input.node !== undefined && input.node !== null) {
-        const link = await linkPackagePeer({ storage, peers, timeoutMs: config.federationTimeoutMs, thisNodeId: config.nodeId }, input.nodeId, input.node,
+        const link = await linkPackagePeer({ storage, peers, timeoutMs: config.federationTimeoutMs, thisNodeId: config.nodeId, cap: config.packagePeerCap }, input.nodeId, input.node,
             { source: 'package-seller', by: caller.owner }, { pendingWhenUnreachable: false });
         if (!link.ok) return link;
         peerRegistered = link.registered;

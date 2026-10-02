@@ -21,6 +21,7 @@
  *   import { packagesRouter } from '../routes/packages.js';
  *   app.use(packagesRouter(config, storage));
  * @version-history
+ *   2026-10-02 — POST /v1/packages/:groupId/versions/:version/withdraw (package sale design, phase 5: T6).
  *   2026-10-02 — POST /v1/packages/compose under a name the caller already has publishes the next
  *     version (`new_version` true) instead of 409; POST /v1/packages/compose-set (package sale design, phase 4).
  *   2026-10-01 — GET /v1/packages/:groupId carries `sheet`, the "what you get" sheet (guided journey P3).
@@ -70,6 +71,8 @@ import {
 } from '../services/package-read.js';
 import { composePackageFromApps } from '../services/package-compose.js';
 import { composeSet } from '../services/package-compose-set.js';
+import { withdrawVersion } from '../services/package-withdrawals.js';
+import { getActiveScheduler } from '../services/scheduler.js';
 import { packageSheet } from '../services/package-sheet.js';
 import { importParsedPackage, upstreamFromZip } from '../services/package-import.js';
 import type { PeerInfo } from '../services/federation.js';
@@ -594,6 +597,22 @@ export function packagesRouter(
 
     res.json(success(config.nodeId, out.package, [
       { description: 'Install it', method: 'POST', url: `/v1/packages/${encodeURIComponent(groupId)}/install` },
+    ]));
+  });
+
+  // POST /v1/packages/:groupId/versions/:version/withdraw — take a bad version back from every node
+  // that has it, with a reason (services/package-withdrawals.ts). The author or an operator.
+  router.post('/v1/packages/:groupId/versions/:version/withdraw', requireAuth(), requireScope('packages:write'), async (req, res) => {
+    const groupId = decodeURIComponent(req.params.groupId as string);
+    const out = await withdrawVersion({ storage, config, scheduler: getActiveScheduler() },
+      { owner: req.auth!.owner, isOperator: req.auth!.roles.includes('operator') },
+      { groupId, version: req.params.version as string, reason: (req.body ?? {}).reason });
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
+      return;
+    }
+    res.json(success(config.nodeId, { withdrawal: out.withdrawal, copies_here: out.copies_here }, [
+      { description: 'Publish a fixed version', method: 'POST', url: `/v1/packages/${encodeURIComponent(groupId)}/versions` },
     ]));
   });
 

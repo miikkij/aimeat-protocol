@@ -5,6 +5,7 @@
   and the trust checks that must exist before a node sells somebody else's code. Written from a
   verification of the package, repository, commerce and install code on main at 31603ae7f.
 @version-history
+  v0.6.0 — 2026-10-02 — Phase 5 built (section 9); the scale measured (section 7).
   v0.5.0 — 2026-10-02 — Phase 4 built (section 9).
   v0.4.0 — 2026-10-02 — Phases 1 to 3 built on the API and MCP side (section 9); the status says so.
   v0.3.0 — 2026-10-02 — Questions 1, 4 and 5 answered. Renewal: the buyer starts it first, automatic
@@ -18,8 +19,9 @@
 
 # Selling a package: verification and design
 
-Status: **every open question answered (section 10); phases 1 to 4 built on the API and MCP side,
-phase 5 not yet (section 9).** No screen is built; screens wait for Jouni's look. The
+Status: **every open question answered (section 10); phases 1 to 5 built on the API and MCP side
+(section 9).** Open: the storage of grants beyond about 2,000 nodes per package (section 7), which
+needs Jouni's decision. No screen is built; screens wait for Jouni's look. The
 verification in section 1 was made against the code on `main` at `31603ae7f`.
 
 ## What a person gets
@@ -630,6 +632,18 @@ the record is full. Every signed read lists every entitlements record to find th
 today's size (one repository, one bundle, a handful of customers); both matter for a hosting
 provider's repository, and should be measured on a seeded repository before one opens.
 
+*Measured 2026-10-02* (`aimeat/scripts/measure-package-repository.ts`, SQLite, every grant with the
+copy of the terms phase 3 added): one grant is **502 bytes**, so one package group's record passes
+the project's 1024 kB rule for a memory value at **about 2,088 entitled nodes** (981 kB at 2,000). The
+rule is checked on the memory routes (services/quota.ts), not on a system-namespace write, so the
+2,089th sale does not fail: the record grows past the rule, and every grant and renewal rewrites the
+whole record. A customer node's listing reads every entitlements record: **40 ms** at 50 groups × 500
+nodes, **640 ms** at 200 groups × 2,000 nodes (400,000 grants), growing with the number of grants on
+the repository. Neither matters for a repository of today's size or of a few hundred customers per
+package. Before one package sells more than about 1,500 copies, the grants of a group need more than
+one record (one record per node, or a shard per hundred nodes, read through an index of which groups a
+node holds); that is a storage change, and **it needs Jouni's decision** on which.
+
 ## 8. Is the brief one shop's wish?
 
 Mostly not: a priced offer, a checkout that grants, a composer and a trust summary are what any
@@ -691,7 +705,18 @@ Each phase is usable on its own and is tested before the next starts.
    than deployed through a runner as the install set does. Not built: splitting the declared
    workspaces into more than one organism; the author renames the one organism.*
 5. **A repository open to strangers:** withdrawal (T6), review on a selling node, the scale
-   measurement, and the offer in the Exchange's discovery for agents.
+   measurement, and the offer in the Exchange's discovery for agents. *Built 2026-10-02: withdrawal
+   with a reason (services/package-withdrawals.ts, POST /v1/packages/:groupId/versions/:version/withdraw,
+   aimeat_package_withdraw): never served again, each copy's extensions switched off and its owner told
+   once, on the repository at once and on a customer node at its daily check through `withdrawn` on the
+   listing. Review on a selling node: the seller's offer read carries what the version on sale can do,
+   the operator reviews it (aimeat_package_sale action review), and new sales wait while a newer
+   version can do more; renewals go on. Discovery: packages on sale are `offering` entries with segment
+   `package` (discovery/sources/package-offers-source.ts). Finding F's open items: the cap on
+   packages-only peers (AIMEAT_PACKAGE_PEER_CAP, default 500, told on the Security page) and the daily
+   removal of unused ones (services/package-peer-limits.ts). The scale measurement is in section 7;
+   past about 2,088 nodes one package group's record outgrows the memory value rule, which needs a
+   storage decision.*
 
 ## 10. Questions for Jouni, and his answers
 

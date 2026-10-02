@@ -8593,6 +8593,8 @@
   "notiftext.package_sale_request_approved.body": "Myyjä hyväksyi pyynnön. Näet Paketit-sivulta, mitä seuraavaksi tapahtuu.",
   "notiftext.package_sale_request_refused.title": "Pyyntöäsi paketista {name} ei hyväksytty",
   "notiftext.package_sale_request_refused.body": "Myyjä ei hyväksynyt pyyntöä. Mitään ei asennettu eikä veloitettu.",
+  "notiftext.package_version_withdrawn.title": "Asennuksesi {label} versio on vedetty pois",
+  "notiftext.package_version_withdrawn.body": "Tekijä veti pois version {version}: {reason} Sen mukana tulleet laajennukset on kytketty pois päältä. Sovelluksesi ja tietueesi pysyvät ennallaan. Asenna seuraava versio, kun se tulee.",
   "notiftext.app_mail_read_consent.title": "Sähköpostin lukemiseen tarvitaan nyt oma oikeus",
   "notiftext.app_mail_read_consent.body": "Näillä sovelluksilla on oikeus julkaista ja lähettää liittämiesi tilien kautta: {apps}. Tähän asti sama oikeus salli niiden myös lukea sähköpostiasi. Nyt lukemiseen tarvitaan oma oikeus. Salli se jokaiselle sovellukselle, jonka haluat jatkossakin lukevan sähköpostiasi.",
   "notiftext.app_mail_read_consent.allow": "Salli lukeminen: {app}",

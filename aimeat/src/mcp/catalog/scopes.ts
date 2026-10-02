@@ -22,6 +22,7 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.44.0 -- 2026-10-02 -- aimeat_package_withdraw -> packages:write, the word its route asks (phase 5).
  *   v1.43.0 -- 2026-10-02 -- aimeat_package_compose_set -> packages:write, as compose (phase 4).
  *   v1.42.0 -- 2026-10-02 -- aimeat_package_offer -> packages:write, aimeat_package_buy -> commerce:buy,
  *     the words their REST endpoints ask (package sale design, phase 3).
@@ -238,6 +239,7 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_package_status_set:                'app:write',
     aimeat_package_compose:                   'packages:write',
     aimeat_package_compose_set:               'packages:write',
+    aimeat_package_withdraw:                  'packages:write',
     aimeat_package_update:                    'packages:write',
     aimeat_package_fork:                      'packages:write',
     aimeat_package_instance_set:              'packages:write',

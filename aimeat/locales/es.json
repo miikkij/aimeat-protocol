@@ -7464,6 +7464,8 @@
   "notiftext.package_sale_request_approved.body": "El vendedor la aprobó. Abre tu página de Paquetes para ver qué sigue.",
   "notiftext.package_sale_request_refused.title": "No se aprobó tu solicitud de {name}",
   "notiftext.package_sale_request_refused.body": "El vendedor no la aprobó. No se instaló ni se cobró nada.",
+  "notiftext.package_version_withdrawn.title": "Se retiró la versión de {label} que tienes",
+  "notiftext.package_version_withdrawn.body": "Su autor retiró la versión {version}: {reason} Las extensiones que trajo se desactivaron. Tus aplicaciones y registros siguen como están. Instala la próxima versión cuando llegue.",
   "notiftext.app_mail_read_consent.title": "Ahora, leer tu correo requiere un permiso aparte",
   "notiftext.app_mail_read_consent.body": "Estas aplicaciones tienen permiso para publicar y enviar a través de las cuentas que conectaste: {apps}. Hasta ahora, ese permiso también les permitía leer tu correo. Ahora leer el correo tiene su propio permiso: dáselo a cada aplicación que deba seguir leyendo tu correo.",
   "notiftext.app_mail_read_consent.allow": "Permitir lectura: {app}",

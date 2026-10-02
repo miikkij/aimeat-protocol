@@ -27,6 +27,7 @@
  *   2026-09-30 — aimeat_admin_node_update: read only, open world (it reads npm).
  *   2026-09-29 — aimeat_refinery_classes and _status (read only), aimeat_refinery_run (writes rows,
  *     reads an outside mailbox, spends the model allowance).
+ *   2026-10-02 — aimeat_package_withdraw (destructive: switches extensions off; other nodes act on it).
  *   2026-10-02 — aimeat_package_compose_set (writes packages; the dry run writes nothing).
  *   2026-10-02 — aimeat_package_offer, aimeat_package_buy and aimeat_package_claim (a purchase and a claim reach other nodes).
  *   2026-09-29 — aimeat_package_sellers and aimeat_package_sale (a revoke is destructive; the sale reaches the repository).
@@ -403,6 +404,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // Not destructive: it changes who may reach a version, never its bytes, and archiving is
     // reversible by setting the status back.
     aimeat_package_status_set: { title: 'Set Package Status', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_package_withdraw: { title: 'Withdraw a Package Version', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     // Not idempotent: composing twice under one name is refused as a conflict, and composing under
     // another name makes a second package. It reads the owner's apps and writes nothing of theirs.
     aimeat_package_compose: { title: 'Compose Package From Apps', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },

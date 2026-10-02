@@ -9,6 +9,7 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.74.0 -- 2026-10-02 -- e2e-package-withdraw.ts joins the list (package sale design, phase 5).
  *   v1.73.0 -- 2026-10-02 -- e2e-package-sets.ts joins the list (package sale design, phase 4).
  *   v1.72.0 -- 2026-10-02 -- e2e-package-sale.ts joins the list (package sale design, phase 3).
  *   v1.71.0 -- 2026-10-02 -- e2e-package-consent.ts joins the list (package sale design, phase 2).
@@ -871,6 +872,8 @@ const ALL_SUITES = [
     // The set composer: the workspace an app declares, one package per app and an install bundle, a
     // quiet mistake refused, and the buyer installing the set with each app told where its workspace is.
     'test/e2e-package-sets.ts',
+    // Withdrawing a bad version: the copy's extension off, its owner told once, the version served no more.
+    'test/e2e-package-withdraw.ts',
     // A peer a package path registers: only on the node's own card, packages-only, no sign-in and no
     // messages through it, a sale that waits for a node that is down, and the operator's release.
     'test/e2e-peer-registration-proof.ts',

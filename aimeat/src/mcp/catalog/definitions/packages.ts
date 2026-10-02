@@ -12,6 +12,7 @@
  * @structure packagesTools[] -- catalog entries, folded into definitions.ts
  * @usage import { packagesTools } from './packages.js';
  * @version-history
+ *   v1.14.0 -- 2026-10-02 -- aimeat_package_withdraw (package sale design, phase 5: T6).
  *   v1.13.0 -- 2026-10-02 -- aimeat_package_compose_set; aimeat_package_install installs a set and takes
  *     `organism_names` (package sale design, phase 4).
  *   v1.12.0 -- 2026-10-02 -- aimeat_package_offer and aimeat_package_buy (package sale design, phase 3).
@@ -163,6 +164,17 @@ export const packagesTools: AimeatToolDefinition[] = [
             group_id: { type: 'string', required: true, description: 'Package group identifier.' },
             version: { type: 'string', description: 'Which version. Defaults to the latest one.' },
             status: { type: 'string', required: true, enum: ['draft', 'published', 'beta', 'archived'], description: 'The status to set.' },
+        },
+    },
+    {
+        name: 'aimeat_package_withdraw',
+        description: 'Withdraw a bad version of your package, with a reason. Nothing serves it again: not an install, not a pull, not a repository\'s customers. Every installed copy of it is told once and its extensions are switched off; on another node that happens at that node\'s daily check. Apps and records stay as they are. It cannot be undone: publish a fixed version, which managed copies receive as an ordinary update. The package\'s author, or an operator. The same as POST /v1/packages/:groupId/versions/:version/withdraw.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            group_id: { type: 'string', required: true, description: 'Package group identifier.' },
+            version: { type: 'string', required: true, description: 'The version to withdraw.' },
+            reason: { type: 'string', required: true, description: 'Why, in 10 to 1000 characters: every owner who has the version reads it.' },
         },
     },
     {

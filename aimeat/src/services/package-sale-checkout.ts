@@ -25,8 +25,11 @@
  *   record, the supplier and the supplier's price: the seller's cost, not a share of the buyer's
  *   payment ("the platform records who sold, who supplied, and the amounts").
  * @structure packageSellableResolver() · carryOutSale() · parsePackageLine() · readOfferAsSeller() ·
- *   decideSaleRequest()
+ *   decideSaleRequest() · reviewSale()
  * @version-history
+ *   v1.1.0 — 2026-10-02 — Review on a selling node: a new sale waits until the operator reviewed what
+ *     the version on sale can do (reviewSale; NEEDS_REVIEW), and the buyer's view says `needs_review`.
+ *     A renewal goes on. Package sale design, phase 5.
  *   v1.0.0 — 2026-10-02 — Initial (package sale design, phase 3).
  */
 import type { AimeatConfig } from '../config.js';
@@ -38,7 +41,7 @@ import { CommerceError } from '../commerce/errors.js';
 import { listPaymentHandlers } from '../commerce/payment-handlers.js';
 import { saleOffer, saleGrant, saleClaim } from './package-sale-client.js';
 import {
-    catalogueEntry, subscriptionFor, putSubscription, putRequest, readRequests,
+    catalogueEntry, subscriptionFor, putSubscription, putRequest, readRequests, recordReview,
     type CatalogueEntry, type Subscription, type SaleRequest,
 } from './package-sale-catalogue.js';
 import { notify } from './notify.js';
@@ -51,7 +54,16 @@ interface OfferTermsView {
     updates: { included_days: number; renewal: { amount: number; currency: string; period_days: number } | null };
     channel: 'stable' | 'beta';
 }
-interface OfferView { group_id: string; author: string; state: 'on_sale' | 'paused' | 'ended'; terms: OfferTermsView | null; all_terms: OfferTermsView[] }
+interface OfferView {
+    group_id: string; author: string; state: 'on_sale' | 'paused' | 'ended'; terms: OfferTermsView | null; all_terms: OfferTermsView[];
+    /** What the version on sale can do (package-offer.ts offerCapabilities), for the seller's review. */
+    latest?: { version: string; items: string[]; hash: string } | null;
+}
+
+/** Whether the operator reviewed what the version on sale now can do. */
+function reviewCurrent(entry: CatalogueEntry, offer: OfferView): boolean {
+    return !!entry.reviewed && !!offer.latest && entry.reviewed.capabilities_hash === offer.latest.hash;
+}
 
 export interface PackageLineInput { node?: { node_id: string; url: string; public_key: string }; auto_renew?: boolean }
 
@@ -91,6 +103,11 @@ export function packageSellableResolver(peers: Map<string, PeerInfo>): SellableR
             const offer = await readOfferAsSeller(deps, repository, groupId);
             if (offer.state === 'ended' || (line.act === 'buy' && offer.state !== 'on_sale') || !offer.terms) {
                 throw new CommerceError('NOT_FOR_SALE', 409, `The author of ${groupId} does not sell it now.`);
+            }
+            // The seller of record answers for what it sells: a new sale waits until the operator has
+            // reviewed what the version on sale can do. A renewal goes on, as the buyer already has it.
+            if (line.act === 'buy' && !reviewCurrent(entry, offer)) {
+                throw new CommerceError('NEEDS_REVIEW', 409, `This node's operator has not reviewed what the version of ${groupId} on sale can do, so it is not sold now. Ask again later.`);
             }
             let unitPrice = 0;
             let currency = entry.price?.currency ?? entry.renewal?.currency ?? 'EUR';
@@ -231,7 +248,7 @@ export async function buyerOfferView(
             ok: true,
             view: {
                 repository, group_id: groupId, title: entry.title ?? groupId,
-                state: entry.state === 'on_sale' && offer.state === 'on_sale' ? 'on_sale' : 'paused',
+                state: entry.state === 'on_sale' && offer.state === 'on_sale' ? (reviewCurrent(entry, offer) ? 'on_sale' : 'needs_review') : 'paused',
                 grant: t?.grant ?? null, price: t?.grant === 'payment' ? entry.price : null, renewal: entry.renewal,
                 updates_included_days: t?.updates.included_days ?? null, channel: t?.channel ?? null,
                 licence: t?.licence ?? null, tax: t?.tax ?? null, support: t?.support ?? null, author: offer.author,
@@ -286,4 +303,26 @@ export async function decideSaleRequest(
         link: '/v1/profile?tab=packages', i18n: { key: 'package_sale_request_approved', vars: { name: req.group_id } },
     });
     return { ok: true, request: done };
+}
+
+/**
+ * The operator reviews what the version on sale can do, read from the repository with this node's
+ * key, and records it: new sales open while the repository's capability hash stays the reviewed one.
+ * The answer carries the capabilities, so the operator's AI can say what was approved.
+ */
+export async function reviewSale(
+    deps: Deps, reviewer: string, repository: string, groupId: string,
+): Promise<{ ok: true; entry: CatalogueEntry; latest: NonNullable<OfferView['latest']> } | { ok: false; status: number; code: string; message: string }> {
+    let offer: OfferView;
+    try {
+        offer = await readOfferAsSeller(deps, repository, groupId);
+    } catch (err) {
+        const e = err as { code?: string; status?: number; message?: string };
+        return { ok: false, status: e.status ?? 502, code: e.code ?? 'OFFER_UNAVAILABLE', message: e.message ?? String(err) };
+    }
+    if (!offer.latest) return { ok: false, status: 409, code: 'NOTHING_PUBLISHED', message: `${groupId} has no published version to review.` };
+    const out = await recordReview(deps.storage, repository, groupId, {
+        version: offer.latest.version, capabilities_hash: offer.latest.hash, at: new Date().toISOString(), by: reviewer,
+    });
+    return out.ok ? { ok: true, entry: out.entry, latest: offer.latest } : out;
 }

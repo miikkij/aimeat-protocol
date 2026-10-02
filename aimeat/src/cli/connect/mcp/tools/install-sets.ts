@@ -10,6 +10,7 @@
  * @structure registerInstallSetTools(mcp, registry)
  * @usage registered from cli/connect/mcp/tools/index.ts
  * @version-history
+ *   v1.3.0 — 2026-10-02 — aimeat_package_sale action review (POST /v1/package-sales/catalogue/review).
  *   v1.2.0 — 2026-10-02 — aimeat_package_sale gains offer, claim, catalogue, price, requests and decide;
  *     aimeat_package_claim over POST /v1/package-claims (package sale design, phase 3).
  *   v1.1.0 — 2026-09-29 — aimeat_package_sale (GET, PUT, DELETE /v1/package-sales/...).
@@ -41,7 +42,7 @@ export function registerInstallSetTools(mcp: McpServer, registry: AgentRegistry)
 
   mcp.tool('aimeat_package_sale', descriptionFor('aimeat_package_sale'), {
     agent_name: agentNameSchema,
-    action: z.enum(['needs', 'grant', 'revoke', 'offer', 'claim', 'catalogue', 'price', 'requests', 'decide']).describe('needs: the questions to ask; grant: serve (or change, or end the updates of) a customer node; revoke: stop serving it; offer: the author\'s terms; claim: a code for a node not known yet; catalogue: what this node sells; price: put a package on sale here at this node\'s price, or change it; requests: sales waiting for approval; decide: approve or refuse one.'),
+    action: z.enum(['needs', 'grant', 'revoke', 'offer', 'claim', 'catalogue', 'price', 'review', 'requests', 'decide']).describe('needs: the questions to ask; grant: serve (or change, or end the updates of) a customer node; revoke: stop serving it; offer: the author\'s terms and what the version on sale can do; claim: a code for a node not known yet; catalogue: what this node sells; price: put a package on sale here at this node\'s price, or change it; review: approve what the version on sale can do, which opens new sales; requests: sales waiting for approval; decide: approve or refuse one.'),
     repository: z.string().optional().describe('The package repository\'s node id. Not for catalogue, requests or decide.'),
     repository_link: z.object({ url: z.string(), public_key: z.string() }).optional().describe('The first time only: { url, public_key } of the repository, to link it as a peer of this node.'),
     group_id: z.string().optional().describe('The package or install bundle group id on the repository.'),
@@ -64,6 +65,9 @@ export function registerInstallSetTools(mcp: McpServer, registry: AgentRegistry)
     if (action === 'requests') return text(await client.get('/v1/package-sales/requests'));
     if (action === 'decide') {
       return text(await client.post(`/v1/package-sales/requests/${encodeURIComponent(input.request_id ?? '')}/decision`, { decision: input.decision }));
+    }
+    if (action === 'review') {
+      return text(await client.post('/v1/package-sales/catalogue/review', { repository: input.repository, group_id: input.group_id }));
     }
     if (action === 'price') {
       const body: Record<string, unknown> = { repository: input.repository, group_id: input.group_id };
