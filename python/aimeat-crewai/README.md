@@ -228,11 +228,17 @@ the node applies when it stores a choice. A choice that fails is no choice; neve
 another key in its place.
 
 ```python
-from aimeat_crewai import llm_for_choice, unsafe_choice_reason
+from aimeat_crewai import effective_llm_choice, llm_for_choice, unsafe_choice_reason
 
+choice = effective_llm_choice(agent_name="concierge")   # what the node says applies, or None
 llm = llm_for_choice(choice, agent_name="concierge")    # None unless choice is {kind: "node"}
 reason = unsafe_choice_reason(choice)                    # None, or why a model choice is refused
 ```
+
+`effective_llm_choice` reads `GET /v1/agents/{name}/crew/llm`, where the node decides: the agent's
+own saved choice, else the owner's default, else `{kind: "node"}` when the agent holds `ai:use` and
+the node can pay for its text now, else nothing, so the crew keeps the key on its own machine. A
+`model` choice that fails `unsafe_choice_reason`, and any failure to ask, are None.
 
 `node_llm()` finds the token where the hosted fleet writes it (`tokens/<agent>@<owner>.token` in
 the connector home) and the node address in the home's `config.yaml`. An agent that holds a key

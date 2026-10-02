@@ -190,6 +190,76 @@ def test_a_key_based_agent_goes_through_the_daemon_with_the_daemons_secret(home:
     assert req["body"].get("stream") in (None, False), "the pass-through answers whole bodies"
 
 
+class _Caps:
+    """A stand-in node that answers GET /v1/ai/capabilities with a fixed status and body."""
+
+    def __init__(self, status: int, body: dict[str, Any]) -> None:
+        self.auth: list[str] = []
+        self.paths: list[str] = []
+        caps = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self) -> None:
+                caps.auth.append(self.headers.get("Authorization", ""))
+                caps.paths.append(self.path)
+                out = json.dumps(body).encode()
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(out)))
+                self.end_headers()
+                self.wfile.write(out)
+
+            def log_message(self, *args: Any) -> None:
+                pass
+
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.url = f"http://127.0.0.1:{self.server.server_address[1]}"
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def stop(self) -> None:
+        self.server.shutdown()
+        self.server.server_close()
+
+
+def _effective(value: Any, scope: Any) -> dict[str, Any]:
+    """GET /v1/agents/{name}/crew/llm as the node answers it (crew-menu.ts effectiveLlmChoice)."""
+    return {"ok": True, "protocol": "aimeat", "version": "v1", "data": {"value": value, "scope": scope, "why": "test"}}
+
+
+@pytest.mark.parametrize(("status", "body", "expected"), [
+    # The node default: the agent has ai:use and the node can pay.
+    (200, _effective({"kind": "node"}, "node"), {"kind": "node"}),
+    # The agent's own saved choice comes back as it is.
+    (200, _effective({"kind": "profile", "profile": "fast"}, "agent"), {"kind": "profile", "profile": "fast"}),
+    # No choice applies: the crew keeps its machine's key.
+    (200, _effective(None, None), None),
+    # A model choice the guard refuses is not used, even when the node hands it back.
+    (200, _effective({"kind": "model", "provider": {"api_key_env": "AIMEAT_ENCRYPTION_KEY"}}, "agent"), None),
+    # A node too old for the route, or one that refuses the read.
+    (404, {"ok": False, "error": {"code": "NOT_FOUND", "message": "no route"}}, None),
+])
+def test_effective_llm_choice_reads_the_nodes_decision(
+    home: Path, status: int, body: dict[str, Any], expected: Any,
+) -> None:
+    from aimeat_crewai import effective_llm_choice
+
+    caps = _Caps(status, body)
+    try:
+        got = effective_llm_choice(agent_name="concierge", node_url=caps.url, agent_token="tok-a")
+    finally:
+        caps.stop()
+    assert got == expected
+    assert caps.paths == ["/v1/agents/concierge/crew/llm"]
+    assert caps.auth == ["Bearer tok-a"], "the question is asked as the agent itself"
+
+
+def test_effective_llm_choice_is_the_machine_key_when_the_node_cannot_be_asked(home: Path) -> None:
+    from aimeat_crewai import effective_llm_choice
+
+    assert effective_llm_choice(agent_name="concierge", node_url="http://127.0.0.1:9", agent_token="t") is None
+    assert effective_llm_choice(agent_name="nobody-has-a-token-for-me") is None
+
+
 def test_a_daemon_that_does_not_serve_the_agent_is_not_used(home: Path) -> None:
     (home / "serve.json").write_text(json.dumps({
         "schema_version": 3, "port": 9, "pid": os.getpid(), "secret": "s",

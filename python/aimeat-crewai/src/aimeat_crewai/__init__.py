@@ -32,7 +32,9 @@ Changelog:
     key variable must be a provider key, every address public https). `node_llm` finds the token the
     hosted fleet writes (tokens/<agent>@<owner>.token) and the node address in the connector home's
     config.yaml, and an agent with no stored token (a key-based agent) goes through the connector
-    daemon's /v1/llm pass-through, which attaches its current credential.
+    daemon's /v1/llm pass-through, which attaches its current credential. `effective_llm_choice` reads
+    the choice that applies, as the node decides it (GET /v1/agents/{name}/crew/llm): the agent's own,
+    the owner's default, the node when the agent has ai:use and the node can pay, else None.
   0.31.1 -- 2026-09-30 -- The liaison's backstory (slim and full) says what to do with classified
     content: a `classification_warning` is said to the person and the content is not repeated
     outward, a CLASSIFIED refusal is not retried, and an exception is the person's own step in their
@@ -62,6 +64,7 @@ from .ai import (
     node_llm,
 )
 from .crew_llm import (
+    effective_llm_choice,
     is_node_choice,
     llm_for_choice,
     unsafe_choice_reason,
@@ -242,6 +245,7 @@ __all__ = [  # noqa: RUF022 -- grouped by topic with the version each group arri
     "capabilities",
     # The owner's crew model choice, read safely (0.32.0)
     "llm_for_choice",
+    "effective_llm_choice",
     "is_node_choice",
     "unsafe_choice_reason",
     "NODE_CHOOSES_MODEL",
