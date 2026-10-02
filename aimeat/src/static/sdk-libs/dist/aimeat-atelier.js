@@ -24237,6 +24237,14 @@
       const f = entry.frame;
       const start = rectOf(entry);
       let moved = false;
+      const wasIn = ringsUnder(entry);
+      const towed = (!onGrip && spec.tow ? spec.tow(f) || [] : []).map(function(id) {
+        return shown.get(String(id));
+      }).filter(function(e) {
+        return e && e !== entry;
+      }).map(function(e) {
+        return { entry: e, x0: e.frame.x || 0, y0: e.frame.y || 0 };
+      });
       if (onGrip) {
         return {
           onMove: function(dx, dy) {
@@ -24257,27 +24265,43 @@
           f.x = Math.round(start.x + dx);
           f.y = Math.round(start.y + dy);
           place2(entry);
+          towed.forEach(function(tw2) {
+            tw2.entry.frame.x = Math.round(tw2.x0 + dx);
+            tw2.entry.frame.y = Math.round(tw2.y0 + dy);
+            place2(tw2.entry);
+          });
           drawRings();
         },
         onEnd: function() {
           if (!moved) return;
-          dropCheck(entry);
-          if (spec.onMove) spec.onMove(f, rectOf(entry));
+          dropCheck(entry, wasIn);
+          if (spec.onMove) {
+            spec.onMove(f, rectOf(entry));
+            towed.forEach(function(tw2) {
+              spec.onMove(tw2.entry.frame, rectOf(tw2.entry));
+            });
+          }
         }
       };
     }
-    function dropCheck(entry) {
-      if (!spec.onDrop) return;
+    function ringsUnder(entry) {
       const r = rectOf(entry), cx = r.x + r.w / 2, cy = r.y + r.h / 2;
-      for (const ring2 of rings) {
-        if ((ring2.members || []).indexOf(entry.frame.id) >= 0 || (ring2.borrowed || []).indexOf(entry.frame.id) >= 0) continue;
+      return rings.filter(function(ring2) {
         const g = ringGeom(ring2);
-        if (!g) continue;
-        const d = Math.hypot(cx - g.cx, cy - g.cy);
-        if (d <= g.r) {
-          spec.onDrop(entry.frame, ring2);
-          return;
-        }
+        return !!g && Math.hypot(cx - g.cx, cy - g.cy) <= g.r;
+      }).map(function(ring2) {
+        return ring2.id;
+      });
+    }
+    function dropCheck(entry, wasIn) {
+      if (!spec.onDrop) return;
+      const id = entry.frame.id;
+      const now2 = ringsUnder(entry);
+      for (const ring2 of rings) {
+        if (now2.indexOf(ring2.id) < 0 || (wasIn || []).indexOf(ring2.id) >= 0) continue;
+        if ((ring2.members || []).indexOf(id) >= 0 || (ring2.borrowed || []).indexOf(id) >= 0) continue;
+        spec.onDrop(entry.frame, ring2);
+        return;
       }
     }
     function buildFrame(f) {
@@ -24437,25 +24461,37 @@
       root.appendChild(emptyCard);
     }
     function ringGeom(ring2) {
-      const members2 = (ring2.members || []).concat(ring2.borrowed || []).map(function(id) {
+      const anchor = ring2.anchor != null ? shown.get(String(ring2.anchor)) : null;
+      const members2 = (ring2.members || []).map(function(id) {
         return shown.get(String(id));
       }).filter(Boolean);
-      if (!members2.length) return null;
-      let cx = 0, cy = 0;
-      const rects = members2.map(rectOf);
-      rects.forEach(function(r) {
-        cx += r.x + r.w / 2;
-        cy += r.y + r.h / 2;
-      });
-      cx /= rects.length;
-      cy /= rects.length;
-      let rad = 0;
-      rects.forEach(function(r) {
+      const all = anchor ? [anchor].concat(members2.filter(function(m) {
+        return m !== anchor;
+      })) : members2;
+      if (!all.length) return null;
+      let cx = 0, cy = 0, rad = 0;
+      if (anchor) {
+        const a = rectOf(anchor);
+        cx = a.x + a.w / 2;
+        cy = a.y + a.h / 2;
+        rad = Math.max(a.w, a.h) / 2 + RING_PAD;
+      } else {
+        const rects = all.map(rectOf);
+        rects.forEach(function(r) {
+          cx += r.x + r.w / 2;
+          cy += r.y + r.h / 2;
+        });
+        cx /= rects.length;
+        cy /= rects.length;
+      }
+      all.forEach(function(e) {
+        if (e === anchor) return;
+        const r = rectOf(e);
         [[r.x, r.y], [r.x + r.w, r.y], [r.x, r.y + r.h], [r.x + r.w, r.y + r.h]].forEach(function(p) {
-          rad = Math.max(rad, Math.hypot(p[0] - cx, p[1] - cy));
+          rad = Math.max(rad, Math.hypot(p[0] - cx, p[1] - cy) + (anchor ? 28 : RING_PAD));
         });
       });
-      return { cx, cy, r: rad + RING_PAD };
+      return { cx, cy, r: rad };
     }
     function drawRings() {
       const keep = /* @__PURE__ */ new Set();
@@ -24663,6 +24699,8 @@
     root.appendChild(scan);
     const planHost = el("div", { class: "ak-request__plan", "data-ak-part": "plan" });
     root.appendChild(planHost);
+    const extraHost = el("div", { class: "ak-request__extra", "data-ak-part": "extra", hidden: true });
+    root.appendChild(extraHost);
     const log = konsole({ target: root, cap: spec.cap, data: { lines: sample ? sampleLines() : spec.lines || [] }, empty: { title: tb("request.empty"), hint: "" } });
     log.el.setAttribute("data-ak-part", "console");
     root.style.setProperty("--ak-request-console-h", "var(--ak-request-console-h, 160px)");
@@ -24758,12 +24796,17 @@
     renderPlan();
     return {
       el: root,
-      /** @param {{ plan?: RequestPlan|null, lines?: any[], busy?: boolean, value?: string, loop?: boolean }} patch */
+      /** @param {{ plan?: RequestPlan|null, extra?: Node|null, lines?: any[], busy?: boolean, value?: string, loop?: boolean }} patch */
       set: function(patch) {
         if (destroyed || !patch) return;
         if ("plan" in patch) {
           plan2 = patch.plan || null;
           renderPlan();
+        }
+        if ("extra" in patch) {
+          clear(extraHost);
+          if (patch.extra instanceof Node) extraHost.appendChild(patch.extra);
+          extraHost.hidden = !extraHost.firstChild;
         }
         if (patch.lines) log.set({ data: { lines: patch.lines } });
         if ("busy" in patch) setBusy(!!patch.busy);
@@ -28533,7 +28576,7 @@
       file: "hero.js"
     },
     "requestPanel": {
-      parts: ["root", "line", "caret", "input", "send", "scan", "plan", "intent", "meta", "step", "mark", "gate", "row", "approve", "cancel", "loop", "console"],
+      parts: ["root", "line", "caret", "input", "send", "scan", "plan", "intent", "meta", "step", "mark", "gate", "row", "approve", "cancel", "extra", "loop", "console"],
       slots: ["plan(plan)", "step(step)"],
       variants: ["compact"],
       tokens: ["--ak-request-console-h"],
