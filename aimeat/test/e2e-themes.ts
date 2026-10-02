@@ -12,6 +12,8 @@
  *   Q2: "mahdollisimman muokattavaksi"), and nobody but the operator writes a theme.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=themes
  * @version-history
+ *   v1.2.0 — 2026-10-02 — An AI's JSON answer applied as the "Ask your AI" paste does, and its
+ *     failure path (a colour that does not parse).
  *   v1.1.0 — 2026-09-24 — Who chooses (PUT /v1/themes/policy), and one name, one theme (NAME_TAKEN).
  *   v1.0.0 — 2026-09-24 — Initial suite (UI consolidation phase 4).
  */
@@ -159,6 +161,47 @@ await test('POST /v1/themes with its own fields — one call; old style ids name
     assert(t.offeredStyles.length === 2 && t.offeredStyles.every((s: string) => s.startsWith(t.id + '-')), `offered ${t.offeredStyles}`);
     assert(t.defaultStyle === `${t.id}-paper`, `default ${t.defaultStyle}`);
     await json(`/v1/themes/${t.id}`, op(put({ retired: true })));
+});
+
+await test('An AI\'s JSON answer, applied as the "Ask your AI" paste does — its styles only, the copies retired, nobody offered it', async () => {
+    // The same calls, in the same order, as applyThemePlan in public/views/admin/themes-ai.js.
+    const made = await json('/v1/themes', op(post({ name: 'Fjord from AI', basedOn: 'aimeat', shapes: { '--shape-corner': '14px' } })));
+    assert(made.status === 201, `make: ${made.status} ${JSON.stringify(made.body.error)}`);
+    const t = made.body.data.theme;
+    const ids: string[] = [];
+    for (const style of [
+        { name: 'Fjord', light: { '--bg': '#f4f8fb', '--accent': '#0b5c8a' }, dark: { '--bg': '#0d1820', '--accent': '#7cc4ef' }, faces: { headline: 'Fraunces', body: 'Inter' } },
+        { name: 'Fjord Night', onlyMode: 'dark', dark: { '--bg': '#050b10' } },
+    ]) {
+        const r = await json(`/v1/themes/${t.id}/styles`, op(post(style)));
+        assert(r.status === 201, `style ${style.name}: ${r.status} ${JSON.stringify(r.body.error)}`);
+        ids.push(r.body.data.style.id);
+    }
+    const offer = await json(`/v1/themes/${t.id}`, op(put({ defaultStyle: ids[0], offeredStyles: ids })));
+    assert(offer.status === 200, `offered styles: ${offer.status} ${JSON.stringify(offer.body.error)}`);
+    for (const copied of t.styles) {
+        const r = await json(`/v1/themes/${t.id}/styles/${copied.id}`, op(put({ retired: true })));
+        assert(r.status === 200, `retire ${copied.id}: ${r.status} ${JSON.stringify(r.body.error)}`);
+    }
+    const { body } = await json(`/v1/themes/${t.id}`);
+    const theme = body.data.theme;
+    const live = theme.styles.filter((s: any) => !s.retired).map((s: any) => s.name);
+    assert(live.join(',') === 'Fjord,Fjord Night', `live styles ${live}`);
+    assert(theme.defaultStyle === ids[0], `default ${theme.defaultStyle}`);
+    assert(theme.shapes['--shape-corner'] === '14px', `shapes ${JSON.stringify(theme.shapes)}`);
+    assert(theme.styles.find((s: any) => s.id === ids[0]).faces.headline === 'Fraunces', 'faces kept');
+    const policy = (await json('/v1/themes/all')).body.data.policy;
+    assert(!policy.offered.includes(t.id), 'the operator offers it, the paste does not');
+    await json(`/v1/themes/${t.id}`, op(put({ retired: true })));
+});
+
+await test('An AI\'s answer with a colour that does not parse — the theme is made, the style is refused with the reason', async () => {
+    // The paste's "made, but one step failed" path: the error names the value, and the theme stays to be finished or retired.
+    const made = await json('/v1/themes', op(post({ name: 'Half from AI', basedOn: 'aimeat' })));
+    assert(made.status === 201, `make: ${made.status}`);
+    const r = await json(`/v1/themes/${made.body.data.theme.id}/styles`, op(post({ name: 'Broken', light: { '--bg': 'very blue' } })));
+    assert(r.status === 422 && /--bg/.test(r.body.error?.message ?? ''), `expected 422 naming --bg, got ${r.status} ${JSON.stringify(r.body.error)}`);
+    await json(`/v1/themes/${made.body.data.theme.id}`, op(put({ retired: true })));
 });
 
 await test('PUT a style — colours in light and dark; contrast lines come back', async () => {

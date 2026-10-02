@@ -21145,6 +21145,34 @@
     "builtWithout": "Rakennettu ilman päätöstä: {title}"
   },
   "themes": {
+    "ai": {
+      "title": "Kysy tekoälyltäsi",
+      "lead": "Oma tekoälysi voi tehdä teeman puolestasi. Kirjoita, millaisen ulkoasun haluat. Kopioi sitten teksti ja anna se tekoälyllesi. Tekoälyn tekemä teema ei näy ulkoasun valitsimessa. Sinä avaat sen ensin täällä ja päätät, milloin ihmiset voivat valita sen.",
+      "langNote": "Tekoälylle annettava teksti on englanniksi, koska tekoäly toimii niin parhaiten. Tekoäly voi silti vastata sinulle suomeksi.",
+      "look": "Millaisen ulkoasun haluat",
+      "lookHint": "Esimerkiksi: rauhallinen ja vihreä, pyöreät kulmat, otsikoissa antiikva. Jos jätät kentän tyhjäksi, tekoäly kysyy sinulta ensin.",
+      "mcpLabel": "Tekoälysi on yhteydessä tähän sivustoon",
+      "mcpHint": "Tekoäly tekee teeman itse, ja teema näkyy yllä olevassa listassa.",
+      "jsonLabel": "Tekoälysi ei ole yhteydessä tähän sivustoon",
+      "jsonHint": "Tekoäly antaa teeman takaisin tekstinä. Liitä sen koko vastaus alle, niin tämä sivu tekee teeman.",
+      "copy": "Kopioi tekoälyllesi",
+      "copied": "Kopioitu",
+      "pasteLabel": "Liitä tähän se, mitä tekoälysi antoi",
+      "pastePh": "Kaikki, mitä se kirjoitti, käy. Selitykset saavat olla mukana.",
+      "make": "Tee teema",
+      "making": "Teen teemaa…",
+      "partly": "Teema {name} on tehty, mutta yksi vaihe epäonnistui: {error}. Avaa teema ja viimeistele se, tai poista se käytöstä.",
+      "bad": {
+        "json": "Vastauksessa ei ole teemaa. Pyydä tekoälyä antamaan teema yhtenä JSON-koodilohkona.",
+        "name": "Teema tarvitsee nimen, jossa on 1–60 merkkiä.",
+        "styles": "Teemassa pitää olla 1–12 tyyliä.",
+        "styleName": "Jokainen tyyli tarvitsee nimen.",
+        "colours": "Tyylin {style} värit ovat väärässä muodossa. Jokaisella värillä on nimi ja arvo.",
+        "faces": "Tyylin {style} fontit ovat väärässä muodossa.",
+        "shapes": "Muodot ovat väärässä muodossa. Jokaisella muodolla on nimi ja arvo.",
+        "css": "Teeman CSS:n pitää olla tekstiä."
+      }
+    },
     "intro": "Tämän AIMEATin omien sivujen ulkoasut (koti, keskustelu, Asetukset ja hallinta, ylläpito). Teemassa on tyylejä, ja tyylillä on värit vaaleassa ja tummassa tilassa. Ihmiset valitsevat sivun yläreunan ulkoasun valitsimesta, puhelimessa valikosta. Kun tämä näkymä on auki, se näyttää valmiin ulkoasun, joten teema ei voi rikkoa sitä.",
     "loading": "Ladataan…",
     "themes": "Teemat",
