@@ -16,7 +16,9 @@
  *   og-field, og-actions) and css/components/field.css (the field's own options).
  *
  *   Named options:
- *   - Field: `labelNote` (a small typewriter word beside the label: a count), `wide` (spans both columns of a two-column Fields), `invalid` (the label in the danger
+ *   - Field: `help` (a term: the question mark of components/HelpTip.js beside the label, whose
+ *     tooltip and dialog explain the setting from the locale's `explain.<term>.*`; the controls of the
+ *     family pass it on), `labelNote` (a small typewriter word beside the label: a count), `wide` (spans both columns of a two-column Fields), `invalid` (the label in the danger
  *     colour: a required field left empty), `group` (the control is a set of buttons or boxes, so the
  *     label names a group instead of pointing at one control; the controls of the family pass
  *     `named` instead, when the set inside names itself by the label), `message` (words, or { text, error })
@@ -30,13 +32,15 @@
  *     `spaced` (with `plain chapter`): its one-line fields carry their own air (the About editor).
  *   - FormActions: `end` (the row at the right), `apart` (the first thing at the left, the rest at
  *     the right: a hint beside the send action).
- * @structure Field({ label, hint, message, error, wide, invalid, group, named, id, labelId, hintId, children }) ·
+ * @structure Field({ label, help, hint, message, error, wide, invalid, group, named, id, labelId, hintId, children }) ·
  *   Fields({ cols, children }) · FormActions({ end, apart, children }) · useFieldIds(id) · messageOf(m, error) ·
  *   hasFieldWords(props) · inField(props, ids, control, named)
  * @usage html`<${Fields} cols=${2}><${TextField} label=${t('x.name')} value=${v} onInput=${setV} /><//>`
  *        html`<${Field} label=${t('x.who')} hint=${t('x.whoHint')} group>…<//>`
  *        html`<${FormActions}><${Loud} control onClick=${save}>${t('x.save')}<//><//>`
  * @version-history
+ *   v1.9.0 — 2026-10-02 — Field `help`: a question mark beside the row label that explains the setting
+ *     (components/HelpTip.js), passed on by inField so every control of the family takes it; additive.
  *   v1.8.0 — 2026-09-27 — Fields `spaced` (with `plain chapter`: the old detail's About editor, its
  *     one-line fields and the rows under it spaced one by one); additive, form-fields.css
  *     .og-fields--spaced, appcat parity (sections-a).
@@ -66,6 +70,7 @@ import { h } from 'preact';
 import { useId } from 'preact/hooks';
 import htm from 'htm';
 import { Note } from '/components/Note.js';
+import { HelpTip } from '/components/HelpTip.js';
 
 const html = htm.bind(h);
 const cx = (...parts) => parts.filter(Boolean).join(' ');
@@ -90,17 +95,22 @@ export function messageOf(message, error) {
  * The field's frame. With `group`, the label names the group of controls inside (role group, labelled
  * by the label); otherwise the label points at the control whose id is `id`.
  */
-export function Field({ label, labelNote, hint, message, error, wide, invalid, group, named, id, labelId: givenLabelId, hintId, children }) {
+export function Field({ label, labelNote, help, hint, message, error, wide, invalid, group, named, id, labelId: givenLabelId, hintId, children }) {
   const msg = messageOf(message, error);
   const cls = cx('og-field', 'field', wide && 'field--wide', invalid && 'field--invalid');
   const own = useId();
   const labelId = givenLabelId || `fl${own.replace(/[^a-zA-Z0-9_-]/g, '')}`;
   // `named`: the control inside is a set that names itself by the label's id (a Choice, a TagInput).
-  const lab = label === undefined || label === null || label === ''
+  const bare = label === undefined || label === null || label === ''
     ? null
     : group || named
       ? html`<span class="poster-label" id=${labelId}>${label}${labelNote ? html`<small class="field-label-note">${labelNote}</small>` : null}</span>`
       : html`<label class="poster-label" for=${id} id=${labelId}>${label}${labelNote ? html`<small class="field-label-note">${labelNote}</small>` : null}</label>`;
+  // `help`: the question mark stands beside the label, outside it, because a button inside a
+  // <label> would be a second control the label names.
+  const lab = bare && help
+    ? html`<span class="field-label-row">${bare}<${HelpTip} term=${help} label=${typeof label === 'string' ? label : undefined} /></span>`
+    : bare;
   return html`
     <div class=${cls} role=${group && lab ? 'group' : undefined} aria-labelledby=${group && lab ? labelId : undefined}>
       ${lab}
@@ -151,9 +161,9 @@ export function hasFieldWords(props) {
  * back bare. `named`: the control is a set that names itself by the label's id (ids.labelId).
  */
 export function inField(props, ids, control, named) {
-  const { label, hint, message, error, wide, invalid } = props;
+  const { label, help, hint, message, error, wide, invalid } = props;
   if (!hasFieldWords(props)) return control;
-  return html`<${Field} label=${label} hint=${hint} message=${messageOf(message, error)} wide=${wide} invalid=${invalid}
+  return html`<${Field} label=${label} help=${help} hint=${hint} message=${messageOf(message, error)} wide=${wide} invalid=${invalid}
     named=${named} id=${ids.id} labelId=${ids.labelId} hintId=${ids.hintId}>${control}<//>`;
 }
 

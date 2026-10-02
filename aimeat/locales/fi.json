@@ -22519,5 +22519,65 @@
       "wrappingUp": "Tämä vie aikaa, joten vastaan nyt sillä, mitä jo tiedän."
     },
     "stopped": "Lopetin tähän, koska tämä kesti liian kauan, eikä vastaukseni ole valmis. Sano \"jatka\", niin jatkan tästä, tai kysy asia pienemmissä osissa."
+  },
+  "explain": {
+    "open": "Ohje: {term}",
+    "more": "Napsauta, niin näet esimerkit.",
+    "range": "Arvoalue",
+    "low": "Pieni arvo",
+    "high": "Suuri arvo",
+    "examples": "Esimerkkejä",
+    "when": "Milloin arvoa kannattaa muuttaa",
+    "ai": {
+      "temperature": {
+        "title": "Lämpötila",
+        "short": "Kuinka paljon vastaukset vaihtelevat. 0 antaa samaan kysymykseen saman vastauksen, 2 vapaimmat vastaukset. Arvo väliltä 0–2.",
+        "what": "Malli kirjoittaa vastauksen sana kerrallaan, ja joka kohdassa sillä on useita mahdollisia seuraavia sanoja. Lämpötila määrää, kuinka rohkeasti malli valitsee niiden välillä. Pienellä arvolla malli valitsee lähes aina todennäköisimmän sanan. Suurella arvolla se valitsee myös harvinaisempia sanoja, joten teksti vaihtelee ja yllättää enemmän. Samalla virheitä tulee enemmän.",
+        "range": "0–2. Tyhjä kenttä käyttää mallin omaa oletusta, yleensä 1.",
+        "low": "0–0,3: sama kysymys saa lähes saman vastauksen. Sopii tosiasioihin, tietojen poimintaan, koodiin ja luokitteluun.",
+        "high": "1,2–2: vaihtelevaa ja yllättävää tekstiä. Yli 1,5:n arvolla teksti menettää usein punaisen lankansa.",
+        "ex1": "0: kokousmuistion tiivistelmä. Kaksi ajoa antaa saman tiivistelmän.",
+        "ex2": "0,7: vastaus sähköpostiin. Sävy on luonteva, ja sisältö pysyy asiassa.",
+        "ex3": "1,2: kymmenen nimeä uudelle tuotteelle. Jokainen ajo antaa eri ideoita.",
+        "tip": "Jätä kenttä tyhjäksi, jos sinulla ei ole syytä muuttaa sitä. Pienennä arvoa, kun saman kysymyksen pitää saada aina sama vastaus. Suurenna sitä, kun vastaukset tuntuvat liian samanlaisilta. Muuta joko lämpötilaa tai Top P:tä, älä molempia. Osa päättelymalleista ei välitä tästä asetuksesta."
+      },
+      "top_p": {
+        "title": "Top P",
+        "short": "Kuinka laajasta sanavalikoimasta malli valitsee. 0,1 on kapea, 1 koko valikoima. Arvo väliltä 0–1.",
+        "what": "Malli asettaa joka kohdassa mahdolliset seuraavat sanat järjestykseen sen mukaan, kuinka todennäköisiä ne ovat. Top P ottaa mukaan vain todennäköisimmät sanat, kunnes niiden todennäköisyydet ovat yhteensä yhtä suuret kuin arvo. Malli valitsee näistä. Arvolla 0,1 malli valitsee vain muutamasta todennäköisimmästä sanasta. Arvolla 1 jokainen sana on mahdollinen. Asetus tekee lähes saman asian kuin lämpötila, mutta eri tavalla.",
+        "range": "0–1. Tyhjä kenttä käyttää mallin omaa oletusta, yleensä 1.",
+        "low": "0,1–0,5: varmaa ja ennustettavaa tekstiä. Malli harhautuu harvoin.",
+        "high": "0,9–1: koko sanavarasto on käytössä, ja teksti on monipuolisempaa.",
+        "ex1": "0,3: asiakaspalvelun vastaukset, joiden pitää pysyä tosiasioissa.",
+        "ex2": "0,95: blogiteksti tai tarina, jossa vaihteleva sanasto auttaa.",
+        "tip": "Tätä tarvitsee muuttaa harvoin. Jos haluat muuttaa sitä, kuinka paljon vastaukset vaihtelevat, käytä lämpötilaa ja jätä Top P tyhjäksi."
+      },
+      "max_tokens": {
+        "title": "Pisin vastaus",
+        "short": "Kuinka paljon malli saa kirjoittaa yhteen vastaukseen, tokeneina. 1 000 tokenia on noin 350–500 suomenkielistä sanaa.",
+        "what": "Mallit laskevat tekstin tokeneina eli sanojen paloina. Malli lopettaa, kun se saavuttaa rajan, vaikka kesken lauseen. Raja ei itsessään maksa mitään: maksat vain siitä, minkä malli oikeasti kirjoittaa. Päättelymallin miettiminen lasketaan samaan rajaan.",
+        "range": "1:stä siihen asti, mitä malli sallii, usein 4 000–128 000. Tyhjä kenttä käyttää mallin omaa rajaa.",
+        "low": "Lyhyet vastaukset, ja pitkä vastaus katkeaa kesken.",
+        "high": "Tilaa pitkille teksteille ja päättelymallin miettimiselle.",
+        "ex1": "300: yhden kappaleen vastaus, noin 100–150 suomenkielistä sanaa.",
+        "ex2": "2 000: sivun mittainen tiivistelmä tai lyhyt raportti.",
+        "ex3": "16 000: päättelymalli, joka miettii ennen pitkää vastausta.",
+        "tip": "Suurenna rajaa, kun vastaukset katkeavat kesken. Pienennä sitä, kun haluat estää liian pitkät vastaukset. Pidä raja päättelymallin kanssa suurena tai käännä päättely pois. Muuten miettiminen voi käyttää koko rajan, ja vastaus jää tyhjäksi."
+      },
+      "reasoning": {
+        "title": "Päättely",
+        "short": "Kuinka pitkään päättelymalli miettii ennen vastaamista: pois, kevyt, keskitaso tai syvä.",
+        "what": "Päättelymalli käy ongelman läpi vaihe vaiheelta ennen kuin se kirjoittaa vastauksen. Pidempi miettiminen antaa paremman vastauksen vaikeaan kysymykseen. Vastaus tulee kuitenkin hitaammin ja maksaa enemmän, koska miettiminen maksetaan tokeneina. Malli, jossa ei ole päättelyä, ei välitä tästä asetuksesta.",
+        "range": "Mallin oletus, Pois, Kevyt, Keskitaso, Syvä.",
+        "lowLabel": "Vähän miettimistä",
+        "highLabel": "Paljon miettimistä",
+        "low": "Pois tai Kevyt: nopea ja edullinen. Riittää yksinkertaisiin kysymyksiin, uudelleenkirjoitukseen ja tiivistelmiin.",
+        "high": "Syvä: hidas ja kallis, mutta vahvin matematiikassa, koodissa, suunnittelussa ja monivaiheisessa analyysissä.",
+        "ex1": "Pois: kappaleen kääntäminen. Miettiminen ei tuo siihen mitään.",
+        "ex2": "Keskitaso: kolmen tarjouksen vertailu ja suositus yhdestä.",
+        "ex3": "Syvä: virheen etsiminen pitkästä koodista.",
+        "tip": "Jos vastaus jää tyhjäksi, miettiminen on käyttänyt koko Pisin vastaus -rajan. Käännä päättely pois tai suurenna rajaa."
+      }
+    }
   }
 }

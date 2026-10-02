@@ -9,6 +9,8 @@
  * @structure PAGE_DEMOS — { [id]: { variants: [{ name, render(ex) }] } }
  * @usage import { PAGE_DEMOS } from './demos-page.js';
  * @version-history
+ *   v1.4.0 — 2026-10-02 — HelpTip (the question mark alone and beside a field's label), Tooltip and
+ *     ExplainDialog.
  *   v1.3.0 — 2026-09-27 — SettingsStack's sections are SettingsSection (no hand-written section), and
  *     SwatchPicker's pattern.
  *   v1.2.0 — 2026-09-26 — The numbered list's first tone with a line and its steps (Jouni's decision "Numbered list").
@@ -16,12 +18,17 @@
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 2, the library view).
  */
 import { h } from 'preact';
+import { useState } from 'preact/hooks';
 import htm from 'htm';
 import { PageFrame } from '/components/PageFrame.js';
 import { PageIntro } from '/components/PageIntro.js';
 import { ErrorNote, ErrorNoteFallback } from '/components/ErrorNote.js';
 import { ActionRow } from '/components/ActionRow.js';
 import { Hint } from '/components/Hint.js';
+import { HelpTip } from '/components/HelpTip.js';
+import { Tooltip } from '/components/Tooltip.js';
+import { ExplainDialog } from '/components/ExplainDialog.js';
+import { TextField } from '/components/TextField.js';
 import { Masthead, MastheadButton, MastheadCog } from '/components/Masthead.js';
 import { LinkLine } from '/components/LinkLine.js';
 import { StatLine, statSentence } from '/components/StatLine.js';
@@ -62,6 +69,13 @@ const AVATAR = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rec
 
 const CATEGORIES = ['made', 'agent', 'trouble', 'money', 'access', 'system'];
 
+/** The explanation dialog opened from an action link, as a page would open it. */
+function ExplainDemo({ term }) {
+  const [open, setOpen] = useState(false);
+  return html`<button type="button" class="poster-action" onClick=${() => setOpen(true)}>What does temperature do?</button>
+    <${ExplainDialog} term=${term} open=${open} onClose=${() => setOpen(false)} />`;
+}
+
 export const PAGE_DEMOS = {
   'page-frame': { flush: true, variants: [
     { name: 'wide', render: () => html`<${PageFrame}><${PageIntro} title="A wide page" sub="Work happens here." /><//>` },
@@ -81,6 +95,17 @@ export const PAGE_DEMOS = {
         <button type="button" class="btn-outline">Not now</button><//>` },
   ] },
   'hint': { variants: [{ name: 'default', render: (ex) => html`<${Hint}>${ex.children}<//>` }] },
+  'help-tip': { variants: [
+    { name: 'default', render: (ex) => html`<${HelpTip} term=${ex.term} />` },
+    { name: 'beside a field label', render: () => html`<${TextField} label="Temperature" help="ai.temperature" type="number" size="short" value="" placeholder="default" onInput=${noop} />` },
+  ] },
+  'tooltip': { variants: [
+    { name: 'on an icon button', render: (ex) => html`<${Tooltip} title=${ex.title} text=${ex.text} more=${ex.more}>
+        <button type="button" class="poster-icon poster-icon--small" aria-label=${ex.title}>?</button><//>` },
+  ] },
+  'explain-dialog': { variants: [
+    { name: 'from a link', render: (ex) => html`<${ExplainDemo} term=${ex.term} />` },
+  ] },
   'masthead': { variants: [
     { name: 'default', render: (ex) => html`<${Masthead} avatarSvg=${AVATAR} name=${ex.name} identity=${ex.identity}>
         <a class="poster-action" href="/v1/profile">Settings</a>

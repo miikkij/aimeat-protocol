@@ -20320,5 +20320,65 @@
       "wrappingUp": "Esto tarda, así que respondo ahora con lo que ya sé."
     },
     "stopped": "Me detuve aquí porque esto tardó demasiado y mi respuesta no está terminada. Di \"continúa\" y sigo desde aquí, o pregunta de nuevo por partes más pequeñas."
+  },
+  "explain": {
+    "open": "Explicación: {term}",
+    "more": "Haz clic para ver ejemplos.",
+    "range": "Rango",
+    "low": "Valor bajo",
+    "high": "Valor alto",
+    "examples": "Ejemplos",
+    "when": "Cuándo cambiarlo",
+    "ai": {
+      "temperature": {
+        "title": "Temperatura",
+        "short": "Cuánto varían las respuestas. Con 0, la misma pregunta recibe la misma respuesta; con 2, las respuestas son las más libres. Un valor de 0 a 2.",
+        "what": "El modelo escribe la respuesta palabra por palabra, y en cada punto tiene varias palabras posibles para continuar. La temperatura decide con qué audacia elige entre ellas. Con un valor bajo, elige casi siempre la palabra más probable. Con un valor alto, también elige palabras menos probables, así que el texto varía y sorprende más. También comete más errores.",
+        "range": "De 0 a 2. Un campo vacío usa el valor propio del modelo, normalmente 1.",
+        "low": "De 0 a 0,3: la misma pregunta recibe casi la misma respuesta. Sirve para datos, extraer información, código y clasificar.",
+        "high": "De 1,2 a 2: texto variado y sorprendente. Por encima de 1,5, el texto suele perder el hilo.",
+        "ex1": "0: el resumen de unas notas de reunión. Dos ejecuciones dan el mismo resumen.",
+        "ex2": "0,7: la respuesta a un correo. El tono es natural y el contenido no se aparta del tema.",
+        "ex3": "1,2: diez nombres para un producto nuevo. Cada ejecución da ideas distintas.",
+        "tip": "Deja el campo vacío si no tienes un motivo para cambiarlo. Baja el valor cuando la misma pregunta deba recibir siempre la misma respuesta. Súbelo cuando las respuestas se parezcan demasiado. Cambia la temperatura o top P, no los dos. Algunos modelos de razonamiento no tienen en cuenta este ajuste."
+      },
+      "top_p": {
+        "title": "Top P",
+        "short": "De qué variedad de palabras elige el modelo. 0,1 es estrecha, 1 es toda la variedad. Un valor de 0 a 1.",
+        "what": "En cada punto, el modelo ordena las palabras posibles según su probabilidad. Top P deja solo las más probables, hasta que sus probabilidades suman el valor, y el modelo elige entre ellas. Con 0,1, el modelo elige solo entre las pocas palabras más probables. Con 1, todas las palabras son posibles. El ajuste hace casi lo mismo que la temperatura, de otra manera.",
+        "range": "De 0 a 1. Un campo vacío usa el valor propio del modelo, normalmente 1.",
+        "low": "De 0,1 a 0,5: un texto seguro y previsible. El modelo rara vez se desvía.",
+        "high": "De 0,9 a 1: usa todo el vocabulario, y el texto es más rico.",
+        "ex1": "0,3: respuestas de atención al cliente que deben ceñirse a los hechos.",
+        "ex2": "0,95: una entrada de blog o un relato, donde ayuda un vocabulario variado.",
+        "tip": "Rara vez hace falta cambiarlo. Para cambiar cuánto varían las respuestas, usa la temperatura y deja top P vacío."
+      },
+      "max_tokens": {
+        "title": "Respuesta más larga",
+        "short": "Cuánto puede escribir el modelo en una respuesta, en tokens. 1000 tokens son unas 600 palabras en español.",
+        "what": "Los modelos cuentan el texto en tokens, que son trozos de palabras. El modelo se detiene al llegar a este límite, aunque esté a mitad de una frase. El límite en sí no cuesta nada: solo pagas lo que el modelo escribe de verdad. Lo que piensa un modelo de razonamiento cuenta para el mismo límite.",
+        "range": "Desde 1 hasta lo que permita el modelo, a menudo de 4000 a 128 000. Un campo vacío usa el límite propio del modelo.",
+        "low": "Respuestas cortas, y una respuesta larga queda cortada.",
+        "high": "Espacio para textos largos y para que un modelo de razonamiento piense.",
+        "ex1": "300: una respuesta de un párrafo, unas 180 palabras en español.",
+        "ex2": "2000: un resumen de una página o un informe breve.",
+        "ex3": "16 000: un modelo de razonamiento que piensa antes de una respuesta larga.",
+        "tip": "Sube el límite cuando las respuestas se corten a mitad. Bájalo para evitar respuestas demasiado largas. Con un modelo de razonamiento, mantén el límite alto o desactiva el razonamiento. Si no, el razonamiento puede gastar todo el límite y la respuesta queda vacía."
+      },
+      "reasoning": {
+        "title": "Razonamiento",
+        "short": "Cuánto piensa un modelo de razonamiento antes de responder: desactivado, ligero, medio o profundo.",
+        "what": "Un modelo de razonamiento resuelve el problema paso a paso antes de escribir la respuesta. Pensar más da una respuesta mejor a una pregunta difícil. Pero la respuesta llega más despacio y cuesta más, porque lo que piensa se paga en tokens. Un modelo sin razonamiento no tiene en cuenta este ajuste.",
+        "range": "Valor del modelo, Desactivado, Ligero, Medio, Profundo.",
+        "lowLabel": "Pensar menos",
+        "highLabel": "Pensar más",
+        "low": "Desactivado o Ligero: rápido y barato. Basta para preguntas sencillas, reescribir y resumir.",
+        "high": "Profundo: lento y caro, pero el más fuerte en matemáticas, código, planificación y análisis de muchos pasos.",
+        "ex1": "Desactivado: traducir un párrafo. Pensar no aporta nada.",
+        "ex2": "Medio: comparar tres ofertas y recomendar una.",
+        "ex3": "Profundo: encontrar el fallo en un código largo.",
+        "tip": "Si una respuesta llega vacía, el razonamiento ha gastado todo el límite de la respuesta más larga. Desactiva el razonamiento o sube el límite."
+      }
+    }
   }
 }

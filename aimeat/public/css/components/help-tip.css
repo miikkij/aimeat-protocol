@@ -1,0 +1,49 @@
+/**
+ * @file help-tip.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The question mark beside a setting (components/HelpTip.js): the icon button of
+ *   poster.css (.poster-icon, the sun under the pointer) made 20px to sit beside a row label, and the
+ *   row a field's label stands in with it (components/Field.js, `help`). The tooltip is
+ *   css/components/tooltip.css and the dialog css/components/explain-dialog.css. Reads the theme's
+ *   tokens only.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-10-02 — Initial (wish "Ohjenappi ja vihjeteksti asetuksille").
+ */
+
+.help-tip {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+
+/* This sheet sets only the size and the mark's face; the frame, the corner and the sun under the
+   pointer are the icon button's. */
+.help-tip-button {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  text-transform: none;
+  letter-spacing: 0;
+}
+/* A 28px target around the 20px square, so a finger or an unsteady hand finds it. */
+.help-tip-button::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+}
+.help-tip-button:focus-visible {
+  outline: var(--shape-frame) solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+/* A field's row label with its question mark beside it. */
+.field-label-row {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+}

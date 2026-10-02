@@ -1,0 +1,27 @@
+/**
+ * @file explain-dialog.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The parts of the explanation dialog (components/ExplainDialog.js) that the library's
+ *   parts do not space themselves: the list of examples under its row label, and the dashed aside on
+ *   when to change the setting. The dialog is the site's Modal; the lead, the facts, the label and
+ *   the aside are the library's. Reads the theme's tokens only.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-10-02 — Initial (wish "Ohjenappi ja vihjeteksti asetuksille").
+ */
+
+.explain-examples {
+  margin-top: 1.1rem;
+}
+.explain-examples ul {
+  margin: .4rem 0 0;
+  padding-left: 1.2rem;
+  line-height: 1.55;
+}
+.explain-examples li + li {
+  margin-top: .35rem;
+}
+.explain-when {
+  margin-top: 1.2rem;
+}

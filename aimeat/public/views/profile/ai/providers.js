@@ -13,6 +13,8 @@
  *   secRouting · secPolicy
  * @usage import { secProviders, secRouting, secPolicy } from './ai/providers.js';
  * @version-history
+ *   v1.4.0 — 2026-10-02 — The fine-tuning fields (temperature, top P, longest answer, reasoning) carry
+ *     a question mark that explains each one: what it does, its range, examples (components/HelpTip.js).
  *   v1.3.1 — 2026-10-02 — Above the providers, a line for each capability that is off for a reason the
  *     person can fix here, with Test now when a test turns it on, and one for a capability whose
  *     provider failed its last test (offLines); an owner's provider with an untested or failing
@@ -226,7 +228,7 @@ function capEditor(pv, p, c) {
   const set = (patch) => pv.setModelDraft(c, patch);
   const tuning = c === 'text' || c === 'vision' || c === 'files';
   const num = (key, min, max, step) => html`
-    <${TextField} label=${x('param.' + key)} type="number" size="short" min=${min} max=${max} step=${step} value=${d[key] ?? ''} placeholder=${x('default')} onInput=${(v) => set({ [key]: v })} />`;
+    <${TextField} label=${x('param.' + key)} help=${'ai.' + key} type="number" size="short" min=${min} max=${max} step=${step} value=${d[key] ?? ''} placeholder=${x('default')} onInput=${(v) => set({ [key]: v })} />`;
   return html`
     <${Line} wrap gap="small">
       <${TextField} value=${d.model ?? ''} placeholder=${x('pv.modelPlaceholder')} ariaLabel=${x('pv.modelFor', { cap: x('cap.' + c) })} onInput=${(v) => set({ model: v })} />
@@ -240,7 +242,7 @@ function capEditor(pv, p, c) {
       <${Note} kind="meta">${x('pv.tuning')}<//>
       <${Line} wrap gap="medium">
         ${num('temperature', 0, 2, 0.1)}${num('top_p', 0, 1, 0.05)}${num('max_tokens', 1, 1000000, 256)}
-        <${Select} fit label=${x('param.reasoning')} value=${d.reasoning ?? ''} onChange=${(v) => set({ reasoning: v })}
+        <${Select} fit label=${x('param.reasoning')} help="ai.reasoning" value=${d.reasoning ?? ''} onChange=${(v) => set({ reasoning: v })}
           options=${['', 'off', 'low', 'medium', 'high'].map((k) => [k, x('reasoning.' + (k || 'default'))])} />
       <//>` : null}
     <${Actions}><${Action} small disabled=${pv.busy === 'cap'} onClick=${() => pv.saveCap(p, c, capPatchOf(c, d, p.type))}>${x('save')}<//><//>`;
