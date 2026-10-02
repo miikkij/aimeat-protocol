@@ -19,6 +19,9 @@
  * @structure ThemeTokenKind · THEME_TOKENS · CORE_TOKENS · THEME_FACES · FACE_SLOTS · faceStack
  * @usage import { THEME_TOKENS, THEME_FACES } from './tokens.js';
  * @version-history
+ *   v1.2.0 — 2026-10-02 — Eleven more faces (Instrument Serif and Sans, Schibsted Grotesk, Bricolage
+ *     Grotesque, Syne, Unbounded, Gloock, Mona Sans, Hubot Sans, Geist Mono, Martian Mono), vendored
+ *     in public/lib/fonts so a theme has display faces that are not the ones every generated page wears.
  *   v1.1.0 — 2026-09-26 — --ink-ground and --on-ink-ground are tokens a style sets (Jouni's decision "dark-ground").
  *   v1.0.0 — 2026-09-24 — Initial (UI consolidation phase 4, Themes & Styles).
  */
@@ -95,6 +98,18 @@ export const THEME_FACES: Readonly<Record<string, string>> = {
     'Bungee': "'Bungee', 'Archivo Black', system-ui, sans-serif",
     'VT323': "'VT323', 'JetBrains Mono', monospace",
     'JetBrains Mono': "'JetBrains Mono', 'SF Mono', monospace",
+    // The faces vendored on 2026-10-02 so a theme can look like something of its own.
+    'Instrument Serif': "'Instrument Serif', Georgia, 'Times New Roman', serif",
+    'Instrument Sans': "'Instrument Sans', 'Inter', system-ui, sans-serif",
+    'Schibsted Grotesk': "'Schibsted Grotesk', 'Inter', system-ui, sans-serif",
+    'Bricolage Grotesque': "'Bricolage Grotesque', 'Archivo', system-ui, sans-serif",
+    'Syne': "'Syne', 'Archivo Black', system-ui, sans-serif",
+    'Unbounded': "'Unbounded', 'Archivo Black', system-ui, sans-serif",
+    'Gloock': "'Gloock', Georgia, 'Times New Roman', serif",
+    'Mona Sans': "'Mona Sans', 'Inter', system-ui, sans-serif",
+    'Hubot Sans': "'Hubot Sans', 'Mona Sans', 'Archivo Black', system-ui, sans-serif",
+    'Geist Mono': "'Geist Mono', 'JetBrains Mono', 'SF Mono', monospace",
+    'Martian Mono': "'Martian Mono', 'JetBrains Mono', 'SF Mono', monospace",
 };
 
 /** The three faces a theme may choose, and the token each one sets. */

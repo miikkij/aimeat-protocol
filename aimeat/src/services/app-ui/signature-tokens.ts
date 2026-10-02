@@ -11,6 +11,7 @@
  * @usage
  *   import { SIGNATURE_TOKENS } from './signature-tokens.js';
  * @version-history
+ *   v1.3.0 — 2026-10-02 — SERVED_FONT_FAMILIES takes the eleven faces vendored that day (aimeat-fonts.css v1.2.0).
  *   v1.2.0 — 2026-09-28 — The spring hand joins the signature: --ak-spring-stiffness, -damping and
  *     -mass, each a plain number inside SPRING_BOUNDS, so a layout and a Design Book motion part
  *     can say how the kit's springs feel (the ten motion parts).
@@ -28,6 +29,8 @@
  */
 export const SERVED_FONT_FAMILIES: readonly string[] = [
   'Archivo', 'Archivo Black', 'Bungee', 'DM Sans', 'Fjalla One', 'Fraunces', 'Inter', 'JetBrains Mono', 'Space Grotesk', 'VT323',
+  'Instrument Serif', 'Instrument Sans', 'Schibsted Grotesk', 'Bricolage Grotesque', 'Syne', 'Unbounded', 'Gloock',
+  'Mona Sans', 'Hubot Sans', 'Geist Mono', 'Martian Mono',
 ];
 
 /** Faces a browser has without a download, and the generic keywords. Lower case. */
