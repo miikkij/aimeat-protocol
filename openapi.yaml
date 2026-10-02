@@ -38147,9 +38147,12 @@ paths:
       operationId: createOrganismApproval
       summary: Request approval for an action (gate or auto-run)
       description: |
-        Generic gate primitive. Evaluates the manifest's gate policy (`policy.agentAutonomy` +
+        Generic gate primitive. Evaluates the gate policy (`policy.agentAutonomy` +
         `policy.alwaysGate`, via gate-policy): a consequential action becomes a `pending` approval;
         everything else auto-runs and is recorded as a decision. Members (incl. agents) may create.
+        When `arguments.ws` names a workspace the caller can read, that workspace's manifest policy
+        applies: its autonomy level wins over the organism's, and its `alwaysGate` list adds to the
+        organism's (never removes from it). Otherwise the organism manifest's policy applies.
         The two actions of a member's suggested workspace change (`workspace.space.add`,
         `workspace.sections.change`) are refused here with 400: they are filed by
         POST .../workspace/spaces and PUT .../workspace/sections/{space}, because approving one runs it.

@@ -13,6 +13,9 @@
  *   secRouting · secPolicy
  * @usage import { secProviders, secRouting, secPolicy } from './ai/providers.js';
  * @version-history
+ *   v1.6.0 — 2026-10-02 — With "Only tested providers" on, a capability's routing row says which provider
+ *     in its list the node skips until it is tested (an owner's, on, never tested: untestedIn), with Test
+ *     now beside it (pv.testNow, the same test as the providers' rows). With the rule off, nothing.
  *   v1.5.0 — 2026-10-02 — The question marks that explain the routing rules, the embeddings row, the
  *     model policy, the Content Classifier and the PDF engine: ai.fallback, ai.fallback_attempts,
  *     ai.fallback_pool, ai.only_tested, ai.fallback_leaves_machine, ai.max_cost_per_call,
@@ -57,7 +60,7 @@ import { Action, Loud, Actions } from '/components/Action.js';
 import { Row as Line, Space } from '/components/Layout.js';
 import { HelpLabel } from '/components/HelpTip.js';
 import { x, dateWord } from './frame.js';
-import { CAPS, PROVIDER_TYPES, slug, capPatchOf, testableCapOf } from './use-providers.js';
+import { CAPS, PROVIDER_TYPES, slug, capPatchOf, testableCapOf, untestedIn } from './use-providers.js';
 import { t } from '/js/i18n.js';
 
 const msg = (m) => (m ? html`<${Note} kind="message" error=${!!m.error}>${m.text}<//>` : null);
@@ -352,9 +355,12 @@ export function secRouting(ctx, num) {
   const titleOf = (id) => pv.providers.find((p) => p.id === id)?.title || id;
   const servers = (c) => pv.providers.filter((p) => p.capabilities?.[c]?.enabled);
   const set = CAPS.filter((c) => (routing.defaults?.[c] || []).length).length;
+  const r = e ? pv.rulesDraft : routing.rules;
   const capRow = (c) => {
     const list = e ? pv.routeDraft[c] : (routing.defaults?.[c] || []);
     const options = [['', x('rt.none')], ...servers(c).map((p) => [p.id, p.title])];
+    const untested = untestedIn(pv, list, c, !!r.onlyTested);
+    const testNow = (p) => html`<${Action} small key=${p.id} disabled=${pv.busy === 'test'} onClick=${() => pv.testNow(p, c)}>${x('pv.testNow')}${untested.length > 1 ? ` · ${p.title}` : ''}<//>`;
     const v = e
       ? html`<${Line} wrap gap="small">
           ${[0, 1, 2].slice(0, Math.min(3, list.length + 1)).map((i) => html`
@@ -362,9 +368,15 @@ export function secRouting(ctx, num) {
             <${Select} fit key=${c + i} ariaLabel=${x('rt.place', { cap: x('cap.' + c), n: i + 1 })} value=${list[i] || ''} onChange=${(id) => pv.setRoute(c, i, id)} options=${options} />`)}
         <//>`
       : (list.length ? list.map(titleOf).join(' → ') : x('rt.auto'));
+    if (untested.length) {
+      return {
+        key: c, k: capName(c), v, subTone: 'notice',
+        sub: untested.map((p) => x('rt.untestedSkipped', { provider: p.title })).join(' '),
+        actions: html`${untested.map(testNow)}`,
+      };
+    }
     return { key: c, k: capName(c), v, missing: !e && !list.length, sub: servers(c).length ? '' : x('rt.noServer') };
   };
-  const r = e ? pv.rulesDraft : routing.rules;
   const rules = [
     { key: 'fallback', k: named('ai.fallback', x('rt.fallback')), v: e ? html`<${Check} inline checked=${!!r.fallback} onChange=${(v) => pv.setRule({ fallback: v })}>${x('rt.fallbackOn')}<//>` : (r.fallback ? x('rt.fallbackYes', { n: r.maxAttempts }) : x('rt.fallbackNo')) },
     e ? { key: 'attempts', k: named('ai.fallback_attempts', x('rt.attempts')), v: html`<${TextField} type="number" size="short" min="1" max="5" step="1" value=${String(r.maxAttempts ?? 3)} ariaLabel=${x('rt.attempts')} onInput=${(v) => pv.setRule({ maxAttempts: v })} />` } : null,

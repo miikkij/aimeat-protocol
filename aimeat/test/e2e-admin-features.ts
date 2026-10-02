@@ -4,6 +4,8 @@
  *   sending, the directory and matching runs, push templates, CSM and MSM, genesis peers, and the
  *   node config doors mounted alongside them.
  * @version-history
+ *   v1.4.0 — 2026-10-02 — A number setting above the range the Config tab shows is refused (400, not
+ *     applied) and its maximum is accepted: moderation.auto_hide_threshold, range 1-100.
  *   v1.3.0 — 2026-09-09 — GET /v1/admin/marketplace left the sweep and lost its test: the route was
  *     deleted with the marketplace storage methods (no writer, no reader).
  *   v1.2.0 — 2026-08-19 — The front-page switch: site.front_page=demo serves the static showroom
@@ -531,6 +533,29 @@ await test('PUT /v1/admin/config \u2192 reject invalid path', async () => {
     }));
     assert(status === 400, `expected 400, got ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === false, 'ok is false');
+});
+
+await test('PUT /v1/admin/config \u2192 a number above its stated range is refused, the maximum is accepted', async () => {
+    // moderation.auto_hide_threshold shows range 1-100 on the Config tab; its row check only says >= 1.
+    const path = 'moderation.auto_hide_threshold';
+    const { body: getBody } = await json('/v1/admin/config', authed());
+    const entry = getBody.data.schema[path];
+    assert(entry && entry.range === '1-100', `schema range for ${path}: ${JSON.stringify(entry)}`);
+    const original = entry.value;
+    const put = (value: unknown) => json('/v1/admin/config', authed({ method: 'PUT', body: JSON.stringify({ changes: [{ path, value }] }) }));
+    try {
+        const above = await put(101);
+        assert(above.status === 400, `101 must be refused, got ${above.status}: ${JSON.stringify(above.body)}`);
+        assert(above.body.error?.code === 'INVALID_INPUT', `code ${above.body.error?.code}`);
+        assert(JSON.stringify(above.body).includes(`Invalid value for ${path}`), `the refusal names the path: ${JSON.stringify(above.body)}`);
+        const after = (await json('/v1/admin/config', authed())).body.data.schema[path].value;
+        assert(after === original, `a refused value must not be applied: ${after} vs ${original}`);
+        const atMax = await put(100);
+        assert(atMax.status === 200, `100 (the maximum) must be accepted, got ${atMax.status}: ${JSON.stringify(atMax.body)}`);
+        assert(atMax.body.data.applied?.[0]?.new_value === 100, `applied ${JSON.stringify(atMax.body.data)}`);
+    } finally {
+        await put(original);
+    }
 });
 
 // \u2500\u2500\u2500 The front-page switch (site.front_page) \u2500\u2500\u2500

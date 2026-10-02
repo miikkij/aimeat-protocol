@@ -2,9 +2,10 @@
  * @file views/profile/agents/agent-defaults-section.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Agent Defaults section — owner-level default rules and token
- *   budget for agents. Mounted at the foot of the Your agents page.
+ * @description Agent Defaults section — owner-level default rules for agents. Mounted at the foot
+ *   of the Your agents page.
  * @version-history
+ *   v1.13.0 -- 2026-10-02 -- The token budget goes, its row and its field: nothing on the server enforces default_token_budget, so the form no longer shows it or sends it. The rules and the memory areas save as before.
  *   v1.12.0 -- 2026-10-02 -- The question mark that explains the token budget: agent.token_budget on its TextField (components/HelpTip.js).
  *   v1.11.1 --2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
  *     itself, so rules with a quote or an ampersand showed as &quot; / &amp;. A rule is the server's
@@ -44,7 +45,6 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { getOwnerDefaults, upsertOwnerDefaults } from '/js/services/agent-directives.js';
 import { swallowed } from '/js/swallowed.js';
-import { num } from '/js/format.js';
 import { SubHeading } from '/components/SubHeading.js';
 import { Card } from '/components/Card.js';
 import { Row, Space } from '/components/Layout.js';
@@ -64,7 +64,6 @@ export function AgentDefaultsSection({ showToast, initial }) {
 
   // Edit state
   const [editRules, setEditRules] = useState([]);
-  const [editBudget, setEditBudget] = useState('');
   const [newRule, setNewRule] = useState('');
 
   const loadDefaults = useCallback(async () => {
@@ -90,9 +89,7 @@ export function AgentDefaultsSection({ showToast, initial }) {
 
   const startEdit = useCallback(() => {
     const rules = defaults?.rules || [];
-    const budget = defaults?.default_token_budget;
     setEditRules([...rules]);
-    setEditBudget(budget != null ? String(budget) : '');
     setNewRule('');
     setEditing(true);
   }, [defaults]);
@@ -100,15 +97,10 @@ export function AgentDefaultsSection({ showToast, initial }) {
   const handleSave = useCallback(async () => {
     setSaving(true);
     try {
-      const budgetVal = editBudget.trim() ? parseInt(editBudget, 10) : undefined;
-      if (editBudget.trim() && (isNaN(budgetVal) || budgetVal < 0)) {
-        showToast(t('profile.access.adInvalidBudget') || 'Token budget must be a non-negative number');
-        setSaving(false);
-        return;
-      }
+      // No default_token_budget: nothing on the server enforces it, so the form neither shows nor
+      // sends it. PUT /v1/owner/agent-defaults stores an omitted budget as unset, as an empty field did.
       await upsertOwnerDefaults({
         rules: editRules,
-        default_token_budget: budgetVal,
         default_memory_areas: defaults?.default_memory_areas || [],
       });
       showToast(t('profile.access.adSaved') || 'Agent defaults saved');
@@ -119,7 +111,7 @@ export function AgentDefaultsSection({ showToast, initial }) {
     } finally {
       setSaving(false);
     }
-  }, [editRules, editBudget, defaults, showToast, loadDefaults]);
+  }, [editRules, defaults, showToast, loadDefaults]);
 
   const addRule = useCallback(() => {
     if (!newRule.trim()) return;
@@ -135,7 +127,6 @@ export function AgentDefaultsSection({ showToast, initial }) {
   }, []);
 
   const rules = defaults?.rules || [];
-  const budget = defaults?.default_token_budget;
 
   return html`
     <${Space} above="section">
@@ -160,17 +151,6 @@ export function AgentDefaultsSection({ showToast, initial }) {
             <//>
           `)}
         <//>
-
-        <${List} cols="name-doors" dense>
-          <${ListRow}>
-            <${Name} asKey>${t('profile.access.adTokenBudget') || 'Token Budget'}<//>
-            <${Doors}>
-              <${Action} tone="text" title=${t('profile.access.adEdit') || 'Edit'} onClick=${startEdit}>
-                ${budget != null ? num(budget) : (t('profile.access.adUnlimited') || 'Unlimited')} ✎
-              <//>
-            <//>
-          <//>
-        <//>
       <//>
     ` : html`
       <${Card} tone="section">
@@ -194,10 +174,6 @@ export function AgentDefaultsSection({ showToast, initial }) {
               value=${newRule} onInput=${setNewRule} onEnter=${addRule}
               actions=${html`<${Action} small onClick=${addRule}>${t('profile.access.adAddRule') || 'Add'}<//>`} />
           <//>
-
-          <${TextField} type="number" min="0" label=${t('profile.access.adTokenBudget') || 'Token Budget'} help="agent.token_budget"
-            placeholder=${t('profile.access.adBudgetPlaceholder') || 'Leave empty for unlimited'}
-            value=${editBudget} onInput=${setEditBudget} />
 
           <${FormActions}>
             <${Loud} control onClick=${handleSave} disabled=${saving}>
