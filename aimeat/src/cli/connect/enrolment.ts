@@ -27,21 +27,37 @@
  *
  *   WHO MAY OFFER WHAT. An offer arrives on the socket of ONE identity this daemon holds, and a
  *   daemon may hold identities on several nodes run by different people. So an offer is bound to
- *   that receiving identity before anything else happens: it must name the receiver's owner, a node
- *   URL with the receiver's origin and the receiver's node id; every name must fit the node's own
- *   name grammar before a path is built from it; and a key, bearer or settings file this connector
- *   already holds for another node is never written over. The written settings take the receiver's
- *   own node URL, the one this daemon already reaches that node on.
+ *   that receiving identity before anything else happens: it must name the receiver's owner and the
+ *   receiver's node id; every name must fit the node's own name grammar before a path is built from
+ *   it; and a key, bearer or settings file this connector already holds for another node is never
+ *   written over. The written settings take the receiver's own node URL, the one this daemon
+ *   already reaches that node on.
+ *
+ *   THE NODE IS PROVEN BY ITS IDENTITY, NOT BY ITS URL. A node has more than one address: on a
+ *   hosted node the crew runtime runs in the node's own container and reaches it on loopback
+ *   (http://127.0.0.1:40050), while the offer names the public base URL. Comparing those origins
+ *   refused every offer on every hosted node (measured 2026-10-02). So the connector reads the
+ *   node's card (GET /.well-known/aimeat) at the address IT uses, and the card's node id and public
+ *   key must be the offer's. What this proves: the server this connector actually talks to says it
+ *   is the node the offer names, with the key the offer names, whatever its address is called. What
+ *   it does not prove: anything against a node that lies in both places, since the offer and the
+ *   card come from the same server. A node lying about its id is stopped by the holding check,
+ *   which compares what this connector already holds, and which proves "the same node" by the same
+ *   card read when two addresses differ.
  *
  * @structure
  *   - EnrolOffer / EnrolledAgent / EnrolReceiver — the wire shapes and the receiving identity
- *   - refuseUnboundOffer / heldForAnotherNode — the binding checks, before any write
+ *   - fetchNodeCard(nodeUrl) — the node's card at an address this connector uses
+ *   - refuseUnboundOffer / proveOfferingNode / heldForAnotherNode — the binding checks, before any write
  *   - handleEnrolOffer(offer, deps) — the whole flow, answering the invoke
  * @usage
  *   onInvoke: (frame) => frame.capability === ENROL_CAPABILITY
  *     ? handleEnrolOffer(frame.input, { receiver: entry, ...deps }).then(r => tunnel.replyInvoke(frame.id, r.ok, r.result))
  *     : inv.handleInvoke(frame)
  * @version-history
+ *   v1.2.0 — 2026-10-02 — The offering node is proven by its card at the connector's own address
+ *     (node id and public key), not by comparing the offer's URL with the connector's. Settings
+ *     already held at another address of the same node are that node, by the same card read.
  *   v1.1.0 — 2026-09-24 — The offer is bound to the identity whose socket carried it: owner, node
  *     origin and node id must be the receiver's, names must fit the node's grammar before any path
  *     is built, and nothing held for another node is written over (secaudit 2026-09, A9-2).
@@ -56,6 +72,7 @@ import {
 import { getToken } from './keychain.js';
 import { gaiiFromToken, gaiiParts } from './agent-gaii.js';
 import { buildGAII, parseGAII } from '../../utils/gaii.js';
+import { readBodyCapped } from '../../utils/read-capped.js';
 import { logger } from '../../utils/logger.js';
 
 /** The capability the node sends this under. Kept in step with routes/agents-v2/basic-agents.ts. */
@@ -80,10 +97,17 @@ export interface EnrolOffer {
   grant_id: string;
   node_url: string;
   node_id: string;
+  /** The key the node publishes at /.well-known/aimeat. A node older than 2026-10-02 sends none. */
+  node_public_key?: string | null;
   owner: string;
   enrol_url?: string;
   agents: EnrolOfferAgent[];
 }
+
+/** Who the server at an address says it is, read from its /.well-known/aimeat. */
+export type NodeCard =
+  | { ok: true; nodeId: string; publicKey: string | null }
+  | { ok: false; detail: string };
 
 /** One agent the node accepted, as it comes back from POST /v1/agents/v2/enrol. */
 interface EnrolledAgent {
@@ -110,6 +134,37 @@ export interface EnrolDeps {
   attach(entry: { agent: string; owner: string; gaii: string; config: AimeatPerAgentConfig }): Promise<void>;
   /** The connector's own version, for the card's runtime block. */
   version?: string;
+  /** Read a node's card at an address this connector uses. Defaults to fetchNodeCard. */
+  readNodeCard?(nodeUrl: string): Promise<NodeCard>;
+}
+
+/** The most a node card may be: a few hundred bytes of identity and key in the standard envelope. */
+const MAX_NODE_CARD_BYTES = 64 * 1024;
+const NODE_CARD_TIMEOUT_MS = 10_000;
+
+/**
+ * GET <nodeUrl>/.well-known/aimeat. Never throws. The address is this connector's own (the
+ * receiver's settings, or settings already on disk), never the offer's word.
+ */
+export async function fetchNodeCard(nodeUrl: string): Promise<NodeCard> {
+  let res: Response;
+  let raw: Buffer | null;
+  try {
+    res = await fetch(`${nodeUrl.replace(/\/+$/, '')}/.well-known/aimeat`, { signal: AbortSignal.timeout(NODE_CARD_TIMEOUT_MS) });
+    raw = await readBodyCapped(res, MAX_NODE_CARD_BYTES);
+  } catch (err) {
+    return { ok: false, detail: String(err).slice(0, 200) };
+  }
+  if (!res.ok) return { ok: false, detail: `HTTP ${res.status}` };
+  if (!raw) return { ok: false, detail: 'the answer is larger than a node card can be' };
+  let body: { data?: { node_id?: unknown; public_key?: unknown } } | null;
+  try { body = JSON.parse(raw.toString('utf8')); } catch (err) {
+    return { ok: false, detail: `the answer is not JSON: ${String(err).slice(0, 120)}` };
+  }
+  const nodeId = body?.data?.node_id;
+  const publicKey = body?.data?.public_key;
+  if (typeof nodeId !== 'string' || !nodeId) return { ok: false, detail: 'the answer carries no node id' };
+  return { ok: true, nodeId, publicKey: typeof publicKey === 'string' && publicKey ? publicKey : null };
 }
 
 function isOffer(v: unknown): v is EnrolOffer {
@@ -141,9 +196,10 @@ function refuseUnboundOffer(offer: EnrolOffer, receiver: EnrolReceiver): Refusal
   if (offer.owner !== receiver.owner) {
     return refusal('OFFER_NOT_FOR_THIS_OWNER', `This offer names the account "${offer.owner}", but it arrived for an agent of "${receiver.owner}".`);
   }
-  const origin = originOf(offer.node_url);
-  if (!origin || origin !== originOf(receiver.config.node_url)) {
-    return refusal('OFFER_FROM_ANOTHER_NODE', `This offer names the node ${offer.node_url}, but it arrived from ${receiver.config.node_url}.`);
+  // The offer's URL is only used to address the agent's card and keys on that node. Which node
+  // this is gets decided by identity in proveOfferingNode, because one node has several addresses.
+  if (!originOf(offer.node_url)) {
+    return refusal('BAD_OFFER', `This offer names "${offer.node_url}" as the node's address, which is not an http(s) address.`);
   }
   if (offer.node_id !== gaiiParts(receiver.gaii)?.node) {
     return refusal('OFFER_FROM_ANOTHER_NODE', `This offer names the node id "${offer.node_id}", but it arrived for ${receiver.gaii}.`);
@@ -163,12 +219,36 @@ function refuseUnboundOffer(offer: EnrolOffer, receiver: EnrolReceiver): Refusal
   return null;
 }
 
+/** The node an offer was proven to come from: what its card at the receiver's address says. */
+type ProvenNode = { nodeId: string; publicKey: string | null };
+
+/**
+ * The card at the address this connector reaches the node on, against the offer: the node id must
+ * be the offer's, and so must the key when the offer names one. Null when they are one node.
+ */
+function proveOfferingNode(offer: EnrolOffer, receiverUrl: string, card: NodeCard): Refusal | null {
+  if (!card.ok) {
+    return refusal('NODE_CARD_UNREADABLE',
+      `This connector could not read the node's card at ${receiverUrl}/.well-known/aimeat (${card.detail}), so it cannot tell which node made this offer.`);
+  }
+  if (card.nodeId !== offer.node_id) {
+    return refusal('OFFER_FROM_ANOTHER_NODE', `This offer names the node id "${offer.node_id}", but the node at ${receiverUrl} is "${card.nodeId}".`);
+  }
+  if (offer.node_public_key && card.publicKey !== offer.node_public_key) {
+    return refusal('OFFER_FROM_ANOTHER_NODE', `This offer names a node key that the node at ${receiverUrl} does not publish.`);
+  }
+  return null;
+}
+
 /**
  * What this connector already holds under (name, owner), when it came from another node: a
  * sentence naming it, or null. A key or a bearer must be this very identity, and the settings the
- * agent is served with must point at the offering node's origin. Reads only.
+ * agent is served with must point at the offering node: at the receiver's own address, or at an
+ * address whose card names the same node id and key (`isProvenNode`). Reads only.
  */
-async function heldForAnotherNode(name: string, owner: string, expectedGaii: string, origin: string): Promise<string | null> {
+async function heldForAnotherNode(
+  name: string, owner: string, expectedGaii: string, receiverUrl: string, isProvenNode: (url: string) => Promise<boolean>,
+): Promise<string | null> {
   if (hasAgentKey(name, owner)) {
     const key = await getAgentKey(name, owner);
     if (key?.gaii !== expectedGaii) return `the key for ${name}@${owner} belongs to ${key?.gaii ?? 'an identity this connector cannot read'}`;
@@ -178,7 +258,11 @@ async function heldForAnotherNode(name: string, owner: string, expectedGaii: str
   if (token && tokenGaii !== expectedGaii) return `the stored token for ${name}@${owner} belongs to ${tokenGaii ?? 'an identity this connector cannot read'}`;
   // The settings it would be served with, however the loader arrives at them.
   const settings = peekPerAgentConfig(name, owner) ?? (token ? fallbackConfigFor(name, owner) : null);
-  if (settings && originOf(settings.node_url) !== origin) return `the settings for ${name}@${owner} point at ${settings.node_url}`;
+  // Same origin is the same server. Another origin may still be the same node under another name
+  // (its public address and its loopback one), which only its card can say.
+  if (settings && originOf(settings.node_url) !== originOf(receiverUrl) && !(await isProvenNode(settings.node_url))) {
+    return `the settings for ${name}@${owner} point at ${settings.node_url}`;
+  }
   return null;
 }
 
@@ -198,8 +282,27 @@ export async function handleEnrolOffer(offer: unknown, deps: EnrolDeps): Promise
   // 0: BOUND TO THE RECEIVER, before a key is made, the node is asked or a path is built.
   const unbound = refuseUnboundOffer(offer, deps.receiver);
   if (unbound) return unbound;
-  const origin = originOf(deps.receiver.config.node_url) as string;
-  const held = (await Promise.all(offer.agents.map(a => heldForAnotherNode(a.name, offer.owner, a.gaii, origin))))
+
+  // 0b: THE NODE BY ITS IDENTITY, read at the address this connector uses. One read per address
+  // for the whole offer: the holding check below asks again for every agent.
+  const readCard = deps.readNodeCard ?? fetchNodeCard;
+  const cards = new Map<string, Promise<NodeCard>>();
+  const cardAt = (url: string): Promise<NodeCard> => {
+    const key = url.replace(/\/+$/, '');
+    if (!cards.has(key)) cards.set(key, readCard(key));
+    return cards.get(key) as Promise<NodeCard>;
+  };
+  const receiverUrl = deps.receiver.config.node_url.replace(/\/+$/, '');
+  const receiverCard = await cardAt(receiverUrl);
+  const unproven = proveOfferingNode(offer, receiverUrl, receiverCard);
+  if (unproven) return unproven;
+  const proven: ProvenNode = receiverCard as ProvenNode;
+  const isProvenNode = async (url: string): Promise<boolean> => {
+    const card = await cardAt(url);
+    return card.ok && card.nodeId === proven.nodeId && card.publicKey === proven.publicKey;
+  };
+
+  const held = (await Promise.all(offer.agents.map(a => heldForAnotherNode(a.name, offer.owner, a.gaii, receiverUrl, isProvenNode))))
     .filter((h): h is string => h !== null);
   if (held.length) {
     return refusal('HELD_FOR_ANOTHER_NODE',
@@ -277,7 +380,7 @@ export async function handleEnrolOffer(offer: unknown, deps: EnrolDeps): Promise
     // node appeared while the node was answering; otherwise this agent is not written.
     const conflict = e.gaii !== prep.offered.gaii
       ? `the node answered ${e.gaii} for ${prep.offered.gaii}`
-      : await heldForAnotherNode(e.name, offer.owner, e.gaii, origin);
+      : await heldForAnotherNode(e.name, offer.owner, e.gaii, receiverUrl, isProvenNode);
     if (conflict) {
       failed.push({ name: e.name, message: conflict });
       continue;
@@ -296,8 +399,9 @@ export async function handleEnrolOffer(offer: unknown, deps: EnrolDeps): Promise
       // names no agent had nobody to answer it, across 66 identities. Measured on disk, not
       // inferred: the write below carries these four, and it never saw them because the object
       // handed to it was built empty.
-      // The node URL is the RECEIVER's, the one this daemon already reaches that node on; the
-      // offer's has the same origin by now, but it is the node's word and this one is ours.
+      // The node URL is the RECEIVER's, the one this daemon already reaches that node on. The
+      // offer's may be another address of the same node (its public one, when this daemon runs
+      // beside the node on loopback); it is the node's word and this one is ours.
       const existing = loadPerAgentConfig(e.name, offer.owner) ?? {};
       const perAgent: AimeatPerAgentConfig = { ...existing, node_url: deps.receiver.config.node_url };
       savePerAgentConfig(e.name, offer.owner, perAgent);

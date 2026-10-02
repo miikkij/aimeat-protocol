@@ -298,6 +298,8 @@ describe('a new-layout install', () => {
         }, {
             // The offer arrived on the socket of another of alice's agents on the same node.
             receiver: { gaii: 'receiver-bot#alice@test-node', owner: 'alice', config: { node_url: 'http://node.example:2' } },
+            // The node's card at that address names the node the offer names.
+            readNodeCard: async () => ({ ok: true, nodeId: 'test-node', publicKey: null }),
             // The node accepts the card and hands back the identity, which is all this path reads.
             forward: async () => ({ status: 200, body: { ok: true, data: { enrolled: [{ name: 'concierge', gaii }] } } }),
             attach: async () => { /* the registry is not what this test is about */ },
