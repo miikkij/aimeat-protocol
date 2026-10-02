@@ -141,10 +141,28 @@ describe('atelier handbook', () => {
     expect(b.isConnected).toBe(false);
   });
 
-  it('draws a sample with four chapters in three groups', () => {
+  it('draws a sample with four chapters in three groups, and collects only where it is told to', () => {
+    pageControl('elsewhere', 'Elsewhere', 'not in the card');
     const book = kit.handbook({ sample: true });
     book.open();
     expect(part(book.el, 'entry').length).toBe(4);
     expect(part(book.el, 'group').length).toBe(3);
+    const card = document.createElement('div') as any;
+    document.body.appendChild(card);
+    const save = document.createElement('button') as any;
+    save.setAttribute('data-ak-help', 'save');
+    save.setAttribute('data-ak-help-title', 'Save');
+    card.appendChild(save);
+    const carded = kit.handbook({ sample: true, collect: card });
+    expect(carded.scan().map((c: any) => c.id)).toEqual(['s-ask', 's-data', 's-move', 's-share', 'save']);
+  });
+
+  it('says its search in the language in force', () => {
+    const book = kit.handbook({ collect: false, chapters: [{ id: 'a', title: 'A' }] });
+    book.open();
+    const input = part(book.el, 'search')[0].children.find((c: any) => c.tagName === 'INPUT');
+    expect(input.getAttribute('placeholder')).toBe('Search the guide');
+    i18n.setLang('fi');
+    expect(input.getAttribute('placeholder')).toBe('Hae oppaasta');
   });
 });
