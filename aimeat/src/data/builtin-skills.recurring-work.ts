@@ -31,6 +31,8 @@
  * @usage
  *   import { RECURRING_WORK_SKILL_ENTRIES } from './builtin-skills.recurring-work.js';
  * @version-history
+ *   v1.5.0 — 2026-10-02 — Section 4: the agent is proposed here and never sent elsewhere, built on
+ *     the organisms and workspaces the person keeps, and the person is given the approval address.
  *   v1.4.0 — 2026-09-29 — `kind: "refinery"`, one mail refinery batch each fire.
  *   v1.3.0 — 2026-09-28 — `kind: "ai"` runs on the owner's AI providers; an ai step or job can make a
  *     picture or transcribe (op), and the capability is checked at setup (System 2 plan, V5).
@@ -129,14 +131,22 @@ something a script could do is a bill that arrives every week for no reason.
 ## 4. When the work needs an agent of its own
 
 Some recurring work is more than one completion: several steps, tools, judgement about what was
-found, something that answers when spoken to. Then propose a new agent.
+found, something that answers when spoken to. Then propose a new agent, here. This node makes it,
+so never point the person to an outside agent builder, tool or product for it.
 
-\`aimeat_agent_propose\` takes a name, a \`purpose\` the person can decide from, the scopes the
-agent needs (never more than you hold yourself) and a \`crew_def\`, the JSON document that says
-what the agent is: its roles, its tasks and its tools. The call creates nothing. It puts one line
-on the person's open items, and their press on it creates the agent, gives it the definition and
-hands it to their connector to run. Send the \`crew_def\` with the proposal: an agent approved
-without one exists and cannot start.
+First read what it will work on: \`aimeat_organism_list\` and \`aimeat_workspace_list\` (or
+\`aimeat_discover\` with scope "shared") show the organisms and workspaces they keep. "Every
+morning, gather my open deals" is about the deals in their own sales workspace, so read that
+workspace's record shape and design the agent for it.
+
+\`aimeat_agent_propose\` takes a name, a \`purpose\` the person can decide from (name their data in
+it), the scopes the agent needs (never more than you hold yourself; a crew runtime also needs
+\`memory:write\` and \`agent:write\` for its own writes) and a \`crew_def\`, the JSON
+document that says what the agent is: its roles, its tasks and its tools. The call creates nothing.
+It puts one line on the person's open items, and their press on it creates the agent, gives it the
+definition and hands it to their connector to run. The answer carries \`approval_url\` and
+\`next_step\`: give the person both, so they know where to press. Send the \`crew_def\` with the
+proposal: an agent approved without one exists and cannot start.
 
 Once it runs, section 2 applies: a schedule of \`kind: "agent_task"\` gives it the work on a
 clock. How to write the definition and how to check it is in the skill \`node:add-a-crew-agent\`.

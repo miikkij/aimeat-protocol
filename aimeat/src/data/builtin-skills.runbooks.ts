@@ -12,6 +12,8 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   v1.6.0 — 2026-10-02 — manage-my-agents: a proposed worker is built on the workspaces it will use,
+ *     the owner approves at the approval_url the answer gives, and an outside builder is never the answer.
  *   v1.5.0 — 2026-10-01 — manage-my-agents: which agent the owner needs, asked by what it should do, with
  *     where each kind runs and who pays, and the picture of the four places (guided journey P4).
  *   v1.4.2 — 2026-10-01 — manage-my-agents: reading the address book needs contacts:read, and an
@@ -118,10 +120,12 @@ Ask what the agent should do, then name the kind, where it runs and who pays:
 - **Work while they are away:** a worker. Ask where it should run.
   - On their computer: it needs the connector, a small program that keeps one connection open to
     this AIMEAT (\`npx aimeat connect --url <this node> --owner <them>\`, then
-    \`npx aimeat connect serve\`), and the computer stays on while it works. Propose the agent with
-    \`aimeat_agent_propose\` (a name, its purpose, a crew definition); the owner approves it on the
-    Agents page or in their open items, and approving creates it. It thinks with the model in their
-    settings and they pay with their own AI key.
+    \`npx aimeat connect serve\`), and the computer stays on while it works. Read the organisms and
+    workspaces it will work on first (\`aimeat_workspace_list\`), then propose the agent with
+    \`aimeat_agent_propose\` (a name, its purpose naming that data, a crew definition); the owner
+    approves it at the \`approval_url\` the answer gives (the Agents page, also in their open
+    items), and approving creates it. This node makes and runs it, so an outside agent builder is
+    never the answer. It thinks with the model in their settings and they pay with their own AI key.
   - On this AIMEAT: a scheduled AI job (\`aimeat_schedule_create\`). Nothing to install, it runs
     with their own AI key, and the computer can be off.
 - **The same thing on a timetable:** a schedule (\`aimeat_schedule_create\`).

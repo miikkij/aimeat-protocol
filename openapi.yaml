@@ -8713,7 +8713,9 @@ paths:
                   description: Must be the caller's own owner when given.
       responses:
         '201':
-          description: The proposal is waiting for the owner. Nothing was created.
+          description: |
+            The proposal is waiting for the owner. Nothing was created. A name that is already
+            waiting answers with the standing proposal and `already_waiting: true`.
           content:
             application/json:
               schema:
@@ -8725,7 +8727,13 @@ paths:
                         type: object
                         properties:
                           created: { type: boolean, enum: [false] }
-                          next_step: { type: string }
+                          already_waiting: { type: boolean }
+                          approval_url:
+                            type: string
+                            description: The page where the owner approves it. A proposing agent hands this to the person.
+                          next_step:
+                            type: string
+                            description: One sentence for the person, naming approval_url.
                           proposal: { type: object }
         '400': { description: A name, purpose or crew definition that could not work }
         '403': { description: Another owner, an app or ecosystem principal, or more scope than the proposer holds }

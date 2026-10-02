@@ -17,6 +17,8 @@
  *   import { registerAgentManagementTools } from './agent-management.js';
  *   registerAgentManagementTools(mcp, storage, config, getAgentGaii);
  * @version-history
+ *   v1.7.0 -- 2026-10-02 -- aimeat_agent_propose answers with `approval_url` and the service's own
+ *     next_step sentence, the same two the REST answer gives.
  *   v1.6.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.6.0 -- 2026-09-08 -- aimeat_agent_propose, which aimeat_agent_basics_get's own description
@@ -48,7 +50,7 @@ import type { Storage } from '../storage/interface.js';
 import { parseGAII, localAccountName } from '../utils/gaii.js';
 import { setAgentTags, setAgentMode, setAgentRunMode, setAgentRuntimeSource, setAgentDescription, setAgentConsoleUrl } from '../services/agent-profile-write.js';
 import { describeBasicAgents, requestBasicAgents } from '../services/basic-agents.js';
-import { proposeAgent } from '../services/agent-proposals.js';
+import { proposeAgent, proposalApprovalUrl, proposalNextStep } from '../services/agent-proposals.js';
 import { VALID_MODES } from '../routes/agents/constants.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
@@ -277,6 +279,7 @@ export function registerAgentManagementTools(
                 scopes: sessionScopes,
             }, input as Parameters<typeof proposeAgent>[2]);
             if (!out.ok) return { content: [{ type: 'text' as const, text: out.message }], isError: true };
+            const approvalUrl = proposalApprovalUrl(config.baseUrl);
             return {
                 content: [{
                     type: 'text' as const,
@@ -284,9 +287,8 @@ export function registerAgentManagementTools(
                         proposal: out.proposal,
                         created: false,
                         already_waiting: out.alreadyWaiting ?? false,
-                        next_step: out.alreadyWaiting
-                            ? `${out.proposal.display_name} is already waiting for ${localAccountName(agentGaii)} to approve it in their profile under Agents.`
-                            : `Nothing has been created. ${out.proposal.display_name} is waiting for you to approve it in your profile under Agents.`,
+                        approval_url: approvalUrl,
+                        next_step: proposalNextStep(out.proposal.display_name, approvalUrl, out.alreadyWaiting ?? false),
                     }, null, 2),
                 }],
             };

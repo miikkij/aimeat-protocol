@@ -19,6 +19,8 @@
  *
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-v2
  * @version-history
+ *   v1.3.0 — 2026-10-02 — A proposal answers with approval_url, a next_step that names it, and
+ *     already_waiting.
  *   v1.2.0 — 2026-09-24 — A re-spelled copy of a spent assertion is refused as the same assertion
  *     (audit A4-3).
  *   v1.1.0 — 2026-09-08 — Section 8a: approval credentials the agent, a connector that cannot take
@@ -1021,6 +1023,11 @@ async function run() {
         });
         assert(r.status === 201, `expected 201, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
         assert(r.body.data.created === false, 'a proposal must create nothing');
+        // The agent relays this to a person, who needs a page to open, not "your profile somewhere".
+        const approvalUrl = String(r.body.data.approval_url ?? '');
+        assert(/^https?:\/\/.+\/v1\/profile\?tab=agents$/.test(approvalUrl), `approval_url should be the Agents page, got ${approvalUrl}`);
+        assert(String(r.body.data.next_step).includes(approvalUrl), `next_step should name the address, got ${r.body.data.next_step}`);
+        assert(r.body.data.already_waiting === false, 'a first proposal is not already waiting');
         proposalId = r.body.data.proposal.id;
 
         // The whole point: the account does not have this agent yet.
@@ -1261,6 +1268,8 @@ async function run() {
         assert(second.status === 201, `second ${second.status}`);
         assert(second.body.data.proposal.id === first.body.data.proposal.id,
             'the second ask should come back as the standing proposal, not a new one');
+        assert(second.body.data.already_waiting === true, 'the second ask should say it was already waiting');
+        assert(/already waiting/.test(String(second.body.data.next_step)), `next_step should say so, got ${second.body.data.next_step}`);
 
         const waiting = (await json('/v1/agents/v2/agent-proposals', { headers: authA }))
             .body.data.proposals.filter((p: any) => p.name === 'asked-twice' && p.state === 'proposed');

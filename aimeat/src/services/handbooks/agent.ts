@@ -7,6 +7,9 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/mcp/catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.23.0 -- 2026-10-02 -- When the person asks for a new agent (new-agent.ts): look at their
+ *     organisms and workspaces, propose it here, give them the approval address. The boundary line no
+ *     longer sends agent management to admin wholesale.
  *   v1.22.0 -- 2026-10-02 -- Buying a package for the owner: aimeat_package_buy (package sale design, phase 3).
  *   v1.21.1 -- 2026-09-30 -- The classification action list names explorer.
  *   v1.21.0 -- 2026-09-30 -- An AI sees everything by default; what an AI's send-out leaves behind; the owner's exception with a reason (exception_list, exception_set refused).
@@ -46,6 +49,7 @@
  *   v1.1.0 -- 2026-07-16 -- Add Platform feedback section (aimeat_feedback_send/inbox).
  *   v1.0.0 -- 2026-05-30 -- Initial agent-surface handbook
  */
+import { NEW_AGENT_MD } from './new-agent.js';
 
 export const AGENT_HANDBOOK = `# AIMEAT — Agent Surface Handbook
 
@@ -231,6 +235,8 @@ vectors, and only when word search has proved not enough. When your owner has a 
 model policy, suggest the recommended models once. A key is given by a person on the web page, never
 in chat. Skill: aimeat-ai-capabilities.
 
+${NEW_AGENT_MD}
+
 **Self & onboarding.** \`aimeat_agent_profile\` · \`aimeat_agent_activity\` ·
 \`aimeat_agent_capabilities_report\` · \`aimeat_agent_telemetry_report\` · \`aimeat_agents_list\`
 (your owner's agents — for delegation via task) · the \`aimeat_onboarding_*\` steps · \`aimeat_handbook_get\`.
@@ -255,6 +261,7 @@ door: flag the content itself with POST /v1/flags, which goes to the moderators.
 ## Boundaries (do not improvise across surfaces)
 - No marketplace (board posting, work, wallet, action_execute) — that's **service**.
 - No app/extension/cortex building — that's **appdev**.
-- No node admin, consent grants, group/agent management — that's **admin** (owner-operated).
+- No node admin, consent grants, group management or another agent's settings — that's **admin**
+  (owner-operated). Proposing a new agent is here: see above.
 Reaching for a tool that isn't here means you're on the wrong surface — say so instead of faking it.
 `;

@@ -6,6 +6,8 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.15.0 -- 2026-10-02 -- When the person asks for a new agent (new-agent.ts), after agent
+ *     classification: this surface carries aimeat_agent_propose and no handbook said what it is for.
  *   v1.14.0 -- 2026-10-01 -- Federation: the roster's `origin`, and aimeat_admin_federation_peer_remove for
  *     freeing a node id held under another key.
  *   v1.13.1 -- 2026-09-30 -- Classification: a person in their own session or an app makes an
@@ -44,6 +46,7 @@
  *     order that works, and the manual account disable/enable pair.
  *   v1.0.0 -- 2026-05-30 -- Initial admin-surface handbook
  */
+import { NEW_AGENT_MD } from './new-agent.js';
 
 export const ADMIN_HANDBOOK = `# AIMEAT — Admin / Governance Surface Handbook
 
@@ -159,6 +162,8 @@ what the server enforces on cross-agent reads — this is the access-control lay
 
 **Owner-managed agent classification.** \`aimeat_agent_mode_set\` (autonomous/interactive/task-runner/
 coordinator/workstation) · \`aimeat_agent_tags_set\` (crew:/role:/project: tags, max 20).
+
+${NEW_AGENT_MD}
 
 **Organisation sign-in and provisioning (operator).** An organisation connects its own identity
 provider as an SSO CONNECTION: its people sign in with their work account (SAML) and its directory

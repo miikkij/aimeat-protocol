@@ -12,6 +12,7 @@
  * @usage
  *   import { scriptedTranscript } from './scripted.js';
  * @version-history
+ *   v1.1.0 — 2026-10-02 — A play for propose-agent.
  *   v1.0.0 — 2026-09-18 — Initial.
  */
 import type { Task, TaskContext } from './tasks.js';
@@ -98,6 +99,28 @@ const PLAYS: Record<string, Play> = {
     'build-app': {
         steps: (c) => [{ tool: 'aimeat_app_publish', args: { filename: `${c.marker}.html`, name: c.marker, description: 'A small tip calculator.', category: 'tools', version: '1.0.0', content_base64: Buffer.from(TIP_APP(c.marker), 'utf8').toString('base64') } }],
         say: (c) => `Your tip calculator "${c.marker}" is published.`,
+    },
+    'propose-agent': {
+        steps: (c) => [
+            { tool: 'aimeat_organism_list', args: {} },
+            {
+                tool: 'aimeat_agent_propose',
+                args: {
+                    name: `deals-${c.marker.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20)}`,
+                    display_name: 'Morning deals',
+                    purpose: `Reads the open deals in your ${c.marker} sales workspace every morning and lists what to act on first.`,
+                    scopes: ['memory:read', 'memory:write', 'agent:write'],
+                    mode: 'task-runner',
+                    run_mode: 'spawn',
+                    crew_def: {
+                        readme_md: '# Morning deals', tags: ['role.deals'], process: 'sequential', listen_for: ['tasks'],
+                        agents: [{ role: 'Analyst', goal: 'Say which open deals need action today.', backstory: 'You read deal lists.', allow_delegation: false, tools: ['memory'] }],
+                        tasks: [{ id: 'digest', description: `Read the open deals in the ${c.marker} sales workspace. {{ctx.prompt}}`, expected_output: 'The deals to act on today, most urgent first.', agent: 'Analyst' }],
+                    },
+                },
+            },
+        ],
+        say: (c, seen) => `I proposed "Morning deals": it reads the open deals in your ${c.marker} sales workspace every morning. Approve it here: ${field(seen[1] ?? '', 'approval_url')}`,
     },
     'share-to-workspace': {
         steps: (c) => [

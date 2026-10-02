@@ -1025,10 +1025,10 @@
      "slug": "g-7-agent-proposals",
      "cells": [
       "<strong>Agent proposals</strong>",
-      "An AI proposes an agent with its purpose and instructions. The account owner approves or declines it. Approval creates the agent and its definition, then attempts to attach it to the owner's runtime.",
+      "An AI proposes an agent with its purpose and instructions. The account owner approves or declines it. Approval creates the agent and its definition, then attempts to attach it to the owner's runtime. The proposal's answer gives the address of the page where the owner approves it. The owner's own agent reaches the proposal tool, and the handbooks tell it to build the agent on the owner's organisms and workspaces instead of pointing to an outside builder.",
       "<code>/v1/agents/v2/agent-proposals</code>, <code>aimeat_agent_propose</code>"
      ],
-     "plain": "Agent proposals An AI proposes an agent with its purpose and instructions. The account owner approves or declines it. Approval creates the agent and its definition, then attempts to attach it to the owner's runtime. /v1/agents/v2/agent-proposals, aimeat_agent_propose"
+     "plain": "Agent proposals An AI proposes an agent with its purpose and instructions. The account owner approves or declines it. Approval creates the agent and its definition, then attempts to attach it to the owner's runtime. The proposal's answer gives the address of the page where the owner approves it. The owner's own agent reaches the proposal tool, and the handbooks tell it to build the agent on the owner's organisms and workspaces instead of pointing to an outside builder. /v1/agents/v2/agent-proposals, aimeat_agent_propose"
     },
     {
      "slug": "g-7-agent-v2-messages-and-tasks",

@@ -8,6 +8,8 @@
  * @structure FULL_HANDBOOK — markdown, served by GET /v1/agents/me/handbook?surface=full
  * @usage import { FULL_HANDBOOK } from './full.js';
  * @version-history
+ *   v1.6.0 — 2026-10-02 — When the person asks for a new agent (new-agent.ts), between the grounds and
+ *     the surfaces: a request this node answers itself, and the one an agent had sent elsewhere.
  *   v1.5.0 — 2026-10-01 — Ends with where the feature map is, and the actions a person does on the
  *     screen and why (data/screen-only.ts), so the AI gives the link before it meets a refusal.
  *   v1.4.0 — 2026-10-01 — The Apps line says, for any model but Claude Opus or Fable, to tell the
@@ -26,6 +28,7 @@
  *   v1.0.0 — 2026-09-03 — Initial, with the `full` surface.
  */
 import { SCREEN_ONLY_MD } from '../../data/screen-only.js';
+import { NEW_AGENT_MD } from './new-agent.js';
 
 export const FULL_HANDBOOK = `# Working here with everything
 
@@ -62,6 +65,8 @@ returns the entries. It looks in one reach at a time: \`scope: "own"\` (the defa
 person's own content, \`"shared"\` is what the organisms they belong to share with them, and
 \`"public"\` is what anyone can read. Something a colleague or a club wrote down is under
 \`"shared"\`, and no memory search will find it. Use the narrower tools once you know the domain.
+
+${NEW_AGENT_MD}
 
 ## If your work has a shape, take the surface named after it
 

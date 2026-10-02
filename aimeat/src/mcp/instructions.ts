@@ -15,6 +15,9 @@
  *   import { instructionsFor } from './instructions.js';
  *   new McpServer({ name, version }, { capabilities, instructions: instructionsFor(role, { guidance }) });
  * @version-history
+ *   v1.6.0 — 2026-10-02 — A request for a new agent is a proposal on this node, built on the
+ *     person's own organisms and workspaces, never a referral elsewhere. Right after the core and the
+ *     support line, on the surfaces that reach aimeat_agent_propose; CORE itself had no room.
  *   v1.5.0 — 2026-10-01 — The memory ground says that "remember", "note" and "save" mean this node's
  *     memory, not the client's own. Measured with the cold-agent task `remember`: Sonnet 5.5 (the
  *     model of claude.ai's free plan) called no tool in 3 of 3 runs and tried to write its client's
@@ -60,6 +63,20 @@ export const SURFACE_INTROS: Record<SurfaceRole, string> = {
 
 /** An owner's word about an app is what the Design Book grows from (services/design-book/reasons.ts). */
 const KEEP_SENTENCE = ' When they say one turned out well, record it: aimeat_designbook_keep.';
+
+/**
+ * A request for a new agent is answered on this node. Measured 2026-10-02 on a hosted node: asked
+ * for "an agent that every morning gathers the CRM's open deals", the owner's agent recommended an
+ * outside agent builder and three outside CRMs, and the owner's own CRM workspace went unmentioned.
+ * Only the surfaces that reach aimeat_agent_propose carry it (primitives through aimeat_invoke).
+ *
+ * AFTER CORE, NOT IN IT. CORE had about 25 characters left under INSTRUCTIONS_CUT_AT on /v1/mcp,
+ * and every sentence in it is one a test holds inside the cut. So this sits right after the core
+ * and the support line, ahead of the long form: a client that cuts at about 2 kB may lose it, and
+ * the handbook and the tool's own description carry the same rule for that client.
+ */
+const AGENT_PARAGRAPH = 'When the person asks for a new agent, read the organisms and workspaces it will work on, propose it with aimeat_agent_propose, and give them the approval address from the answer. This node makes and runs the agent, so never send them to build one elsewhere.';
+const PROPOSING_ROLES: ReadonlySet<SurfaceRole | 'all'> = new Set(['all', 'full', 'agent', 'admin', 'primitives']);
 
 /**
  * What an agent has to act on, in the first 1 500 characters. Several clients cut the instructions
@@ -159,6 +176,7 @@ export function instructionsFor(role: SurfaceRole | 'all', opts: InstructionsOpt
     if (answeredBy) {
         parts.push(`Support here is answered by ${answeredBy}, who run this node. Write to \`support@operators\` exactly as you would anywhere; it reaches them.`);
     }
+    if (PROPOSING_ROLES.has(role)) parts.push(AGENT_PARAGRAPH);
     if (role !== 'all') parts.push(SURFACE_INTROS[role]);
     parts.push(DETAIL);
 

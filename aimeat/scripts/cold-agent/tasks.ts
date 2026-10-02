@@ -22,6 +22,9 @@
  * @usage
  *   import { TASKS } from './tasks.js';
  * @version-history
+ *   2026-10-02 — propose-agent (by name): a request for an agent over the person's own sales
+ *     workspace passes only as a proposal on this node that names the workspace, with the approval
+ *     address in the answer and no outside product named.
  *   2026-09-19 — build-app passes only when the app is on the Atelier track with a register.
  *     Published used to be enough, and three Classic apps in a row counted as good.
  *   v1.0.0 — 2026-09-18 — Initial: ten tasks across memory, apps, skills, joining, asking the
@@ -82,6 +85,8 @@ async function ownerRecords(ctx: TaskContext): Promise<string[]> {
 /** find-shared: a fact no other run shares (20 to 99, so never the 14 or the 18 of the date), and the organism to put away afterwards. */
 const pierOf = (marker: string): string => String(20 + (parseInt(marker.replace(/[^0-9a-f]/g, '').slice(0, 6) || '0', 16) % 80));
 const sharedOrgs = new Map<string, string>();
+/** propose-agent: the organism its setup made, to archive afterwards. */
+const proposeOrgs = new Map<string, string>();
 
 const says = (ctx: TaskContext, ...needles: string[]) => needles.every(n => ctx.metrics.finalText.toLowerCase().includes(n.toLowerCase()));
 
@@ -320,6 +325,47 @@ export const TASKS: Task[] = [
             const nodeCalls = ctx.metrics.toolCalls.filter(c => c.name !== 'ToolSearch').length;
             const calm = nodeCalls <= 6;
             return { ok: honest && calm, detail: !honest ? 'the answer does not say the record is missing' : calm ? `said so after ${nodeCalls} call(s) to the node` : `said so after ${nodeCalls} calls to the node` };
+        },
+    },
+    {
+        // The request a hosted node's concierge answered with an essay on 2026-10-02: CrewAI Studio
+        // and three outside CRMs, the owner's own CRM workspace unmentioned, no proposal written.
+        // The pass is the node's own path: a proposal by this run's agent whose purpose or
+        // definition names the person's sales workspace, an answer that gives the approval address,
+        // and no outside product named as the place to build it. Run it by name.
+        id: 'propose-agent',
+        door: 'mcp',
+        byNameOnly: true,
+        prompt: 'I want an agent that every morning gathers the open deals from my {marker} sales workspace and tells me what to act on. Propose one.',
+        goodTools: ['aimeat_workspace_list', 'aimeat_workspace_read', 'aimeat_agent_propose'],
+        setup: async (ctx) => {
+            const must = (r: { status: number }, what: string) => { if (r.status >= 300) throw new Error(`propose-agent setup: ${what} answered ${r.status}`); };
+            const org = await api<{ organism: { id: string } }>(ctx.baseUrl, '/v1/organisms', ctx.ownerToken, { method: 'POST', body: { name: `${ctx.marker} company`, description: 'My small company.', type: 'project', join_policy: 'invite', visibility: 'private' } });
+            must(org, 'creating the organism');
+            const orgId = org.data!.organism.id;
+            proposeOrgs.set(ctx.marker, orgId);
+            const manifest = { manifestVersion: '1.0', id: orgId, name: `${ctx.marker} sales`, kind: 'project', status: 'active', objectTypes: [{ name: 'deals', schemaRef: 'schema:deals@1', namespace: 'shared.deals', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true, mode: 'document' }] };
+            const ws = await api<{ ws?: string }>(ctx.baseUrl, `/v1/organisms/${orgId}/workspaces`, ctx.ownerToken, { method: 'POST', body: { name: `${ctx.marker} sales`, manifest } });
+            must(ws, 'creating the workspace');
+            const wsId = ws.data?.ws;
+            if (!wsId) throw new Error(`propose-agent setup: the workspace answer carried no id: ${JSON.stringify(ws.data)}`);
+            const key = `organism.${orgId}.w.${wsId}.shared.deals.open-deals.latest`;
+            must(await api(ctx.baseUrl, '/v1/memory', ctx.ownerToken, { method: 'POST', body: { key, value: { title: 'Open deals', markdown: '# Open deals\n\n| Customer | Value | Stage | Next step | Due |\n|---|---|---|---|---|\n| Kallio Oy | 12 000 EUR | Proposal sent | Call about the offer | 2026-10-05 |\n| Rantanen Ky | 4 500 EUR | Negotiation | Send the revised price | 2026-10-03 |\n| Lumo Design | 8 000 EUR | Qualified | Book a demo | 2026-10-09 |' }, visibility: 'private' } }), 'writing the deals');
+        },
+        verify: async (ctx) => {
+            const r = await api<{ proposals: { name: string; purpose: string; proposed_by: string; proposed_at: string; state: string; crew_def: unknown; id: string }[] }>(ctx.baseUrl, '/v1/agents/v2/agent-proposals', ctx.ownerToken);
+            const mine = (r.data?.proposals ?? []).filter(p => p.state === 'proposed' && !p.proposed_by.startsWith(`${ctx.ownerName}@`) && p.proposed_by !== ctx.ownerName);
+            const hit = mine.find(p => JSON.stringify({ purpose: p.purpose, def: p.crew_def }).toLowerCase().includes(ctx.marker.toLowerCase()));
+            const elsewhere = /crewai studio|hubspot|salesforce|pipedrive|zapier|make\.com|n8n/i.test(ctx.metrics.finalText);
+            const toldWhere = /\/v1\/profile\?tab=agents/.test(ctx.metrics.finalText);
+            // Put it away: decline every proposal this run made, and archive the organism.
+            for (const p of mine) await api(ctx.baseUrl, `/v1/agents/v2/agent-proposals/${p.id}/decline`, ctx.ownerToken, { method: 'POST', body: {} });
+            const orgId = proposeOrgs.get(ctx.marker);
+            if (orgId) await api(ctx.baseUrl, `/v1/organisms/${orgId}/archive`, ctx.ownerToken, { method: 'POST', body: { level: 'organism' } });
+            if (!hit) return { ok: false, detail: mine.length ? 'a proposal was written, and it does not name the sales workspace' : 'no proposal was written' };
+            if (elsewhere) return { ok: false, detail: 'a proposal was written, and the answer also sends the person to an outside product' };
+            const defined = !!hit.crew_def;
+            return { ok: toldWhere, detail: toldWhere ? 'proposed on the node, built on the sales workspace, and the answer gives the approval address' : 'proposed on the node, and the answer does not give the approval address', note: defined ? 'with a crew definition' : 'without a crew definition: approved, it would exist and not run' };
         },
     },
     {
