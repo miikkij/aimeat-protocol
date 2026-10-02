@@ -48,6 +48,8 @@
  *     (services/package-upstream-refresh.ts).
  *   v1.12.0 — 2026-09-28 — The install set named by AIMEAT_INSTALL_SET is applied after the peers load
  *     (services/install-set-startup.ts).
+ *   v1.15.0 — 2026-10-02 — The two task-start one-time changes (services/task-start-migrations.ts):
+ *     basic agents nobody has set start on their own, app grants with memory:delete get memory:purge.
  *   v1.14.0 — 2026-10-02 — The `package-peer-cleanup` core handler, on a package repository
  *     (services/package-peer-limits.ts).
  *   v1.13.0 — 2026-10-02 — The `package-renewals` core handler, after the peers load
@@ -84,6 +86,7 @@ import { seedBuiltinExtensions } from '../services/builtin-extension-seeder.js';
 import { seedExamplePackages } from '../services/package-seeder.js';
 import { migrateScopeVocabulary } from '../services/scope-vocabulary-migration.js';
 import { migrateMailReadConsent } from '../services/mail-read-consent.js';
+import { migrateBasicAgentsTaskStartOnce, grantPurgeToAppGrantsOnce } from '../services/task-start-migrations.js';
 import { migrateOperatorAdminOnce } from '../services/operator-admin-migration.js';
 import { migrateAppToolsKeysOnce } from '../services/app-tools-key.js';
 import { sealStoredPspRecords } from '../commerce/psp-secrets.js';
@@ -288,6 +291,14 @@ export async function initializeServices(
   // same. The marker it leaves keeps it from repeating.
   migrateMailReadConsent(storage, config)
     .catch(err => logger.error('Failed to send the mail read notice', { error: String(err) }));
+
+  // The task-start rulings of 2026-10-02, once per node each (services/task-start-migrations.ts): the
+  // basic agents nobody has set start their tasks by themselves, and each owner is told once; an app
+  // grant that held memory:delete keeps deleting its records now that that takes memory:purge.
+  migrateBasicAgentsTaskStartOnce(storage, config)
+    .catch(err => logger.error('Failed to switch the basic agents to start on their own; the next boot tries again', { error: String(err) }));
+  grantPurgeToAppGrantsOnce(storage, config.nodeId)
+    .catch(err => logger.error('Failed to give memory:purge to app grants; the next boot tries again', { error: String(err) }));
 
   // Encrypt the payment secrets of every seller record written before they were stored sealed.
   // Until this runs, a plain Stripe key is readable through the generic memory doors

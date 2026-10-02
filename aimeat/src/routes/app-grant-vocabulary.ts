@@ -17,6 +17,7 @@
  *     connections:use says what it does: publish and send. The one word used to open the mailbox
  *     too while the consent screen said "publish" (security audit A5-1).
  *   v1.3.0 -- 2026-09-07 -- Document the enforced publishing scope and existing migration.
+ *   v1.3.0 -- 2026-10-02 -- memory:purge: deleting shared workspace records for good.
  *   v1.2.0 -- 2026-09-06 -- secrets:manage: the owner's credential vault, askable by an app.
  *   v1.1.0 -- 2026-08-29 -- organism:rows: the person's half of the two-hand rule that lets an app
  *     keep an append-only trail on a row space the organism opened to it.
@@ -31,6 +32,8 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   'memory:read': 'Read your stored memories and data',
   'memory:write': 'Create and update your memories and data',
   'memory:delete': 'Delete your memories and data',
+  // 2026-10-02: removing shared workspace records for good, with no grace window to take them back.
+  'memory:purge': 'Delete shared workspace records for good (they cannot be restored)',
   'storage:read': 'Read your stored files (images, documents)',
   'storage:write': 'Save and update your stored files (images, documents)',
   'catalogue:read': 'Read the public catalogue/directory',

@@ -842,12 +842,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The app configuration values record."
     },
-    "src/services/app-workspaces.ts": {
-      "reads": {
-        "getMemory": 2
-      },
-      "why": "Reviewed 2026-10-02 (package sale design, phase 4), the node's own read: the record of which organism and workspace ids an install made for an installed app's declared contracts. Ids only, served to the app beside its public config; no content of the workspace."
-    },
     "src/services/app-dev-grant.ts": {
       "reads": {
         "getMemory": 3
@@ -932,6 +926,12 @@
         "listMemoryHistory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 review), the node's own read: the app layout configuration record and its earlier versions."
+    },
+    "src/services/app-workspaces.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-02 (package sale design, phase 4), the node's own read: the record of which organism and workspace ids an install made for an installed app's declared contracts. Ids only, served to the app beside its public config; no content of the workspace."
     },
     "src/services/appdev-kb.ts": {
       "reads": {
@@ -1059,12 +1059,6 @@
         "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The component's key list, read only to delete those keys."
-    },
-    "src/services/package-component-collisions.ts": {
-      "reads": {
-        "getMemory": 2
-      },
-      "why": "Reviewed 2026-10-02 (package sale design, phase 1), the node's own read: a memory component's own key list and whether each key it names already exists, read only to refuse an install that would overwrite the owner's record. Only the record's tags are looked at; no value leaves."
     },
     "src/services/connect-tunnel-push.ts": {
       "reads": {
@@ -1705,17 +1699,17 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
     },
-    "src/services/own-key-coverage.ts": {
-      "reads": {
-        "getMemory": 2
-      },
-      "why": "Reviewed 2026-10-02, the node's own read: the owner's encrypted AI key records (openrouter.apikey, ai.apikey.provider.*), read only to answer whether a ciphertext is there. No content and no key leaves the function."
-    },
     "src/services/outbound/outbound-service.ts": {
       "reads": {
         "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The owner's own template and theme, sent by the owner; a person's own content is theirs to send."
+    },
+    "src/services/own-key-coverage.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-02, the node's own read: the owner's encrypted AI key records (openrouter.apikey, ai.apikey.provider.*), read only to answer whether a ciphertext is there. No content and no key leaves the function."
     },
     "src/services/owner-memory.ts": {
       "reads": {
@@ -1724,6 +1718,24 @@
         "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The owner-scope read helper; each caller that hands a value on is listed and checked on its own."
+    },
+    "src/services/package-approvals.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-02 (package sale design, phase 2), the node's own read: the approval record of an install, in the system namespace package-approvals that no principal addresses, read to answer GET /v1/instances/:id and to tell whether an update adds to what was approved. It holds capability names, not the owner's content."
+    },
+    "src/services/package-claims.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-02 (package sale design, phase 3), the node's own read: pending claim codes of one package, keyed by the hash of the code, in the package-entitlements system namespace that no principal addresses. Grant terms, not anybody's content."
+    },
+    "src/services/package-component-collisions.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-02 (package sale design, phase 1), the node's own read: a memory component's own key list and whether each key it names already exists, read only to refuse an install that would overwrite the owner's record. Only the record's tags are looked at; no value leaves."
     },
     "src/services/package-entitlements.ts": {
       "reads": {
@@ -1739,24 +1751,11 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Install-request state records."
     },
-    "src/services/package-sellers.ts": {
+    "src/services/package-notices.ts": {
       "reads": {
-        "getMemory": 2
+        "getMemory": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The seller registry."
-    },
-    "src/services/package-skill-component.ts": {
-      "reads": {
-        "listMemory": 1,
-        "getMemory": 7
-      },
-      "why": "Reviewed 2026-09-30, the node's own read: compose copies the composer's OWN skills bound to their own app into their own package, by their own act, as it copies the app's bytes and the cortex's libs; install, update and uninstall read the installer's own skill manifest to decide overwrite or delete, and hash its files. Nothing goes into a model prompt unless through fetchComponentContentForAi (component-content.ts), which asks useForAi for skillFileTargets first. Since 2026-10-02 install also reads whether the node's own library has a skill of that name, only to leave the package's skill out; no value leaves."
-    },
-    "src/services/package-approvals.ts": {
-      "reads": {
-        "getMemory": 2
-      },
-      "why": "Reviewed 2026-10-02 (package sale design, phase 2), the node's own read: the approval record of an install, in the system namespace package-approvals that no principal addresses, read to answer GET /v1/instances/:id and to tell whether an update adds to what was approved. It holds capability names, not the owner's content."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: An update-notice marker. Moved from package-upstream-refresh.ts unchanged on 2026-10-02."
     },
     "src/services/package-offer.ts": {
       "reads": {
@@ -1764,11 +1763,18 @@
       },
       "why": "Reviewed 2026-10-02 (package sale design, phase 3), the node's own read: a package's offer (prices, update period, licence reference, support contacts) in the package-entitlements system namespace that no principal addresses, written by the package's author to be read by seller nodes and buyers. Commercial terms, not anybody's content."
     },
-    "src/services/package-claims.ts": {
+    "src/services/package-peer-limits.ts": {
+      "reads": {
+        "getMemory": 1,
+        "listMemory": 2
+      },
+      "why": "Reviewed 2026-10-02 (package sale design, phase 5), the node's own read: the cap marker, and the grants and sellers in the package-entitlements system namespace, read only for which node ids they name."
+    },
+    "src/services/package-renewals.ts": {
       "reads": {
         "getMemory": 1
       },
-      "why": "Reviewed 2026-10-02 (package sale design, phase 3), the node's own read: pending claim codes of one package, keyed by the hash of the code, in the package-entitlements system namespace that no principal addresses. Grant terms, not anybody's content."
+      "why": "Reviewed 2026-10-02 (package sale design, phase 3), the node's own read: the subscriptions due for automatic renewal and their catalogue entries, in the package-sales system namespace that no principal addresses. The saved payment reference goes only to the payment handler that issued it."
     },
     "src/services/package-sale-catalogue.ts": {
       "reads": {
@@ -1783,30 +1789,24 @@
       },
       "why": "Reviewed 2026-10-02 (package sale design, phase 3), the node's own read: the catalogue entry of the package being sold, in the package-sales system namespace that no principal addresses."
     },
-    "src/services/package-renewals.ts": {
+    "src/services/package-sellers.ts": {
       "reads": {
-        "getMemory": 1
+        "getMemory": 2
       },
-      "why": "Reviewed 2026-10-02 (package sale design, phase 3), the node's own read: the subscriptions due for automatic renewal and their catalogue entries, in the package-sales system namespace that no principal addresses. The saved payment reference goes only to the payment handler that issued it."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The seller registry."
     },
-    "src/services/package-notices.ts": {
+    "src/services/package-skill-component.ts": {
       "reads": {
-        "getMemory": 1
+        "listMemory": 1,
+        "getMemory": 7
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: An update-notice marker. Moved from package-upstream-refresh.ts unchanged on 2026-10-02."
+      "why": "Reviewed 2026-09-30, the node's own read: compose copies the composer's OWN skills bound to their own app into their own package, by their own act, as it copies the app's bytes and the cortex's libs; install, update and uninstall read the installer's own skill manifest to decide overwrite or delete, and hash its files. Nothing goes into a model prompt unless through fetchComponentContentForAi (component-content.ts), which asks useForAi for skillFileTargets first. Since 2026-10-02 install also reads whether the node's own library has a skill of that name, only to leave the package's skill out; no value leaves."
     },
     "src/services/package-withdrawals.ts": {
       "reads": {
         "getMemory": 2
       },
       "why": "Reviewed 2026-10-02 (package sale design, phase 5), the node's own read: the withdrawn versions of a package group and their reasons, in the system namespace package-withdrawals that no principal addresses."
-    },
-    "src/services/package-peer-limits.ts": {
-      "reads": {
-        "getMemory": 1,
-        "listMemory": 2
-      },
-      "why": "Reviewed 2026-10-02 (package sale design, phase 5), the node's own read: the cap marker, and the grants and sellers in the package-entitlements system namespace, read only for which node ids they name."
     },
     "src/services/peer-incidents.ts": {
       "reads": {
@@ -1888,6 +1888,12 @@
         "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
+    },
+    "src/services/scope-use.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-02, the node's own read: the service-owned record of which permissions each of the owner's `*` agents used (scope-use.agents), read to build the narrowing and to decide when `*` holds the agent's tasks. No content is shown to anyone."
     },
     "src/services/scope-vocabulary-migration.ts": {
       "reads": {
@@ -1972,6 +1978,12 @@
         "listMemoryHistory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 review), the node's own read: the node's layout records and their earlier versions."
+    },
+    "src/services/task-start-migrations.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-02, the node's own read: the two run-once markers under the node's system identity that say a one-time task-start change has run. No content is shown to anyone."
     },
     "src/services/themes/service.ts": {
       "reads": {

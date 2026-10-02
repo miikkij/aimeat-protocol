@@ -13,9 +13,12 @@
  *   `interactive` front door could not have it at all. It is not shown for a chat connection, which
  *   is the person's own AI and is not given tasks. When the agent can spend money, send mail or
  *   delete as the owner, its work always waits, and the switch says so instead of moving.
- * @structure FactsLine({ agent }) · PurchaseLimitLine({ agent, showToast }) · AutonomyLine({ agent, showToast })
+ * @structure FactsLine({ agent }) · PurchaseLimitLine({ agent, showToast }) · AutonomyLine({ agent, showToast }) ·
+ *   WildcardLine({ agent, showToast })
  * @usage <${FactsLine} agent=${agent} /> <${PurchaseLimitLine} agent=${agent} showToast=${showToast} />
  * @version-history
+ *   v1.3.0 — 2026-10-02 — WildcardLine: an agent holding all permissions (`*`) says how far the record
+ *     of what it uses is, and offers the narrowing to those permissions with one press (ruling C).
  *   v1.2.0 — 2026-10-02 — AutonomyLine writes `task_start` instead of `mode`, is shown for every
  *     agent that takes tasks, and says why when the permission floor holds its work.
  *   v1.1.0 — 2026-10-02 — PurchaseLimitLine: the agent's daily money limit for purchases, set here
@@ -27,7 +30,8 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { apiGet, apiPatch, apiPut } from '/js/api.js';
+import { apiGet, apiPatch, apiPut, apiPost } from '/js/api.js';
+import { areaLine } from '/js/consent-vocab.js';
 import { swallowed } from '/js/swallowed.js';
 import { CardLine } from '/components/OpenCard.js';
 import { Switch } from '/components/Switch.js';
@@ -154,6 +158,44 @@ export function AutonomyLine({ agent, showToast }) {
     <${CardLine} label=${f('selfStart')}>
       <${Switch} on=${on} disabled=${held} onToggle=${toggle} label=${on ? f('yes') : f('no')} ariaLabel=${f('selfStart')} />
       <span>${held ? f('selfStartHeld') : on ? f('selfStartOn') : f('selfStartOff')}</span>
+    <//>
+  `;
+}
+
+/**
+ * "All permissions" (`*`), for an agent that holds it (`task_start_wildcard` on the agent list,
+ * services/scope-use.ts). While the node is still noting what it uses, the line says how many days
+ * are left; once the record is ready the agent's tasks wait for the owner, and the line offers the
+ * narrowing to the permissions it used with one press (POST /v1/agents/:name/scope-narrowing).
+ */
+export function WildcardLine({ agent, showToast }) {
+  const w = agent.task_start_wildcard;
+  const [done, setDone] = useState(false);
+  const [saving, setSaving] = useState(false);
+  if (!w || done) return null;
+  const n = w.proposal.length;
+
+  async function narrow() {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await apiPost(`/v1/agents/${encodeURIComponent(agent.name)}/scope-narrowing`, {});
+      setDone(true);
+      showToast?.(f('wildcardNarrowed', { n }), 'success');
+    } catch (err) {
+      swallowed('agent-card: narrow', err);
+      showToast?.(f('wildcardFailed'), 'error');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return html`
+    <${CardLine} label=${f('wildcardLabel')}>
+      <span>${w.ready
+        ? f('wildcardReady', { n, areas: areaLine(w.proposal, t) })
+        : f('wildcardCollecting', { days: w.days_left })}</span>
+      ${w.used.length > 0 && html`<${Action} small soft onClick=${narrow}>${f('wildcardNarrow', { n })} →<//>`}
     <//>
   `;
 }

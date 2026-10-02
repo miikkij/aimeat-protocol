@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-02 -- aimeat_agent_scope_narrow: a `*` agent narrowed to the permissions it used.
  *   2026-10-02 -- aimeat_task_create forwards `start`; aimeat_task_start and aimeat_agent_task_start_set:
  *     whether a task starts on its own or waits for the owner's OK (services/agent-task-rules.ts).
  *   2026-10-02 -- aimeat_agent_propose says when to use it, to read the person's workspaces first and
@@ -561,6 +562,12 @@ export const agentTools: ConnectCliToolDefinition[] = [
         input: { task_id: { type: 'string', required: true, description: 'The waiting task to start.' } },
         // The route reads the task by id; the name segment is the caller's own and decides nothing.
         handler: ({ client, agentPath }, input) => client.post(`/v1/agents/${agentPath}/tasks/${encodeURIComponent(requiredString(input, 'task_id'))}/start`, {}),
+    },
+    {
+        name: 'aimeat_agent_scope_narrow',
+        description: "Replace one of the owner's agents' * with the named permissions it actually used, when the person agrees. Needs agent:permissions.",
+        input: { target_agent_name: { type: 'string', required: true, description: 'The agent holding * to narrow.' } },
+        handler: ({ client }, input) => client.post(`/v1/agents/${encodeURIComponent(requiredString(input, 'target_agent_name'))}/scope-narrowing`, {}),
     },
     {
         name: 'aimeat_agent_task_start_set',

@@ -20,6 +20,7 @@
  *     routes/app-grants-manage.ts.
  * @usage app.use(appGrantsRouter(config, storage));
  * @version-history
+ *   v1.20.0 — 2026-10-02 — A grant of memory:delete carries memory:purge (withAppPurge).
  *   v1.19.0 — 2026-10-02 — The silent bridge does not self-approve an app a package installed for the
  *     owner: it asks for consent like any other app (package sale design, T2).
  *   v1.18.0 — 2026-09-26 — The refresh mints for a grant only while an account holds its owner name,
@@ -122,7 +123,7 @@ import { readRefreshCookie } from '../services/owner-session.js';
 import { PORTFOLIO_TARGET_PREFIX, resolveAppOriginTarget, resolveFrameAppTarget } from '../services/app-origin-target.js';
 import { apexOrigin, frameRedirect } from '../services/app-frame-redirect.js';
 import { parseAppScopes } from '../services/protected-resource.js';
-import { afterApproval, heldOwnerAdded, narrowToDeclared } from '../services/app-grant-scopes.js';
+import { afterApproval, heldOwnerAdded, narrowToDeclared, withAppPurge } from '../services/app-grant-scopes.js';
 import type { AppGrantRecord } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 
@@ -520,6 +521,8 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     spec: { app: string; appName: string; appOrigin: string; owner: string; gaii: string; scopes: string[]; shown?: string[] },
     existing: AppGrantRecord | null,
   ): Promise<{ grantId: string; rawRefresh: string; scopes: string[] }> {
+    // An app's delete reaches workspace records for good as it always did (services/app-grant-scopes.ts).
+    spec = { ...spec, scopes: withAppPurge(spec.scopes) };
     const rawRefresh = randomBytes(32).toString('hex');
     const now = new Date().toISOString();
     const patchFor = (row: AppGrantRecord | null) => {

@@ -7,6 +7,7 @@
  *   the agents as a table that opens into a card), the ink rail, the device-auth approvals, the
  *   scope modal.
  * @version-history
+ *   v4.18.0 -- 2026-10-02 -- The agents list names the agents whose `*` holds their tasks until narrowed.
  *   v4.17.0 -- 2026-10-01 -- "What should an agent do?" is section 01 (agents/agent-guide.js); the others
  *     move to 02-05. No agents yet shows three examples that fill the form; the CrewAI fold tells
  *     crewaimeat and aimeat-crewai apart (guided journey P4).
@@ -740,6 +741,8 @@ export default function AgentsTab({ session, showToast, onStats }) {
             ${agents.length === 0
               ? html`<${NoAgentsYet} onPick=${pickExample} />`
               : html`
+                ${/* The agents whose `*` now holds their tasks, waiting for the owner's narrowing. */''}
+                ${agents.some(a => a.task_start_wildcard?.ready) && html`<${Note} kind="hint">${p('wildcardWaiting', { names: agents.filter(a => a.task_start_wildcard?.ready).map(a => a.display_name || a.name).join(', ') })}<//>`}
                 <${AgentSearch}
                   query=${query}
                   setQuery=${setQuery}

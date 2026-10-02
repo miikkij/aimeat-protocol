@@ -8614,6 +8614,9 @@
   "notiftext.task_waiting.open": "Avaa",
   "notiftext.task_waiting_held.title": "{agent} odottaa lupaasi: {title}",
   "notiftext.task_waiting_held.body": "Suunnitelmassa on {steps} vaihetta. Vain sinä voit käynnistää tämän, koska agentti voi käyttää rahaa, lähettää postia tai poistaa asioita sinun nimissäsi, tai sen suunnitelma kertoo tekevänsä niin.",
+  "notiftext.basic_agents_start_on.title": "Perusagenttisi aloittavat nyt tehtävänsä itse",
+  "notiftext.basic_agents_start_on.body": "{agents} aloittavat nyt tehtävän heti, kun se tulee: kukin ehdottaa suunnitelmansa ja jatkaa, ja sinä näet, mitä se teki. Tehtävä, joka käyttää rahaa, lähettää postia sinun nimissäsi tai poistaa jotain lopullisesti, odottaa yhä lupaasi. Voit muuttaa tämän Agentit-sivulla: avaa agentti ja käytä kytkintä \"Aloittaa työn itse\".",
+  "notiftext.basic_agents_start_on.open": "Avaa Agentit",
   "contacts.cover.desc": "Osoitekirjasi: ihmiset, joihin luotat. Kun kutsut organismiin, jaat työtilan tai lähetät viestin, valitset täältä. Agentit ja sovellukset ovat mukana ihmistensä alla, ja joku ilman tiliä voidaan kirjata ja kutsua.",
   "contacts.cover.add": "Lisää",
   "contacts.cover.addSub": "nimi tai sähköposti · joku ilman tiliä · chatissa",
@@ -15594,6 +15597,7 @@
         "open": "Avaa",
         "close": "Sulje",
         "waitingCount": "{n} odottaa sinua",
+        "wildcardWaiting": "Nämä agentit saavat tehdä mitä tahansa, joten niiden tehtävät odottavat lupaasi, kunnes rajaat ne käyttämiinsä oikeuksiin: {names}. Avaa agentti ja paina \"Rajaa näihin\".",
         "basicHaveLine": "{names} ovat sinun ja käynnissä.",
         "basicMissingLine": "{n} vielä luomatta.",
         "shapeHint": "Määritys, jolla se pyörii ensimmäisestä päivästä. Muuta sitä myöhemmin Crew-välilehdellä.",
@@ -15608,7 +15612,7 @@
         "runs": {
           "spawn": "Käynnistyy, kun työtä tulee, ja sammuu sen jälkeen.",
           "resident": "Yhdistimesi pitää sen käynnissä.",
-          "unset": "Kukaan ei ole vielä päättänyt, joten mikään ei käynnistä tätä agenttia itsestään."
+          "unset": "Kukaan ei ole valinnut, miten sen ohjelma ajetaan, joten yhdistimesi ei käynnistä sitä. Tehtävien aloitus on oma asetuksensa: Aloittaa työn itse."
         },
         "runsChange": "Muuta",
         "runsDecide": "Päätä: kun työtä tulee vai aina päällä",
@@ -15776,6 +15780,7 @@
           },
           "memory": {
             "delete": "Poista tallennettuja muistiinpanoja, tietueita ja dataa.",
+            "purge": "Poista jaetun työtilan tietueita lopullisesti. Niitä ei voi palauttaa, joten sen tehtävät odottavat aina lupaasi.",
             "read": "Lue tilillesi tallennetut muistiinpanot, tietueet ja data.",
             "write": "Tallenna ja päivitä muistiinpanoja, tietueita ja dataa tilillesi.",
             "write-as-owner": "Tallenna tietueita sinun nimissäsi oman nimensä sijaan, jolloin ne näkyvät sinun tietueinasi.",
@@ -15951,12 +15956,12 @@
       "runMode": {
         "spawn": "Kun työtä tulee",
         "resident": "Aina päällä",
-        "tooltip": "Miten tätä agenttia ajetaan. Kun työtä tulee: se odottaa täällä, kunnes työtä tulee. Aina päällä: yhdistimesi pitää sen käynnissä. Ei päätetty: kukaan ei ole sanonut, joten mikään ei käynnistä sitä itsestään. Voit vaihtaa näiden kolmen välillä milloin tahansa.",
+        "tooltip": "Miten tämän agentin ohjelmaa ajetaan. Kun työtä tulee: se odottaa täällä, kunnes työtä tulee. Aina päällä: yhdistimesi pitää sen käynnissä. Ei päätetty: kukaan ei ole sanonut, joten yhdistimesi ei käynnistä sen ohjelmaa. Voit vaihtaa näiden kolmen välillä milloin tahansa.",
         "label": "Miten se ajetaan",
         "saved": "Asetettu: {mode}.",
         "failed": "Tallennus ei onnistunut. Yritä uudelleen.",
         "unset": "Ei päätetty",
-        "cleared": "Jätettiin päättämättä. Mikään ei käynnistä sitä itsestään."
+        "cleared": "Jätettiin päättämättä. Yhdistimesi ei käynnistä sen ohjelmaa."
       },
       "new": {
         "title": "Oma agentti",
@@ -17028,6 +17033,12 @@
         "selfStartOffSaved": "Agentin työ odottaa nyt, että käynnistät sen.",
         "selfStartFailed": "Tallennus ei onnistunut. Yritä uudelleen.",
         "selfStartHeld": "Sen työ odottaa aina sinua, koska se voi käyttää rahaa, lähettää postia tai poistaa asioita sinun nimissäsi.",
+        "wildcardLabel": "Kaikki oikeudet",
+        "wildcardCollecting": "Se saa tehdä mitä tahansa. AIMEAT kirjaa, mitä oikeuksia se käyttää. {days} päivän päästä sen tehtävät alkavat odottaa lupaasi, kunnes rajaat sen käyttämiinsä oikeuksiin.",
+        "wildcardReady": "Se saa tehdä mitä tahansa, joten sen tehtävät odottavat lupaasi. Se käytti {n} oikeutta: {areas}. Kun rajaat sen niihin, \"Aloittaa työn itse\" päättää taas.",
+        "wildcardNarrow": "Rajaa näihin {n}",
+        "wildcardNarrowed": "Sillä on nyt ne {n} oikeutta, joita se käytti.",
+        "wildcardFailed": "Tallennus ei onnistunut. Yritä uudelleen.",
         "buyLabel": "Ostot päivässä",
         "buyLine": "{amount} {currency}, tänään käytetty {spent}",
         "buyNone": "Ei rajaa: agentti ei käytä rahaa, ennen kuin asetat rajan.",

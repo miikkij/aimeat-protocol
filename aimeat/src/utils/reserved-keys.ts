@@ -20,6 +20,8 @@
  *   appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   v1.20.0 — 2026-10-02 — `scope-use.` is a SERVICE-OWNED prefix: the record of the permissions an
+ *     agent holding `*` used, which nobody but services/scope-use.ts may write, restore or delete.
  *   v1.19.0 — 2026-09-29 — `classification.policy.` is also a SERVICE-OWNED prefix: no memory route
  *     writes, patches, imports, copies, restores or deletes it for any principal, the account owner
  *     included, and appMayWriteKey refuses it to every role. Only services/classification/
@@ -264,8 +266,14 @@ export const SERVER_WRITTEN_KEY_PREFIXES: readonly string[] = ['notif.'];
  * delete through the bin did the same by removing the record. services/classification/policy-admin.ts
  * is the one writer, straight to storage. It stays in RESERVED_OWNER_KEY_PREFIXES as well, so every
  * list that asks "is this reserved" still answers yes.
+ *
+ * `scope-use.` (2026-10-02) is the record of which permissions each of the owner's agents holding `*`
+ * actually used (services/scope-use.ts). The narrowing the owner accepts with one press is built
+ * from it, and it decides when `*` starts to hold an agent's tasks. An agent that could write it could
+ * forge its own history: claim it used everything, or nothing. services/scope-use.ts is the one
+ * writer, straight to storage.
  */
-export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.'];
+export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.', 'scope-use.'];
 
 /** True iff `key` is owned by one service and no memory route writes, restores or deletes it. */
 export function isServiceOwnedKey(key: unknown): boolean {

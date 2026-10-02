@@ -22,6 +22,7 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.47.0 -- 2026-10-02 -- aimeat_workspace_object_delete -> memory:purge (removes for good).
  *   v1.46.0 -- 2026-10-02 -- aimeat_agent_tags_set moves to SCOPE_EXEMPT_TOOLS: the crew runtime sets
  *     an agent's own tags on every start, and an agent without agent:write finished no task.
  *   v1.45.0 -- 2026-10-02 -- aimeat_task_start -> task:write, aimeat_agent_task_start_set -> agent:write.
@@ -292,7 +293,9 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_extension_install:                 'ext:write',
 
     // Removes a stored record.
-    aimeat_workspace_object_delete:           'memory:delete',
+    // Removes a record for good, no grace window: its own word since 2026-10-02, held on the
+    // task-start floor (services/agent-task-rules.ts). memory:delete stays the undoable delete.
+    aimeat_workspace_object_delete:           'memory:purge',
 
     // Outbound connections. Four words, and the distinction between them is the design: READING the
   // list of accounts you attached is knowing what you have, STARTING one is attaching another,
@@ -429,6 +432,9 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_task_start:                        'task:write',
     // Changes whether an agent's work starts without asking: the agent:write word, like its mode.
     aimeat_agent_task_start_set:              'agent:write',
+    // Takes an agent's * away for the words it used: changing a sibling's permissions, the word
+    // POST /v1/agents/:name/scope-narrowing asks too.
+    aimeat_agent_scope_narrow:                'agent:permissions',
 
     // Asks somebody else to do work, which can cost.
     aimeat_capabilities_invoke:               'work:request',

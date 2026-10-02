@@ -29,6 +29,7 @@ import type { Storage, AgentTaskRecord, AgentTaskTodo } from '../storage/interfa
 import type { createWebhookDispatcher } from './webhook-dispatcher.js';
 import { decideTaskStart, mayStartWaitingTask, taskWakeId, type StartCaller } from './agent-task-rules.js';
 import { waitReason } from './task-start-notice.js';
+import { withWildcardFacts } from './scope-use.js';
 import { recordTaskStarted } from './activity-recorder.js';
 import { emitChange, emitDelivery } from './event-bus.js';
 import { emitResourceUpdated } from '../mcp/resource-events.js';
@@ -76,7 +77,7 @@ export async function startWaitingTask(
         if (task.status !== 'queued') {
             return { ok: false, status: 403, code: 'OWNER_MUST_START', message: `Only the owner can restart a ${task.status} task.` };
         }
-        const decision = decideTaskStart(await storage.getAgent(task.agentGaii), { policy: task.startPolicy, todos: task.todos });
+        const decision = decideTaskStart(await withWildcardFacts(storage, await storage.getAgent(task.agentGaii)), { policy: task.startPolicy, todos: task.todos });
         if (!mayStartWaitingTask(caller, task.agentGaii, decision)) {
             return { ok: false, status: 403, code: 'OWNER_MUST_START',
                 message: `${waitReason(task.agentGaii.split('#')[0], decision)} Only the owner can start it, from the notification they got or from Tasks.` };

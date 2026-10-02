@@ -94,6 +94,7 @@ import type { createWebhookDispatcher } from './webhook-dispatcher.js';
 import { evaluateConstraints, applyAfterRun } from './schedule-constraints.js';
 import { emitChange, emitDelivery } from './event-bus.js';
 import { decideTaskStart, taskWakeId, AUTO_START_MARK } from './agent-task-rules.js';
+import { withWildcardFacts } from './scope-use.js';
 import { emitResourceUpdated } from '../mcp/resource-events.js';
 import { logger } from '../utils/logger.js';
 import { localAccountName } from '../utils/gaii.js';
@@ -582,7 +583,7 @@ export class Scheduler {
     // The same start decision every created task gets (services/agent-task-rules.ts): the agent's
     // own answer, never past the permission floor. It read `mode === 'task-runner'` inline until
     // 2026-10-02, a copy of the old rule that would have kept a concierge's schedules waiting.
-    const autoActivated = decideTaskStart(agent).startsNow;
+    const autoActivated = decideTaskStart(await withWildcardFacts(this.storage, agent)).startsNow;
     const now = new Date().toISOString();
     const scheduleScope: AgentTaskScope = {
       name: 'schedule', value: job.cron, type: 'cron', description: job.displayName || job.name,
@@ -672,7 +673,7 @@ export class Scheduler {
     automation?: AgentTaskRecord['automation'];
   }): Promise<string> {
     const agent = await this.storage.getAgent(args.agentGaii);
-    const autoActivated = decideTaskStart(agent).startsNow;
+    const autoActivated = decideTaskStart(await withWildcardFacts(this.storage, agent)).startsNow;
     const now = new Date().toISOString();
     const record: AgentTaskRecord = {
       id: randomUUID(),

@@ -169,7 +169,7 @@ import { createWorkItem } from '../routes/work.js';
 import { MEMORY_LIST_MAX_LIMIT } from '../routes/memory/shared.js';
 import { acceptWork, deliverWork } from '../services/work-lifecycle.js';
 import type { PeerInfo } from '../services/federation.js';
-import { taskStartView } from '../services/agent-task-start-write.js';
+import { taskStartView, scopeUseLookup } from '../services/agent-task-start-write.js';
 
 
 // F3: bound aimeat_memory_list so a default (and especially owner_scope) call cannot return an
@@ -363,6 +363,7 @@ export function registerCoreTools(
                 logger.warn('aimeat_agents_list: refusal notes not read, the list goes without them', { error: String(err) });
                 return new Map();
             });
+            const useOf = await scopeUseLookup(storage, agents);
             return structuredResult('aimeat_agents_list', undefined, {
                 agents: agents.map(a => ({
                     gaii: a.gaii,
@@ -386,7 +387,7 @@ export function registerCoreTools(
                     // should serve has to be able to tell those apart.
                     run_mode: a.runMode ?? null,
                     // Whether its tasks start on their own, and what holds them for the owner.
-                    ...taskStartView(a),
+                    ...taskStartView(a, useOf(a)),
                     default_scopes: a.defaultScopes ?? ['*'],
                     ...agentAccessView(a.defaultScopes ?? ['*'], access.get(a.name)),
                 })),

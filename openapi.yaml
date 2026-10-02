@@ -4466,7 +4466,7 @@ components:
         A task WAITS when (first match wins) the agent holds a permission that can spend money,
         send mail or a message as the owner, or delete as the owner (`commerce:buy`,
         `exchange:write`, `connections:use`, `outbound:send`, `messages:send-as-owner`,
-        `messages:delete-as-owner`): `floor`; a step of its plan declares such an effect:
+        `messages:delete-as-owner`, `memory:purge`), or holds `*` once its usage record is ready: `floor`; a step of its plan declares such an effect:
         `effects`; the task's own `start` or the agent's `task_start` is `confirm`: `setting`.
         Otherwise it starts on its own.
       properties:
@@ -11115,7 +11115,17 @@ paths:
                                     task_start_held_by:
                                       type: array
                                       items: { type: string }
-                                      description: The permissions that make every task of this agent wait for the owner, whatever the setting.
+                                      description: The permissions that make every task of this agent wait for the owner, whatever the setting. `*` is among them once the agent's all-permissions record is ready.
+                                    task_start_wildcard:
+                                      type: object
+                                      nullable: true
+                                      description: For an agent holding `*`, how far the record of what it uses is, and the one-press narrowing (POST .../scope-narrowing). Null for every other agent.
+                                      properties:
+                                        ready: { type: boolean, description: '14 days of record naming a permission: `*` now holds its tasks.' }
+                                        days_left: { type: integer }
+                                        since: { type: string, nullable: true }
+                                        used: { type: array, items: { type: string } }
+                                        proposal: { type: array, items: { type: string } }
                                     refusals:
                                       type: array
                                       description: |
@@ -12294,6 +12304,54 @@ paths:
         - BearerAuth: []
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
+
+  /v1/agents/{name}/scope-narrowing:
+    post:
+      operationId: narrowAgentScopes
+      summary: Replace an agent's `*` with the permissions it used
+      description: |
+        The one-press narrowing for an agent holding all permissions (`*`). The node records which
+        permissions such an agent's calls used (REST checks and MCP tools, from 2026-10-02); this
+        replaces `*` with those words, plus every other word its list already names. The agent list
+        shows the proposal first (`task_start_wildcard.proposal`).
+
+        Why it exists: `*` holds every task of the agent for the owner's OK once 14 days of its use
+        are on record. Narrowed, the agent's own task setting decides again.
+
+        Only takes away, so it does not need the owner in person: the owner, or another of their
+        agents holding `agent:permissions`. 409 NOT_WILDCARD when the agent does not hold `*`, and
+        409 NOTHING_RECORDED when nothing it used is on record yet. Also `aimeat_agent_scope_narrow`.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The agent's new permissions and what they came from
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          gaii: { type: string }
+                          name: { type: string }
+                          scopes: { type: array, items: { type: string } }
+                          used: { type: array, items: { type: string } }
+        '403':
+          description: Not the owner, and no agent:permissions
+        '404':
+          description: No such agent
+        '409':
+          description: NOT_WILDCARD or NOTHING_RECORDED
 
   /v1/agents/{name}/scopes:
     patch:
@@ -36900,6 +36958,11 @@ paths:
         cross-owner rows are never touched (a member can only delete their own records) — and commits the
         deletions together. An append-only (create_only) namespace refuses the whole batch (409).
         Active member of the organism.
+
+        Needs `memory:purge` since 2026-10-02: the records go for good, with no grace window, so
+        this is its own permission, and an agent holding it has every task wait for the owner's OK.
+        `memory:delete` stays the undoable delete of DELETE /v1/memory/{key}. An app grant that held
+        `memory:delete` was given `memory:purge` once.
       tags: [Organisms]
       security: [{ BearerAuth: [] }]
       parameters:

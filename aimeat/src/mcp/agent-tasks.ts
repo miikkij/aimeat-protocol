@@ -9,6 +9,7 @@
  *   import { registerAgentTaskTools } from './agent-tasks.js';
  *   registerAgentTaskTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.12.0 — 2026-10-02 — aimeat_agent_scope_narrow: a `*` agent narrowed to what it used (ruling C).
  *   v1.11.0 — 2026-10-02 — Whether a task starts on its own or waits for the owner's OK.
  *     aimeat_task_create takes `start` and answers with `start` (runs now, or waits and why);
  *     aimeat_task_propose_todos takes `effects` per todo and says whether to go on or stop;
@@ -83,10 +84,11 @@ import { mayLoosenStart, type StartCaller } from '../services/agent-task-rules.j
 import { startAnswer } from '../services/task-start-notice.js';
 import { startWaitingTask } from '../services/task-start-op.js';
 import { setAgentTaskStart, taskStartView } from '../services/agent-task-start-write.js';
+import { narrowAgent } from '../services/scope-narrowing.js';
 import { toolError } from './tool-error.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { parseGAII, buildGAII, localAccountName } from '../utils/gaii.js';
+import { parseGAII, buildGAII, localAccountName, ownerGhiiOf } from '../utils/gaii.js';
 import { taskWithFileHandles } from '../services/task-files.js';
 import { taskOutcome } from '../services/task-outcome.js';
 import { completeTask, failTask } from '../services/agent-task-fanout.js';
@@ -446,6 +448,25 @@ export function registerAgentTaskTools(
             const out = await setAgentTaskStart({ storage, config }, localAccountName(agentGaii), agentGaii, target_agent_name, task_start);
             if (!out.ok) return { ...toolError(out.code, out.message) };
             return { content: [{ type: 'text' as const, text: JSON.stringify({ name: out.agent.name, ...taskStartView(out.agent) }, null, 2) }] };
+        },
+    );
+
+    // ── Tool 3c: aimeat_agent_scope_narrow ──
+    // The owner's AI accepting, on the person's word, the narrowing of a `*` agent to the permissions
+    // it used. Same implementation as POST /v1/agents/:name/scope-narrowing (services/scope-use.ts).
+    mcp.tool(
+        'aimeat_agent_scope_narrow',
+        descriptionFor('aimeat_agent_scope_narrow'),
+        {
+            target_agent_name: z.string().describe('The agent holding * to narrow (same owner as you).'),
+        },
+        annotationsFor('aimeat_agent_scope_narrow'),
+        async ({ target_agent_name }) => {
+            const owner = localAccountName(agentGaii);
+            const agent = (await storage.getAgentsByOwner(owner)).find(a => a.name === target_agent_name) ?? null;
+            const out = await narrowAgent(storage, ownerGhiiOf(agentGaii), agent);
+            if (!out.ok) return { ...toolError(out.code, out.message) };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ name: out.agent.name, scopes: out.agent.defaultScopes ?? [], used: out.status.used }, null, 2) }] };
         },
     );
 

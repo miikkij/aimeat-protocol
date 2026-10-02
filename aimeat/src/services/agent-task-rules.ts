@@ -45,6 +45,8 @@
  *   const d = decideTaskStart(agent, { policy: task.startPolicy, todos });
  *   if (!canProposeTodos(task)) return refuse(TODO_PROPOSE_REFUSAL(task.status));
  * @version-history
+ *   v2.1.0 — 2026-10-02 — Rulings B and C: `memory:purge` (deleting shared records for good) is on the
+ *     floor, and `*` counts once the agent's usage record is ready (services/scope-use.ts).
  *   v2.0.0 — 2026-10-02 — The start decision leaves `mode`: the agent's `taskStart`, the task's
  *     `startPolicy`, the permission floor and the plan's declared effects. `taskWakeId()`: the tunnel
  *     skipped a second `task_assigned` that reused the task id as its delivery id, so Start on a
@@ -71,10 +73,9 @@ export const TASK_EFFECTS: readonly TaskEffect[] = ['spend', 'send_as_owner', 'd
  * what an agent can do. A task is free text, and a check that reads intent from it is a guess.
  *
  * NOT HERE, ON PURPOSE:
- *   - `memory:delete`. Every agent holds it by default (AIMEAT_DEFAULT_AGENT_SCOPES), so it would stop
- *     every task-runner on every node, and a deleted memory entry can be restored for a grace window.
- *     It also reaches aimeat_workspace_object_delete, which is permanent; that is an open question
- *     in the design note, not an oversight.
+ *   - `memory:delete`. Every agent holds it by default (AIMEAT_DEFAULT_AGENT_SCOPES), and a deleted
+ *     memory entry can be restored for a grace window. Deleting shared workspace records FOR GOOD took
+ *     its own word on 2026-10-02, `memory:purge`, and that one is on the floor.
  *   - `work:request`. It calls capabilities under contracts the owner already accepted, metered
  *     against the owner's own budget. Starting a new paid relationship takes `exchange:write`.
  */
@@ -85,24 +86,32 @@ export const TASK_START_FLOOR: ReadonlyArray<{ scope: string; kind: TaskEffect }
     { scope: 'outbound:send', kind: 'send_as_owner' },
     { scope: 'messages:send-as-owner', kind: 'send_as_owner' },
     { scope: 'messages:delete-as-owner', kind: 'delete' },
+    // Deleting shared workspace records for good (ruling B, 2026-10-02).
+    { scope: 'memory:purge', kind: 'delete' },
 ];
 
-type StartAgent = Pick<AgentRecord, 'mode'> & Partial<Pick<AgentRecord, 'taskStart' | 'defaultScopes'>>;
+/**
+ * The agent as the start rules read it. `wildcardReady` is filled by services/scope-use.ts
+ * withWildcardFacts(): the agent holds `*` and its usage record is old enough to offer a narrowing.
+ */
+type StartAgent = Pick<AgentRecord, 'mode'> & Partial<Pick<AgentRecord, 'taskStart' | 'defaultScopes'>> & { wildcardReady?: boolean };
 
 /**
  * The floor permissions this agent's record grants BY NAME: the word itself or its domain wildcard
  * (`commerce:*`). The record is the ceiling a token is narrowed to (auth/effective-scopes.ts).
  *
- * THE GLOBAL `*` DOES NOT COUNT, and that is a measured choice, not an oversight. On aimeat.io on
- * 2026-10-02, 52 of the 53 task-runners of the busiest account held `*`; counting it would have
- * stopped every one of them, the nightly crews included, on the next deploy. `*` is the owner's
- * blanket "this agent may do anything", given before this floor existed. Whether it should put an
- * agent on the floor is the owner's ruling to make (design note doc-muqrc4umacmq, question C); until
- * then the floor holds what an owner granted knowing what it was.
+ * THE GLOBAL `*` COUNTS, BUT NOT BY SURPRISE (ruling C, Jouni 2026-10-02): "all permissions" must
+ * never read as "nothing dangerous". It counts once the agent's usage record is ready
+ * (`wildcardReady`, services/scope-use.ts): OBSERVE_DAYS of record naming at least one permission, so
+ * the owner is offered, with one press, the named permissions it actually used. Until then a `*` agent
+ * starts as it did. On aimeat.io on 2026-10-02, 52 of the 53 task-runners of the busiest account held
+ * `*`, and the node had no record of what any of them used. `*` itself is reported as `'*'`.
  */
-export function floorScopesOf(agent: Partial<Pick<AgentRecord, 'defaultScopes'>> | null | undefined): string[] {
-    const named = (agent?.defaultScopes ?? []).filter(s => s !== '*');
-    return TASK_START_FLOOR.filter(f => scopeIsCovered(named, f.scope)).map(f => f.scope);
+export function floorScopesOf(agent: (Partial<Pick<AgentRecord, 'defaultScopes'>> & { wildcardReady?: boolean }) | null | undefined): string[] {
+    const held = agent?.defaultScopes ?? [];
+    const named = held.filter(s => s !== '*');
+    const floor = TASK_START_FLOOR.filter(f => scopeIsCovered(named, f.scope)).map(f => f.scope);
+    return held.includes('*') && agent?.wildcardReady ? ['*', ...floor] : floor;
 }
 
 /** The agent's own answer, or, when nobody has said, the one its mode always gave. */

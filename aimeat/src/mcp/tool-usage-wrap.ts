@@ -20,12 +20,15 @@
  * @usage
  *   patchable.tool = wrapToolHandler(gatedTool, () => agentGaii);
  * @version-history
+ *   v1.2.0 — 2026-10-02 — A successful call notes the permission its tool needs (services/scope-use.ts).
  *   v1.1.0 — 2026-09-30 — A SCOPE_DENIED result to an agent is noted as a refusal
  *     (services/agent-refusals.ts), as auth/deny.ts notes the REST one.
  *   v1.0.0 — 2026-08-14 — Initial: MCP tool calls become a measured surface.
  */
 import { recordUsageCall } from '../services/usage/usage-buffer.js';
 import { noteAgentRefusal } from '../services/agent-refusals.js';
+import { noteScopeUse } from '../services/scope-use.js';
+import { requiredScopeForTool } from './catalog/scopes.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import type { UsageActorKind } from '../storage/interface.js';
 
@@ -80,6 +83,11 @@ export function wrapToolHandler(register: AnyFn, principal: () => string): AnyFn
           // note on the agent's card and open tasks (services/agent-refusals.ts).
           const words = actorKindOf(gaii) === 'agent' ? scopeDeniedWords(result) : [];
           if (words.length) noteAgentRefusal({ sub: gaii, roles: ['agent'] }, words, false, `MCP ${name}`);
+        } else if (actorKindOf(gaii) === 'agent') {
+          // The word this tool needs, for the narrowing a `*` agent's owner is offered
+          // (services/scope-use.ts decides at flush whether the agent holds `*`).
+          const word = requiredScopeForTool(name);
+          if (word) noteScopeUse(gaii, [word]);
         }
         return result;
       } catch (err) {

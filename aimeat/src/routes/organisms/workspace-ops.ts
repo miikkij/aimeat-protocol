@@ -7,6 +7,7 @@
  *   export/import, workspace wipe, and archive/unarchive. Extracted from src/routes/organisms.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.11.0 -- 2026-10-02 -- POST .../workspace/records/delete asks memory:purge: it removes for good.
  *   v1.10.0 -- 2026-09-29 -- TARGET-082 review: the three public share reads answer the 404
  *     no-disclosure check and the share gate BEFORE the classification reader runs, so a visitor the
  *     gate refuses writes no refusal row into the organism's audit log.
@@ -631,8 +632,14 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
    * a member can only delete their own records), and commits every deletion in one batch. Replaces N
    * single object-delete calls (a 549-record CADENCE teardown was 549 round-trips + per-key deletes).
    * Body: { ws?, namespace, ids: [] }. Mirrors aimeat_workspace_object_delete's own/same-owner + role
-   * + append-only semantics. ── */
-  router.post('/v1/organisms/:id/workspace/records/delete', requireAuth(), requireExternalPrincipal(), requireScope('memory:delete'), async (req, res) => {
+   * + append-only semantics.
+   *
+   * `memory:purge`, not `memory:delete`, since 2026-10-02 (Jouni's ruling): this removes records for
+   * good, with no grace window, so it is its own word, and an agent holding it has every task wait
+   * for the owner (services/agent-task-rules.ts). `memory:delete` stays the undoable delete of
+   * DELETE /v1/memory/:key. App grants that held memory:delete were given the word once
+   * (services/task-start-migrations.ts). ── */
+  router.post('/v1/organisms/:id/workspace/records/delete', requireAuth(), requireExternalPrincipal(), requireScope('memory:purge'), async (req, res) => {
     const id = req.params.id as string;
     const body = req.body ?? {};
     const namespace = body.namespace;

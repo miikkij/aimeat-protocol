@@ -18,11 +18,24 @@
  *   · afterApproval(approved, existing, shown)
  * @usage import { afterApproval, heldOwnerAdded } from '../services/app-grant-scopes.js';
  * @version-history
+ *   v1.1.0 — 2026-10-02 — withAppPurge(): an app granted memory:delete is granted memory:purge with it.
  *   v1.0.0 — 2026-09-26 — Initial.
  */
 
 /** Reading what is in a connected account. The first word an owner adds to a grant by hand. */
 export const READ_THROUGH_SCOPE = 'connections:read-through';
+
+/**
+ * An app granted `memory:delete` is granted `memory:purge` with it (2026-10-02). Deleting shared
+ * workspace records for good took its own word so that an AGENT holding it has every task wait for
+ * the owner (services/agent-task-rules.ts); an app has no tasks, and its delete button is the person
+ * pressing it in the app. Without this, every app that asked for delete before the word existed
+ * would lose its record delete for every person who approved it after the change. The door still
+ * asks one word, and the grant carries it.
+ */
+export function withAppPurge(scopes: string[]): string[] {
+  return scopes.includes('memory:delete') && !scopes.includes('memory:purge') ? [...scopes, 'memory:purge'] : scopes;
+}
 
 /** The part of a grant this module reads. */
 export interface GrantWords { scopes?: string[] | null; ownerAddedScopes?: string[] | null }
