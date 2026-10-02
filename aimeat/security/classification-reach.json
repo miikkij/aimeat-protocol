@@ -1741,9 +1741,15 @@
     "src/services/package-skill-component.ts": {
       "reads": {
         "listMemory": 1,
-        "getMemory": 6
+        "getMemory": 7
       },
-      "why": "Reviewed 2026-09-30, the node's own read: compose copies the composer's OWN skills bound to their own app into their own package, by their own act, as it copies the app's bytes and the cortex's libs; install, update and uninstall read the installer's own skill manifest to decide overwrite or delete, and hash its files. Nothing goes into a model prompt unless through fetchComponentContentForAi (component-content.ts), which asks useForAi for skillFileTargets first."
+      "why": "Reviewed 2026-09-30, the node's own read: compose copies the composer's OWN skills bound to their own app into their own package, by their own act, as it copies the app's bytes and the cortex's libs; install, update and uninstall read the installer's own skill manifest to decide overwrite or delete, and hash its files. Nothing goes into a model prompt unless through fetchComponentContentForAi (component-content.ts), which asks useForAi for skillFileTargets first. Since 2026-10-02 install also reads whether the node's own library has a skill of that name, only to leave the package's skill out; no value leaves."
+    },
+    "src/services/package-approvals.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-02 (package sale design, phase 2), the node's own read: the approval record of an install, in the system namespace package-approvals that no principal addresses, read to answer GET /v1/instances/:id and to tell whether an update adds to what was approved. It holds capability names, not the owner's content."
     },
     "src/services/package-upstream-refresh.ts": {
       "reads": {

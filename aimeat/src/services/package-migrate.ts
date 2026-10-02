@@ -29,6 +29,9 @@
  *   import { applyInstanceMigration } from '../services/package-migrate.js';
  *   const out = await applyInstanceMigration({ storage, config }, caller, { instanceId, targetVersion, actions });
  * @version-history
+ *   v1.7.0 — 2026-10-02 — A target version that can do more than the install was approved for needs the
+ *     owner, or an agent holding packages:install-code: without it the refusal names the word and the
+ *     doors file a request. A finished migration records the new approval (package-approvals.ts, T7).
  *   v1.6.0 — 2026-09-30 — A `skill` component: named after itself, bound to this instance's copy of its
  *     app, and carrying this instance's tag, so replace deletes only a skill this instance published.
  *     One the owner has of their own is skipped and named in `warnings` (package-skill-component.ts).
@@ -58,6 +61,9 @@ import { registeredNameFor } from './package-install.js';
 import { reservedKeysInComponent, reservedComponentMessage, memoryComponentWriteRefusal } from './package-memory-component.js';
 import { planInstanceUpdate } from './package-update-plan.js';
 import { forkedUpdateRefusal } from './package-managed.js';
+import { packageCapabilities, widenedItems } from './package-capabilities.js';
+import { approvedItems, codeInstallRefusal, recordApproval } from './package-approvals.js';
+import { ownerBypassesScopes } from '../utils/scope-coverage.js';
 import { emitChange } from './event-bus.js';
 import { logger } from '../utils/logger.js';
 
@@ -380,12 +386,24 @@ export async function applyInstanceMigration(
     }
 
     // Everything else holds; only the words are missing. Nothing has been deleted or written.
+    // What the target version can do beyond what this install was approved for (package-approvals.ts).
+    // An agent or an app without packages:install-code does not widen it on its own; the owner does.
+    const targetCaps = packageCapabilities(targetPkg.components, config, owner);
+    const widened = widenedItems(await approvedItems(storage, config, instance), targetCaps.items);
+    const codeRefusal = codeInstallRefusal(targetCaps, caller, widened);
+    if (codeRefusal && codeRefusal.missing.length === 0) {
+        return { ok: false, status: codeRefusal.status, code: codeRefusal.code, message: `${codeRefusal.message} Nothing was changed.` };
+    }
+    if (codeRefusal) for (const word of codeRefusal.missing) missingWords.add(word);
+
     if (missingWords.size > 0) {
         const missing = [...missingWords];
         return {
             ok: false, status: 403, code: 'SCOPE_DENIED',
-            message: `Component "${lackingComponent}" writes into the owner's memory, which needs ${missing.map(s => `"${s}"`).join(' and ')}, `
-                + `and this session does not carry ${missing.length === 1 ? 'it' : 'them'}. Nothing was changed.`,
+            message: lackingComponent
+                ? `Component "${lackingComponent}" writes into the owner's memory, which needs ${missing.map(s => `"${s}"`).join(' and ')}, `
+                    + `and this session does not carry ${missing.length === 1 ? 'it' : 'them'}. Nothing was changed.`
+                : `${codeRefusal!.message} Nothing was changed.`,
             missing, target: targetPkg, instance,
         };
     }
@@ -527,6 +545,9 @@ export async function applyInstanceMigration(
     if (!updated) {
         return { ok: false, status: 500, code: 'MIGRATION_FAILED', message: 'Failed to update instance record' };
     }
+    // The install is now approved for what the new version can do: the owner, or the agent that held
+    // packages:install-code (or that widened nothing).
+    await recordApproval(storage, instanceId, targetCaps, targetVersion, ownerBypassesScopes(caller) ? ownerGhii : caller.sub);
 
     emitChange('instances');
     if (newInstalledComponents.some(c => c.type === 'skill')) emitChange('skills');

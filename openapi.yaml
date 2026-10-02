@@ -45713,7 +45713,16 @@ paths:
         overwrite a record the owner already has is refused with 409 KEY_EXISTS, unless an install of
         the same package wrote it; a cortex schema part that would replace another person's structure
         lock with a different structure is refused with 409 SCHEMA_LOCKED_BY_OTHER (the same structure is
-        shared and left alone). Both before anything registers, and on a dry run too.
+        shared and left alone). Both before anything registers, and on a dry run too. A package that
+        carries code (an app, an extension, a cortex or a skill) is installed by an agent or an app grant
+        only with packages:install-code; without it the answer is 202 and a request the owner approves,
+        which carries `capabilities` (what the version can do). The dry run answers `capabilities` per part
+        (an extension's actions, outside calls, AI jobs, email, payments, workspace reach, AI provider
+        hosts, secrets and schedules; an app's permissions; a cortex's structure locks; skills; memory
+        keys), `capabilities_hash`, and `source` (the author, the node the package came from, and
+        whether its signature was checked). The install records what it was approved to do; GET
+        /v1/instances/{id} answers it as `approval`. A skill named like one of the node's own skills
+        is left out with a warning.
       tags: [Instances]
       security:
         - BearerAuth: []
@@ -45825,6 +45834,10 @@ paths:
     get:
       operationId: getPackageInstallRequest
       summary: One package install request
+      description: >-
+        The request, with `capabilities` ({ hash, items }): what the package version will be able to do.
+        A request whose `missing` names packages:install-code is about code, and approving it approves
+        those items.
       tags: [Instances]
       security:
         - BearerAuth: []
@@ -45951,7 +45964,10 @@ paths:
     get:
       operationId: getInstance
       summary: Get instance
-      description: Retrieve details of a specific package instance.
+      description: >-
+        Retrieve details of a specific package instance, with `approval`: the capability items the
+        install was approved for, their hash, the version, when, and who approved (the owner, or the
+        agent that held packages:install-code); null for an install made before 2026-10-02.
       tags: [Instances]
       security:
         - BearerAuth: []
@@ -46367,7 +46383,11 @@ paths:
         `removed` and left alone, because deleting a copy is a separate act. Everything else moves.
         A memory component moved by an agent or an app grant costs what apply-migration asks for it;
         without those words the answer is 202 and a request for the owner, and nothing moves until it
-        is approved.
+        is approved. A version that can do more than the install was approved for (a new extension, a
+        new secret, a new permission an app asks for) is the same for an agent or an app grant without
+        packages:install-code: 202 and a request. The owner's own update approves it, and the install
+        records the new approval. The nightly update check never applies such a version on its own: it
+        tells the owner once (package_update_needs_approval).
       tags: [Instances]
       security:
         - BearerAuth: []

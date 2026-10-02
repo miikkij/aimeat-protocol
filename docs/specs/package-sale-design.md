@@ -647,10 +647,17 @@ declaration any app author can write.
 Each phase is usable on its own and is tested before the next starts.
 
 1. **Fixes on `main`, independent of selling:** F (section 6), T3, T4, T8, the `updates_until` reset,
-   the quota count.
+   the quota count. *Built 2026-10-02 (`38404005a`), with the seller's limits, the version route's
+   permission, compose reading a cortex's extension calls and the suspend reason. Not built from F:
+   the cap and the cleanup.*
 2. **The trust layer before selling:** the consent step with `capabilities` (T1), no silent scopes
    for package-installed apps (T2), re-consent on a widening update (T7), and the display of author,
-   signer and origin (T5).
+   signer and origin (T5). *Built 2026-10-02 on the API and MCP side: the dry run's `capabilities`
+   and `source` (services/package-capabilities.ts), packages:install-code with a request for the owner
+   that carries the list, the approval record (services/package-approvals.ts), consent for a
+   package's app, an update that adds capabilities waiting for the owner, and a package skill that
+   cannot take a node skill's name. The two screens (the install preview on the Packages page and the
+   permission row on the agent page) wait for Jouni's look before they go to `main`.*
 3. **The keystone:** the offer record (with `grant` and a price that may be empty) and the seller
    node's signed read of it, the selling node's sales catalogue, the `package` resolver on the
    selling node, claims with proof of the node key, the subject shape of offers and entitlements,

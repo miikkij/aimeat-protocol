@@ -33,13 +33,15 @@
  *   const comps = await boundSkillComponents(storage, ownerGhii, `app:${owner}/${filename}`, filename);
  *   const out = await registerSkillComponent(storage, { config, owner, ownerGaii, ... });
  * @version-history
+ *   v1.1.0 — 2026-10-02 — A skill named like one of the node's own is left out with a warning, and the
+ *     `fromPackage` tag names the package's author and origin node (package sale design, T5).
  *   v1.0.0 — 2026-09-30 — Initial (wish-a-package-carries-the-skills-bound-to-its-apps).
  */
 import YAML from 'yaml';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ContentLabelTarget } from '../storage/interface.js';
 import { validateSkillFiles, SkillValidationError, parseSkillMd } from './skill-md.js';
-import { manifestKey, fileKey, MANIFEST_KEY_RE } from './skill-refs.js';
+import { manifestKey, fileKey, MANIFEST_KEY_RE, scopeOwnerGhii } from './skill-refs.js';
 import { publishSkill, deleteSkill, SkillAccessError, type SkillManifestValue, type SkillPackageTag } from './skills.js';
 import { localAccountName } from '../utils/gaii.js';
 import { memoryTarget } from './classification/labels.js';
@@ -144,7 +146,7 @@ export interface SkillComponentInput {
     content: string;
     meta?: Record<string, unknown>;
     /** The install this skill belongs to, and app component id -> the filename this install gave it. */
-    packageContext?: { groupId: string; instanceId: string; appNames: Map<string, string> };
+    packageContext?: { groupId: string; instanceId: string; appNames: Map<string, string>; author?: string; originNode?: string };
     dryRun?: boolean;
 }
 
@@ -173,6 +175,15 @@ export async function registerSkillComponent(
     try { name = validateSkillFiles(fileMap).parsed.frontmatter.name; }
     catch (err) { return { ok: false, error: `${(err as SkillValidationError).code ?? 'INVALID_SKILL'}: ${(err as Error).message}` }; }
 
+    // A skill of the node's own library keeps its name: a bare name resolves the owner's registry
+    // first, so a package skill under that name would stand in for the node's skill wherever the
+    // owner's AI asks for it (package sale design, T5).
+    if (await storage.getMemory(scopeOwnerGhii(input.config, 'node'), manifestKey(name))) {
+        return {
+            ok: true,
+            skipped: `This node has a built-in skill named "${name}", so the package's skill of that name was not installed and the node's skill stays the one your AI reads.`,
+        };
+    }
     const existing = await storage.getMemory(input.ownerGaii, manifestKey(name));
     const tag = (existing?.value as SkillManifestValue | undefined)?.fromPackage;
     if (existing && tag?.groupId !== ctx.groupId) {
@@ -188,7 +199,10 @@ export async function registerSkillComponent(
             scope: 'user', owner: input.owner, publisher: input.publisher, files: fileMap,
             // A new skill is the owner's alone; an update keeps whatever visibility the owner gave it.
             ...(existing ? {} : { visibility: 'owner' as const }),
-            fromPackage: { groupId: ctx.groupId, instanceId: ctx.instanceId },
+            fromPackage: {
+                groupId: ctx.groupId, instanceId: ctx.instanceId,
+                ...(ctx.author ? { author: ctx.author } : {}), ...(ctx.originNode ? { originNode: ctx.originNode } : {}),
+            },
         });
     } catch (err) {
         if (err instanceof SkillValidationError || err instanceof SkillAccessError) return { ok: false, error: `${err.code}: ${err.message}` };

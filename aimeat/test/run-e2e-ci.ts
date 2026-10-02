@@ -9,6 +9,7 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.71.0 -- 2026-10-02 -- e2e-package-consent.ts joins the list (package sale design, phase 2).
  *   v1.70.0 -- 2026-10-02 -- e2e-package-guards.ts joins the list (package sale design, phase 1).
  *   v1.69.0 -- 2026-09-30 -- e2e-classification.ts joins GUARD_SUITES (139 → 140), measured alone on
  *            a freshly deleted database, three consecutive 55-of-55 runs on both backends.
@@ -852,6 +853,9 @@ const ALL_SUITES = [
     // A package does not take over what belongs to somebody else: the installer's own records, another
     // person's structure lock, another author's gallery listing; and compose names a cortex's extensions.
     'test/e2e-package-guards.ts',
+    // The owner decides what a package with code may do: the summary on the dry run, a request when an
+    // agent lacks packages:install-code, the recorded approval, and an update that adds to it.
+    'test/e2e-package-consent.ts',
     'test/e2e-federation-packages.ts',
     // A package repository and a customer node: a private package served only on an entitlement,
     // the update check that applies a newer version, and the end of updates.

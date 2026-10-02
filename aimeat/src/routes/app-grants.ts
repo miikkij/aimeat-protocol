@@ -20,6 +20,8 @@
  *     routes/app-grants-manage.ts.
  * @usage app.use(appGrantsRouter(config, storage));
  * @version-history
+ *   v1.19.0 — 2026-10-02 — The silent bridge does not self-approve an app a package installed for the
+ *     owner: it asks for consent like any other app (package sale design, T2).
  *   v1.18.0 — 2026-09-26 — The refresh mints for a grant only while an account holds its owner name,
  *     is not deactivated, and is not newer than the grant (auth/credential-age.ts ownerRefuses).
  *   v1.17.1 — 2026-09-26 — The app owner behind a grant target comes from localAccountName
@@ -125,6 +127,7 @@ import type { AppGrantRecord } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 
 import { APP_GRANTABLE_SCOPES } from './app-grant-vocabulary.js';
+import { isPackageApp } from '../services/package-approvals.js';
 export { APP_GRANTABLE_SCOPES };
 
 /**
@@ -657,7 +660,8 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     // author's decision about their own account, and a screen on every scope edit would land on the
     // one person who wrote the line that triggered it. Their drift is closed by the narrowing above
     // and by the same narrowing on refresh, without a prompt anywhere.
-    const isOwnApp = owner === grantOwner;
+    // An app a package installed is somebody else's code under the owner's name: consent, not self-approval (package-approvals.ts).
+    const isOwnApp = owner === grantOwner && !(await isPackageApp(storage, owner, grantTarget));
     const existing = await storage.getAppGrantByOwnerAndApp(owner, grantTarget);
     const fallback = ['memory:read', 'memory:write', 'storage:read', 'storage:write'];
     const wanted = requested.length ? requested : (existing?.scopes ?? fallback);

@@ -20,6 +20,10 @@
  *   import { installPackage } from '../services/package-install.js';
  *   const out = await installPackage({ storage, config, scheduler }, caller, { groupId });
  * @version-history
+ *   v1.10.0 — 2026-10-02 — The dry run carries `capabilities`, `capabilities_hash` and `source`: what
+ *     each part will be able to do and where the package comes from. An agent or an app installing a
+ *     package with code needs packages:install-code, or the doors file a request for the owner; the
+ *     install records its approval (package-capabilities.ts, package-approvals.ts; design T1, T5).
  *   v1.9.0 — 2026-10-02 — A memory component that would overwrite a record the owner already has, or a
  *     cortex schema part that would replace another person's structure lock, is refused before anything
  *     registers (409 KEY_EXISTS, SCHEMA_LOCKED_BY_OTHER), on a dry run too (package-component-collisions.ts).
@@ -68,6 +72,8 @@ import {
 } from './component-registrar.js';
 import { reservedKeysInComponent, reservedComponentMessage, memoryComponentWriteRefusal } from './package-memory-component.js';
 import { componentCollision } from './package-component-collisions.js';
+import { packageCapabilities, type PackageCapabilities } from './package-capabilities.js';
+import { codeInstallRefusal, combinedRefusal, packageSourceOf, recordApproval } from './package-approvals.js';
 import { registerExtensionSchedules } from './extension-schedules.js';
 import { planPackageConfig, missingConfigMessage, configPreview } from './package-config.js';
 import { expectsOf, missingExpects, expectsMissingMessage, type PackageExpects } from './package-expects.js';
@@ -131,6 +137,11 @@ export interface PackageInstallPreview {
     mode: 'managed' | 'editable';
     /** What each part asks for, what was given, and which required app fields are still empty. */
     config: Array<Record<string, unknown>>;
+    /** What each part will be able to do (package-capabilities.ts), and the hash an approval records. */
+    capabilities: PackageCapabilities;
+    capabilities_hash: string;
+    /** Who made the package and which node it came from, with whether its signature was checked. */
+    source: ReturnType<typeof packageSourceOf>;
     /** What the package needs this node to have and it does not: a real install refuses on it. */
     expects_missing?: PackageExpects;
     /** Present when this caller lacks words the install needs: the real call files a request. */
@@ -291,9 +302,12 @@ export async function installPackage(
     // A skill component binds to the name this install gives its app, known before anything registers,
     // and is tagged with this install so only this install replaces or removes it.
     const instanceId = randomUUID();
+    const source = packageSourceOf(pkg, config.nodeId);
     const packageContext = {
         groupId, instanceId,
         appNames: new Map(plannedComponents.filter(p => p.type === 'app').map(p => [p.componentId, p.registeredAs])),
+        // Who wrote the package and where it came from, for the skills it publishes (package-skill-component.ts).
+        author: source.author_ghii, originNode: source.origin_node,
     };
     const pkgRef = { config, groupId, instanceId };
     const warnings: string[] = [];
@@ -359,10 +373,13 @@ export async function installPackage(
         .filter(e => Object.keys(e.values).length > 0)
         .map(e => [e.componentId, e.values as Record<string, unknown>]));
 
-    // And writing the owner's memory at all costs what the memory door asks of this caller. Words the
-    // caller lacks are not the end of it: the doors file a request for the owner from this refusal,
-    // so it carries what was missing and which version it would have been. A dry run says so instead.
-    const writeRefusal = memoryComponentWriteRefusal(pkg.components, caller, ownerGhii);
+    // And writing the owner's memory at all costs what the memory door asks of this caller, and code
+    // (an app, an extension, a cortex, a skill) is installed by an agent or an app only with
+    // packages:install-code (package-approvals.ts). Words the caller lacks are not the end of it: the
+    // doors file a request for the owner from this refusal, so it carries what was missing and which
+    // version it would have been. A dry run says so instead.
+    const caps = packageCapabilities(pkg.components, config, owner);
+    const writeRefusal = combinedRefusal(memoryComponentWriteRefusal(pkg.components, caller, ownerGhii), codeInstallRefusal(caps, caller));
     const awaitsOwner = writeRefusal?.code === 'SCOPE_DENIED' && writeRefusal.missing.length > 0;
     if (writeRefusal && !(awaitsOwner && isDryRun)) {
         return {
@@ -403,6 +420,11 @@ export async function installPackage(
                 label: instanceLabel,
                 mode,
                 config: configPreview(configPlan),
+                // What each part will be able to do, and where the package comes from: what the person
+                // approves when they install (package-capabilities.ts, package-approvals.ts).
+                capabilities: caps.capabilities,
+                capabilities_hash: caps.hash,
+                source,
                 ...(expectsMissing ? { expects_missing: expectsMissing } : {}),
                 ...(awaitsOwner ? { status: 'would_await_owner' as const, missing: writeRefusal!.missing } : {}),
                 ...(warnings.length ? { warnings } : {}),
@@ -515,6 +537,9 @@ export async function installPackage(
 
     try {
         const created = await storage.createInstance(instanceRecord);
+        // What this install was approved to do, and by whom: the owner in person, or the agent holding
+        // packages:install-code. A later update that adds to it waits for the owner (package-approvals.ts).
+        await recordApproval(storage, created.id, caps, pkg.version, caller.roles.includes('agent') || caller.roles.includes('app') ? caller.sub : ownerGhii);
 
         // Increment template install count if a listing exists
         try {
