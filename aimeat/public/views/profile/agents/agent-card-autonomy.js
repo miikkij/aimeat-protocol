@@ -13,10 +13,11 @@
  *   `interactive` front door could not have it at all. It is not shown for a chat connection, which
  *   is the person's own AI and is not given tasks. When the agent can spend money, send mail or
  *   delete as the owner, its work always waits, and the switch says so instead of moving.
- * @structure FactsLine({ agent }) · PurchaseLimitLine({ agent, showToast }) · AutonomyLine({ agent, showToast }) ·
- *   WildcardLine({ agent, showToast })
+ * @structure FactsLine({ agent }) · LastTaskLine({ agent }) · PurchaseLimitLine({ agent, showToast }) ·
+ *   AutonomyLine({ agent, showToast }) · WildcardLine({ agent, showToast })
  * @usage <${FactsLine} agent=${agent} /> <${PurchaseLimitLine} agent=${agent} showToast=${showToast} />
  * @version-history
+ *   v1.4.0 — 2026-10-02 — LastTaskLine: the newest task's title, who ordered it (you, an agent, an app) and when.
  *   v1.3.0 — 2026-10-02 — WildcardLine: an agent holding all permissions (`*`) says how far the record
  *     of what it uses is, and offers the narrowing to those permissions with one press (ruling C).
  *   v1.2.0 — 2026-10-02 — AutonomyLine writes `task_start` instead of `mode`, is shown for every
@@ -33,6 +34,7 @@ import { t } from '/js/i18n.js';
 import { apiGet, apiPatch, apiPut, apiPost } from '/js/api.js';
 import { areaLine } from '/js/consent-vocab.js';
 import { swallowed } from '/js/swallowed.js';
+import { timeAgo } from '/js/utils.js';
 import { CardLine } from '/components/OpenCard.js';
 import { Switch } from '/components/Switch.js';
 import { Choice } from '/components/Choice.js';
@@ -55,6 +57,34 @@ export function FactsLine({ agent }) {
     ${typeof doneWeek === 'number' && html`<${CardLine} label=${f('weekLabel')}>
       <span>${doneWeek > 0 ? f('weekDone', { n: doneWeek }) : f('weekNone')}</span>
     <//>`}
+  `;
+}
+
+/** Who ordered a task, in words: you, another of your agents, an app, or nobody recorded (before 2026-08-15). */
+function orderedBy(createdBy) {
+  if (!createdBy) return '';
+  const local = String(createdBy).split('@')[0];
+  if (!local.includes('#')) return f('byYou');
+  const who = local.split('#')[0];
+  return who.startsWith('eco:') ? f('byApp', { name: who.slice(4) }) : f('byAgent', { name: who });
+}
+
+/** "Last task": its title, who ordered it and when, from the agent's newest task. Read when the card opens. */
+export function LastTaskLine({ agent }) {
+  const [task, setTask] = useState(undefined);
+  useEffect(() => {
+    apiGet(`/v1/agents/${encodeURIComponent(agent.name)}/tasks?per_page=1`)
+      .then(r => setTask((r?.data?.tasks ?? [])[0] ?? null))
+      .catch(err => { swallowed('agent-card: last task', err); setTask(null); });
+  }, [agent.name]);
+  if (task === undefined) return null;
+  const who = task ? orderedBy(task.createdBy) : '';
+  return html`
+    <${CardLine} label=${f('lastLabel')}>
+      <span>${!task ? f('lastNone')
+        : who ? f('lastTask', { title: task.title, who, when: timeAgo(task.updatedAt) })
+        : f('lastTaskNoWho', { title: task.title, when: timeAgo(task.updatedAt) })}</span>
+    <//>
   `;
 }
 

@@ -5913,6 +5913,8 @@
   "pkpage.sheetDataUnmapped": "{app}: nobody has written down what it keeps or where it goes.",
   "pkpage.sheetAgentsK": "Agents that come with it",
   "pkpage.sheetAgentsSub": "Each one waits for your approval on your open items after the install. Nothing runs before you approve it.",
+  "pkpage.sheetToolsK": "Tools for agents",
+  "pkpage.sheetToolsSub": "What the apps let an agent call. They come without prices; you price them yourself if you want to sell them.",
   "pkpage.sheetRunsK": "Runs on its own",
   "pkpage.sheetRunsSub": "Jobs that start by themselves once it is installed.",
   "pkpage.sheetGuidesK": "Guides for your AI",
@@ -17090,7 +17092,14 @@
         "buySave": "Save the limit",
         "buyRemove": "Remove the {currency} limit",
         "buySaved": "The agent may now spend up to {amount} {currency} a day.",
-        "buyCleared": "The agent no longer spends {currency}."
+        "buyCleared": "The agent no longer spends {currency}.",
+        "lastLabel": "Last task",
+        "lastTask": "{title}, ordered by {who}, {when}",
+        "lastTaskNoWho": "{title}, {when}",
+        "lastNone": "No tasks yet.",
+        "byYou": "you",
+        "byAgent": "your agent {name}",
+        "byApp": "the app {name}"
       }
     },
     "scopes": {

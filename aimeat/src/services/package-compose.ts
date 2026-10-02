@@ -36,6 +36,9 @@
  *   import { composePackageFromApps } from '../services/package-compose.js';
  *   const out = await composePackageFromApps({ storage, config }, caller, { name, apps });
  * @version-history
+ *   v1.6.0 — 2026-10-02 — An app component carries its public data map and its tool list without prices
+ *     in meta.app (datamap, tools). The sheet read a map nothing wrote, so it said "not written down"
+ *     for every app.
  *   v1.5.0 — 2026-10-02 — Composing again under a name the caller already has publishes the group's next
  *     version instead of refusing 409 (`newVersion` in the result); planComposeFromApps() plans without
  *     writing, for the set composer (package-compose-set.ts). Package sale design, phase 4.
@@ -59,6 +62,10 @@ import {
     type PackageWriteResult, type RawComponentInput,
 } from './package-create.js';
 import { boundSkillComponents } from './package-skill-component.js';
+import { publicDataMap } from './data-map/data-map-types.js';
+import { readAppDataMap } from './data-map/data-map-store.js';
+import { appToolsKey } from '../models/app-tool-schemas.js';
+import { toolsForPackage } from './package-app-tools.js';
 
 /** What the installing node must already have, because this package deliberately does not carry it. */
 export interface ComposeExpectations {
@@ -290,6 +297,20 @@ export async function planComposeFromApps(
             }
         }
 
+        // What the app says about itself beside its bytes: where its data goes (the public form of its
+        // data map, which the registrar already stores for the installer) and the tools it offers
+        // agents, without prices (package-app-tools.ts). Composing dropped both until 2026-10-02, so
+        // every package sheet said "nobody has written down" even for an app with a careful map.
+        const meta = appMetaOf(app);
+        const appMeta = meta.app as Record<string, unknown>;
+        // The map lives under the app id without `.html` (data-map-access.ts appIdOf); the tool list
+        // under the filename itself (app-tools-key.ts). Read each where its own writer put it.
+        const map = await readAppDataMap(storage, caller.ownerGhii, filename.replace(/\.html$/i, ''));
+        if (map && map.source !== 'none') appMeta.datamap = publicDataMap(map);
+        const toolsRec = await storage.getMemory(caller.ownerGhii, appToolsKey(filename));
+        const tools = toolsRec ? toolsForPackage(toolsRec.value) : null;
+        if (tools) appMeta.tools = tools;
+
         appComponents.push({
             id: filename,
             type: 'app',
@@ -297,7 +318,7 @@ export async function planComposeFromApps(
             content: source,
             contentHash: hashContent(source),
             dependencies,
-            meta: appMetaOf(app),
+            meta,
         });
 
         // The app's operating guides: the caller's OWN skills bound to exactly this app, never one

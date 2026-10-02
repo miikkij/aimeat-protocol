@@ -5912,6 +5912,8 @@
   "pkpage.sheetDataUnmapped": "{app}: kukaan ei ole kirjannut, mitä se säilyttää tai minne tiedot menevät.",
   "pkpage.sheetAgentsK": "Mukana tulevat agentit",
   "pkpage.sheetAgentsSub": "Jokainen odottaa asennuksen jälkeen hyväksyntääsi avoimissa asioissasi. Mikään ei käynnisty ennen kuin hyväksyt sen.",
+  "pkpage.sheetToolsK": "Työkalut agenteille",
+  "pkpage.sheetToolsSub": "Mitä sovellukset antavat agentin kutsua. Ne tulevat ilman hintoja; hinnoittelet ne itse, jos haluat myydä niitä.",
   "pkpage.sheetRunsK": "Toimii itsestään",
   "pkpage.sheetRunsSub": "Tehtävät, jotka käynnistyvät itsestään asennuksen jälkeen.",
   "pkpage.sheetGuidesK": "Ohjeet tekoälyllesi",
@@ -17073,7 +17075,14 @@
         "buySave": "Tallenna raja",
         "buyRemove": "Poista {currency}-raja",
         "buySaved": "Agentti voi nyt käyttää enintään {amount} {currency} päivässä.",
-        "buyCleared": "Agentti ei enää käytä valuuttaa {currency}."
+        "buyCleared": "Agentti ei enää käytä valuuttaa {currency}.",
+        "lastLabel": "Viimeisin tehtävä",
+        "lastTask": "{title}, tilaaja {who}, {when}",
+        "lastTaskNoWho": "{title}, {when}",
+        "lastNone": "Ei vielä tehtäviä.",
+        "byYou": "sinä",
+        "byAgent": "agenttisi {name}",
+        "byApp": "sovellus {name}"
       }
     },
     "scopes": {

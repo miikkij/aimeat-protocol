@@ -46242,6 +46242,15 @@ paths:
                                   data: { type: array, items: { type: object } }
                                   dataUnmapped: { type: array, items: { type: string } }
                                   agents: { type: array, items: { type: object } }
+                                  tools:
+                                    type: array
+                                    description: The tools the package's apps offer to agents, as the package carries them, without prices.
+                                    items:
+                                      type: object
+                                      properties:
+                                        app: { type: string }
+                                        name: { type: string }
+                                        description: { type: string }
                                   runsOnItsOwn: { type: array, items: { type: object } }
                                   guides: { type: array, items: { type: string } }
                                   asks:

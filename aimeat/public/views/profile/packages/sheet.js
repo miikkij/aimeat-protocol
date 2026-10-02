@@ -10,6 +10,7 @@
  * @structure sheetBlock(ctx, o) · asksBlock(ctx, o, key)
  * @usage ${sheetBlock(ctx, o)} … ${asksBlock(ctx, o, key)}
  * @version-history
+ *   v1.1.0 — 2026-10-02 — The tools the apps offer to agents, as the package carries them (no prices).
  *   v1.0.0 — 2026-10-01 — Initial.
  */
 import { h } from 'preact';
@@ -35,6 +36,7 @@ export function sheetBlock(ctx, o) {
     s.prompts?.length && { k: x('sheetAskK'), v: lines(s.prompts), sub: x('sheetAskSub') },
     data.length && { k: x('sheetDataK'), v: lines(data) },
     s.agents?.length && { k: x('sheetAgentsK'), v: lines(s.agents.map((a) => `${a.name} (${a.app})${a.purpose ? ': ' + a.purpose : ''}`)), sub: x('sheetAgentsSub') },
+    s.tools?.length && { k: x('sheetToolsK'), v: lines(s.tools.map((t) => `${t.name} (${t.app})${t.description ? ': ' + t.description : ''}`)), sub: x('sheetToolsSub') },
     s.runsOnItsOwn?.length && { k: x('sheetRunsK'), v: lines(s.runsOnItsOwn.map((r) => `${r.component}: ${r.what}${r.when ? ` (${r.when})` : ''}`)), sub: x('sheetRunsSub') },
     s.guides?.length && { k: x('sheetGuidesK'), v: s.guides.join(', '), sub: x('sheetGuidesSub') },
   ].filter(Boolean);

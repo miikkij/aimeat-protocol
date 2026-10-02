@@ -15,6 +15,7 @@
  * @usage
  *   import { registerComponent, deleteComponent, fetchComponentContent, computeHash } from '../services/component-registrar.js';
  * @version-history
+ *   v1.13.0 — 2026-10-02 — An app component's tool list (meta.app.tools, no prices) is written for the installed app.
  *   v1.12.0 — 2026-10-02 — A memory component refuses a key the owner already has (KEY_EXISTS) unless
  *     this component or an install of the same package wrote it, and tags what it writes with the
  *     package; a cortex schema part refuses another principal's lock (SCHEMA_LOCKED_BY_OTHER) and no
@@ -77,6 +78,7 @@ import { parseBundledCrews } from './app-bundled-crews.js';
 import { validateCortexAgents } from '../models/crew-def-schemas.js';
 import { publishApp } from './app-publish.js';
 import { putProgramMap } from './data-map/data-map-access.js';
+import { installPackageAppTools } from './package-app-tools.js';
 import { forgetDependencies, appRef } from './dependency-map.js';
 import { removeCortex } from './cortex-lifecycle.js';
 import { odpsWriteRefusal, extensionOdpsKey } from './exchange-odps-write.js';
@@ -584,6 +586,8 @@ export async function registerComponent(
             });
           }
         }
+        // The app's tool list, without prices, under this app's own name (package-app-tools.ts).
+        if (!input.dryRun) await installPackageAppTools(storage, { ownerGhii: ownerGaii, filename: registeredAs, tools: app.tools, extensionNames: input.urlRewrites?.extensionNames, now });
         // The config the install was given, checked before anything registered (package-config.ts).
         if (!input.dryRun && input.configValues && Object.keys(input.configValues).length) {
           await writeAppConfigValues(storage, ownerGaii, registeredAs, input.configValues as AppConfigValues);

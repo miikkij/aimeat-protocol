@@ -182,6 +182,19 @@ await test('The dependency map saw the cortex in both apps', async () => {
 
 console.log('\nPhase 2 — Compose');
 
+await test('The shop app has a priced tool list and a data map of its own', async () => {
+    const tools = { version: 1, tools: [
+        { name: 'quote', description: 'Price a basket.', inputSchema: { type: 'object' }, price: { morsels: 7 }, priceMoney: { amount: 2_000_000, currency: 'EUR' }, exchange: true },
+    ] };
+    const w = await json('/v1/memory', { method: 'POST', headers: authed(ownerToken), body: JSON.stringify({ key: `apps.${APP_A}.tools`, value: tools, visibility: 'public' }) });
+    assert(w.status === 200 || w.status === 201, `tools ${w.status}: ${JSON.stringify(w.body.error)}`);
+    const m = await json(`/v1/datamap/apps/${ownerName}/${APP_A}`, { method: 'PUT', headers: authed(ownerToken), body: JSON.stringify({
+        spec: 'aimeat.datamap/2', what: 'A small shop that keeps orders.', usedFor: 'Selling a few products.',
+        form: 'one-person', arrangement: 'Nothing is stored yet.', machinery: [], leaves: [], held: [], elsewhere: [],
+    }) });
+    assert(m.status === 200, `datamap ${m.status}: ${JSON.stringify(m.body.error)}`);
+});
+
 await test('Compose builds one package from the two apps', async () => {
     const { status, body } = await json('/v1/packages/compose', {
         method: 'POST',
@@ -277,6 +290,25 @@ await test('The second owner installs it and gets both apps under their own name
     const installedShop = installed.find((c: any) => c.componentId === APP_A);
     installedShopFilename = installedShop?.registeredAs ?? '';
     assert(!!installedShopFilename, 'the installed shop app has a filename');
+});
+
+await test('The tool list travels without prices, and the data map with it: the sheet shows both', async () => {
+    const pkg = await json(`/v1/packages/${encodedGroupId}`, { headers: authed(otherToken) });
+    const shop = (pkg.body.data?.components ?? []).find((c: any) => c.id === APP_A);
+    const carried = shop?.meta?.app?.tools?.[0];
+    assert(carried?.name === 'quote' && carried.description === 'Price a basket.', `carried tool: ${JSON.stringify(carried)}`);
+    for (const k of ['price', 'priceMoney', 'pricesMoney', 'exchange', 'plans']) assert(!(k in carried), `no ${k} travels`);
+    assert(shop?.meta?.app?.datamap?.what === 'A small shop that keeps orders.', `data map travels: ${JSON.stringify(shop?.meta?.app?.datamap ?? null).slice(0, 200)}`);
+    const sheet = pkg.body.data?.sheet;
+    assert(sheet?.tools?.some((t: any) => t.name === 'quote'), `sheet tools: ${JSON.stringify(sheet?.tools)}`);
+    assert(sheet?.data?.some((d: any) => d.what === 'A small shop that keeps orders.'), `sheet data: ${JSON.stringify(sheet?.data)}`);
+});
+
+await test('The installer gets the tool list under their own app name, with no price', async () => {
+    const r = await json(`/v1/memory/apps.${installedShopFilename}.tools`, { headers: authed(otherToken) });
+    assert(r.status === 200, `installer's tool list: ${r.status}`);
+    const tool = r.body.data?.value?.tools?.[0];
+    assert(tool?.name === 'quote' && tool.price === undefined && tool.priceMoney === undefined, `installed tool: ${JSON.stringify(tool)}`);
 });
 
 await test('An installed app keeps the name it was published under', async () => {
