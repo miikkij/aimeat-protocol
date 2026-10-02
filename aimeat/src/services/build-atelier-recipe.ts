@@ -24,6 +24,9 @@
  *   import { renderCustomisation, renderLiving, renderPatterns } from './build-atelier-recipe.js';
  *   body += renderCustomisation() + renderLiving(base) + renderPatterns();
  * @version-history
+ *   v1.9.0 — 2026-10-03 — The variants line names the board family (`fill` and `plain` on board,
+ *     `compact` on requestPanel, `dense` and `plain` on shelf) and the handbook (`dense`), and the
+ *     token count says sixty-six: the board family's six widths and the handbook's one.
  *   v1.8.0 — 2026-10-01 — The variants line names aiTask (`compact`) and workflowInput (`dense`), and
  *     the token count follows the kit at sixty-three (aiTask, workflowInput, doc and decision each
  *     brought a width).
@@ -72,14 +75,15 @@ export function renderCustomisation(): string {
     + 'picked.\n'
     + '3. **Variants.** `variant: "dense"` stamps `data-ak-variant` and the stylesheet reads it, '
     + 'so you PICK a legitimate shape: `dense` and `plain` on list, listDetail, table, timeline, '
-    + 'cardGrid, mediaCard, queue, health, kanban, section and searchBar; `numbered` on list and '
+    + 'cardGrid, mediaCard, queue, health, kanban, section, searchBar and shelf; `numbered` on list and '
     + 'listDetail; `wide` on cardGrid; `lined` on table; `tall`, `compact` and `center` on hero; '
     + '`compact`, `trend` and `plain` on statRow; `compact` and `center` on figure; `compact` on '
-    + 'rating, aiTask and aiChat; `plain` on doc; `dense` on tabs, bottomNav, segmented, members, workspacePicker and workflowInput; `pill` on tabs; '
+    + 'rating, aiTask, aiChat and requestPanel; `plain` on doc and board; `fill` on board; '
+    + '`dense` on tabs, bottomNav, segmented, members, workspacePicker, workflowInput and handbook; `pill` on tabs; '
     + '`quiet` on section; `ghost` on stateButton; `table` on members and workspaceTeam. An unknown name '
     + 'is refused with a console line naming the real ones.\n'
     + '4. **Per-component tokens.** `--ak-list-aside-size`, `--ak-stat-figure-size`, '
-    + '`--ak-card-aspect`, `--ak-hero-title-size` and fifty-nine more, each defaulting to the '
+    + '`--ak-card-aspect`, `--ak-hero-title-size` and sixty-six more, each defaulting to the '
     + 'value the component already had. Set one on YOUR OWN element and exactly that part '
     + 'changes, in every look and both modes.\n\n'
     + 'A statRow tile and a figure also take `unit` (what the number is measured in) and '

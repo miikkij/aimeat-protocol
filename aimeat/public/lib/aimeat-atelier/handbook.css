@@ -1,0 +1,122 @@
+/*
+ * @file aimeat-atelier/handbook.css
+ * @description The handbook (handbook.js): an app's manual from its header, from the side or as a
+ *   dialog. One component token, --ak-handbook-w, the side book's width. Narrow, the contents and
+ *   the chapter take turns (data-ak-view toc | read); from 640px of panel the two stand side by
+ *   side. Every colour is a kit token, so the book follows the look, the palette and the theme.
+ * @version-history
+ *   v0.65.0 — 2026-10-03 — Initial (wish-ohjekirja-komponentti-atelieriin-sis-llysluettelo-ohjeet-app).
+ */
+
+/* ── The two ways in: from the side (the app stays usable beside it) and as a dialog ───────── */
+.ak-handbook { border: 0; padding: 0; background: none; color: var(--ak-ink); max-width: none; max-height: none; }
+.ak-handbook::backdrop { background: color-mix(in oklab, var(--ak-ink) 45%, transparent); }
+.ak-handbook--side {
+  --ak-handbook-w: min(26rem, 100vw);
+  position: fixed;
+  inset: 0 0 0 auto;
+  z-index: 60;
+  margin: 0;
+  width: var(--ak-handbook-w);
+  height: 100dvh;
+}
+.ak-handbook--side.ak-handbook--left { inset: 0 auto 0 0; }
+.ak-handbook--dialog {
+  margin: auto;
+  width: min(52rem, calc(100vw - 2 * var(--ak-pad)));
+  height: min(44rem, calc(100dvh - 2 * var(--ak-pad)));
+}
+
+.ak-handbook__panel {
+  box-sizing: border-box;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: var(--ak-pad);
+  background: var(--ak-surface);
+  background-image: var(--ak-surface-image);
+  border: var(--ak-line-w) solid var(--ak-line);
+  box-shadow: var(--ak-elev-2);
+  container-type: inline-size;
+}
+.ak-handbook--side .ak-handbook__panel { border-width: 0 0 0 var(--ak-line-w); border-radius: 0; }
+.ak-handbook--side.ak-handbook--left .ak-handbook__panel { border-width: 0 var(--ak-line-w) 0 0; }
+.ak-handbook--dialog .ak-handbook__panel { border-radius: var(--ak-radius); }
+
+.ak-handbook__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ak-handbook__title { margin: 0; font-family: var(--ak-font-display); font-size: var(--ak-text-title); }
+.ak-handbook__close { min-width: var(--ak-touch); min-height: var(--ak-touch); }
+
+/* ── The contents and the chapter: in turns when narrow, side by side when there is room ─── */
+.ak-handbook__cols { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 1fr; gap: 16px; }
+.ak-handbook__toc, .ak-handbook__article { min-height: 0; overflow-y: auto; }
+.ak-handbook[data-ak-view="toc"] .ak-handbook__article { display: none; }
+.ak-handbook[data-ak-view="read"] .ak-handbook__toc { display: none; }
+@container (min-width: 640px) {
+  .ak-handbook__cols { grid-template-columns: minmax(12rem, 16rem) 1fr; }
+  .ak-handbook[data-ak-view] .ak-handbook__toc,
+  .ak-handbook[data-ak-view] .ak-handbook__article { display: block; }
+  .ak-handbook__back { display: none; }
+}
+
+.ak-handbook__group { display: flex; flex-direction: column; gap: 2px; margin-bottom: 12px; }
+.ak-handbook__groupname {
+  padding: 0 10px 4px;
+  font-size: var(--ak-text-micro);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ak-ink-dim);
+}
+.ak-handbook__entry {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--ak-ink);
+  font: inherit;
+  text-align: left;
+  min-height: var(--ak-touch-min, 36px);
+  padding: 6px 10px;
+  border-radius: var(--ak-radius-sm);
+  cursor: pointer;
+}
+.ak-handbook__entry:hover { background: var(--ak-surface-2); }
+.ak-handbook__entry[aria-current="true"] {
+  background: color-mix(in oklab, var(--ak-accent) 12%, var(--ak-surface));
+  color: var(--ak-accent-text, var(--ak-ink));
+  font-weight: 600;
+}
+.ak-handbook__empty { margin: 0; padding: 10px; color: var(--ak-ink-dim); font-size: var(--ak-text-fine); }
+
+.ak-handbook__article { display: flex; flex-direction: column; gap: 10px; }
+.ak-handbook__back { align-self: flex-start; }
+.ak-handbook__heading { margin: 0; font-family: var(--ak-font-display); font-size: calc(var(--ak-text-title) * 0.9); }
+.ak-handbook__text { line-height: 1.55; max-width: 62ch; }
+.ak-handbook__text p { margin: 0 0 10px; }
+.ak-handbook__go { align-self: flex-start; }
+.ak-handbook__note { margin: 0; font-size: var(--ak-text-fine); color: var(--ak-warn-text, var(--ak-ink-dim)); }
+.ak-handbook__note[hidden] { display: none; }
+.ak-handbook[data-ak-variant="dense"] .ak-handbook__panel { gap: 6px; }
+
+/* ── The place a chapter points at, marked in the app for a moment ─────────────────────────── */
+.ak-handbook__mark { outline: 3px solid var(--ak-accent); outline-offset: 4px; border-radius: var(--ak-radius-sm); }
+
+/* ── The header's button: a round question mark beside the account pill ─────────────────── */
+.ak-handbook__button {
+  appearance: none;
+  min-width: var(--ak-touch-min, 36px);
+  min-height: var(--ak-touch-min, 36px);
+  border-radius: var(--ak-radius-pill);
+  border: var(--ak-line-w) solid var(--ak-line);
+  background: var(--ak-surface);
+  color: var(--ak-ink);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ak-handbook__button:hover { border-color: var(--ak-accent); }
+/* In the shell's bar it takes the push to the right the motion switch otherwise takes. */
+.ak-app__bar > .ak-handbook__button { flex: none; margin-left: auto; }
+.ak-app__bar > .ak-handbook__button ~ .ak-app__motion,
+.ak-app__bar > .ak-handbook__button ~ .ak-app__weather { margin-left: 0; }
+.ak-handbook__button[aria-expanded="true"] { background: var(--ak-accent); border-color: var(--ak-accent); color: var(--ak-accent-ink, var(--ak-surface)); }

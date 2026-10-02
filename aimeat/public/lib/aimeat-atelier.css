@@ -56,6 +56,8 @@
  *   wearLook reads the page's look for a dialog, a menu or a toast. Inside an app frame the
  *   frame's own data-ak-look wins.
  * @version-history
+ *   v0.65.0 — 2026-10-03 — handbook.css: the handbook (an app's manual from its header, from the
+ *     side or as a dialog); --ak-handbook-w is its own (wish-ohjekirja-komponentti-atelieriin-sis-llysluettelo-ohjeet-app).
  *   v0.64.0 — 2026-10-02 — board.css: the board family (board, requestPanel, shelf) from ORIGAMI
  *     1.2.0 in the kit's tokens; --ak-board-h, --ak-board-head, --ak-board-frame-radius and
  *     --ak-board-ring are the board's own (wish-origami-atelieriin-ja-laudan-osat-kitin-lohkoiksi-ja-design-).
@@ -402,6 +404,7 @@
 @import url('./aimeat-atelier/effects.css');
 @import url('./aimeat-atelier/workbench.css');
 @import url('./aimeat-atelier/board.css');
+@import url('./aimeat-atelier/handbook.css');
 @import url('./aimeat-atelier/controls.css');
 @import url('./aimeat-atelier/menu.css');
 @import url('./aimeat-atelier/island.css');

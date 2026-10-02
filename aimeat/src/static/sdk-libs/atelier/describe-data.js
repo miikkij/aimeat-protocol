@@ -140,6 +140,14 @@ export const PARTS = {
     fork: "Copy .ak-form* and .ak-input* out of data.css and build the fields yourself; you keep the tokens, and you give up the label/hint/error wiring, the announced refusal with focus on the first problem, the submit guard and the range's reading.",
     file: "form.js",
   },
+  "handbook": {
+    parts: ["root","panel","head","title","search","close","toc","group","entry","article","heading","text","go","back","note","empty","button"],
+    slots: ["body(chapter)"],
+    variants: ["dense"],
+    tokens: ["--ak-handbook-w"],
+    fork: "Write the chapters into a dialog of your own; you give up the table of contents, the search, the chapters the page carries, the languages and the marked place.",
+    file: "handbook.js",
+  },
   "health": {
     parts: ["root","row","lamp","name","label","sub","reading","aside"],
     slots: ["label(item)","sub(item)","reading(item)","aside(item)"],

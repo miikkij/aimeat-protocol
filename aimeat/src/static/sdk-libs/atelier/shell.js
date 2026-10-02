@@ -41,6 +41,7 @@
  * @tokens bottomNav --ak-chrome-bottom
  * @fork bottomNav Copy .ak-bottomnav* out of shell.css; the chrome reserve is the shell's.
  * @version-history
+ *   v0.68.0 — 2026-10-03 — `help` takes a handbook (handbook.js): its button stands in the bar.
  *   v0.67.0 — 2026-10-01 — The tab row scrolls ITSELF so the chosen tab is fully in view: at the
  *     first draw, on a pick and on set({ value }), smoothly on a change unless motion is reduced
  *     (scroll-edge.js keepInView). Only the strip's scrollLeft moves, never the page. The bar's
@@ -194,7 +195,7 @@ function ambientSpec(want) {
  * The app shell.
  * @param {{
  *   target?: string|Element, title: string, tagline?: string, look?: string, footer?: string,
- *   logo?: string,
+ *   logo?: string, help?: { button: () => HTMLElement },
  *   navItems?: Array<{ id: string, label: string, count?: number|string, tone?: string,
  *     group?: string, bottom?: boolean, onPick?: (item: any) => void }>,
  *   nav?: 'bottom'|'side', navValue?: string, navLabel?: string,
@@ -251,7 +252,9 @@ export function app(spec) {
   // markup it always had. The pill is not part of this and is not moved.
   const logo = logoEl(spec.logo);
   const brand = logo ? el('span', { class: 'ak-app__brand' }, [logo, heading]) : heading;
-  const bar = el('header', { class: 'ak-app__bar' }, [brand, motionBtn, pill]);
+  // The app's handbook, when it has one (handbook.js): its button stands before the motion switch.
+  const helpBtn = spec.help && typeof spec.help.button === 'function' ? spec.help.button() : null;
+  const bar = el('header', { class: 'ak-app__bar' }, [brand, helpBtn, motionBtn, pill]);
 
   // THE THEME OPENS AS AN IRIS. The light/dark control is not the shell's: it travels inside
   // the account pill and flips <html data-theme> the instant it is clicked, which is one frame

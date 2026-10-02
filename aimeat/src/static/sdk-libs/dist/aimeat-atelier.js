@@ -4864,7 +4864,8 @@
     window.addEventListener("ak-motion", syncMotion);
     const logo = logoEl(spec.logo);
     const brand = logo ? el("span", { class: "ak-app__brand" }, [logo, heading]) : heading;
-    const bar2 = el("header", { class: "ak-app__bar" }, [brand, motionBtn, pill]);
+    const helpBtn = spec.help && typeof spec.help.button === "function" ? spec.help.button() : null;
+    const bar2 = el("header", { class: "ak-app__bar" }, [brand, helpBtn, motionBtn, pill]);
     let replaying = false;
     const onBarClick = function(ev) {
       if (replaying) return;
@@ -24639,8 +24640,464 @@
     };
   }
 
+  // src/static/sdk-libs/atelier/handbook.js
+  var VARIANTS2 = ["dense"];
+  var MARK_MS = 2600;
+  var STRINGS10 = {
+    en: {
+      title: "Guide",
+      open: "Open the guide",
+      close: "Close",
+      contents: "Contents",
+      search: "Search the guide",
+      show: "Show me",
+      back: "Contents",
+      empty: "Nothing in the guide matches.",
+      none: "This app has no guide yet.",
+      away: "That place is not on the screen right now.",
+      group: "General"
+    },
+    fi: {
+      title: "Opas",
+      open: "Avaa opas",
+      close: "Sulje",
+      contents: "Sisällys",
+      search: "Hae oppaasta",
+      show: "Näytä missä",
+      back: "Sisällys",
+      empty: "Oppaasta ei löydy tällaista.",
+      none: "Tällä appilla ei ole vielä opasta.",
+      away: "Se kohta ei ole nyt näkyvissä.",
+      group: "Yleistä"
+    },
+    es: {
+      title: "Guía",
+      open: "Abrir la guía",
+      close: "Cerrar",
+      contents: "Contenido",
+      search: "Buscar en la guía",
+      show: "Muéstrame dónde",
+      back: "Contenido",
+      empty: "Nada en la guía coincide.",
+      none: "Esta app aún no tiene guía.",
+      away: "Ese lugar no está en la pantalla ahora.",
+      group: "General"
+    }
+  };
+  function hb(key) {
+    const hosted = i18n.t("handbook." + key);
+    if (hosted !== "handbook." + key) return hosted;
+    const table2 = (
+      /** @type {Record<string, string>} */
+      STRINGS10[
+        /** @type {'en'|'fi'|'es'} */
+        i18n.lang()
+      ] || STRINGS10.en
+    );
+    return table2[key] || STRINGS10.en[key] || key;
+  }
+  function wordsOf(v) {
+    if (v == null) return "";
+    if (typeof v === "string") {
+      const s = v.trim();
+      if (s.charAt(0) === "{") {
+        try {
+          return wordsOf(JSON.parse(s));
+        } catch {
+          return v;
+        }
+      }
+      return v;
+    }
+    if (typeof v === "object") {
+      const lang = i18n.lang();
+      return String(v[lang] || v.en || v[Object.keys(v)[0]] || "");
+    }
+    return String(v);
+  }
+  function collect(root) {
+    const out = [];
+    const scope = root || document;
+    if (!scope || typeof scope.querySelectorAll !== "function") return out;
+    Array.prototype.forEach.call(scope.querySelectorAll("[data-ak-help]"), function(n) {
+      const id = n.getAttribute("data-ak-help");
+      if (!id) return;
+      out.push({
+        id,
+        title: n.getAttribute("data-ak-help-title") || n.getAttribute("aria-label") || n.textContent || id,
+        body: n.getAttribute("data-ak-help-text") || "",
+        group: n.getAttribute("data-ak-help-group") || "",
+        from: n
+      });
+    });
+    return out;
+  }
+  function sampleChapters() {
+    return [
+      {
+        id: "s-ask",
+        group: { en: "Start", fi: "Aloitus" },
+        title: { en: "Ask for something", fi: "Pyydä jotain" },
+        body: { en: "Type what you want in your own words. The app shows its plan before it does anything.", fi: "Kirjoita omin sanoin, mitä haluat. Appi näyttää suunnitelmansa ennen kuin tekee mitään." }
+      },
+      {
+        id: "s-data",
+        group: { en: "Start", fi: "Aloitus" },
+        title: { en: "Add from your data", fi: "Lisää omasta datasta" },
+        body: { en: "Pick a memory key or a workspace, and a panel is built from its real fields.", fi: "Valitse muistiavain tai työtila, niin paneeli rakentuu sen oikeista kentistä." }
+      },
+      {
+        id: "s-move",
+        group: { en: "The board", fi: "Lauta" },
+        title: { en: "Move and Use", fi: "Siirrä ja Käytä" },
+        body: { en: "Move drags frames; Use lets you click inside them.", fi: "Siirrä raahaa kehyksiä, Käytä päästää klikkaamaan niiden sisällä." }
+      },
+      {
+        id: "s-share",
+        group: { en: "Together", fi: "Yhdessä" },
+        title: { en: "Share a board", fi: "Jaa lauta" },
+        body: { en: "Invite people to the workspace the board lives in.", fi: "Kutsu ihmisiä työtilaan, jossa lauta on." }
+      }
+    ];
+  }
+  function handbook(spec) {
+    const s = spec || {};
+    const sample = s.sample === true;
+    const mode = s.mode === "dialog" ? "dialog" : "side";
+    const side = s.side === "left" ? "left" : "right";
+    const parts = s.parts || {};
+    let own = sample ? sampleChapters() : (s.chapters || []).slice();
+    let shown = [];
+    let current2 = null;
+    let query = "";
+    let marked = null;
+    let markTimer = null;
+    let destroyed = false;
+    const buttons = [];
+    const root = (
+      /** @type {HTMLDialogElement} */
+      el("dialog", {
+        class: "ak-root ak-handbook ak-handbook--" + mode + " ak-handbook--" + side,
+        "data-ak-part": "root",
+        "data-ak-view": "toc"
+      })
+    );
+    applyVariant(root, s, VARIANTS2);
+    const titleEl = el("h2", { class: "ak-handbook__title", "data-ak-part": "title" });
+    const closeBtn = el("button", {
+      type: "button",
+      class: "ak-btn ak-btn--ghost ak-handbook__close",
+      "data-ak-part": "close",
+      "data-ak-noguard": true,
+      on: { click: function() {
+        close();
+      } }
+    }, "✕");
+    const head = el("div", { class: "ak-handbook__head", "data-ak-part": "head" }, [titleEl, closeBtn]);
+    const find = s.search === false ? null : searchBar({ onChange: function(q) {
+      query = String(q || "").trim().toLowerCase();
+      draw();
+    } });
+    if (find) find.el.setAttribute("data-ak-part", "search");
+    const toc = el("nav", { class: "ak-handbook__toc", "data-ak-part": "toc" });
+    const article = el("article", { class: "ak-handbook__article", "data-ak-part": "article", "aria-live": "polite" });
+    const panel = el(
+      "div",
+      { class: "ak-handbook__panel", "data-ak-part": "panel" },
+      [head, find ? find.el : null, el("div", { class: "ak-handbook__cols" }, [toc, article])]
+    );
+    root.appendChild(panel);
+    root.addEventListener("cancel", function(ev) {
+      ev.preventDefault();
+      close();
+    });
+    root.addEventListener("click", function(ev) {
+      if (ev.target === root) close();
+    });
+    function chapters() {
+      const page = s.collect === false || sample ? [] : collect(s.collect && s.collect !== true ? s.collect : document);
+      const byId = /* @__PURE__ */ new Map();
+      own.forEach(function(c) {
+        byId.set(c.id, Object.assign({}, c));
+      });
+      page.forEach(function(c) {
+        const have = byId.get(c.id);
+        if (have) {
+          if (!have.target && !have.from) have.from = c.from;
+          return;
+        }
+        byId.set(c.id, c);
+      });
+      return Array.from(byId.values());
+    }
+    function textOf(c) {
+      return [wordsOf(c.title), wordsOf(c.body), wordsOf(c.group), c.keywords || ""].join(" ").toLowerCase();
+    }
+    function placeOf(c) {
+      let t2 = c.target;
+      if (typeof t2 === "function") {
+        try {
+          t2 = t2();
+        } catch {
+          t2 = null;
+        }
+      }
+      if (typeof t2 === "string") t2 = document.querySelector(t2);
+      return (
+        /** @type {Element|null} */
+        t2 || c.from || null
+      );
+    }
+    function fill(host, v) {
+      clear(host);
+      if (v == null || v === false) return;
+      if (typeof v === "function") {
+        v(host);
+        return;
+      }
+      if (v instanceof Node) {
+        host.appendChild(v);
+        return;
+      }
+      wordsOf(v).split(/\n{2,}/).forEach(function(para) {
+        if (para.trim()) host.appendChild(el("p", { text: para.trim() }));
+      });
+    }
+    function drawToc() {
+      clear(toc);
+      const hits = query ? shown.filter(function(c) {
+        return textOf(c).indexOf(query) >= 0;
+      }) : shown;
+      if (!shown.length || !hits.length) {
+        toc.appendChild(el("p", { class: "ak-handbook__empty", "data-ak-part": "empty", text: hb(shown.length ? "empty" : "none") }));
+        return;
+      }
+      let group = null, list2 = null;
+      hits.forEach(function(c) {
+        const g = wordsOf(c.group) || hb("group");
+        if (g !== group || !list2) {
+          group = g;
+          list2 = el(
+            "div",
+            { class: "ak-handbook__group", "data-ak-part": "group", role: "group", "aria-label": g },
+            [el("div", { class: "ak-handbook__groupname", text: g, "aria-hidden": "true" })]
+          );
+          toc.appendChild(list2);
+        }
+        list2.appendChild(el("button", {
+          type: "button",
+          class: "ak-handbook__entry",
+          "data-ak-part": "entry",
+          "data-ak-id": c.id,
+          "data-ak-noguard": true,
+          "aria-current": current2 === c.id ? "true" : null,
+          on: { click: function() {
+            read(c.id);
+          } }
+        }, wordsOf(c.title)));
+      });
+    }
+    function drawArticle() {
+      clear(article);
+      const c = shown.filter(function(x) {
+        return x.id === current2;
+      })[0];
+      article.appendChild(el("button", {
+        type: "button",
+        class: "ak-btn ak-btn--ghost ak-handbook__back",
+        "data-ak-part": "back",
+        "data-ak-noguard": true,
+        on: { click: function() {
+          setView("toc");
+        } }
+      }, "← " + hb("back")));
+      if (!c) return;
+      article.appendChild(el("h3", { class: "ak-handbook__heading", "data-ak-part": "heading", text: wordsOf(c.title) }));
+      const body = el("div", { class: "ak-handbook__text", "data-ak-part": "text" });
+      fill(body, parts.body ? parts.body(c) : c.body);
+      article.appendChild(body);
+      if (c.target || c.from) {
+        const note = el("p", { class: "ak-handbook__note", "data-ak-part": "note", hidden: true, text: hb("away") });
+        article.appendChild(el("button", {
+          type: "button",
+          class: "ak-btn ak-btn--primary ak-handbook__go",
+          "data-ak-part": "go",
+          "data-ak-noguard": true,
+          on: { click: function() {
+            if (!go(c)) note.hidden = false;
+          } }
+        }, hb("show") + " →"));
+        article.appendChild(note);
+      }
+    }
+    function draw() {
+      if (destroyed) return;
+      titleEl.textContent = wordsOf(s.title) || hb("title");
+      closeBtn.setAttribute("aria-label", hb("close"));
+      root.setAttribute("aria-label", wordsOf(s.title) || hb("title"));
+      toc.setAttribute("aria-label", hb("contents"));
+      drawToc();
+      drawArticle();
+      buttons.forEach(paintButton);
+    }
+    function setView(v) {
+      root.setAttribute("data-ak-view", v);
+    }
+    function read(id) {
+      current2 = id;
+      setView("read");
+      draw();
+    }
+    function mark(node) {
+      unmark();
+      marked = /** @type {HTMLElement} */
+      node;
+      marked.classList.add("ak-handbook__mark");
+      if (typeof marked.scrollIntoView === "function") marked.scrollIntoView({ block: "center", behavior: reducedMotion() ? "auto" : "smooth" });
+      attention(marked, "flash");
+      markTimer = setTimeout(unmark, MARK_MS);
+    }
+    function unmark() {
+      if (markTimer) {
+        clearTimeout(markTimer);
+        markTimer = null;
+      }
+      if (marked) marked.classList.remove("ak-handbook__mark");
+      marked = null;
+    }
+    function go(c) {
+      let node = placeOf(c);
+      if (s.onGo) {
+        try {
+          s.onGo(c, node);
+        } catch {
+        }
+        node = placeOf(c);
+      }
+      if (!node || !node.isConnected || /** @type {HTMLElement} */
+      node.offsetParent === null) return false;
+      if (mode === "dialog") close();
+      mark(node);
+      return true;
+    }
+    function isOpen() {
+      return !!root.open;
+    }
+    function open(id) {
+      if (destroyed) return;
+      if (!root.isConnected) document.body.appendChild(root);
+      root.removeAttribute("data-ak-look");
+      wearLook(root, document.activeElement);
+      shown = chapters();
+      if (id && shown.some(function(c) {
+        return c.id === id;
+      })) {
+        current2 = id;
+        setView("read");
+      } else if (!current2 || !shown.some(function(c) {
+        return c.id === current2;
+      })) {
+        current2 = shown[0] ? shown[0].id : null;
+        setView("toc");
+      }
+      draw();
+      if (!root.open) {
+        if (mode === "dialog" || typeof root.show !== "function") root.showModal();
+        else root.show();
+        if (!reducedMotion() && typeof panel.animate === "function") {
+          const from = mode === "dialog" ? "translateY(10px)" : side === "left" ? "translateX(-100%)" : "translateX(100%)";
+          panel.animate([{ transform: from, opacity: mode === "dialog" ? 0 : 1 }, { transform: "none", opacity: 1 }], { duration: 240, easing: "cubic-bezier(0.2, 0.7, 0.3, 1)" });
+        }
+        buttons.forEach(paintButton);
+        if (s.onOpen) s.onOpen();
+      }
+    }
+    function close() {
+      if (!root.open) return;
+      root.close();
+      buttons.forEach(paintButton);
+      if (s.onClose) s.onClose();
+    }
+    function toggle2() {
+      if (isOpen()) close();
+      else open();
+    }
+    function paintButton(b) {
+      b.setAttribute("aria-label", hb("open"));
+      b.setAttribute("title", hb("open"));
+      b.setAttribute("aria-expanded", isOpen() ? "true" : "false");
+    }
+    function button2() {
+      const b = el("button", {
+        type: "button",
+        class: "ak-handbook__button",
+        "data-ak-part": "button",
+        "data-ak-noguard": true,
+        "aria-haspopup": "dialog",
+        on: { click: function() {
+          toggle2();
+        } }
+      }, "?");
+      buttons.push(b);
+      paintButton(b);
+      return b;
+    }
+    const stopLang = i18n.onChange(function() {
+      if (isOpen()) {
+        shown = chapters();
+        draw();
+      } else buttons.forEach(paintButton);
+    });
+    return {
+      el: root,
+      open,
+      close,
+      toggle: toggle2,
+      isOpen,
+      /** @param {{ chapters?: Chapter[], title?: any }} patch */
+      set: function(patch) {
+        if (!patch || destroyed) return;
+        if (patch.chapters) own = patch.chapters.slice();
+        if (patch.title !== void 0) s.title = patch.title;
+        if (isOpen()) {
+          shown = chapters();
+          draw();
+        }
+      },
+      /** @param {Chapter|Chapter[]} more */
+      add: function(more) {
+        (Array.isArray(more) ? more : [more]).forEach(function(c) {
+          own = own.filter(function(x) {
+            return x.id !== c.id;
+          }).concat([c]);
+        });
+        if (isOpen()) {
+          shown = chapters();
+          draw();
+        }
+      },
+      /** Every chapter the book would show now, the page's included: for an agent or a test. */
+      scan: function() {
+        return chapters().map(function(c) {
+          return { id: c.id, title: wordsOf(c.title), group: wordsOf(c.group), place: !!placeOf(c) };
+        });
+      },
+      button: button2,
+      destroy: function() {
+        destroyed = true;
+        unmark();
+        if (typeof stopLang === "function") stopLang();
+        if (root.open) root.close();
+        root.remove();
+        buttons.forEach(function(b) {
+          b.remove();
+        });
+      }
+    };
+  }
+
   // src/static/sdk-libs/atelier/request-panel.js
-  var VARIANTS2 = ["compact"];
+  var VARIANTS3 = ["compact"];
   var MARKS = { pending: "·", running: "→", done: "✓", failed: "✗" };
   var STATES = ["pending", "running", "done", "failed"];
   function samplePlan() {
@@ -24669,7 +25126,7 @@
     const sample = spec.sample === true;
     const parts = spec.parts || {};
     const root = el("div", { class: "ak-root ak-request", "data-ak-part": "root" });
-    applyVariant(root, spec, VARIANTS2);
+    applyVariant(root, spec, VARIANTS3);
     if (spec.target) resolve(spec.target).appendChild(root);
     let plan2 = sample ? samplePlan() : spec.plan || null;
     let destroyed = false;
@@ -24841,7 +25298,7 @@
   }
 
   // src/static/sdk-libs/atelier/shelf.js
-  var VARIANTS3 = ["dense", "plain"];
+  var VARIANTS4 = ["dense", "plain"];
   function sampleItems() {
     return [
       { id: "l1", tab: "library", title: "RSVP form", sub: "four fields, posts without an account", kind: "form" },
@@ -24869,7 +25326,7 @@
     const sample = spec.sample === true;
     const parts = spec.parts || {};
     const root = el("div", { class: "ak-root ak-shelf", "data-ak-part": "root" });
-    applyVariant(root, spec, VARIANTS3);
+    applyVariant(root, spec, VARIANTS4);
     if (spec.target) resolve(spec.target).appendChild(root);
     const tabList = spec.tabs || [{ id: "library", label: tb("shelf.library") }, { id: "made", label: tb("shelf.made") }];
     const actions = spec.actions || [{ id: "use", label: tb("shelf.use"), kind: "primary" }, { id: "board", label: tb("shelf.board"), kind: "ghost" }];
@@ -28441,6 +28898,14 @@
       fork: "Copy .ak-form* and .ak-input* out of data.css and build the fields yourself; you keep the tokens, and you give up the label/hint/error wiring, the announced refusal with focus on the first problem, the submit guard and the range's reading.",
       file: "form.js"
     },
+    "handbook": {
+      parts: ["root", "panel", "head", "title", "search", "close", "toc", "group", "entry", "article", "heading", "text", "go", "back", "note", "empty", "button"],
+      slots: ["body(chapter)"],
+      variants: ["dense"],
+      tokens: ["--ak-handbook-w"],
+      fork: "Write the chapters into a dialog of your own; you give up the table of contents, the search, the chapters the page carries, the languages and the marked place.",
+      file: "handbook.js"
+    },
     "health": {
       parts: ["root", "row", "lamp", "name", "label", "sub", "reading", "aside"],
       slots: ["label(item)", "sub(item)", "reading(item)", "aside(item)"],
@@ -28754,7 +29219,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.64.0",
+    version: "0.65.0",
     /**
      * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
      * named parts (every one carries `data-ak-part`, so an app's own CSS reaches it), the slots
@@ -28878,6 +29343,9 @@
     requestPanel,
     shelf,
     verbs,
+    // ── An app's own manual from its header: contents, chapters from the app and the page, a
+    //    search, every word per language, and the place a chapter names marked in the app ──
+    handbook,
     // ── A Public Intake form and its admin list (AIMEAT.intake), the owner's outside accounts (AIMEAT.connect) ──
     intakeForm,
     intakeAdmin,
