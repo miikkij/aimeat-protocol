@@ -21,6 +21,7 @@
  *   import { generateForOwner } from '../services/ai-image.js';
  *   const out = await generateForOwner(storage, config, gaii, { prompt: 'a red bicycle' });
  * @version-history
+ *   v2.3.0 — 2026-10-02 — Takes `lang`, so a refusal's sentence is in the person's language.
  *   v2.2.0 — 2026-09-28 — Takes `role`, the AI role the call runs as (services/ai/roles.ts).
  *   v2.1.0 — 2026-09-28 — Takes caller and verifiedApp for the owner's model policy (V2).
  *   v2.1.0 — 2026-09-28 — Providers (System 2 plan, V3): the owner's candidates are tried by their
@@ -53,6 +54,7 @@ import { callCost } from './ai/catalog/price.js';
 import type { AiCandidate } from './ai/route-plan.js';
 import { contentHashOf } from './ai-provenance.js';
 import type { CallerClass } from './ai/policy.js';
+import type { RequestLanguage } from './ai/ai-fix-words.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -84,6 +86,8 @@ export interface GenerateForOwnerOptions {
   /** Whose call this is and the app its grant names, for the owner's model policy. */
   caller?: CallerClass;
   verifiedApp?: string;
+  /** The request's word on the person's language, for a refusal's sentence. */
+  lang?: RequestLanguage;
   /** A provider the call names (an id or a type), and the call's word on fallback. */
   provider?: string;
   fallback?: boolean;
@@ -156,6 +160,7 @@ export async function generateForOwner(
   const plan = await prepareAiCall(storage, config, gaii, {
     op: 'image', model: opts.model, appId: opts.appId, ...(opts.agent ? { agent: opts.agent } : {}),
     ...(opts.caller ? { caller: opts.caller } : {}), ...(opts.verifiedApp ? { verifiedApp: opts.verifiedApp } : {}),
+    ...(opts.lang ? { lang: opts.lang } : {}),
     ...(opts.provider ? { provider: opts.provider } : {}), ...(opts.fallback !== undefined ? { fallback: opts.fallback } : {}),
     ...(opts.role ? { role: opts.role } : {}),
   });

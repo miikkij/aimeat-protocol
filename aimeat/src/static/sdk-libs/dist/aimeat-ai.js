@@ -825,11 +825,16 @@
   function aiError(r, fallback) {
     const e = r && r.error;
     const err = (
-      /** @type {Error & { code?: string, details?: any }} */
+      /** @type {Error & { code?: string, details?: any, fix?: string, settingsUrl?: string, reason?: string }} */
       new Error(e && e.message || fallback)
     );
     err.code = e && e.code || "UNKNOWN";
-    if (e && e.details !== void 0 && e.details !== null) err.details = e.details;
+    if (e && e.details !== void 0 && e.details !== null) {
+      err.details = e.details;
+      if (typeof e.details.fix === "string") err.fix = e.details.fix;
+      if (typeof e.details.settingsUrl === "string") err.settingsUrl = e.details.settingsUrl;
+      if (typeof e.details.reason === "string") err.reason = e.details.reason;
+    }
     return err;
   }
   function withProvenance(r) {
@@ -1198,12 +1203,15 @@
   var ai = {
     /**
      * What the person's AI can do for this app, per capability (text, vision, files, image, speech,
-     * transcription, embed): { on, model, price, ... } when on, { on: false, reason, fix } when off.
-     * Ask this before showing a button that needs a capability, and show `fix` when it is off.
+     * transcription, embed): { on, model, price, ... } when on, { on: false, reason, fix, settingsUrl }
+     * when off. Ask this before showing a button that needs a capability; when it is off, show `fix`
+     * (the person's sentence, in their language) and a link to `settingsUrl` (their AI settings, opened
+     * where the fix is). A refused call's error carries the same as err.fix and err.settingsUrl.
      * Cached 60 seconds per app_id.
      *
      *   const caps = await AIMEAT.ai.capabilities({ app_id: 'my-app' });
-     *   if (!caps.capabilities.image.on) notice.textContent = caps.capabilities.image.fix;
+     *   const img = caps.capabilities.image;
+     *   if (!img.on) { notice.textContent = img.fix; link.href = img.settingsUrl; }
      */
     capabilities,
     /**

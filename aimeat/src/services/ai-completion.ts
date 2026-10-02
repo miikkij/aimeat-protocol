@@ -21,6 +21,8 @@
  *   import { completeForOwner, AiCompletionError } from '../services/ai-completion.js';
  *   const r = await completeForOwner(storage, config, gaii, { prompt });
  * @version-history
+ *   v3.9.0 — 2026-10-02 — prepareAiCall's refusal carries `fix` for the person, `agentFix` and
+ *     `settingsUrl` (ai/ai-fix-words.ts); `lang` in the options names the request's language.
  *   v3.8.0 — 2026-09-28 — Capabilities for apps and agents (System 2 plan, V5): prepareAiCall knows
  *     the operations speak and embed (roles tts and embed), reads the app's prefer.* and local.* from
  *     its meta (policy-store appAiMetaOf), and completeForOwner takes `files` for the files capability.
@@ -148,6 +150,7 @@ import { resolveModelFor, type ModelRole } from './ai-model-defaults.js';
 import { debitAllowance, readAllowance, remainingOf } from './ai-allowance.js';
 import { todayKey, getTodayUsage, recordAiUsage, emptyUsage, type UsageRecord } from './ai-usage-record.js';
 import { agentCapRefusal } from './agent-ai-keys.js';
+import { withPersonFix, type RequestLanguage } from './ai/ai-fix-words.js';
 import { DEFAULT_DAILY_BUDGET_USD, getDailyBudgetUsd } from './ai-daily-budget.js';
 export { todayKey, getTodayUsage, recordAiUsage, type UsageRecord, DEFAULT_DAILY_BUDGET_USD, getDailyBudgetUsd };
 
@@ -182,6 +185,8 @@ export interface CompleteForOwnerOptions {
   fallback?: boolean;
   /** The capability, when the prompt alone does not say it (a provider test of `files`). */
   capability?: AiCapability;
+  /** The request's word on the person's language (PrepareAiCallOptions.lang). */
+  lang?: RequestLanguage;
   /** Optional image attachments (data: or https URLs) for vision-capable models. */
   images?: string[];
   /** Files (a PDF among them) for a model that reads them itself: the capability becomes `files`. */
@@ -373,6 +378,8 @@ export interface PrepareAiCallOptions {
    * role it declares, which runs only once the owner bound it. A named model or provider wins over it.
    */
   role?: string;
+  /** The request's word on the person's language, for the sentence a refusal carries. */
+  lang?: RequestLanguage;
 }
 
 /**
@@ -380,13 +387,24 @@ export interface PrepareAiCallOptions {
  *
  * Throws before anything is spent: a provider the node does not allow, an app the owner has not
  * allowed, a missing key, a daily budget already used up. Refusing before the write is the order,
- * not just the presence of the checks.
+ * not just the presence of the checks. A refusal carries the person's sentence, the AI's fix and
+ * the settings link (ai/ai-fix-words.ts), so every caller of this gate gives the person the same.
  */
 export async function prepareAiCall(
+  storage: Storage, config: AimeatConfig, gaii: string, opts: PrepareAiCallOptions = {},
+): Promise<AiCallPlan> {
+  try { return await planAiCall(storage, config, gaii, opts); } catch (e) {
+    if (!(e instanceof AiCompletionError)) throw e;
+    const cap = opts.capability ?? OP_CAPABILITY[opts.op ?? 'text'] ?? (opts.hasImages ? 'vision' : 'text');
+    throw await withPersonFix(e, storage, config, gaii, cap, opts.lang);
+  }
+}
+
+async function planAiCall(
   storage: Storage,
   config: AimeatConfig,
   gaii: string,
-  opts: PrepareAiCallOptions = {},
+  opts: PrepareAiCallOptions,
 ): Promise<AiCallPlan> {
   const [apiKeyRecord, prefsRecord, usageRecord] = await Promise.all([
     storage.getMemory(gaii, 'openrouter.apikey'),
@@ -661,7 +679,7 @@ export async function completeForOwner(
     ...(opts.verifiedApp ? { verifiedApp: opts.verifiedApp } : {}),
     ...(opts.provider ? { provider: opts.provider } : {}),
     ...(opts.fallback !== undefined ? { fallback: opts.fallback } : {}),
-    ...(capability ? { capability } : {}),
+    ...(capability ? { capability } : {}), ...(opts.lang ? { lang: opts.lang } : {}),
   });
   const { prefs } = plan;
 

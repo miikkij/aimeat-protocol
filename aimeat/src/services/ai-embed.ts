@@ -14,6 +14,7 @@
  * @usage
  *   const r = await embedForOwner(storage, config, payer, { input: ['a', 'b'], appId: 'notes' });
  * @version-history
+ *   v1.2.0 — 2026-10-02 — Takes `lang`, so a refusal's sentence is in the person's language.
  *   v1.1.0 — 2026-09-28 — Takes `role`, the AI role the call runs as (services/ai/roles.ts).
  *   v1.0.0 — 2026-09-28 — Initial (V5 of the System 2 plan).
  */
@@ -27,6 +28,7 @@ import { runRoute, type AiRoute } from './ai/route-run.js';
 import { callCost } from './ai/catalog/price.js';
 import type { AiCandidate } from './ai/route-plan.js';
 import type { CallerClass } from './ai/policy.js';
+import type { RequestLanguage } from './ai/ai-fix-words.js';
 
 /** One call's ceiling: enough for a page of notes, small enough to answer inside a request. */
 export const EMBED_LIMITS = { maxInputs: 256, maxTotalChars: 500_000 } as const;
@@ -39,6 +41,8 @@ export interface EmbedForOwnerOptions {
   agent?: string;
   caller?: CallerClass;
   verifiedApp?: string;
+  /** The request's word on the person's language, for a refusal's sentence. */
+  lang?: RequestLanguage;
   provider?: string;
   fallback?: boolean;
   /** The AI role the call runs as (services/ai/roles.ts). A named model or provider wins over it. */
@@ -73,6 +77,7 @@ export async function embedForOwner(
   const plan = await prepareAiCall(storage, config, gaii, {
     op: 'embed', model: opts.model, appId: opts.appId, ...(opts.agent ? { agent: opts.agent } : {}),
     ...(opts.caller ? { caller: opts.caller } : {}), ...(opts.verifiedApp ? { verifiedApp: opts.verifiedApp } : {}),
+    ...(opts.lang ? { lang: opts.lang } : {}),
     ...(opts.provider ? { provider: opts.provider } : {}), ...(opts.fallback !== undefined ? { fallback: opts.fallback } : {}),
     ...(opts.role ? { role: opts.role } : {}),
   });

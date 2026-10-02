@@ -8374,6 +8374,7 @@
       "aiTask.signIn": "Sign in to ask your AI.",
       "aiTask.signInBtn": "Sign in",
       "aiTask.off": "Your AI is not ready for this app.",
+      "aiTask.openSettings": "Open AI settings",
       "aiTask.copyTitle": "Or use your own AI chat",
       "aiTask.answer": "The AI answer",
       "aiTask.model": "Model: {model}",
@@ -8424,6 +8425,7 @@
       "aiTask.signIn": "Kirjaudu sisään, niin voit kysyä tekoälyltäsi.",
       "aiTask.signInBtn": "Kirjaudu sisään",
       "aiTask.off": "Tekoälysi ei ole valmis tätä sovellusta varten.",
+      "aiTask.openSettings": "Avaa tekoälyasetukset",
       "aiTask.copyTitle": "Tai käytä omaa tekoälykeskusteluasi",
       "aiTask.answer": "Tekoälyn vastaus",
       "aiTask.model": "Malli: {model}",
@@ -8474,6 +8476,7 @@
       "aiTask.signIn": "Inicia sesión para preguntarle a tu IA.",
       "aiTask.signInBtn": "Iniciar sesión",
       "aiTask.off": "Tu IA no está lista para esta app.",
+      "aiTask.openSettings": "Abrir los ajustes de IA",
       "aiTask.copyTitle": "O usa tu propio chat de IA",
       "aiTask.answer": "Respuesta de la IA",
       "aiTask.model": "Modelo: {model}",
@@ -18397,7 +18400,7 @@
       try {
         const caps = await lib.capabilities({ app_id: appId });
         const text = caps && caps.capabilities && caps.capabilities.text;
-        if (text && text.on === false) return { avail: "off", fix: String(text.fix || text.message || text.reason || "") };
+        if (text && text.on === false) return { avail: "off", fix: String(text.fix || text.message || text.reason || ""), settingsUrl: String(text.settingsUrl || "") };
         if (text && text.on === true) return { avail: "on", fix: "" };
       } catch (e) {
         console.debug("aimeat-atelier: AI capabilities not read", e);
@@ -18429,7 +18432,26 @@
       });
       out.push(el("div", { class: "ak-" + block + "__bar", "data-ak-part": "bar" }, [b]));
     }
+    if (st.avail === "off" && st.settingsUrl) {
+      out.push(el("div", { class: "ak-" + block + "__bar", "data-ak-part": "bar" }, [settingsLink(st.settingsUrl)]));
+    }
     return out;
+  }
+  function settingsLink(url) {
+    return el("a", { class: "ak-btn ak-btn--primary", href: url, target: "_blank", rel: "noopener", "data-ak-part": "settings" }, tai("aiTask.openSettings"));
+  }
+  function errorOf(e) {
+    return {
+      code: e && e.code,
+      message: e && e.message ? e.message : String(e || ""),
+      ...e && e.fix ? { fix: String(e.fix) } : {},
+      ...e && e.settingsUrl ? { settingsUrl: String(e.settingsUrl) } : {}
+    };
+  }
+  function paintFailure(p, err) {
+    p.textContent = err ? errorWords(err) : "";
+    if (err && err.settingsUrl) p.append(" ", settingsLink(err.settingsUrl));
+    p.hidden = !err;
   }
   function sampleMark() {
     const b = sampleBadge2();
@@ -18476,6 +18498,7 @@
   function errorWords(e) {
     const code = e && e.code === "JSON_PARSE_FAILED" ? "JSON_SCHEMA_MISMATCH" : e && e.code;
     if (code && CODES.indexOf(code) >= 0) return tai("aiTask.err." + code);
+    if (e && e.fix) return String(e.fix);
     const why = e && e.message ? String(e.message) : "";
     return why ? tai("aiTask.err.generic", { why }) : tai("aiTask.err.noReason");
   }
@@ -18487,6 +18510,7 @@
     const state = {
       avail: "checking",
       fix: "",
+      settingsUrl: "",
       text: "",
       busy: false,
       /** @type {any} */
@@ -18522,6 +18546,7 @@
       if (mine !== gen || dead) return;
       state.avail = r.avail;
       state.fix = r.fix;
+      state.settingsUrl = r.settingsUrl || "";
       build();
     }
     function sampleAnswer() {
@@ -18651,10 +18676,7 @@
         parts.status.classList.toggle("ak-sr-only", !state.busy);
       }
       paintCopy(why);
-      if (parts.failure) {
-        parts.failure.textContent = state.error ? errorWords(state.error) : "";
-        parts.failure.hidden = !state.error;
-      }
+      if (parts.failure) paintFailure(parts.failure, state.error);
     }
     function paintCopy(why) {
       const host = panel ? (
@@ -18741,7 +18763,7 @@
         state.answer = r;
         return r;
       }, function(e) {
-        if (!(e && e.code === "SPEND_CANCELLED")) state.error = { code: e && e.code, message: e && e.message ? e.message : String(e || "") };
+        if (!(e && e.code === "SPEND_CANCELLED")) state.error = errorOf(e);
         return null;
       }).then(function(r) {
         state.busy = false;
@@ -18860,6 +18882,7 @@
     const state = {
       avail: "checking",
       fix: "",
+      settingsUrl: "",
       text: "",
       busy: false,
       /** Ask was pressed on an empty box; the line under it says why nothing happened. */
@@ -18905,6 +18928,7 @@
       if (mine !== gen || dead) return;
       state.avail = r.avail;
       state.fix = r.fix;
+      state.settingsUrl = r.settingsUrl || "";
       build();
     }
     function shown() {
@@ -19087,8 +19111,7 @@
         parts.status.classList.toggle("ak-sr-only", !state.busy);
       }
       if (parts.failure) {
-        parts.failure.textContent = state.error ? errorWords(state.error) : "";
-        parts.failure.hidden = !state.error;
+        paintFailure(parts.failure, state.error);
       }
     }
     function handOut() {
@@ -19157,7 +19180,7 @@
         const i = state.history.lastIndexOf(asked);
         if (i >= 0) state.history.splice(i, 1);
         if (!state.text) state.text = q;
-        if (!(e && e.code === "SPEND_CANCELLED")) state.error = { code: e && e.code, message: e && e.message ? e.message : String(e || "") };
+        if (!(e && e.code === "SPEND_CANCELLED")) state.error = errorOf(e);
         return null;
       }).then(function(turn) {
         state.busy = false;
@@ -26838,7 +26861,7 @@
       file: "members.js"
     },
     "aiChat": {
-      parts: ["root", "title", "sample", "hint", "notice", "signIn", "chatNotice", "log", "empty", "turn", "who", "question", "aiLabel", "body", "meta", "model", "made", "truncated", "failure", "form", "field", "label", "input", "bar", "send", "clear", "reason", "status"],
+      parts: ["root", "title", "sample", "hint", "notice", "signIn", "settings", "chatNotice", "log", "empty", "turn", "who", "question", "aiLabel", "body", "meta", "model", "made", "truncated", "failure", "form", "field", "label", "input", "bar", "send", "clear", "reason", "status"],
       slots: [],
       variants: ["compact"],
       tokens: ["--ak-ai-width"],
@@ -26846,7 +26869,7 @@
       file: "ai-chat.js"
     },
     "aiTask": {
-      parts: ["root", "title", "sample", "hint", "notice", "signIn", "field", "label", "input", "reason", "bar", "run", "status", "failure", "result", "aiLabel", "body", "meta", "model", "made", "cost", "truncated", "copyRoute", "copyTitle"],
+      parts: ["root", "title", "sample", "hint", "notice", "signIn", "settings", "field", "label", "input", "reason", "bar", "run", "status", "failure", "result", "aiLabel", "body", "meta", "model", "made", "cost", "truncated", "copyRoute", "copyTitle"],
       slots: [],
       variants: ["compact"],
       tokens: ["--ak-ai-width"],

@@ -8,10 +8,10 @@
       "note": "one row added to the language table (a task that waits for the owner); it does not change what the skill does; Jouni decided, 2026-10-02"
     },
     "aimeat-ai-capabilities": {
-      "digest": "sha256:d63709d870aee8d593e5bb5a",
+      "digest": "sha256:485bf557e6f87ddc278c013e",
       "decision": "skipped",
-      "on": "2026-09-28",
-      "note": "section 2b: context, connection needs every capability, roles() is the app's own; Jouni 2026-09-28 ('tee' to the proposed skip)"
+      "on": "2026-10-02",
+      "note": "fix/settingsUrl/agentFix fields and one instruction added, cases and structure unchanged; Jouni decided 2026-10-02"
     }
   }
 }

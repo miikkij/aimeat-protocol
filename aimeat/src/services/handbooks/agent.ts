@@ -7,6 +7,8 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/mcp/catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.24.0 -- 2026-10-02 -- An AI that is off: tell the owner `fix` and give them `settingsUrl`;
+ *     `agentFix` is the agent's; for UNTESTED offer to run aimeat_ai_provider_test with their yes.
  *   v1.23.0 -- 2026-10-02 -- When the person asks for a new agent (new-agent.ts): look at their
  *     organisms and workspaces, propose it here, give them the approval address. The boundary line no
  *     longer sends agent management to admin wholesale.
@@ -223,13 +225,17 @@ with \`provider\`, or let the owner's routing choose and fall back. \`aimeat_ai_
 one (an image test costs a picture: ask first). \`aimeat_ai_routing_set\` proposes which provider comes
 first per capability and the fallback rules; the owner confirms. A key is set only by the owner on
 the web page: never ask for one in chat. A refusal \`AI_CAPABILITY_UNAVAILABLE\` lists each provider
-with the reason it was left out; pass the fix to your owner. Skill: configure-routing.
+with the reason it was left out; tell your owner its \`fix\` (their sentence) and give them its
+\`settingsUrl\`, which opens their AI settings where it is fixed; \`agentFix\` is for you. When the
+reason is UNTESTED, offer to run the test yourself: with your owner's yes, \`aimeat_ai_provider_test\`
+with the provider in \`testProvider\` (a text test costs a fraction of a cent). Skill: configure-routing.
 \`aimeat_ai_roles\` lists your owner's AI roles (what a model is used for) and the app roles that wait for a binding (\`requestedAt\`); pass a role id as \`role\` in an AI call.
 \`aimeat_ai_role_set\` proposes a change to a role, or binds an app's role to one of your owner's; the owner confirms, and an app's role runs only once bound.
 
 **AI capabilities.** Your first AI call is \`aimeat_ai_capabilities\`: per capability (text, vision,
 files, image, speech, transcription, embed) whether it is on for you, the model, the price, and for one
-that is off the \`reason\` and a \`fix\`: do it or pass it to your owner. \`aimeat_ai_models\` lists the
+that is off the \`reason\`, \`agentFix\` (what you can do) and \`fix\` with \`settingsUrl\` (what to tell
+your owner, and the link that takes them there). \`aimeat_ai_models\` lists the
 catalogue. \`aimeat_ai_transcribe\` turns a stored audio file into text; \`aimeat_ai_embed\` makes
 vectors, and only when word search has proved not enough. When your owner has a provider and no
 model policy, suggest the recommended models once. A key is given by a person on the web page, never

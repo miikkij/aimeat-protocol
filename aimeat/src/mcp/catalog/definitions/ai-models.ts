@@ -7,6 +7,7 @@
  *   and the shell dispatch (src/tool-dispatch/tool-call-defs-ai-models.ts) all read their name,
  *   description and input from here.
  * @version-history
+ *   v1.3.2 — 2026-10-02 — aimeat_ai_capabilities names agentFix, fix and settingsUrl.
  *   v1.3.1 — 2026-09-28 — aimeat_ai_role_set's bindings: null also dismisses the app's request; a role
  *     that lacks a capability the app's role needs is refused.
  *   v1.3.0 — 2026-09-28 — AI roles: aimeat_ai_roles and aimeat_ai_role_set; `role` (AI_ROLE_PARAM) on
@@ -96,7 +97,8 @@ export const aiModelTools: AimeatToolDefinition[] = [
       + 'per capability (text, vision, files, image, speech, transcription, embed), whether it is on for you right now, '
       + 'the model and provider a call would use, its price from the model catalogue, and a one-line howTo. For a '
       + 'capability that is off: the reason (NO_MODEL, NO_PROVIDER_SUPPORTS, NO_KEY, POLICY_EMPTY, BUDGET_EXHAUSTED, '
-      + 'RETIRED_MODEL, UNTESTED, APP_NOT_ALLOWED) and a fix you can do or pass to the owner. Also the '
+      + 'RETIRED_MODEL, UNTESTED, APP_NOT_ALLOWED), agentFix (what you can do), fix (the sentence to tell the owner, in their language) '
+      + 'and settingsUrl (the link that opens their AI settings where it is fixed). Also the '
       + 'owner\'s model policy, today\'s budget, and the guide skill (aimeat-ai-capabilities). Spends nothing.',
     input: {
       app_id: { type: 'string', description: 'The app you act for, when you do: its own model list and preferences count.' },

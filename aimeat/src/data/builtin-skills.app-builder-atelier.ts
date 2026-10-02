@@ -13,6 +13,8 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.28.1 — 2026-10-02 — Kit 0.64.0: aiTask, when the person's AI is off, says why in their words
+ *     with a button to their AI settings.
  *   v1.28.0 — 2026-10-02 — Kit 0.63.0: aiChat, a kept aiTask answer, and the props the app migration
  *     asked for (decision, workspaceTeam, workspacePicker, intake, dropzone, connections inside an
  *     app, a Classic page and the look on <html>). Read against describe-data.js after they joined.
@@ -277,7 +279,8 @@ moved under you says so.
    owner's outside accounts are \`connections({ target, need })\` (over \`aimeat-connect.js\`).
    The same goes for a workflow step waiting for the person (\`workflowInput\`, over
    \`aimeat-workflows.js\`), one question to the person's own AI with its answer, AI label, model and
-   cost (\`aiTask\`, over \`aimeat-ai.js\`; a model choice is the form field type \`model\`), one
+   cost, and when their AI is off the reason in their words with a button to their AI settings
+   (\`aiTask\`, over \`aimeat-ai.js\`; a model choice is the form field type \`model\`), one
    markdown document (\`doc\`, over \`aimeat-markdown.js\`), one decision rule with its review
    (\`decision\`, over \`aimeat-decide.js\`), uploads (\`dropzone({ upload })\`, over
    \`aimeat-storage.js\`), copying text (\`AIMEAT.atelier.copy(text)\`), and prices from

@@ -32,7 +32,7 @@
  *   hands a copy to onTurn(history) after every answer and after Start over; `history` in the spec
  *   (or set({ history })) draws a kept one again, labels included, because each answer turn keeps
  *   its provenance. Nothing here fetches or writes memory.
- * @parts aiChat root · title · sample · hint · notice · signIn · chatNotice · log · empty · turn · who · question · aiLabel · body · meta · model · made · truncated · failure · form · field · label · input · bar · send · clear · reason · status
+ * @parts aiChat root · title · sample · hint · notice · signIn · settings · chatNotice · log · empty · turn · who · question · aiLabel · body · meta · model · made · truncated · failure · form · field · label · input · bar · send · clear · reason · status
  * @variants aiChat compact
  * @tokens aiChat --ak-ai-width
  * @fork aiChat Copying it out means building the grounded prompt from the document and the turns yourself, calling AIMEAT.ai.complete(), chatNotice() and disclose() per answer, AIMEAT.md.render(), writing the no-AI, signed-out and error words in three languages, and holding Ask busy.
@@ -43,13 +43,16 @@
  *     onTurn: (h) => AIMEAT.data.set('my-app.analyses.' + analysis.id, { ...analysis, chat: h }) });
  *   chat.ask('What must the CV contain?');
  * @version-history
+ *   v0.64.0 — 2026-10-02 — With the AI off, the notice carries an Open AI settings button to the
+ *     node's `settingsUrl`; a refused turn's failure line says the node's sentence for the person and
+ *     carries the same button (ai-task.js errorOf, paintFailure).
  *   v0.63.0 — 2026-10-02 — Initial.
  */
 import { el, clear, resolve, uid, enter, attention } from './dom.js';
 import { tai } from './ai-task-i18n.js';
 import { watch } from './members-shared.js';
 import { applyVariant } from './parts-model.js';
-import { aiOf, signedOut, unset, errorWords, probeAi, aiNotice, aiLabelInto, drawText, madeWhen, sampleMark } from './ai-task.js';
+import { aiOf, signedOut, unset, errorOf, paintFailure, probeAi, aiNotice, aiLabelInto, drawText, madeWhen, sampleMark } from './ai-task.js';
 
 /** The instructions sent with every question unless the app gives its own `systemPrompt`. */
 const DEFAULT_SYSTEM = 'You answer follow-up questions about one document. Answer from the document '
@@ -136,6 +139,7 @@ export function aiChat(spec) {
   const state = {
     avail: 'checking',
     fix: '',
+    settingsUrl: '',
     text: '',
     busy: false,
     /** Ask was pressed on an empty box; the line under it says why nothing happened. */
@@ -177,6 +181,7 @@ export function aiChat(spec) {
     if (mine !== gen || dead) return;
     state.avail = r.avail;
     state.fix = r.fix;
+    state.settingsUrl = r.settingsUrl || '';
     build();
   }
 
@@ -365,8 +370,7 @@ export function aiChat(spec) {
       parts.status.classList.toggle('ak-sr-only', !state.busy);
     }
     if (parts.failure) {
-      parts.failure.textContent = state.error ? errorWords(state.error) : '';
-      parts.failure.hidden = !state.error;
+      paintFailure(parts.failure, state.error);
     }
   }
 
@@ -443,7 +447,7 @@ export function aiChat(spec) {
       if (i >= 0) state.history.splice(i, 1);
       if (!state.text) state.text = q;
       // A cancelled spend confirm is the person's own no: nothing to say.
-      if (!(e && e.code === 'SPEND_CANCELLED')) state.error = { code: e && e.code, message: e && e.message ? e.message : String(e || '') };
+      if (!(e && e.code === 'SPEND_CANCELLED')) state.error = errorOf(e);
       return null;
     }).then(function (turn) {
       state.busy = false;

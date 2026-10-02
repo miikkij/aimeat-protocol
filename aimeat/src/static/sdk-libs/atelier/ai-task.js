@@ -12,7 +12,8 @@
  *                 words; without it one sentence that names aimeat-ai.js
  *     signed out  a Sign in button through AIMEAT.auth.signIn() when the page has it
  *     unavailable capabilities({ app_id }).capabilities.text.on is false (isAvailable() on a node
- *                 that does not answer capabilities): the library's own `fix` sentence
+ *                 that does not answer capabilities): the node's `fix` sentence for the person,
+ *                 and an Open AI settings button to its `settingsUrl`
  *     ready       the box and the run button; an empty box, or one under `minChars`, keeps the
  *                 button off and says why under it
  *     busy        the button is held busy and a status line says the AI is working
@@ -39,12 +40,13 @@
  *   prompt into any AI chat and paste the answer back, for a person whose AI is not connected here.
  *   A pasted answer is drawn like a model answer, says where it came from, and reaches onResult with
  *   `pasted: true` and no provenance record.
- * @parts aiTask root · title · sample · hint · notice · signIn · field · label · input · reason · bar · run · status · failure · result · aiLabel · body · meta · model · made · cost · truncated · copyRoute · copyTitle
+ * @parts aiTask root · title · sample · hint · notice · signIn · settings · field · label · input · reason · bar · run · status · failure · result · aiLabel · body · meta · model · made · cost · truncated · copyRoute · copyTitle
  * @variants aiTask compact
  * @tokens aiTask --ak-ai-width
  * @fork aiTask Copying it out means calling AIMEAT.ai.capabilities(), complete() or completeJson(), disclose() and AIMEAT.md.render() yourself, writing the no-AI, signed-out and error words in three languages, holding the button busy, and drawing a stored answer again with its label and date.
  * @structure exported helpers, shared with ai-chat.js (aiOf · authOf · signedOut · unset · money ·
- *   errorWords · probeAi · aiNotice · sampleMark · aiLabelInto · drawText · madeWhen) · aiTask(spec)
+ *   errorWords · errorOf · paintFailure · settingsLink · probeAi · aiNotice · sampleMark · aiLabelInto ·
+ *   drawText · madeWhen) · aiTask(spec)
  * @usage
  *   AIMEAT.atelier.aiTask({ target: '#ask', appId: 'my-app', title: 'Read my situation',
  *     input: { placeholder: 'Describe it in your own words', minChars: 10 },
@@ -56,6 +58,11 @@
  *     onResult: (r) => AIMEAT.data.set('my-app.analyses.' + id, r) });
  *   task.show(await AIMEAT.data.get('my-app.analyses.' + id));
  * @version-history
+ *   v0.64.0 — 2026-10-02 — The way to the fix: with the AI off, the notice carries an Open AI
+ *     settings button (part `settings`) to the node's `settingsUrl`, which opens the person's AI
+ *     settings at the provider to fix; a refused call's failure line says the node's sentence for the
+ *     person (`fix`) and carries the same button. errorOf, paintFailure and settingsLink are exported
+ *     for aiChat.
  *   v0.63.0 — 2026-10-02 — A stored result: `result` in the spec and show(result) on the handle draw
  *     an answer the app kept, with its AI label, model and date, without calling the AI. A fresh
  *     result gets `at`. render(result, host) draws both. The meta line has the date (part `made`).
@@ -101,7 +108,7 @@ export function unset(v) {
  * without making it.
  * @param {string} appId
  * @param {boolean} sample  the block is a sample, so nothing is asked
- * @returns {Promise<{ avail: 'sample'|'nolib'|'signedout'|'off'|'on', fix: string }>}
+ * @returns {Promise<{ avail: 'sample'|'nolib'|'signedout'|'off'|'on', fix: string, settingsUrl?: string }>}
  */
 export async function probeAi(appId, sample) {
   if (sample) return { avail: 'sample', fix: '' };
@@ -112,7 +119,7 @@ export async function probeAi(appId, sample) {
     try {
       const caps = await lib.capabilities({ app_id: appId });
       const text = caps && caps.capabilities && caps.capabilities.text;
-      if (text && text.on === false) return { avail: 'off', fix: String(text.fix || text.message || text.reason || '') };
+      if (text && text.on === false) return { avail: 'off', fix: String(text.fix || text.message || text.reason || ''), settingsUrl: String(text.settingsUrl || '') };
       if (text && text.on === true) return { avail: 'on', fix: '' };
     } catch (e) {
       // A node without GET /v1/ai/capabilities: isAvailable() below answers instead.
@@ -130,8 +137,10 @@ export async function probeAi(appId, sample) {
  * The line that says why the AI route is not here and what to do, with a Sign in button through
  * AIMEAT.auth.signIn() when nobody is signed in and the page has the library. Empty when the
  * route is here.
+ * With the AI off and the node's `settingsUrl`, an Open AI settings button that opens the person's
+ * AI settings at the provider to fix, with its test chosen when a test is the fix.
  * @param {string} block  the BEM block of the caller, e.g. 'aitask' or 'aichat'
- * @param {{ avail: string, fix: string }} st
+ * @param {{ avail: string, fix: string, settingsUrl?: string }} st
  * @param {boolean} [copy]  the block offers the copy-the-prompt route
  * @returns {HTMLElement[]}
  */
@@ -152,7 +161,45 @@ export function aiNotice(block, st, copy) {
     });
     out.push(el('div', { class: 'ak-' + block + '__bar', 'data-ak-part': 'bar' }, [b]));
   }
+  if (st.avail === 'off' && st.settingsUrl) {
+    out.push(el('div', { class: 'ak-' + block + '__bar', 'data-ak-part': 'bar' }, [settingsLink(st.settingsUrl)]));
+  }
   return out;
+}
+
+/**
+ * The button that opens the person's AI settings where the node says the fix is (the `settingsUrl`
+ * of a capability that is off, or of a refused call). A new tab, so the app stays where it was.
+ * @param {string} url
+ * @returns {HTMLElement}
+ */
+export function settingsLink(url) {
+  return el('a', { class: 'ak-btn ak-btn--primary', href: url, target: '_blank', rel: 'noopener', 'data-ak-part': 'settings' }, tai('aiTask.openSettings'));
+}
+
+/**
+ * What a failed call leaves for the failure line: the code and message, and the node's sentence for
+ * the person and its settings link when the refusal carries them (AIMEAT.ai errors lift both).
+ * @param {any} e
+ * @returns {{ code?: string, message: string, fix?: string, settingsUrl?: string }}
+ */
+export function errorOf(e) {
+  return {
+    code: e && e.code, message: e && e.message ? e.message : String(e || ''),
+    ...(e && e.fix ? { fix: String(e.fix) } : {}), ...(e && e.settingsUrl ? { settingsUrl: String(e.settingsUrl) } : {}),
+  };
+}
+
+/**
+ * The failure line: the words for the error, and the Open AI settings button when the node named
+ * where the fix is.
+ * @param {HTMLElement} p
+ * @param {{ code?: string, message?: string, fix?: string, settingsUrl?: string }|null} err
+ */
+export function paintFailure(p, err) {
+  p.textContent = err ? errorWords(err) : '';
+  if (err && err.settingsUrl) p.append(' ', settingsLink(err.settingsUrl));
+  p.hidden = !err;
 }
 
 /** The kit's sample badge, named as a part of the AI blocks. @returns {HTMLElement} */
@@ -222,13 +269,16 @@ export function money(v, currency) {
 const CODES = ['NO_API_KEY', 'INVALID_API_KEY', 'QUOTA_EXHAUSTED', 'APP_QUOTA_EXHAUSTED', 'RATE_LIMITED', 'JSON_SCHEMA_MISMATCH'];
 
 /**
- * The words for a failed call, in the current language.
- * @param {{ code?: string, message?: string }} e
+ * The words for a failed call, in the current language: the kit's own for the codes it knows, else
+ * the node's sentence for the person (`fix`), else the message.
+ * @param {{ code?: string, message?: string, fix?: string }} e
  * @returns {string}
  */
 export function errorWords(e) {
   const code = e && e.code === 'JSON_PARSE_FAILED' ? 'JSON_SCHEMA_MISMATCH' : (e && e.code);
   if (code && CODES.indexOf(code) >= 0) return tai('aiTask.err.' + code);
+  // The node's own sentence for the person (an AI that is off, and what turns it on).
+  if (e && e.fix) return String(e.fix);
   const why = e && e.message ? String(e.message) : '';
   return why ? tai('aiTask.err.generic', { why: why }) : tai('aiTask.err.noReason');
 }
@@ -293,6 +343,7 @@ export function aiTask(spec) {
   const state = {
     avail: 'checking',
     fix: '',
+    settingsUrl: '',
     text: '',
     busy: false,
     /** @type {any} */
@@ -330,6 +381,7 @@ export function aiTask(spec) {
     if (mine !== gen || dead) return;
     state.avail = r.avail;
     state.fix = r.fix;
+    state.settingsUrl = r.settingsUrl || '';
     build();
   }
 
@@ -456,10 +508,7 @@ export function aiTask(spec) {
       parts.status.classList.toggle('ak-sr-only', !state.busy);
     }
     paintCopy(why);
-    if (parts.failure) {
-      parts.failure.textContent = state.error ? errorWords(state.error) : '';
-      parts.failure.hidden = !state.error;
-    }
+    if (parts.failure) paintFailure(parts.failure, state.error);
   }
 
   /**
@@ -559,7 +608,7 @@ export function aiTask(spec) {
       return r;
     }, function (e) {
       // A cancelled spend confirm is the person's own no: nothing to say.
-      if (!(e && e.code === 'SPEND_CANCELLED')) state.error = { code: e && e.code, message: e && e.message ? e.message : String(e || '') };
+      if (!(e && e.code === 'SPEND_CANCELLED')) state.error = errorOf(e);
       return null;
     }).then(function (r) {
       state.busy = false;

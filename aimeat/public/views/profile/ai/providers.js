@@ -9,10 +9,14 @@
  *   for moving on) and the model policy (open, the recommended models, or the owner's own list, and
  *   whose calls it covers). Pure render over ctx.pv (ai/use-providers.js), on the page's existing
  *   components.
- * @structure secProviders · providerRow · providerOpen · addForm · classifierOptions · classifierRow ·
+ * @structure secProviders · offLines · providerRow · providerOpen · addForm · classifierOptions · classifierRow ·
  *   secRouting · secPolicy
  * @usage import { secProviders, secRouting, secPolicy } from './ai/providers.js';
  * @version-history
+ *   v1.3.1 — 2026-10-02 — Above the providers, a line for each capability that is off for a reason the
+ *     person can fix here, with Test now when a test turns it on, and one for a capability whose
+ *     provider failed its last test (offLines); an owner's provider with an untested or failing
+ *     capability has Test now on its collapsed row, which opens it at that test and runs it.
  *   v1.3.0 — 2026-09-29 — Jouni's review: in the routing editor the Content Classifier's row has a
  *     select like the other rows (the decision model, each decision provider, the text routing, each
  *     text provider), saved with them; its status line stays under it; a daily cap of none says so.
@@ -45,7 +49,7 @@ import { Hint } from '/components/Hint.js';
 import { Action, Loud, Actions } from '/components/Action.js';
 import { Row as Line, Space } from '/components/Layout.js';
 import { x, dateWord } from './frame.js';
-import { CAPS, PROVIDER_TYPES, slug, capPatchOf } from './use-providers.js';
+import { CAPS, PROVIDER_TYPES, slug, capPatchOf, testableCapOf } from './use-providers.js';
 import { t } from '/js/i18n.js';
 
 const msg = (m) => (m ? html`<${Note} kind="message" error=${!!m.error}>${m.text}<//>` : null);
@@ -78,6 +82,7 @@ export function secProviders(ctx, num) {
   return html`
     <${PageSection} id="ai-providers" num=${num} title=${x('pv.title')} count=${count}>
       <${Note} kind="lead">${x('pv.lead')}<//>
+      ${offLines(ctx)}
       ${pv.error ? html`<${Note} kind="message" error>${pv.error}<//>` : null}
       ${!pv.view && !pv.error ? html`<${Note} kind="loading">${x('loading')}<//>` : null}
       ${pv.view ? html`
@@ -92,18 +97,52 @@ export function secProviders(ctx, num) {
     <//>`;
 }
 
+/**
+ * What is off, above the providers: one line per capability, with what stopped it, and Test now when
+ * a test turns it on. The person is already on the page the node's `fix` sends them to, so the line
+ * is the first half of that sentence (`off.<reason>`) and the button is the second.
+ */
+function offLines(ctx) {
+  const pv = ctx.pv;
+  if (!pv.off.length && !pv.failing.length) return null;
+  const testNow = (p, cap) => html`<${Action} small disabled=${pv.busy === 'test'} onClick=${() => pv.testNow(p, cap)}>${x('pv.testNow')}<//>`;
+  const rows = pv.off.map((o) => {
+    const p = o.testProvider ? pv.find(o.testProvider.id) : null;
+    const what = o.reason === 'UNTESTED' && !p ? 'off.UNTESTED_ANY' : 'off.' + o.reason;
+    return {
+      key: 'off-' + o.cap,
+      k: x('cap.' + o.cap),
+      state: 'attention',
+      v: x(what, { cap: x('cap.' + o.cap), provider: p ? p.title : '' }),
+      actions: p ? testNow(p, o.testProvider.capability) : null,
+    };
+  }).concat(pv.failing.map((f) => ({
+    key: 'failing-' + f.cap,
+    k: x('cap.' + f.cap),
+    state: 'danger',
+    v: x('off.FAILING', { provider: f.provider.title }),
+    actions: testNow(f.provider, f.cap),
+  })));
+  return html`<${Space} below="medium"><${Note} kind="state" tone="attention">${x('pv.offLead')}<//><${Facts} rows=${rows} /><//>`;
+}
+
 function providerRow(ctx, p) {
   const pv = ctx.pv;
   const open = pv.openId === p.id;
   const own = p.source === 'owner';
   const caps = enabledCaps(p);
+  // Test now on the collapsed row only: an opened row has its own test at the foot of the panel.
+  const testable = open ? null : testableCapOf(p);
   const meta = [x('ptype.' + p.type), own ? '' : x('pv.fromNode')].filter(Boolean).join(' · ');
   return html`
     <${Row} key=${p.id} open=${open} id=${'ai-provider-' + p.id}>
       <${Name} meta=${meta} warn=${!!p.problem}>${p.title}<//>
       <${Desc} sub=${p.problem || p.data_statement || ''}>${caps.length ? caps.map((c) => x('cap.' + c)).join(' · ') : x('pv.noCaps')}<//>
       <${Who} sub=${healthWords(p)} warn=${own && p.auth?.type === 'key' && !p.auth?.has_key}>${keyWords(p)}<//>
-      <${Doors}>${own ? html`<${Action} small row onClick=${() => pv.toggle(p.id)}>${open ? x('close') : x('change')}<//>` : null}<//>
+      <${Doors}>
+        ${testable ? html`<${Action} small row disabled=${pv.busy === 'test'} onClick=${() => pv.testNow(p, testable)}>${x('pv.testNow')}<//>` : null}
+        ${own ? html`<${Action} small row onClick=${() => pv.toggle(p.id)}>${open ? x('close') : x('change')}<//>` : null}
+      <//>
       ${open && own ? providerOpen(ctx, p) : null}
     <//>`;
 }

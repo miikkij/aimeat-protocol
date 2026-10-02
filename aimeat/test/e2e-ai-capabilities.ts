@@ -17,6 +17,11 @@
  *   calls aimeat_ai_capabilities and gets a fix for a capability that is off.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-capabilities.ts
  * @version-history
+ *   v1.1.0 — 2026-10-02 — An UNTESTED capability leads the person to the test: `fix` is their sentence
+ *     (no tool names) in the cookie's or the browser's language, `settingsUrl` opens the provider at
+ *     its text test, `testProvider` names it, and a refused /v1/ai/complete carries the same in
+ *     error.details. The AI-facing words moved from `fix` to `agentFix`, so tests 2, 5, 6 and 13 read
+ *     them there (their setup no longer matched the contract; the source was right).
  *   v1.0.0 — 2026-09-28 — Initial (V5 of the System 2 plan).
  */
 import * as ed from '@noble/ed25519';
@@ -228,7 +233,8 @@ const toolJson = (r: any) => JSON.parse(String(r?.result?.content?.[0]?.text ?? 
     await test('2. PASS: an AI calls aimeat_ai_capabilities and gets a fix it can pass on', async () => {
       const agent = await connectAgent(b, 'capbot', ['ai:use']);
       const out = toolJson(await mcpCall(agent, 'aimeat_ai_capabilities', {}));
-      assert(out.capabilities?.image?.on === false && /AI settings page/.test(out.capabilities.image.fix), `tool answer: ${JSON.stringify(out.capabilities?.image)}`);
+      const img = out.capabilities?.image;
+      assert(img?.on === false && /AI settings page/.test(img.agentFix) && /AI settings/.test(img.fix) && img.settingsUrl === `${BASE}/v1/profile?tab=ai&open=ai-providers`, `tool answer: ${JSON.stringify(img)}`);
     });
 
     await test('3. an owner provider that is not tested yet: UNTESTED, and the provider test of speech and embeddings works', async () => {
@@ -236,6 +242,22 @@ const toolJson = (r: any) => JSON.parse(String(r?.result?.content?.[0]?.text ?? 
       assert((await setKey(a, 'my-openai', 'sk-openai-a')).status === 200, 'key');
       const before = (await caps(a.token)).body.data.capabilities;
       assert(before.text.on === false && before.text.reason === 'UNTESTED', `text: ${JSON.stringify(before.text)}`);
+      // The person is led to the test (Jouni 2026-10-02): a sentence for them with no tool names, a
+      // link that opens this provider at its text test, and the tool for an AI in agentFix.
+      assert(before.text.fix.includes('My OpenAI') && before.text.fix.includes('Test now') && !/aimeat_|\{/.test(before.text.fix), `person's fix: ${before.text.fix}`);
+      assert(before.text.settingsUrl === `${BASE}/v1/profile?tab=ai&open=ai-provider-my-openai&test=text`, `settingsUrl: ${before.text.settingsUrl}`);
+      assert(before.text.testProvider?.id === 'my-openai' && before.text.testProvider.capability === 'text', `testProvider: ${JSON.stringify(before.text.testProvider)}`);
+      assert(/aimeat_ai_provider_test/.test(before.text.agentFix), `agentFix: ${before.text.agentFix}`);
+      // In the person's language: the interface's cookie first, then the browser's.
+      const fi = (await json('/v1/ai/capabilities', { headers: { ...auth(a.token), 'accept-language': 'fi-FI,fi;q=0.9' } })).body.data.capabilities.text;
+      assert(fi.fix.startsWith('Tekoälyn tarjoajaasi My OpenAI ei ole vielä testattu.') && fi.fix.includes('Testaa nyt'), `fi fix: ${fi.fix}`);
+      const es = (await json('/v1/ai/capabilities', { headers: { ...auth(a.token), 'accept-language': 'fi', cookie: 'aimeat-lang=es' } })).body.data.capabilities.text;
+      assert(es.fix.includes('aún no se ha probado'), `es fix (cookie over browser): ${es.fix}`);
+      // A refused call carries the same in error.details, for an app to show.
+      const refused = await json('/v1/ai/complete', { method: 'POST', headers: { ...auth(a.token), 'accept-language': 'fi' }, body: JSON.stringify({ prompt: 'One word.', app_id: 'cap-e2e' }) });
+      const d = refused.body?.error?.details ?? {};
+      assert(refused.status === 400 && refused.body.error.code === 'AI_CAPABILITY_UNAVAILABLE' && d.reason === 'UNTESTED', `refusal: ${refused.status} ${JSON.stringify(refused.body?.error)}`);
+      assert(d.fix.includes('Testaa nyt') && d.settingsUrl === before.text.settingsUrl && /aimeat_ai_provider_test/.test(d.agentFix), `refusal details: ${JSON.stringify(d)}`);
       for (const capability of ['text', 'embed', 'speech']) {
         const t = await json('/v1/ai/providers/my-openai/test', { method: 'POST', headers: auth(a.token), body: JSON.stringify({ capability }) });
         assert(t.status === 200 && t.body.data.ok === true, `${capability} test ${t.status}: ${JSON.stringify(t.body?.error ?? t.body?.data)}`);
@@ -274,7 +296,7 @@ const toolJson = (r: any) => JSON.parse(String(r?.result?.content?.[0]?.text ?? 
       })).status === 200, 'put c-openai');
       assert((await routing(c, { defaults: { transcription: ['c-openai'] } })).status === 200, 'routing');
       const r = (await caps(c.token)).body.data.capabilities;
-      assert(r.text.on === false && r.text.reason === 'NO_KEY' && /never ask for a key in chat/i.test(r.text.fix), `text: ${JSON.stringify(r.text)}`);
+      assert(r.text.on === false && r.text.reason === 'NO_KEY' && /never ask for a key in chat/i.test(r.text.agentFix) && r.text.fix.includes('no key'), `text: ${JSON.stringify(r.text)}`);
       assert(r.transcription.on === false && r.transcription.reason === 'NO_MODEL', `transcription: ${JSON.stringify(r.transcription)}`);
       assert(r.image.reason === 'NO_PROVIDER_SUPPORTS', `image: ${JSON.stringify(r.image)}`);
     });
@@ -284,7 +306,7 @@ const toolJson = (r: any) => JSON.parse(String(r?.result?.content?.[0]?.text ?? 
       try {
         const r = (await caps(a.token)).body.data;
         assert(r.capabilities.text.on === true, `text stays on: ${JSON.stringify(r.capabilities.text)}`);
-        assert(r.capabilities.image.on === false && r.capabilities.image.reason === 'POLICY_EMPTY' && /aimeat_ai_policy_set/.test(r.capabilities.image.fix), `image: ${JSON.stringify(r.capabilities.image)}`);
+        assert(r.capabilities.image.on === false && r.capabilities.image.reason === 'POLICY_EMPTY' && /aimeat_ai_policy_set/.test(r.capabilities.image.agentFix), `image: ${JSON.stringify(r.capabilities.image)}`);
         assert(r.policy.mode === 'custom' && r.policy.appliesToCaller === true, `policy: ${JSON.stringify(r.policy)}`);
       } finally {
         await setPolicy(a, { mode: 'open' });
@@ -372,7 +394,7 @@ const toolJson = (r: any) => JSON.parse(String(r?.result?.content?.[0]?.text ?? 
       const refresh = await json('/v1/admin/ai/catalog/refresh', { method: 'POST', headers: auth(op.token) });
       assert(refresh.status === 200 && refresh.body.data.written === true, `refresh: ${JSON.stringify(refresh.body)}`);
       const r = (await caps(d.token)).body.data.capabilities;
-      assert(r.text.on === false && r.text.reason === 'RETIRED_MODEL' && /aimeat_ai_models/.test(r.text.fix), `text: ${JSON.stringify(r.text)}`);
+      assert(r.text.on === false && r.text.reason === 'RETIRED_MODEL' && /aimeat_ai_models/.test(r.text.agentFix), `text: ${JSON.stringify(r.text)}`);
     });
   } finally {
     await stopServer(server);

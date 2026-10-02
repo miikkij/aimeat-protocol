@@ -16433,8 +16433,13 @@ paths:
         machine, `chosenBy`, `keySource`, how many `fallbacks` a call has, and the catalogue `price`;
         always a one-line `howTo`. When off: `reason` (NO_MODEL, NO_PROVIDER_SUPPORTS, NO_KEY,
         POLICY_EMPTY, BUDGET_EXHAUSTED, RETIRED_MODEL, UNTESTED, APP_NOT_ALLOWED,
-        UNAVAILABLE), the refusal's `code` and `message`, a `fix` an AI can do or pass on, and for
-        NO_PROVIDER_SUPPORTS the provider types that could serve it. Each capability is planned with the
+        UNAVAILABLE), the refusal's `code` and `message`; `fix`, the sentence for the person in their
+        language (the aimeat-lang cookie, then their account's language, then Accept-Language) with
+        no tool names; `settingsUrl`, the absolute address of their AI settings opened at the provider
+        to fix (`/v1/profile?tab=ai&open=ai-provider-<id>&test=<capability>`, or `open=ai-providers`);
+        `agentFix`, the same fix for an AI; for UNTESTED `testProvider` { id, title, capability }; and
+        for NO_PROVIDER_SUPPORTS the provider types that could serve it. Every AI call's refusal
+        carries the same `reason`, `fix`, `agentFix` and `settingsUrl` in `error.details`. Each capability is planned with the
         same gate a call runs, for this caller (an owner, an agent with its own key and lists, an app
         with its grant and its meta), and nothing is spent. Also the owner's model policy mode and
         whether it binds this caller, today's budget, the catalogue's snapshot, and `guide`, the skill
