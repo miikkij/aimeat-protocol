@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.14.0 — 2026-10-02 — PATCH /v1/agents/:name/runtime-source: an agent reports its own runtime
+ *     (now with `llm`, where its model calls go) without agent:write; a sibling's still need it.
  *   v1.13.0 — 2026-10-02 — PATCH /v1/agents/:name/tags: an agent sets its own tags without
  *     agent:write; a sibling's still need it (auth/self-or-scope.ts).
  *   v1.12.0 — 2026-10-02 — PATCH /v1/agents/:name/task-start, and `task_start`,
@@ -512,10 +514,13 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
    * record the claim and stamp its own time on it, which is the difference between an unanswerable
    * question and one answered by a party who might be wrong.
    *
-   * `agent:write` and the same-owner fence, exactly like run-mode above: the caller here is a fleet
-   * runtime reporting about itself.
+   * The same-owner fence, and `agent:write` for a sibling's record only: the caller here is a fleet
+   * runtime reporting about ITSELF, the act auth/self-or-scope.ts leaves unscoped for tags (ruled
+   * 2026-10-02). Since 2026-10-02 the report also says where the crew's model calls go (`llm`), and
+   * the basic agents hold no agent:write, so with the scope required on their own record a crew
+   * that reports its road would have every task end as refused (aimeat-crewai 0.31.0).
    */
-  router.patch('/v1/agents/:name/runtime-source', requireAuth(), requireScope('agent:write'), async (req, res) => {
+  router.patch('/v1/agents/:name/runtime-source', requireAuth(), requireScopeUnlessSelf('agent:write', config.nodeId), async (req, res) => {
     const outcome = await setAgentRuntimeSource({ storage, config }, req.auth!.owner as string,
       decodeURIComponent(req.params.name as string), req.body?.runtime_source);
     if (!outcome.ok) {

@@ -5,6 +5,8 @@
  *   the words no wildcard carries, which is the half this file used to leave out.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-mcp-scopes
  * @version-history
+ *   v1.5.0 — 2026-10-02 — aimeat_agent_runtime_report: an agent's own report (with `llm`) without
+ *     agent:write, a sibling's refused without it.
  *   v1.4.0 — 2026-10-02 — aimeat_agent_tags_set: an agent's own tags without agent:write, a
  *     sibling's refused without it and allowed with it.
  *   v1.3.0 — 2026-09-24 — The operator's reach inside ordinary tools (security audit A8-1, second
@@ -228,6 +230,20 @@ await test('…and an agent holding agent:write may tag a sibling', async () => 
     const client = await connectMcp(broad.gaii, broad.key);
     const r = await client.call('aimeat_agent_tags_set', { target_agent_name: 'narrowagent', tags: ['role.narrow', 'set.by.broad'] });
     assert(r.ok, `broad agent tagging its sibling: ${JSON.stringify(r.body).slice(0, 300)}`);
+});
+
+// The runtime report is the same act (an agent describing itself), and since 2026-10-02 it carries
+// `llm`, where the crew's model calls go. A basic agent holds no agent:write, so with the tool behind
+// the word a crew reporting its road would have every task end as refused.
+await test('Narrow agent reports its OWN runtime and model road over MCP, and is refused a sibling\'s', async () => {
+    const client = await connectMcp(narrow.gaii, narrow.key);
+    const tools = await client.list();
+    assert(tools.includes('aimeat_agent_runtime_report'), 'aimeat_agent_runtime_report is offered without agent:write');
+    const own = await client.call('aimeat_agent_runtime_report', { target_agent_name: 'narrowagent', kind: 'crew-def', llm: 'node' });
+    assert(own.ok, `its own report: ${JSON.stringify(own.body).slice(0, 300)}`);
+    const sibling = await client.call('aimeat_agent_runtime_report', { target_agent_name: 'broadagent', kind: 'crew-def', llm: 'node' });
+    const text = sibling.body.result?.content?.[0]?.text ?? '';
+    assert(!sibling.ok && text.startsWith('SCOPE_DENIED'), `a sibling's report must be refused: ${text}`);
 });
 
 await test('Broad agent (*) sees the full tool surface', async () => {

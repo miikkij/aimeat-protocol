@@ -200,7 +200,7 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_agent_runtime_report',
-        description: "Say what code is running this agent, so a run can be audited afterwards. A crew whose definition lives on this node is already answerable — the definition is versioned here — but a code-backed crew has none, and then nothing can say what ran. Send the file, its hash, the commit it came from and which runtime read it; send null to clear. The node records the claim and stamps its own time on it, and never checks it: it does not run the process and cannot read the disk.",
+        description: "Say what code is running this agent, so a run can be audited afterwards. A crew whose definition lives on this node is already answerable — the definition is versioned here — but a code-backed crew has none, and then nothing can say what ran. Send the file, its hash, the commit it came from and which runtime read it; send null to clear. The node records the claim and stamps its own time on it, and never checks it: it does not run the process and cannot read the disk. Say in `llm` where the crew's model calls go. An agent reports its own with no permission word; a same-owner sibling's needs agent:write.",
         caller: 'agent',
         visibility: agentEverywhere,
         input: {

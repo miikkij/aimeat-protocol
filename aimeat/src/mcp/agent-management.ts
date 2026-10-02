@@ -17,7 +17,8 @@
  *   import { registerAgentManagementTools } from './agent-management.js';
  *   registerAgentManagementTools(mcp, storage, config, getAgentGaii);
  * @version-history
- *   v1.9.0 -- 2026-10-02 -- aimeat_agent_runtime_report takes `llm` ('node' | 'machine').
+ *   v1.9.0 -- 2026-10-02 -- aimeat_agent_runtime_report takes `llm` ('node' | 'machine'), and an agent
+ *     reports its own runtime without agent:write (scope-exempt, the sibling check in the handler).
  *   v1.8.0 -- 2026-10-02 -- aimeat_agent_tags_set: an agent sets its own tags without agent:write,
  *     and another agent's still need it. The tool moves to SCOPE_EXEMPT_TOOLS so an agent without
  *     the word sees it, and the sibling check sits in the handler.
@@ -178,6 +179,12 @@ export function registerAgentManagementTools(
         async ({ target_agent_name, ...src }) => {
             const callerParsed = parseGAII(agentGaii);
             if (!callerParsed) return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
+            // Its own report needs no agent:write; a sibling's does (auth/self-or-scope.ts, the same rule
+            // as PATCH /v1/agents/:name/runtime-source). Scope-exempt, so the sibling check is here.
+            const self = agentGaiiFromIdentifier(target_agent_name, localAccountName(agentGaii), config.nodeId) === agentGaii;
+            if (!self && !scopeIsCovered(sessionScopes, 'agent:write')) {
+                return toolError('SCOPE_DENIED', 'Scope "agent:write" required to report another agent\'s runtime. An agent may report its own without it.');
+            }
             const outcome = await setAgentRuntimeSource({ storage, config }, localAccountName(agentGaii), target_agent_name, src);
             if (!outcome.ok) return { content: [{ type: 'text' as const, text: outcome.message }], isError: true };
             return { content: [{ type: 'text' as const, text: JSON.stringify({ gaii: outcome.agent.gaii, name: outcome.agent.name, runtime_source: outcome.agent.runtimeSource ?? null }, null, 2) }] };
