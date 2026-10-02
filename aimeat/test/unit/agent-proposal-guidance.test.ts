@@ -84,8 +84,10 @@ describe('a request for a new agent leads to a proposal on this node', () => {
             ['handbook paragraph', AGENT_HANDBOOK],
             ['add-a-crew-agent', skill('add-a-crew-agent')],
         ];
+        // And memory:read beside it: the runtime reads its own definition with it. A hosted chat
+        // proposed memory:write alone and the approved agent never started (2026-10-02, cc7364a8c).
         for (const [which, text] of texts) {
-            expect(text, which).toMatch(/memory:write/);
+            expect(text, which).toMatch(/memory:read\W+and\W+\\?`?memory:write/);
             expect(text, which).not.toMatch(/memory:write\W+(and|\+)\W+\\?`?agent:write/);
         }
     });

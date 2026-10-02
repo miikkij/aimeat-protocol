@@ -19,6 +19,7 @@
  * @usage
  *   import { NEW_AGENT_MD } from './new-agent.js';
  * @version-history
+ *   v1.0.1 — 2026-10-02 — The node adds memory:read and memory:write to a proposal itself.
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 
@@ -33,8 +34,8 @@ runs it on the person's own connector.
    will use, so you design for the data they keep and not for a product they do not have.
 2. **Propose it.** \`aimeat_agent_propose\` with a name, a \`purpose\` that names their data ("reads
    the open deals in your Sales workspace each morning and lists what to act on"), the scopes the
-   job needs plus \`memory:write\`, which a crew runtime writes its result with, and a
-   \`crew_def\`. It creates nothing. Skill \`add-a-crew-agent\` has the
+   job needs (the node adds \`memory:read\` and \`memory:write\`, which a crew runtime reads its
+   definition and writes its result with), and a \`crew_def\`. It creates nothing. Skill \`add-a-crew-agent\` has the
    definition's shape and how to check it.
 3. **Tell them where to approve.** The answer carries \`approval_url\` and \`next_step\`: give them
    both, in their words. Their own press makes the agent. Work on a clock comes after that, as a

@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.23.3 -- 2026-10-02 -- add-a-crew-agent: a crew agent needs memory:read and memory:write, and
+ *     the node adds both to every proposal and approval.
  *   v1.23.2 -- 2026-10-02 -- add-a-crew-agent: with nothing chosen, an agent holding ai:use thinks
  *     through the node when the node can pay; the menu's `effective` says which choice applies.
  *   v1.23.1 -- 2026-10-02 -- diagnose-a-workflow: an AI refusal carries `fix` and `settingsUrl` for
@@ -400,8 +402,10 @@ Always send the \`crew_def\`. An agent approved without one exists and cannot st
 validate and a new agent has none.
 
 **Scopes and modes.** Name each scope, never \`*\`, and never more than you hold yourself. An agent
-run by a crew runtime needs \`memory:write\` whatever its job: the runtime stores the result with
-it, and without it the agent reads, works, and has its task fail at the end (measured 2026-10-02).
+run by a crew runtime needs \`memory:read\` and \`memory:write\` whatever its job: the runtime reads
+its own definition with the first and stores the result with the second. The node adds both to
+every proposal and every approval, so you need not ask for them (measured 2026-10-02: an agent
+approved with \`memory:write\` alone could not read its definition and never ran).
 It needs no \`agent:write\` to report its own tags or its own runtime; that word lets an agent approve new agents and
 change other agents' settings, so give it only to an agent whose job is that. An agent
 that reads and writes the owner's memory needs \`memory:read\` and \`memory:write\`; one that takes

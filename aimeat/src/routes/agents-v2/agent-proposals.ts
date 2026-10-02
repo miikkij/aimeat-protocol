@@ -23,6 +23,8 @@
  * @structure nextStep() · registerAgentProposalRoutes()
  * @usage registerAgentProposalRoutes(router, config, storage);
  * @version-history
+ *   v1.3.0 — 2026-10-02 — Approval gives the agent the crew runtime's scopes (memory:read,
+ *     memory:write) whatever the proposal says, so no proposal makes an agent that cannot start.
  *   v1.2.0 — 2026-10-02 — The proposal answer carries `approval_url` and `already_waiting`, and its
  *     `next_step` names the address (services/agent-proposals.ts proposalNextStep). The MCP tool
  *     already said whether the name was waiting; the REST answer, which the connector and the fleet
@@ -49,6 +51,7 @@ import {
   type ProposerPrincipal,
 } from '../../services/agent-proposals.js';
 import { logger } from '../../utils/logger.js';
+import { withCrewRuntimeScopes } from '../../data/crew-runtime-scopes.js';
 
 const VALID_MODES = ['autonomous', 'interactive', 'task-runner', 'coordinator', 'workstation'];
 const VALID_RUN_MODES = ['resident', 'spawn'];
@@ -150,6 +153,11 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
 
     const now = new Date().toISOString();
     const gaii = buildGAII(proposal.name, owner, config.nodeId);
+    // What any crew agent needs to start, whatever the proposer wrote (data/crew-runtime-scopes.ts).
+    // A proposal stored before 2026-10-02 can lack them, and an agent approved with memory:write
+    // alone could not read its own definition and never ran. Proposing adds them too, so the owner
+    // sees them on the proposal; this is the same list again, not a widening of what was shown.
+    const scopes = withCrewRuntimeScopes(proposal.scopes);
     await storage.createAgent({
       name: proposal.name,
       owner,
@@ -160,7 +168,7 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
       // No key yet: the agent brings its own at enrolment and it is pinned there, exactly as the
       // basic-agents button leaves it.
       publicKey: '',
-      defaultScopes: proposal.scopes,
+      defaultScopes: scopes,
       trustScore: 50,
       morselBalance: 0,
       createdAt: now,
@@ -228,8 +236,8 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
       description: proposal.purpose,
       runMode: proposal.run_mode,
       mode: proposal.mode,
-      // From the record we just wrote, which took its scopes from the proposal the owner approved.
-      scopes: proposal.scopes,
+      // From the record we just wrote: the proposal the owner approved, with the runtime's words.
+      scopes,
     }]);
 
     await settleProposal({ config, storage }, owner, proposal, 'approved');
@@ -249,7 +257,7 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
     });
     res.json(success(config.nodeId, {
       created: true,
-      agent: { name: proposal.name, gaii, mode: proposal.mode, run_mode: proposal.run_mode, scopes: proposal.scopes },
+      agent: { name: proposal.name, gaii, mode: proposal.mode, run_mode: proposal.run_mode, scopes },
       seeded: !!proposal.crew_def,
       attached: enrolment.ok,
       // The reason, verbatim, when it is not attached: "unconnected" without a why sends the owner

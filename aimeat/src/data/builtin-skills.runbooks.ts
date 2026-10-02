@@ -12,6 +12,8 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   v1.9.1 — 2026-10-02 — manage-my-agents: a memory:read refusal of a crew agent is given, not
+ *     declined; without it the agent never starts.
  *   v1.9.0 — 2026-10-02 — manage-my-agents: a worker on the owner's computer uses their settings and
  *     their own key only when its model choice is this node; otherwise the computer's key. Its own
  *     runtime report needs no agent:write, like its own tags.
@@ -190,7 +192,10 @@ flowchart LR
   (PATCH /v1/agents/:name/tags) from before then needs no grant: tell the owner to decline it. The
   same holds for its own runtime report (PATCH /v1/agents/:name/runtime-source).
   agent:write lets an agent approve new agents and change other agents' settings, so it is given
-  only to an agent whose job is that.
+  only to an agent whose job is that. A refusal of memory:read is the opposite case: a crew agent
+  reads its own instructions with it, and one approved before 2026-10-02 with memory:write alone
+  never starts. Tell the owner to give it ("Give the permission" on that agent's card); its next
+  wake runs the task that waited.
 - **Inspect one:** \`aimeat_agent_profile\` — capabilities, trust, linked skills; pass the agent's GAII.
 - **Onboarding state:** \`aimeat_onboarding_status\` — which Hello-Integration steps remain. It
   reports the calling agent's own onboarding only.
