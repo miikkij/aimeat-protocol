@@ -13,6 +13,10 @@
  *   AIMEAT.atelier.toast({ title: 'Part adopted', sub: 'shop.html', action: { label: 'Undo', onPick } });
  *   AIMEAT.atelier.palette({ items: [{ id: 'adopt', label: 'Adopt…', run() {} }], hotkey: 'k' });
  * @version-history
+ *   v0.63.1 — 2026-10-02 — The tour's note follows its element on every scroll (once a frame, in
+ *     capture, so a scrolling container counts too): it was placed once, before the step's smooth
+ *     scroll, and on a phone it covered the element and stayed behind when the reader scrolled.
+ *     The step's button takes the focus, and the focus goes back where it was when the tour ends.
  *   v0.62.2 — 2026-10-01 — The kit's own words here come from its dictionary in en/fi/es: the
  *     palette's name, placeholder and no-match line, the compare handle's name, and the tour's
  *     Next, Done and Skip. An app's `empty`, `placeholder` and `labels` still win; English is the
@@ -311,7 +315,9 @@ export function compare(spec) {
 
 /**
  * The tour: each step marks one element on the real screen and says one thing beside it;
- * Next walks on, Escape or Done ends it, and nothing of it remains afterwards.
+ * Next walks on, Escape or Done ends it, and nothing of it remains afterwards. The note follows
+ * its element while the page scrolls, holds the keyboard focus for its step, and gives the focus
+ * back to where it was when the tour ends.
  * @param {{ steps: Array<{ target: string|Element, text: string }>, onDone?: () => void,
  *   labels?: { next?: string, done?: string, skip?: string } }} spec
  * @returns {{ start: () => void, end: () => void }}
@@ -321,6 +327,14 @@ export function tour(spec) {
   let i = -1;
   let note = null;
   let marked = null;
+  let frame = 0;
+  let before = null;
+  // Once per frame however many scroll events arrive: the step's own smooth scroll sends one a
+  // frame. Capture, so a scroll inside any container that holds the element counts too.
+  function follow() {
+    if (frame) return;
+    frame = requestAnimationFrame(function () { frame = 0; place(); });
+  }
 
   function place() {
     if (!note || !marked) return;
@@ -353,6 +367,9 @@ export function tour(spec) {
     ]);
     document.body.appendChild(wearLook(note, marked));
     place();
+    // The step's own button holds the focus, so Enter walks on and a screen reader is in the note.
+    // preventScroll: the note is fixed, and the smooth scroll above is already moving the page.
+    note.querySelector('button').focus({ preventScroll: true });
   }
   function clearStep() {
     if (marked) marked.classList.remove('ak-tour__mark');
@@ -364,12 +381,18 @@ export function tour(spec) {
     clearStep();
     window.removeEventListener('keydown', onKey);
     window.removeEventListener('resize', place);
+    window.removeEventListener('scroll', follow, true);
+    if (frame) { cancelAnimationFrame(frame); frame = 0; }
+    if (before && before.isConnected && typeof before.focus === 'function') before.focus({ preventScroll: true });
+    before = null;
     if (i >= 0 && s.onDone) s.onDone();
     i = -1;
   }
   function start() {
+    before = document.activeElement;
     window.addEventListener('keydown', onKey);
     window.addEventListener('resize', place);
+    window.addEventListener('scroll', follow, { capture: true, passive: true });
     show(0);
   }
   return { start, end };

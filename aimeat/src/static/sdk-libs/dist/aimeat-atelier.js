@@ -6383,6 +6383,15 @@
     let i = -1;
     let note = null;
     let marked = null;
+    let frame2 = 0;
+    let before = null;
+    function follow() {
+      if (frame2) return;
+      frame2 = requestAnimationFrame(function() {
+        frame2 = 0;
+        place2();
+      });
+    }
     function place2() {
       if (!note || !marked) return;
       const r = marked.getBoundingClientRect();
@@ -6423,6 +6432,7 @@
       ]);
       document.body.appendChild(wearLook(note, marked));
       place2();
+      note.querySelector("button").focus({ preventScroll: true });
     }
     function clearStep() {
       if (marked) marked.classList.remove("ak-tour__mark");
@@ -6437,12 +6447,21 @@
       clearStep();
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("resize", place2);
+      window.removeEventListener("scroll", follow, true);
+      if (frame2) {
+        cancelAnimationFrame(frame2);
+        frame2 = 0;
+      }
+      if (before && before.isConnected && typeof before.focus === "function") before.focus({ preventScroll: true });
+      before = null;
       if (i >= 0 && s.onDone) s.onDone();
       i = -1;
     }
     function start() {
+      before = document.activeElement;
       window.addEventListener("keydown", onKey);
       window.addEventListener("resize", place2);
+      window.addEventListener("scroll", follow, { capture: true, passive: true });
       show(0);
     }
     return { start, end };
@@ -27219,7 +27238,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.63.0",
+    version: "0.63.1",
     /**
      * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
      * named parts (every one carries `data-ak-part`, so an app's own CSS reaches it), the slots
