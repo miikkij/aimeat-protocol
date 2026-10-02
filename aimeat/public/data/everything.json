@@ -1883,10 +1883,10 @@
      "slug": "g-10-development-rights",
      "cells": [
       "<strong>Development rights</strong>",
-      "Let another person and their agents draft, publish or fully develop the original app under its owner's identity. Grant rights per app or across all your apps, and revoke them later. Development rights do not allow deleting the app, changing prices or granting rights onward.",
-      "<code>/v1/apps/:owner/:filename/dev-grants</code>, <code>/v1/app-dev-grants</code>"
+      "Let another person and their agents draft, publish or fully develop the original app under its owner's identity. Grant rights per app or across all your apps, and revoke them later. Development rights do not allow deleting the app, changing prices or granting rights onward. Ask your AI &quot;let Bob develop this app too&quot; and it gives the right on that app, tells you what Bob's AI does next, and links the Apps page where you see and take back every right. A right over all your apps at once is given on that page, signed in. The invited person's AI finds the app with <code>building: true</code> and works on it by naming its owner.",
+      "<code>/v1/apps/:owner/:filename/dev-grants</code>, <code>/v1/app-dev-grants</code>, <code>aimeat_app_manage</code> actions <code>builders</code>, <code>builder_set</code> and <code>builder_remove</code>, <code>aimeat_app_list</code> (<code>building</code>), Settings &gt; Apps &gt; Who else may build these"
      ],
-     "plain": "Development rights Let another person and their agents draft, publish or fully develop the original app under its owner's identity. Grant rights per app or across all your apps, and revoke them later. Development rights do not allow deleting the app, changing prices or granting rights onward. /v1/apps/:owner/:filename/dev-grants, /v1/app-dev-grants"
+     "plain": "Development rights Let another person and their agents draft, publish or fully develop the original app under its owner's identity. Grant rights per app or across all your apps, and revoke them later. Development rights do not allow deleting the app, changing prices or granting rights onward. Ask your AI \"let Bob develop this app too\" and it gives the right on that app, tells you what Bob's AI does next, and links the Apps page where you see and take back every right. A right over all your apps at once is given on that page, signed in. The invited person's AI finds the app with building: true and works on it by naming its owner. /v1/apps/:owner/:filename/dev-grants, /v1/app-dev-grants, aimeat_app_manage actions builders, builder_set and builder_remove, aimeat_app_list (building), Settings > Apps > Who else may build these"
     },
     {
      "slug": "g-10-app-roadmap",

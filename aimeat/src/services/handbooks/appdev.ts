@@ -5,6 +5,8 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-10-02 — Somebody else builds it too: builder_set, builders and builder_remove, the page to
+ *     hand the owner, and what the invited person's AI does.
  *   2026-10-02 — An AI that is off: the app shows the person `fix` and a link to `settingsUrl`, never
  *     `message` or `agentFix`.
  *   2026-10-01 — Build flow step 0: on any model but Claude Opus or Fable, tell the person once
@@ -278,6 +280,17 @@ action needs the permission its route needs: app:write to read, app:manage to de
 cancel an invitation, exchange:grant to approve, remove or sweep, commerce:sell to set the plan. Anybody can call two of them on somebody
 else's app: \`member_me\` answers your own role and request there, and \`member_request\` (with
 \`owner\`, and an optional \`note\`) asks its owner to let you in, which needs social:write.
+
+**Somebody else builds it too.** When the owner says "let Bob develop this app too", that is a
+development right, not a membership: \`aimeat_app_manage\` \`builder_set\` with \`filename\`, \`account\`
+and \`dev_level\` (\`drafter\` writes drafts the owner publishes, \`publisher\` also publishes, \`full\`
+works on it as on their own; use \`drafter\` unless the owner asked for more). It needs app:manage.
+The answer says what Bob's AI does next and gives the settings page (\`page.url\`) where the owner sees
+and takes back every right: hand the owner both. \`builders\` lists who holds a right, \`builder_remove\`
+takes one back. Bob needs an account on this server; when the owner knows only his email address,
+ask the owner for his account name. A right over EVERY app of the owner is the account holder's own act on that
+page, signed in, so send them there rather than looking for a tool. On Bob's side, his AI finds the app
+with \`aimeat_app_list\` \`{ building: true }\` and passes \`owner\` to the app tools.
 
 ### can() is a HINT, never a gate
 

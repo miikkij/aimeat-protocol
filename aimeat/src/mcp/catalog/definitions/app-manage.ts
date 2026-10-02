@@ -21,6 +21,10 @@
  *   const checked = checkAppManageInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
+ *   2026-10-02 — The development right from a chat: builders, builder_set and builder_remove over the
+ *     dev-grants routes, and the dev_level field. An owner who asks their AI to let somebody develop
+ *     an app got no tool for it and no address of the page that does it
+ *     (wish-kehitysoikeus-sovellukseen-chatista-anna-jounille-p-sy-kehit).
  *   2026-10-01 — Keeping the audit log: `audit` takes `year` and answers the archived years and the
  *     limit in force; audit_archive moves the entries before a date into the archive; audit_keep
  *     reads or sets how much is kept (a deleting limit is the account holder's own, signed in).
@@ -82,7 +86,7 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     // ui
     detail: { type: 'array', description: UI_DETAIL_PARAM },
     layout: { type: 'object', description: 'For ui_set: the WHOLE layout { v: 1, look?, nav?, blocks: [{ id, component, props }] }. It replaces what is there; read it first with ui_get.' },
-    note: { type: 'string', description: 'For ui_set: one line on what this change was for. For member_set: the owner\'s own note on the decision (at most 400 characters; the member does not see it). For member_request: your message to the owner, who sees it with the request.' },
+    note: { type: 'string', description: 'For ui_set: one line on what this change was for. For member_set and builder_set: the owner\'s own note on the decision (at most 400 characters; the person does not see it). For member_request: your message to the owner, who sees it with the request.' },
     version: { type: 'number', description: 'For ui_restore: the layout version to put back (ui_set answers with the one it replaced).' },
     // settings
     name: { type: 'string', description: 'For settings: the app\'s display name. Changes it without a new version.' },
@@ -106,7 +110,8 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     // config
     values: { type: 'object', description: 'For config_set: the fields to change, { "<field>": value }. A null puts a field back to its default; fields not named keep their values.' },
     // members (routes/app-members.ts)
-    account: { type: 'string', description: 'For member_set, member_remove, member_decline and member_dismiss: the person, as an account name ("bob"), their identity ("bob@node") or one of their agents. All three mean the same person.' },
+    account: { type: 'string', description: 'For member_set, member_remove, member_decline, member_dismiss, builder_set and builder_remove: the person, as an account name ("bob"), their identity ("bob@node") or one of their agents. All three mean the same person. The person needs an account on this server; aimeat_contact_resolve_email finds the account name from an email address.' },
+    dev_level: { type: 'string', enum: ['full', 'publisher', 'drafter'], description: 'For builder_set: how much the person may do to the app. drafter writes drafts and you publish them; publisher also publishes and keeps the app\'s name, description and look; full works on it as on their own app. No level deletes the app, changes its price or licence, or passes the right on. Use drafter unless the person asked for more.' },
     role: { type: 'string', description: 'For member_set: the role to give, in the app\'s own words (e.g. "member", "editor"). It starts with a letter and holds letters, digits, ".", "_" or "-", at most 40 characters. "owner" is refused: the owner already reaches everything.' },
     level: { type: 'number', description: 'For member_set: an optional rank inside the app, where a lower number is more power. Most apps leave it out.' },
     offerings: { type: 'array', description: 'For member_set: the offering ids this membership gives free access to. Omit it to use what the app\'s plan says for the role (member_plan_get).' },
@@ -175,6 +180,21 @@ const MEMBER_ACTION_SPECS: Record<string, AppManageAction> = {
         summary: 'ask the owner of somebody else\'s app to let you in. The owner is notified with your note; asking again replaces the note. A member is told they already are one' },
 };
 
+/**
+ * The development right: who, other than the owner, may build the app (routes/app-members.ts,
+ * dev-grants). Over the route like the member actions, which decides that only the owner gives it.
+ * The right over EVERY app of the owner is not here: its route takes the account holder in person,
+ * so the summaries send the agent to the settings page the answers name.
+ */
+const BUILDER_ACTION_SPECS: Record<string, AppManageAction> = {
+    builders: { fields: F(['filename'], []), scope: 'app:write',
+        summary: 'who, other than you, may build the app, at which level, and who may build every app of yours; the answer gives the settings page where the owner sees and takes back these rights. Owner only' },
+    builder_set: { fields: F(['filename', 'account', 'dev_level'], ['note']), scope: 'app:manage',
+        summary: 'give a person the right to build the app with their own AI, or change their level. Use it when the owner asks to let somebody develop, edit or work on the app. The person is notified, every agent of theirs is covered, and the answer says what their AI does next and gives the settings page to hand the owner. A right over every app of the owner at once is the account holder\'s own act on that page, never this tool. Owner only' },
+    builder_remove: { fields: F(['filename', 'account'], []), scope: 'app:manage',
+        summary: 'take the right to build the app back. A membership the person holds stays. Owner only' },
+};
+
 export const APP_MANAGE_ACTIONS: Record<string, AppManageAction> = {
     settings: { fields: F(['filename'], ['owner', ...SETTINGS_FIELDS]), oneOf: SETTINGS_FIELDS, scope: 'app:write',
         summary: 'change name, description, per-language descriptions, parked (hidden from the public catalogue), forkable, access code or copy protection, without a new version' },
@@ -227,6 +247,7 @@ export const APP_MANAGE_ACTIONS: Record<string, AppManageAction> = {
     agent_status: { fields: F(['filename', 'bundled_agent'], ['owner', 'runner_agent']), scope: null,
         summary: 'whether it is registered, when it was last seen, and its deploy state' },
     ...MEMBER_ACTION_SPECS,
+    ...BUILDER_ACTION_SPECS,
     grants: { fields: F([], []), scope: 'consent:manage',
         summary: 'the apps your owner has granted permissions to, with their permissions and spend; revoking one is the owner\'s own act on the Access page' },
     backup_export: { fields: F([], []), scope: 'app:write',
@@ -281,7 +302,7 @@ export function checkAppManageInput(input: Record<string, unknown>, extra: strin
     return { ok: false, message: `action "${actionName}" ${parts.join('. It ')}. Its fields: ${fieldList(action)}.` };
 }
 
-const DESCRIPTION = 'Manage one of your apps: its settings, search visibility, legal pages, visitors, screen layout, thumbnail, versions, forks, cost, bundled agents, members and backup, in one tool. Two member actions work on somebody else\'s app: member_me reads your standing and member_request asks to join. Pick `action`; each action takes only its own fields, and a call with a missing or foreign field is refused with every problem named at once, so nothing is charged or changed. Actions:\n'
+const DESCRIPTION = 'Manage one of your apps: its settings, search visibility, legal pages, visitors, screen layout, thumbnail, versions, forks, cost, bundled agents, members, who else may build it, and backup, in one tool. Two member actions work on somebody else\'s app: member_me reads your standing and member_request asks to join. Pick `action`; each action takes only its own fields, and a call with a missing or foreign field is refused with every problem named at once, so nothing is charged or changed. Actions:\n'
     + APP_MANAGE_ACTION_NAMES.map(n => `- ${n} (${fieldList(APP_MANAGE_ACTIONS[n]!)}): ${APP_MANAGE_ACTIONS[n]!.summary}.`).join('\n')
     + '\nPermissions are checked per action: an action needs the word shown by the refusal, so an agent without app:write can still read versions, lineage and agent status.'
     + AI_PROVENANCE_TOOL_NOTE;

@@ -1537,6 +1537,71 @@ await test('MCP: the owner\'s agent sets and reads the plan, sweeps, and clears 
     assert(refused.isError && refused.text.startsWith('SCOPE_DENIED'), `setting the plan needs commerce:sell: ${refused.text}`);
 });
 
+// ── 2026-10-02: the development right from a chat. "Let Jouni develop this app too" had no tool:
+// the owner's AI could neither give the right nor name the page that gives it. ──────────────────────
+
+async function callTool(session: McpSession, name: string, args: Record<string, unknown>): Promise<{ isError: boolean; data: any; text: string }> {
+    const body = await mcpRpc(session, 'tools/call', { name, arguments: args });
+    const text = body?.result?.content?.[0]?.text ?? JSON.stringify(body?.error ?? body ?? {});
+    let data: any;
+    try { data = JSON.parse(text); } catch { data = { _text: text }; }
+    return { isError: body?.result?.isError === true || body?.error !== undefined, data, text };
+}
+
+await test('MCP: the owner\'s agent lets another person build the app from a chat; their agent finds it and drafts; the right is taken back', async () => {
+    const s = await mcpSession(await agentOf(owner, ['app:write', 'app:manage']));
+    const before = (await bell(stranger.token)).filter(n => n.type === 'app_dev_grant').length;
+
+    const set = await manage(s, { action: 'builder_set', filename: CHAT_APP, account: stranger.name, dev_level: 'drafter', note: 'from a chat' });
+    assert(!set.isError, `builder_set: ${set.text}`);
+    assert(set.data.granted === true && set.data.levelName === 'drafter', `granted at drafter: ${set.text}`);
+    assert(typeof set.data.next === 'string' && set.data.next.includes('building: true') && set.data.next.includes(`owner: "${owner.name}"`),
+        `the answer says what the invited person's AI does next: ${set.text}`);
+    assert(typeof set.data.page?.url === 'string' && set.data.page.url.endsWith('/v1/profile?tab=apps'), `and names the settings page: ${set.text}`);
+    const after = (await bell(stranger.token)).filter(n => n.type === 'app_dev_grant').length;
+    assert(after === before + 1, `the invited person is told once: ${before} -> ${after}`);
+
+    const list = await manage(s, { action: 'builders', filename: CHAT_APP });
+    assert(!list.isError, `builders: ${list.text}`);
+    assert((list.data.grants as any[]).some(g => g.account === stranger.name && g.levelName === 'drafter'), `the right is listed: ${list.text}`);
+    assert(Array.isArray(list.data.allApps) && typeof list.data.page?.url === 'string', `with the all-apps list and the page: ${list.text}`);
+
+    // The other side: what their agent does with the answer's `next`.
+    const theirs = await mcpSession(await agentOf(stranger, ['app:write']));
+    const found = await callTool(theirs, 'aimeat_app_list', { building: true });
+    assert(!found.isError && (found.data.apps as any[]).some(a => a.filename === CHAT_APP && a.building_for === owner.name),
+        `the invited agent finds the app it may build: ${found.text}`);
+    const html = Buffer.from('<!doctype html><title>chat</title><p>drafted by a builder', 'utf8').toString('base64');
+    const draft = await callTool(theirs, 'aimeat_app_draft_save', { filename: CHAT_APP, owner: owner.name, content_base64: html });
+    assert(!draft.isError, `the invited agent writes the owner's draft: ${draft.text}`);
+
+    const rm = await manage(s, { action: 'builder_remove', filename: CHAT_APP, account: stranger.name });
+    assert(!rm.isError && rm.data.revoked === true, `builder_remove: ${rm.text}`);
+    const again = await callTool(theirs, 'aimeat_app_draft_save', { filename: CHAT_APP, owner: owner.name, content_base64: html });
+    assert(again.isError, `after the revoke the draft is refused: ${again.text}`);
+    await json(`/v1/apps/${owner.name}/${CHAT_APP}/draft`, { method: 'DELETE', headers: auth(owner.token) });
+});
+
+await test('MCP: builder_set is the owner\'s alone, needs app:manage, and an unknown account says how to find the right one', async () => {
+    const intruder = await mcpSession(await agentOf(stranger, ['app:write', 'app:manage']));
+    const self = await manage(intruder, { action: 'builder_set', filename: CHAT_APP, account: stranger.name, dev_level: 'full' });
+    // Without an owner field the call names the caller's own catalogue, which holds no such app.
+    assert(self.isError && /^(FORBIDDEN|NOT_FOUND)/.test(self.text), `a stranger's agent cannot give itself a right: ${self.text}`);
+    const peek = await manage(intruder, { action: 'builders', filename: CHAT_APP });
+    assert(peek.isError, `nor read who builds another owner's app: ${peek.text}`);
+
+    const reader = await mcpSession(await agentOf(owner, ['app:write']));
+    const noWord = await manage(reader, { action: 'builder_set', filename: CHAT_APP, account: stranger.name, dev_level: 'drafter' });
+    assert(noWord.isError && noWord.text.startsWith('SCOPE_DENIED'), `builder_set without app:manage: ${noWord.text}`);
+
+    const s = await mcpSession(await agentOf(owner, ['app:manage']));
+    const nobody = await manage(s, { action: 'builder_set', filename: CHAT_APP, account: 'zz-nobody-here', dev_level: 'drafter' });
+    assert(nobody.isError && nobody.text.startsWith('NOT_FOUND') && nobody.text.includes('aimeat_contact_resolve_email'),
+        `an unknown account names how to find the right name: ${nobody.text}`);
+    const builders = (await json(`/v1/apps/${owner.name}/${CHAT_APP}/dev-grants`, { headers: auth(owner.token) })).body.data.grants as any[];
+    assert(!builders.some(g => g.account === stranger.name), `nothing refused was written: ${JSON.stringify(builders)}`);
+});
+
 // ── 2026-10-01: IAM round 2 — display names, approve by email and invitations, role-change
 // notices, paging, managers, the audit trail, the decline wait, notices in the member's language,
 // and the app's own token setting the plan ────────────────────────────────────────────────────────

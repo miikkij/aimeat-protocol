@@ -14,6 +14,8 @@
  * @structure appManageCall · MEMBER_ACTIONS
  * @usage return out(await appManageCall(client, owner, input));
  * @version-history
+ *   2026-10-02 -- builders, builder_set and builder_remove over GET, PUT and DELETE
+ *     /v1/apps/:owner/:filename/dev-grants; dev_level is sent as the route's `level`.
  *   2026-10-01 -- Keeping the audit log: audit sends year as ?archive=, audit_archive and audit_keep go
  *     over their routes (and so, on the node, through the loopback with the member actions).
  *   2026-10-01 -- IAM round 2: member_set sends email and locale, members sends q, limit and offset as a query,
@@ -57,6 +59,8 @@ export const MEMBER_ACTIONS: ReadonlySet<string> = new Set([
     'member_audit', 'member_invite_cancel',
     // Keeping the audit log: the route decides who may set a limit that deletes (the account holder).
     'audit_archive', 'audit_keep',
+    // The development right: the dev-grants routes hold the owner test, the notification and the audit row.
+    'builders', 'builder_set', 'builder_remove',
 ]);
 
 /**
@@ -194,6 +198,13 @@ export async function appManageCall(client: AimeatClient, owner: string, input: 
             return client.get(`/v1/apps/${enc(ownerName)}/${file}/members/audit${query(input, ['limit', 'before'])}`);
         case 'member_invite_cancel':
             return client.delete(`/v1/apps/${enc(ownerName)}/${file}/members/invites/${enc(String(input.invite_id))}`);
+        case 'builders':
+            return client.get(`/v1/apps/${enc(ownerName)}/${file}/dev-grants`);
+        case 'builder_set':
+            return client.put(`/v1/apps/${enc(ownerName)}/${file}/dev-grants/${enc(String(input.account))}`,
+                { level: input.dev_level, ...pick(input, ['note']) });
+        case 'builder_remove':
+            return client.delete(`/v1/apps/${enc(ownerName)}/${file}/dev-grants/${enc(String(input.account))}`);
         default:
             return { ok: false, error: { code: 'INVALID_INPUT', message: `Unknown action "${checked.action}".` } };
     }
