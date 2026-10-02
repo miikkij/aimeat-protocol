@@ -38,12 +38,17 @@
  *   - asKey: the title is a memory key (see PageHead.js).
  *   - after: what the page draws after its frame inside it (its confirm dialog, a dialog, a file
  *     field).
+ *   - help: a term whose question mark stands after the title words (see PageHead.js).
+ *   - start: what stands under the head, before the figure strip (a slot: the PageStart component,
+ *     what the page is for, what to do first and what happens next).
  * @structure SettingsPage(props) · settingsRail(props)
  * @usage html`<${SettingsPage} name="skills" crumb=${[t('nav.profile'), t('profile.landing.menuBuildShare'), t('skills.tabLabel')]}
  *          title=${t('skills.tabLabel')} sub=${x('titleSub')} marks=${marks} desc=${x('desc')} actions=${actions}
  *          strip=${strip} railTitle=${x('railTitle')} sections=${sections} pagesLabel=${x('pages')} pages=${pages}
  *          after=${html`<${ctx.ConfirmUI} />`}>…the sections…<//>`
  * @version-history
+ *   v1.3.0 — 2026-10-03 — `help` passed to PageHead (the title's question mark) and the `start` slot
+ *     under the head (PageStart; guidance for normal people, part B); additive.
  *   v1.2.0 — 2026-09-26 — `edit` passed to PageHead: the rename field in the title's place (a
  *     calibration's page; additive, G4).
  *   v1.1.0 — 2026-09-26 — `aside` (settings over the rails in the side column) and `asKey` (a key as
@@ -73,17 +78,18 @@ export function settingsRail({ railTitle, sections, back, pages, pagesLabel, rai
 }
 
 export function SettingsPage(props) {
-  const { name, page, crumb, label, title, sub, marks, desc, actions, strip, rail, side, aside, after, asKey, children } = props;
+  const { name, page, crumb, label, title, sub, marks, desc, actions, strip, rail, side, aside, after, asKey, help, start, children } = props;
   const rails = (Array.isArray(rail) ? rail : [rail || settingsRail(props)]).filter(Boolean);
   const head = html`
     ${crumb ? html`<${Crumb} steps=${crumb} />` : null}
-    <${PageHead} label=${label} title=${title} sub=${sub} marks=${marks} desc=${desc} actions=${actions} page=${page} asKey=${asKey} edit=${props.edit} />`;
+    <${PageHead} label=${label} title=${title} sub=${sub} marks=${marks} desc=${desc} actions=${actions} page=${page} asKey=${asKey} edit=${props.edit} help=${help} />`;
   const column = side || (rails.length > 1 || aside
     ? html`<div class="settings-page-side">${aside}${rails.map((r, i) => html`<${Rail} key=${i} ...${r} />`)}</div>`
     : rails.length ? html`<${Rail} ...${rails[0]} />` : null);
   return html`
     <div class=${cx('og', name && `og-${name}`, page && 'og-page')}>
       ${column ? head : html`<div class="settings-page-head">${head}</div>`}
+      ${start}
       ${strip}
       ${column ? html`
         <div class="og-grid">

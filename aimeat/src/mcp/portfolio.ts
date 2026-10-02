@@ -21,6 +21,9 @@
  * @structure registerPortfolioTools(mcp, storage, config, getAgentGaii)
  * @usage registerPortfolioTools(mcp, storage, config, getAgentGaii);
  * @version-history
+ *   v1.2.0 — 2026-10-03 — `enable: true` switches the page on, as the welcome-mat paste does, unless
+ *     the person switched it off; the answer carries `served`. A card published here for a person who
+ *     never pasted a mat was stored and answered 404 at the address the tool handed back.
  *   v1.1.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-09-03 — The answer names addresses this node serves. It used to hand back
@@ -37,7 +40,9 @@ import type { Storage } from '../storage/interface.js';
 import { parseGAII, localAccountName } from '../utils/gaii.js';
 import { descriptionFor } from './catalog/shape.js';
 import { annotationsFor } from './annotations.js';
-import { portfolioWriteGaii, portfolioStandaloneUrl, writePortfolioHtml } from '../routes/portfolio.js';
+import {
+    portfolioWriteGaii, portfolioStandaloneUrl, writePortfolioHtml, switchPortfolioOnUnlessTurnedOff,
+} from '../routes/portfolio.js';
 import { emitChange } from '../services/event-bus.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
@@ -65,9 +70,10 @@ export function registerPortfolioTools(
         descriptionFor('aimeat_portfolio_publish'),
         {
             html: z.string().describe('The complete HTML document to serve as this person\'s welcome page. It replaces the current one.'),
+            enable: z.boolean().optional().describe('true when the person approved the page and wants it public now: switches their page on, unless they switched it off themselves. Without it the page is stored and stays as switched as it was.'),
         },
         annotationsFor('aimeat_portfolio_publish'),
-        async ({ html }): Promise<TextResult> => {
+        async ({ html, enable }): Promise<TextResult> => {
             const owner = parseGAII(getAgentGaii()) ? localAccountName(getAgentGaii()) : '';
             if (!owner) {
                 return out({ error: 'NO_OWNER', message: 'Could not resolve the owner from this session' }, true);
@@ -87,15 +93,21 @@ export function registerPortfolioTools(
             // browser reads. Resolving it anywhere else is how two "welcome pages" come to exist.
             const target = await portfolioWriteGaii(storage, owner, config.nodeId);
             await writePortfolioHtml(storage, target, data);
+            const served = await switchPortfolioOnUnlessTurnedOff(storage, config.nodeId, owner, target, enable === true);
             emitChange('portfolio');
             // Both addresses the node actually serves, and none it does not: the person is told
             // to look, so the link has to open.
             return out({
                 published: true,
+                served,
                 size_kb: Math.round(data.length / 1024),
                 url: `${config.baseUrl.replace(/\/+$/, '')}/v1/portfolio/${encodeURIComponent(owner)}`,
                 standalone_url: portfolioStandaloneUrl(config, owner),
-                note: 'Tell the person the address and let them look. A page they have not seen is not finished.',
+                note: served
+                    ? 'Tell the person the address and let them look. A page they have not seen is not finished.'
+                    : enable === true
+                        ? 'The page is stored, and the person switched their page off, so the address shows nothing yet. Tell them they switch it on themselves on the Portfolio page (/v1/profile?tab=portfolio).'
+                        : 'The page is stored and not public yet. When the person approves it and wants it public, publish again with enable: true, or they switch it on on the Portfolio page (/v1/profile?tab=portfolio).',
             });
         },
     );

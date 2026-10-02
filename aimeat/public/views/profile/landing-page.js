@@ -17,6 +17,8 @@
  *   - PresencePill + PresenceDialog — header status pill that opens the availability settings dialog
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   2026-10-03 — NextSteps reads the person's path itself; the extensions promo gets the app count and
+ *     decides on its own when to show (after the apps stage, guidance A2).
  *   2026-09-26 — The open tab's crumb is SettingsFrameHead's `crumb`, the overview's panels stand in the
  *     CardGrid of panels, the start page is StartPageSetting's footer: this file writes no class (page group G8).
  *   2026-09-13 — Fix: a ?tab= in the address beats the tab remembered in sessionStorage, so the home
@@ -172,7 +174,6 @@ export function tierLevel(tier) {
 
 export default function LandingPage({ tier, stats, homeUsage, homeAgents, session, showToast, renderTab, getTabLabel }) {
   const [apps, setApps] = useState([]);
-  const [appsLoaded, setAppsLoaded] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [pwOpen, setPwOpen] = useState(false);
   // Which inline view is open (and under which slot), restored on F5. Stored in
@@ -221,7 +222,7 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
     // eslint-disable-next-line aimeat/no-silent-catch -- no remembered tab means start basic
     } catch { return false; }
   });
-  // Extensions promo: onboarding-only (apps < 3) and dismissable for good.
+  // Extensions promo: shown once the path's apps stage is done or there are three apps (CortexSection decides), dismissable for good.
   const [showPromo, setShowPromo] = useState(() => { try { return localStorage.getItem('aimeat.cortexPromoDismissed') !== '1'; } catch { return true; } });
   const dismissPromo = () => { setShowPromo(false); try { localStorage.setItem('aimeat.cortexPromoDismissed', '1'); } catch { /* noop */ } };   // eslint-disable-line aimeat/no-silent-catch -- noop
 
@@ -245,7 +246,6 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
       const list = await listApps();
       setApps(Array.isArray(list) ? list.filter(a => a.owner === owner) : []);
     } catch (err) { swallowed('landing-page', err); setApps([]); }
-    finally { setAppsLoaded(true); }
   }, [owner]);
 
   useEffect(() => { loadApps(); }, [loadApps]);
@@ -459,8 +459,7 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
             onEditProfile=${() => setEditOpen(true)}
             switchTab=${(id) => open(id, 'main')} />
           <${WaitingForYou} owner=${owner} />
-          <${NextSteps} switchTab=${(id) => open(id, 'main')}
-            hasApps=${appsLoaded ? apps.length > 0 : undefined} />
+          <${NextSteps} switchTab=${(id) => open(id, 'main')} />
           <${CardGrid} cols="panels">
             <${ContinueCard} />
             <${AgentsCard} owner=${owner} initialAgents=${homeAgents} />
@@ -473,8 +472,9 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
               <${AgentLedgerCard} />
               <${CommerceCard} />` : null}
           <//>
-          ${(showPromo && apps.length < 3) ? html`
-            <${CortexSection} switchTab=${() => open('extensions', 'main')} onDismiss=${dismissPromo} />` : null}
+          ${showPromo ? html`
+            <${CortexSection} switchTab=${() => open('extensions', 'main')} onDismiss=${dismissPromo}
+              appCount=${apps.length} />` : null}
           ${/* Where a sign-in lands. The same control the home mounts in its own settings, at the
                 foot of this overview as a footer preference. The way to the home itself is the
                 header and the top of the sidebar; this only decides the start page. */''}

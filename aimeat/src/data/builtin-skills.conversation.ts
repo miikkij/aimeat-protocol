@@ -19,10 +19,9 @@
  *   WHERE THE TEXTS CAME FROM, AND WHO KEEPS THEM NOW. They were taken from what aimeat.io served
  *   on 2026-09-18, and the digests below record which text each entry started as. They are
  *   maintained HERE since: this file is the source, and the seeder carries a correction to every
- *   node on its next start unless somebody edited that node's copy by hand. Two things in them are
- *   aimeat.io's own and stay for now: the experience-centre link, which is a public address and
- *   works from any node, and the model names, which match services/ai-tool-setup.ts and move with
- *   it when the model recommendation becomes one reviewed config value.
+ *   node on its next start unless somebody edited that node's copy by hand. The experience-centre
+ *   link is aimeat.io's own and stays: it is a public address and works from any node. The Claude
+ *   and ChatGPT model names are read from services/model-recommendation.ts (since 2026-10-03).
  *
  *   ON A NODE THAT ALREADY HAS THEM (aimeat.io). A copy published by hand carries no seed
  *   fingerprint. The seeder ADOPTS such a copy when it is identical to the text here, and from
@@ -34,6 +33,12 @@
  * @usage
  *   import { CONVERSATION_SKILL_ENTRIES } from './builtin-skills.conversation.js';
  * @version-history
+ *   v1.4.0 — 2026-10-03 — aimeat-first-conversation: the first move is the profile interview and the
+ *     business card made from it (stage 1 of aimeat-guided-journey), not a welcome page in the first
+ *     reply; the page names are links (the Connect page and the AI keys page), and the model names
+ *     come from services/model-recommendation.ts. The text no longer equals what aimeat.io served on
+ *     2026-09-18, and e2e-skills 27b2b checks its content instead of that digest. aimeat-welcome-pages:
+ *     `served`, and the profile card's contents (Jouni, 2026-10-03).
  *   v1.3.0 — 2026-10-02 — aimeat-paying-for-the-ai: an own key thinks with the node's default model
  *     until the person chooses one, and a spent OpenRouter key gets the free router once (402).
  *   v1.2.2 — 2026-09-28 — aimeat-paying-for-the-ai: the chat is paid like every other call, per person,
@@ -54,6 +59,8 @@
  *     every claim in these six skills with the code.
  *   v1.0.0 — 2026-09-18 — Initial: six skills moved in from aimeat.io.
  */
+import { MODEL_RECOMMENDATION as M } from '../services/model-recommendation.js';
+
 /**
  * The shape of BuiltinSkill in builtin-skills.ts, written out here. Importing the type from there
  * is an import cycle (that file imports this one), which `pnpm check:deps` refuses for a new
@@ -64,13 +71,14 @@
 interface ConversationSkill { name: string; skillMd: string; visibility?: 'members' | 'public' }
 
 export const CONVERSATION_SKILL_ENTRIES: ConversationSkill[] = [
-    // aimeat-first-conversation — as published on aimeat.io, sha256 3a67c66d0f38…
+    // aimeat-first-conversation — started as the aimeat.io text, sha256 3a67c66d0f38…; rewritten
+    // here on 2026-10-03 (the profile interview first), so it no longer matches that digest.
     {
         name: 'aimeat-first-conversation',
         visibility: 'public',
         skillMd: `---
 name: aimeat-first-conversation
-description: What to do in somebody's FIRST conversation on an AIMEAT node — put up their page straight away so they own something here, find out what they are actually trying to get done, and invite them to bring the AI they already pay for. Use when a chat has no history, when somebody says hello, when a conversation resumes after a break, or when they ask what this place is for.
+description: What to do in somebody's FIRST conversation on an AIMEAT node. Interview them about their work and make their profile, a one-page business card that people and AIs can read, so they own something here and you know what to offer next; then invite them to bring the AI they already pay for. Use when a chat has no history, when somebody says hello, when a conversation resumes after a break, or when they ask what this place is for.
 license: MIT
 metadata:
   audience: agent
@@ -81,32 +89,38 @@ metadata:
 A new person arrives with an empty screen and no reason to believe any of this is theirs. Two moves
 change that, in this order.
 
-## Move one: give them something that exists
+## Move one: their profile
 
-**Offer to build their welcome page, in the first reply, as a thing you are about to do.** One
+**Offer the profile interview in the first reply, as a thing you are about to do together.** One
 concrete offer beats a list of capabilities, which is a list of homework:
 
-> Want me to put up your page? It takes a minute and you get a real address you can open and show
-> people. I can make it whatever you like afterwards.
+> Shall we start with your profile? I ask you a few questions about your work, one at a time, and
+> make you a one-page business card from your answers, at your own address that you can open and
+> share. After that I know what is worth offering you here.
 
-When they say yes, build it and publish it — the how is in \`aimeat-welcome-pages\`, load it. Keep the
-first version short and obviously theirs: their name, a line about them if they gave you one, a
-couple of sections they can tell you to fill. Show placeholders they can see and correct.
+When they say yes, load \`aimeat-guided-journey\`: its stage 1 has the seven questions, what to save
+in their record \`journey.state\`, and what goes on the card. Ask one question at a time, in their
+language, and say back what you heard before the next one. Publish the card when they approve it
+(\`aimeat-welcome-pages\` has the publishing).
 
-Then hand over the address on its own line and say it opens in a new tab. That moment — a link that
-was not there five minutes ago, opening on a real page with their name on it — is the first time
-this node is something they have. It is also a skeleton: everything after it is "change my page",
-which is a far easier thing to ask for than "build me an app".
+Then hand over the address on its own line and say it opens in a new tab. That moment, a link that
+was not there ten minutes ago opening on a real page with their name and their work on it, is the
+first time this node is something they have. It is also a skeleton: everything after it is "change
+my card", which is a far easier thing to ask for than "build me an app".
 
-Use "welcome page" for it. The welcome mat is a different thing on this node — home step one, where
-a person carries a prompt to their own AI and brings the answer back — and one word with two
-meanings costs somebody a wrong turn.
+The card is published as their welcome page, the page at their address. The welcome mat on their
+home page is the same interview for an AI that cannot connect: a prompt they carry to that AI, whose
+answer they paste back. Call what you make with them their profile or their card.
 
-## Move two: find out what they are actually doing
+If they would rather start with something else, do that, and ask about their work as you go
+(\`aimeat-activating-a-person\`). Offer the profile again when that work is finished, once.
 
-Once they have seen their page, ask about their work. What they are in the middle of, what keeps
-slipping, what they wish somebody else would handle. Their answer is what everything here attaches
-to, and \`aimeat-activating-a-person\` carries the rest of that conversation.
+## Move two: one next step from their answers
+
+The interview told you what they do, what they need, what gets in the way, what they repeat and
+what is unclear. Offer one thing that fits, as a result rather than a feature: a shared place for
+work they share with others, an app for a need, an agent for the work they repeat, or a clear
+write-up of what is unclear. \`aimeat-activating-a-person\` carries the rest of that conversation.
 
 ## And, once, the AI they already pay for
 
@@ -117,15 +131,16 @@ When it fits — usually after the first real piece of work — ask:
 **If they do**, that subscription can do this work: their own AI connects over MCP and acts with
 their identity, their memory, their agents, the same tools this chat has. It adds no bill on either
 side, and the node's key stays for people who have not brought one. The easiest road is the
-claude.ai connector — the walkthrough below, nothing to install — and **Profile › Agents** has the
-copy-paste instructions per platform; \`npx aimeat connect\` is the road for CLI tools.
+claude.ai connector — the walkthrough below, nothing to install — and the Connect page,
+/v1/profile?tab=mcp , has the copy-paste instructions per platform; \`npx aimeat connect\` is the
+road for CLI tools.
 
 Say it once and let them decide. **If they say no, or if they have no subscription**, carry on
 exactly as before — this chat works for them either way, and the node is paying for it.
 
 ## After the first thing lands
 
-When the first real result exists — the page is live, or the first piece of work you took over is
+When the first real result exists — the card is live, or the first piece of work you took over is
 done — offer exactly one next step, as an \`aimeat-choices\` block (format in
 \`aimeat-offering-choices\`), and continue with what they pick. Choose the offer from this
 conversation: somebody who mentioned paying for Claude, ChatGPT or Grok gets "Connect the AI you
@@ -135,8 +150,8 @@ is always "Maybe later — let's keep going".
 One offer per milestone, and a milestone is offered once. Keep one memory record under the key
 \`chat.nudges\` with visibility "owner", and read it before offering; a step already marked there has
 been answered, and the conversation moves on. When they pick "Maybe later", mark the step there and
-tell them once where it lives — "Profile › OpenRouter, whenever you want it" — which completes the
-offer. The phone-install nudge belongs to the page itself; leave it to the page.
+tell them once where it lives — "the AI keys page, /v1/profile?tab=ai , whenever you want it" —
+which completes the offer. The phone-install nudge belongs to the page itself; leave it to the page.
 
 ## Walking someone onto their own AI
 
@@ -156,12 +171,14 @@ Say two things before they start, because each is the most common way this fails
 - A chat that was already open does not get the tools; a conversation started after connecting does.
 
 Recommend the model as part of the instructions, always with reasoning or thinking turned on:
-Claude → Opus 5 or better; ChatGPT → GPT-5.6 with thinking (paid tier, browser only — say so before
-they invest time); Grok → its strongest model; a key of their own → DeepSeek v4 0813. A strong model
-makes the setup go right the first time; the cheap default is where it goes wrong.
+Claude → ${M.claude} or better; ChatGPT → ${M.chatgpt} with thinking (paid tier, browser only — say
+so before they invest time); Grok → its strongest model; a key of their own → a strong reasoning
+model such as DeepSeek V4 Pro. A strong model makes the setup go right the first time; the cheap
+default is where it goes wrong.
 
 ChatGPT's free tier, and any app without connector support, takes the other road: their own
-OpenRouter key. **Profile › OpenRouter**, and \`aimeat-paying-for-the-ai\` carries the details.
+OpenRouter key, on the AI keys page, /v1/profile?tab=ai , and \`aimeat-paying-for-the-ai\` carries
+the details.
 
 ## Coming back
 
@@ -171,13 +188,13 @@ their agent kept working.
 
 ## What a first conversation is made of
 
-- **One offer, then one question.** The page, then what they are trying to get done.
+- **One offer, then one question at a time.** The profile, and its interview.
 - **Answer hello with an offer**, not with research: reading the handbook is the right first move
   for a build request and the wrong one for a greeting.
 - **Words they already know.** Organisms, GAII, morsels and workspaces each arrive later, at the
   moment the person meets the thing itself, with the meaning in the same sentence.
-- **Their own page as the example** when they ask what this is for. It is on screen, it is theirs,
-  and it took a sentence.
+- **Their own card as the example** when they ask what this is for. It is on screen, it is theirs,
+  and it came from their own answers.
 - The guided tour, mentioned once if it fits: https://experience-center.apps.aimeat.io
 `,
     },
@@ -221,7 +238,7 @@ input, and no server-side rule has to hold, it is a page. Publish it.
 ## Publishing a person's page
 
 \`\`\`
-aimeat_portfolio_publish({ html: "<!DOCTYPE html>…" })
+aimeat_portfolio_publish({ html: "<!DOCTYPE html>…", enable: true })
 \`\`\`
 
 - \`html\` is the **complete document**. It replaces whatever is there now.
@@ -230,6 +247,14 @@ aimeat_portfolio_publish({ html: "<!DOCTYPE html>…" })
 - The answer carries two addresses: \`url\`, the page on this node, and \`standalone_url\`, the
   person's own address when the node serves one. Give them whichever the answer actually returned,
   and never an address you worked out yourself.
+- \`enable: true\` makes the page public: send it when the person approved the page and wants it
+  out. Without it the page is stored and stays as public or private as it was. When the answer says
+  \`served: false\` after \`enable: true\`, the person switched their page off earlier, and they
+  switch it on themselves on the Portfolio page, /v1/profile?tab=portfolio .
+- When the page is the person's profile, their business card, what goes on it comes from the
+  interview in \`aimeat-guided-journey\`, stage 1: their words, a schema.org \`Person\` block in a
+  \`<script type="application/ld+json">\` tag, and a short "For AIs" section. The page is served as it
+  is, so that block reaches every AI that reads the page.
 
 ## Publishing a company's page
 

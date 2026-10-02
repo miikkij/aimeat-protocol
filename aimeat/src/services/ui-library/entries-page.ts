@@ -9,6 +9,7 @@
  * @structure PAGE_ENTRIES
  * @usage import { PAGE_ENTRIES } from './entries-page.js';
  * @version-history
+ *   v1.8.0 — 2026-10-03 — PageStart: what a page is for, what to do first and what happens next (guidance part B).
  *   v1.7.0 — 2026-09-27 — SettingsStack's SettingsSection and SwatchPicker's pattern (the home's settings dialog
  *     passes meanings, not classes).
  *   v1.6.0 — 2026-09-26 — The Timeline is every list of what happened in Settings & Controls (Jouni's decision "Activity log", a unification).
@@ -126,6 +127,33 @@ export const PAGE_ENTRIES: UiEntryWritten[] = [
         variants: [],
         example: { term: 'ai.temperature' },
         note: 'The site\'s Modal with the library\'s parts inside: Note lead, Facts, the row label and the small dashed aside. Its own sheet only spaces the examples and the aside.',
+    },
+    {
+        id: 'page-start', name: 'PageStart', kind: 'component', status: 'active',
+        summary: 'The start of a page for a person who has not used it yet: one quiet block under the head that says what the page is for, gives one first action (a prompt to paste into their own AI, and the page\'s own button for the same) and says what happens next. It folds to one line, and the browser remembers that per page.',
+        module: '/components/PageStart.js', sheet: '/css/components/page-start.css',
+        data: {
+            shape: 'PageStart({ id, vars, purpose, prompt, next, action, link, done }) · in a Settings page: SettingsPage({ start })',
+            fields: {
+                id: 'the page: its words are the locale\'s pageStart.<id>.* (purpose, prompt, next, action, link), and its fold is remembered under it',
+                vars: 'the values the prompt\'s {placeholders} take (an address)',
+                purpose: 'what the person gets here, one sentence (the locale\'s words when omitted)',
+                prompt: 'the text the person copies into their own AI (the locale\'s words when omitted)',
+                next: 'what follows the first action, one sentence (the locale\'s words when omitted)',
+                action: '{ onClick | href | copy, label }: the page\'s own button for the same first action',
+                link: '{ onClick | href, label }: a way on after the purpose sentence',
+                done: 'true when the first action is done (it starts folded), null while the page does not know yet, false or absent: open; the person\'s own choice wins',
+            },
+        },
+        useFor: ['The top of a main page a newcomer lands on: memory, organisms, agents, connect your AI, wallet, access, packages, apps, notebook, AI.'],
+        variants: [{ name: 'folded', class: 'page-start--folded', prop: 'done or the person\'s choice', when: 'the person has done the first action, or folded it: one line with the way to open it' }],
+        example: {
+            id: 'memory',
+            purpose: 'Memory keeps what every AI you connect should know about you and your work.',
+            prompt: 'Remember in my AIMEAT that I [work as a bookkeeper and prefer short answers].',
+            next: 'The entry appears on this page, and your connected AIs find it when they need it.',
+        },
+        note: 'Built from the library\'s parts: Label, Note (lead, hint), Action and PromptCard (its copy in the quiet tone). Its sheet only lays them out: the hairlines above and below, three columns, one column under 900px. The fold is stored in localStorage (aimeat.pageStart.<id>), never on the server.',
     },
     {
         id: 'masthead', name: 'Masthead', kind: 'component', status: 'active',

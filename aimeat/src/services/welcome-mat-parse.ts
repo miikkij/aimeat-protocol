@@ -14,16 +14,36 @@
  * @structure
  *   - parseWelcomeMat(raw): the five levels → { ok, html, level, meta } or { ok:false, missing }
  *   - readWelcomeMatMeta(html): the four ai-* meta fields + title, all optional
+ *   - takeProfileBlock(html): the private interview answers out, and the page without them
  *   - WELCOME_MAT_BEGIN / _END: the markers the prompt asks the model to emit
+ *   - PROFILE_BLOCK_ID: the id of the private answers block
  * @usage
  *   import { parseWelcomeMat } from '../services/welcome-mat-parse.js';
  *   const parsed = parseWelcomeMat(req.body.paste);
  * @version-history
+ *   v1.1.0 — 2026-10-03 — The profile interview's answers travel in the page as one
+ *     `<script type="application/json" id="aimeat-profile">` element. A successful parse returns
+ *     them as `profile` and returns the page WITHOUT that element, because the page is published
+ *     and the answers (challenges, repeated work, what is unclear) are private. A broken block is
+ *     removed as well and yields no profile.
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 2).
  */
 
 export const WELCOME_MAT_BEGIN = '<!-- AIMEAT WELCOME MAT BEGIN -->';
 export const WELCOME_MAT_END = '<!-- AIMEAT WELCOME MAT END -->';
+
+/**
+ * The id of the element that carries the interview's answers:
+ * `<script type="application/json" id="aimeat-profile">{ "work": "…", … }</script>`.
+ *
+ * A separate element and not a property of the page's schema.org Person JSON-LD, because the
+ * JSON-LD is published with the card on purpose while these answers are private: the challenges,
+ * the repeated work and what is unclear to the person stay off the public page. One element with a
+ * fixed id can be removed exactly before the page is stored; properties mixed into the Person would
+ * have to be picked out of JSON the person may want public. schema.org also has no property for
+ * any of the five answers.
+ */
+export const PROFILE_BLOCK_ID = 'aimeat-profile';
 
 /** What the page says about the AI that wrote it. Every field is optional by design. */
 export interface WelcomeMatMeta {
@@ -53,6 +73,12 @@ export type WelcomeMatParse =
         /** True when level 4 had to build the document shell around a fragment. */
         wrapped: boolean;
         meta: WelcomeMatMeta;
+        /**
+         * The interview's answers from the private profile block, as the AI wrote them (not yet
+         * cleaned: services/journey-state.ts does that). Null when the page carries no readable
+         * block. The block itself is never in `html`.
+         */
+        profile: Record<string, unknown> | null;
     }
     | {
         ok: false;
@@ -206,6 +232,32 @@ export function readWelcomeMatMeta(html: string): WelcomeMatMeta {
     };
 }
 
+/** Every `<script … id="aimeat-profile" …>…</script>`, whatever the attribute order and quotes. */
+const PROFILE_BLOCK_RE = new RegExp(
+    `<script\\b[^>]*\\bid\\s*=\\s*["']?${PROFILE_BLOCK_ID}["']?[^>]*>([\\s\\S]*?)<\\/script\\s*>`, 'gi');
+
+/**
+ * Take the private profile block out of a page. Returns the first block's JSON object (an array, a
+ * string or broken JSON gives null) and the page with EVERY such block removed, readable or not:
+ * whatever the AI put in it was meant to stay private.
+ */
+export function takeProfileBlock(html: string): { html: string; profile: Record<string, unknown> | null } {
+    let profile: Record<string, unknown> | null = null;
+    let seen = false;
+    const stripped = html.replace(PROFILE_BLOCK_RE, (_whole, body: string) => {
+        if (!seen) {
+            seen = true;
+            try {
+                const value: unknown = JSON.parse(body.trim());
+                if (value && typeof value === 'object' && !Array.isArray(value)) profile = value as Record<string, unknown>;
+            // eslint-disable-next-line aimeat/no-silent-catch -- a broken block is the AI's typo, not a fault: it yields no answers and the page is still a page; the caller sees profile: null
+            } catch { /* nothing to read */ }
+        }
+        return '';
+    });
+    return { html: stripped, profile };
+}
+
 /**
  * The five attempts, in order, stopping at the first that hits (03-welcome-mat.md). Level 5 is the
  * rejection: there was no page in the paste. It names what was looked for, and the caller keeps the
@@ -238,9 +290,12 @@ export function parseWelcomeMat(raw: unknown): WelcomeMatParse {
     const fragment = fromBodyFragment(text);
     if (fragment) {
         const meta = readWelcomeMatMeta(text);
-        const wrapped = wrapFragment(fragment, meta);
+        // The profile block, like the metadata, may sit outside the fragment: read it from the
+        // whole paste, and take it out of the fragment that becomes the page.
+        const { profile } = takeProfileBlock(text);
+        const wrapped = wrapFragment(takeProfileBlock(fragment).html, meta);
         if (!hasVisibleContent(wrapped)) return { ok: false, reason: 'empty_page', missing: ['content'] };
-        return { ok: true, html: wrapped, level: 4, wrapped: true, meta };
+        return { ok: true, html: wrapped, level: 4, wrapped: true, meta, profile };
     }
 
     // Level 5 — no page here. Say which of the three things was absent.
@@ -252,7 +307,8 @@ export function parseWelcomeMat(raw: unknown): WelcomeMatParse {
 }
 
 /** Shared tail for levels 1–3: the extracted text is already a document. */
-function complete(html: string, level: WelcomeMatLevel, wrapped: boolean): WelcomeMatParse {
+function complete(extracted: string, level: WelcomeMatLevel, wrapped: boolean): WelcomeMatParse {
+    const { html, profile } = takeProfileBlock(extracted);
     if (!hasVisibleContent(html)) return { ok: false, reason: 'empty_page', missing: ['content'] };
-    return { ok: true, html, level, wrapped, meta: readWelcomeMatMeta(html) };
+    return { ok: true, html, level, wrapped, meta: readWelcomeMatMeta(html), profile };
 }

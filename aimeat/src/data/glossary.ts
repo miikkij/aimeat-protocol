@@ -21,9 +21,16 @@
  *   - GLOSSARY      — the registry, grouped by area, alphabetical within an area
  *   - GLOSSARY_AREAS — display order + heading for the areas
  *   - findTerm(t)   — case-insensitive lookup by term or alias
+ *   - glossaryTermId(t) — the term's stable id: the locale key `glossary.plain.<id>` and the page anchor
+ *
+ *   PLAIN LAYER. The definitions here are English and written for builders. The sentence a person
+ *   reads first lives in the locales as `glossary.plain.<id>` (en, fi, es), because it is UI text in
+ *   the reader's language; routes/glossary.ts adds it to each term. A term without that key has no
+ *   plain sentence, which is right for builder-only terms such as Namespace or Cortex.
  * @usage
  *   import { GLOSSARY, findTerm } from '../data/glossary.js';
  * @version-history
+ *   v1.2.0 — 2026-10-03 — glossaryTermId(): the id the plain sentence and the page anchor share.
  *   v1.1.0 — 2026-10-01 — Organism says what it is for in the words every page now uses, and names
  *     the starting shapes (guided journey P5).
  *   v1.0.0 — 2026-07-28 — Initial: 36 terms across six areas (agent-readability phase 06)
@@ -284,6 +291,14 @@ export const GLOSSARY: GlossaryTerm[] = [
     seeAlso: ['Federation', 'Node'],
   },
 ];
+
+/**
+ * The term's stable id: lower case, spaces as hyphens ("App grant" → "app-grant"). It names the locale
+ * key of the plain sentence (`glossary.plain.<id>`) and the page anchor (`#term-<id>`).
+ */
+export function glossaryTermId(t: GlossaryTerm): string {
+  return t.term.toLowerCase().replace(/\s+/g, '-');
+}
 
 /** Case-insensitive lookup by term or alias. */
 export function findTerm(needle: string): GlossaryTerm | undefined {

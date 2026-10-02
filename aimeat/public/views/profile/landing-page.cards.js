@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   v1.22.0 -- 2026-10-03 -- The overview's next steps come from the person's path (journey.next first, then the open stages after it; views/home/journey-steps.js), with no emoji; the extensions promo shows once the apps stage is done or the person has three apps, and its cards lose their emoji marks (guidance A2).
  *   v1.21.0 -- 2026-10-01 -- The Packages page is "Get apps", right under Apps and in the basic menu (decision D8 of the user-journey review).
  *   v1.20.2 -- 2026-09-29 -- The build-an-app step opens /v1/appcat?create=1 instead of /app-catalog.html (Jouni).
  *   v1.20.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes itself, so an organism, workspace, agent, recent item or display name with a quote or an ampersand showed as &quot; / &amp;.
@@ -84,6 +85,8 @@ import { Mark, Marks, Label } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Action, Icon } from '/components/Action.js';
 import { Row as Line, Split, Space } from '/components/Layout.js';
+import { useHomeState } from '/views/surface/home-state.js';
+import { STEP, openSteps, stepTitle, stepLine, stepHref } from '../home/journey-steps.js';
 import {
   relTime, fmtClock, openProfileTab, gotoWorkspace, gotoOrganism, gotoOrganismsList,
   fmtBytes, fmtUsd, fmtCompact,
@@ -522,77 +525,46 @@ export function ProfileCard({ tier, stats, session, onEditProfile, switchTab }) 
   `;
 }
 
-/* "Suggested next steps" — a curated, value-first card pointing at the genuinely useful
- * but under-used surfaces (replaces the old four-path onboarding hero that flashed for
- * everyone because tier starts 'new' before stats load). First item highlighted:
- *   1. Write self-organizing notes → Notebook (always; the highest-value habit)
- *   2. Create your portfolio → Portfolio — ONLY if the user hasn't published one yet
- *      (under-used; tell others who you are)
- *   3. Build an app → the app catalog's create flow (prompt builder), in the portal's
- *      current language (?lang=) with the builder auto-opened (?create=1) — ONLY if the
- *      user has no app of their own yet
- *   4. Use agents others shared → the Offers "Do" surface (always)
- * The two conditional steps render only once their data is KNOWN to be "missing" (apps
- * loaded → 0; portfolio config fetched → not enabled), so an existing user never sees a
- * step flash in then disappear. Each step carries its own `go()` so it can switch a tab
- * OR open an external page. */
-export function NextSteps({ switchTab, hasApps }) {
-  // hasPortfolio: undefined = loading, true = published config exists, false = none yet.
-  const [hasPortfolio, setHasPortfolio] = useState(undefined);
-  // Hello MCP outranks everything else while it is unproven: until the connection is verified,
-  // every other suggestion here is advice the user cannot act on properly. undefined = still
-  // reading, so the step never flashes in for someone who already passed.
-  const [mcpProven, setMcpProven] = useState(undefined);
-  useEffect(() => {
-    let cancelled = false;
-    checkHelloMcp()
-      .then(r => { if (!cancelled) setMcpProven(r.passed); })
-      .catch((err) => { swallowed('landing-page.cards: helloMcp', err); if (!cancelled) setMcpProven(true); });
-    return () => { cancelled = true; };
-  }, []);
-  useEffect(() => {
-    let cancelled = false;
-    apiGet('/v1/portfolio/config')
-      .then(r => { if (!cancelled) setHasPortfolio(!!(r?.data?.config?.enabled)); })
-      .catch((err) => { swallowed('landing-page.cards', err); if (!cancelled) setHasPortfolio(false); });
-    return () => { cancelled = true; };
-  }, []);
-
-  const buildAppUrl = '/v1/appcat?create=1';
-  const steps = [];
-  // First and most important until it passes, then gone: a proven connection is the thing the
-  // rest of the product is used through.
-  if (mcpProven === false) steps.push({ icon: '\u{1F50C}', key: 'helloMcp', go: () => switchTab('mcp') });
-  steps.push({ icon: '\u{1F9E0}', key: 'writeNotes', go: () => switchTab('notebook') });
-  if (hasPortfolio === false) steps.push({ icon: '\u{1F3A8}', key: 'portfolio', go: () => switchTab('portfolio') });
-  if (hasApps === false) steps.push({ icon: '\u{26A1}', key: 'buildApp', go: () => window.open(buildAppUrl, '_blank', 'noopener') });
-  steps.push({ icon: '\u{1F91D}', key: 'useSharedAgents', go: () => switchTab('offers') });
+/* "Your next steps": the person's path from GET /v1/home/state `journey` (services/journey-state.ts),
+ * the next open stage first and the open ones after it, the same steps the home, the help page and
+ * the chat's starters show (views/home/journey-steps.js). The card waits for the journey, so a step
+ * never shows and then leaves; with the path walked only the open items stay. A step that lives
+ * in Settings switches the tab, any other one opens its page. */
+export function NextSteps({ switchTab }) {
+  const { journey } = useHomeState();
+  const steps = openSteps(journey);
+  if (steps === null) return null;
+  const go = (id) => (STEP[id].tab ? switchTab(STEP[id].tab) : window.location.assign(stepHref(id)));
 
   return html`
     <${Space} above="section">
       <${Card} tone="panel" title=${t('profile.landing.nextTitle')}>
-        <${IndexList}>
-          ${steps.map((s, i) => html`
-            <${IndexItem} key=${s.key} first=${i === 0} onClick=${s.go}
-              line=${t('profile.landing.next.' + s.key + 'Desc')}>${t('profile.landing.next.' + s.key + 'Title')}<//>
+        ${steps.length > 0 && html`<${IndexList}>
+          ${steps.map((id, i) => html`
+            <${IndexItem} key=${id} first=${i === 0} onClick=${() => go(id)}
+              line=${stepLine(id)}>${stepTitle(id)}<//>
           `)}
-        <//>
+        <//>`}
         <${OpenItemsList} />
       <//>
     <//>
   `;
 }
 
-/* Onboarding promo — shown only while the user has fewer than 3 apps, and dismissable for good.
- * After that the same content lives on the Extensions page; for a seasoned user it was dead space. */
-export function CortexSection({ switchTab, onDismiss }) {
+/* The extensions promo: shown once the path's apps stage is done (an app or an installed package)
+ * or the person has three apps, because charts and a canvas are the step after a first app, not
+ * before it. Dismissable for good; the same content lives on the Extensions page. */
+export function CortexSection({ switchTab, onDismiss, appCount = 0 }) {
+  const { journey } = useHomeState();
+  const appsDone = !!journey?.stages?.find((s) => s.id === 'apps')?.done;
+  if (!appsDone && appCount < 3) return null;
   const dismiss = html`<${Icon} small label=${t('profile.landing.promoDismiss') || 'Hide'}
     onClick=${(e) => { e.stopPropagation(); onDismiss?.(); }}>✕<//>`;
   return html`
     <${Box} marks=${html`<${Label}>${t('profile.landing.cortexSectionTitle')}<//>`} end=${dismiss}>
       <${CardGrid} cols="two">
-        <${Card} tone="framed" mark=${'\u{1F4CA}'} name=${t('profile.landing.cortexCharts')} text=${t('profile.landing.cortexChartsDesc')} onOpen=${() => switchTab('extensions')} />
-        <${Card} tone="framed" mark=${'\u{1F3A8}'} name=${t('profile.landing.cortexCanvas')} text=${t('profile.landing.cortexCanvasDesc')} onOpen=${() => switchTab('extensions')} />
+        <${Card} tone="framed" name=${t('profile.landing.cortexCharts')} text=${t('profile.landing.cortexChartsDesc')} onOpen=${() => switchTab('extensions')} />
+        <${Card} tone="framed" name=${t('profile.landing.cortexCanvas')} text=${t('profile.landing.cortexCanvasDesc')} onOpen=${() => switchTab('extensions')} />
       <//>
     <//>
   `;

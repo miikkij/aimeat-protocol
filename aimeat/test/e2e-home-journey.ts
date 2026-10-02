@@ -4,19 +4,22 @@
  *   /v1/home/state, the person's own words written by their AI into `journey.state`, and the
  *   handbook that names the guided-journey skill while the path is not walked.
  *
- *   Happy path: a new account is at stage `ai`; an MCP session marks the AI connected; the AI writes
- *   what the person wants, their road and a declined stage, and the page reads it back; the first
- *   note moves the account past `first-result`.
+ *   Happy path: a new account starts at the profile (`first-result`); an MCP session marks the AI
+ *   connected; the AI writes the interview's answers, the road and a declined stage, and the page
+ *   and the handbook read them back; the card published with aimeat_portfolio_publish is served and
+ *   moves the account past `first-result`.
  *
  *   Failure modes covered:
  *     - an agent token cannot read its owner's home state (the path is the person's, not the agent's);
  *     - another owner's home never shows this owner's words;
  *     - a record written badly by hand (unknown road, unknown stage) is ignored, not trusted;
+ *     - a note without a card does not count as the profile;
  *     - once every stage is done or declined, the handbook says nothing about the path.
  * @usage
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-home-journey
  * @version-history
+ *   v1.1.0 — 2026-10-03 — The profile is the first stage: the interview's answers and the published card.
  *   v1.0.0 — 2026-10-01 — Initial.
  */
 import * as ed from '@noble/ed25519';
@@ -141,12 +144,14 @@ console.log('\n=== Home journey E2E (the seven stages and the person\'s own word
 const me = await provision('a');
 const other = await provision('b');
 
-await test('1. a new account is at the first stage, with seven stages open', async () => {
+await test('1. a new account starts at the profile, with seven stages open', async () => {
     const j = await journeyOf(me.ownerToken);
     assert(Array.isArray(j.stages) && j.stages.length === 7, `seven stages: ${JSON.stringify(j.stages)}`);
+    assert(j.stages[0].id === 'first-result', `the profile is the first stage: ${JSON.stringify(j.stages.map((s: any) => s.id))}`);
     assert(j.stages.every((s: any) => !s.done && !s.declined), `none done: ${JSON.stringify(j.stages)}`);
-    assert(j.next === 'ai', `next is ai, got ${j.next}`);
+    assert(j.next === 'first-result', `next is first-result, got ${j.next}`);
     assert(j.want === null && j.road === null, 'no words of theirs yet');
+    assert(j.profile && Object.values(j.profile).every(v => v === null), `no interview answers yet: ${JSON.stringify(j.profile)}`);
 });
 
 const rpc = await connect(me.mcpToken);
@@ -158,7 +163,8 @@ await test('2. an MCP session marks the AI connected, and the handbook names the
     const text = await handbook(rpc, 2);
     assert(text.includes(SECTION), 'the handbook carries the path section');
     assert(text.includes('aimeat-guided-journey'), 'and names the skill');
-    assert(text.includes('[open] a first real result'), 'and the open stage');
+    assert(text.includes('[open] their profile'), 'and the open stage');
+    assert(text.includes('They have not had the profile interview yet'), 'and that the interview comes first');
 });
 
 await test('3. the skill the handbook names exists on the node', async () => {
@@ -166,19 +172,73 @@ await test('3. the skill the handbook names exists on the node', async () => {
     assert(toolText(body).includes('Walking a person along their path'), `skill body: ${toolText(body).slice(0, 200)}`);
 });
 
-await test('4. the AI writes what the person wants, their road and a declined stage; the page reads them', async () => {
-    await writeOwnerMemory(rpc, 'journey.state', { want: 'run my bakery orders', road: 'free', declined: [{ stage: 'organise', at: '2026-10-01' }] }, 4);
+const INTERVIEW = {
+    want: 'run my bakery orders', road: 'free', declined: [{ stage: 'organise', at: '2026-10-01' }],
+    work: 'I run a bakery with two staff', needs: 'take orders without the phone',
+    challenges: ['orders get lost', 'no time for the books'], repetitive: 'typing order confirmations',
+    unclear: 'VAT on catering',
+};
+
+await test('4. the AI writes the interview, the road and a declined stage; the page and the handbook read them', async () => {
+    await writeOwnerMemory(rpc, 'journey.state', INTERVIEW, 4);
     const j = await journeyOf(me.ownerToken);
     assert(j.want === 'run my bakery orders', `want: ${j.want}`);
     assert(j.road === 'free', `road: ${j.road}`);
     assert(stage(j, 'organise').declined === true, 'organise declined');
+    assert(j.profile.work === 'I run a bakery with two staff', `work: ${j.profile.work}`);
+    assert(j.profile.challenges === 'orders get lost; no time for the books', `challenges: ${j.profile.challenges}`);
+    const text = await handbook(rpc, 41);
+    assert(text.includes('- Work they repeat: "typing order confirmations"'), 'the handbook quotes the interview');
+    assert(!text.includes('They have not had the profile interview yet'), 'and no longer asks for it');
 });
 
-await test('5. the first note moves the account past the first result, and next skips the declined stage', async () => {
-    await writeOwnerMemory(rpc, 'home.first-note', { title: 'Oven', text: 'The oven is serviced in March.' }, 5);
+await test('5. the published card is the first result: it is served, and next skips the declined stage', async () => {
+    const card = '<!doctype html><html><head><title>Journey Test</title><script type="application/ld+json">{"@context":"https://schema.org","@type":"Person","name":"Journey Test"}</script></head><body><h1>Journey Test</h1><p>Bakery.</p><section><h2>For AIs</h2><p>Contact by email.</p></section></body></html>';
+    // Without `enable` the page is stored and not public: the file and the switch stay two acts.
+    const stored = await rpc('tools/call', { name: 'aimeat_portfolio_publish', arguments: { html: card } }, 5);
+    assert(JSON.parse(toolText(stored)).served === false, `stored, not public: ${toolText(stored)}`);
+    assert((await json(`/v1/portfolio/data/${me.ownerName}`)).status === 404, 'not served before enable');
+    // On the person's yes, `enable: true` makes it public.
+    const body = await rpc('tools/call', { name: 'aimeat_portfolio_publish', arguments: { html: card, enable: true } }, 50);
+    assert(body.result?.isError !== true, `publish refused: ${toolText(body)}`);
+    assert(JSON.parse(toolText(body)).served === true, `served: ${toolText(body)}`);
     const j = await journeyOf(me.ownerToken);
     assert(stage(j, 'first-result').done === true, 'first-result done');
     assert(j.next === 'apps', `organise is declined, so next is apps, got ${j.next}`);
+    // The address the person is told to open has to show the card, JSON-LD included.
+    const pub = await json(`/v1/portfolio/data/${me.ownerName}`);
+    assert(pub.status === 200, `the published card is served, got ${pub.status}: ${JSON.stringify(pub.body.error)}`);
+    assert(String(pub.body.data.portfolio_html).includes('application/ld+json'), 'the JSON-LD block is kept');
+});
+
+await test('5a. FAILURE: a page the owner switched off stays off when their AI publishes again', async () => {
+    const off = await json('/v1/portfolio/config', auth(me.ownerToken, { method: 'PUT', body: JSON.stringify({ enabled: false }) }));
+    assert(off.status === 200, `switch off ${off.status}`);
+    const body = await rpc('tools/call', { name: 'aimeat_portfolio_publish', arguments: { html: '<!doctype html><html><body><h1>Again</h1></body></html>', enable: true } }, 52);
+    const out = JSON.parse(toolText(body));
+    assert(out.published === true && out.served === false, `the answer says the page is off: ${toolText(body)}`);
+    const pub = await json(`/v1/portfolio/data/${me.ownerName}`);
+    assert(pub.status === 404, `the owner's off switch holds, got ${pub.status}`);
+    const on = await json('/v1/portfolio/config', auth(me.ownerToken, { method: 'PUT', body: JSON.stringify({ enabled: true }) }));
+    assert(on.status === 200, `switch back on ${on.status}`);
+});
+
+await test('5c. the JSON upload the connector sends takes the same `enable`, and answers `served`', async () => {
+    const third = await provision('c');
+    const html = '<!doctype html><html><body><h1>Via the connector</h1></body></html>';
+    const up = await json('/v1/portfolio/upload', auth(third.mcpToken, { method: 'PUT', body: JSON.stringify({ html, enable: true }) }));
+    assert(up.status === 200 && up.body.data.served === true, `upload ${up.status}: ${JSON.stringify(up.body)}`);
+    const pub = await json(`/v1/portfolio/data/${third.ownerName}`);
+    assert(pub.status === 200 && String(pub.body.data.portfolio_html).includes('Via the connector'), `served ${pub.status}`);
+    assert(stage(await journeyOf(third.ownerToken), 'first-result').done === true, 'the card is the first result on this road too');
+});
+
+await test('5b. FAILURE: a note, an app or a shared place without a card does not count as the profile', async () => {
+    const orpc = await connect(other.mcpToken);
+    await writeOwnerMemory(orpc, 'home.first-note', { title: 'Oven', text: 'The oven is serviced in March.' }, 51);
+    const j = await journeyOf(other.ownerToken);
+    assert(stage(j, 'first-result').done === false, 'a note is not the profile');
+    assert(j.next === 'first-result', `the profile is still next, got ${j.next}`);
 });
 
 await test('6. FAILURE: an agent token cannot read its owner\'s home state', async () => {
@@ -189,7 +249,8 @@ await test('6. FAILURE: an agent token cannot read its owner\'s home state', asy
 await test('7. FAILURE: another owner\'s home never shows this owner\'s words', async () => {
     const j = await journeyOf(other.ownerToken);
     assert(j.want === null && j.road === null, `other owner sees nothing of mine: ${JSON.stringify(j)}`);
-    assert(j.next === 'ai', `other owner is at the start, got ${j.next}`);
+    assert(Object.values(j.profile).every(v => v === null), `nor my interview: ${JSON.stringify(j.profile)}`);
+    assert(j.next === 'first-result', `other owner is at the start, got ${j.next}`);
 });
 
 await test('8. FAILURE: a badly written record is ignored rather than trusted', async () => {
@@ -202,7 +263,7 @@ await test('8. FAILURE: a badly written record is ignored rather than trusted', 
 
 await test('9. once every stage is done or declined, the handbook says nothing about the path', async () => {
     await writeOwnerMemory(rpc, 'journey.state', {
-        want: 'run my bakery orders', road: 'free',
+        ...INTERVIEW,
         declined: ['organise', 'apps', 'agents', 'share'].map(s => ({ stage: s, at: '2026-10-01' })),
     }, 9);
     const j = await journeyOf(me.ownerToken);

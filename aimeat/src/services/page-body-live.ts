@@ -32,6 +32,8 @@
  * @usage
  *   const live = await livePageMarkdown('/', config, storage);
  * @version-history
+ *   v1.0.2 — 2026-10-03 — The help page's text version lists the knowledge question as the page does,
+ *     and its steps read help.start1-3, which now name the profile first (the newcomer's path).
  *   v1.0.1 — 2026-09-30 — readChangelog() and ChangelogEntry exported: node-update-check.ts compares
  *     the running node's change log with the newer version's.
  *   v1.0.0 — 2026-09-24 — Initial: front page, app store, change log, members, help.
@@ -144,7 +146,7 @@ async function build(path: string, config: AimeatConfig, storage: Storage): Prom
     case '/v1/help': {
       // The questions the help page answers, in its own words and order (public/views/help.js).
       const t = createT('en');
-      const qs = ['cost', 'privacy', 'agent', 'organism', 'connect', 'broken'];
+      const qs = ['cost', 'privacy', 'agent', 'organism', 'knowledge', 'connect', 'broken'];
       const lines = ['## ' + t('help.startTitle'), '',
         `1. ${t('help.start1')}`, `2. ${t('help.start2')}`, `3. ${t('help.start3')}`, '',
         '## ' + t('help.qTitle'), ''];

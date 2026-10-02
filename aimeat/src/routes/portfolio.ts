@@ -8,6 +8,9 @@
  * @structure catalog / members / config (GET+PUT) / upload / data/:username
  *   portfolioWriteGaii() / portfolioReadGaiis() — which identity a portfolio is stored under
  * @version-history
+ *   v1.10.0 — 2026-10-03 — `enable: true` on the JSON upload (and on the MCP tool) switches the page
+ *     on unless the owner switched it off; the answer carries `served`. A card an AI published was
+ *     stored and answered 404 for anyone who never pasted a mat. Without `enable`, nothing changes.
  *   v1.9.0 — 2026-09-29 — TARGET-082 review: the catalog's images pass the caller's reader too.
  *   v1.8.0 — 2026-09-29 — TARGET-082 V4: the catalog's memory entries pass the caller's ContentReader
  *     (presentMemories) before a preview is cut from a value.
@@ -105,6 +108,45 @@ export async function writePortfolioHtml(
     createdAt: new Date().toISOString(),
   });
   return target;
+}
+
+/**
+ * Whether the owner's page is served after a publish, switching it on when the caller asks to.
+ *
+ * The page is served only when `portfolio.config` says `enabled`, and storing a page does not set
+ * that: the file and the switch are two acts (e2e-remake-home holds it). Only the welcome-mat paste
+ * set the switch, so a card an AI published for a person who never pasted a mat answered 404 at the
+ * address the tool handed back (measured 2026-10-03, e2e-home-journey test 5). With `enable`, which
+ * the AI sends when the person approved the page and wants it public, the switch is set the way the
+ * paste sets it, merged onto what is stored. An owner who switched their page OFF keeps it off: that
+ * is their decision, and the caller says so instead of handing out a dark address.
+ */
+export async function switchPortfolioOnUnlessTurnedOff(
+  storage: Storage, nodeId: string, ownerName: string, target: string, enable: boolean,
+): Promise<boolean> {
+  let current: Record<string, unknown> | null = null;
+  for (const gaii of await portfolioReadGaiis(storage, ownerName, nodeId)) {
+    const mem = await storage.getMemory(gaii, PORTFOLIO_CONFIG_KEY);
+    if (mem?.value && typeof mem.value === 'object') { current = mem.value as Record<string, unknown>; break; }
+  }
+  if (current?.enabled === false) return false;
+  if (current?.enabled === true) return true;
+  if (!enable) return false;
+  const existing = await storage.getMemory(target, PORTFOLIO_CONFIG_KEY);
+  const prev = (existing?.value && typeof existing.value === 'object' ? existing.value : current ?? {}) as Record<string, unknown>;
+  const now = new Date().toISOString();
+  await storage.setMemory({
+    key: PORTFOLIO_CONFIG_KEY,
+    ownerGaii: target,
+    value: { ...prev, enabled: true, source: prev.source ?? 'ai' },
+    visibility: 'owner',
+    tags: ['portfolio'],
+    ttlHours: null,
+    version: existing ? existing.version + 1 : 1,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  });
+  return true;
 }
 
 export async function portfolioWriteGaii(
@@ -425,8 +467,16 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
     }
 
     await writePortfolioHtml(storage, target, fileData);
+    // The JSON body is the agent's road (the connector's aimeat_portfolio_publish). `enable: true`
+    // switches the page on, as the node's MCP tool does; without it the file and the switch stay two
+    // acts. A browser upload keeps the Portfolio tab's own switch.
+    const enable = isJson && (req.body as { enable?: unknown } | undefined)?.enable === true;
+    const served = isJson ? await switchPortfolioOnUnlessTurnedOff(storage, config.nodeId, ownerName, target, enable) : undefined;
 
-    res.json(success(config.nodeId, { uploaded: true, sizeKb: Math.round(fileData.length / 1024) }));
+    res.json(success(config.nodeId, {
+      uploaded: true, sizeKb: Math.round(fileData.length / 1024),
+      ...(served === undefined ? {} : { served }),
+    }));
     emitChange('portfolio');
   });
 

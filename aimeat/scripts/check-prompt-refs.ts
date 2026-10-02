@@ -30,6 +30,9 @@
  *   cd aimeat && pnpm check:prompt-refs            # exits 1 on any finding
  *   cd aimeat && pnpm check:prompt-refs --list     # the sources, and nothing runs
  * @version-history
+ *   v1.1.0 -- 2026-10-03 -- Reads the guided-journey skill and the person help prompt too. The
+ *     aimeat-first-conversation exemption is gone: that skill reads its model names from
+ *     services/model-recommendation.ts now.
  *   v1.0.0 -- 2026-09-18 -- Initial, from the instruction review of the same day.
  */
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
@@ -83,6 +86,7 @@ const SOURCES: string[] = [
     'aimeat/src/cli/connect/onboarding-prompt.ts',
     'aimeat/src/data/builtin-skills.ts',
     'aimeat/src/data/builtin-skills.conversation.ts',
+    'aimeat/src/data/builtin-skills.guided-journey.ts',
     'aimeat/src/data/builtin-skills.recurring-work.ts',
     'aimeat/src/data/builtin-skills.open-items.ts',
     'aimeat/src/data/builtin-skills.workstation.ts',
@@ -98,6 +102,7 @@ const SOURCES: string[] = [
     'aimeat/public/views/home/journey-prompts.js',
     'aimeat/public/views/landing-prompts.js',
     'docs/AIMEAT_Help_Prompt.md',
+    'docs/AIMEAT_Help_Prompt_Person.md',
     'docs/building-an-aimeat-compatible-agent.md',
     'docs/building-an-aimeat-compatible-ecosystem-app.md',
     'python/aimeat-crewai/README.md',
@@ -125,7 +130,6 @@ const BANNED: Banned[] = [
  * Key: `<banned id or "tool" or "route">|<repo-relative file>|<the token or a fragment of the line>`.
  */
 const ALLOWED: Record<string, string> = {
-    'model-name-written-out|aimeat/src/data/builtin-skills.conversation.ts|Claude → Opus 5 or better': 'The skill aimeat-first-conversation is kept byte for byte equal to the copy on aimeat.io and a digest test holds that (e2e-skills 27b2b), so its text cannot read a constant. When the recommendation moves, change the skill on aimeat.io, regenerate this file and its digest.',
     'route|aimeat/src/data/bootstrap-endpoints.ts|/v1/profile': 'A page of the SPA, served by the static handler and not by a router declaration; the bootstrap lists it as where a person manages their data.',
     'contract-gap|aimeat/src/routes/bootstrap.ts|/v1/portal': 'A page a person opens in a browser. The contract describes the API, and an HTML page is not part of it.',
     'contract-gap|aimeat/src/services/markdown-negotiation.ts|/v1/portal': 'The same page, named in the landing markdown as where a person registers.',
@@ -271,7 +275,7 @@ function main(): void {
     if (age > MODEL_REVIEW_MAX_AGE_DAYS) {
         console.error(`\n✗ the model recommendation was last checked ${age} days ago (${MODEL_RECOMMENDATION.reviewedOn}; the limit is ${MODEL_REVIEW_MAX_AGE_DAYS}).`
             + '\n    Open the sources listed at the top of aimeat/src/services/ai-tool-setup.ts, confirm the model names and the menu paths,'
-            + '\n    then move reviewedOn in aimeat/src/services/model-recommendation.ts. The skill aimeat-first-conversation names the same models and is changed on aimeat.io first.');
+            + '\n    then move reviewedOn in aimeat/src/services/model-recommendation.ts. The skills aimeat-first-conversation and aimeat-guided-journey read the same names from there.');
         process.exit(1);
     }
     if (findings.length || missing.length) {

@@ -10,6 +10,8 @@
  *   import { registerPromptsTools } from './prompts.js';
  *   registerPromptsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.10.1 -- 2026-10-03 -- The `tier` description says "settings" also holds the system's words in
+ *     plain language ("settings/concept.<id>"), the same meaning on every page and tool.
  *   v1.10.0 -- 2026-10-02 -- tier "settings" and "settings/<term>": the setting explanations the pages
  *     show behind a question mark, in English, Finnish and Spanish (services/settings-explain.ts).
  *   v1.9.0 -- 2026-10-01 -- tier "features" and "features/<id>": what this node can do, in parts
@@ -83,7 +85,7 @@ export function registerPromptsTools(
         'aimeat_handbook_get',
         descriptionFor('aimeat_handbook_get'),
         {
-            tier: z.string().optional().describe('A REST-style tier handbook or a managed prompt by id (e.g. "tier1", "tier2", or a custom prompt ID), for an agent that works over HTTP. Leave it out over MCP: the handbook for your own surface comes back. Two values are for every builder. "build-app-atelier" returns the first part of the ATELIER build specification, the track an app is built on unless there is a reason not to, and "build-app-atelier/<id>" one of the parts it lists. "build-app" and "build-app/<id>" do the same for the Classic specification. "features" lists what this node can do, by area, and "features/<id>" is one area: read it once you know what the person needs, to offer the one thing that fits. "settings" lists the settings the pages explain behind a question mark, by area, and "settings/<term>" is one of them in English, Finnish and Spanish: read it when the person asks what a setting means or which value to pick.'),
+            tier: z.string().optional().describe('A REST-style tier handbook or a managed prompt by id (e.g. "tier1", "tier2", or a custom prompt ID), for an agent that works over HTTP. Leave it out over MCP: the handbook for your own surface comes back. Two values are for every builder. "build-app-atelier" returns the first part of the ATELIER build specification, the track an app is built on unless there is a reason not to, and "build-app-atelier/<id>" one of the parts it lists. "build-app" and "build-app/<id>" do the same for the Classic specification. "features" lists what this node can do, by area, and "features/<id>" is one area: read it once you know what the person needs, to offer the one thing that fits. "settings" lists, first, the words this system uses (organism, agent, morsel and others), each in plain language, then the settings the pages explain behind a question mark, by area. "settings/<term>" is one of them in English, Finnish and Spanish. "settings/concept.<id>" is a word, for example "settings/concept.organism": read it before you use the word with the person or when they ask what it is, and give the word that meaning, which every page and tool uses too. Any other term is a setting: read it when the person asks what it means or which value to pick.'),
             surface: z.enum(V2_ROLES as unknown as [SurfaceRole, ...SurfaceRole[]]).optional().describe('Read another interface\'s handbook than your own. Leave it out to get the one for the interface you are connected to.'),
         },
         annotationsFor('aimeat_handbook_get'),

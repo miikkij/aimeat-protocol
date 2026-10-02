@@ -7,6 +7,7 @@
  *   the agents as a table that opens into a card), the ink rail, the device-auth approvals, the
  *   scope modal.
  * @version-history
+ *   v4.19.0 -- 2026-10-03 -- The page's start (components/PageStart.js, New agent as its button) and the title's question mark, concept.agent (guidance part B).
  *   v4.18.0 -- 2026-10-02 -- The agents list names the agents whose `*` holds their tasks until narrowed.
  *   v4.17.0 -- 2026-10-01 -- "What should an agent do?" is section 01 (agents/agent-guide.js); the others
  *     move to 02-05. No agents yet shows three examples that fill the form; the CrewAI fold tells
@@ -140,6 +141,7 @@ import { useConfirm } from '/components/Modal.js';
 import { AgentConsent } from '/components/AgentConsent.js';
 import { McpSetupGuide } from './ai-setup-guide.js';
 import { SettingsPage } from '/components/SettingsPage.js';
+import { PageStart } from '/components/PageStart.js';
 import { Section } from '/components/Section.js';
 import { scrollToSection } from '/components/Rail.js';
 import { FigureStrip } from '/components/FigureStrip.js';
@@ -629,7 +631,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
   return html`
     <${SettingsPage} name="agp"
       crumb=${[t('nav.profile'), t('profile.tabs.agents')]}
-      title=${t('profile.agents.title')} sub=${agents.length}
+      title=${t('profile.agents.title')} sub=${agents.length} help="concept.agent"
       marks=${marks}
       desc=${p('lede')}
       actions=${html`
@@ -640,6 +642,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
               shows the same panel for the person's FIRST agent, and a copy here would drift from it.
               Behaviour is unchanged — same requests, same scope presets, same verify calls. */''}
         <${AgentConsent} requests=${pendingRequests} onApprove=${handleApprove} onDeny=${handleDeny} />
+        <${PageStart} id="agents" done=${agents.length > 0} action=${{ onClick: openNew }} />
         <${FigureStrip} items=${strip} />`}
       railTitle=${p('railTitle')}
       sections=${sections}

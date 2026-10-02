@@ -12,6 +12,7 @@
  *   secConsumers
  * @usage import { renderPage } from './ai/page.js';
  * @version-history
+ *   v1.32.0 -- 2026-10-03 -- The page's start (components/PageStart.js): it says this is the AI the person's apps and agents use on this server and links the page where their chat AI is connected; its button opens the key field while there is no key. The title's question mark, concept.provider (guidance part B).
  *   v1.31.0 -- 2026-10-02 -- The question marks that explain the daily budget and an app's daily limit: ai.daily_budget on the budget row, ai.app_daily_cap on the spend table's limit column (components/HelpTip.js); the grey line about the app limits under the table goes, the explanation carries it. The budget's line with the live figures stays.
  *   v1.30.0 -- 2026-10-02 -- The crews' row follows own_key.agents: the key pays when every agent's crew thinks through this server; when only some do, the row names them; otherwise none do.
  *   v1.29.0 -- 2026-10-02 -- 07 says what the own key does not reach, from the server's own_key: a row for the agents' crews (they call their model with the key of the machine that runs them), and the chat's line about moving onto this server only while the operator's shared chat key pays for it. The lead and the agents' row no longer say that everything here spends the key.
@@ -78,6 +79,8 @@ import { appRow } from './rows.js';
 import { secProviders, secRouting, secPolicy } from './providers.js';
 import { secRoles, roleTitle } from './roles-section.js';
 import { HelpLabel } from '/components/HelpTip.js';
+import { PageStart } from '/components/PageStart.js';
+import { scrollToSection, openTab } from '/components/Rail.js';
 
 const SHOWN = 8;
 /** The line a form says after it acted; a refusal in its error tone. */
@@ -91,6 +94,8 @@ export function renderPage(ctx) {
       crumb=${crumb()}
       ...${mast(ctx)}
       strip=${strip(ctx)}
+      start=${html`<${PageStart} id="ai" done=${loading ? null : !!ctx.keyed} link=${{ onClick: () => openTab('mcp') }}
+        action=${ctx.keyed ? null : { onClick: () => scrollToSection('ai-connection') }} />`}
       railTitle=${x('railTitle')}
       sections=${[
         { id: 'ai-connection', num: '01', label: x('secConnection'), count: '' },
@@ -127,7 +132,7 @@ function mast(ctx) {
     ? html`<${Loud} control disabled=${ctx.busy === 'test'} onClick=${() => ctx.testConnection()}>${ctx.busy === 'test' ? x('testing') : x('testConnection')}<//>`
     : html`<${Loud} href="https://openrouter.ai/keys" newTab>${x('getKey')}<//>`;
   return {
-    title: t('profile.generator.openrouter.title'), sub: x('titleSub'), marks, desc,
+    title: t('profile.generator.openrouter.title'), sub: x('titleSub'), help: 'concept.provider', marks, desc,
     actions: html`${loud}<${Actions}>
       ${keyed ? html`<${Action} small href="https://openrouter.ai/keys" newTab>${x('getKeyShort')}<//>` : null}
       <${Action} small soft href="https://openrouter.ai/credits" newTab>${x('credits')}<//>

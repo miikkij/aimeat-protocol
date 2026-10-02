@@ -8,6 +8,8 @@
  *   The GET / response includes AI-facing guidance sections (for_ai_assistants, for_ai_agents)
  *   and the full endpoint catalogue grouped by capability domain.
  * @version-history
+ *   v1.5.0 — 2026-10-03 — GET /v1/help/prompt/person: the help prompt a person pastes into a consumer
+ *     AI (docs/AIMEAT_Help_Prompt_Person.md). /v1/help/prompt stays the builder's manual.
  *   v1.4.3 — 2026-10-02 — The surfaces list names `chat`, the node chat's small starting set.
  *   v1.4.2 — 2026-09-24 — The root's SPA shell carries the live page body: the apps whose owners
  *     asked to be found, and the latest changes (services/page-body-live.ts), for Bing.
@@ -90,14 +92,24 @@ import { logger } from '../utils/logger.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-/** Load AIMEAT_Help_Prompt.md once at startup (strip the preamble before the --- separator) */
-const HELP_PROMPT_RAW = (() => {
-  const mdPath = resolve(__dirname, '../../../docs/AIMEAT_Help_Prompt.md');
-  const content = readFileSync(mdPath, 'utf-8');
+/** Load a help prompt from docs/ once at startup (strip the preamble before the --- separator) */
+function loadHelpPrompt(file: string): string {
+  const content = readFileSync(resolve(__dirname, '../../../docs', file), 'utf-8');
   // Strip everything before the first --- line (title + "Paste this..." preamble)
   const separatorIdx = content.indexOf('\n---\n');
   return separatorIdx !== -1 ? content.slice(separatorIdx + 5) : content;
-})();
+}
+
+/** The builder's manual: connecting, auth flows, the endpoint catalogue. */
+const HELP_PROMPT_RAW = loadHelpPrompt('AIMEAT_Help_Prompt.md');
+
+/**
+ * Help prompts for a named reader, at /v1/help/prompt/<name>. `person` is pasted into a consumer AI
+ * by somebody who is not a developer, so it fetches nothing and names no route to call.
+ */
+const HELP_PROMPTS_BY_READER: Record<string, string> = {
+  person: loadHelpPrompt('AIMEAT_Help_Prompt_Person.md'),
+};
 
 const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90" fill="red">♥</text></svg>`;
 
@@ -617,6 +629,18 @@ export function bootstrapRouter(
       node_host: host,
     });
     res.type('text/markdown; charset=utf-8').send(rendered);
+  });
+
+  // GET /v1/help/prompt/:reader — a help prompt for one kind of reader (Tier 0, no auth)
+  router.get('/v1/help/prompt/:reader', (req, res, next) => {
+    const raw = Object.hasOwn(HELP_PROMPTS_BY_READER, req.params.reader) ? HELP_PROMPTS_BY_READER[req.params.reader] : null;
+    if (!raw) { next(); return; }
+    const base = config.baseUrl;
+    res.type('text/markdown; charset=utf-8').send(substituteVariables(raw, {
+      node_url: base,
+      node_id: config.nodeId,
+      node_host: base.replace(/^https?:\/\//, ''),
+    }));
   });
 
   // GET /v1/health — simple liveness/readiness check (Tier 0, no auth)

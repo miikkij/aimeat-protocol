@@ -13,6 +13,11 @@
  *   - AgentHelp — the copyable prompt + the machine-readable entry points
  * @usage import HelpView from '/views/help.js'
  * @version-history
+ *   v2.5.0 -- 2026-10-03 -- "For me" opens with what AIMEAT gives a person, then the steps: a signed-in
+ *       person's own path (journey.next first, views/home/journey-steps.js), a visitor's the newcomer
+ *       order as plain text. Each question has an anchor and opens from /v1/help#<id>; a "knowledge"
+ *       question answers the public library's "What is a package?" link. "For my AI" serves the person's
+ *       help prompt (/v1/help/prompt/person); the developer prompt stays listed (guidance A2).
  *   v2.4.1 -- 2026-09-29 -- The app catalogue link opens /v1/appcat instead of /app-catalog.html (Jouni).
  *   v2.4.0 -- 2026-09-13 -- Compose the existing ink top rule from poster.css.
  *   v2.3.1 — 2026-08-29 — "Connection instructions" leads to the connect story (/v1/connect-your-ai).
@@ -30,9 +35,11 @@
  *       the terms moved inside the answers. Key ids unchanged, text lives in the locales.
  */
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
+import { hasSession } from '/js/services/auth.js';
+import { openSteps, stepTitle, stepLine, stepHref, useJourney, VISITOR_STEPS } from './home/journey-steps.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { Spinner } from '/components/Spinner.js';
@@ -47,15 +54,58 @@ const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fa
 // what works for me, sharing, connecting, breaking. The system's own words (agent, organism,
 // morsel) live inside the answers, never in the question. Each answer is a few sentences, not
 // a link list — a link list is what sends someone back to the search box.
-const QUESTIONS = ['cost', 'privacy', 'agent', 'organism', 'connect', 'broken'];
+const QUESTIONS = ['cost', 'privacy', 'agent', 'organism', 'knowledge', 'connect', 'broken'];
 
-/* Canonical Collapsible is controlled; each question owns its own open state. */
+/** The question an address names (/v1/help#knowledge), so a link from another page opens its answer. */
+const askedQuestion = () => {
+  const id = (typeof window !== 'undefined' ? window.location.hash : '').replace(/^#/, '');
+  return QUESTIONS.includes(id) ? id : null;
+};
+
+/* Canonical Collapsible is controlled; each question owns its own open state. The wrapper carries
+ * the question's id, so /v1/help#<id> lands on it and opens it. */
 function Question({ id }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(() => askedQuestion() === id);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (askedQuestion() === id) ref.current?.scrollIntoView({ block: 'start' });
+  }, [id]);
   return html`
-    <${Collapsible} title=${tr(`help.q.${id}.q`, id)} open=${open} onToggle=${() => setOpen(o => !o)}>
-      <p class="hlp-answer">${tr(`help.q.${id}.a`, '')}</p>
-    <//>
+    <div id=${id} ref=${ref}>
+      <${Collapsible} title=${tr(`help.q.${id}.q`, id)} open=${open} onToggle=${() => setOpen(o => !o)}>
+        <p class="hlp-answer">${tr(`help.q.${id}.a`, '')}</p>
+      <//>
+    </div>
+  `;
+}
+
+/**
+ * The steps. A signed-in person reads their own path (journey.next first, then the open stages
+ * after it), each a link to where it is done; a visitor reads the order a newcomer meets, as plain
+ * text. Nothing renders while a signed-in person's path is still being read.
+ */
+function Steps() {
+  const { journey, ready } = useJourney();
+  const signedIn = hasSession();
+  if (signedIn && !ready) return null;
+  const mine = signedIn ? openSteps(journey) : null;
+  if (mine) {
+    return html`
+      <h2 class="section-title">${t('help.nextTitle')}</h2>
+      ${mine.length === 0 ? html`<p>${t('help.pathWalked')}</p>` : html`
+        <ol class="hlp-steps">
+          ${mine.map((id) => html`<li key=${id}><a href=${stepHref(id)}>${stepTitle(id)}</a>. ${stepLine(id)}</li>`)}
+        </ol>`}
+    `;
+  }
+  return html`
+    <h2 class="section-title">${tr('help.startTitle', 'Getting started')}</h2>
+    <ol class="hlp-steps">
+      ${VISITOR_STEPS.map((id) => html`<li key=${id}><strong>${stepTitle(id)}</strong>. ${stepLine(id)}</li>`)}
+    </ol>
+    ${!signedIn && html`<p>${t('help.visitorNote')}</p>`}
+    ${hasSite('learn') ? html`
+      <p>${tr('help.start4', 'Learn the whole platform hands-on, free, without an account.')} <a href=${siteLink('learn')} target="_blank" rel="noopener">${tr('help.start4Link', 'Open the Experience Center')}</a></p>` : ''}
   `;
 }
 
@@ -63,14 +113,10 @@ function HumanHelp({ onAskAi }) {
   const contact = contactHref(tr('help.contactSubject', 'A question about AIMEAT'));
   return html`
     <div class="hlp-human">
-      <h2 class="section-title">${tr('help.startTitle', 'Getting started')}</h2>
-      <ol class="hlp-steps">
-        <li>${tr('help.start1', 'Sign in or create an account. One click with Google, or email and password.')}</li>
-        <li>${tr('help.start2', 'Connect your AI assistant so it can work here.')} <a href="/v1/connect-your-ai">${tr('help.start2Link', 'Connection instructions')}</a></li>
-        <li>${tr('help.start3', 'Build your first app by describing it to your AI.')} <a href="/v1/appcat">${tr('help.start3Link', 'Open the app catalog')}</a></li>
-        ${hasSite('learn') ? html`
-          <li>${tr('help.start4', 'Learn the whole platform hands-on, free, without an account.')} <a href=${siteLink('learn')} target="_blank" rel="noopener">${tr('help.start4Link', 'Open the Experience Center')}</a></li>` : ''}
-      </ol>
+      <h2 class="section-title">${t('help.whatTitle')}</h2>
+      <p>${t('help.whatLead')}</p>
+
+      <${Steps} />
 
       <h2 class="section-title">${tr('help.qTitle', 'Common questions')}</h2>
       <div class="hlp-questions">
@@ -104,7 +150,8 @@ function AgentHelp({ prompt, loading, error }) {
         <li><code>GET /llms.txt</code> — ${tr('help.epLlms', 'the full agent manual')}</li>
         <li><code>GET /v1/spec</code> — ${tr('help.epSpec', 'the OpenAPI contract')}</li>
         <li><code>POST /v1/mcp</code> — ${tr('help.epMcp', 'the MCP endpoint')}</li>
-        <li><code>GET /v1/help/prompt</code> — ${tr('help.epPrompt', 'this prompt as plain markdown')}</li>
+        <li><code>GET /v1/help/prompt/person</code> — ${tr('help.epPrompt', 'this prompt as plain markdown')}</li>
+        <li><code>GET /v1/help/prompt</code> — ${t('help.epPromptDev')}</li>
       </ul>
     </div>
   `;
@@ -119,7 +166,9 @@ export default function HelpView() {
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    fetch('/v1/help/prompt')
+    // The person's help prompt: what they can do here and their next step. The developer one
+    // (/v1/help/prompt: discovery, device flow, tokens) stays listed below for builders.
+    fetch('/v1/help/prompt/person')
       .then(r => {
         if (!r.ok) throw new Error(r.statusText);
         return r.text();

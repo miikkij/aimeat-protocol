@@ -11,6 +11,7 @@
  * @structure renderPage · secInstalled · secOffers · secOwn · secNew · composeForm · secAgent
  * @usage import { renderPage } from './packages/page.js';
  * @version-history
+ *   v1.23.0 — 2026-10-03 — The page's start (components/PageStart.js: the first prompt asks the person's AI what is on offer, its button opens the offers) and the title's question mark, concept.package (guidance part B).
  *   v1.22.0 — 2026-09-26 — On the component kit (page group G7): the page is SettingsPage (crumb, mast,
  *     marks, strip, rail as data), the lists are List (Filters, SearchLine, More, the pick rows of the
  *     compose road), the roads Roads/Road, the AI rule a Box, the facts Facts, the hidden zip field
@@ -55,6 +56,8 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { PageSection } from '/components/PageSection.js';
 import { SettingsPage } from '/components/SettingsPage.js';
+import { PageStart } from '/components/PageStart.js';
+import { scrollToSection } from '/components/Rail.js';
 import { Hint } from '/components/Hint.js';
 import { Facts } from '/components/Facts.js';
 import { FigureStrip } from '/components/FigureStrip.js';
@@ -112,8 +115,9 @@ export function renderPage(ctx) {
     <${ctx.ConfirmUI} />`;
 
   return html`
-    <${SettingsPage} name="packages" crumb=${crumb()} title=${t('profile.tabs.packages')} sub=${x('titleSub')} marks=${marks}
+    <${SettingsPage} name="packages" crumb=${crumb()} title=${t('profile.tabs.packages')} sub=${x('titleSub')} help="concept.package" marks=${marks}
       desc=${none ? x('descEmpty', { n: offers.length }) : x('desc')} actions=${actions} strip=${strip}
+      start=${html`<${PageStart} id="packages" done=${d ? instances.length > 0 : null} action=${{ onClick: () => scrollToSection('pk-offers') }} />`}
       railTitle=${x('railTitle')} sections=${sections} pagesLabel=${x('pages')} pages=${pageLinks()}
       after=${after}>
       ${secInstalled(ctx, instances)}

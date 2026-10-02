@@ -60,18 +60,25 @@ everywhere at once, and say so in the Changes section.
 |---|---|---|---|---|
 | the person's own system | the running AIMEAT their account lives in | your own AIMEAT | oma AIMEAT | tu propio AIMEAT |
 | someone else's system | another AIMEAT they can sign into and whose memory they browse | environment / remote environment | ympäristö / etäympäristö | entorno / entorno remoto |
+| another AIMEAT joined to this one | an installation this one federates with: its people may sign in here and data crosses between the two; an operator word, on the federation and security admin pages | peer | vertainen | par |
 | the machine | the host, when the sentence is really about the machine: what holds a credential, what has an address, what is reachable | server | palvelin | servidor |
 | whoever pays for the shared AI key | the operator of this installation, on an operator surface | this server / the server's key | palvelin / palvelimen avain | este servidor / la clave del servidor |
 | the dark side menu of the admin pages | the menu only the operator of this installation sees; its heading tells at once that this is the operator's side | operator menu | operaattorin valikko | menú del operador |
 | stored knowledge | what the person and their agents wrote here | memory | muisti | memoria |
 | one stored thing | a single record under one key | entry | merkintä | entrada |
+| refined knowledge kept to reuse | research or other material the person brought, packed by their AI into entries that each carry their sources; the page that holds it is Knowledge / Tietopankki / Conocimiento | knowledge base | tietopankki | base de conocimiento |
+| one bundle of that knowledge | a named set of knowledge entries with their sources and the links between them, made by the person's AI; it can be listed in the public library, copied into another person's knowledge base, or shared with a shared place | knowledge package | tietopaketti | paquete de conocimiento |
 | the AI acting for them | scoped, named, revocable, acts in their name | agent | agentti | agente |
+| the AI a person talks to | their own Claude, ChatGPT or other chat AI, connected here or not; Finnish inflects *tekoäly* as a word and never writes *AI:lle*, *AI:sta* or *AI:n* (2026-10-03, 61 strings rewritten) | your AI | tekoälysi | tu IA |
+| a ready text to copy into an AI | the words the page composes for the person's own AI; the person reads it before the AI runs it, and the work is in its wording. Finnish never says *prompti* | prompt | kehote | prompt |
 | a published web app | one file, runs on their AIMEAT | app | sovellus | aplicación |
 | sandboxed outside-calling code | holds no key of theirs | extension | laajennus | extensión |
 | a shared group | people and AIs sharing work | organism | organismi | organismo |
 | a shared container | documents and records inside an organism | workspace | työtila | espacio de trabajo |
-| an organism, said to a newcomer | the home's first task and the guided path name an organism by what it does for them before the word organism appears: one place every AI they connect and every person they invite reads and writes | shared place | yhteinen paikka | lugar compartido |
+| an organism, said to a newcomer | the home's first task and the guided path name an organism by what it does for them before the word organism appears: one place every AI they connect and every person they invite reads and writes. The menu item and the page title say it too (Shared places / Yhteiset paikat / Lugares compartidos); *organism* is its technical name | shared place | yhteinen paikka | lugar compartido |
 | the person's progress on the home | seven stages from a good AI to something shared; each is ticked when the account holds it | your path / stage | polkusi / vaihe | tu camino / etapa |
+| the person's own page, made from an interview | their AI asks about their work, needs and repeated tasks and turns the answers into a page that people and other AIs read; the business card is that page made shareable, never a separate surface | profile / business card | profiili / käyntikortti | perfil / tarjeta de presentación |
+| the block at the top of a page that says how to begin | what the page is for, the first thing to do (a prompt to copy and a button), and what happens next; a person sees only its heading as a name | start block (heading: Start here) | otsikko: Aloita tästä | título: Empieza aquí |
 | which agents an organism lets in | the organism's setting: every member's agents, or only the agents listed in its Agents section; any other agent is treated as a non-member | admit (an agent) | päästää sisään (agentin) | admitir (un agente) |
 | who may only read a workspace | a member given read access to one workspace; never *katselija* or *espectador* | viewer | lukija | lector |
 | who may read and write a workspace | a member given write access to one workspace; never *osallistuja* or *contribuidor* | contributor | kirjoittaja | colaborador |
@@ -282,6 +289,7 @@ service, the directory, the token, the identifier and the username: the test nam
 
 ## Changes
 
+- **2026-10-03**: knowledge base, knowledge package, peer, profile and business card, the start block, prompt and "your AI", with the guidance pass for people new to the product. Every word was already on a screen: *tietopankki* and *tietopaketti* in the Knowledge explanation, *vertainen* and *par* on the federation page, *käyntikortti* in the home's first step, *Aloita tästä* / *Empieza aquí* on every page's start block. Spanish had two words for the business card; *tarjeta de presentación* is the Latin American one, and help.start1 now says it too. The Finnish sweep the same day rewrote every string that said *prompti* or *prompt* (64), an inflected *AI:* (61) or *appi* / *appsi* / *apit* (207) as whole sentences with *kehote*, *tekoäly* and *sovellus*; "AI-" compounds such as *AI-chat* and *AI-budjetti* (about 130 strings) were left for a later pass. The menu names Organisms, MCP and the other system words became what a person does there (Shared places, Connect your AI), and the explanation of an organism now says only that *organism* is its technical name.
 - **2026-10-02** — morsel in Finnish is *murunen*, everywhere. The table row said so and the
   never-translated list said the opposite; the Finnish pages said *murunen* about 110 times and
   *morseli* in 29 strings (prices, wallet, boards, the app catalogue's pricing). Jouni ruled for

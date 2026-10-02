@@ -10,6 +10,7 @@
  * @structure renderPage · secRows · secSuggest
  * @usage import { renderPage } from './mcp/page.js';
  * @version-history
+ *   v2.1.0 -- 2026-10-03 -- The page's start (components/PageStart.js: the first prompt names this server's MCP address, its button opens the connect steps) and the title's question mark, concept.connect (guidance part B).
  *   v2.0.0 -- 2026-09-26 -- Every part is a component call that gets data (page group G6): the frame
  *     is SettingsPage (crumb, head, marks, strip, rail as data), the strip FigureStrip, the connected
  *     AIs the List (the mark the Avatar through Lead, the coral word of an AI that may do everything
@@ -43,6 +44,8 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { SettingsPage } from '/components/SettingsPage.js';
+import { PageStart } from '/components/PageStart.js';
+import { getNodeUrl } from '/js/services/auth.js';
 import { Section } from '/components/Section.js';
 import { FigureStrip } from '/components/FigureStrip.js';
 import { Tinted } from '/components/Figure.js';
@@ -83,8 +86,10 @@ export function renderPage(ctx) {
     <${Actions}><${Action} small onClick=${() => goTab('agents')}>${m('agentsDoor')}<//><//>`;
 
   return html`
-    <${SettingsPage} name="mcp" crumb=${crumb()} title=${t('profile.tabs.mcp')} sub=${m('titleSub')} marks=${marks}
+    <${SettingsPage} name="mcp" crumb=${crumb()} title=${t('profile.tabs.mcp')} sub=${m('titleSub')} help="concept.connect" marks=${marks}
       desc=${`${m('desc')} ${proven ? m('descProven') : m('descNew')}`} actions=${actions} strip=${strip}
+      start=${html`<${PageStart} id="mcp" vars=${{ url: getNodeUrl() + '/v1/mcp' }} done=${ctx.proof ? proven : null}
+        action=${{ onClick: () => { if (proven) ctx.setFold('guide', true); scrollToSection('mcp-connect'); } }} />`}
       railTitle=${m('railTitle')}
       sections=${[
         { id: 'mcp-rows', num: '01', label: m('secRows'), count: rows.length },

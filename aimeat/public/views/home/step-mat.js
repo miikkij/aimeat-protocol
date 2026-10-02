@@ -14,6 +14,8 @@
  * @structure StepMat({ state, onDone }) — the open step.
  * @usage import { StepMat } from './step-mat.js';
  * @version-history
+ *   2026-10-03: The prompt is asked for in the page's language (it is the profile interview now, in en,
+ *     fi and es), and the step's words name the profile and business card (home.mat.*).
  *   2026-09-27: The step writes no class: "Here is my welcome mat" is Loud, `quiet` until something
  *     is pasted, and the prompt's copy is PromptCard `loud`/`quiet`; the markup is the same (page
  *     group G9, a move).
@@ -33,7 +35,7 @@ import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, getLocale } from '/js/i18n.js';
 import { api, apiGet } from '/js/api.js';
 import { PromptCard } from '/components/PromptCard.js';
 import { StepCard, StepLede } from '/components/StepCard.js';
@@ -75,7 +77,7 @@ export function StepMat({ onDone }) {
 
   useEffect(() => {
     let alive = true;
-    apiGet('/v1/prompts/welcome-mat')
+    apiGet(`/v1/prompts/welcome-mat?lang=${encodeURIComponent(getLocale())}`)
       .then((r) => {
         if (!alive) return;
         setPrompt(r?.data?.prompt || '');

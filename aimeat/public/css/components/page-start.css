@@ -1,0 +1,50 @@
+/**
+ * @file page-start.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The start of a page (components/PageStart.js): one quiet block under the page's head,
+ *   between two hairlines, with its small label and the fold at the top and three parts under them
+ *   (what this is for, do this first, what happens next) side by side, one under the other on a
+ *   phone. This sheet only lays the parts out; the label, the lead, the hint, the action link and
+ *   the prompt card keep their own looks. Reads the theme's tokens only.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-10-03 — Initial (guidance for normal people, part B).
+ */
+
+.page-start {
+  margin: 1.4rem 0 0;
+  padding: .8rem 0 1.1rem;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.page-start--folded { padding: .55rem 0; }
+
+.page-start-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+/* The prompt is the widest part: it holds the text the person copies. */
+.page-start-parts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 1.2rem 2rem;
+  margin-top: .9rem;
+}
+.page-start-part {
+  display: flex;
+  flex-direction: column;
+  gap: .55rem;
+  min-width: 0;
+}
+/* The parts' own margins give way to the column's gap. */
+.page-start-part > .og-lead,
+.page-start-part > .poster-hint,
+.page-start-part > .poster-prompt { margin: 0; }
+
+@media (max-width: 900px) {
+  .page-start-parts { grid-template-columns: minmax(0, 1fr); gap: 1.1rem; }
+}

@@ -13,7 +13,10 @@
  *        first version of the portfolio they already have;
  *     3. reads the four ai-* fields and decides the branch from `ai-client`, because MCP is a
  *        property of the client app and not of the model;
- *     4. writes the funnel markers.
+ *     4. writes the funnel markers;
+ *     5. writes the interview's answers, when the page carries the private profile block, into the
+ *        person's `journey.state` (services/journey-state.ts mergeJourneyProfile). The parser has
+ *        already taken the block out of the page, so the answers are never published.
  *
  *   A rejected paste is a 400 that NAMES what was missing and says how many attempts have been
  *   made. The person's text is never echoed back and never cleared: the box keeps it client-side,
@@ -21,6 +24,8 @@
  * @structure registerWelcomeMatRoutes(router, ctx): POST /v1/home/welcome-mat, POST /v1/home/ai-client
  * @usage Registered from src/routes/home.ts.
  * @version-history
+ *   v1.3.0 — 2026-10-03 — The copy-prompt road keeps the interview: the pasted card's private
+ *     profile block is merged into `journey.state`, and the response names the fields as `profile_saved`.
  *   v1.2.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
  *   v1.2.0 — 2026-09-24 — requireOwnerSession refuses a federated session: a visitor from another
  *     node carries roles:['owner'] and passed the person test, so the home step served the local
@@ -46,6 +51,7 @@ import {
     ONBOARDING_KEYS, recordOnboardingEvent, recordWelcomeMatPasted, recordAiModelDetected,
 } from '../../services/onboarding-funnel.js';
 import { readHomeState } from '../../services/home-state.js';
+import { mergeJourneyProfile, type ProfileField } from '../../services/journey-state.js';
 import {
     portfolioWriteGaii, portfolioStandaloneUrl, writePortfolioHtml, PORTFOLIO_CONFIG_KEY,
 } from '../portfolio.js';
@@ -210,6 +216,17 @@ export function registerWelcomeMatRoutes(router: Router, ctx: HomeRouteCtx): voi
         await storeMatAsPortfolio(ctx, owner, parsed.html, parsed.meta.title);
         const { attempts } = await recordWelcomeMatPasted(storage, config, owner, 'ok');
 
+        // The interview's answers, from the page's private profile block. The page is stored
+        // already; a failed answers write is logged and does not undo it.
+        let profileSaved: ProfileField[] = [];
+        if (parsed.profile) {
+            try {
+                profileSaved = (await mergeJourneyProfile(ctx, owner, parsed.profile, 'home.welcome-mat')).updated;
+            } catch (err) {
+                logger.warn('welcome-mat: interview answers not saved', { owner, error: String(err) });
+            }
+        }
+
         // The branch comes from `ai-client`. The model's own `ai-can-mcp` claim is recorded and
         // deliberately not obeyed: models are confident about capabilities they do not have.
         const resolution = resolveAiClient(parsed.meta.client);
@@ -227,6 +244,8 @@ export function registerWelcomeMatRoutes(router: Router, ctx: HomeRouteCtx): voi
             level: parsed.level,
             wrapped: parsed.wrapped,
             meta: parsed.meta,
+            /** The interview answers this paste wrote into journey.state (empty when none). */
+            profile_saved: profileSaved,
             ...branchPayload(decision),
             portfolio_url: `/v1/portfolio/${encodeURIComponent(owner)}`,
             standalone_url: portfolioStandaloneUrl(config, owner),

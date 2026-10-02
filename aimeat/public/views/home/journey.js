@@ -3,9 +3,14 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Where the path ends and where the person is on it, which AI they use, then useful
- *   work for their AI: a shared place first, then an agent, a schedule or an app, with the result
- *   shown at home.
+ *   work for their AI: the profile first (an interview that becomes their business card), then a
+ *   shared place, an agent, a schedule or an app, with the result shown at home.
  * @version-history
+ *   v1.4.0 — 2026-10-03 — The first task is "Make your profile" (Jouni's ruling: a newcomer's first
+ *     result is their profile, made in an interview by their AI), with the prompt buildJourneyPrompt
+ *     ('profile') and its result the person's page; it is chosen until the path's first result is
+ *     ticked, then the shared place. The optional page form hides behind the profile task, which
+ *     makes the same page (guidance A2).
  *   v1.3.0 — 2026-10-01 — Jouni's review: the first task is "Create a shared place" (an organism with
  *     a workspace) instead of a note, and its result lists the person's places; the road question
  *     goes once the path's connect stage is ticked, by the same test the tick uses; on the prompt
@@ -47,8 +52,10 @@ import { buildJourneyPrompt } from './journey-prompts.js';
 import { JourneyPath, RoadChooser, ConnectBox, refreshHome as refresh } from './journey-roads.js';
 
 const html = htm.bind(h);
-const actions = ['place', 'agent', 'schedule', 'app'];
-const targets = { place: 'organisms', agent: 'agents', schedule: 'scheduler', app: 'apps' };
+const actions = ['profile', 'place', 'agent', 'schedule', 'app'];
+const targets = { profile: 'portfolio', place: 'organisms', agent: 'agents', schedule: 'scheduler', app: 'apps' };
+/** The profile's line is the path's own line for that stage, so the two cannot say different things. */
+const hintKey = (id) => (id === 'profile' ? 'homeJourney.stepFirstResultDesc' : 'homeJourney.' + id + 'Hint');
 /** The same read and key the home's shared-spaces row uses (surface/blocks-home.js), so it is one read. */
 const organismsPath = (owner) => (owner ? `/v1/organisms?member=${encodeURIComponent(owner)}&include=counts` : '');
 const pickOrganisms = (d) => (d?.organisms ?? d?.items ?? []).map((o) => ({
@@ -59,10 +66,13 @@ export function HomeJourney() {
   const session = useSession();
   const { state, journey } = useHomeState();
   const choiceKey = 'aimeat.home-task.' + session?.owner;
-  const [action, setAction] = useState(() => {
-    try { const stored = sessionStorage.getItem(choiceKey); return actions.includes(stored) ? stored : 'place'; }
-    catch (e) { swallowed('home journey: choice read', e); return 'place'; }
+  // What the person picked in this tab; until they pick, the profile while the first result is open.
+  const [picked, setAction] = useState(() => {
+    try { const stored = sessionStorage.getItem(choiceKey); return actions.includes(stored) ? stored : null; }
+    catch (e) { swallowed('home journey: choice read', e); return null; }
   });
+  const firstResultDone = !!journey?.stages?.find(s => s.id === 'first-result')?.done;
+  const action = picked ?? (firstResultDone ? 'place' : 'profile');
   const [road, setRoad] = useState(null);
   const [connecting, setConnecting] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -99,7 +109,7 @@ export function HomeJourney() {
         <//>`)}
       <//>
       <${ChooserPanel}>
-      <${Hint}>${t('homeJourney.' + action + 'Hint')}<//>
+      <${Hint}>${t(hintKey(action))}<//>
       <${ChooserStatus}>
         <span>${t(connected ? 'homeJourney.connected' : 'homeJourney.notConnected')}</span>
         ${connected && html`<${Action} expanded=${connecting} onClick=${() => setConnecting(v => !v)}>
@@ -125,14 +135,20 @@ export function HomeJourney() {
           <${Hint}>${t('homeJourney.placeLifecycle')}<//>
         <//>`}
         ${copied && action === 'place' && ready && places.length === 0 && html`<p>${t('homeJourney.placeWaiting')}</p>`}
+        ${action === 'profile' && state.mat.done && html`<${ChooserResult}>
+          <h3>${t('homeJourney.profileSaved')}</h3>
+          <p><${Action} href=${state.mat.standaloneUrl || state.mat.url}>${t('home.mat.view')} →<//></p>
+        <//>`}
+        ${copied && action === 'profile' && !state.mat.done && html`<p>${t('homeJourney.profileWaiting')}</p>`}
       </div>
       <//>`}
-      <${ChooserFold} summary=${t('homeJourney.optionalPage')}>
+      ${/* The profile task makes this same page with an interview, so the form waits behind the other tasks. */''}
+      ${action !== 'profile' && html`<${ChooserFold} summary=${t('homeJourney.optionalPage')}>
         <p>${t('homeJourney.optionalPageHint')}</p>
         ${state.mat.done
           ? html`<${Action} href=${state.mat.standaloneUrl || state.mat.url}>${t('home.mat.view')} →<//>`
           : html`<${StepMat} onDone=${refresh} />`}
-      <//>
+      <//>`}
       ${message && html`<p role="alert">${message}</p>`}
     <//>`;
 }
