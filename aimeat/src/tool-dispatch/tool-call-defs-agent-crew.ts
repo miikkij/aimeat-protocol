@@ -13,6 +13,7 @@
  * @structure agentCrewCliTools[] — the handler table, spread by tool-call-defs-agent.ts
  * @usage import { agentCrewCliTools } from './tool-call-defs-agent-crew.js';
  * @version-history
+ *   v1.2.0 -- 2026-10-02 -- aimeat_crew_llm_set names the {kind:'node'} choice and the guard's rules.
  *   v1.1.0 -- 2026-09-06 -- target_agent_name (and crew_validate/crew_seed's doc) are marked
  *     required, which is what the handlers already demanded. Declaring them optional and then
  *     throwing meant every one of these tools refused every call the published schema permitted.
@@ -124,10 +125,10 @@ export const agentCrewCliTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_crew_llm_set',
-        description: "Choose which model an agent thinks with, or clear it. Omit target_agent_name to set the owner's default for every agent. A provider may NAME the environment variable holding the key and is refused if it carries one.",
+        description: "Choose which model an agent thinks with, or clear it. Omit target_agent_name to set the owner's default for every agent. {kind:'node', role?} sends the crew's model calls through the node's /v1/llm, which picks the model and the key. A provider may NAME the environment variable holding the key and is refused if it carries one; the variable must be a provider key (ends in _API_KEY, not AIMEAT_) and every address public https.",
         input: {
             target_agent_name: { type: 'string', description: "The agent to set it for. Omit for the owner's default." },
-            choice: { type: 'object', description: "{kind:'profile', profile} or {kind:'model', label, provider}. Omit to clear." },
+            choice: { type: 'object', description: "{kind:'node', role?}, {kind:'profile', profile} or {kind:'model', label, provider}. Omit to clear." },
         },
         handler: ({ client }, input) => {
             const body = { choice: optionalRecord(input, 'choice') ?? null };

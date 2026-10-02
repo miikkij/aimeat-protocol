@@ -12,6 +12,7 @@
  *   secConsumers
  * @usage import { renderPage } from './ai/page.js';
  * @version-history
+ *   v1.30.0 -- 2026-10-02 -- The crews' row follows own_key.agents: the key pays when every agent's crew thinks through this server; when only some do, the row names them; otherwise none do.
  *   v1.29.0 -- 2026-10-02 -- 07 says what the own key does not reach, from the server's own_key: a row for the agents' crews (they call their model with the key of the machine that runs them), and the chat's line about moving onto this server only while the operator's shared chat key pays for it. The lead and the agents' row no longer say that everything here spends the key.
  *   v1.28.0 -- 2026-09-28 -- AI roles (wish-tekoalyn-roolit): the six fixed model roles (05) and the fine-tuning (07) leave the page, since a capability's model and fine-tuning are set on its provider and what a model is for is a role; 04 is the roles and the apps' roles (ai/roles-section.js), the model policy is 05, the budget 06, the consumers 07. The strip's fourth figure counts the roles and says how many app roles wait for a binding.
  *   v1.27.0 -- 2026-09-28 -- Three sections after the connection: 02 the providers, 03 the routing, 04 the model policy (ai/providers.js, System 2); the sections after them are 05 to 08.
@@ -254,6 +255,12 @@ function secConsumers(ctx) {
   const gaps = (chat?.own_key?.not_covered || []).map((g) => g.part);
   const chatMissed = gaps.includes('chat');
   const crewsMissed = !chat?.own_key || gaps.includes('agent_runtimes');
+  // The agents whose runtime said their crew thinks through this server, so the key reaches them.
+  const onNode = (chat?.own_key?.agents || []).filter((a) => a.llm === 'node').map((a) => a.agent);
+  const crewsRow = {
+    k: x('consumer.crews'),
+    v: !crewsMissed ? x('consumerCrewsNodeBody') : onNode.length ? x('consumerCrewsMixed', { agents: onNode.join(', ') }) : x('consumerCrewsBody'),
+  };
   return html`
     <${PageSection} id="ai-consumers" num="07" title=${x('secConsumers')} count=${null}>
       <${Note} kind="lead">${x('consumersIntro')}<//>
@@ -264,7 +271,7 @@ function secConsumers(ctx) {
         { k: x('consumer.chat'), v: chat
           ? (chat.pays === 'node' ? x('consumerChatNode', { host: ctx.host, model: chat.model || '' }) : chat.pays === 'own' ? x('consumerChatOwn') : x('consumerChatAllowance', { n: money(chat.allowance_remaining_usd || 0) }))
           : x('consumerChatUnknown'), ...(chatMissed ? { sub: x('consumerChatSub') } : {}) },
-        ...(crewsMissed ? [{ k: x('consumer.crews'), v: x('consumerCrewsBody') }] : []),
+        crewsRow,
         { k: x('consumer.agentRule'), v: x('consumerAgentRuleBody') },
       ]} />
     <//>`;

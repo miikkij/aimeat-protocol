@@ -26,6 +26,13 @@ Typical use:
 See the package README and `examples/` for full recipes.
 
 Changelog:
+  0.32.0 -- 2026-10-02 -- A crew can think through the node with the owner's own key. `llm_for_choice`
+    builds the LLM for the owner's `{kind:'node', role?}` crew choice (crews.llm.<agent>) with
+    `node_llm`, and `unsafe_choice_reason` applies the node's guard to a `model` choice on read (the
+    key variable must be a provider key, every address public https). `node_llm` finds the token the
+    hosted fleet writes (tokens/<agent>@<owner>.token) and the node address in the connector home's
+    config.yaml, and an agent with no stored token (a key-based agent) goes through the connector
+    daemon's /v1/llm pass-through, which attaches its current credential.
   0.31.1 -- 2026-09-30 -- The liaison's backstory (slim and full) says what to do with classified
     content: a `classification_warning` is said to the person and the content is not repeated
     outward, a CLASSIFIED refusal is not retried, and an exception is the person's own step in their
@@ -53,6 +60,11 @@ from .ai import (
     AiUnreachable,
     capabilities,
     node_llm,
+)
+from .crew_llm import (
+    is_node_choice,
+    llm_for_choice,
+    unsafe_choice_reason,
 )
 from .daemon import (
     DAEMON_DEFAULT_TOOL_FILTER,
@@ -185,7 +197,7 @@ from .workflow_spec import (
 
 # Kept in step with pyproject BY HAND, which is why it was wrong: 0.20.0 shipped announcing
 # itself as 0.19.0, and the first crew to install it reported the mismatch before we saw it.
-__version__ = "0.31.1"
+__version__ = "0.32.0"
 
 __all__ = [  # noqa: RUF022 -- grouped by topic with the version each group arrived in; alphabetical order would scatter those comments away from what they name
     "__version__",
@@ -228,6 +240,10 @@ __all__ = [  # noqa: RUF022 -- grouped by topic with the version each group arri
     # The node's AI for a crew (0.30.0): an LLM on the node's /v1/llm route, and what is on
     "node_llm",
     "capabilities",
+    # The owner's crew model choice, read safely (0.32.0)
+    "llm_for_choice",
+    "is_node_choice",
+    "unsafe_choice_reason",
     "NODE_CHOOSES_MODEL",
     "AI_CAPABILITIES",
     "AiError",

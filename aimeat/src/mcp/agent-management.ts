@@ -17,6 +17,7 @@
  *   import { registerAgentManagementTools } from './agent-management.js';
  *   registerAgentManagementTools(mcp, storage, config, getAgentGaii);
  * @version-history
+ *   v1.9.0 -- 2026-10-02 -- aimeat_agent_runtime_report takes `llm` ('node' | 'machine').
  *   v1.8.0 -- 2026-10-02 -- aimeat_agent_tags_set: an agent sets its own tags without agent:write,
  *     and another agent's still need it. The tool moves to SCOPE_EXEMPT_TOOLS so an agent without
  *     the word sees it, and the sibling check sits in the handler.
@@ -171,6 +172,7 @@ export function registerAgentManagementTools(
             commit: z.string().optional().describe('Commit the file came from.'),
             runtime: z.string().optional().describe("Which runtime read it, e.g. 'crewaimeat 0.7.0'."),
             definition_revision: z.number().optional().describe('For a JSON crew: which definition revision was live.'),
+            llm: z.enum(['node', 'machine']).optional().describe("Where the crew's model calls go: 'node' through this node's /v1/llm with the agent's token, 'machine' to its provider with a key on its own machine."),
         },
         annotationsFor('aimeat_agent_runtime_report'),
         async ({ target_agent_name, ...src }) => {

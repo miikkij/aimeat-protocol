@@ -8,6 +8,8 @@
  *   re-assembled in order by definitions.ts. The descriptions are the canonical text every surface
  *   shows (descriptionFor()).
  * @version-history
+ *   v1.3.0 — 2026-10-02 — aimeat_crew_llm_set: the {kind:'node', role?} choice, and the rules a
+ *     `model` choice is refused on (UNSAFE_CHOICE).
  *   v1.2.0 — 2026-09-09 — aimeat_crew_menu and aimeat_crew_llm_set: the runtime answers for its
  *     own tool list, and the owner's model choice is a record rather than a file on one machine.
  *   v1.1.0 — 2026-09-09 — app_tools joins the menu text, which had named crew_registry but not it.
@@ -75,12 +77,12 @@ export const crewTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_crew_llm_set',
-        description: "Choose which model an agent thinks with, or clear the choice. Pass `target_agent_name` for one agent, or omit it to set the owner's DEFAULT for every agent they have. `choice` is {kind:'profile', profile:'<name>'} naming a profile from aimeat_crew_menu, or {kind:'model', label, provider} pinning one model; pass null to clear and fall back. Precedence, strongest first: a pin made on the machine itself, this agent's own choice, the machine's `crews` map, the crew definition's own `llm_profile`, the owner's default, the machine's default. A `provider` may NAME the environment variable holding the key (api_key_env) and is refused if it carries a key: the credential stays on the machine that runs the agent. Needs memory:write; the choice is a record in the owner's own namespace (crews.llm.<agent>), so their own tools can read it.",
+        description: "Choose which model an agent thinks with, or clear the choice. Pass `target_agent_name` for one agent, or omit it to set the owner's DEFAULT for every agent they have. `choice` is {kind:'node', role?} to think through this node (the crew sends its model calls to the node's /v1/llm with the agent's own token, and the node picks the model and the key: the agent's own key, then the owner's, then the node's from the owner's allowance; `role` names one of the owner's AI roles; the agent needs ai:use), {kind:'profile', profile:'<name>'} naming a profile from aimeat_crew_menu, or {kind:'model', label, provider} pinning one model; pass null to clear and fall back. Precedence, strongest first: a pin made on the machine itself, this agent's own choice, the machine's `crews` map, the crew definition's own `llm_profile`, the owner's default, the machine's default. A `provider` may NAME the environment variable holding the key (api_key_env) and is refused if it carries a key: the credential stays on the machine that runs the agent. api_key_env must be a provider key variable (a name ending in _API_KEY, not starting with AIMEAT_), and every address in the provider must be public https; anything else is refused with UNSAFE_CHOICE. Needs memory:write; the choice is a record in the owner's own namespace (crews.llm.<agent>), so their own tools can read it.",
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
             target_agent_name: { ...AGENT_NAME, required: false, description: `${AGENT_NAME.description} Omit it to set the owner's default for every agent.` },
-            choice: { type: 'object', description: "The choice: {kind:'profile', profile} or {kind:'model', label, provider}. Omit or pass null to clear it." },
+            choice: { type: 'object', description: "The choice: {kind:'node', role?}, {kind:'profile', profile} or {kind:'model', label, provider}. Omit or pass null to clear it." },
         },
     },
     {

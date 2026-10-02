@@ -44,7 +44,7 @@ from typing import Any
 from urllib.parse import quote
 
 from .offers import resolve_agent_token
-from .paths import aimeat_home
+from .paths import aimeat_home, connector_node_url
 
 logger = logging.getLogger(__name__)
 
@@ -224,9 +224,9 @@ def _node(
 ) -> _Node:
     """The node's address and this agent's bearer token, resolved the way the rest of the package
     resolves them: the argument, then the connector-stored token, then the environment."""
-    url = (node_url or os.environ.get("AIMEAT_NODE_URL") or "").rstrip("/")
+    url = (node_url or os.environ.get("AIMEAT_NODE_URL") or connector_node_url() or "").rstrip("/")
     if not url:
-        raise DecideError("node_url is required (pass it or set AIMEAT_NODE_URL).")
+        raise DecideError("node_url is required (pass it, set AIMEAT_NODE_URL, or name it in the connector home's config.yaml).")
     token = agent_token
     if not token and agent_name:
         token = resolve_agent_token(agent_name)

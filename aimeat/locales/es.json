@@ -5298,6 +5298,8 @@
   "aipage.consumerChatUnknown": "No se pudo leer ahora quién paga el chat.",
   "aipage.consumerChatSub": "Si el chat pasa más adelante a correr a través de este servidor, empezará a usar tu clave y los modelos que elegiste.",
   "aipage.consumerCrewsBody": "No usan tu clave. Un equipo llama a su modelo por sí mismo, con la clave de la máquina donde se ejecuta, no con la clave que guardaste aquí.",
+  "aipage.consumerCrewsNodeBody": "Usan tu clave. Todos tus agentes llaman a su modelo a través de este servidor, así que paga tu clave, dentro de tu presupuesto diario y del límite de cada agente.",
+  "aipage.consumerCrewsMixed": "Un equipo usa tu clave solo cuando llama a su modelo a través de este servidor. Lo hacen: {agents}. Los demás usan la clave de la máquina donde se ejecutan.",
   "aipage.consumerAgentRuleBody": "Un agente no cambia esto: la clave, los modelos y el presupuesto son tuyos. Ve si la IA está disponible, y recibe un motivo claro cuando el presupuesto se ha gastado.",
   "aipage.modelsEmpty": "El proveedor no devolvió ningún modelo. Revisa la dirección.",
   "aipage.modelsError": "No se pudieron cargar los modelos. Revisa la dirección y la clave, guarda y actualiza.",

@@ -16,9 +16,28 @@ Set ``AIMEAT_HOME=~/.aimeat`` to restore the previous global behaviour.
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 
 def aimeat_home() -> Path:
     """Connector home dir. ``AIMEAT_HOME`` env wins; else ``<cwd>/.aimeat``."""
     return Path(os.environ.get("AIMEAT_HOME") or (Path.cwd() / ".aimeat"))
+
+
+_NODE_URL_LINE = re.compile(r"""^node_url:\s*['"]?([^'"\s#]+)""", re.MULTILINE)
+
+
+def connector_node_url() -> str | None:
+    """The node address the connector home's ``config.yaml`` names (``node_url:``), or None.
+
+    The Node connector writes it there (aimeat/src/cli/connect/config.ts), and so does the hosted
+    fleet's bootstrap, which sets no ``AIMEAT_NODE_URL`` for the crew runs. Read with a pattern
+    rather than a YAML parser: one top-level scalar, and no dependency for it.
+    """
+    try:
+        text = (aimeat_home() / "config.yaml").read_text(encoding="utf-8")
+    except OSError:
+        return None
+    match = _NODE_URL_LINE.search(text)
+    return match.group(1).rstrip("/") if match else None

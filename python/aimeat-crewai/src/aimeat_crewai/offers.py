@@ -126,15 +126,41 @@ def validate_offers_doc(
 
 
 def resolve_agent_token(agent_name: str) -> str | None:
-    """Best-effort read of the connector-stored agent token from
-    ``<AIMEAT_HOME or <cwd>/.aimeat>/agents/<name>/.token`` (the documented
-    location; see mcp_client.http_params). Returns None if not found."""
+    """Best-effort read of the connector-stored agent token. Returns None if not found.
+
+    Two places, in order:
+      1. ``<AIMEAT_HOME>/agents/<name>/.token`` (the documented location; see
+         mcp_client.http_params).
+      2. ``<AIMEAT_HOME>/tokens/<agent>@<owner>.token``, where the Node connector keeps a v1
+         bearer and where the hosted fleet writes the concierge's (aimeat-commercial
+         provision.ts). ``agent_name`` may be the full identity ``agent#owner@node``; a bare
+         name is used when exactly one owner's file matches it, because two owners' agents of
+         one name on one machine cannot be told apart by the name alone.
+    """
     home = aimeat_home()
-    token_file = home / "agents" / agent_name / ".token"
-    try:
-        return token_file.read_text(encoding="utf-8").strip() or None
-    except OSError:
-        return None
+    agent, owner = agent_name, None
+    if "#" in agent_name:
+        agent, _, rest = agent_name.partition("#")
+        owner = rest.split("@", 1)[0] or None
+    candidates = [home / "agents" / agent / ".token"]
+    tokens_dir = home / "tokens"
+    if owner:
+        candidates.append(tokens_dir / f"{agent}@{owner}.token")
+    else:
+        try:
+            matches = sorted(tokens_dir.glob(f"{agent}@*.token"))
+        except OSError:
+            matches = []
+        if len(matches) == 1:
+            candidates.append(matches[0])
+    for token_file in candidates:
+        try:
+            token = token_file.read_text(encoding="utf-8").strip()
+        except OSError:
+            continue
+        if token:
+            return token
+    return None
 
 
 def publish_offers(

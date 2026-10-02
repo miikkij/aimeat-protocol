@@ -16,6 +16,7 @@
  * @usage registerAgentCrewTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
  *   v1.0.0 -- 2026-08-28 -- Initial: the five tools over services/crew-ops.ts.
+ *   v1.0.2 -- 2026-10-02 -- aimeat_crew_llm_set's choice names the {kind:'node', role?} shape.
  *   v1.0.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  */
@@ -212,7 +213,7 @@ export function registerAgentCrewTools(
             target_agent_name: agentNameSchema.optional()
                 .describe("The agent to set it for. Omit to set the owner's DEFAULT for every agent they have."),
             choice: z.record(z.string(), z.unknown()).nullish()
-                .describe("{kind:'profile', profile} or {kind:'model', label, provider}. Omit or null to clear."),
+                .describe("{kind:'node', role?} (think through this node, which picks the model and the key), {kind:'profile', profile} or {kind:'model', label, provider}. Omit or null to clear."),
         },
         annotationsFor('aimeat_crew_llm_set'),
         async ({ target_agent_name, choice }) => {

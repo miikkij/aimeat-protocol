@@ -33,6 +33,8 @@
  *   const outcome = await setAgentMode({ storage, config }, req.auth!.owner, name, req.body?.mode);
  *   if (!outcome.ok) return renderRefusal(outcome.code, outcome.message);
  * @version-history
+ *   v1.5.0 -- 2026-10-02 -- setAgentRuntimeSource takes `llm` ('node' | 'machine'): where the crew's
+ *     model calls go, which the own-key answer reads per agent (services/own-key-coverage.ts).
  *   v1.4.0 -- 2026-09-06 -- A scope change here also pushes scopes_changed to a live tunnel. The MCP
  *     tool list was the only thing being told; a connector holds a token the node pinned at attach
  *     and went on being authorized by the old permissions.
@@ -503,6 +505,10 @@ export async function setAgentRuntimeSource(
             message: 'runtime_source needs a `kind` (e.g. "python" or "crew-def"), or null to clear it' };
     }
     const str = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined);
+    if (src.llm !== undefined && src.llm !== 'node' && src.llm !== 'machine') {
+        return { ok: false, code: 'INVALID_INPUT',
+            message: "runtime_source.llm is 'node' (the crew's model calls go through this node's /v1/llm) or 'machine' (the crew calls its provider with a key on its own machine)" };
+    }
     const stored = {
         kind: src.kind.trim().slice(0, 64),
         ...(str(src.file, 512) ? { file: str(src.file, 512) } : {}),
@@ -510,6 +516,7 @@ export async function setAgentRuntimeSource(
         ...(str(src.commit, 128) ? { commit: str(src.commit, 128) } : {}),
         ...(str(src.runtime, 128) ? { runtime: str(src.runtime, 128) } : {}),
         ...(Number.isInteger(src.definition_revision) ? { definitionRevision: src.definition_revision as number } : {}),
+        ...(src.llm === 'node' || src.llm === 'machine' ? { llm: src.llm as 'node' | 'machine' } : {}),
         reportedAt: new Date().toISOString(),
     };
     const updated = await deps.storage.updateAgent(target.gaii, { runtimeSource: stored });
