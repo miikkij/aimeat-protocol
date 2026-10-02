@@ -5,8 +5,10 @@
  *
  *   capabilities() reads GET /v1/ai/capabilities. The node plans each capability with the same gate a
  *   real call runs (the owner's providers, keys, model policy, app allowlist and budget) and spends
- *   nothing, so `on` is what a call would find now. A capability that is off carries `reason` and
- *   `fix`: the sentence an app shows the person.
+ *   nothing, so `on` is what a call would find now. A capability that is off carries `reason`, `fix`
+ *   (the sentence an app shows the person, in their language, with no tool names) and `settingsUrl`
+ *   (their AI settings, opened at the provider to fix; show it as a link or a button beside `fix`).
+ *   `agentFix` is the same fix written for an AI.
  *
  *   models() reads GET /v1/ai/models, the node's model catalogue, which an app grant with ai:use can
  *   call. Until V5 it read the owner-only /v1/openrouter/models, which answered 403 to every app.
@@ -14,8 +16,11 @@
  *   old OpenRouter listing had, so a picker written against that listing still reads it.
  * @structure capabilities(opts) · models(opts) · roles() · priceEstimate(state, units) · clearCaches()
  * @usage const caps = await AIMEAT.ai.capabilities({ app_id: 'my-app' });
- *   if (!caps.capabilities.image.on) showNotice(caps.capabilities.image.fix);
+ *   const img = caps.capabilities.image;
+ *   if (!img.on) showNotice(img.fix, img.settingsUrl);   // the sentence, and a link to where it is fixed
  * @version-history
+ *   v1.2.0 - 2026-10-02 - Documents `settingsUrl` and `agentFix` beside `fix`, which is now the
+ *     person's sentence in their language.
  *   v1.1.0 - 2026-09-28 - roles(): GET /v1/ai/roles, the owner's AI roles and the apps' role bindings.
  *   v1.0.0 - 2026-09-28 - System 2 plan, V5. Initial: capabilities(), and models() moved from
  *     /v1/openrouter/models to /v1/ai/models.
@@ -38,7 +43,7 @@ const _modelsCache = new Map();
  * Returns the node's answer as it is: { capabilities: { text, vision, files, image, speech,
  * transcription, embed }, policy, budget, catalog, guide }. Each capability is
  * { on, model?, provider?, providerType?, leaves?, keySource?, fallbacks?, price?, reason?, fix?,
- * message?, howTo }. `model` is a "type:id" reference; `leaves` says whether the data leaves the
+ * settingsUrl?, agentFix?, testProvider?, message?, howTo }. `model` is a "type:id" reference; `leaves` says whether the data leaves the
  * person's machine; `price` is the catalogue's price for that model (per million tokens, per picture,
  * per character or per second).
  *

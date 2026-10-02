@@ -11,6 +11,7 @@
  *   tai('aiTask.run');
  *   tai('aiTask.needChars', { n: 20, m: 4 });
  * @version-history
+ *   v0.64.0 — 2026-10-02 — aiTask.openSettings, the button to the person's AI settings.
  *   v0.63.0 — 2026-10-02 — aiTask.made (the date a result was made) and the aiChat words.
  *   v0.62.0 — 2026-10-01 — Initial: aiTask (every state, the error words per code) and the form's
  *     model field.
@@ -32,6 +33,7 @@ const STRINGS = {
     'aiTask.signIn': 'Sign in to ask your AI.',
     'aiTask.signInBtn': 'Sign in',
     'aiTask.off': 'Your AI is not ready for this app.',
+    'aiTask.openSettings': 'Open AI settings',
     'aiTask.copyTitle': 'Or use your own AI chat',
     'aiTask.answer': 'The AI answer',
     'aiTask.model': 'Model: {model}',
@@ -82,6 +84,7 @@ const STRINGS = {
     'aiTask.signIn': 'Kirjaudu sisään, niin voit kysyä tekoälyltäsi.',
     'aiTask.signInBtn': 'Kirjaudu sisään',
     'aiTask.off': 'Tekoälysi ei ole valmis tätä sovellusta varten.',
+    'aiTask.openSettings': 'Avaa tekoälyasetukset',
     'aiTask.copyTitle': 'Tai käytä omaa tekoälykeskusteluasi',
     'aiTask.answer': 'Tekoälyn vastaus',
     'aiTask.model': 'Malli: {model}',
@@ -132,6 +135,7 @@ const STRINGS = {
     'aiTask.signIn': 'Inicia sesión para preguntarle a tu IA.',
     'aiTask.signInBtn': 'Iniciar sesión',
     'aiTask.off': 'Tu IA no está lista para esta app.',
+    'aiTask.openSettings': 'Abrir los ajustes de IA',
     'aiTask.copyTitle': 'O usa tu propio chat de IA',
     'aiTask.answer': 'Respuesta de la IA',
     'aiTask.model': 'Modelo: {model}',

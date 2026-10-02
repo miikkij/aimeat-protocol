@@ -5,6 +5,8 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-10-02 — An AI that is off: the app shows the person `fix` and a link to `settingsUrl`, never
+ *     `message` or `agentFix`.
  *   2026-10-01 — Build flow step 0: on any model but Claude Opus or Fable, tell the person once
  *     before building that those build the better app (cold-agent build-app, Sonnet 5.5 1/3).
  *   2026-10-01 — The roster from a chat, round 2: email on member_set, search and paging on members,
@@ -150,13 +152,15 @@ the app truly needs certain models, declare them in the head,
 (each \`<type>:<model id>\`); the app then uses only those, and a malformed entry comes back in
 \`ai_hints\`. Skill: aimeat-ai-model-policy. The owner's providers and routing decide which provider
 answers; an app never names a provider id (it cannot know the owner's), and a refusal
-\`AI_CAPABILITY_UNAVAILABLE\` means the owner has no working provider for that capability: show its
-message, which names what to set up. Every answer carries \`route\` (who answered).
+\`AI_CAPABILITY_UNAVAILABLE\` means the owner has no working provider for that capability: show the
+person \`err.fix\` (their sentence, in their language) and a link to \`err.settingsUrl\`, which opens
+their AI settings where it is fixed. Every answer carries \`route\` (who answered).
 
 **AI capabilities.** Before you plan an AI feature, call \`aimeat_ai_capabilities\`: per capability
 (text, vision, files, image, speech, transcription, embed) whether it is on, the model, the price, and
 for one that is off the \`fix\`. In the app, check the same with \`AIMEAT.ai.capabilities()\` and show
-the person the fix; never hide a button in silence. Name what the app prefers in the meta,
+the person the \`fix\` with an "Open AI settings" link to \`settingsUrl\`; never hide a button in
+silence, and never show \`message\` or \`agentFix\`, which are written for an AI. Name what the app prefers in the meta,
 \`prefer.image=openrouter; local.transcription=yes\` (it orders the owner's providers and adds none).
 \`aimeat_ai_models\` lists the catalogue with the \`ref\` to use. Never propose embeddings: they are for a
 collection far larger than one prompt, only when the person decides, and a vector collection does not

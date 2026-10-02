@@ -16,6 +16,8 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-08-12 — Spanish (es) added. localeFromCookie now matches any two-letter tag and
  *     validates it against LOCALES, so a fourth language needs one edit here rather than two.
+ *   v1.2.0 — 2026-10-02 — A key is looked up flat first ("aipage.off.UNTESTED" as one key), so the
+ *     server reads the SPA's flat dotted keys as well as nested ones.
  */
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -39,6 +41,9 @@ for (const loc of LOCALES) {
 }
 
 function resolve(dict: Dict, key: string): string | string[] | undefined {
+  // A flat dotted key ("aipage.pv.test"), the way most of the SPA's keys are written, first.
+  const flat = dict[key];
+  if (typeof flat === 'string' || Array.isArray(flat)) return flat;
   const parts = key.split('.');
   let cur: string | string[] | Dict = dict;
   for (const p of parts) {

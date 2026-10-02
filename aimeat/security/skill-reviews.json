@@ -88,11 +88,11 @@
       "note": "The choices format is parsed and drawn by this file (moved from views/chat/parts.js on 2026-09-23)."
     },
     "node:aimeat-paying-for-the-ai": {
-      "reviewedOn": "2026-09-28",
+      "reviewedOn": "2026-10-02",
       "watches": [
         "aimeat/src/services/ai-completion.ts"
       ],
-      "digest": "sha256:7cc94f73987cb1b34d0efa7e"
+      "digest": "sha256:3ed0307b1d3b7b424d74ff4f"
     },
     "node:aimeat-mail-to-data": {
       "reviewedOn": "2026-09-28",
@@ -128,7 +128,7 @@
         "aimeat/src/static/sdk-libs/atelier/describe-data.js",
         "aimeat/src/services/design-book/component.ts"
       ],
-      "digest": "sha256:e30d8302fa529c9dcd2725d3"
+      "digest": "sha256:8d0ae04ed5486cad519c1621"
     },
     "node:aimeat-phaser": {
       "reviewedOn": "2026-09-19",
@@ -282,13 +282,13 @@
       "digest": "sha256:bbb2d4c7322997eb834d1310"
     },
     "node:aimeat-ai-model-policy": {
-      "reviewedOn": "2026-09-28",
+      "reviewedOn": "2026-10-02",
       "watches": [
         "aimeat/src/services/ai/policy-gate.ts",
         "aimeat/src/services/ai/policy-store.ts",
         "aimeat/src/routes/ai-policy.ts"
       ],
-      "digest": "sha256:c19fae24e71827f66439f18e"
+      "digest": "sha256:d10824a8f26325da383e9e30"
     },
     "node:aimeat-ai-capabilities": {
       "reviewedOn": "2026-10-02",
@@ -298,7 +298,7 @@
         "aimeat/src/services/app-ai-capability-hints.ts",
         "aimeat/src/static/sdk-libs/ai/index.js"
       ],
-      "digest": "sha256:8641ec506220431afc128fde"
+      "digest": "sha256:d418352b9f9ac0b1163364ed"
     },
     "node:use-app-bound-skills": {
       "reviewedOn": "2026-09-29",
@@ -322,7 +322,7 @@
         "aimeat/src/services/scheduler.ts",
         "aimeat/src/services/ai/route-plan.ts"
       ],
-      "digest": "sha256:79089b25b922f4e3a1a07b65"
+      "digest": "sha256:b4e17f9ef42c2ddf68378bf3"
     },
     "node:aimeat-game-apps": {
       "reviewedOn": "2026-09-19",
@@ -393,12 +393,12 @@
       "note": "Its tools are gitignored and live on the developer's main machine only."
     },
     "project:aimeat-writing": {
-      "reviewedOn": "2026-09-19",
+      "reviewedOn": "2026-10-02",
       "watches": [
         "aimeat/src/i18n.ts",
         "aimeat/scripts/locale-merge.ts"
       ],
-      "digest": "sha256:da9c86cfce31f85acf16b433"
+      "digest": "sha256:f9c33bd52c86fea462a6a4a9"
     }
   },
   "fileDigests": {
@@ -416,7 +416,7 @@
       "aimeat/public/components/Suggestion.js": "c8ca8af7c09e778a"
     },
     "node:aimeat-paying-for-the-ai": {
-      "aimeat/src/services/ai-completion.ts": "c668521393bb85a8"
+      "aimeat/src/services/ai-completion.ts": "bdbc9d941358b327"
     },
     "node:aimeat-mail-to-data": {
       "aimeat/src/mcp/catalog/definitions/connections.ts": "774105847fbe84e3",
@@ -434,7 +434,7 @@
     "node:aimeat-app-builder-atelier": {
       "aimeat/src/services/build-atelier-prompt.ts": "049cbf4731dbfd00",
       "aimeat/src/services/build-atelier-layers.ts": "1493a01bd84cc021",
-      "aimeat/src/static/sdk-libs/atelier/describe-data.js": "ff20bb6359ed779b",
+      "aimeat/src/static/sdk-libs/atelier/describe-data.js": "701367104cd26262",
       "aimeat/src/services/design-book/component.ts": "71091551c9319c7e"
     },
     "node:aimeat-phaser": {
@@ -536,7 +536,7 @@
       "aimeat/src/models/workflow-schemas.ts": "2ea7b5cbb26bcb4d",
       "aimeat/src/mcp/agent-schedules.ts": "3af26ae08452607b",
       "aimeat/src/services/scheduler.ts": "aafc80e035f0bbdf",
-      "aimeat/src/services/ai/route-plan.ts": "1bf6d59a7d888b92"
+      "aimeat/src/services/ai/route-plan.ts": "685f7f9f4aa9dc93"
     },
     "node:aimeat-game-apps": {
       "aimeat/src/data/library-packs/vendored-creative.ts": "d4c59f171eb2fb20",
@@ -568,7 +568,7 @@
     },
     "project:aimeat-video": {},
     "project:aimeat-writing": {
-      "aimeat/src/i18n.ts": "5010fd431bbb999b",
+      "aimeat/src/i18n.ts": "d1dd54b01598e00c",
       "aimeat/scripts/locale-merge.ts": "e1c28235732aafa5"
     },
     "node:aimeat-recurring-work": {
@@ -586,13 +586,13 @@
     "node:aimeat-ai-model-policy": {
       "aimeat/src/services/ai/policy-gate.ts": "063c42b5531095a0",
       "aimeat/src/services/ai/policy-store.ts": "2481a16ae530297d",
-      "aimeat/src/routes/ai-policy.ts": "d33660e83cdac1c9"
+      "aimeat/src/routes/ai-policy.ts": "2fef9b8d37685237"
     },
     "node:aimeat-ai-capabilities": {
-      "aimeat/src/services/ai/capabilities.ts": "6a0d7cea6bc82ffe",
-      "aimeat/src/services/ai-embed.ts": "4b2e3a13ab7796c5",
+      "aimeat/src/services/ai/capabilities.ts": "4809a98c294777cb",
+      "aimeat/src/services/ai-embed.ts": "373bf3b2d8a0a12a",
       "aimeat/src/services/app-ai-capability-hints.ts": "3a684ecb1285421d",
-      "aimeat/src/static/sdk-libs/ai/index.js": "241d20196c36fb3f"
+      "aimeat/src/static/sdk-libs/ai/index.js": "aca920503717cbca"
     },
     "node:aimeat-refinery": {
       "aimeat/src/services/refinery/pipeline.ts": "d4481883f6dcb4e0",

@@ -10,6 +10,8 @@
  *   return paid(opts, { key: ['ai-embed', opts.app_id, text], what: 'Make embeddings' },
  *     () => postJson('/v1/ai/embed', body, 'Embedding failed'));
  * @version-history
+ *   v1.1.0 - 2026-10-02 - aiError lifts the refusal's `fix` (the person's sentence), `settingsUrl` and
+ *     `reason` onto the error, so an app shows the sentence and a link to where the fix is.
  *   v1.0.0 - 2026-09-28 - System 2 plan, V5. Initial: extracted from complete() so image, speak,
  *     transcribe, embed and stream raise the same typed errors and share the same spend guard.
  */
@@ -20,15 +22,25 @@ import { once, keyOf, confirmSpend, noteBudget, cancelledError } from '../_core/
 /**
  * The Error a failed envelope becomes. `.code` is the node's error code; `.details` carries what the
  * node added to a refusal (a model-policy refusal names the models it would allow, for example).
+ *
+ * When the AI is off for a reason the person can fix, the refusal says how, and these are lifted
+ * onto the error: `.fix`, the sentence to show the person, in their language; `.settingsUrl`, the
+ * address of their AI settings opened where the fix is (a link or a button beside the sentence);
+ * `.reason`, the reason's name. `.message` stays the node's technical message.
  * @param {any} r  the parsed envelope, or null when there was none
  * @param {string} fallback  the message when the envelope carries none
- * @returns {Error & { code?: string, details?: any }}
+ * @returns {Error & { code?: string, details?: any, fix?: string, settingsUrl?: string, reason?: string }}
  */
 export function aiError(r, fallback) {
   const e = r && r.error;
-  const err = /** @type {Error & { code?: string, details?: any }} */ (new Error((e && e.message) || fallback));
+  const err = /** @type {Error & { code?: string, details?: any, fix?: string, settingsUrl?: string, reason?: string }} */ (new Error((e && e.message) || fallback));
   err.code = (e && e.code) || 'UNKNOWN';
-  if (e && e.details !== undefined && e.details !== null) err.details = e.details;
+  if (e && e.details !== undefined && e.details !== null) {
+    err.details = e.details;
+    if (typeof e.details.fix === 'string') err.fix = e.details.fix;
+    if (typeof e.details.settingsUrl === 'string') err.settingsUrl = e.details.settingsUrl;
+    if (typeof e.details.reason === 'string') err.reason = e.details.reason;
+  }
   return err;
 }
 

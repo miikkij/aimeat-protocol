@@ -16,7 +16,7 @@
  *   BUDGET_EXHAUSTED, RETIRED_MODEL). Two more situations are real, so they have their own names
  *   rather than a wrong one of the six: UNTESTED (the owner's rules use only tested providers) and
  *   APP_NOT_ALLOWED (the owner's app allowlist). Anything else is UNAVAILABLE with the refusal's code
- *   beside it. A failing provider is never the reason a capability is off: with nothing else to try,
+ *   beside it. The reasons and their words live in ai-fix-words.ts, shared with every refusal. A failing provider is never the reason a capability is off: with nothing else to try,
  *   the routing tries it (route-plan.ts), so the capability is on and a call finds out.
  * @structure CAPABILITY_ORDER · CapabilityState · aiCapabilitiesView()
  * @version-history
@@ -27,6 +27,10 @@
  *   v1.2.0 — 2026-09-29 — content_classifier: the Content Classifier's state and fix (TARGET-082 V3).
  *   v1.3.0 — 2026-10-02 — `own_key` for the owner and their agents: what the owner's own key pays for
  *     on this node and what it never reaches (services/own-key-coverage.ts).
+ *   v1.4.0 — 2026-10-02 — `fix` is the person's sentence in their language; `agentFix` is the fix for
+ *     an AI, `settingsUrl` opens the AI settings at the provider to fix, and `testProvider` names the
+ *     provider whose test turns an UNTESTED capability on (ai-fix-words.ts, Jouni: the person was not
+ *     led to the place where the test is pressed).
  *   v1.1.1 — 2026-09-28 — The settings read in aiCapabilitiesView's Promise.all is wrapped in an async
  *     function: a storage that threw synchronously left the sibling reads' rejections unhandled.
  */
@@ -42,6 +46,10 @@ import type { CallerClass } from './policy.js';
 import { readRoles, rolesWithLegacy, bindingKey } from './roles.js';
 import { classifierState } from '../classification/classifier-state.js';
 import { ownKeyCoverage } from '../own-key-coverage.js';
+import type { Locale } from '../../i18n.js';
+import {
+  reasonOf, agentFixFor, personFixFor, personLocale, aiSettingsUrl, type CapabilityReason, type RequestLanguage,
+} from './ai-fix-words.js';
 
 export const CAPABILITY_ORDER: readonly AiCapability[] = ['text', 'vision', 'files', 'image', 'speech', 'transcription', 'embed'];
 
@@ -60,9 +68,7 @@ const HOW_TO: Record<AiCapability, string> = {
   embed: 'AIMEAT.ai.embed({ app_id, input: [texts] }) · POST /v1/ai/embed · aimeat_ai_embed; rarely, only when the person decides, for a collection far larger than one prompt (skill aimeat-ai-capabilities)',
 };
 
-export type CapabilityReason =
-  | 'NO_MODEL' | 'NO_PROVIDER_SUPPORTS' | 'NO_KEY' | 'POLICY_EMPTY' | 'BUDGET_EXHAUSTED' | 'RETIRED_MODEL'
-  | 'UNTESTED' | 'APP_NOT_ALLOWED' | 'UNAVAILABLE';
+export type { CapabilityReason };
 
 export interface CapabilityState {
   on: boolean;
@@ -81,47 +87,22 @@ export interface CapabilityState {
   reason?: CapabilityReason;
   code?: string;
   message?: string;
+  /** The sentence the person reads, in their language, with no tool or field names. */
   fix?: string;
+  /** The same fix for an AI that can act on it: tool names and parameters. */
+  agentFix?: string;
+  /** The AI settings page, opened at the provider to fix (and its test, when a test is the fix). */
+  settingsUrl?: string;
+  /** For UNTESTED: the provider whose test turns the capability on. */
+  testProvider?: { id: string; title: string; capability: AiCapability };
   /** For NO_PROVIDER_SUPPORTS: the provider types that serve this capability on this node. */
   providersThatCan?: string[];
   howTo: string;
 }
 
-const KEY_CODES = new Set(['NO_API_KEY', 'NODE_KEY_HOST', 'ENCRYPTION_NOT_CONFIGURED']);
-const MODEL_CODES = new Set(['NO_IMAGE_MODEL', 'NO_STT_MODEL', 'NO_TTS_MODEL', 'NO_EMBED_MODEL']);
-const BUDGET_CODES = new Set(['QUOTA_EXHAUSTED', 'APP_QUOTA_EXHAUSTED', 'AGENT_QUOTA_EXHAUSTED']);
-
-function reasonOf(e: AiCompletionError): CapabilityReason {
-  if (MODEL_CODES.has(e.code)) return 'NO_MODEL';
-  if (KEY_CODES.has(e.code)) return 'NO_KEY';
-  if (BUDGET_CODES.has(e.code)) return 'BUDGET_EXHAUSTED';
-  if (e.code === 'AI_MODEL_POLICY_EMPTY' || e.code === 'AI_MODEL_NOT_ALLOWED') return 'POLICY_EMPTY';
-  if (e.code === 'APP_NOT_ALLOWED' || e.code === 'APP_ID_REQUIRED') return 'APP_NOT_ALLOWED';
-  if (e.code === 'AI_PROVIDER_TYPE_NOT_ALLOWED') return 'NO_PROVIDER_SUPPORTS';
-  if (e.code === 'AI_CAPABILITY_UNAVAILABLE') {
-    const reasons = ((e.details as { rejected?: Array<{ reason: string }> } | undefined)?.rejected ?? []).map(r => r.reason);
-    if (reasons.length === 0 || reasons.every(r => r === 'capability-off' || r === 'type-not-allowed' || r === 'requires-local')) return 'NO_PROVIDER_SUPPORTS';
-    if (reasons.includes('no-model')) return 'NO_MODEL';
-    if (reasons.includes('no-key')) return 'NO_KEY';
-    if (reasons.includes('policy')) return 'POLICY_EMPTY';
-    if (reasons.includes('untested')) return 'UNTESTED';
-  }
-  return 'UNAVAILABLE';
-}
-
-/** What to do, in words an AI can act on or pass to the owner. */
-function fixFor(reason: CapabilityReason, cap: AiCapability, providersThatCan: string[]): string {
-  switch (reason) {
-    case 'NO_MODEL': return `Set a model for ${cap} on one of the owner's AI providers (the owner does it on the AI settings page), or ask the operator for a node default.`;
-    case 'NO_PROVIDER_SUPPORTS': return `None of the owner's providers serves ${cap}. The owner adds a provider of type ${providersThatCan.join(', ') || '(none allowed on this node)'} on the AI settings page and turns ${cap} on.`;
-    case 'NO_KEY': return 'The provider has no key. The owner sets it on the AI settings page; never ask for a key in chat.';
-    case 'POLICY_EMPTY': return `The owner's model policy allows no model for ${cap} here. Propose a change with aimeat_ai_policy_set; the owner confirms it.`;
-    case 'BUDGET_EXHAUSTED': return 'Today\'s AI budget is spent. The owner raises it in Settings, or it resets at midnight UTC.';
-    case 'RETIRED_MODEL': return `The model is retired. Find another with aimeat_ai_models { capability: "${cap}" } and propose it to the owner.`;
-    case 'UNTESTED': return `The owner's rules use only tested providers. Test one: aimeat_ai_provider_test { provider, capability: "${cap}" }.`;
-    case 'APP_NOT_ALLOWED': return 'The owner allows AI only for listed apps. The owner adds this app to the list in Settings.';
-    default: return 'Read aimeat_ai_providers for why each provider is left out.';
-  }
+/** The three fix fields of a capability that is off, for a reason found here rather than in a refusal. */
+function offWords(config: AimeatConfig, locale: Locale, reason: CapabilityReason, cap: AiCapability, providersThatCan: string[]) {
+  return { fix: personFixFor(locale, reason, cap), agentFix: agentFixFor(reason, cap, providersThatCan), settingsUrl: aiSettingsUrl(config) };
 }
 
 /** The provider types that serve a capability on this node, for NO_PROVIDER_SUPPORTS. */
@@ -133,6 +114,7 @@ function typesThatCan(config: AimeatConfig, cap: AiCapability): string[] {
 /** One capability: the call it would be, planned and never run. */
 async function stateOf(
   storage: Storage, config: AimeatConfig, gaii: string, cap: AiCapability, ctx: CapabilityCaller, providers: AiProvider[],
+  locale: Locale,
 ): Promise<CapabilityState> {
   const howTo = HOW_TO[cap];
   // No provider of the owner's or the node's serves it at all: the fix is a provider, whatever
@@ -141,7 +123,7 @@ async function stateOf(
     const providersThatCan = typesThatCan(config, cap);
     return {
       on: false, reason: 'NO_PROVIDER_SUPPORTS', message: `No provider you can use serves ${cap}.`,
-      fix: fixFor('NO_PROVIDER_SUPPORTS', cap, providersThatCan), providersThatCan, howTo,
+      ...offWords(config, locale, 'NO_PROVIDER_SUPPORTS', cap, providersThatCan), providersThatCan, howTo,
     };
   }
   let plan: AiCallPlan;
@@ -150,13 +132,19 @@ async function stateOf(
       op: OP_OF[cap], capability: cap, ...(cap === 'vision' ? { hasImages: true } : {}),
       caller: ctx.caller, ...(ctx.agent ? { agent: ctx.agent } : {}),
       ...(ctx.verifiedApp ? { verifiedApp: ctx.verifiedApp } : {}), ...(ctx.appId ? { appId: ctx.appId } : {}),
+      lang: { chosen: locale },
     });
   } catch (e) {
     if (!(e instanceof AiCompletionError)) throw e;
     const reason = reasonOf(e);
     const providersThatCan = reason === 'NO_PROVIDER_SUPPORTS' ? typesThatCan(config, cap) : [];
+    // prepareAiCall put the person's sentence and the link on the refusal (ai-fix-words.ts).
+    const d = (e.details ?? {}) as Partial<Pick<CapabilityState, 'fix' | 'settingsUrl' | 'testProvider'>>;
+    const words = offWords(config, locale, reason, cap, providersThatCan);
     return {
-      on: false, reason, code: e.code, message: e.message, fix: fixFor(reason, cap, providersThatCan),
+      on: false, reason, code: e.code, message: e.message,
+      fix: d.fix ?? words.fix, agentFix: words.agentFix, settingsUrl: d.settingsUrl ?? words.settingsUrl,
+      ...(d.testProvider ? { testProvider: d.testProvider } : {}),
       ...(providersThatCan.length ? { providersThatCan } : {}), howTo,
     };
   }
@@ -169,7 +157,7 @@ async function stateOf(
     howTo,
   };
   if (m?.status === 'retired') {
-    return { ...state, on: false, reason: 'RETIRED_MODEL', message: `${state.model} is retired: the catalogue's sources no longer list it.`, fix: fixFor('RETIRED_MODEL', cap, []) };
+    return { ...state, on: false, reason: 'RETIRED_MODEL', message: `${state.model} is retired: the catalogue's sources no longer list it.`, ...offWords(config, locale, 'RETIRED_MODEL', cap, []) };
   }
   return state;
 }
@@ -179,6 +167,8 @@ export interface CapabilityCaller {
   agent?: string;
   verifiedApp?: string;
   appId?: string;
+  /** The request's word on the person's language, for the `fix` sentences. */
+  lang?: RequestLanguage;
 }
 
 /**
@@ -213,12 +203,14 @@ async function rolesOf(
 export async function aiCapabilitiesView(
   storage: Storage, config: AimeatConfig, gaii: string, ctx: CapabilityCaller,
 ): Promise<Record<string, unknown>> {
-  const { node, owner } = await providersForOwner(storage, config, gaii);
+  const [{ node, owner }, locale] = await Promise.all([
+    providersForOwner(storage, config, gaii), personLocale(storage, gaii, ctx.lang),
+  ]);
   const providers = [...owner, ...node];
   // The storage read inside an async function, so a storage that throws before returning a promise
   // rejects this call rather than leaving a sibling's rejection unhandled (as provider-store.ts does).
   const [states, policy, usage, prefsRecord, ownKey] = await Promise.all([
-    Promise.all(CAPABILITY_ORDER.map(cap => stateOf(storage, config, gaii, cap, ctx, providers))),
+    Promise.all(CAPABILITY_ORDER.map(cap => stateOf(storage, config, gaii, cap, ctx, providers, locale))),
     readOwnerAiPolicy(storage, gaii),
     getTodayUsage(storage, gaii),
     (async () => storage.getMemory(gaii, 'openrouter.settings'))(),

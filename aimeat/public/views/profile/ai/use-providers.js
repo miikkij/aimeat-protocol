@@ -9,9 +9,15 @@
  *   the ordered providers per capability, the routing rules and the Content Classifier's model,
  *   which is the owner's classification policy; the model policy and whose calls it covers). Every
  *   write is the owner's and applies at once. The render is ai/providers.js.
- * @structure useProviders() → pv (state + handlers) · CAPS · PROVIDER_TYPES · slug · classifierValue
+ * @structure useProviders() → pv (state + handlers) · CAPS · PROVIDER_TYPES · slug · classifierValue ·
+ *   askedFor · testableCapOf
  * @usage const pv = useProviders(); … renderProviders(ctx) reads ctx.pv
  * @version-history
+ *   v1.4.0 — 2026-10-02 — The way to a test (Jouni: the person was not led to it): a settingsUrl
+ *     (`?open=ai-provider-<id>&test=<capability>`) opens that provider at its test and scrolls to it;
+ *     testNow runs an untested or failing provider's test from its row; `off` lists the capabilities
+ *     that are off for a reason the person can fix here, from GET /v1/ai/capabilities, and `failing`
+ *     the ones whose provider failed its last test. A failed form message stays until the next one.
  *   v1.3.0 — 2026-09-29 — The Content Classifier's choice in the routing editor (ccDraft, the decision
  *     providers from GET /v1/ai/decide/providers): Save stores it in the owner's classification policy
  *     (the classifier's type and provider) when it changed (Jouni's review, TARGET-082 V5).
@@ -23,7 +29,7 @@
  *   v1.0.0 — 2026-09-28 — Initial (System 2): the page for the providers, the routing and the model
  *     policy the node has had since V2 to V6, on the page's existing components.
  */
-import { useState, useEffect, useCallback } from 'preact/hooks';
+import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import { swallowed } from '/js/swallowed.js';
 import { apiGet, apiPut, apiPost, apiDelete } from '/js/api.js';
 import { readPolicy, writePolicy } from '/js/services/classification.js';
@@ -76,7 +82,13 @@ export function slug(title) {
 }
 
 const EMPTY_DRAFT = { type: 'openrouter', title: '', baseUrl: '', extension: '', apiKey: '', caps: { text: true } };
-const flashFor = (setter) => (text, error = false) => { setter({ text, error }); setTimeout(() => setter(null), 6000); };
+/** A form's message: a success goes after six seconds, a failure stays until the next message, so
+ *  the person can read what went wrong (a failed test said why for six seconds only). */
+const flashFor = (setter) => (text, error = false) => {
+  const m = { text, error };
+  setter(m);
+  if (!error) setTimeout(() => setter((cur) => (cur === m ? null : cur)), 6000);
+};
 const errText = (e, fallback) => e?.error?.message || e?.response?.error?.message || e?.message || fallback;
 
 /** A provider as the PUT body takes it back: its fields, with the capabilities as the record keeps them. */
@@ -127,10 +139,47 @@ function capsOf(p) {
   return out;
 }
 
+/**
+ * A link that opens one provider at its test, `?open=ai-provider-<id>&test=<capability>`, or the
+ * providers section, `?open=ai-providers` (or `#ai-providers` on a cold load). The node gives this
+ * address as `settingsUrl` with every AI refusal (services/ai/ai-fix-words.ts). Read once at mount:
+ * the profile view rewrites the address to `?tab=ai` right after.
+ */
+function askedFor() {
+  const q = new URLSearchParams(window.location.search);
+  const open = q.get('open') || window.location.hash.slice(1);
+  const test = q.get('test');
+  return {
+    open: open === 'ai-providers' || open.startsWith('ai-provider-') ? open : null,
+    test: CAPS.includes(test) ? test : null,
+  };
+}
+
+/** The model drafts an opened provider's capability editors start from. */
+const modelDraftsOf = (p) => Object.fromEntries(Object.entries(p?.capabilities || {}).map(([c, v]) => [c, capDraftOf(v)]));
+
+/** The enabled capability of an owner's provider that is not tested yet, or failed its last test (a
+ *  refused key, say), or null: a test is what the person does next for it. Untested first. */
+export function testableCapOf(p) {
+  if (p.source !== 'owner') return null;
+  const on = CAPS.filter((c) => p.capabilities?.[c]?.enabled);
+  const status = (c) => p.health?.[c]?.status || 'untested';
+  return on.find((c) => status(c) === 'untested') || on.find((c) => status(c) === 'failing') || null;
+}
+
+/** Why a capability is off, worth a line above the providers. Text is the AI, so any reason is. For
+ *  the others only what the person set up and is not working (a test, a key, a retired model): one
+ *  nobody set up is not news, since most people never add speech or pictures. */
+const SET_UP_BUT_OFF = ['UNTESTED', 'NO_KEY', 'RETIRED_MODEL'];
+const worthALine = (cap, s) => s && s.on === false && s.reason !== 'APP_NOT_ALLOWED' && (cap === 'text' || SET_UP_BUT_OFF.includes(s.reason));
+
 export function useProviders({ confirm, toast }) {
+  const [asked] = useState(askedFor);
+  const landed = useRef(false);
   const [view, setView] = useState(null);
   const [policy, setPolicy] = useState(null);
   const [classifier, setClassifier] = useState(null);
+  const [caps, setCaps] = useState(null);
   const [decideProviders, setDecideProviders] = useState([]);
   const [ccDraft, setCcDraft] = useState(null);
   const [error, setError] = useState(null);
@@ -152,7 +201,11 @@ export function useProviders({ confirm, toast }) {
   const load = useCallback(async () => {
     // The Content Classifier's state is read on its own, so the providers never wait for it.
     apiGet('/v1/ai/capabilities')
-      .then((c) => { if (c && c.ok !== false && c.data?.content_classifier) setClassifier(c.data.content_classifier); })
+      .then((c) => {
+        if (!c || c.ok === false || !c.data) return;
+        if (c.data.content_classifier) setClassifier(c.data.content_classifier);
+        if (c.data.capabilities) setCaps(c.data.capabilities);
+      })
       .catch((e) => swallowed('ai: capabilities', e));
     // The decision providers name the classifier's choices; none listed (the decision model off, or
     // no access) leaves the default decision model as its one decision choice.
@@ -180,9 +233,51 @@ export function useProviders({ confirm, toast }) {
   const toggle = (id) => {
     setOpenId((cur) => (cur === id ? null : id));
     setKeyDraft('');
-    const p = find(id);
-    setModelDraft(Object.fromEntries(Object.entries(p?.capabilities || {}).map(([c, v]) => [c, capDraftOf(v)])));
+    setModelDraft(modelDraftsOf(find(id)));
   };
+  /** Open one provider's panel (never close it), with its test set to a capability. */
+  const openAt = (p, cap) => {
+    if (openId !== p.id) toggle(p.id);
+    if (cap) setTestCap(cap);
+  };
+
+  // Arriving by a settingsUrl lands ON the provider, open at its test, or on the providers section.
+  // Once, when the providers first arrive: a later reload must not pull the page back.
+  useEffect(() => {
+    if (landed.current || !view || !asked.open) return;
+    landed.current = true;
+    const id = asked.open.startsWith('ai-provider-') ? asked.open.slice('ai-provider-'.length) : null;
+    const p = id ? (view.providers || []).find((x) => x.id === id && x.source === 'owner') : null;
+    if (p) {
+      setOpenId(p.id);
+      setKeyDraft('');
+      setModelDraft(modelDraftsOf(p));
+      const cap = asked.test || testableCapOf(p);
+      if (cap) setTestCap(cap);
+    }
+    // The page draws its sections only once its own settings have arrived as well, so the target is
+    // looked for until it is there, for five seconds at most. With a provider the target is its test
+    // (the capability select), at the foot of the opened panel, the only one open; else the
+    // providers section.
+    let tries = 0;
+    const timer = setInterval(() => {
+      const el = p ? document.querySelector(`[aria-label="${CSS.escape(x('pv.testCap'))}"]`) : document.getElementById('ai-providers');
+      if (el || ++tries > 50) {
+        clearInterval(timer);
+        el?.scrollIntoView({ block: p ? 'center' : 'start' });
+      }
+    }, 100);
+  }, [view, asked]);
+
+  /** What is off and worth a line above the providers, in the capabilities' order. */
+  const off = caps ? CAPS.filter((c) => worthALine(c, caps[c])).map((c) => ({ cap: c, ...caps[c] })) : [];
+  /** An owner's provider whose capability failed its last test (a refused key): the node still tries
+   *  it when nothing else is left, so the capability reads as on, and only this line says it is not
+   *  working. One line per capability, after the ones above. */
+  const failing = (view?.providers || []).flatMap((p) => (p.source !== 'owner' ? [] : CAPS
+    .filter((c) => p.capabilities?.[c]?.enabled && p.health?.[c]?.status === 'failing' && !off.some((o) => o.cap === c))
+    .map((c) => ({ cap: c, provider: p }))))
+    .filter((f, i, all) => all.findIndex((g) => g.cap === f.cap) === i);
 
   const setDraft = (patch) => setDraftState((d) => {
     const next = { ...d, ...patch };
@@ -270,19 +365,19 @@ export function useProviders({ confirm, toast }) {
     setBusy(false);
   };
 
-  const test = async (p, acceptCost = false) => {
+  const test = async (p, acceptCost = false, cap = testCap) => {
     const flash = flashFor(setMsg);
     setBusy('test');
     try {
-      const r = await apiPost(`/v1/ai/providers/${p.id}/test`, { capability: testCap, accept_cost: acceptCost });
+      const r = await apiPost(`/v1/ai/providers/${p.id}/test`, { capability: cap, accept_cost: acceptCost });
       if (r?.ok === false) throw r;
       const d = r.data || {};
-      flash(x('pv.testOk', { cap: x('cap.' + testCap), model: d.model || '', ms: d.latency_ms ?? 0, cost: d.cost_usd != null ? `$${Number(d.cost_usd).toFixed(4)}` : '–' }));
+      flash(x('pv.testOk', { cap: x('cap.' + cap), model: d.model || '', ms: d.latency_ms ?? 0, cost: d.cost_usd != null ? `$${Number(d.cost_usd).toFixed(4)}` : '–' }));
       await load();
     } catch (e) {
       if (e?.error?.code === 'AI_TEST_COSTS_MONEY') {
         setBusy(false);
-        confirm(`${e.error.message} ${x('pv.testCostAsk')}`, () => test(p, true));
+        confirm(`${e.error.message} ${x('pv.testCostAsk')}`, () => test(p, true, cap));
         return;
       }
       flash(`${x('testFail')}: ${errText(e, '')}`, true);
@@ -363,11 +458,14 @@ export function useProviders({ confirm, toast }) {
     setBusy(false);
   };
 
+  /** Test now: the provider opens at that capability's test, which runs, so its answer shows there. */
+  const testNow = (p, cap) => { openAt(p, cap); test(p, false, cap); };
+
   return {
     view, policy, classifier, decideProviders, ccDraft, setCcDraft, error, providers, owned, openId, adding, draft, keyDraft, modelDraft, testCap,
-    routeDraft, rulesDraft, policyDraft, busy, msg, addMsg, routeMsg, policyMsg,
+    routeDraft, rulesDraft, policyDraft, busy, msg, addMsg, routeMsg, policyMsg, off, failing,
     load, toggle, setAdding, setDraft, toggleDraftCap, add, setKeyDraft, saveKey, removeKey,
-    setModelDraft: (c, patch) => setModelDraft((d) => ({ ...d, [c]: { ...(d[c] || capDraftOf(null)), ...patch } })), saveCap, setTestCap, test, remove,
+    setModelDraft: (c, patch) => setModelDraft((d) => ({ ...d, [c]: { ...(d[c] || capDraftOf(null)), ...patch } })), saveCap, setTestCap, test, testNow, remove, find,
     editRouting, setRoute, setRule, saveRouting, editPolicy, setPolicyField, savePolicy,
   };
 }

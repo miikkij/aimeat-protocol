@@ -18,6 +18,8 @@
  * @structure AI_CAPABILITIES_SKILL_ENTRY
  * @usage import { AI_CAPABILITIES_SKILL_ENTRY } from './builtin-skills.ai-capabilities.js';
  * @version-history
+ *   v1.1.0 — 2026-10-02 — `fix` is the person's sentence, `settingsUrl` the link to where it is
+ *     fixed, `agentFix` the AI's; for UNTESTED, offer to run the test with the person's yes.
  *   v1.0.0 — 2026-09-28 — Initial (V5 of the System 2 plan).
  *   v1.0.1 — 2026-09-28 — An extension of the owner's can be a provider (V6).
  *   v1.1.0 — 2026-09-28 — Embeddings are rare and the person's decision: never proposed by the AI,
@@ -64,7 +66,12 @@ capabilities. Each is on or off for each caller:
 
 Before you plan, call \`aimeat_ai_capabilities\` (an app: \`AIMEAT.ai.capabilities({ app_id })\`). For
 each capability it answers \`on\`, the \`model\` and \`provider\` a call would use, the \`price\`, and a
-\`howTo\` line. For one that is off it answers \`reason\` and \`fix\`:
+\`howTo\` line. For one that is off it answers \`reason\` and three ways to the fix:
+
+- \`fix\`: the sentence for the person, already in their language, with no tool names. Say it to them.
+- \`settingsUrl\`: their AI settings, opened at the provider to fix, with its test chosen when a test
+  is the fix. Give it to them as a link.
+- \`agentFix\`: the same fix for you, with the tool to use. \`testProvider\` names the provider to test.
 
 | reason | What to do |
 |---|---|
@@ -74,19 +81,20 @@ each capability it answers \`on\`, the \`model\` and \`provider\` a call would u
 | POLICY_EMPTY | Propose a policy change with aimeat_ai_policy_set; the owner confirms. |
 | BUDGET_EXHAUSTED | The owner raises the daily budget, or it resets at midnight UTC. |
 | RETIRED_MODEL | Find another with aimeat_ai_models and propose it. |
-| UNTESTED | The owner's rules use only tested providers. Test it: aimeat_ai_provider_test { provider, capability }. |
+| UNTESTED | The owner's rules use only tested providers. Offer to test it; with their yes, aimeat_ai_provider_test { provider: testProvider.id, capability }. Or give them \`settingsUrl\`, where Test now is one press. |
 | APP_NOT_ALLOWED | The owner adds the app to their AI app list. |
 
-Tell the person the fix in their words. Do not build around a capability that is off, and do not
-promise a feature the node cannot run for them.
+Tell the person \`fix\` and give them \`settingsUrl\`. Do not build around a capability that is off,
+and do not promise a feature the node cannot run for them.
 
 ## 2. Five rules for code
 
 1. **Ask for the capability, not a model.** Leave \`model\` out and the owner's providers choose. Name
    a model only when the app truly needs that one.
 2. **Check first and show the fix.** \`const caps = await AIMEAT.ai.capabilities({ app_id })\`; when
-   \`caps.capabilities.image.on\` is false, keep the control visible, disabled, with \`fix\` beside it.
-   Never hide a button in silence.
+   \`caps.capabilities.image.on\` is false, keep the control visible, disabled, with \`fix\` beside it
+   and an "Open AI settings" link to \`settingsUrl\`. Never hide a button in silence, and never show
+   the person \`message\` or \`agentFix\`: they are written for developers and AIs.
 3. **Declare the models the app needs** in its head: \`<meta name="aimeat-ai" content="generates=text,image;
    discloses=yes; models=<type>:<model id>">\`. \`prefer.<capability>=\` orders the owner's providers (a type,
    or a model reference) and never adds one; \`local.<capability>=yes\` keeps that capability on this
@@ -97,8 +105,9 @@ promise a feature the node cannot run for them.
 5. **Tell the price before an expensive call**: a picture, a long transcription, a large embedding run.
    The price is in the capabilities answer; \`confirm: true\` on \`AIMEAT.ai.image()\` and \`speak()\` shows it.
 
-Errors carry \`err.code\`: AI_CAPABILITY_UNAVAILABLE (with \`details.rejected\` and a \`fix\`),
-AI_MODEL_NOT_ALLOWED (with the \`allowed\` list), QUOTA_EXHAUSTED. Show the message; never an empty result.
+Errors carry \`err.code\`: AI_CAPABILITY_UNAVAILABLE (with \`details.rejected\`), AI_MODEL_NOT_ALLOWED
+(with the \`allowed\` list), QUOTA_EXHAUSTED. A refusal the person can fix carries \`err.fix\` and
+\`err.settingsUrl\`, as a capability does: show the sentence and the link; never an empty result.
 
 ## 2b. Roles: what a model is for
 

@@ -15,7 +15,7 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
- *   2026-10-02 — The agent-face part names aimeat-format-md: the app's own extension action answers ?format=md.
+ *   2026-10-02 — The agent-face part names aimeat-format-md: the app's own extension action answers ?format=md. The AI line: when a capability is off, show its `fix` with a link to `settingsUrl`.
  *   2026-10-01 — Public Intake: the link to share is the app page with ?form=<form id>. The code
  *     comment called defineForm's answer "a shareable link", and its submit_url is an API address.
  *   2026-10-01 — Own users/roles: init({ app, roles }) with what each role may do, and a gate from
@@ -424,7 +424,7 @@ function composeAppPrompt(
 
   // AI
   body += '### AI (prompt-driven)\n';
-  body += "aimeat-ai runs AI on the LOGGED-IN USER's own AI providers (text, pictures, speech, transcription, embeddings) — free for the app, and the user controls spend. Load aimeat-auth first; for text gate the control on isAvailable(), for any other capability check `(await AIMEAT.ai.capabilities()).capabilities.<capability>.on` and show its `fix` when off. Ask for the capability, not a model.\n";
+  body += "aimeat-ai runs AI on the LOGGED-IN USER's own AI providers (text, pictures, speech, transcription, embeddings) — free for the app, and the user controls spend. Load aimeat-auth first; for text gate the control on isAvailable(), for any other capability check `(await AIMEAT.ai.capabilities()).capabilities.<capability>.on` and, when off, show its `fix` (the person's sentence) with a link \"Open AI settings\" to its `settingsUrl`; a refused call carries the same as err.fix and err.settingsUrl. Ask for the capability, not a model.\n";
   body += '```html\n';
   body += '<script src="' + nodeUrl + '/v1/libs/aimeat-auth.js"></' + 'script>\n';
   body += '<script src="' + nodeUrl + '/v1/libs/aimeat-ai.js"></' + 'script>\n';

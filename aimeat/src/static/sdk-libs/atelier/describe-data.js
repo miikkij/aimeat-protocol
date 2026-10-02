@@ -21,7 +21,7 @@ export const PARTS = {
     file: "members.js",
   },
   "aiChat": {
-    parts: ["root","title","sample","hint","notice","signIn","chatNotice","log","empty","turn","who","question","aiLabel","body","meta","model","made","truncated","failure","form","field","label","input","bar","send","clear","reason","status"],
+    parts: ["root","title","sample","hint","notice","signIn","settings","chatNotice","log","empty","turn","who","question","aiLabel","body","meta","model","made","truncated","failure","form","field","label","input","bar","send","clear","reason","status"],
     slots: [],
     variants: ["compact"],
     tokens: ["--ak-ai-width"],
@@ -29,7 +29,7 @@ export const PARTS = {
     file: "ai-chat.js",
   },
   "aiTask": {
-    parts: ["root","title","sample","hint","notice","signIn","field","label","input","reason","bar","run","status","failure","result","aiLabel","body","meta","model","made","cost","truncated","copyRoute","copyTitle"],
+    parts: ["root","title","sample","hint","notice","signIn","settings","field","label","input","reason","bar","run","status","failure","result","aiLabel","body","meta","model","made","cost","truncated","copyRoute","copyTitle"],
     slots: [],
     variants: ["compact"],
     tokens: ["--ak-ai-width"],

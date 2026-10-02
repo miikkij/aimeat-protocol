@@ -17,6 +17,8 @@
  *     PUT  /v1/ai/policy       — owner: apply; agent: propose, then confirm with confirm_token
  *     GET  /v1/ai/recommended  — the node's recommended models per capability
  * @version-history
+ *   v1.2.0 — 2026-10-02 — aiCallerOf carries the request's language, so an AI refusal's `fix` is in
+ *     the person's language.
  *   v1.1.0 — 2026-09-28 — System 2 plan, V5: aiCallerOf names the owner's chat agent `chat`, and GET
  *     /v1/ai/policy answers applies_to_caller from the chat switch for it.
  *   v1.0.0 — 2026-09-28 — Initial (V2 of the System 2 plan).
@@ -35,6 +37,8 @@ import { AiCompletionError } from '../services/ai/errors.js';
 import { policyView, recommendedModelsOf, setOwnerAiPolicy } from '../services/ai/policy-store.js';
 import type { CallerClass } from '../services/ai/policy.js';
 import { CHAT_AGENT_NAME } from '../services/chat-agent.js';
+import { detectLocale, localeFromCookie } from '../i18n.js';
+import type { RequestLanguage } from '../services/ai/ai-fix-words.js';
 
 /** The scope an agent needs to propose a change to its owner's policy. Outside the `*` bundle. */
 const POLICY_WRITE_SCOPE = 'memory:write-reserved';
@@ -46,13 +50,26 @@ const POLICY_WRITE_SCOPE = 'memory:write-reserved';
  * The owner's built-in chat agent (`chat#<owner>@<node>`, services/chat-agent.ts) is `chat`, so the
  * switch "the node's chat" covers its model calls: on the node route they arrive at /v1/llm with that
  * agent's token (System 2 plan, V5). The name is read from the verified principal, never a body field.
+ *
+ * `lang` is the request's word on the person's language (the interface's cookie, the browser's
+ * Accept-Language), for the sentence a refusal carries (services/ai/ai-fix-words.ts).
  */
-export function aiCallerOf(req: Request, nodeId: string): { caller: CallerClass; verifiedApp?: string } {
+export function aiCallerOf(req: Request, nodeId: string): { caller: CallerClass; verifiedApp?: string; lang?: RequestLanguage } {
   const auth = req.auth!;
-  if (auth.roles.includes('app') && auth.app) return { caller: 'app', verifiedApp: auth.app };
+  const lang = requestLanguageOf(req);
+  const withLang = lang ? { lang } : {};
+  if (auth.roles.includes('app') && auth.app) return { caller: 'app', verifiedApp: auth.app, ...withLang };
   const { agent } = aiPayerOf(resolveIdentity(auth, nodeId));
-  if (agent === CHAT_AGENT_NAME) return { caller: 'chat' };
-  return { caller: agent ? 'agent' : 'owner' };
+  if (agent === CHAT_AGENT_NAME) return { caller: 'chat', ...withLang };
+  return { caller: agent ? 'agent' : 'owner', ...withLang };
+}
+
+/** What the request says about the person's language, or undefined when it says nothing. */
+function requestLanguageOf(req: Request): RequestLanguage | undefined {
+  const chosen = localeFromCookie(req.headers?.cookie);
+  const browser = req.headers?.['accept-language'];
+  if (!chosen && !browser) return undefined;
+  return { ...(chosen ? { chosen } : {}), ...(browser ? { browser: detectLocale(browser) } : {}) };
 }
 
 export function aiPolicyRouter(config: AimeatConfig, storage: Storage): Router {

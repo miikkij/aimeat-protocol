@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Time, tab-navigation, and number/byte format helpers. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-10-02 — syncTabHistory's mount reflection keeps `open` and `test`, so a link into a
+ *     tab still names its target when the tab loads after the address was rewritten.
  *   v1.0.0 — 2026-07-13 — Extracted from views/profile/landing-page.js (max-file-lines)
  */
 import { date as fmtDate, time as fmtTime, dateTime as fmtDateTime, sameDay, ago } from '/js/format.js';
@@ -61,10 +63,17 @@ export function gotoOrganismsList() {
  * Back button moves between tabs (and Home) INSIDE the profile instead of leaving
  * /v1/profile entirely. Tab navigation is internal (no SPA route change), so without
  * this a Back press popped straight out of the profile. `replace` is used on mount to
- * reflect a restored tab without adding a spurious entry. */
+ * reflect a restored tab without adding a spurious entry; it keeps the link's `open` and `test`
+ * (a link into a tab, such as the AI page's settingsUrl), which the tab reads once it has loaded. */
 export function syncTabHistory(tabId, replace) {
   try {
-    const path = tabId ? `/v1/profile?tab=${encodeURIComponent(tabId)}` : '/v1/profile';
+    const q = new URLSearchParams(tabId ? { tab: tabId } : {});
+    if (replace) {
+      const here = new URLSearchParams(window.location.search);
+      for (const k of ['open', 'test']) if (here.get(k)) q.set(k, here.get(k));
+    }
+    const qs = q.toString();
+    const path = qs ? `/v1/profile?${qs}` : '/v1/profile';
     const state = { aimeatTab: tabId || null };
     if (replace) history.replaceState(state, '', path);
     else history.pushState(state, '', path);

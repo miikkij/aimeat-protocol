@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.23.1 -- 2026-10-02 -- diagnose-a-workflow: an AI refusal carries `fix` and `settingsUrl` for
+ *     the owner.
  *   v1.23.0 -- 2026-10-02 -- add-a-crew-agent: aimeat_crew_llm_set's {kind:"node"} choice and the
  *     rules a pinned model is held to; an agent's own runtime report needs no agent:write either.
  *   v1.22.1 -- 2026-10-02 -- add-a-crew-agent: a crew agent needs memory:write and no agent:write;
@@ -633,8 +635,10 @@ metadata:
    owner's routing sets a ceiling per call that the model's catalogue price exceeds); \`aimeat_ai_providers\`
    shows each provider's health, and \`aimeat_ai_provider_test\` checks one again. A provider that
    failed three times in a row is gone round for five minutes while another can answer, and one
-   whose key was refused waits for the owner's test or a new key. An answer that did come carries
-   \`route\`: when \`fellBack\` is true, the first provider failed and the attempts say why.
+   whose key was refused waits for the owner's test or a new key. The refusal's details carry
+   \`fix\`, the sentence to tell the owner, and \`settingsUrl\`, the link that opens their AI settings
+   at the provider to fix. An answer that did come carries \`route\`: when \`fellBack\` is true, the
+   first provider failed and the attempts say why.
 
 ## Principles
 - Diagnose before touching: collect the evidence from steps 1-4 and present the likely cause.

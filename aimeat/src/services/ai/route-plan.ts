@@ -31,6 +31,9 @@
  * @structure
  *   ChosenBy · AiCandidate · RejectedCandidate · RoutePlanInput · planRoute · refusalFor
  * @version-history
+ *   v1.6.0 — 2026-10-02 — A rejected candidate carries the provider's title, so the person's sentence
+ *     can name it; the refusal's AI-facing fix is `agentFix`, and `fix` is the person's
+ *     (ai-fix-words.ts, added where prepareAiCall refuses).
  *   v1.5.0 — 2026-09-28 — `minContext`: a model the catalogue says reads less than an app's role needs
  *     is passed over (reason 'too-small'), the call side of roles-fit.ts.
  *   v1.4.0 — 2026-09-28 — A role's order (`roleOrder`, chosenBy 'role'): the owner's explicit choice, so
@@ -86,6 +89,8 @@ export type RejectReason =
 
 export interface RejectedCandidate {
   provider: string;
+  /** The provider's name as the owner gave it, for a sentence that names it. */
+  title?: string;
   model?: string;
   reason: RejectReason;
   message: string;
@@ -294,7 +299,7 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
   const candidates: AiCandidate[] = [];
   const rejected: RejectedCandidate[] = [];
   const reject = (p: AiProvider, reason: RejectReason, message: string, extra: Partial<RejectedCandidate> = {}) =>
-    rejected.push({ provider: p.id, reason, message, ...extra });
+    rejected.push({ provider: p.id, title: p.title, reason, message, ...extra });
   let allowance: { remainingUsd: number } | null = null;
   const deferred: Array<{ candidate: AiCandidate; message: string }> = [];
 
@@ -476,8 +481,8 @@ export function refusalFor(plan: RoutePlan, op: AiOp, capability: AiCapability, 
     `No provider can answer this ${capability} call now. ${plan.rejected.map(r => r.message).join(' ')}`,
     {
       capability,
-      rejected: plan.rejected.map(r => ({ provider: r.provider, reason: r.reason, message: r.message })),
-      fix: 'Set up or test a provider for this capability, or name a provider or model in the call.',
+      rejected: plan.rejected.map(r => ({ provider: r.provider, ...(r.title ? { title: r.title } : {}), reason: r.reason, message: r.message })),
+      agentFix: 'Set up or test a provider for this capability, or name a provider or model in the call.',
       next: { description: 'List your AI providers', method: 'GET', url: '/v1/ai/providers' },
     });
 }

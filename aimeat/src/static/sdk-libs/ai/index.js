@@ -13,6 +13,8 @@
  *   const caps = await AIMEAT.ai.capabilities({ app_id });
  *   if (caps.capabilities.text.on) { const r = await AIMEAT.ai.complete({ prompt, app_id }); }
  * @version-history
+ *   v1.8.0 - 2026-10-02 - The capability that is off and the refused call both carry the person's
+ *     sentence (`fix`) and `settingsUrl`; the docs say to show both (call.js aiError lifts them).
  *   v1.7.0 - 2026-09-28 - AI roles: complete(), stream(), image(), speak(), transcribe(), embed() and
  *     job.start() send `role`; roles() reads GET /v1/ai/roles.
  *   v1.6.0 - 2026-09-28 - System 2 plan, V5. capabilities() says per capability whether it is on
@@ -123,12 +125,15 @@ function conform(parsed, want) {
 const ai = {
   /**
    * What the person's AI can do for this app, per capability (text, vision, files, image, speech,
-   * transcription, embed): { on, model, price, ... } when on, { on: false, reason, fix } when off.
-   * Ask this before showing a button that needs a capability, and show `fix` when it is off.
+   * transcription, embed): { on, model, price, ... } when on, { on: false, reason, fix, settingsUrl }
+   * when off. Ask this before showing a button that needs a capability; when it is off, show `fix`
+   * (the person's sentence, in their language) and a link to `settingsUrl` (their AI settings, opened
+   * where the fix is). A refused call's error carries the same as err.fix and err.settingsUrl.
    * Cached 60 seconds per app_id.
    *
    *   const caps = await AIMEAT.ai.capabilities({ app_id: 'my-app' });
-   *   if (!caps.capabilities.image.on) notice.textContent = caps.capabilities.image.fix;
+   *   const img = caps.capabilities.image;
+   *   if (!img.on) { notice.textContent = img.fix; link.href = img.settingsUrl; }
    */
   capabilities,
 
