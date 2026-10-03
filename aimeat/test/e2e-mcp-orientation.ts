@@ -17,6 +17,8 @@
  *       share their group, and prompts/get returns a body with the node values already filled.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-mcp-orientation.ts
  * @version-history
+ *   2026-10-03 — Test 2 bounds the END of the agent surface line by the measured cut (2 052); the
+ *     core alone now runs past the old start bound of 1 900.
  *   2026-10-02 — 17l/17m: the setting explanations (tier "settings"), on MCP and REST, in three languages.
  *   2026-10-01 — 17j/17k: the feature map in parts (tier "features"), on MCP and REST, and the
  *     handbook's screen-only list.
@@ -251,10 +253,14 @@ async function main() {
             // Until 2026-09-18 the surface line came first. Several clients cut the instructions at
             // about 2 kB, so what an agent acts on now leads and the surface line follows it; both
             // still arrive inside the part a cutting client shows.
+            // The bound is where a client was measured to cut (2 052), applied to the END of the line:
+            // the core alone now runs past 1 900, so a start bound of 1 900 could no longer hold.
             const core = instructions.indexOf('aimeat_handbook_get first');
-            const surface = instructions.indexOf('This interface is the owner');
+            const line = "This interface is the owner's own agent: their memory, tasks, messages, knowledge and discovery.";
+            const surface = instructions.indexOf(line);
             assert(core >= 0 && core < 400, `the way in leads, at ${core}`);
-            assert(surface > core && surface < 1900, `the agent surface still introduces itself, at ${surface}`);
+            assert(surface > core && surface + line.length <= 2052,
+                `the agent surface still introduces itself inside the cut, from ${surface} to ${surface + line.length}`);
         });
 
         // ── Phase 2: the address a person can open ──

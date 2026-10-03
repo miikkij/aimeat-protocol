@@ -25686,7 +25686,7 @@
           }
           say(out, tb("verbs.sending"));
           const poster = adapters.submit || async function(u, body) {
-            const res = await fetch(u, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+            const res = await fetch(u, { method: "POST", credentials: "omit", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
             const got = await res.json().catch(function() {
               return {};
             });

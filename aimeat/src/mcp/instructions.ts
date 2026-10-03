@@ -15,7 +15,10 @@
  *   import { instructionsFor } from './instructions.js';
  *   new McpServer({ name, version }, { capabilities, instructions: instructionsFor(role, { guidance }) });
  * @version-history
- *   v1.7.0 — 2026-10-02 — The `chat` surface: its line says the tool list starts small and that
+ *   v1.7.1 — 2026-10-03 — The surface line comes before the new-agent paragraph again. Behind it,
+ *     the line started at 2 154 on /v2/mcp/agent, past the measured cut at 2 052; in front, it starts
+ *     at 1 922 and ends inside it. Order only; no sentence changed.
+ *   v1.7.0 — 2026-10-02 —The `chat` surface: its line says the tool list starts small and that
  *     aimeat_tools_find adds what the job needs. It carries the new-agent paragraph and the keep
  *     sentence, as the owner's own agent.
  *   v1.6.0 — 2026-10-02 — A request for a new agent is a proposal on this node, built on the
@@ -75,9 +78,9 @@ const KEEP_SENTENCE = ' When they say one turned out well, record it: aimeat_des
  * Only the surfaces that reach aimeat_agent_propose carry it (primitives through aimeat_invoke).
  *
  * AFTER CORE, NOT IN IT. CORE had about 25 characters left under INSTRUCTIONS_CUT_AT on /v1/mcp,
- * and every sentence in it is one a test holds inside the cut. So this sits right after the core
- * and the support line, ahead of the long form: a client that cuts at about 2 kB may lose it, and
- * the handbook and the tool's own description carry the same rule for that client.
+ * and every sentence in it is one a test holds inside the cut. So this sits after the core, the
+ * support line and the surface line, ahead of the long form: a client that cuts at about 2 kB may
+ * lose it, and the handbook and the tool's own description carry the same rule for that client.
  */
 const AGENT_PARAGRAPH = 'When the person asks for a new agent, read the organisms and workspaces it will work on, propose it with aimeat_agent_propose, and give them the approval address from the answer. This node makes and runs the agent, so never send them to build one elsewhere.';
 const PROPOSING_ROLES: ReadonlySet<SurfaceRole | 'all'> = new Set(['all', 'full', 'agent', 'admin', 'primitives', 'chat']);
@@ -182,8 +185,12 @@ export function instructionsFor(role: SurfaceRole | 'all', opts: InstructionsOpt
     if (answeredBy) {
         parts.push(`Support here is answered by ${answeredBy}, who run this node. Write to \`support@operators\` exactly as you would anywhere; it reaches them.`);
     }
-    if (PROPOSING_ROLES.has(role)) parts.push(AGENT_PARAGRAPH);
+    // The surface line before the new-agent paragraph: it is short, it says which interface this is,
+    // and after CORE it still ends inside the cut a client was measured at (2 052). The paragraph
+    // in front of it pushed it to 2 154 on /v2/mcp/agent; the paragraph's rule is in the handbook
+    // and the tool's own description for a client that cuts it.
     if (role !== 'all') parts.push(SURFACE_INTROS[role]);
+    if (PROPOSING_ROLES.has(role)) parts.push(AGENT_PARAGRAPH);
     parts.push(DETAIL);
 
     const guidance = opts.proactiveGuidance?.trim();
