@@ -20,7 +20,9 @@
  *   technical definition stays as it is, for builders.
  * @usage app.use(glossaryRouter(config));
  * @version-history
- *   v1.1.0 — 2026-10-03 — ?lang= and `plain` on every term a person meets, `label` on every area,
+ *   v1.1.1 — 2026-10-03 — The translator is found by comparing the locale, not by using the request's
+ *     value as a key (CodeQL alert 1698).
+ *   v1.1.0 — 2026-10-03 —?lang= and `plain` on every term a person meets, `label` on every area,
  *     and the plain sentence in the markdown (guidance for normal people, part C).
  *   v1.0.0 — 2026-07-28 — Initial (agent-readability phase 06)
  */
@@ -32,12 +34,19 @@ import { sendMarkdown } from '../services/markdown-negotiation.js';
 import { success, error } from '../middleware/envelope.js';
 import { LOCALES, createT, toLocale, type Locale, type TFunction } from '../i18n.js';
 
-/** One translator per locale, made once: createT falls back to English per key. */
-const T = Object.fromEntries(LOCALES.map((l) => [l, createT(l)])) as Record<Locale, TFunction>;
+/**
+ * One translator per locale, made once: createT falls back to English per key. Found by comparing the
+ * locale, never by using the request's ?lang= as a key: an object indexed by it reaches whatever that
+ * key names, its prototype included (CodeQL js/unvalidated-dynamic-method-call, alert 1698; toLocale
+ * already narrows the value, and this does not rely on it).
+ */
+const TRANSLATORS: ReadonlyArray<{ locale: Locale; t: TFunction }> = LOCALES.map((l) => ({ locale: l, t: createT(l) }));
+const EN = createT('en');
 
 /** A locale string, or undefined when no locale carries the key (createT returns the key itself). */
 function localeText(locale: Locale, key: string): string | undefined {
-  const v = T[locale](key);
+  const translate = TRANSLATORS.find((x) => x.locale === locale)?.t ?? EN;
+  const v = translate(key);
   return v === key ? undefined : v;
 }
 
