@@ -5,6 +5,8 @@
  *   plus the /v1/libs catalogue and the generated JS sources themselves.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=libs
  * @version-history
+ *   v1.13.2 — 2026-10-03 — Atelier's boundary also names /v1/themes/fonts.css, exactly once: the
+ *     kit links the added faces' sheet when a look names one (0.65.1, atelier/added-faces.js).
  *   v1.13.1 — 2026-10-03 — Atelier's network boundary names five calls: the card verbs' submit
  *     (0.64.0) joins the four, and it must send no cookie.
  *   v1.13.0 — 2026-09-28 —The workbench: its seven pieces asserted as exports, workbench.css
@@ -1208,7 +1210,10 @@ await test('GET /v1/libs/aimeat-atelier.js — one named network call, and no ha
     // the card verbs): `submit` posts a card's fields to the address the card names, with no
     // session and no cookie (credentials: 'omit'), as a public form would. Everything else still
     // renders what the host supplies, so the assertion stays "exactly these", never "some calls
-    // are fine now".
+    // are fine now". Since 2026-10-03 (0.65.1, the font manager) the kit also LINKS one
+    // stylesheet, not a fetch: /v1/themes/fonts.css of the app's own origin, and only when the
+    // look names a face the operator added (atelier/added-faces.js). It is the one other node
+    // path the bundle may name.
     const fetches = code.match(/\bfetch\s*\(/g) || [];
     assert(fetches.length === 5,
         `exactly five matched calls — layout, atlas geometry, legal surface, session relay, card submit — found ${fetches.length}`);
@@ -1218,10 +1223,13 @@ await test('GET /v1/libs/aimeat-atelier.js — one named network call, and no ha
     assert((code.match(/session\.fetch\s*\(/g) || []).length === 1,
         'exactly one call is the session relay, and the kit itself holds no credential');
     assert(!/XMLHttpRequest|EventSource|WebSocket/.test(code), 'must not open any other transport');
-    // Every API-path reference is the layout read and nothing else.
+    // Every API-path reference is the layout read, and the added faces' sheet once.
     const paths = code.match(/\/v1\/[a-z-]+/g) || [];
-    assert(paths.length > 0 && paths.every((p) => p === '/v1/apps'),
-        `the only node API path is the layout read under /v1/apps — found: ${[...new Set(paths)].join(', ')}`);
+    assert(paths.length > 0 && paths.every((p) => p === '/v1/apps' || p === '/v1/themes'),
+        `the only node API paths are the layout read under /v1/apps and the added faces' sheet — found: ${[...new Set(paths)].join(', ')}`);
+    const themePaths = code.match(/\/v1\/themes[^"'`\s]*/g) || [];
+    assert(themePaths.length === 1 && themePaths[0] === '/v1/themes/fonts.css',
+        `the one /v1/themes path is the added faces' sheet — found: ${themePaths.join(', ')}`);
     // `/ui` and whatever follows it in the same string: the read asks for the arrangement alone
     // now (`/ui?catalogue=none`), so the path stopped being a string of its own. What is asserted
     // is still the same thing — the one API call goes to the layout record.

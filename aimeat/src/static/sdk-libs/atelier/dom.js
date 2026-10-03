@@ -26,6 +26,8 @@
  *   on <html> win over the kit's own :root values (aimeat-atelier.css). Inside an app frame the
  *   frame's own look still wins.
  * @version-history
+ *   v0.65.1 — 2026-10-03 — injectStyle arms added-faces.js: once the kit's stylesheet has loaded, a
+ *     look that names a face the operator added to the node gets /v1/themes/fonts.css linked once.
  *   v0.62.0 — 2026-10-02 — wearLook reads the page's own look, data-ak-look on <body> or <html>,
  *     after the element the layer came from and the app frame, so a page with kit blocks and no app
  *     frame dresses the members block's confirm dialog, the toasts and the menus in its look
@@ -56,6 +58,7 @@
  *     look's curve shapes its entrance and not only its transitions.
  *   v0.1.0 — 2026-08-27 — Initial (TARGET-074 phase 1, slice 1).
  */
+import { loadAddedFaces } from './added-faces.js';
 
 /**
  * The look a layer outside the app frame wears. The kit appends a dialog, a menu, a toast, a drawer
@@ -301,6 +304,8 @@ export function injectStyle(opts) {
     link.href = o.href || '/lib/aimeat-atelier.css';
     head.insertBefore(link, head.firstChild);
   }
+  // A look that names a face the operator added to the node gets that face's sheet, once.
+  loadAddedFaces(link);
   let style = /** @type {HTMLStyleElement|null} */ (document.getElementById('ak-style-extra'));
   if (o.extraCss) {
     if (!style) {
