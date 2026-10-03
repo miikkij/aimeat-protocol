@@ -11,6 +11,7 @@
  *   v1.1.0 — 2026-07-16 — listStorageFilesForOwners batch primitive.
  *   v1.2.0 — 2026-08-15 — TARGET-063: getStorageFileMeta and readStorageFileRange (database-side
  *     substring), and the UTF-8 verdict settled on write.
+ *   v1.3.0 — 2026-10-03 — listFontFilesAcrossOwners: font files of every owner, one bounded query.
  */
 import { sql } from 'kysely';
 import type { ChunkedUploadRecord, StorageFileRecord } from '../../../interface.js';
@@ -104,6 +105,26 @@ export const fileMethods = {
       .select([sql<number>`coalesce(sum(size),0)`.as('bytes'), sql<number>`count(*)`.as('count')])
       .where('ownerGaii', 'in', ownerGaiis).executeTakeFirst();
     return { bytes: Number(r?.bytes ?? 0), count: Number(r?.count ?? 0) };
+  },
+
+  async listFontFilesAcrossOwners(this: PostgresKyselyStorage, opts: { limit: number; excludeOwner?: string }): Promise<{ total: number; items: StorageFileRecord[] }> {
+    // One statement: the rows and, by a window count, how many matched. `data` is not selected, so
+    // no bytea is read. The test for a font is the SQLite provider's (methods/storage-files.ts).
+    const rows = await this.db.selectFrom('StorageFile')
+      .select(['key', 'ownerGaii', 'visibility', 'groupId', 'workspaceRef', 'mimeType', 'size', 'tags', 'federate', 'createdAt', sql<string>`count(*) over ()`.as('total')])
+      .where('ownerGaii', '!=', opts.excludeOwner ?? '')
+      .where(sql<boolean>`(lower("mimeType") like 'font/%' or lower("mimeType") like 'application/font%' or lower("mimeType") like 'application/x-font%'
+        or lower("key") like '%.woff2' or lower("key") like '%.woff' or lower("key") like '%.ttf' or lower("key") like '%.otf')`)
+      .orderBy('createdAt', 'desc').limit(Math.max(0, Math.floor(opts.limit))).execute();
+    return {
+      total: rows.length ? Number(rows[0].total) : 0,
+      items: rows.map(r => ({
+        key: r.key, ownerGaii: r.ownerGaii, visibility: r.visibility as StorageFileRecord['visibility'],
+        groupId: r.groupId ?? undefined, workspaceRef: r.workspaceRef ?? undefined, mimeType: r.mimeType,
+        size: r.size, data: Buffer.alloc(0), tags: r.tags || [], federate: r.federate ?? false,
+        createdAt: (r.createdAt instanceof Date ? r.createdAt : new Date(r.createdAt)).toISOString(),
+      })),
+    };
   },
 
   async deleteStorageFile(this: PostgresKyselyStorage, ownerGaii: string, key: string): Promise<boolean> {

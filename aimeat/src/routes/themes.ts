@@ -22,12 +22,23 @@
  *   GET  /v1/themes/:id/versions                  operator: the saved versions
  *   POST /v1/themes/:id/versions/:version/restore operator: put one back
  *
+ *   The font manager (services/themes/fonts.ts):
+ *   GET  /v1/themes/fonts                         public: every face, base and added, its licence trail
+ *                                                 and the styles using it; the operator also gets the
+ *                                                 fonts in owners' storage
+ *   GET  /v1/themes/fonts.css                     public: the @font-face rules of the added faces
+ *   GET  /v1/themes/fonts/:family/:file           public: one face file, font/woff2
+ *   PUT  /v1/themes/fonts/:family                 operator: add or replace a face; one upload_url per file
+ *   DELETE /v1/themes/fonts/:family               operator: remove an added face (refused while in use)
+ *
  *   Reading is public: a theme is CSS every visitor of AIMEAT's own pages downloads anyway. Writing
  *   goes through requireOperatorPrincipal with site:theme-write (Jouni: only the operator edits), so
  *   the operator's own agent can make and repair a theme from a chat.
  * @structure themesRouter(config, storage, requireNotLb?, provenance?)
  * @usage router.use(themesRouter(config, storage, requireNotLb));  (mounted by routes/site.ts)
  * @version-history
+ *   v2.1.0 — 2026-10-03 — The font manager's five routes; /v1/themes/all carries `fonts`, the
+ *     operator's view for the operator.
  *   v2.0.0 — 2026-09-24 — The two-level model of 07: styles, component CSS, versions, previews,
  *     warnings instead of refusals, a sheet per theme.
  *   v1.0.0 — 2026-09-24 — Initial (one level).
@@ -40,6 +51,7 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { THEME_WRITE_SCOPE } from '../utils/scope-coverage.js';
 import { ThemeService, ThemeError, type ThemeInput, type Theme } from '../services/themes/service.js';
+import { FontError, type FontInput } from '../services/themes/fonts.js';
 import type { StyleInput } from '../services/themes/styles.js';
 import type { ConfigProvenance } from '../services/config-provenance.js';
 import { requireOwnerSession } from './home/welcome-mat.js';
@@ -54,16 +66,19 @@ export function themesRouter(config: AimeatConfig, storage: Storage, requireNotL
     // The SPA shell reads the snapshot synchronously before its first paint (portal-spa.ts): build it
     // now, and again whenever the operator changes a setting (a theme write refreshes it itself).
     const refresh = () => { svc.offered().catch((e) => console.warn('[themes] snapshot:', e instanceof Error ? e.message : e)); };
-    refresh();
+    // The faces the operator added, into this process's registry before the first page asks for one.
+    svc.fonts.load().catch((e) => console.warn('[themes] fonts:', e instanceof Error ? e.message : e)).finally(refresh);
     onChangeEvent((evt) => { if (evt.domain === 'config') refresh(); });
 
     function sendError(res: Parameters<RequestHandler>[1], err: unknown): void {
-        if (err instanceof ThemeError) {
+        if (err instanceof ThemeError || err instanceof FontError) {
             res.status(err.httpStatus).json(error(config.nodeId, err.code, err.message, err.httpStatus, err.details));
             return;
         }
         throw err;
     }
+    /** Whether the principal of this request runs this node (the operator's view of the inventory). */
+    const isOperator = async (req: Parameters<RequestHandler>[0]) => !!req.auth && await svc.callerIsOperator(req.auth);
     const by = (req: Parameters<RequestHandler>[0]) => resolveIdentity(req.auth!, config.nodeId);
     const dry = (req: Parameters<RequestHandler>[0]) => req.query.dryRun === '1' || (req.body ?? {}).dryRun === true;
 
@@ -74,7 +89,55 @@ export function themesRouter(config: AimeatConfig, storage: Storage, requireNotL
     });
 
     router.get('/v1/themes/all', async (req, res) => {
-        try { res.json(success(config.nodeId, await svc.catalogue(req.query.summary === '1' || req.query.summary === 'true'))); } catch (err) { sendError(res, err); }
+        try { res.json(success(config.nodeId, await svc.catalogue(req.query.summary === '1' || req.query.summary === 'true', await isOperator(req)))); } catch (err) { sendError(res, err); }
+    });
+
+    // ── The font manager (services/themes/fonts.ts). Before /v1/themes/:id, or "fonts" would be read
+    // as a theme id. Reading is public, as a theme's sheet is; writing is the operator's.
+
+    router.get('/v1/themes/fonts', async (req, res) => {
+        try {
+            res.json(success(config.nodeId, await svc.fonts.inventory({ operator: await isOperator(req) }), [
+                { description: 'The @font-face rules of the added faces', method: 'GET', url: '/v1/themes/fonts.css' },
+                { description: 'Add or replace a face (operator)', method: 'PUT', url: '/v1/themes/fonts/{family}' },
+            ]));
+        } catch (err) { sendError(res, err); }
+    });
+
+    router.get('/v1/themes/fonts.css', (req, res) => {
+        const { css, etag } = svc.fonts.sheet();
+        res.setHeader('ETag', etag);
+        // The shell links it with ?v=<hash>, so a change reaches the next page load; the plain
+        // address stays short-lived, as a theme's sheet does.
+        res.setHeader('Cache-Control', 'public, max-age=60');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        if (req.headers['if-none-match'] === etag) { res.status(304).end(); return; }
+        res.type('text/css; charset=utf-8').send(css);
+    });
+
+    router.get('/v1/themes/fonts/:family/:file', async (req, res) => {
+        try {
+            const found = await svc.fonts.file(String(req.params.family), String(req.params.file));
+            if (!found) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such face file on this node.')); return; }
+            // The address carries ?v=<digest>, and a new upload gets a new one, so the bytes never change under it.
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+            res.setHeader('ETag', `"${found.sha256.slice(0, 16)}"`);
+            // An app on its own origin loads the face from here; the font fetch is CORS-gated.
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.type('font/woff2').send(found.data);
+        } catch (err) { sendError(res, err); }
+    });
+
+    router.put('/v1/themes/fonts/:family', ...operator, ...notLb, async (req, res) => {
+        try {
+            const r = await svc.fonts.save(String(req.params.family), (req.body ?? {}) as FontInput, by(req));
+            res.status(r.created ? 201 : 200).json(success(config.nodeId, { font: r.font, uploads: r.uploads },
+                [{ description: 'PUT each file\'s woff2 bytes to its upload_url', method: 'PUT', url: '/v1/upload/{token}' }]));
+        } catch (err) { sendError(res, err); }
+    });
+
+    router.delete('/v1/themes/fonts/:family', ...operator, ...notLb, async (req, res) => {
+        try { res.json(success(config.nodeId, await svc.fonts.remove(String(req.params.family)))); } catch (err) { sendError(res, err); }
     });
 
     router.get('/v1/themes/choice', requireAuth(), requireRole('owner'), requireOwnerSession(config.nodeId), async (req, res) => {

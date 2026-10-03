@@ -35,10 +35,13 @@
  *   const report = await buildComplianceReport(storage, config, { sinceDays: 30 });
  *   res.json(success(config.nodeId, report));
  * @version-history
+ *   v1.1.0 — 2026-10-03 — Gap kind font-licence-unknown: a face the operator added without a licence
+ *     or a copyright holder (the font manager, services/themes/fonts.ts), in the node-wide report.
  *   v1.0.0 — 2026-08-23 — BR-02, ring 1 (node-wide).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import { FontService } from './themes/fonts.js';
 import {
   buildAiTransparencyReport, listUnlabelledPublic, DEFAULT_TREND_DAYS,
   type AiTransparencyReport,
@@ -80,7 +83,8 @@ export interface ComplianceGap {
     | 'undocumented-ai-activity'
     | 'unclassified-usecase'
     | 'unlabelled-public-content'
-    | 'app-declares-generation-with-gap';
+    | 'app-declares-generation-with-gap'
+    | 'font-licence-unknown';
   /** One sentence a person can act on, without needing the vocabulary of this file. */
   detail: string;
   /** What in the data says so — a model id, a filename, a count. Never a guess. */
@@ -426,6 +430,16 @@ export async function buildComplianceReport(
   const visible = owner ? rawUseCases.filter(uc => !uc.ownerGhii || uc.ownerGhii === owner) : rawUseCases;
   const usecases = visible.map(uc => ({ ...uc, risk: classifyUseCase(uc, questionnaire) }));
 
+  // A face the operator added without a licence or a copyright holder (the font manager). The node
+  // serves it, so it is the installation's, and only the operator's report carries it.
+  const fontGaps: ComplianceGap[] = owner ? [] : (await new FontService(config, storage, async () => []).records())
+    .filter(f => f.licenceStatus === 'unknown')
+    .map(f => ({
+      kind: 'font-licence-unknown' as const,
+      detail: `The face "${f.family}" was added to this node without ${!f.licence && !f.copyright ? 'a licence or a copyright holder' : !f.licence ? 'a licence' : 'a copyright holder'}, so nobody can say it was lawfully obtained.`,
+      evidence: { family: f.family, added_by: f.addedBy, added_at: f.addedAt, licence: f.licence, copyright: f.copyright, source: f.source },
+    }));
+
   return {
     scope: {
       node_id: config.nodeId,
@@ -440,7 +454,7 @@ export async function buildComplianceReport(
       : notCovered(config, transparency.scope.note),
     derived: { ai_transparency: transparency, ai_usage: usage, consent },
     register: { usecases, questionnaire },
-    gaps: findGaps(usecases, usage, transparency),
+    gaps: [...findGaps(usecases, usage, transparency), ...fontGaps],
   };
 }
 

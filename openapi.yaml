@@ -22091,7 +22091,8 @@ paths:
             `served_marks_note` when the body was a served copy. A cortex ZIP under the name of a
             cortex the uploader installed replaces it the way PUT /v1/cortex/{name} does: an active
             one is taken down and activated again from the new manifest, and `status` says it is
-            active.
+            active. A font upload (an address from PUT /v1/themes/fonts/{family}) answers with
+            `ok`, `family`, `file`, `bytes`, `sha256` and `url`, the address the face file is served at.
           content:
             application/json:
               schema:
@@ -22102,7 +22103,7 @@ paths:
                     example: true
                   type:
                     type: string
-                    enum: [app, storage, extension, cortex]
+                    enum: [app, storage, extension, cortex, skill, font]
                 additionalProperties: true
         '400':
           description: |
@@ -22130,7 +22131,8 @@ paths:
             `ODPS_FIELD_TOO_LONG` (extension uploads): an action flagged for EXCHANGE has changed text that
             would publish an ODPS document past a schema maxLength. Nothing was installed. The body is
             `{ success: false, error, message, details }`, with `details` in the shape
-            components/responses/OdpsFieldTooLong describes.
+            components/responses/OdpsFieldTooLong describes. `NOT_WOFF2` (font uploads): the bytes
+            do not begin with the woff2 signature wOF2; nothing was stored.
         '413':
           description: |
             `FILE_TOO_LARGE` — the body exceeds the per-file size limit encoded in the token, or
@@ -40693,7 +40695,9 @@ paths:
         warnings; the operator's choices; and what a style may set (the colour tokens, the faces
         the node serves, each component's hooks) and what a theme may set (`vocabulary.shapes`: each
         shape value, what it is for, and the built-in value). `summary=1` gives each style its core colours
-        only. No authentication: other admins read what only the operator may change.
+        only. `fonts` is the font manager's inventory, as GET /v1/themes/fonts answers it (the
+        owners' fonts in storage only when the caller is the operator). No authentication: other
+        admins read what only the operator may change.
       tags: [Site]
       security: []
       parameters:
@@ -40714,9 +40718,180 @@ paths:
                       data:
                         type: object
                         properties:
+                          fonts: { type: object, additionalProperties: true }
                           policy: { type: object, additionalProperties: true }
                           themes: { type: array, items: { type: object, additionalProperties: true } }
                           vocabulary: { type: object, additionalProperties: true }
+
+  /v1/themes/fonts:
+    get:
+      operationId: listThemeFonts
+      summary: Every face this node serves, base and added, with its licence trail
+      description: |
+        The font manager's inventory. `base` is every face this node ships with (free licences):
+        its stack, weights and styles, licence, copyright holder, source and version from
+        /lib/fonts/LICENSE.md, and the theme styles that use it. `added` is every face the operator
+        added to the running node, never base setup: the same, plus `addedBy`, `addedAt`, its files
+        (each `uploaded` or not), `servable` (a file has arrived, so a style may choose it) and
+        `licenceStatus`, which is `unknown` when the licence or the copyright holder is missing.
+        `unknownLicences` names those families. For the operator (in person, or an operator's agent
+        holding site:theme-write) `owners` lists the font files owners keep in their own storage for
+        their apps, newest first, at most 200 with the `total` beside them: an inventory only.
+        Public otherwise, as a theme's stylesheet is.
+      tags: [Site]
+      security: []
+      responses:
+        '200':
+          description: The inventory
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          base: { type: array, items: { type: object, additionalProperties: true } }
+                          added: { type: array, items: { type: object, additionalProperties: true } }
+                          unknownLicences: { type: array, items: { type: string } }
+                          sheet: { type: string, example: /v1/themes/fonts.css }
+                          owners:
+                            type: object
+                            description: Only for the operator.
+                            properties:
+                              total: { type: integer }
+                              shown: { type: integer }
+                              files: { type: array, items: { type: object, additionalProperties: true } }
+                              note: { type: string }
+
+  /v1/themes/fonts.css:
+    get:
+      operationId: getThemeFontsStylesheet
+      summary: The @font-face rules of the faces the operator added
+      description: |
+        One @font-face per arrived file of every added face, pointing at
+        GET /v1/themes/fonts/{family}/{file}?v=<digest>, with `font-display: swap` and the file's
+        `unicode-range` when it has one. The page shell links it as /v1/themes/fonts.css?v=<hash>
+        after /lib/aimeat-theme.css when there is an added face. Answers 304 to a matching
+        If-None-Match; carries Access-Control-Allow-Origin: *.
+      tags: [Site]
+      security: []
+      responses:
+        '200':
+          description: The stylesheet
+          content:
+            text/css:
+              schema: { type: string }
+        '304':
+          description: Unchanged since the ETag the browser holds
+
+  /v1/themes/fonts/{family}/{file}:
+    parameters:
+      - name: family
+        in: path
+        required: true
+        schema: { type: string }
+        description: The family's address, for example space-mono.
+      - name: file
+        in: path
+        required: true
+        schema: { type: string }
+        description: The file's name, for example 400-italic-latin.woff2.
+    get:
+      operationId: getThemeFontFile
+      summary: One file of a face the operator added
+      description: |
+        The woff2 bytes, `font/woff2`, cached for a year (the address carries ?v=<digest>, and a new
+        upload gets a new one), with Access-Control-Allow-Origin: * so an app on its own origin can
+        load it.
+      tags: [Site]
+      security: []
+      responses:
+        '200':
+          description: The file
+          content:
+            font/woff2:
+              schema: { type: string, format: binary }
+        '404':
+          description: No such face file (or the face was removed)
+
+  /v1/themes/fonts/{family}:
+    parameters:
+      - name: family
+        in: path
+        required: true
+        schema: { type: string }
+        description: The family's address or its name ("space-mono" or "Space Mono").
+    put:
+      operationId: saveThemeFont
+      summary: Add or replace a face (operator)
+      description: |
+        Registers a face on the running node, or replaces one the operator added: its name, the
+        generic family it falls back to, the woff2 files it has (each with its weight, style, and
+        for a face in parts a `subset` and its `unicodeRange`) and what is known of its licence.
+        Answers with one presigned `upload_url` per file; PUT the woff2 bytes there
+        (PUT /v1/upload/{token}). A file the family keeps keeps its bytes until a new upload
+        replaces them; a file it no longer lists is deleted. Leave `files` out on a change to keep
+        them. There is no limit on files or families; the one check on the bytes is that they are
+        woff2. Without `licence` or `copyright` the face is `licenceStatus: unknown`, which the
+        Fonts tab, the libraries page and the compliance report show. Only the operator, in person
+        or through an operator's agent holding site:theme-write.
+      tags: [Site]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                family: { type: string, maxLength: 60, description: 'The name a style chooses, for example "Space Mono". Required for a new face.' }
+                kind: { type: string, enum: [sans-serif, serif, monospace, cursive] }
+                files:
+                  type: array
+                  items:
+                    type: object
+                    required: [weight]
+                    properties:
+                      weight: { type: string, example: '400', description: '"400", or "100 900" for a variable face.' }
+                      style: { type: string, enum: [normal, italic] }
+                      subset: { type: string, example: latin-ext }
+                      unicodeRange: { type: string, example: 'U+0000-00FF, U+0131' }
+                licence: { type: string, nullable: true, example: OFL-1.1 }
+                copyright: { type: string, nullable: true }
+                source: { type: string, nullable: true, description: An https:// address. }
+      responses:
+        '200':
+          description: The face was changed; `data.font` and `data.uploads`
+        '201':
+          description: The face was added; `data.font` and `data.uploads` (one upload_url per file)
+        '401':
+          description: Not signed in
+        '403':
+          description: Not the operator
+        '409':
+          description: FAMILY_TAKEN (a base face has that name, or another added face does), or load-balancer mode
+        '422':
+          description: INVALID_FONT, with every refused field named
+    delete:
+      operationId: removeThemeFont
+      summary: Remove a face the operator added (operator)
+      description: |
+        Removes the face and its files. Refused while any style of any theme names it, with the
+        themes and styles named; a theme's CSS that mentions the family is a warning in the answer.
+      tags: [Site]
+      responses:
+        '200':
+          description: Removed; `data.warnings` names theme CSS that mentions it
+        '401':
+          description: Not signed in
+        '403':
+          description: Not the operator
+        '404':
+          description: No such added face
+        '409':
+          description: FONT_IN_USE (with `details.usedBy`), BASE_FACE (a face this node ships with), or load-balancer mode
 
   /v1/themes/choice:
     get:

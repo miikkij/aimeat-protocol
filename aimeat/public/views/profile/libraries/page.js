@@ -7,9 +7,10 @@
  *   gives, the third-party libraries served from this node at a fixed version), each with a filter
  *   row and a search; and the fourth section that says how an AI takes a library into use. What
  *   opens under a row is rows.js. Pure render over the ctx bag.
- * @structure renderPage · shelf · secAI
+ * @structure renderPage · shelf · secFaces · secAI
  * @usage import { renderPage } from './libraries/page.js';
  * @version-history
+ *   v1.19.0 -- 2026-10-03 -- Section 04, Faces: every face this server serves with its licence, an added face marked as added and one with no licence data as a warning (the font manager); the AI section is 05.
  *   v1.18.0 -- 2026-09-26 -- Every part is a kit component (SettingsPage with its crumb, tags, loud copy, strip and rail as data; FigureStrip; Filters; SearchLine; List; More; Box; Facts; Note): the page passes data and writes no class (page group G8).
  *   v1.17.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.16.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -104,14 +105,16 @@ export function renderPage(ctx) {
         { id: 'lb-base', num: '01', label: x('secBase'), count: packs ? base.length : '' },
         { id: 'lb-ui', num: '02', label: x('secUi'), count: packs ? ui.length : '' },
         { id: 'lb-third', num: '03', label: x('secThird'), count: packs ? third.length : '' },
-        { id: 'lb-ai', num: '04', label: x('secAi'), count: '' },
+        { id: 'lb-faces', num: '04', label: x('secFaces'), count: ctx.fonts ? ctx.fonts.base.length + ctx.fonts.added.length : '' },
+        { id: 'lb-ai', num: '05', label: x('secAi'), count: '' },
       ]}
       pagesLabel=${x('pages')}
       pages=${pageLinks()}>
       ${shelf(ctx, 'base', '01', x('secBase'), x('secBaseSub'), base, true)}
       ${shelf(ctx, 'ui', '02', x('secUi'), x('secUiSub'), ui, false)}
       ${shelf(ctx, 'third', '03', x('secThird'), x('secThirdSub'), third, false)}
-      ${secAI(ctx, '04', all)}
+      ${secFaces(ctx, '04')}
+      ${secAI(ctx, '05', all)}
     <//>`;
 }
 
@@ -168,6 +171,30 @@ function shelf(ctx, key, num, title, sub, list, first) {
           onMore=${shown.length < rows.length ? () => ctx.setShown(key, ctx.shown[key] + PAGE) : null}
           note=${x('shownOf', { shown: shown.length, total: rows.length })} />
         <${Hint}>${x('hint.' + key)}<//>`}
+    <//>`;
+}
+
+/* ── The faces this server serves, with their licences (the font manager) ─────────────────────── */
+
+/**
+ * Every face, base and added, with its licence. An added face is always said to be added, never base
+ * setup, and one whose licence or copyright holder nobody stated is a warning (Jouni, 2026-10-03).
+ */
+function secFaces(ctx, num) {
+  const f = ctx.fonts;
+  const row = (face) => {
+    const unknown = face.licenceStatus === 'unknown';
+    return {
+      key: `${face.origin}:${face.family}`, k: face.family, warn: unknown,
+      v: `${face.origin === 'added' ? x('facesAdded') : x('facesBase')} · ${face.licence || x('facesNoLicence')}`,
+      sub: unknown ? x('facesUnknown') : (face.copyright || ''), subTone: unknown ? 'notice' : undefined,
+    };
+  };
+  return html`
+    <${PageSection} id="lb-faces" num=${num} title=${x('secFaces')} count=${f ? x('facesCount', { base: f.base.length, added: f.added.length }) : null}>
+      ${!f ? html`<${Note} kind="loading">${t('common.loading')}<//>` : html`
+        <${Note} kind="lead">${x('facesIntro')}<//>
+        <${Facts} wide rows=${[...f.added.map(row), ...f.base.map(row)]} />`}
     <//>`;
 }
 

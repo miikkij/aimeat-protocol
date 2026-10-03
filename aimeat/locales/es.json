@@ -2268,7 +2268,9 @@
         "unlabelled": "{n} elementos públicos no llevan etiqueta",
         "unlabelledOne": "un elemento público no lleva etiqueta",
         "sep": ", ",
-        "last": " y "
+        "last": " y ",
+        "fonts": "{n} fuentes añadidas no tienen datos de licencia",
+        "fontsOne": "una fuente añadida no tiene datos de licencia"
       },
       "under": {
         "filled": "{entries} entradas · {questions} preguntas · respuestas: {ai} de la IA, {human} tuyas, {evidence} del registro",
@@ -2291,7 +2293,10 @@
         "unansweredWhy": "tiene {n} de {total} sin responder, así que no tiene clase.",
         "unansweredClear": "Cada entrada tiene todas sus preguntas respondidas.",
         "unlabelledWhy": "{n} elementos públicos no llevan etiqueta. Pide a la aplicación o al agente que los publicó que declare cómo se hicieron.",
-        "unlabelledClear": "Ninguno en este periodo. {labelled} elementos públicos llevan etiqueta, {unlabelled} no."
+        "unlabelledClear": "Ninguno en este periodo. {labelled} elementos públicos llevan etiqueta, {unlabelled} no.",
+        "fontsWhy": "se añadieron sin licencia o sin titular de los derechos, así que nadie puede decir que se obtuvieron legalmente.",
+        "fontsClear": "Cada fuente añadida en este servidor indica su licencia y el titular de los derechos.",
+        "fontsWhyOne": "se añadió sin licencia o sin titular de los derechos, así que nadie puede decir que se obtuvo legalmente."
       },
       "clear": "limpio",
       "toApps": "A Aplicaciones",
@@ -2455,7 +2460,9 @@
         "owner-your-slice": "Solo lo tuyo. Nada en esta página describe la actividad de otra persona, y nadie más ve la tuya aquí.",
         "owner-register-is-the-operators": "El registro de para qué se usa la IA lo mantiene quien administra esta instalación, no tú. Abajo están las entradas que nombran tu cuenta. Si falta algo tuyo, eso es una conversación con esa persona y no algo que puedas arreglar aquí.",
         "owner-provenance-off": "El registro está desactivado en esta instalación, y eso no lo configuraste tú. No se registró nada, así que cada cifra de arriba es cero por eso y no porque no hayas hecho nada."
-      }
+      },
+      "gapFonts": "Fuentes sin datos de licencia",
+      "toFonts": "A Fuentes"
     },
     "csm": {
       "listTitle": "Qué está bajo llave",
@@ -4357,6 +4364,14 @@
   "libspage.aiUsedK": "Quién la usa",
   "libspage.aiUsedBody": "El mismo mapa de dependencias que en la página Extensiones: del código de las apps publicadas se lee qué bibliotecas cargan. {using} apps de {total} usan alguna de estas, y {unused} bibliotecas no están todavía en ninguna app.",
   "libspage.aiUsedBodyShort": "El mismo mapa de dependencias que en la página Extensiones: del código de las apps publicadas se lee qué bibliotecas cargan. {libs} bibliotecas están en uso, y {unused} no están todavía en ninguna app.",
+  "libspage.secFaces": "Fuentes",
+  "libspage.secFacesSub": "las fuentes que las apps y los temas pueden usar aquí",
+  "libspage.facesIntro": "Todas las fuentes que sirve este servidor, con su licencia. Las fuentes de base vienen con este servidor y tienen licencias libres. Las fuentes añadidas las añadió el operador de este servidor, que responde de ellas.",
+  "libspage.facesBase": "instalación de base",
+  "libspage.facesAdded": "añadida en este servidor",
+  "libspage.facesUnknown": "Licencia desconocida: nadie indicó la licencia o el titular de los derechos.",
+  "libspage.facesNoLicence": "sin licencia indicada",
+  "libspage.facesCount": "{base} de base, {added} añadidas",
   "capspage.titleSub": "lo que un agente encuentra aquí por nombre y puede llamar",
   "capspage.chipCallable": "invocables {n}",
   "capspage.chipProviders": "proveedores {n}",
@@ -19149,7 +19164,9 @@
       "components": "Componentes",
       "css": "CSS del tema",
       "pages": "En páginas reales",
-      "shapes": "Formas"
+      "shapes": "Formas",
+      "themes": "Temas",
+      "fonts": "Fuentes"
     },
     "styles": "Estilos",
     "stylesHint": "Un estilo es un juego de colores en claro y en oscuro, tres tipos de letra y si tiene los dos modos o solo uno. La gente elige entre los estilos que ofreces.",
@@ -19401,6 +19418,78 @@
       "shapeTrackingAction": "Espaciado entre letras de las acciones y las pestañas",
       "shapeCaseLabel": "Mayúsculas o minúsculas de las etiquetas",
       "shapeTrackingLabel": "Espaciado entre letras de las etiquetas"
+    },
+    "fonts": {
+      "intro": "Las fuentes que tus temas y el Design Book pueden usar. Las fuentes de base vienen con este servidor y tienen licencias libres. Aquí puedes añadir más fuentes: se pueden usar en este servidor al momento, sin actualizar nada. Respondes de cada fuente que añades, así que indica su licencia.",
+      "addedTitle": "Añadidas en este servidor ({n})",
+      "addedHint": "Fuentes que añadió el operador. Nunca forman parte de la instalación de base. Cada una muestra lo que se dijo de su licencia.",
+      "add": "Añadir una fuente",
+      "noneAdded": "Todavía no se ha añadido ninguna fuente.",
+      "unknownCount": "{n} fuentes añadidas no tienen datos de licencia: {list}. Esto se ve en el informe de cumplimiento.",
+      "baseTitle": "Fuentes de base ({n})",
+      "baseHint": "Estas fuentes vienen con este servidor. Sus licencias son libres (SIL Open Font License 1.1), y el archivo de licencias es /lib/fonts/LICENSE.md.",
+      "sample": "Aa Bb Cc Ññ Áá Éé 0123",
+      "sampleOf": "Una línea con la fuente {name}",
+      "base": "instalación de base",
+      "added": "añadida en este servidor",
+      "weights": "pesos {list}",
+      "noFiles": "todavía sin archivos",
+      "licenceMissing": "sin licencia indicada",
+      "usedBy": "La usan: {list}",
+      "unused": "Ningún estilo la usa.",
+      "source": "Origen",
+      "notServed": "Todavía no se usa: no ha llegado ningún archivo.",
+      "licenceUnknown": "Licencia desconocida: nadie indicó la licencia o el titular de los derechos. Añádelos con Cambiar.",
+      "licenceStated": "Licencia indicada",
+      "addedBy": "La añadió {who} el {date}",
+      "waiting": "Faltan todavía {n} archivos.",
+      "change": "Cambiar",
+      "remove": "Eliminar",
+      "inUse": "Un estilo usa esta fuente. Elige primero otra fuente en ese estilo y después elimina esta.",
+      "removeTitle": "Eliminar la fuente",
+      "removeConfirm": "¿Eliminar {name} y sus archivos de este servidor? No se puede deshacer.",
+      "ownersTitle": "Fuentes de los propietarios",
+      "ownersHint": "Los propietarios guardan estos archivos en su propio almacenamiento para sus propias apps, y cada propietario responde de los suyos. No son fuentes de los temas, y esta lista no los cambia.",
+      "ownersNone": "Ningún propietario guarda una fuente.",
+      "ownersShown": "Se muestran {shown} de {total}, las más nuevas primero.",
+      "addTitle": "Añadir una fuente",
+      "changeTitle": "Cambiar {name}",
+      "dialogHint": "Dale un nombre a la fuente, elige sus archivos woff2 e indica el peso de cada uno y si es cursiva. Después indica lo que sabes de su licencia. Añade solo fuentes que puedas usar legalmente.",
+      "family": "Nombre",
+      "familyHint": "El nombre que elige un estilo, por ejemplo Space Mono. No se puede cambiar después.",
+      "kind": "Alternativa",
+      "kindHint": "Lo que muestra la página mientras carga la fuente.",
+      "kinds": {
+        "sans-serif": "Sans serif",
+        "serif": "Serif",
+        "monospace": "Monoespaciada",
+        "cursive": "Manuscrita"
+      },
+      "files": "Archivos woff2",
+      "filesHint": "Un archivo por cada peso, normal y cursiva, o un solo archivo variable. Una fuente en partes (latin, latin-ext) tiene un archivo por parte, cada uno con su rango Unicode.",
+      "weight": "Peso",
+      "style": "Normal o cursiva",
+      "styleNormal": "Normal",
+      "styleItalic": "Cursiva",
+      "subset": "Parte (opcional)",
+      "range": "Rango Unicode (opcional)",
+      "dropFile": "Quitar este archivo",
+      "licence": "Licencia",
+      "licenceHint": "Por ejemplo OFL-1.1.",
+      "copyright": "Titular de los derechos",
+      "copyrightHint": "Como dice la fuente, por ejemplo © 2016 Google Inc.",
+      "sourceField": "De dónde viene",
+      "sourceHint": "Una dirección que empieza por https://",
+      "willBeUnknown": "Sin la licencia y el titular de los derechos, esta fuente se marca con licencia desconocida, y eso se ve en el informe de cumplimiento.",
+      "uploading": "Subiendo el archivo {n} de {total}…",
+      "notWoff2": "{name} no es un archivo woff2. Conviértelo a woff2 y vuelve a intentarlo.",
+      "saveChange": "Guardar",
+      "addIt": "Añadir la fuente",
+      "unknownCountOne": "Una fuente añadida no tiene datos de licencia: {list}. Esto se ve en el informe de cumplimiento.",
+      "changeHint": "Cambia los archivos de la fuente, el peso de cada uno y si es cursiva, o lo que se sabe de su licencia. El nombre no cambia.",
+      "needs": "Dale a la fuente un nombre y al menos un archivo woff2.",
+      "showBase": "Mostrar las {n} fuentes de base",
+      "ownerFacts": "{size} · {date}"
     }
   },
   "appcat": {
@@ -21616,7 +21705,27 @@
     "concept.knowledge.ex1": "Las notas de veinte entrevistas con clientes, empaquetadas en hallazgos, cada uno con la entrevista de la que salió.",
     "concept.knowledge.ex2": "Un paquete sobre un cambio en la ley que compartes con tu lugar compartido, para que la IA de cada miembro lea los mismos hechos.",
     "concept.knowledge.ex3": "Un paquete de la biblioteca pública que copias a tu propia base de conocimiento, con sus fuentes.",
-    "concept.knowledge.tip": "Haz un paquete con material que valga la pena guardar y volver a usar. Las notas del día a día van a la memoria."
+    "concept.knowledge.tip": "Haz un paquete con material que valga la pena guardar y volver a usar. Las notas del día a día van a la memoria.",
+    "themes": {
+      "font_licence": {
+        "title": "Licencia de una fuente",
+        "short": "Lo que permite la licencia de la fuente. Indica la licencia y el titular de los derechos, o la fuente se marca con licencia desconocida.",
+        "what": "Una fuente es software, y tiene una licencia. Las fuentes que trae este servidor tienen licencias libres (SIL Open Font License 1.1). Cuando añades una fuente, respondes de ella: indica su licencia, el titular de los derechos tal como lo dice la fuente y de dónde la obtuviste. Si la licencia o el titular quedan vacíos, la fuente se marca con licencia desconocida. Entonces nadie puede decir que se obtuvo legalmente, y eso se ve en la pestaña Fuentes, en la página Bibliotecas y en el informe de cumplimiento.",
+        "ex1": "OFL-1.1, © 2016 Google Inc., https://fonts.google.com/specimen/Space+Mono: una fuente libre de Google Fonts.",
+        "ex2": "Una fuente que compró tu empresa: el nombre de la licencia de la compra, la fundidora como titular de los derechos y la dirección de la compra.",
+        "tip": "Añade solo fuentes que puedas usar legalmente en un sitio web. De las fuentes que los propietarios guardan para sus propias apps responden ellos, y no se añaden aquí."
+      },
+      "font_weight": {
+        "title": "Peso de un archivo",
+        "short": "Lo gruesas que son las letras de este archivo: 400 es normal y 700 es negrita. Un archivo variable da un rango, por ejemplo 100 900.",
+        "what": "Cada archivo de una fuente dibuja un peso, y la página toma el archivo cuyo peso pide un texto. Un archivo variable dibuja todos los pesos de su rango.",
+        "range": "De 1 a 1000, o un rango como 100 900.",
+        "ex1": "400: el corte normal.",
+        "ex2": "700: el corte en negrita.",
+        "ex3": "100 900: un archivo variable para todos los pesos, de fino a negro.",
+        "tip": "El nombre de un archivo suele decir su peso, por ejemplo 700-normal-latin.woff2. Esta página lee el peso del nombre, así que compruébalo."
+      }
+    }
   },
   "chat.starterProfile": "Hagamos tu perfil",
   "chat.starterProfileAsk": "Hagamos mi perfil. Entrevístame con una pregunta a la vez: a qué me dedico, qué necesito, qué frena mi trabajo y qué trabajo repito. Luego escribe mi página de perfil con mis respuestas, muéstramela antes de publicarla y dime la dirección cuando esté en línea.",

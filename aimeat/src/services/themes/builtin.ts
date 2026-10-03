@@ -16,9 +16,11 @@
  *   builtinThemes
  * @usage import { builtinThemes } from './builtin.js';  builtinThemes(themeCss, paletteCss)
  * @version-history
+ *   v1.1.0 — 2026-10-03 — A face is "served" by the one list in font-registry.ts (base and added).
  *   v1.0.0 — 2026-09-24 — Initial (UI consolidation phase 4, Themes & Styles).
  */
-import { THEME_TOKENS, FACE_SLOTS, THEME_FACES } from './tokens.js';
+import { THEME_TOKENS, FACE_SLOTS } from './tokens.js';
+import { faceStackOf } from './font-registry.js';
 import { resolveColour, toCss, type Rgba } from './values.js';
 
 /** In the pill's order (src/static/sdk-libs/auth/palette.js). */
@@ -84,7 +86,7 @@ export function bridgeFormulas(themeCss: string): TokenMap {
 /** A face named first in a font-family stack, when the node serves it. */
 function firstServedFace(stack: string | undefined): string | undefined {
     const first = (stack || '').split(',')[0]?.trim().replace(/^['"]|['"]$/g, '');
-    return first && THEME_FACES[first] ? first : undefined;
+    return first && faceStackOf(first) ? first : undefined;
 }
 
 /**

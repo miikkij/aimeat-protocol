@@ -62,6 +62,23 @@ thirteen for themes that want a face of their own (Instrument Serif and Sans, Sc
 Bricolage Grotesque, Syne, Unbounded, Gloock, Mona Sans, Hubot Sans, Geist Mono, Martian Mono,
 Press Start 2P, Selawik).
 
+**A face can also be added to the running node, with no commit and no deploy** (the font manager,
+since 2026-10-03): the operator adds it on Admin → Themes & Styles → Fonts, or an AI does with
+`aimeat_theme_font_save` (its woff2 files, the weight and style of each, its licence, copyright
+holder and source). It is stored under the node's own principal, served by
+`/v1/themes/fonts.css` (which the page shell links after the base faces), and from the moment a
+file arrives every style and the Design Book bench may choose it, because every reader of the two
+lists above reads the merged list in `src/services/themes/font-registry.ts`. The licence rule
+(Jouni, 2026-10-03): what the node ships is free licences only, and stays vendored with its row in
+`LICENSE.md`; a face the operator adds is always marked as added, never as base setup, and the
+operator answers for it. Ask for its licence and copyright holder before adding it. Without them it
+is marked "licence unknown", which means nobody can say it was lawfully obtained, and it shows on
+the Fonts tab, the Libraries page and the compliance report. Owners do not add theme faces; a font
+an owner keeps in storage for an app (an `@font-face` from the app's own origin) is theirs to
+answer for, and the operator sees it only as an inventory. A published app on the kit does not yet
+load an added face: the kit's sheet imports `aimeat-fonts.css`, which does not import
+`/v1/themes/fonts.css`.
+
 Fjalla One is condensed and ships one cut, so a headline is short: one sentence, the second half in
 coral when it carries the point. Never synthesise a bold on a single-weight face. A monospace family
 is `var(--font-mono)`, never `monospace` or a hand-typed stack; the view sheets were swept of both

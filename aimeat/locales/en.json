@@ -3325,7 +3325,9 @@
         "unlabelled": "{n} public items carry no label",
         "unlabelledOne": "one public item carries no label",
         "sep": ", ",
-        "last": ", and "
+        "last": ", and ",
+        "fonts": "{n} added faces have no licence data",
+        "fontsOne": "one added face has no licence data"
       },
       "under": {
         "filled": "{entries} entries · {questions} questions · answers: {ai} by AI, {human} by you, {evidence} from the record",
@@ -3348,7 +3350,10 @@
         "unansweredWhy": "has {n} of {total} unanswered, so it has no class.",
         "unansweredClear": "Every entry has all its questions answered.",
         "unlabelledWhy": "{n} public items carry no label. Ask the app or agent that published them to say how they were made.",
-        "unlabelledClear": "None this period. {labelled} public items carry a label, {unlabelled} do not."
+        "unlabelledClear": "None this period. {labelled} public items carry a label, {unlabelled} do not.",
+        "fontsWhy": "were added without a licence or a copyright holder, so nobody can say they were lawfully obtained.",
+        "fontsClear": "Every face added on this server states its licence and its copyright holder.",
+        "fontsWhyOne": "was added without a licence or a copyright holder, so nobody can say it was lawfully obtained."
       },
       "clear": "clear",
       "toApps": "To Applications",
@@ -3512,7 +3517,9 @@
         "owner-your-slice": "Only yours. Nothing on this page describes anybody else's activity, and nobody else sees yours here.",
         "owner-register-is-the-operators": "The record of what AI is used for is kept by whoever runs this installation, not by you. Below are the entries that name your account. If something of yours is missing, that is a conversation with them rather than something you can fix here.",
         "owner-provenance-off": "Recording is switched off on this installation, which is not your setting. Nothing was recorded, so every number above is zero for that reason and not because you did nothing."
-      }
+      },
+      "gapFonts": "Faces without licence data",
+      "toFonts": "To Fonts"
     },
     "csm": {
       "listTitle": "What is locked",
@@ -5415,6 +5422,14 @@
   "libspage.aiUsedK": "Who uses it",
   "libspage.aiUsedBody": "The same dependency map as on the Extensions page: the published apps' source says which libraries they load. {using} apps of {total} use one of these, and {unused} libraries are not in any app yet.",
   "libspage.aiUsedBodyShort": "The same dependency map as on the Extensions page: the published apps' source says which libraries they load. {libs} libraries are in use, and {unused} are not in any app yet.",
+  "libspage.secFaces": "Faces",
+  "libspage.secFacesSub": "the faces apps and themes can use here",
+  "libspage.facesIntro": "Every face this server serves, with its licence. The base faces come with this server and have free licences. The added faces were added by the operator of this server, who answers for them.",
+  "libspage.facesBase": "base setup",
+  "libspage.facesAdded": "added on this server",
+  "libspage.facesUnknown": "Licence unknown: nobody stated the licence or the copyright holder.",
+  "libspage.facesNoLicence": "no licence given",
+  "libspage.facesCount": "{base} base, {added} added",
   "capspage.titleSub": "what an agent can find here by name, and call",
   "capspage.chipCallable": "callable {n}",
   "capspage.chipProviders": "providers {n}",
@@ -21367,7 +21382,9 @@
       "components": "Components",
       "css": "Theme CSS",
       "pages": "On real pages",
-      "shapes": "Shapes"
+      "shapes": "Shapes",
+      "themes": "Themes",
+      "fonts": "Fonts"
     },
     "styles": "Styles",
     "stylesHint": "A style is one set of colours in light and dark, three fonts, and whether it has both modes or only one. People choose among the styles you offer.",
@@ -21619,6 +21636,78 @@
       "shapeTrackingAction": "Letter spacing of actions and tabs",
       "shapeCaseLabel": "Letter case of labels",
       "shapeTrackingLabel": "Letter spacing of labels"
+    },
+    "fonts": {
+      "intro": "The faces your themes and the Design Book can use. The base faces come with this server and have free licences. You can add more faces here: they are in use on this server at once, with no update. You answer for each face you add, so give its licence.",
+      "addedTitle": "Added on this server ({n})",
+      "addedHint": "Faces the operator added. They are never part of the base setup. Each one shows what was said about its licence.",
+      "add": "Add a face",
+      "noneAdded": "No faces added yet.",
+      "unknownCount": "{n} added faces have no licence data: {list}. This shows in the compliance report.",
+      "baseTitle": "Base faces ({n})",
+      "baseHint": "These faces come with this server. Their licences are free (SIL Open Font License 1.1), and the licence file is /lib/fonts/LICENSE.md.",
+      "sample": "Aa Bb Cc Ää Öö Åå 0123",
+      "sampleOf": "A line set in {name}",
+      "base": "base setup",
+      "added": "added on this server",
+      "weights": "weights {list}",
+      "noFiles": "no files yet",
+      "licenceMissing": "no licence given",
+      "usedBy": "Used by {list}",
+      "unused": "No style uses it.",
+      "source": "Source",
+      "notServed": "Not in use yet: no file has arrived.",
+      "licenceUnknown": "Licence unknown: nobody stated the licence or the copyright holder. Use Change to add them.",
+      "licenceStated": "Licence stated",
+      "addedBy": "Added by {who} on {date}",
+      "waiting": "{n} files have not arrived yet.",
+      "change": "Change",
+      "remove": "Remove",
+      "inUse": "A style uses this face. Choose another face in that style first, then remove this one.",
+      "removeTitle": "Remove the face",
+      "removeConfirm": "Remove {name} and its files from this server? This cannot be undone.",
+      "ownersTitle": "Fonts in owners' storage",
+      "ownersHint": "Owners keep these files in their own storage for their own apps, and each owner answers for them. They are not theme faces, and this list does not change them.",
+      "ownersNone": "No owner keeps a font in storage.",
+      "ownersShown": "Shown {shown} of {total}, the newest first.",
+      "addTitle": "Add a face",
+      "changeTitle": "Change {name}",
+      "dialogHint": "Give the face its name, choose its woff2 files and say the weight of each, and whether it is italic. Then give what you know of its licence. Add only faces you may lawfully use.",
+      "family": "Name",
+      "familyHint": "The name a style chooses, for example Space Mono. It cannot change later.",
+      "kind": "Fallback",
+      "kindHint": "What the page shows while the face loads.",
+      "kinds": {
+        "sans-serif": "Sans serif",
+        "serif": "Serif",
+        "monospace": "Monospace",
+        "cursive": "Handwriting"
+      },
+      "files": "woff2 files",
+      "filesHint": "One file for each weight, upright and italic, or one variable file. A face in parts (latin, latin-ext) has a file for each part, each with its unicode range.",
+      "weight": "Weight",
+      "style": "Upright or italic",
+      "styleNormal": "Upright",
+      "styleItalic": "Italic",
+      "subset": "Part (optional)",
+      "range": "Unicode range (optional)",
+      "dropFile": "Leave this file out",
+      "licence": "Licence",
+      "licenceHint": "For example OFL-1.1.",
+      "copyright": "Copyright holder",
+      "copyrightHint": "As the font says, for example © 2016 Google Inc.",
+      "sourceField": "Where it came from",
+      "sourceHint": "An address that starts with https://",
+      "willBeUnknown": "Without the licence and the copyright holder, this face is marked licence unknown, and that shows in the compliance report.",
+      "uploading": "Uploading file {n} of {total}…",
+      "notWoff2": "{name} is not a woff2 file. Convert it to woff2 and try again.",
+      "saveChange": "Save",
+      "addIt": "Add the face",
+      "unknownCountOne": "One added face has no licence data: {list}. This shows in the compliance report.",
+      "changeHint": "Change the files of the face, the weight of each and whether it is italic, or what is known of its licence. The name stays.",
+      "needs": "Give the face a name and at least one woff2 file.",
+      "showBase": "Show the {n} base faces",
+      "ownerFacts": "{size} · {date}"
     }
   },
   "appcat": {
@@ -23834,7 +23923,27 @@
     "concept.knowledge.ex1": "Notes from twenty customer interviews, packed into findings, each with the interview that it came from.",
     "concept.knowledge.ex2": "A package about a change in the law that you share with your shared place, so that the AI of each member reads the same facts.",
     "concept.knowledge.ex3": "A package from the public library that you copy into your own knowledge base, with its sources.",
-    "concept.knowledge.tip": "Make a package from material that is worth keeping and using again. Everyday notes go to memory."
+    "concept.knowledge.tip": "Make a package from material that is worth keeping and using again. Everyday notes go to memory.",
+    "themes": {
+      "font_licence": {
+        "title": "Licence of a face",
+        "short": "What the licence of the face lets you do. Give the licence and the copyright holder, or the face is marked licence unknown.",
+        "what": "A font is software, and it has a licence. The faces this server ships with have free licences (SIL Open Font License 1.1). When you add a face, you answer for it: give its licence, its copyright holder as the font says, and where you got it. If the licence or the copyright holder is empty, the face is marked licence unknown. Then nobody can say that the face was lawfully obtained, and this shows on the Fonts tab, on the Libraries page and in the compliance report.",
+        "ex1": "OFL-1.1, © 2016 Google Inc., https://fonts.google.com/specimen/Space+Mono: a free face from Google Fonts.",
+        "ex2": "A face your company bought: the name of the licence from the purchase, the type foundry as the copyright holder, and the address of the purchase.",
+        "tip": "Add only faces you may lawfully use on a website. The fonts owners keep for their own apps are theirs to answer for, and they are not added here."
+      },
+      "font_weight": {
+        "title": "Weight of a file",
+        "short": "How heavy the letters of this file are: 400 is regular and 700 is bold. A variable file gives a range, for example 100 900.",
+        "what": "Each file of a face draws one weight, and the page takes the file whose weight a text asks for. A variable file draws every weight in its range.",
+        "range": "1 to 1000, or a range such as 100 900.",
+        "ex1": "400: the regular cut.",
+        "ex2": "700: the bold cut.",
+        "ex3": "100 900: one variable file for every weight from thin to black.",
+        "tip": "The name of a file often says its weight, for example 700-normal-latin.woff2. This page reads the weight from the name, so check it."
+      }
+    }
   },
   "chat.starterProfile": "Let's make your profile",
   "chat.starterProfileAsk": "Let's make my profile. Interview me one question at a time: what I do, what I need, what slows my work down and which work I repeat. Then write my profile page from my answers, show it to me before you publish it, and tell me the address when it is live.",

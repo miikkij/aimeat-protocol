@@ -31,6 +31,8 @@
  *     door and the empty state's slab reach it), save, draft, keep, the CSV
  * @usage Registered in views/admin.js NAV_GROUPS; rendered with the shared admin tab props.
  * @version-history
+ *   v3.1.0 — 2026-10-03 — A fifth gap row, faces added without licence data (the font manager), with
+ *     the way to the Fonts tab of Themes & Styles.
  *   v3.0.0 — 2026-09-27 — Library components only: the page prints through PrintPage (the body mark,
  *     the screen-only parts, the document), the period chooser is Tabs in the filter tone, the gaps
  *     the Verdict with Readings whose ends are the doors or the fine "clear" mark, the strip the
@@ -117,6 +119,8 @@ export function gapsLine(g, registerEmpty) {
   if (g.apps.length > 0) parts.push(g.apps.length === 1 ? C('line.appsOne') : C('line.apps', { n: num(g.apps.length) }));
   if (g.usecases.length > 0) parts.push(g.usecases.length === 1 ? C('line.unansweredOne') : C('line.unanswered', { n: num(g.usecases.length) }));
   if (g.unlabelled > 0) parts.push(g.unlabelled === 1 ? C('line.unlabelledOne') : C('line.unlabelled', { n: num(g.unlabelled) }));
+  const fonts = g.fonts || [];
+  if (fonts.length > 0) parts.push(fonts.length === 1 ? C('line.fontsOne') : C('line.fonts', { n: num(fonts.length) }));
   if (parts.length === 0) return C('gapsNone');
   const joined = parts.length === 1 ? parts[0]
     : parts.slice(0, -1).join(C('line.sep')) + C('line.last') + parts[parts.length - 1];
@@ -144,6 +148,16 @@ function NeedsALook({ report, g, stats, questions, drafting, onDraft, onAnswer, 
   const under = empty ? C('under.empty', { questions: num(questions.length) })
     : C('under.filled', { entries: num(stats.entries), questions: num(questions.length), ai: num(stats.ai), human: num(stats.human), evidence: num(stats.evidence) });
   const toApps = () => switchPage('apps');
+  // Faces added without licence data (the font manager): the Fonts tab of Themes & Styles.
+  const fonts = g.fonts || [];
+  const fontsWhy = fonts.length === 0 ? C('gap.fontsClear') : html`${codes(fonts)} ${fonts.length === 1 ? C('gap.fontsWhyOne') : C('gap.fontsWhy')}`;
+  const toFonts = () => {
+    // switchPage keeps the address's other parameters, so ?view=fonts reaches Themes & Styles.
+    const url = new URL(window.location.href);
+    url.searchParams.set('view', 'fonts');
+    history.replaceState(null, '', url);
+    switchPage('themes');
+  };
   return html`
     <${Section} first id="adm-cmp-01" num="01" title=${C('gapsTitle')} doors=${door(C('toApps'), toApps)}>
       <${Verdict} word=${word} tone=${g.total > 0 ? 'danger' : undefined} line=${gapsLine(g, empty)} stamp=${under}>
@@ -153,7 +167,8 @@ function NeedsALook({ report, g, stats, questions, drafting, onDraft, onAnswer, 
           { key: 'apps', name: C('gapAppGap'), why: appsWhy, end: g.apps.length === 0 ? clear : door(C('toApps'), toApps) },
           { key: 'unclassified', name: C('gapUnclassified'), why: ucWhy,
             end: g.usecases.length === 0 ? clear : door(C('answer'), () => onAnswer(g.usecases[0].id)) },
-          { key: 'unlabelled', name: C('gapUnlabelled'), why: unlWhy, end: g.unlabelled === 0 ? clear : door(C('toApps'), toApps), last: true },
+          { key: 'unlabelled', name: C('gapUnlabelled'), why: unlWhy, end: g.unlabelled === 0 ? clear : door(C('toApps'), toApps) },
+          { key: 'fonts', name: C('gapFonts'), why: fontsWhy, end: fonts.length === 0 ? clear : door(C('toFonts'), toFonts), last: true },
         ]} />
       <//>
     <//>`;

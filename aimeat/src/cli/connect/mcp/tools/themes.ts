@@ -10,6 +10,7 @@
  * @structure registerThemeTools(mcp, registry)
  * @usage registerThemeTools(mcp, registry);
  * @version-history
+ *   v2.2.0 — 2026-10-03 — aimeat_theme_font_save (the font manager).
  *   v2.1.0 — 2026-09-24 — aimeat_theme_policy_set.
  *   v2.0.0 — 2026-09-24 — The two-level model of 07; one request mapping shared with the CLI door.
  *   v1.0.0 — 2026-09-24 — Initial (UI consolidation phase 4).
@@ -67,6 +68,21 @@ export function registerThemeTools(mcp: McpServer, registry: AgentRegistry): voi
     offered: z.array(z.string().max(40)).min(1).max(40).optional().describe("The theme ids people can choose, for example ['aimeat', 'pebble']."),
     default: z.string().max(40).optional().describe('The default theme: one of the offered.'),
   }, annotationsFor('aimeat_theme_policy_set'), call('aimeat_theme_policy_set'));
+
+  mcp.tool('aimeat_theme_font_save', descriptionFor('aimeat_theme_font_save'), {
+    family: z.string().min(1).max(60).describe("The face's name as a style chooses it, for example 'Space Mono'."),
+    kind: z.enum(['sans-serif', 'serif', 'monospace', 'cursive']).optional().describe("What it falls back to while it loads: 'sans-serif' (default), 'serif', 'monospace' or 'cursive'."),
+    files: z.array(z.object({
+      weight: z.string().max(9).describe("'400', or '100 900' for a variable face."),
+      style: z.string().max(6).optional().describe("'normal' (default) or 'italic'."),
+      subset: z.string().max(30).optional().describe("A name for one part of a face shipped in parts, such as 'latin' or 'latin-ext'."),
+      unicodeRange: z.string().max(4000).optional().describe("That part's unicode-range as CSS writes it, for example 'U+0000-00FF, U+0131'."),
+    })).optional().describe('The woff2 files the face has; you get one upload_url for each. Leave it out on a change to keep the files.'),
+    licence: z.string().max(200).optional().describe("The licence, for example 'OFL-1.1'. Without it the face is marked licence unknown."),
+    copyright: z.string().max(500).optional().describe('Who holds the copyright, as the font says. Without it the face is marked licence unknown.'),
+    source: z.string().max(500).optional().describe('Where the face came from, an https:// address.'),
+    remove: z.boolean().optional().describe('true removes the face and its files; refused while a style uses it.'),
+  }, annotationsFor('aimeat_theme_font_save'), call('aimeat_theme_font_save'));
 
   mcp.tool('aimeat_theme_component_css_set', descriptionFor('aimeat_theme_component_css_set'), {
     theme: z.string().min(1).max(40).describe('The theme the CSS belongs to.'),

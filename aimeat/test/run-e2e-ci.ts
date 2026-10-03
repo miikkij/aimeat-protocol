@@ -9,6 +9,7 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.77.0 -- 2026-10-03 -- e2e-theme-fonts.ts joins the list (the font manager).
  *   v1.76.0 -- 2026-10-02 -- e2e-app-design-spec.ts joins the list.
  *   v1.75.0 -- 2026-10-02 -- e2e-task-start.ts joins the list.
  *   v1.74.0 -- 2026-10-02 -- e2e-package-withdraw.ts joins the list (package sale design, phase 5).
@@ -309,6 +310,7 @@ const ALL_SUITES = [
     'test/e2e-designbook.ts',
     'test/e2e-ui-components.ts',
     'test/e2e-themes.ts',
+    'test/e2e-theme-fonts.ts',
     'test/e2e-app-fork.ts',
     'test/e2e-app-marks.ts',
     'test/e2e-app-legal.ts',

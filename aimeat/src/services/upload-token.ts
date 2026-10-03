@@ -12,6 +12,7 @@
  * @usage
  *   import { generateUploadToken, verifyUploadToken } from '../services/upload-token.js';
  * @version-history
+ *   v1.8.0 — 2026-10-03 — utype 'font': a theme face's file for the font manager (services/themes/fonts.ts).
  *   v1.7.0 — 2026-09-13 — PRESIGNED_META_KEYS.app carries `cortex_agents`, validated at the mint and
  *     again at the PUT, so an app's crew-defs survive the upload road the docs recommend.
  *   v1.6.0 — 2026-08-11 — PRESIGNED_META_KEYS.app carries `spec_token` / `spec_ack`, so the door
@@ -106,7 +107,7 @@ export interface UploadTokenPayload {
      * Set server-side at mint time from resolveIdentity(), NEVER from anything a client sends.
      */
     actor?: string;
-    utype: 'app' | 'storage' | 'extension' | 'cortex' | 'skill';
+    utype: 'app' | 'storage' | 'extension' | 'cortex' | 'skill' | 'font';
     meta: Record<string, unknown>;
     maxBytes: number;
     contentType: string;
@@ -116,7 +117,7 @@ export interface VerifiedUploadToken {
     sub: string;
     /** The principal that requested the URL — the GAII of an agent, or `sub` when they are the same. */
     actor: string;
-    utype: 'app' | 'storage' | 'extension' | 'cortex' | 'skill';
+    utype: 'app' | 'storage' | 'extension' | 'cortex' | 'skill' | 'font';
     meta: Record<string, unknown>;
     maxBytes: number;
     contentType: string;
@@ -164,6 +165,8 @@ export const PRESIGNED_META_KEYS = {
     extension: ['update', 'activate'],
     cortex: ['update', 'activate'],
     skill: ['scope', 'visibility', 'organism_id', 'workspace_id'],
+    // A theme face's file (the font manager): which family and which of its files the bytes are.
+    font: ['family', 'file'],
 } as const satisfies Record<UploadTokenPayload['utype'], readonly string[]>;
 
 /**

@@ -18,6 +18,7 @@
  *   import { validateUiLayout, AppUiError } from './validate.js';
  *   const layout = validateUiLayout(req.body);   // throws AppUiError(422) with words
  * @version-history
+ *   v1.8.0 — 2026-10-03 — The face refusal names the faces the operator added as well (servedFontFamilies).
  *   v1.7.0 — 2026-09-28 — The three spring tokens are signature tokens, each a plain number inside
  *     SPRING_BOUNDS, refused in words otherwise.
  *   v1.6.0 — 2026-09-05 — THE EFFECTS (wish-atelier-post-process-effects, stage 4): a block's
@@ -58,7 +59,7 @@
 import type { BlockPropValue } from '../surface-layout/types.js';
 import { propProblem } from '../surface-layout/validate.js';
 import { componentById, NAV_MODES, CHOREOGRAPHIES, LOOKS, BLOCK_SPANS, UI_COMPONENTS, SIGNATURE_TOKENS } from './registry.js';
-import { SERVED_FONT_FAMILIES, SPRING_BOUNDS, unservedFirstFamily } from './signature-tokens.js';
+import { servedFontFamilies, SPRING_BOUNDS, unservedFirstFamily } from './signature-tokens.js';
 import { runMatrix } from '../atelier-contrast.js';
 import { AMBIENT_IDS, AMBIENT_NONE, AMBIENT_BOUNDS, ambientById, isAmbientValue } from '../../data/atelier-ambients.js';
 import {
@@ -210,7 +211,7 @@ export function validateSignatureTokens(raw: unknown, look?: string): Record<str
     if (name === '--ak-font' || name === '--ak-font-display') {
       const missing = unservedFirstFamily(value);
       if (missing) {
-        fail(`${name} starts with "${missing}", which this node does not serve, so the page would fall back to a system face without saying so. Start the stack with one it serves (${SERVED_FONT_FAMILIES.join(', ')}) or with a system face (Georgia, Courier New, system-ui, serif, monospace).`);
+        fail(`${name} starts with "${missing}", which this node does not serve, so the page would fall back to a system face without saying so. Start the stack with one it serves (${servedFontFamilies().join(', ')}) or with a system face (Georgia, Courier New, system-ui, serif, monospace).`);
       }
     }
     // A SPRING NUMBER IS READ AS A NUMBER by the kit, so it is one: no unit, inside the bounds

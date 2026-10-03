@@ -9,6 +9,7 @@
  * @structure themeTools
  * @usage import { themeTools } from './themes.js';
  * @version-history
+ *   v2.3.0 — 2026-10-03 — aimeat_theme_font_save (the font manager); aimeat_theme_list describes `fonts`.
  *   v2.2.0 — 2026-09-24 — Shape values: aimeat_theme_save takes `shapes`, aimeat_theme_list names them.
  *   v2.1.0 — 2026-09-24 — aimeat_theme_policy_set: who chooses, from chat (the settings tool only reads).
  *   v2.0.0 — 2026-09-24 — The two-level model: aimeat_theme_style_save and
@@ -20,7 +21,7 @@ import type { AimeatToolDefinition } from './types.js';
 export const themeTools: AimeatToolDefinition[] = [
     {
         name: 'aimeat_theme_list',
-        description: "List this server's themes: the look of every page of AIMEAT's own interface (the home, the chat, Settings & Controls, admin; published apps keep their own). A theme holds styles; a style is a set of colours in light and dark, three faces and a mode (both, light only, dark only). The built-in AIMEAT theme holds the six built-in styles (aimeat, paper, circuit, contrast, mist, voltage) and is read only; copy it to make your own. For each theme you get its styles with their main colours and any contrast line they miss, which styles the pill offers and the default one, which components have CSS in it and whether that CSS is served, and its theme CSS warnings. You also get who chooses (whether people pick, which themes are available, the default theme; changed with aimeat_theme_policy_set), what a style may set (the colour tokens, the faces this server serves, each component's usual things to change) and the shape values a theme may set (vocabulary.shapes: corners, frames, shadows, letter case, each with what it is for and the built-in value). Every component reads the shape values, so set a theme's look there first and keep component CSS for what is one component's own.",
+        description: "List this server's themes: the look of every page of AIMEAT's own interface (the home, the chat, Settings & Controls, admin; published apps keep their own). A theme holds styles; a style is a set of colours in light and dark, three faces and a mode (both, light only, dark only). The built-in AIMEAT theme holds the six built-in styles (aimeat, paper, circuit, contrast, mist, voltage) and is read only; copy it to make your own. For each theme you get its styles with their main colours and any contrast line they miss, which styles the pill offers and the default one, which components have CSS in it and whether that CSS is served, and its theme CSS warnings. You also get who chooses (whether people pick, which themes are available, the default theme; changed with aimeat_theme_policy_set), what a style may set (the colour tokens, the faces this server serves, each component's usual things to change) and the shape values a theme may set (vocabulary.shapes: corners, frames, shadows, letter case, each with what it is for and the built-in value). Every component reads the shape values, so set a theme's look there first and keep component CSS for what is one component's own. `fonts` is every face: `base` (the faces this server ships with, free licences, each with its licence, copyright holder and source) and `added` (faces the operator added with aimeat_theme_font_save, never base setup; licenceStatus \"unknown\" means nobody stated the licence or the copyright holder, and it shows at an audit), each with the styles that use it. For the operator's own agent it also carries `owners`: the fonts owners keep in their own storage for their apps, an inventory only.",
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: true, cliFallback: true },
         input: {},
@@ -79,6 +80,21 @@ export const themeTools: AimeatToolDefinition[] = [
             personalChoice: { type: 'boolean', description: 'People choose in the look picker (true), or everybody sees the default (false).' },
             offered: { type: 'array', description: "The theme ids people can choose, for example ['aimeat', 'pebble']." },
             default: { type: 'string', description: 'The default theme: one of the offered.' },
+        },
+    },
+    {
+        name: 'aimeat_theme_font_save',
+        description: "Add a face (font) to this server, so its themes and the Design Book can use it at once, or change or remove one you added. Give `family` (the name a style chooses, for example 'Space Mono'), `files` (each woff2 file the face has: `weight` '400' or '100 900' for a variable face, `style` normal or italic, and for a face shipped in parts a `subset` name with its `unicodeRange`), `kind` (what it falls back to: sans-serif, serif, monospace or cursive) and what you know of its licence: `licence` (for example 'OFL-1.1'), `copyright` (the holder, as the font says) and `source` (where it came from). The answer has one `upload_url` per file: PUT the woff2 bytes there (curl -X PUT --data-binary @file.woff2 '<upload_url>'). The face is served, and a style may choose it, once a file has arrived. The only check on the bytes is that they are woff2; there is no limit on size or on how many. A face you add is always marked as added, never as part of the base setup, and the operator answers for it: without a licence or a copyright holder it is marked licence unknown, which shows on the Fonts tab, the libraries page and the compliance report. Ask the person for the licence before you add a face, and add only faces they may lawfully use. Sending the same family again changes it; leave `files` out to keep its files. `remove: true` removes the face and its files, refused while a style of a theme uses it (the refusal names them). Only the operator of this server, with site:theme-write. aimeat_theme_list shows every face.",
+        caller: 'agent',
+        visibility: { publicMcp: true, connectorMcp: true, cliFallback: true },
+        input: {
+            family: { type: 'string', required: true, description: "The face's name as a style chooses it, for example 'Space Mono'." },
+            kind: { type: 'string', description: "What it falls back to while it loads: 'sans-serif' (default), 'serif', 'monospace' or 'cursive'." },
+            files: { type: 'array', description: 'The woff2 files the face has, each { weight, style?, subset?, unicodeRange? }; one upload_url comes back for each. Leave it out on a change to keep the files.' },
+            licence: { type: 'string', description: "The licence, for example 'OFL-1.1'. Without it the face is marked licence unknown." },
+            copyright: { type: 'string', description: 'Who holds the copyright, as the font says. Without it the face is marked licence unknown.' },
+            source: { type: 'string', description: 'Where the face came from, an https:// address.' },
+            remove: { type: 'boolean', description: 'true removes the face and its files; refused while a style uses it.' },
         },
     },
     {

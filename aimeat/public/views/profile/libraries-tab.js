@@ -12,6 +12,7 @@
  * @structure LibrariesTab() — state (packs, details, filters, queries, expanded) + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'libraries'.
  * @version-history
+ *   v2.1.0 — 2026-10-03 — Reads GET /v1/themes/fonts for the Faces section (the font manager).
  *   v2.0.0 — 2026-09-03 — Poster face (design canvas "AIMEAT Kirjastot-sivu", direction A): rows
  *     on three shelves instead of a card wall, the styling bundle shown, deprecated packs name their
  *     successor, "who uses it" from the dependency map, the AI rule and per-library AI text copied
@@ -35,6 +36,7 @@ const emptyFilter = () => ({ status: '', model: '', use: '', proven: false, who:
 export default function LibrariesTab({ showToast }) {
   const [packs, setPacks] = useState(null);
   const [appsUsing, setAppsUsing] = useState(null);
+  const [fonts, setFonts] = useState(null);
   const [details, setDetails] = useState({});
   const [expanded, setExpanded] = useState(null);
   const [docShown, setDocShown] = useState(null);
@@ -58,6 +60,11 @@ export default function LibrariesTab({ showToast }) {
       const using = apps.filter((a) => (a.requires?.packs || []).length || (a.requires?.cortex || []).length).length;
       setAppsUsing({ using, total: apps.length });
     } catch (e) { swallowed('libraries: map', e); }
+    // Every face this server serves, with its licence (the font manager): a public read.
+    try {
+      const f = await apiGet('/v1/themes/fonts');
+      setFonts(f?.data || null);
+    } catch (e) { swallowed('libraries: faces', e); }
   }, [locale]);
   useEffect(() => { load(); }, [load]);
   useEffect(() => onLiveUpdate(null, load), [load]);
@@ -92,7 +99,7 @@ export default function LibrariesTab({ showToast }) {
 
   const ctx = {
     nodeUrl: getNodeUrl(), showToast,
-    packs, appsUsing, details, expanded, docShown, filters, queries, shown,
+    packs, appsUsing, fonts, details, expanded, docShown, filters, queries, shown,
     setFilter: (key, patch) => { setFilters((f) => ({ ...f, [key]: { ...f[key], ...patch } })); setShownState((s) => ({ ...s, [key]: 20 })); },
     setQuery: (key, q) => { setQueries((m) => ({ ...m, [key]: q })); setShownState((s) => ({ ...s, [key]: 20 })); },
     setShown: (key, n) => setShownState((s) => ({ ...s, [key]: n })),

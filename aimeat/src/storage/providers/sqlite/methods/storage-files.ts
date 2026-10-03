@@ -17,6 +17,7 @@
  *   segment, merged onto SqliteStorage's prototype
  * @usage merged in providers/sqlite/index.ts alongside the other method groups
  * @version-history
+ *   v1.1.0 — 2026-10-03 — listFontFilesAcrossOwners: font files of every owner, one bounded query.
  *   v1.0.0 — 2026-08-15 — Extracted from methods/identity-nodes.ts (max-file-lines), carrying
  *     TARGET-063's getStorageFileMeta, readStorageFileRange and the UTF-8 verdict.
  */
@@ -51,6 +52,11 @@ function fileRowToRecord(r: Record<string, unknown>, data: Buffer): StorageFileR
 /** Everything except the bytes — the columns a metadata read, a listing and a range reply all need. */
 const META_COLUMNS =
   'key, ownerGaii, visibility, mimeType, size, tags, groupId, workspaceRef, federate, utf8Verified, createdAt';
+
+/** What a font file is, by its name or by its type. The same test on Postgres (methods/files.ts). */
+const FONT_FILE_WHERE =
+  "lower(mimeType) LIKE 'font/%' OR lower(mimeType) LIKE 'application/font%' OR lower(mimeType) LIKE 'application/x-font%'"
+  + " OR lower(key) LIKE '%.woff2' OR lower(key) LIKE '%.woff' OR lower(key) LIKE '%.ttf' OR lower(key) LIKE '%.otf'";
 
 export const storageFileMethods = {
   async createStorageFile(this: SqliteStorage, file: StorageFileRecord): Promise<StorageFileRecord> {
@@ -129,6 +135,16 @@ export const storageFileMethods = {
       (out[record.ownerGaii] ??= []).push(record);
     }
     return out;
+  },
+
+  async listFontFilesAcrossOwners(this: SqliteStorage, opts: { limit: number; excludeOwner?: string }): Promise<{ total: number; items: StorageFileRecord[] }> {
+    // One statement: the rows and, by a window count, how many matched. No bytes are read.
+    const rows = this.db.prepare(
+      `SELECT ${META_COLUMNS}, COUNT(*) OVER () AS total FROM storage_files
+       WHERE ownerGaii != ? AND (${FONT_FILE_WHERE})
+       ORDER BY createdAt DESC LIMIT ?`,
+    ).all(opts.excludeOwner ?? '', Math.max(0, Math.floor(opts.limit))) as Record<string, unknown>[];
+    return { total: rows.length ? Number(rows[0].total) : 0, items: rows.map(r => fileRowToRecord(r, Buffer.alloc(0))) };
   },
 
   async deleteStorageFile(this: SqliteStorage, ownerGaii: string, key: string): Promise<boolean> {

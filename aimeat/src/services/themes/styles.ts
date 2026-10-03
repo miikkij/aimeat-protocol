@@ -18,6 +18,8 @@
  * @structure Style · StyleInput · OnlyMode · builtinStyles · prepareStyle · styleSheet · swatchOf
  * @usage import { builtinStyles, prepareStyle, styleSheet } from './styles.js';
  * @version-history
+ *   v1.2.0 — 2026-10-03 — A style may choose a face the operator added (the font manager): the faces
+ *     and their stacks come from font-registry.ts, the base faces and the added ones together.
  *   v1.1.0 — 2026-09-26 — A stored style without a token added since takes the AIMEAT style's value for it, so --ink-ground and --on-ink-ground do not refuse an older style (Jouni's decision "dark-ground").
  *   v1.0.0 — 2026-09-24 — Initial: the style level of the two-level model (was the branch's "theme").
  */
@@ -25,7 +27,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveAssetDir } from '../../server-bootstrap/asset-dirs.js';
-import { THEME_TOKENS, THEME_FACES, FACE_SLOTS, faceStack, tokenKind, isThemeToken, type FaceSlot } from './tokens.js';
+import { THEME_TOKENS, FACE_SLOTS, tokenKind, isThemeToken, type FaceSlot } from './tokens.js';
+import { faceStackOf, themeFaceNames } from './font-registry.js';
 import { checkValue, toCss } from './values.js';
 import { builtinThemes, type TokenMap, type ThemeFaces } from './builtin.js';
 import { checkContrast, modeColours, type ContrastResult } from './contrast.js';
@@ -92,7 +95,7 @@ export function prepareStyle(input: StyleInput, base: Style): { style: Omit<Styl
     const faces: ThemeFaces = { ...base.faces };
     for (const [slot, face] of Object.entries(input.faces ?? {})) {
         if (!(slot in FACE_SLOTS)) { refused.push(`faces.${slot}: the faces are headline, body and mono`); continue; }
-        if (face && !THEME_FACES[face]) { refused.push(`faces.${slot}: "${face}" is not a face this server serves (${Object.keys(THEME_FACES).join(', ')})`); continue; }
+        if (face && !faceStackOf(face)) { refused.push(`faces.${slot}: "${face}" is not a face this server serves (${themeFaceNames().join(', ')})`); continue; }
         faces[slot as FaceSlot] = face || undefined;
     }
     const mode = input.onlyMode === undefined ? base.onlyMode : (input.onlyMode || null);
@@ -106,7 +109,7 @@ const declarations = (map: TokenMap, faces?: ThemeFaces): string[] => {
     for (const t of THEME_TOKENS) if (map[t.name] !== undefined) out.push(`  ${t.name}: ${map[t.name]};`);
     if (faces) for (const [slot, token] of Object.entries(FACE_SLOTS)) {
         const face = faces[slot as FaceSlot];
-        const stack = face ? faceStack(face) : undefined;
+        const stack = face ? faceStackOf(face) : undefined;
         if (stack) out.push(`  ${token}: ${stack};`);
     }
     return out;

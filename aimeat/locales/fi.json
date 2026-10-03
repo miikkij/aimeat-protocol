@@ -3325,7 +3325,9 @@
         "unlabelled": "{n} julkista kohdetta on ilman merkintää",
         "unlabelledOne": "yksi julkinen kohde on ilman merkintää",
         "sep": ", ",
-        "last": " ja "
+        "last": " ja ",
+        "fonts": "lisätyistä fonteista {n} on ilman lisenssitietoa",
+        "fontsOne": "yksi lisätty fontti on ilman lisenssitietoa"
       },
       "under": {
         "filled": "{entries} merkintää · {questions} kysymystä · vastauksia: tekoälyltä {ai}, sinulta {human}, kirjatusta {evidence}",
@@ -3348,7 +3350,10 @@
         "unansweredWhy": "on vastaamatta {n} kysymystä {total}:sta, joten sillä ei ole luokkaa.",
         "unansweredClear": "Jokaisen merkinnän kaikkiin kysymyksiin on vastattu.",
         "unlabelledWhy": "{n} julkista kohdetta on ilman merkintää. Pyydä ne julkaissutta sovellusta tai agenttia kertomaan, miten ne on tehty.",
-        "unlabelledClear": "Ei yhtään tällä jaksolla. {labelled} julkisessa kohteessa on merkintä, {unlabelled} on ilman."
+        "unlabelledClear": "Ei yhtään tällä jaksolla. {labelled} julkisessa kohteessa on merkintä, {unlabelled} on ilman.",
+        "fontsWhy": "on lisätty ilman lisenssiä tai tekijänoikeuden haltijaa, joten kukaan ei voi sanoa, että ne on hankittu laillisesti.",
+        "fontsClear": "Jokaisella tälle palvelimelle lisätyllä fontilla on lisenssi ja tekijänoikeuden haltija.",
+        "fontsWhyOne": "on lisätty ilman lisenssiä tai tekijänoikeuden haltijaa, joten kukaan ei voi sanoa, että se on hankittu laillisesti."
       },
       "clear": "puhdas",
       "toApps": "Sovelluksiin",
@@ -3512,7 +3517,9 @@
         "owner-your-slice": "Vain sinun omasi. Mikään tällä sivulla ei kerro kenenkään muun toiminnasta, eikä kukaan muu näe sinun tietojasi täältä.",
         "owner-register-is-the-operators": "Kirjaukset siitä mihin tekoälyä käytetään pitää se, joka pyörittää tätä asennusta, et sinä. Alla näkyvät ne merkinnät, jotka koskevat sinun tiliäsi. Jos jotain sinun toimintaasi puuttuu, se on keskustelu hänen kanssaan eikä asia jonka voit korjata täältä.",
         "owner-provenance-off": "Kirjaus on kytketty pois tästä asennuksesta, mikä ei ole sinun asetuksesi. Mitään ei kirjattu, joten jokainen yllä oleva luku on nolla siitä syystä eikä siksi ettet olisi tehnyt mitään."
-      }
+      },
+      "gapFonts": "Fontit ilman lisenssitietoa",
+      "toFonts": "Fontteihin"
     },
     "csm": {
       "listTitle": "Mikä on lukossa",
@@ -5414,6 +5421,14 @@
   "libspage.aiUsedK": "Kuka käyttää",
   "libspage.aiUsedBody": "Sama riippuvuuskartta kuin Laajennukset-sivulla: julkaistujen sovellusten lähdekoodista luetaan, mitä kirjastoja ne lataavat. {using} sovellusta {total} sovelluksesta käyttää jotakin näistä, ja {unused} kirjastoa ei ole vielä yhdessäkään sovelluksessa.",
   "libspage.aiUsedBodyShort": "Sama riippuvuuskartta kuin Laajennukset-sivulla: julkaistujen sovellusten lähdekoodista luetaan, mitä kirjastoja ne lataavat. {libs} kirjastoa on käytössä, ja {unused} kirjastoa ei ole vielä yhdessäkään sovelluksessa.",
+  "libspage.secFaces": "Fontit",
+  "libspage.secFacesSub": "fontit, joita sovellukset ja teemat voivat käyttää",
+  "libspage.facesIntro": "Kaikki tämän palvelimen fontit ja niiden lisenssit. Perusfontit tulevat palvelimen mukana, ja niiden lisenssit ovat vapaita. Lisätyt fontit on lisännyt palvelimen ylläpitäjä, joka vastaa niistä.",
+  "libspage.facesBase": "perusasennus",
+  "libspage.facesAdded": "lisätty tälle palvelimelle",
+  "libspage.facesUnknown": "Lisenssi tuntematon: lisenssiä tai tekijänoikeuden haltijaa ei kerrottu.",
+  "libspage.facesNoLicence": "lisenssiä ei kerrottu",
+  "libspage.facesCount": "{base} perus, {added} lisättyä",
   "capspage.titleSub": "mitä agentti löytää täältä nimellä ja voi kutsua",
   "capspage.chipCallable": "kutsuttavia {n}",
   "capspage.chipProviders": "tarjoajia {n}",
@@ -21348,7 +21363,9 @@
       "components": "Komponentit",
       "css": "Teeman CSS",
       "pages": "Oikeilla sivuilla",
-      "shapes": "Muodot"
+      "shapes": "Muodot",
+      "themes": "Teemat",
+      "fonts": "Fontit"
     },
     "styles": "Tyylit",
     "stylesHint": "Tyyli on yksi värijoukko vaaleassa ja tummassa tilassa, kolme kirjasinta ja tieto siitä, onko tyylillä molemmat tilat vai vain toinen. Ihmiset valitsevat tarjoamistasi tyyleistä.",
@@ -21600,6 +21617,78 @@
       "shapeTrackingAction": "Toimintojen ja välilehtien kirjainväli",
       "shapeCaseLabel": "Nimikkeiden kirjainkoko",
       "shapeTrackingLabel": "Nimikkeiden kirjainväli"
+    },
+    "fonts": {
+      "intro": "Fontit, joita teemasi ja Design Book voivat käyttää. Perusfontit tulevat palvelimen mukana, ja niiden lisenssit ovat vapaita. Voit lisätä tässä uusia fontteja. Ne ovat heti käytössä tällä palvelimella ilman päivitystä. Vastaat jokaisesta lisäämästäsi fontista, joten kerro sen lisenssi.",
+      "addedTitle": "Tälle palvelimelle lisätyt ({n})",
+      "addedHint": "Ylläpitäjän lisäämät fontit. Ne eivät koskaan kuulu perusasennukseen. Jokaisen kohdalla näkyy, mitä sen lisenssistä kerrottiin.",
+      "add": "Lisää fontti",
+      "noneAdded": "Fontteja ei ole vielä lisätty.",
+      "unknownCount": "Lisätyistä fonteista {n} on ilman lisenssitietoa: {list}. Tämä näkyy vaatimustenmukaisuusraportissa.",
+      "baseTitle": "Perusfontit ({n})",
+      "baseHint": "Nämä fontit tulevat palvelimen mukana. Niiden lisenssit ovat vapaita (SIL Open Font License 1.1). Lisenssitiedosto on /lib/fonts/LICENSE.md.",
+      "sample": "Aa Bb Cc Ää Öö Åå 0123",
+      "sampleOf": "Mallirivi fontilla {name}",
+      "base": "perusasennus",
+      "added": "lisätty tälle palvelimelle",
+      "weights": "painot {list}",
+      "noFiles": "ei vielä tiedostoja",
+      "licenceMissing": "lisenssiä ei kerrottu",
+      "usedBy": "Käytössä: {list}",
+      "unused": "Mikään tyyli ei käytä tätä.",
+      "source": "Lähde",
+      "notServed": "Ei vielä käytössä: yhtään tiedostoa ei ole ladattu.",
+      "licenceUnknown": "Lisenssi tuntematon: lisenssiä tai tekijänoikeuden haltijaa ei kerrottu. Lisää ne kohdasta Muuta.",
+      "licenceStated": "Lisenssi kerrottu",
+      "addedBy": "Lisääjä {who}, {date}",
+      "waiting": "Tiedostoista {n} puuttuu vielä.",
+      "change": "Muuta",
+      "remove": "Poista",
+      "inUse": "Jokin tyyli käyttää tätä fonttia. Valitse siihen tyyliin ensin toinen fontti ja poista tämä sitten.",
+      "removeTitle": "Poista fontti",
+      "removeConfirm": "Poistetaanko {name} ja sen tiedostot tältä palvelimelta? Poistoa ei voi perua.",
+      "ownersTitle": "Omistajien omat fontit",
+      "ownersHint": "Omistajat säilyttävät näitä tiedostoja omassa tallennustilassaan omia sovelluksiaan varten, ja jokainen omistaja vastaa omistaan. Ne eivät ole teemojen fontteja, eikä tämä luettelo muuta niitä.",
+      "ownersNone": "Kenelläkään omistajalla ei ole fonttia tallennustilassa.",
+      "ownersShown": "Näytetään {shown}/{total}, uusimmat ensin.",
+      "addTitle": "Lisää fontti",
+      "changeTitle": "Muuta: {name}",
+      "dialogHint": "Anna fontille nimi, valitse sen woff2-tiedostot ja kerro kunkin paino ja se, onko se kursiivi. Kerro sitten, mitä tiedät sen lisenssistä. Lisää vain fontteja, joita saat laillisesti käyttää.",
+      "family": "Nimi",
+      "familyHint": "Nimi, jonka tyyli valitsee, esimerkiksi Space Mono. Nimeä ei voi myöhemmin muuttaa.",
+      "kind": "Varafontti",
+      "kindHint": "Mitä sivu näyttää, kun fontti latautuu.",
+      "kinds": {
+        "sans-serif": "Groteski (sans serif)",
+        "serif": "Antiikva (serif)",
+        "monospace": "Tasalevyinen",
+        "cursive": "Käsialafontti"
+      },
+      "files": "woff2-tiedostot",
+      "filesHint": "Yksi tiedosto kullekin painolle, pystylle ja kursiiville, tai yksi muuttuva tiedosto. Jos fontti on jaettu osiin (latin, latin-ext), jokaisella osalla on oma tiedosto ja oma merkkialue.",
+      "weight": "Paino",
+      "style": "Pysty vai kursiivi",
+      "styleNormal": "Pysty",
+      "styleItalic": "Kursiivi",
+      "subset": "Osa (valinnainen)",
+      "range": "Merkkialue (valinnainen)",
+      "dropFile": "Jätä tämä tiedosto pois",
+      "licence": "Lisenssi",
+      "licenceHint": "Esimerkiksi OFL-1.1.",
+      "copyright": "Tekijänoikeuden haltija",
+      "copyrightHint": "Kuten fontissa lukee, esimerkiksi © 2016 Google Inc.",
+      "sourceField": "Mistä se on peräisin",
+      "sourceHint": "Osoite, joka alkaa https://",
+      "willBeUnknown": "Jos lisenssi ja tekijänoikeuden haltija puuttuvat, fontin lisenssi merkitään tuntemattomaksi, ja se näkyy vaatimustenmukaisuusraportissa.",
+      "uploading": "Ladataan tiedostoa {n}/{total}…",
+      "notWoff2": "{name} ei ole woff2-tiedosto. Muunna se woff2-muotoon ja yritä uudelleen.",
+      "saveChange": "Tallenna",
+      "addIt": "Lisää fontti",
+      "unknownCountOne": "Yksi lisätty fontti on ilman lisenssitietoa: {list}. Tämä näkyy vaatimustenmukaisuusraportissa.",
+      "changeHint": "Muuta fontin tiedostoja, niiden painoja ja kursiivia tai sitä, mitä sen lisenssistä tiedetään. Nimi pysyy samana.",
+      "needs": "Anna fontille nimi ja vähintään yksi woff2-tiedosto.",
+      "showBase": "Näytä {n} perusfonttia",
+      "ownerFacts": "{size} · {date}"
     }
   },
   "appcat": {
@@ -23815,7 +23904,27 @@
     "concept.knowledge.ex1": "Kahdenkymmenen asiakashaastattelun muistiinpanot pakattuina havainnoiksi, joissa jokaisessa on haastattelu, josta se on peräisin.",
     "concept.knowledge.ex2": "Lakimuutosta koskeva paketti, jonka jaat yhteiseen paikkaan, jotta jokaisen jäsenen tekoäly lukee samat tosiasiat.",
     "concept.knowledge.ex3": "Julkisen kirjaston paketti, jonka kopioit omaan tietopankkiisi lähteineen.",
-    "concept.knowledge.tip": "Tee paketti aineistosta, jota kannattaa säilyttää ja käyttää uudelleen. Arkiset muistiinpanot kuuluvat muistiin."
+    "concept.knowledge.tip": "Tee paketti aineistosta, jota kannattaa säilyttää ja käyttää uudelleen. Arkiset muistiinpanot kuuluvat muistiin.",
+    "themes": {
+      "font_licence": {
+        "title": "Fontin lisenssi",
+        "short": "Mitä fontin lisenssi sallii. Kerro lisenssi ja tekijänoikeuden haltija, muuten fontin lisenssi merkitään tuntemattomaksi.",
+        "what": "Fontti on ohjelmisto, ja sillä on lisenssi. Palvelimen mukana tulevien fonttien lisenssit ovat vapaita (SIL Open Font License 1.1). Kun lisäät fontin, vastaat siitä itse. Kerro sen lisenssi, tekijänoikeuden haltija fontin omin sanoin ja paikka, josta sait sen. Jos lisenssi tai tekijänoikeuden haltija puuttuu, fontin lisenssi merkitään tuntemattomaksi. Silloin kukaan ei voi sanoa, että fontti on hankittu laillisesti. Tämä näkyy Fontit-välilehdellä, Kirjastot-sivulla ja vaatimustenmukaisuusraportissa.",
+        "ex1": "OFL-1.1, © 2016 Google Inc., https://fonts.google.com/specimen/Space+Mono: vapaa fontti Google Fontsista.",
+        "ex2": "Yrityksesi ostama fontti: lisenssin nimi ostosta, fonttivalimo tekijänoikeuden haltijana ja oston osoite.",
+        "tip": "Lisää vain fontteja, joita saat laillisesti käyttää verkkosivulla. Omistajat vastaavat itse fonteista, joita he säilyttävät omia sovelluksiaan varten, eikä niitä lisätä tässä."
+      },
+      "font_weight": {
+        "title": "Tiedoston paino",
+        "short": "Kuinka paksuja tämän tiedoston kirjaimet ovat: 400 on tavallinen ja 700 lihavoitu. Muuttuvalle tiedostolle annetaan alue, esimerkiksi 100 900.",
+        "what": "Fontin jokainen tiedosto piirtää yhden painon, ja sivu ottaa sen tiedoston, jonka painoa teksti pyytää. Muuttuva tiedosto piirtää kaikki alueensa painot.",
+        "range": "1–1000 tai alue, esimerkiksi 100 900.",
+        "ex1": "400: tavallinen leikkaus.",
+        "ex2": "700: lihavoitu leikkaus.",
+        "ex3": "100 900: yksi muuttuva tiedosto kaikille painoille ohuesta mustaan.",
+        "tip": "Tiedoston nimi kertoo usein painon, esimerkiksi 700-normal-latin.woff2. Tämä sivu lukee painon nimestä, joten tarkista se."
+      }
+    }
   },
   "chat.starterProfile": "Tehdään sinulle profiili",
   "chat.starterProfileAsk": "Tehdään minulle profiili. Haastattele minua kysymys kerrallaan: mitä teen, mitä tarvitsen, mikä hidastaa työtäni ja mitkä työt toistuvat. Kirjoita sitten vastauksistani profiilisivuni, näytä se minulle ennen julkaisua ja kerro osoite, kun se on julkaistu.",

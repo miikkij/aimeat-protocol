@@ -9,6 +9,7 @@
  *   compliance-gaps.test.ts; this is the page's fold over what that computation serves.
  * @usage cd aimeat && pnpm exec vitest run test/unit/compliance-tab-gaps.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-03 — The fifth kind, font-licence-unknown (the font manager).
  *   v1.0.0 — 2026-09-05 — Initial (the Compliance page in the poster face).
  */
 import { describe, it, expect } from 'vitest';
@@ -53,7 +54,16 @@ describe('groupGaps', () => {
     expect(g.other).toHaveLength(1);
   });
   it('is empty and total 0 without gaps', () => {
-    expect(groupGaps(undefined)).toEqual({ total: 0, models: [], apps: [], usecases: [], unlabelled: 0, other: [] });
+    expect(groupGaps(undefined)).toEqual({ total: 0, models: [], apps: [], usecases: [], unlabelled: 0, fonts: [], other: [] });
+  });
+  it('groups the faces added without licence data by family', () => {
+    const g = groupGaps([
+      { kind: 'font-licence-unknown', evidence: { family: 'Space Mono' } },
+      { kind: 'font-licence-unknown', evidence: { family: 'Harbour Display' } },
+    ]);
+    expect(g.total).toBe(2);
+    expect(g.fonts).toEqual(['Harbour Display', 'Space Mono']);
+    expect(g.other).toHaveLength(0);
   });
 });
 

@@ -16,6 +16,7 @@
  * @structure ComponentCssState · componentCssState · themeSheet · catalogueHooks · servedFaces
  * @usage import { themeSheet, componentCssState } from './sheet.js';
  * @version-history
+ *   v1.2.0 — 2026-10-03 — servedFaces() reads font-registry.ts: the faces the operator added count too.
  *   v1.1.0 — 2026-09-24 — The theme's shape values, before its component CSS (07 "New components
  *     follow the theme").
  *   v1.0.0 — 2026-09-24 — Initial (replaces css.ts's hooks-only theme CSS).
@@ -23,13 +24,13 @@
 import { getUiComponent } from '../ui-library/catalogue.js';
 import { UI_ENTRY_SOURCES } from '../ui-library/entries.js';
 import type { UiThemeHook } from '../ui-library/types.js';
-import { THEME_FACES } from './tokens.js';
+import { themeFaceNames } from './font-registry.js';
 import { lintCss, touchesClasses, type CssWarning } from './css-lint.js';
 import { styleSheet, type Style } from './styles.js';
 import { shapeSheet } from './shapes.js';
 
-/** The families the node serves, for the face warning. */
-export const servedFaces = (): string[] => Object.keys(THEME_FACES);
+/** The families the node serves, for the face warning: the base faces and the ones the operator added. */
+export const servedFaces = (): string[] => themeFaceNames();
 
 /** Every component's theme hooks, keyed by component id (the usual things to change, S5). */
 export function catalogueHooks(): Record<string, { selector: string; hooks: UiThemeHook[] }> {

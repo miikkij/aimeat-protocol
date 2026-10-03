@@ -2011,6 +2011,14 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 review), the node's own read: system theme records, their earlier versions, and each person's theme choice."
     },
+    "src/services/themes/fonts.ts": {
+      "reads": {
+        "listAllMemoryMeta": 1,
+        "getMemory": 3,
+        "getStorageFile": 1
+      },
+      "why": "Reviewed 2026-10-03 (the font manager), the node's own read: the added-face records (ui.font.*) and their woff2 files, both under the node's system identity, served to every visitor as fonts.css and the face files. No person's content is read; the owners' fonts inventory reads file metadata only, through listFontFilesAcrossOwners."
+    },
     "src/services/track-registry.ts": {
       "reads": {
         "listAllMemory": 1

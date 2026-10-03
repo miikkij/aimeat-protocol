@@ -15,9 +15,11 @@
  *   (window.__aimeatLook.hold), so a theme that breaks pages cannot break the tool that repairs it.
  *   Built only from library parts, with no sheet of its own.
  * @structure ThemesTab (default) · ThemeRow · WhoChooses · NewThemeDialog; the "Ask your AI" section
- *   is themes-ai.js
+ *   is themes-ai.js, the Fonts tab themes-fonts.js
  * @usage Mounted by the admin dashboard tab router (views/admin.js), group Design.
  * @version-history
+ *   v2.3.0 — 2026-10-03 — Two tabs on the first screen: Themes, and Fonts (themes-fonts.js, the font
+ *     manager); ?view=fonts in the address opens the second.
  *   v2.2.0 — 2026-10-02 — "Ask your AI" between the themes and who chooses: the prompts for an AI with
  *     and without the MCP theme tools, and the paste box for a JSON answer (themes-ai.js).
  *   v2.1.0 — 2026-09-27 — No class written any more: the action links are Action, the loud actions
@@ -45,8 +47,10 @@ import { ActionRow } from '/components/ActionRow.js';
 import { Action, Loud, Actions } from '/components/Action.js';
 import { Note } from '/components/Note.js';
 import { Choice, StyleMarks, versionLabel } from './themes-bits.js';
+import { ModeTabs, ModeTab } from '/components/ModeTabs.js';
 import ThemeScreen from './themes-theme.js';
 import { AskAiBand } from './themes-ai.js';
+import FontsTab from './themes-fonts.js';
 
 const html = htm.bind(h);
 
@@ -155,6 +159,9 @@ export default function ThemesTab() {
   const [error, setError] = useState('');
   const [open, setOpen] = useState(/** @type {string|null} */ (null));
   const [making, setMaking] = useState(/** @type {null | { basedOn: string }} */ (null));
+  // The first screen's two tabs: the themes, and the faces they may choose (the font manager).
+  // ?view=fonts opens the second (the Compliance page's way to a face without licence data).
+  const [tab, setTab] = useState(() => (new URLSearchParams(location.search).get('view') === 'fonts' ? 'fonts' : 'themes'));
 
   // While this view is open the page wears the built-in theme: a theme cannot break its own repair tool.
   useEffect(() => {
@@ -191,7 +198,14 @@ export default function ThemesTab() {
     return html`<${ThemeScreen} themeId=${open} policy=${data.policy} vocabulary=${data.vocabulary}
       onBack=${() => { setOpen(null); load(); }} onCopied=${(id) => { setOpen(id); load(); }} />`;
   }
+  const tabs = html`
+    <${ModeTabs}>
+      <${ModeTab} on=${tab === 'themes'} onClick=${() => setTab('themes')}>${t('themes.tab.themes')}<//>
+      <${ModeTab} on=${tab === 'fonts'} onClick=${() => setTab('fonts')}>${t('themes.tab.fonts')}<//>
+    <//>`;
+  if (tab === 'fonts') return html`${tabs}<${FontsTab} />`;
   return html`
+    ${tabs}
     <${Hint}>${t('themes.intro')}<//>
     ${error && html`<${ErrorNote} text=${error} />`}
     <${Band} title=${t('themes.themes')}>
