@@ -140,6 +140,8 @@ and its shape. Symptom first in the section too, then cause, then the rule.
 | 105 | A suite's own node gets EADDRINUSE on a number no file names, Postgres sweep only | 5 |
 | 106 | Stop is pressed and the agent keeps working; the cancel test is green | 5 |
 | 107 | An app's record read beside it comes back empty, though the app has one | 1 |
+| 108 | Gate green, pushed, and an unrelated unit test red on the next full run | 2 |
+| 109 | A dialog opened from a label reads in the label's capitals and colour | · |
 
 ---
 
@@ -1218,3 +1220,11 @@ Two SESSIONS in one checkout is forbidden now (`CLAUDE.md`), so the case below i
 - **The case.** On 2026-10-02 kit 0.64.0 added the board family to `sdk-libs/atelier/describe-data.js` (three components with variants, six new per-component tokens). `test/unit/atelier-recipe.test.ts` holds the build-app-atelier spec's customisation section to that file, and it went red: the spec named neither the new variants nor the new token count. The gate's unit step runs `vitest run --changed <merge-base>`, which picks a test by its IMPORT graph, and the recipe test reads `describe-data.js` with `readFileSync`, so it is outside the graph of the file that changed. Four commits were pushed past it; found 2026-10-03 when a whole `test/unit/atelier` run was made for the handbook.
 - **The rule.** After a change to a generated registry (`describe-data.js`, the living `describe-data.js`, a library-pack list), run every unit test that names the file, not only the ones the gate picks: `grep -rl "<file name>" aimeat/test/unit` and run those. A spec text that counts or lists what a registry holds (`build-atelier-recipe.ts`) changes in the same commit as the registry.
 - **The tell.** `readFileSync(new URL('../../src/…', import.meta.url))` in a test: the gate cannot see what that test depends on.
+
+## 109. A native `<dialog>` takes the text styles of the element it is rendered in
+
+*Symptoms: a dialog opened from a label, a column head or a heading shows its whole text in that label's capitals, letter spacing and colour, although its own sheet sets none of them.*
+
+- **The case.** On 2026-10-03 the help question mark (`components/HelpTip.js`) was put after a Facts row's name, which is a `.poster-label`: uppercase, spaced, coral. The tooltip and the explanation dialog are children of the HelpTip span, and the explanation read as coral capitals. The dialog is the site's Modal on the browser's own `<dialog>` opened with `showModal()`. The top layer changes where a dialog is drawn, not where it sits in the DOM, so it inherits `color`, `font-*`, `letter-spacing`, `text-transform`, `line-height` and `text-align` from its DOM parent like any other element. The SPA has no portal (preact/compat is not loaded), so a dialog is always rendered at the place its component is called.
+- **The rule.** A component that renders a dialog or a tooltip inline resets the inherited text styles on its own wrapper to the body's tokens (`help-tip.css` `.help-tip`: `color`, `font-family`, `font-size`, `font-weight`, `line-height`, `letter-spacing`, `text-transform`, `text-align`), and its trigger button sets its own face. Where the caller controls the markup, put the trigger outside the styled element instead: `PageHead` draws its HelpTip after the `<h1>`, not inside it.
+- **The tell.** A Modal, a `<dialog>` or a `position: fixed` popover called from inside a label, a `th`, a heading or any element whose class sets `text-transform` or a colour. Open it once in the browser from that place, not from the design lab demo, where it sits in plain body text.
