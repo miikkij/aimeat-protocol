@@ -27,6 +27,8 @@
  *   // <button data-ak-do="submit" data-ak-target="/v1/intake/{org}/{ws}/{form}"
  *   //         data-ak-in="etunimi=#first, email=#mail" data-ak-out="#said">I will be there</button>
  * @version-history
+ *   v0.64.1 — 2026-10-03 — submit's plain fetch sends no cookie (credentials: 'omit'), so "no
+ *     session" holds on the node's own origin too; e2e-libs names it as the kit's fifth call.
  *   v0.64.0 — 2026-10-02 — Initial (wish-origami-atelieriin-ja-laudan-osat-kitin-lohkoiksi-ja-design-).
  */
 import { resolve } from './dom.js';
@@ -205,7 +207,9 @@ export function verbs(spec) {
         if (!Object.keys(input).length) { say(out, tb('verbs.nothing'), true); return; }
         say(out, tb('verbs.sending'));
         const poster = adapters.submit || async function (u, body) {
-          const res = await fetch(u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+          // No session, and no cookie either: the node's refresh cookie lives under /v1/auth, and a
+          // card that named that path would otherwise send it from the node's own page.
+          const res = await fetch(u, { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           const got = await res.json().catch(function () { return {}; });
           if (!res.ok || got.ok === false) throw new Error((got.error && (got.error.message || got.error.code)) || ('HTTP ' + res.status));
           return got;

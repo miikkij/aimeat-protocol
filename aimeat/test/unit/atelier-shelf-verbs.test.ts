@@ -6,6 +6,7 @@
  *   timer, save and ai behind the sign-in, submit with no session, offer and tool through
  *   adapters, a refused verb's words).
  * @version-history
+ *   v1.0.1 - 2026-10-03 - submit sends no cookie: the call carries credentials 'omit'.
  *   v1.0.0 - 2026-10-02 - Initial (wish-origami-atelieriin-ja-laudan-osat-kitin-lohkoiksi-ja-design-).
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -202,7 +203,7 @@ describe('verbs', () => {
     ]);
     const v = verbsKit.verbs({ root: host, signedIn: () => false });
     await v.run(made[3]);
-    expect(posts).toEqual([{ url: '/v1/intake/o/w/f', body: { etunimi: 'Anna', email: 'anna@example.test', lahde: 'card' }, creds: undefined }]);
+    expect(posts).toEqual([{ url: '/v1/intake/o/w/f', body: { etunimi: 'Anna', email: 'anna@example.test', lahde: 'card' }, creds: 'omit' }]);
     expect(made[2].textContent).toBe('Thank you, that is sent.');
     expect(made[0].value).toBe('');
     await v.run(made[4]);

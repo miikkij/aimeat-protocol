@@ -9,7 +9,9 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-app-agent-deploy
  * @version-history
- *   v1.3.0 — 2026-10-01 — A deploy with no crew-forge becomes an agent proposal on the deployer's
+ *   v1.3.1 — 2026-10-03 — The sibling's 32-character name is trimmed of a trailing hyphen; with a
+ *     three-digit owner suffix the cut ended in one and the node refused it (1 run in about 100).
+ *   v1.3.0 — 2026-10-01 —A deploy with no crew-forge becomes an agent proposal on the deployer's
  *     own open items (201 kind 'proposed'), no longer 404 RUNNER_NOT_FOUND. The source changed on
  *     purpose (crew-forge left the basic agents on 2026-09-02); the cross-owner assertion stays.
  *   v1.2.0 — 2026-09-13 — The presigned road carries cortex.agents: a valid crew-def survives mint
@@ -371,7 +373,9 @@ async function main() {
             ['memory:read', 'memory:write', 'agent:write']);
         const r = await json('/v1/agents/device-authorize', {
             method: 'POST', headers: { Authorization: `Bearer ${approver.token}` },
-            body: JSON.stringify({ owner: owner1, agent_name: DEPLOYED().slice(0, 32), mode: 'task-runner', scopes: ['memory:read', 'memory:write'] }),
+            // Cut, then trimmed: with a three-digit owner suffix (bundler100-999) the 32nd character is
+            // a hyphen, an agent name may not end in one, and the nightly sweep of 2026-10-03 got 400.
+            body: JSON.stringify({ owner: owner1, agent_name: DEPLOYED().slice(0, 32).replace(/-+$/, ''), mode: 'task-runner', scopes: ['memory:read', 'memory:write'] }),
         });
         assert(r.status === 200 && r.body.data.auto_approved === true, `agent auto: ${r.status} ${JSON.stringify(r.body.data)}`);
         const p = await json('/v1/agents/device-token', {

@@ -5,7 +5,9 @@
  *   plus the /v1/libs catalogue and the generated JS sources themselves.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=libs
  * @version-history
- *   v1.13.0 — 2026-09-28 — The workbench: its seven pieces asserted as exports, workbench.css
+ *   v1.13.1 — 2026-10-03 — Atelier's network boundary names five calls: the card verbs' submit
+ *     (0.64.0) joins the four, and it must send no cookie.
+ *   v1.13.0 — 2026-09-28 —The workbench: its seven pieces asserted as exports, workbench.css
  *     among the fetched parts (it holds no animation, so the infinite count is unchanged), and
  *     the workbench look among the preset blocks.
  *   v1.12.0 — 2026-09-05 — The effects (wish-atelier-post-process-effects): fx and fxPlay
@@ -1202,12 +1204,15 @@ await test('GET /v1/libs/aimeat-atelier.js — one named network call, and no ha
     // Earth shapes, no external host), the commercial module's sessionless GET of the app's
     // OWN public legal surface (pre-contract information, served without the access code), and
     // the marks switches' relay through the SESSION the shell handed the app (session.fetch —
-    // the credential lives in the auth library, never here). Everything else still renders
-    // what the host supplies, so the assertion stays "exactly these", never "some calls are
-    // fine now".
+    // the credential lives in the auth library, never here). A FIFTH since 2026-10-02 (0.64.0,
+    // the card verbs): `submit` posts a card's fields to the address the card names, with no
+    // session and no cookie (credentials: 'omit'), as a public form would. Everything else still
+    // renders what the host supplies, so the assertion stays "exactly these", never "some calls
+    // are fine now".
     const fetches = code.match(/\bfetch\s*\(/g) || [];
-    assert(fetches.length === 4,
-        `exactly four matched calls — layout, atlas geometry, legal surface, session relay — found ${fetches.length}`);
+    assert(fetches.length === 5,
+        `exactly five matched calls — layout, atlas geometry, legal surface, session relay, card submit — found ${fetches.length}`);
+    assert(/credentials:\s*["']omit["']/.test(code), 'the card submit sends no session and no cookie');
     assert(code.includes('/lib/aimeat-atlas@1.json'), 'one call targets the vendored atlas geometry');
     assert(code.includes('/legal'), 'one call targets the app\'s own public legal surface');
     assert((code.match(/session\.fetch\s*\(/g) || []).length === 1,
