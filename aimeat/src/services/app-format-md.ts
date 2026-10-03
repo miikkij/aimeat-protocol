@@ -24,9 +24,12 @@
  *   string is taken too). Anything else, a refusal, a timeout or a result past the 256 KB face cap,
  *   is logged and answers null, and the node serves what it served before: the stored face or the
  *   converted HTML. The caller's per-version cache bounds how often an anonymous GET starts a sandbox.
- * @structure parseFormatMdMeta(html) · formatMdRefusal(storage, ownerName, decl) · renderAppMarkdown(deps, app)
+ * @structure withoutComments(text) · parseFormatMdMeta(html) · formatMdRefusal(storage, ownerName, decl) · renderAppMarkdown(deps, app)
  * @usage const md = await renderAppMarkdown({ storage, config }, app); // string or null
  * @version-history
+ *   v1.0.1 — 2026-10-03 — parseFormatMdMeta() takes comments out with withoutComments(), as a browser
+ *     reads them, including one that never closes; the regex strip could leave a `<!--` behind
+ *     (CodeQL alert 1696).
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import type { AimeatConfig } from '../config.js';
@@ -43,13 +46,33 @@ const NAME = /^[a-z0-9][a-z0-9-]{1,126}[a-z0-9]$/;
 const ACTION = /^[A-Za-z0-9_-]{1,100}$/;
 
 /**
+ * The text with its HTML comments taken out, read the way a browser reads them: a comment runs from
+ * `<!--` to the next `-->`, and one that never closes runs to the end. A regex strip
+ * (`/<!--[\s\S]*?-->/g`) left a `<!--` behind in two ways (CodeQL alert 1696): a comment that never
+ * closes stayed whole, and removing one joined the text around it, `<!` and `--`, into a new one.
+ * A space stands where each comment was, so nothing joins.
+ */
+function withoutComments(text: string): string {
+  let out = '';
+  let at = 0;
+  for (;;) {
+    const open = text.indexOf('<!--', at);
+    if (open === -1) return out + text.slice(at);
+    out += text.slice(at, open) + ' ';
+    const close = text.indexOf('-->', open + 4);
+    if (close === -1) return out;
+    at = close + 3;
+  }
+}
+
+/**
  * The declaration in the app's head, or null when there is none. A meta that is present and does not
  * read as an extension action is `{ error }`, so the publish can refuse it with the reason.
  */
 export function parseFormatMdMeta(html: string): FormatMdDeclaration | { error: string } | null {
   // Comments out first: an app's header comment that MENTIONS the tag (the Experience Center's
   // version history does) is not a declaration, and matched first it read as an empty one.
-  const head = html.slice(0, 65536).replace(/<!--[\s\S]*?-->/g, '');
+  const head = withoutComments(html.slice(0, 65536));
   const m = /<meta\b[^>]*name\s*=\s*["']aimeat-format-md["'][^>]*>/i.exec(head);
   if (!m) return null;
   const content = /content\s*=\s*["']([^"']*)["']/i.exec(m[0])?.[1]?.trim() ?? '';

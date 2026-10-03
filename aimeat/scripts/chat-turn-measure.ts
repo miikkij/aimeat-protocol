@@ -31,7 +31,9 @@
  *   options: --port 40471 (the proxy takes the next) · --model deepseek/deepseek-v4-pro-0813 · --lang fi · --wait-s 240 · --out <file.json>
  *     · --allow-uncapped (only when the key's owner said so)
  * @version-history
- *   v1.1.0 — 2026-10-02 — A capped test key only (OPENROUTER_TEST_KEY); the cost and the tokens of
+ *   v1.1.1 — 2026-10-03 — The recording proxy forwards only the three endpoints the node calls, each
+ *     a constant URL (CodeQL js/request-forgery, alert 1697).
+ *   v1.1.0 — 2026-10-02 —A capped test key only (OPENROUTER_TEST_KEY); the cost and the tokens of
  *     every model call, from a recording proxy.
  *   v1.0.0 — 2026-10-02 — Initial.
  */
@@ -87,6 +89,12 @@ async function assertCapped(key: string): Promise<{ limit: number; remaining: nu
     return { limit, remaining: body.data?.limit_remaining ?? null };
 }
 
+/**
+ * The only OpenRouter endpoints the recording proxy forwards: the ones the node calls through its
+ * OpenRouter base URL (services/openrouter.ts: the chat call, the cost lookup, the model list).
+ */
+const FORWARDED = ['/api/v1/chat/completions', '/api/v1/generation', '/api/v1/models'] as const;
+
 /** One model call, as the recording proxy saw it. */
 interface ModelCall { t: number; tools: number; requestChars: number; prompt?: number; cached?: number; completion?: number; cost?: number }
 
@@ -109,9 +117,16 @@ function startRecorder(port: number, started: () => number): { calls: ModelCall[
             const forwarded = req.method === 'POST' ? JSON.stringify(parsed) : undefined;
             const call: ModelCall = { t: started(), tools: Array.isArray(parsed.tools) ? parsed.tools.length : 0, requestChars: body.length };
             if (req.method === 'POST' && req.url?.endsWith('/chat/completions')) calls.push(call);
+            // Only the endpoints the node calls, each a constant: `https://openrouter.ai${req.url}` sent a
+            // path that starts with `@` to another host, carrying the key (CodeQL js/request-forgery, 1697).
+            const asked = new URL(req.url ?? '/', 'http://127.0.0.1');
+            const path = FORWARDED.find((p) => p === asked.pathname);
+            if (!path) { res.writeHead(404).end(); return; }
+            const id = path === '/api/v1/generation' ? asked.searchParams.get('id') : null;
+            const target = `https://openrouter.ai${path}${id ? `?id=${encodeURIComponent(id)}` : ''}`;
             const headers: Record<string, string> = {};
             for (const [k, v] of Object.entries(req.headers)) if (typeof v === 'string' && !['host', 'content-length', 'connection'].includes(k)) headers[k] = v;
-            const upstream = await fetch(`https://openrouter.ai${req.url}`, { method: req.method, headers, body: forwarded });
+            const upstream = await fetch(target, { method: req.method, headers, body: forwarded });
             res.writeHead(upstream.status, { 'content-type': upstream.headers.get('content-type') ?? 'application/json' });
             const reader = upstream.body?.getReader();
             let tail = '';
