@@ -11,6 +11,8 @@
  * @structure UsageRecord · todayKey · getTodayUsage · recordAiUsage
  * @usage import { getTodayUsage, recordAiUsage, type UsageRecord } from './ai-completion.js';
  * @version-history
+ *   v1.3.0 — 2026-10-03 — A call that names no app is filed under its endpoint (`source`) instead of
+ *     `_unknown`, and `per_agent` splits each agent's spend by app or endpoint.
  *   v1.2.0 — 2026-09-28 — `priceRef` on a call: the ledger cites where a caller-priced cost came from
  *     (the model catalogue's snapshot, or the estimate), not the provider (System 2 plan, V4).
  *   v1.1.0 — 2026-09-20 — `per_agent` and the `agent` a call names, for the per-agent daily cap; the
@@ -37,7 +39,11 @@ export interface UsageRecord {
   per_app: Record<string, { cost_usd: number; calls: number; tokens: number; audio_seconds?: number }>;
   /** Spend by the owner's agents, by bare agent name: what the per-agent daily cap is checked
    *  against (services/agent-ai-keys.ts). Absent on a day no agent spent. */
-  per_agent?: Record<string, { cost_usd: number; calls: number; tokens: number }>;
+  per_agent?: Record<string, {
+    cost_usd: number; calls: number; tokens: number;
+    /** The same agent's spend split by app, or by endpoint for a call that named no app. */
+    per_app?: Record<string, { cost_usd: number; calls: number; tokens: number }>;
+  }>;
   updated_at: string;
 }
 
@@ -140,6 +146,11 @@ async function appendAiUsage(
   config?: AimeatConfig,
 ): Promise<UsageRecord> {
   usage = await getTodayUsage(storage, gaii);
+  // A call that names no app is filed under the endpoint it came through (`ai-image`, `ai-embed`,
+  // `ai-complete`, `llm-proxy`), never under `_unknown`: a crew's picture made with its own agent
+  // token sat in `_unknown` beside its text calls under `llm-proxy`, and the owner could not tell
+  // who spent it (hosted check, 2026-10-03). `_unknown` is left only for a caller that names neither.
+  const appKey = canonicalAiAppId(call.appId, gaii) || call.source || '_unknown';
   const updated: UsageRecord = {
     date: todayKey(),
     total_cost_usd: usage.total_cost_usd + call.costUsd,
@@ -148,10 +159,9 @@ async function appendAiUsage(
     audio_seconds: (usage.audio_seconds ?? 0) + (call.audioSeconds ?? 0),
     // Folded on write, so a day that began under an older name continues as one app.
     per_app: mergePerApp(usage.per_app, gaii),
-    ...(usage.per_agent || call.agent ? { per_agent: addAgentSpend(usage.per_agent, call.agent, call) } : {}),
+    ...(usage.per_agent || call.agent ? { per_agent: addAgentSpend(usage.per_agent, call.agent, { ...call, app: appKey }) } : {}),
     updated_at: new Date().toISOString(),
   };
-  const appKey = canonicalAiAppId(call.appId, gaii) || '_unknown';
   const existing = updated.per_app[appKey] ?? { cost_usd: 0, calls: 0, tokens: 0 };
   updated.per_app[appKey] = {
     cost_usd: existing.cost_usd + call.costUsd,

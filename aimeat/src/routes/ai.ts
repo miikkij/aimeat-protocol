@@ -21,6 +21,8 @@
  *   import { aiRouter } from './routes/ai.js';
  *   app.use(aiRouter(config, storage));
  * @version-history
+ *   v1.x — 2026-10-03 — GET /v1/ai/usage answers `per_agent`: each agent's spend today, split by app,
+ *     or by endpoint for a call that named no app (services/ai-usage-record.ts).
  *   v1.x — 2026-09-30 — /complete and /transcribe answer `classification_warnings` when a file or the
  *     audio the model was given is warning-classified (TARGET-082 review, item 2). A file the
  *     classification keeps from every model answers its own 403 CLASSIFIED on both; /complete said
@@ -455,6 +457,8 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
         total_calls: usage.total_calls,
         total_tokens: usage.total_tokens,
         per_app: usage.per_app,
+        // Which of the owner's agents spent what today, each split by app or endpoint.
+        per_agent: usage.per_agent ?? {},
       }));
     });
 

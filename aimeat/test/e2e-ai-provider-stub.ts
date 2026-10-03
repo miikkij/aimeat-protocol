@@ -606,6 +606,41 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
         assert(provider.requests.length === before, 'neither refusal reached a provider');
     });
 
+    await test('5f. An agent\'s image and vision calls with no app id are filed under the agent and the door, never _unknown', async () => {
+        // Found on a hosted crew, 2026-10-03: the concierge's picture (0.04 USD, its own agent token,
+        // no app id) sat under per_app `_unknown` while its text calls sat under `llm-proxy`, so the
+        // owner could not see who spent it. A fresh owner, so the usage record holds only these calls.
+        const d = await setupOwner('d');
+        await pointAtStub(d, provider);
+        const crewAgentName = `aistubcrew${Date.now()}`;
+        const crewAgent = await connectAgent(d, crewAgentName, ['ai:use']);
+
+        provider.queue('images', imageJson({ b64: PNG, cost: 0.04 }));
+        const img = await json('/v1/ai/image', {
+            method: 'POST', headers: auth(crewAgent), body: JSON.stringify({ prompt: 'a red bicycle', model: MODEL }),
+        });
+        assert(img.status === 200, `image: expected 200, got ${img.status}: ${JSON.stringify(img.body?.error)}`);
+
+        provider.queue('chat', chatJson('A bicycle.'), carries('MARK-CREW-VISION'));
+        const vision = await json('/v1/ai/complete', {
+            method: 'POST', headers: auth(crewAgent),
+            body: JSON.stringify({ prompt: 'MARK-CREW-VISION', images: [`data:image/png;base64,${PNG}`] }),
+        });
+        assert(vision.status === 200, `vision: expected 200, got ${vision.status}: ${JSON.stringify(vision.body?.error)}`);
+
+        const usage = await json('/v1/ai/usage', { headers: auth(d.token) });
+        assert(usage.status === 200, `usage ${usage.status}`);
+        const { per_app: perApp, per_agent: perAgent } = usage.body.data;
+        assert(perApp._unknown === undefined, `nothing is filed under _unknown: ${JSON.stringify(perApp)}`);
+        assert(perApp['ai-image']?.calls === 1 && perApp['ai-image'].cost_usd === 0.04,
+            `the picture is filed under the image door: ${JSON.stringify(perApp)}`);
+        assert(perApp['ai-complete']?.calls === 1, `the vision call is filed under the completion door: ${JSON.stringify(perApp)}`);
+        const mine = perAgent?.[crewAgentName];
+        assert(mine?.calls === 2, `both calls are filed under the agent: ${JSON.stringify(perAgent)}`);
+        assert(mine.per_app?.['ai-image']?.cost_usd === 0.04 && mine.per_app?.['ai-complete']?.calls === 1,
+            `the agent's spend says which door it went through: ${JSON.stringify(mine)}`);
+    });
+
     // ── 6. /v1/ai/complete: the branches a completion can end in ──────────────
 
     const complete = (body: Record<string, unknown>) => json('/v1/ai/complete', {
