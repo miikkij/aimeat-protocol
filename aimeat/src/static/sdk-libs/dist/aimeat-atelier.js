@@ -13,6 +13,109 @@
     return ns;
   }
 
+  // src/static/sdk-libs/atelier/added-faces.js
+  var ADDED_FACES_HREF = "/v1/themes/fonts.css";
+  var ADDED_FACES_LINK_ID = "ak-added-faces";
+  var FACE_TOKENS = ["--ak-font", "--ak-font-display"];
+  var SYSTEM_FACES = /* @__PURE__ */ new Set([
+    "serif",
+    "sans-serif",
+    "monospace",
+    "cursive",
+    "fantasy",
+    "system-ui",
+    "ui-serif",
+    "ui-sans-serif",
+    "ui-monospace",
+    "ui-rounded",
+    "math",
+    "emoji",
+    "fangsong",
+    "-apple-system",
+    "blinkmacsystemfont",
+    "segoe ui",
+    "roboto",
+    "helvetica neue",
+    "helvetica",
+    "arial",
+    "verdana",
+    "tahoma",
+    "trebuchet ms",
+    "georgia",
+    "times new roman",
+    "times",
+    "palatino",
+    "garamond",
+    "courier new",
+    "courier",
+    "consolas",
+    "menlo",
+    "monaco",
+    "impact",
+    "inherit",
+    "initial",
+    "unset",
+    "revert"
+  ]);
+  function firstFamily(stack) {
+    const s = String(stack || "").trim();
+    if (!s) return "";
+    const q = s[0];
+    if (q === '"' || q === "'") {
+      const end = s.indexOf(q, 1);
+      return (end > 0 ? s.slice(1, end) : s.slice(1)).trim();
+    }
+    return s.split(",")[0].trim();
+  }
+  function needsAddedFaces(families, declared2) {
+    const known3 = /* @__PURE__ */ new Set();
+    for (const f of declared2) known3.add(String(f).replace(/^["']|["']$/g, "").trim().toLowerCase());
+    return families.some((f) => {
+      const name = String(f || "").trim().toLowerCase();
+      return !!name && !SYSTEM_FACES.has(name) && !known3.has(name);
+    });
+  }
+  function declaredFamilies() {
+    const out = [];
+    const set = document.fonts;
+    if (set && typeof set.forEach === "function") set.forEach((face) => {
+      out.push(face.family);
+    });
+    return out;
+  }
+  function check() {
+    if (document.getElementById(ADDED_FACES_LINK_ID)) return;
+    const hosts = [document.documentElement, document.querySelector(".ak-app")].filter(Boolean);
+    const families = [];
+    for (const host of hosts) {
+      const cs = getComputedStyle(
+        /** @type {Element} */
+        host
+      );
+      for (const name of FACE_TOKENS) families.push(firstFamily(cs.getPropertyValue(name)));
+    }
+    if (!needsAddedFaces(families, declaredFamilies())) return;
+    const link = document.createElement("link");
+    link.id = ADDED_FACES_LINK_ID;
+    link.rel = "stylesheet";
+    link.href = ADDED_FACES_HREF;
+    (document.head || document.documentElement).appendChild(link);
+  }
+  var armed = false;
+  function loadAddedFaces(link) {
+    if (armed || typeof document === "undefined") return;
+    armed = true;
+    if (!link || link.sheet) {
+      check();
+      return;
+    }
+    const run = () => {
+      check();
+    };
+    link.addEventListener("load", run, { once: true });
+    link.addEventListener("error", run, { once: true });
+  }
+
   // src/static/sdk-libs/atelier/dom.js
   function wearLook(node, from) {
     if (!node || node.hasAttribute("data-ak-look")) return node;
@@ -152,6 +255,7 @@
       link.href = o.href || "/lib/aimeat-atelier.css";
       head.insertBefore(link, head.firstChild);
     }
+    loadAddedFaces(link);
     let style = (
       /** @type {HTMLStyleElement|null} */
       document.getElementById("ak-style-extra")
@@ -25961,7 +26065,7 @@
       }
     };
   }
-  function check() {
+  function check2() {
     const mark = svg("svg", { viewBox: "0 0 24 24", width: 20, height: 20, "aria-hidden": "true", class: "ak-island__check", "data-ak-part": "check" });
     mark.appendChild(svg("path", { d: "M5 12.5l4.2 4.2L19 7", pathLength: 1 }));
     return mark;
@@ -25994,7 +26098,7 @@
       root.removeAttribute("aria-busy");
       if (next === "done") {
         status.textContent = s.done || t("done");
-        isl.set({ content: s.done ? [check(), el("span", { text: s.done })] : check(), shape: s.done ? "pill" : "circle", tone: "ok" });
+        isl.set({ content: s.done ? [check2(), el("span", { text: s.done })] : check2(), shape: s.done ? "pill" : "circle", tone: "ok" });
         timer = setTimeout(function() {
           set("idle");
         }, DONE_HOLD);
@@ -29230,7 +29334,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.65.0",
+    version: "0.65.1",
     /**
      * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
      * named parts (every one carries `data-ak-part`, so an app's own CSS reaches it), the slots

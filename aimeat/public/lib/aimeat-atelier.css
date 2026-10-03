@@ -56,6 +56,8 @@
  *   wearLook reads the page's look for a dialog, a menu or a toast. Inside an app frame the
  *   frame's own data-ak-look wins.
  * @version-history
+ *   v0.65.1 — 2026-10-03 — No style changed: the script's version, for the faces the operator adds
+ *     to the node (the kit links /v1/themes/fonts.css when a look names one; atelier/added-faces.js).
  *   v0.65.0 — 2026-10-03 — handbook.css: the handbook (an app's manual from its header, from the
  *     side or as a dialog); --ak-handbook-w is its own (wish-ohjekirja-komponentti-atelieriin-sis-llysluettelo-ohjeet-app).
  *   v0.64.0 — 2026-10-02 — board.css: the board family (board, requestPanel, shelf) from ORIGAMI

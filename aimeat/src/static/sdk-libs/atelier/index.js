@@ -6,14 +6,16 @@
  *   i18n layers underneath. Load one script and an Atelier app has its frame, its states and its
  *   motion without writing any of it.
  *
- *   IT RENDERS; IT DOES NOT FETCH — WITH TWO NAMED EXCEPTIONS. The library imports no
+ *   IT RENDERS; IT DOES NOT FETCH — WITH THREE NAMED EXCEPTIONS. The library imports no
  *   `_core/session.js`, holds no credentials, no state beyond what it was last told, and reports
  *   events rather than acting on them. The mosaic module is the first exception: one sessionless
  *   GET of the app's OWN public layout record (`/v1/apps/:owner/:filename/ui`), which is as
  *   public as the app itself and read the way the stylesheet is read. The commercial module is
  *   the second, in the same class: one sessionless GET of the app's OWN public legal surface
  *   (`/v1/apps/:owner/:filename/legal`) — pre-contract information, served without the access
- *   code. The other outward glance is feature-detecting window.AIMEAT.auth (and, in the
+ *   code. The added-faces module is the third, in the same class again: when, and only when, the
+ *   look names a face the node's operator added, it links the public `/v1/themes/fonts.css` of the
+ *   app's own origin (added-faces.js). The other outward glance is feature-detecting window.AIMEAT.auth (and, in the
  *   commercial module, AIMEAT.rows / AIMEAT.intake) so components can ride the libraries the
  *   app loaded; with none of them on the page everything still renders and degrades in words.
  *
@@ -55,6 +57,9 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.65.1 — 2026-10-03 — ADDED FACES (added-faces.js): a look whose --ak-font or --ak-font-display
+ *     names a face the operator added to the node (the font manager) gets /v1/themes/fonts.css
+ *     linked once, after the kit's stylesheet has loaded; a look on the base faces loads nothing more.
  *   v0.65.0 — 2026-10-03 — THE HANDBOOK (handbook.js, handbook.css): an app's manual from its
  *     header. A table of contents, one chapter at a time, a search, chapters from the app's list
  *     and from every element on the page that carries data-ak-help, every word per language, and a
@@ -468,7 +473,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.65.0',
+  version: '0.65.1',
 
   /**
    * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
