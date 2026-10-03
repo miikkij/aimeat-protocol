@@ -21,6 +21,9 @@
  *   const spaPath = resolvePublicFile('spa.html');
  *   if (spaPath) serveSpa(res, spaPath, config, '/v1/glossary');
  * @version-history
+ *   v1.7.0 — 2026-10-03 — The build watchdog runs in the top window only: a framed shell (the design
+ *     lab's previews, Themes & Styles) is reloaded with its parent, and dozens of frames each polling
+ *     /v1/build added their requests to a page that had already run out of them.
  *   v1.6.0 — 2026-09-30 — A route with no registry page gets <meta name="robots" content="noindex, follow">.
  *   v1.5.0 — 2026-09-24 — The shell carries window.__AIMEAT_THEMES (Themes & Styles) before its first
  *     paint: the offered themes, their styles and each theme's own stamped sheet.
@@ -131,6 +134,8 @@ export function serveSpa(
   // moment the server reports a different BUILD_ID (i.e. it restarted with new code), reloads the
   // page so fresh ES modules are fetched. This kills the recurring "restarted the server but the
   // open tab still runs old code until a manual hard refresh" problem — no F5 ever needed.
+  // Only the top window watches: a shell inside a frame (the design lab's previews) is reloaded
+  // with the page around it, and a gallery of frames each polling would multiply the requests.
   const nonceAttr = nonce ? ` nonce="${nonce}"` : '';
   const bootScript =
     `window.__B="${v}";` +
@@ -142,7 +147,7 @@ export function serveSpa(
     // Injected rather than fetched so the first paint already knows which nav items and
     // sections exist. Empty on a fresh clone, and every consumer treats empty as "absent".
     `window.__SITE=${JSON.stringify(publicSiteLinks(config))};` +
-    `(function(){var c="${BUILD_ID}";` +
+    `(function(){if(window.self!==window.top)return;var c="${BUILD_ID}";` +
     `function chk(){fetch("/v1/build",{cache:"no-store"}).then(function(r){return r.ok?r.json():null;})` +
     `.then(function(d){if(d&&d.build&&d.build!==c){location.reload();}}).catch(function(){});}` +
     `document.addEventListener("visibilitychange",function(){if(!document.hidden)chk();});` +

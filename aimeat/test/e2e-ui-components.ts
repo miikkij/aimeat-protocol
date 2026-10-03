@@ -12,6 +12,7 @@
  *   and a signed-in one must read the same thing.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ui-components
  * @version-history
+ *   v1.3.0 — 2026-10-03 — The preview page's build watchdog returns early inside a frame.
  *   v1.2.0 -- 2026-09-27 -- The chip is active after its adoption. Check status filters against the
  *     complete catalogue, including a non-empty active result (September full-run UI finding).
  *   v1.1.0 — 2026-09-23 — The design lab's preview page is served as the app (phase 2).
@@ -150,6 +151,10 @@ await test("The design lab's preview page is served as the app", async () => {
     assert(res.status === 200, `preview page: ${res.status}`);
     // The server stamps a nonce on the tag, so the attribute order is not fixed.
     assert(/<script[^>]*type="importmap"/.test(body), 'it is the app shell');
+    // Only the top window polls /v1/build: the lab's overview held 254 of these frames, each
+    // polling, on a page that had already run out of connections (2026-10-03).
+    assert(/\(function\(\)\{if\(window\.self!==window\.top\)return;var c="[^"]+";function chk\(\)/.test(body),
+        'the build watchdog returns early inside a frame');
 });
 
 let mcpToken = '';
