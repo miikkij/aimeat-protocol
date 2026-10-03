@@ -13,6 +13,10 @@
  *   palettes gets the faces) and linked directly by the served pages that do not read the palettes
  *   (connect, the developer page, the front-page variants). Nothing on the node links a font CDN.
  * @version-history
+ *   v1.3.0 — 2026-10-03 — Two more faces for two themes Jouni asked for: Press Start 2P (Google
+ *     Fonts, latin + latin-ext subsets) for a Commodore 64 theme, and Selawik 1.01 (Microsoft's
+ *     open-source face with Segoe UI's metrics, five static cuts from its GitHub release, each file
+ *     whole) for an Azure portal theme. Both SIL OFL 1.1, rows in /lib/fonts/LICENSE.md.
  *   v1.2.0 — 2026-10-02 — Eleven more faces a theme may choose (Jouni: "if fonts are short, put
  *     more in the package"): Instrument Serif (roman and italic), Instrument Sans, Schibsted
  *     Grotesk, Bricolage Grotesque, Syne, Unbounded, Gloock, Geist Mono and Martian Mono from
@@ -263,4 +267,39 @@
 @font-face {
   font-family: 'Hubot Sans'; font-style: normal; font-weight: 200 900; font-stretch: 75% 125%; font-display: swap;
   src: url('/lib/fonts/hubot-sans-var.woff2') format('woff2');
+}
+
+/* ── Two faces vendored on 2026-10-03 for the C64 and AZURE themes. ── */
+/* Press Start 2P: an 8×8 bitmap face in the manner of the home computers of the 1980s. One cut. */
+@font-face {
+  font-family: 'Press Start 2P'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/lib/fonts/press-start-2p-400-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Press Start 2P'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/lib/fonts/press-start-2p-400-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* Selawik: Microsoft's open-source face with the metrics of Segoe UI. Five static cuts, one file
+   each from Microsoft's release; each file carries its whole character set, so no unicode-range. */
+@font-face {
+  font-family: 'Selawik'; font-style: normal; font-weight: 300; font-display: swap;
+  src: url('/lib/fonts/selawik-300.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Selawik'; font-style: normal; font-weight: 350; font-display: swap;
+  src: url('/lib/fonts/selawik-350.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Selawik'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/lib/fonts/selawik-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Selawik'; font-style: normal; font-weight: 600; font-display: swap;
+  src: url('/lib/fonts/selawik-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Selawik'; font-style: normal; font-weight: 700; font-display: swap;
+  src: url('/lib/fonts/selawik-700.woff2') format('woff2');
 }

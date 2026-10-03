@@ -28,6 +28,8 @@ full text: https://openfontlicense.org/open-font-license-official-text/
 | Martian Mono | v6 (variable wdth 75–112.5, wght 100–800) | `martian-mono-var-latin.woff2`, `martian-mono-var-latin-ext.woff2` | © 2021 The Martian Mono Project Authors (https://github.com/evilmartians/mono) | https://fonts.google.com/specimen/Martian+Mono |
 | Mona Sans | v2.0.27 (variable wdth 75–125, opsz, wght 200–900; one file, latin and latin-ext whole) | `mona-sans-var.woff2` | © 2022 The Mona Sans Project Authors (https://github.com/github/mona-sans), Reserved Font Name "Mona" | https://github.com/github/mona-sans/releases/tag/v2.0.27 |
 | Hubot Sans | v1.0.1 (variable slnt, wdth 75–125, wght 200–900; one file, latin and latin-ext whole) | `hubot-sans-var.woff2` | © 2022 GitHub (https://github.com/github/hubot-sans), Reserved Font Name "Hubot Sans" | https://github.com/github/hubot-sans/releases/tag/v1.0.1 |
+| Press Start 2P | v16 (400, the only cut) | `press-start-2p-400-latin.woff2`, `press-start-2p-400-latin-ext.woff2` | © 2012 The Press Start 2P Project Authors (cody@zone38.net), Reserved Font Name "Press Start 2P" | https://fonts.google.com/specimen/Press+Start+2P |
+| Selawik | 1.01 (static 300, 350, 400, 600, 700; one file per cut, each whole) | `selawik-300.woff2`, `selawik-350.woff2`, `selawik-400.woff2`, `selawik-600.woff2`, `selawik-700.woff2` | © 2015 Microsoft Corporation (www.microsoft.com), Reserved Font Name Selawik; Selawik is a trademark of Microsoft Corporation | https://github.com/microsoft/Selawik/releases/tag/1.01 |
 
 Baloo 2 + Bangers vendored 2026-07-19 for the self-hosted `fonts` capability pack
 (game/display faces, loaded via `/lib/fonts.css`). Inter, Space Grotesk, Fraunces and
@@ -49,3 +51,10 @@ on Google Fonts: each is the variable woff2 file of GitHub's own release, unchan
 latin and latin-ext in one file and so has no `unicode-range` in `aimeat-fonts.css`. Both carry a
 Reserved Font Name under the OFL, which only matters to someone who modifies the font and ships it
 under the same name; these files are not modified.
+
+Press Start 2P and Selawik vendored 2026-10-03 for two themes Jouni asked for, a Commodore 64 one
+and an Azure portal one. Press Start 2P is Google Fonts' latin and latin-ext subsets, unchanged.
+Selawik is Microsoft's open-source face built with the metrics of Segoe UI; the five woff2 files
+are the ones in `Selawik_Release.zip` of its 1.01 release, unchanged and renamed by weight
+(`selawkl` 300, `selawksl` 350, `selawk` 400, `selawksb` 600, `selawkb` 700). Both carry a Reserved
+Font Name, which binds only someone who modifies the font.
