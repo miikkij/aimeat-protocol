@@ -450,12 +450,12 @@
     },
     {
       "id": "fonts",
-      "name": "Baloo 2, Bangers, Inter, Archivo, Archivo Black, Space Grotesk, Fraunces, JetBrains Mono, Fjalla One, DM Sans, VT323, Bungee, Instrument Serif, Instrument Sans, Schibsted Grotesk, Bricolage Grotesque, Syne, Unbounded, Gloock, Geist Mono, Martian Mono, Mona Sans, Hubot Sans",
+      "name": "Baloo 2, Bangers, Inter, Archivo, Archivo Black, Space Grotesk, Fraunces, JetBrains Mono, Fjalla One, DM Sans, VT323, Bungee, Instrument Serif, Instrument Sans, Schibsted Grotesk, Bricolage Grotesque, Syne, Unbounded, Gloock, Geist Mono, Martian Mono, Mona Sans, Hubot Sans, Press Start 2P, Selawik",
       "version": "see fonts/LICENSE.md",
       "spdx": "OFL-1.1",
       "copyright": "see fonts/LICENSE.md for the copyright holder of each family",
       "homepage": "https://fonts.google.com",
-      "source": "Google Fonts, latin + latin-ext subsets, unmodified woff2; Mona Sans and Hubot Sans are the variable woff2 files of GitHub's own releases (github.com/github/mona-sans, github.com/github/hubot-sans), unmodified",
+      "source": "Google Fonts, latin + latin-ext subsets, unmodified woff2; Mona Sans and Hubot Sans are the variable woff2 files of GitHub's own releases (github.com/github/mona-sans, github.com/github/hubot-sans), unmodified; Selawik is the five woff2 files of Microsoft's 1.01 release (github.com/microsoft/Selawik), unmodified",
       "licenseFile": "LICENSES/OFL-1.1.txt",
       "noticeFile": "fonts/LICENSE.md",
       "files": [
