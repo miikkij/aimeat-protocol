@@ -15,6 +15,7 @@
  *   v1.1.0 — 2026-07-16 — listStorageFilesForOwners batch primitive (portfolio catalog N+1)
  *   v1.2.0 — 2026-08-15 — TARGET-063: getStorageFileMeta + readStorageFileRange, so serving a byte
  *     range stops reading the whole file to answer it.
+ *   v1.3.0 — 2026-10-03 — listFontFilesAcrossOwners: the font manager's inventory of owners' fonts.
  */
 import type { StorageFileRecord, ChunkedUploadRecord } from '../interface.js';
 
@@ -40,6 +41,11 @@ export interface FileRepository {
   /** Total storage bytes + file count across MANY owner identities in ONE DB-side aggregate (the
    *  owner-scope footprint for the usage summary; replaces listStorageFiles-then-sum per identity). */
   sumStorageBytesForOwners(ownerGaiis: string[]): Promise<{ bytes: number; count: number }>;
+  /** Font files across every owner, metadata only (no bytes), in ONE bounded query: a key ending in
+   *  .woff2, .woff, .ttf or .otf, or a font type. The newest `limit` rows, and `total`, how many
+   *  matched, from the same query (a window count). `excludeOwner` leaves one principal out, the
+   *  node's own, whose fonts are the theme faces. The operator's inventory in the font manager. */
+  listFontFilesAcrossOwners(opts: { limit: number; excludeOwner?: string }): Promise<{ total: number; items: StorageFileRecord[] }>;
   deleteStorageFile(ownerGaii: string, key: string): Promise<boolean>;
   updateFileTagsByKey(ownerGaii: string, key: string, tags: string[]): Promise<StorageFileRecord | null>;
   updateFileVisibility(ownerGaii: string, key: string, visibility: StorageFileRecord['visibility'], workspaceRef?: string): Promise<StorageFileRecord | null>;

@@ -7,10 +7,12 @@
  *   stood at 798 lines against the 800 cap); registry.ts re-exports the name, so every importer
  *   keeps the address it had. The list is append-only, and the words beside each token are what
  *   the catalogue hands an AI.
- * @structure SIGNATURE_TOKENS · SPRING_BOUNDS · SERVED_FONT_FAMILIES · unservedFirstFamily()
+ * @structure SIGNATURE_TOKENS · SPRING_BOUNDS · SERVED_FONT_FAMILIES · servedFontFamilies() · unservedFirstFamily()
  * @usage
  *   import { SIGNATURE_TOKENS } from './signature-tokens.js';
  * @version-history
+ *   v1.5.0 — 2026-10-03 — servedFontFamilies(): the base list and the faces the operator added to the
+ *     running node (the font manager); unservedFirstFamily() reads it, so the bench accepts an added face.
  *   v1.4.0 — 2026-10-03 — SERVED_FONT_FAMILIES takes Press Start 2P and Selawik (aimeat-fonts.css v1.3.0).
  *   v1.3.0 — 2026-10-02 — SERVED_FONT_FAMILIES takes the eleven faces vendored that day (aimeat-fonts.css v1.2.0).
  *   v1.2.0 — 2026-09-28 — The spring hand joins the signature: --ak-spring-stiffness, -damping and
@@ -21,6 +23,7 @@
  *   v1.0.0 — 2026-09-05 — Pure extraction from registry.ts v1.20.0
  *     (wish-atelier-post-process-effects, stage 1).
  */
+import { addedFamilyNames } from '../themes/font-registry.js';
 
 /**
  * Every face /lib/aimeat-fonts.css declares, which the kit's stylesheet imports, so a page on the
@@ -43,11 +46,20 @@ const SYSTEM_FONT_FAMILIES: ReadonlySet<string> = new Set([
   'monaco', 'impact', 'inherit',
 ]);
 
+/**
+ * The faces a look may name now: the base list above, then the faces the operator added to the
+ * running node (the font manager, services/themes/font-registry.ts) once a file of each has arrived.
+ */
+export function servedFontFamilies(): string[] {
+  const base = new Set(SERVED_FONT_FAMILIES.map(f => f.toLowerCase()));
+  return [...SERVED_FONT_FAMILIES, ...addedFamilyNames().filter(f => !base.has(f.toLowerCase()))];
+}
+
 /** Null when the stack's first family will render as named; otherwise the family that will not. */
 export function unservedFirstFamily(stack: string): string | null {
   const first = stack.split(',')[0].trim().replace(/^['"]|['"]$/g, '').trim();
   if (!first || first.startsWith('var(')) return null;
-  const known = SYSTEM_FONT_FAMILIES.has(first.toLowerCase()) || SERVED_FONT_FAMILIES.some(f => f.toLowerCase() === first.toLowerCase());
+  const known = SYSTEM_FONT_FAMILIES.has(first.toLowerCase()) || servedFontFamilies().some(f => f.toLowerCase() === first.toLowerCase());
   return known ? null : first;
 }
 
@@ -68,7 +80,7 @@ export const SIGNATURE_TOKENS: Record<string, string> = {
   '--ak-gap': 'The grid gap between blocks.',
   '--ak-pad': 'The base padding inside surfaces.',
   '--ak-main-max': 'The content column width, e.g. "56rem" for a tight editorial measure.',
-  '--ak-font': `The body face, as a stack. Its FIRST family is one this node serves (${SERVED_FONT_FAMILIES.join(', ')}) or a system face (Georgia, Courier New, system-ui, serif, monospace…): a face nobody serves falls back in silence and the page reads like every other page.`,
+  '--ak-font': `The body face, as a stack. Its FIRST family is one this node serves (${SERVED_FONT_FAMILIES.join(', ')}, and the faces its operator added, which aimeat_theme_list names under fonts.added) or a system face (Georgia, Courier New, system-ui, serif, monospace…): a face nobody serves falls back in silence and the page reads like every other page.`,
   '--ak-font-display': `The display face for titles and figures, as a stack. Same rule as --ak-font. The loud ones this node serves: Bungee (a sign-painter's shout), Archivo Black (the poster), Fjalla One (the condensed headline), Fraunces (the soft serif), VT323 (the terminal).`,
   '--ak-weight-display': 'The display weight, e.g. "900" for a heavy masthead.',
   '--ak-text-hero': 'The hero title size, e.g. "clamp(2.2rem, 7vw, 4.4rem)".',

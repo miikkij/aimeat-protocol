@@ -55,6 +55,7 @@
  *     aimeat_workspace_suggestions beside the document tools on appdev, agent and service.
  *   2026-09-25 — aimeat_admin_federation_relay_claim_set beside aimeat_admin_federation.
  *   2026-09-25 — aimeat_package_install_requests on `appdev` and `agent`, beside the install it answers.
+ *   2026-10-03 — aimeat_theme_font_save beside the other theme tools (the font manager).
  *   2026-09-24 — aimeat_theme_policy_set beside the other theme tools.
  *   2026-09-24 — aimeat_theme_style_save and aimeat_theme_component_css_set beside the other theme tools.
  *   2026-09-24 — aimeat_theme_list, aimeat_theme_get and aimeat_theme_save on the agent and admin surfaces.
@@ -252,7 +253,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_ui_component_list', 'aimeat_ui_component_get',
         // The node's themes: the look of every page. Saving is the operator's, gated in the tool.
         'aimeat_theme_list', 'aimeat_theme_get', 'aimeat_theme_save', 'aimeat_theme_style_save', 'aimeat_theme_component_css_set',
-        'aimeat_theme_policy_set',
+        'aimeat_theme_policy_set', 'aimeat_theme_font_save',
         'aimeat_storage_upload', 'aimeat_storage_download', 'aimeat_storage_delete',
         'aimeat_datapackage_publish', 'aimeat_datapackage_export',
         // NOTE: aimeat_task_request_changes is connector-only (owner tool, not registered on the
@@ -427,7 +428,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         // ...and the parts those pages are drawn from, and the themes they wear.
         'aimeat_ui_component_list', 'aimeat_ui_component_get',
         'aimeat_theme_list', 'aimeat_theme_get', 'aimeat_theme_save', 'aimeat_theme_style_save', 'aimeat_theme_component_css_set',
-        'aimeat_theme_policy_set',
+        'aimeat_theme_policy_set', 'aimeat_theme_font_save',
         // The operator's break-glass over an organism whose creator account is unreachable, plus the
         // read that shows the roster before it is re-pointed.
         'aimeat_admin_organism_ownership', 'aimeat_admin_organism_owner_add',

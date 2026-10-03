@@ -21,6 +21,8 @@
  *   const spaPath = resolvePublicFile('spa.html');
  *   if (spaPath) serveSpa(res, spaPath, config, '/v1/glossary');
  * @version-history
+ *   v1.8.0 — 2026-10-03 — The shell links /v1/themes/fonts.css?v=<hash> after the base faces when the
+ *     operator has added a face (the font manager).
  *   v1.7.0 — 2026-10-03 — The build watchdog runs in the top window only: a framed shell (the design
  *     lab's previews, Themes & Styles) is reloaded with its parent, and dozens of frames each polling
  *     /v1/build added their requests to a page that had already run out of them.
@@ -45,6 +47,7 @@ import { fileURLToPath } from 'node:url';
 import type { AimeatConfig } from '../config.js';
 import { getSoftwareVersion } from '../utils/version.js';
 import { themeSnapshot } from '../services/themes/service.js';
+import { fontsSheetHref } from '../services/themes/font-registry.js';
 import { findPublicPage, type PublicPage } from '../data/public-pages.js';
 import { injectPageHead, injectSiteHead } from '../utils/page-head.js';
 import { injectPageBody } from '../utils/page-body.js';
@@ -160,6 +163,10 @@ export function serveSpa(
   // snapshot is ThemeService's, refreshed on every theme write and every config change.
   const themesJson = JSON.stringify(themeSnapshot()).replace(/</g, '\\u003c');
   html = html.replace('<!-- __AIMEAT_THEMES__ -->', `<script${nonceAttr}>window.__AIMEAT_THEMES=${themesJson};</script>`);
+  // The faces the operator added (the font manager), right after the base faces' sheet: the address
+  // carries its own hash, so a face added or removed reaches the next page load. None, no link.
+  const fontsHref = fontsSheetHref();
+  html = html.replace('<!-- __AIMEAT_FONTS__ -->', fontsHref ? `<link rel="stylesheet" href="${fontsHref}">` : '');
 
   // The node's own identity — its name, description, social image, verification tags and the two
   // site-level JSON-LD blocks — unconditionally, because it is true of every route including the

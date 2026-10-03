@@ -17,6 +17,7 @@
  *   already covered.
  * @usage cd aimeat && pnpm exec vitest run test/unit/compliance-gaps.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-03 — A face added without licence data is a finding (the font manager).
  *   v1.0.0 — 2026-08-23 — BR-02. Closes the hole the browser pass exposed: no test drove the
  *     undocumented-model path, which is the headline half of the report.
  */
@@ -37,6 +38,8 @@ function storageWith(opts: {
   usecases?: unknown[];
   questionnaire?: unknown;
   appsWithGap?: Array<{ ownerName: string; filename: string; gap: string }>;
+  /** Faces the operator added (the font manager), as stored under the node's own principal. */
+  fonts?: Array<{ family: string; licence: string | null; copyright: string | null }>;
 }): Storage {
   const usageRows = (opts.models ?? []).map(model => ({
     date: '2026-08-01', agentGaii: `a#o@test-node`, ownerGhii: 'o@test-node',
@@ -46,9 +49,18 @@ function storageWith(opts: {
   const memory: Record<string, unknown> = {};
   if (opts.usecases) memory['compliance.usecases'] = { usecases: opts.usecases };
   if (opts.questionnaire) memory['compliance.questionnaire'] = opts.questionnaire;
+  for (const f of opts.fonts ?? []) {
+    const slug = f.family.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    memory[`ui.font.${slug}`] = {
+      family: f.family, slug, origin: 'added', kind: 'sans-serif', files: [], licence: f.licence, copyright: f.copyright, source: null,
+      licenceStatus: f.licence && f.copyright ? 'stated' : 'unknown', addedBy: 'op@test-node', addedAt: '2026-10-03T00:00:00.000Z', updatedAt: '2026-10-03T00:00:00.000Z',
+    };
+  }
 
   return {
+    listAllMemoryMeta: async (q: { prefix: string }) => ({ items: Object.keys(memory).filter(k => k.startsWith(q.prefix)).map(key => ({ key })) }),
     queryUsageDailyAllOwners: async () => usageRows,
+    queryUsageDaily: async () => usageRows,
     consentFacets: async () => [],
     aiProvenanceFacets: async () => [],
     listAiProvenance: async () => ({ items: [], total: 0 }),
@@ -112,6 +124,24 @@ describe('an app that says it generates content while the publish check found a 
     const gaps = report.gaps.filter(g => g.kind === 'app-declares-generation-with-gap');
     expect(gaps).toHaveLength(1);
     expect(gaps[0].evidence).toMatchObject({ app: 'alice/news.html', in_register: false });
+  });
+});
+
+describe('a face the operator added without licence data', () => {
+  it('is a finding in the node-wide report, and a face with both is not', async () => {
+    const report = await buildComplianceReport(storageWith({ fonts: [
+      { family: 'Quiet Grotesk', licence: null, copyright: null },
+      { family: 'Space Mono', licence: 'OFL-1.1', copyright: '© 2016 Google Inc.' },
+      { family: 'Half Told', licence: 'OFL-1.1', copyright: null },
+    ] }), CONFIG);
+    const gaps = report.gaps.filter(g => g.kind === 'font-licence-unknown');
+    expect(gaps.map(g => g.evidence?.family).sort()).toEqual(['Half Told', 'Quiet Grotesk']);
+    expect(gaps.find(g => g.evidence?.family === 'Half Told')?.detail).toContain('a copyright holder');
+  });
+
+  it('is not in an owner\'s own slice, which operates nothing', async () => {
+    const report = await buildComplianceReport(storageWith({ fonts: [{ family: 'Quiet Grotesk', licence: null, copyright: null }] }), CONFIG, { ownerGhii: 'o@test-node' });
+    expect(report.gaps.some(g => g.kind === 'font-licence-unknown')).toBe(false);
   });
 });
 

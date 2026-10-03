@@ -20,15 +20,18 @@
  * @usage imported by compliance-tab.js and compliance-tab.register.js; tested by
  *   test/unit/compliance-gaps.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-03 — The fifth kind, font-licence-unknown: faces added without licence data
+ *     (the font manager), grouped by family.
  *   v1.0.0 — 2026-09-05 — Initial (the Compliance page in the poster face).
  */
 
-/** The four kinds the node serves, in the order the page's rows have. */
+/** The five kinds the node serves, in the order the page's rows have. */
 export const GAP_KINDS = [
   'undocumented-ai-activity',
   'app-declares-generation-with-gap',
   'unclassified-usecase',
   'unlabelled-public-content',
+  'font-licence-unknown',
 ];
 
 /** The classes, worst first; `unclassified` leads because it means nobody has looked. */
@@ -44,10 +47,10 @@ const classOf = (u) => (u && u.risk && u.risk.class) || 'unclassified';
  *
  * @param {Array<{kind: string, detail?: string, evidence?: object}>|undefined} gaps
  * @returns {{ total: number, models: string[], apps: Array<{app: string, inRegister: boolean}>,
- *   usecases: Array<{id: string, unanswered: string[]}>, unlabelled: number, other: object[] }}
+ *   usecases: Array<{id: string, unanswered: string[]}>, unlabelled: number, fonts: string[], other: object[] }}
  */
 export function groupGaps(gaps) {
-  const g = { total: 0, models: [], apps: [], usecases: [], unlabelled: 0, other: [] };
+  const g = { total: 0, models: [], apps: [], usecases: [], unlabelled: 0, fonts: [], other: [] };
   for (const gap of gaps || []) {
     g.total++;
     const ev = gap.evidence || {};
@@ -64,11 +67,15 @@ export function groupGaps(gaps) {
       case 'unlabelled-public-content':
         g.unlabelled += Number(ev.count) || 0;
         break;
+      case 'font-licence-unknown':
+        g.fonts.push(String(ev.family || gap.detail || ''));
+        break;
       default:
         g.other.push(gap);
     }
   }
   g.models.sort((a, b) => a.localeCompare(b));
+  g.fonts.sort((a, b) => a.localeCompare(b));
   g.apps.sort((a, b) => a.app.localeCompare(b.app));
   return g;
 }

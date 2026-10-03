@@ -3,7 +3,8 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The node MCP half of Themes & Styles: aimeat_theme_list, aimeat_theme_get,
- *   aimeat_theme_save, aimeat_theme_style_save and aimeat_theme_component_css_set. They call
+ *   aimeat_theme_save, aimeat_theme_style_save, aimeat_theme_component_css_set and
+ *   aimeat_theme_font_save (the font manager, services/themes/fonts.ts). They call
  *   ThemeService, the same service as the /v1/themes routes, so a theme made in a chat is the theme
  *   the admin view shows and the pill offers.
  *
@@ -16,6 +17,8 @@
  * @structure registerThemeTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage registerThemeTools(mcp, storage, config, agentGaii, scopes);
  * @version-history
+ *   v2.3.0 — 2026-10-03 — aimeat_theme_font_save (add, change or remove a face the operator adds);
+ *     aimeat_theme_list carries `fonts`, the owners' fonts in storage for the operator's agent only.
  *   v2.2.0 — 2026-09-24 — SECURITY (audit A8-1): the operator test at call time is asked of the
  *     agent and its scopes (the service's callerIsOperator, through services/operator-principal.ts),
  *     so site:theme-write is checked at call time as well as at registration.
@@ -30,6 +33,8 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { ThemeService, ThemeError, type ThemeInput } from '../services/themes/service.js';
 import type { StyleInput } from '../services/themes/styles.js';
+import { FontError } from '../services/themes/fonts.js';
+import { FONT_KINDS } from '../services/themes/font-registry.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { toolError } from './tool-error.js';
@@ -38,7 +43,7 @@ const out = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JS
 
 /** Every refusal from the service is already worded for a person, with the code the route answers. */
 function refusal(err: unknown) {
-    if (err instanceof ThemeError) return toolError(err.code, err.message);
+    if (err instanceof ThemeError || err instanceof FontError) return toolError(err.code, err.message);
     throw err;
 }
 
@@ -63,7 +68,45 @@ export function registerThemeTools(
         {},
         annotationsFor('aimeat_theme_list'),
         async () => {
-            try { return out(await svc.catalogue(true)); } catch (err) { return refusal(err); }
+            // `fonts` carries the owners' fonts in storage only for the operator's own agent.
+            try { return out(await svc.catalogue(true, !!(await operatorGaii()))); } catch (err) { return refusal(err); }
+        },
+    );
+
+    mcp.tool(
+        'aimeat_theme_font_save',
+        descriptionFor('aimeat_theme_font_save'),
+        {
+            family: z.string().min(1).max(60).describe("The face's name as a style chooses it, for example 'Space Mono'."),
+            kind: z.enum(FONT_KINDS).optional().describe("What it falls back to while it loads: 'sans-serif' (default), 'serif', 'monospace' or 'cursive'."),
+            files: z.array(z.object({
+                weight: z.string().max(9).describe("'400', or '100 900' for a variable face."),
+                style: z.string().max(6).optional().describe("'normal' (default) or 'italic'."),
+                subset: z.string().max(30).optional().describe("A name for one part of a face shipped in parts, such as 'latin' or 'latin-ext'."),
+                unicodeRange: z.string().max(4000).optional().describe("That part's unicode-range as CSS writes it, for example 'U+0000-00FF, U+0131'."),
+            })).optional().describe('The woff2 files the face has; you get one upload_url for each. Leave it out on a change to keep the files.'),
+            licence: z.string().max(200).optional().describe("The licence, for example 'OFL-1.1'. Without it the face is marked licence unknown."),
+            copyright: z.string().max(500).optional().describe('Who holds the copyright, as the font says. Without it the face is marked licence unknown.'),
+            source: z.string().max(500).optional().describe('Where the face came from, an https:// address.'),
+            remove: z.boolean().optional().describe('true removes the face and its files; refused while a style uses it.'),
+        },
+        annotationsFor('aimeat_theme_font_save'),
+        async (args) => {
+            const gaii = await operatorGaii();
+            if (!gaii) return toolError('ACCESS_DENIED', NOT_OPERATOR);
+            try {
+                if (args.remove) return out({ ok: true, ...(await svc.fonts.remove(args.family)) });
+                const r = await svc.fonts.save('', {
+                    family: args.family,
+                    ...(args.kind !== undefined ? { kind: args.kind } : {}),
+                    ...(args.files !== undefined ? { files: args.files } : {}),
+                    ...(args.licence !== undefined ? { licence: args.licence } : {}),
+                    ...(args.copyright !== undefined ? { copyright: args.copyright } : {}),
+                    ...(args.source !== undefined ? { source: args.source } : {}),
+                }, gaii);
+                return out({ ok: true, saved: true, font: r.font, uploads: r.uploads,
+                    next: 'PUT each file\'s woff2 bytes to its upload_url (curl -X PUT --data-binary @file.woff2). The face is served, and a style may choose it, once a file has arrived.' });
+            } catch (err) { return refusal(err); }
         },
     );
 

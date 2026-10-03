@@ -70,6 +70,7 @@
  *     SCOPE_EXEMPT_TOOLS for operator:admin, outside every wildcard: the 24 aimeat_admin_* tools that
  *     had no word, the MCP registry pair and the SEO pair (from app:write). aimeat_surface_layout_get
  *     takes site:layout-write, the word of its write. Not grandfathered, like every operator word.
+ *   v1.26.0 -- 2026-10-03 -- aimeat_theme_font_save → site:theme-write (the font manager).
  *   v1.25.0 -- 2026-09-24 -- aimeat_theme_policy_set → site:theme-write.
  *   v1.24.0 -- 2026-09-24 -- aimeat_theme_style_save and aimeat_theme_component_css_set → site:theme-write.
  *   v1.23.0 -- 2026-09-24 -- aimeat_theme_save → site:theme-write (Themes & Styles).
@@ -419,6 +420,7 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_theme_style_save:                  'site:theme-write',
     aimeat_theme_component_css_set:           'site:theme-write',
     aimeat_theme_policy_set:                  'site:theme-write',
+    aimeat_theme_font_save:                   'site:theme-write',
     aimeat_storage_upload:                    'storage:write',
     aimeat_storage_delete:                    'storage:write',
 

@@ -69,6 +69,9 @@
        theme.css on purpose: theme.css ends with the bridge that maps these onto the shell's own
        tokens, and it re-declares --border — a width here, a color there — so order is the tiebreak. -->
   <link rel="stylesheet" href="/lib/aimeat-theme.css">
+  <!-- The faces the node's operator added (the font manager): routes/portal-spa.ts writes the link
+       to /v1/themes/fonts.css?v=<hash> here when there is one, and nothing when there is none. -->
+  <!-- __AIMEAT_FONTS__ -->
   <link rel="stylesheet" href="/css/theme.css">
   <!-- The shell block: the rules theme.css held, one sheet per part, in theme.css's order. Every
        page that links theme.css links this block right after it (check:theme-tokens holds it). -->

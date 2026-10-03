@@ -11,6 +11,7 @@
  * @structure themeCliTools[] -- the shell handler table, registered by tool-call.ts · themeRequests
  * @usage import { themeCliTools } from './tool-call-defs-themes.js';
  * @version-history
+ *   v2.3.0 -- 2026-10-03 -- aimeat_theme_font_save (PUT and DELETE /v1/themes/fonts/:family, the font manager).
  *   v2.2.0 -- 2026-09-24 -- aimeat_theme_save forwards `shapes`, the theme's shape values.
  *   v2.1.0 -- 2026-09-24 -- aimeat_theme_policy_set (PUT /v1/themes/policy).
  *   v2.0.0 -- 2026-09-24 -- The two-level model of 07: style and component CSS tools, restoreVersion,
@@ -71,6 +72,13 @@ export async function themeRequests(client: AimeatClient, tool: string, input: J
             const body = sent(input, [['personalChoice', 'boolean'], ['offered', 'array'], ['default', 'string']]);
             return client.put('/v1/themes/policy', body);
         }
+        case 'aimeat_theme_font_save': {
+            // The route reads the family's address from its name ("Space Mono" is space-mono).
+            const family = requiredString(input, 'family');
+            if (optionalBoolean(input, 'remove')) return client.delete(`/v1/themes/fonts/${enc(family)}`);
+            const body = sent(input, [['kind', 'string'], ['files', 'array'], ['licence', 'string'], ['copyright', 'string'], ['source', 'string']]);
+            return client.put(`/v1/themes/fonts/${enc(family)}`, { family, ...body });
+        }
         case 'aimeat_theme_component_css_set':
             return client.put(`/v1/themes/${enc(requiredString(input, 'theme'))}/components/${enc(requiredString(input, 'component'))}`,
                 { css: optionalString(input, 'css') || null, ...dryRun });
@@ -81,5 +89,5 @@ export async function themeRequests(client: AimeatClient, tool: string, input: J
 
 export const themeCliTools: ConnectCliToolDefinition[] = [
     'aimeat_theme_list', 'aimeat_theme_get', 'aimeat_theme_save', 'aimeat_theme_style_save', 'aimeat_theme_component_css_set',
-    'aimeat_theme_policy_set',
+    'aimeat_theme_policy_set', 'aimeat_theme_font_save',
 ].map((name) => ({ name, handler: ({ client }, input) => themeRequests(client, name, input) }));

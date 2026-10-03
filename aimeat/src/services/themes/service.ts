@@ -29,6 +29,10 @@
  * @structure ThemeError · Theme · ThemeInput · ThemeService · themeSnapshot · INNER_PATHS
  * @usage const svc = new ThemeService(config, storage); await svc.offered();
  * @version-history
+ *   v2.5.0 — 2026-10-03 — The font manager (fonts.ts): the service holds a FontService, the catalogue
+ *     carries `fonts` (the inventory; the owners' fonts for the operator), the vocabulary's faces are
+ *     the base faces and the ones the operator added, and a theme never takes the id of a
+ *     /v1/themes/<word> route ("fonts" among them) as its own.
  *   v2.4.0 — 2026-09-27 — /v1/appcat is an inner page: the app catalogue on the component library
  *     wears the theme and style a person picks.
  *   v2.3.0 — 2026-09-24 — SECURITY (audit A8-1): callerIsOperator takes the principal and asks
@@ -48,7 +52,9 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { emitChange } from '../event-bus.js';
 import { getUiComponent } from '../ui-library/catalogue.js';
-import { THEME_TOKENS, CORE_TOKENS, THEME_FACES } from './tokens.js';
+import { THEME_TOKENS, CORE_TOKENS } from './tokens.js';
+import { themeFaceNames } from './font-registry.js';
+import { FontService } from './fonts.js';
 import { lintCss, type CssWarning } from './css-lint.js';
 import { builtinStyles, prepareStyle, swatchOf, STYLE_ID_RE, type Style, type StyleInput } from './styles.js';
 import { themeSheet, componentCssState, catalogueHooks, servedFaces, type ComponentCssState } from './sheet.js';
@@ -116,6 +122,8 @@ let snapshotCache: ThemeSnapshot | null = null;
 export const themeSnapshot = (): ThemeSnapshot | null => snapshotCache;
 
 const ID_RE = /^[a-z0-9][a-z0-9-]{1,39}$/;
+/** Words a /v1/themes/<word> route answers itself, so no theme takes one as its id. */
+const RESERVED_IDS = new Set([BUILTIN_THEME, 'all', 'choice', 'policy', 'preview', 'fonts']);
 const hash = (s: string, n = 12) => createHash('sha1').update(s).digest('hex').slice(0, n);
 
 function builtinTheme(): Theme {
@@ -171,7 +179,12 @@ function applyInput(t: Theme, input: ThemeInput): Theme {
 }
 
 export class ThemeService {
-    constructor(private readonly config: AimeatConfig, private readonly storage: Storage) {}
+    /** The font manager: the faces the operator adds, which the styles of these themes may choose. */
+    readonly fonts: FontService;
+
+    constructor(private readonly config: AimeatConfig, private readonly storage: Storage) {
+        this.fonts = new FontService(config, storage, () => this.listAll());
+    }
 
     private get systemGhii(): string { return `system@${this.config.nodeId}`; }
 
@@ -255,11 +268,15 @@ export class ThemeService {
         return { css: t.css ? lintCss(t.css, { faces: servedFaces() }).warnings : [], components, contrast };
     }
 
-    /** Themes, choices and what a theme may set: one answer for the route and both MCP surfaces. */
-    async catalogue(summary: boolean): Promise<Record<string, unknown>> {
+    /**
+     * Themes, choices and what a theme may set: one answer for the route and both MCP surfaces.
+     * `fonts` is the font manager's inventory; `operator` adds the owners' fonts in storage to it.
+     */
+    async catalogue(summary: boolean, operator = false): Promise<Record<string, unknown>> {
         const themes = await this.listAll();
         const snap = await this.offered();
         return {
+            fonts: await this.fonts.inventory({ operator, themes }),
             policy: snap.policy,
             themes: themes.map((t) => {
                 const w = this.warningsOf(t);
@@ -270,7 +287,7 @@ export class ThemeService {
                     shapes: t.shapes || {}, componentCss: Object.keys(t.componentCss || {}), hasThemeCss: !!t.css } : { ...t, shapes: t.shapes || {} }), styles, componentCssState: w.components, cssWarnings: w.css };
             }),
             // `shapes`: every shape value a theme may set, with the built-in theme's value.
-            vocabulary: { tokens: THEME_TOKENS, core: CORE_TOKENS, faces: Object.keys(THEME_FACES), hooks: catalogueHooks(),
+            vocabulary: { tokens: THEME_TOKENS, core: CORE_TOKENS, faces: themeFaceNames(), hooks: catalogueHooks(),
                 shapes: SHAPE_TOKENS.map((s) => ({ ...s, builtin: builtinShapes()[s.name] ?? null })) },
         };
     }
@@ -331,7 +348,7 @@ export class ThemeService {
         const stem = slug(name, 'theme');
         for (let n = 1; n < 100; n++) {
             const id = n === 1 ? stem : `${stem}-${n}`;
-            if (id !== BUILTIN_THEME && ID_RE.test(id) && !(await this.get(id))) return id;
+            if (!RESERVED_IDS.has(id) && ID_RE.test(id) && !(await this.get(id))) return id;
         }
         throw new ThemeError('CONFLICT', 'No free id for a theme of that name; choose another name.', 409);
     }

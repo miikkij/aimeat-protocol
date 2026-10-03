@@ -142,6 +142,11 @@ everywhere at once, and say so in the Changes section.
 | a theme's corners, frames, shadows and letter case | the same in every style and in light and dark; every component reads them, so a component added later follows them | shapes (one of them: a shape value) | muodot (yksi: muoto) | formas (una: forma) |
 | the admin view that manages themes | its name, on the Design group of the admin pages | Themes & Styles | Teemat ja tyylit | Temas y estilos |
 | where a person picks the look | the control at the top of the page, beside language and light or dark, that offers the themes and styles (the "pill") | look picker | ulkoasun valitsin | selector de aspecto |
+| a typeface a style may choose | served by this node as woff2 files; a style takes three (headlines, running text, code); the Fonts tab of Themes & Styles lists them | face (the tab: Fonts) | fontti | fuente |
+| a face this node ships with | vendored in the repository, free licences (SIL OFL 1.1), the same on every node | base face; base setup | perusfontti; perusasennus | fuente de base; instalación de base |
+| a face the operator added to the running node | never part of the base setup; the operator answers for its licence | added face | lisätty fontti | fuente añadida |
+| an added face nobody stated the licence or the copyright holder of | shown on the Fonts tab, the Libraries page and in the compliance report | licence unknown | lisenssi tuntematon | licencia desconocida |
+| fonts owners keep in their own storage for their apps | each owner's own; the operator sees them as an inventory only | fonts in owners' storage | omistajien omat fontit | fuentes de los propietarios |
 | the service the person is on | the AIMEAT they are reading this screen on, which is a thing with a name | this service, or its name | tämä palvelu, tai sen nimi | este servicio, o su nombre |
 | the list of public systems | where a public AIMEAT can be found by others | the federation directory | AIMEAT-palvelimien luettelo | el directorio de la federación |
 | a machine credential | what a program presents to prove it may connect | token | token | token |
@@ -434,3 +439,9 @@ service, the directory, the token, the identifier and the username: the test nam
   notifications renew the *update service* (*päivityspalvelu*, *servicio de actualizaciones*), the word the
   package_updates_ended notice already used, and the verb is *uusia* / *renovar*. *Código de canje* is the
   usual Latin American word for a code redeemed once.
+- **2026-10-03** — face, base face, added face, licence unknown and fonts in owners' storage, with the
+  font manager (Themes & Styles → Fonts). *Fontti* and *base setup* are the developer's own words in
+  the wish ("omia fontteja", "ettei ne ole base setupista"); *perusasennus* renders base setup.
+  Spanish *fuente* is the word the operating systems use. A font's upright or italic is *pysty vai
+  kursiivi* / *normal o cursiva* on screen, never *tyyli* / *estilo*, which already name a style of a
+  theme.

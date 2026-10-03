@@ -52,6 +52,7 @@
  *     nothing destroyed) and aimeat_workspace_suggestions (a decision writes).
  *   2026-09-25 — aimeat_admin_federation_relay_claim_set (idempotent, nothing destroyed).
  *   2026-09-25 — aimeat_package_install_requests (a write that installs on approval; idempotent).
+ *   2026-10-03 — aimeat_theme_font_save (a write; remove: true destroys a face and its files).
  *   2026-09-24 — aimeat_theme_policy_set (idempotent, nothing destroyed).
  *   2026-09-24 — aimeat_theme_style_save and aimeat_theme_component_css_set (writes, nothing destroyed).
  *   2026-09-24 — aimeat_theme_list and aimeat_theme_get (read-only), aimeat_theme_save (a write).
@@ -638,6 +639,8 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_theme_style_save: { title: 'Themes: make or change a style', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     aimeat_theme_component_css_set: { title: 'Themes: CSS for one component', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_theme_policy_set: { title: 'Themes: who chooses, which are available, the default', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    // remove: true deletes a face and its files, so the tool as a whole is destructive.
+    aimeat_theme_font_save: { title: 'Themes: add, change or remove a face (font)', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     aimeat_memory_hands: { title: 'Memory: who has written here', readOnlyHint: true },
     aimeat_compliance_register_read: { title: 'Compliance: Read Register', readOnlyHint: true },
     // destructiveHint: it REPLACES the document rather than merging into it, so a partial write

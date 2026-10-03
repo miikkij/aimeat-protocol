@@ -6,6 +6,8 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.16.0 -- 2026-10-03 -- Faces for the themes: aimeat_theme_font_save, the licence the operator answers
+ *     for, "licence unknown" at an audit, and the owners' fonts as an inventory (the font manager).
  *   v1.15.0 -- 2026-10-02 -- When the person asks for a new agent (new-agent.ts), after agent
  *     classification: this surface carries aimeat_agent_propose and no handbook said what it is for.
  *   v1.14.0 -- 2026-10-01 -- Federation: the roster's `origin`, and aimeat_admin_federation_peer_remove for
@@ -78,6 +80,20 @@ not have yet). Tell the operator the version, the date and the new things in pla
 \`prompt\` is a ready update prompt for an AI with a shell on the node's machine (Claude Code, Codex):
 offer it, and let the operator decide when, because the update restarts the node. After an update,
 call it with \`refresh: true\` and check that \`current\` is the new version.
+
+**Faces for the themes (operator).** \`aimeat_theme_font_save\` adds a face (a font) to this node, so
+its themes and the Design Book can use it at once, with no update: give \`family\`, the woff2
+\`files\` with the weight and style of each, and what is known of its licence (\`licence\`,
+\`copyright\`, \`source\`), then PUT each file's bytes to its \`upload_url\`. The faces this node ships
+with have free licences; a face the operator adds is always marked as added, never as base setup,
+and the operator answers for it. So ask the person for the licence and the copyright holder before
+you add a face, and add only faces they may lawfully use. Without them the face is marked licence
+unknown, which means nobody can say it was lawfully obtained, and it shows on the Fonts tab, on the
+Libraries page and as a finding in the compliance report. There is no limit on size or number; the
+only check is that the bytes are woff2. \`remove: true\` is refused while a style uses the face.
+\`aimeat_theme_list\` lists every face under \`fonts\`, and for the operator also the fonts owners keep
+in their own storage for their apps: those are each owner's own, an inventory only. Owners do not
+add theme faces.
 
 **Federation (operator).** \`aimeat_admin_federation\` — where this node stands with the other nodes
 it talks to. Lead with \`needs\`, not with the peer count: approving a peering request does NOT

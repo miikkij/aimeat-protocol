@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Presigned upload endpoint. Receives raw file bodies at PUT /v1/upload/:token,
  *   validates the token, enforces size limits, and delegates processing based on upload type
- *   (app, storage, extension, cortex, skill).
+ *   (app, storage, extension, cortex, skill, font).
  *
  *   A handler here reads the signed token's meta, unpacks whatever shape the bytes arrive in, and
  *   renders the answer. The decisions belong to the service each capability already has, so the
@@ -24,6 +24,7 @@
  *   import { uploadRouter } from '../routes/upload.js';
  *   app.use(uploadRouter(config, storage));
  * @version-history
+ *   v1.23.0 — 2026-10-03 — utype 'font': a theme face's woff2 for the font manager (services/themes/fonts.ts).
  *   v1.22.0 — 2026-10-02 — design_spec_hint in the app answer (services/app-design-spec.ts).
  *   v1.21.0 — 2026-09-28 — The extension ZIP refuses other code for an extension a managed package install owns.
  *   v1.20.0 — 2026-09-26 — A ZIP under the name of a cortex the uploader installed goes through
@@ -159,6 +160,7 @@ import { getExtSecretKeys, encryptSecretFields } from '../services/extension-sec
 import { reconcileAfterExtensionWrite } from '../services/exchange-projection.js';
 import { odpsWriteRefusal, extensionOdpsKey } from '../services/exchange-odps-write.js';
 import { managedChangeRefusal } from '../services/package-managed.js';
+import { receiveFontUpload } from '../services/themes/fonts.js';
 
 export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
@@ -228,6 +230,11 @@ export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
                 case 'skill':
                     await handleSkillUpload(res, config, storage, verified.sub, verified.meta, data);
                     return;
+                case 'font': {
+                    const r = await receiveFontUpload(config, storage, verified.actor, verified.meta, data);
+                    res.status(r.status).json(r.body);
+                    return;
+                }
                 default:
                     res.status(400).json({ success: false, error: 'INVALID_TYPE', message: `Unknown upload type` });
             }
