@@ -18713,7 +18713,11 @@ paths:
         Owner-only. Returns the current UTC day's AI spend against the daily budget, with a per-app
         breakdown — the numbers behind the "AI apps daily budget" bar. Data comes from the retained
         `ai-usage.<gaii>.<day>` usage record. Response `data`: `{ date, daily_budget_usd,
-        spent_today_usd, remaining_usd, total_calls, total_tokens, per_app }`.
+        spent_today_usd, remaining_usd, total_calls, total_tokens, per_app, per_agent }`.
+        A call that named no app is filed in `per_app` under the endpoint it came through
+        (`ai-complete`, `ai-image`, `ai-embed`, `ai-transcribe`, `llm-proxy`, ...). `per_agent` is
+        keyed by the bare name of the owner's agent: `{ cost_usd, calls, tokens, per_app }`, where
+        `per_app` splits that agent's spend the same way.
       tags: [Memory]
       security:
         - BearerAuth: []

@@ -34,6 +34,8 @@
  *   const agent = agentNameOf(caller.principal, caller.gaii);
  *   const key = agent ? await readAgentKey(storage, config, caller.gaii, agent, 'decide') : null;
  * @version-history
+ *   v1.2.0 — 2026-10-03 — addAgentSpend splits an agent's spend by app or endpoint (`per_app`), so the
+ *     owner's usage says what each agent spent on what.
  *   v1.1.0 — 2026-09-20 — aiPayerOf: an agent's text call is paid by its owner. The cap reads the
  *     owner's usage record only, because every call in an agent's name is metered there now.
  *   v1.0.0 — 2026-09-20 — Initial: decision rules on the node, and a key per agent.
@@ -163,7 +165,10 @@ export async function clearAgentKey(storage: Storage, ownerGhii: string, agent: 
   return true;
 }
 
-type PerAgent = Record<string, { cost_usd: number; calls: number; tokens: number }>;
+type Spend = { cost_usd: number; calls: number; tokens: number };
+/** `per_app` splits one agent's spend by the app it called for, or by the endpoint when no app was
+ *  named, so the owner sees what the agent spent on what. Absent on records written before it. */
+type PerAgent = Record<string, Spend & { per_app?: Record<string, Spend> }>;
 
 /**
  * Today's spend by one agent, from the OWNER's usage record: every call in an agent's name, a
@@ -200,11 +205,19 @@ export async function agentCapRefusal(
 }
 
 /** The `per_agent` map with one call added. Pure: the usage writer stores what this returns. */
-export function addAgentSpend(perAgent: PerAgent | undefined, agent: string | null | undefined, call: { costUsd: number; tokens: number }): PerAgent {
+export function addAgentSpend(
+  perAgent: PerAgent | undefined, agent: string | null | undefined,
+  call: { costUsd: number; tokens: number; app?: string },
+): PerAgent {
   const out: PerAgent = { ...(perAgent ?? {}) };
   if (!agent) return out;
-  const e = out[agent] ?? { cost_usd: 0, calls: 0, tokens: 0 };
-  out[agent] = { cost_usd: e.cost_usd + call.costUsd, calls: e.calls + 1, tokens: e.tokens + call.tokens };
+  const add = (s: Spend | undefined): Spend => ({
+    cost_usd: (s?.cost_usd ?? 0) + call.costUsd, calls: (s?.calls ?? 0) + 1, tokens: (s?.tokens ?? 0) + call.tokens,
+  });
+  const e = out[agent];
+  const perApp = { ...(e?.per_app ?? {}) };
+  if (call.app) perApp[call.app] = add(perApp[call.app]);
+  out[agent] = { ...add(e), ...(Object.keys(perApp).length ? { per_app: perApp } : {}) };
   return out;
 }
 
