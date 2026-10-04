@@ -27,6 +27,8 @@
  *   - llmProxyRouter(config, storage) — POST /v1/llm/chat/completions, GET /v1/llm/models
  * @usage mounted in server-bootstrap/routes-loader.ts; an agent uses <node>/v1/llm as its base URL
  * @version-history
+ *   v1.7.1 — 2026-10-04 — The session_id is the system message's hash alone, not the payer's, so every
+ *     conversation with the same prefix reaches the provider that holds it.
  *   v1.7.0 — 2026-10-04 — A call to OpenRouter carries a session_id (cacheSessionId), so every round of a
  *     conversation reaches the provider that holds its prompt cache.
  *   v1.6.0 — 2026-10-04 — `parallel_tool_calls` is passed to the provider beside `tools`; it was dropped,
@@ -221,7 +223,7 @@ export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
                 // hit, only once it has seen a cache hit, unless the request names a session_id
                 // (cacheSessionId below). Only for OpenRouter: another provider may refuse the field.
                 const routed = c.provider.type === 'openrouter'
-                    ? { ...upstream, model: c.model, session_id: cacheSessionId(gaii, agent, body) }
+                    ? { ...upstream, model: c.model, session_id: cacheSessionId(body) }
                     : { ...upstream, model: c.model };
                 const r = speaksOpenAiChat(c.provider.type)
                     ? await chatCompletionRaw(c.target.key, c.target.baseUrl, routed, controller.signal)
@@ -271,19 +273,20 @@ interface CacheSessionBody { messages?: ChatMessage[]; session_id?: unknown; pro
  * message, but it applies that only after it has seen a cache hit; on a model several providers serve
  * (DeepSeek), the rounds before that scatter and nothing is cached (no hit in any round of three agent
  * requests, measured 2026-10-02, commit 08de02e25). The caller's own session_id or prompt_cache_key wins;
- * otherwise the same two messages, hashed with who pays and which agent asked, so two people with the
- * same opening never share a key. The key names no content: it is a hash.
+ * otherwise a hash of the system message alone. The system message and the tools are the prefix a
+ * prompt cache reuses, and they are the same for every conversation of the same agent on this node, so
+ * every one of them goes to the provider that already holds that prefix. A first version hashed the
+ * payer in too: each person then got a provider of their own, and a person's first question found no
+ * cache (measured 2026-10-04: a second one-line question cached 2 048 of 11 339 tokens, against
+ * 18 432 of 19 472 on OpenRouter's own default). The key carries neither the person nor the content.
  */
-export function cacheSessionId(payer: string, agent: string | null | undefined, body: CacheSessionBody): string {
+export function cacheSessionId(body: CacheSessionBody): string {
     for (const given of [body.session_id, body.prompt_cache_key]) {
         if (typeof given === 'string' && given.trim()) return given.trim().slice(0, 256);
     }
     const messages = Array.isArray(body.messages) ? body.messages : [];
-    const first = (pick: (m: ChatMessage) => boolean) => JSON.stringify(messages.find(pick)?.content ?? '');
-    const isSystem = (m: ChatMessage) => m?.role === 'system' || m?.role === 'developer';
-    const hash = createHash('sha256')
-        .update(`${payer}\n${agent ?? ''}\n`).update(first(isSystem)).update('\n').update(first((m) => !isSystem(m)))
-        .digest('hex');
+    const system = messages.find((m) => m?.role === 'system' || m?.role === 'developer');
+    const hash = createHash('sha256').update(JSON.stringify(system?.content ?? '')).digest('hex');
     return `aimeat-${hash.slice(0, 40)}`;
 }
 
