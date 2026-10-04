@@ -47081,6 +47081,18 @@ paths:
                   type: object
                   additionalProperties: { type: string }
                   description: For a set, the owner's own names for its organisms, by the set's organism key.
+                grant_apps:
+                  type: boolean
+                  description: >-
+                    Approve the package's apps at install, for the permissions each declares
+                    (`capabilities.apps` in the dry run), so they sign the owner in with no consent
+                    screen (true); or leave each app to ask on its first visit (false). Absent: true for
+                    the owner's own package, false for someone else's; the dry run says which as
+                    `app_approval: { own_package, grant_apps_default }`. An agent or an app grant
+                    approves an app only for scopes it holds itself; an app that asks for more is left
+                    to ask (`result: skipped`). The 201 answer names each app's grant in `app_grants`
+                    (`granted`, `present`, `skipped`, `error`). An install that becomes a request keeps
+                    the choice, and the owner's approval applies it. Not a boolean: 400 INVALID_INPUT.
       responses:
         '201':
           description: Package installed

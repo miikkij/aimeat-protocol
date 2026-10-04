@@ -26,7 +26,7 @@
  *   v1.0.0 — 2026-10-04 — Initial.
  */
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, PackageInstanceRecord } from '../storage/interface.js';
 import { APP_GRANTABLE_SCOPES } from '../routes/app-grant-vocabulary.js';
 import { parseAppScopes } from './protected-resource.js';
 import { upsertAppGrant } from './app-grant-upsert.js';
@@ -36,7 +36,7 @@ export const DEFAULT_APP_SCOPES = ['memory:read', 'memory:write', 'storage:read'
 
 /** One app's grant, as the apply record keeps it, by grant target `owner/filename`. */
 export interface AppGrantStep {
-    result: 'granted' | 'present' | 'error';
+    result: 'granted' | 'present' | 'skipped' | 'error';
     scopes: string[];
     detail?: string;
     at: string;
@@ -67,36 +67,55 @@ function declaredScopes(data: unknown): string[] {
 }
 
 /**
+ * Record the owner's grant for each app one installed copy registered, into `steps` by grant target.
+ * An app already granted or recorded is left alone. `mayGrant` is the installer's limit: an agent
+ * installs for its owner and grants no app a scope it does not hold itself, so an app that asks for
+ * more is left to ask on its first visit (`result: 'skipped'`). Null for the owner in person.
+ */
+export async function grantAppsOfInstance(
+    storage: Storage, config: AimeatConfig, owner: string, instance: PackageInstanceRecord,
+    steps: Record<string, AppGrantStep>, mayGrant: ((scope: string) => boolean) | null = null,
+): Promise<Record<string, AppGrantStep>> {
+    const ownerGhii = `${owner}@${config.nodeId}`;
+    const now = new Date().toISOString();
+    for (const comp of instance.installedComponents.filter(c => c.type === 'app')) {
+        const target = `${owner}/${comp.registeredAs}`;
+        if (steps[target]?.result === 'granted' || steps[target]?.result === 'present') continue;
+        try {
+            const live = await storage.getAppGrantByOwnerAndApp(owner, target);
+            if (live) { steps[target] = { result: 'present', scopes: live.scopes, at: now }; continue; }
+            const app = await storage.getAppByOwnerName(owner, comp.registeredAs);
+            if (!app) { steps[target] = { result: 'error', scopes: [], detail: 'The install registered no app under this name.', at: now }; continue; }
+            const scopes = declaredScopes(app.data);
+            const beyond = mayGrant ? scopes.filter(s => !mayGrant(s)) : [];
+            if (beyond.length) {
+                steps[target] = { result: 'skipped', scopes, at: now,
+                    detail: `The installer does not hold ${beyond.join(', ')}, so it cannot approve them for the app; the app asks on its first visit.` };
+                continue;
+            }
+            const written = await upsertAppGrant(storage, {
+                app: target, appName: app.manifest?.name || comp.registeredAs,
+                appOrigin: await appOriginOf(storage, config, target),
+                owner, gaii: ownerGhii, scopes,
+            }, null);
+            steps[target] = { result: 'granted', scopes: written.scopes, at: now };
+        } catch (err) {
+            steps[target] = { result: 'error', scopes: [], detail: String(err instanceof Error ? err.message : err), at: now };
+        }
+    }
+    return steps;
+}
+
+/**
  * Record the owner's grant for every app the set's installs registered. Writes `record.app_grants`;
  * one app that cannot be granted is recorded as an error and the others go on, so the customer
  * meets at most that app's consent screen.
  */
 export async function grantInstalledApps(storage: Storage, config: AimeatConfig, record: GrantRecord): Promise<void> {
-    const owner = record.owner;
-    const ownerGhii = `${owner}@${config.nodeId}`;
     const steps = record.app_grants ?? {};
-    const now = new Date().toISOString();
     for (const step of Object.values(record.packages)) {
         const instance = step.instance_id ? await storage.getInstance(step.instance_id) : null;
-        for (const comp of instance?.installedComponents.filter(c => c.type === 'app') ?? []) {
-            const target = `${owner}/${comp.registeredAs}`;
-            if (steps[target]?.result === 'granted' || steps[target]?.result === 'present') continue;
-            try {
-                const live = await storage.getAppGrantByOwnerAndApp(owner, target);
-                if (live) { steps[target] = { result: 'present', scopes: live.scopes, at: now }; continue; }
-                const app = await storage.getAppByOwnerName(owner, comp.registeredAs);
-                if (!app) { steps[target] = { result: 'error', scopes: [], detail: 'The install registered no app under this name.', at: now }; continue; }
-                const scopes = declaredScopes(app.data);
-                const written = await upsertAppGrant(storage, {
-                    app: target, appName: app.manifest?.name || comp.registeredAs,
-                    appOrigin: await appOriginOf(storage, config, target),
-                    owner, gaii: ownerGhii, scopes,
-                }, null);
-                steps[target] = { result: 'granted', scopes: written.scopes, at: now };
-            } catch (err) {
-                steps[target] = { result: 'error', scopes: [], detail: String(err instanceof Error ? err.message : err), at: now };
-            }
-        }
+        if (instance) await grantAppsOfInstance(storage, config, record.owner, instance, steps);
     }
     record.app_grants = steps;
 }

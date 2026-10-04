@@ -33,6 +33,8 @@
  *   const filed = await fileInstallRequest({ storage, config }, ownerGhii, draft);
  *   await settleInstallRequest({ storage, config }, ownerGhii, request, 'declined', { by: decider });
  * @version-history
+ *   v1.3.0 — 2026-10-04 — `options.grantApps`, shown as `grant_apps`: whether approving the install
+ *     also approves the package's apps.
  *   v1.2.0 — 2026-10-02 — A request carries `capabilities` (what the package version can do). A request
  *     about code (packages:install-code missing) says so on the open item and in the notification
  *     (notiftext.package_install_request_code, package_update_request_code).
@@ -97,8 +99,9 @@ export interface PackageInstallRequest {
     /**
      * `mode` is what the install asked for (package-managed.ts); absent means editable. `config` is
      * the install config (package-config.ts), never with a secret in it: such an install files no request.
+     * `grantApps` is whether the approval also approves the package's apps (package-install-requests.ts).
      */
-    options: { label?: string; actions?: MigrationRequest[]; mode?: 'managed' | 'editable'; config?: Record<string, unknown> };
+    options: { label?: string; actions?: MigrationRequest[]; mode?: 'managed' | 'editable'; config?: Record<string, unknown>; grantApps?: boolean };
     /** The components that write into the owner's memory: what the owner is asked about. */
     memory_parts: string[];
     /**
@@ -179,6 +182,7 @@ export function summarizeRequest(request: PackageInstallRequest, now = Date.now(
         label: request.options.label ?? null,
         mode: request.options.mode ?? 'editable',
         config: request.options.config ?? null,
+        ...(typeof request.options.grantApps === 'boolean' ? { grant_apps: request.options.grantApps } : {}),
         actions: request.options.actions?.map(a => ({ componentId: a.componentId, action: a.action, has_content: typeof a.content === 'string' })) ?? null,
         memory_parts: request.memory_parts,
         ...(request.capabilities ? { capabilities: request.capabilities } : {}),

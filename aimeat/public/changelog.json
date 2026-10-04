@@ -2,6 +2,18 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does.",
   "entries": [
     {
+      "date": "2026-10-04",
+      "kind": "feature",
+      "title": {
+        "en": "Apps you buy come ready",
+        "fi": "Ostamasi sovellukset ovat valmiina"
+      },
+      "body": {
+        "en": "When you buy a node, its apps are already approved for what they say they use. They sign you in without asking again, and your welcome link opens the app with you signed in. When you install a package yourself, the apps of your own package are approved at once. For someone else's package, your AI shows what each app asks for, and you choose: approve them now, or let each app ask on its first visit. An update that asks for more still asks you, and you can take any approval away under Profile › Access. A new person can also create an account straight from an app's sign-in window.",
+        "fi": "Kun ostat noden, sen sovellukset on jo hyväksytty käyttämään sitä, mitä ne kertovat tarvitsevansa. Ne kirjaavat sinut sisään kysymättä uudestaan, ja tervetulolinkki avaa sovelluksen valmiiksi kirjautuneena. Kun asennat paketin itse, oman pakettisi sovellukset hyväksytään heti. Jos paketti on jonkun muun, tekoälysi näyttää, mitä kukin sovellus pyytää, ja sinä valitset: hyväksyt ne heti, tai jokainen sovellus kysyy ensimmäisellä käyttökerralla. Jos päivitys pyytää lisää, se kysyy sinulta. Voit perua minkä tahansa hyväksynnän kohdassa Profiili › Pääsy. Uusi käyttäjä voi myös luoda tilin suoraan sovelluksen kirjautumisikkunasta."
+      }
+    },
+    {
       "date": "2026-10-03",
       "kind": "feature",
       "title": {

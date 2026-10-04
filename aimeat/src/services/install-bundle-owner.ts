@@ -20,6 +20,8 @@
  *   what was made is kept in the same record an install set keeps.
  * @structure bundleInstallOf() · installSetForOwner()
  * @version-history
+ *   v1.1.0 — 2026-10-04 — `grantApps` passes to each package's install, whose answer the record keeps
+ *     in `app_grants`; the plan names each package's apps and whether the install approves them.
  *   v1.0.0 — 2026-10-02 — Initial (package sale design, phase 4).
  */
 import type { InstallBundle } from './install-set-spec.js';
@@ -41,6 +43,8 @@ export interface SetInstallInput {
     /** The person's own organism names, by the bundle's organism key. */
     organismNames?: unknown;
     dryRun?: boolean;
+    /** Approve the set's apps at install; absent: each package's own default (installOrRequest). */
+    grantApps?: unknown;
 }
 
 export type SetInstallResult =
@@ -80,7 +84,7 @@ export async function installSetForOwner(deps: ApplyDeps, caller: PackageActCall
     }
 
     const problems: string[] = [];
-    const planned: Array<{ group_id: string; local_group_id: string; result: string }> = [];
+    const planned: Array<{ group_id: string; local_group_id: string; result: string; apps?: unknown; app_approval?: unknown }> = [];
     for (const org of bundle.organisms) {
         for (const ws of org.workspaces) {
             const why = await checkWorkspaceManifest(storage, 'set-install-check', ws.name, ws.manifest);
@@ -109,7 +113,11 @@ export async function installSetForOwner(deps: ApplyDeps, caller: PackageActCall
                 if (missing.length) problems.push(`${pkg.groupId}: CONFIG_REQUIRED: ${String(e.component_id)} needs ${missing.map(m => m.field).join(', ')}`);
             }
         }
-        planned.push({ group_id: pkg.groupId, local_group_id: local, result: 'would_install' });
+        // What each app will ask for, and whether the install approves it by itself: what the person
+        // decides on with `grant_apps`.
+        const preview = dry.ok && dry.kind === 'dry-run' ? dry.preview : null;
+        planned.push({ group_id: pkg.groupId, local_group_id: local, result: 'would_install',
+            ...(preview?.app_approval ? { apps: preview.capabilities.apps, app_approval: preview.app_approval } : {}) });
     }
     if (input.dryRun) {
         return {
@@ -139,10 +147,11 @@ export async function installSetForOwner(deps: ApplyDeps, caller: PackageActCall
             if (present) { record.packages[pkg.groupId] = { group_id: pkg.groupId, local_group_id: local, instance_id: present.id, result: 'present', mode: present.mode ?? 'editable' }; continue; }
             const got = await reach(deps, owner, remote, pkg.groupId, false);
             if (!got.ok) throw new Error(got.message);
-            const out = await installOrRequest(deps, caller, { groupId: local, mode: pkg.mode, config: configOf(pkg.groupId, pkg.config), label: bundle.name });
+            const out = await installOrRequest(deps, caller, { groupId: local, mode: pkg.mode, config: configOf(pkg.groupId, pkg.config), label: bundle.name, grantApps: input.grantApps });
             if (!out.ok) throw new Error(`${pkg.groupId}: ${out.code}: ${out.message}`);
             if (out.kind === 'requested') { requests.push({ group_id: pkg.groupId, request_id: out.request.id }); continue; }
             if (out.kind !== 'installed') continue;
+            if (out.appGrants) record.app_grants = { ...(record.app_grants ?? {}), ...out.appGrants };
             warnings.push(...out.warnings.map(w => `${pkg.groupId}: ${w}`));
             proposed.push(...(out.agentsProposed ?? []));
             record.packages[pkg.groupId] = { group_id: pkg.groupId, local_group_id: local, instance_id: out.instance.id, result: 'installed', mode: pkg.mode, ...(out.warnings.length ? { warnings: out.warnings } : {}) };

@@ -23,6 +23,7 @@
  *   aimeat_package_check_updates, aimeat_package_repository, aimeat_package_entitlements.
  * @usage import { registerPackageTools } from './packages.js';
  * @version-history
+ *   v1.14.0 — 2026-10-04 — aimeat_package_install takes `grant_apps` and answers `app_grants`.
  *   v1.13.0 — 2026-10-02 — aimeat_package_withdraw (package sale design, phase 5: T6).
  *   v1.12.0 — 2026-10-02 — aimeat_package_compose_set (a set to sell, with its dry run); aimeat_package_compose
  *     answers `new_version`; aimeat_package_install installs a set for the owner and takes
@@ -76,7 +77,7 @@ import { packageSheet } from '../services/package-sheet.js';
 import { listSellers, addSeller, removeSeller } from '../services/package-sellers.js';
 import { installSetRepositories } from '../services/install-set-trust.js';
 import { toolError } from './tool-error.js';
-import { PACKAGE_CONFIG_PARAM } from './catalog/definitions/packages.js';
+import { PACKAGE_CONFIG_PARAM, GRANT_APPS_PARAM } from './catalog/definitions/packages.js';
 import { setPackageVersionStatus } from '../services/package-create.js';
 import { composePackageFromApps } from '../services/package-compose.js';
 import { pullPackage, listRepositoryPackages } from '../services/package-pull.js';
@@ -398,7 +399,8 @@ export function registerPackageTools(
         mode: z.enum(['managed', 'editable']).optional().describe('"managed": the package owns the code and layout, updates replace them, and only settings are yours to change. "editable" (default): you may edit everything.'),
         config: z.record(z.string(), z.record(z.string(), z.unknown())).optional().describe(PACKAGE_CONFIG_PARAM),
         organism_names: z.record(z.string(), z.string()).optional().describe('For a set: your own names for its organisms, by the set\'s organism key.'),
-    }, annotationsFor('aimeat_package_install'), async ({ group_id, label, version, dry_run: dryRun, mode, config: installConfig, organism_names: organismNames }) => {
+        grant_apps: z.boolean().optional().describe(GRANT_APPS_PARAM),
+    }, annotationsFor('aimeat_package_install'), async ({ group_id, label, version, dry_run: dryRun, mode, config: installConfig, organism_names: organismNames, grant_apps: grantApps }) => {
         // Packages install under the OWNER, so resolve the agent's owner and never a supplied id.
         const gaii = getAgentGaii();
         const owner = localAccountName(gaii);
@@ -409,7 +411,7 @@ export function registerPackageTools(
         const setDeps = { storage, config, peers, scheduler: getActiveScheduler() ?? undefined };
         if (await bundleInstallOf(setDeps, group_id, owner)) {
             const set = await installSetForOwner(setDeps, { owner, sub: gaii, ownerGhii, ...grant }, {
-                groupId: group_id, config: installConfig, organismNames, dryRun: dryRun === true,
+                groupId: group_id, config: installConfig, organismNames, dryRun: dryRun === true, grantApps,
             });
             if (!set.ok) return { ...toolError(set.code, set.problems ? `${set.message} ${set.problems.join(' | ')}` : set.message) };
             const { ok, ...shown } = set;
@@ -420,7 +422,7 @@ export function registerPackageTools(
         const out = await installOrRequest(
             { storage, config, scheduler: getActiveScheduler() ?? undefined },
             { owner, sub: gaii, ownerGhii, ...grant },
-            { groupId: group_id, label, version, dryRun: dryRun === true, mode, config: installConfig },
+            { groupId: group_id, label, version, dryRun: dryRun === true, mode, config: installConfig, grantApps },
         );
 
         if (!out.ok) {
@@ -456,6 +458,8 @@ export function registerPackageTools(
                     ...(out.warnings.length ? { warnings: out.warnings } : {}),
                     // Each waits on the owner's open items; approving it creates the agent.
                     ...(out.agentsProposed?.length ? { agents_proposed: out.agentsProposed } : {}),
+                    // The owner's grant recorded for each app, when the install approved them.
+                    ...(out.appGrants ? { app_grants: out.appGrants } : {}),
                 }, null, 2),
             }],
         };
