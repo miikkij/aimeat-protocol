@@ -31,6 +31,9 @@
  *   const out = await installOrRequest({ storage, config, scheduler }, caller, { groupId, label });
  *   if (out.ok && out.kind === 'requested') res.status(202).json(success(nodeId, requestedBody(out)));
  * @version-history
+ *   v1.4.0 — 2026-10-04 — An install records the owner's grant for the apps it registered when the
+ *     installer chose `grantApps`, or did not say and the package is the owner's own; an agent grants
+ *     no app a scope it lacks. A request keeps the choice, and the owner's approval applies it.
  *   v1.3.0 — 2026-10-02 — A request records what the package version can do (`capabilities`), so a
  *     request about code shows the owner what they approve (package sale design, T1).
  *   v1.2.0 — 2026-09-30 — A skill component is one of the `memory_parts` the owner is asked about:
@@ -55,7 +58,8 @@ import { recordAccountEvent } from './account-events.js';
 import { emitChange } from './event-bus.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
 import { callerPrincipal, isForeignPrincipal } from '../utils/gaii.js';
-import { ownerBypassesScopes } from '../utils/scope-coverage.js';
+import { ownerBypassesScopes, scopeIsCovered } from '../utils/scope-coverage.js';
+import { grantAppsOfInstance, type AppGrantStep } from './install-set-grants.js';
 import { stableStringify } from '../utils/stable-json.js';
 import { decisionRefusal, requestExpired, type InstallRequestDecider } from './package-install-request-policy.js';
 import {
@@ -167,6 +171,7 @@ export async function installOrRequest(
     deps: RequestDeps, caller: PackageActCaller, input: PackageInstallInput,
 ): Promise<PackageInstallResult | RequestedAnswer | InstallRequestFail> {
     const out = await installPackage(deps, caller, input);
+    if (out.ok && out.kind === 'installed') return withAppGrants(deps, caller, out, input.grantApps);
     if (out.ok || !out.missing?.length || !out.target) return out;
     const requester = requesterOf(caller, deps.config.nodeId);
     if (!requester) return out;
@@ -181,8 +186,25 @@ export async function installOrRequest(
         ...(typeof input.label === 'string' && input.label ? { label: input.label } : {}),
         ...(input.mode === 'managed' ? { mode: 'managed' as const } : {}),
         ...(input.config && typeof input.config === 'object' ? { config: input.config as Record<string, unknown> } : {}),
+        ...(typeof input.grantApps === 'boolean' ? { grantApps: input.grantApps } : {}),
     };
     return fileFrom(deps, caller, 'install', requester, out.missing, out.target, null, options, memoryIdsOf(out.target));
+}
+
+/**
+ * After an install: record the owner's grant for the apps it registered, when the installer chose to
+ * (`grantApps`), or did not say and the package is the owner's own (Jouni, 2026-10-04: installing it
+ * is approving it; for someone else's package the person sees what the apps need and chooses). An
+ * agent approves no app a scope it does not hold itself (install-set-grants.ts grantAppsOfInstance).
+ */
+async function withAppGrants<T extends { instance: PackageInstanceRecord; ownPackage: boolean; appGrants?: Record<string, AppGrantStep> }>(
+    deps: RequestDeps, caller: PackageInstallCaller, out: T, grantApps: unknown,
+): Promise<T> {
+    const approve = typeof grantApps === 'boolean' ? grantApps : out.ownPackage;
+    if (!approve) return out;
+    const mayGrant = ownerBypassesScopes(caller) ? null : (s: string) => scopeIsCovered(caller.scopes, s);
+    const appGrants = await grantAppsOfInstance(deps.storage, deps.config, caller.owner, out.instance, {}, mayGrant);
+    return Object.keys(appGrants).length ? { ...out, appGrants } : out;
 }
 
 /** Update a whole installed copy, or file a request when the new version needs words the caller lacks. */
@@ -292,7 +314,10 @@ async function perform(deps: RequestDeps, owner: string, ownerGhii: string, requ
         });
         if (!out.ok) return fail(out.status, out.code, out.message);
         if (out.kind !== 'installed') return fail(500, 'INSTALL_FAILED', 'The install answered a preview instead of installing.');
-        return { ok: true, outcome: { instance_id: out.instance.id, version: out.instance.packageVersion }, result: { instance: out.instance } };
+        // The owner approved the request, so the apps are approved as the requester chose (the owner's
+        // own package when it did not say), with the owner's authority.
+        const granted = await withAppGrants(deps, caller, out, request.options.grantApps);
+        return { ok: true, outcome: { instance_id: out.instance.id, version: out.instance.packageVersion }, result: { instance: out.instance, ...(granted.appGrants ? { app_grants: granted.appGrants } : {}) } };
     }
     const instanceId = request.instance?.id ?? '';
     if (request.act === 'update') {

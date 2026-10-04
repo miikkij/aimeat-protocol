@@ -10,6 +10,7 @@
  *   redirectUri, onBlocked)
  * @usage import { silentGrant, consentWindow } from './app-frame-core.js';
  * @version-history
+ *   v1.1.0 — 2026-10-04 — consentWindow takes `prompt`; 'create' sends prompt=create to authorize.
  *   v1.0.0 — 2026-09-26 — Initial: moved out of app-frame.js unchanged, so the App Catalog's preview
  *     asks for the same grant the isolated frame does instead of handing over the session.
  */
@@ -68,11 +69,12 @@ function openWindow(url) {
  * `onBlocked(retry, cancel)` runs when the browser stops the window: `retry` must be called from a
  * click on this page, `cancel` gives up.
  */
-export function consentWindow(app, scope, manage, redirectUri, onBlocked) {
+export function consentWindow(app, scope, manage, redirectUri, onBlocked, prompt) {
   return pkce().then(function (p) {
     var state = b64url(crypto.getRandomValues(new Uint8Array(16)).buffer);
     var url = '/v1/app-grants/authorize?response_type=code&response_mode=web_message'
       + (manage ? '&manage=1' : '')
+      + (prompt === 'create' ? '&prompt=create' : '')
       + '&app=' + encodeURIComponent(app)
       + '&scope=' + encodeURIComponent(scope || '')
       + '&redirect_uri=' + encodeURIComponent(redirectUri)

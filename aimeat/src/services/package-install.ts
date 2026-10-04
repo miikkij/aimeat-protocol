@@ -20,6 +20,9 @@
  *   import { installPackage } from '../services/package-install.js';
  *   const out = await installPackage({ storage, config, scheduler }, caller, { groupId });
  * @version-history
+ *   v1.11.0 — 2026-10-04 — The input takes `grantApps`, the dry run answers `app_approval` (whether the
+ *     install approves the apps by itself: yes for the owner's own package), and an install answers
+ *     `ownPackage`. installOrRequest records the grants (Jouni: installing it is approving it).
  *   v1.10.0 — 2026-10-02 — The dry run carries `capabilities`, `capabilities_hash` and `source`: what
  *     each part will be able to do and where the package comes from. An agent or an app installing a
  *     package with code needs packages:install-code, or the doors file a request for the owner; the
@@ -55,6 +58,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
+import type { AppGrantStep } from './install-set-grants.js';
 import type {
     Storage,
     PackageRecord,
@@ -117,6 +121,12 @@ export interface PackageInstallInput {
     mode?: unknown;
     /** `{ <componentId>: { <field>: value } }`: the config each part gets (package-config.ts). */
     config?: unknown;
+    /**
+     * Approve the package's apps at install (true) or leave each to ask on its first visit (false).
+     * Absent: true for the owner's own package, false for someone else's. Read by installOrRequest
+     * (package-install-requests.ts), which records the grants; installPackage itself ignores it.
+     */
+    grantApps?: unknown;
 }
 
 export interface PackageInstallPreview {
@@ -149,6 +159,12 @@ export interface PackageInstallPreview {
     missing?: string[];
     /** A skill the install would leave out, because the owner has one of that name of their own. */
     warnings?: string[];
+    /**
+     * Present when the package has apps. `grant_apps_default`: whether the install approves the apps
+     * for the scopes `capabilities.apps` lists when the caller does not say (`grant_apps`): true for
+     * the owner's own package, false for someone else's, where each app asks on its first visit.
+     */
+    app_approval?: { own_package: boolean; grant_apps_default: boolean };
 }
 
 /**
@@ -163,7 +179,7 @@ export interface PackageInstallRefusal {
 
 export type PackageInstallResult =
     | { ok: true; kind: 'dry-run'; preview: PackageInstallPreview }
-    | { ok: true; kind: 'installed'; instance: PackageInstanceRecord; warnings: string[]; agentsProposed: BundledAgentProposal[] }
+    | { ok: true; kind: 'installed'; instance: PackageInstanceRecord; warnings: string[]; agentsProposed: BundledAgentProposal[]; ownPackage: boolean; appGrants?: Record<string, AppGrantStep> }
     | PackageInstallRefusal;
 
 /**
@@ -428,6 +444,8 @@ export async function installPackage(
                 ...(expectsMissing ? { expects_missing: expectsMissing } : {}),
                 ...(awaitsOwner ? { status: 'would_await_owner' as const, missing: writeRefusal!.missing } : {}),
                 ...(warnings.length ? { warnings } : {}),
+                // Whether the install approves the package's apps by itself (package-install-requests.ts).
+                ...(caps.capabilities.apps.length ? { app_approval: { own_package: source.author_ghii === ownerGaii, grant_apps_default: source.author_ghii === ownerGaii } } : {}),
             },
         };
     }
@@ -565,7 +583,7 @@ export async function installPackage(
             agentsProposed.push(...proposed);
             for (const s of skipped) warnings.push(`An agent of the package was not proposed: ${s}`);
         }
-        return { ok: true, kind: 'installed', instance: created, warnings, agentsProposed };
+        return { ok: true, kind: 'installed', instance: created, warnings, agentsProposed, ownPackage: source.author_ghii === ownerGaii };
     } catch (e) {
         // Instance record creation failed — rollback all registered components
         for (const reg of [...registeredComponents].reverse()) {

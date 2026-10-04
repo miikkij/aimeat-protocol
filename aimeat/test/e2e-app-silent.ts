@@ -22,6 +22,9 @@
  *   v1.5.0 — 2026-09-26 — Phase 6: a page of the node asks by name (`?app=`), as the App Catalog's
  *     preview now does on every node: the owner's own app gets a grant scoped to it, another
  *     person's app nothing, an app origin is refused, and the app's own path is a bound redirect.
+ *   v1.7.0 — 2026-10-04 — Phase 6: installing the owner's own package approves its app (Jouni: installing
+ *     it is approving it), so the T2 check installs with grant_apps:false, and a second check proves the
+ *     default: the app signs in at once, and still not as the owner's own.
  *   v1.6.0 — 2026-10-02 — Phase 6: an app a package installed for the owner asks for consent instead of
  *     approving itself (package sale design, T2).
  *   v1.2.0 — 2026-08-11 — The subdomain-serve check addresses a real Host in the app family
@@ -552,13 +555,32 @@ async function main() {
                 }),
             });
             assert(pkg.status === 201, `publish package: ${pkg.status} ${JSON.stringify(pkg.body)}`);
+            // grant_apps:false: the owner chose not to approve the apps at install, so the bridge's own
+            // rule shows. Left out, the owner's own package approves them (the next test).
             const inst = await json(`/v1/packages/${encodeURIComponent(pkg.body.data.packageGroupId)}/install`, {
-                method: 'POST', headers: { Authorization: `Bearer ${A.token}` }, body: JSON.stringify({ label: 'silent' }),
+                method: 'POST', headers: { Authorization: `Bearer ${A.token}` }, body: JSON.stringify({ label: 'silent', grant_apps: false }),
             });
             assert(inst.status === 201, `install: ${inst.status} ${JSON.stringify(inst.body)}`);
             const filename = (inst.body.data.installedComponents as any[]).find(c => c.type === 'app').registeredAs;
             const r = await byName(`${a}/${filename}`, A.rt);
             assert(r.ok === false && r.error === 'consent_required' && !r.access_token, `expected consent_required, got ${JSON.stringify(r)}`);
+        });
+        await test('the owner\'s own package installed with no choice approves its app: it signs in at once, not as own', async () => {
+            const pkg = await json('/v1/packages', {
+                method: 'POST', headers: { Authorization: `Bearer ${A.token}` },
+                body: JSON.stringify({
+                    name: 'silentpkg2', description: 'A package with an app', category: 'utility', visibility: 'private',
+                    components: [{ id: 'pkg-app2.html', type: 'app', label: 'Packaged', dependencies: [], content: '<!DOCTYPE html><html><head><title>P</title></head><body><h1>P</h1></body></html>' }],
+                }),
+            });
+            assert(pkg.status === 201, `publish package: ${pkg.status} ${JSON.stringify(pkg.body)}`);
+            const inst = await json(`/v1/packages/${encodeURIComponent(pkg.body.data.packageGroupId)}/install`, {
+                method: 'POST', headers: { Authorization: `Bearer ${A.token}` }, body: JSON.stringify({ label: 'silent2' }),
+            });
+            assert(inst.status === 201, `install: ${inst.status} ${JSON.stringify(inst.body)}`);
+            const filename = (inst.body.data.installedComponents as any[]).find(c => c.type === 'app').registeredAs;
+            const r = await byName(`${a}/${filename}`, A.rt);
+            assert(r.ok === true && !!r.access_token && r.own === false, `expected a grant, not own: ${JSON.stringify({ ...r, access_token: !!r.access_token })}`);
         });
         await test('another person\'s app gets nothing until they agree', async () => {
             const r = await byName(`${bn}/app-b.html`, A.rt);

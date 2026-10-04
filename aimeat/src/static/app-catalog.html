@@ -10415,10 +10415,10 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     var top = window.screen && window.screen.height ? (window.screen.height - h) / 2 : 0;
     return window.open(url, "aimeat_consent", "width=" + w + ",height=" + h + ",left=" + left + ",top=" + top);
   }
-  function consentWindow(app, scope, manage, redirectUri, onBlocked) {
+  function consentWindow(app, scope, manage, redirectUri, onBlocked, prompt2) {
     return pkce().then(function(p) {
       var state = b64url(crypto.getRandomValues(new Uint8Array(16)).buffer);
-      var url = "/v1/app-grants/authorize?response_type=code&response_mode=web_message" + (manage ? "&manage=1" : "") + "&app=" + encodeURIComponent(app) + "&scope=" + encodeURIComponent(scope || "") + "&redirect_uri=" + encodeURIComponent(redirectUri) + "&code_challenge=" + encodeURIComponent(p.challenge) + "&code_challenge_method=" + encodeURIComponent(p.method) + "&state=" + encodeURIComponent(state);
+      var url = "/v1/app-grants/authorize?response_type=code&response_mode=web_message" + (manage ? "&manage=1" : "") + (prompt2 === "create" ? "&prompt=create" : "") + "&app=" + encodeURIComponent(app) + "&scope=" + encodeURIComponent(scope || "") + "&redirect_uri=" + encodeURIComponent(redirectUri) + "&code_challenge=" + encodeURIComponent(p.challenge) + "&code_challenge_method=" + encodeURIComponent(p.method) + "&state=" + encodeURIComponent(state);
       return new Promise(function(resolve) {
         var popup = openWindow(url);
         if (popup) {

@@ -6,6 +6,8 @@
  *   itself (dry_run validation, component registration, @activate-cron firing, rollback on failure)
  *   lives in the service, so this door and the MCP tool run the same code.
  * @version-history
+ *   v1.12.0 — 2026-10-04 — The body takes `grant_apps` and the 201 answer carries `app_grants`: the
+ *     owner's grant recorded for each app the install approved (package-install-requests.ts).
  *   v1.11.0 — 2026-10-02 — A package that carries an install bundle installs as a set for the caller's
  *     owner: its packages, organisms and workspaces (services/install-bundle-owner.ts); the body takes
  *     `organism_names`, and `config` is per package group. Package sale design, phase 4.
@@ -72,13 +74,17 @@ export function registerInstallRoutes(
     const owner = req.auth!.owner;
     const ownerGhii = await resolveGhii(storage, owner, config);
 
-    const { label, version, dry_run: dryRun, mode, config: installConfig, organism_names: organismNames } = req.body ?? {};
+    const { label, version, dry_run: dryRun, mode, config: installConfig, organism_names: organismNames, grant_apps: grantApps } = req.body ?? {};
+    if (grantApps !== undefined && typeof grantApps !== 'boolean') {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'grant_apps is true (approve the apps now) or false (each app asks on its first visit).'));
+      return;
+    }
 
     // A package that carries an install bundle is a set: its packages, its organisms and workspaces,
     // for this owner (services/install-bundle-owner.ts). `config` is then per package group.
     if (await bundleInstallOf({ storage, config, peers }, groupId, owner)) {
       const set = await installSetForOwner({ storage, config, peers, scheduler }, actCallerOf(req, owner, ownerGhii), {
-        groupId, config: installConfig, organismNames, dryRun: dryRun === true,
+        groupId, config: installConfig, organismNames, dryRun: dryRun === true, grantApps,
       });
       if (!set.ok) {
         res.status(set.status).json(error(config.nodeId, set.code, set.message, set.status, set.problems ? { problems: set.problems } : undefined));
@@ -96,7 +102,7 @@ export function registerInstallRoutes(
     const out = await installOrRequest(
       { storage, config, scheduler },
       actCallerOf(req, owner, ownerGhii),
-      { groupId, label, version, dryRun: dryRun === true, mode, config: installConfig },
+      { groupId, label, version, dryRun: dryRun === true, mode, config: installConfig, grantApps },
     );
 
     if (!out.ok) {
@@ -123,6 +129,8 @@ export function registerInstallRoutes(
       ...out.instance,
       ...(out.warnings.length ? { warnings: out.warnings } : {}),
       ...(out.agentsProposed?.length ? { agents_proposed: out.agentsProposed } : {}),
+      // The owner's grant recorded for each app the install registered, when the install approved them.
+      ...(out.appGrants ? { app_grants: out.appGrants } : {}),
     }, [
       { description: 'View instance', method: 'GET', url: `/v1/instances/${out.instance.id}` },
       { description: 'Check component status', method: 'GET', url: `/v1/instances/${out.instance.id}/status` },

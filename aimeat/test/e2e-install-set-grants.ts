@@ -16,8 +16,12 @@
  *   - Phase 5: sign-in and registration from an app (app Origin, isolated frame, app Host) answer 403
  *     APP_ORIGIN_SIGN_IN; the node's own callers and the SAML form post are untouched; with the
  *     setting off the same request is let through
+ *   - Phase 6: an owner installing a package: someone else's package records no grant unless the
+ *     owner chooses grant_apps, the owner's own package approves its app, an agent approves no scope
+ *     it lacks, and a grant_apps that is not a boolean is refused
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-install-set-grants
  * @version-history
+ *   v1.1.0 — 2026-10-04 — Phase 6: the owner's own install (Jouni: installing it is approving it).
  *   v1.0.0 — 2026-10-04 — Initial.
  */
 
@@ -29,6 +33,7 @@ import type { Server } from 'node:http';
 import type { Storage } from '../src/storage/interface.js';
 import { setActiveEmailService, type EmailService } from '../src/services/email.js';
 import { hostRequest } from './helpers/host-request.js';
+import { sign } from '../src/auth/keypair.js';
 
 let passed = 0;
 let failed = 0;
@@ -143,6 +148,8 @@ await test('Boot a node with an app origin, an operator and a vendor', async () 
         port: PORT, nodeId: NODE_ID, baseUrl: BASE, devMode: true, testMode: true, adminPassword: adminPw,
         storageProvider: 'memory', packagesEnabled: true, packageCreateRole: 'owner',
         appHost: APP_HOST, appOriginEnabled: true, appOriginSignInRefuse: true,
+        // Phase 6 makes six accounts through the admin setup routes, which allow five a minute.
+        adminAuthRateLimitMax: 100,
     });
     const made = await createServer(config);
     storage = made.storage;
@@ -313,6 +320,82 @@ await test('With the setting off, the same request from an app is let through (l
         const r = await login({ Origin: `http://shop.${APP_HOST}` });
         assert(reachedRoute(r), `reaches the password route: ${r.status} ${JSON.stringify(r.body.error)}`);
     } finally { config.appOriginSignInRefuse = true; }
+});
+
+console.log('\nPhase 6 — An owner installs a package themselves');
+
+const installPkg = (token: string, group: string, body: Record<string, unknown> = {}) =>
+    json(`/v1/packages/${encodeURIComponent(group)}/install`, { method: 'POST', headers: auth(token), body: JSON.stringify(body) });
+const appOf = (out: { body: any }) => (out.body.data.installedComponents as any[]).find(c => c.type === 'app').registeredAs as string;
+
+/** An agent of `owner` with exactly `scopes`, and its token. */
+async function agentToken(ownerToken: string, owner: string, name: string, scopes: string[]): Promise<string> {
+    const reg = await json('/v1/agents', { method: 'POST', headers: auth(ownerToken), body: JSON.stringify({ name, owner, capabilities: ['memory'], mode: 'interactive', scopes }) });
+    assert(reg.status === 201, `agent ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
+    const gaii = reg.body.data.agent.gaii as string;
+    const stamp = new Date().toISOString();
+    const signature = await sign(reg.body.data.private_key, gaii + stamp);
+    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: stamp, signature }) });
+    assert(tok.body.ok === true, `agent token ${name}: ${JSON.stringify(tok.body.error)}`);
+    return tok.body.data.token as string;
+}
+
+await test('The dry run of someone else\'s package names what each app asks for, and that the apps will ask', async () => {
+    const cara = await setupOwner(`cara${ts}`);
+    const r = await installPkg(cara, shopGroup, { dry_run: true });
+    assert(r.status === 200, `dry run: ${r.status} ${JSON.stringify(r.body)}`);
+    assert(r.body.data.app_approval?.own_package === false && r.body.data.app_approval?.grant_apps_default === false, `app_approval: ${JSON.stringify(r.body.data.app_approval)}`);
+    const app = r.body.data.capabilities.apps[0];
+    assert(app && SCOPES.split(' ').every(s => app.scopes.includes(s)), `the app's scopes: ${JSON.stringify(app)}`);
+});
+
+await test('Someone else\'s package installed with no choice records no grant: each app asks on its first visit', async () => {
+    const owner = `dora${ts}`;
+    const token = await setupOwner(owner);
+    const r = await installPkg(token, shopGroup);
+    assert(r.status === 201 && !r.body.data.app_grants, `install: ${r.status} ${JSON.stringify(r.body.data?.app_grants)}`);
+    assert(!(await storage.getAppGrantByOwnerAndApp(owner, `${owner}/${appOf(r)}`)), 'no grant row');
+});
+
+await test('Someone else\'s package installed with grant_apps:true approves its app for the declared scopes', async () => {
+    const owner = `emil${ts}`;
+    const token = await setupOwner(owner);
+    const r = await installPkg(token, shopGroup, { grant_apps: true });
+    const target = `${owner}/${appOf(r)}`;
+    assert(r.status === 201 && r.body.data.app_grants?.[target]?.result === 'granted', `install: ${r.status} ${JSON.stringify(r.body.data?.app_grants)}`);
+    const row = await storage.getAppGrantByOwnerAndApp(owner, target);
+    assert(!!row && SCOPES.split(' ').every(s => row.scopes.includes(s)), `grant row: ${JSON.stringify(row?.scopes)}`);
+});
+
+await test('The owner\'s own package approves its app with no choice given', async () => {
+    const owner = `finn${ts}`;
+    const token = await setupOwner(owner);
+    const pub = await json('/v1/packages', { method: 'POST', headers: auth(token),
+        body: JSON.stringify({ name: `mine${ts}`, description: 'My app', category: 'utility', visibility: 'private',
+            components: [{ id: 'app-mine', type: 'app', label: 'Mine', content: APP_HTML, dependencies: [] }] }) });
+    assert(pub.status === 201, `publish: ${pub.status} ${JSON.stringify(pub.body)}`);
+    const dry = await installPkg(token, pub.body.data.packageGroupId, { dry_run: true });
+    assert(dry.body.data.app_approval?.own_package === true && dry.body.data.app_approval?.grant_apps_default === true, `own dry run: ${JSON.stringify(dry.body.data.app_approval)}`);
+    const r = await installPkg(token, pub.body.data.packageGroupId);
+    const target = `${owner}/${appOf(r)}`;
+    assert(r.status === 201 && r.body.data.app_grants?.[target]?.result === 'granted', `install: ${r.status} ${JSON.stringify(r.body.data?.app_grants)}`);
+});
+
+await test('An agent approves no app a scope it does not hold: the app is left to ask', async () => {
+    const owner = `gail${ts}`;
+    const token = await setupOwner(owner);
+    const agent = await agentToken(token, owner, 'installer', ['packages:write', 'packages:install-code', 'memory:read']);
+    const r = await installPkg(agent, shopGroup, { grant_apps: true });
+    assert(r.status === 201, `install: ${r.status} ${JSON.stringify(r.body)}`);
+    const target = `${owner}/${appOf(r)}`;
+    const step = r.body.data.app_grants?.[target];
+    assert(step?.result === 'skipped' && /storage:read/.test(step.detail ?? ''), `skipped, naming storage:read: ${JSON.stringify(step)}`);
+    assert(!(await storage.getAppGrantByOwnerAndApp(owner, target)), 'no grant row');
+});
+
+await test('grant_apps that is not true or false is refused', async () => {
+    const r = await installPkg(opsToken, shopGroup, { grant_apps: 'yes' });
+    assert(r.status === 400 && /grant_apps/.test(r.body.error?.message ?? ''), `expected 400: ${r.status} ${JSON.stringify(r.body)}`);
 });
 
 server.close();

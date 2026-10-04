@@ -17,6 +17,7 @@
  * @structure packageTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { packageTools } from './tool-call-defs-packages.js';
  * @version-history
+ *   v1.14.0 -- 2026-10-04 -- aimeat_package_install forwards `grant_apps`.
  *   v1.13.0 -- 2026-10-02 -- aimeat_package_withdraw (POST /v1/packages/:groupId/versions/:version/withdraw).
  *   v1.12.0 -- 2026-10-02 -- aimeat_package_compose_set (POST /v1/packages/compose-set); aimeat_package_install
  *     forwards `organism_names` (package sale design, phase 4).
@@ -44,7 +45,7 @@
  *     at apps. Pure extraction: the handlers are unchanged, only their names and their home.
  */
 import type { ConnectCliToolDefinition, JsonObject } from './tool-call-helpers.js';
-import { PACKAGE_CONFIG_PARAM } from '../mcp/catalog/definitions/packages.js';
+import { PACKAGE_CONFIG_PARAM, GRANT_APPS_PARAM } from '../mcp/catalog/definitions/packages.js';
 import {
     query, requiredString, optionalString, optionalBoolean, optionalArray, optionalRecord, requiredArray,
 } from './tool-call-helpers.js';
@@ -257,11 +258,13 @@ export const packageTools: ConnectCliToolDefinition[] = [
             mode: { type: 'string', enum: ['managed', 'editable'], description: '"managed": the package owns the code and layout. "editable" (default): you may edit everything.' },
             config: { type: 'object', description: PACKAGE_CONFIG_PARAM },
             organism_names: { type: 'object', description: 'For a set: your own names for its organisms, { <organism key>: name }.' },
+            grant_apps: { type: 'boolean', description: GRANT_APPS_PARAM },
         },
         handler: ({ client }, input) => {
             const body: JsonObject = {};
             const organismNames = optionalRecord(input, 'organism_names');
             if (organismNames !== undefined) body.organism_names = organismNames;
+            if (typeof input.grant_apps === 'boolean') body.grant_apps = input.grant_apps;
             const label = optionalString(input, 'label');
             if (label !== undefined) body.label = label;
             const version = optionalString(input, 'version');

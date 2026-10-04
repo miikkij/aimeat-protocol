@@ -12,6 +12,7 @@
  * @structure packagesTools[] -- catalog entries, folded into definitions.ts
  * @usage import { packagesTools } from './packages.js';
  * @version-history
+ *   v1.15.0 -- 2026-10-04 -- aimeat_package_install takes `grant_apps` (GRANT_APPS_PARAM).
  *   v1.14.0 -- 2026-10-02 -- aimeat_package_withdraw (package sale design, phase 5: T6).
  *   v1.13.0 -- 2026-10-02 -- aimeat_package_compose_set; aimeat_package_install installs a set and takes
  *     `organism_names` (package sale design, phase 4).
@@ -48,6 +49,9 @@ import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
 
 /** What `config` on aimeat_package_install is, on every interface. */
+/** The `grant_apps` input of aimeat_package_install, shared by its three surfaces. */
+export const GRANT_APPS_PARAM = 'Approve the package\'s apps now, for the permissions each one asks for, so they sign your owner in with no question (true), or let each app ask on its first visit (false). Left out: true for your owner\'s own package, false for someone else\'s. Run dry_run first: `capabilities.apps` lists what each app asks for and `app_approval` says what the install does when you leave this out, so tell your owner what the apps ask for and let them choose. An agent can approve an app only for permissions it holds itself; an app that asks for more asks your owner on its first visit.';
+
 export const PACKAGE_CONFIG_PARAM = 'Each part\'s config, keyed by component id: { "<component id>": { "<field>": value } }. An app part takes the fields its config schema declares; an extension part takes its config fields, and a secret field there is stored encrypted and never shown. Run with dry_run first: the answer lists every part\'s fields and which required ones are still empty, so you can ask your owner for them. A required field left empty refuses the install with CONFIG_REQUIRED naming it.';
 
 export const packagesTools: AimeatToolDefinition[] = [
@@ -211,7 +215,7 @@ export const packagesTools: AimeatToolDefinition[] = [
         // reaches for by name ("install the company brain"), and until 2026-08-23 it existed on the
         // HTTP route alone, so an agent could list a package and not install it.
         name: 'aimeat_package_install',
-        description: 'Install a component package as your own copy. Each component is registered under your identity. With mode "editable" (the default) what you get is yours to edit; with mode "managed" the package owns the code and layout, an update replaces them, and you change only the settings (name, description, access code, parking, search visibility, legal texts) until you fork the install. A package that seeds memory records writes them into your owner\'s memory, which takes the memory:write and memory:write-as-owner permissions; without them the install becomes a request your owner approves (status awaiting_owner, with a request_id), and nothing is installed until then. A package that carries code (an app, an extension, a cortex, a skill) takes packages:install-code in the same way. Run dry_run first: it answers `capabilities` (what each part will be able to do) and `source` (who made it and where it came from), which is what you tell your owner before they approve. A set (a package that carries an install bundle) installs all of it for your owner: each package of the set by these same rules, then its organisms and workspaces under your owner\'s names (`organism_names`), each app told where its workspace is; `config` is then { <package group id>: { <component id>: { <field>: value } } }. A set that makes organisms needs organism:write. If a package of the set waits for your owner, the set stops there, and installing it again continues and makes nothing twice.',
+        description: 'Install a component package as your own copy. Each component is registered under your identity. With mode "editable" (the default) what you get is yours to edit; with mode "managed" the package owns the code and layout, an update replaces them, and you change only the settings (name, description, access code, parking, search visibility, legal texts) until you fork the install. A package that seeds memory records writes them into your owner\'s memory, which takes the memory:write and memory:write-as-owner permissions; without them the install becomes a request your owner approves (status awaiting_owner, with a request_id), and nothing is installed until then. A package that carries code (an app, an extension, a cortex, a skill) takes packages:install-code in the same way. Run dry_run first: it answers `capabilities` (what each part will be able to do) and `source` (who made it and where it came from), which is what you tell your owner before they approve. The package\'s apps: installing your owner\'s own package approves them, so they sign in with no question; for someone else\'s package, tell your owner what each app asks for (`capabilities.apps`) and pass `grant_apps` true to approve them now, or leave it out so each app asks on its first visit (`app_approval` in the dry run says which applies). A set (a package that carries an install bundle) installs all of it for your owner: each package of the set by these same rules, then its organisms and workspaces under your owner\'s names (`organism_names`), each app told where its workspace is; `config` is then { <package group id>: { <component id>: { <field>: value } } }. A set that makes organisms needs organism:write. If a package of the set waits for your owner, the set stops there, and installing it again continues and makes nothing twice.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -222,6 +226,7 @@ export const packagesTools: AimeatToolDefinition[] = [
             mode: { type: 'string', enum: ['managed', 'editable'], description: '"managed": the package owns the code and layout. "editable" (default): you may edit everything.' },
             config: { type: 'object', description: PACKAGE_CONFIG_PARAM },
             organism_names: { type: 'object', description: 'For a set: your own names for its organisms, { <organism key>: name }.' },
+            grant_apps: { type: 'boolean', description: GRANT_APPS_PARAM },
         },
     },
     {

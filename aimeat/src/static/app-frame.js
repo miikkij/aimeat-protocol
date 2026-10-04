@@ -20,6 +20,8 @@
  *   App Catalog's preview.
  * @usage Served at /app-frame.js as a module; referenced by app-frame.html.
  * @version-history
+ *   v1.2.0 — 2026-10-04 — The consent request's `prompt` ('create') reaches the consent window, so
+ *     signIn({ register: true }) opens on the create-account form in the isolated frame too.
  *   v1.1.0 — 2026-09-26 — A module: the grant, the consent window and forFrame moved unchanged to
  *     app-frame-core.js, which the App Catalog's preview now uses too. The page tells the frame its
  *     own origin in the boot data.
@@ -150,8 +152,8 @@ import { silentGrant, consentWindow } from './app-frame-core.js';
    * address, which the node binds to this app. When the browser stops the window, a click on the bar
    * opens it.
    */
-  function consent(scope, manage) {
-    return consentWindow(app, scope, manage, location.origin + location.pathname, showBar);
+  function consent(scope, manage, prompt) {
+    return consentWindow(app, scope, manage, location.origin + location.pathname, showBar, prompt);
   }
 
   function signOut() {
@@ -220,7 +222,7 @@ import { silentGrant, consentWindow } from './app-frame-core.js';
     }
     if (d.type !== 'aimeat_frame_req' || typeof d.id !== 'string') return;
     if (d.op === 'login') silentGrant(app, String(d.scope || '')).then(function (r) { reply(d.id, d.op, r); });
-    else if (d.op === 'consent') consent(String(d.scope || ''), !!d.manage).then(function (r) { reply(d.id, d.op, r); });
+    else if (d.op === 'consent') consent(String(d.scope || ''), !!d.manage, d.prompt === 'create' ? 'create' : '').then(function (r) { reply(d.id, d.op, r); });
     else if (d.op === 'logout') signOut().then(function (r) { reply(d.id, d.op, r); });
     else reply(d.id, d.op, null);
   });

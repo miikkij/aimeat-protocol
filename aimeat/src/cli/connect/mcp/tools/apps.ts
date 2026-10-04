@@ -22,6 +22,7 @@
  *     aimeat_package_instances and aimeat_package_fork over GET /v1/instances and POST /v1/instances/:id/fork.
  *   2026-09-28 — aimeat_image_generate takes `role`, the AI role the call runs as, sent to POST /v1/ai/image.
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
+ *   v1.11.0 -- 2026-10-04 -- aimeat_package_install forwards `grant_apps`.
  *   v1.10.0 -- 2026-09-27 -- The versions, screenshot, seo, marks, visitors, visitors_measure, legal and
  *     audit tools moved into aimeat_app_manage (app-manage.ts).
  *   v1.9.0 -- 2026-09-25 -- aimeat_package_install_requests over GET /v1/package-install-requests(/:id)
@@ -52,7 +53,7 @@ import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 import { AI_ROLE_PARAM } from '../../../../mcp/catalog/definitions/ai-models.js';
-import { PACKAGE_CONFIG_PARAM } from '../../../../mcp/catalog/definitions/packages.js';
+import { PACKAGE_CONFIG_PARAM, GRANT_APPS_PARAM } from '../../../../mcp/catalog/definitions/packages.js';
 import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
 import { provenanceEchoedResult, readPayloadWithProvenance } from '../../ai-provenance-carry.js';
 import { envelopeResult, payloadResult } from './_registry.js';
@@ -134,7 +135,8 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     mode: z.enum(['managed', 'editable']).optional().describe('"managed": the package owns the code and layout. "editable" (default): you may edit everything'),
     config: z.record(z.string(), z.record(z.string(), z.unknown())).optional().describe(PACKAGE_CONFIG_PARAM),
     organism_names: z.record(z.string(), z.string()).optional().describe('For a set: your own names for its organisms, by the set\'s organism key'),
-  }, annotationsFor('aimeat_package_install'), async ({ group_id, label, version, dry_run, mode, config, organism_names }) => {
+    grant_apps: z.boolean().optional().describe(GRANT_APPS_PARAM),
+  }, annotationsFor('aimeat_package_install'), async ({ group_id, label, version, dry_run, mode, config, organism_names, grant_apps }) => {
     const body: Record<string, unknown> = {};
     if (label !== undefined) body.label = label;
     if (version !== undefined) body.version = version;
@@ -142,6 +144,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     if (mode !== undefined) body.mode = mode;
     if (config !== undefined) body.config = config;
     if (organism_names !== undefined) body.organism_names = organism_names;
+    if (grant_apps !== undefined) body.grant_apps = grant_apps;
     return out(await client.post(`/v1/packages/${encodeURIComponent(group_id)}/install`, body));
   });
 
