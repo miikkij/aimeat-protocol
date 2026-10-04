@@ -106,10 +106,13 @@
  *     its timeout as before (secaudit 2026-09, R4).
  *   v1.19.1 — 2026-09-27 — onHumanAnswer takes only an own key of run.steps as a step, so a step id
  *     of `__proto__` is refused as not waiting (CodeQL js/prototype-polluting-assignment).
+ *   v1.19.2 — 2026-10-04 — A declined task ends its step like a done or failed one
+ *     (isTerminalTaskStatus); the step is then judged by its output, as before.
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AgentTaskRecord } from '../../storage/interface.js';
+import { isTerminalTaskStatus } from '../../storage/interface.js';
 import type { createWebhookDispatcher } from '../webhook-dispatcher.js';
 import type { PushService } from '../push.js';
 import type { EmailService } from '../email.js';
@@ -414,7 +417,7 @@ export class WorkflowEngine {
   }
 
   // ── task terminal → advance ────────────────────────────────────────────────────
-  async onTaskTerminal(task: AgentTaskRecord, _outcome: 'done' | 'failed'): Promise<void> {
+  async onTaskTerminal(task: AgentTaskRecord, _outcome: 'done' | 'failed' | 'declined'): Promise<void> {
     const scope = task.scope?.find(s => s.name === 'workflow-run');
     if (!scope?.value) return;
     const [workflowId, runId] = scope.value.split('/');
@@ -435,7 +438,7 @@ export class WorkflowEngine {
       // Wait until every task of this step is terminal (a step may fan out to several agents).
       for (const tid of rs.taskIds ?? []) {
         const t = await this.storage.getAgentTask(tid);
-        if (t && t.status !== 'done' && t.status !== 'failed') return; // still in flight
+        if (t && !isTerminalTaskStatus(t.status)) return; // still in flight
       }
 
       // Use the signals PINNED at start time (not current offers) — a mid-run offer edit/delete must
@@ -648,8 +651,8 @@ export class WorkflowEngine {
           if (rs.state !== 'dispatched') continue;
           for (const tid of rs.taskIds ?? []) {
             const task = await this.storage.getAgentTask(tid);
-            if (task && (task.status === 'done' || task.status === 'failed')) {
-              await this.onTaskTerminal(task, task.status); // advances the run (re-checks all step tasks)
+            if (task && isTerminalTaskStatus(task.status)) {
+              await this.onTaskTerminal(task, task.status as 'done' | 'failed' | 'declined'); // advances the run (re-checks all step tasks)
               break;
             }
           }

@@ -19,6 +19,7 @@
  *   strictest label of the items it was copied from (living-source-labels.ts). A source whose label
  *   rises later does not raise its copies yet: a background pass raises copies when a source rises (V4, later).
  * @version-history
+ *   v1.5.1 — 2026-10-04 — A declined agent task frees the section as a failed one does.
  *   v1.5.0 — 2026-09-29 — A source copy inherits the strictest classification of its sources, set as a
  *     rule label after the copy is written; a labelling failure logs a warning (TARGET-082 V4).
  *     readDeliverable names the key it read, so the folded copy knows its source.
@@ -245,7 +246,8 @@ async function handleAgentSection(
       await clear();
       return content ? 'folded' : 'failed';
     }
-    if (task.status === 'failed' || task.status === 'stalled') { await addLedger(storage, ownerGaii, loc, { event: 'agent-failed', slot }); await clear(); return 'failed'; }
+    // A declined task wrote nothing, so for this section it ends like a failed one.
+    if (task.status === 'failed' || task.status === 'declined' || task.status === 'stalled') { await addLedger(storage, ownerGaii, loc, { event: 'agent-failed', slot }); await clear(); return 'failed'; }
     return 'waiting';   // queued / active
   }
 

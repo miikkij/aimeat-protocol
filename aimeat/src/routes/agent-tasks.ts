@@ -22,6 +22,7 @@
  *   - PATCH  /v1/agents/:name/tasks/:id/todos/:todoId -- Update individual todo status
  *   - GET    /v1/agents/:name/tasks/:id/events -- List events
  * @version-history
+ *   v1.10.1 -- 2026-10-04 -- A declined task archives by age like a done or failed one (isTerminalTaskStatus).
  *   v1.10.0 -- 2026-07-12 -- /start now emitDelivery's a `task_assigned` wake on owner approval
  *     (queued -> active), matching create-time auto-activation. Closes the "waits for polling" gap where
  *     a tunnel-parked daemon only picked an approved task up on its ~5-min safety-net re-list.
@@ -53,13 +54,13 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentTaskRecord } from '../storage/interface.js';
+import { isTerminalTaskStatus } from '../storage/interface.js';
 import { resolveIdentity, agentGaiiFromIdentifier } from '../utils/gaii.js';
 import type { WebhookDispatcher, TaskBucket, TaskRouteHelpers } from './agent-tasks/helpers.js';
 import { registerTaskCreateReadRoutes } from './agent-tasks/create-read.js';
 import { registerTaskLifecycleRoutes } from './agent-tasks/lifecycle.js';
 import { registerTaskCompletionRoutes } from './agent-tasks/completion.js';
 
-const TASK_TERMINAL_STATUSES = new Set(['done', 'failed']);
 
 /**
  * Which Tasks-tab bucket a task falls in. See
@@ -72,7 +73,7 @@ function deriveTaskBucket(
 ): TaskBucket {
   if (task.triage === 'kept') return 'keep';
   if (task.triage === 'archived') return 'archive';
-  if (!TASK_TERMINAL_STATUSES.has(task.status)) return 'recent';
+  if (!isTerminalTaskStatus(task.status)) return 'recent';
   if (!autoArchive) return 'recent';
   const ageHours = (nowMs - new Date(task.updatedAt).getTime()) / 3_600_000;
   return ageHours > windowHours ? 'archive' : 'recent';

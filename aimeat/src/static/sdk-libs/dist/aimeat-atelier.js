@@ -1128,6 +1128,7 @@
       delegateGo: "Let AI handle it",
       delegateHanded: "Handed over",
       delegateFailed: "The agent could not finish it.",
+      delegateDeclined: "The agent declined it.",
       delegateNoAgents: "No agent is connected to this account yet.",
       agentActivityNone: "No agent activity yet.",
       chosen: "Chosen",
@@ -1296,6 +1297,7 @@
       delegateGo: "Anna tekoälyn hoitaa",
       delegateHanded: "Annettu hoidettavaksi",
       delegateFailed: "Agentti ei saanut sitä valmiiksi.",
+      delegateDeclined: "Agentti kieltäytyi siitä.",
       delegateNoAgents: "Tähän tiliin ei ole vielä kytketty agenttia.",
       agentActivityNone: "Ei agenttitoimintaa vielä.",
       chosen: "Valittu",
@@ -1464,6 +1466,7 @@
       delegateGo: "Deja que la IA lo haga",
       delegateHanded: "Encargado",
       delegateFailed: "El agente no pudo terminarlo.",
+      delegateDeclined: "El agente lo rechazó.",
       delegateNoAgents: "Esta cuenta aún no tiene ningún agente conectado.",
       agentActivityNone: "Sin actividad de agentes todavía.",
       chosen: "Elegida",
@@ -7631,6 +7634,13 @@
               if (spec.onDone) spec.onDone({ task, deliverable: null });
             } else if (task.status === "failed" || task.status === "stalled") {
               status.textContent = t("delegateFailed");
+              btn.disabled = false;
+              if (stopWatch) {
+                stopWatch();
+                stopWatch = null;
+              }
+            } else if (task.status === "declined") {
+              status.textContent = t("delegateDeclined");
               btn.disabled = false;
               if (stopWatch) {
                 stopWatch();

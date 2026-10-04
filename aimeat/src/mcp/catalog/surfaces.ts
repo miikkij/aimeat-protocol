@@ -24,6 +24,7 @@
  *   import { toolsForSurface } from '../catalog/surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
+ *   2026-10-04 — aimeat_task_decline on the agent surface, beside aimeat_task_fail.
  *   2026-10-02 — An eighth surface, `chat`, for the node's own chat: 19 tools on at the start, every
  *     other tool registered and switched off until aimeat_tools_find (CHAT_ONLY) or a call by name
  *     switches it on. toolsRegisteredOn(role) says what a session registers.
@@ -259,7 +260,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         // NOTE: aimeat_task_request_changes is connector-only (owner tool, not registered on the
         // server /v1/mcp), so it cannot appear on a server v2 surface — intentionally omitted here.
         'aimeat_task_create', 'aimeat_task_list', 'aimeat_task_get', 'aimeat_task_propose_todos',
-        'aimeat_task_event', 'aimeat_task_todo', 'aimeat_task_complete', 'aimeat_task_fail',
+        'aimeat_task_event', 'aimeat_task_todo', 'aimeat_task_complete', 'aimeat_task_fail', 'aimeat_task_decline',
         // The person's own AI starting a waiting task on their word, and setting whether an agent's
         // tasks start on their own at all.
         'aimeat_task_start', 'aimeat_agent_task_start_set', 'aimeat_agent_scope_narrow',

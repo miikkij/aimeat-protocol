@@ -12752,6 +12752,7 @@
       "taskDoneTitled": "{agent} finished: {title}",
       "taskFailed": "{agent} could not finish a task.",
       "taskFailedTitled": "{agent} could not finish: {title}",
+      "taskDeclined": "{agent} declined {title}: {reason}",
       "passkeyAdded": "You added a passkey.",
       "passkeyAddedNamed": "You added the passkey {name}.",
       "passkeyRemoved": "You removed a passkey.",
@@ -15505,7 +15506,8 @@
         "stalled": "stalled",
         "queued": "queued",
         "revision_requested": "revision requested",
-        "draft": "draft"
+        "draft": "draft",
+        "declined": "declined"
       },
       "verification": {
         "deterministic": "deterministic",
@@ -16387,6 +16389,9 @@
         "requestChangesSent": "Change request sent. Waiting for the agent to revise.",
         "requestChangesError": "Failed to send change request",
         "revisionWaiting": "Waiting for the agent to propose a revised plan.",
+        "declined": "Declined",
+        "declinedBecause": "The agent declined: {reason}",
+        "declinedNoReason": "no reason was recorded",
         "waitsForYou": "Waits for your OK. Start it here, or ask your AI to start it.",
         "outdatedTodos": "Previously proposed (outdated)",
         "blurTitle": "Hide title (blur for screen recording)",

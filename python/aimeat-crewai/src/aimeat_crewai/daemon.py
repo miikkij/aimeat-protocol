@@ -1361,6 +1361,8 @@ DAEMON_DEFAULT_TOOL_FILTER: tuple[str, ...] = (
     "aimeat_task_event",
     "aimeat_task_complete",
     "aimeat_task_fail",
+    # A request the crew should not take ends as declined with the reason, not as failed (0.32.1).
+    "aimeat_task_decline",
     "aimeat_task_create",  # for crew-to-crew delegation
     # Deliverables.
     #

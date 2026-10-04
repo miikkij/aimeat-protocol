@@ -24,8 +24,10 @@
  * @structure taskOutcome() — the terminal event plus the deliverable pointer, or null while running
  * @usage
  *   import { taskOutcome } from '../services/task-outcome.js';
- *   const outcome = await taskOutcome(storage, task);   // null unless done/failed
+ *   const outcome = await taskOutcome(storage, task);   // null unless done/failed/declined
  * @version-history
+ *   v1.1.0 — 2026-10-04 — A declined task has an outcome too: state 'declined', and the agent's
+ *     reason from the 'declined' event as the message.
  *   v1.0.0 — 2026-08-16 — Initial. Reported by crewaimeat-dev against aimeat-crewai 0.20.0: a
  *     completed task-runner leaves its output where the caller cannot read it.
  */
@@ -34,9 +36,10 @@ import type { Storage, AgentTaskRecord } from '../storage/interface.js';
 /** What a finished task produced. Null while it is still running — an unfinished task has no
  *  outcome, and reporting an empty one would read as "finished with nothing". */
 export interface TaskOutcome {
-    /** 'done' or 'failed' — the same word the terminal event carries. */
-    state: 'done' | 'failed';
-    /** The agent's own sentence about what it did, from the terminal event. */
+    /** 'done', 'failed' or 'declined' — the task's end status. */
+    state: 'done' | 'failed' | 'declined';
+    /** The agent's own sentence about what it did, from the terminal event. For a declined task, the
+     *  reason the agent gave for refusing. */
     message: string;
     at: string;
     /** Memory key under the AGENT's namespace where the deliverable was published, when one was
@@ -46,7 +49,7 @@ export interface TaskOutcome {
     deliverable_url?: string;
 }
 
-const TERMINAL = new Set(['completed', 'failed']);
+const TERMINAL = new Set(['completed', 'failed', 'declined']);
 
 /**
  * The outcome of a task, or null if it has not finished.
@@ -56,7 +59,7 @@ const TERMINAL = new Set(['completed', 'failed']);
  * "what happened" means to whoever is asking.
  */
 export async function taskOutcome(storage: Storage, task: AgentTaskRecord): Promise<TaskOutcome | null> {
-    if (task.status !== 'done' && task.status !== 'failed') return null;
+    if (task.status !== 'done' && task.status !== 'failed' && task.status !== 'declined') return null;
 
     const { events } = await storage.listTaskEvents(task.id, { page: 1, perPage: 50 });
     // listTaskEvents orders oldest-first; the terminal one is at the end.

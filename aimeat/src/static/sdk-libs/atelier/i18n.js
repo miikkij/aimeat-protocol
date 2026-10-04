@@ -17,6 +17,7 @@
  * @usage  AIMEAT.atelier.i18n.use({ fi: { addTask: 'Lisää tehtävä' }, en: { addTask: 'Add task' } });
  *         AIMEAT.atelier.i18n.t('addTask');
  * @version-history
+ *   v0.12.1 — 2026-10-04 — delegateDeclined (en/fi/es): the agent refused the delegated task.
  *   v0.12.0 — 2026-10-01 — The words of crew, palette, compare and tour (en/fi/es): crewLive (the
  *     count of who is here now), paletteLabel, palettePlaceholder, paletteEmpty, compareLabel and
  *     tourSkip; the tour's Next and Done use the existing next and done. English is the text those
@@ -111,6 +112,7 @@ const BASE = {
     delegateGo: 'Let AI handle it',
     delegateHanded: 'Handed over',
     delegateFailed: 'The agent could not finish it.',
+    delegateDeclined: 'The agent declined it.',
     delegateNoAgents: 'No agent is connected to this account yet.',
     agentActivityNone: 'No agent activity yet.',
     chosen: 'Chosen',
@@ -252,6 +254,7 @@ const BASE = {
     delegateGo: 'Anna tekoälyn hoitaa',
     delegateHanded: 'Annettu hoidettavaksi',
     delegateFailed: 'Agentti ei saanut sitä valmiiksi.',
+    delegateDeclined: 'Agentti kieltäytyi siitä.',
     delegateNoAgents: 'Tähän tiliin ei ole vielä kytketty agenttia.',
     agentActivityNone: 'Ei agenttitoimintaa vielä.',
     chosen: 'Valittu',
@@ -393,6 +396,7 @@ const BASE = {
     delegateGo: 'Deja que la IA lo haga',
     delegateHanded: 'Encargado',
     delegateFailed: 'El agente no pudo terminarlo.',
+    delegateDeclined: 'El agente lo rechazó.',
     delegateNoAgents: 'Esta cuenta aún no tiene ningún agente conectado.',
     agentActivityNone: 'Sin actividad de agentes todavía.',
     chosen: 'Elegida',

@@ -5,6 +5,7 @@
  * @description Schedule, workflow, task lifecycle, and agent memory (read/write/list/search) tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-04 — aimeat_task_decline; aimeat_task_fail points to it for a refusal.
  *   2026-10-02 — aimeat_task_create takes `start`, propose_todos takes `effects` and says what to do
  *     next; aimeat_task_start and aimeat_agent_task_start_set.
  *   2026-09-29 — aimeat_schedule_create takes kind "refinery" (one mail refinery batch each fire, input { prefix }).
@@ -170,7 +171,7 @@ export const schedulesTasksMemoryTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_task_list',
-        description: 'List the tasks assigned TO this agent (paginated; optional status filter such as queued, active, done, failed). Each entry includes title, status, and todo counts. Poll for queued work, then aimeat_task_get for full detail. To assign a task to another same-owner agent, use aimeat_task_create instead.',
+        description: 'List the tasks assigned TO this agent (paginated; optional status filter such as queued, active, done, failed, declined). Each entry includes title, status, and todo counts. Poll for queued work, then aimeat_task_get for full detail. To assign a task to another same-owner agent, use aimeat_task_create instead.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -282,12 +283,22 @@ export const schedulesTasksMemoryTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_task_fail',
-        description: 'Mark one of your ACTIVE or STALLED tasks as failed, recording the reason. Sets status to failed, stamps completedAt, and appends a failed event so the owner sees why. A stalled task counts: an agent that crashed is exactly the one that needs to report a failure. If the work succeeded, use aimeat_task_complete instead.',
+        description: 'Mark one of your ACTIVE or STALLED tasks as failed, recording the reason. Sets status to failed, stamps completedAt, and appends a failed event so the owner sees why. A stalled task counts: an agent that crashed is exactly the one that needs to report a failure. If the work succeeded, use aimeat_task_complete instead. If you chose not to do the work because the request is not one you should take, use aimeat_task_decline: a refusal is not a failure.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
             task_id: { type: 'string', required: true, description: 'Task identifier.' },
             reason: { type: 'string', required: true, description: 'Reason for failure.' },
+        },
+    },
+    {
+        name: 'aimeat_task_decline',
+        description: "Decline one of your QUEUED, ACTIVE or STALLED tasks because the request is not one you should take (off your topic, against your rules, outside what the owner allowed), with the reason. The task ends as declined, not failed: the owner's task list shows your reason as a refusal, and none of your failure counts move. Use aimeat_task_fail when you tried and could not do it.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            task_id: { type: 'string', required: true, description: 'Task identifier.' },
+            reason: { type: 'string', required: true, description: 'Why you decline the request, in a sentence the owner reads (at most 2000 characters).' },
         },
     },
     {

@@ -1061,10 +1061,10 @@
      "slug": "g-7-tasks",
      "cells": [
       "<strong>Tasks</strong>",
-      "Give your agents work: draft, queued, active, done or failed, with events, todos, rating and webhooks. A task wakes a parked agent.",
-      "<code>/v1/agents/:gaii/tasks</code>, <code>aimeat_task_*</code>"
+      "Give your agents work: draft, queued, active, done, failed or declined, with events, todos, rating and webhooks. A task wakes a parked agent. An agent that should not take a request declines it and says why: you see the reason in the task list and on your home page, and it does not count as a failure.",
+      "<code>/v1/agents/:gaii/tasks</code>, <code>POST /v1/agents/:name/tasks/:id/decline</code>, <code>aimeat_task_*</code>"
      ],
-     "plain": "Tasks Give your agents work: draft, queued, active, done or failed, with events, todos, rating and webhooks. A task wakes a parked agent. /v1/agents/:gaii/tasks, aimeat_task_*"
+     "plain": "Tasks Give your agents work: draft, queued, active, done, failed or declined, with events, todos, rating and webhooks. A task wakes a parked agent. An agent that should not take a request declines it and says why: you see the reason in the task list and on your home page, and it does not count as a failure. /v1/agents/:gaii/tasks, POST /v1/agents/:name/tasks/:id/decline, aimeat_task_*"
     },
     {
      "slug": "g-7-a-task-starts-by-itself-or-waits-for-your-ok",

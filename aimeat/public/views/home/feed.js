@@ -11,6 +11,8 @@
  * @structure HomeFeed({ items }) · FeedRow({ item }) · line · when
  * @usage import { HomeFeed } from './feed.js';
  * @version-history
+ *   2026-10-04: agent_task_declined, filed with the agents' news and not under trouble: the agent's
+ *     refusal and its reason.
  *   2026-09-25: operator_admin_granted, filed under access: which of the operator's full-access agents
  *     the one-time migration gave the permission to administer the installation, one sentence for one
  *     agent and one for several.
@@ -106,6 +108,10 @@ export function line(item) {
       return d.title
         ? tr('home.feed.taskFailedTitled', '{agent} could not finish: {title}').replace('{agent}', d.agent || '').replace('{title}', d.title)
         : tr('home.feed.taskFailed', '{agent} could not finish a task.').replace('{agent}', d.agent || '');
+    // A refusal with a reason is an answer, not trouble: it is filed with the agents' other news.
+    case 'agent_task_declined':
+      return tr('home.feed.taskDeclined', '{agent} declined {title}: {reason}')
+        .replace('{agent}', d.agent || '').replace('{title}', d.title || '').replace('{reason}', d.reason || '');
     case 'passkey_added':
       return d.label
         ? tr('home.feed.passkeyAddedNamed', 'You added the passkey {name}.').replace('{name}', d.label)
@@ -233,7 +239,7 @@ export function kindCategory(kind) {
   if (['welcome_mat', 'app_published', 'app_updated', 'workspace_record_published',
     'workflow_created', 'workflow_updated', 'workflow_deleted', 'skill_installed',
     'extension_installed', 'package_installed'].includes(k)) return 'made';
-  if (['agent_connected', 'agent_knocking', 'agent_task_done', 'workflow_run_started',
+  if (['agent_connected', 'agent_knocking', 'agent_task_done', 'agent_task_declined', 'workflow_run_started',
     'workflow_run_finished', 'app_tool_first_use'].includes(k)) return 'agent';
   // The operator reset sits with 'trouble' rather than with the other two: a second factor that
   // disappeared without the person doing it is the one row on this feed they must not scroll past.

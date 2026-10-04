@@ -7,6 +7,7 @@
  *   Supports special @activate trigger: runs on extension activation AND every server startup.
  *   Every execution creates an ExecutionLogEntry with timing, result, and memory I/O.
  * @version-history
+ *   v2.17.1 — 2026-10-04 — A declined occurrence no longer blocks the next fire (isTerminalTaskStatus).
  *   v2.17.0 — 2026-10-02 — Both task makers read the start decision (services/agent-task-rules.ts)
  *     instead of `mode === 'task-runner'`, mark the 'started' event of a task they start, and push
  *     with a per-transition delivery id (taskWakeId). JobTrigger, JobRunResult and JobOutcome move to scheduler-types.ts.
@@ -88,6 +89,7 @@ import { Cron } from 'croner';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ScheduledJobRecord, ExecutionLogEntry, AgentTaskRecord, AgentTaskScope, ScheduleConstraint } from '../storage/interface.js';
+import { isTerminalTaskStatus } from '../storage/interface.js';
 import type { EmailService } from './email.js';
 import type { PushService } from './push.js';
 import type { createWebhookDispatcher } from './webhook-dispatcher.js';
@@ -564,12 +566,11 @@ export class Scheduler {
     //    on its own (queued/draft/revision_requested/active/stalled). A paused
     //    one was deliberately stopped, so an explicit run gets a fresh occurrence.
     //  - Cron/@activate: keep the stricter guard so unfinished occurrences don't
-    //    accumulate (anything not done/failed defers the next fire).
+    //    accumulate (anything not done/failed/declined defers the next fire).
     const { tasks } = await this.storage.listAgentTasks(agentGaii, { perPage: 200 });
-    const TERMINAL = ['done', 'failed'];
     const blocks = trigger === 'manual'
-      ? (t: AgentTaskRecord) => t.status !== 'paused' && !TERMINAL.includes(t.status)
-      : (t: AgentTaskRecord) => !TERMINAL.includes(t.status);
+      ? (t: AgentTaskRecord) => t.status !== 'paused' && !isTerminalTaskStatus(t.status)
+      : (t: AgentTaskRecord) => !isTerminalTaskStatus(t.status);
     const inFlight = tasks.find(t => t.parentTaskId === job.id && t.triage !== 'archived' && blocks(t));
     if (inFlight) {
       logger.info(`agent_task ${job.id}: occurrence ${inFlight.id} still ${inFlight.status}; skipping this fire [${trigger}]`);

@@ -14,6 +14,7 @@
  *     task: { title: 'Sort the inbox', description: 'Mark the overdue errands done.' } });
  *   AIMEAT.atelier.agentActivity({ target: host, agent: 'secretary' });
  * @version-history
+ *   v0.1.1 — 2026-10-04 — A declined task ends the delegate with its own words, not as a failure.
  *   v0.1.0 — 2026-08-28 — Initial (TARGET-074 phase 6, the delegate and activity affordances).
  */
 import { el, clear, resolve, enter } from './dom.js';
@@ -74,6 +75,11 @@ export function delegate(spec) {
             if (spec.onDone) spec.onDone({ task: task, deliverable: null });
           } else if (task.status === 'failed' || task.status === 'stalled') {
             status.textContent = t('delegateFailed');
+            btn.disabled = false;
+            if (stopWatch) { stopWatch(); stopWatch = null; }
+          } else if (task.status === 'declined') {
+            // The agent refused the request: an answer, so it says so instead of reporting a failure.
+            status.textContent = t('delegateDeclined');
             btn.disabled = false;
             if (stopWatch) { stopWatch(); stopWatch = null; }
           }

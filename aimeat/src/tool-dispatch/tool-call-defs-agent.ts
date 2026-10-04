@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-04 -- aimeat_task_decline → POST …/decline, `reason` required.
  *   2026-10-03 -- `tier`: "settings" also holds the system's words in plain language ("settings/concept.<id>").
  *   2026-10-02 -- `tier` names "settings" and "settings/<term>", the setting explanations in parts.
  *   2026-10-02 -- aimeat_agent_propose: the node adds memory:read and memory:write itself.
@@ -657,6 +658,18 @@ export const agentTools: ConnectCliToolDefinition[] = [
         },
         handler: ({ client, agentPath }, input) => client.post(`/v1/agents/${agentPath}/tasks/${encodeURIComponent(requiredString(input, 'task_id'))}/fail`, {
             message: optionalString(input, 'message') ?? optionalString(input, 'reason') ?? 'Task failed',
+        }),
+    },
+    {
+        // → POST /v1/agents/:name/tasks/:id/decline — the agent's refusal with its reason; not a failure.
+        name: 'aimeat_task_decline',
+        description: 'Decline a task you should not take, with the reason. The task ends as declined, not failed.',
+        input: {
+            task_id: { type: 'string', required: true, description: 'Task identifier.' },
+            reason: { type: 'string', required: true, description: 'Why the request is declined, in a sentence the owner reads.' },
+        },
+        handler: ({ client, agentPath }, input) => client.post(`/v1/agents/${agentPath}/tasks/${encodeURIComponent(requiredString(input, 'task_id'))}/decline`, {
+            reason: requiredString(input, 'reason'),
         }),
     },
     {

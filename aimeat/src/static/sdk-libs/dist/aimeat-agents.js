@@ -519,7 +519,7 @@
             } catch {
             }
           }
-          if (!done && (t.status === "done" || t.status === "failed" || t.status === "stalled")) {
+          if (!done && (t.status === "done" || t.status === "failed" || t.status === "declined" || t.status === "stalled")) {
             done = true;
             if (to) clearTimeout(to);
             stop();

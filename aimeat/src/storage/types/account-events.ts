@@ -15,6 +15,7 @@
  * @usage
  *   import type { AccountEventInput } from '../storage/interface.js';
  * @version-history
+ *   v1.7.0 — 2026-10-04 — agent_task_declined: an agent refused a task and said why.
  *   v1.6.0 — 2026-09-25 — operator_admin_granted: the one-time migration gave the operator's
  *     full-access agents the permission to administer the node (services/operator-admin-migration.ts),
  *     and the operator reads which ones here.
@@ -55,6 +56,7 @@ export type AccountEventKind =
   | 'agent_removed'
   | 'agent_task_done'
   | 'agent_task_failed'
+  | 'agent_task_declined'
   // What they built
   | 'app_published'
   | 'app_updated'

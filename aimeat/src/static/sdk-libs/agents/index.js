@@ -11,6 +11,7 @@
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-agents.js"></script>
  *   const { task, deliverable } = await AIMEAT.agents.run('my-agent', { description: '…' });
  * @version-history
+ *   v1.0.1 — 2026-10-04 — runTask resolves on a declined task too: it has ended.
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-agents.ts (SDK-libs migration Phase 1).
  *   v1.2.1 — 2026-07-31 — Forward idempotencyKey/allowDuplicate to the node's own live-commission
  *     guard and surface its answer as task.deduplicated (+ reason), so an app can say "already
@@ -281,7 +282,8 @@ var agents = {
       var done = false, to = null;
       var stop = agents.watch(name, id, async function (t, events) {
         if (opts && opts.onProgress) { try { opts.onProgress(t, events); } catch { /* progress callback errors are non-fatal */ } }
-        if (!done && (t.status === 'done' || t.status === 'failed' || t.status === 'stalled')) {
+        // 'declined': the agent refused the request with its reason (t.outcome.message); it has ended.
+        if (!done && (t.status === 'done' || t.status === 'failed' || t.status === 'declined' || t.status === 'stalled')) {
           done = true; if (to) clearTimeout(to); stop();
           var deliverable = t.status === 'done' ? await agents.deliverable(name, id).catch(function () { return null; }) : null;
           resolve({ task: t, deliverable: deliverable });
