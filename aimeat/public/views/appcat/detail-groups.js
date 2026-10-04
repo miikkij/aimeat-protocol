@@ -11,8 +11,8 @@
  *   - What this is: about, the design spec, where the app puts what, what it needs, its skills;
  *   - Building together: the roadmap, who else may build it, the audit log;
  *   - Publishing and visibility: server settings, visitors, search, marks, legal pages, promotion;
- *   - Money and agents: the EXCHANGE listing, tool sales, costs and contracts, bundled agents. This
- *     group is `quiet`: when the app sells no tool and bundles no agent, it folds to one line.
+ *   - Money and agents: the EXCHANGE listing, tool sales, costs and contracts, bundled agents.
+ *   Every group shows all its sections; nothing folds away (Jouni: "ettei aleta piilottelemaan mitään").
  *
  *   A section asks for a look when the catalogue's own "something missing" test (model.js kunto)
  *   says the app lacks what that section fixes, when the design spec is missing or behind the app's
@@ -31,7 +31,7 @@ export const GROUPS = [
   { id: 'what', title: 'detail.groupWhat', ids: ['about', 'spec', 'datamap', 'needs', 'skills'] },
   { id: 'together', title: 'detail.groupTogether', ids: ['roadmap', 'builders', 'audit'] },
   { id: 'publish', title: 'detail.groupPublish', ids: ['manage', 'visitors', 'search', 'marks', 'legal', 'promote'] },
-  { id: 'money', title: 'detail.groupMoney', ids: ['odps', 'monetize', 'cost', 'agents'], quiet: true },
+  { id: 'money', title: 'detail.groupMoney', ids: ['odps', 'monetize', 'cost', 'agents'] },
 ];
 
 /** Every section in page order. */

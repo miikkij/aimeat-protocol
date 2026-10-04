@@ -22239,8 +22239,6 @@
     "detail.groupTogether": "Building together",
     "detail.groupPublish": "Publishing and visibility",
     "detail.groupMoney": "Money and agents",
-    "detail.groupFolded": "Show {n} sections",
-    "detail.groupFoldedNote": "This app sells no tools and brings no agents with it.",
     "detail.specMissing": "Nobody has written the design spec yet",
     "detail.specBehind": "The design spec is behind the app's version",
     "view.building": "Building for others",

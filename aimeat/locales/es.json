@@ -20025,8 +20025,6 @@
     "detail.groupTogether": "Desarrollo conjunto",
     "detail.groupPublish": "Publicación y visibilidad",
     "detail.groupMoney": "Dinero y agentes",
-    "detail.groupFolded": "Mostrar {n} secciones",
-    "detail.groupFoldedNote": "Esta app no vende herramientas ni trae agentes consigo.",
     "detail.specMissing": "Nadie ha escrito aún la especificación de diseño",
     "detail.specBehind": "La especificación de diseño va por detrás de la versión de la app",
     "view.building": "Construyes para otros",
