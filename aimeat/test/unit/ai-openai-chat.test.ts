@@ -160,6 +160,14 @@ describe('toCallOptions', () => {
     expect(choice({ type: 'function', function: { name: 'get_weather' } })).toEqual({ type: 'tool', toolName: 'get_weather' });
   });
 
+  it('parallel_tool_calls false is Anthropic disableParallelToolUse, only beside tools', () => {
+    const tools = [{ type: 'function', function: { name: 'lookup', parameters: { type: 'object', properties: {} } } }];
+    expect(toCallOptions({ messages: [], tools, parallel_tool_calls: false }).providerOptions)
+      .toEqual({ anthropic: { disableParallelToolUse: true } });
+    expect(toCallOptions({ messages: [], tools, parallel_tool_calls: true }).providerOptions).toBeUndefined();
+    expect(toCallOptions({ messages: [], parallel_tool_calls: false }).providerOptions).toBeUndefined();
+  });
+
   it('response_format json_object and json_schema', () => {
     expect(toCallOptions({ messages: [], response_format: { type: 'json_object' } }).responseFormat).toEqual({ type: 'json' });
     const schema = { type: 'object', properties: { n: { type: 'number' } } };

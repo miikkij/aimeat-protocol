@@ -11517,7 +11517,9 @@ paths:
         also disable the free-model fallback, which is deliberately left alone for an explicit model.
 
         `tools`, `tool_choice` and `response_format` pass through untouched — the node has no opinion
-        about which tools a caller offers its own model. With `stream: true` the provider's own
+        about which tools a caller offers its own model. `parallel_tool_calls` (a boolean) is passed
+        beside `tools` and left out without them; for an Anthropic provider `false` becomes its
+        `disable_parallel_tool_use`. Another type is refused 400 INVALID_BODY. With `stream: true` the provider's own
         `text/event-stream` frames are forwarded byte for byte, so any client that understands
         OpenAI's stream understands this one.
 
