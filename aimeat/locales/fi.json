@@ -22220,8 +22220,6 @@
     "detail.groupTogether": "Kehitys yhdessä",
     "detail.groupPublish": "Julkaisu ja näkyvyys",
     "detail.groupMoney": "Raha ja agentit",
-    "detail.groupFolded": "Näytä {n} osiota",
-    "detail.groupFoldedNote": "Tämä sovellus ei myy työkaluja eikä tuo mukanaan agentteja.",
     "detail.specMissing": "Design speciä ei ole vielä kirjoitettu",
     "detail.specBehind": "Design spec on jäänyt sovelluksen versiosta jälkeen",
     "view.building": "Rakennat muille",
