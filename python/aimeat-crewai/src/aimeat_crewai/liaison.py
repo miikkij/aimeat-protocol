@@ -199,6 +199,36 @@ def _install_agent_name_default(tool: Any, agent_name: str) -> None:
         pass
 
 
+def _install_omit_unset(tool: Any) -> None:
+    """
+    Make `tool`'s validated arguments leave out every field the caller did not set, at every depth.
+
+    crewai-tools' CrewAIToolAdapter builds args_schema with CrewAI's create_model_from_schema, which
+    gives each optional field the default None, nested objects included, and BaseTool hands `_run`
+    `validated.model_dump()`. A todo the model sent as {"title": "A"} therefore reached the node as
+    {"title": "A", "description": null, ...}, which the node refused (crewfive, 73176d1). The
+    top-level strip in _strip_none_kwargs cannot see inside a list. Dumping with exclude_unset
+    drops what was never set, recursively, and keeps a value the caller did give, including an
+    explicit null on a field where null means "clear". Same single-choke-point subclass as
+    _install_propose_todos_repair: every execution path dumps the instance this schema validated.
+    """
+    schema = getattr(tool, "args_schema", None)
+    if not isinstance(schema, type) or not hasattr(schema, "model_dump"):
+        return
+
+    class _OmitUnsetSchema(schema):  # type: ignore[valid-type,misc]
+        def model_dump(self, *args: Any, **kwargs: Any) -> Any:
+            kwargs.setdefault("exclude_unset", True)
+            return super().model_dump(*args, **kwargs)
+
+    _OmitUnsetSchema.__name__ = getattr(schema, "__name__", "Args")
+    _OmitUnsetSchema.__qualname__ = _OmitUnsetSchema.__name__
+    try:
+        tool.args_schema = _OmitUnsetSchema
+    except Exception:  # noqa: BLE001, S110 -- defensive; never break tool wiring  # pragma: no cover
+        pass
+
+
 def _strip_none_kwargs(tool: Any) -> Any:
     """
     Wrap a CrewAI tool so its `_run` filters out kwargs where the value is None
@@ -232,6 +262,8 @@ def _strip_none_kwargs(tool: Any) -> Any:
         return original_run(*args, **clean)
 
     tool._run = wrapped_run
+    # The strip above is top-level only; a None inside a list item is dropped here (crewfive 73176d1).
+    _install_omit_unset(tool)
 
     # Disable CrewAI's cache for AIMEAT tools. CrewAI defaults to caching
     # every tool result by (tool_name, args) and only the agent itself can

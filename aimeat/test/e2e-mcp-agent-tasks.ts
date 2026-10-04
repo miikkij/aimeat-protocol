@@ -23,6 +23,7 @@
  *   block above it says why a second node is the only way to reach that state.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-agent-tasks
  * @version-history
+ *   v1.4.0 — 2026-10-04 — The first plan carries the nulls CrewAI sends for left-out optional fields.
  *   v1.3.0 — 2026-08-14 — The completion, which was the last tool surface still writing its own
  *     records. Three cases for the three ways the two copies had drifted: a STALLED task completes
  *     over MCP (on a second node, because nothing else reaches that state), `deliverable_key`
@@ -434,12 +435,16 @@ async function run() {
         assert(task.status === 'queued', `expected a queued task, got '${task.status}'`);
     });
 
-    await test('the first plan is accepted on the active task', async () => {
+    // The second todo carries what CrewAI sends for fields the model left out: null on every optional
+    // field. The node refused it with "expected string, received null at todos[0].description"
+    // (crewfive, 2026-10-03) until a refused null on an optional field read as left out
+    // (src/mcp/null-as-absent.ts).
+    await test('the first plan is accepted on the active task, with the nulls CrewAI sends for left-out fields', async () => {
         const r = await callTool(runner.session, 'aimeat_task_propose_todos', {
             task_id: runnerTaskId,
             todos: [
                 { title: 'Read the brief', order: 1 },
-                { title: 'Do the work', order: 2 },
+                { title: 'Do the work', order: 2, description: null, verification: null, estimate_minutes: null, effects: null },
             ],
         });
         assert(!r.isError, `first plan refused: ${r.text.slice(0, 300)}`);
