@@ -39,12 +39,15 @@
  *   gooseChildEnv(config, parentEnv, personal?)
  * @usage spawn(bin, ['acp'], { env: gooseChildEnv(config, process.env, { token }) })
  * @version-history
+ *   v1.2.0 — 2026-10-04 — GOOSE_PATH_ROOT is always the chat's own root (services/goose-chat-config.ts),
+ *     where the node's config switches off the goose extensions the chat does not use.
  *   v1.1.0 — 2026-09-28 — System 2 plan, V5: the node route. Without the shared key the child's
  *     OpenAI provider points at /v1/llm with the person's own chat token, so the model policy, the
  *     budget and the metering apply to the chat. The shared key is the operator's special case.
  *   v1.0.0 — 2026-09-16 — Initial. The child had the node's whole environment.
  */
 import type { AimeatConfig } from '../config.js';
+import { chatGooseRoot } from './goose-chat-config.js';
 
 /** Names every process needs, on Linux, macOS and Windows. None of them holds a credential. */
 export const GOOSE_BASE_ENV = [
@@ -79,7 +82,7 @@ const SECOND_PROVIDER_PIN = /^GOOSE_(PLANNER|SUBAGENT|LEAD|WORKER)_(PROVIDER|MOD
 const NODE_ROUTE_REMOVED = new Set(['OPENROUTER_API_KEY', 'OPENAI_BASE_URL']);
 
 type GooseEnvConfig = Pick<AimeatConfig,
-  'baseUrl' | 'goosePathRoot' | 'gooseProviderApiKey' | 'gooseProvider' | 'gooseModel' | 'gooseEnvPassthrough'>;
+  'baseUrl' | 'nodeId' | 'goosePathRoot' | 'gooseProviderApiKey' | 'gooseProvider' | 'gooseModel' | 'gooseEnvPassthrough'>;
 
 /** True when the operator set AIMEAT_GOOSE_PROVIDER_API_KEY: one shared child, not metered per person. */
 export function chatUsesSharedKey(config: Pick<AimeatConfig, 'gooseProviderApiKey'>): boolean {
@@ -104,7 +107,10 @@ export function gooseChildEnv(
     // LC_* is locale; GOOSE_* is goose's own configuration, which the host set for goose.
     if (allowed.has(upper) || upper.startsWith('LC_') || upper.startsWith('GOOSE_')) env[name] = value;
   }
-  if (config.goosePathRoot) env.GOOSE_PATH_ROOT = config.goosePathRoot;
+  // Always the chat's own root, so goose reads the config the node wrote for it and never a human's
+  // goose profile (services/goose-chat-config.ts). A GOOSE_PATH_ROOT the host passed is overridden.
+  for (const name of Object.keys(env)) if (name.toUpperCase() === 'GOOSE_PATH_ROOT') delete env[name];
+  env.GOOSE_PATH_ROOT = chatGooseRoot(config);
 
   if (!chatUsesSharedKey(config) && personal) return nodeRouteEnv(config, env, personal.token);
 

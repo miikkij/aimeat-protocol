@@ -9,11 +9,15 @@
  *   key and no setting that could send a model call elsewhere.
  * @usage cd aimeat && pnpm vitest run test/unit/goose-env.test.ts
  * @version-history
+ *   v1.2.0 — 2026-10-04 — GOOSE_PATH_ROOT is always the chat's own root, also when none is configured.
  *   v1.1.0 — 2026-09-28 — System 2 plan, V5: the node route and the shared key.
  *   v1.0.0 — 2026-09-16 — Initial.
  */
 import { describe, it, expect } from 'vitest';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { gooseChildEnv, chatUsesSharedKey, NODE_CHOOSES_MODEL } from '../../src/services/goose-env.js';
+import { chatGooseRoot } from '../../src/services/goose-chat-config.js';
 
 const parent: NodeJS.ProcessEnv = {
   Path: 'C:\\Windows;C:\\bin', SystemRoot: 'C:\\Windows', HOME: '/home/node', LANG: 'en_US.UTF-8',
@@ -26,7 +30,7 @@ const parent: NodeJS.ProcessEnv = {
 };
 
 const cfg = (over: Partial<Parameters<typeof gooseChildEnv>[0]> = {}) => ({
-  baseUrl: 'https://node.example.test',
+  baseUrl: 'https://node.example.test', nodeId: 'aimeat-test-node',
   goosePathRoot: '/var/lib/aimeat/goose', gooseProviderApiKey: 'sk-chat', gooseProvider: 'openrouter',
   gooseModel: 'some/model', gooseEnvPassthrough: [] as string[], ...over,
 });
@@ -60,8 +64,17 @@ describe('gooseChildEnv', () => {
     expect(env.GOOSE_PROVIDER).toBe('openrouter');
     expect(env.GOOSE_MODEL).toBe('some/model');
     expect(env.GOOSE_PATH_ROOT).toBe('/var/lib/aimeat/goose');
-    const bare = gooseChildEnv(cfg({ gooseProviderApiKey: '', gooseProvider: '', gooseModel: '', goosePathRoot: '' }), {});
-    expect(bare).toEqual({});
+    // With nothing configured the child still gets the chat's own goose root, where the node's config
+    // switches goose's unused extensions off (services/goose-chat-config.ts), and nothing else.
+    const bareCfg = cfg({ gooseProviderApiKey: '', gooseProvider: '', gooseModel: '', goosePathRoot: '' });
+    expect(gooseChildEnv(bareCfg, {})).toEqual({ GOOSE_PATH_ROOT: chatGooseRoot(bareCfg) });
+    expect(chatGooseRoot(bareCfg)).toBe(join(tmpdir(), 'aimeat-goose-aimeat-test-node'));
+  });
+
+  it('replaces a GOOSE_PATH_ROOT the host passed, so a human\'s goose profile never reaches the chat', () => {
+    const env = gooseChildEnv(cfg(), { ...parent, goose_path_root: '/home/node/.config/goose' });
+    expect(env.goose_path_root).toBeUndefined();
+    expect(env.GOOSE_PATH_ROOT).toBe('/var/lib/aimeat/goose');
   });
 
   it('passes a name the host listed, and nothing it did not', () => {

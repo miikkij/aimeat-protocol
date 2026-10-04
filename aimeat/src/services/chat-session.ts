@@ -29,6 +29,7 @@
  * @usage
  *   for await (const u of runChatTurn({ storage, config }, ownerName, threadId, text)) { … }
  * @version-history
+ *   v1.9.0 — 2026-10-04 — A goose session runs in the chat's own empty directory, not the node's.
  *   v1.8.0 — 2026-10-02 — The node speaks in the turn and the turn has a ceiling
  *     (services/chat-turn-guard.ts). A progress line within 1.5 s and one per kind of step, in the
  *     page's language; a note asks the model to write between its steps and says how a new agent is
@@ -75,6 +76,7 @@ import { DEFAULT_LOCALE, type Locale } from '../i18n.js';
 import { CHAT_AGENT_NAME, ensureChatAgent, mintChatAgentToken } from './chat-agent.js';
 import { AgentPool, type AgentLease, type PoolStart } from './chat-agent-pool.js';
 import { chatUsesSharedKey } from './goose-env.js';
+import { ensureChatGooseConfig } from './goose-chat-config.js';
 import { prepareAiCall } from './ai-completion.js';
 import { appendTurn, readThread, setGooseSession, type ChatTurn } from './chat-threads.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
@@ -216,6 +218,9 @@ async function sessionFor(
 
     const sessionId = await lease.client.newSession({
         mcpServers: [aimeatMcpServer(config.baseUrl, token)],
+        // An empty directory: in the node's own, goose read the repository's AGENTS.md into every
+        // round as project hints (services/goose-chat-config.ts).
+        cwd: ensureChatGooseConfig(config).cwd,
     });
     await setGooseSession(storage, gaii, threadId, stamp(lease.generation, sessionId));
     logger.info(`[chat] ${identity.gaii} -> goose session ${sessionId} for thread ${threadId}`);
