@@ -17,8 +17,8 @@
  *   Rail({ title, groups, tone }): `title` is the rail's name for a screen reader. `tone="light"`:
  *   the index on the page's own ground under a heavy ink rule, the group words in ink capitals of the
  *   poster face, the items grey, the counts in grey typewriter (the admin Config page's index on
- *   main, .adm-cfg-rail). `tone="ink"`: the box in the text colour, which turns light with dark words
- *   in the dark theme (the old app catalogue's detail rail). Each group is
+ *   main, .adm-cfg-rail). `tone="ink"`: the App Catalog detail's rail, on the ink ground in both
+ *   themes like every contents rail (it turned light in the dark theme until 2026-10-05). Each group is
  *   { label?, items, rule? }: a coral label, then its items; a rule (hr) stands between two groups
  *   unless the later one says `rule: false`.
  *
@@ -42,6 +42,8 @@
  *          { label: x('railTitle'), items: [{ section: 'sk-own', mark: '01', label: x('secOwn'), count: 12 }] },
  *          { label: x('pages'), items: [{ tab: 'agents', label: t('profile.tabs.agents') }] }]} />`
  * @version-history
+ *   v1.4.1 — 2026-10-05 — The description of `tone="ink"` follows tab-page.css v1.7.0: the ink ground in
+ *     both themes. No code change.
  *   v1.4.0 — 2026-09-27 — `tone="ink"`: the box in the text's own colour, so it turns light in the dark
  *     theme with dark words (the old app catalogue's detail rail, .dtl-rail; appcat parity); additive.
  *   v1.3.1 — 2026-09-27 — scrollToSection keeps the section's scroll-margin-top in sight above it

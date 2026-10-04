@@ -18,6 +18,8 @@
  * @structure DesignSpecBlock({ ctx, app, path, owner, heading })
  * @usage html`<${DesignSpecBlock} key=${path} ctx=${ctx} app=${app} path=${path} owner=${owner} />`
  * @version-history
+ *   v1.3.0 — 2026-10-05 — The spec shows whole, without a scroll box of its own: in a 60vh box its
+ *     last line sat below the box's edge on the app's page (Jouni). A step of air under it before the actions.
  *   v1.2.0 — 2026-10-04 — Settings > Apps no longer shows it; the App Catalog's app page is its place.
  *   v1.1.0 — 2026-10-04 — `heading={false}` leaves the block's own heading out, for the App Catalog's
  *     app page, whose section draws the headline (wish-appcatin-sovellussivulle-design-spec-roadmap-rakentajat-ja-l).
@@ -123,7 +125,7 @@ export function DesignSpecBlock({ ctx, app, path, owner, heading = true }) {
         ${read.stale
           ? html`<${Note} kind="state" tone="attention">${a('specStale', { version: read.appVersion, written: spec.version })}<//>`
           : html`<${Note} kind="state" tone="fine">${a('specCurrent', { version: spec.version })}<//>`}
-        <${Markdown} text=${spec.markdown} small scroll />
+        <${Space} below="large"><${Markdown} text=${spec.markdown} small /><//>
       ` : html`<${Note} kind="quiet">${a('specNone')}<//>`}
       <${Actions}>
         <${Action} small disabled=${busy} onClick=${startEditing}>${spec ? a('specEdit') : a('specWrite')}<//>
