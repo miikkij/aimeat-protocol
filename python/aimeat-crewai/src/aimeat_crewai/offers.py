@@ -21,7 +21,13 @@ import json
 import os
 from typing import Any
 
-from .paths import aimeat_home
+from .credentials import (
+    AGENT_HEADER,
+    ExpiredToken,
+    daemon_route,
+    expired_token_message,
+    stored_agent_token,
+)
 from .workflow_spec import NONE, assess_offers_doc
 
 __all__ = [
@@ -136,31 +142,11 @@ def resolve_agent_token(agent_name: str) -> str | None:
          provision.ts). ``agent_name`` may be the full identity ``agent#owner@node``; a bare
          name is used when exactly one owner's file matches it, because two owners' agents of
          one name on one machine cannot be told apart by the name alone.
+
+    A JWT whose ``exp`` is in the past counts as no token (0.32.1): the node reads it as
+    anonymous. ``credentials.stored_agent_token`` also returns the expired files it passed over.
     """
-    home = aimeat_home()
-    agent, owner = agent_name, None
-    if "#" in agent_name:
-        agent, _, rest = agent_name.partition("#")
-        owner = rest.split("@", 1)[0] or None
-    candidates = [home / "agents" / agent / ".token"]
-    tokens_dir = home / "tokens"
-    if owner:
-        candidates.append(tokens_dir / f"{agent}@{owner}.token")
-    else:
-        try:
-            matches = sorted(tokens_dir.glob(f"{agent}@*.token"))
-        except OSError:
-            matches = []
-        if len(matches) == 1:
-            candidates.append(matches[0])
-    for token_file in candidates:
-        try:
-            token = token_file.read_text(encoding="utf-8").strip()
-        except OSError:
-            continue
-        if token:
-            return token
-    return None
+    return stored_agent_token(agent_name)[0]
 
 
 def publish_offers(
@@ -180,7 +166,10 @@ def publish_offers(
         agent_name: the bare agent name -- becomes the memory key segment.
         node_url: node base URL. Falls back to env AIMEAT_NODE_URL.
         agent_token: Bearer token. Falls back to the connector-stored token
-            (resolve_agent_token), then env AIMEAT_AGENT_TOKEN.
+            (resolve_agent_token, which skips an expired JWT), then env AIMEAT_AGENT_TOKEN,
+            then, when neither node_url nor agent_token is passed, the connector daemon that
+            serves this agent. An expired stored token with none of those raises, naming the
+            file and when it expired, before anything is sent.
         require: minimum level to enforce before publishing (default "offering";
             pass None to skip the level gate, or "workflow_compatible"/"priced").
         session: optional requests.Session (else a one-off requests call).
@@ -195,9 +184,22 @@ def publish_offers(
     validate_offers_doc(doc, require=require)
 
     url = (node_url or os.environ.get("AIMEAT_NODE_URL") or "").rstrip("/")
+    expired: list[ExpiredToken] = []
+    token = agent_token
+    if not token:
+        token, expired = stored_agent_token(agent_name)
+    token = token or os.environ.get("AIMEAT_AGENT_TOKEN")
+    extra_headers: dict[str, str] = {}
+    if not token and not (node_url or agent_token):
+        # No current token of its own: the connector daemon holds the agent's credential.
+        route = daemon_route(agent_name)
+        if route is not None:
+            url, token = route
+            extra_headers[AGENT_HEADER] = agent_name
     if not url:
         raise RuntimeError("node_url is required (pass it or set AIMEAT_NODE_URL).")
-    token = agent_token or resolve_agent_token(agent_name) or os.environ.get("AIMEAT_AGENT_TOKEN")
+    if not token and expired:
+        raise RuntimeError(expired_token_message(agent_name, expired))
     if not token:
         raise RuntimeError(
             f"No agent token. Pass agent_token=, set AIMEAT_AGENT_TOKEN, or run "
@@ -210,7 +212,7 @@ def publish_offers(
         raise RuntimeError("publish_offers needs `requests` (pip install requests).") from exc
 
     payload = {"key": f"agents.{agent_name}.offers", "value": doc}
-    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json", **extra_headers}
     http = session or requests
     resp = http.post(f"{url}/v1/memory", json=payload, headers=headers, timeout=30)
     try:
