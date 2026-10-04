@@ -33,6 +33,15 @@ Changelog:
     validated arguments are now dumped with exclude_unset, at every depth. The daemon's default tool
     list carries aimeat_task_decline (node: POST /v1/agents/:name/tasks/:id/decline), so a crew that
     refuses a request with its reason ends the task as declined, not failed.
+    An expired stored agent token is never sent. On the crewfive fleet every v1 JWT in
+    tokens/<agent>@<owner>.token had expired by 2026-09-26, `node_llm` sent it anyway, and the node
+    read it as anonymous: every crew model call came back 401 AUTH_REQUIRED. `resolve_agent_token`
+    now skips a JWT whose exp is in the past (credentials.py) and logs the file and its expiry once.
+    `node_llm` goes through the serve daemon first when serve.json names one that serves the agent,
+    because the daemon's credential is always current. decide(), the rule and register calls,
+    capabilities(), effective_llm_choice() and publish_offers() use the daemon when no current token
+    is left, and otherwise fail before anything is sent, naming the file, its expiry and what renews
+    it. Explicit node_url/agent_token still go direct.
   0.32.0 -- 2026-10-02 -- A crew can think through the node with the owner's own key. `llm_for_choice`
     builds the LLM for the owner's `{kind:'node', role?}` crew choice (crews.llm.<agent>) with
     `node_llm`, and `unsafe_choice_reason` applies the node's guard to a `model` choice on read (the
