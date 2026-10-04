@@ -12,6 +12,8 @@
  * @structure instanceRow · offerRow · ownRow · loadingRow
  * @usage import { instanceRow, offerRow, ownRow } from './rows.js';
  * @version-history
+ *   v1.22.0 — 2026-10-04 — An opened offer shows what its apps ask for, with the check that approves
+ *     them at install when the package is someone else's (sheet.js appApprovalBlock).
  *   v1.21.0 — 2026-10-01 — An opened offer shows the package's "what you get" sheet and the settings
  *     its install asks (sheet.js), above the install field (guided journey P3). An opened offer row
  *     shows one Close, not two.
@@ -64,7 +66,7 @@ import { Tabs } from '/components/Tabs.js';
 import { TextField } from '/components/TextField.js';
 import { List, Row, Name, Desc, Who, Cell, Doors, Panel } from '/components/List.js';
 import { x, partWord, partTab, partCounts, categoryWord, listingWord, dateWord, versionDate, agentTextFor, openTab } from './frame.js';
-import { sheetBlock, asksBlock } from './sheet.js';
+import { sheetBlock, asksBlock, appApprovalBlock } from './sheet.js';
 
 /** The kinds of part a package carries, as tags under its description ("app", "extension ×2"). */
 const partTags = (list) => partCounts(list).map(([type, n]) => `${partWord(type)}${n > 1 ? ` ×${n}` : ''}`);
@@ -233,6 +235,7 @@ function offerOpen(ctx, o, key) {
         { k: x('makerK'), v: o.remote ? x('makerRemote', { node: o.sourceNode }) : o.system ? x('makerSystem') : x('makerAuthor', { author: o.author }), sub: [o.version ? x('versionOf', { date: versionDate(o.version) }) : '', categoryWord(o.category) ? x('categoryOf', { c: categoryWord(o.category) }) : '', o.tags.length ? x('tagsOf', { tags: o.tags.join(', ') }) : ''].filter(Boolean).join(' · ') },
         l && (l.installCount || l.reviewCount) && { k: x('galleryK'), v: [l.installCount ? x('installsN', { n: l.installCount }) : '', l.reviewCount ? x('reviewsN', { n: l.reviewCount, rating: Number(l.rating || 0).toFixed(1) }) : ''].filter(Boolean).join(' · ') },
         o.group && asksBlock(ctx, o, key),
+        o.group && appApprovalBlock(ctx, o, key, !!ctx.ownByGroup?.[o.group]),
         o.group && { k: x('installK'), v: installField(ctx, key, inst.label, () => ctx.install(o, inst.label)), sub: x('installSub') },
       ]} />
     <//>`;

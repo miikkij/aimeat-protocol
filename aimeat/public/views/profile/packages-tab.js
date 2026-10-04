@@ -13,6 +13,8 @@
  * @structure PackagesTab() — state (data, remote, expanded, versions, updates, installForm, filter) + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'packages'
  * @version-history
+ *   v2.5.0 — 2026-10-04 — The owner's choice to approve the apps of someone else's package at install
+ *     (`grant_apps`), ticked on the opened offer.
  *   v2.4.0 — 2026-10-01 — An opened offer reads the package's "what you get" sheet (GET
  *     /v1/packages/:group `sheet`), the install sends the settings typed on the row as `config`, and
  *     the toast says how many of the package's agents now wait for approval (guided journey P3).
@@ -64,6 +66,8 @@ export default function PackagesTab({ session, showToast }) {
   const [sheets, setSheets] = useState({});
   // key → { componentId: { field: value } }: the settings the install asks, typed on the opened row.
   const [installConfig, setInstallConfig] = useState({});
+  // The owner's choice per opened offer: approve the apps of someone else's package at install.
+  const [grantApps, setGrantApps] = useState({});
   const [filter, setFilterState] = useState({ who: '', cat: '' });
   const [query, setQuery] = useState('');
   const [shown, setShown] = useState(20);
@@ -191,7 +195,9 @@ export default function PackagesTab({ session, showToast }) {
       // An empty optional field is left out, so the app's own default applies.
       const config = Object.fromEntries(Object.entries(installConfig[key] || {}).map(([c, fields]) =>
         [c, Object.fromEntries(Object.entries(fields).filter(([, v]) => String(v ?? '').trim() !== ''))]));
-      const r = await pkgService.installPackage(o.group, { label: (label || '').trim(), ...(Object.keys(config).length ? { config } : {}) });
+      // Ticked on someone else's package: approve its apps now. Left out, the node decides: your own
+      // package's apps are approved, someone else's ask on their first visit.
+      const r = await pkgService.installPackage(o.group, { label: (label || '').trim(), ...(Object.keys(config).length ? { config } : {}), ...(grantApps[key] ? { grant_apps: true } : {}) });
       if (!r?.ok) { fail(r); return; }
       const n = (r.data?.instance?.installedComponents || r.data?.installedComponents || []).length;
       const agents = (r.data?.agents_proposed ?? []).length;
@@ -199,6 +205,7 @@ export default function PackagesTab({ session, showToast }) {
         + (agents ? ' ' + x('agentsWaitToast', { n: agents }) : ''));
       setInstallForm(null);
       setInstallConfig((m) => ({ ...m, [key]: undefined }));
+      setGrantApps((m) => ({ ...m, [key]: undefined }));
       setExpanded(null);
       load();
       setTimeout(() => document.getElementById('pk-installed')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
@@ -325,7 +332,8 @@ export default function PackagesTab({ session, showToast }) {
     nodeUrl: getNodeUrl(), ownerName, isOperator, showToast, ConfirmUI, fileRef,
     data, instances, own, offers, offerByGroup, ownByGroup, listingByGroup,
     expanded, versions, updates, installForm, filter, query, shown, busy,
-    compose, myApps, sheets, installConfig,
+    compose, myApps, sheets, installConfig, grantApps,
+    setGrantApps: (key, on) => setGrantApps((m) => ({ ...m, [key]: on })),
     setConfigValue: (key, componentId, field, value) => setInstallConfig((m) => ({
       ...m, [key]: { ...(m[key] || {}), [componentId]: { ...((m[key] || {})[componentId] || {}), [field]: value } },
     })),

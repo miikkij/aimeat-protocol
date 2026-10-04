@@ -19,6 +19,8 @@
  * @structure PackageSheet · packageSheet(pkg) · sheetOfManifest(manifest)
  * @usage const sheet = packageSheet(pkg, config);
  * @version-history
+ *   v1.2.0 — 2026-10-04 — `appAccess`: what each app asks for when it opens, which an install may
+ *     approve (`grant_apps`); the Packages page shows it beside the choice.
  *   v1.1.0 — 2026-10-02 — `tools`: what the apps offer to agents, as carried (no prices; package-app-tools.ts).
  *   v1.0.0 — 2026-10-01 — Initial.
  */
@@ -27,6 +29,7 @@ import type { PackageRecord, PackageComponent } from '../storage/types/packages.
 import { parseBundledCrews } from './app-bundled-crews.js';
 import { expectsOf, type PackageExpects } from './package-expects.js';
 import { questionsOf } from './package-config-needs.js';
+import { packageCapabilities } from './package-capabilities.js';
 import type { AimeatConfig } from '../config.js';
 
 export interface PackageSheet {
@@ -51,6 +54,11 @@ export interface PackageSheet {
     asks: Array<{ componentId: string; component: string; field: string; title: string; description: string; default: string; required: boolean; secret: boolean }>;
     /** What this node must already have. */
     expects: PackageExpects;
+    /**
+     * What each app asks for when it opens: the permissions an install may approve for it
+     * (`grant_apps`), from the same reading the install's capabilities use (package-capabilities.ts).
+     */
+    appAccess: Array<{ app: string; scopes: string[]; declared: boolean }>;
 }
 
 const text = (v: unknown, max = 400): string => (typeof v === 'string' ? v.trim().slice(0, max) : '');
@@ -114,7 +122,12 @@ export function packageSheet(pkg: PackageRecord, config: AimeatConfig): PackageS
         prompts: author.prompts,
         apps: [], data: [], dataUnmapped: [], agents: [], tools: [], runsOnItsOwn: [], guides: [], asks: [],
         expects: expectsOf(pkg.manifest),
+        appAccess: [],
     };
+    const labelOfApp = new Map((pkg.components ?? []).filter(c => c.type === 'app')
+        .map(c => [c.id, text(((c.meta ?? {}) as Record<string, Record<string, unknown>>).app?.name, 120) || c.label]));
+    sheet.appAccess = packageCapabilities(pkg.components ?? [], config, pkg.author).capabilities.apps
+        .map(a => ({ app: labelOfApp.get(a.component) ?? a.name, scopes: a.scopes, declared: a.declared }));
     for (const c of pkg.components ?? []) {
         const meta = (c.meta ?? {}) as Record<string, unknown>;
         if (c.type === 'app') {
