@@ -31,7 +31,9 @@
  *   options: --port 40471 (the proxy takes the next) · --model deepseek/deepseek-v4-pro-0813 · --lang fi · --wait-s 240 · --out <file.json>
  *     · --allow-uncapped (only when the key's owner said so)
  *     · --stub (the recorder answers every model call: no key, no money, the real request) · --dump <dir> (each round's request as JSON)
+ *     · --as-sent (forward the node's request unchanged, without the recorder's own usage.include)
  * @version-history
+ *   v1.2.1 — 2026-10-04 — --as-sent: the recorder adds nothing, so a run shows what the node asks for.
  *   v1.2.0 — 2026-10-04 — Each round's anatomy (system, tools and messages in characters, the tool names,
  *     and a fingerprint of the system message and tools, which is what a prompt cache reuses); --stub
  *     answers locally, the first round with one tool call so a turn has two rounds; --dump writes each
@@ -158,7 +160,7 @@ function stubAnswer(parsed: { stream?: boolean; tools?: unknown[]; messages?: Ar
  * OpenRouter puts `usage` (with `cost`) in the last chunk of a streamed answer.
  */
 function startRecorder(
-    port: number, started: () => number, opts: { stub?: boolean; dumpDir?: string } = {},
+    port: number, started: () => number, opts: { stub?: boolean; dumpDir?: string; asSent?: boolean } = {},
 ): { calls: ModelCall[]; close: () => void } {
     const calls: ModelCall[] = [];
     const server = createServer((req, res) => {
@@ -169,8 +171,9 @@ function startRecorder(
             let parsed: { tools?: unknown[]; usage?: unknown; stream?: boolean; messages?: Array<{ role?: string; content?: unknown }> } = {};
             try { parsed = JSON.parse(body.toString('utf8') || '{}'); } catch { /* not JSON */ }
             const isChat = req.method === 'POST' && !!req.url?.endsWith('/chat/completions');
-            // Ask for the cost in the answer; OpenRouter accepts it on any chat completion.
-            if (isChat) parsed.usage = { include: true };
+            // Ask for the cost in the answer; OpenRouter accepts it on any chat completion. With --as-sent
+            // the request goes on as the node made it, which shows whether the node asks for it itself.
+            if (isChat && !opts.asSent) parsed.usage = { include: true };
             const forwarded = req.method === 'POST' ? JSON.stringify(parsed) : undefined;
             const call: ModelCall = { t: started(), tools: Array.isArray(parsed.tools) ? parsed.tools.length : 0, requestChars: body.length, ...(isChat ? anatomy(parsed) : {}) };
             if (isChat) {
@@ -347,7 +350,7 @@ async function main(): Promise<void> {
         console.log(`key: capped at ${cap.limit} USD, ${cap.remaining ?? '?'} USD left`);
     } else console.log('stub: the recorder answers every model call; nothing is sent to OpenRouter');
     let turnStart = 0;
-    const recorder = startRecorder(port + 1, () => (turnStart ? Date.now() - turnStart : -1), { stub, ...(dumpDir ? { dumpDir: resolve(dumpDir) } : {}) });
+    const recorder = startRecorder(port + 1, () => (turnStart ? Date.now() - turnStart : -1), { stub, asSent: process.argv.includes('--as-sent'), ...(dumpDir ? { dumpDir: resolve(dumpDir) } : {}) });
     const node = await startNode(port, model, key, port + 1);
     try {
         const token = await registerOwner(node.base, `measure${Date.now().toString(36)}`);

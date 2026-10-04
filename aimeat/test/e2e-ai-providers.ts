@@ -22,7 +22,8 @@
  *   - R1-R3: the routing endpoint, the MCP tools and the deprecated routes
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-providers.ts
  * @version-history
- *   v1.1.0 — 2026-10-04 — 5b: both rounds of one /v1/llm conversation reach OpenRouter with one session_id.
+ *   v1.1.0 — 2026-10-04 — 5b: both rounds of one /v1/llm conversation reach OpenRouter with one session_id;
+ *     5c: a cached turn's ledger cost is what OpenRouter reports for it, which it reports only when asked.
  *   v1.0.0 — 2026-09-28 — Initial (V3 of the System 2 plan).
  */
 import * as ed from '@noble/ed25519';
@@ -263,6 +264,32 @@ const toolText = (r: any) => String(r?.result?.content?.[0]?.text ?? '');
       assert(typeof first?.session_id === 'string' && /^aimeat-[0-9a-f]{40}$/.test(first.session_id), `round 1 session_id: ${first?.session_id}`);
       assert(second?.session_id === first.session_id, `the same session_id on round 2: ${second?.session_id} vs ${first.session_id}`);
       assert(!first.session_id.includes(d.name), 'the session_id does not name the person');
+    });
+
+    await test('5c. a cached chat turn on OpenRouter costs in the ledger exactly what OpenRouter reports for it', async () => {
+      // Hosted place, 2026-10-04: three chat turns recorded 0.0464 USD while the key was charged 0.0254.
+      // OpenRouter reports a call's cost (cached tokens at their own rate) only when asked with
+      // usage.include, and the proxy did not ask, so the node priced every cached token as input. This
+      // stand-in answers as OpenRouter does: the cost only when it was asked for.
+      const e = await setupOwner('e');
+      const CHARGED = 0.00123;
+      stub.queue('chat', (req) => {
+        const asked = (req.json as any)?.usage?.include === true;
+        const usage = { prompt_tokens: 20000, completion_tokens: 100, total_tokens: 20100,
+          prompt_tokens_details: { cached_tokens: 19000 }, ...(asked ? { cost: CHARGED } : {}) };
+        return sseChat(['Helsinki.'], { usage: usage as unknown as Record<string, number> }).reply;
+      }, (req) => req.body.includes('MARK-CACHED-TURN'));
+      const res = await fetch(`${BASE}/v1/llm/chat/completions`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...auth(e.token) },
+        body: JSON.stringify({ stream: true, messages: [{ role: 'system', content: 'You are a test agent.' }, { role: 'user', content: 'MARK-CACHED-TURN' }] }),
+      });
+      assert(res.status === 200, `turn: ${res.status} ${await res.clone().text()}`);
+      await res.text();
+      const sent = stub.requests.filter(at('node-or')).pop()?.json as any;
+      assert(sent?.usage?.include === true, `the node asked OpenRouter for the cost: ${JSON.stringify(sent?.usage)}`);
+      const usage = await json('/v1/ai/usage', { headers: auth(e.token) });
+      const spent = usage.body?.data?.spent_today_usd;
+      assert(typeof spent === 'number' && Math.abs(spent - CHARGED) < 1e-12, `the ledger records the charge: ${spent} vs ${CHARGED}`);
     });
 
     await test('2. an Anthropic tool call streams through /v1/llm as OpenAI SSE frames', async () => {

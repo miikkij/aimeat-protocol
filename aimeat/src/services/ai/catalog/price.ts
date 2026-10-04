@@ -16,6 +16,8 @@
  *   price a direct provider's call has.
  * @structure CallUse · CallPrice · callCost · servesCapability · textPricePerMtok
  * @version-history
+ *   v1.1.0 — 2026-10-04 — `cachedPromptTokens`: the catalogue prices cached prompt tokens at its
+ *     cache-read rate, not the input rate.
  *   v1.0.0 — 2026-09-28 — Initial (V4 of the System 2 plan).
  */
 import { priceUsd } from '../../llm-pricing.js';
@@ -34,6 +36,8 @@ export interface CallUse {
   /** The model asked for, tried when the answered id is not in the catalogue. */
   requestedModel?: string;
   promptTokens?: number;
+  /** How many of promptTokens the provider read from its prompt cache (prompt_tokens_details.cached_tokens). */
+  cachedPromptTokens?: number;
   completionTokens?: number;
   images?: number;
   seconds?: number;
@@ -53,7 +57,13 @@ function fromCatalog(m: CatalogModel, u: CallUse): number | undefined {
   if (u.seconds !== undefined) return fin(p.transcriptionPerSecond) ? p.transcriptionPerSecond * u.seconds : undefined;
   if (u.characters !== undefined) return fin(p.speechPerChar) ? p.speechPerChar * u.characters : undefined;
   if (!fin(p.inPerMtok) && !fin(p.outPerMtok)) return undefined;
-  return ((u.promptTokens ?? 0) * (p.inPerMtok ?? 0) + (u.completionTokens ?? 0) * (p.outPerMtok ?? 0)) / 1e6;
+  // Cached prompt tokens at the cache-read rate (a tenth of the input rate on DeepSeek), when the
+  // catalogue has one; priced as input they doubled the chat's recorded spend once caching hit
+  // (hosted place, 2026-10-04: 0.0464 recorded against 0.0254 charged).
+  const prompt = u.promptTokens ?? 0;
+  const cached = Math.min(prompt, u.cachedPromptTokens ?? 0);
+  const cacheRate = fin(p.cacheReadPerMtok) ? p.cacheReadPerMtok : (p.inPerMtok ?? 0);
+  return ((prompt - cached) * (p.inPerMtok ?? 0) + cached * cacheRate + (u.completionTokens ?? 0) * (p.outPerMtok ?? 0)) / 1e6;
 }
 
 export function callCost(u: CallUse): CallPrice {

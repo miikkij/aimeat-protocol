@@ -27,6 +27,8 @@
  *   - llmProxyRouter(config, storage) — POST /v1/llm/chat/completions, GET /v1/llm/models
  * @usage mounted in server-bootstrap/routes-loader.ts; an agent uses <node>/v1/llm as its base URL
  * @version-history
+ *   v1.8.0 — 2026-10-04 — A call to OpenRouter asks for its own cost (usage.include), and a catalogue
+ *     price takes the cache-read rate for cached prompt tokens: the ledger matches the charge again.
  *   v1.7.1 — 2026-10-04 — The session_id is the system message's hash alone, not the payer's, so every
  *     conversation with the same prefix reaches the provider that holds it.
  *   v1.7.0 — 2026-10-04 — A call to OpenRouter carries a session_id (cacheSessionId), so every round of a
@@ -76,6 +78,12 @@ import { logger } from '../utils/logger.js';
 const TURN_TIMEOUT_MS = 10 * 60_000;
 
 interface ChatMessage { role: string; content: unknown }
+
+/** The usage block an OpenAI-dialect answer carries; OpenRouter adds `cost` when asked (usage.include). */
+interface ProviderUsage {
+    prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; cost?: number;
+    prompt_tokens_details?: { cached_tokens?: number };
+}
 
 /** What came back, however it came back: one shape for the streamed and the whole-response case. */
 interface ProviderOutcome {
@@ -221,9 +229,13 @@ export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
                 // this dialect, so the gateway answers for it in the same shape.
                 // OpenRouter keeps a conversation on one provider, which is what makes its prompt cache
                 // hit, only once it has seen a cache hit, unless the request names a session_id
-                // (cacheSessionId below). Only for OpenRouter: another provider may refuse the field.
+                // (cacheSessionId below). And it reports what the call cost (usage.cost, cached tokens
+                // at their own rate) only when asked with usage.include: without it the ledger priced
+                // cached tokens as input and recorded about twice the charge once caching hit
+                // (hosted place, 2026-10-04: 0.0464 USD recorded, 0.0254 charged). Only for OpenRouter:
+                // another provider may refuse either field.
                 const routed = c.provider.type === 'openrouter'
-                    ? { ...upstream, model: c.model, session_id: cacheSessionId(body) }
+                    ? { ...upstream, model: c.model, session_id: cacheSessionId(body), usage: { include: true } }
                     : { ...upstream, model: c.model };
                 const r = speaksOpenAiChat(c.provider.type)
                     ? await chatCompletionRaw(c.target.key, c.target.baseUrl, routed, controller.signal)
@@ -344,7 +356,7 @@ async function passWhole(
     const json = await provider.json() as {
         model?: string;
         choices?: Array<{ message?: { content?: string } }>;
-        usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; cost?: number };
+        usage?: ProviderUsage;
     };
     res.json(json);
     return readUsage(json.model ?? plan.model, json.choices?.[0]?.message?.content ?? '', json.usage, plan);
@@ -374,7 +386,7 @@ async function pipeStream(
     let buffer = '';
     let content = '';
     let model = plan.model;
-    let usage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; cost?: number } | undefined;
+    let usage: ProviderUsage | undefined;
 
     for (;;) {
         const { done, value } = await reader.read();
@@ -420,15 +432,15 @@ async function pipeStream(
 }
 
 /** Tokens and cost: the provider's charge, then the model catalogue, then the table and the estimate
- *  the rest of the node falls back to (services/ai/catalog/price.ts). */
-function readUsage(
-    model: string, content: string,
-    usage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; cost?: number } | undefined,
-    plan: AiCallPlan,
-): ProviderOutcome {
+ *  the rest of the node falls back to (services/ai/catalog/price.ts). The cached prompt tokens go
+ *  along, so a catalogue price takes the cache-read rate for them. */
+function readUsage(model: string, content: string, usage: ProviderUsage | undefined, plan: AiCallPlan): ProviderOutcome {
     const promptTokens = usage?.prompt_tokens ?? 0;
     const completionTokens = usage?.completion_tokens ?? 0;
     const totalTokens = usage?.total_tokens ?? (promptTokens + completionTokens);
-    const price = callCost({ type: plan.providerType, model, requestedModel: plan.model, promptTokens, completionTokens, reported: usage?.cost });
+    const cachedPromptTokens = usage?.prompt_tokens_details?.cached_tokens ?? 0;
+    const price = callCost({
+        type: plan.providerType, model, requestedModel: plan.model, promptTokens, cachedPromptTokens, completionTokens, reported: usage?.cost,
+    });
     return { model, content, promptTokens, completionTokens, totalTokens, costUsd: price.costUsd, costSource: price.costSource, priceRef: price.priceRef };
 }
