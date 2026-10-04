@@ -9,6 +9,8 @@
  *   button to Settings), and the paste for the operator's own AI.
  * @structure HeldSection · IncidentsSection · AccountsSection · SettingsSection · AskAiSection · isHeldIncident
  * @version-history
+ *   v2.4.0 — 2026-10-04 — The apps line says how to give apps addresses of their own on a node one
+ *     person uses too, not only on a shared one.
  *   v2.3.0 — 2026-09-26 — A held name counts its app grants and access tokens, each on its own line,
  *     and says in one sentence that they do not work whatever the decision.
  *   v2.2.0 — 2026-09-26 — The incident the update at start opens has a section of its own (HeldSection),
@@ -70,7 +72,8 @@ function appsLine(apps) {
   const why = S('settings.apps.' + key + 'Why', { host, people: num(apps.people) });
   return {
     title: S('settings.apps.' + key),
-    why: apps.isolation === 'isolated-frame' ? why + ' ' + S('settings.apps.isolatedFrameFix', { host }) : why,
+    // Every app is meant to have an address of its own (2026-10-04): the fix stands wherever apps lack one.
+    why: apps.isolation !== 'app-origin' ? why + ' ' + S('settings.apps.isolatedFrameFix', { host }) : why,
   };
 }
 

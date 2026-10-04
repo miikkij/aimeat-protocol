@@ -22,11 +22,14 @@ describe('the apps line of the security overview', () => {
         expect(s.summary).toContain('apps.example.com');
         expect([s.warning, s.what_to_set, s.settings]).toEqual([null, null, null]);
     });
-    it('one person without an app origin: healthy, and it says what happens when a second arrives', () => {
-        const s = isolationStatusFor({ isolation: 'shared-origin', people: 1, appOriginEnabled: false, appHost: '', baseUrl: 'http://localhost:40050' });
-        expect(s.zone).toBe('healthy');
-        expect(s.summary).toContain('isolated frame');
+    it('one person without an app origin: watch, a package\'s app is framed, and the two settings that give apps addresses', () => {
+        // Every app is meant to have an address of its own (Jouni, 2026-10-04), so this node is told how.
+        const s = isolationStatusFor({ isolation: 'shared-origin', people: 1, appOriginEnabled: false, appHost: 'apps.place.example', baseUrl: 'https://place.example' });
+        expect(s.zone).toBe('watch');
+        expect(s.summary).toContain('An app a package installed runs in an isolated frame');
+        expect(s.summary).toContain('When a second person gets an account');
         expect(s.warning).toBeNull();
+        expect(s.settings).toEqual({ AIMEAT_APP_HOST: 'apps.place.example', AIMEAT_APP_ORIGIN_ENABLED: 'true' });
     });
     it('several people without an app origin: a warning, and the two settings with this node\'s values', () => {
         const s = isolationStatusFor({ isolation: 'isolated-frame', people: 12, appOriginEnabled: false, appHost: 'apps.intra.example', baseUrl: 'https://intra.example' });

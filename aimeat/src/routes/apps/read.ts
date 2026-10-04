@@ -10,6 +10,8 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   v1.15.0 — 2026-10-04 — The frame decision names the app, so an app a package installed takes the
+ *     isolated frame on a node one person uses too (inline-frame.ts v1.1.0).
  *   v1.14.0 — 2026-09-29 — The badge reads the node's AIMEAT_APP_BADGE switch too (servedBadgeOn).
  *   v1.13.0 — 2026-09-27 — Pure extraction: the version list moved to services/app-versions.ts and
  *     the screenshot POST and DELETE work to services/app-screenshot-store.ts, so the MCP tool calls
@@ -416,7 +418,8 @@ export function registerReadRoutes(
             // builder holding a development right), opened by the app's owner.
             let draftAnswer: RunnableAnswer = 'plain';
             if (!req.appOrigin) {
-                draftAnswer = await runnableAnswer(config, storage, req, req.query.mode === 'frame' ? 'frame' : 'inline');
+                draftAnswer = await runnableAnswer(config, storage, req, req.query.mode === 'frame' ? 'frame' : 'inline',
+                    { owner: localAccountName(draftOwnerGhii), filename });
                 if (draftAnswer === 'host') { sendFrameHost(res); return; }
             }
             res.setHeader('Content-Type', appContentType(draft.mimeType));
@@ -573,10 +576,11 @@ export function registerReadRoutes(
 
         // Audit A7-1: with no app origin, a node several people share runs the app in an isolated frame.
         // A browser opening it gets the page that holds the frame and none of the app's bytes; the
-        // bytes themselves go out sandboxed below. A node one person uses answers 'plain', as before.
+        // bytes themselves go out sandboxed below. A node one person uses answers 'plain' for that
+        // person's own apps and the frame for an app a package installed (inline-frame.ts).
         let answer: RunnableAnswer = 'plain';
         if (runnable && !req.appOrigin) {
-            answer = await runnableAnswer(config, storage, req, mode === 'frame' ? 'frame' : 'inline');
+            answer = await runnableAnswer(config, storage, req, mode === 'frame' ? 'frame' : 'inline', { owner: app.ownerName, filename: app.filename });
             if (answer === 'host') { sendFrameHost(res); return; }
         }
 

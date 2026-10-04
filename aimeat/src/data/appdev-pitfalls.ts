@@ -12,6 +12,8 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   2026-10-04 — isolated-frame-on-shared-nodes: the frame also takes a package's app on a node one
+ *     person uses (routes/apps/inline-frame.ts v1.1.0).
  *   2026-10-02 — track-mixing: a Classic page may load the kit for its library blocks; the mix is the
  *     shell drawn, or the kit loaded and nothing in it called (the publish lint says the same).
  *   2026-10-01 — iam-decide-at-framing points at the node roster and a gate from aimeat_iam_define,
@@ -359,8 +361,8 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   }),
   E({
     id: 'isolated-frame-on-shared-nodes',
-    title: 'On a node several people share with no app addresses, the app runs in an isolated frame',
-    symptom: 'The app opens at its usual /v1/apps/<owner>/<file>?mode=inline address, but inside a frame whose origin is opaque. Code that took the node\'s own sign-in directly (the stored aimeat_session, POST /v1/auth/refresh, a fetch with credentials: "include") gets nothing, IndexedDB and a service worker are refused, and push notifications, installing the app and Web Locks are not there. aimeat.io and every node that gives apps an address of their own are not affected.',
+    title: 'On a node with no app addresses, the app runs in an isolated frame when several people share the node or a package installed it',
+    symptom: 'The app opens at its usual /v1/apps/<owner>/<file>?mode=inline address, but inside a frame whose origin is opaque. Code that took the node\'s own sign-in directly (the stored aimeat_session, POST /v1/auth/refresh, a fetch with credentials: "include") gets nothing, IndexedDB and a service worker are refused, and push notifications, installing the app and Web Locks are not there. Since 2026-10-04 this also holds on a node one person uses (a sold place) for an app a package installed: every app you ship in a package meets the frame wherever the node has no app addresses. aimeat.io and every node that gives apps an address of their own are not affected.',
     fix: 'Sign in only through aimeat-auth: AIMEAT.auth.login() on start, AIMEAT.auth.signIn() from a click, and session.fetch() or the SDK libraries for every call. They take the app\'s own grant from the page around the frame and need no change. localStorage, sessionStorage and document.cookie work (the node keeps localStorage for each app); keep what must last in memory or files through the node (AIMEAT.data, AIMEAT.storage), never in IndexedDB. AIMEAT.auth.isAppOrigin() is true in the frame.',
     appliesTo: ['auth', 'app'],
     severity: 'warn',
