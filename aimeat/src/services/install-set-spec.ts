@@ -29,6 +29,9 @@
  *   const set = parseInstallSet(body.install_set);
  *   if (!set.ok) return refusal(set.message);
  * @version-history
+ *   v1.2.0 — 2026-10-04 — The set takes `grant_apps` (default true: the owner's grant for each app it
+ *     installs is recorded, the purchase being the approval) and `landing` (the app the owner's
+ *     welcome link opens).
  *   v1.1.0 — 2026-10-02 — A bundle workspace may name the `contract` its apps declare (package sale
  *     design, phase 4: the set composer writes it, and the install links the apps to the workspace).
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 4).
@@ -110,6 +113,13 @@ export interface InstallSet {
     /** Config per package group, then per component id; merged over the bundle's defaults. */
     config: Record<string, Record<string, Record<string, unknown>>>;
     autoUpdate: boolean;
+    /**
+     * Record the owner's grant for each app the set installs, for the scopes the app declares
+     * (install-set-grants.ts). Default true: the purchase is the approval (Jouni, 2026-10-04).
+     */
+    grantApps: boolean;
+    /** The app the owner's welcome link opens: an app component of one of the bundle's packages. */
+    landing?: { groupId: string; app: string };
 }
 
 export type Parsed<T> = { ok: true; value: T } | { ok: false; message: string };
@@ -290,6 +300,16 @@ export function parseInstallSet(raw: unknown, bundle: InstallBundle | null = nul
             if (bundle && !bundle.packages.some(p => p.groupId === g)) fail(`config names package "${g}", which the bundle does not list.`);
         }
         if (doc.auto_update !== undefined && typeof doc.auto_update !== 'boolean') fail('auto_update is true or false.');
+        if (doc.grant_apps !== undefined && typeof doc.grant_apps !== 'boolean') fail('grant_apps is true or false.');
+        let landing: InstallSet['landing'];
+        if (doc.landing !== undefined) {
+            if (!isObj(doc.landing)) fail('landing is { group_id, app }: a package of the bundle and its app component id.');
+            const l = doc.landing as Obj;
+            const lGroup = groupIdOf(l.group_id, 'landing.group_id');
+            const lApp = str(l.app, 120) ?? fail('landing.app is the id of an app component.');
+            if (bundle && !bundle.packages.some(p => p.groupId === lGroup)) fail(`landing names package "${lGroup}", which the bundle does not list.`);
+            landing = { groupId: lGroup, app: lApp as string };
+        }
         let repository: InstallSet['repository'];
         if (doc.repository !== undefined) {
             if (!isObj(doc.repository)) fail('repository is { node_id, url, public_key }.');
@@ -308,6 +328,8 @@ export function parseInstallSet(raw: unknown, bundle: InstallBundle | null = nul
             owner: { name: ownerName as string, email: ownerEmail as string, ...(displayName ? { displayName } : {}) },
             members, organismNames, config,
             autoUpdate: doc.auto_update === undefined ? true : doc.auto_update as boolean,
+            grantApps: doc.grant_apps === undefined ? true : doc.grant_apps as boolean,
+            ...(landing ? { landing } : {}),
         };
     });
 }

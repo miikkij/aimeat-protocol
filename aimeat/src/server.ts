@@ -13,6 +13,8 @@
  *   - buildServer: builds and wires the Express app and its background managers
  *
  * @version-history
+ *   v1.6.0 — 2026-10-04 — appOriginSignIn() after CORS: the sign-in and registration routes refuse a
+ *     request from an app (middleware/app-origin-sign-in.ts).
  *   v1.5.0 — 2026-10-01 — apexPageRedirect() after robotsHeader(): the node's content pages asked
  *     for on an app or portfolio host answer 301 to the apex instead of a copy.
  *   v1.4.0 — 2026-09-30 — robotsHeader() is mounted here, ahead of the static files, instead of in
@@ -40,6 +42,7 @@ import { subdomainMiddleware } from './middleware/subdomain.js';
 import { robotsHeader } from './middleware/robots-header.js';
 import { apexPageRedirect } from './middleware/apex-page-redirect.js';
 import { agentMeAliasMiddleware } from './middleware/agent-me-alias.js';
+import { appOriginSignIn } from './middleware/app-origin-sign-in.js';
 import { logger } from './utils/logger.js';
 import { runAsNode } from './utils/gaii.js';
 import { TunnelManager } from './services/personal-tunnel.js';
@@ -220,6 +223,10 @@ async function buildServer(config: AimeatConfig, configSources?: ConfigSources):
   // CORS after auth — can look up GHII-level origins for authenticated requests.
   // OPTIONS preflights bypass rate limiting since CORS responds with 204.
   app.use(corsMiddleware(config, () => storageForCors));
+
+  // An app does not sign people in: the sign-in and registration routes refuse a request from an
+  // app host, an app Origin or the isolated frame. After CORS, so the app can read the refusal.
+  app.use(appOriginSignIn(config));
 
   // Rate limiting — global (with role multipliers)
   app.use(rateLimit(config.rateLimits.global, config.rateLimits.roleMultipliers));

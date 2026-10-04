@@ -11861,6 +11861,7 @@
     "cfgDesc_apps_audit_keep_default": "Montako uusinta merkintää kunkin sovelluksen auditointiloki säilyttää, kun omistaja ei ole asettanut omaa rajaa. 0 säilyttää kaikki ja siirtää vanhat vuoden arkistoon; muu luku poistaa vanhemmat merkinnät.",
     "cfgDesc_auth_agent_v2_token_ttl_seconds": "Kuinka monta sekuntia omalla avainparilla tunnistautuvan agentin token on voimassa. Kun se vanhenee, agentti allekirjoittaa uuden pyynnön ja saa uuden tokenin.",
     "cfgDesc_auth_agent_enrolment_grant_ttl_seconds": "Kuinka monta sekuntia agenttien lisäys- tai siirtotarjous on voimassa sen jälkeen, kun omistaja painaa painiketta. Liittimen on vastattava tämän ajan kuluessa, ja tarjous toimii kerran.",
+    "cfgDesc_auth_app_origin_sign_in_refuse": "Estää kirjautumisen ja tilin luomisen sovelluksesta, jotta sovellus ei koskaan saa ihmisen omaa istuntoa. Pois päältä: jokainen tällainen yritys kirjataan lokiin ja sallitaan. Kytke tämä päälle, kun lokissa ei enää näy yrityksiä.",
     "cfgDesc_features_capability_call_counting": "Laajennuksen toimintoihin suoraan tehdyt kutsut lasketaan mukaan kyvykkyysrekisterin kutsutilastoihin. Rekisterin kautta tehdyt kutsut lasketaan aina.",
     "cfgDesc_federation_relay_claim": "Pitääkö pyynnössä, jonka toinen palvelin välittää tänne, olla allekirjoitus. Pidä asetus tilassa Vaaditaan (oletus versiosta 3.20.0 alkaen): Ei vaadita päästää vanhan vertaisen läpi, suojaa vain vähän ja poistuu versiossa 4.0.0.",
     "cfgDesc_passkey_enabled": "Pääsyavaimet (WebAuthn) ovat tarjolla kirjautumistapana salasanan rinnalla.",

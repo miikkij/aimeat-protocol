@@ -60,9 +60,14 @@
  *   v1.6.0 — 2026-09-29 — Log in opens the dialog with `redirect` set to the app that asked, so an
  *     emailed sign-in link returns the person to the app. This page cannot be the place: the request
  *     it shows lives ten minutes, and a link opened from the mail has no popup opener to answer.
+ *   v1.7.0 — 2026-10-04 — Signed out, the sign-in dialog opens at once (the person pressed Sign in in
+ *     the app to get here), on the create-account form when the app asked for it (`prompt: 'create'`,
+ *     from signIn({ register: true })); "Log in to continue" stays under it. A package-installed app
+ *     (`package_app`) is not auto-approved for its owner: it was the one path that skipped the screen
+ *     for somebody else's code. Asked by aimeat-commercial, measured on its store's buyer path.
  */
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { api } from '/js/api.js';
@@ -101,20 +106,32 @@ export default function AppGrant() {
   // Reactive to login: the consent popup may open with no one logged in (login_required) and the
   // user signs in right here — the session hook flips this to the consent view on success.
   const authed = !!useSession();
+  // The sign-in dialog opens once by itself; after that only the Log in button opens it.
+  const loginOpened = useRef(false);
 
   async function doLogin() {
-    // An emailed sign-in link returns to the app that asked, not to this page (v1.6.0).
+    // An emailed sign-in link returns to the app that asked, not to this page (v1.6.0). An app that
+    // asked for the create-account form (prompt=create) gets the dialog open on it (v1.7.0).
     let redirect = '';
+    let register = false;
     try {
       const res = await api(`/v1/app-grants/request/${encodeURIComponent(requestId)}`);
       redirect = res.data?.app_origin || '';
+      register = res.data?.prompt === 'create';
     } catch (err) { swallowed('app-grant: the app to return to', err); }
-    if (!showLoginModal(redirect ? { redirect } : {})) window.location.href = '/v1/profile';
+    const opts = { ...(redirect ? { redirect } : {}), ...(register ? { tab: 'register' } : {}) };
+    if (!showLoginModal(opts)) window.location.href = '/v1/profile';
   }
 
   useEffect(() => {
     if (!requestId) { setState({ status: 'error', error: tr('appGrant.missing', 'No authorization request.') }); return; }
-    if (!authed) { setState({ status: 'login' }); return; }
+    if (!authed) {
+      // The person pressed Sign in inside the app to get here, so the dialog opens at once. The
+      // "Log in to continue" screen stays under it for someone who closes the dialog.
+      setState({ status: 'login' });
+      if (!loginOpened.current) { loginOpened.current = true; doLogin(); }
+      return;
+    }
     let live = true;
     api(`/v1/app-grants/request/${encodeURIComponent(requestId)}`)
       .then(async (res) => {
@@ -132,7 +149,9 @@ export default function AppGrant() {
         // same auto-approve policy as the silent bridge — their own app never needs the trust prompt.
         // The server computes `own` independently at consent time, so this is UX, not the gate.
         const myOwner = (getStoredGhii() || '').split('@')[0];
-        const own = !!(res.data.origin_bound && res.data.app_owner && myOwner && myOwner === res.data.app_owner);
+        // A package installed the app: somebody else's code under the owner's name, so the owner
+        // sees the screen like anyone else (v1.7.0; the server never marks it own either).
+        const own = !!(res.data.origin_bound && res.data.app_owner && myOwner && myOwner === res.data.app_owner && !res.data.package_app);
         // Pre-check the UNION of already-granted and now-requested scopes: an app update that added
         // a scope must surface it CHECKED — presenting it unchecked made users keep the old grant
         // without noticing (the Band Jam scope-upgrade trap).
@@ -150,6 +169,8 @@ export default function AppGrant() {
       })
       .catch((e) => { if (live) setState({ status: 'error', error: e.message || tr('appGrant.expired', 'This request has expired.') }); });
     return () => { live = false; };
+    // doLogin reads only requestId, which is listed, and loginOpened keeps it to one call.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestId, authed]);
 
   // Pass-through approval (already-granted app, not managing): approve once, silently.

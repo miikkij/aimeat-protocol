@@ -11862,6 +11862,7 @@
     "cfgDesc_apps_audit_keep_default": "How many of the newest entries each app's audit log keeps when its owner has set no limit. 0 keeps all and moves old ones to a yearly archive; any other number deletes the older entries",
     "cfgDesc_auth_agent_v2_token_ttl_seconds": "Lifetime in seconds of the token an agent with its own key pair receives. When it runs out, the agent signs a new request and gets another",
     "cfgDesc_auth_agent_enrolment_grant_ttl_seconds": "How long, in seconds, an offer to add or move agents stays usable after the owner presses the button. The connector must answer within this time, and the offer works once",
+    "cfgDesc_auth_app_origin_sign_in_refuse": "Refuse sign-in and account creation from an app, so that an app never holds a person's own session. Off: each such attempt is written to the log and allowed. Turn it on when the log shows none.",
     "cfgDesc_features_capability_call_counting": "Count calls made straight to an extension's actions in the capability registry's call statistics. Calls made through the registry always count",
     "cfgDesc_federation_relay_claim": "Whether a request another server relays here must carry a signature. Keep Required (the default from 3.20.0): Optional lets an older peer through, protects little, and is removed in 4.0.0",
     "cfgDesc_passkey_enabled": "Passkeys (WebAuthn) are offered as a way to sign in, beside the password",

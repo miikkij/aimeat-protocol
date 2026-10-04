@@ -15,6 +15,8 @@
  *      whether its updates apply by themselves.
  *   4. Creates each organism and its workspaces, under the customer's own names.
  *   5. Brings in the other users (install-set-people.ts).
+ *   4b. Records the owner's grant for each installed app, unless the set says `grant_apps: false`
+ *      (install-set-grants.ts: the purchase is the approval).
  *   6. Deploys each crew agent through the owner's runner agent. With no runner connected the agent is
  *      left pending, and applying the set again after the runner connects deploys it (decision 4).
  *
@@ -32,6 +34,9 @@
  * @usage
  *   const out = await applyInstallSet({ storage, config, peers }, { installSet, secrets, dryRun: true });
  * @version-history
+ *   v1.8.0 — 2026-10-04 — After the apps are linked to their workspaces, the owner's grant for each
+ *     installed app is recorded (`app_grants`), and the owner's welcome link opens the set's
+ *     `landing` app. The plan shows both. Jouni: the purchase is the approval.
  *   v1.7.0 — 2026-10-02 — After the workspaces are made, each installed app whose declaration names a
  *     workspace's contract is told where it is (linkAppsToWorkspaces, app-workspaces.ts). The record
  *     helpers, reach, createOrganisms and the link are exported for the owner's own set install
@@ -75,6 +80,7 @@ import { proveNodeCard } from './package-peer-register.js';
 import { recordPeerOrigin } from './peer-origin.js';
 import { NS_INSTALL_SETS } from './install-set-trust.js';
 import { writeAppWorkspaceLinks, type AppWorkspaceLink } from './app-workspaces.js';
+import { grantInstalledApps, landingPath, type AppGrantStep } from './install-set-grants.js';
 
 // The namespace lives with the trust check (install-set-trust.ts), which package-pull.ts reads
 // without importing this file back.
@@ -109,6 +115,8 @@ export interface AppliedRecord {
     packages: Record<string, PackageStep>;
     members: Record<string, MemberOutcome>;
     agents: Record<string, AgentStep>;
+    /** The owner's grant this set recorded for each installed app, by `owner/filename` (install-set-grants.ts). */
+    app_grants?: Record<string, AppGrantStep>;
     secrets_given: string[];
     /** Emails of the accounts this set created, and of those already sent the welcome sign-in link. */
     accounts_created?: string[];
@@ -343,6 +351,8 @@ export async function applyInstallSet(deps: ApplyDeps, input: ApplyInput): Promi
             members: set.members.map(m => ({ email: m.email, join: m.join, organisms: m.memberships.map(x => x.organism) })),
             agents: bundle.agents.map(a => ({ group_id: a.groupId, app: a.app, agent: a.agent })),
             auto_update: set.autoUpdate,
+            grant_apps: set.grantApps,
+            landing: set.landing ? { group_id: set.landing.groupId, app: set.landing.app } : null,
             problems: prep.problems,
             // What the install would leave out: not a problem, the set applies, but the operator hears it.
             warnings: prep.warnings,
@@ -379,6 +389,7 @@ export async function applyInstallSet(deps: ApplyDeps, input: ApplyInput): Promi
         await installPackages(deps, set, bundle, remote, secrets, record);
         await createOrganisms(deps, ownerName, set.organismNames, bundle, record);
         await linkAppsToWorkspaces(deps, ownerName, bundle, record);
+        if (set.grantApps) await grantInstalledApps(storage, config, record);
         for (const user of set.members) {
             const outcome = await joinMember(storage, config, ownerName, user, record.organisms);
             record.members[user.email.toLowerCase()] = outcome;
@@ -393,7 +404,10 @@ export async function applyInstallSet(deps: ApplyDeps, input: ApplyInput): Promi
     // The welcome goes out once everything the person was given exists.
     record.accounts_created = [...created];
     const toWelcome = ownerWelcome ? [...created, set.owner.email.toLowerCase()] : [...created];
-    record.welcomed = [...(record.welcomed ?? []), ...await welcomeCreated(storage, config, toWelcome, record.welcomed ?? [])];
+    // The owner's link opens the set's landing app, signed in, when the set names one.
+    const landing = await landingPath(storage, ownerName, set.landing, record.packages);
+    const landingByEmail: Record<string, string> = landing ? { [set.owner.email.toLowerCase()]: landing } : {};
+    record.welcomed = [...(record.welcomed ?? []), ...await welcomeCreated(storage, config, toWelcome, record.welcomed ?? [], landingByEmail)];
     await writeRecord(storage, key, record);
     return { ok: true, dry_run: false, record, owner_created: owner.created, warnings: setWarnings(record) };
 }

@@ -614,6 +614,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // (no escalation); approvedBy is recorded. Public-safe default ON — set false to force
     // every registration through the manual consent page.
     sameOwnerAutoApprove: process.env.AIMEAT_SAME_OWNER_AUTO_APPROVE !== 'false',
+    appOriginSignInRefuse: process.env.AIMEAT_APP_ORIGIN_SIGN_IN_REFUSE === 'true',
     // MCP audit Phase 3 (F1): enforce per-agent scopes on the public /v1/mcp tool surface
     // (mirrors the REST requireScope gates). Default true — closes the least-privilege hole.
     // Set false for a warn-only rollout: tools are still registered, but would-be-filtered

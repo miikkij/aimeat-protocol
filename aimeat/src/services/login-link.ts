@@ -32,6 +32,8 @@
  * @structure LOGIN_LINK_TTL_MS · WELCOME_LINK_TTL_MS · loginReturnTarget() · issueLoginLink() ·
  *   sendLoginLink() · sendWelcomeLink() · redeemLoginLink()
  * @version-history
+ *   v1.2.0 — 2026-10-04 — sendWelcomeLink() takes a `redirect` too: an install set's owner lands on
+ *     the set's landing app.
  *   v1.1.0 — 2026-09-29 — The return address: loginReturnTarget(), and a `redirect` the link carries.
  *   v1.0.0 — 2026-09-29 — Initial (install packages: users created at install can sign in).
  */
@@ -134,16 +136,19 @@ export async function sendLoginLink(
 
 /**
  * Welcome a person whose account an install created: the account name and a sign-in link valid for
- * WELCOME_LINK_TTL_MS. False, and nothing stored, on the same conditions as sendLoginLink().
+ * WELCOME_LINK_TTL_MS. False, and nothing stored, on the same conditions as sendLoginLink(). `redirect`
+ * is where the link opens, checked by loginReturnTarget() as sendLoginLink() checks it; the front page
+ * when it is absent or refused.
  */
 export async function sendWelcomeLink(
     storage: Storage, config: AimeatConfig, ghii: GHIIRecord, email: string,
-    mail: EmailService | null | undefined = getActiveEmailService(),
+    mail: EmailService | null | undefined = getActiveEmailService(), redirect?: unknown,
 ): Promise<boolean> {
     if (!mail?.enabled || !ghii.magicLinkEnabled) return false;
     const owner = await storage.getOwner(ghii.ownerName);
     if (!owner || owner.disabledAt) return false;
-    const loginUrl = await issueLoginLink(storage, config, ghii, email, WELCOME_LINK_TTL_MS);
+    const back = (await loginReturnTarget(storage, config, redirect)) ? redirect as string : null;
+    const loginUrl = await issueLoginLink(storage, config, ghii, email, WELCOME_LINK_TTL_MS, back);
     const site = config.baseUrl.replace(/^https?:\/\//, '');
     const m = welcomeEmail({ site, username: ghii.ownerName, loginUrl }, ghii.locale);
     const sent = await mail.sendRaw(email, m.subject, m.html, m.text);

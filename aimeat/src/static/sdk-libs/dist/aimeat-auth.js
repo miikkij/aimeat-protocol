@@ -2506,9 +2506,9 @@
       }, 8e3);
     });
   }
-  async function requestConsentPopup(app, scopeStr, manage) {
+  async function requestConsentPopup(app, scopeStr, manage, prompt) {
     if (inIsolatedFrame()) {
-      return askFrameHost("consent", { scope: scopeStr || appDeclaredScopes(), manage: !!manage }, 15 * 60 * 1e3);
+      return askFrameHost("consent", { scope: scopeStr || appDeclaredScopes(), manage: !!manage, prompt: prompt === "create" ? "create" : "" }, 15 * 60 * 1e3);
     }
     var apexOrigin;
     try {
@@ -2520,7 +2520,7 @@
     var state = b64url(crypto.getRandomValues(new Uint8Array(16)).buffer);
     var redirectUri = location.origin + "/";
     var scope = scopeStr || appDeclaredScopes();
-    var url = apexOrigin + "/v1/app-grants/authorize?response_type=code&response_mode=web_message" + (manage ? "&manage=1" : "") + "&app=" + encodeURIComponent(app) + "&scope=" + encodeURIComponent(scope) + "&redirect_uri=" + encodeURIComponent(redirectUri) + "&code_challenge=" + encodeURIComponent(p.challenge) + "&code_challenge_method=" + encodeURIComponent(p.method) + "&state=" + encodeURIComponent(state);
+    var url = apexOrigin + "/v1/app-grants/authorize?response_type=code&response_mode=web_message" + (manage ? "&manage=1" : "") + (prompt === "create" ? "&prompt=create" : "") + "&app=" + encodeURIComponent(app) + "&scope=" + encodeURIComponent(scope) + "&redirect_uri=" + encodeURIComponent(redirectUri) + "&code_challenge=" + encodeURIComponent(p.challenge) + "&code_challenge_method=" + encodeURIComponent(p.method) + "&state=" + encodeURIComponent(state);
     var w = 460, h = 660;
     var left = window.screen && window.screen.width ? (window.screen.width - w) / 2 : 0;
     var top = window.screen && window.screen.height ? (window.screen.height - h) / 2 : 0;
@@ -2645,7 +2645,7 @@
     emit("login", session, { restored: !!restored });
     return session;
   }
-  function restoreSessionFromAppOrigin(interactive) {
+  function restoreSessionFromAppOrigin(interactive, prompt) {
     if (currentSession) return Promise.resolve(currentSession);
     if (_appOriginLoginInFlight) return _appOriginLoginInFlight;
     _appOriginLoginInFlight = (async function() {
@@ -2659,7 +2659,7 @@
       }
       if (!grant && interactive && r && r.app && (r.error === "consent_required" || r.error === "login_required")) {
         appId = r.app;
-        grant = await requestConsentPopup(r.app, r.scope);
+        grant = await requestConsentPopup(r.app, r.scope, false, prompt);
         own = !!(grant && grant.own);
         if (grant && grant.app) appId = grant.app;
       }
@@ -2995,7 +2995,7 @@
      *
      * Added 2026-09-13. Before it the login pill's own button was the only interactive road, and
      * apps reached it by clicking `#login button`, which is the theme control that renders first.
-     * @param {object & { onLogin?: Function }} [opts]
+     * @param {object & { onLogin?: Function, register?: boolean, tab?: string }} [opts]
      * @returns {Promise<object|null>}
      */
     signIn(opts) {
@@ -3003,7 +3003,7 @@
       if (currentSession) return Promise.resolve(currentSession);
       var stop = onLoginWhileOpen({ onLogin: o.onLogin, onSession: o.onSession });
       if (isAppOrigin()) {
-        return restoreSessionFromAppOrigin(true).finally(stop);
+        return restoreSessionFromAppOrigin(true, o.register || o.tab === "register" ? "create" : "").finally(stop);
       }
       return new Promise(function(resolve) {
         showLoginModal(o, function() {

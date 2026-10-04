@@ -7,6 +7,8 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.14.0 — 2026-10-04 — The agent, MCP-session and ecosystem scope settings moved unchanged to
+ *     config-types-agent-access.ts (AgentAccessConfig, mixed in) at the 800-line ceiling.
  *   v1.13.0 — 2026-10-01 — AppAuditConfig mixed in (config-app-audit.ts): the node's default limit
  *     on an app's audit log.
  *   v1.12.0 — 2026-09-30 — UpdateCheckConfig mixed in (config-update-check.ts): the npm version check.
@@ -164,8 +166,9 @@ import type { PackagesConfig } from './config-types-packages.js';
 import type { ClassificationConfig } from './config-data-access.js';
 import type { UpdateCheckConfig } from './config-update-check.js';
 import type { AppAuditConfig } from './config-app-audit.js';
+import type { AgentAccessConfig } from './config-types-agent-access.js';
 
-export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, McpProxyConfig, EnterpriseSsoConfig, AccountSecurityConfig, CapabilitiesConfig, ThemesConfig, PackagesConfig, ClassificationConfig, UpdateCheckConfig, AppAuditConfig {
+export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, McpProxyConfig, EnterpriseSsoConfig, AccountSecurityConfig, CapabilitiesConfig, ThemesConfig, PackagesConfig, ClassificationConfig, UpdateCheckConfig, AppAuditConfig, AgentAccessConfig {
   port: number;
   baseUrl: string;
   /**
@@ -677,25 +680,8 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   statsEnabled: boolean;
   statsAccess: 'public' | 'authenticated' | 'operator';
 
-  // Scoped Agent Capabilities (REQ-006)
-  defaultAgentScopes: string[];
-  maxAgentScopes: string[];
-  /** Same-owner device-auth auto-approval (owner or same-owner agent; no cross-owner, no scope escalation). Default true. */
-  sameOwnerAutoApprove: boolean;
-  /** F1: enforce per-agent scopes on the /v1/mcp tool surface (default true; false = warn-only). */
-  mcpEnforceScopes: boolean;
-  /** Close an MCP session after this many minutes without a request (fractions allowed, floor
-   *  0.05 -- the sub-minute range exists for tests; run production at 30-120). Each session
-   *  holds a full tool catalog in memory, and most clients never send the DELETE that would
-   *  end it — they just stop talking. A reaped client re-initializes on its next call. */
-  mcpSessionIdleMinutes: number;
-  /** How often the idle sweep looks, in ms. Read once at boot; the E2E runner pins it to 1000. */
-  mcpSessionSweepMs: number;
-
-  // Ecosystem application (GEAI) scope bounds — parallel to the agent knobs above, so an operator
-  // can bound ecosystem connections independently of agents.
-  defaultEcoScopes: string[];
-  maxEcoScopes: string[];
+  // Scoped agent capabilities, MCP sessions and ecosystem scope bounds: AgentAccessConfig
+  // (config-types-agent-access.ts).
 
   // Prometheus Metrics
   metricsEnabled: boolean;

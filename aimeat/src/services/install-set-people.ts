@@ -24,6 +24,8 @@
  *   the set's; the record's welcomed list keeps it to one mail per set.
  * @structure checkOwner() · ensureOwner() · joinMember() · ownerToWelcome() · welcomeCreated() · MemberOutcome · CreatedOrganisms
  * @version-history
+ *   v1.4.0 — 2026-10-04 — welcomeCreated() takes where each person's link opens; the owner's opens the
+ *     set's landing app (install-set-grants.ts landingPath).
  *   v1.3.0 — 2026-09-29 — ownerToWelcome() no longer asks whether anyone has signed in to the owner
  *     account: the shop's crew image signs in with the owner's password when the node boots, to get
  *     its agent token, so the condition refused the welcome on exactly the nodes the shop sells
@@ -194,13 +196,16 @@ export async function ownerToWelcome(storage: Storage, config: AimeatConfig, own
  * Mail each account this install created the welcome sign-in link (login-link.ts), once. `created`
  * and `welcomed` are the record's lists of emails; the ones mailed now are returned. An email that
  * could not be sent (this node sends no mail yet) stays unwelcomed, so applying the set again tries it.
+ * `landing` is where one person's link opens, by email: the owner's goes to the set's landing app.
  */
-export async function welcomeCreated(storage: Storage, config: AimeatConfig, created: string[], welcomed: string[]): Promise<string[]> {
+export async function welcomeCreated(
+    storage: Storage, config: AimeatConfig, created: string[], welcomed: string[], landing: Record<string, string> = {},
+): Promise<string[]> {
     const sent: string[] = [];
     for (const email of created) {
         if (welcomed.includes(email)) continue;
         const account = await accountOfEmail(storage, email);
-        if (account && await sendWelcomeLink(storage, config, account, email)) sent.push(email);
+        if (account && await sendWelcomeLink(storage, config, account, email, undefined, landing[email])) sent.push(email);
     }
     return sent;
 }
