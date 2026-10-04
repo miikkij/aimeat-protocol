@@ -10,6 +10,8 @@
  * @structure AppIsolationStatus · isolationStatusFor(input) (pure) · appIsolationStatus(config, storage)
  * @usage const apps = await appIsolationStatus(config, storage);
  * @version-history
+ *   v1.1.0 — 2026-10-04 — A node one person uses is `watch` too and is told how to give apps addresses
+ *     of their own, and its summary says an app a package installed runs in the isolated frame.
  *   v1.0.0 — 2026-09-25 — Initial (audit A7-1: apps on shared nodes without an app origin).
  */
 import type { AimeatConfig } from '../config.js';
@@ -55,26 +57,31 @@ export function isolationStatusFor(input: {
       warning: null, what_to_set: null, settings: null,
     };
   }
-  if (isolation === 'shared-origin') {
-    return {
-      isolation, people, app_origin: appOrigin, zone: 'healthy',
-      summary: 'Only one person has an account here, so apps run on this node\'s own address with that person\'s sign-in. '
-        + 'When a second person gets an account, every app moves into an isolated frame by itself.',
-      warning: null, what_to_set: null, settings: null,
-    };
-  }
   // A real host when the node has one; on localhost or an IP address no public subdomain family can
   // exist, so the suggestion is a placeholder the operator replaces.
   const suggested = appHost || deriveAppHost(baseUrl) || 'apps.your-domain.example';
+  const whatToSet = `Point the wildcard name *.${suggested} at this server, with a TLS certificate that covers it. `
+    + `Then set AIMEAT_APP_HOST=${suggested} and AIMEAT_APP_ORIGIN_ENABLED=true, and restart the node.`;
+  const settings = { AIMEAT_APP_HOST: suggested, AIMEAT_APP_ORIGIN_ENABLED: 'true' };
+  // Every app is meant to run on an address of its own (Jouni, 2026-10-04), so a node without them is
+  // told how to set them, also when one person uses it.
+  if (isolation === 'shared-origin') {
+    return {
+      isolation, people, app_origin: appOrigin, zone: 'watch',
+      summary: 'Only one person has an account here, so the apps that person made run on this node\'s own address with their sign-in. '
+        + 'An app a package installed runs in an isolated frame, with only the permissions it was given. '
+        + 'When a second person gets an account, every app moves into an isolated frame by itself.',
+      warning: null, what_to_set: whatToSet, settings,
+    };
+  }
   return {
     isolation, people, app_origin: appOrigin, zone: 'watch',
     summary: `${people} people have an account here and apps have no address of their own, so every app runs in an isolated frame. `
       + 'The frame cannot read anybody\'s sign-in, cookies or stored data on this node, and the app reaches the node only with the permissions it was given.',
     warning: 'An app in the isolated frame cannot use a browser database, cookies that last, a service worker or notifications, and it cannot be installed. '
       + 'Give every app an address of its own to remove these limits.',
-    what_to_set: `Point the wildcard name *.${suggested} at this server, with a TLS certificate that covers it. `
-      + `Then set AIMEAT_APP_HOST=${suggested} and AIMEAT_APP_ORIGIN_ENABLED=true, and restart the node.`,
-    settings: { AIMEAT_APP_HOST: suggested, AIMEAT_APP_ORIGIN_ENABLED: 'true' },
+    what_to_set: whatToSet,
+    settings,
   };
 }
 

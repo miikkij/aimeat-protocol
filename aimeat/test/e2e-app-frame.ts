@@ -15,6 +15,8 @@
  *       app's address is refused.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-app-frame.ts
  * @version-history
+ *   v1.2.0 — 2026-10-04 — Phase 1: on a one-owner node, an app a package installed gets the frame page
+ *     and its grant from the install; the owner's own app stays on the node's address.
  *   v1.1.0 — 2026-09-26 — Phase 1: the grant door answers a page of the node by name on a one-owner
  *     node too, with the app's own grant, which the App Catalog's preview now asks for.
  *   v1.0.0 — 2026-09-25 — Initial (audit A7-1: apps on shared nodes without an app origin).
@@ -176,6 +178,32 @@ async function main() {
             assert(r.ok === true && !!r.access_token && r.own === true && r.app === `${a}/${SOLO}`, `expected the app's grant, got ${JSON.stringify(r)}`);
             const claims = JSON.parse(Buffer.from(r.access_token!.split('.')[1], 'base64url').toString('utf8'));
             assert(JSON.stringify(claims.roles) === '["app"]' && claims.app === `${a}/${SOLO}`, `an app grant, got ${JSON.stringify(claims)}`);
+        });
+
+        await test('one owner: an app a package installed gets the frame page, never the app\'s bytes, and its grant from the install', async () => {
+            // A sold place without app origins served bought apps with the owner's whole session,
+            // operator rights included (2026-10-04). A package's app is framed on a one-person node too.
+            const pkg = await json('/v1/packages', { method: 'POST', headers: { Authorization: `Bearer ${A.token}` },
+                body: JSON.stringify({ name: 'framepkg', description: 'A package with an app', category: 'utility', visibility: 'private',
+                    components: [{ id: 'pkg-app', type: 'app', label: 'Packaged', dependencies: [], content: appHtml('MARK-PKG') }] }) });
+            assert(pkg.status === 201, `publish package: ${pkg.status} ${JSON.stringify(pkg.body)}`);
+            const inst = await json(`/v1/packages/${encodeURIComponent(pkg.body.data.packageGroupId)}/install`, {
+                method: 'POST', headers: { Authorization: `Bearer ${A.token}` }, body: JSON.stringify({ label: 'framed' }) });
+            assert(inst.status === 201, `install: ${inst.status} ${JSON.stringify(inst.body)}`);
+            const file = (inst.body.data.installedComponents as any[]).find(c => c.type === 'app').registeredAs;
+            const r = await page(`/v1/apps/${a}/${file}?mode=inline`, NAVIGATION);
+            assert(r.status === 200 && !r.text.includes('MARK-PKG') && r.text.includes('/app-frame.js'),
+                `expected the frame page, got ${r.status} ${r.text.slice(0, 200)}`);
+            // A caller that is not a browser asks the same address and gets the bytes only sandboxed.
+            const bytes = await page(`/v1/apps/${a}/${file}?mode=inline`);
+            const sb = sandboxOf(bytes.headers.get('content-security-policy') ?? '');
+            assert(bytes.text.includes('MARK-PKG') && !!sb && !sb.includes('allow-same-origin'), `the bytes only in an opaque sandbox, got ${JSON.stringify(sb)}`);
+            const g = await frameGrant(`${a}/${file}`, 'memory:read memory:write', A.rt);
+            assert(g.ok === true && !!g.access_token && g.own === false, `the app's grant from the install, not own: ${JSON.stringify({ ...g, access_token: !!g.access_token })}`);
+        });
+        await test('one owner: the owner\'s own app still runs on the node\'s own address', async () => {
+            const r = await page(`/v1/apps/${a}/${SOLO}?mode=inline`, NAVIGATION);
+            assert(r.status === 200 && r.text.includes('MARK-SOLO'), `the owner's own app, plain: ${r.status}`);
         });
 
         console.log('\nPhase 2: a second person joins — every app moves into the isolated frame');

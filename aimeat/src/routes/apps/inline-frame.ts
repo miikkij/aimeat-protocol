@@ -13,20 +13,25 @@
  *       CSP `sandbox` directive, and with the frame support script (src/static/app-frame-shim.js,
  *       put in place by utils/app-frame-assets.ts withFrameShim) as the document's first script.
  *   `?mode=frame` is sandboxed on every node, so the address means the same thing wherever it is
- *   used. A node with an app origin never reaches this file (its apex redirects), and a node one
- *   person uses answers 'plain' for `?mode=inline`, exactly as before.
- * @structure RunnableAnswer · runnableAnswer(config, storage, req, mode) · sendFrameHost(res) ·
+ *   used. A node with an app origin never reaches this file (its apex redirects). A node one person
+ *   uses answers 'plain' for `?mode=inline` for that person's own apps, and the frame for an app a
+ *   package installed.
+ * @structure RunnableAnswer · runnableAnswer(config, storage, req, mode, app) · sendFrameHost(res) ·
  *   sandboxedCsp(config) · withFrameShim(body) · FRAME_HOST_CSP
  * @usage
  *   const answer = await runnableAnswer(config, storage, req, 'inline');
  *   if (answer === 'host') { sendFrameHost(res); return; }
  * @version-history
+ *   v1.1.0 — 2026-10-04 — runnableAnswer takes the app: on a node one person uses, an app a package
+ *     installed takes the isolated frame too. Fleet places ran without app origins and served bought
+ *     apps with the owner's whole session, operator rights included.
  *   v1.0.0 — 2026-09-25 — Initial (audit A7-1: apps on shared nodes without an app origin).
  */
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { appIsolationMode } from '../../services/app-isolation.js';
+import { isPackageApp } from '../../services/package-approvals.js';
 import { appCsp } from '../../utils/app-csp.js';
 import { appFrameHostHtml, withFrameShim } from '../../utils/app-frame-assets.js';
 
@@ -62,9 +67,16 @@ function isDocumentLoad(req: Request): boolean {
 /** Which answer a runnable request on the node's own address gets. */
 export async function runnableAnswer(
   config: AimeatConfig, storage: Storage, req: Request, mode: 'inline' | 'frame',
+  app?: { owner: string; filename: string },
 ): Promise<RunnableAnswer> {
   if (mode === 'frame') return 'sandboxed';
-  if ((await appIsolationMode(config, storage)) !== 'isolated-frame') return 'plain';
+  const isolation = await appIsolationMode(config, storage);
+  // On a node one person uses, an app a package installed is somebody else's code under that person's
+  // name, and that person is usually the operator too (a sold place). It takes the isolated frame, so
+  // it holds only its grant, never the session (Jouni, 2026-10-04). The person's own apps stay plain.
+  const framed = isolation === 'isolated-frame'
+    || (isolation === 'shared-origin' && !!app && await isPackageApp(storage, app.owner, `${app.owner}/${app.filename}`));
+  if (!framed) return 'plain';
   // Without the static tree the page cannot be served; the bytes still go out sandboxed, only without
   // a page to sign in through.
   return isDocumentLoad(req) && appFrameHostHtml() ? 'host' : 'sandboxed';
