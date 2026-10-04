@@ -94,6 +94,7 @@
     "0089_organism_agent_access.sql": "fe78b214ea0f54a98a7bb987ab917c97341d16506f9dfecfbfc4757b7c589090",
     "0090_content_labels.sql": "9baff4dda6e792729168e26c58eddb01a364bfa9aa8d05b814e5864377bba42a",
     "0091_classification_audit.sql": "b63ede304ff266f494204d7f6a45de18f3528e2e8ca481377974b2e52ca63aef",
-    "0092_task_start.sql": "6cec8641c09ac29dc9c11d9815d273fa9a1ffa2c7cfab2ead11973ec26bfedab"
+    "0092_task_start.sql": "6cec8641c09ac29dc9c11d9815d273fa9a1ffa2c7cfab2ead11973ec26bfedab",
+    "0093_scheduled_job_fire_claim.sql": "37944148bb611456d6e32ca25b6c242e5a23322b2af143943831c0d3e8a9da16"
   }
 }

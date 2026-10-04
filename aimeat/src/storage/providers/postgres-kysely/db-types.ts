@@ -2028,6 +2028,7 @@ export interface ScheduledJob {
   id: Generated<string>;
   input: Json | null;
   instanceId: string | null;
+  lastFireAt: Timestamp | null;
   lastRunAt: Timestamp | null;
   lastRunDurationMs: number | null;
   lastRunError: string | null;

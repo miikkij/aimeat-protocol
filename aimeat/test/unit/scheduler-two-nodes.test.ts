@@ -12,6 +12,7 @@
  *   reschedule and the next-run read use.
  * @usage cd aimeat && pnpm exec vitest run test/unit/scheduler-two-nodes.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-04 — The stand-in store answers claimScheduledFire (scheduler-fire-claim.ts).
  *   v1.0.0 — 2026-09-26 — Initial.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
@@ -46,6 +47,8 @@ function storageWith(job: ScheduledJobRecord): Storage {
         getScheduledJob: async (id: string) => (id === job.id ? job : null),
         updateScheduledJob: async () => {},
         createExecutionLog: async () => {},
+        // Each node has its own store here, so each one wins its own claim of every fire.
+        claimScheduledFire: async () => true,
     } as unknown as Storage;
 }
 

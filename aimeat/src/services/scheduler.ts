@@ -7,6 +7,7 @@
  *   Supports special @activate trigger: runs on extension activation AND every server startup.
  *   Every execution creates an ExecutionLogEntry with timing, result, and memory I/O.
  * @version-history
+ *   v2.18.0 — 2026-10-04 — A cron fire is claimed in the database before it runs (scheduler-fire-claim.ts).
  *   v2.17.1 — 2026-10-04 — A declined occurrence no longer blocks the next fire (isTerminalTaskStatus).
  *   v2.17.0 — 2026-10-02 — Both task makers read the start decision (services/agent-task-rules.ts)
  *     instead of `mode === 'task-runner'`, mark the 'started' event of a task they start, and push
@@ -103,6 +104,7 @@ import { localAccountName } from '../utils/gaii.js';
 import { SlotPool } from './slot-pool.js';
 import { runExtensionJob } from './scheduler-extension-job.js';
 import { runAiJob, runWorkflowJob, runEcoCapabilityJob } from './scheduler-remote-jobs.js';
+import { claimCronFire } from './scheduler-fire-claim.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
 
@@ -305,8 +307,10 @@ export class Scheduler {
       // use that key. A production process serves one node: the name gains a suffix, nothing else.
       const cronOpts: { name: string; timezone?: string } = { name: `${job.id}@${this.config.nodeId}` };
       if (job.timezone) cronOpts.timezone = job.timezone;
-      const cron = new Cron(job.cron, cronOpts, async () => {
-        await this.executeJob(job, 'cron');
+      // Each fire is claimed in the database first, so a second node process on the same database
+      // does not run it again (scheduler-fire-claim.ts).
+      const cron = new Cron(job.cron, cronOpts, async (self: Cron) => {
+        if (await claimCronFire(this.storage, job, self)) await this.executeJob(job, 'cron');
       });
 
       this.cronJobs.set(job.id, cron);

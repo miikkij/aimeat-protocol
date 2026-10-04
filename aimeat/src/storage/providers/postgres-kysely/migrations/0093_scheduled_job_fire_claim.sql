@@ -1,0 +1,13 @@
+-- 0093_scheduled_job_fire_claim.sql
+--
+-- The scheduled time of the last cron fire a node process claimed for this job.
+--
+-- Every node process starts its own scheduler, and nothing coordinated two of them on one
+-- database. On aimeat.io the workflow laimeat-sanomat-evening started two runs per fire on
+-- 2026-10-02 and 2026-10-03, 1 ms and 15 ms apart, and each run dispatched its own tasks. Before a
+-- cron fire runs, the scheduler now claims it with one conditional update of this column
+-- (storage claimScheduledFire, services/scheduler-fire-claim.ts); the process that loses the
+-- claim does not run the fire. Only the scheduler writes it. NULL = no fire claimed yet.
+--
+-- Mirrors the SQLite column added in schema.ts.
+ALTER TABLE "ScheduledJob" ADD COLUMN IF NOT EXISTS "lastFireAt" TIMESTAMP(3);
