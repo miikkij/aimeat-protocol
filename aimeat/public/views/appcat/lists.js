@@ -8,9 +8,10 @@
  *   nothing), the favourites (every starred app, own and others', drawn as the community's rows), and
  *   the foot on ink. One row open at a time in each list. Drawn with PageSection list, List index,
  *   EmptyState and InkFoot; no class here.
- * @structure LibraryList(props) · CommunityList(props) · FavouritesList(props) · CatFoot({ loaded, n })
+ * @structure LibraryList(props) · CommunityList(props) · FavouritesList(props) · BuildingList(props) · CatFoot({ loaded, n })
  * @usage html`<${LibraryList} rows=${rows} total=${own.length} … />`
  * @version-history
+ *   v1.2.0 — 2026-10-04 — BuildingList: the apps the person builds for somebody else (wish-appcatin-sovellussivulle-design-spec-roadmap-rakentajat-ja-l).
  *   v1.1.0 — 2026-09-27 — Parity with the old page: the foot line and the 6px under the own list's
  *     headline are PageSection's (`foot`, `spaced`); an open row closes when the old page drew its
  *     list anew (search, tag, state, order, star, listing) or a filter hides it; the community and
@@ -123,6 +124,20 @@ export function FavouritesList({ rows, order, total, favourites, closeOn }) {
   return html`<${PageSection} list title=${x('fav.title')} count=${'· ' + total}>
     ${total === 0
       ? html`<${EmptyState} line text=${x('fav.empty')} hint=${x('fav.emptyHint')} />`
+      : html`<${List} cols=${CUT} index>${rowsOf(rows, false, favourites, openRef, toggle, order)}<//>`}
+  <//>`;
+}
+
+/**
+ * The apps somebody else owns that the person may build: their design spec and roadmap open from
+ * the row's detail, as on an own app.
+ * @param {{ rows: any[], order: any[], total: number, favourites: Set<string>, closeOn: any[] }} props
+ */
+export function BuildingList({ rows, order, total, favourites, closeOn }) {
+  const [openRef, toggle] = useOpenRow(closeOn, rows);
+  return html`<${PageSection} list title=${x('building.title')} count=${'· ' + total} foot=${x('building.foot')}>
+    ${total === 0
+      ? html`<${EmptyState} line text=${x('building.empty')} />`
       : html`<${List} cols=${CUT} index>${rowsOf(rows, false, favourites, openRef, toggle, order)}<//>`}
   <//>`;
 }

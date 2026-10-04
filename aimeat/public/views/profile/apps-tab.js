@@ -11,6 +11,9 @@
  * @structure AppsTab — state, loads, handlers, the ctx bag, render
  * @usage Registered in views/profile.js TABS as id 'apps'.
  * @version-history
+ *   v2.2.0 — 2026-10-04 — `shared`: the apps somebody else owns and the person may build
+ *     (listApps({ building: true })), so a draft waiting on such an app shows under What waits for you,
+ *     now that the Roadmap and shared work section is gone (wish-appcatin-sovellussivulle-design-spec-roadmap-rakentajat-ja-l).
  *   v2.1.0 — 2026-09-08 — Who else may build these apps: the blanket list, the per-app rights,
  *     and the form that gives one. A right that can only be read back by asking an AI is a
  *     right whose holder its owner eventually forgets.
@@ -53,6 +56,7 @@ export default function AppsTab({ session, showToast, onStats }) {
   const [communityOwners, setCommunityOwners] = useState(0);
   const [bound, setBound] = useState({});          // "owner/filename" → the skills bound to it
   const [grants, setGrants] = useState([]);
+  const [shared, setShared] = useState([]);       // apps somebody else owns that this person may build
   const [builders, setBuilders] = useState(null);  // who else may build these apps
   const [buildersBusy, setBuildersBusy] = useState(false);
   const [buildPrompt, setBuildPrompt] = useState('');
@@ -95,6 +99,9 @@ export default function AppsTab({ session, showToast, onStats }) {
       }
       setBound(map);
     } catch (err) { swallowed('apps-tab: skills', err); setBound({}); }
+    try {
+      setShared(await listApps({ building: true }));
+    } catch (err) { swallowed('apps-tab: shared apps', err); setShared([]); }
     try {
       const res = await apiGet('/v1/app-grants');
       setGrants(res?.data?.grants || []);
@@ -277,7 +284,7 @@ Start by asking me which app and what I want changed. Fill a data map (aimeat_da
 
   const ctx = {
     publishApp, submitPublish, closePublish: () => { if (!busy) setPublishApp(null); },
-    session, apps, community, communityOwners, bound, grants, buildPrompt, busy, diff, openScopes,
+    session, apps, community, communityOwners, bound, grants, shared, buildPrompt, busy, diff, openScopes,
     builders, buildersBusy, onGrantBuilder, onRevokeBuilder,
     kunto: computeKunto(apps || [], bound), ConfirmUI, showToast,
     publishDraft, discardDraft, toggleDiff, revokeGrant, toggleScopes: (g) => setOpenScopes(openScopes === g.grant_id ? null : g.grant_id),

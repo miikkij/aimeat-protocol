@@ -36,6 +36,11 @@
  * @structure Detail({ app, onClose }) · SECTION_IDS
  * @usage html`<${Detail} app=${cat.detail} onClose=${closeDetail} />`
  * @version-history
+ *   v1.4.0 — 2026-10-04 — The sections stand in five groups (detail-groups.js): the page follows their
+ *     order, the rail names each group, a section's chapter line names its group, a section that
+ *     fixes something the app lacks is drawn as a notice in the rail with the reason as its title,
+ *     and Money and agents folds to one section when the app sells no tool and bundles no agent.
+ *     The design spec and the roadmap also show to a person building somebody else's app (d.isBuilder).
  *   v1.3.0 — 2026-10-04 — Three sections from Settings > Apps, so everything about building one app
  *     is on that app's page: the design spec after About, the roadmap after Versions, who else may
  *     build it after Manage (wish-appcatin-sovellussivulle-design-spec-roadmap-rakentajat-ja-l).
@@ -55,6 +60,8 @@ import htm from 'htm';
 import { Overlay } from '/components/Overlay.js';
 import { Rail } from '/components/Rail.js';
 import { Section } from '/components/Section.js';
+import { Note } from '/components/Note.js';
+import { Action, Actions } from '/components/Action.js';
 import { apiGet } from '/js/api.js';
 import { getSession } from '/js/services/auth.js';
 import { x, lang } from '/views/appcat/i18n.js';
@@ -66,12 +73,13 @@ import { b64ToText } from '/views/appcat/workcopy.js';
 import { useDetailState, openApp, serverOwner, whenBytes, sessionEdit, setVersion, bumpVersions, setAboutEditing, discardProposal, openStagingPreview } from '/views/appcat/detail-state.js';
 import { useDetailRail } from '/views/appcat/detail-rail.js';
 import { DetailHead, DetailBand } from '/views/appcat/detail-head.js';
+import { GROUPS, SECTION_IDS as GROUPED_IDS, attentionOf } from '/views/appcat/detail-groups.js';
+import { kunto } from '/views/appcat/model.js';
 
 const html = htm.bind(h);
 
-/** The sections in the order of F65. */
-export const SECTION_IDS = ['work', 'ai', 'about', 'spec', 'datamap', 'needs', 'history', 'versions', 'roadmap', 'visitors',
-  'manage', 'builders', 'skills', 'search', 'marks', 'legal', 'audit', 'promote', 'odps', 'monetize', 'cost', 'agents', 'actions'];
+/** The sections in page order: the groups of detail-groups.js, one after another. */
+export const SECTION_IDS = GROUPED_IDS;
 
 /**
  * Each section's file, named literally so the catalogue's build (and a reader) can follow it; loaded
@@ -182,6 +190,23 @@ function DetailView({ given, onClose }) {
     return () => { live = false; };
   }, [owner, filename, isOwnPublished]);
 
+  // How many tools the app's manifest declares, for whether Money and agents is in use. The record is
+  // the owner's own (apps.{filename}.tools); a missing one is no tools.
+  const [toolsN, setToolsN] = useState(null);
+  const [moneyOpen, setMoneyOpen] = useState(false);
+  useEffect(() => {
+    setMoneyOpen(false); setToolsN(null);
+    if (!isOwnPublished) return undefined;
+    let live = true;
+    apiGet('/v1/memory/' + encodeURIComponent(`apps.${filename}.tools`) + '?soft=1')
+      .then((j) => {
+        const v = j && j.data && (j.data.value || (j.data.record && j.data.record.value));
+        if (live) setToolsN(v && Array.isArray(v.tools) ? v.tools.length : 0);
+      })
+      .catch((err) => { console.warn('[appcat] the tool manifest could not be read', err); if (live) setToolsN(0); });
+    return () => { live = false; };
+  }, [ref, filename, isOwnPublished]);
+
   // Escape closes the detail when nothing above it is open (F122, F170).
   useEffect(() => {
     const onKey = (e) => {
@@ -205,10 +230,12 @@ function DetailView({ given, onClose }) {
     forkedFrom: manifest.forkedFrom || null,
   };
 
-  const shown = SECTION_IDS.map((id) => modules[id]).filter(Boolean);
   const ids = [];
+  // A person holding a development right on somebody else's app. The listed row of such an app is the
+  // community's and carries no rung, so the building listing decides, not the row shown.
+  const isBuilder = !isOwn && (given.dev_level != null || (cat.building || []).some((r) => appRef(r) === ref));
   const d = {
-    app: row, manifest, owner, rowOwner: row.owner, filename: row.filename, ref, me, isOwn, isOwnPublished,
+    app: row, manifest, owner, rowOwner: row.owner, filename: row.filename, ref, me, isOwn, isOwnPublished, isBuilder,
     published: true, lang: lang(), meta,
     reload: () => reloadCatalog(),
     notice: (text, kind) => notice(text, kind),
@@ -229,16 +256,36 @@ function DetailView({ given, onClose }) {
     legalLoaded: (data) => setLegal(data || null),
     isFavourite: (r) => !!(cat.favourites && cat.favourites.has && cat.favourites.has(r)),
   };
-  const visible = shown.filter((mod) => shows(mod, d));
-  visible.forEach((mod) => ids.push(DOM_ID(mod.meta.id)));
+  // The groups with the sections that show for this app; the quiet group folds while not in use.
+  const att = attentionOf(d, isOwn ? kunto(row, cat.skillsBound || new Set()) : null);
+  const moneyInUse = (toolsN || 0) > 0 || !!(modules.agents && shows(modules.agents, d));
+  const groups = GROUPS.map((g) => {
+    const mods = g.ids.map((id) => modules[id]).filter((mod) => mod && shows(mod, d));
+    return { ...g, mods, folded: !!g.quiet && !moneyInUse && !moneyOpen };
+  }).filter((g) => g.mods.length);
+  const visible = groups.flatMap((g) => (g.folded ? [] : g.mods.map((mod) => ({ mod, group: g }))));
+  visible.forEach(({ mod }) => ids.push(DOM_ID(mod.meta.id)));
   const rail = useDetailRail(bodyRef, ids, ref);
   scrollRef.current = rail.scrollToId;
   const total = two(visible.length);
+  const unfold = (g) => {
+    setMoneyOpen(true);
+    // The sections draw on the next render; then the first of them comes to the top.
+    setTimeout(() => scrollRef.current?.(DOM_ID(g.mods[0].meta.id), 0), 60);
+  };
 
-  const railNode = html`<${Rail} tone="ink" title=${x('detail.railTitle')} groups=${[{
-    label: x('detail.railTitle'),
-    items: visible.map((mod, i) => ({ key: mod.meta.id, mark: two(i + 1), label: x(mod.meta.title), on: rail.current === i, onClick: () => rail.goTo(i) })),
-  }]} />`;
+  let n = 0;
+  const railNode = html`<${Rail} tone="ink" title=${x('detail.railTitle')} groups=${groups.map((g) => ({
+    label: x(g.title),
+    items: g.folded
+      ? [{ key: g.id + '-unfold', mark: '+', label: x('detail.groupFolded', { n: g.mods.length }), onClick: () => unfold(g) }]
+      : g.mods.map((mod) => {
+        const i = n++;
+        const why = att[mod.meta.id];
+        return { key: mod.meta.id, mark: two(i + 1), label: x(mod.meta.title), notice: !!why, title: why ? why.join(' · ') : undefined,
+          on: rail.current === i, onClick: () => rail.goTo(i) };
+      }),
+  }))} />`;
 
   // The toolbar (F57, F124): the icon, the name, and the pencil into the About editor while it is shut.
   return html`<${Overlay} normalLeading smallWords label=${meta.name} glyph=${meta.icon} title=${meta.name}
@@ -247,14 +294,18 @@ function DetailView({ given, onClose }) {
       closeLabel=${x('common.close')} rail=${railNode} bodyRef=${bodyRef}>
     <${DetailHead} d=${d} />
     <${DetailBand} d=${d} />
-    ${visible.map((mod, i) => {
+    ${visible.map(({ mod, group }, i) => {
       const Body = mod.default;
       const doors = typeof mod.meta.doors === 'function' ? mod.meta.doors(d) : null;
       return html`<${Section} key=${ref + ':' + mod.meta.id} id=${DOM_ID(mod.meta.id)} first=${i === 0}
-          chapter=${two(i + 1) + ' / ' + total} title=${x(mod.meta.title)} doors=${doors}>
+          chapter=${x(group.title) + ' · ' + two(i + 1) + ' / ' + total} title=${x(mod.meta.title)} doors=${doors}>
         <${Guard} id=${mod.meta.id}><${Body} d=${d} /><//>
       <//>`;
     })}
+    ${groups.filter((g) => g.folded).map((g) => html`<${Section} key=${ref + ':' + g.id} id=${DOM_ID(g.id)} chapter=${x(g.title)} title=${x(g.title)}>
+      <${Note} kind="quiet">${x('detail.groupFoldedNote')}<//>
+      <${Actions}><${Action} small onClick=${() => unfold(g)}>${x('detail.groupFolded', { n: g.mods.length })}<//><//>
+    <//>`)}
   <//>`;
 }
 

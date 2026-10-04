@@ -2,9 +2,9 @@
  * @file public/views/profile/apps/design-spec.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The design spec of the app chosen in the Roadmap and shared work section: the one
- *   document that says what the app is for, its screens, where its data lives, what was decided
- *   and what is open, for everybody who builds it.
+ * @description The design spec of one app, shown as a section of the app's page in the App
+ *   Catalog (appcat/sections/spec.js): the one document that says what the app is for, its
+ *   screens, where its data lives, what was decided and what is open, for everybody who builds it.
  *
  *   Jouni, 2026-10-02: a developer shared an app with him and nothing anywhere said what the app
  *   was. The spec lives beside the app on this page, where the right to build it is given, so the
@@ -18,6 +18,7 @@
  * @structure DesignSpecBlock({ ctx, app, path, owner, heading })
  * @usage html`<${DesignSpecBlock} key=${path} ctx=${ctx} app=${app} path=${path} owner=${owner} />`
  * @version-history
+ *   v1.2.0 — 2026-10-04 — Settings > Apps no longer shows it; the App Catalog's app page is its place.
  *   v1.1.0 — 2026-10-04 — `heading={false}` leaves the block's own heading out, for the App Catalog's
  *     app page, whose section draws the headline (wish-appcatin-sovellussivulle-design-spec-roadmap-rakentajat-ja-l).
  *   v1.0.0 — 2026-10-02 — Initial (wish-sovelluksen-design-speksi-sovelluksen-l-helle-settings-contr).

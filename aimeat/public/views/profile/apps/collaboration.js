@@ -2,11 +2,15 @@
  * @file collaboration.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Shared app discovery, roadmap editing and a publication change note. Made of the
- *   component kit: the page passes data and never a class.
- * @structure PublishDialog({ app, busy, onPublish, onClose }) · CollaborationSection({ ctx })
- * @usage import { CollaborationSection, PublishDialog } from './collaboration.js';
+ * @description The dialog that publishes a draft with its change note. Made of the component kit:
+ *   the page passes data and never a class.
+ * @structure PublishDialog({ app, busy, onPublish, onClose })
+ * @usage import { PublishDialog } from './collaboration.js';
  * @version-history
+ *   v3.0.0 — 2026-10-04 — CollaborationSection is gone with the Roadmap and shared work section: an
+ *     app's design spec, roadmap and builders are sections of its own page in the App Catalog, the
+ *     apps built for somebody else its Building for others view, and a draft such an app waits on is
+ *     under What waits for you (wish-appcatin-sovellussivulle-design-spec-roadmap-rakentajat-ja-l).
  *   v2.2.0 — 2026-10-04 — The roadmap is RoadmapBlock (roadmap-block.js), which reads it itself, so the
  *     App Catalog's app page shows the same block; the spec no longer waits for the roadmap to load.
  *   v2.1.0 — 2026-10-02 — The chosen app's design spec (design-spec.js) sits above its roadmap, under
@@ -37,24 +41,15 @@
  *   v1.0.0 - 2026-09-08 - Make collaboration usable from the Apps page.
  */
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState } from 'preact/hooks';
 import htm from 'htm';
 import { Modal } from '/components/Modal.js';
-import { Section } from '/components/Section.js';
-import { List, Row, Name, Doors } from '/components/List.js';
-import { Action, Loud } from '/components/Action.js';
+import { Loud } from '/components/Action.js';
 import { Note } from '/components/Note.js';
-import { Check } from '/components/Check.js';
-import { Select } from '/components/Select.js';
 import { TextArea } from '/components/TextField.js';
 import { Space } from '/components/Layout.js';
-import { listApps } from '/js/services/apps.js';
-import { swallowed } from '/js/swallowed.js';
-import { a, nameOf, appRef } from './frame.js';
-import { DesignSpecBlock } from './design-spec.js';
-import { RoadmapBlock } from './roadmap-block.js';
+import { a, nameOf } from './frame.js';
 const html = htm.bind(h);
-const pathOf = app => `/v1/apps/${encodeURIComponent(app.owner)}/${encodeURIComponent(app.filename)}`;
 
 export function PublishDialog({ app, busy, onPublish, onClose }) {
   const [line, setLine] = useState('');
@@ -67,47 +62,5 @@ export function PublishDialog({ app, busy, onPublish, onClose }) {
         <${TextArea} label=${a('roadPublishLabel')} hint=${a('roadPublishHint')} rows=${3} maxLength="600" value=${line} onInput=${setLine} />
       <//>
     </form>
-  <//>`;
-}
-
-export function CollaborationSection({ ctx }) {
-  const [showShared, setShowShared] = useState(false);
-  const [shared, setShared] = useState(null);
-  const [sharedError, setSharedError] = useState(false);
-  const [selected, setSelected] = useState('');
-  const apps = [...(ctx.apps || []), ...(showShared ? shared || [] : [])];
-  const app = apps.find(x => appRef(x) === selected);
-  const owner = app?.owner === ctx.session.owner;
-  const selectedPath = app ? pathOf(app) : null;
-
-  useEffect(() => {
-    if (!showShared) return;
-    let active = true;
-    setSharedError(false);
-    listApps({ building: true }).then(rows => { if (active) setShared(rows); })
-      .catch(err => { swallowed('apps: shared list', err); if (active) setSharedError(true); });
-    return () => { active = false; };
-  }, [showShared, ctx.apps]);
-
-  return html`<${Section} id="ap-collaboration" num="07" title=${a('roadTitle')}>
-    <${Check} checked=${showShared} onChange=${setShowShared}>${a('sharedShow')}<//>
-    ${showShared && sharedError ? html`<${Note} kind="quiet" role="alert">${a('sharedFailed')}<//>` : null}
-    ${showShared && !sharedError && shared === null ? html`<${Note} kind="loading">${a('bldLoading')}<//>` : null}
-    ${showShared && shared?.length === 0 ? html`<${Note} kind="quiet">${a('sharedNone')}<//>` : null}
-    ${showShared && shared?.length ? html`<${List} cols="name-doors" keepCols rows=${shared} render=${x => html`<${Row} key=${appRef(x)}>
-      <${Name} meta=${`${x.owner} · ${a('bldRung_' + x.dev_level_name)}`}>${nameOf(x)}<//>
-      <${Doors}>
-        <${Action} small row onClick=${() => setSelected(appRef(x))}>${a('roadOpen')}<//>
-        ${x.has_draft && x.dev_level <= 10 ? html`<${Action} small row onClick=${() => ctx.publishDraft(x)}>${a('publishDraft')}<//>` : null}
-      <//>
-    <//>`} />` : null}
-    <${Space} above="medium">
-      <${Select} label=${a('roadApp')} value=${selected} onChange=${setSelected} placeholder=${a('roadChoose')}
-        options=${apps.map(x => [appRef(x), `${nameOf(x)} · ${x.owner}`])} />
-    <//>
-    ${app ? html`
-      <${DesignSpecBlock} key=${'spec:' + selectedPath} ctx=${ctx} app=${app} path=${selectedPath} owner=${owner} />
-      <${RoadmapBlock} key=${'road:' + selectedPath} ctx=${ctx} path=${selectedPath} owner=${owner} me=${ctx.session.owner} refresh=${ctx.apps} />
-    ` : null}
   <//>`;
 }
