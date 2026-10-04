@@ -135,6 +135,7 @@
     "no-twin:POST /v1/agents/verify": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (action, user_code) and no agent tool does the same job.",
     "no-twin:POST /v1/agui/:owner/:agent": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (runId, threadId) and no agent tool does the same job.",
     "no-twin:POST /v1/ai/complete": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (app_id, model, prompt, systemPrompt) and no agent tool does the same job.",
+    "no-twin:POST /v1/llm/chat/completions": "ANSWERED 2026-10-04: this route IS the agents' door. It is the OpenAI-compatible model endpoint an agent runtime (the node chat's goose, a crew on {kind:'node'}) calls with its own token as its model provider; a model call is not a tool call, so no MCP tool twins it. The field it reads (session_id, beside the caller's prompt_cache_key) only routes the call to the provider that holds its prompt cache; it writes no record.",
     "no-twin:POST /v1/app-grants/token": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (redirect_uri) and no agent tool does the same job.",
     "no-twin:POST /v1/app-store/purchase": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (app_filename) and no agent tool does the same job.",
     "no-twin:POST /v1/apps/:owner/:filename/agents/:agentName/deploy": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (organism_id) and no agent tool does the same job.",
