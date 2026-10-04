@@ -6,6 +6,8 @@
  *   cron scheduler + the agents-card next-run + execution history. Translated 1:1 from the Prisma
  *   implementation. Replaces the listScheduledJobs startup-compat placeholder.
  * @version-history
+ *   v1.1.0 — 2026-10-04 — claimScheduledFire (lastFireAt, migration 0093): a cron fire runs once
+ *     when two node processes share the database.
  *   v1.0.0 — 2026-07-15 — Phase 5: scheduler on Postgres+Kysely.
  */
 import { sql } from 'kysely';
@@ -87,6 +89,15 @@ export const scheduleMethods = {
   async deleteScheduledJob(this: PostgresKyselyStorage, id: string): Promise<boolean> {
     const r = await this.db.deleteFrom('ScheduledJob').where('id', '=', id).executeTakeFirst();
     return Number(r.numDeletedRows ?? 0) > 0;
+  },
+  /** One conditional UPDATE: the row lock makes a second process's update see the first one's value. */
+  async claimScheduledFire(this: PostgresKyselyStorage, id: string, fireAt: string): Promise<boolean> {
+    const at = new Date(fireAt);
+    const r = await this.db.updateTable('ScheduledJob').set({ lastFireAt: at })
+      .where('id', '=', id)
+      .where(eb => eb.or([eb('lastFireAt', 'is', null), eb('lastFireAt', '<', at)]))
+      .executeTakeFirst();
+    return Number(r.numUpdatedRows ?? 0) === 1;
   },
 
   async createExecutionLog(this: PostgresKyselyStorage, entry: ExecutionLogEntry): Promise<ExecutionLogEntry> {

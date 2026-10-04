@@ -12,6 +12,8 @@
  *     deleted: no caller.
  *   v1.3.0 — 2026-09-25 — federation_peers: the peer's own relay-claim setting and its last claimed
  *     and unclaimed relay times.
+ *   v1.4.0 — 2026-10-04 — claimScheduledFire (scheduled_jobs.lastFireAt): a cron fire runs once when
+ *     two node processes share the database file.
  */
 import type {
   EcosystemAppRecord, EcoAuthorizationRecord, EcoAutomationRecipe, OperatorReviewRecord, ScheduledJobRecord, ExtensionInstanceRecord,
@@ -131,6 +133,15 @@ export const federationOauthMethods = {
   async deleteScheduledJob(this: SqliteStorage, id: string): Promise<boolean> {
     const result = this.db.prepare('DELETE FROM scheduled_jobs WHERE id = ?').run(id);
     return result.changes > 0;
+  },
+
+  /** One conditional UPDATE. lastFireAt is always written by toISOString, so text order is time order. */
+  async claimScheduledFire(this: SqliteStorage, id: string, fireAt: string): Promise<boolean> {
+    const at = new Date(fireAt).toISOString();
+    const result = this.db.prepare(
+      'UPDATE scheduled_jobs SET lastFireAt = ? WHERE id = ? AND (lastFireAt IS NULL OR lastFireAt < ?)',
+    ).run(at, id, at);
+    return result.changes === 1;
   },
 
   deserializeScheduledJob(this: SqliteStorage, row: Record<string, unknown>): ScheduledJobRecord {

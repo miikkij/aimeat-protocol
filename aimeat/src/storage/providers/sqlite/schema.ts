@@ -12,6 +12,8 @@
  *   block 1), or upgrades crash with "no such column" before the ALTER runs.
  * @usage initializeSchema(db) from sqlite/index.ts constructor.
  * @version-history
+ *   2026-10-04 — The scheduler's column block moves to schema-columns-scheduler.ts unchanged
+ *     (max-file-lines), and gains scheduled_jobs.lastFireAt (migration 0093).
  *   2026-10-02 — agent_tasks.startPolicy, agents.taskStart: how a task starts (migration 0092 says why).
  *   2026-09-26 — The move to the GHII is the half of migration 0086, on positive evidence only; the
  *     half of 0085 no longer runs (schema-identity-backfill.ts).
@@ -71,6 +73,7 @@ import { applySchemaTables3 } from './schema-tables-3.js';
 import { applySchemaTables4 } from './schema-tables-4.js';
 import { splitPushSubscriptionsPerDevice, relaxPushLastUsedAt, relaxInvitationsOrganismId } from './schema-rebuilds.js';
 import { moveActionsAndWorkToFullIdentity } from './schema-identity-backfill.js';
+import { applySchedulerColumns } from './schema-columns-scheduler.js';
 
 export function initializeSchema(db: Database.Database): void {
   // CREATE TABLE/INDEX DDL, applied in numeric order (same order as the original single
@@ -417,21 +420,8 @@ export function initializeSchema(db: Database.Database): void {
   // Governance Phase C — budget limits on agent directives
   safeAddColumn('agent_directives', 'budgetLimits', 'TEXT');
 
-  // Agent Scheduler — recurring schedules (ai/agent_task kinds), owner scoping,
-  // budget constraints, timezone. All additive/nullable; existing core/extension
-  // rows read back unchanged.
-  safeAddColumn('scheduled_jobs', 'ownerScope', 'TEXT');
-  safeAddColumn('scheduled_jobs', 'agentName', 'TEXT');
-  safeAddColumn('scheduled_jobs', 'agentGaii', 'TEXT');
-  safeAddColumn('scheduled_jobs', 'createdByAgent', 'INTEGER NOT NULL DEFAULT 0');
-  safeAddColumn('scheduled_jobs', 'displayName', 'TEXT');
-  safeAddColumn('scheduled_jobs', 'description', 'TEXT');
-  safeAddColumn('scheduled_jobs', 'purpose', 'TEXT');
-  safeAddColumn('scheduled_jobs', 'timezone', 'TEXT');
-  safeAddColumn('scheduled_jobs', 'constraints', 'TEXT');
-  safeAddColumn('scheduled_jobs', 'runCount', 'INTEGER NOT NULL DEFAULT 0');
-  safeAddColumn('execution_log', 'taskId', 'TEXT');
-  safeAddColumn('agents', 'scheduleConstraintDefaults', 'TEXT');
+  // Agent Scheduler columns, and the claimed cron fire (schema-columns-scheduler.ts).
+  applySchedulerColumns(safeAddColumn);
 
   // Push Layer Phase A — webhook delivery fields
   safeAddColumn('agents', 'webhookUrl', 'TEXT');
