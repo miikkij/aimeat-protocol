@@ -7,6 +7,7 @@
  *   reading it from there.
  * @structure SCOPE_EXEMPT_TOOLS
  * @version-history
+ *   v1.3.0 — 2026-10-04 — aimeat_task_decline: its own task only (isOwnTask), like aimeat_task_fail.
  *   v1.2.0 — 2026-10-02 — aimeat_agent_runtime_report: its own report without a word, a sibling's with agent:write.
  *   v1.1.0 — 2026-10-02 — aimeat_agent_tags_set: own tags without a word, a sibling's with agent:write.
  *   v1.0.0 — 2026-09-29 — Moved from scopes.ts, unchanged.
@@ -63,6 +64,7 @@ export const SCOPE_EXEMPT_TOOLS = new Set<string>([
     'aimeat_task_complete',                          // isOwnTask() at agent-tasks
     'aimeat_task_event',                             // isOwnTask() at agent-tasks
     'aimeat_task_fail',                              // isOwnTask() at agent-tasks
+    'aimeat_task_decline',                           // isOwnTask() at agent-tasks
     'aimeat_task_propose_todos',                     // Authorization is isOwnTask(), defined at agent-tasks
     'aimeat_task_request_changes',                   // It is never registered on the server /v1/mcp: it sits in V2_EXCLUDED (src/mcp/catalog/surfaces
     'aimeat_task_todo',                              // isOwnTask() at agent-tasks

@@ -3,6 +3,8 @@
  * @description E2E for the agent task surface: create, list, detail, start, complete, fail, todos,
  *   triage, buckets, search, and the live-trace reclaim that runs on completion.
  * @version-history
+ *   v1.2.0 — 2026-10-04 — 11c: a declined task ends as declined with its reason on the detail and the
+ *     list, moves no failure counter, and refuses every later ending; /decline joins the stranger table.
  *   v1.1.0 — 2026-08-17 — E2E quality, agent-tasks:325 and :359. One owner and one agent drove the
  *     whole file, so canAccessTask had only ever been asked about a principal it says yes to: 10e
  *     adds a second owner with its own agent, and 10f walks seven write doors as each of them and as
@@ -497,6 +499,7 @@ await test('10f. Owner B and B\'s agent are refused every write door on A\'s tas
     const doors: Array<{ label: string; method: string; suffix: string; body?: unknown }> = [
         { label: 'complete', method: 'POST', suffix: '/complete', body: { message: 'hijacked' } },
         { label: 'fail', method: 'POST', suffix: '/fail', body: { error: 'hijacked' } },
+        { label: 'decline', method: 'POST', suffix: '/decline', body: { reason: 'hijacked' } },
         { label: 'event', method: 'POST', suffix: '/event', body: { type: 'progress', message: 'hijacked' } },
         { label: 'patch', method: 'PATCH', suffix: '', body: { title: 'hijacked' } },
         { label: 'rate', method: 'POST', suffix: '/rate', body: { rating: 1, comment: 'hijacked' } },
@@ -631,6 +634,61 @@ await test('11b. FAILING a task keeps the live-progress record (it is the diagno
     await json(`/v1/agents/${agentName}/tasks/${id}`, {
         method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` },
     });
+});
+
+// ─── Phase 4b: Decline ───
+console.log('\nPhase 4b -- Decline Task');
+
+await test('11c. DECLINING a task ends it as declined with the reason, and counts as no failure', async () => {
+    // Hosted fleet, 2026-10-03: a CRM agent refused an off-topic task properly, could only end it with
+    // /fail, and the customer's task list showed "failed". A refusal is an answer, not an error.
+    const reason = 'This is a CRM agent; a poem about the sea is outside what it does.';
+    const statsOf = async () => (await json(`/v1/agents/${agentName}/capabilities`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    })).body.data.activity_stats ?? {};
+    const failedBefore = (await statsOf()).tasksFailed ?? 0;
+
+    // Declined straight from the queue, before the work starts: an agent reads the request and refuses it.
+    const { body: created } = await json(`/v1/agents/${agentName}/tasks`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ title: 'Write a poem about the sea', description: 'Off topic for this agent', status: 'queued' }),
+    });
+    const id = created.data.task.id;
+
+    const empty = await json(`/v1/agents/${agentName}/tasks/${id}/decline`, {
+        method: 'POST', headers: { Authorization: `Bearer ${agentToken}` }, body: JSON.stringify({ reason: '   ' }),
+    });
+    assert(empty.status === 400, `a decline without a reason is refused 400, got ${empty.status}`);
+
+    const { status, body } = await json(`/v1/agents/${agentName}/tasks/${id}/decline`, {
+        method: 'POST', headers: { Authorization: `Bearer ${agentToken}` }, body: JSON.stringify({ reason }),
+    });
+    assert(status === 200, `decline: ${status}: ${JSON.stringify(body.error)}`);
+    assert(body.data.task.status === 'declined', `status: ${body.data.task.status}`);
+    assert(typeof body.data.task.completedAt === 'string', 'has completedAt');
+
+    const detail = await json(`/v1/agents/${agentName}/tasks/${id}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(detail.body.data.outcome?.state === 'declined' && detail.body.data.outcome?.message === reason,
+        `the outcome carries the reason: ${JSON.stringify(detail.body.data.outcome)}`);
+
+    // The owner's task list shows the reason without opening the task.
+    const list = await json(`/v1/agents/${agentName}/tasks?bucket=recent&per_page=100`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const row = (list.body.data.tasks as any[]).find(t => t.id === id);
+    assert(row?.status === 'declined' && row.outcome?.message === reason, `the list row carries the reason: ${JSON.stringify(row?.outcome)}`);
+
+    const failedAfter = (await statsOf()).tasksFailed ?? 0;
+    assert(failedAfter === failedBefore, `a refusal moves no failure counter: tasksFailed ${failedBefore} → ${failedAfter}`);
+
+    // Ended: a second decline, a completion and a failure are all refused as the wrong state.
+    for (const [suffix, payload] of [['/decline', { reason }], ['/complete', { message: 'x' }], ['/fail', { message: 'x' }]] as const) {
+        const again = await json(`/v1/agents/${agentName}/tasks/${id}${suffix}`, {
+            method: 'POST', headers: { Authorization: `Bearer ${agentToken}` }, body: JSON.stringify(payload),
+        });
+        assert(again.status === 409, `${suffix} on a declined task: expected 409, got ${again.status}`);
+    }
+
+    await json(`/v1/agents/${agentName}/tasks/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } });
 });
 
 // ─── Phase 5: Delete ───

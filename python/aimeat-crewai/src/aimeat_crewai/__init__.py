@@ -30,7 +30,9 @@ Changelog:
     list item. CrewAI's MCP tool adapter gives every optional field the default None, nested ones
     included, and the top-level None strip did not reach them, so the node refused a todo with
     "expected string, received null at todos[0].description" (crewfive, 73176d1). Each tool's
-    validated arguments are now dumped with exclude_unset, at every depth.
+    validated arguments are now dumped with exclude_unset, at every depth. The daemon's default tool
+    list carries aimeat_task_decline (node: POST /v1/agents/:name/tasks/:id/decline), so a crew that
+    refuses a request with its reason ends the task as declined, not failed.
   0.32.0 -- 2026-10-02 -- A crew can think through the node with the owner's own key. `llm_for_choice`
     builds the LLM for the owner's `{kind:'node', role?}` crew choice (crews.llm.<agent>) with
     `node_llm`, and `unsafe_choice_reason` applies the node's guard to a `model` choice on read (the

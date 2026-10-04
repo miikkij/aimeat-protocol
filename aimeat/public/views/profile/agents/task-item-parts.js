@@ -7,6 +7,7 @@
  *   the request-changes modal and the memory-entry viewer (JSON tree, image, markdown). Pure
  *   extraction from ./task-item.js so that file stays under the 800-line limit.
  * @version-history
+ *   v1.8.0 -- 2026-10-04 -- declineReason(): the reason a declined task carries in its outcome.
  *   v1.7.0 -- 2026-09-26 -- The parts are components that take data (page group G1a): statusTone gives
  *     the Status's tone (was statusChipClass), the to-do's tick is the List's Tick (todoTick goes),
  *     the eye carries its size and stroke itself, the request-changes dialog is Note, TextArea,
@@ -71,13 +72,19 @@ export function statusLabel(status) {
 }
 
 /** Which Status tone a task wears (components/Mark.js kind="status"): fine when done, danger when
- *  failed, attention while it runs, off for everything else. A to-do's tick is the List's Tick,
- *  which draws ✓ ✗ → from the to-do's own status. */
+ *  failed, attention while it runs, off for everything else. Declined is off on purpose: the agent
+ *  refused the request with its reason, which is an answer and not an error. A to-do's tick is the
+ *  List's Tick, which draws ✓ ✗ → from the to-do's own status. */
 export function statusTone(status) {
   if (status === 'done') return 'fine';
   if (status === 'failed') return 'danger';
   if (status === 'active') return 'attention';
   return 'off';
+}
+
+/** The reason an agent gave for declining a task, from the outcome the task list carries for it. */
+export function declineReason(task) {
+  return task && task.status === 'declined' ? (task.outcome && task.outcome.message) || '' : '';
 }
 
 // Render one task scope entry as readable text. Scope is an array whose entries

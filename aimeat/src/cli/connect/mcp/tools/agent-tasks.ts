@@ -7,6 +7,7 @@
  *   mode, each tool accepts an optional `agent_name` parameter; if omitted, the
  *   registry's primary agent is used.
  * @version-history
+ *   2026-10-04 — aimeat_task_decline: the agent refuses a task with its reason (POST …/decline).
  *   2026-10-02 — aimeat_agent_scope_narrow (ruling C).
  *   2026-10-02 — aimeat_task_create takes `start`, propose_todos takes `effects` per todo, and
  *     aimeat_task_start / aimeat_agent_task_start_set: parity with the server MCP surface.
@@ -238,6 +239,17 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
     const enc = encodeURIComponent(agent);
     // REST /fail reads `message`; server MCP exposes this as `reason`.
     const resp = await client.post(`/v1/agents/${enc}/tasks/${encodeURIComponent(task_id)}/fail`, { message: reason });
+    return envelopeResult(resp);
+  });
+
+  mcp.tool('aimeat_task_decline', descriptionFor('aimeat_task_decline'), {
+    agent_name: agentNameSchema,
+    task_id: z.string().describe('Task identifier'),
+    reason: z.string().describe('Why you decline the request, in a sentence the owner reads'),
+  }, annotationsFor('aimeat_task_decline'), async ({ agent_name, task_id, reason }) => {
+    const { client, agent } = pickAgent(registry, agent_name);
+    const enc = encodeURIComponent(agent);
+    const resp = await client.post(`/v1/agents/${enc}/tasks/${encodeURIComponent(task_id)}/decline`, { reason });
     return envelopeResult(resp);
   });
 }

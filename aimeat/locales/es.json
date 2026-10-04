@@ -11055,6 +11055,7 @@
       "taskDoneTitled": "{agent} terminó: {title}",
       "taskFailed": "{agent} no pudo terminar una tarea.",
       "taskFailedTitled": "{agent} no pudo terminar: {title}",
+      "taskDeclined": "{agent} rechazó {title}: {reason}",
       "passkeyAdded": "Agregaste una llave de acceso.",
       "passkeyAddedNamed": "Agregaste la llave de acceso {name}.",
       "passkeyRemoved": "Quitaste una llave de acceso.",
@@ -13731,7 +13732,8 @@
         "stalled": "atascada",
         "queued": "en cola",
         "revision_requested": "revisión pedida",
-        "draft": "borrador"
+        "draft": "borrador",
+        "declined": "rechazada"
       },
       "verification": {
         "deterministic": "determinista",
@@ -14609,6 +14611,9 @@
         "requestChangesSent": "Petición de cambios enviada. Esperando a que el agente revise.",
         "requestChangesError": "No se pudo enviar la petición de cambios",
         "revisionWaiting": "Esperando a que el agente proponga un plan revisado.",
+        "declined": "Rechazada",
+        "declinedBecause": "El agente la rechazó: {reason}",
+        "declinedNoReason": "no se guardó el motivo",
         "waitsForYou": "Espera tu permiso. Empiézala aquí o pide a tu IA que la empiece.",
         "outdatedTodos": "Propuesto antes (ya no vale)",
         "blurTitle": "Ocultar el título (difuminarlo para grabar la pantalla)",

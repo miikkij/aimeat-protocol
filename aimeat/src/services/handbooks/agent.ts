@@ -7,6 +7,8 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/mcp/catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.25.0 -- 2026-10-04 -- aimeat_task_decline: a request the agent should not take is declined with
+ *     the reason, not failed.
  *   v1.24.0 -- 2026-10-02 -- An AI that is off: tell the owner `fix` and give them `settingsUrl`;
  *     `agentFix` is the agent's; for UNTESTED offer to run aimeat_ai_provider_test with their yes.
  *   v1.23.0 -- 2026-10-02 -- When the person asks for a new agent (new-agent.ts): look at their
@@ -97,8 +99,10 @@ signed in themselves.
 
 **Tasks — structured work for the owner.** \`aimeat_task_create\` · \`aimeat_task_list\` ·
 \`aimeat_task_get\` · \`aimeat_task_propose_todos\` · \`aimeat_task_event\` · \`aimeat_task_todo\` ·
-\`aimeat_task_complete\` · \`aimeat_task_fail\`. Flow: get/accept a task → propose TODOs → work,
-appending events + flipping TODO status → complete (with a summary) or fail (with a reason).
+\`aimeat_task_complete\` · \`aimeat_task_fail\` · \`aimeat_task_decline\`. Flow: get/accept a task → propose TODOs → work,
+appending events + flipping TODO status → complete (with a summary) or fail (with a reason). A request
+you should not take (off your topic, against your rules): decline it with the reason. It ends as
+declined, which the owner reads as your answer, not as a failure.
 
 **Messages — the owner conversation.** \`aimeat_message_inbox\` (pending inbound) ·
 \`aimeat_message_send\` (markdown; can carry a proposed_task or a single-select prompt for the owner)

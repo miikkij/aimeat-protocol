@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent-task completion + review routes (event, complete, fail, rate, triage, todos, events, deliverables). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-10-04 — POST …/decline: the agent refuses the request with its reason, and the task
+ *     ends as 'declined' rather than 'failed'.
  *   v1.5.0 — 2026-08-14 — /complete and /fail are now nothing but the door: the state gate, the
  *     records and the tail all live in services/agent-task-fanout.ts, which aimeat_task_complete and
  *     aimeat_task_fail call as well. One behaviour change reaches this side of the pair: an AGENT
@@ -36,7 +38,7 @@ import { refuseNotYours } from '../../middleware/refusals.js';
 import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
-import { completeTask, failTask } from '../../services/agent-task-fanout.js';
+import { completeTask, failTask, declineTask } from '../../services/agent-task-fanout.js';
 import { recomputeAndCacheStatistics } from '../../services/agent-statistics.js';
 import { recordTaskEvent, setTodoStatus } from '../../services/agent-task-write.js';
 import { AgentTaskRateSchema, AgentTaskTriageSchema } from '../../models/agent-task-schemas.js';
@@ -147,6 +149,35 @@ export function registerTaskCompletionRoutes(
       return;
     }
     res.json(success(config.nodeId, { task: failed.task }));
+  });
+
+  /* ── POST /v1/agents/:name/tasks/:id/decline -- The agent refuses the request, with its reason ──
+   *
+   * A refusal is a correct answer, so it does not end as 'failed': the task goes to 'declined', the
+   * reason is the 'declined' event's message, and no failure counter moves (services/agent-task-fanout.ts
+   * declineTask, which aimeat_task_decline calls too). `reason` is required.
+   */
+  router.post('/v1/agents/:name/tasks/:id/decline', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+
+    const task = await storage.getAgentTask(id);
+    if (!task) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Task not found'));
+      return;
+    }
+
+    if (!canAccessTask(req, task)) {
+      res.status(403).json(refuseNotYours(config, { thing: 'task', action: 'open', listUrl: '/v1/agents' }));
+      return;
+    }
+
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason : '';
+    const declined = await declineTask({ storage, config }, task, reason, resolve(req));
+    if (!declined.ok) {
+      res.status(declined.status).json(error(config.nodeId, declined.code, declined.message));
+      return;
+    }
+    res.json(success(config.nodeId, { task: declined.task }));
   });
 
   /* ── POST /v1/agents/:name/tasks/:id/rate -- Review a completed task's deliverable ──

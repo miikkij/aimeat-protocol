@@ -12751,6 +12751,7 @@
       "taskDoneTitled": "{agent} sai valmiiksi: {title}",
       "taskFailed": "{agent} ei saanut tehtävää valmiiksi.",
       "taskFailedTitled": "{agent} ei saanut valmiiksi: {title}",
+      "taskDeclined": "{agent} kieltäytyi tehtävästä {title}: {reason}",
       "passkeyAdded": "Lisäsit pääsyavaimen.",
       "passkeyAddedNamed": "Lisäsit pääsyavaimen {name}.",
       "passkeyRemoved": "Poistit pääsyavaimen.",
@@ -15504,7 +15505,8 @@
         "stalled": "jumissa",
         "queued": "jonossa",
         "revision_requested": "muutospyyntö",
-        "draft": "luonnos"
+        "draft": "luonnos",
+        "declined": "kieltäytyi"
       },
       "verification": {
         "deterministic": "deterministinen",
@@ -16382,6 +16384,9 @@
         "requestChangesSent": "Muutospyyntö lähetetty. Odotetaan agentin uutta ehdotusta.",
         "requestChangesError": "Muutospyynnön lähetys epäonnistui",
         "revisionWaiting": "Odotetaan agentin korjattua ehdotusta.",
+        "declined": "Kieltäytyi",
+        "declinedBecause": "Agentti kieltäytyi: {reason}",
+        "declinedNoReason": "syytä ei tallennettu",
         "waitsForYou": "Odottaa lupaasi. Käynnistä se tästä tai pyydä tekoälyäsi käynnistämään se.",
         "outdatedTodos": "Aiemmin ehdotetut (vanhentuneet)",
         "blurTitle": "Piilota otsikko (sumenna ruutunauhoitusta varten)",

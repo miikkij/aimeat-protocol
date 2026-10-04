@@ -31,11 +31,15 @@
  *   - afterTaskFailed() — the two a failure sets off
  *   - completeTask() — the whole completion: the state move, the stamp, the event and the fan-out
  *   - failTask() — the whole failure: the state move, the event and the fan-out
+ *   - declineTask() — the agent's refusal with its reason: the state move, the event, the feed row
+ *     and the workflow step, and none of the failure tail
  * @usage
  *   const done = await completeTask({ storage, config }, task,
  *     { message, deliverableKey, pipeline: 'rest.task_complete' }, resolve(req));
  *   if (!done.ok) { … done.status / done.code / done.message … }
  * @version-history
+ *   v1.4.0 — 2026-10-04 — declineTask(): a task the agent refused with its reason ends as 'declined',
+ *     not 'failed' (hosted fleet report, 2026-10-03).
  *   v1.3.0 — 2026-08-24 — completeTask() refuses a plan-less Hello Integration test task. It used to
  *     succeed, which passed onboarding step 10 and jammed step 9 for good. Reason on the gate.
  *   v1.2.0 — 2026-08-14 — completeTask(). The last writing tool surface: aimeat_task_complete wrote
@@ -377,5 +381,71 @@ export async function failTask(
         timestamp: now,
     });
     await afterTaskFailed(deps, task, actor);
+    return { ok: true, task: updated ?? task };
+}
+
+/**
+ * The states a task may be declined from: before the work starts (queued) and while it runs (active,
+ * stalled). An agent reads the request and may find it is not one it should take, at either point.
+ */
+export const DECLINABLE_STATES: readonly string[] = ['queued', 'active', 'stalled'];
+
+/** The longest reason kept. A refusal is a sentence or two; this only stops a runaway string. */
+export const DECLINE_REASON_MAX = 2000;
+
+/**
+ * Move a task to 'declined': the agent refused the request and said why. A correct refusal, not an
+ * error, so none of the failure tail runs: no failure counter moves, the agent's success rate is
+ * untouched, and the owner's feed files it with the agents' news rather than under trouble.
+ * Measured on a hosted place, 2026-10-03: a CRM agent given an off-topic task refused it properly,
+ * could only end the task with /fail, and the customer's task list showed "failed".
+ *
+ * The reason is the 'declined' event's message, where taskOutcome reads it (services/task-outcome.ts).
+ */
+export async function declineTask(
+    deps: Deps,
+    task: AgentTaskRecord,
+    reason: string,
+    actor?: string,
+): Promise<FailResult> {
+    const why = reason.trim();
+    if (!why) {
+        return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'reason is required: say why the request is declined.' };
+    }
+    if (why.length > DECLINE_REASON_MAX) {
+        return { ok: false, status: 400, code: 'INVALID_INPUT', message: `reason is at most ${DECLINE_REASON_MAX} characters.` };
+    }
+    if (!DECLINABLE_STATES.includes(task.status)) {
+        return {
+            ok: false, status: 409, code: 'INVALID_STATE',
+            message: `Only queued, active or stalled tasks can be declined (current: ${task.status})`,
+        };
+    }
+    const now = new Date().toISOString();
+    const updated = await deps.storage.updateAgentTask(task.id, {
+        status: 'declined',
+        completedAt: now,
+        lastEventAt: now,
+        updatedAt: now,
+    });
+    await deps.storage.appendTaskEvent({
+        id: randomUUID(),
+        taskId: task.id,
+        type: 'declined',
+        message: why,
+        timestamp: now,
+    });
+    emitChange('agent-tasks', actor);
+    void recordAccountEvent(deps.storage, {
+        ownerGhii: ownerGhiiOf(task.agentGaii),
+        kind: 'agent_task_declined',
+        actorGaii: task.agentGaii,
+        subject: task.id,
+        link: `/v1/profile?tab=agents&task=${encodeURIComponent(task.id)}`,
+        data: { agent: task.agentGaii.split('#')[0], title: task.title ?? '', reason: why.slice(0, 280) },
+    }, deps.config);
+    // The step a workflow dispatched this task for has ended; the engine judges it by its output.
+    getActiveWorkflowEngine()?.onTaskTerminal(task, 'declined')
+        .catch(e => logger.error('workflow advance on task decline failed', { taskId: task.id, error: String(e) }));
     return { ok: true, task: updated ?? task };
 }

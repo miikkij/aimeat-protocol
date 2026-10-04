@@ -23,6 +23,7 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   2026-10-04 — aimeat_task_decline (a write, not destructive, idempotent like aimeat_task_fail).
  *   2026-10-02 — aimeat_tools_find (read-only: it changes which of the session's tools are listed).
  *   2026-10-02 — aimeat_task_start and aimeat_agent_task_start_set.
  *   2026-10-01 — aimeat_admin_federation_peer_remove (destructive: a link ends, its work is cancelled).
@@ -323,6 +324,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_task_todo: { title: 'Update Task TODO', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_task_complete: { title: 'Complete Task', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_task_fail: { title: 'Fail Task', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_task_decline: { title: 'Decline Task', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
     // ── Schedules (agent-created recurring jobs) ──
     aimeat_schedule_create: { title: 'Create Schedule', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },

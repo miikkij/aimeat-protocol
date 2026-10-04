@@ -18,6 +18,7 @@
  *   - instances: listInstances / readInstance / addSource / deriveSlotFromSources / setSlotContent
  *   - render: renderInstanceMarkdown(instance)
  * @version-history
+ *   v1.0.1 — 2026-10-04 — Waiting for an agent task stops on a declined task as on a failed one.
  *   v1.0.0 — 2026-06-21 — Phase 0: templates + deploy + manual derive + assemble/render.
  */
 import { api } from '/js/api.js';
@@ -348,7 +349,7 @@ function awaitTask(agentName, taskId, onStatus) {
       const st = task?.status;
       if (st) onStatus?.(st);
       if (st === 'done') { settled = true; cleanup(); resolve(task); return; }
-      if (st === 'failed' || st === 'stalled') { settled = true; cleanup(); reject(new Error('agent ' + st)); return; }
+      if (st === 'failed' || st === 'declined' || st === 'stalled') { settled = true; cleanup(); reject(new Error('agent ' + st)); return; }
       if (Date.now() > deadline) { settled = true; cleanup(); reject(new Error('TIMEOUT')); }
     }
     const onLive = (e) => { const d = e.detail?.domains; if (d && !d.has('agent-tasks')) return; check(); };

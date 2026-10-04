@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent-task create + read routes (POST create, GET list, GET detail). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-10-04 — The task list gives a declined task its `outcome`, so the agent's reason shows
+ *     without opening the task.
  *   v1.5.0 — 2026-10-02 — `start` on create, allowed as 'automatic' only to a caller who may loosen
  *     the agent's start (mayLoosenStart); the answer carries `start`: does it run now or wait, and
  *     why, in a sentence the person's AI can read out.
@@ -230,8 +232,12 @@ export function registerTaskCreateReadRoutes(
     const total = filtered.length;
     const startIdx = (page - 1) * perPage;
     const paged = filtered.slice(startIdx, startIdx + perPage);
+    // A declined task carries its outcome, so the list shows the agent's reason without opening the
+    // task. Only declined ones: one event read each, on the page shown, and a refusal is rare.
+    const withReasons = await Promise.all(paged.map(async t =>
+      t.status === 'declined' ? { ...t, outcome: await taskOutcome(storage, t) } : t));
 
-    res.json(success(config.nodeId, { tasks: paged, total, counts, page, per_page: perPage }));
+    res.json(success(config.nodeId, { tasks: withReasons, total, counts, page, per_page: perPage }));
   });
 
   /* ── GET /v1/agents/:name/tasks/:id -- Get task detail ── */

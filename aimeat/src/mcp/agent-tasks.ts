@@ -9,6 +9,8 @@
  *   import { registerAgentTaskTools } from './agent-tasks.js';
  *   registerAgentTaskTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.13.0 — 2026-10-04 — aimeat_task_decline: the agent refuses a task with its reason, and the task
+ *     ends as 'declined'; aimeat_task_list filters by it.
  *   v1.12.0 — 2026-10-02 — aimeat_agent_scope_narrow: a `*` agent narrowed to what it used (ruling C).
  *   v1.11.0 — 2026-10-02 — Whether a task starts on its own or waits for the owner's OK.
  *     aimeat_task_create takes `start` and answers with `start` (runs now, or waits and why);
@@ -91,7 +93,7 @@ import { descriptionFor } from './catalog/shape.js';
 import { parseGAII, buildGAII, localAccountName, ownerGhiiOf } from '../utils/gaii.js';
 import { taskWithFileHandles } from '../services/task-files.js';
 import { taskOutcome } from '../services/task-outcome.js';
-import { completeTask, failTask } from '../services/agent-task-fanout.js';
+import { completeTask, failTask, declineTask } from '../services/agent-task-fanout.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
 
@@ -233,7 +235,7 @@ export function registerAgentTaskTools(
         'aimeat_task_list',
         descriptionFor('aimeat_task_list'),
         {
-            status: z.enum(['draft', 'queued', 'active', 'stalled', 'done', 'failed']).optional()
+            status: z.enum(['draft', 'queued', 'active', 'stalled', 'done', 'failed', 'declined']).optional()
                 .describe('Filter by task status'),
             page: z.number().optional().describe('Page number (default 1)'),
             per_page: z.number().optional().describe('Results per page (default 20, max 100)'),
@@ -674,6 +676,43 @@ export function registerAgentTaskTools(
                         status: updated?.status ?? 'failed',
                         reason,
                         completed_at: now,
+                    }, null, 2),
+                }],
+            };
+        },
+    );
+
+    // ── Tool 9: aimeat_task_decline ──
+    // A refusal with a reason is a correct answer, so it ends the task as 'declined' and moves no
+    // failure counter (services/agent-task-fanout.ts declineTask, which POST …/decline calls too).
+    mcp.tool(
+        'aimeat_task_decline',
+        descriptionFor('aimeat_task_decline'),
+        {
+            task_id: z.string().describe('The task ID to decline'),
+            reason: z.string().describe('Why you decline the request, in a sentence the owner reads'),
+        },
+        annotationsFor('aimeat_task_decline'),
+        async ({ task_id, reason }) => {
+            const task = await storage.getAgentTask(task_id);
+            if (!task) return { ...toolError('NOT_FOUND', 'Task not found') };
+            if (!isOwnTask(task)) return { ...toolError('FORBIDDEN', 'Access denied -- task belongs to another agent') };
+
+            const declined = await declineTask({ storage, config }, task, reason, agentGaii);
+            if (!declined.ok) return { ...toolError(declined.code, declined.message) };
+            const updated = declined.task;
+
+            emitResourceUpdated(agentGaii, `aimeat://tasks/${task_id}`);
+
+            return {
+                content: [{
+                    type: 'text' as const,
+                    text: JSON.stringify({
+                        declined: true,
+                        task_id,
+                        status: updated.status,
+                        reason: reason.trim(),
+                        completed_at: updated.completedAt ?? new Date().toISOString(),
                     }, null, 2),
                 }],
             };

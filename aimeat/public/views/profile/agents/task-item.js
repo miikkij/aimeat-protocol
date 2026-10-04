@@ -7,6 +7,8 @@
  *   happened, details, memory entries, rating -- plus the actions row (start, request changes,
  *   triage, cancel, delete). The helpers it is built from live in ./task-item-parts.js.
  * @version-history
+ *   v2.23.0 — 2026-10-04 — A declined task shows the agent's reason under its title, in the neutral
+ *     tone: a refusal, not an error.
  *   v2.22.0 — 2026-10-02 — A queued task with a plan says in words that it waits for the owner's OK.
  *   v2.21.0 — 2026-09-30 — A `scope_denied` event (the server refused the task's agent a permission) is
  *     said in the reader's language and wears the trouble dot.
@@ -70,6 +72,7 @@ import {
   setTaskBlurred,
   statusLabel,
   statusTone,
+  declineReason,
   formatScopeEntry,
   todoProgress,
   EyeIcon,
@@ -361,6 +364,10 @@ export function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }
   const agentSteps = todos.filter(td => td.environment === 'agent').length;
   const doneTodos = todos.filter(td => td.status === 'done').length;
   const status = task.status || 'draft';
+  // The agent refused the request: its reason is the line under the row's title, open or closed.
+  const declinedLine = status === 'declined'
+    ? tOr('profile.agents.tasks.declinedBecause', 'Declined: {reason}', { reason: declineReason(task) || t('profile.agents.tasks.declinedNoReason') })
+    : null;
   const hasScope = task.scope && (!Array.isArray(task.scope) || task.scope.length > 0);
   const hasRules = task.rules && task.rules.length > 0;
   const hasDetails = Boolean(task.deliverableKey) || hasScope || hasRules;
@@ -405,6 +412,7 @@ export function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }
   return html`
     <${ListRow} open=${expanded} onToggle=${handleExpand}>
       <${Name} nameRef=${taskRef} blurred=${blurred} attention=${expanded}
+        desc=${declinedLine || undefined}
         before=${html`<${Icon} small pressed=${blurred} onClick=${handleToggleBlur}
           label=${blurred ? t('profile.agents.tasks.unblurTitle') : t('profile.agents.tasks.blurTitle')}><${EyeIcon} hidden=${blurred} /><//>`}>${task.title || task.id}<//>
       <${Cell}><${Mark} kind="count" tone="tally">${progress || ''}<//><//>

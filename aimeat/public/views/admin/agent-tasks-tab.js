@@ -5,6 +5,7 @@
  * @description Admin dashboard tab for browsing all agent tasks across all owners.
  *   Provides status filtering, pagination, and TODO progress display.
  * @version-history
+ *   v1.2.2 -- 2026-10-04 -- The 'declined' status in the filter, in the neutral tone.
  *   v1.2.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
  *     itself, so a task title or agent GAII with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.2.0 -- 2026-09-27 -- On the library components (page group G5): the status filter is the
@@ -34,10 +35,11 @@ import { Row as Line } from '/components/Layout.js';
 
 const PAGE_SIZE = 20;
 
-const STATUSES = ['', 'draft', 'queued', 'active', 'stalled', 'done', 'failed'];
+const STATUSES = ['', 'draft', 'queued', 'active', 'stalled', 'done', 'failed', 'declined'];
 
-/** A task status's tone as the Status mark says it; an unknown status is drawn as a draft. */
-const STATUS_TONE = { active: 'attention', done: 'fine', failed: 'danger', stalled: 'attention', queued: 'off', draft: 'off' };
+/** A task status's tone as the Status mark says it; an unknown status is drawn as a draft. Declined
+ *  is off: the agent refused the request with its reason, which is an answer and not an error. */
+const STATUS_TONE = { active: 'attention', done: 'fine', failed: 'danger', declined: 'off', stalled: 'attention', queued: 'off', draft: 'off' };
 
 export default function AgentTasksTab() {
   const [tasks, setTasks] = useState([]);

@@ -23,7 +23,8 @@
  *   block above it says why a second node is the only way to reach that state.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-agent-tasks
  * @version-history
- *   v1.4.0 — 2026-10-04 — The first plan carries the nulls CrewAI sends for left-out optional fields.
+ *   v1.4.0 — 2026-10-04 — The first plan carries the nulls CrewAI sends for left-out optional fields;
+ *     aimeat_task_decline ends the agent's own task as declined and refuses another agent's.
  *   v1.3.0 — 2026-08-14 — The completion, which was the last tool surface still writing its own
  *     records. Three cases for the three ways the two copies had drifted: a STALLED task completes
  *     over MCP (on a second node, because nothing else reaches that state), `deliverable_key`
@@ -652,6 +653,30 @@ async function run() {
         assert(completed!.details?.aiProvenanceId === undefined,
             'a person\'s own words were recorded as model-written, which is a false statement about '
             + `authorship: ${JSON.stringify(completed)}`);
+    });
+
+    // A refusal with a reason ends the task as declined, not failed (hosted fleet report, 2026-10-03).
+    await test('aimeat_task_decline ends the agent\'s own task as declined with its reason, and refuses another agent\'s', async () => {
+        const created = await callTool(runner.session, 'aimeat_task_create', {
+            target_agent: runner.agentName, title: 'Write a poem about the sea', description: 'Off topic for this agent.',
+        });
+        const id = JSON.parse(created.text).task_id ?? JSON.parse(created.text).id;
+        const reason = 'Outside what this agent does.';
+        const r = await callTool(runner.session, 'aimeat_task_decline', { task_id: id, reason });
+        assert(!r.isError, `decline refused: ${r.text.slice(0, 300)}`);
+        const answer = JSON.parse(r.text);
+        assert(answer.declined === true && answer.status === 'declined', `answer: ${r.text.slice(0, 300)}`);
+        const got = JSON.parse((await callTool(runner.session, 'aimeat_task_get', { task_id: id })).text);
+        const task = got.task ?? got;
+        assert(task.status === 'declined', `status: ${task.status}`);
+        assert(got.outcome?.state === 'declined' && got.outcome?.message === reason, `outcome: ${JSON.stringify(got.outcome)}`);
+
+        const theirs = await callTool(interactive.session, 'aimeat_task_create', {
+            target_agent: interactive.agentName, title: 'Not yours to decline', description: 'Belongs to the interactive agent.',
+        });
+        const theirId = JSON.parse(theirs.text).task_id ?? JSON.parse(theirs.text).id;
+        const hijack = await callTool(runner.session, 'aimeat_task_decline', { task_id: theirId, reason: 'hijacked' });
+        assert(hijack.isError, `another agent's task was declined: ${hijack.text.slice(0, 300)}`);
     });
 
     await runStalledCase();

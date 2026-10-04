@@ -4336,8 +4336,9 @@ components:
         - revision_requested: the owner reviewed the proposed todos and used /request-changes to ask for a revised plan; agent will re-propose.
         - active: the agent is executing the plan.
         - paused, stalled: temporary holds.
-        - done, failed: terminal states.
-      enum: [draft, queued, revision_requested, active, paused, done, failed, stalled]
+        - done, failed, declined: terminal states. declined = the agent refused the request with its
+          reason (POST …/decline); it is an answer, not an error, and counts as no failure.
+      enum: [draft, queued, revision_requested, active, paused, done, failed, declined, stalled]
 
     AgentTaskFileRef:
       type: object
@@ -4551,7 +4552,7 @@ components:
       properties:
         type:
           type: string
-          enum: [created, started, progress, log, completed, failed, stalled]
+          enum: [created, started, progress, log, completed, failed, declined, stalled]
         message:
           type: string
         details:
@@ -50858,6 +50859,63 @@ paths:
                         $ref: '#/components/schemas/AgentTask'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /v1/agents/{name}/tasks/{id}/decline:
+    post:
+      operationId: declineAgentTask
+      summary: Decline a task, with the reason
+      description: >
+        The agent refuses the request because it is not one it should take (off its topic, against its
+        rules, outside what the owner allowed). The task ends as `declined`, not `failed`: the reason
+        is the `declined` event's message and the task's `outcome.message`, the owner's task list shows
+        it as a refusal, and no failure counter of the agent moves. Allowed from queued, active and
+        stalled. The same transition as the MCP tool aimeat_task_decline.
+      tags: [Agent Tasks]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+                  maxLength: 2000
+                  description: Why the request is declined, in a sentence the owner reads.
+      responses:
+        '200':
+          description: Task declined
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentTask'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':

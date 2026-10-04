@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Capability, agent-task, directive, sharing, usage-ledger, and messaging record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-10-04 — Task status and event type 'declined' (an agent's refusal with its reason),
+ *     and TERMINAL_TASK_STATUSES / isTerminalTaskStatus, the one list of end statuses.
  *   v1.5.0 — 2026-10-02 — AgentTaskRecord.startPolicy and AgentTaskTodo.effects: how a task was meant
  *     to start, and what a step declares it will do that the owner must see first.
  *   v1.4.0 — 2026-09-30 — AgentTaskEventRecord type 'scope_denied': the node refused the task's agent
@@ -118,6 +120,19 @@ export interface AgentTaskFileRef {
  */
 export const LIVE_TASK_STATUSES = ['draft', 'queued', 'revision_requested', 'active', 'paused'] as const;
 
+/**
+ * The statuses a task ends in: `done`, `failed`, and `declined` (the agent refused the request with
+ * its reason, which is a correct answer and not an error). One list, because a task that ended must
+ * stop blocking the next scheduled run, advance its workflow step and archive by age, and every one
+ * of those places kept its own copy of "done or failed" until `declined` arrived (2026-10-04).
+ */
+export const TERMINAL_TASK_STATUSES: readonly string[] = ['done', 'failed', 'declined'];
+
+/** True when a task has ended (TERMINAL_TASK_STATUSES). */
+export function isTerminalTaskStatus(status: string): boolean {
+  return TERMINAL_TASK_STATUSES.includes(status);
+}
+
 export interface AgentTaskRecord {
   id: string;
   agentGaii: string;
@@ -164,7 +179,10 @@ export interface AgentTaskRecord {
   // The agent should read the latest 'revision_requested' event for the
   // owner's message, then call aimeat_task_propose_todos again. Old todos are
   // kept marked 'outdated' for context.
-  status: 'draft' | 'queued' | 'revision_requested' | 'active' | 'paused' | 'stalled' | 'done' | 'failed';
+  // 'declined' (2026-10-04): the agent refused the request and said why (POST …/decline,
+  // aimeat_task_decline). The reason is the 'declined' event's message. Not a failure: it moves no
+  // failure counter and is shown as a refusal, not an error.
+  status: 'draft' | 'queued' | 'revision_requested' | 'active' | 'paused' | 'stalled' | 'done' | 'failed' | 'declined';
   /**
    * Commission fingerprint — the server-side half of the "one click, one run" guard. Set by
    * POST /v1/agents/:name/tasks from the caller's `idempotency_key` or, failing that, derived from
@@ -236,7 +254,7 @@ export interface AgentTaskEventRecord {
   type: 'started' | 'progress' | 'todo_completed' | 'todo_failed' |
         'memory_write' | 'extension_install' | 'app_publish' |
         'verification' | 'completed' | 'failed' | 'message' |
-        'revision_requested' | 'rating' | 'scope_denied';
+        'revision_requested' | 'rating' | 'scope_denied' | 'declined';
   message: string;
   details?: Record<string, unknown>;
   timestamp: string;
