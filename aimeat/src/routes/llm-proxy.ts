@@ -27,6 +27,9 @@
  *   - llmProxyRouter(config, storage) — POST /v1/llm/chat/completions, GET /v1/llm/models
  * @usage mounted in server-bootstrap/routes-loader.ts; an agent uses <node>/v1/llm as its base URL
  * @version-history
+ *   v1.6.0 — 2026-10-04 — `parallel_tool_calls` is passed to the provider beside `tools`; it was dropped,
+ *     so a crew could not turn parallel tool calls off on the node route (crewfive's wish). A value
+ *     that is not a boolean is refused 400.
  *   v1.5.0 — 2026-10-02 — A spent own or agent key (402 from the provider) is retried once on the free
  *     router before the first byte, as /v1/ai/complete does (route-run.ts noCreditRetry).
  *   v1.4.0 — 2026-09-28 — AI roles: a call may name the AI role it runs as, in the body's `role` or
@@ -145,10 +148,14 @@ export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
         const body = (req.body ?? {}) as {
             messages?: ChatMessage[]; stream?: boolean;
             temperature?: number; top_p?: number; max_tokens?: number;
-            tools?: unknown; tool_choice?: unknown; response_format?: unknown;
+            tools?: unknown; tool_choice?: unknown; response_format?: unknown; parallel_tool_calls?: unknown;
         };
         if (!Array.isArray(body.messages) || body.messages.length === 0) {
             res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'messages is required.'));
+            return;
+        }
+        if (body.parallel_tool_calls !== undefined && typeof body.parallel_tool_calls !== 'boolean') {
+            res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'parallel_tool_calls must be true or false.'));
             return;
         }
 
@@ -178,6 +185,11 @@ export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
             // node has no opinion about which tools a caller offers its own model.
             ...(body.tools !== undefined ? { tools: body.tools } : {}),
             ...(body.tool_choice !== undefined ? { tool_choice: body.tool_choice } : {}),
+            // Whether the model may ask for several tools in one answer. Only beside `tools`: OpenAI
+            // refuses the field on a request without them. An Anthropic provider gets it as its own
+            // setting through the gateway's converter (adapters/openai-chat.ts).
+            ...(typeof body.parallel_tool_calls === 'boolean' && body.tools !== undefined
+                ? { parallel_tool_calls: body.parallel_tool_calls } : {}),
             ...(body.response_format !== undefined ? { response_format: body.response_format } : {}),
             ...(body.stream ? { stream: true, stream_options: { include_usage: true } } : {}),
         };

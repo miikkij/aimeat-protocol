@@ -391,6 +391,38 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
         assert(r.body.error?.code === 'RATE_LIMITED', `code ${r.body.error?.code}`);
     });
 
+    await test('2d. parallel_tool_calls reaches the provider beside tools, is left out without them, and must be a boolean', async () => {
+        // crewfive's wish, 2026-10-03: the proxy dropped the field, so a crew on the node route could
+        // not stop a model from batching tool calls it should make one at a time.
+        const tools = [{ type: 'function', function: { name: 'lookup', parameters: { type: 'object', properties: {} } } }];
+        provider.queue('chat', chatJson('One at a time.'), carries('MARK-PARALLEL-OFF'));
+        const off = await json('/v1/llm/chat/completions', {
+            method: 'POST', headers: auth(aiAgent),
+            body: JSON.stringify({ messages: [{ role: 'user', content: 'MARK-PARALLEL-OFF' }], tools, parallel_tool_calls: false }),
+        });
+        assert(off.status === 200, `expected 200, got ${off.status}: ${JSON.stringify(off.body?.error)}`);
+        const sentOff = provider.requestsFor('chat').filter(carries('MARK-PARALLEL-OFF')).at(-1)!.json as any;
+        assert(sentOff.parallel_tool_calls === false, `the provider was asked for no parallel calls: ${JSON.stringify(sentOff.parallel_tool_calls)}`);
+
+        // Without tools OpenAI refuses the field, so the node does not send it.
+        provider.queue('chat', chatJson('No tools.'), carries('MARK-PARALLEL-NOTOOLS'));
+        const bare = await json('/v1/llm/chat/completions', {
+            method: 'POST', headers: auth(aiAgent),
+            body: JSON.stringify({ messages: [{ role: 'user', content: 'MARK-PARALLEL-NOTOOLS' }], parallel_tool_calls: true }),
+        });
+        assert(bare.status === 200, `expected 200, got ${bare.status}`);
+        const sentBare = provider.requestsFor('chat').filter(carries('MARK-PARALLEL-NOTOOLS')).at(-1)!.json as any;
+        assert(!('parallel_tool_calls' in sentBare), 'the field is not sent to the provider without tools');
+
+        const before = provider.requests.length;
+        const wrong = await json('/v1/llm/chat/completions', {
+            method: 'POST', headers: auth(aiAgent),
+            body: JSON.stringify({ messages: [{ role: 'user', content: 'x' }], tools, parallel_tool_calls: 'no' }),
+        });
+        assert(wrong.status === 400 && wrong.body.error?.code === 'INVALID_BODY', `a string is refused 400: ${wrong.status} ${wrong.body.error?.code}`);
+        assert(provider.requests.length === before, 'the refusal did not reach the provider');
+    });
+
     // ── 3. The two model catalogues ───────────────────────────────────────────
 
     await test('3a. A model with only an id still gets a label, and the list sorts without throwing', async () => {

@@ -28,6 +28,7 @@
  *   - v4StreamToOpenAiSse() — a doStream part stream as OpenAI SSE bytes
  *   - openAiChatResponse() — the function the gateway calls: request in, OpenAI `Response` out
  * @version-history
+ *   v1.1.0 — 2026-10-04 — `parallel_tool_calls: false` becomes Anthropic's disableParallelToolUse.
  *   v1.0.0 — 2026-09-28 — Initial (V3 of the System 2 plan).
  */
 import { APICallError, getErrorMessage } from '@ai-sdk/provider';
@@ -49,6 +50,7 @@ export interface OpenAiChatBody {
   max_completion_tokens?: number;
   tools?: unknown[];
   tool_choice?: unknown;
+  parallel_tool_calls?: boolean;
   response_format?: unknown;
   stop?: string | string[] | null;
   stream?: boolean;
@@ -263,6 +265,11 @@ export function toCallOptions(body: OpenAiChatBody, signal?: AbortSignal): Langu
   }
   const toolChoice = toToolChoice(body.tool_choice);
   if (toolChoice) options.toolChoice = toolChoice;
+  // OpenAI's parallel_tool_calls: false is Anthropic's disableParallelToolUse. True is both APIs'
+  // default, so only false is sent.
+  if (body.parallel_tool_calls === false && options.tools) {
+    options.providerOptions = { anthropic: { disableParallelToolUse: true } };
+  }
   const responseFormat = toResponseFormat(body.response_format);
   if (responseFormat) options.responseFormat = responseFormat;
   if (signal) options.abortSignal = signal;
