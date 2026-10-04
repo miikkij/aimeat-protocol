@@ -29,6 +29,7 @@
  *     file is named in CLAUDE.md's table, CLAUDE.md carries no em-dash, and every `pnpm <script>`
  *     the root file, the rules, the skills and the agents name is defined in a package.json.
  *   v1.1.1 — 2026-09-27 — Ceiling 39,500 → 40,500 for the docs/internal plans rule.
+ *   v1.1.2 — 2026-10-04 — Ceiling 40,500 → 40,800 for the rule that a mentioned place comes with its URL.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -50,8 +51,10 @@ const SKILLS_DIR = join(REPO, '.claude', 'skills');
  * (docs/pitfalls.md §94), which holds in every session.
  * Raised to 40,500 on 2026-09-27, at Jouni's request, for the rule that plans live in the main
  * checkout's docs/internal/ and never in a worktree's, which holds in every session.
+ * Raised to 40,800 on 2026-10-04, at Jouni's request, for the rule that every place a reply mentions
+ * comes with its URL, which holds in every session.
  */
-const CEILING_BYTES = 40_500;
+const CEILING_BYTES = 40_800;
 
 function trackedFiles(): string[] {
     return execFileSync('git', ['-C', REPO, 'ls-files'], { encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024 })

@@ -59,6 +59,7 @@ Enterprise architect, ex-CTO, thirty years in. Do not explain fundamentals and d
 - **Do not hedge finished work.** Done is done. A related thing you noticed is not an exception to "done"; it is a separate note, and it earns a mention only if it needs a decision. "All done except…" about something that needs nothing turns a non-task into a debt he now has to carry.
 - **Label the register when a report mixes them.** Found, fixed, left, and suggested are four different things, and a reader should never have to work out which one a sentence is.
 - One term, one meaning, per conversation. Two senses of the same word (the node's Platform feedback versus a memory typed `feedback`) makes him check whether you are even discussing the same thing.
+- **Every place you mention comes with its URL**: production, or sandbox plus the account to sign in with and what to press. "On the Packages page" without a link makes him ask (Jouni, 2026-10-04).
 
 **Writing is judged, in chat and in every file.** → skill `aimeat-writing`. The short version, which applies to everything without waiting for the skill:
 
