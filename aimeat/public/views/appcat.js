@@ -11,7 +11,7 @@
  *   for the old page's bar. Nothing is kept in the browser's own storage: the view chosen lives in the
  *   address (?view=), the stars on the node. Writes no class; the parts are components.
  *
- *   Deep links (features.md F287–F291): ?lang= (the site reads it), ?view=library|community|favorites,
+ *   Deep links (features.md F287–F291): ?lang= (the site reads it), ?view=library|community|favorites|building,
  *   ?filter=<state or condition>, ?q=<search>, ?create=1 (the generate-with-AI dialog), ?add=1 (sign
  *   in, then the Add dialog on its Paste tab). Keys (F170–F173): Escape closes the app viewer, else
  *   the detail view; Ctrl/Cmd+N opens Add; Ctrl/Cmd+F brings the focus to the search; while a dialog
@@ -19,6 +19,8 @@
  * @structure AppCat({ navigate }) (default) · readView() · writeView(v)
  * @usage routed at /v1/appcat by spa.html (and portal.ts spaRoutes).
  * @version-history
+ *   v1.1.0 — 2026-10-04 — The view Building for others (?view=building): the apps somebody else owns
+ *     and the person may build, shown in the index only to a person who holds such a right (wish-appcatin-sovellussivulle-design-spec-roadmap-rakentajat-ja-l).
  *   v1.0.0 — 2026-09-27 — Initial (appcat, the shell builder).
  */
 import { h } from 'preact';
@@ -35,11 +37,11 @@ import * as detailModule from '/views/appcat/detail.js';
 import { CatRail } from '/views/appcat/rail.js';
 import { CatMasthead, openAdd } from '/views/appcat/masthead.js';
 import { CatBand, CatTools, CortexBar, SEARCH_ID } from '/views/appcat/tools.js';
-import { LibraryList, CommunityList, FavouritesList, CatFoot } from '/views/appcat/lists.js';
+import { LibraryList, CommunityList, FavouritesList, BuildingList, CatFoot } from '/views/appcat/lists.js';
 import { KUNTO_KEYS, STATES, filterRows, sortRows, stateCounts } from '/views/appcat/model.js';
 
 const html = htm.bind(h);
-const VIEWS = ['library', 'community', 'favorites'];
+const VIEWS = ['library', 'community', 'favorites', 'building'];
 
 /** The view the address names (F71, F262 → ?view=); an unknown one is the library (F70). */
 export function readView() {
@@ -142,15 +144,17 @@ export default function AppCat() {
   const favOrder = sortRows(favRowsAll, sort);
   const communityRows = filterRows(communityOrder, { tag, q });
   const favRows = filterRows(favOrder, { tag, q });
+  const buildingOrder = sortRows(cat.building || [], sort);
+  const buildingRows = filterRows(buildingOrder, { tag, q });
   // The moments the old page drew a list anew, which left no row open.
   const ownRedraw = [q, tag, stateFilter, sort, cat.favourites, cat.all];
   const serverRedraw = [sort, cat.favourites, cat.all];
   const counts = stateCounts(cat.own, cat.skillsBound);
-  const tagRows = view === 'community' ? cat.community : view === 'favorites' ? favRowsAll : cat.own;
+  const tagRows = view === 'community' ? cat.community : view === 'favorites' ? favRowsAll : view === 'building' ? (cat.building || []) : cat.own;
   const Detail = detailModule.Detail || detailModule.default;
 
   const rail = html`<${CatRail} view=${view} onView=${chooseView} loaded=${cat.loaded}
-    counts=${{ library: cat.own.length, community: cat.community.length, favorites: favRowsAll.length }}
+    counts=${{ library: cat.own.length, community: cat.community.length, favorites: favRowsAll.length, building: (cat.building || []).length }}
     states=${view === 'library' ? counts : null} stateFilter=${stateFilter} onState=${chooseState}
     tagRows=${tagRows} tag=${tag} onTag=${setTag} tagsOpen=${tagsOpen} onTagsOpen=${() => setTagsOpen(!tagsOpen)} />`;
 
@@ -163,6 +167,7 @@ export default function AppCat() {
       ${view === 'library' ? html`<${LibraryList} rows=${ownRows} total=${cat.own.length} loaded=${cat.loaded} filtering=${filtering} favourites=${cat.favourites} closeOn=${ownRedraw} />` : null}
       ${view === 'community' ? html`<${CommunityList} rows=${communityRows} order=${communityOrder} total=${cat.community.length} loaded=${cat.loaded} filtering=${filtering} favourites=${cat.favourites} closeOn=${serverRedraw} />` : null}
       ${view === 'favorites' ? html`<${FavouritesList} rows=${favRows} order=${favOrder} total=${favRowsAll.length} favourites=${cat.favourites} closeOn=${serverRedraw} />` : null}
+      ${view === 'building' ? html`<${BuildingList} rows=${buildingRows} order=${buildingOrder} total=${(cat.building || []).length} favourites=${cat.favourites} closeOn=${serverRedraw} />` : null}
       <${CatFoot} loaded=${cat.loaded} n=${cat.own.length} />
     <//>
     <${DialogHost} />

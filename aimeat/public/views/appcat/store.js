@@ -20,6 +20,9 @@
  *   subscribe(fn) · setState(patch)
  * @usage const cat = useCatalog(); cat.own.map(…)
  * @version-history
+ *   v1.1.0 — 2026-10-04 — `building`: the apps somebody else owns and the person holds a development
+ *     right on (GET /v1/apps?building=true), read beside the stars when signed in, for the Building for
+ *     others view (wish-appcatin-sovellussivulle-design-spec-roadmap-rakentajat-ja-l).
  *   v1.0.0 — 2026-09-27 — The listing with paging, own and community, the stars and the bound skills on
  *     the node, the notice (drawn by the shell with the Toast component), findApp, getCatalog. isOwn
  *     compares bare owner names (F351).
@@ -33,12 +36,12 @@ import { getSession } from '/js/services/auth.js';
  * The state. `loaded` turns true when the first listing has answered (success or failure).
  * `notice` is { text, kind, at } or null; `skillsLoaded` says the bound skills have been read.
  * @typedef {{ loaded: boolean, error: string|null, me: string|null, all: any[], own: any[],
- *   community: any[], favourites: Set<string>, skillsBound: Set<string>, skillsLoaded: boolean,
+ *   community: any[], building: any[], favourites: Set<string>, skillsBound: Set<string>, skillsLoaded: boolean,
  *   detail: any|null, notice: { text: string, kind: string, at: number }|null }} CatalogState
  */
 /** @type {CatalogState} */
 const state = {
-  loaded: false, error: null, me: null, all: [], own: [], community: [], favourites: new Set(),
+  loaded: false, error: null, me: null, all: [], own: [], community: [], building: [], favourites: new Set(),
   skillsBound: new Set(), skillsLoaded: false, detail: null, notice: null,
 };
 const listeners = new Set();
@@ -102,6 +105,20 @@ async function fetchFavourites() {
   }
 }
 
+/**
+ * The apps somebody else owns that the person may build (one page: a development right is given by
+ * hand, person by person). A refused read is no such apps.
+ */
+async function fetchBuilding() {
+  try {
+    const json = await api(`/v1/apps?building=true&limit=${PAGE}`, { method: 'GET' });
+    return json?.data?.apps || [];
+  } catch (err) {
+    console.warn('[appcat] the apps you build for others could not be read', err);
+    return [];
+  }
+}
+
 /** The apps a skill of the person's own is bound to ("owner/filename"), for the "No skill" row (F180). */
 async function fetchSkillsBound() {
   const json = await api('/v1/skills?scope=user', { method: 'GET' });
@@ -124,15 +141,16 @@ export async function reloadCatalog() {
   const mine = ++round;
   const session = getSession();
   const me = session?.owner || null;
-  const [listing, favourites] = await Promise.all([
+  const [listing, favourites, building] = await Promise.all([
     fetchAll().then((rows) => ({ rows, error: null }), (err) => ({ rows: [], error: err?.message || String(err) })),
     fetchFavourites(),
+    me ? fetchBuilding() : Promise.resolve([]),
   ]);
   if (mine !== round) return;
   const all = listing.rows;
   const own = me ? all.filter((a) => sameOwner(a.owner, me)) : [];
   const community = me ? all.filter((a) => !sameOwner(a.owner, me)) : all;
-  setState({ loaded: true, error: listing.error || null, me, all, own, community, favourites });
+  setState({ loaded: true, error: listing.error || null, me, all, own, community, building, favourites });
   if (!me || listing.error) { setState({ skillsBound: new Set(), skillsLoaded: !!me }); return; }
   // The skills are read after the lists are up, so a slow or refused read only delays that one row.
   try {

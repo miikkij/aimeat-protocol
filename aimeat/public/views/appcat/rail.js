@@ -9,6 +9,8 @@
  * @structure CatRail(props)
  * @usage html`<${CatRail} view=${view} onView=${setView} … />`
  * @version-history
+ *   v1.2.0 — 2026-10-04 — Building for others among the views, only when the person builds somebody
+ *     else's app (wish-appcatin-sovellussivulle-design-spec-roadmap-rakentajat-ja-l).
  *   v1.1.0 — 2026-09-27 — "Something missing" is a second word inside the state group
  *     (SideMenuLabel), as the old #state-bar held both: no air between, one strip on a phone.
  *   v1.0.0 — 2026-09-27 — Initial (appcat, the shell).
@@ -24,7 +26,7 @@ const TAGS_FOLDED = 8;
 
 /**
  * @param {{ view: string, onView: (v: string) => void, loaded: boolean,
- *   counts: { library: number, community: number, favorites: number },
+ *   counts: { library: number, community: number, favorites: number, building: number },
  *   states: { listed: number, unlisted: number, draft: number, kunto: Record<string, number> } | null,
  *   stateFilter: string|null, onState: (s: string) => void,
  *   tagRows: any[], tag: string|null, onTag: (t: string|null) => void, tagsOpen: boolean, onTagsOpen: () => void }} p
@@ -34,6 +36,8 @@ export function CatRail(p) {
     { value: 'library', label: x('view.library'), n: p.loaded ? p.counts.library : '' },
     { value: 'community', label: x('view.community'), n: p.loaded && p.counts.community > 0 ? p.counts.community : '' },
     { value: 'favorites', label: x('view.favorites'), n: p.loaded ? p.counts.favorites : '' },
+    // Only for a person who builds somebody else's app: the others never see an empty view.
+    ...(p.counts.building > 0 ? [{ value: 'building', label: x('view.building'), n: p.counts.building }] : []),
   ];
   const tags = tagCounts(p.tagRows);
   const activeLc = p.tag ? p.tag.toLowerCase() : null;

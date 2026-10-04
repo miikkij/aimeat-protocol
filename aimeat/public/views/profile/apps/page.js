@@ -15,7 +15,9 @@
  *   v2.2.0 -- 2026-10-04 -- A permission row names the app as the catalogue does (grantName): a grant made
  *     through the app's own address stored its file name, so the rows read ansapolku.html where the
  *     catalogue reads Ansapolku. The name now comes from the app itself when the app is the person's own.
- *     The rail names section 07, Roadmap and shared work, which it had left out.
+ *     Roadmap and shared work (section 07) is gone: an app's design spec, roadmap and builders are
+ *     sections of its own page in the App Catalog, and a draft waiting on an app somebody else owns,
+ *     where the person may publish, shows under What waits for you (wish-appcatin-sovellussivulle-design-spec-roadmap-rakentajat-ja-l).
  *   v2.1.0 -- 2026-10-03 -- The page's start (components/PageStart.js: the first prompt asks the person's AI for an app, the build prompt's copy is its button) and the title's question mark, concept.app (guidance part B).
  *   v2.0.0 -- 2026-09-26 -- Every part is a component call that gets data (page group G6): the frame
  *     is SettingsPage (crumb, head, marks, strip, rail as data), the strip FigureStrip; what waits
@@ -71,7 +73,7 @@ import { Space } from '/components/Layout.js';
 import { scrollToSection } from '/components/Rail.js';
 import { a, day, rel, kb, nameOf, appRef, appUrl, catalogUrl, noteFor, initials, crumb, pageLinks, goTab } from './frame.js';
 import { secAgents, secBuild } from './build.js';
-import { CollaborationSection, PublishDialog } from './collaboration.js';
+import { PublishDialog } from './collaboration.js';
 import { secBuilders } from './builders.js';
 
 export function renderPage(ctx) {
@@ -79,8 +81,10 @@ export function renderPage(ctx) {
   const loading = ctx.apps === null;
   const none = !loading && apps.length === 0;
   const drafts = apps.filter((x) => x.has_draft);
+  // A draft on somebody else's app waits for this person only at a rung that may publish (10 or less).
+  const sharedDrafts = (ctx.shared || []).filter((x) => x.has_draft && typeof x.dev_level === 'number' && x.dev_level <= 10);
   const grants = ctx.grants || [];
-  const waiting = drafts.length + grants.length;
+  const waiting = drafts.length + sharedDrafts.length + grants.length;
   const listed = apps.filter((x) => !x.parked && !x.operator_hidden).length;
   const opens = apps.reduce((s, x) => s + (x.downloads || 0), 0);
   const top = [...apps].sort((p, q) => (q.downloads || 0) - (p.downloads || 0)).slice(0, 2);
@@ -115,7 +119,7 @@ export function renderPage(ctx) {
 
   const sections = none
     ? [{ id: 'ap-first', num: '01', label: a('secFirst'), count: '' }, { id: 'ap-waiting', num: '02', label: a('secWaiting'), count: 0 }, { id: 'ap-kunto', num: '03', label: a('secKunto'), count: '' }, { id: 'ap-build', num: '04', label: a('uploadLabel'), count: '' }]
-    : [{ id: 'ap-waiting', num: '01', label: a('secWaiting'), count: waiting }, { id: 'ap-kunto', num: '02', label: a('secKunto'), count: '' }, { id: 'ap-newest', num: '03', label: a('secNewest'), count: Math.min(apps.length, 6) }, { id: 'ap-agents', num: '04', label: a('secAgents'), count: '' }, { id: 'ap-build', num: '05', label: a('secBuild'), count: '' }, { id: 'ap-builders', num: '06', label: a('secBuilders'), count: '' }, { id: 'ap-collaboration', num: '07', label: a('roadTitle'), count: '' }];
+    : [{ id: 'ap-waiting', num: '01', label: a('secWaiting'), count: waiting }, { id: 'ap-kunto', num: '02', label: a('secKunto'), count: '' }, { id: 'ap-newest', num: '03', label: a('secNewest'), count: Math.min(apps.length, 6) }, { id: 'ap-agents', num: '04', label: a('secAgents'), count: '' }, { id: 'ap-build', num: '05', label: a('secBuild'), count: '' }, { id: 'ap-builders', num: '06', label: a('secBuilders'), count: '' }];
 
   return html`
     <${SettingsPage} name="apps" crumb=${crumb()} title=${t('profile.tabs.apps')} sub=${a('titleSub')} help="concept.app" marks=${marks}
@@ -124,21 +128,21 @@ export function renderPage(ctx) {
       railTitle=${a('railTitle')} sections=${sections} pagesLabel=${a('pages')} pages=${pageLinks()}
       after=${html`<${ctx.ConfirmUI} />
         ${ctx.publishApp ? html`<${PublishDialog} key=${appRef(ctx.publishApp)} app=${ctx.publishApp} busy=${!!ctx.busy} onPublish=${ctx.submitPublish} onClose=${ctx.closePublish} />` : null}`}>
-      ${none ? html`${secFirst(ctx)}${secWaiting(ctx, drafts, grants, '02')}${secKunto(ctx, '03')}${secBuild(ctx, { formOnly: true, num: '04' })}`
+      ${none ? html`${secFirst(ctx)}${secWaiting(ctx, drafts, sharedDrafts, grants, '02')}${secKunto(ctx, '03')}${secBuild(ctx, { formOnly: true, num: '04' })}`
         : loading ? html`<${Note} kind="loading">${t('common.loading')}<//>`
-        : html`${secWaiting(ctx, drafts, grants, '01')}${secKunto(ctx, '02')}${secNewest(ctx, apps)}${secAgents(ctx)}${secBuild(ctx, { formOnly: false, num: '05' })}${secBuilders(ctx)}`}
-      ${!loading ? html`<${CollaborationSection} ctx=${ctx} />` : null}
+        : html`${secWaiting(ctx, drafts, sharedDrafts, grants, '01')}${secKunto(ctx, '02')}${secNewest(ctx, apps)}${secAgents(ctx)}${secBuild(ctx, { formOnly: false, num: '05' })}${secBuilders(ctx)}`}
     <//>`;
 }
 
 /* ── 01 · What waits for you ─────────────────────────────────────────────────────────────────── */
 
-function secWaiting(ctx, drafts, grants, num) {
-  const waiting = drafts.length + grants.length;
+function secWaiting(ctx, drafts, sharedDrafts, grants, num) {
+  const waiting = drafts.length + sharedDrafts.length + grants.length;
   return html`
     <${Section} id="ap-waiting" num=${num} title=${a('secWaiting')} count=${waiting} first=${num === '01'}>
       <${List} cols="name-tag-doors" empty=${ctx.apps && ctx.apps.length ? a('waitingEmpty') : a('waitingEmptyNew')}>
         ${drafts.map((app) => draftRow(ctx, app))}
+        ${sharedDrafts.map((app) => sharedDraftRow(ctx, app))}
         ${grants.map((g) => grantRow(ctx, g))}
       <//>
       <${Note}>${a('waitingHint')}<//>
@@ -159,6 +163,19 @@ function draftRow(ctx, app) {
         <${Action} small soft disabled=${busy} onClick=${() => ctx.discardDraft(app)}>${a('discardDraft')}<//>
       <//>
       ${open ? diffPanel(ctx.diff) : null}
+    <//>`;
+}
+
+/** A draft on an app somebody else owns, where this person's rung may publish it. */
+function sharedDraftRow(ctx, app) {
+  const busy = ctx.busy === appRef(app);
+  return html`
+    <${Row} key=${'s' + appRef(app)}>
+      <${Name} meta=${a('sharedDraftMeta', { owner: app.owner, rung: a('bldRung_' + app.dev_level_name) || app.dev_level_name })}>${nameOf(app)}<//>
+      <${Cell}><${Mark} kind="status" tone="attention">${a('draftChip')}<//><//>
+      <${Doors}>
+        <${Action} small disabled=${busy} onClick=${() => ctx.publishDraft(app)}>${a('publishDraft')}<//>
+      <//>
     <//>`;
 }
 
