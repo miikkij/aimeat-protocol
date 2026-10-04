@@ -46714,6 +46714,15 @@ paths:
                                         description: { type: string }
                                   runsOnItsOwn: { type: array, items: { type: object } }
                                   guides: { type: array, items: { type: string } }
+                                  appAccess:
+                                    type: array
+                                    description: What each app asks for when it opens (its aimeat-scopes meta, or the SDK's defaults when `declared` is false), which an install may approve for it with `grant_apps`.
+                                    items:
+                                      type: object
+                                      properties:
+                                        app: { type: string }
+                                        scopes: { type: array, items: { type: string } }
+                                        declared: { type: boolean }
                                   asks:
                                     type: array
                                     description: The settings the install asks. `title` is the field's own name for a person, `field` the key the install's `config` takes.

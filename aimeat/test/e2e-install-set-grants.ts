@@ -393,6 +393,13 @@ await test('An agent approves no app a scope it does not hold: the app is left t
     assert(!(await storage.getAppGrantByOwnerAndApp(owner, target)), 'no grant row');
 });
 
+await test('The package sheet names what each app asks for, which the Packages page shows beside the choice', async () => {
+    const r = await json(`/v1/packages/${encodeURIComponent(shopGroup)}`, { headers: auth(opsToken) });
+    const access = r.body.data?.sheet?.appAccess ?? [];
+    assert(r.status === 200 && access.length === 1, `appAccess: ${r.status} ${JSON.stringify(r.body.data?.sheet)}`);
+    assert(access[0].declared === true && SCOPES.split(' ').every((s: string) => access[0].scopes.includes(s)), `the declared scopes: ${JSON.stringify(access[0])}`);
+});
+
 await test('grant_apps that is not true or false is refused', async () => {
     const r = await installPkg(opsToken, shopGroup, { grant_apps: 'yes' });
     assert(r.status === 400 && /grant_apps/.test(r.body.error?.message ?? ''), `expected 400: ${r.status} ${JSON.stringify(r.body)}`);
