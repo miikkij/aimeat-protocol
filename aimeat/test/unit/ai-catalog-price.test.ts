@@ -5,6 +5,7 @@
  *   which ids name one model across provider types; and when the scheduled refresh is due.
  * @usage pnpm test -- ai-catalog-price
  * @version-history
+ *   v1.1.0 — 2026-10-04 — Cached prompt tokens priced at the catalogue's cache-read rate.
  *   v1.0.0 — 2026-09-28 — Initial (V4 of the System 2 plan).
  */
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -34,6 +35,7 @@ beforeAll(async () => {
     model({ type: 'anthropic', id: 'claude-opus-5-5', price: { inPerMtok: 4, outPerMtok: 20 } }),
     model({ type: 'openrouter', id: 'anthropic/claude-opus-5.5', price: { inPerMtok: 4, outPerMtok: 20 } }),
     model({ type: 'openrouter', id: 'anthropic/claude-opus-4.1', status: 'retired' }),
+    model({ type: 'openrouter', id: 'deepseek/deepseek-v4-pro-0813', price: { inPerMtok: 0.6, outPerMtok: 2.4, cacheReadPerMtok: 0.06 } }),
     model({ type: 'openai', id: 'gpt-image-2', caps: caps({ textIn: true, imageOut: true }), price: { perImage: 0.04 } }),
     model({ type: 'openai', id: 'whisper-1', caps: caps({ audioIn: true, textOut: true, transcription: true }), price: { transcriptionPerSecond: 0.0001 } }),
     model({ type: 'openrouter', id: 'openai/whisper-1', caps: caps({ audioIn: true, textOut: true, transcription: true }), price: { raw: { prompt: 0.0001 } } }),
@@ -53,6 +55,15 @@ describe('what a call costs', () => {
     const p = callCost({ type: 'anthropic', model: 'claude-opus-5-5', promptTokens: 1000, completionTokens: 500 });
     expect(p).toMatchObject({ costSource: 'catalog', priceRef: meta.snapshot, exact: false });
     expect(p.costUsd).toBeCloseTo((1000 * 4 + 500 * 20) / 1e6, 12);
+  });
+
+  it('cached prompt tokens at the cache-read rate, and at the input rate when there is none', () => {
+    // 10 000 prompt tokens, 9 000 of them cached, 100 out. DeepSeek-shaped price: cache read a tenth of input.
+    const p = callCost({ type: 'openrouter', model: 'deepseek/deepseek-v4-pro-0813', promptTokens: 10000, cachedPromptTokens: 9000, completionTokens: 100 });
+    expect(p.costSource).toBe('catalog');
+    expect(p.costUsd).toBeCloseTo((1000 * 0.6 + 9000 * 0.06 + 100 * 2.4) / 1e6, 12);
+    const noRate = callCost({ type: 'anthropic', model: 'claude-opus-5-5', promptTokens: 1000, cachedPromptTokens: 900 });
+    expect(noRate.costUsd).toBeCloseTo((1000 * 4) / 1e6, 12);
   });
 
   it('the answered id first, then the one asked for', () => {
