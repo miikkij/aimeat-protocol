@@ -43,7 +43,13 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
-from .offers import resolve_agent_token
+from .credentials import (
+    AGENT_HEADER,
+    ExpiredToken,
+    daemon_route,
+    expired_token_message,
+    stored_agent_token,
+)
 from .paths import aimeat_home, connector_node_url
 
 logger = logging.getLogger(__name__)
@@ -204,6 +210,16 @@ class _Node:
     url: str
     token: str
     session: Any = None
+    #: Set when the call goes through the connector daemon: ``url`` is the daemon's loopback address,
+    #: ``token`` its serve.json secret, and this names the agent in ``X-Aimeat-Agent``.
+    via_daemon_agent: str | None = None
+
+    @property
+    def headers(self) -> dict[str, str]:
+        out = {"Authorization": f"Bearer {self.token}", "Content-Type": "application/json"}
+        if self.via_daemon_agent:
+            out[AGENT_HEADER] = self.via_daemon_agent
+        return out
 
     def _http(self) -> Any:
         if self.session is not None:
@@ -221,22 +237,46 @@ def _node(
     node_url: str | None = None,
     agent_token: str | None = None,
     session: Any = None,
+    prefer_daemon: bool = False,
 ) -> _Node:
     """The node's address and this agent's bearer token, resolved the way the rest of the package
-    resolves them: the argument, then the connector-stored token, then the environment."""
+    resolves them: the argument, then the connector-stored token, then the environment, then the
+    connector daemon that serves ``agent_name``.
+
+    A stored JWT that has expired counts as no token (credentials.py). When nothing else can carry
+    the call, this raises naming the file and its expiry, so nothing reaches the node to come back
+    as an anonymous 401.
+
+    The daemon is used only when the caller passed neither ``node_url`` nor ``agent_token``.
+    ``prefer_daemon`` puts it first, ahead of a stored token: ``node_llm()`` sets it, because the
+    daemon's credential is always current and a v1 token in the home may not be.
+    """
+    explicit = bool(node_url or agent_token)
+    daemon = None if explicit else daemon_route(agent_name)
+    via_daemon = (
+        _Node(url=daemon[0], token=daemon[1], session=session, via_daemon_agent=agent_name)
+        if daemon is not None else None
+    )
+    if prefer_daemon and via_daemon is not None:
+        return via_daemon
     url = (node_url or os.environ.get("AIMEAT_NODE_URL") or connector_node_url() or "").rstrip("/")
+    token = agent_token
+    expired: list[ExpiredToken] = []
+    if not token and agent_name:
+        token, expired = stored_agent_token(agent_name)
+    token = token or os.environ.get("AIMEAT_AGENT_TOKEN")
+    if url and token:
+        return _Node(url=url, token=token, session=session)
+    if via_daemon is not None:
+        return via_daemon
     if not url:
         raise DecideError("node_url is required (pass it, set AIMEAT_NODE_URL, or name it in the connector home's config.yaml).")
-    token = agent_token
-    if not token and agent_name:
-        token = resolve_agent_token(agent_name)
-    token = token or os.environ.get("AIMEAT_AGENT_TOKEN")
-    if not token:
-        raise DecideError(
-            "No agent token. Pass agent_token=, set AIMEAT_AGENT_TOKEN, or run "
-            f"`aimeat connect add --agent {agent_name or '<name>'}` so the token is stored locally."
-        )
-    return _Node(url=url, token=token, session=session)
+    if expired:
+        raise DecideError(expired_token_message(agent_name or "", expired))
+    raise DecideError(
+        "No agent token. Pass agent_token=, set AIMEAT_AGENT_TOKEN, or run "
+        f"`aimeat connect add --agent {agent_name or '<name>'}` so the token is stored locally."
+    )
 
 
 def _retry_after_of(resp: Any, details: Any) -> float | None:
@@ -282,7 +322,7 @@ def _call(node: _Node, method: str, path: str, payload: dict[str, Any] | None = 
     has to read an envelope and none of them can disagree about what a 402 means.
     """
     http = node._http()
-    headers = {"Authorization": f"Bearer {node.token}", "Content-Type": "application/json"}
+    headers = node.headers
     try:
         fn = getattr(http, method)
         resp = fn(f"{node.url}{path}", headers=headers, timeout=kwargs.pop("timeout", 60), **(
