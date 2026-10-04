@@ -20,6 +20,13 @@
  *     routes/app-grants-manage.ts.
  * @usage app.use(appGrantsRouter(config, storage));
  * @version-history
+ *   v1.22.0 — 2026-10-04 — The visible consent flow knows a package-installed app is not the owner's
+ *     own: authorize records `packageApp`, the request answers `package_app`, and authorize-consent
+ *     never marks it own. The consent page had approved such an app for its owner with no screen,
+ *     while the silent bridge asked. Authorize also takes `prompt=create` (the OIDC registration
+ *     hint) and the request answers it as `prompt`, so the page opens on the create-account form.
+ *   v1.21.0 — 2026-10-04 — upsertGrant moved, unchanged, to services/app-grant-upsert.ts so the install
+ *     set can write the grants it records through the same code (pure extraction).
  *   v1.20.0 — 2026-10-02 — A grant of memory:delete carries memory:purge (withAppPurge).
  *   v1.19.0 — 2026-10-02 — The silent bridge does not self-approve an app a package installed for the
  *     owner: it asks for consent like any other app (package sale design, T2).
@@ -123,7 +130,8 @@ import { readRefreshCookie } from '../services/owner-session.js';
 import { PORTFOLIO_TARGET_PREFIX, resolveAppOriginTarget, resolveFrameAppTarget } from '../services/app-origin-target.js';
 import { apexOrigin, frameRedirect } from '../services/app-frame-redirect.js';
 import { parseAppScopes } from '../services/protected-resource.js';
-import { afterApproval, heldOwnerAdded, narrowToDeclared, withAppPurge } from '../services/app-grant-scopes.js';
+import { heldOwnerAdded, narrowToDeclared } from '../services/app-grant-scopes.js';
+import { hashGrantToken, upsertAppGrant, type GrantSpec } from '../services/app-grant-upsert.js';
 import type { AppGrantRecord } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 
@@ -235,6 +243,8 @@ interface PendingRequest {
   responseMode: 'query' | 'web_message'; // web_message → consent page postMessages the code to the popup-opener app
   manage: boolean; // true → consent page always shows the management screen (gear); false → may auto-approve an existing grant
   originBound: boolean; // redirect_uri verified to be THE per-app subdomain mapped to this app → own-app auto-approve eligible
+  packageApp: boolean;  // a package installed this app: somebody else's code under the owner's name, never "own"
+  prompt: '' | 'create'; // OIDC prompt=create: the app asked for the create-account form first
   expiresAt: number;
 }
 
@@ -255,10 +265,8 @@ interface AuthCode {
   expiresAt: number;
 }
 
-/** SHA-256 hex (refresh-token storage). */
-function hashToken(token: string): string {
-  return createHash('sha256').update(token).digest('hex');
-}
+/** SHA-256 hex (refresh-token storage); one implementation with the grant writer's. */
+const hashToken = hashGrantToken;
 
 /** PKCE verification. S256 (default): base64url(sha256(verifier)) === challenge. plain: verifier ===
  *  challenge (used only by non-secure-context clients without crypto.subtle; real app origins use S256). */
@@ -424,12 +432,16 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
 
     const responseMode = String(req.query.response_mode ?? 'query') === 'web_message' ? 'web_message' : 'query';
     const manage = String(req.query.manage ?? '') === '1';
+    // An app a package installed is not the owner's own, whoever it is registered under: the consent
+    // page and authorize-consent read this, as the silent bridge does (package-approvals.ts).
+    const packageApp = await isPackageApp(storage, app.slice(0, slash), app);
     const requestId = `agreq-${randomBytes(18).toString('hex')}`;
     pendingRequests.set(requestId, {
       requestId, app, appName: appRecord.manifest?.name || app.slice(slash + 1),
       appIcon: appRecord.manifest?.icon || '', appDescription: appRecord.manifest?.description || '',
       appOrigin: rd.origin, scopes: requested, redirectUri, state, codeChallenge,
       codeChallengeMethod: method === 'plain' ? 'plain' : 'S256', responseMode, manage, originBound,
+      packageApp, prompt: String(req.query.prompt ?? '') === 'create' ? 'create' : '',
       expiresAt: Date.now() + REQUEST_TTL_MS,
     });
 
@@ -460,6 +472,10 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       // same policy as the silent bridge) — but ONLY when the redirect origin is bound to this app.
       app_owner: pending.app.includes('/') ? pending.app.slice(0, pending.app.indexOf('/')) : null,
       origin_bound: pending.originBound,
+      // A package installed the app: the consent page shows the screen even to the app's owner.
+      package_app: pending.packageApp,
+      // 'create' when the app asked for the create-account form (signIn({ register: true })).
+      prompt: pending.prompt || null,
       scopes: pending.scopes.map(s => ({ scope: s, description: APP_GRANTABLE_SCOPES[s], description_keys: scopeDescriptionKeys(s) })),
     }));
   });
@@ -487,7 +503,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     // Own only when the approving owner IS the app's owner AND the request is origin-bound — an
     // unbound request (path-form app, dev localhost) never earns the own flag even for the owner.
     const appOwner = pending.app.includes('/') ? pending.app.slice(0, pending.app.indexOf('/')) : '';
-    const own = pending.originBound && !!appOwner && owner === appOwner;
+    const own = pending.originBound && !!appOwner && owner === appOwner && !pending.packageApp;
     const code = `agc-${randomBytes(24).toString('hex')}`;
     authCodes.set(code, {
       code, app: pending.app, appName: pending.appName, appOrigin: pending.appOrigin,
@@ -502,54 +518,9 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     res.json(success(config.nodeId, { redirect_url: url.toString() }));
   });
 
-  /**
-   * Establish the owner's SINGLE live grant for an app: refresh the existing one, else create it.
-   * Both consent paths (silent SSO bridge, authorization_code exchange) go through here so neither
-   * can stack duplicates. `existing` is passed in because callers have already looked it up to make
-   * their own policy decision — no second query on the hot silent path.
-   *
-   * Scopes are replaced by what was just approved, never unioned: the consent screen's Advanced
-   * subset must be able to take access away, not only add it. The one exception is a word the OWNER
-   * added by hand: it stays unless the consent screen listed it (`spec.shown`) and the owner left it
-   * unticked (services/app-grant-scopes.ts afterApproval). The answer carries the scopes written.
-   *
-   * The partial unique index on (owner, app) WHERE NOT revoked makes the invariant a DB guarantee,
-   * so two simultaneous first-time consents surface as a constraint violation instead of a duplicate
-   * row. Rather than failing the exchange, adopt the row that won the race.
-   */
-  async function upsertGrant(
-    spec: { app: string; appName: string; appOrigin: string; owner: string; gaii: string; scopes: string[]; shown?: string[] },
-    existing: AppGrantRecord | null,
-  ): Promise<{ grantId: string; rawRefresh: string; scopes: string[] }> {
-    // An app's delete reaches workspace records for good as it always did (services/app-grant-scopes.ts).
-    spec = { ...spec, scopes: withAppPurge(spec.scopes) };
-    const rawRefresh = randomBytes(32).toString('hex');
-    const now = new Date().toISOString();
-    const patchFor = (row: AppGrantRecord | null) => {
-      const next = afterApproval(spec.scopes, row, spec.shown ?? []);
-      return { refreshTokenHash: hashToken(rawRefresh), lastUsedAt: now, scopes: next.scopes, ownerAddedScopes: next.ownerAddedScopes };
-    };
-    if (existing) {
-      const patch = patchFor(existing);
-      await storage.updateAppGrant(existing.grantId, patch);
-      return { grantId: existing.grantId, rawRefresh, scopes: patch.scopes };
-    }
-    const grantId = `appgrant-${randomBytes(16).toString('hex')}`;
-    try {
-      await storage.createAppGrant({
-        grantId, app: spec.app, appName: spec.appName, appOrigin: spec.appOrigin,
-        owner: spec.owner, gaii: spec.gaii, scopes: spec.scopes,
-        refreshTokenHash: hashToken(rawRefresh), createdAt: now, lastUsedAt: now, revoked: false,
-      });
-      return { grantId, rawRefresh, scopes: spec.scopes };
-    } catch (err) {
-      const raced = await storage.getAppGrantByOwnerAndApp(spec.owner, spec.app);
-      if (!raced) throw err; // a genuine storage failure, not the unique-index race
-      const patch = patchFor(raced);
-      await storage.updateAppGrant(raced.grantId, patch);
-      return { grantId: raced.grantId, rawRefresh, scopes: patch.scopes };
-    }
-  }
+  // Establish the owner's SINGLE live grant for an app (services/app-grant-upsert.ts). Both consent
+  // paths (silent SSO bridge, authorization_code exchange) go through it so neither can stack duplicates.
+  const upsertGrant = (spec: GrantSpec, existing: AppGrantRecord | null) => upsertAppGrant(storage, spec, existing);
 
   /** Mint a scoped access JWT for a grant: sub = owner GHII, role 'app', granted scopes only. */
   async function issueAccessToken(grant: { gaii: string; owner: string; scopes: string[]; grantId: string; app?: string }): Promise<{ token: string; expiresIn: number }> {

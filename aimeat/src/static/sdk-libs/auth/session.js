@@ -12,6 +12,8 @@
  *   scheduleAutoRefresh/createSession · refreshOnFocus · the `auth` object.
  * @usage import { auth, api, isAppOrigin, restoreSessionFromAppOrigin } from './session.js';
  * @version-history
+ *   v1.6.0 — 2026-10-04 — signIn({ register: true }) or { tab: 'register' } on an app origin opens the
+ *     consent window on the create-account form (restoreSessionFromAppOrigin's `prompt`, 'create').
  *   v1.5.1 — 2026-09-25 — isAppOrigin()'s comment names the isolated frame too (app-origin.js v1.2.0).
  *   v1.5.0 — 2026-09-13 — Every 'login' says which road produced the session, as `{ restored }` in the
  *     listener's second argument: true for login()'s restore, the cookie, the unasked silent bridge
@@ -139,7 +141,7 @@ export function _buildAppSession(accessToken, appId, own, displayName, restored)
 }
 
 // Shared in-flight promise so concurrent callers reuse a single silent bridge instead of two iframes.
-export function restoreSessionFromAppOrigin(interactive) {
+export function restoreSessionFromAppOrigin(interactive, prompt) {
   if (currentSession) return Promise.resolve(currentSession);
   if (_appOriginLoginInFlight) return _appOriginLoginInFlight;
   _appOriginLoginInFlight = (async function () {
@@ -162,7 +164,7 @@ export function restoreSessionFromAppOrigin(interactive) {
     if (!grant && interactive && r && r.app
       && (r.error === 'consent_required' || r.error === 'login_required')) {
       appId = r.app;
-      grant = await requestConsentPopup(r.app, r.scope);
+      grant = await requestConsentPopup(r.app, r.scope, false, prompt);
       // login_required hits OWN apps too — the token exchange reports own/app itself, so trust it.
       own = !!(grant && grant.own);
       if (grant && grant.app) appId = grant.app;
@@ -560,7 +562,7 @@ export const auth = {
    *
    * Added 2026-09-13. Before it the login pill's own button was the only interactive road, and
    * apps reached it by clicking `#login button`, which is the theme control that renders first.
-   * @param {object & { onLogin?: Function }} [opts]
+   * @param {object & { onLogin?: Function, register?: boolean, tab?: string }} [opts]
    * @returns {Promise<object|null>}
    */
   signIn(opts) {
@@ -568,7 +570,7 @@ export const auth = {
     if (currentSession) return Promise.resolve(currentSession);
     var stop = onLoginWhileOpen({ onLogin: o.onLogin, onSession: o.onSession });
     if (isAppOrigin()) {
-      return restoreSessionFromAppOrigin(true).finally(stop);
+      return restoreSessionFromAppOrigin(true, (o.register || o.tab === 'register') ? 'create' : '').finally(stop);
     }
     return new Promise(function (resolve) {
       // The third argument hears the dialog leave the page, however it leaves; a finished sign-in

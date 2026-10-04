@@ -201,6 +201,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // How long an unspent basic-agents enrolment grant stays usable. The daemon that will spend it is
   // connected at the moment the button is pressed, so a longer window only lengthens the time a
   // stolen grant id is worth something.
+  { key: 'appOriginSignInRefuse', dotPath: 'auth.app_origin_sign_in_refuse', envVar: 'AIMEAT_APP_ORIGIN_SIGN_IN_REFUSE', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Refuse sign-in and registration from an app, so an app never holds the owner session. Off: each such request is logged and let through; turn it on once the log is quiet.' },
   { key: 'agentEnrolmentGrantTtlSeconds', dotPath: 'auth.agent_enrolment_grant_ttl_seconds', envVar: 'AIMEAT_AGENT_ENROLMENT_TTL', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 60 && (v as number) <= 3600, immutable: false, description: 'How long an unspent agent-enrolment grant stays usable, in seconds', range: '60-3600' },
   // Immutable on purpose, and not only because the loader would hand this string-typed door a
   // string where the node reads a list: which organisations may sign in is a decision that belongs

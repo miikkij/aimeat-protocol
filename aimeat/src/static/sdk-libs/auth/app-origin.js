@@ -15,6 +15,9 @@
  *   reportUngrantableScopes
  * @usage import { isAppOrigin, silentAppToken } from './app-origin.js';
  * @version-history
+ *   v1.3.0 — 2026-10-04 — requestConsentPopup takes `prompt` ('create'), sent as `prompt=create` to the
+ *     authorize route and to the isolated frame's host page, so a new person starts on the
+ *     create-account form.
  *   v1.2.0 — 2026-09-25 — The isolated frame (audit A7-1). An app the node serves into its isolated
  *     frame counts as isolated too (isAppOrigin is true there), and silentAppToken, apexLogout and
  *     requestConsentPopup ask the page around the frame (./app-frame.js) instead of a bridge iframe or
@@ -129,12 +132,14 @@ export function apexLogout() {
 }
 
 // ── App-grant consent popup (H-2, PKCE code flow; b64url/pkce live in ./pkce.js) ──
-export async function requestConsentPopup(app, scopeStr, manage) {
+// `prompt` 'create' is the OIDC registration hint: the window opens on the create-account form, for a
+// new person the app knows is new (signIn({ register: true })).
+export async function requestConsentPopup(app, scopeStr, manage, prompt) {
   // In the isolated frame the page around it opens the consent window and exchanges the code: a
   // window this frame opened could not hand the code back to an opaque origin. The page may take as
   // long as the person reads; it answers null when they close the window or say no.
   if (inIsolatedFrame()) {
-    return askFrameHost('consent', { scope: scopeStr || appDeclaredScopes(), manage: !!manage }, 15 * 60 * 1000);
+    return askFrameHost('consent', { scope: scopeStr || appDeclaredScopes(), manage: !!manage, prompt: prompt === 'create' ? 'create' : '' }, 15 * 60 * 1000);
   }
   var apexOrigin;
   try { apexOrigin = new URL(APEX_URL).origin; } catch { return null; }
@@ -145,6 +150,7 @@ export async function requestConsentPopup(app, scopeStr, manage) {
   // manage=1 → the consent page always shows the management screen (the gear).
   var url = apexOrigin + '/v1/app-grants/authorize?response_type=code&response_mode=web_message'
     + (manage ? '&manage=1' : '')
+    + (prompt === 'create' ? '&prompt=create' : '')
     + '&app=' + encodeURIComponent(app)
     + '&scope=' + encodeURIComponent(scope)
     + '&redirect_uri=' + encodeURIComponent(redirectUri)

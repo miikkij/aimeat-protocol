@@ -872,6 +872,9 @@ const ALL_SUITES = [
     // An install set applied to a customer node: a bundle from a repository, the owner, the members
     // (an account now or an email invitation), the organism, the config, and the crew agent.
     'test/e2e-install-sets.ts',
+    // The install set records the owner's grant for each app it installs and lands the welcome link on
+    // an app, which then signs in with no click; sign-in and registration from an app are refused.
+    'test/e2e-install-set-grants.ts',
     // A package sold through a selling node's own checkout: the author's offer, the seller's price, a
     // claim code, a grant with the terms, renewal by hand and automatic, a refund, approval requests.
     'test/e2e-package-sale.ts',
