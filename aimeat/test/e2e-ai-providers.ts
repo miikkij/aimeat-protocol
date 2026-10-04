@@ -22,6 +22,7 @@
  *   - R1-R3: the routing endpoint, the MCP tools and the deprecated routes
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-providers.ts
  * @version-history
+ *   v1.1.0 — 2026-10-04 — 5b: both rounds of one /v1/llm conversation reach OpenRouter with one session_id.
  *   v1.0.0 — 2026-09-28 — Initial (V3 of the System 2 plan).
  */
 import * as ed from '@noble/ed25519';
@@ -241,6 +242,27 @@ const toolText = (r: any) => String(r?.result?.content?.[0]?.text ?? '');
         assert(bearer(req) === `Bearer ${key}`, `${id} carried ${bearer(req)}`);
         assert(r.body.data.route.chosenBy === 'call-provider', `${id} chosen by the call: ${r.body.data.route.chosenBy}`);
       }
+    });
+
+    await test('5b. every round of one /v1/llm conversation reaches OpenRouter with the same session_id, so its prompt cache can hit', async () => {
+      // OpenRouter keeps a conversation on one provider only after a cache hit unless the request names
+      // a session_id; DeepSeek has several providers, and three agent requests measured on 2026-10-02 had
+      // no cache hit in any round. The key is a hash: it names neither the person nor the content.
+      const d = await setupOwner('d');
+      const llm = (messages: unknown[]) => fetch(`${BASE}/v1/llm/chat/completions`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...auth(d.token) },
+        body: JSON.stringify({ messages }),
+      });
+      const opening = [{ role: 'system', content: 'You are a test agent.' }, { role: 'user', content: 'MARK-SESSION-ROUND-1' }];
+      const r1 = await llm(opening);
+      assert(r1.status === 200, `round 1: ${r1.status} ${await r1.clone().text()}`);
+      const first = stub.requests.filter(at('node-or')).pop()?.json as any;
+      const r2 = await llm([...opening, { role: 'assistant', content: 'ok' }, { role: 'user', content: 'MARK-SESSION-ROUND-2' }]);
+      assert(r2.status === 200, `round 2: ${r2.status}`);
+      const second = stub.requests.filter(at('node-or')).pop()?.json as any;
+      assert(typeof first?.session_id === 'string' && /^aimeat-[0-9a-f]{40}$/.test(first.session_id), `round 1 session_id: ${first?.session_id}`);
+      assert(second?.session_id === first.session_id, `the same session_id on round 2: ${second?.session_id} vs ${first.session_id}`);
+      assert(!first.session_id.includes(d.name), 'the session_id does not name the person');
     });
 
     await test('2. an Anthropic tool call streams through /v1/llm as OpenAI SSE frames', async () => {

@@ -25,6 +25,7 @@
  *   const sessionId = await acp.newSession({ mcpServers: [aimeatMcpServer(base, token)] });
  *   for await (const u of acp.prompt(sessionId, 'build me a pong game')) { … }
  * @version-history
+ *   v2.9.0 — 2026-10-04 — start() writes the chat's goose config first (services/goose-chat-config.ts).
  *   v2.8.0 — 2026-10-02 — The chat's tool surface is /v2/mcp/chat: a small core, the rest found by
  *     purpose. On /v1/mcp a one-line question paid for about 129 000 tokens of tool descriptions.
  *   v2.7.0 — 2026-10-02 — cancel() sends `session/cancel` as the notification ACP defines. Sent as a
@@ -65,6 +66,7 @@ import type { AimeatConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { cardFromToolResult, type ChatCard } from './chat-cards.js';
 import { gooseChildEnv } from './goose-env.js';
+import { ensureChatGooseConfig } from './goose-chat-config.js';
 
 /** An MCP server handed to one session. `http` is the transport goose reports as supported. */
 /** One picture handed to the model with a turn: the bytes, and what they are. */
@@ -160,6 +162,9 @@ export class GooseAcpClient {
         // Only what the agent needs, never the node's whole environment (services/goose-env.ts): the
         // agent talks to people and can run the tools goose's own config switches on.
         const env = gooseChildEnv(config, process.env, personal);
+        // The config that switches off the goose extensions the chat does not use, written before goose
+        // reads it (services/goose-chat-config.ts).
+        ensureChatGooseConfig(config);
 
         const child = spawn(bin, ['acp'], { stdio: ['pipe', 'pipe', 'pipe'], env });
         const client = new GooseAcpClient(child);

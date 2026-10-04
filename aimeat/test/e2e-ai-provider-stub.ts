@@ -39,6 +39,9 @@
  *   - phase 9: the living-document pulse's derive loop, its gate, its stop and its guards
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-provider-stub.ts
  * @version-history
+ *   v1.5.0 — 2026-10-04 — 5f: an agent's image and vision calls with no app id are filed under the agent
+ *     and the endpoint (2026-10-03); 2d: parallel_tool_calls reaches the provider beside tools, and a
+ *     custom provider gets no session_id.
  *   v1.4.0 — 2026-09-28 — The System 2 gateway (V1): 4a and 5a also assert the provenance record a
  *     transcript and a picture now get, hashed from the text and from the stored bytes; 5e proves
  *     Jouni's ruling on the node's key (it pays for an operation only when the operator named a node
@@ -403,6 +406,9 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
         assert(off.status === 200, `expected 200, got ${off.status}: ${JSON.stringify(off.body?.error)}`);
         const sentOff = provider.requestsFor('chat').filter(carries('MARK-PARALLEL-OFF')).at(-1)!.json as any;
         assert(sentOff.parallel_tool_calls === false, `the provider was asked for no parallel calls: ${JSON.stringify(sentOff.parallel_tool_calls)}`);
+        // The session_id OpenRouter routes by goes to OpenRouter only (e2e-ai-providers 5b): a custom
+        // provider may refuse a field it does not know.
+        assert(!('session_id' in sentOff), 'a custom provider gets no session_id');
 
         // Without tools OpenAI refuses the field, so the node does not send it.
         provider.queue('chat', chatJson('No tools.'), carries('MARK-PARALLEL-NOTOOLS'));

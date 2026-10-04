@@ -30,7 +30,12 @@
  *   cd aimeat && pnpm exec tsx scripts/chat-turn-measure.ts --text "Mikä on Suomen pääkaupunki?"
  *   options: --port 40471 (the proxy takes the next) · --model deepseek/deepseek-v4-pro-0813 · --lang fi · --wait-s 240 · --out <file.json>
  *     · --allow-uncapped (only when the key's owner said so)
+ *     · --stub (the recorder answers every model call: no key, no money, the real request) · --dump <dir> (each round's request as JSON)
  * @version-history
+ *   v1.2.0 — 2026-10-04 — Each round's anatomy (system, tools and messages in characters, the tool names,
+ *     and a fingerprint of the system message and tools, which is what a prompt cache reuses); --stub
+ *     answers locally, the first round with one tool call so a turn has two rounds; --dump writes each
+ *     round's request.
  *   v1.1.1 — 2026-10-03 — The recording proxy forwards only the three endpoints the node calls, each
  *     a constant URL (CodeQL js/request-forgery, alert 1697).
  *   v1.1.0 — 2026-10-02 —A capped test key only (OPENROUTER_TEST_KEY); the cost and the tokens of
@@ -39,7 +44,7 @@
  */
 import { spawn, execFileSync, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -96,27 +101,89 @@ async function assertCapped(key: string): Promise<{ limit: number; remaining: nu
 const FORWARDED = ['/api/v1/chat/completions', '/api/v1/generation', '/api/v1/models'] as const;
 
 /** One model call, as the recording proxy saw it. */
-interface ModelCall { t: number; tools: number; requestChars: number; prompt?: number; cached?: number; completion?: number; cost?: number }
+interface ModelCall {
+    t: number; tools: number; requestChars: number; prompt?: number; cached?: number; completion?: number; cost?: number;
+    /** What the request was made of, in characters: the system message, the tool definitions, the rest of the messages. */
+    systemChars?: number; toolsChars?: number; messagesChars?: number;
+    /** sha256 of the system message and the tools, the part a prompt cache can reuse; the same value round after round means the prefix held. */
+    prefixHash?: string;
+    /** The tool names in the order they were sent. */
+    toolNames?: string[];
+}
+
+/** The parts of a chat-completions body a prompt cache cares about, measured. */
+function anatomy(parsed: { messages?: Array<{ role?: string; content?: unknown }>; tools?: unknown[] }): Partial<ModelCall> {
+    const messages = Array.isArray(parsed.messages) ? parsed.messages : [];
+    const system = messages.filter((m) => m?.role === 'system' || m?.role === 'developer');
+    const rest = messages.filter((m) => !(m?.role === 'system' || m?.role === 'developer'));
+    const tools = Array.isArray(parsed.tools) ? parsed.tools : [];
+    const systemJson = JSON.stringify(system);
+    const toolsJson = JSON.stringify(tools);
+    return {
+        systemChars: systemJson.length, toolsChars: toolsJson.length, messagesChars: JSON.stringify(rest).length,
+        prefixHash: createHash('sha256').update(systemJson).update(toolsJson).digest('hex').slice(0, 12),
+        toolNames: tools.map((t) => String((t as { function?: { name?: string } })?.function?.name ?? '?')),
+    };
+}
+
+/** The tool the --stub answer calls once, so a turn has two rounds and the prefix can be compared. */
+const STUB_TOOL = 'aimeat__aimeat_handbook_get';
+
+/**
+ * The answer the recorder gives in --stub mode. The first round of a turn that offers STUB_TOOL calls
+ * it; every other round answers one short sentence. Streamed or whole, as the request asked.
+ */
+function stubAnswer(parsed: { stream?: boolean; tools?: unknown[]; messages?: Array<{ role?: string }> }): { type: string; body: string } {
+    const usage = { prompt_tokens: 0, completion_tokens: 3, total_tokens: 3, cost: 0 };
+    const offersTool = (parsed.tools ?? []).some((t) => (t as { function?: { name?: string } })?.function?.name === STUB_TOOL);
+    const toolRound = offersTool && !(parsed.messages ?? []).some((m) => m?.role === 'tool');
+    const call = { index: 0, id: 'call_stub_1', type: 'function', function: { name: STUB_TOOL, arguments: '{}' } };
+    if (!parsed.stream) {
+        const message = toolRound ? { role: 'assistant', content: null, tool_calls: [call] } : { role: 'assistant', content: 'Helsinki.' };
+        return { type: 'application/json', body: JSON.stringify({ id: 'stub', object: 'chat.completion', model: 'stub', choices: [{ index: 0, message, finish_reason: toolRound ? 'tool_calls' : 'stop' }], usage }) };
+    }
+    const frame = (o: unknown) => `data: ${JSON.stringify(o)}\n\n`;
+    const delta = toolRound ? { role: 'assistant', tool_calls: [call] } : { role: 'assistant', content: 'Helsinki.' };
+    return {
+        type: 'text/event-stream',
+        body: frame({ id: 'stub', object: 'chat.completion.chunk', model: 'stub', choices: [{ index: 0, delta }] })
+            + frame({ id: 'stub', object: 'chat.completion.chunk', model: 'stub', choices: [{ index: 0, delta: {}, finish_reason: toolRound ? 'tool_calls' : 'stop' }], usage })
+            + 'data: [DONE]\n\n',
+    };
+}
 
 /**
  * A recording proxy between the node and OpenRouter. The node keeps only a day's total per owner, and
  * the question is what each ROUND costs: how many tokens went in, how many were cached, what it cost.
  * OpenRouter puts `usage` (with `cost`) in the last chunk of a streamed answer.
  */
-function startRecorder(port: number, started: () => number): { calls: ModelCall[]; close: () => void } {
+function startRecorder(
+    port: number, started: () => number, opts: { stub?: boolean; dumpDir?: string } = {},
+): { calls: ModelCall[]; close: () => void } {
     const calls: ModelCall[] = [];
     const server = createServer((req, res) => {
         const chunks: Buffer[] = [];
         req.on('data', (c: Buffer) => chunks.push(c));
         req.on('end', async () => {
             const body = Buffer.concat(chunks);
-            let parsed: { tools?: unknown[]; usage?: unknown; stream?: boolean } = {};
+            let parsed: { tools?: unknown[]; usage?: unknown; stream?: boolean; messages?: Array<{ role?: string; content?: unknown }> } = {};
             try { parsed = JSON.parse(body.toString('utf8') || '{}'); } catch { /* not JSON */ }
+            const isChat = req.method === 'POST' && !!req.url?.endsWith('/chat/completions');
             // Ask for the cost in the answer; OpenRouter accepts it on any chat completion.
-            if (req.method === 'POST' && req.url?.endsWith('/chat/completions')) parsed.usage = { include: true };
+            if (isChat) parsed.usage = { include: true };
             const forwarded = req.method === 'POST' ? JSON.stringify(parsed) : undefined;
-            const call: ModelCall = { t: started(), tools: Array.isArray(parsed.tools) ? parsed.tools.length : 0, requestChars: body.length };
-            if (req.method === 'POST' && req.url?.endsWith('/chat/completions')) calls.push(call);
+            const call: ModelCall = { t: started(), tools: Array.isArray(parsed.tools) ? parsed.tools.length : 0, requestChars: body.length, ...(isChat ? anatomy(parsed) : {}) };
+            if (isChat) {
+                calls.push(call);
+                // The whole request as the provider would receive it, one file per round, to read what goose sends.
+                if (opts.dumpDir) writeFileSync(join(opts.dumpDir, `round-${String(calls.length).padStart(2, '0')}.json`), JSON.stringify(parsed, null, 2));
+            }
+            // --stub: answer here and spend nothing. The node and goose cannot tell, so the request is the real one.
+            if (opts.stub) {
+                if (isChat) { const a = stubAnswer(parsed); res.writeHead(200, { 'content-type': a.type }).end(a.body); return; }
+                if (req.url?.includes('/models')) { res.writeHead(200, { 'content-type': 'application/json' }).end('{"data":[]}'); return; }
+                res.writeHead(404).end(); return;
+            }
             // Only the endpoints the node calls, each a constant: `https://openrouter.ai${req.url}` sent a
             // path that starts with `@` to another host, carrying the key (CodeQL js/request-forgery, 1697).
             const asked = new URL(req.url ?? '/', 'http://127.0.0.1');
@@ -269,11 +336,18 @@ async function main(): Promise<void> {
     const waitMs = Number(arg('wait-s', '240')) * 1000;
     const out = arg('out', '');
 
-    const key = readKey();
-    const cap = await assertCapped(key);
-    console.log(`key: capped at ${cap.limit} USD, ${cap.remaining ?? '?'} USD left`);
+    // --stub answers every model call in the recorder: no key, no money, and the request goose sends is
+    // the real one, which is what a change to the prompt's size is measured on before it costs anything.
+    const stub = process.argv.includes('--stub');
+    const dumpDir = arg('dump', '');
+    if (dumpDir) mkdirSync(resolve(dumpDir), { recursive: true });
+    const key = stub ? 'sk-stub-no-key' : readKey();
+    if (!stub) {
+        const cap = await assertCapped(key);
+        console.log(`key: capped at ${cap.limit} USD, ${cap.remaining ?? '?'} USD left`);
+    } else console.log('stub: the recorder answers every model call; nothing is sent to OpenRouter');
     let turnStart = 0;
-    const recorder = startRecorder(port + 1, () => (turnStart ? Date.now() - turnStart : -1));
+    const recorder = startRecorder(port + 1, () => (turnStart ? Date.now() - turnStart : -1), { stub, ...(dumpDir ? { dumpDir: resolve(dumpDir) } : {}) });
     const node = await startNode(port, model, key, port + 1);
     try {
         const token = await registerOwner(node.base, `measure${Date.now().toString(36)}`);
@@ -312,6 +386,10 @@ async function main(): Promise<void> {
             proposal_ready_ms: by('tool_call').find((e) => e.status === 'completed' && /agent propose/.test(String(tools.get(String(e.id || e.title))?.title ?? '')))?.t ?? null,
             // Each model call: when it was sent, how many tools it carried, tokens in (cached of them), out, and its cost.
             model_calls: recorder.calls.map((c) => `${(c.t / 1000).toFixed(1)}s tools ${c.tools} in ${c.prompt ?? '?'} (cached ${c.cached ?? '?'}) out ${c.completion ?? '?'} cost ${c.cost ?? '?'}`),
+            // What each round was made of, in characters, and the prefix fingerprint: one value across the
+            // rounds means the system message and the tools did not change, so a prompt cache could hit.
+            request_anatomy: recorder.calls.map((c) => `chars system ${c.systemChars} tools ${c.toolsChars} messages ${c.messagesChars} total ${c.requestChars} prefix ${c.prefixHash}`),
+            tools_sent: recorder.calls[0]?.toolNames ?? [],
             turn_cost_usd: recorder.calls.reduce((sum, c) => sum + (c.cost ?? 0), 0),
             node_recorded_usd: spent?.data?.spent_today_usd ?? null,
             answer,
