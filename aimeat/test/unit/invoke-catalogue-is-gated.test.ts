@@ -16,6 +16,7 @@
  *   absent from the tables, or the reverse — this is the one that says so.
  *
  * @version-history
+ *   2026-10-04 — The exemption bound is 20, for aimeat_task_decline (an agent declines its own task).
  *   2026-10-02 — The exemption bound is 19, for aimeat_agent_runtime_report (its own report needs no word).
  *   2026-10-02 — The exemption bound is 18, for aimeat_agent_tags_set (own tags need no word).
  *   2026-09-27 — The exemption bound is 17, for aimeat_app_manage.
@@ -90,7 +91,10 @@ describe('the invoke catalogue is a gated surface', () => {
         // report now says where the crew's model calls go (`llm`), a crew sends it about itself, and
         // the basic agents hold no agent:write; a sibling's report still needs the word, checked by
         // the handler on the node and by the REST endpoint through invoke.
-        expect(exempt.length).toBeLessThanOrEqual(19);
+        // 20 since 2026-10-04: aimeat_task_decline, beside aimeat_task_fail and for its reason: an agent
+        // ends its OWN task (isOwnTask on the node, canAccessTask on POST …/decline through invoke), and
+        // a refusal is not a permission an agent should be able to lack.
+        expect(exempt.length).toBeLessThanOrEqual(20);
         expect(mutating.length).toBeGreaterThan(100);
     });
 });
