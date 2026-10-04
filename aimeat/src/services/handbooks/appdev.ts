@@ -5,6 +5,7 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-10-04 — The design spec is shown on the app's own page in the App Catalog.
  *   2026-10-02 — The app's design spec: read it with aimeat_app_manage spec before changing a shared
  *     app, write it back with spec_set after a publish (services/app-design-spec.ts).
  *   2026-10-02 — Somebody else builds it too: builder_set, builders and builder_remove, the page to
@@ -302,8 +303,9 @@ outline when nobody has written one. After every publish, write it back with wha
 \`spec_set\` with \`markdown\` (the whole document; pass the \`expected_revision\` you read, and a
 refusal means somebody else wrote in between). The same text again marks it current for the new
 version. The publish answer carries \`design_spec_hint\` when the spec is missing on a shared app or
-has fallen behind. Only the owner removes it (\`spec_clear\`). The owner sees and edits it on the Apps
-page of their settings, under Roadmap and shared work.
+has fallen behind. Only the owner removes it (\`spec_clear\`). The owner sees and edits it on the app's
+own page in the App Catalog, in its Design spec section, beside the Roadmap and Who else may build
+this sections.
 
 ### can() is a HINT, never a gate
 

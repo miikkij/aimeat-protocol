@@ -27,6 +27,7 @@
  *     default: the app signs in at once, and still not as the owner's own.
  *   v1.6.0 — 2026-10-02 — Phase 6: an app a package installed for the owner asks for consent instead of
  *     approving itself (package sale design, T2).
+ *   v1.7.0 — 2026-10-04 — Phase 6: the grant made by name carries the app's own name, not its file name.
  *   v1.2.0 — 2026-08-11 — The subdomain-serve check addresses a real Host in the app family
  *     (helpers/host-request.ts). `x-app-origin` on its own stopped being an app origin when
  *     subdomain.ts v1.5.0 began requiring the Host to belong to the family it claims.
@@ -545,6 +546,17 @@ async function main() {
             assert(r.ok === true && r.own === true && r.app === `${a}/app-a.html`, `expected the app's grant, got ${JSON.stringify(r)}`);
             const claims = JSON.parse(Buffer.from(r.access_token!.split('.')[1], 'base64url').toString('utf8'));
             assert(JSON.stringify(claims.roles) === '["app"]', `an app grant, not the session, got ${JSON.stringify(claims.roles)}`);
+        });
+        await test('the grant made by name carries the app\'s own name, not its file name', async () => {
+            const html = '<!DOCTYPE html><html><head></head><body>named</body></html>';
+            const pub = await json('/v1/apps', { method: 'POST', headers: { Authorization: `Bearer ${A.token}` },
+                body: JSON.stringify({ filename: 'named-app.html', content: b64(html), name: 'Named App', description: 'd', category: 'utility' }) });
+            assert(pub.status === 201, `publish: ${pub.status} ${JSON.stringify(pub.body)}`);
+            const r = await byName(`${a}/named-app.html`, A.rt);
+            assert(r.ok === true && r.own === true, `expected the app's grant, got ${JSON.stringify(r)}`);
+            const list = await json('/v1/app-grants', { headers: { Authorization: `Bearer ${A.token}` } });
+            const g = (list.body.data.grants as any[]).find(x => x.app === `${a}/named-app.html`);
+            assert(g && g.app_name === 'Named App', `app_name, got ${JSON.stringify(g && g.app_name)}`);
         });
         await test('an app a package installed for the owner is not their own: it asks for consent (package sale design, T2)', async () => {
             const pkg = await json('/v1/packages', {
