@@ -20,6 +20,8 @@
  *     paragraphs and lists .5rem apart (Jouni's decision "Small reader"; the values of an agent's README).
  *   v1.4.0 — 2026-09-26 — The scroll cut (.md-body--scroll; Markdown's `scroll`), moved from
  *     agents-detail.css .pf-agd-readme (a move).
+ *   v1.5.0 — 2026-10-05 — The scroll cut keeps air under its last line, so a document scrolled to its
+ *     end does not stop flush against the edge and read as cut off.
  */
 
 .md-body {
@@ -31,7 +33,7 @@
 }
 /* The scroll cut (Markdown's `scroll`): a long document in a tab (an agent's README) keeps a reading
    width that still fits ~80-column art in a code fence, and scrolls inside. */
-.md-body--scroll { max-width: 760px; max-height: 60vh; overflow: auto; }
+.md-body--scroll { max-width: 760px; max-height: 60vh; overflow: auto; padding-bottom: .75rem; }
 .md-body > :first-child { margin-top: 0; }
 .md-body > :last-child { margin-bottom: 0; }
 

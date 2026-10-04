@@ -10,6 +10,10 @@
  *   that draws the kit writes them. Corners, frames, shadows and letter case read the shape tokens.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.7.0 — 2026-10-05 — The ink tone stands on the ink ground in both themes, as every contents rail
+ *     does since theme.css v1.46.0: in the dark theme it had turned light, and its sun group labels and
+ *     numbers measured 1.5:1 and its coral notices 2.35:1 on it (Jouni: "näkyy paskasti"). A notice
+ *     line reads at full strength, since it is the line that asks for a look.
  *   v1.6.0 — 2026-09-27 — The rail's ink tone (.og-rail--ink, Rail tone="ink"): the old app catalogue's
  *     detail rail, which turns light in the dark theme (appcat parity); additive.
  *   v1.5.0 — 2026-09-27 — The rail's light tone (.og-rail--light, Rail tone="light"): main's admin
@@ -47,10 +51,12 @@
 .og-rail--light .og-rail-link:hover, .og-rail--light .og-rail-link.on { color: var(--text); }
 .og-rail--light .og-rail-link em { font-size: .66rem; color: inherit; }
 .og-rail--light .og-rail-link i { color: var(--accent); }
-/* The ink tone (Rail tone="ink"): the box in the text's own colour, so it turns light with dark words
-   in the dark theme, as the old app catalogue's detail rail (.dtl-rail) drew it. */
-.og-rail--ink { background: var(--text); color: var(--bg); }
-.og-rail--ink .og-rail-link { color: var(--bg); }
+/* The ink tone (Rail tone="ink", the App Catalog's detail): the ink ground in both themes, as every
+   contents rail, because the sun labels and numbers and the coral notices do not read on a light box. */
+.og-rail--ink { background: var(--ink-ground); color: var(--on-ink-ground); }
+.og-rail--ink .og-rail-link { color: var(--on-ink-ground); }
+/* A line that asks for a look is not dimmed with the others. */
+.og-rail-link:has(.og-rail-notice) { opacity: 1; }
 .og-rail--light hr { border-top-color: var(--border); }
 .og-tree { position: sticky; top: 1rem; max-height: calc(100vh - 6rem); overflow-y: auto; display: flex; flex-direction: column; gap: .2rem; padding: .2rem 0 0; }
 .og-tree-group { display: flex; flex-direction: column; margin-bottom: .8rem; }
