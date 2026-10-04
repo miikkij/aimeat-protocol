@@ -14,6 +14,7 @@ do not require a running node or LLM.
 """
 from __future__ import annotations
 
+import pytest
 from pydantic import BaseModel, ValidationError
 
 from aimeat_crewai.liaison import (
@@ -170,7 +171,9 @@ def test_strip_none_kwargs_installs_repair_only_for_propose_todos() -> None:
         {"task_id": "t1", "todos": [{"description": "d"}]}
     )  # no raise
 
-    # ...an unrelated tool keeps its schema unchanged.
+    # ...an unrelated tool gets no repair. Its schema is still subclassed once, by the omit-unset
+    # dump every tool gets (test_omitted_optional_stays_omitted.py), so the check is behaviour: a
+    # todo with no title is still refused.
     class _OtherTool(_FakeTool):
         def __init__(self) -> None:
             super().__init__()
@@ -179,4 +182,6 @@ def test_strip_none_kwargs_installs_repair_only_for_propose_todos() -> None:
     other = _OtherTool()
     other_schema = other.args_schema
     _strip_none_kwargs(other)
-    assert other.args_schema is other_schema
+    assert issubclass(other.args_schema, other_schema)
+    with pytest.raises(ValidationError):
+        other.args_schema.model_validate({"task_id": "t1", "todos": [{"description": "d"}]})

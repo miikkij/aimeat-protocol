@@ -25,6 +25,7 @@
  * @usage Called by `aimeat connect serve`.
  *
  * @version-history
+ *   2026-10-04 -- A null for an optional field that refuses null reads as the field left out.
  *   2026-09-27 -- A call to a tool that moved into aimeat_app_manage answers TOOL_MOVED with the new call.
  *   v1.9.4 -- 2026-05-28 -- Update connector guidance and fail missing credentials without a stack trace
  *   v2.0.0 -- 2026-05-29 -- Multi-agent serve: registry-driven, per-agent poller, task-runner hook
@@ -42,6 +43,7 @@ import { checkConnectorHome } from '../home-access.js';
 import { buildRegistry, type AgentRegistry } from '../agent-registry.js';
 import { registerAllTools } from './tools/index.js';
 import { answerMovedTools } from '../../../mcp/moved-tools-answer.js';
+import { treatNullAsAbsent } from '../../../mcp/null-as-absent.js';
 import { registerResources } from './resources.js';
 import { startPollerForAgent } from './poller.js';
 import { isRunner } from '../task-runner.js';
@@ -57,6 +59,8 @@ export function buildMcpServer(role: SurfaceRole | 'all', registry: AgentRegistr
     name: role === 'all' ? 'aimeat-connect' : `aimeat-connect-${role}`,
     version: '0.1.0',
   });
+  // A null sent for an optional field the client left out reads as left out (mcp/null-as-absent.ts).
+  treatNullAsAbsent(mcp);
 
   if (role === 'all') {
     registerAllTools(mcp, registry);

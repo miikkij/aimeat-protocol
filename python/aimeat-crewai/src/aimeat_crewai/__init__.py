@@ -26,6 +26,11 @@ Typical use:
 See the package README and `examples/` for full recipes.
 
 Changelog:
+  0.32.1 -- 2026-10-04 -- An optional field the model left out is no longer sent as null inside a
+    list item. CrewAI's MCP tool adapter gives every optional field the default None, nested ones
+    included, and the top-level None strip did not reach them, so the node refused a todo with
+    "expected string, received null at todos[0].description" (crewfive, 73176d1). Each tool's
+    validated arguments are now dumped with exclude_unset, at every depth.
   0.32.0 -- 2026-10-02 -- A crew can think through the node with the owner's own key. `llm_for_choice`
     builds the LLM for the owner's `{kind:'node', role?}` crew choice (crews.llm.<agent>) with
     `node_llm`, and `unsafe_choice_reason` applies the node's guard to a `model` choice on read (the
@@ -200,7 +205,7 @@ from .workflow_spec import (
 
 # Kept in step with pyproject BY HAND, which is why it was wrong: 0.20.0 shipped announcing
 # itself as 0.19.0, and the first crew to install it reported the mismatch before we saw it.
-__version__ = "0.32.0"
+__version__ = "0.32.1"
 
 __all__ = [  # noqa: RUF022 -- grouped by topic with the version each group arrived in; alphabetical order would scatter those comments away from what they name
     "__version__",

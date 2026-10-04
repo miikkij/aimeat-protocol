@@ -11,6 +11,8 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   2026-10-04 — A null sent for an optional field that refuses null is read as the field left out
+ *     (null-as-absent.ts), on every tool of every surface.
  *   2026-10-02 — /v2/mcp/chat registers every permitted tool, switches off what the chat's list does
  *     not name, and adds aimeat_tools_find; a call by name switches a tool back on
  *     (mcp/tool-loader.ts).
@@ -152,6 +154,7 @@ import { mcpRequestAuthority, sameMcpPrincipal, withRequestPermission } from './
 // every existing importer keeps working; new code imports the leaf.
 import { emitResourceUpdated, emitResourceListChanged } from './resource-events.js';
 import { answerMovedTools } from './moved-tools-answer.js';
+import { treatNullAsAbsent } from './null-as-absent.js';
 export { resourceEvents, emitResourceUpdated, emitResourceListChanged, emitToolListChanged, type ResourceChangeEvent } from './resource-events.js';
 
 export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
@@ -262,6 +265,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
                 instructions: instructionsFor(role, { proactiveGuidance: guidance, supportAnsweredBy }),
             },
         );
+        // A client that sends null for an optional field it left out is read as leaving it out
+        // (mcp/null-as-absent.ts): CrewAI does that for every optional field, nested ones included.
+        treatNullAsAbsent(mcp);
 
         // F1: enforce per-agent scopes on the tool surface. We monkeypatch BOTH mcp.tool and
         // mcp.registerTool (tools may use either) for the duration of registration so each
