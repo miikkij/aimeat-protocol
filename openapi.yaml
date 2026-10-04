@@ -8272,7 +8272,10 @@ paths:
         are refused from the deletion on, also after the name is registered again and an agent of
         the same name, which gets the same identity, is connected. The app grants, the personal
         access tokens and the session rows are deleted with the account, so the next holder of the
-        name lists none.
+        name lists none. The account's free-access grants and paid contracts in EXCHANGE, as
+        consumer and as provider (the person or any of their agents), are revoked rather than
+        deleted: the other party keeps the record, and a person who later registers the same name
+        inherits no access. An identity of another node is not touched.
       tags: [Identity]
       security:
         - BearerAuth: []
