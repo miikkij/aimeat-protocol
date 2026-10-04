@@ -15,9 +15,11 @@
  *   area, for the person who just wants to fix a line.
  *
  *   Made of the component kit: the block passes data and never a class.
- * @structure DesignSpecBlock({ ctx, app, path, owner })
+ * @structure DesignSpecBlock({ ctx, app, path, owner, heading })
  * @usage html`<${DesignSpecBlock} key=${path} ctx=${ctx} app=${app} path=${path} owner=${owner} />`
  * @version-history
+ *   v1.1.0 — 2026-10-04 — `heading={false}` leaves the block's own heading out, for the App Catalog's
+ *     app page, whose section draws the headline (wish-appcatin-sovellussivulle-design-spec-roadmap-rakentajat-ja-l).
  *   v1.0.0 — 2026-10-02 — Initial (wish-sovelluksen-design-speksi-sovelluksen-l-helle-settings-contr).
  */
 import { h } from 'preact';
@@ -43,7 +45,7 @@ const html = htm.bind(h);
 /** The code a refused call carried, wherever the client put it. */
 const codeOf = (err) => err?.error?.code || err?.response?.error?.code || '';
 
-export function DesignSpecBlock({ ctx, app, path, owner }) {
+export function DesignSpecBlock({ ctx, app, path, owner, heading = true }) {
   const [read, setRead] = useState({ state: 'loading', spec: null, stale: false, appVersion: 0, template: '' });
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState('');
@@ -109,8 +111,8 @@ export function DesignSpecBlock({ ctx, app, path, owner }) {
   const mcpPrompt = buildSpecMcpPrompt({ url: getNodeUrl(), owner: app.owner, filename: app.filename, name: nameOf(app), present: !!spec, stale: read.stale });
   const pastePrompt = buildSpecPastePrompt({ name: nameOf(app), current });
 
-  return html`<${Space} above="large">
-    <${SubHeading} level=${3}>${a('specTitle')}<//>
+  return html`<${Space} above=${heading ? 'large' : 'none'}>
+    ${heading ? html`<${SubHeading} level=${3}>${a('specTitle')}<//>` : null}
     <${Note}>${a('specLead')}<//>
     ${read.state === 'loading' ? html`<${Note} kind="loading">${a('specLoading')}<//>` : null}
     ${read.state === 'failed' ? html`<${Note} kind="quiet" role="alert">${a('specFailed')}<//>` : null}

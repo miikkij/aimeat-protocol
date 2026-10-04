@@ -17,6 +17,8 @@
  *   resolveFrameAppTarget
  * @usage const resolved = await resolveAppOriginTarget(config, storage, req.query.origin);
  * @version-history
+ *   v1.4.0 — 2026-10-04 — The isolated frame's answer names the app by its own name, which the record
+ *     it already reads carries; it named the file, and the grant kept that label ("ansapolku.html").
  *   v1.3.0 — 2026-09-26 — resolveFrameAppTarget answers on every node: the App Catalog's preview
  *     asks by name too, and it handed the owner's session to the code it previewed instead.
  *   v1.2.0 — 2026-09-25 — resolveFrameAppTarget: the app the isolated frame's page asks for, by its
@@ -157,7 +159,7 @@ export async function resolveFrameAppTarget(
   return {
     ok: true, family: 'app',
     target: `${record.ownerName}/${record.filename}`,
-    name: record.filename,
+    name: record.manifest?.name?.trim() || record.filename,
     owner: record.ownerName,
   };
 }

@@ -7,6 +7,8 @@
  * @structure PublishDialog({ app, busy, onPublish, onClose }) · CollaborationSection({ ctx })
  * @usage import { CollaborationSection, PublishDialog } from './collaboration.js';
  * @version-history
+ *   v2.2.0 — 2026-10-04 — The roadmap is RoadmapBlock (roadmap-block.js), which reads it itself, so the
+ *     App Catalog's app page shows the same block; the spec no longer waits for the roadmap to load.
  *   v2.1.0 — 2026-10-02 — The chosen app's design spec (design-spec.js) sits above its roadmap, under
  *     its own heading, and the roadmap halves get a heading of their own.
  *   v2.0.0 — 2026-09-26 — Every part is a component call that gets data (page group G6): the dialog's
@@ -39,20 +41,18 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 import { Modal } from '/components/Modal.js';
 import { Section } from '/components/Section.js';
-import { List, Row, Name, Desc, Doors } from '/components/List.js';
+import { List, Row, Name, Doors } from '/components/List.js';
 import { Action, Loud } from '/components/Action.js';
 import { Note } from '/components/Note.js';
-import { SubHeading } from '/components/SubHeading.js';
 import { Check } from '/components/Check.js';
 import { Select } from '/components/Select.js';
 import { TextArea } from '/components/TextField.js';
-import { Fields, FormActions } from '/components/Field.js';
 import { Space } from '/components/Layout.js';
-import { apiGet, apiPost, apiPatch, apiDelete } from '/js/api.js';
 import { listApps } from '/js/services/apps.js';
 import { swallowed } from '/js/swallowed.js';
-import { a, nameOf, appRef, day } from './frame.js';
+import { a, nameOf, appRef } from './frame.js';
 import { DesignSpecBlock } from './design-spec.js';
+import { RoadmapBlock } from './roadmap-block.js';
 const html = htm.bind(h);
 const pathOf = app => `/v1/apps/${encodeURIComponent(app.owner)}/${encodeURIComponent(app.filename)}`;
 
@@ -75,13 +75,6 @@ export function CollaborationSection({ ctx }) {
   const [shared, setShared] = useState(null);
   const [sharedError, setSharedError] = useState(false);
   const [selected, setSelected] = useState('');
-  const [road, setRoad] = useState(null);
-  const [loaded, setLoaded] = useState(false);
-  const [inside, setInside] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [what, setWhat] = useState('');
-  const [state, setState] = useState('wanted');
   const apps = [...(ctx.apps || []), ...(showShared ? shared || [] : [])];
   const app = apps.find(x => appRef(x) === selected);
   const owner = app?.owner === ctx.session.owner;
@@ -95,29 +88,6 @@ export function CollaborationSection({ ctx }) {
       .catch(err => { swallowed('apps: shared list', err); if (active) setSharedError(true); });
     return () => { active = false; };
   }, [showShared, ctx.apps]);
-
-  useEffect(() => {
-    setLoaded(false); setFailed(false); setRoad(null); setWhat(''); setState('wanted');
-  }, [selectedPath]);
-
-  useEffect(() => {
-    if (!selectedPath) return;
-    let active = true;
-    apiGet(`${selectedPath}/roadmap`).then(res => {
-      if (active) { setRoad(res.data.roadmap); setInside(res.data.inside_the_build); setLoaded(true); }
-    }).catch(err => { swallowed('apps: roadmap', err); if (active) setFailed(true); });
-    return () => { active = false; };
-  }, [selectedPath, ctx.apps]);
-
-  async function change(fn) {
-    setBusy(true);
-    try {
-      await fn();
-      const res = await apiGet(`${pathOf(app)}/roadmap`);
-      setRoad(res.data.roadmap); setWhat('');
-    } catch (err) { ctx.showToast?.(err?.message || a('roadFailed'), true); }
-    finally { setBusy(false); }
-  }
 
   return html`<${Section} id="ap-collaboration" num="07" title=${a('roadTitle')}>
     <${Check} checked=${showShared} onChange=${setShowShared}>${a('sharedShow')}<//>
@@ -135,36 +105,9 @@ export function CollaborationSection({ ctx }) {
       <${Select} label=${a('roadApp')} value=${selected} onChange=${setSelected} placeholder=${a('roadChoose')}
         options=${apps.map(x => [appRef(x), `${nameOf(x)} · ${x.owner}`])} />
     <//>
-    ${app && failed ? html`<${Note} kind="quiet" role="alert">${a('roadFailed')}<//>` : null}
-    ${app && !loaded && !failed ? html`<${Note} kind="loading">${a('bldLoading')}<//>` : null}
-    ${app && loaded ? html`
-      <${DesignSpecBlock} key=${selectedPath} ctx=${ctx} app=${app} path=${selectedPath} owner=${owner} />
-      <${Space} above="large"><${SubHeading} level=${3}>${a('roadHeading')}<//><//>
-      <${Note}>${a(road?.wantedVisibility === 'everyone' ? 'roadPublicHint' : 'roadPrivateHint')}<//>
-      ${owner ? html`<${Space} above="medium"><${Select} label=${a('roadVisibility')} disabled=${busy}
-        value=${road?.wantedVisibility || 'developers'} onChange=${v => change(() => apiPatch(`${pathOf(app)}/roadmap`, { wanted_visibility: v }))}
-        options=${[['developers', a('roadDevelopers')], ['everyone', a('roadEveryone')]]} /><//>` : null}
-      ${['done', 'wanted'].map(half => html`<${Space} key=${half} above="large">
-        <${SubHeading} level=${3}>${a(half === 'done' ? 'roadDone' : 'roadWanted')}<//>
-        <${List} cols="name-doors" empty=${a('roadEmpty')}
-          rows=${(road?.entries || []).filter(e => e.state === half)} render=${e => html`<${Row} key=${e.id}>
-            <${Desc} pre sub=${`${e.by} · ${day(e.at)}${e.version ? ` · v${e.version}` : ''}`}>${e.what}<//>
-            <${Doors}>${owner || (e.state === 'wanted' && e.by === ctx.session.owner) ? html`<${Action} small disabled=${busy}
-              onClick=${() => change(() => apiDelete(`${pathOf(app)}/roadmap/${encodeURIComponent(e.id)}`))}>${a('roadRemove')}<//>` : null}<//>
-          <//>`} />
-      <//>`)}
-      <${Space} above="large">
-        <form onSubmit=${e => { e.preventDefault(); change(() => apiPost(`${pathOf(app)}/roadmap`, { state, what })); }}>
-          <${Fields} cols=${2}>
-            <${Select} label=${a('roadState')} value=${state} onChange=${setState}
-              options=${[['wanted', a('roadWanted')], ...(inside ? [['done', a('roadDone')]] : [])]} />
-            <${TextArea} wide label=${a('roadWhat')} rows=${3} maxLength="600" required value=${what} onInput=${setWhat} />
-          <//>
-          <${Space} above="large">
-            <${FormActions}><${Loud} control type="submit" disabled=${busy || what.trim().length < 3}>${a('roadAdd')}<//><//>
-          <//>
-        </form>
-      <//>
+    ${app ? html`
+      <${DesignSpecBlock} key=${'spec:' + selectedPath} ctx=${ctx} app=${app} path=${selectedPath} owner=${owner} />
+      <${RoadmapBlock} key=${'road:' + selectedPath} ctx=${ctx} path=${selectedPath} owner=${owner} me=${ctx.session.owner} refresh=${ctx.apps} />
     ` : null}
   <//>`;
 }

@@ -12,6 +12,10 @@
  * @structure renderPage · secWaiting · secKunto · secNewest · secFirst
  * @usage import { renderPage } from './apps/page.js';
  * @version-history
+ *   v2.2.0 -- 2026-10-04 -- A permission row names the app as the catalogue does (grantName): a grant made
+ *     through the app's own address stored its file name, so the rows read ansapolku.html where the
+ *     catalogue reads Ansapolku. The name now comes from the app itself when the app is the person's own.
+ *     The rail names section 07, Roadmap and shared work, which it had left out.
  *   v2.1.0 -- 2026-10-03 -- The page's start (components/PageStart.js: the first prompt asks the person's AI for an app, the build prompt's copy is its button) and the title's question mark, concept.app (guidance part B).
  *   v2.0.0 -- 2026-09-26 -- Every part is a component call that gets data (page group G6): the frame
  *     is SettingsPage (crumb, head, marks, strip, rail as data), the strip FigureStrip; what waits
@@ -91,7 +95,7 @@ export function renderPage(ctx) {
     { key: 'apps', n: apps.length, label: a('stripApps'), sub: a('stripAppsSub', { listed, unlisted: apps.length - listed }) },
     { key: 'drafts', n: drafts.length, tone: drafts.length ? 'coral' : undefined, label: a('stripDrafts'), sub: drafts.length ? drafts.map(nameOf).slice(0, 2).join(' · ') : a('stripDraftsNone') },
     { key: 'opens', n: fmt(opens), label: a('stripOpens'), sub: top.length ? top.map((x) => `${nameOf(x)} ${fmt(x.downloads || 0)}`).join(' · ') : a('stripNone') },
-    { key: 'grants', n: grants.length, label: a('stripGrants'), sub: grants.length ? grants.map((g) => g.app_name || g.app).slice(0, 2).join(' · ') : a('stripGrantsNone') },
+    { key: 'grants', n: grants.length, label: a('stripGrants'), sub: grants.length ? grants.map((g) => grantName(ctx, g)).slice(0, 2).join(' · ') : a('stripGrantsNone') },
   ]} />`;
 
   const marks = [
@@ -111,7 +115,7 @@ export function renderPage(ctx) {
 
   const sections = none
     ? [{ id: 'ap-first', num: '01', label: a('secFirst'), count: '' }, { id: 'ap-waiting', num: '02', label: a('secWaiting'), count: 0 }, { id: 'ap-kunto', num: '03', label: a('secKunto'), count: '' }, { id: 'ap-build', num: '04', label: a('uploadLabel'), count: '' }]
-    : [{ id: 'ap-waiting', num: '01', label: a('secWaiting'), count: waiting }, { id: 'ap-kunto', num: '02', label: a('secKunto'), count: '' }, { id: 'ap-newest', num: '03', label: a('secNewest'), count: Math.min(apps.length, 6) }, { id: 'ap-agents', num: '04', label: a('secAgents'), count: '' }, { id: 'ap-build', num: '05', label: a('secBuild'), count: '' }, { id: 'ap-builders', num: '06', label: a('secBuilders'), count: '' }];
+    : [{ id: 'ap-waiting', num: '01', label: a('secWaiting'), count: waiting }, { id: 'ap-kunto', num: '02', label: a('secKunto'), count: '' }, { id: 'ap-newest', num: '03', label: a('secNewest'), count: Math.min(apps.length, 6) }, { id: 'ap-agents', num: '04', label: a('secAgents'), count: '' }, { id: 'ap-build', num: '05', label: a('secBuild'), count: '' }, { id: 'ap-builders', num: '06', label: a('secBuilders'), count: '' }, { id: 'ap-collaboration', num: '07', label: a('roadTitle'), count: '' }];
 
   return html`
     <${SettingsPage} name="apps" crumb=${crumb()} title=${t('profile.tabs.apps')} sub=${a('titleSub')} help="concept.app" marks=${marks}
@@ -170,12 +174,24 @@ function diffPanel(diff) {
     <//>`;
 }
 
+/**
+ * The name a permission row shows. The grant stores a label at the moment it was given, and a grant
+ * made through the app's own address stored the file name; the app's current name wins whenever the
+ * app is one of the person's own, so a rename shows too.
+ */
+function grantName(ctx, g) {
+  const own = (ctx.apps || []).find((x) => appRef(x) === g.app);
+  if (own) return nameOf(own);
+  const file = String(g.app || '').split('/').pop();
+  return g.app_name && g.app_name !== file ? g.app_name : file.replace(/\.html?$/i, '') || g.app;
+}
+
 function grantRow(ctx, g) {
   const open = ctx.openScopes === g.grant_id;
   const busy = ctx.busy === g.grant_id;
   return html`
     <${Row} key=${'g' + g.grant_id} open=${open}>
-      <${Name} meta=${a('grantMeta', { n: (g.scopes || []).length, granted: day(g.granted_at), used: g.last_used_at ? rel(g.last_used_at) : a('grantNever') })}>${g.app_name || g.app}<//>
+      <${Name} meta=${a('grantMeta', { n: (g.scopes || []).length, granted: day(g.granted_at), used: g.last_used_at ? rel(g.last_used_at) : a('grantNever') })}>${grantName(ctx, g)}<//>
       <${Cell}><${Mark} tone="sun">${a('grantChip')}<//><//>
       <${Doors}>
         <${Action} small soft onClick=${() => ctx.toggleScopes(g)}>${open ? a('hideScopes') : a('viewScopes')}<//>

@@ -36,6 +36,9 @@
  * @structure Detail({ app, onClose }) · SECTION_IDS
  * @usage html`<${Detail} app=${cat.detail} onClose=${closeDetail} />`
  * @version-history
+ *   v1.3.0 — 2026-10-04 — Three sections from Settings > Apps, so everything about building one app
+ *     is on that app's page: the design spec after About, the roadmap after Versions, who else may
+ *     build it after Manage (wish-appcatin-sovellussivulle-design-spec-roadmap-rakentajat-ja-l).
  *   v1.2.0 — 2026-09-27 — The sections' files are named literally (SECTION_LOADERS), so the
  *     catalogue's build follows them.
  *   v1.1.0 — 2026-09-27 — Parity pass: the toolbar's icon, pencil and the back link are Overlay options
@@ -67,8 +70,8 @@ import { DetailHead, DetailBand } from '/views/appcat/detail-head.js';
 const html = htm.bind(h);
 
 /** The sections in the order of F65. */
-export const SECTION_IDS = ['work', 'ai', 'about', 'datamap', 'needs', 'history', 'versions', 'visitors', 'manage',
-  'skills', 'search', 'marks', 'legal', 'audit', 'promote', 'odps', 'monetize', 'cost', 'agents', 'actions'];
+export const SECTION_IDS = ['work', 'ai', 'about', 'spec', 'datamap', 'needs', 'history', 'versions', 'roadmap', 'visitors',
+  'manage', 'builders', 'skills', 'search', 'marks', 'legal', 'audit', 'promote', 'odps', 'monetize', 'cost', 'agents', 'actions'];
 
 /**
  * Each section's file, named literally so the catalogue's build (and a reader) can follow it; loaded
@@ -78,12 +81,15 @@ const SECTION_LOADERS = {
   work: () => import('/views/appcat/sections/work.js'),
   ai: () => import('/views/appcat/sections/ai.js'),
   about: () => import('/views/appcat/sections/about.js'),
+  spec: () => import('/views/appcat/sections/spec.js'),
   datamap: () => import('/views/appcat/sections/datamap.js'),
   needs: () => import('/views/appcat/sections/needs.js'),
   history: () => import('/views/appcat/sections/history.js'),
   versions: () => import('/views/appcat/sections/versions.js'),
+  roadmap: () => import('/views/appcat/sections/roadmap.js'),
   visitors: () => import('/views/appcat/sections/visitors.js'),
   manage: () => import('/views/appcat/sections/manage.js'),
+  builders: () => import('/views/appcat/sections/builders.js'),
   skills: () => import('/views/appcat/sections/skills.js'),
   search: () => import('/views/appcat/sections/search.js'),
   marks: () => import('/views/appcat/sections/marks.js'),
