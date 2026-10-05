@@ -1065,22 +1065,22 @@
   var LANG_KEY = "aimeat-lang";
   var COOKIE_MAX_AGE = 31536e3;
   function readLocales(opts) {
-    let list2 = opts && Array.isArray(opts.locales) ? opts.locales : null;
-    if (!list2) {
+    let list3 = opts && Array.isArray(opts.locales) ? opts.locales : null;
+    if (!list3) {
       try {
         const m = (
           /** @type {HTMLMetaElement|null} */
           document.querySelector('meta[name="aimeat-locales"]')
         );
-        if (m && m.content) list2 = m.content.split(/[\s,]+/);
+        if (m && m.content) list3 = m.content.split(/[\s,]+/);
       } catch {
       }
     }
-    if (!list2) return [];
+    if (!list3) return [];
     const seen = {};
     const out = [];
-    for (let i = 0; i < list2.length; i++) {
-      const c = String(list2[i] || "").trim().toLowerCase();
+    for (let i = 0; i < list3.length; i++) {
+      const c = String(list3[i] || "").trim().toLowerCase();
       if (/^[a-z]{2}$/.test(c) && !seen[c]) {
         seen[c] = 1;
         out.push(c);
@@ -1096,9 +1096,9 @@
     }
   }
   function readLang(locales) {
-    const list2 = Array.isArray(locales) ? locales : null;
-    const pick = list2 ? function(v) {
-      return v && list2.indexOf(v) >= 0 ? v : null;
+    const list3 = Array.isArray(locales) ? locales : null;
+    const pick = list3 ? function(v) {
+      return v && list3.indexOf(v) >= 0 ? v : null;
     } : function(v) {
       return v ? String(v).slice(0, 2) : null;
     };
@@ -1118,19 +1118,19 @@
     } catch {
     }
     if (nav) return nav;
-    return list2 ? list2[0] : "en";
+    return list3 ? list3[0] : "en";
   }
   function pageLang() {
-    const list2 = readLocales();
+    const list3 = readLocales();
     return (
       /** @type {string} */
-      readLang(list2.length ? list2 : null)
+      readLang(list3.length ? list3 : null)
     );
   }
-  function writeLang(lang) {
+  function writeLang(lang2) {
     try {
-      localStorage.setItem(LANG_KEY, lang);
-      document.cookie = LANG_KEY + "=" + lang + ";path=/;max-age=" + COOKIE_MAX_AGE + ";SameSite=Lax";
+      localStorage.setItem(LANG_KEY, lang2);
+      document.cookie = LANG_KEY + "=" + lang2 + ";path=/;max-age=" + COOKIE_MAX_AGE + ";SameSite=Lax";
     } catch {
     }
   }
