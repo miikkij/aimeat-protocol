@@ -15,6 +15,7 @@
  *   import { registerAiImageTool } from './ai-image.js';
  *   registerAiImageTool(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.4.0 — 2026-09-28 — `role`, the AI role the call runs as, forwarded as on POST /v1/ai/image.
  *   v1.3.0 — 2026-09-28 — `provider` and `fallback`, forwarded as on POST /v1/ai/image (System 2, V3).
  *   v1.2.0 — 2026-09-28 — The asking agent is named to the service, so its own key pays first and its
@@ -24,7 +25,6 @@
  *   v1.0.0 — 2026-08-16 — Initial.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -34,7 +34,7 @@ import { generateForOwner } from '../services/ai-image.js';
 import { AiCompletionError } from '../services/ai/completion.js';
 import { aiPayerOf } from '../services/agent-ai-keys.js';
 import { aiCallerOfPrincipal } from '../services/ai/caller-context.js';
-import { AI_ROLE_PARAM } from '../tool-catalog/definitions/ai-models.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerAiImageTool(
     mcp: McpServer,
@@ -45,17 +45,7 @@ export function registerAiImageTool(
     mcp.tool(
         'aimeat_image_generate',
         descriptionFor('aimeat_image_generate'),
-        {
-            prompt: z.string().describe('What the picture should show. Describe it plainly; this is not a chat turn.'),
-            size: z.string().optional().describe('Provider-specific size, e.g. "1024x1024". Omit to let the model decide.'),
-            storage_key: z.string().optional().describe('Where to store it. Defaults to ai-images/<timestamp>-<random>.<ext>.'),
-            public: z.boolean().optional().describe('Make it publicly readable. Needed when a model has to fetch the image back by URL. Default false.'),
-            model: z.string().optional().describe('Override the image model. Omit to use the configured one.'),
-            app_id: z.string().optional().describe('Attribution for the per-app quota and the spend report.'),
-            provider: z.string().optional().describe('One of the owner\'s AI providers (aimeat_ai_providers), or a type. No fallback then.'),
-            fallback: z.boolean().optional().describe('false keeps the call on its first provider; omitted, the owner\'s rules decide.'),
-            role: z.string().min(1).max(300).optional().describe(AI_ROLE_PARAM),
-        },
+        zodShapeFor('aimeat_image_generate'),
         annotationsFor('aimeat_image_generate'),
         async ({ prompt, size, storage_key, public: isPublic, model, app_id, provider, fallback, role }) => {
             // The OWNER's identity, not the agent's. The API key, the daily budget and the spend

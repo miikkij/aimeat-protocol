@@ -21,24 +21,22 @@
  *   import { registerAppDraftEditTools } from './apps-draft-edit.js';
  *   registerAppDraftEditTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.1.0 — 2026-09-13 — The write, replace and seed results render `served_marks_removed` /
  *     `served_marks_note` from whatever the draft slot reports, through the servedMarksResponse every
  *     app door uses. The promotion (aimeat_app_draft_publish) strips the node's serve marks either way.
  *   v1.0.0 — 2026-08-16 — Initial implementation.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { resolveAppTargetScope } from '../services/app-lifecycle.js';
-import {
-    writeAppDraft, replaceInAppDraft, readAppDraft, seedAppDraft,
-    DRAFT_READ_DEFAULT_LINES, DRAFT_READ_MAX_LINES,
-} from '../services/app-draft-edit.js';
+import { writeAppDraft, replaceInAppDraft, readAppDraft, seedAppDraft } from '../services/app-draft-edit.js';
 import { servedMarksResponse } from '../services/app-serve-marks-strip.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 /** MCP has one error channel, plain text, so the refusal code travels in the sentence. */
 function refusalMessage(refusal: { status: number; code: string; message: string }): string {
@@ -63,18 +61,7 @@ export function registerAppDraftEditTools(
     mcp.tool(
         'aimeat_app_draft_write',
         descriptionFor('aimeat_app_draft_write'),
-        {
-            filename: z.string().describe('App filename this draft stages (e.g. "pong.html").'),
-            owner: z.string().optional()
-                .describe('Whose catalogue this app is in. Omit for your own. Naming somebody else works only when they granted you a development right on it.'),
-            content: z.string().describe('The text to write. Plain UTF-8, not base64.'),
-            mode: z.enum(['append', 'replace']).optional()
-                .describe('append (default) adds to the end; replace overwrites the whole draft.'),
-            expected_size_bytes: z.number().int().nonnegative().optional()
-                .describe('Refuse unless the draft is currently this many bytes.'),
-            name: z.string().optional().describe('Display name (defaults to the live app\'s, or the draft\'s once set).'),
-            description: z.string().optional().describe('Description (defaults to the live app\'s, or the draft\'s once set).'),
-        },
+        zodShapeFor('aimeat_app_draft_write'),
         annotationsFor('aimeat_app_draft_write'),
         async ({ filename, owner, content, mode, expected_size_bytes, name, description }) => {
             const agentGaii = getAgentGaii();
@@ -115,15 +102,7 @@ export function registerAppDraftEditTools(
     mcp.tool(
         'aimeat_app_draft_replace',
         descriptionFor('aimeat_app_draft_replace'),
-        {
-            filename: z.string().describe('App filename whose draft to edit.'),
-            owner: z.string().optional()
-                .describe('Whose catalogue this app is in. Omit for your own. Naming somebody else works only when they granted you a development right on it.'),
-            old_string: z.string().describe('The exact text to replace, including indentation.'),
-            new_string: z.string().describe('What to put there instead.'),
-            replace_all: z.boolean().optional()
-                .describe('Replace every occurrence instead of requiring exactly one. Default false.'),
-        },
+        zodShapeFor('aimeat_app_draft_replace'),
         annotationsFor('aimeat_app_draft_replace'),
         async ({ filename, owner, old_string, new_string, replace_all }) => {
             const agentGaii = getAgentGaii();
@@ -159,14 +138,7 @@ export function registerAppDraftEditTools(
     mcp.tool(
         'aimeat_app_draft_read',
         descriptionFor('aimeat_app_draft_read'),
-        {
-            filename: z.string().describe('App filename whose draft to read.'),
-            owner: z.string().optional()
-                .describe('Whose catalogue this app is in. Omit for your own. Naming somebody else works only when they granted you a development right on it.'),
-            offset: z.number().int().min(1).optional().describe('First line to return, 1-based. Default 1.'),
-            limit: z.number().int().min(1).optional()
-                .describe(`How many lines to return. Default ${DRAFT_READ_DEFAULT_LINES}, maximum ${DRAFT_READ_MAX_LINES}.`),
-        },
+        zodShapeFor('aimeat_app_draft_read'),
         annotationsFor('aimeat_app_draft_read'),
         async ({ filename, owner, offset, limit }) => {
             const agentGaii = getAgentGaii();
@@ -201,13 +173,7 @@ export function registerAppDraftEditTools(
     mcp.tool(
         'aimeat_app_draft_seed',
         descriptionFor('aimeat_app_draft_seed'),
-        {
-            filename: z.string().describe('The draft slot to write into.'),
-            owner: z.string().optional()
-                .describe('Whose catalogue this app is in. Omit for your own. Naming somebody else works only when they granted you a development right on it.'),
-            from_filename: z.string().optional().describe('The published app to copy from. Defaults to filename.'),
-            version: z.number().int().min(1).optional().describe('Which published version. Defaults to the newest.'),
-        },
+        zodShapeFor('aimeat_app_draft_seed'),
         annotationsFor('aimeat_app_draft_seed'),
         async ({ filename, owner, from_filename, version }) => {
             const agentGaii = getAgentGaii();

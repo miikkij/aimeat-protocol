@@ -161,30 +161,12 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // Component packages (/v1/packages). A different thing from an app, and named so since
     // 2026-08-16 — these five were called aimeat_app_* on the connector doors while the node's MCP
     // used the same names for the web apps at /v1/apps.
-    aimeat_app_list: { title: 'List Apps', readOnlyHint: true },
-    aimeat_app_get: { title: 'Get App', readOnlyHint: true },
     // Destructive because some actions are: ui_set replaces a layout, subdomain_delete and
     // screenshot_clear remove, an empty access_code clears one. Not idempotent: agent_deploy starts
     // a new task on every call. A client that confirms each call is the safe reading of a mixed tool.
     aimeat_app_manage: { title: 'Manage an App', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
-    aimeat_app_publish: { title: 'Publish App', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_app_draft_save: { title: 'Save App Draft', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    // append is not idempotent: calling it twice writes the chunk twice, which is the whole point of
-    // building a file across many calls. A client that retries on timeout must use expected_size_bytes.
-    aimeat_app_draft_write: { title: 'Write App Draft', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_app_draft_replace: { title: 'Replace In App Draft', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_app_draft_read: { title: 'Read App Draft', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_app_draft_seed: { title: 'Seed App Draft', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_seo_status: { title: 'Search Visibility Status', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    // Open world: it posts to api.indexnow.org. Idempotent: the same notice twice is the same notice.
-    aimeat_seo_announce: { title: 'Instant Update to Search Engines', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
-    aimeat_image_generate: { title: 'Generate Image', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     aimeat_voice_reply: { title: 'Generate Voice Reply', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     aimeat_voice_speak: { title: 'Generate Speech', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-    aimeat_app_draft_publish: { title: 'Publish App Draft', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_app_draft_discard: { title: 'Discard App Draft', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
-    aimeat_app_fork: { title: 'Fork App', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_app_delete: { title: 'Delete App', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
 
     // ── Extensions ──
 
@@ -214,7 +196,6 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
 
     // ── Admin (operator-only) ──
     // destructiveHint: mints morsels (irreversible ledger change, financial action)
-    aimeat_admin_mint: { title: 'Admin: Mint Morsels', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
 
     // ── Commerce (TARGET-033/034 over MCP) ──
 

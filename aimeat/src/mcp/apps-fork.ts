@@ -8,6 +8,7 @@
  * @structure registerAppForkTool(mcp, storage, config, getAgentGaii, emitResourceListChanged)
  * @usage import { registerAppForkTool } from './apps-fork.js';
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.1.0 — 2026-08-11 — August 2026 audit step 8: the write goes through forkApp() in
  *     services/app-lifecycle.ts, the same function POST /v1/apps/:owner/:filename/fork calls. Five
  *     things the HTTP fork does and this one did not now happen on both: the AI disclosure posture is
@@ -18,13 +19,13 @@
  *   v1.0.0 — 2026-08-11 — Extracted from mcp/apps.ts (max-file-lines), no behaviour change.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { forkApp, resolveAppOwnerScope } from '../services/app-lifecycle.js';
 import { logger } from '../utils/logger.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerAppForkTool(
     mcp: McpServer,
@@ -37,12 +38,7 @@ export function registerAppForkTool(
     mcp.tool(
         'aimeat_app_fork',
         descriptionFor('aimeat_app_fork'),
-        {
-            owner: z.string().describe('Owner name of the source app'),
-            filename: z.string().describe('Filename of the source app'),
-            new_filename: z.string().describe('Filename for the fork in your catalogue. Alphanumeric, dots, hyphens, underscores. Max 100 chars.'),
-            version: z.number().optional().describe('Source version to fork (default: latest)'),
-        },
+        zodShapeFor('aimeat_app_fork'),
         annotationsFor('aimeat_app_fork'),
         async ({ owner, filename, new_filename, version }) => {
             const agentGaii = getAgentGaii();

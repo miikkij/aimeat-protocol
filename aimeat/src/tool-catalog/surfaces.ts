@@ -202,7 +202,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         // alone is 6 500 characters, which every round would pay for.
         
         // Their apps and skills.
-        'aimeat_app_list', 
+        
         // Their agents, a new one, and work for them. A schedule is found when it is needed.
         
         
@@ -211,7 +211,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         
         
-        'aimeat_app_publish', 'aimeat_app_draft_save', 'aimeat_app_draft_publish', 'aimeat_app_draft_discard', 'aimeat_app_list', 'aimeat_app_get', 'aimeat_app_manage', 'aimeat_app_delete',
+        'aimeat_app_manage', 
         // Component packages — a different backend from the apps above, named so since 2026-08-16.
         // Four of them are registered on this node's /v1/mcp (mcp/packages.ts) and the v2 surface
         // must list exactly what is registered. Authoring by hand (publish) and pruning history
@@ -222,10 +222,10 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         
         
-        'aimeat_app_draft_write', 'aimeat_app_draft_replace', 'aimeat_app_draft_read', 'aimeat_app_draft_seed',
-        'aimeat_seo_status',
-        'aimeat_seo_announce',
-        'aimeat_image_generate', 
+        
+        
+        
+        
         
         'aimeat_voice_reply', 'aimeat_voice_speak',
         
@@ -241,12 +241,12 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         
         
-        'aimeat_app_fork', 
+        
         
         
     ],
     agent: [
-        'aimeat_image_generate', 
+        
         
         'aimeat_voice_reply', 'aimeat_voice_speak',
         
@@ -403,7 +403,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
     ],
     admin: [
-        'aimeat_admin_mint',
+        
         // TARGET-082: the operator's AI sets the node's classification switch and policy.
         
         // BR-04: the operator connects an organisation's identity provider and offboards by hand.

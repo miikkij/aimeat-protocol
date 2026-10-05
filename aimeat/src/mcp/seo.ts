@@ -21,6 +21,7 @@
  * @structure registerSeoTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage import { registerSeoTools } from './seo.js';
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.3.1 — 2026-10-05 — A comment names requireOperator, the REST route's check since secaudit 2026-10, C2.
  *   v1.3.0 — 2026-09-27 — aimeat_app_seo_set moved into aimeat_app_manage (action "seo", src/mcp/app-manage.ts).
  *   v1.2.0 — 2026-09-24 — SECURITY (audit A8-1): the status and the announcement ask the
@@ -33,7 +34,6 @@
  *   v1.0.0 — 2026-08-25 — Initial.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -42,6 +42,7 @@ import { buildSeoStatus, announceNote } from '../routes/admin-seo.js';
 import { planAnnouncement, announceEverything } from '../services/indexnow-site.js';
 import { emitChange } from '../services/event-bus.js';
 import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerSeoTools(
   mcp: McpServer,
@@ -54,7 +55,7 @@ export function registerSeoTools(
   mcp.tool(
     'aimeat_seo_status',
     descriptionFor('aimeat_seo_status'),
-    {},
+    zodShapeFor('aimeat_seo_status'),
     annotationsFor('aimeat_seo_status'),
     async () => {
       // The REST route is behind requireOperator() (askOperator with operator:admin), and this tool
@@ -76,10 +77,7 @@ export function registerSeoTools(
   mcp.tool(
     'aimeat_seo_announce',
     descriptionFor('aimeat_seo_announce'),
-    {
-      scope: z.enum(['all', 'pages']).optional().describe('"all" (default): the pages and every findable application. "pages": the pages alone.'),
-      plan: z.boolean().optional().describe('true lists what would be sent, host by host, and sends nothing.'),
-    },
+    zodShapeFor('aimeat_seo_announce'),
     annotationsFor('aimeat_seo_announce'),
     async (args: { scope?: 'all' | 'pages'; plan?: boolean }) => {
       // Operator-gated here for the same reason aimeat_seo_status is: this calls the service the

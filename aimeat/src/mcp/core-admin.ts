@@ -36,7 +36,6 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -187,7 +186,7 @@ export function registerCoreAdminTools(
     mcp.tool(
         'aimeat_admin_mint',
         descriptionFor('aimeat_admin_mint'),
-        { gaii: z.string(), amount: z.number().int().positive() },
+        zodShapeFor('aimeat_admin_mint'),
         annotationsFor('aimeat_admin_mint'),
         async ({ gaii, amount }) => {
             if (!(await isOperator())) return notOperator;
