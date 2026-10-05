@@ -47,6 +47,9 @@
  *     what a model reads (services/ai-inputs.ts), with the node's classification reader (TARGET-082).
  *   v1.11.0 — 2026-10-05 — Every model call runs as the principal the run acts for (ai-caller.ts):
  *     an agent's cap and the owner's rules for that agent or app apply (secaudit 2026-10, AI-3).
+ *   v1.12.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
+ *     A step's image and transcribe calls pass `limit: 'exempt'`: a run is the node's own work, and
+ *     a fan-out of thirty steps must not hit a per-minute request limit.
  */
 import type { StepDeps, OnPushTerminal } from './engine-steps.js';
 import type { WorkflowRun, WorkflowStep } from '../../models/workflow-schemas.js';
@@ -135,7 +138,7 @@ export function dispatchAiStep(
       ...(action.language ? { language: action.language } : {}),
       ...(action.provider ? { provider: action.provider } : {}),
       ...(action.role ? { role: action.role } : {}),
-      appId, ...await who(),
+      appId, ...await who(), limit: 'exempt',
     });
     addSpend(r.usage.costUsd);
     return landValue(action.json
@@ -193,7 +196,7 @@ export function dispatchAiStep(
         ...(action.size ? { size: action.size } : {}),
         ...(action.provider ? { provider: action.provider } : {}),
         ...(action.role ? { role: action.role } : {}),
-        appId, ...await who(),
+        appId, ...await who(), limit: 'exempt',
       });
       addSpend(r.usage.costUsd);
       return landValue({ storage_key: r.storageKey, url: r.fetchUrl, mime_type: r.mime, model: r.model });

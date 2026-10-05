@@ -19,7 +19,7 @@
  *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  *   v1.3.0 -- 2026-05-30 -- Add `surface` param → fetches the v2 per-role surface handbook.
  *   v1.4.0 -- 2026-09-18 -- Add `tier`, which the node's own tool has always had: "build-app" is the
- *     layered build specification (cli/connect/handbook-path.ts).
+ *     layered build specification (tool-dispatch/handbook-path.ts).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -27,7 +27,7 @@ import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 import { agentNameSchema, pickAgent, envelopeResult } from './_registry.js';
-import { handbookTierPath } from '../../handbook-path.js';
+import { handbookTierPath } from '../../../../tool-dispatch/handbook-path.js';
 
 export function registerHandbookTools(mcp: McpServer, registry: AgentRegistry): void {
   mcp.tool('aimeat_handbook_get', descriptionFor('aimeat_handbook_get'), {

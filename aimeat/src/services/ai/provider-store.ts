@@ -29,6 +29,7 @@
  *   setOwnerProviderKey · deleteOwnerProviderKey · ownerKeyIds · setAgentProviderKey ·
  *   agentProviderKeys · aiProvidersView · knownProviderIds · persistHealth
  * @version-history
+ *   v1.0.1 — 2026-10-05 — An agent name is checked with isValidAgentName, the grammar agents have (secaudit 2026-10, M2).
  *   v1.0.0 — 2026-09-28 — Initial (V3 of the System 2 plan).
  *   v1.1.0 — 2026-09-28 — catalogCheck and model_status from the model catalogue (V4); an extension
  *     provider is checked against its extension when saved (assertOwnExtensionProvider, V6).
@@ -44,6 +45,7 @@ import { recordAccountEvent } from '../account-events.js';
 import { readAgentKey } from '../agent-ai-keys.js';
 import { resolveModelFor, type ModelRole } from '../ai-model-defaults.js';
 import { logger } from '../../utils/logger.js';
+import { isValidAgentName } from '../../utils/gaii.js';
 import { isObj, isLoopbackHost, providerIdOf, PROVIDER_ID_PROBLEM } from '../ai-provider-common.js';
 import { AiCompletionError } from './errors.js';
 import { clearHealth } from './health.js';
@@ -64,7 +66,6 @@ const AGENT_KEY_PREFIX = 'ai.apikey.agent.';
 const LEGACY_SETTINGS = 'openrouter.settings';
 const LEGACY_KEY = 'openrouter.apikey';
 const SPEC = 'aimeat.ai-provider/v1';
-const AGENT_RE = /^[a-z0-9][a-z0-9-]{1,63}$/;
 
 export const agentProviderKeyRecord = (agent: string, providerId: string): string => `${AGENT_KEY_PREFIX}${agent}.${providerId}`;
 
@@ -93,7 +94,7 @@ export async function readOwnerProviderKey(storage: Storage, config: AimeatConfi
 export async function readAgentProviderKey(
   storage: Storage, config: AimeatConfig, ownerGhii: string, agent: string, p: AiProvider,
 ): Promise<string | null> {
-  if (!AGENT_RE.test(agent)) return null;
+  if (!isValidAgentName(agent)) return null;
   const own = decryptRecord(config, (await storage.getMemory(ownerGhii, agentProviderKeyRecord(agent, p.id)))?.value);
   if (own) return own;
   const atOpenRouter = p.type === 'openrouter' && p.baseUrl === fixedBaseUrlOf(config, 'openrouter');
@@ -394,7 +395,7 @@ export async function setAgentProviderKey(
   storage: Storage, config: AimeatConfig, ownerGhii: string, agent: string, rawId: string, apiKey: unknown,
 ): Promise<void> {
   const id = providerIdOf(rawId);
-  if (!AGENT_RE.test(agent)) throw new AiCompletionError('INVALID_AGENT', 400, 'Not an agent name.');
+  if (!isValidAgentName(agent)) throw new AiCompletionError('INVALID_AGENT', 400, 'Not an agent name.');
   const known = id && (nodeAiProviders(config).some(p => p.id === id) || !!(await storage.getMemory(ownerGhii, `${PROVIDER_PREFIX}${id}`)));
   if (!id || !known) throw new AiCompletionError('UNKNOWN_PROVIDER', 400, `providers.${rawId}: not a provider you can use. GET /v1/ai/providers lists them.`);
   const record = agentProviderKeyRecord(agent, id);
@@ -413,7 +414,7 @@ export async function setAgentProviderKey(
 
 /** The providers an agent holds a key of its own for: never a key, only which ones and when. */
 export async function agentProviderKeys(storage: Storage, ownerGhii: string, agent: string): Promise<Record<string, { set_at: string | null }>> {
-  if (!AGENT_RE.test(agent)) return {};
+  if (!isValidAgentName(agent)) return {};
   const prefix = `${AGENT_KEY_PREFIX}${agent}.`;
   const out: Record<string, { set_at: string | null }> = {};
   for (const r of await storage.listMemory(ownerGhii, { prefix })) {

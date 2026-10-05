@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Agent-task lifecycle routes (update, delete, queue, start, propose-todos, request-changes, pause). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.5.0 — 2026-10-02 — /start: every push carries its own delivery id (taskWakeId), so Start on a
  *     proposed task wakes the agent at once; another of the owner's agents holding task:write may
  *     start a task that waits only because of the setting. /queue reads the start decision.
@@ -31,6 +32,7 @@ import { readerFor } from '../../services/classification/reader.js';
 import { success, error } from '../../middleware/envelope.js';
 import { refuseNotYours, refuseNeedsPermission } from '../../middleware/refusals.js';
 import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
+import { isOwnerInPerson } from '../../utils/gaii.js';
 import { emitChange, emitDelivery } from '../../services/event-bus.js';
 import { emitResourceUpdated } from '../../mcp/index.js';
 import { recordTaskStarted } from '../../services/activity-recorder.js';
@@ -65,7 +67,7 @@ export function registerTaskLifecycleRoutes(
       return;
     }
 
-    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    const isOwnerSession = isOwnerInPerson(req.auth);
 
     // Owners can update draft/queued tasks; agents can update queued (propose todos) and active (execute todos)
     if (isOwnerSession && !['draft', 'queued'].includes(task.status)) {
@@ -252,7 +254,7 @@ export function registerTaskLifecycleRoutes(
   // route added today does not join it.
   router.post('/v1/agents/:name/tasks/:id/queue', requireAuth(), requireScope('task:write'), async (req, res) => {
     const queueRoles = req.auth!.roles;
-    const isOwner = queueRoles.includes('owner') && !queueRoles.includes('agent');
+    const isOwner = isOwnerInPerson(req.auth);
     const isApp = queueRoles.includes('app');
     if (!isOwner && !isApp) {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the owner or a granted app can release a draft task'));
@@ -313,7 +315,7 @@ export function registerTaskLifecycleRoutes(
    */
   router.post('/v1/agents/:name/tasks/:id/start', requireAuth(), async (req, res) => {
     const startRoles = req.auth!.roles;
-    const isOwner = startRoles.includes('owner') && !startRoles.includes('agent');
+    const isOwner = isOwnerInPerson(req.auth);
     const isApp = startRoles.includes('app');
     const isAgent = startRoles.includes('agent') && !isApp;
     if (!isOwner && !isApp && !isAgent) {
@@ -412,9 +414,8 @@ export function registerTaskLifecycleRoutes(
     // Owner-session only -- agents inherit the owner role in their JWT (see
     // /v1/auth/token), so requireRole('owner') alone would let an agent
     // self-request-changes on its own proposed plan, which makes no sense.
-    // The same pattern as /start gates this: ['owner'] AND NOT ['agent'].
-    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
-    if (!isOwnerSession) {
+    // The same test as /start gates this: isOwnerInPerson (utils/gaii.ts).
+    if (!isOwnerInPerson(req.auth)) {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the owner can request changes on a task'));
       return;
     }
@@ -519,8 +520,7 @@ export function registerTaskLifecycleRoutes(
   /* ── POST /v1/agents/:name/tasks/:id/pause -- Pause task (active -> paused) ── */
   router.post('/v1/agents/:name/tasks/:id/pause', requireAuth(), async (req, res) => {
     // Owner-only: agents cannot pause tasks
-    const isOwner = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
-    if (!isOwner) {
+    if (!isOwnerInPerson(req.auth)) {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the owner can pause tasks'));
       return;
     }

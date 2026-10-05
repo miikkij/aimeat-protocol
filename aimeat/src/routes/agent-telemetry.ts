@@ -8,6 +8,7 @@
  *   - POST /v1/agents/:name/telemetry  -- Append a telemetry event
  *   - GET  /v1/agents/:name/telemetry  -- List telemetry events (with filtering)
  * @version-history
+ *   v1.3.1 -- 2026-10-05 -- The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.0.0 -- 2026-05-23 -- Initial creation for Agent Dashboard telemetry
  *   v1.1.0 -- 2026-05-28 -- Wire POST handler into activity-recorder so telemetry
  *                            bumps the daily telemetry_events counter and llm_call
@@ -28,7 +29,7 @@ import type { Storage, TelemetryEvent } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { refuseNotYours } from '../middleware/refusals.js';
 import { requireAuth } from '../auth/middleware.js';
-import { agentGaiiFromIdentifier } from '../utils/gaii.js';
+import { agentGaiiFromIdentifier, isOwnerInPerson } from '../utils/gaii.js';
 import { pushTelemetry, recordTelemetryActivity, listTelemetryBuffered } from '../services/telemetry-buffer.js';
 
 /* ── Zod validation schema ── */
@@ -50,9 +51,8 @@ export function agentTelemetryRouter(config: AimeatConfig, storage: Storage): Ro
 
   /** Check if current session can access an agent's telemetry */
   function canAccessAgent(req: Express.Request, agentName: string): boolean {
+    if (isOwnerInPerson(req.auth)) return true;
     const roles = req.auth!.roles as string[];
-    const isOwnerSession = roles.includes('owner') && !roles.includes('agent');
-    if (isOwnerSession) return true;
     if (roles.includes('agent')) {
       return req.auth!.sub === resolveAgentGaii(req, agentName);
     }

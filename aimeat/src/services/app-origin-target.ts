@@ -13,10 +13,12 @@
  *
  *   The single-label rule is load-bearing in both families: `a.b.apps.example` must NOT resolve, or
  *   a nested subdomain could stand in for the app one level up.
- * @structure PORTFOLIO_TARGET_PREFIX · isPortfolioTarget · resolveAppOriginTarget ·
+ * @structure PORTFOLIO_TARGET_PREFIX · isPortfolioTarget · appOriginHostFamily · resolveAppOriginTarget ·
  *   resolveFrameAppTarget
  * @usage const resolved = await resolveAppOriginTarget(config, storage, req.query.origin);
  * @version-history
+ *   v1.5.0 — 2026-10-05 — appOriginHostFamily: the one test of which address family a host belongs
+ *     to, used here and by the grant redirect check in routes/app-grants.ts (secaudit 2026-10, C8).
  *   v1.4.0 — 2026-10-04 — The isolated frame's answer names the app by its own name, which the record
  *     it already reads carries; it named the file, and the grant kept that label ("ansapolku.html").
  *   v1.3.0 — 2026-09-26 — resolveFrameAppTarget answers on every node: the App Catalog's preview
@@ -49,6 +51,31 @@ export function isPortfolioTarget(target: string): boolean {
   return target.startsWith(PORTFOLIO_TARGET_PREFIX);
 }
 
+/**
+ * Which family of this node's published addresses a host belongs to, by its name alone: a per-app
+ * subdomain of the app host, a portfolio subdomain, or a company subdomain, each one label deep and
+ * never the family's bare host. Null for anything else. The one copy of the host test the grant
+ * redirect check (routes/app-grants.ts) and resolveAppOriginTarget below both ask (secaudit
+ * 2026-10, C8); the label is returned for the caller that looks it up.
+ */
+export function appOriginHostFamily(
+  config: Pick<AimeatConfig, 'appHost' | 'portfolioOriginEnabled' | 'portfolioHost' | 'coOriginEnabled' | 'coHost'>,
+  host: string,
+): { family: 'app' | 'portfolio' | 'co'; label: string } | null {
+  const h = host.toLowerCase();
+  const families: Array<['app' | 'portfolio' | 'co', string]> = [
+    ['app', (config.appHost || '').toLowerCase()],
+    ['portfolio', (config.portfolioOriginEnabled ? (config.portfolioHost || '') : '').toLowerCase()],
+    ['co', (config.coOriginEnabled ? (config.coHost || '') : '').toLowerCase()],
+  ];
+  for (const [family, base] of families) {
+    if (!base || h === base || !h.endsWith('.' + base)) continue;
+    const label = h.slice(0, -(base.length + 1));
+    return label && !label.includes('.') ? { family, label } : null;
+  }
+  return null;
+}
+
 export type AppOriginTarget =
   | { ok: true; family: 'app' | 'portfolio'; target: string; name: string; owner: string }
   | { ok: false; error: 'app_origin_disabled' | 'bad_origin' | 'unknown_app' };
@@ -72,9 +99,10 @@ export async function resolveAppOriginTarget(
   let host: string;
   try { host = new URL(String(origin ?? '')).hostname.toLowerCase(); } catch { return { ok: false, error: 'bad_origin' }; }
 
-  if (appHost && host !== appHost && host.endsWith('.' + appHost)) {
-    const sub = host.slice(0, -(appHost.length + 1));
-    if (!sub || sub.includes('.')) return { ok: false, error: 'bad_origin' }; // single-label per-app subdomain only
+  const family = appOriginHostFamily(config, host);
+
+  if (family?.family === 'app') {
+    const sub = family.label; // single-label per-app subdomain only (appOriginHostFamily)
 
     // Subdomain → the app it serves. This binding is what ties a token to one app's origin.
     const site = await storage.getSubdomainSite(sub);
@@ -89,9 +117,8 @@ export async function resolveAppOriginTarget(
     };
   }
 
-  if (portfolioHost && host !== portfolioHost && host.endsWith('.' + portfolioHost)) {
-    const sub = host.slice(0, -(portfolioHost.length + 1));
-    if (!sub || sub.includes('.')) return { ok: false, error: 'bad_origin' };
+  if (family?.family === 'portfolio') {
+    const sub = family.label;
     const resolved = await resolvePublishedPortfolio(storage, sub);
     if (!resolved.ok || !resolved.html) return { ok: false, error: 'unknown_app' };
     return {
@@ -107,9 +134,8 @@ export async function resolveAppOriginTarget(
   // and mean different things. Every refusal here matches the serving path in routes/subdomains.ts:
   // an inactive company, a reserved or malformed label, and a front page that is not an app all
   // answer the same way, so this door is no better an enumeration oracle than that one.
-  if (coHost && host !== coHost && host.endsWith('.' + coHost)) {
-    const slug = host.slice(0, -(coHost.length + 1));
-    if (!slug || slug.includes('.')) return { ok: false, error: 'bad_origin' };
+  if (family?.family === 'co') {
+    const slug = family.label;
     if (RESERVED_SUBDOMAINS.has(slug) || !SUBDOMAIN_RE.test(slug)) return { ok: false, error: 'unknown_app' };
 
     const company = await storage.getCompanyBySlug(slug);

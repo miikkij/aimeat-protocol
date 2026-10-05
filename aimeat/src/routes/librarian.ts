@@ -12,6 +12,8 @@
  *   carrying `memory:read`; otherwise it is scoped to the caller's own identity.
  * @usage app.use(librarianRouter(config, storage))
  * @version-history
+ *   v1.3.2 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
+ *     secaudit 2026-10, C4).
  *   v1.3.1 — 2026-10-05 — ai:use and memory:read are asked with scopeIsCovered, so `ai:*` and
  *     `memory:*` pass here as they pass requireScope (secaudit 2026-10, C3).
  *   v1.3.0 — 2026-09-29 — The search, classify, plan and distribute pass the caller's classification
@@ -35,7 +37,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { resolveIdentity } from '../utils/gaii.js';
+import { resolveIdentity, isOwnerInPerson } from '../utils/gaii.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { librarianSearch } from '../services/librarian.js';
 import { readerFor } from '../services/classification/reader.js';
@@ -53,12 +55,11 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
    *  boundary as /v1/ai/complete, and the same gate shape (see ai.ts gateOwnerOrAiUseAgent),
    *  so a sandboxed app-origin session (role 'app') works once the owner granted ai:use. */
   function gateOwnerOrAiUse(req: Request, res: Response): boolean {
-    const roles = req.auth?.roles ?? [];
     // Same owner branch as requireScope, exclusions included: an agent or ecosystem session is a
     // scoped principal and comes in on `ai:use`. Until 2026-08-11 (audit H-2) POST /v1/auth/token
     // copied the owner's roles onto agent tokens, so `roles.includes('owner')` on its own was a way
     // to run the owner's AI over the owner's material without holding the word for it.
-    if (roles.includes('owner') && !roles.includes('agent') && !roles.includes('ecosystem')) return true;
+    if (isOwnerInPerson(req.auth)) return true;
     const scopes = (req.auth as { scopes?: string[] } | undefined)?.scopes ?? [];
     // scopeIsCovered: `ai:*` passes here as it passes assertAiUseAllowed (C3).
     if (scopeIsCovered(scopes, 'ai:use')) return true;
@@ -84,7 +85,7 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
 
     const keyPrefix = (req.query.prefix as string | undefined)?.trim() || undefined;
     const scope = req.query.scope === 'public' ? 'public' : 'own';
-    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    const isOwnerSession = isOwnerInPerson(req.auth);
     // Fan the `own` search across the owner's FULL read surface (GHII + every agent + every ecosystem
     // app) for an owner session, OR for any grant that carries `memory:read` — an app/agent token that
     // resolves to the owner's GHII sees only GHII-owned rows (published .latest docs + GHII memory)

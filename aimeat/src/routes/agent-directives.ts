@@ -10,6 +10,7 @@
  *   - GET    /v1/owner/agent-defaults         -- Get owner-level defaults
  *   - PUT    /v1/owner/agent-defaults         -- Upsert owner defaults
  * @version-history
+ *   v1.8.1 -- 2026-10-05 -- The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.8.0 -- 2026-09-04 -- An APP principal needs task:read to read an agent's directives, and only
  *     an app principal does. Same shape and same word as GET /v1/agents/:name/tasks: a conditional
  *     refusal in the handler rather than a requireScope, because task:read is not in
@@ -42,7 +43,7 @@ import { success, error } from '../middleware/envelope.js';
 import { refuseNotYours, refuseNeedsPermission } from '../middleware/refusals.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { agentGaiiFromIdentifier } from '../utils/gaii.js';
+import { agentGaiiFromIdentifier, isOwnerInPerson } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
 import { AgentDirectivesSchema, OwnerAgentDefaultsSchema } from '../models/agent-directives-schemas.js';
@@ -91,8 +92,7 @@ export function agentDirectivesRouter(config: AimeatConfig, storage: Storage, we
 
   /** Owner-session or the agent itself may read this agent's data-access view (owner-or-self). */
   function canAccessAgent(req: Express.Request, agentGaii: string): boolean {
-    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
-    return isOwnerSession || req.auth!.sub === agentGaii;
+    return isOwnerInPerson(req.auth) || req.auth!.sub === agentGaii;
   }
 
   /* ── GET /v1/agents/:name/data-access/overview -- Data Access subtab composite (mount fold) ──

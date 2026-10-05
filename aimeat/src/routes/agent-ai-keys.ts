@@ -20,6 +20,8 @@
  * @structure agentAiKeysRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.2.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
+ *     The key test counts it on the route (aiCallLimit) in place of the per-principal path limiter.
  *   v1.1.0 — 2026-09-28 — A key per provider (System 2 plan, V3): PUT takes `providers`
  *     { "<provider id>": { api_key } | null }, stored as `ai.apikey.agent.<agent>.<id>`, and the read
  *     lists which providers the agent has a key for, never the key.
@@ -30,7 +32,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { requireOwnerPrincipal, isOwnerPrincipal } from '../auth/account-security.js';
-import { rateLimit } from '../middleware/rate-limit.js';
+import { aiCallLimit } from '../middleware/ai-call-limit.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, buildGAII } from '../utils/gaii.js';
 import { AiCompletionError, completeForOwner } from '../services/ai-completion.js';
@@ -46,7 +48,9 @@ const MODELS: readonly string[] = ['decide', 'openrouter'];
 
 export function agentAiKeysRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
-  const aiRateLimit = rateLimit(config.rateLimits.openrouter);
+  // The key test reaches testDecideKey or completeForOwner, which no MCP tool calls for it, so the
+  // route counts the account's AI call limit itself (middleware/ai-call-limit.ts).
+  const keyTestLimit = aiCallLimit(config);
 
   const fail = (res: Response, e: unknown) => {
     if (e instanceof AgentAiKeyError || e instanceof DecideError || e instanceof AiCompletionError) {
@@ -138,7 +142,7 @@ export function agentAiKeysRouter(config: AimeatConfig, storage: Storage): Route
   });
 
   // ── POST /v1/agents/:name/ai-keys/:model/test ── one tiny real call on the key that would pay for this agent
-  router.post('/v1/agents/:name/ai-keys/:model/test', requireAuth(), requireOwnerPrincipal(), aiRateLimit, async (req: Request, res: Response) => {
+  router.post('/v1/agents/:name/ai-keys/:model/test', requireAuth(), requireOwnerPrincipal(), keyTestLimit, async (req: Request, res: Response) => {
     try {
       const t = await target(req);
       const model = req.params.model as string;

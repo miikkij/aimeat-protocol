@@ -42,6 +42,7 @@
  *   setProvenanceHeaders(res, prov);
  *   res.json(success(config.nodeId, data, hints, envelopeMeta(prov)));
  * @version-history
+ *   v1.8.1 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   v1.8.0 — 2026-09-29 — The visible label is the EU icon alone on every viewport (developer
  *     decision 2026-09-29), and its statement opens in a panel above the chip on hover, focus or a
  *     tap, so the chip never moves (it used to jump from bottom:12px to bottom:58px and grow). The
@@ -85,6 +86,7 @@ import { toIetfHeader, toW3cHtml, toIptc, toEuIcon } from './ai-provenance-adapt
 import { projectForDetail, buildDisclosure } from './ai-provenance.js';
 import type { SurfaceContext } from './ai-disclosure.js';
 import { createT, type Locale } from '../i18n.js';
+import { escapeHtml } from '../utils/html-escape.js';
 
 /** A record ready to be served, with the URL a third party resolves it at. */
 export interface ServedProvenance {
@@ -231,9 +233,7 @@ const VISIBLE_LABEL_ID = 'aimeat-ai-label';
 /** The EU icon's height in the chip, in px. The chip's width is derived from it. */
 const ICON_H = 15;
 
-function esc(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
+const esc = escapeHtml;
 
 /**
  * esc(), plus every non-ASCII character as a numeric entity — so the text survives a document that

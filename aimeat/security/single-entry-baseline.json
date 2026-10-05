@@ -294,6 +294,101 @@
         "why": "C4: asks whether the session is the account holder in person. Moves to isOwnerInPerson."
       }
     },
-    "operator-route": {}
+    "operator-route": {},
+    "html-escape": {
+      "src/services/datapackage/odata.ts": {
+        "count": 1,
+        "why": "An XML escaper for the OData CSDL document, not HTML: it writes the XML entity &apos; for ', which XML defines and HTML 4 does not. It escapes all five characters."
+      },
+      "src/services/finance/finvoice.ts": {
+        "count": 1,
+        "why": "An XML escaper for the Finvoice 3.0 document a bank channel reads, not HTML. A ' in element text or a double-quoted attribute needs no escape in XML, and the E2E golden-file suite holds the document byte for byte, so it keeps its four-character escape."
+      }
+    },
+    "email-pattern": {},
+    "agent-name-pattern": {
+      "src/models/signal-schemas.ts": {
+        "count": 1,
+        "why": "STREAM_ID_RE: a signal stream's id, not an agent name."
+      },
+      "src/routes/organisms/intake.ts": {
+        "count": 1,
+        "why": "FORM_ID_RE: an intake form's id, not an agent name."
+      }
+    },
+    "owner-role": {
+      "src/commerce/agent-purchase-limit.ts": {
+        "count": 1,
+        "why": "Asks whether the caller is an agent (agent role and no owner role), which the limit is about."
+      },
+      "src/middleware/rate-limit.ts": {
+        "count": 1,
+        "why": "The rate multiplier per role, not an access decision."
+      },
+      "src/routes/agents/device-auth.ts": {
+        "count": 1,
+        "why": "The device-auth approver's kind (autoApprovePrincipal), which picks the approval path by role."
+      },
+      "src/routes/agents/management.ts": {
+        "count": 1,
+        "why": "(owner || operator) without agent or ecosystem: also admits the node's own operator-only caller (system runs build roles ['operator']), which isOwnerInPerson refuses."
+      },
+      "src/routes/ghii/owner-session.ts": {
+        "count": 1,
+        "why": "Reads the stored account record's roles to mint a sign-in token, not a session's."
+      },
+      "src/routes/mcp-servers.ts": {
+        "count": 1,
+        "why": "Sets the callerKind label in a record; decides nothing."
+      },
+      "src/routes/schemas.ts": {
+        "count": 1,
+        "why": "The owner role or the operator (isOperatorCaller) may define a schema: a role test, not the in-person question."
+      },
+      "src/routes/skills.ts": {
+        "count": 1,
+        "why": "Asks whether the caller is an agent session."
+      },
+      "src/routes/wallet.ts": {
+        "count": 1,
+        "why": "Asks whether the caller is an agent session."
+      },
+      "src/services/agent-proposals.ts": {
+        "count": 1,
+        "why": "(owner || operator) without agent: also admits the node's own operator-only caller, which isOwnerInPerson refuses."
+      },
+      "src/services/classification/reader-kind.ts": {
+        "count": 2,
+        "why": "Tells a person from an AI by the roles; an app and a visitor count as a person here, which isOwnerInPerson does not answer."
+      },
+      "src/services/consent-write.ts": {
+        "count": 1,
+        "why": "(owner || operator) without agent: also admits the node's own operator-only caller, which isOwnerInPerson refuses."
+      },
+      "src/services/external-login.ts": {
+        "count": 1,
+        "why": "Reads the stored account record's roles to mint a sign-in token, not a session's."
+      },
+      "src/services/group-shares.ts": {
+        "count": 1,
+        "why": "(owner || operator) without agent: also admits the node's own operator-only caller, which isOwnerInPerson refuses."
+      },
+      "src/services/memory-write.ts": {
+        "count": 1,
+        "why": "(owner || operator) without agent: also admits the node's own operator-only caller, which isOwnerInPerson refuses."
+      },
+      "src/services/notification-create.ts": {
+        "count": 1,
+        "why": "Asks whether the caller is an agent session."
+      },
+      "src/services/operator-principal.ts": {
+        "count": 1,
+        "why": "askOperator itself: whether a role list acts for someone."
+      },
+      "src/services/owner-mailbox-reads.ts": {
+        "count": 1,
+        "why": "(owner || operator) when nothing acts for someone: also admits the node's own operator-only caller, which isOwnerInPerson refuses."
+      }
+    }
   }
 }

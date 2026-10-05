@@ -12,6 +12,7 @@
  * @structure registerAppConfigRoutes(router, config, storage)
  *   GET /v1/apps/:owner/:filename/config · PUT /v1/apps/:owner/:filename/config
  * @version-history
+ *   v1.2.1 — 2026-10-05 — The owner test is isSameAccount (utils/same-account.ts; secaudit 2026-10, C8).
  *   v1.2.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.1.0 — 2026-10-05 — The read applies the app's own gates: an operator-hidden app is not found,
  *     and an access-coded app's workspace ids need the code (?code or X-Access-Code), the unlock token
@@ -24,6 +25,7 @@ import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireScope, optionalAuth } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { resolveIdentity, ownerGhiiOf, localAccountName } from '../../utils/gaii.js';
+import { isSameAccount } from '../../utils/same-account.js';
 import { getAppConfig, setAppConfig } from '../../services/app-config.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
 
@@ -33,7 +35,7 @@ export function registerAppConfigRoutes(router: Router, config: AimeatConfig, st
         // The app's own gates (secaudit 2026-10, APP-6): the owner, an agent of theirs and an operator
         // pass them; anyone else brings the access code or the unlock token, as for the app itself.
         const auth = req.auth && req.auth.anonymous !== true ? req.auth : null;
-        const ownerOrOperator = !!auth && (localAccountName(ownerGhiiOf(resolveIdentity(auth, config.nodeId))) === ownerName
+        const ownerOrOperator = !!auth && (isSameAccount(ownerGhiiOf(resolveIdentity(auth, config.nodeId)), ownerName)
             || await isOperatorCaller(storage, auth));
         const header = (name: string) => (typeof req.headers[name] === 'string' ? req.headers[name] as string : undefined);
         const out = await getAppConfig(storage, ownerName, req.params.filename as string, {

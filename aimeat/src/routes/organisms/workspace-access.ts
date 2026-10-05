@@ -6,6 +6,7 @@
  *   email invitations, provisioned-code ("key") invitations, and the PUBLIC invitation token flow.
  *   Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.15.1 — 2026-10-05 — The code key's address is checked with isValidEmail (secaudit 2026-10, M2).
  *   v1.15.0 — 2026-10-05 — Cancelling a provisioned-code key erases the account it made with
  *     eraseOwner, the one account deletion (secaudit 2026-10, C7).
  *   v1.14.1 — 2026-10-02 — PATCH and cancel on /:id/invitations/email/:invId answer 404 for a
@@ -88,6 +89,7 @@ import { createEmailInvitation, cancelEmailInvitation, invitePublic, hashInviteT
 import type { InvitationRecord, InvitationWorkspaceGrant } from '../../storage/repositories/invitation.repository.js';
 import type { OrganismHelpers } from './shared.js';
 import { eraseOwner } from '../../services/owner-erasure.js';
+import { isValidEmail } from '../../utils/email-validator.js';
 
 export function registerOrganismWorkspaceAccessRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const {
@@ -546,7 +548,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     if (!wsGrants) return;
 
     const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
-    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'A valid "email" is required')); return; }
+    if (!cleanEmail || !isValidEmail(cleanEmail)) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'A valid "email" is required')); return; }
     if (!code || typeof code !== 'string' || code.length < 8) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'A "code" (min 8 chars) is required')); return; }
     let uname = typeof username === 'string' ? username.trim().toLowerCase() : '';
     if (uname.includes('@')) uname = uname.split('@')[0];

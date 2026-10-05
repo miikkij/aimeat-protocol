@@ -22,6 +22,7 @@
  *   goes and whether the document can take it is decided once, in services/app-serve-marks.ts.
  * @usage import { agentDiscoverySnippet, appRefSnippet } from '../utils/app-agent-discovery.js';
  * @version-history
+ *   v2.2.1 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   v2.2.0 — 2026-09-13 — The `#aimeat-app-ref` block leaves the body markup for appRefSnippet(),
  *     which the marks pass puts at the start of the head. At the end of the body it arrived after
  *     every inline script of the app, so appRef() at parse time was null and the owner saw the
@@ -42,6 +43,8 @@
  *     owner, the app id with its extension, the tool manifest, the WebMCP endpoint and the
  *     agent-face markdown rendering.
  */
+import { escapeHtml } from './html-escape.js';
+
 /**
  * Should the node load the WebMCP bridge into this app? Yes by default — a served app is where a
  * browser-resident agent meets it, and every app already has a listing to expose. No when the
@@ -80,9 +83,7 @@ export interface AppDiscoverySpec {
 /** Present in a document that already carries the block — what makes a re-serve idempotent. */
 export const DISCOVERY_MARK = 'id="aimeat-agent-discovery"';
 
-function esc(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
+const esc = escapeHtml;
 
 /**
  * The discovery block.

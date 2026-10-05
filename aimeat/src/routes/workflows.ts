@@ -28,6 +28,8 @@
  *   import { workflowsRouter } from './routes/workflows.js';
  *   app.use(workflowsRouter(config, storage));
  * @version-history
+ *   v1.7.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
+ *     secaudit 2026-10, C4).
  *   v1.7.0 — 2026-09-29 — GET /:id/runs and /:id/runs/:runId read runs as the caller's classification
  *     reader, so an observed value the caller may not see is withheld (TARGET-082 V4).
  *   v1.6.1 — 2026-09-26 — PUT /:id and POST /:id/run take requireLocalSession(): a visitor signed in
@@ -66,7 +68,7 @@ import { requireAuth, requireScope, requireOwnerPrincipal, requireLocalSession }
 import { denyScope403 } from '../auth/deny.js';
 import type { WorkflowCaller } from '../services/workflow/step-authority.js';
 import { runRefusedAsOwner, clearRefusal } from '../services/workflow/trigger-authority.js';
-import { resolveIdentity } from '../utils/gaii.js';
+import { resolveIdentity, isOwnerInPerson } from '../utils/gaii.js';
 import { readerFor } from '../services/classification/reader.js';
 import { recordAccountEvent } from '../services/account-events.js';
 import { emitChange } from '../services/event-bus.js';
@@ -368,9 +370,7 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
     // the step goes green and the run advances — it just does not become editorial control. Every
     // other principal class arrives here with roles that say what it is, so this is read rather
     // than inferred from the identity string. See engine-human.ts for what it gates.
-    const roles = req.auth!.roles;
-    const byIsHuman = roles.includes('owner')
-      && !roles.includes('agent') && !roles.includes('ecosystem') && !roles.includes('app');
+    const byIsHuman = isOwnerInPerson(req.auth);
     const result = await engine.onHumanAnswer(ownerGhiiOf(req), id, runId, stepId, { ...parsed.data, by, byIsHuman });
     if (!result.ok) {
       const status = result.code === 'NOT_FOUND' ? 404 : result.code === 'BAD_ANSWER' ? 400 : 409;

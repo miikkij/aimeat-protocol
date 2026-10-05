@@ -30,6 +30,7 @@
  * @usage
  *   text = applyAppHeadMeta(text, { owner, filename, appName, description, origin, baseUrl, tools });
  * @version-history
+ *   v1.4.2 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   v1.4.1 — 2026-08-31 — The three places that located a tag in the author's document by regex
  *     (`<meta name="robots">`, `<title>`, `<html>`) do it by index instead. Each of those patterns
  *     rescanned forward from every occurrence of its own prefix, so a document made of repeated
@@ -54,6 +55,7 @@
  */
 
 import { findOpenTag } from './html-inject.js';
+import { escapeHtml } from './html-escape.js';
 
 export interface AppPricedTool {
   name: string;
@@ -133,9 +135,7 @@ export interface AppHeadSpec {
   legal?: Array<{ rel?: string; href: string; title: string }>;
 }
 
-function esc(t: string): string {
-  return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-}
+const esc = escapeHtml;
 
 const has = (html: string, re: RegExp) => re.test(html);
 

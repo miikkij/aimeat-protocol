@@ -43,6 +43,8 @@
  *   const ctx = buildExtensionCtx({ …, workspace: wsCap.workspace });
  *   … catch (err) { const r = workspaceRefusalFor(err, wsCap); if (r) res.status(r.status).json(error(…, r.code, r.message)); }
  * @version-history
+ *   v1.1.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
+ *     secaudit 2026-10, C4).
  *   v1.1.0 — 2026-09-29 — index and get pass the caller's classification reader to readWorkspaceOp
  *     (TARGET-082).
  *   v1.0.0 — 2026-09-05 — Initial: the gap the Coding Central app tools (claim_open, claim_release,
@@ -52,6 +54,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, ExtensionRecord } from '../storage/interface.js';
 import type { ExtensionCtx } from './extension-runtime.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { isOwnerInPerson } from '../utils/gaii.js';
 import { readerForCaller } from './classification/reader.js';
 import { workspaceDeclarationOf, type WorkspaceDeclaration } from './extension-workspace-declaration.js';
 import {
@@ -91,12 +94,6 @@ export interface ExtensionWorkspaceCapability {
     lastRefusal: () => ExtensionWorkspaceRefusal | null;
 }
 
-/** The test requireScope makes before it asks for a word: an owner in person bypasses scopes;
- *  an agent, an app grant or an ecosystem app does not. */
-function isOwnerInPerson(roles: string[]): boolean {
-    return roles.includes('owner') && !roles.includes('agent') && !roles.includes('app') && !roles.includes('ecosystem');
-}
-
 /**
  * Build the capability. Everything the guest can call goes through `run`, which turns a refusal
  * into a thrown `CODE: message` and remembers it, so the script sees the service's words and the
@@ -127,7 +124,9 @@ export function buildExtensionWorkspace(deps: ExtensionWorkspaceDeps): Extension
         if (kind === 'write' && !declaration.write) {
             refuse(403, 'PERMISSION', `Extension "${extName}" does not declare workspace write access (manifest workspace.write).`);
         }
-        if (isOwnerInPerson(caller.roles)) return;
+        // The test requireScope makes before it asks for a word: an owner in person bypasses scopes;
+        // an agent, an app grant or an ecosystem app does not.
+        if (isOwnerInPerson(caller)) return;
         const scope = kind === 'write' ? WORKSPACE_WRITE_SCOPE : WORKSPACE_READ_SCOPE;
         if (!scopeIsCovered(caller.scopes, scope)) {
             refuse(403, 'SCOPE_DENIED', `Scope "${scope}" required to ${kind} a workspace through extension "${extName}". Caller scopes: [${caller.scopes.join(', ')}]`);

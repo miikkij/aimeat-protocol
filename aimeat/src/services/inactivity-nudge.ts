@@ -30,6 +30,7 @@
  *   // Registered as core handler 'inactivity-nudge' in services/core-jobs.ts.
  *   await runInactivityNudgeJob(config, storage);
  * @version-history
+ *   v1.0.1 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   v1.0.0 — 2026-08-07 — Initial.
  */
 import type { AimeatConfig } from '../config.js';
@@ -41,6 +42,7 @@ import { readNotificationSettings, appendMailLog } from './notification-settings
 import { ONBOARDING_KEYS } from './onboarding-funnel.js';
 import { buildWelcomeMatPrompt } from './welcome-mat-prompt.js';
 import { logger } from '../utils/logger.js';
+import { escapeHtml } from '../utils/html-escape.js';
 
 /** How long a silence has to last before it is worth a message. */
 export const INACTIVITY_DAYS = 14;
@@ -251,9 +253,4 @@ export async function runInactivityNudgeJob(
     // a nightly mailer leaves no trace of what it did.
     if (considered > 0) logger.info(`Inactivity nudge: ${sent} sent of ${considered} quiet account(s)`);
     return { sent, considered };
-}
-
-/** Minimal escaping for values interpolated into the email HTML. */
-function escapeHtml(s: string): string {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }

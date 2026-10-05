@@ -12,6 +12,7 @@
  *   - DELETE /v1/agents/:name/onboarding/override    -- Clear readiness override
  *   - DELETE /v1/agents/:name/onboarding           -- Cancel onboarding
  * @version-history
+ *   v1.9.1 -- 2026-10-05 -- The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.9.0 -- 2026-08-28 -- hints.test_task_status and hints.test_task_has_plan say the state a driver
  *                            acts on; POST /start removes the previous smoke test when it is still
  *                            open. A crew that resolved the test task by TITLE found the old one,
@@ -62,7 +63,7 @@ import type { Storage } from '../storage/interface.js';
 import { LIVE_TASK_STATUSES } from '../storage/types/agents-messaging.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope, agentNotFoundResponse } from '../auth/middleware.js';
-import { agentGaiiFromIdentifier } from '../utils/gaii.js';
+import { agentGaiiFromIdentifier, isOwnerInPerson } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
 import { createDefaultSteps } from '../models/agent-onboarding-schemas.js';
@@ -134,8 +135,7 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
   }
 
   function canAccessAgent(req: Express.Request, agentName: string): boolean {
-    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
-    if (isOwnerSession) return true;
+    if (isOwnerInPerson(req.auth)) return true;
     const expectedGaii = resolveAgentGaii(req, agentName);
     return req.auth!.sub === expectedGaii;
   }

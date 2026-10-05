@@ -15,6 +15,7 @@
  *   Both need `ai:use` (an owner session passes), as every AI route does (auth/ai-gate.ts).
  * @structure aiCapabilitiesRouter(config, storage)
  * @version-history
+ *   v1.2.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *   v1.1.0 — 2026-09-28 — POST /v1/ai/embed takes `role`, the AI role the call runs as (readCallRole).
  *   v1.0.0 — 2026-09-28 — Initial (V5 of the System 2 plan).
  */
@@ -23,8 +24,8 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { assertAiUseAllowed } from '../auth/ai-gate.js';
-import { rateLimit } from '../middleware/rate-limit.js';
 import { success, error } from '../middleware/envelope.js';
+import { retryAfterOf } from '../services/account-limits.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { aiPayerOf } from '../services/agent-ai-keys.js';
 import { AiCompletionError } from '../services/ai/errors.js';
@@ -35,8 +36,9 @@ import { aiCallerOf } from './ai-policy.js';
 
 export function aiCapabilitiesRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
-  const aiRateLimit = rateLimit(config.rateLimits.openrouter);
   const fail = (res: Response, e: unknown) => {
+    const retryAfter = retryAfterOf(e);
+    if (retryAfter !== undefined) res.setHeader('Retry-After', String(retryAfter));
     if (e instanceof AiCompletionError) return res.status(e.status).json(error(config.nodeId, e.code, e.message, e.status, e.details));
     return res.status(502).json(error(config.nodeId, 'PROVIDER_ERROR', (e as Error).message));
   };
@@ -57,8 +59,9 @@ export function aiCapabilitiesRouter(config: AimeatConfig, storage: Storage): Ro
     } catch (e) { fail(res, e); }
   });
 
-  // ── POST /v1/ai/embed ──
-  router.post('/v1/ai/embed', requireAuth(), requireScope('ai:use'), aiRateLimit, async (req: Request, res: Response) => {
+  // ── POST /v1/ai/embed ── embedForOwner counts the account's AI call limit, which aimeat_ai_embed
+  // shares; no path limiter here.
+  router.post('/v1/ai/embed', requireAuth(), requireScope('ai:use'), async (req: Request, res: Response) => {
     if (!assertAiUseAllowed(req, res, config.nodeId)) return;
     req.setTimeout(180_000);
     res.setTimeout(180_000);

@@ -23,6 +23,7 @@
  *   html = injectSiteHead(html, config, nonceAttr);
  *   html = injectPageHead(html, findPublicPage('/v1/connect'), config, nonceAttr);
  * @version-history
+ *   2026-10-05 - HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   2026-09-17 - TARGET-078: productivity category; omit a price that depends on deployment.
  *   v1.2.1 — 2026-08-26 — SECURITY (CodeQL js/reflected-xss): the per-page WebPage JSON-LD embedded
  *     page.title/description via JSON.stringify, which does not escape `<`, so a `</script>` in a
@@ -49,10 +50,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { PublicPage } from '../data/public-pages.js';
-
-function esc(t: string): string {
-  return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-}
+import { escapeHtml as esc } from './html-escape.js';
 
 /**
  * Escape a serialized-JSON string for embedding inside a `<script type="application/ld+json">`.

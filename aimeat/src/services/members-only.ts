@@ -19,12 +19,14 @@
  *   const refused = await membersOnlyRefusalForCapability(storage, tool.action_id, buyer);
  *   if (refused) throw new CommerceError('MEMBERS_ONLY', 403, MEMBERS_ONLY_MESSAGE);
  * @version-history
+ *   v1.0.1 — 2026-10-05 — The installer test is isSameAccount (utils/same-account.ts; secaudit 2026-10, C8).
  *   v1.0.0 — 2026-10-01 — Initial (wish-members-only-refuses-a-non-member-before-checkout-or-a-contr).
  *     resolveGatedApp moved here from routes/extensions/permissions.ts unchanged, so a service and the
  *     commerce layer can ask it without importing a route module; permissions.ts re-exports it.
  */
 import type { Storage, ExtensionRecord } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
+import { isSameAccount } from '../utils/same-account.js';
 import { getCarryPlan, getMember } from './app-members.js';
 
 /** What the caller is told, on every route. Nothing has been charged when it is said. */
@@ -69,7 +71,7 @@ export async function membersOnlyRefusal(
 ): Promise<{ appId: string } | null> {
   const appId = resolveGatedApp(ext);
   if (!appId) return null;
-  if (localAccountName(callerGaii).toLowerCase() === localAccountName(ext.installedBy).toLowerCase()) return null;
+  if (isSameAccount(callerGaii, ext.installedBy)) return null;
   const plan = await getCarryPlan(storage, appId);
   if (plan?.access !== 'members-only') return null;
   return (await getMember(storage, appId, callerGaii)) ? null : { appId };

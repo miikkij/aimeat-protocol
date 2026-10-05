@@ -47,11 +47,11 @@ import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
-import { provenanceEchoedResult } from '../../ai-provenance-carry.js';
+import { provenanceEchoedResult } from '../../../../tool-dispatch/ai-provenance-carry.js';
 import { normalizeObjectTypes, WorkspaceMetaError, backfillManifestEnvelope } from '../../../../services/workspace-meta.js';
 import { normalizeWriteItems, resolveWriteItem, MAX_BATCH_ITEMS, type ResolvedWriteItem, type WriteObjectType } from '../../../../services/workspace-write-items.js';
 import { entryTitle } from '../../../../services/structure-overview.js';
-import { fileThroughDoor, unfileThroughDoor, sectionsFromRead } from '../../workspace-section-filing.js';
+import { fileThroughDoor, unfileThroughDoor, sectionsFromRead } from '../../../../tool-dispatch/workspace-section-filing.js';
 
 export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();

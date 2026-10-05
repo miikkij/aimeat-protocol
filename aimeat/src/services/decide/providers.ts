@@ -40,6 +40,7 @@
  *   const { provider, chosenBy } = await selectProvider(storage, config, { ownerGhii, agent, named });
  *   const problems = providerViolations(provider, state, questions);
  * @version-history
+ *   v1.4.1 — 2026-10-05 — An agent name is checked with isValidAgentName, the grammar agents have (secaudit 2026-10, M2).
  *   v1.4.0 — 2026-09-28 — The id rule, isObj, the loopback test and the egress list parser moved to
  *     services/ai-provider-common.ts (a pure move, System 2 plan V3), so System 2's provider records
  *     share them. Behaviour unchanged.
@@ -69,6 +70,7 @@ import { encrypt, decrypt, getEncryptionKey } from '../encryption.js';
 import { upsertPrivateRecord } from '../private-record.js';
 import { emitChange } from '../event-bus.js';
 import { logger } from '../../utils/logger.js';
+import { isValidAgentName } from '../../utils/gaii.js';
 import {
   isObj, isLoopbackHost as LOOPBACK, PROVIDER_ID_RE, PROVIDER_ID_PROBLEM as ID_PROBLEM, providerIdOf, egressOriginsOf,
 } from '../ai-provider-common.js';
@@ -423,7 +425,7 @@ export async function planProviderChoice(
   if (input.agents !== undefined) {
     if (!isObj(input.agents)) throw new DecideError('INVALID_BODY', 400, 'agent_providers: { "<agent name>": "<provider id>" | null }.');
     for (const [agent, id] of Object.entries(input.agents)) {
-      if (!/^[a-z0-9][a-z0-9-]{1,63}$/.test(agent)) throw new DecideError('INVALID_BODY', 400, `agent_providers: '${agent}' is not an agent name.`);
+      if (!isValidAgentName(agent)) throw new DecideError('INVALID_BODY', 400, `agent_providers: '${agent}' is not an agent name.`);
       const v = check(id, `agent_providers.${agent}`);
       if (v === null) delete next.agents[agent]; else next.agents[agent] = v;
     }

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key and CORS management; the public GET /v1/memory/:gaii/:key read is registered from routes/memory/public-read.ts. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.11.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2). DELETE ?owner= computes its roles with rolesWithOperator and writes recordOperatorAccess, the trail the admin memory route writes.
  *   v1.10.0 — 2026-09-29 — TARGET-082 review: GET /v1/memory/:key answers `classificationWarning`
  *     when an AI is shown a warning-classified record. GET /v1/memory/:gaii/:key moved to
@@ -67,7 +68,7 @@ import { warningField } from '../../services/classification-exits.js';
 import { memoryTarget } from '../../services/classification/labels.js';
 import { registerPublicReadRoute } from './public-read.js';
 import { stampAgentWrite, resolveAttachableProvenanceId, storeHeldProvenance } from '../../services/ai-provenance.js';
-import { ownerGhiiOf, isForeignPrincipal } from '../../utils/gaii.js';
+import { ownerGhiiOf, isForeignPrincipal, isOwnerInPerson } from '../../utils/gaii.js';
 import { loadServedProvenance, envelopeMeta, setProvenanceHeaders } from '../../services/ai-provenance-marks.js';
 import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone, memoryContentBytes } from './shared.js';
 import { logger } from '../../utils/logger.js';
@@ -115,7 +116,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     // Owner may target one of their own agents' keyspace via ?agent= (mirrors list/search).
     const agentParam = req.query.agent as string | undefined;
-    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    const isOwnerSession = isOwnerInPerson(req.auth);
     if (agentParam && agentParam !== gaii) {
       const targetAgent = await storage.getAgent(agentParam);
       // `targetAgent.owner !== req.auth!.owner` compares NAMES, and a federated visitor's name is
@@ -237,7 +238,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // the route is what belongs to the route: the operator's ?owner= override (a ROLE check, and
     // roles are the door's business), the owner-scope opt-in, and the workspace guard below.
     const ownerOverride = req.query.owner as string | undefined;
-    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    const isOwnerSession = isOwnerInPerson(req.auth);
     // The operator half of ?owner= asks isOperatorCaller through rolesWithOperator, as the MCP tools
     // ask askOperator: the operator's agent holding operator:admin passes too, and the service
     // (memory-bin.ts binRefusal) reads 'operator' from the same computed list.
@@ -310,7 +311,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
       caller: gaii, ownerName: req.auth!.owner as string, key,
       // Same reach as the delete beside it, and for the same reason: whoever could remove a
       // sibling's key has to be able to put it back, or the undo is narrower than the act.
-      ownerScope: (req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent')) || req.query.owner_scope === 'true',
+      ownerScope: isOwnerInPerson(req.auth) || req.query.owner_scope === 'true',
       // The organism namespace rule inside the service reads the roles, as the delete's does.
       roles: req.auth!.roles,
     });
@@ -376,8 +377,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // The owner can update anything the owner owns, whoever wrote it; `?owner_scope=true` extends
     // the same reach to another same-owner principal that already carries memory:write — an app
     // grant, or an agent — as GET and DELETE do (same-owner-access invariant).
-    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
-    const ownerScopeWrite = isOwnerSession || req.query.owner_scope === 'true';
+    const ownerScopeWrite = isOwnerInPerson(req.auth) || req.query.owner_scope === 'true';
     let existing = await storage.getMemory(gaii, key);
     let effectiveGaii = gaii;
     if (!existing && ownerScopeWrite) {

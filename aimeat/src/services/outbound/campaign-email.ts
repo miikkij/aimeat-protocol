@@ -25,10 +25,12 @@
  * @structure renderCampaignEmail — html + text, from body paragraphs, links, unsubscribe and a theme
  * @usage const { html, text } = renderCampaignEmail({ subject, body, links, unsubscribeUrl, theme })
  * @version-history
+ *   v1.0.1 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   v1.0.0 — 2026-08-27 — Initial.
  */
 import { fontStack, type ThemeTokens } from './email-theme.js';
 import { usableLinks, type OutboundLink } from './email-body.js';
+import { escapeHtml } from '../../utils/html-escape.js';
 
 export interface CampaignEmailInput {
   subject: string;
@@ -46,10 +48,7 @@ export interface CampaignEmailInput {
   locale?: string;
 }
 
-function esc(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
+const esc = escapeHtml;
 
 const UNSUB: Record<string, string> = {
   fi: 'Et halua näitä viestejä?',

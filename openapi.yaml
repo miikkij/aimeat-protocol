@@ -16716,6 +16716,8 @@ paths:
           $ref: '#/components/responses/AimeatError'
         '403':
           $ref: '#/components/responses/AimeatError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
         '502':
           $ref: '#/components/responses/AimeatError'
 
@@ -16963,6 +16965,8 @@ paths:
           $ref: '#/components/responses/AimeatError'
         '403':
           $ref: '#/components/responses/AimeatError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /v1/ai/routing:
     get:
@@ -17845,6 +17849,8 @@ paths:
           $ref: '#/components/responses/AimeatError'
         '404':
           $ref: '#/components/responses/AimeatError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /v1/ai/decide/rule-proposals:
     post:
@@ -18158,6 +18164,8 @@ paths:
           $ref: '#/components/responses/AimeatError'
         '403':
           $ref: '#/components/responses/AimeatError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
         '503':
           $ref: '#/components/responses/AimeatError'
     get:
@@ -18203,6 +18211,8 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '404':
           $ref: '#/components/responses/AimeatError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /v1/ai/decide/runs/{id}/stop:
     post:
@@ -18702,6 +18712,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+        '429':
+          $ref: '#/components/responses/RateLimited'
         '502':
           description: Provider error
           content:
@@ -52362,6 +52374,14 @@ paths:
           description: >
             ATTACHMENT_NOT_READY — the bytes have not been duplicated locally yet (or the attachment
             expired before they could be).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '429':
+          description: >
+            RATE_LIMITED — the account started as many AI calls this minute as it may (counted per
+            account, with POST /v1/ai/transcribe and aimeat_ai_transcribe).
           content:
             application/json:
               schema:

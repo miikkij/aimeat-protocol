@@ -26,6 +26,8 @@
  *   const ctx = buildExtensionCtx({ …, ai: buildExtensionAi({ service, extName: ext.name,
  *       ownerGhii, nodeId }) });
  * @version-history
+ *   v1.3.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
+ *     `start` passes `limit: 'exempt'`: an extension's start is the node's own work.
  *   v1.2.0 — 2026-09-28 — `start` passes on `role`, the AI role the job's call runs as.
  *   v1.1.0 — 2026-09-28 — System 2 plan, V5: `start` passes on `op`, `provider`, `audio_key`,
  *     `language` and `size`. A transcription reads the audio from the extension owner's storage,
@@ -124,6 +126,9 @@ export function buildExtensionAi(deps: ExtensionAiDeps): NonNullable<ExtensionCt
                     ownerGhii,
                     createdBy,
                     extension: extName,
+                    // An extension's start is the node's own work (an action, a callback chain, a
+                    // schedule): it does not draw on the account's AI call limit for requests.
+                    limit: 'exempt',
                     ...(chain ? { parentJob: chain.parentJob, chainDepth: chain.parentDepth + 1 } : {}),
                     ...(chain ? { onRefused: chain.onRefused } : {}),
                 });

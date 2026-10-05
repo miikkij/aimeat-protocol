@@ -1,5 +1,5 @@
 /**
- * @file cli/connect/workspace-section-filing.ts
+ * @file src/tool-dispatch/workspace-section-filing.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Filing a document under a section, and taking a deleted one out of the section index,

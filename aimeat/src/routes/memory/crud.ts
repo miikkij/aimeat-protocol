@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Core memory CRUD routes: POST /v1/memory (write), GET /v1/memory (list), GET /v1/memory/search. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.10.1 -- 2026-10-05 -- The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
+ *     secaudit 2026-10, C4).
  *   v1.10.0 -- 2026-09-29 -- TARGET-082 review: every list and search item an AI is shown with a
  *     warning classification carries `classificationWarning`, as GET /v1/memory/:key does.
  *   v1.9.0 -- 2026-09-29 -- The list (values and meta) and the search pass the classification reader:
@@ -56,7 +58,7 @@ import { writeMemoryRecord } from '../../services/memory-write.js';
 import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
 import { resolveWriteTarget } from './owner-target.js';
-import { resolveIdentity, isForeignPrincipal, localAccountName } from '../../utils/gaii.js';
+import { resolveIdentity, isForeignPrincipal, isOwnerInPerson, localAccountName } from '../../utils/gaii.js';
 import { exchangeOutcome } from '../../services/exchange-projection.js';
 import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone, MEMORY_LIST_MAX_LIMIT } from './shared.js';
 import { isVersionKey, searchHitShape, matchesType } from '../../services/memory-search-shape.js';
@@ -125,7 +127,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // the ownership validation in GET /v1/memory?agent=. Restricted to owner
     // sessions so an agent cannot write into a sibling agent's namespace.
     if (agentParam && agentParam !== gaii) {
-      const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+      const isOwnerSession = isOwnerInPerson(req.auth);
       if (!isOwnerSession) {
         res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only owner sessions may store memory under a specific agent'));
         return;
@@ -246,7 +248,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     let gaii = resolveIdentity(req.auth!, config.nodeId);
     const agentParam = req.query.agent as string | undefined;
     // Owner sessions (human user) automatically see all their agents' memory
-    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    const isOwnerSession = isOwnerInPerson(req.auth);
     // Owner-scope broadening (GHII + all agents + eco apps) is the same-owner-access invariant for the
     // owner and their own agents/app-grants. An ECOSYSTEM app must NOT broaden to the owner's entire
     // keyspace — it reads its own eco: namespace and only the owner areas its data-area grants cover
@@ -463,7 +465,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
   // GET /v1/memory/search — search memory entries (MUST be before :key to avoid capture)
   // Owner sessions search across all their agents' memory
   router.get('/v1/memory/search', requireAuth(), requireExternalPrincipal(), requireScope('memory:read'), async (req, res) => {
-    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    const isOwnerSession = isOwnerInPerson(req.auth);
     // Same as the listing above: resolved, so `?agent=` cannot compare equal to a bare owner name and
     // search a coordinate nothing is filed under. Semgrep did not flag this one — searchText takes its
     // identities inside an options object rather than as the first argument — but it is the same

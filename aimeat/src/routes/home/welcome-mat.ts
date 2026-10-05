@@ -24,6 +24,7 @@
  * @structure registerWelcomeMatRoutes(router, ctx): POST /v1/home/welcome-mat, POST /v1/home/ai-client
  * @usage Registered from src/routes/home.ts.
  * @version-history
+ *   v1.3.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.3.0 — 2026-10-03 — The copy-prompt road keeps the interview: the pasted card's private
  *     profile block is merged into `journey.state`, and the response names the fields as `profile_saved`.
  *   v1.2.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
@@ -39,7 +40,7 @@ import type { Router, RequestHandler } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireRole } from '../../auth/middleware.js';
-import { isForeignPrincipal } from '../../utils/gaii.js';
+import { isOwnerInPerson } from '../../utils/gaii.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
@@ -65,9 +66,9 @@ export interface HomeRouteCtx {
  * The home is the PERSON's, so its routes need a person's session.
  *
  * requireRole('owner') is not that fence: an agent token inherits its owner's roles on this node
- * (the scope list is what fences an agent), so an agent would sail through it. The distinction the
- * codebase already uses for exactly this is `owner` present AND `agent` absent — extended here to
- * ecosystem apps and app grants, which are the other principals that act "as" an owner.
+ * (the scope list is what fences an agent), so an agent would sail through it. The test for exactly
+ * this is isOwnerInPerson (utils/gaii.ts): `owner` present, and no agent, ecosystem or app role, which
+ * are the principals that act "as" an owner.
  *
  * It matters most on the welcome mat: the mat doubles as evidence that a human has an AI and
  * understands copy-paste, and an agent pasting it on their behalf would prove neither while
@@ -75,13 +76,10 @@ export interface HomeRouteCtx {
  */
 export function requireOwnerSession(nodeId: string): RequestHandler {
     return (req, res, next) => {
-        const roles = req.auth?.roles ?? [];
-        // A federated session carries roles:['owner'] with none of agent/ecosystem/app, so the test
-        // below said "person" for a visitor from another node whose name matches a local account. The
-        // home is the LOCAL person's; a visitor has none here (secaudit 2026-09: A3-1).
-        const isPerson = roles.includes('owner') && !isForeignPrincipal(req.auth)
-            && !roles.includes('agent') && !roles.includes('ecosystem') && !roles.includes('app');
-        if (!isPerson) {
+        // isOwnerInPerson also refuses a federated session: the home is the LOCAL person's, and a
+        // visitor from another node whose name matches a local account has none here (secaudit
+        // 2026-09: A3-1).
+        if (!isOwnerInPerson(req.auth)) {
             res.status(403).json(error(nodeId, 'ACCESS_DENIED',
                 'This is the account holder\'s own step. Sign in as yourself to do it.'));
             return;

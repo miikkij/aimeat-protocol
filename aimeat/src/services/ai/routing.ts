@@ -20,6 +20,7 @@
  *   ROUTING_KEY · agentRoutingKey · RoutingRules · DEFAULT_RULES · RoutingRecord · readRouting ·
  *   rulesFor · defaultsFor · normaliseRoutingInput · setRouting
  * @version-history
+ *   v1.0.1 — 2026-10-05 — An agent name is checked with isValidAgentName, the grammar agents have (secaudit 2026-10, M2).
  *   v1.0.0 — 2026-09-28 — Initial (V3 of the System 2 plan).
  *   v1.0.1 — 2026-09-28 — Comments: what the model catalogue (V4) now prices and orders.
  */
@@ -30,13 +31,13 @@ import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../oper
 import { isObj } from '../ai-provider-common.js';
 import { AiCompletionError } from './errors.js';
 import { FALLBACK_CLASSES, type FailureClass } from './health.js';
+import { isValidAgentName } from '../../utils/gaii.js';
 import type { AiCapability } from './types.js';
 
 export const ROUTING_KEY = 'ai.routing.owner';
 export const agentRoutingKey = (agent: string): string => `ai.routing.agent.${agent}`;
 
 const CAPABILITIES: readonly AiCapability[] = ['text', 'vision', 'files', 'image', 'speech', 'transcription', 'embed'];
-const AGENT_RE = /^[a-z0-9][a-z0-9-]{1,63}$/;
 const MAX_DEFAULTS = 10;
 
 export interface RoutingRules {
@@ -118,7 +119,7 @@ function readRules(v: unknown): RoutingRules {
 export async function readRouting(storage: Storage, gaii: string, agent?: string): Promise<LoadedRouting> {
   const [owner, agentRec] = await Promise.all([
     storage.getMemory(gaii, ROUTING_KEY),
-    agent && AGENT_RE.test(agent) ? storage.getMemory(gaii, agentRoutingKey(agent)) : Promise.resolve(null),
+    agent && isValidAgentName(agent) ? storage.getMemory(gaii, agentRoutingKey(agent)) : Promise.resolve(null),
   ]);
   const o = isObj(owner?.value) ? owner.value : {};
   return {
@@ -154,7 +155,7 @@ export function normaliseRoutingInput(input: unknown, knownIds: ReadonlySet<stri
   if (!isObj(input)) return { problems: ['routing: an object with defaults, rules or both.'] };
   const out: RoutingInput = {};
   if (input.agent !== undefined) {
-    if (typeof input.agent !== 'string' || !AGENT_RE.test(input.agent)) problems.push('agent: the bare name of one of your agents.');
+    if (typeof input.agent !== 'string' || !isValidAgentName(input.agent)) problems.push('agent: the bare name of one of your agents.');
     else out.agent = input.agent;
   }
   if (input.defaults !== undefined) {

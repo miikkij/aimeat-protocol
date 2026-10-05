@@ -15,6 +15,7 @@
  *     GET .../instances (hosted instances of the agent + their PUBLIC offers/prices)
  * @usage registered from appsRouter() in src/routes/apps.ts
  * @version-history
+ *   v1.4.2 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.4.1 — 2026-10-05 — tokenHasScope is scopeIsCovered (secaudit 2026-10, C3).
  *   v1.4.0 — 2026-10-01 — Passes the caller's principal, so a deploy with no runner becomes a proposal
  *     the owner approves instead of RUNNER_NOT_FOUND (services/app-agent-propose.ts).
@@ -39,7 +40,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, optionalAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
-import { localAccountName } from '../../utils/gaii.js';
+import { localAccountName, isOwnerInPerson } from '../../utils/gaii.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import {
     deployAppAgent, appAgentInstances, appAgentStatus, type AppAgentRefusal,
@@ -71,7 +72,7 @@ function authorizeAppAgentCaller(
     req: Request, res: Response, config: AimeatConfig, appScope: string,
 ): string | null {
     const roles = req.auth!.roles as string[];
-    const isOwner = roles.includes('owner') && !roles.includes('agent');
+    const isOwner = isOwnerInPerson(req.auth);
     const isAgent = roles.includes('agent');
     const isApp = roles.includes('app');
     if (!isOwner && !isAgent && !isApp) {

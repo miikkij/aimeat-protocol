@@ -10,6 +10,7 @@
  *   E2E half is e2e-package-components Part H.
  * @usage pnpm exec vitest run test/unit/package-memory-component.test.ts
  * @version-history
+ *   v1.2.1 — 2026-10-05 — The owner test is isOwnerInPerson (secaudit 2026-10, C4).
  *   v1.2.0 — 2026-09-30 — A skill component costs memory:write. Failed on the old code, which let it
  *     through with no word at all.
  *   v1.1.0 — 2026-09-25 — A translation component costs nothing extra; the refusal carries the words
@@ -19,7 +20,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { memoryComponentWriteRefusal, memoryWordsFor } from '../../src/services/package-memory-component.js';
-import { ownerBypassesScopes } from '../../src/utils/scope-coverage.js';
+import { isOwnerInPerson } from '../../src/utils/gaii.js';
 
 const OWNER = 'alice@node-1';
 const MEMORY = [{ id: 'seed', type: 'memory' as const }];
@@ -110,12 +111,12 @@ describe('memoryComponentWriteRefusal', () => {
     });
 });
 
-describe('ownerBypassesScopes', () => {
+describe('isOwnerInPerson', () => {
     it('is requireScope\'s rule: an owner role and nothing that makes it a scoped principal', () => {
-        expect(ownerBypassesScopes({ roles: ['owner'] })).toBe(true);
-        expect(ownerBypassesScopes({ roles: ['owner', 'agent'] })).toBe(false);
-        expect(ownerBypassesScopes({ roles: ['owner', 'ecosystem'] })).toBe(false);
-        expect(ownerBypassesScopes({ roles: ['owner'], federated: true })).toBe(false);
-        expect(ownerBypassesScopes({ roles: ['app'] })).toBe(false);
+        expect(isOwnerInPerson({ roles: ['owner'] })).toBe(true);
+        expect(isOwnerInPerson({ roles: ['owner', 'agent'] })).toBe(false);
+        expect(isOwnerInPerson({ roles: ['owner', 'ecosystem'] })).toBe(false);
+        expect(isOwnerInPerson({ roles: ['owner'], federated: true })).toBe(false);
+        expect(isOwnerInPerson({ roles: ['app'] })).toBe(false);
     });
 });

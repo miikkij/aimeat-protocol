@@ -11,10 +11,12 @@
  *   v1.1.1 — 2026-09-29 — TARGET-082 V4: findOwnerScopeMemory is documented as the unchecked
  *     lookup for read-to-update; a route that puts its record in a response passes it through
  *     presentMemory first (packages-core.ts GET /v1/knowledge/:id does).
+ *   v1.1.2 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
+ *     secaudit 2026-10, C4).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
-import { resolveIdentity } from '../../utils/gaii.js';
+import { resolveIdentity, isOwnerInPerson } from '../../utils/gaii.js';
 
 export type KnowledgeHelpers = {
   resolve: (req: Express.Request) => string;
@@ -37,8 +39,7 @@ export function makeKnowledgeHelpers(config: AimeatConfig, storage: Storage): Kn
     const record = await storage.getMemory(callerGaii, key);
     if (record) return { record, ownerGaii: callerGaii };
 
-    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
-    if (!isOwnerSession) return null;
+    if (!isOwnerInPerson(req.auth)) return null;
 
     const ownerName = req.auth!.owner as string;
     const agents = await storage.getAgentsByOwner(ownerName);

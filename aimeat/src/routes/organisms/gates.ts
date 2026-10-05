@@ -6,6 +6,8 @@
  *   publish-gate + change-guard), revert-to-draft, and human approval resolution. Extracted from
  *   src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
+ *     secaudit 2026-10, C4).
  *   v1.4.0 — 2026-10-02 — POST /approvals decides with the workspace's own policy when the action names
  *     a workspace the caller may read (`arguments.ws`): its autonomy level replaces the organism's, and
  *     the always-gate list is the union of both. The workspace autonomy setting had no effect before.
@@ -28,7 +30,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, PendingApprovalRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
-import { resolveIdentity } from '../../utils/gaii.js';
+import { resolveIdentity, isOwnerInPerson } from '../../utils/gaii.js';
 import { emitChange } from '../../services/event-bus.js';
 import { shouldGate, gatePolicyFromManifest, DEFAULT_ALWAYS_GATE, type GatePolicy, type Risk } from '../../services/gate-policy.js';
 import { readWorkspaceMetaRecord } from '../../services/workspace-meta.js';
@@ -112,8 +114,8 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
     // Whose word `risk` is. A human member describing what they are about to do is the party the
     // policy protects; an agent, an app grant or an ecosystem token describing its OWN action is the
     // party it constrains, and its word cannot lower the gate below the default. Same test the rest
-    // of this codebase uses for "a person in person": the owner role without the agent one.
-    const selfDeclaredRisk = !(req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent'));
+    // of this codebase uses for "a person in person": isOwnerInPerson (utils/gaii.ts).
+    const selfDeclaredRisk = !isOwnerInPerson(req.auth);
     const decision = shouldGate({ action, risk: riskVal, rule, policy, selfDeclaredRisk });
 
     const actor = resolveIdentity(req.auth!, config.nodeId);

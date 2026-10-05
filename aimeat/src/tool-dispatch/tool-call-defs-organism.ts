@@ -1,5 +1,5 @@
 /**
- * @file cli/connect/tool-call-defs-organism.ts
+ * @file src/tool-dispatch/tool-call-defs-organism.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Public-memory, organism, workspace and schedule connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.

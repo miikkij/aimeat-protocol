@@ -19,6 +19,8 @@ import { relative } from '/js/format.js';
  *   - downloadBlob/toCsvBlob: hand the viewer a file the page built, and build a CSV Excel can read
  *
  * @version-history
+ *   v1.0.1 — 2026-10-05 — escHtml escapes `'` too, so its result is safe in either kind of quoted
+ *     attribute (secaudit 2026-10, C8).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-08-12 — Spanish added. detectLocale reads the LOCALES list instead of naming two
  *     languages in four places.
@@ -56,7 +58,8 @@ export function escHtml(s) {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 /** Decode the common HTML entities back to plain text. Some names (e.g. workspace registry names)

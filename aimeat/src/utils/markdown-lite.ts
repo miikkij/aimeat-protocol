@@ -15,12 +15,10 @@
  * @usage
  *   const html = renderMarkdownLite(doc.content);
  * @version-history
+ *   v1.0.1 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   v1.0.0 — 2026-08-29 — Initial, for the app legal pages (services/app-legal.ts).
  */
-
-function esc(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
+import { escapeHtml as esc } from './html-escape.js';
 
 /** Inline marks over ALREADY-ESCAPED text, so nothing the author wrote can open a tag. */
 function inline(escaped: string): string {

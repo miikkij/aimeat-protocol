@@ -213,7 +213,7 @@
     "check:owner-principal:seed": "tsx scripts/check-owner-principal.ts --seed",
     "check:deps": "depcruise src --config .dependency-cruiser.cjs --ignore-known",
     "deps:report": "depcruise src --config .dependency-cruiser.cjs --no-ignore-known",
-    "deps:baseline": "depcruise-baseline src --config .dependency-cruiser.cjs > .dependency-cruiser-known-violations.json",
+    "deps:baseline": "depcruise-baseline src --config .dependency-cruiser.cjs",
     "deps:graph": "depcruise src --config .dependency-cruiser.cjs --output-type mermaid > ../secaudit/dependency-graph.mmd",
     "deps:layers": "depcruise src --config .dependency-cruiser.cjs --output-type archi > ../secaudit/dependency-layers.dot",
     "check:sse-parity": "tsx scripts/check-sse-parity.ts --strict",

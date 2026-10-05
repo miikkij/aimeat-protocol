@@ -10,6 +10,7 @@
  *   - PUT  /v1/agents/:name/capabilities -- Agent reports its capabilities
  *   - GET  /v1/agents/:name/capabilities -- Get agent capabilities + activity stats
  * @version-history
+ *   v1.3.1 -- 2026-10-05 -- The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.3.0 -- 2026-08-11 -- The write moved to services/agent-profile-write.ts, which
  *                            aimeat_agent_capabilities_report now calls too. That tool had kept
  *                            the pre-v1.2.0 behaviour of folding languages into the domain list.
@@ -25,7 +26,7 @@ import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { refuseNotYours } from '../middleware/refusals.js';
 import { requireAuth } from '../auth/middleware.js';
-import { agentGaiiFromIdentifier } from '../utils/gaii.js';
+import { agentGaiiFromIdentifier, isOwnerInPerson } from '../utils/gaii.js';
 import { setAgentCapabilities } from '../services/agent-profile-write.js';
 
 export function agentCapabilitiesRouter(config: AimeatConfig, storage: Storage): Router {
@@ -39,8 +40,7 @@ export function agentCapabilitiesRouter(config: AimeatConfig, storage: Storage):
 
   /** Check if current session can access this agent */
   function canAccess(req: Express.Request, agentGaii: string): boolean {
-    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
-    if (isOwnerSession) {
+    if (isOwnerInPerson(req.auth)) {
       return true;
     }
     return req.auth!.sub === agentGaii;

@@ -17,7 +17,7 @@ import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
-import { readPayloadWithProvenance } from '../../ai-provenance-carry.js';
+import { readPayloadWithProvenance } from '../../../../tool-dispatch/ai-provenance-carry.js';
 import { payloadResult } from './_registry.js';
 
 export function registerMemoryExtTools(mcp: McpServer, registry: AgentRegistry): void {

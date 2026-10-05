@@ -6,6 +6,7 @@
  * @structure streamReply, streamSpeech; bounded SSE parsing; speech price cache
  * @usage await streamReply(storage, config, principal, options, signal, emit)
  * @version-history
+ *   v1.8.0 - 2026-10-05 - The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *   v1.7.0 - 2026-10-05 - `caller` is required: every call says who asks (secaudit 2026-10, AI-3).
  *   v1.6.0 - 2026-09-28 - The reply and the speech take `role`, the AI role the call runs as (services/ai/roles.ts).
  *   v1.4.0 - 2026-09-28 - Speech takes no model and no voice when a role gives them (System 2 plan,
@@ -42,6 +43,7 @@ import { emitChange } from './event-bus.js';
 import { appSpentToday, appQuotaFor } from './ai-app-id.js';
 import type { CallerClass } from './ai/policy.js';
 import { resolveTtsVoice } from './ai-model-defaults.js';
+import { requireAiCallTurn, type AiCallLimitMark } from './account-limits.js';
 
 function policyCallerOf(o: VoicePolicyCaller): VoicePolicyCaller {
   return {
@@ -63,6 +65,9 @@ export interface ReplyOptions extends VoicePolicyCaller {
   /** A provider id or type the call names: no fallback then. */
   provider?: string;
   reasoning?: { enabled?: boolean; effort?: 'low' | 'medium' | 'high'; max_tokens?: number; exclude?: boolean } | null;
+  /** 'exempt' for node-internal work; absent, the call counts against the account's AI call limit
+   *  (services/account-limits.ts). */
+  limit?: AiCallLimitMark;
 }
 export interface SpeakOptions extends VoicePolicyCaller {
   /** Without a model the speech role decides (the provider's, the owner's, the node's); without a
@@ -70,6 +75,9 @@ export interface SpeakOptions extends VoicePolicyCaller {
   input: string; model?: string; app_id: string; voice?: string; response_format: 'pcm' | 'mp3'; speed: number; instructions?: string;
   /** A provider id or type the call names (and the provider test uses): no fallback then. */
   provider?: string;
+  /** 'exempt' for node-internal work (the provider test, which counts itself); absent, the call
+   *  counts against the account's AI call limit (services/account-limits.ts). */
+  limit?: AiCallLimitMark;
 }
 
 async function checkResponse(response: Response): Promise<void> {
@@ -114,6 +122,8 @@ async function settled(storage: Storage, config: AimeatConfig, gaii: string, pla
 }
 
 export async function streamReply(storage: Storage, config: AimeatConfig, gaii: string, options: ReplyOptions, signal: AbortSignal, emit: VoiceEmit): Promise<void> {
+  // POST /v1/ai/stream and aimeat_voice_reply both arrive here: one count per account, before any spend.
+  requireAiCallTurn(config, gaii, options.limit);
   const first = await prepareAiCall(storage, config, gaii, {
     model: options.model, appId: options.app_id, ...policyCallerOf(options),
     ...(options.provider ? { provider: options.provider, fallback: false } : {}),
@@ -192,6 +202,8 @@ async function speechPrice(plan: AiCallPlan): Promise<number | undefined> {
 }
 
 export async function streamSpeech(storage: Storage, config: AimeatConfig, gaii: string, options: SpeakOptions, signal: AbortSignal, emit: VoiceEmit): Promise<void> {
+  // POST /v1/ai/speak and aimeat_voice_speak both arrive here: one count per account, before any spend.
+  requireAiCallTurn(config, gaii, options.limit);
   // A spoken reply asks for the speech capability: the owner's policy list for speech applies to it.
   const plan = await prepareAiCall(storage, config, gaii, {
     op: 'speak', model: options.model, appId: options.app_id, capability: 'speech', ...policyCallerOf(options),

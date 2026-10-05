@@ -29,6 +29,7 @@
  *   cd aimeat && pnpm check:single-entry --list    # every file each rule counts
  *   cd aimeat && pnpm check:single-entry --seed operator-role   # rewrite one rule's ceilings
  * @version-history
+ *   v1.1.0 — 2026-10-05 — Rule html-escape: HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, C1, C2 and C7).
  */
 import { readdirSync, readFileSync, statSync, writeFileSync, existsSync } from 'node:fs';
@@ -88,6 +89,32 @@ const RULES: Rule[] = [
     label: 'An operator route is gated by requireOperator(storage) (auth/middleware.ts), which admits the operator\'s agent holding operator:admin as the MCP admin tools do (C2)',
     pattern: /requireRole\(['"]operator['"]\)/,
     skipDirs: ['src/auth/'],
+  },
+  {
+    id: 'html-escape',
+    label: 'HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (C8)',
+    // A hand-written escaper's `<` step, `.replace(/</g, '&lt;')`, as the rebuilt line reads it.
+    pattern: /replace\(\/<\/g,['"]&lt;['"]\)/,
+    // src/data holds app and cortex code shipped as data, which runs in a browser, not on the node.
+    skipDirs: ['src/utils/html-escape.ts', 'src/data/'],
+  },
+  {
+    id: 'owner-role',
+    label: 'The account holder in person is asked with isOwnerInPerson (utils/gaii.ts), which also refuses an agent, an ecosystem app, an app grant and a visitor (C4)',
+    pattern: /roles\)?\??\.includes\(['"]owner['"]\)/,
+    skipDirs: ['src/auth/', 'src/utils/gaii.ts'],
+  },
+  {
+    id: 'email-pattern',
+    label: 'An e-mail address is checked with isValidEmail (utils/email-validator.ts), which also caps the length (M2)',
+    pattern: /\[\^\\s@\]\+@/,
+    skipDirs: ['src/utils/email-validator.ts', 'src/data/', 'src/static/'],
+  },
+  {
+    id: 'agent-name-pattern',
+    label: 'An agent name is checked with validateAgentName or isValidAgentName (utils/gaii.ts); the looser {1,63} pattern admitted names no agent can have (M2)',
+    pattern: /\[a-z0-9\]\[a-z0-9-\]\{1,63\}\$/,
+    skipDirs: ['src/utils/gaii.ts'],
   },
 ];
 

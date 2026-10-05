@@ -12,6 +12,7 @@
  *   - maintenancePageHtml(nodeId, message): renders the auto-refreshing maintenance page
  *
  * @version-history
+ *   v1.2.1 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   v1.2.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.1.0 — 2026-09-12 — The maintenance page in the house face (design canvas "AIMEAT Admin
  *     Maintenance"): the wordmark with its SVG heart, the ink headline, the operator's line, and
@@ -28,10 +29,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, MaintenanceState } from '../storage/interface.js';
 import { isOperatorCaller } from '../services/operator-override.js';
 import { logger } from '../utils/logger.js';
-
-function esc(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
+import { escapeHtml as esc } from '../utils/html-escape.js';
 
 /**
  * Resolve the server-bootstrap directory for path resolution.

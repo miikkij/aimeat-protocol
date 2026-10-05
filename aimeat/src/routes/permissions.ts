@@ -6,6 +6,8 @@
  *   simulation, and per-key effective rules (the UI's sharing-rules popover).
  * @structure permissionsRouter() — GET /v1/permissions/summary, /check, /memory/:key
  * @version-history
+ *   v1.1.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
+ *     secaudit 2026-10, C4).
  *   v1.1.0 — 2026-06-10 — Owner-session cross-agent fallback (getOwnedMemory): per-key
  *     visibility is read from the record's REAL owner (GHII or one of the owner's agents),
  *     fixing the popover reporting 'private'/'owner' for an agent-owned public key.
@@ -20,7 +22,7 @@ import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { checkConsentForRead } from '../services/consent.js';
 import { consentMatchPattern } from '../storage/pattern-utils.js';
-import { resolveIdentity } from '../utils/gaii.js';
+import { resolveIdentity, isOwnerInPerson } from '../utils/gaii.js';
 
 export function permissionsRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
@@ -33,8 +35,7 @@ export function permissionsRouter(config: AimeatConfig, storage: Storage): Route
     // "private"/"owner". Mirrors the cross-agent lookup in PUT/DELETE /v1/memory/:key.
     async function getOwnedMemory(req: Express.Request, ownerGaii: string, key: string) {
         let record = await storage.getMemory(ownerGaii, key);
-        const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
-        if (!record && isOwnerSession) {
+        if (!record && isOwnerInPerson(req.auth)) {
             const agents = await storage.getAgentsByOwner(req.auth!.owner as string);
             for (const agent of agents) {
                 record = await storage.getMemory(agent.gaii, key);

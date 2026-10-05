@@ -13,6 +13,7 @@
  *   import { transcribeForOwner } from '../services/ai-transcription.js';
  *   const r = await transcribeForOwner(storage, config, gaii, { audio, appId: 'inbox' });
  * @version-history
+ *   v2.5.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *   v2.4.0 — 2026-10-05 — `caller` is required: every call says who asks (secaudit 2026-10, AI-3).
  *   v2.3.0 — 2026-10-02 — Takes `lang`, so a refusal's sentence is in the person's language.
  *   v2.2.0 — 2026-09-28 — Takes `role`, the AI role the call runs as (services/ai/roles.ts).
@@ -51,6 +52,7 @@ import { logger } from '../utils/logger.js';
 import { resolveSttLanguage } from './ai-model-defaults.js';
 import type { CallerClass } from './ai/policy.js';
 import type { RequestLanguage } from './ai/ai-fix-words.js';
+import { requireAiCallTurn, type AiCallLimitMark } from './account-limits.js';
 
 /** Shown when the owner has no `sttModel`. Lives in services/ai/unset-model.ts since the gate refuses
  *  it; re-exported so the route, the message route and the UI copy point at the same instruction. */
@@ -81,6 +83,9 @@ export interface TranscribeForOwnerOptions {
   fallback?: boolean;
   /** The AI role the call runs as (services/ai/roles.ts). A named model or provider wins over it. */
   role?: string;
+  /** 'exempt' for node-internal work; absent, the call counts against the account's AI call limit
+   *  (services/account-limits.ts). */
+  limit?: AiCallLimitMark;
 }
 
 export interface TranscribeForOwnerResult {
@@ -128,6 +133,9 @@ export async function transcribeForOwner(
     throw new AiCompletionError('AUDIO_TOO_LARGE', 400,
       `Audio is ${(bytes.length / 1048576).toFixed(1)} MB; this node accepts up to ${config.sttMaxMb} MB for transcription.`);
   }
+  // POST /v1/ai/transcribe, the message attachment transcribe route and aimeat_ai_transcribe all
+  // arrive here: one count per account, before any spend.
+  requireAiCallTurn(config, gaii, opts.limit);
 
   // Owner setting, then the node's default, then a refusal by name (the gate words it). The
   // refusal stays: handing audio to a chat model turns a clear local error into an opaque provider one.

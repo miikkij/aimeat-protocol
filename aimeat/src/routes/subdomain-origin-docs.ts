@@ -23,6 +23,7 @@
  *     which is what keeps the import between the two files one-directional)
  * @usage registerAppOriginDocs(router, config, storage, { resolveApp, isRestricted });
  * @version-history
+ *   v1.2.1 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   v1.2.0 — 2026-09-24 — The origin sitemap lists the app and its legal pages only; the agent
  *     documents left it (Bing counted them as thin pages).
  *   v1.1.0 — 2026-08-29 — The app's own legal pages at /terms, /privacy, /imprint, /refunds,
@@ -46,6 +47,7 @@ import { appCsp } from '../utils/app-csp.js';
 import { applyServeMarks } from '../services/app-serve-marks.js';
 import { loadServedProvenance, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
 import { appReviewedBy } from '../services/app-marks.js';
+import { escapeHtml } from '../utils/html-escape.js';
 
 export interface AppOriginDocDeps {
   resolveApp: (target: string) => Promise<AppRecord | null>;
@@ -262,7 +264,7 @@ export function registerAppOriginDocs(
     const app = await appForOrigin(req);
     if (!app) return next();
     const raw = Array.from((app.manifest?.icon ?? '').trim()).slice(0, 8).join('') || '♥';
-    const safe = raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const safe = escapeHtml(raw);
     res.setHeader('Cache-Control', 'public, max-age=86400');
     res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'");
     res.type('image/svg+xml').send(

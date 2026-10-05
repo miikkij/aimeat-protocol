@@ -15,6 +15,7 @@
  *   - GET /v1/discover · GET /v1/discover/facets
  * @usage app.use(discoverRouter(config, storage))
  * @version-history
+ *   v0.4.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v0.4.0 — 2026-09-29 — The context carries the caller's classification reader (TARGET-082).
  *   v0.3.0 — 2026-08-31 — `tool` accepted as a type filter: an app's published tool is a thing to
  *     use, and this is the surface that answers what there is to use.
@@ -26,7 +27,7 @@ import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
-import { resolveIdentity } from '../utils/gaii.js';
+import { resolveIdentity, isOwnerInPerson } from '../utils/gaii.js';
 import { readerFor } from '../services/classification/reader.js';
 import {
   buildDiscoveryRegistry,
@@ -68,7 +69,7 @@ function parseFilters(query: Record<string, unknown>): DiscoveryFilters {
  * Default scope: authenticated → own; anonymous → public. scope=shared is Phase 3.
  */
 function buildContext(
-  req: { auth?: { sub: string; owner: string; roles: string[]; scopes?: string[]; anonymous?: boolean }; query: Record<string, unknown> },
+  req: { auth?: { sub: string; owner: string; roles: string[]; scopes?: string[]; anonymous?: boolean; federated?: boolean }; query: Record<string, unknown> },
   config: AimeatConfig,
   storage: Storage,
 ): { ctx: DiscoveryContext } | { errCode: string; errMsg: string; status: number } {
@@ -89,7 +90,7 @@ function buildContext(
           ownerName: req.auth.owner,
           sub: req.auth.sub,
           gaii: resolveIdentity(req.auth, config.nodeId),
-          isOwnerSession: req.auth.roles.includes('owner') && !req.auth.roles.includes('agent'),
+          isOwnerSession: isOwnerInPerson(req.auth),
           scopes: req.auth.scopes ?? [],
         }
       : { ownerName: '', sub: '', gaii: '', isOwnerSession: false, scopes: [] },

@@ -24,11 +24,13 @@
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V4).
  *   v1.0.1 — 2026-09-26 — resolveRecipient names the recipient's account with localAccountName, so a
  *     principal of another node that shares the owner's name is cross-owner (secaudit 2026-09, F-1).
+ *   v1.0.2 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
+ *     secaudit 2026-10, C4).
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentV2MessageRecord, AgentV2PushConfigRecord } from '../storage/interface.js';
-import { resolveIdentity, localAccountName, isGEAI } from '../utils/gaii.js';
+import { resolveIdentity, localAccountName, isGEAI, isOwnerInPerson } from '../utils/gaii.js';
 import { validateMessageInput, validatePushConfigInput, publicPushConfig } from '../models/agent-v2-message.js';
 import { sendAgentV2Message } from './agent-v2-messaging.js';
 
@@ -45,11 +47,6 @@ export type OpResult<T> =
 
 /** The largest page a listing answers with, whatever was asked for. */
 const MAX_LIST_LIMIT = 200;
-
-function isOwnerSession(auth: Principal): boolean {
-  const roles = auth.roles ?? [];
-  return roles.includes('owner') && !roles.includes('agent') && !roles.includes('ecosystem');
-}
 
 /**
  * Is `principal` a real principal of `owner` on this node? Three shapes qualify: the owner's own
@@ -180,7 +177,7 @@ export async function setPushTarget(
     ? ((body as Record<string, string>).principal).trim() : '';
   const target = asked !== '' ? asked : self;
 
-  if (target !== self && !isOwnerSession(auth)) {
+  if (target !== self && !isOwnerInPerson(auth)) {
     return {
       ok: false, status: 403, code: 'ACCESS_DENIED',
       message: 'A principal may register a delivery target for itself. Registering one for another principal is the account holder’s to do.',
@@ -234,7 +231,7 @@ export async function setPushTarget(
 export async function listPushTargets(
   storage: Storage, config: AimeatConfig, auth: Principal, askedPrincipal?: string,
 ): Promise<OpResult<ReturnType<typeof publicPushConfig>[]>> {
-  const principal = isOwnerSession(auth)
+  const principal = isOwnerInPerson(auth)
     ? (askedPrincipal && askedPrincipal.trim() !== '' ? askedPrincipal : undefined)
     : resolveIdentity(auth, config.nodeId);
   const configs = await storage.listAgentV2PushConfigs(auth.owner, principal);
@@ -246,7 +243,7 @@ export async function deletePushTarget(
 ): Promise<OpResult<string>> {
   const found = await storage.getAgentV2PushConfig(auth.owner, id);
   if (!found) return { ok: false, status: 404, code: 'NOT_FOUND', message: 'No such delivery target on this account.' };
-  if (found.principal !== resolveIdentity(auth, config.nodeId) && !isOwnerSession(auth)) {
+  if (found.principal !== resolveIdentity(auth, config.nodeId) && !isOwnerInPerson(auth)) {
     return {
       ok: false, status: 403, code: 'ACCESS_DENIED',
       message: 'That delivery target belongs to another principal on this account.',

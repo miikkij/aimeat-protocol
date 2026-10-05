@@ -1,5 +1,5 @@
 /**
- * @file cli/connect/tool-call-defs-boards.ts
+ * @file src/tool-dispatch/tool-call-defs-boards.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The board connect-call tool definitions: read, post, list, create, subscribe, react,

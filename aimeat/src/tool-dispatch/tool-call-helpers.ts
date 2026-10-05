@@ -1,5 +1,5 @@
 /**
- * @file cli/connect/tool-call-helpers.ts
+ * @file src/tool-dispatch/tool-call-helpers.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Shared types + input-coercion helpers for the connect-call REST tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.

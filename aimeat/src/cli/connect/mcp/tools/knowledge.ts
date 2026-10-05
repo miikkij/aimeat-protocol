@@ -27,8 +27,8 @@ import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
-import { readPayloadWithProvenance } from '../../ai-provenance-carry.js';
-import { knowledgeContributeUnreachable, KNOWLEDGE_CONTRIBUTE_CONNECTOR_NOTE } from '../../tool-call-defs-core.js';
+import { readPayloadWithProvenance } from '../../../../tool-dispatch/ai-provenance-carry.js';
+import { knowledgeContributeUnreachable, KNOWLEDGE_CONTRIBUTE_CONNECTOR_NOTE } from '../../../../tool-dispatch/tool-call-defs-core.js';
 import { envelopeResult, payloadResult } from './_registry.js';
 
 export function registerKnowledgeTools(mcp: McpServer, registry: AgentRegistry): void {

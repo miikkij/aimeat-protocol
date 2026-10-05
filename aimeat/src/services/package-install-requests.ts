@@ -31,6 +31,7 @@
  *   const out = await installOrRequest({ storage, config, scheduler }, caller, { groupId, label });
  *   if (out.ok && out.kind === 'requested') res.status(202).json(success(nodeId, requestedBody(out)));
  * @version-history
+ *   v1.4.1 — 2026-10-05 — The owner test is isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.4.0 — 2026-10-04 — An install records the owner's grant for the apps it registered when the
  *     installer chose `grantApps`, or did not say and the package is the owner's own; an agent grants
  *     no app a scope it lacks. A request keeps the choice, and the owner's approval applies it.
@@ -57,8 +58,8 @@ import { fetchComponentContent } from './component-registrar.js';
 import { recordAccountEvent } from './account-events.js';
 import { emitChange } from './event-bus.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
-import { callerPrincipal, isForeignPrincipal } from '../utils/gaii.js';
-import { ownerBypassesScopes, scopeIsCovered } from '../utils/scope-coverage.js';
+import { callerPrincipal, isForeignPrincipal, isOwnerInPerson } from '../utils/gaii.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { grantAppsOfInstance, type AppGrantStep } from './install-set-grants.js';
 import { stableStringify } from '../utils/stable-json.js';
 import { decisionRefusal, requestExpired, type InstallRequestDecider } from './package-install-request-policy.js';
@@ -202,7 +203,7 @@ async function withAppGrants<T extends { instance: PackageInstanceRecord; ownPac
 ): Promise<T> {
     const approve = typeof grantApps === 'boolean' ? grantApps : out.ownPackage;
     if (!approve) return out;
-    const mayGrant = ownerBypassesScopes(caller) ? null : (s: string) => scopeIsCovered(caller.scopes, s);
+    const mayGrant = isOwnerInPerson(caller) ? null : (s: string) => scopeIsCovered(caller.scopes, s);
     const appGrants = await grantAppsOfInstance(deps.storage, deps.config, caller.owner, out.instance, {}, mayGrant);
     return Object.keys(appGrants).length ? { ...out, appGrants } : out;
 }
@@ -349,7 +350,7 @@ export async function decideInstallRequest(
         if (refusal) return fail(refusal.status, refusal.code, refusal.message);
         if (request.state !== 'awaiting_owner') return fail(409, 'ALREADY_SETTLED', `This request was already ${request.state}.`);
 
-        const by = ownerBypassesScopes(decider) ? ownerGhii : decider.sub;
+        const by = isOwnerInPerson(decider) ? ownerGhii : decider.sub;
         // Fails closed: an expiry that cannot be read is an expired request.
         if (requestExpired(request, Date.now())) {
             await settleInstallRequest(deps, ownerGhii, request, 'expired', { by: null });

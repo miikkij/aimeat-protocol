@@ -24,6 +24,7 @@
  * @structure NS_PACKAGE_APPROVALS · INSTALL_CODE_SCOPE · codeInstallRefusal() · InstallApproval ·
  *   recordApproval() · approvalOf() · forgetApproval() · approvedItems() · isOwnPackage() · installedFromPackage()
  * @version-history
+ *   v1.1.1 — 2026-10-05 — The owner test is isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.1.0 — 2026-10-05 — isOwnPackage: only a package written on this node is the installer's own
  *     (secaudit 2026-10, PKG-5).
  *   v1.0.0 — 2026-10-02 — Initial (package sale design, phase 2).
@@ -31,7 +32,8 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage, PackageInstanceRecord, PackageComponentType, PackageRecord } from '../storage/interface.js';
 import { packageCapabilities, type CapabilitySummary } from './package-capabilities.js';
-import { ownerBypassesScopes, scopeIsCovered } from '../utils/scope-coverage.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { isOwnerInPerson } from '../utils/gaii.js';
 
 export const NS_PACKAGE_APPROVALS = 'package-approvals';
 
@@ -69,7 +71,7 @@ export function codeInstallRefusal(
   widened?: string[],
 ): { status: 403; code: 'SCOPE_DENIED' | 'FORBIDDEN'; message: string; missing: string[] } | null {
   if (widened ? widened.length === 0 : !summary.carriesCode) return null;
-  if (ownerBypassesScopes(caller)) return null;
+  if (isOwnerInPerson(caller)) return null;
   if (caller.roles.includes('ecosystem')) {
     return { status: 403, code: 'FORBIDDEN', missing: [], message: 'This package carries code, and an ecosystem app does not install code into the owner\'s account.' };
   }

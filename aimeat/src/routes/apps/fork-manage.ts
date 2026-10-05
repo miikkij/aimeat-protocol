@@ -6,6 +6,7 @@
  *   PATCH /v1/apps/:filename (rename/access-code/parked/forkable/protection/cortex), DELETE /v1/apps/:filename.
  *   Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.9.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.8.0 — 2026-09-28 — PATCH refuses `cortex` (the bundled crew-defs) on an app a managed package
  *     install owns, 409 MANAGED_BY_PACKAGE (services/package-managed.ts); the settings stay open.
@@ -53,7 +54,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { forkApp, deleteOwnedApp } from '../../services/app-lifecycle.js';
 import { managedChangeRefusal } from '../../services/package-managed.js';
-import { resolveIdentity, ownerGhiiOf, localAccountName } from '../../utils/gaii.js';
+import { resolveIdentity, ownerGhiiOf, localAccountName, isOwnerInPerson } from '../../utils/gaii.js';
 import {
     applyOwnerSettingsUpdate, appSettingsState, appDownloadUrl, parseOwnerSettingsInput,
     SETTINGS_PRESENTATION_FIELDS, SETTINGS_OFFERING_FIELDS, type AppSettingsField, type AppSettingsInput,
@@ -84,7 +85,7 @@ const bad = (message: string): PatchRefusal => ({ status: 400, code: 'INVALID_IN
  * scope a legal declaration needs is asked right after it (legalUpdateRefusal), and a page that
  * disappears mid-request is a 404 no ordering can prevent.
  */
-function patchRefusal(body: Record<string, unknown>, roles: string[], delegated: unknown): PatchRefusal | null {
+function patchRefusal(body: Record<string, unknown>, auth: Parameters<typeof isOwnerInPerson>[0], delegated: unknown): PatchRefusal | null {
     // The settings fields are asked in two parts around `cortex`, so that a body with two bad
     // fields is refused on the same one it always was.
     const presentation = parseOwnerSettingsInput(settingsPart(body, SETTINGS_PRESENTATION_FIELDS));
@@ -110,9 +111,7 @@ function patchRefusal(body: Record<string, unknown>, roles: string[], delegated:
         // Never for a delegate, whatever rung they hold. Declaring the natural person who answers
         // for an app is the account holder's own act, and somebody signed in as the owner of THEIR
         // account is not the owner of this one. The same test services/app-marks.ts applies.
-        const ownerPrincipal = delegated === null
-            && roles.includes('owner') && !roles.includes('app')
-            && !roles.includes('agent') && !roles.includes('ecosystem');
+        const ownerPrincipal = delegated === null && isOwnerInPerson(auth);
         if (!ownerPrincipal) return { status: 403, code: 'ACCESS_DENIED', message: AUTHOR_NEEDS_OWNER_PRINCIPAL };
         const parsed = parseAuthorInput(body.author);
         if ('error' in parsed) return bad(parsed.error);
@@ -298,7 +297,7 @@ export function registerForkManageRoutes(
         // this pass calls the same exported parser the service that owns the field calls, so there
         // is one implementation of each rule and this is a second CALL, not a second copy.
         // Invariant 14. Found by the AI triage of 2026-09-13.
-        const refusal = patchRefusal(body, req.auth!.roles, delegated);
+        const refusal = patchRefusal(body, req.auth, delegated);
         if (refusal) {
             res.status(refusal.status).json(error(config.nodeId, refusal.code, refusal.message));
             return;
@@ -409,13 +408,10 @@ export function registerForkManageRoutes(
         // requireOwnerPrincipal() applies: an owner token with no agent, app or ecosystem role.
         // The owner NAME is not that test; every principal here carries it.
         if ('marks' in body || 'author' in body) {
-            const roles = req.auth!.roles;
             // Never for a delegate, whatever rung they hold. Declaring the natural person who
             // answers for an app is the account holder's own act, and somebody signed in as the
             // owner of THEIR account is not the owner of this one.
-            const ownerPrincipal = delegated === null
-                && roles.includes('owner') && !roles.includes('app')
-                && !roles.includes('agent') && !roles.includes('ecosystem');
+            const ownerPrincipal = delegated === null && isOwnerInPerson(req.auth);
             const out = await applyOwnerMarksUpdate(storage, { ownerGaii: effectiveGaii, filename }, {
                 ...('marks' in body ? { marks: body.marks } : {}),
                 ...('author' in body ? { author: body.author } : {}),

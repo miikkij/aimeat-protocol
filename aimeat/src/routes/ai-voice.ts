@@ -6,6 +6,7 @@
  * @structure registerVoiceRoutes; voiceAppId binds app tokens to their signed identity
  * @usage registerVoiceRoutes(router, config, storage)
  * @version-history
+ *   v1.2.0 - 2026-10-05 - The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *   v1.1.0 - 2026-09-28 - Passes who is calling to the owner's model policy and returns a refusal's details.
  *   v1.0.0 - 2026-09-19 - NDJSON voice stages with backpressure and disconnect cancellation.
  */
@@ -17,8 +18,8 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { ownerGhiiOf, resolveIdentity } from '../utils/gaii.js';
 import { error, success } from '../middleware/envelope.js';
-import { rateLimit } from '../middleware/rate-limit.js';
 import { AiCompletionError } from '../services/ai-completion.js';
+import { retryAfterOf } from '../services/account-limits.js';
 import { streamReply, streamSpeech } from '../services/ai-voice.js';
 import { logger } from '../utils/logger.js';
 import { voiceReplySchema as reply, voiceSpeechSchema as speech } from '../services/ai-voice-contract.js';
@@ -37,7 +38,6 @@ export function voiceAppId(req: Request, requested?: string): string | undefined
 }
 
 export function registerVoiceRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
-  const limit = rateLimit(config.rateLimits.openrouter);
   async function run(req: Request, res: Response, kind: 'reply' | 'speech') {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(new Error('Voice request timed out')), 180000);
@@ -72,10 +72,15 @@ export function registerVoiceRoutes(router: Router, config: AimeatConfig, storag
       const typed = failure instanceof AiCompletionError;
       const code = typed ? failure.code : failure instanceof z.ZodError ? 'INVALID_BODY' : 'PROVIDER_ERROR';
       const message = failure instanceof z.ZodError ? failure.issues.map(issue => issue.path.join('.') + ': ' + issue.message).join('; ') : (failure as Error).message;
-      if (res.headersSent) res.end(JSON.stringify({ type: 'error', code, message }) + '\n');
-      else res.status(typed ? failure.status : code === 'INVALID_BODY' ? 400 : 502).json(error(config.nodeId, code, message, undefined, typed ? failure.details : undefined));
+      if (res.headersSent) { res.end(JSON.stringify({ type: 'error', code, message }) + '\n'); return; }
+      // The account's AI call limit (services/account-limits.ts) says when to come back.
+      const retryAfter = retryAfterOf(failure);
+      if (retryAfter !== undefined) res.setHeader('Retry-After', String(retryAfter));
+      res.status(typed ? failure.status : code === 'INVALID_BODY' ? 400 : 502).json(error(config.nodeId, code, message, undefined, typed ? failure.details : undefined));
     } finally { clearTimeout(timeout); res.off('close', closed); }
   }
-  router.post('/v1/ai/stream', requireAuth(), requireScope('ai:use'), limit, (req, res) => run(req, res, 'reply'));
-  router.post('/v1/ai/speak', requireAuth(), requireScope('ai:use'), limit, (req, res) => run(req, res, 'speech'));
+  // No path limiter: streamReply and streamSpeech count the account's AI call limit, which
+  // aimeat_voice_reply and aimeat_voice_speak share.
+  router.post('/v1/ai/stream', requireAuth(), requireScope('ai:use'), (req, res) => run(req, res, 'reply'));
+  router.post('/v1/ai/speak', requireAuth(), requireScope('ai:use'), (req, res) => run(req, res, 'speech'));
 }

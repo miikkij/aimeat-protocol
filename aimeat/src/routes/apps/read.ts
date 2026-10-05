@@ -10,6 +10,8 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   v1.16.2 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
+ *   v1.16.1 — 2026-10-05 — The owner test is isSameAccount (utils/same-account.ts; secaudit 2026-10, C8).
  *   v1.16.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.15.0 — 2026-10-04 — The frame decision names the app, so an app a package installed takes the
  *     isolated frame on a node one person uses too (inline-frame.ts v1.1.0).
@@ -80,6 +82,7 @@ import { verifyDraftToken, DraftTokenError } from '../../services/draft-token.js
 import { generateAppAccessToken } from '../../services/app-access-token.js';
 import { setStoredImageHeaders } from '../../utils/file-download-headers.js';
 import { ownerCoordinate, localAccountName } from '../../utils/gaii.js';
+import { isSameAccount } from '../../utils/same-account.js';
 import { applyServeMarks } from '../../services/app-serve-marks.js';
 import { servedBadgeOn, appReviewedBy } from '../../services/app-marks.js';
 import { appToolNames } from '../../services/app-tool-names.js';
@@ -97,6 +100,7 @@ import { logger } from '../../utils/logger.js';
 import { recordAppOpen } from '../../services/usage/record-app-open.js';
 import { countPageView } from '../../services/signals/page-views.js';
 import { geoFromHeaders } from '../../utils/geo-headers.js';
+import { escapeHtml } from '../../utils/html-escape.js';
 import { isOperatorCaller, operatorOverride } from '../../services/operator-override.js';
 import {
     loadServedProvenance, envelopeMeta, setProvenanceHeaders,
@@ -119,7 +123,7 @@ function accessCodeUnlockPage(
     nonce?: string,
 ): string {
     const fi = String(req.headers['accept-language'] ?? '').toLowerCase().startsWith('fi');
-    const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const esc = escapeHtml;
     const hidden = Object.entries(req.query)
         .filter(([k, v]) => k !== 'code' && typeof v === 'string')
         .map(([k, v]) => `<input type="hidden" name="${esc(k)}" value="${esc(v as string)}">`)
@@ -472,7 +476,7 @@ export function registerReadRoutes(
             let isOwner = false;
             if (req.auth) {
                 const { owner: viewerOwner } = await canonicalOwner(req);
-                isOwner = viewerOwner === app.ownerName;
+                isOwner = isSameAccount(viewerOwner, app.ownerName);
             }
             if (!isOwner && !(await operatorReads())) {
                 res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"${version ? ` (version ${version})` : ''}`));
@@ -599,7 +603,7 @@ export function registerReadRoutes(
         // owner + operators may still download their own source (backup/management).
         if (!runnable && app.manifest.protection?.noRawDownload) {
             let isOwner = false;
-            if (req.auth) { const { owner: viewerOwner } = await canonicalOwner(req); isOwner = viewerOwner === app.ownerName; }
+            if (req.auth) { const { owner: viewerOwner } = await canonicalOwner(req); isOwner = isSameAccount(viewerOwner, app.ownerName); }
             if (!isOwner && !(await operatorReads())) {
                 res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'This app is not available as a raw download. Open it inline (runnable) instead.'));
                 return;

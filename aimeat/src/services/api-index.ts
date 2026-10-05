@@ -17,6 +17,7 @@
  * @usage
  *   const index = apiIndexHtml();
  * @version-history
+ *   2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   2026-09-28 — openapi.yaml is found by services/openapi-file.ts, which knows the packaged location.
  *   v1.0.0 — 2026-09-24 — Initial.
  */
@@ -24,12 +25,9 @@ import { readFileSync } from 'node:fs';
 import { parse } from 'yaml';
 import { logger } from '../utils/logger.js';
 import { findOpenApiFile } from './openapi-file.js';
+import { escapeHtml as esc } from '../utils/html-escape.js';
 
 const METHODS = ['get', 'post', 'put', 'patch', 'delete'] as const;
-
-function esc(t: string): string {
-  return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
 
 interface Operation { summary?: string; tags?: string[]; deprecated?: boolean }
 

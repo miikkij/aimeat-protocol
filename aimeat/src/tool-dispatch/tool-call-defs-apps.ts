@@ -1,5 +1,5 @@
 /**
- * @file cli/connect/tool-call-defs-apps.ts
+ * @file src/tool-dispatch/tool-call-defs-apps.ts
  * @description App-fork, IAM, organism-archive, workspace-transfer, wallet, app, extension, cortex and workflow connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @structure
  *   - attachProofOverHttp() -- the acceleration-proof attach, over the doors a connector has. Shared

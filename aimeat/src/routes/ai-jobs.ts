@@ -43,6 +43,8 @@
  * @structure aiJobsRouter(config, storage, service)
  * @usage app.use(aiJobsRouter(config, storage, aiJobService));
  * @version-history
+ *   v1.5.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
+ *     POST /v1/ai/jobs has no path limiter: startJob counts, as it does for aimeat_ai_job_start.
  *   v1.4.0 — 2026-09-29 — POST /v1/ai/jobs records who started the job (identity, account, roles,
  *     scopes and the PAT mark of the verified credential), so the job reads its inputs as that caller
  *     (TARGET-082 V4).
@@ -67,7 +69,6 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { assertAiUseAllowed } from '../auth/ai-gate.js';
-import { rateLimit } from '../middleware/rate-limit.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { AiJobError } from '../services/ai-jobs/index.js';
@@ -78,8 +79,8 @@ import type { AiJobState } from '../services/ai-jobs/types.js';
 export function aiJobsRouter(config: AimeatConfig, storage: Storage, service: AiJobService): Router {
     const router = Router();
     const resolve = (req: Request) => resolveIdentity(req.auth!, config.nodeId);
-    // The openrouter bucket, same as /v1/ai/complete: same provider, same spend concerns.
-    const aiRateLimit = rateLimit(config.rateLimits.openrouter);
+    // No path limiter: startJob counts the account's AI call limit (services/account-limits.ts),
+    // which aimeat_ai_job_start shares, and answers AiJobError RATE_LIMITED with a Retry-After.
 
     /** One place the four refusals become a status, a code and a Retry-After. */
     const fail = (res: Response, e: unknown): Response => {
@@ -92,7 +93,7 @@ export function aiJobsRouter(config: AimeatConfig, storage: Storage, service: Ai
 
     // ── POST /v1/ai/jobs ──
     router.post('/v1/ai/jobs',
-        requireAuth(), aiRateLimit,
+        requireAuth(),
         async (req: Request, res: Response) => {
             if (!assertAiUseAllowed(req, res, config.nodeId)) return;
             const body = req.body as {

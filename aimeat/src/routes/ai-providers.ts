@@ -27,6 +27,7 @@
  *     GET    /v1/ai/routing
  *     PUT    /v1/ai/routing
  * @version-history
+ *   v1.1.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *   v1.0.0 — 2026-09-28 — Initial (V3 of the System 2 plan).
  */
 import { Router, type Request, type Response } from 'express';
@@ -35,8 +36,8 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { isOwnerPrincipal, requireOwnerPrincipal } from '../auth/account-security.js';
 import { assertAiUseAllowed } from '../auth/ai-gate.js';
-import { rateLimit } from '../middleware/rate-limit.js';
 import { success, error } from '../middleware/envelope.js';
+import { retryAfterOf } from '../services/account-limits.js';
 import { resolveIdentity, isForeignPrincipal } from '../utils/gaii.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { aiPayerOf } from '../services/agent-ai-keys.js';
@@ -57,9 +58,10 @@ const NEXT_LIST = { description: 'List your AI providers', method: 'GET', url: '
 
 export function aiProvidersRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
-  const aiRateLimit = rateLimit(config.rateLimits.openrouter);
 
   const fail = (res: Response, e: unknown) => {
+    const retryAfter = retryAfterOf(e);
+    if (retryAfter !== undefined) res.setHeader('Retry-After', String(retryAfter));
     if (e instanceof AiCompletionError) return res.status(e.status).json(error(config.nodeId, e.code, e.message, e.status, e.details));
     const s = (e as { status?: unknown; code?: unknown }).status;
     if (typeof s === 'number' && typeof (e as { code?: unknown }).code === 'string') {
@@ -120,8 +122,9 @@ export function aiProvidersRouter(config: AimeatConfig, storage: Storage): Route
     } catch (e) { fail(res, e); }
   });
 
-  // ── POST /v1/ai/providers/:id/test ── the smallest real call, through the gate
-  router.post('/v1/ai/providers/:id/test', requireAuth(), requireScope('ai:use'), aiRateLimit, async (req: Request, res: Response) => {
+  // ── POST /v1/ai/providers/:id/test ── the smallest real call, through the gate. testProvider
+  // counts the account's AI call limit, which aimeat_ai_provider_test shares; no path limiter here.
+  router.post('/v1/ai/providers/:id/test', requireAuth(), requireScope('ai:use'), async (req: Request, res: Response) => {
     if (!assertAiUseAllowed(req, res, config.nodeId)) return;
     const body = (req.body ?? {}) as { capability?: unknown; accept_cost?: unknown };
     try {

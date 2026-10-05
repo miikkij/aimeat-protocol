@@ -37,6 +37,7 @@
  * @usage
  *   const out = await applyOwnerLegalUpdate(storage, { ownerGaii, filename }, { legal: body.legal, actor });
  * @version-history
+ *   v1.2.1 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   v1.2.0 — 2026-09-24 — legalUpdateRefusal(): what applyOwnerLegalUpdate() would refuse, the
  *     provenance scope included, asked without writing (508c32904067). PATCH /v1/apps/:filename
  *     asks it before its first write.
@@ -58,6 +59,7 @@ import { appDisplayName } from './app-agent-surfaces.js';
 import { AppToolsDocSchema } from '../models/app-tool-schemas.js';
 import { provenanceForWrite, provenanceDeclarationRefusal, ProvenanceScopeError, type DeclaredProvenance } from './ai-provenance.js';
 import { logger } from '../utils/logger.js';
+import { escapeHtml as esc } from '../utils/html-escape.js';
 
 export const LEGAL_CONTENT_MAX = 200_000;
 export const LEGAL_URL_MAX = 2048;
@@ -430,10 +432,6 @@ export function apexLegalBase(baseUrl: string, app: Pick<AppRecord, 'ownerName' 
 }
 
 export type RenderedLegalPage = { redirect: string } | { html: string };
-
-function esc(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
 
 /**
  * What a reader gets. HTML is the owner's document verbatim; markdown becomes a plain page that

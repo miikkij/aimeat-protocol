@@ -27,6 +27,8 @@
  *   - llmProxyRouter(config, storage) — POST /v1/llm/chat/completions, GET /v1/llm/models
  * @usage mounted in server-bootstrap/routes-loader.ts; an agent uses <node>/v1/llm as its base URL
  * @version-history
+ *   v1.9.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
+ *     POST /v1/llm/chat/completions counts the account on the route (aiCallLimit), not per principal.
  *   v1.8.0 — 2026-10-04 — A call to OpenRouter asks for its own cost (usage.include), and a catalogue
  *     price takes the cache-read rate for cached prompt tokens: the ledger matches the charge again.
  *   v1.7.1 — 2026-10-04 — The session_id is the system message's hash alone, not the payer's, so every
@@ -58,6 +60,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { rateLimit } from '../middleware/rate-limit.js';
+import { aiCallLimit } from '../middleware/ai-call-limit.js';
 import { assertAiUseAllowed } from '../auth/ai-gate.js';
 import { error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
@@ -99,9 +102,13 @@ interface ProviderOutcome {
 
 export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
-    // The same ceiling the other AI doors run under. A proxy without one is the cheapest way to
+    // The same ceiling the other AI routes run under. A proxy without one is the cheapest way to
     // spend an operator's money, and it reads the same operator setting as /v1/ai/complete.
+    // GET /v1/llm/models starts no AI call and keeps the per-principal path limiter. The chat
+    // completion counts the account's AI call limit on the route (aiCallLimit): no MCP tool calls
+    // the proxy, so there is no service entry to share.
     const aiRateLimit = rateLimit(config.rateLimits.openrouter);
+    const chatLimit = aiCallLimit(config);
 
     /**
      * GET /v1/llm/models — the models this node will actually run.
@@ -153,7 +160,7 @@ export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
      * is the order that matters: a call that was refused must never have been paid for, and a call
      * that was paid for must never go unrecorded.
      */
-    router.post('/v1/llm/chat/completions', requireAuth(), requireScope('ai:use'), aiRateLimit, async (req: Request, res: Response) => {
+    router.post('/v1/llm/chat/completions', requireAuth(), requireScope('ai:use'), chatLimit, async (req: Request, res: Response) => {
         if (!assertAiUseAllowed(req, res, config.nodeId)) return;
         // An agent's call is paid by its owner, in the agent's name (services/agent-ai-keys.ts).
         const { payer: gaii, agent } = aiPayerOf(resolveIdentity(req.auth!, config.nodeId));

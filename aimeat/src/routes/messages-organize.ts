@@ -18,6 +18,8 @@
  *   acting principal's own owner, derived from the session (services/direct-message-delete.ts
  *   ownerMailbox); a session from another node is refused before any of it.
  * @version-history
+ *   v1.0.1 -- 2026-10-05 -- The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
+ *     secaudit 2026-10, C4).
  *   v1.0.0 -- 2026-09-13 -- Initial, with the Messages list's sections, rules and archive.
  */
 
@@ -32,6 +34,7 @@ import {
   MESSAGES_ORGANIZE_AS_OWNER_SCOPE, archiveConversations, organizeView, readInboxOrganizeStrict, updateInboxOrganize,
 } from '../services/inbox-organize/record.js';
 import { logger } from '../utils/logger.js';
+import { isOwnerInPerson } from '../utils/gaii.js';
 
 export function messagesOrganizeRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -41,7 +44,7 @@ export function messagesOrganizeRouter(config: AimeatConfig, storage: Storage): 
 
   /** An agent changing what its owner is shown leaves no trace in the list itself, so the log does. */
   const audit = (req: Express.Request, what: string, detail: Record<string, unknown>) => {
-    if (req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent') && !req.auth!.roles.includes('ecosystem')) return;
+    if (isOwnerInPerson(req.auth)) return;
     logger.info('messages organised as owner (delegated)', { actor: req.auth!.sub, owner: ownerMailbox(req.auth!, config.nodeId), what, ...detail });
   };
 

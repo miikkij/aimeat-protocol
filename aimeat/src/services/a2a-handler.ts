@@ -26,6 +26,8 @@
  * @usage const handler = new AimeatA2ARequestHandler(storage, config, agent, () => callerAuth);
  * @version-history
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V6a).
+ *   v1.0.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
+ *     secaudit 2026-10, C4).
  */
 import {
   Role,
@@ -50,6 +52,7 @@ import { streamTask } from './a2a-stream.js';
 import { createTask, getTask, cancelTask, listTasks } from './agent-v2-tasks-ops.js';
 import { sendTurn, setPushTarget, listPushTargets, deletePushTarget, type Principal, type OpResult } from './agent-v2-messaging-ops.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { isOwnerInPerson } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -105,9 +108,7 @@ export class AimeatA2ARequestHandler implements A2ARequestHandler {
    * own principals. An agent or an ecosystem app is enforced, whatever its owner's roles are.
    */
   private requireScope(scope: string): void {
-    const roles = this.caller.roles ?? [];
-    const ownerSession = roles.includes('owner') && !roles.includes('agent') && !roles.includes('ecosystem');
-    if (ownerSession) return;
+    if (isOwnerInPerson(this.caller)) return;
     if (scopeIsCovered(this.caller.scopes ?? [], scope)) return;
     logger.warn('[scope-denied] a2a', { principal: this.caller.sub, needs: scope, has: this.caller.scopes });
     throw new JsonRpcRequestMalformedError({

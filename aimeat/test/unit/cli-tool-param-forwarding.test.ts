@@ -53,7 +53,7 @@
 import { describe, it, expect } from 'vitest';
 import { CONNECT_CLI_TOOLS } from '../../src/cli/connect/tool-call.js';
 import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../../src/mcp/catalog/definitions.js';
-import type { JsonObject } from '../../src/cli/connect/tool-call-helpers.js';
+import type { JsonObject } from '../../src/tool-dispatch/tool-call-helpers.js';
 
 /** Handled by withProvenanceCarrying() around every definition, not by the handlers themselves. */
 const WRAPPER_PARAMS = new Set(['ai_provenance', 'ai_provenance_id']);

@@ -19,7 +19,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import type { ApiResponse } from '../../api-client.js';
-import { themeRequests } from '../../tool-call-defs-themes.js';
+import { themeRequests } from '../../../../tool-dispatch/tool-call-defs-themes.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 

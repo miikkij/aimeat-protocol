@@ -15,8 +15,11 @@
  * @structure CssWarning · CssRule · CssReport · lintCss · selectorClasses · touchesClasses
  * @usage import { lintCss } from './css-lint.js'; const r = lintCss(css, { componentClasses, faces });
  * @version-history
+ *   v1.1.0 — 2026-10-05 — What loads a file (@import, url()) is found with css-tree's tokenizer, so an
+ *     escaped name is warned as the browser reads it (secaudit 2026-10, C8). Still warn-only.
  *   v1.0.0 — 2026-09-24 — Initial (UI consolidation phase 4, 07-themes-and-styles.md).
  */
+import { ident, tokenize, tokenTypes } from 'css-tree';
 
 export type CssWarningCode = 'hides' | 'motion' | 'literal-colour' | 'face' | 'outside' | 'loads';
 
@@ -60,6 +63,32 @@ const LITERAL_COLOUR = /#[0-9a-fA-F]{3,8}\b|\b(rgb|rgba|hsl|hsla)\(|\b(red|blue|
 
 /** Line number (1-based) of an offset. */
 const lineAt = (text: string, offset: number): number => text.slice(0, offset).split('\n').length;
+
+/**
+ * What loads a file: an @import, a url() in any form. Read with css-tree's tokenizer, the reader the
+ * component bench uses (services/design-book/component-scan.ts), so an escaped name such as
+ * `@\69mport` or `u\72l(` is the name it is in the browser. A hand regex saw neither, and the sheet
+ * loaded a file with no warning (secaudit 2026-10, C8). Still a warning, never a refusal: the
+ * operator decides (07-themes-and-styles.md).
+ */
+function loadWarnings(css: string, rules: CssRule[]): CssWarning[] {
+    const out: CssWarning[] = [];
+    const propertyOn = (line: number): string | undefined =>
+        rules.flatMap((r) => r.declarations).find((d) => d.line === line)?.property;
+    tokenize(css, (type, start, end) => {
+        const raw = css.slice(start, end);
+        const line = lineAt(css, start);
+        if (type === tokenTypes.AtKeyword && ident.decode(raw.slice(1)).toLowerCase() === 'import') {
+            out.push({ line, code: 'loads', text: 'An @import loads another sheet; the site\'s content policy decides whether it may.' });
+        } else if (type === tokenTypes.Url || (type === tokenTypes.Function && ident.decode(raw.slice(0, -1)).toLowerCase() === 'url')) {
+            const property = propertyOn(line);
+            out.push(property
+                ? { line, code: 'loads', property, text: `${property} loads a file; the site's content policy decides whether it may.` }
+                : { line, code: 'loads', text: 'The CSS loads a file; the site\'s content policy decides whether it may.' });
+        }
+    });
+    return out;
+}
 
 /**
  * Read CSS: its rules, the one parse error that makes it unusable (unbalanced brackets or quotes, a
@@ -133,7 +162,6 @@ export function lintCss(css: string, opts: { componentClasses?: string[]; faces?
         } else if (c === ';' && stack.length === 0) {
             const stmt = text.slice(preludeStart, i).trim();
             if (stmt && !stmt.startsWith('@')) return { error: { line: lineAt(text, preludeStart), text: `"${stmt.slice(0, 40)}" stands outside a rule.` }, rules, warnings };
-            if (/^@import\b/.test(stmt)) warnings.push({ line: lineAt(text, preludeStart), code: 'loads', text: 'An @import loads another sheet; the site\'s content policy decides whether it may.' });
             preludeStart = i + 1;
         }
     }
@@ -165,11 +193,9 @@ export function lintCss(css: string, opts: { componentClasses?: string[]; faces?
                     warnings.push({ line: d.line, code: 'face', property: d.property, text: `"${first}" is not a face this server serves, so the browser falls back to another one.` });
                 }
             }
-            if (/url\(/i.test(d.value)) {
-                warnings.push({ line: d.line, code: 'loads', property: d.property, text: `${d.property} loads a file; the site's content policy decides whether it may.` });
-            }
         }
     }
+    warnings.push(...loadWarnings(css, rules));
     warnings.sort((a, b) => a.line - b.line);
     return { error: null, rules, warnings };
 }
