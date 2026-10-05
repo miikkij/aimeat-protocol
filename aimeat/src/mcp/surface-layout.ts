@@ -22,6 +22,7 @@
  * @structure registerSurfaceLayoutTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage registerSurfaceLayoutTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.1.0 — 2026-09-24 — SECURITY (audit A8-1): the operator test at call time is asked of the
  *     agent and its scopes (the service's callerIsOperator, through services/operator-principal.ts),
  *     so site:layout-write is checked at call time as well as at registration.
@@ -38,6 +39,7 @@ import type { SurfaceId } from '../services/surface-layout/types.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 interface TextResult {
     content: Array<{ type: 'text'; text: string }>;
@@ -87,9 +89,7 @@ export function registerSurfaceLayoutTools(
     mcp.tool(
         'aimeat_surface_layout_get',
         descriptionFor('aimeat_surface_layout_get'),
-        {
-            surface: z.string().describe("Which page: 'portal', 'home' or 'home-onboarding'."),
-        },
+        zodShapeFor('aimeat_surface_layout_get'),
         annotationsFor('aimeat_surface_layout_get'),
         async ({ surface }): Promise<TextResult> => {
             if (!await isOperator()) return notOperator();

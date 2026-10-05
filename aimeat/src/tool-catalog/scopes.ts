@@ -320,11 +320,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     aimeat_flag_report:                       'social:write',
     aimeat_organism_join:                     'social:write',
 
-    // Arranging the node's pages. The word is one no wildcard carries, because what it changes is
-    // what everyone sees on arrival. The read takes the same word: it carries the block vocabulary
-    // the write needs, and it was open to every agent of the operator on the account role alone.
-    aimeat_surface_layout_get:                'site:layout-write',
-    aimeat_surface_layout_set:                'site:layout-write',
     aimeat_storage_upload:                    'storage:write',
     aimeat_storage_delete:                    'storage:write',
 
