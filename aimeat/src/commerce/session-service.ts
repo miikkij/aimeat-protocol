@@ -15,6 +15,9 @@
  *   updateSessionItems · cancelSession · completeSession
  * @usage import { createSession, completeSession } from '../commerce/session-service.js';
  * @version-history
+ *   v2.8.0 — 2026-10-05 — An agent's amount is reserved against its daily limit in one compare-and-swap
+ *     right before the collect, and released when the collect fails or the fulfilment is refunded
+ *     (secaudit 2026-10, PKG-6).
  *   v2.7.0 — 2026-10-02 — A line whose buyer turned automatic renewal on asks the handler to keep the
  *     payment method (`saveForLater`), and the fulfilment sees what was kept (package sale design).
  *   v2.6.0 — 2026-10-02 — An agent pays money only within the daily purchase limit its owner set on
@@ -62,7 +65,7 @@ import { bookBeneficiaryShares } from './beneficiary-book.js';
 import { takeDesignations } from './beneficiary-designation.js';
 import { emitChange } from '../services/event-bus.js';
 import { localAccountName } from '../utils/gaii.js';
-import { agentPurchaseRefusal, recordAgentPurchase } from './agent-purchase-limit.js';
+import { agentPurchaseRefusal, reserveAgentPurchase, releaseAgentPurchase } from './agent-purchase-limit.js';
 
 export { CommerceError } from './errors.js';
 
@@ -479,9 +482,20 @@ export async function completeSession(
   const seller = { ghii: session.sellerGhii, owner: session.sellerOwner, psp: sellables[0]?.psp };
   // A line whose buyer turned automatic renewal on asks the handler to keep the payment method.
   const saveForLater = session.items.some(i => (i.input as { auto_renew?: unknown } | undefined)?.auto_renew === true);
-  const collected: { trackingCode: string; saved?: import('./types.js').SavedPayment } = session.total > 0
-    ? await handler.collect(ctx, { buyerGhii: session.buyerGhii, amount: session.total, currency: session.currency, reference: session.id, fee: totalFee, instrument, seller, ...(saveForLater ? { saveForLater } : {}) })
-    : { trackingCode: `comtx_free_${session.id}` };
+  // An agent's amount is counted against its daily limit in the same step that checks the limit, right
+  // before the collect, so two completions in the same instant cannot both pass (secaudit 2026-10,
+  // PKG-6). The early check above stays: it refuses before the session is read further.
+  const reserved = await reserveAgentPurchase(storage, config, session, caller);
+  if (reserved) throw reserved;
+  let collected: { trackingCode: string; saved?: import('./types.js').SavedPayment };
+  try {
+    collected = session.total > 0
+      ? await handler.collect(ctx, { buyerGhii: session.buyerGhii, amount: session.total, currency: session.currency, reference: session.id, fee: totalFee, instrument, seller, ...(saveForLater ? { saveForLater } : {}) })
+      : { trackingCode: `comtx_free_${session.id}` };
+  } catch (err) {
+    await releaseAgentPurchase(storage, session, caller);
+    throw err;
+  }
 
   // 2) Fulfillment — a failure here refunds the collect and leaves the session open.
   //    Default: an agent TASK per line item. A sellable's custom fulfill() replaces it
@@ -513,6 +527,7 @@ export async function completeSession(
     if (session.total > 0) {
       await handler.refund(ctx, { buyerGhii: session.buyerGhii, amount: session.total, trackingCode: collected.trackingCode, seller });
     }
+    await releaseAgentPurchase(storage, session, caller);
     const e = err as { message?: string };
     throw new CommerceError('FULFILLMENT_FAILED', 502, `Payment refunded — fulfillment task creation failed: ${e.message ?? 'unknown error'}`);
   }
@@ -559,8 +574,6 @@ export async function completeSession(
   await putRecord(storage, session.buyerGhii, sessionKey(session.id), completed);
   // The seller's orders-received copy, under THEIR GHII (readable without touching buyer data).
   await putRecord(storage, session.sellerGhii, orderKey(session.id), completed);
-  // An agent's money purchase counts toward its daily limit once it went through (agent-purchase-limit.ts).
-  await recordAgentPurchase(storage, session, caller);
 
   // BOTH sides get a row. Money moved in two directions and each party experienced a different
   // event: one paid, one was paid. A single row on the buyer's feed would leave the seller — the
