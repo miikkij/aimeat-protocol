@@ -212,11 +212,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     aimeat_app_fork:                          'app:write',
     aimeat_app_publish:                       'app:write',
 
-    // Removes a stored record.
-    // Removes a record for good, no grace window: its own word since 2026-10-02, held on the
-    // task-start floor (services/agent-task-rules.ts). memory:delete stays the undoable delete.
-    aimeat_workspace_object_delete:           'memory:purge',
-
   // Workspace ROW spaces. `organism:write` rather than `memory:write`, because these rows are NOT
     // memory records: they live in their own table, are charged to the organism rather than to the
     // member, and are governed by workspace membership. The word also matches what the REST routes
@@ -227,41 +222,12 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     // handler also asks organism:write, as the REST DELETE routes do (mcp/workspace-rows.ts).
     aimeat_workspace_rows_delete:             'memory:purge',
 
-    aimeat_workspace_publish:                 'memory:write',
-    aimeat_workspace_revert_to_draft:         'memory:write',
-    aimeat_workspace_write:                   'memory:write',
     // The in-place document edits write the SAME record aimeat_workspace_write writes — a workspace
     // draft — so they answer to the same word, and their REST routes enforce that word and not the
     // organism:write their neighbours on that router use.
     aimeat_workspace_doc_append:              'memory:write',
     aimeat_workspace_doc_section_replace:     'memory:write',
 
-    // Changes WHO ELSE can read the owner's knowledge. A different promise than changing
-    // the knowledge, which is why it is not organism:write.
-    aimeat_organism_invitation_cancel:        'organism:invite',
-    aimeat_organism_invitation_email_cancel:  'organism:invite',
-    aimeat_organism_invitation_update:        'organism:invite',
-    aimeat_organism_invite:                   'organism:invite',
-    aimeat_organism_invite_email:             'organism:invite',
-    aimeat_organism_member_add:               'organism:invite',
-    aimeat_organism_member_remove:            'organism:invite',
-    aimeat_organism_owner_add:                'organism:invite',
-    aimeat_organism_owner_remove:             'organism:invite',
-    aimeat_workspace_access:                  'organism:invite',
-    aimeat_workspace_member_grant:            'organism:invite',
-    aimeat_workspace_member_revoke:           'organism:invite',
-
-    // Create a workspace, write and publish in one, comment, transfer.
-    aimeat_organism_archive:                  'organism:write',
-    aimeat_organism_create:                   'organism:write',
-    aimeat_organism_import:                   'organism:write',
-    aimeat_organism_leave:                    'organism:write',
-    aimeat_organism_update:                   'organism:write',
-    aimeat_workspace_comment:                 'organism:write',
-    aimeat_workspace_comment_delete:          'organism:write',
-    aimeat_workspace_create:                  'organism:write',
-    aimeat_workspace_transfer:                'organism:write',
-    aimeat_workspace_update:                  'organism:write',
     // A member's change to a workspace and the decision on a member's suggestion: the word their
     // REST doors ask (POST …/workspace/spaces, PUT …/workspace/sections/:space, POST …/suggestions/:sid).
     aimeat_workspace_space_add:               'organism:write',
@@ -271,10 +237,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     // The operator tools: organism break-glass and operator:admin (scopes-operator.ts).
     ...OPERATOR_TOOL_SCOPES,
 
-    aimeat_organism_join:                     'social:write',
-
-    aimeat_memory_read_public: 'memory:read',
-
     // NOTE on `provenance:write` (TARGET-058): it deliberately has NO entry in this map, because it
     // does not gate a TOOL — it gates one optional PARAMETER (`ai_provenance`) on nine of them.
     // Listing a tool here would hide the whole tool from an agent that merely cannot assert how its
@@ -282,8 +244,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     // everyone and needs no permission at all. The check lives at the one place that mints from a
     // declaration, services/ai-provenance.ts:provenanceForWrite, and mirrors requireScope() exactly
     // — so this parameter and POST /v1/provenance cannot answer differently.
-
-    aimeat_wallet_transactions: 'wallet:read',
 
 };
 

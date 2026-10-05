@@ -9,6 +9,7 @@
  *   Tool names/descriptions/annotations come from the shared catalog, so they stay in lockstep with
  *   the server and the v2 surface allowlists (appdev/agent/service).
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.7.0 -- 2026-09-03 -- _read passes the REST answer's `schemas` (the locked JSON Schemas, keyed
  *     by namespace) through onto the index. This door RESHAPES the REST response rather than
  *     forwarding it, so a field the shaping does not name is one the agent here never sees — which
@@ -46,12 +47,12 @@ import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
-import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
 import { provenanceEchoedResult } from '../../../../tool-dispatch/ai-provenance-carry.js';
 import { normalizeObjectTypes, WorkspaceMetaError, backfillManifestEnvelope } from '../../../../services/workspace-meta.js';
-import { normalizeWriteItems, resolveWriteItem, MAX_BATCH_ITEMS, type ResolvedWriteItem, type WriteObjectType } from '../../../../services/workspace-write-items.js';
+import { normalizeWriteItems, resolveWriteItem, type ResolvedWriteItem, type WriteObjectType } from '../../../../services/workspace-write-items.js';
 import { entryTitle } from '../../../../services/structure-overview.js';
 import { fileThroughDoor, unfileThroughDoor, sectionsFromRead } from '../../../../tool-dispatch/workspace-section-filing.js';
+import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
@@ -76,7 +77,7 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
   };
 
   mcp.tool('aimeat_workspace_list', descriptionFor('aimeat_workspace_list'),
-    { organism_id: z.string().describe('Organism id') },
+    zodShapeFor('aimeat_workspace_list'),
     annotationsFor('aimeat_workspace_list'),
     async ({ organism_id }) => {
       // Membership-gated discovery route (aggregates the registry across all members + resolves access
@@ -88,10 +89,7 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
     });
 
   mcp.tool('aimeat_workspace_read', descriptionFor('aimeat_workspace_read'),
-    { organism_id: z.string(), ws: z.string().describe('Workspace id (from aimeat_workspace_list)'),
-      ids: z.array(z.string()).optional().describe('Batch-open: return the FULL value of ONLY these instance ids (from the index). A full memory key, which is the id aimeat_discover gives a workspace record, is taken as well. Omit for the lightweight index.'),
-      space: z.string().optional().describe('With `ids`: optionally restrict the lookup to this space (objectType NAME or namespace).'),
-      include_archived: z.boolean().optional().describe('Include archived (hidden) content. Default false.') },
+    zodShapeFor('aimeat_workspace_read'),
     annotationsFor('aimeat_workspace_read'),
     async ({ organism_id, ws, ids, space, include_archived }) => {
       // The REST read returns the whole workspace (manifest + every object's full value); that round-trip
@@ -167,7 +165,7 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
     });
 
   mcp.tool('aimeat_workspace_overview', descriptionFor('aimeat_workspace_overview'),
-    { organism_id: z.string().describe('Organism identifier.'), ws: z.string().describe('Workspace id (from aimeat_workspace_list).') },
+    zodShapeFor('aimeat_workspace_overview'),
     annotationsFor('aimeat_workspace_overview'),
     async ({ organism_id, ws }) => {
       const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace/overview?ws=${encodeURIComponent(ws)}`);
@@ -175,16 +173,7 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
     });
 
   mcp.tool('aimeat_workspace_write', descriptionFor('aimeat_workspace_write'),
-    {
-      organism_id: z.string(), ws: z.string(),
-      space: z.string().optional().describe("The objectType (space) NAME — e.g. 'feature' or 'notes'. The tool resolves records vs document. With `items`, this is the default each item inherits."),
-      // z.any() so a JSON-stringified object param is parsed back (a z.record/union breaks the MCP SDK).
-      value: z.any().optional().describe('The content as a JSON OBJECT (not a string). Records: the record (matching its schema). Documents: { title, markdown }. Omit when using `items`.'),
-      id: z.string().optional().describe('Instance id. Required for records (or include id in value); auto-generated for documents.'),
-      section: z.string().optional().describe('Document spaces only: section id/name to file the document under.'),
-      items: z.any().optional().describe(`BATCH: an ARRAY of { value, space?, id?, section? } — up to ${MAX_BATCH_ITEMS} — written in ONE call, so a migration costs one approval prompt instead of one per document. All-or-nothing: a single bad item writes nothing.`),
-      ...aiProvenanceInputs,
-    },
+    zodShapeFor('aimeat_workspace_write'),
     annotationsFor('aimeat_workspace_write'),
     async ({ organism_id, ws, space, value, id, section, items, ai_provenance, ai_provenance_id }) => {
       const norm = normalizeWriteItems({ space, value, id, section, items });
@@ -230,7 +219,7 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
     });
 
   mcp.tool('aimeat_workspace_revert_to_draft', descriptionFor('aimeat_workspace_revert_to_draft'),
-    { organism_id: z.string(), ws: z.string(), namespace: z.string(), id: z.string() },
+    zodShapeFor('aimeat_workspace_revert_to_draft'),
     annotationsFor('aimeat_workspace_revert_to_draft'),
     async ({ organism_id, ws, namespace, id }) => {
       const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/revert`, { ws, namespace, id });
@@ -263,11 +252,7 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
     });
 
   mcp.tool('aimeat_workspace_object_delete', descriptionFor('aimeat_workspace_object_delete'),
-    {
-      organism_id: z.string(), ws: z.string(),
-      namespace: z.string().describe("The objectType's namespace, e.g. shared.deliverables"),
-      id: z.string().describe('The instance id to delete (draft + latest + all versions)'),
-    },
+    zodShapeFor('aimeat_workspace_object_delete'),
     annotationsFor('aimeat_workspace_object_delete'),
     async ({ organism_id, ws, namespace, id }) => {
       const base = `${root(organism_id, ws)}.${namespace}.${id}`;
@@ -297,13 +282,7 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
     });
 
   mcp.tool('aimeat_workspace_create', descriptionFor('aimeat_workspace_create'),
-    {
-      organism_id: z.string(),
-      name: z.string().describe('Workspace name'),
-      manifest: z.any().describe('The workspace manifest (objectTypes + policy) as a JSON OBJECT, not a string.'),
-      schemas: z.any().optional().describe('Map of namespace → JSON Schema for records types, as a JSON OBJECT.'),
-      readme: z.string().optional().describe('Optional markdown intro'),
-    },
+    zodShapeFor('aimeat_workspace_create'),
     annotationsFor('aimeat_workspace_create'),
     async ({ organism_id, name, manifest, schemas, readme }) => {
       const man = parseObj(manifest) as Record<string, unknown> | undefined;
@@ -345,14 +324,7 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
     });
 
   mcp.tool('aimeat_workspace_access', descriptionFor('aimeat_workspace_access'),
-    {
-      organism_id: z.string(), ws: z.string(),
-      action: z.enum(['request', 'list', 'decide']).describe("'request' = ask the creator for access · 'list' = (creator/admin) see pending requests + members · 'decide' = (creator/admin) approve/deny one"),
-      message: z.string().optional().describe("action='request': a note to the creator"),
-      requester: z.string().optional().describe("action='decide': the requester's owner name"),
-      decision: z.string().optional().describe("action='decide': 'approve' (default) or 'deny'"),
-      role: z.enum(['viewer', 'contributor']).optional().describe("action='decide' approve: 'viewer' (read) or 'contributor' (read+write). Omit for the default (contributor)."),
-    },
+    zodShapeFor('aimeat_workspace_access'),
     annotationsFor('aimeat_workspace_access'),
     async ({ organism_id, ws, action, message, requester, decision, role }) => {
       const orgPath = `/v1/organisms/${encodeURIComponent(organism_id)}/workspace-access`;
@@ -385,13 +357,7 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
   };
 
   mcp.tool('aimeat_workspace_member_grant', descriptionFor('aimeat_workspace_member_grant'),
-    {
-      organism_id: z.string(),
-      ws: z.string().optional().describe('A single workspace id. Use this OR `workspaces` (or both).'),
-      workspaces: z.array(z.string()).optional().describe('MANY workspace ids to grant in one call.'),
-      grantee: z.string().describe('Owner name, GHII, or GAII to grant (applies to the owner — agents inherit).'),
-      role: z.enum(['viewer', 'contributor']).describe("'viewer' (read) or 'contributor' (read+write)."),
-    },
+    zodShapeFor('aimeat_workspace_member_grant'),
     annotationsFor('aimeat_workspace_member_grant'),
     async ({ organism_id, ws, workspaces, grantee, role }) => {
       const targets = wsList(ws, workspaces);
@@ -409,12 +375,7 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
     });
 
   mcp.tool('aimeat_workspace_member_revoke', descriptionFor('aimeat_workspace_member_revoke'),
-    {
-      organism_id: z.string(),
-      ws: z.string().optional().describe('A single workspace id. Use this OR `workspaces` (or both).'),
-      workspaces: z.array(z.string()).optional().describe('MANY workspace ids to revoke in one call.'),
-      grantee: z.string().describe('Owner name, GHII, or GAII to revoke.'),
-    },
+    zodShapeFor('aimeat_workspace_member_revoke'),
     annotationsFor('aimeat_workspace_member_revoke'),
     async ({ organism_id, ws, workspaces, grantee }) => {
       const targets = wsList(ws, workspaces);
@@ -434,7 +395,7 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
     });
 
   mcp.tool('aimeat_workspace_members', descriptionFor('aimeat_workspace_members'),
-    { organism_id: z.string(), ws: z.string().describe('Workspace id (from aimeat_workspace_list).') },
+    zodShapeFor('aimeat_workspace_members'),
     annotationsFor('aimeat_workspace_members'),
     async ({ organism_id, ws }) => {
       const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace-access?ws=${encodeURIComponent(ws)}`);
@@ -496,12 +457,7 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
     });
 
   mcp.tool('aimeat_workspace_transfer', descriptionFor('aimeat_workspace_transfer'),
-    {
-      organism_id: z.string(),
-      direction: z.enum(['export', 'import']).describe("'export' a workspace to a base64 ZIP, or 'import' a base64 ZIP as a NEW workspace"),
-      ws: z.string().optional().describe("direction='export': the workspace id to export"),
-      zip_base64: z.string().optional().describe("direction='import': the base64 ZIP from a prior export"),
-    },
+    zodShapeFor('aimeat_workspace_transfer'),
     annotationsFor('aimeat_workspace_transfer'),
     async ({ organism_id, direction, ws, zip_base64 }) => {
       let resp;

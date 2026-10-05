@@ -10,6 +10,7 @@
  * @structure registerWorkspaceCreateTool(mcp, storage, config, deps)
  * @usage import { registerWorkspaceCreateTool } from './workspace-create.js';
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.1.0 — 2026-08-11 — August 2026 audit step 8. The four writes this tool made itself (the
  *     schema locks, the manifest, the readme, the registry entry) were a second copy of
  *     provisionWorkspace(), whose own header had claimed since July that both doors shared it. They
@@ -19,7 +20,6 @@
  *   v1.0.0 — 2026-08-11 — Extracted from mcp/workspaces.ts (max-file-lines), no behaviour change.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -28,6 +28,7 @@ import { provisionWorkspace, WorkspaceProvisionError, WorkspaceMetaError } from 
 import { updateOrganismStructure } from '../services/structure-snapshot.js';
 import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
@@ -52,13 +53,7 @@ export function registerWorkspaceCreateTool(
 
     // ── aimeat_workspace_create ──
     mcp.tool('aimeat_workspace_create', descriptionFor('aimeat_workspace_create'),
-        {
-            organism_id: z.string(),
-            name: z.string().describe('Workspace name'),
-            manifest: z.any().describe('The workspace manifest (objectTypes + policy) as a JSON OBJECT, not a string.'),
-            schemas: z.any().optional().describe('Map of namespace → JSON Schema for records types, as a JSON OBJECT.'),
-            readme: z.string().optional().describe('Optional markdown intro'),
-        },
+        zodShapeFor('aimeat_workspace_create'),
         annotationsFor('aimeat_workspace_create'),
         async ({ organism_id, name, manifest, schemas, readme }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);

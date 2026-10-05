@@ -15,12 +15,12 @@
  *   import { registerWorkspaceTransferTool } from './workspace-transfer.js';
  *   registerWorkspaceTransferTool(mcp, storage, config, { ownerName, ownerGhii, ok, fail, denyReason, findWsEntry, roleOf });
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-08-01 — Extracted from mcp/workspaces.ts (max-file-lines, pure extraction).
  *   v1.1.0 — 2026-09-29 — The export passes the agent's classification reader (TARGET-082).
  *   v1.2.0 — 2026-09-29 — The export answers `left_out`, what the classification kept out (TARGET-082 review).
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -31,6 +31,7 @@ import { readerForAgent } from '../services/classification/reader.js';
 import { importWorkspace } from '../services/workspace-import.js';
 import { ZipSecurityError } from '../services/safe-zip.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
@@ -58,12 +59,7 @@ export function registerWorkspaceTransferTool(
     const { ownerName, ownerGhii, agentGaii, ok, fail, denyReason, findWsEntry, roleOf } = ctx;
 
     mcp.tool('aimeat_workspace_transfer', descriptionFor('aimeat_workspace_transfer'),
-        {
-            organism_id: z.string(),
-            direction: z.enum(['export', 'import']).describe("'export' a workspace to a base64 ZIP, or 'import' a base64 ZIP as a NEW workspace"),
-            ws: z.string().optional().describe("direction='export': the workspace id to export"),
-            zip_base64: z.string().optional().describe("direction='import': the base64 ZIP from a prior export"),
-        },
+        zodShapeFor('aimeat_workspace_transfer'),
         annotationsFor('aimeat_workspace_transfer'),
         async ({ organism_id, direction, ws, zip_base64 }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);

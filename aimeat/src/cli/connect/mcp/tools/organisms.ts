@@ -5,6 +5,7 @@
  * @description MCP tool registrations for organism (collective) management --
  *   listing, viewing, joining, leaving, and member listing.
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.8.0 -- 2026-09-30 -- aimeat_workspace_comment_delete (DELETE /v1/organisms/:id/comments/:commentId);
  *     aimeat_organism_invite_email takes `locale`, the email's language.
  *   v1.7.2 -- 2026-09-28 -- aimeat_organism_invite_email takes return_url and passes it to the REST route;
@@ -35,14 +36,14 @@ import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
-import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
 import { provenanceEchoedResult } from '../../../../tool-dispatch/ai-provenance-carry.js';
 import { envelopeResult, payloadResult } from './_registry.js';
+import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client, owner } = registry.resolve();
 
-  mcp.tool('aimeat_organism_list', descriptionFor('aimeat_organism_list'), {}, annotationsFor('aimeat_organism_list'), async () => {
+  mcp.tool('aimeat_organism_list', descriptionFor('aimeat_organism_list'), zodShapeFor('aimeat_organism_list'), annotationsFor('aimeat_organism_list'), async () => {
     // Public discovery PLUS the agent's own organisms (?member={owner} — owner-keyed memberships,
     // including private ones). A bare GET /v1/organisms is public-only, so an agent could not find
     // its own home: join answered ALREADY_MEMBER while this list omitted the organism. Mirrors the
@@ -67,9 +68,7 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
     return payloadResult({ organisms, total: organisms.length }, { ok: mine.ok !== false || pub.ok !== false });
   });
 
-  mcp.tool('aimeat_organism_get', descriptionFor('aimeat_organism_get'), {
-    organism_id: z.string().describe('ID of the organism to retrieve'),
-  }, annotationsFor('aimeat_organism_get'), async ({ organism_id }) => {
+  mcp.tool('aimeat_organism_get', descriptionFor('aimeat_organism_get'), zodShapeFor('aimeat_organism_get'), annotationsFor('aimeat_organism_get'), async ({ organism_id }) => {
     const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}`);
     return envelopeResult(resp);
   });
@@ -81,16 +80,7 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_organism_update', descriptionFor('aimeat_organism_update'), {
-    organism_id: z.string().describe('Organism identifier.'),
-    name: z.string().optional().describe('New organism name.'),
-    description: z.string().optional().describe('Short tagline shown under the name.'),
-    readme: z.string().optional().describe('Free-form markdown README (mermaid allowed) shown at the top of the organism home.'),
-    interests: z.array(z.string()).optional().describe('Interest tags.'),
-    join_policy: z.string().optional().describe('open | approval_required | invite_only.'),
-    visibility: z.string().optional().describe('public | listed | private.'),
-    agent_access: z.enum(['all', 'listed']).optional().describe('Which members\' agents may act here: "all" (every member\'s agents, the default) or "listed" (only the agents in the Agents section of the organism\'s page; any other agent is refused as a non-member). An agent can set "listed"; only the owner signed in can set "all" again.'),
-  }, annotationsFor('aimeat_organism_update'), async ({ organism_id, name, description, readme, interests, join_policy, visibility, agent_access }) => {
+  mcp.tool('aimeat_organism_update', descriptionFor('aimeat_organism_update'), zodShapeFor('aimeat_organism_update'), annotationsFor('aimeat_organism_update'), async ({ organism_id, name, description, readme, interests, join_policy, visibility, agent_access }) => {
     const body: Record<string, unknown> = {};
     if (name !== undefined) body.name = name;
     if (description !== undefined) body.description = description;
@@ -103,28 +93,19 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_organism_join', descriptionFor('aimeat_organism_join'), {
-    organism_id: z.string().describe('ID of the organism to join'),
-    message: z.string().optional().describe('Optional message for join requests (used when approval is required)'),
-  }, annotationsFor('aimeat_organism_join'), async ({ organism_id, message }) => {
+  mcp.tool('aimeat_organism_join', descriptionFor('aimeat_organism_join'), zodShapeFor('aimeat_organism_join'), annotationsFor('aimeat_organism_join'), async ({ organism_id, message }) => {
     const body: Record<string, unknown> = {};
     if (message != null) body.message = message;
     const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/join`, body);
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_organism_leave', descriptionFor('aimeat_organism_leave'), {
-    organism_id: z.string().describe('ID of the organism to leave'),
-  }, annotationsFor('aimeat_organism_leave'), async ({ organism_id }) => {
+  mcp.tool('aimeat_organism_leave', descriptionFor('aimeat_organism_leave'), zodShapeFor('aimeat_organism_leave'), annotationsFor('aimeat_organism_leave'), async ({ organism_id }) => {
     const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/leave`);
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_organism_members', descriptionFor('aimeat_organism_members'), {
-    organism_id: z.string().describe('The organism ID'),
-    role: z.string().optional().describe('Filter by role: creator, admin, member'),
-    status: z.string().optional().describe('Filter by status: active, pending, banned (default: active)'),
-  }, annotationsFor('aimeat_organism_members'), async ({ organism_id, role, status }) => {
+  mcp.tool('aimeat_organism_members', descriptionFor('aimeat_organism_members'), zodShapeFor('aimeat_organism_members'), annotationsFor('aimeat_organism_members'), async ({ organism_id, role, status }) => {
     const params = new URLSearchParams();
     if (role) params.set('role', role);
     if (status) params.set('status', status);
@@ -133,15 +114,7 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_organism_create', descriptionFor('aimeat_organism_create'), {
-    name: z.string().describe('Organism name (min 2 chars)'),
-    description: z.string().optional().describe('What this organism is for'),
-    type: z.string().optional().describe('What kind of group, in your own word (1 to 40 characters). Presets with a translation: community | team | club | cooperative | project | company | family'),
-    join_policy: z.string().optional().describe('open | approval_required | invite_only'),
-    visibility: z.string().optional().describe('public | listed | private'),
-    shape: z.string().optional().describe('A starting shape that also creates its workspaces: own-work | team | company | family | club | project. Sets the type, join policy and visibility unless you give them.'),
-    lang: z.string().optional().describe('Language of the shape\'s workspace names and readme: en | fi | es. The person\'s language.'),
-  }, annotationsFor('aimeat_organism_create'), async ({ name, description, type, join_policy, visibility, shape, lang }) => {
+  mcp.tool('aimeat_organism_create', descriptionFor('aimeat_organism_create'), zodShapeFor('aimeat_organism_create'), annotationsFor('aimeat_organism_create'), async ({ name, description, type, join_policy, visibility, shape, lang }) => {
     const body: Record<string, unknown> = { name };
     if (description != null) body.description = description;
     if (type != null) body.type = type;
@@ -153,31 +126,17 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_organism_export', descriptionFor('aimeat_organism_export'), {
-    organism_id: z.string().describe('Organism to export'),
-  }, annotationsFor('aimeat_organism_export'), async ({ organism_id }) => {
+  mcp.tool('aimeat_organism_export', descriptionFor('aimeat_organism_export'), zodShapeFor('aimeat_organism_export'), annotationsFor('aimeat_organism_export'), async ({ organism_id }) => {
     const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/export?format=base64`);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
   });
 
-  mcp.tool('aimeat_organism_import', descriptionFor('aimeat_organism_import'), {
-    zip_base64: z.string().describe('Organism export ZIP, base64-encoded'),
-  }, annotationsFor('aimeat_organism_import'), async ({ zip_base64 }) => {
+  mcp.tool('aimeat_organism_import', descriptionFor('aimeat_organism_import'), zodShapeFor('aimeat_organism_import'), annotationsFor('aimeat_organism_import'), async ({ zip_base64 }) => {
     const resp = await client.post('/v1/organisms/import', { zip_base64 });
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
   });
 
-  const wsGrantShape = z.array(z.object({
-    ws: z.string().describe('Workspace id'),
-    role: z.enum(['viewer', 'contributor']).describe('viewer = read only; contributor = read + write'),
-  })).optional().describe('Optional per-workspace grants applied when the invitee joins');
-
-  mcp.tool('aimeat_organism_invite', descriptionFor('aimeat_organism_invite'), {
-    organism_id: z.string().describe('Organism identifier'),
-    invitee: z.string().describe('Bare owner name to invite'),
-    role: z.enum(['member', 'admin']).optional().describe('Organism role granted on accept (default "member")'),
-    workspaces: wsGrantShape,
-  }, annotationsFor('aimeat_organism_invite'), async ({ organism_id, invitee, role, workspaces }) => {
+  mcp.tool('aimeat_organism_invite', descriptionFor('aimeat_organism_invite'), zodShapeFor('aimeat_organism_invite'), annotationsFor('aimeat_organism_invite'), async ({ organism_id, invitee, role, workspaces }) => {
     const body: Record<string, unknown> = { invitee };
     if (role) body.role = role;
     if (workspaces) body.workspaces = workspaces;
@@ -185,12 +144,7 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
   });
 
-  mcp.tool('aimeat_organism_member_add', descriptionFor('aimeat_organism_member_add'), {
-    organism_id: z.string().describe('Organism identifier'),
-    ghii: z.string().describe('Bare owner name to add as an active member'),
-    role: z.enum(['member', 'admin']).optional().describe('Organism role (default "member")'),
-    workspaces: wsGrantShape,
-  }, annotationsFor('aimeat_organism_member_add'), async ({ organism_id, ghii, role, workspaces }) => {
+  mcp.tool('aimeat_organism_member_add', descriptionFor('aimeat_organism_member_add'), zodShapeFor('aimeat_organism_member_add'), annotationsFor('aimeat_organism_member_add'), async ({ organism_id, ghii, role, workspaces }) => {
     const body: Record<string, unknown> = { ghii };
     if (role) body.role = role;
     if (workspaces) body.workspaces = workspaces;
@@ -198,11 +152,7 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
   });
 
-  mcp.tool('aimeat_organism_member_remove', descriptionFor('aimeat_organism_member_remove'), {
-    organism_id: z.string().describe('Organism identifier'),
-    ghii: z.string().describe('Bare owner name to remove'),
-    ban: z.boolean().optional().describe('Also block them from being invited or added again'),
-  }, annotationsFor('aimeat_organism_member_remove'), async ({ organism_id, ghii, ban }) => {
+  mcp.tool('aimeat_organism_member_remove', descriptionFor('aimeat_organism_member_remove'), zodShapeFor('aimeat_organism_member_remove'), annotationsFor('aimeat_organism_member_remove'), async ({ organism_id, ghii, ban }) => {
     const path = `/v1/organisms/${encodeURIComponent(organism_id)}/members/${encodeURIComponent(ghii)}${ban ? '?ban=1' : ''}`;
     const resp = await client.delete(path);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
@@ -210,28 +160,17 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
 
   // Ownership is plural: adding is additive, and the LAST owner cannot be removed. Both mirror the
   // REST routes, which call services/organism-ownership.ts — the connector adds no rules of its own.
-  mcp.tool('aimeat_organism_owner_add', descriptionFor('aimeat_organism_owner_add'), {
-    organism_id: z.string().describe('Organism identifier'),
-    ghii: z.string().describe('Bare owner name of an active member to make a co-owner'),
-  }, annotationsFor('aimeat_organism_owner_add'), async ({ organism_id, ghii }) => {
+  mcp.tool('aimeat_organism_owner_add', descriptionFor('aimeat_organism_owner_add'), zodShapeFor('aimeat_organism_owner_add'), annotationsFor('aimeat_organism_owner_add'), async ({ organism_id, ghii }) => {
     const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/owners`, { ghii });
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
   });
 
-  mcp.tool('aimeat_organism_owner_remove', descriptionFor('aimeat_organism_owner_remove'), {
-    organism_id: z.string().describe('Organism identifier'),
-    ghii: z.string().describe('Bare owner name to take off the owners; they stay as an admin'),
-  }, annotationsFor('aimeat_organism_owner_remove'), async ({ organism_id, ghii }) => {
+  mcp.tool('aimeat_organism_owner_remove', descriptionFor('aimeat_organism_owner_remove'), zodShapeFor('aimeat_organism_owner_remove'), annotationsFor('aimeat_organism_owner_remove'), async ({ organism_id, ghii }) => {
     const resp = await client.delete(`/v1/organisms/${encodeURIComponent(organism_id)}/owners/${encodeURIComponent(ghii)}`);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
   });
 
-  mcp.tool('aimeat_organism_invitation_update', descriptionFor('aimeat_organism_invitation_update'), {
-    organism_id: z.string().describe('Organism identifier'),
-    invitee: z.string().describe('Bare owner name whose pending invitation to edit'),
-    role: z.enum(['member', 'admin']).optional().describe('New organism role'),
-    workspaces: wsGrantShape,
-  }, annotationsFor('aimeat_organism_invitation_update'), async ({ organism_id, invitee, role, workspaces }) => {
+  mcp.tool('aimeat_organism_invitation_update', descriptionFor('aimeat_organism_invitation_update'), zodShapeFor('aimeat_organism_invitation_update'), annotationsFor('aimeat_organism_invitation_update'), async ({ organism_id, invitee, role, workspaces }) => {
     const body: Record<string, unknown> = {};
     if (role) body.role = role;
     if (workspaces) body.workspaces = workspaces;
@@ -239,34 +178,23 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
   });
 
-  mcp.tool('aimeat_organism_invitation_cancel', descriptionFor('aimeat_organism_invitation_cancel'), {
-    organism_id: z.string().describe('Organism identifier'),
-    invitee: z.string().describe('Bare owner name whose pending invitation to withdraw'),
-  }, annotationsFor('aimeat_organism_invitation_cancel'), async ({ organism_id, invitee }) => {
+  mcp.tool('aimeat_organism_invitation_cancel', descriptionFor('aimeat_organism_invitation_cancel'), zodShapeFor('aimeat_organism_invitation_cancel'), annotationsFor('aimeat_organism_invitation_cancel'), async ({ organism_id, invitee }) => {
     const resp = await client.delete(`/v1/organisms/${encodeURIComponent(organism_id)}/invitations/${encodeURIComponent(invitee)}`);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
   });
 
-  mcp.tool('aimeat_organism_invitations', descriptionFor('aimeat_organism_invitations'), {}, annotationsFor('aimeat_organism_invitations'), async () => {
+  mcp.tool('aimeat_organism_invitations', descriptionFor('aimeat_organism_invitations'), zodShapeFor('aimeat_organism_invitations'), annotationsFor('aimeat_organism_invitations'), async () => {
     const resp = await client.get('/v1/organisms/invitations/mine');
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_organism_invitation_respond', descriptionFor('aimeat_organism_invitation_respond'), {
-    organism_id: z.string().describe('Organism identifier you were invited to'),
-    decision: z.enum(['accept', 'decline']).describe('accept or decline'),
-  }, annotationsFor('aimeat_organism_invitation_respond'), async ({ organism_id, decision }) => {
+  mcp.tool('aimeat_organism_invitation_respond', descriptionFor('aimeat_organism_invitation_respond'), zodShapeFor('aimeat_organism_invitation_respond'), annotationsFor('aimeat_organism_invitation_respond'), async ({ organism_id, decision }) => {
     const path = decision === 'accept' ? 'accept' : 'decline';
     const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/invitations/${path}`, {});
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
   });
 
-  mcp.tool('aimeat_organism_search', descriptionFor('aimeat_organism_search'), {
-    organism_id: z.string().describe('Organism identifier'),
-    q: z.string().describe('Search text (min 2 characters)'),
-    ws: z.string().optional().describe('Optional: limit to a single workspace id'),
-    archived: z.enum(['exclude', 'include', 'only']).optional().describe('Archive scope: exclude (default), only (archive search), or include (both)'),
-  }, annotationsFor('aimeat_organism_search'), async ({ organism_id, q, ws, archived }) => {
+  mcp.tool('aimeat_organism_search', descriptionFor('aimeat_organism_search'), zodShapeFor('aimeat_organism_search'), annotationsFor('aimeat_organism_search'), async ({ organism_id, q, ws, archived }) => {
     const params = new URLSearchParams({ q });
     if (ws) params.set('ws', ws);
     // The REST route reads archive scope from two flags: ?archived=only (archive
@@ -278,16 +206,7 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
   });
 
-  mcp.tool('aimeat_workspace_comment', descriptionFor('aimeat_workspace_comment'), {
-    organism_id: z.string().describe('Organism identifier'),
-    ws: z.string().describe('Workspace id'),
-    space: z.string().describe('The objectType (space) name'),
-    instance_id: z.string().describe('The record/document id'),
-    body: z.string().describe('The comment text'),
-    anchor: z.object({ section: z.string().optional(), quote: z.string().optional() }).optional().describe('Optional anchor to part of a document'),
-    parent_id: z.string().optional().describe('Optional id of the comment this replies to'),
-    ...aiProvenanceInputs,
-  }, annotationsFor('aimeat_workspace_comment'), async ({ organism_id, ws, space, instance_id, body, anchor, parent_id, ai_provenance, ai_provenance_id }) => {
+  mcp.tool('aimeat_workspace_comment', descriptionFor('aimeat_workspace_comment'), zodShapeFor('aimeat_workspace_comment'), annotationsFor('aimeat_workspace_comment'), async ({ organism_id, ws, space, instance_id, body, anchor, parent_id, ai_provenance, ai_provenance_id }) => {
     const payload: Record<string, unknown> = { ws, space, instance_id, body };
     if (anchor != null) payload.anchor = anchor;
     if (parent_id != null) payload.parent_id = parent_id;
@@ -297,24 +216,13 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
       { tool: 'aimeat_workspace_comment', declared: ai_provenance, declaredId: ai_provenance_id }, resp);
   });
 
-  mcp.tool('aimeat_workspace_comments', descriptionFor('aimeat_workspace_comments'), {
-    organism_id: z.string().describe('Organism identifier'),
-    ws: z.string().describe('Workspace id'),
-    space: z.string().describe('The objectType (space) name'),
-    instance_id: z.string().describe('The record/document id'),
-  }, annotationsFor('aimeat_workspace_comments'), async ({ organism_id, ws, space, instance_id }) => {
+  mcp.tool('aimeat_workspace_comments', descriptionFor('aimeat_workspace_comments'), zodShapeFor('aimeat_workspace_comments'), annotationsFor('aimeat_workspace_comments'), async ({ organism_id, ws, space, instance_id }) => {
     const params = new URLSearchParams({ ws, space, instance_id });
     const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/comments?${params.toString()}`);
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_workspace_comment_delete', descriptionFor('aimeat_workspace_comment_delete'), {
-    organism_id: z.string().describe('Organism identifier'),
-    ws: z.string().describe('Workspace id'),
-    space: z.string().describe('The objectType (space) name'),
-    instance_id: z.string().describe('The record/document id the comment is on'),
-    comment_id: z.string().describe('The comment id (from aimeat_workspace_comments)'),
-  }, annotationsFor('aimeat_workspace_comment_delete'), async ({ organism_id, ws, space, instance_id, comment_id }) => {
+  mcp.tool('aimeat_workspace_comment_delete', descriptionFor('aimeat_workspace_comment_delete'), zodShapeFor('aimeat_workspace_comment_delete'), annotationsFor('aimeat_workspace_comment_delete'), async ({ organism_id, ws, space, instance_id, comment_id }) => {
     const params = new URLSearchParams({ ws, space, instance_id });
     const resp = await client.delete(`/v1/organisms/${encodeURIComponent(organism_id)}/comments/${encodeURIComponent(comment_id)}?${params.toString()}`);
     return envelopeResult(resp);
@@ -425,14 +333,7 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
   ));
 
   // → POST /v1/organisms/:id/(archive|unarchive) — archive/restore an organism or a scoped subtree.
-  mcp.tool('aimeat_organism_archive', descriptionFor('aimeat_organism_archive'), {
-    organism_id: z.string().describe('The organism id.'),
-    level: z.string().describe('Archive scope: organism | workspace | namespace | key.'),
-    action: z.enum(['archive', 'unarchive']).optional().describe('Default archive.'),
-    ws: z.string().optional().describe('Workspace id (for level=workspace/namespace/key).'),
-    namespace: z.string().optional().describe('Namespace (for level=namespace/key).'),
-    key: z.string().optional().describe('Record key (for level=key).'),
-  }, annotationsFor('aimeat_organism_archive'), async ({ organism_id, level, action, ws, namespace, key }) => {
+  mcp.tool('aimeat_organism_archive', descriptionFor('aimeat_organism_archive'), zodShapeFor('aimeat_organism_archive'), annotationsFor('aimeat_organism_archive'), async ({ organism_id, level, action, ws, namespace, key }) => {
     const act = action === 'unarchive' ? 'unarchive' : 'archive';
     const body: Record<string, unknown> = { level };
     if (ws) body.ws = ws;
@@ -442,16 +343,7 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
   });
 
   // → POST /v1/organisms/:id/invitations/email — invite an external email (creator/admin).
-  mcp.tool('aimeat_organism_invite_email', descriptionFor('aimeat_organism_invite_email'), {
-    organism_id: z.string().describe('The organism id.'),
-    email: z.string().describe('Email address to invite.'),
-    org_role: z.enum(['member', 'admin']).optional().describe('Organism role granted on accept (default member).'),
-    workspaces: z.array(z.object({ ws: z.string(), role: z.enum(['viewer', 'contributor']) })).optional().describe('Optional per-workspace grants.'),
-    message: z.string().optional().describe('Optional personal note included in the email.'),
-    expires_in_days: z.number().int().positive().optional().describe('Days until the invitation expires (1-30, default 7).'),
-    return_url: z.string().optional().describe('Where the invitee lands after accepting: an app slug on this node (e.g. "my-app") or a full URL on this node or its app subdomains. Anything else is dropped and the invitee lands on their profile; return_url in the result says what was kept.'),
-    locale: z.string().optional().describe('Language of the invitation email: en, fi or es. Without it the email uses the recipient\'s account language when the address already has an account here, else yours. email_locale in the result says which one went out.'),
-  }, annotationsFor('aimeat_organism_invite_email'), async ({ organism_id, email, org_role, workspaces, message, expires_in_days, return_url, locale }) => {
+  mcp.tool('aimeat_organism_invite_email', descriptionFor('aimeat_organism_invite_email'), zodShapeFor('aimeat_organism_invite_email'), annotationsFor('aimeat_organism_invite_email'), async ({ organism_id, email, org_role, workspaces, message, expires_in_days, return_url, locale }) => {
     const body: Record<string, unknown> = { email };
     if (org_role) body.orgRole = org_role;
     if (workspaces) body.workspaces = workspaces;
@@ -463,17 +355,12 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
   });
 
   // → GET /v1/organisms/:id/invitations/email — list pending email invitations.
-  mcp.tool('aimeat_organism_invitations_email', descriptionFor('aimeat_organism_invitations_email'), {
-    organism_id: z.string().describe('The organism id.'),
-  }, annotationsFor('aimeat_organism_invitations_email'), async ({ organism_id }) => {
+  mcp.tool('aimeat_organism_invitations_email', descriptionFor('aimeat_organism_invitations_email'), zodShapeFor('aimeat_organism_invitations_email'), annotationsFor('aimeat_organism_invitations_email'), async ({ organism_id }) => {
     return out(await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/invitations/email`));
   });
 
   // → POST /v1/organisms/:id/invitations/email/:invId/cancel — cancel a pending email invitation.
-  mcp.tool('aimeat_organism_invitation_email_cancel', descriptionFor('aimeat_organism_invitation_email_cancel'), {
-    organism_id: z.string().describe('The organism id.'),
-    invitation_id: z.string().describe('The invitation id to cancel.'),
-  }, annotationsFor('aimeat_organism_invitation_email_cancel'), async ({ organism_id, invitation_id }) => {
+  mcp.tool('aimeat_organism_invitation_email_cancel', descriptionFor('aimeat_organism_invitation_email_cancel'), zodShapeFor('aimeat_organism_invitation_email_cancel'), annotationsFor('aimeat_organism_invitation_email_cancel'), async ({ organism_id, invitation_id }) => {
     return out(await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/invitations/email/${encodeURIComponent(invitation_id)}/cancel`));
   });
 }

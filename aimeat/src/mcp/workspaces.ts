@@ -17,6 +17,7 @@
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.27.0 -- 2026-10-02 -- Takes the session's scopes and hands them to the row tools.
  *   v1.26.0 -- 2026-09-29 -- aimeat_workspace_read and the two overviews pass the agent's classification
  *     reader (TARGET-082).
@@ -165,7 +166,6 @@ import { buildOrganismOverview, buildWorkspaceOverview } from '../services/struc
 import { updateWorkspaceMeta, WorkspaceMetaError, listOrganismWorkspaceEntries } from '../services/workspace-meta.js';
 import { emitChange } from '../services/event-bus.js';
 import { updateOrganismStructure } from '../services/structure-snapshot.js';
-import { MAX_BATCH_ITEMS } from '../services/workspace-write-items.js';
 import { writeWorkspaceRecord, deleteWorkspaceInstance } from '../services/workspace-write.js';
 import { workspaceCallerOf, readWorkspaceOp, writeWorkspaceDraftsOp, publishWorkspaceOp } from '../services/workspace-tool-ops.js';
 import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, type WsRole } from '../services/workspace-roles.js';
@@ -173,8 +173,9 @@ import { registerWorkspaceMemberTools } from './workspace-members.js';
 import { registerWorkspaceMemberChangeTools } from './workspace-member-changes.js';
 import { unfileDeletedDocument } from '../services/workspace-member-changes.js';
 import { registerWorkspaceTransferTool } from './workspace-transfer.js';
-import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
+import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { logger } from '../utils/logger.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
@@ -304,7 +305,7 @@ export function registerWorkspaceTools(
 
     // ── aimeat_workspace_list ──
     mcp.tool('aimeat_workspace_list', descriptionFor('aimeat_workspace_list'),
-        { organism_id: z.string().describe('Organism id') },
+        zodShapeFor('aimeat_workspace_list'),
         annotationsFor('aimeat_workspace_list'),
         async ({ organism_id }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
@@ -322,10 +323,7 @@ export function registerWorkspaceTools(
     // the FULL value of only the requested instances. So the flow is: read the index → pick the ids
     // that likely hold what you need → read those ids. Both calls are size-bounded.
     mcp.tool('aimeat_workspace_read', descriptionFor('aimeat_workspace_read'),
-        { organism_id: z.string(), ws: z.string().describe('Workspace id (from aimeat_workspace_list)'),
-          ids: z.array(z.string()).optional().describe('Batch-open: return the FULL value of ONLY these instance ids (from the index). A full memory key, which is the id aimeat_discover gives a workspace record, is taken as well. Omit to get the lightweight index (titles + ids, no bodies).'),
-          space: z.string().optional().describe('With `ids`: optionally restrict the lookup to this space (objectType NAME or namespace). Ignored for the index.'),
-          include_archived: z.boolean().optional().describe('Include archived (hidden) content. Default false — archived content is excluded from normal reads.') },
+        zodShapeFor('aimeat_workspace_read'),
         annotationsFor('aimeat_workspace_read'),
         async ({ organism_id, ws, ids, space, include_archived }): Promise<TextResult> => {
             // The work is services/workspace-tool-ops.ts, which the extension sandbox's
@@ -352,7 +350,7 @@ export function registerWorkspaceTools(
 
     // ── aimeat_workspace_overview ── (OKF-style structure map of ONE workspace)
     mcp.tool('aimeat_workspace_overview', descriptionFor('aimeat_workspace_overview'),
-        { organism_id: z.string(), ws: z.string().describe('Workspace id (from aimeat_workspace_list)') },
+        zodShapeFor('aimeat_workspace_overview'),
         annotationsFor('aimeat_workspace_overview'),
         async ({ organism_id, ws }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
@@ -362,17 +360,7 @@ export function registerWorkspaceTools(
 
     // ── aimeat_workspace_write_draft ──
     mcp.tool('aimeat_workspace_write', descriptionFor('aimeat_workspace_write'),
-        {
-            organism_id: z.string(), ws: z.string(),
-            space: z.string().optional().describe("The objectType (space) NAME — e.g. 'feedback' or 'task' (the manifest's objectTypes[].name, NOT its namespace like 'shared.feedback'). The tool resolves whether it is a records or document space. With `items`, this is the default each item inherits."),
-            // z.any(): some clients JSON-stringify an object param — coerceValue parses it back so records
-            // validate and documents aren't stored corrupt. (A z.record/union here breaks the MCP SDK.)
-            value: z.any().optional().describe('The content as a JSON OBJECT (not a string). For a records space, the record (matching its schema). For a document space, { title, markdown }. Omit when using `items`.'),
-            id: z.string().optional().describe('Instance id. Required for a records space (or include id in value); auto-generated for a document.'),
-            section: z.string().optional().describe('Document spaces only: section id/name to file the document under.'),
-            items: z.any().optional().describe(`BATCH: an ARRAY of { value, space?, id?, section? } — up to ${MAX_BATCH_ITEMS} — written in ONE call. Each item inherits the top-level space/section unless it names its own. Use this for a migration: your client asks the human to approve every tool CALL, so twenty separate writes are twenty prompts and one missed prompt ends the job half-done. All-or-nothing: every item is checked first, and a single bad item writes nothing.`),
-            ...aiProvenanceInputs,
-        },
+        zodShapeFor('aimeat_workspace_write'),
         annotationsFor('aimeat_workspace_write'),
         async ({ organism_id, ws, space, value, id, section, items, ai_provenance, ai_provenance_id }): Promise<TextResult> => {
             // services/workspace-tool-ops.ts: membership, the organism namespace rule, every item
@@ -403,7 +391,7 @@ export function registerWorkspaceTools(
 
     // ── aimeat_workspace_revert_to_draft ──
     mcp.tool('aimeat_workspace_revert_to_draft', descriptionFor('aimeat_workspace_revert_to_draft'),
-        { organism_id: z.string(), ws: z.string(), namespace: z.string(), id: z.string() },
+        zodShapeFor('aimeat_workspace_revert_to_draft'),
         annotationsFor('aimeat_workspace_revert_to_draft'),
         async ({ organism_id, ws, namespace, id }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
@@ -490,7 +478,7 @@ export function registerWorkspaceTools(
     registerWorkspaceDocumentTools(mcp, { storage, config, agentGaii, ownerName });
 
     mcp.tool('aimeat_workspace_object_delete', descriptionFor('aimeat_workspace_object_delete'),
-        { organism_id: z.string(), ws: z.string(), namespace: z.string(), id: z.string() },
+        zodShapeFor('aimeat_workspace_object_delete'),
         annotationsFor('aimeat_workspace_object_delete'),
         async ({ organism_id, ws, namespace, id }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);

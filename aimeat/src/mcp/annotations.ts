@@ -113,7 +113,6 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // ── Onboarding ──
 
     // ── Memory ──
-    aimeat_memory_read_public: { title: 'Read Public Memory', readOnlyHint: true },
 
     // ── Skills registry ──
 
@@ -122,49 +121,12 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // ── Storage ──
 
     // ── Wallet & morsels ──
-    aimeat_wallet_transactions: { title: 'List Wallet Transactions', readOnlyHint: true },
 
     // ── Boards ──
 
     // ── Sharing groups ──
 
     // ── Organisms ──
-    aimeat_organism_list: { title: 'List Organisms', readOnlyHint: true },
-    aimeat_organism_get: { title: 'Get Organism', readOnlyHint: true },
-    aimeat_organism_members: { title: 'List Organism Members', readOnlyHint: true },
-    aimeat_organism_join: { title: 'Join Organism', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_organism_leave: { title: 'Leave Organism', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
-    aimeat_organism_create: { title: 'Create Organism', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_organism_update: { title: 'Update Organism', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_organism_archive: { title: 'Archive / Unarchive Organism Content', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_organism_invite: { title: 'Invite to Organism', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_organism_member_add: { title: 'Add Organism Member', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_organism_member_remove: { title: 'Remove Organism Member', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
-    aimeat_organism_invitation_update: { title: 'Edit Pending Invitation', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_organism_invitation_cancel: { title: 'Withdraw Invitation', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
-    aimeat_organism_invitations: { title: 'List My Invitations', readOnlyHint: true },
-    aimeat_organism_invitation_respond: { title: 'Respond to Invitation', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_organism_invite_email: { title: 'Invite to Organism by Email', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_organism_invitations_email: { title: 'List Email Invitations', readOnlyHint: true },
-    aimeat_organism_invitation_email_cancel: { title: 'Cancel Email Invitation', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
-    aimeat_organism_search: { title: 'Search Organism Content', readOnlyHint: true },
-    aimeat_workspace_comment: { title: 'Comment on Workspace Object', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_workspace_comments: { title: 'List Workspace Comments', readOnlyHint: true },
-    aimeat_workspace_comment_delete: { title: 'Delete Workspace Comment', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
-    aimeat_workspace_create: { title: 'Create Workspace', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_workspace_access: { title: 'Manage Workspace Access', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_workspace_member_grant: { title: 'Grant Workspace Role', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_workspace_member_revoke: { title: 'Revoke Workspace Role', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
-    aimeat_workspace_members: { title: 'List Workspace Members', readOnlyHint: true },
-    aimeat_workspace_transfer: { title: 'Export / Import Workspace', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_organism_export: { title: 'Export Organism', readOnlyHint: true },
-    aimeat_organism_import: { title: 'Import Organism', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_workspace_list: { title: 'List Workspaces', readOnlyHint: true },
-    aimeat_workspace_read: { title: 'Read Workspace', readOnlyHint: true },
-    aimeat_workspace_write: { title: 'Write Workspace Draft', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_workspace_publish: { title: 'Publish Workspace Draft', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_workspace_revert_to_draft: { title: 'Reopen Published Record', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_workspace_object_delete: { title: 'Delete Workspace Object', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     // In-place document edits. The append is NOT idempotent — running it twice adds the text twice,
     // which is the honest answer for an operation that exists to accumulate. The section replace is:
     // the same block replacing the same heading leaves the same document.
@@ -184,12 +146,9 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // between "our store said no" and "Google said no".
     // Remote MCP servers. `openWorldHint` is true on all but the list, because everything else here
     // reaches a server this node does not run.
-    aimeat_workspace_update: { title: 'Update Workspace', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_workspace_space_add: { title: 'Add Workspace Space', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_workspace_sections_set: { title: 'Set Workspace Sections', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_workspace_suggestions: { title: 'Workspace Suggestions', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_organism_overview: { title: 'Organism Structure Overview', readOnlyHint: true },
-    aimeat_workspace_overview: { title: 'Workspace Structure Overview', readOnlyHint: true },
 
     // ── Agents (owner's view) ──
 
@@ -266,8 +225,6 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // ── Flags / moderation ──
 
     // ── Admin (operator-only) ──
-    aimeat_organism_owner_add: { title: 'Add Organism Owner', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_organism_owner_remove: { title: 'Remove Organism Owner', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     // destructiveHint: mints morsels (irreversible ledger change, financial action)
     aimeat_admin_mint: { title: 'Admin: Mint Morsels', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
 

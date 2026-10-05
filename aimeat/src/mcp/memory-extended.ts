@@ -35,7 +35,6 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -127,10 +126,7 @@ export function registerMemoryExtendedTools(
     mcp.tool(
         'aimeat_memory_read_public',
         descriptionFor('aimeat_memory_read_public'),
-        {
-            gaii: z.string(),
-            key: z.string(),
-        },
+        zodShapeFor('aimeat_memory_read_public'),
         annotationsFor('aimeat_memory_read_public'),
         async ({ gaii, key }) => {
             // ONE CAPABILITY, ONE DOOR: a Design Book part is read through the Design Book, which
