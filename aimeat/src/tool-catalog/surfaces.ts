@@ -256,8 +256,8 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         
         'aimeat_app_manage',
-        'aimeat_designbook_search', 'aimeat_designbook_get', 'aimeat_designbook_propose', 'aimeat_designbook_adopt',
-        'aimeat_designbook_keep',
+        
+        
         // The parts this node's own interface is built from, read before a page is changed.
         'aimeat_ui_component_list', 'aimeat_ui_component_get',
         // The node's themes: the look of every page. Saving is the operator's, gated in the tool.

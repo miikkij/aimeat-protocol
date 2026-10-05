@@ -433,11 +433,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     // exist again, and an agent trusted to remove things is not automatically trusted to make
     // them reappear under a name someone else may now be using.
     aimeat_memory_restore: 'memory:write',
-    aimeat_designbook_search: 'memory:read',
-    aimeat_designbook_get: 'memory:read',
-    aimeat_designbook_propose: 'memory:write',
-    aimeat_designbook_adopt: 'memory:write',
-    aimeat_designbook_keep: 'memory:write',
 
     // NOTE on `provenance:write` (TARGET-058): it deliberately has NO entry in this map, because it
     // does not gate a TOOL — it gates one optional PARAMETER (`ai_provenance`) on nine of them.
