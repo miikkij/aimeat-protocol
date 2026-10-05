@@ -35,7 +35,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { completeForOwner } from '../ai-completion.js';
+import { completeForOwner } from '../ai/completion.js';
 import { readAiFile } from '../ai-inputs.js';
 import { jobReader, jobCaller } from './starter.js';
 import { warningsNote } from '../classification/reader.js';

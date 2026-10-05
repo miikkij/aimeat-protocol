@@ -53,7 +53,7 @@
  */
 import type { StepDeps, OnPushTerminal } from './engine-steps.js';
 import type { WorkflowRun, WorkflowStep } from '../../models/workflow-schemas.js';
-import { completeForOwner } from '../ai-completion.js';
+import { completeForOwner } from '../ai/completion.js';
 import { generateForOwner } from '../ai-image.js';
 import { transcribeForOwner } from '../ai-transcription.js';
 import { aiOpOf, aiOpRefusal } from '../ai-jobs/op.js';

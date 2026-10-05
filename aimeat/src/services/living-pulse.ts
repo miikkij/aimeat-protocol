@@ -42,7 +42,7 @@ import type { Storage, MemoryRecord, AgentTaskRecord } from '../storage/interfac
 import type { AimeatConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { localAccountName } from '../utils/gaii.js';
-import { completeForOwner, AiCompletionError } from './ai-completion.js';
+import { completeForOwner, AiCompletionError } from './ai/completion.js';
 import { librarianSearch } from './librarian.js';
 import { systemReader } from './classification/reader.js';
 import { memoryTarget } from './classification/labels.js';

@@ -34,7 +34,7 @@
  *     What changes is that a brand-new account on a configured node can use the microphone at all,
  *     where before it had to find a settings page first.
  *   v1.0.0 — 2026-08-01 — Initial version. Multipart transport (services/openrouter.ts transcribe),
- *     shared gate from ai-completion.ts, cost taken from the provider's reported usage.cost because
+ *     shared gate from ai/completion.ts, cost taken from the provider's reported usage.cost because
  *     for audio models it is the only trustworthy price signal.
  */
 import type { AimeatConfig } from '../config.js';
@@ -43,7 +43,7 @@ import type { AiProvenanceRecordRow } from '../storage/interface.js';
 import type { TranscriptionAudio } from './openrouter.js';
 import {
   AiCompletionError, prepareAiCall, settleAiCall, planFor, recordFailedAttempts, type AiCallPlan,
-} from './ai-completion.js';
+} from './ai/completion.js';
 import { transcribeAudio } from './ai/gateway.js';
 import { runRoute, type AiRoute } from './ai/route-run.js';
 import { callCost } from './ai/catalog/price.js';

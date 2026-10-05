@@ -1,5 +1,5 @@
 /**
- * @file ai-completion.ts
+ * @file ai/completion.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Reusable server-side AI completion for a single owner, using the
@@ -18,7 +18,7 @@
  *     — the shared gate every owner-billed provider call runs through (see ai-transcription.ts)
  *   - AiCompletionError — typed error carrying { code, status } for the route
  * @usage
- *   import { completeForOwner, AiCompletionError } from '../services/ai-completion.js';
+ *   import { completeForOwner, AiCompletionError } from './completion.js';
  *   const r = await completeForOwner(storage, config, gaii, { prompt });
  * @version-history
  *   v3.10.0 — 2026-10-05 — prepareAiCall takes `estimate`, and a text call passes its prompt's size and
@@ -30,7 +30,7 @@
  *   v3.8.0 — 2026-09-28 — Capabilities for apps and agents (System 2 plan, V5): prepareAiCall knows
  *     the operations speak and embed (roles tts and embed), reads the app's prefer.* and local.* from
  *     its meta (policy-store appAiMetaOf), and completeForOwner takes `files` for the files capability.
- *     The cost estimate and the pre-call guards moved to ai-call-guards.ts as a pure move
+ *     The cost estimate and the pre-call guards moved to ai/call-guards.ts as a pure move
  *     (max-file-lines), re-exported here under the same names.
  *   v3.7.0 — 2026-09-28 — Providers and routing (System 2 plan, V3). prepareAiCall reads the owner's
  *     provider records (the legacy setting migrated on the first read, services/ai/provider-store.ts),
@@ -48,7 +48,7 @@
  *     Jouni on 2026-10-02: an own key uses the node's default model, and a free model only when
  *     the key has no money left. The default itself comes from ai-model-defaults.ts, which no longer
  *     reads the free router a key-only save wrote. AiCallPlan, planFor and targetOf moved to
- *     ai-call-plan.ts, verbatim, and are re-exported here (max-file-lines).
+ *     ai/call-plan.ts, verbatim, and are re-exported here (max-file-lines).
  *   v3.6.0 — 2026-09-28 — The owner's model policy (System 2 plan, V2; services/ai/policy-gate.ts): the
  *     model is chosen under it BEFORE the key, a named model the rules leave out is refused 403
  *     AI_MODEL_NOT_ALLOWED, lists with nothing in common 403 AI_MODEL_POLICY_EMPTY, a model the
@@ -133,39 +133,39 @@
  *     fine-tuning is per candidate: the call's, the app's for its role, the provider's default, and the
  *     legacy page's setting only on the migrated provider and the node's own.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import type { CompletionReasoning } from './openrouter.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import type { CompletionReasoning } from '../openrouter.js';
 import {
   estimateCostUsd, assertProviderAllowed, assertAppAllowed, decryptOwnerKey, assertWithinBudget,
-} from './ai-call-guards.js';
-import { appAiMetaOf } from './ai/policy-store.js';
-import { text as gatewayText, type TextFile } from './ai/gateway.js';
-import type { AiCapability, AiOp, CostSource } from './ai/types.js';
-import { loadPolicyDecision, freeModelAllowed } from './ai/policy-gate.js';
-import type { CallerClass } from './ai/policy.js';
-import { AiCompletionError } from './ai/errors.js';
-import { providersForOwner } from './ai/provider-store.js';
-import { readRouting, rulesFor } from './ai/routing.js';
-import { readRoles, rolesWithLegacy, resolveRole, noteRoleUsed, noteRoleRequest, bindingKey, type ResolvedRole } from './ai/roles.js';
-import { NODE_OPENROUTER_ID, type ProviderParams } from './ai/providers.js';
-import { planRoute, refusalFor, type AiCandidate } from './ai/route-plan.js';
-import { runRoute, type AiRoute } from './ai/route-run.js';
-import { callCost } from './ai/catalog/price.js';
-import { mintProvenance } from './ai-provenance.js';
-import type { AiProvenanceRecordRow } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
-import { resolveModelFor, type ModelRole } from './ai-model-defaults.js';
-import { debitAllowance, nodeKeyStanding } from './ai-allowance.js';
-import { todayKey, getTodayUsage, recordAiUsage, emptyUsage, type UsageRecord } from './ai-usage-record.js';
-import { agentCapRefusal } from './agent-ai-keys.js';
-import { withPersonFix, type RequestLanguage } from './ai/ai-fix-words.js';
-import { DEFAULT_DAILY_BUDGET_USD, getDailyBudgetUsd } from './ai-daily-budget.js';
+} from './call-guards.js';
+import { appAiMetaOf } from './policy-store.js';
+import { text as gatewayText, type TextFile } from './gateway.js';
+import type { AiCapability, AiOp, CostSource } from './types.js';
+import { loadPolicyDecision, freeModelAllowed } from './policy-gate.js';
+import type { CallerClass } from './policy.js';
+import { AiCompletionError } from './errors.js';
+import { providersForOwner } from './provider-store.js';
+import { readRouting, rulesFor } from './routing.js';
+import { readRoles, rolesWithLegacy, resolveRole, noteRoleUsed, noteRoleRequest, bindingKey, type ResolvedRole } from './roles.js';
+import { NODE_OPENROUTER_ID, type ProviderParams } from './providers.js';
+import { planRoute, refusalFor, type AiCandidate } from './route-plan.js';
+import { runRoute, type AiRoute } from './route-run.js';
+import { callCost } from './catalog/price.js';
+import { mintProvenance } from '../ai-provenance.js';
+import type { AiProvenanceRecordRow } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
+import { resolveModelFor, type ModelRole } from '../ai-model-defaults.js';
+import { debitAllowance, nodeKeyStanding } from '../ai-allowance.js';
+import { todayKey, getTodayUsage, recordAiUsage, emptyUsage, type UsageRecord } from '../ai-usage-record.js';
+import { agentCapRefusal } from '../agent-ai-keys.js';
+import { withPersonFix, type RequestLanguage } from './ai-fix-words.js';
+import { DEFAULT_DAILY_BUDGET_USD, getDailyBudgetUsd } from '../ai-daily-budget.js';
 export { todayKey, getTodayUsage, recordAiUsage, type UsageRecord, DEFAULT_DAILY_BUDGET_USD, getDailyBudgetUsd };
 
 // DEFAULT_DAILY_BUDGET_USD and getDailyBudgetUsd live in ai-daily-budget.ts (a leaf, so the ledger's
 // budget alert can read the number without importing this file) and are re-exported above. The cost
-// estimate and the guards before a call live in ai-call-guards.ts, re-exported the same way.
+// estimate and the guards before a call live in ai/call-guards.ts, re-exported the same way.
 export { estimateCostUsd, assertProviderAllowed, assertAppAllowed, decryptOwnerKey, assertWithinBudget };
 
 // The typed error lives in services/ai/errors.ts (a leaf the policy code can throw too) and is
@@ -283,10 +283,10 @@ export interface CompleteForOwnerResult {
  * given), calls the provider, and records usage. Throws AiCompletionError on any
  * gated/failure condition.
  */
-// The plan and its two readers: a pure extraction to ai-call-plan.ts (max-file-lines, 2026-10-02),
+// The plan and its two readers: a pure extraction to ai/call-plan.ts (max-file-lines, 2026-10-02),
 // re-exported here so every importer of this file is untouched.
-export { planFor, targetOf, type AiCallPlan } from './ai-call-plan.js';
-import { planFor, type AiCallPlan } from './ai-call-plan.js';
+export { planFor, targetOf, type AiCallPlan } from './call-plan.js';
+import { planFor, type AiCallPlan } from './call-plan.js';
 
 /** The operations whose model is a role of its own, and never the text model. */
 const OP_ROLE: Partial<Record<AiOp, ModelRole>> = { image: 'image', transcribe: 'stt', speak: 'tts', embed: 'embed' };

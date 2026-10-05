@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description An owner's AI-spend history: the per-day `ai-usage.<gaii>.<day>` records fanned
  *   into a series plus today / 7-day / 30-day rollups, for the profile home card and the spend
- *   chart. Extracted from ai-completion.ts on 2026-09-09 to stay under max-file-lines; a pure move.
+ *   chart. Extracted from ai/completion.ts on 2026-09-09 to stay under max-file-lines; a pure move.
  *   The records themselves are still written there (recordAiUsage).
  * @structure
  *   - UsageWindow / UsageHistory — the rollup shapes
@@ -13,11 +13,11 @@
  * @version-history
  *   v1.1.0 — 2026-09-19 — Each day's apps are folded to one name per app (services/ai-app-id.ts), so
  *     a day recorded under `app` and `app.html` charts as one app.
- *   v1.0.0 — 2026-09-09 — Moved out of ai-completion.ts unchanged (it arrived there as v1.5.0 on
+ *   v1.0.0 — 2026-09-09 — Moved out of ai/completion.ts unchanged (it arrived there as v1.5.0 on
  *     2026-07-05 for the AI-spend charts).
  */
 import type { Storage } from '../storage/interface.js';
-import { todayKey, type UsageRecord } from './ai-completion.js';
+import { todayKey, type UsageRecord } from './ai/completion.js';
 import { mergePerApp } from './ai-app-id.js';
 
 /** A rolled-up spend window (today / 7d / 30d) — same per-app shape as a day, summed. */

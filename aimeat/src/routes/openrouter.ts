@@ -37,7 +37,7 @@
  *     reasoning parameter, sent to the provider as given on every completion that does not set its
  *     own; null clears it. Only the four documented fields are stored. Beside it, `autoRetry` and
  *     `maxRetries` now mean something on the server: they bound how many times an answer with no
- *     content is asked again (services/ai-completion.ts), which nothing had read since 2026-03.
+ *     content is asked again (services/ai/completion.ts), which nothing had read since 2026-03.
  *   v1.11.0 — 2026-09-08 — GET /models takes ?modality=image; it had narrowed the word to chat.
  *   v1.10.0 — 2026-09-04 — POST /complete spends under `calibrator:<projectId>` for a calibration
  *     project, so the usage table says which calibration cost what; a generator project keeps
@@ -52,7 +52,7 @@
  *     parameter no STT model can be offered anywhere in the UI. The cache key gained the modality so
  *     two different listings cannot overwrite each other.
  *   v1.7.0 — 2026-08-01 — TARGET-058 Phase 8b. The two completing routes (/complete and /test) go
- *     through services/ai-completion.ts instead of speaking to the provider themselves. They predated
+ *     through services/ai/completion.ts instead of speaking to the provider themselves. They predated
  *     the chokepoint and were the last two paths on the node producing model output that nothing
  *     stamped and — the half that costs money — nothing billed: a completion here was charged to the
  *     owner's OpenRouter account and appeared in no budget on this node. Both now mint provenance and
@@ -94,7 +94,7 @@ import { encrypt, decrypt, getEncryptionKey } from '../services/encryption.js';
 import { logger } from '../utils/logger.js';
 import { recordAccountEvent } from '../services/account-events.js';
 import { listModels, DEFAULT_BASE_URLS, type ProviderType, type ModelModality } from '../services/openrouter.js';
-import { completeForOwner, AiCompletionError, assertProviderAllowed } from '../services/ai-completion.js';
+import { completeForOwner, AiCompletionError, assertProviderAllowed } from '../services/ai/completion.js';
 import { DEFAULT_EMPTY_RETRIES } from '../services/ai/gateway.js';
 import { holdsImplicitFreeModel } from '../services/ai-model-defaults.js';
 import { servedProvenanceOf, envelopeMeta, setProvenanceHeaders } from '../services/ai-provenance-marks.js';

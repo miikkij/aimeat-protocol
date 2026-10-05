@@ -1,23 +1,23 @@
 /**
- * @file src/services/ai-call-plan.ts
+ * @file src/services/ai/call-plan.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The plan prepareAiCall returns (everything decided before a model is called) and the
  *   two pure readers of it.
  *
- *   PURE EXTRACTION from ai-completion.ts, which passed the 800-line cap when the plan gained the
+ *   PURE EXTRACTION from ai/completion.ts, which passed the 800-line cap when the plan gained the
  *   free router a spent own key is retried on. The type and the two functions are the same; the
  *   completion service imports them and re-exports every name, so no importer changed.
  * @structure AiCallPlan · targetOf · planFor
- * @usage import { prepareAiCall, planFor, type AiCallPlan } from './ai-completion.js';
+ * @usage import { prepareAiCall, planFor, type AiCallPlan } from './completion.js';
  * @version-history
- *   v1.0.0 — 2026-10-02 — Extracted from ai-completion.ts, verbatim.
+ *   v1.0.0 — 2026-10-02 — Extracted from ai/completion.ts, verbatim.
  */
-import type { AiAdapterType, AiCapability, AiOp, AiTarget } from './ai/types.js';
-import type { RoutingRules } from './ai/routing.js';
-import type { AiCandidate, ChosenBy, RejectedCandidate } from './ai/route-plan.js';
-import type { AppAiRoleParams } from './app-ai-roles.js';
-import type { UsageRecord } from './ai-usage-record.js';
+import type { AiAdapterType, AiCapability, AiOp, AiTarget } from './types.js';
+import type { RoutingRules } from './routing.js';
+import type { AiCandidate, ChosenBy, RejectedCandidate } from './route-plan.js';
+import type { AppAiRoleParams } from '../app-ai-roles.js';
+import type { UsageRecord } from '../ai-usage-record.js';
 
 /**
  * Everything decided BEFORE a model is called, for one owner and one call.

@@ -22,7 +22,7 @@
  *   v1.1.0 - 2026-09-28 - The owner's model policy covers voice: the reply runs under the text list,
  *     the spoken audio under the speech list, and the caller (owner, agent, verified app) is passed on.
  *   v1.0.2 - 2026-09-28 - The fallback price of a streamed reply is estimateCostUsd() from
- *     ai-completion.ts, not a copy of its two numbers.
+ *     ai/completion.ts, not a copy of its two numbers.
  *   v1.0.1 - 2026-09-19 - The speech pre-check reads the app's spend and cap under any of its names
  *     (services/ai-app-id.ts).
  *   v1.0.0 - 2026-09-19 - Configurable voice transport with cancellation and final accounting.
@@ -32,7 +32,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import {
   prepareAiCall, settleAiCall, getTodayUsage, AiCompletionError, planFor, recordFailedAttempts, type AiCallPlan,
-} from './ai-completion.js';
+} from './ai/completion.js';
 import { chatCompletionRaw, speechRaw, generationCost, listModels } from './openrouter.js';
 import { openAiChat, speaksOpenAiChat } from './ai/gateway.js';
 import { runRoute } from './ai/route-run.js';

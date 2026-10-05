@@ -31,7 +31,7 @@ import { aiCapabilitiesView } from '../services/ai/capabilities.js';
 import { queryModels } from '../services/ai/catalog/query.js';
 import { transcribeForOwner } from '../services/ai-transcription.js';
 import { embedForOwner } from '../services/ai-embed.js';
-import { readCallerAudio } from '../services/ai-call-files.js';
+import { readCallerAudio } from '../services/ai/call-files.js';
 import { readerForAgent, warningsNote } from '../services/classification/reader.js';
 import { ClassificationError } from '../services/classification/labels.js';
 import { AI_ROLE_PARAM } from '../tool-catalog/definitions/ai-models.js';

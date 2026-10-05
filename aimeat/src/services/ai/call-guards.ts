@@ -1,24 +1,24 @@
 /**
- * @file ai-call-guards.ts
+ * @file ai/call-guards.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The checks an AI call passes before anything is spent, and the fallback cost
  *   estimate: the provider host allowlist, the owner's app allowlist, the owner's key, the daily
- *   budget and the per-app cap. A pure move out of ai-completion.ts (max-file-lines), which
+ *   budget and the per-app cap. A pure move out of ai/completion.ts (max-file-lines), which
  *   re-exports every name, so no importer changes.
  * @structure estimateCostUsd · assertProviderAllowed · assertAppAllowed · decryptOwnerKey · assertWithinBudget ·
  *   readCallRole
  * @version-history
  *   v1.1.0 — 2026-09-28 — readCallRole: the one check of a call's `role` field (AI roles), shared by the routes.
- *   v1.0.0 — 2026-09-28 — Moved from ai-completion.ts, unchanged.
+ *   v1.0.0 — 2026-09-28 — Moved from ai/completion.ts, unchanged.
  */
-import type { AimeatConfig } from '../config.js';
-import { decrypt, getEncryptionKey } from './encryption.js';
-import type { ProviderType } from './openrouter.js';
-import { AiCompletionError } from './ai/errors.js';
-import { appSpentToday, appQuotaFor, appAllowlisted } from './ai-app-id.js';
-import type { UsageRecord } from './ai-usage-record.js';
-import { getDailyBudgetUsd } from './ai-daily-budget.js';
+import type { AimeatConfig } from '../../config.js';
+import { decrypt, getEncryptionKey } from '../encryption.js';
+import type { ProviderType } from '../openrouter.js';
+import { AiCompletionError } from './errors.js';
+import { appSpentToday, appQuotaFor, appAllowlisted } from '../ai-app-id.js';
+import type { UsageRecord } from '../ai-usage-record.js';
+import { getDailyBudgetUsd } from '../ai-daily-budget.js';
 
 /**
  * Rough cost estimate when the provider didn't report one (LM Studio, custom).

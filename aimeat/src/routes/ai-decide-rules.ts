@@ -40,7 +40,7 @@ import { requireOwnerPrincipal, isOwnerPrincipal } from '../auth/account-securit
 import { success, error } from '../middleware/envelope.js';
 import { retryAfterOf } from '../services/account-limits.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { AiCompletionError } from '../services/ai-completion.js';
+import { AiCompletionError } from '../services/ai/completion.js';
 import { decideForOwner, decisionStats, ruleCallerKind, DecideError } from '../services/decide/service.js';
 import {
   listRules, getRule, putRule, deleteRule, rulesRunnableBy, useAllows,

@@ -88,7 +88,7 @@ import type {
   Storage, AiDecisionRow, AiDecisionAnswer, AiDecisionQuestion, AiDecisionReview,
   AiDecisionKeyScope, AiDecisionOutcome, AiDecisionStatsGroup, AiDecisionStatsGroupBy,
 } from '../../storage/interface.js';
-import { assertAppAllowed, assertWithinBudget, getTodayUsage, recordAiUsage, AiCompletionError } from '../ai-completion.js';
+import { assertAppAllowed, assertWithinBudget, getTodayUsage, recordAiUsage, AiCompletionError } from '../ai/completion.js';
 import { nodeKeyStanding, debitAllowance } from '../ai-allowance.js';
 import { readProgramMap } from '../data-map/data-map-access.js';
 import { logger } from '../../utils/logger.js';

@@ -24,7 +24,7 @@ const hits: Array<{ key: string; ownerGaii: string; snippet: string; title: stri
 vi.mock('../../src/services/librarian.js', () => ({
   librarianSearch: async () => ({ hits: [...hits] }),
 }));
-vi.mock('../../src/services/ai-completion.js', () => ({
+vi.mock('../../src/services/ai/completion.js', () => ({
   AiCompletionError: class AiCompletionError extends Error { code = 'X'; },
   completeForOwner: async () => ({ content: 'derived', usage: { costUsd: 0 }, provenance: null }),
 }));

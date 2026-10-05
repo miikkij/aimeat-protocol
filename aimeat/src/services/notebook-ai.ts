@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Shared owner-model plumbing for the notebook AI features (classify, plan, triage, the
  *   living author). Resolves the caller's own model from their per-owner settings and runs the
- *   completion through THE chokepoint, `services/ai-completion.ts`, mapping its failures to stable
+ *   completion through THE chokepoint, `services/ai/completion.ts`, mapping its failures to stable
  *   codes the routes already understand. Extracted from notebook-classify.ts so the classifier and
  *   the planner never drift on key handling.
  *
@@ -25,7 +25,7 @@
  *   v1.0.0 — 2026-06-21 — Initial: extracted shared key/model resolution + completion wrapper.
  *   v1.1.0 — 2026-07-01 — Vendor-neutral default: replace the hardcoded anthropic/claude-sonnet-4
  *     fallback with OpenRouter's free-models router 'openrouter/free'.
- *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 8b: routed through services/ai-completion.ts. Every
+ *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 8b: routed through services/ai/completion.ts. Every
  *     notebook completion now mints provenance and is metered. `OwnerModel` carries the handle the
  *     chokepoint needs (storage, config, gaii) instead of a decrypted key, and takes an `appId` so
  *     each feature's spend is legible in the owner's usage breakdown rather than pooled.
@@ -33,7 +33,7 @@
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import type { CompletionOptions } from './openrouter.js';
-import { completeForOwner, AiCompletionError, type CompleteForOwnerResult } from './ai-completion.js';
+import { completeForOwner, AiCompletionError, type CompleteForOwnerResult } from './ai/completion.js';
 import { getEncryptionKey } from './encryption.js';
 import { OWNER_CALLER } from './ai/caller-context.js';
 

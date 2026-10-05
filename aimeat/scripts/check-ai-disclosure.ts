@@ -144,7 +144,7 @@ export function stripComments(src: string): string {
 const LLM_TRANSPORT = 'src/services/openrouter.ts';
 
 /** THE chokepoint: mints provenance and meters the call. Everything new must go through it. */
-const LLM_CHOKEPOINT = 'src/services/ai-completion.ts';
+const LLM_CHOKEPOINT = 'src/services/ai/completion.ts';
 
 /**
  * Callers of the raw transport that are NOT the chokepoint.

@@ -64,7 +64,7 @@ import { isAllowed, parseModelRef } from './ai/policy.js';
 import { canonicalModelKey } from './ai/catalog/equivalence.js';
 import { AiCompletionError } from './ai/errors.js';
 import { crewChoiceProblem } from './crew-llm-guard.js';
-import { prepareAiCall } from './ai-completion.js';
+import { prepareAiCall } from './ai/completion.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import type { AgentRecord } from '../storage/types/identity.js';
 

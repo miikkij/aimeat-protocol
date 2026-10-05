@@ -108,7 +108,7 @@ import { duplicateMessageAttachments } from '../services/attachment-duplication.
 import { mailboxReaderOf, readOwnerInbox, readOwnerConversations, readOwnerThread, readOwnerOverview } from '../services/owner-mailbox-reads.js';
 import { requireOwnerMailboxRead } from '../auth/owner-mailbox-gate.js';
 import { transcribeForOwner } from '../services/ai-transcription.js';
-import { AiCompletionError } from '../services/ai-completion.js';
+import { AiCompletionError } from '../services/ai/completion.js';
 import { readAiFile } from '../services/ai-inputs.js';
 import { readerFor, warningsNote } from '../services/classification/reader.js';
 import { ClassificationError } from '../services/classification/labels.js';

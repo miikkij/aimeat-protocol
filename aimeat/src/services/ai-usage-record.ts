@@ -6,10 +6,10 @@
  *   folds a call into it and appends the ledger event. Text completions, transcriptions and decisions
  *   share this record, so the daily budget covers all of them.
  *
- *   A PURE MOVE out of ai-completion.ts (max-file-lines), which re-exports every name, so no
+ *   A PURE MOVE out of ai/completion.ts (max-file-lines), which re-exports every name, so no
  *   importer changed. The reasons each function is the way it is stayed with the functions.
  * @structure UsageRecord · todayKey · getTodayUsage · recordAiUsage
- * @usage import { getTodayUsage, recordAiUsage, type UsageRecord } from './ai-completion.js';
+ * @usage import { getTodayUsage, recordAiUsage, type UsageRecord } from './ai/completion.js';
  * @version-history
  *   v1.3.0 — 2026-10-03 — A call that names no app is filed under its endpoint (`source`) instead of
  *     `_unknown`, and `per_agent` splits each agent's spend by app or endpoint.
@@ -17,7 +17,7 @@
  *     (the model catalogue's snapshot, or the estimate), not the provider (System 2 plan, V4).
  *   v1.1.0 — 2026-09-20 — `per_agent` and the `agent` a call names, for the per-agent daily cap; the
  *     key scope may say 'agent'.
- *   v1.0.0 — 2026-09-20 — Extracted from ai-completion.ts, unchanged.
+ *   v1.0.0 — 2026-09-20 — Extracted from ai/completion.ts, unchanged.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';

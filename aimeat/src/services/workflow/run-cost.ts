@@ -8,7 +8,7 @@
  *   WHY DOLLARS. The cap used to be `costCapMorsels`, and nothing ever read it. It could not have
  *   worked if something had: a morsel paces what agents may store and signals what a person has
  *   contributed; it is not money and buys nothing. What an ai step spends is the provider's charge,
- *   which the node already records in US dollars for every completion (services/ai-completion.ts), so
+ *   which the node already records in US dollars for every completion (services/ai/completion.ts), so
  *   the cap is stated in the same unit as the thing it caps.
  *
  *   WHAT IS SPENT. Each ai step keeps what its own model calls cost (`costUsd` on the run step), the

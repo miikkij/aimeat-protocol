@@ -18,7 +18,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { ownerGhiiOf, resolveIdentity } from '../utils/gaii.js';
 import { error, success } from '../middleware/envelope.js';
-import { AiCompletionError } from '../services/ai-completion.js';
+import { AiCompletionError } from '../services/ai/completion.js';
 import { retryAfterOf } from '../services/account-limits.js';
 import { streamReply, streamSpeech } from '../services/ai-voice.js';
 import { logger } from '../utils/logger.js';

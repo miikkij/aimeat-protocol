@@ -24,7 +24,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import {
   AiCompletionError, prepareAiCall, settleAiCall, planFor, recordFailedAttempts, type AiCallPlan,
-} from './ai-completion.js';
+} from './ai/completion.js';
 import { embed as gatewayEmbed } from './ai/gateway.js';
 import { runRoute, type AiRoute } from './ai/route-run.js';
 import { callCost } from './ai/catalog/price.js';

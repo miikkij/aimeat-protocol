@@ -36,7 +36,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { AiCompletionError, getDailyBudgetUsd, getTodayUsage, prepareAiCall, type AiCallPlan } from '../ai-completion.js';
+import { AiCompletionError, getDailyBudgetUsd, getTodayUsage, prepareAiCall, type AiCallPlan } from './completion.js';
 import type { AiCapability, AiOp } from './types.js';
 import { TYPE_CAPABILITIES, typeAllowed, type AiProvider } from './providers.js';
 import { providersForOwner } from './provider-store.js';

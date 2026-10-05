@@ -721,7 +721,7 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The AI allowance counter."
     },
-    "src/services/ai-completion.ts": {
+    "src/services/ai/completion.ts": {
       "reads": {
         "getMemory": 3
       },

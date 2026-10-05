@@ -10,7 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import { parseAiPosture, lintAppAiDisclosure } from '../../src/services/app-ai-posture.js';
 import { lintAppAiCapabilityUse } from '../../src/services/app-ai-capability-hints.js';
-import { readCallFiles, CALL_FILE_LIMITS } from '../../src/services/ai-call-files.js';
+import { readCallFiles, CALL_FILE_LIMITS } from '../../src/services/ai/call-files.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { systemReader } from '../../src/services/classification/reader.js';
 

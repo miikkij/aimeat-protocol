@@ -16,7 +16,7 @@
  *   - The APP's own list: `models=` in its published `<meta name="aimeat-ai">`. It binds the app
  *     itself, so it needs no verified identity.
  *
- *   A pure module: no storage, no config reads. prepareAiCall (services/ai-completion.ts) loads the
+ *   A pure module: no storage, no config reads. prepareAiCall (services/ai/completion.ts) loads the
  *   inputs and asks.
  * @structure
  *   - AI_PROVIDER_TYPES / parseModelRef() / refOf() — the `<type>:<model id>` reference
