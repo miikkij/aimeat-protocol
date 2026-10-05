@@ -18,6 +18,8 @@
  *   who could make it would sell the author's packages in the node's name.
  * @structure registerPackageSaleRoutes(router, config, storage, peers)
  * @version-history
+ *   v1.7.0 — 2026-10-06 — PUT .../auto-renew names the agent that turns automatic renewal on, so each
+ *     renewal is held to its daily purchase limit (secaudit 2026-10 follow-up, A6).
  *   v1.6.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.5.0 — 2026-10-05 — A signed sale or claim must name this node as its audience and carry a nonce
  *     not seen before; a grant passes the repository role to grantEntitlement (secaudit 2026-10,
@@ -41,6 +43,7 @@ import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
 import { requireAuth, requireScope, requireLocalSession, requireOperatorPrincipal } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { callerOf } from '../middleware/caller.js';
 import { OPERATOR_ADMIN_SCOPE } from '../utils/scope-coverage.js';
 import { isOperatorCaller, operatorOverride } from '../services/operator-override.js';
 import { verifySaleRequest, verifyRequestWithKey, CLAIM_PURPOSE } from '../services/packages/sale/package-sale-auth.js';
@@ -295,7 +298,10 @@ export function registerPackageSaleRoutes(
     });
 
     router.put('/v1/package-sales/subscriptions/auto-renew', ...signedIn, async (req, res) => {
-        const out = await setAutoRenew(storage, req.auth!.owner, (req.body ?? {}) as Record<string, unknown>);
+        // An agent that turns it on is named on the subscription: each renewal is its purchase.
+        const who = callerOf(req, config.nodeId, storage);
+        const out = await setAutoRenew(storage, req.auth!.owner, (req.body ?? {}) as Record<string, unknown>,
+            who.kind === 'agent' ? who.principal : null);
         if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
         res.json(success(config.nodeId, { auto_renew: out.auto_renew, updates_until: out.updates_until }));
     });

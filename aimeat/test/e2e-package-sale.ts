@@ -421,6 +421,40 @@ await test('A declined card fails the renewal, and the buyer is told once per pe
     assert(sub.updates_until === until && /CARD_DECLINED|declined/.test(sub.last_failure?.reason ?? ''), `unchanged, failure kept: ${JSON.stringify(sub)}`);
 });
 
+// Secaudit 2026-10 follow-up, A6: a renewal charged on the kept card went through no purchase limit, so
+// an agent that turned automatic renewal on committed its owner to charges past the daily limit the
+// owner set for it. On the old code the first renewal below was charged with no limit set.
+await test('An agent that turns automatic renewal on renews only within its own daily purchase limit', async () => {
+    const name = `renewer${ts}`;
+    const agentToken = await registerAgent(S, buyerToken, buyer, name, ['commerce:buy']);
+    const on = await S.json('/v1/package-sales/subscriptions/auto-renew', {
+        method: 'PUT', headers: auth(agentToken), body: JSON.stringify({ repository: R.nodeId, group_id: kit, node_id: n1.node_id, auto_renew: true }),
+    });
+    assert(on.status === 200 && on.body.data.auto_renew === true, `the agent turns it on: ${on.status} ${JSON.stringify(on.body)}`);
+    const until = (await subscriptions()).subscriptions.find((x: any) => x.node_id === n1.node_id).updates_until as string;
+    const peers = await peersOf(S);
+    const at = Date.parse(until) - DAY;
+    const refused = (await runAsNode(S.nodeId, () => runAutoRenewals({ storage: S.storage, config: S.config, peers }, at))).find(o => o.node_id === n1.node_id);
+    assert(refused?.result === 'failed' && /PURCHASE_LIMIT_NOT_SET/.test(refused.detail ?? ''), `no limit, no charge: ${JSON.stringify(refused)}`);
+    const unchanged = (await subscriptions()).subscriptions.find((x: any) => x.node_id === n1.node_id);
+    assert(unchanged.updates_until === until, `the date stays: ${JSON.stringify(unchanged)}`);
+
+    const limit = await S.json(`/v1/agents/${name}/purchase-limit`, { method: 'PUT', headers: auth(buyerToken), body: JSON.stringify({ currency: 'EUR', per_day: 10 }) });
+    assert(limit.status === 200, `the owner sets 10 EUR a day: ${limit.status} ${JSON.stringify(limit.body)}`);
+    const renewed = (await runAsNode(S.nodeId, () => runAutoRenewals({ storage: S.storage, config: S.config, peers }, at + 3_600_000))).find(o => o.node_id === n1.node_id);
+    assert(renewed?.result === 'renewed', `within the limit it renews: ${JSON.stringify(renewed)}`);
+    const card = await S.json(`/v1/agents/${name}/purchase-limit`, { headers: auth(buyerToken) });
+    assert(card.body.data.limits.find((l: any) => l.currency === 'EUR')?.spent_today === 6, `6 EUR counted today: ${JSON.stringify(card.body.data)}`);
+
+    // The owner turning it on in person takes the agent's mark away: the renewal is then the owner's own.
+    const mine = await S.json('/v1/package-sales/subscriptions/auto-renew', {
+        method: 'PUT', headers: auth(buyerToken), body: JSON.stringify({ repository: R.nodeId, group_id: kit, node_id: n1.node_id, auto_renew: true }),
+    });
+    assert(mine.status === 200, `the owner turns it on: ${mine.status}`);
+    const sub = (await subscriptions()).subscriptions.find((x: any) => x.node_id === n1.node_id);
+    assert(sub.auto_renew_by === undefined, `the owner's own renewal names no agent: ${JSON.stringify(sub)}`);
+});
+
 console.log('\nPhase 7 — A refusal on the repository refunds');
 
 await test('A sale the repository refuses (a known node under another key) answers FULFILLMENT_FAILED and grants nothing', async () => {

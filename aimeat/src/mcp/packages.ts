@@ -23,6 +23,8 @@
  *   aimeat_package_check_updates, aimeat_package_repository, aimeat_package_entitlements.
  * @usage import { registerPackageTools } from './packages.js';
  * @version-history
+ *   2026-10-06 — aimeat_package_buy's auto_renew names the agent on the subscription, so each renewal is
+ *     held to its daily purchase limit (secaudit 2026-10 follow-up, A6).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.15.0 — 2026-10-05 — aimeat_package_instance_set turns automatic updates on only with
@@ -147,7 +149,8 @@ function registerPackageSaleTools(
             return text({ subscriptions: subs.map(s => ({ ...s, payment: s.payment ? { handler: s.payment.handler } : undefined })), requests: (await readRequests(storage)).filter(r => r.buyer === owner) });
         }
         if (input.action === 'auto_renew') {
-            const out = await setAutoRenew(storage, owner, { repository, group_id: groupId, node_id: input.node_id, auto_renew: input.auto_renew });
+            // Every MCP session is an agent: it is named on the subscription, and each renewal is its purchase.
+            const out = await setAutoRenew(storage, owner, { repository, group_id: groupId, node_id: input.node_id, auto_renew: input.auto_renew }, getAgentGaii());
             return out.ok ? text(out) : { ...toolError(out.code, out.message) };
         }
         const view = await buyerOfferView(deps, repository, groupId);

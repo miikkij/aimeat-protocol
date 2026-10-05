@@ -21,10 +21,18 @@
  *   date. When the date passes unpaid, the updates stop and the install keeps working. A charge that
  *   succeeds and a grant the repository then refuses is refunded.
  *
+ *   AN AGENT'S RENEWAL IS ITS PURCHASE. When an agent turned automatic renewal on (`auto_renew_by`),
+ *   each renewal is held to the daily purchase limit its owner set for it, reserved right before the
+ *   charge and given back when the charge fails or the payment is refunded, as a checkout does
+ *   (commerce/agent-purchase-limit.ts). Without this, an agent with a limit could commit its owner to
+ *   charges past it (secaudit 2026-10 follow-up, A6).
+ *
  *   NO STRIPE SUBSCRIPTION. With one, Stripe would keep a second clock that this node would have to
  *   follow through Stripe's events; the node decides when to charge.
  * @structure AUTO_RENEW_DAYS_BEFORE · runAutoRenewals()
  * @version-history
+ *   v1.1.0 — 2026-10-06 — A renewal an agent turned on is held to that agent's daily purchase limit
+ *     (secaudit 2026-10 follow-up, A6).
  *   v1.0.0 — 2026-10-02 — Initial (package sale design, phase 3).
  */
 import type { AimeatConfig } from '../../../config.js';
@@ -35,6 +43,8 @@ import { bookSessionlessSale } from '../../../commerce/session-service.js';
 import { allSubscriptions, catalogueEntry, putSubscription, type Subscription } from './package-sale-catalogue.js';
 import { readOfferAsSeller, carryOutSale } from './package-sale-checkout.js';
 import { notify } from '../../notify.js';
+import { reserveAgentPurchase, releaseAgentPurchase } from '../../../commerce/agent-purchase-limit.js';
+import { CommerceError } from '../../../commerce/errors.js';
 import { emitChange } from '../../event-bus.js';
 import { logger } from '../../../utils/logger.js';
 
@@ -79,21 +89,37 @@ async function renewOne(deps: Deps, sub: Subscription, reference: string): Promi
     const seller = { ghii: sellerGhii, owner: entry.seller_of_record, psp: (await storage.getMemory(sellerGhii, 'commerce.psp'))?.value ?? undefined };
     const amount = sub.renewal!.amount;
     const currency = sub.renewal!.currency;
+    // An agent turned automatic renewal on: each renewal is that agent's purchase, held to the daily
+    // limit its owner set, checked and counted in one step right before the charge, as a checkout
+    // does (commerce/agent-purchase-limit.ts; secaudit 2026-10 follow-up, A6).
+    const spend = { buyerGhii, currency, total: amount };
+    const agent = sub.auto_renew_by ? { sub: sub.auto_renew_by, roles: ['agent'] } : null;
 
     let trackingCode: string;
     try {
-        trackingCode = (await handler.chargeSaved({ config, storage }, { amount, currency, reference, saved: sub.payment!, seller })).trackingCode;
+        const refusal = await reserveAgentPurchase(storage, config, spend, agent);
+        if (refusal) throw refusal;
+        try {
+            trackingCode = (await handler.chargeSaved({ config, storage }, { amount, currency, reference, saved: sub.payment!, seller })).trackingCode;
+        } catch (err) {
+            await releaseAgentPurchase(storage, spend, agent);
+            throw err;
+        }
     } catch (err) {
-        const reason = err instanceof Error ? err.message : String(err);
+        const reason = err instanceof CommerceError ? `${err.code}: ${err.message}` : err instanceof Error ? err.message : String(err);
         const told = sub.last_failure && sub.last_failure.reason.startsWith(`[${sub.updates_until}]`);
         await putSubscription(storage, { ...sub, last_failure: { at: new Date().toISOString(), reason: `[${sub.updates_until}] ${reason}` }, updatedAt: new Date().toISOString() });
         if (!told) {
+            const overLimit = err instanceof CommerceError && err.code.startsWith('PURCHASE_LIMIT_');
+            const date = sub.updates_until!.slice(0, 10);
             await notify(storage, buyerGhii, {
                 type: 'package_renewal_failed',
                 title: `The automatic renewal of ${entry.title ?? sub.group_id} did not go through`,
-                body: `The card could not be charged (${reason}). The updates end on ${sub.updates_until!.slice(0, 10)} unless you renew by hand; this node tries again each day until then.`,
+                body: overLimit
+                    ? `The agent that turned automatic renewal on may not spend this today (${reason}). The card was not charged. The updates end on ${date} unless you renew by hand or raise the agent's limit; this node tries again each day until then.`
+                    : `The card could not be charged (${reason}). The updates end on ${date} unless you renew by hand; this node tries again each day until then.`,
                 link: '/v1/profile?tab=packages',
-                i18n: { key: 'package_renewal_failed', vars: { name: entry.title ?? sub.group_id, date: sub.updates_until!.slice(0, 10) } },
+                i18n: { key: overLimit ? 'package_renewal_agent_limit' : 'package_renewal_failed', vars: { name: entry.title ?? sub.group_id, date } },
             });
             emitChange('notifications', buyerGhii);
         }
@@ -107,8 +133,9 @@ async function renewOne(deps: Deps, sub: Subscription, reference: string): Promi
             input: {}, paid: { amount, currency },
         });
     } catch (err) {
-        // The money moved and the repository refused the period: give it back.
+        // The money moved and the repository refused the period: give it back, and the agent's count with it.
         await handler.refund({ config, storage }, { buyerGhii, amount, trackingCode, seller });
+        await releaseAgentPurchase(storage, spend, agent);
         throw err;
     }
     await bookSessionlessSale(storage, config, {

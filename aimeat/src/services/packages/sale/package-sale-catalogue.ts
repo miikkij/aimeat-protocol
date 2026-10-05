@@ -24,6 +24,9 @@
  *   · Subscription · subscriptionsOf() · subscriptionFor() · putSubscription() · setAutoRenew() ·
  *   allSubscriptions() · nodeHolder() · putNodeHolder() · SaleRequest · readRequests() · putRequest()
  * @version-history
+ *   v1.3.0 — 2026-10-06 — A subscription names the agent that turned automatic renewal on
+ *     (`auto_renew_by`), so each renewal is held to that agent's daily purchase limit (secaudit
+ *     2026-10 follow-up, A6). The owner turning it on in person removes the name.
  *   v1.2.0 — 2026-10-05 — nodeHolder and putNodeHolder: which buyer holds a node's grant, so a sale
  *     naming another buyer's node is refused (secaudit 2026-10, PKG-2).
  *   v1.1.0 — 2026-10-02 — A catalogue entry keeps the operator's review (`reviewed`, recordReview());
@@ -163,6 +166,9 @@ export interface Subscription {
     renewal: (Money & { period_days: number }) | null;
     updates_until: string | null;
     auto_renew: boolean;
+    /** The agent (GAII) that turned automatic renewal on. Each renewal is then that agent's purchase
+     *  and is held to its daily purchase limit (package-renewals.ts). Absent when the owner turned it on. */
+    auto_renew_by?: string;
     /** Stripe's reference ids for a saved card, never the card: the seller of record's own account. */
     payment?: { handler: string; customer?: string; payment_method?: string };
     last_order: string;
@@ -191,10 +197,12 @@ export async function putSubscription(storage: Storage, sub: Subscription): Prom
 
 /**
  * A buyer turns automatic renewal on or off. On needs a card kept at an earlier payment; off applies
- * from the next period, because the date already paid for stays.
+ * from the next period, because the date already paid for stays. `agent` is the agent's GAII when an
+ * agent of the buyer turns it on: every renewal is then held to that agent's daily purchase limit.
  */
 export async function setAutoRenew(
     storage: Storage, buyer: string, input: { repository?: unknown; group_id?: unknown; node_id?: unknown; auto_renew?: unknown },
+    agent: string | null = null,
 ): Promise<{ ok: true; auto_renew: boolean; updates_until: string | null } | Fail> {
     const str = (v: unknown): string => (typeof v === 'string' ? v : '');
     const sub = await subscriptionFor(storage, buyer, str(input.repository), str(input.group_id), str(input.node_id));
@@ -203,7 +211,9 @@ export async function setAutoRenew(
     if (input.auto_renew && !sub.payment?.payment_method) {
         return fail(409, 'NO_SAVED_PAYMENT', 'No card is kept for this subscription. Renew by hand once with automatic renewal turned on, and the card is kept then.');
     }
-    await putSubscription(storage, { ...sub, auto_renew: input.auto_renew, updatedAt: new Date().toISOString() });
+    const next: Subscription = { ...sub, auto_renew: input.auto_renew, updatedAt: new Date().toISOString() };
+    if (input.auto_renew && agent) next.auto_renew_by = agent; else delete next.auto_renew_by;
+    await putSubscription(storage, next);
     return { ok: true, auto_renew: input.auto_renew, updates_until: sub.updates_until };
 }
 

@@ -8672,6 +8672,8 @@
   "notiftext.package_renewal_due.body": "{label} toimii senkin jälkeen, mutta uusia versioita ei enää tule. Voit uusia päivityspalvelun siellä, mistä ostit sen.",
   "notiftext.package_renewal_failed.title": "Paketin {name} päivityspalvelua ei voitu uusia",
   "notiftext.package_renewal_failed.body": "Korttiasi ei voitu veloittaa. Päivityspalvelu päättyy {date}, ellet uusi sitä itse. Veloitusta yritetään uudelleen joka päivä siihen asti.",
+  "notiftext.package_renewal_agent_limit.title": "Paketin {name} päivityspalvelua ei voitu uusia",
+  "notiftext.package_renewal_agent_limit.body": "Agenttisi kytki automaattisen uusinnan päälle, ja tämä uusinta ylittäisi sen, mitä agentti saa käyttää päivässä, tai agentilla ei ole rajaa. Korttiasi ei veloitettu. Päivityspalvelu päättyy {date}, ellet uusi sitä itse tai nosta agentin rajaa. Uusintaa yritetään uudelleen joka päivä siihen asti.",
   "notiftext.package_renewed.title": "Paketin {name} päivityspalvelu uusittiin",
   "notiftext.package_renewed.body": "Korttiasi veloitettiin {amount}, ja uusia versioita tulee vielä {days} päivän ajan.",
   "notiftext.package_sale_request_approved.title": "Pyyntösi paketista {name} hyväksyttiin",
