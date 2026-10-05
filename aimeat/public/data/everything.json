@@ -1784,10 +1784,10 @@
      "slug": "g-10-screenshots-icons-and-promotion",
      "cells": [
       "<strong>Screenshots, icons and promotion</strong>",
-      "Update an app's screenshot and PNG install icon, edit its name and description, and mark it for promotion in the catalog.",
-      "<code>/v1/apps/:owner/:filename/screenshot</code>, <code>/v1/apps/:owner/:filename/icon</code>, <code>aimeat_app_manage</code> actions <code>screenshot</code>, <code>screenshot_upload</code>, <code>screenshot_clear</code> and <code>settings</code> (name, descriptions), App Catalog &gt; About and Promote"
+      "Update an app's screenshot and PNG install icon, edit its name and description, and mark it for promotion in the catalog. The node can photograph the app itself. A page the node opens this way reaches the node and public addresses, and no private address unless the operator lists that server.",
+      "<code>/v1/apps/:owner/:filename/screenshot</code>, <code>/v1/apps/:owner/:filename/icon</code>, <code>aimeat_app_manage</code> actions <code>screenshot</code>, <code>screenshot_upload</code>, <code>screenshot_clear</code> and <code>settings</code> (name, descriptions), <code>security.screenshot_egress</code> (<code>AIMEAT_SCREENSHOT_EGRESS</code>), App Catalog &gt; About and Promote"
      ],
-     "plain": "Screenshots, icons and promotion Update an app's screenshot and PNG install icon, edit its name and description, and mark it for promotion in the catalog. /v1/apps/:owner/:filename/screenshot, /v1/apps/:owner/:filename/icon, aimeat_app_manage actions screenshot, screenshot_upload, screenshot_clear and settings (name, descriptions), App Catalog > About and Promote"
+     "plain": "Screenshots, icons and promotion Update an app's screenshot and PNG install icon, edit its name and description, and mark it for promotion in the catalog. The node can photograph the app itself. A page the node opens this way reaches the node and public addresses, and no private address unless the operator lists that server. /v1/apps/:owner/:filename/screenshot, /v1/apps/:owner/:filename/icon, aimeat_app_manage actions screenshot, screenshot_upload, screenshot_clear and settings (name, descriptions), security.screenshot_egress (AIMEAT_SCREENSHOT_EGRESS), App Catalog > About and Promote"
     },
     {
      "slug": "g-10-backup-and-restore",

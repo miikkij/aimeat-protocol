@@ -18,6 +18,11 @@
  *   runScreenshotCapturePass() one batch scan; captureAppScreenshot() one app, with its own
  *   per-owner throttle; renderAndStore() the shared render both paths use.
  * @version-history
+ *   v1.7.0 — 2026-10-05 — The browser has no network of its own: it starts with a proxy that leads
+ *     nowhere and service workers blocked, and every context it hands out answers each request
+ *     through headless-network.ts (the node's own origin from loopback, public addresses through
+ *     safeFetch, private ones refused). A rendered app reached the node's private network before
+ *     (secaudit 2026-10, SSRF-1). withHeadlessContext takes the config for that guard.
  *   v1.6.0 — 2026-09-19 — browserLaunchEnv(): the browser starts without the node's own LD_PRELOAD,
  *     MALLOC_CONF and NODE_OPTIONS, which deploy/aimeat.service sets for node and the browser
  *     inherited. Under the unit every launch died ("browser.newContext: Target page, context or
@@ -50,6 +55,9 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { emitChange } from './event-bus.js';
+import {
+  HEADLESS_NO_NETWORK_ARGS, HEADLESS_CONTEXT_OPTIONS, guardHeadlessContext, serveDocumentOnce, type HeadlessRoutable,
+} from './headless-network.js';
 
 const VIEWPORT = { width: 1200, height: 750 };
 const PAGE_TIMEOUT = 20_000;
@@ -119,12 +127,13 @@ async function launchBrowser(): Promise<{ close(): Promise<void>; newContext(o: 
   for (const a of attempts) {
     let browser: { close(): Promise<void>; newContext(o: unknown): Promise<unknown> } | null = null;
     try {
+      // No network of its own: every request is answered by the context's guard (headless-network.ts).
       browser = await chromium.launch({
-        headless: true, channel: a.channel, args: a.args, env: browserLaunchEnv(process.env),
+        headless: true, channel: a.channel, args: [...HEADLESS_NO_NETWORK_ARGS, ...(a.args ?? [])], env: browserLaunchEnv(process.env),
       });
       // Prove the browser can actually open a page — a root chromium LAUNCHES fine under the
       // sandbox and then crashes every target, which a launch-only probe never sees.
-      const probe = await browser.newContext({}) as {
+      const probe = await browser.newContext({ ...HEADLESS_CONTEXT_OPTIONS }) as {
         newPage(): Promise<{ close(): Promise<void> }>; close(): Promise<void>;
       };
       const page = await probe.newPage();
@@ -149,11 +158,10 @@ async function launchBrowser(): Promise<{ close(): Promise<void>; newContext(o: 
 interface TargetApp { ownerName: string; ownerGaii: string; filename: string }
 
 /** The slice of the Playwright surface this file uses, kept local so playwright-core stays lazy. */
-interface RenderPage {
+interface RenderPage extends HeadlessRoutable {
   goto(u: string, o: unknown): Promise<unknown>;
   waitForTimeout(ms: number): Promise<void>;
   screenshot(o: unknown): Promise<Buffer>;
-  route(m: string, h: (r: { request(): { resourceType(): string }; fulfill(o: unknown): void; continue(): void }) => void): Promise<void>;
   close(): Promise<void>;
 }
 interface RenderCtx { newPage(): Promise<RenderPage> }
@@ -162,8 +170,8 @@ interface RenderCtx { newPage(): Promise<RenderPage> }
  * Render one app and store its thumbnail. The bytes come from storage and are served to the page by
  * intercepting the main document, rather than navigating to the public URL: that URL 301-redirects
  * to the app origin under H-2, which 404s on a node with no separate app host and would capture an
- * error page. Sub-resources still load against the node and the page URL stays the node URL, so
- * relative paths and API calls resolve.
+ * error page. Sub-resources load through the context's guard (headless-network.ts): the node's own
+ * from its loopback, public ones through safeFetch, private ones not at all.
  *
  * Throws on failure; each caller words its own answer.
  */
@@ -178,17 +186,7 @@ async function renderAndStore(
     // byte values instead of decoding — wrap in Buffer.
     const html = full?.data ? Buffer.from(full.data).toString('utf8') : null;
     const url = `${base}/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}?mode=inline`;
-    if (html) {
-      let fulfilled = false;
-      await page.route('**/*', (route) => {
-        if (!fulfilled && route.request().resourceType() === 'document') {
-          fulfilled = true;
-          route.fulfill({ status: 200, contentType: 'text/html', body: html });
-        } else {
-          route.continue();
-        }
-      });
-    }
+    if (html) await serveDocumentOnce(page, html, 'text/html');
     // 'load' rather than networkidle: polling and SSE apps never go idle. The settle wait after it is
     // what stops an app that fetches its data post-load from being captured blank.
     await page.goto(url, { waitUntil: 'load', timeout: PAGE_TIMEOUT });
@@ -224,21 +222,30 @@ export const NO_HEADLESS_BROWSER =
  * the Design Book's guarantee bench — one renderer on the node, not two.
  */
 export async function withHeadlessContext<T>(
+  config: AimeatConfig,
   viewport: { width: number; height: number },
   fn: (ctx: { newPage(): Promise<unknown> }) => Promise<T>,
 ): Promise<T | null> {
   const browser = await launchBrowser();
   if (!browser) return null;
   try {
-    const ctx = await browser.newContext({ viewport, deviceScaleFactor: 1 }) as { newPage(): Promise<unknown> };
-    return await fn(ctx);
+    return await fn(await guardedContext(browser, config, viewport));
   } finally {
     await browser.close();
   }
 }
 
+/** A context whose every request the guard answers (headless-network.ts). The one way a context is made here. */
+async function guardedContext<C>(
+  browser: { newContext(o: unknown): Promise<unknown> }, config: AimeatConfig, viewport: { width: number; height: number },
+): Promise<C> {
+  const ctx = await browser.newContext({ viewport, deviceScaleFactor: 1, ...HEADLESS_CONTEXT_OPTIONS }) as C & HeadlessRoutable;
+  await guardHeadlessContext(ctx, config);
+  return ctx;
+}
+
 /** Launch, hand over a context, and always close. */
-async function withBrowser<T>(fn: (ctx: RenderCtx) => Promise<T>): Promise<T | null> {
+async function withBrowser<T>(config: AimeatConfig, fn: (ctx: RenderCtx) => Promise<T>): Promise<T | null> {
   const browser = await launchBrowser();
   if (!browser) {
     disabled = true;
@@ -246,8 +253,7 @@ async function withBrowser<T>(fn: (ctx: RenderCtx) => Promise<T>): Promise<T | n
     return null;
   }
   try {
-    const ctx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 }) as RenderCtx;
-    return await fn(ctx);
+    return await fn(await guardedContext<RenderCtx>(browser, config, VIEWPORT));
   } finally {
     await browser.close();
   }
@@ -270,7 +276,7 @@ export async function runScreenshotCapturePass(config: AimeatConfig, storage: St
     }
     if (missing.length === 0) return 0;
 
-    await withBrowser(async (ctx) => {
+    await withBrowser(config, async (ctx) => {
       for (const app of missing) {
         try {
           await renderAndStore(ctx, config, storage, app);
@@ -340,7 +346,7 @@ export async function captureAppScreenshot(
   onDemandHistory.set(ownerGaii, recent);
 
   try {
-    const bytes = await withBrowser((ctx) => renderAndStore(ctx, config, storage,
+    const bytes = await withBrowser(config, (ctx) => renderAndStore(ctx, config, storage,
       { ownerName: app.ownerName, ownerGaii, filename: app.filename }));
     if (bytes === null) {
       return {

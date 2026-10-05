@@ -35,11 +35,16 @@
  *   const result = await runAppPlaytest(storage, config, 'alice', 'runner.html');
  *   if (result.ran && !result.summary.ok) { ... }
  * @version-history
+ *   v1.1.0 — 2026-10-05 — The app's requests go through the headless browser's guard
+ *     (headless-network.ts): the node's own loopback for its own origin, safeFetch for a public
+ *     address, nothing private. serveApp gave every other request to the browser's network
+ *     (secaudit 2026-10, SSRF-1); serveDocumentOnce replaces it.
  *   v1.0.0 — 2026-09-02 — Initial (the game playtest bench).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { withHeadlessContext, NO_HEADLESS_BROWSER } from './screenshot-capture.js';
+import { serveDocumentOnce, type HeadlessRoutable } from './headless-network.js';
 import { lintAppArtifact, type AppArtifactLintResult } from './app-artifact-lint.js';
 import { logger } from '../utils/logger.js';
 
@@ -101,10 +106,9 @@ export interface PlaytestTarget { ownerName: string; filename: string }
 
 interface PlaytestConsoleMessage { type(): string; text(): string }
 interface PlaytestResponse { url(): string; status(): number }
-interface PlaytestPage {
+interface PlaytestPage extends HeadlessRoutable {
   goto(u: string, o: unknown): Promise<unknown>;
   waitForTimeout(ms: number): Promise<void>;
-  route(m: string, h: (r: { request(): { resourceType(): string }; fulfill(o: unknown): void; continue(): void }) => void): Promise<void>;
   addInitScript(s: unknown): Promise<void>;
   emulateMedia(o: unknown): Promise<void>;
   setViewportSize(o: { width: number; height: number }): Promise<void>;
@@ -306,19 +310,6 @@ function listen(page: PlaytestPage, record: PassRecord, origin: string): void {
   }) as (arg: never) => void);
 }
 
-/** Serve the app's own bytes as the document, exactly as the screenshot capturer does. */
-async function serveApp(page: PlaytestPage, html: string): Promise<void> {
-  let fulfilled = false;
-  await page.route('**/*', (route) => {
-    if (!fulfilled && route.request().resourceType() === 'document') {
-      fulfilled = true;
-      route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: html });
-    } else {
-      route.continue();
-    }
-  });
-}
-
 function check(id: string, ok: boolean, severity: AppPlaytestCheck['severity'], detail: string, ms?: number): AppPlaytestCheck {
   return ms === undefined ? { id, ok, severity, detail } : { id, ok, severity, detail, ms };
 }
@@ -359,12 +350,12 @@ export async function runAppPlaytest(
   const main = newPassRecord();
   let pass: MainPassMeasurements | null;
   try {
-    pass = await withHeadlessContext(MOBILE, async (ctx) => {
+    pass = await withHeadlessContext(config, MOBILE, async (ctx) => {
       const page = await (ctx as { newPage(): Promise<PlaytestPage> }).newPage();
       try {
         listen(page, main, origin);
         await page.addInitScript({ content: AUDIO_PROBE_JS });
-        await serveApp(page, html as string);
+        await serveDocumentOnce(page, html as string);
         return await measureMainPass(page, url, settleMs);
       } finally {
         await page.close();
@@ -386,7 +377,7 @@ export async function runAppPlaytest(
   }
 
   const reduced = newPassRecord();
-  const reducedRan = await runReducedMotionPass(html, url, origin, reduced, settleMs);
+  const reducedRan = await runReducedMotionPass(config, html, url, origin, reduced, settleMs);
 
   const checks = [
     ...bootAndPaintChecks(pass),
@@ -465,15 +456,15 @@ async function measureMainPass(page: PlaytestPage, url: string, settleMs: number
  * that preference is the least likely to report it.
  */
 async function runReducedMotionPass(
-  html: string, url: string, origin: string, record: PassRecord, settleMs: number,
+  config: AimeatConfig, html: string, url: string, origin: string, record: PassRecord, settleMs: number,
 ): Promise<boolean> {
   try {
-    const done = await withHeadlessContext(MOBILE, async (ctx) => {
+    const done = await withHeadlessContext(config, MOBILE, async (ctx) => {
       const page = await (ctx as { newPage(): Promise<PlaytestPage> }).newPage();
       try {
         listen(page, record, origin);
         await page.emulateMedia({ reducedMotion: 'reduce' });
-        await serveApp(page, html);
+        await serveDocumentOnce(page, html);
         await page.goto(url, { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT_MS });
         await page.waitForTimeout(Math.min(settleMs, PAINT_SETTLE_MS));
         return true;

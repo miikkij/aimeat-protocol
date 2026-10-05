@@ -12,10 +12,15 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=app-playtest
  * @version-history
+ *   v1.1.0 — 2026-10-05 — The app reaches the node's own origin and no private address (secaudit
+ *     2026-10, SSRF-1), measured with a server on this machine's private network address.
  *   v1.0.0 — 2026-09-02 — Initial (the game playtest bench).
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { networkInterfaces } from 'node:os';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -179,6 +184,50 @@ const CHECK_IDS = ['boots', 'paints', 'clean-console', 'resizes', 'audio-gated',
         assert(paints.ok === false, `one flat colour is a black screen, got "${paints.detail}"`);
         assert(/one colour/i.test(paints.detail), `the sentence names what is wrong, got "${paints.detail}"`);
         assert(pt.summary.ok === false && pt.summary.failed >= 1, `the summary carries the failure, got ${JSON.stringify(pt.summary)}`);
+    });
+
+    // Secaudit 2026-10, SSRF-1: the app runs on the node's machine, so what it asks for the node
+    // asks for. A server on this machine's private network address stands in for an intranet
+    // service; the app asks it by fetch, by image and by frame, and it must hear nothing, while the
+    // node's own origin still answers.
+    await test('the app reaches the node\'s own origin and no private address (SSRF-1)', async () => {
+        if (!ran) { console.log('     (skipped: no browser on this machine)'); return; }
+        const ip = Object.values(networkInterfaces()).flat()
+            .find(x => x && x.family === 'IPv4' && !x.internal && /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(x.address))?.address;
+        if (!ip) { console.log('     (skipped: this machine has no private network address to stand in for an intranet)'); return; }
+        let hits = 0;
+        const intranet = createServer((_req, res) => { hits++; res.setHeader('Access-Control-Allow-Origin', '*'); res.end('internal'); });
+        await new Promise<void>(ok => intranet.listen(0, ip, () => ok()));
+        const at = `http://${ip}:${(intranet.address() as AddressInfo).port}`;
+        const file = `ptnet${Date.now()}.html`;
+        try {
+            const html = [
+                '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">',
+                `<meta name="aimeat-app" content="${file}"><title>Net probe</title></head><body>`,
+                `<iframe src="${at}/frame" title="probe"></iframe><canvas id="c" width="64" height="64"></canvas><script>`,
+                'var g=document.getElementById("c").getContext("2d");g.fillStyle="#123456";g.fillRect(0,0,64,64);g.fillStyle="#fedcba";g.fillRect(8,8,24,24);',
+                'fetch("/v1/build").then(function(r){console.error("own-origin "+r.status)}).catch(function(){console.error("own-origin failed")});',
+                `fetch("${at}/fetch").then(function(r){console.error("private reached "+r.status)}).catch(function(){console.error("private refused")});`,
+                `var i=new Image();i.src="${at}/img";`,
+                // Chrome's own local-network check stops the fetch, the image and the frame, but not a
+                // top-level navigation, and a screenshot then pictures the internal page.
+                `setTimeout(function(){location.href="${at}/nav"},1500);`,
+                '</' + 'script></body></html>',
+            ].join('\n');
+            const pub = await json('/v1/apps', { method: 'POST', headers: auth(a.token),
+                body: JSON.stringify({ filename: file, mime_type: 'text/html', content: b64(html), name: 'Net probe', description: 'Asks a private address.' }) });
+            assert(pub.status === 201, `publish ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
+            const r = await json(`/v1/apps/me/${file}/audit?playtest=true`, { headers: auth(a.token) });
+            const pt = r.body.data?.live?.playtest;
+            assert(pt?.ran === true, `the run happened, got ${JSON.stringify(pt?.reason)}`);
+            const errors: string[] = pt.console.errors;
+            assert(hits === 0, `the private server was reached ${hits} time(s); console: ${JSON.stringify(errors)}`);
+            assert(errors.includes('private refused'), `the app's fetch of a private address failed as a network error: ${JSON.stringify(errors)}`);
+            assert(errors.includes('own-origin 200'), `the node's own origin still answers: ${JSON.stringify(errors)}`);
+        } finally {
+            intranet.close();
+            await json(`/v1/apps/${file}`, { method: 'DELETE', headers: auth(a.token) });
+        }
     });
 
     await test('a stranger cannot play another owner\'s app through this door, and nor can anyone anonymous', async () => {

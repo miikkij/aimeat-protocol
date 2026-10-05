@@ -10369,6 +10369,7 @@
     "cfg_ai_providers": "Server's AI providers",
     "cfg_ai_builtin_providers": "Local AI servers",
     "cfg_ai_provider_egress": "Addresses of the server's own local AI servers",
+    "cfg_security_screenshot_egress": "Private servers a page the server opens may reach",
     "cfg_ai_provider_types": "Allowed AI provider types",
     "cfg_ai_fixed_baseurl_overrides": "Test addresses for fixed AI providers",
     "cfg_ai_legacy_settings_routes": "Old AI settings routes",
@@ -10682,6 +10683,7 @@
     "cfgDesc_ai_providers": "More AI providers of this server, as a JSON array of provider records (id, title, type, baseUrl, auth, capabilities). Auth is none or the NAME of an environment variable, never a key.",
     "cfgDesc_ai_builtin_providers": "Local AI servers to switch on, comma separated: lmstudio, ollama, llamacpp, at their usual ports on this machine.",
     "cfgDesc_ai_provider_egress": "Exact addresses (scheme, host, port) of this server's own local AI servers, comma separated. Only this server's own providers may reach them; a person's own provider never does.",
+    "cfgDesc_security_screenshot_egress": "Exact addresses (scheme, host, port) of your own private servers, comma separated. A page the server opens in its own browser (a screenshot, a playtest, a Design Book bench) may reach them. Empty: such a page reaches public addresses and this server only.",
     "cfgDesc_ai_provider_types": "Which fixed AI provider types this server allows, comma separated: openrouter, openai, anthropic, mistral, xai. Empty allows all five at their official addresses.",
     "cfgDesc_ai_fixed_baseurl_overrides": "For tests only: points a fixed AI provider type at another address, as JSON. A public server refuses it.",
     "cfgDesc_ai_legacy_settings_routes": "The AI settings routes from before providers still answer. They are deprecated and removed in version 4.0.0. Off, they answer that they are gone and name the new routes.",
@@ -23887,6 +23889,17 @@
           "ex2": "0: no calls after an allowance is used up, the same as refuse.",
           "ex3": "100: room for many people who each use their daily cap per account.",
           "tip": "Set this to the most you are ready to pay in one day."
+        }
+      },
+      "security": {
+        "screenshot_egress": {
+          "title": "Private servers a page the server opens may reach",
+          "short": "Which of your own private servers a page may load from when the server opens it in its own browser.",
+          "what": "The server opens pages in a browser of its own: it takes a screenshot of a published app, playtests a game, and benches a Design Book part. The code on such a page was written by somebody, and it runs on the server's machine. So the server answers every address the page asks for. The page gets this server's own pages and any public address. It gets nothing from a private address (a home or office network, this machine's other services, the cloud's metadata address), unless that address is in this list.",
+          "range": "Exact addresses, comma separated: scheme, host and port, with no path. The default is empty.",
+          "ex1": "Empty (the default): a screenshot of an app that reads your intranet shows the app without that data.",
+          "ex2": "http://intranet.local:8080: a page the server opens may load from that one server, and from no other private address.",
+          "tip": "List only servers whose content may appear in a public screenshot. A screenshot of a published app is public."
         }
       },
       "federation_sync": {
