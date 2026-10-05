@@ -483,14 +483,6 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // Replacing a list is not destructive (the previous one was a setting, not data), and setting
     // the same list twice leaves the same list.
     aimeat_admin_cors_set: { title: 'Admin: Set Allowed Origins', readOnlyHint: false, destructiveHint: false, idempotentHint: true },
-    aimeat_theme_list: { title: 'Themes: list, with the operator\'s choices', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_theme_get: { title: 'Themes: one, whole', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_theme_save: { title: 'Themes: make, change, copy, retire or put back a version', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_theme_style_save: { title: 'Themes: make or change a style', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_theme_component_css_set: { title: 'Themes: CSS for one component', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_theme_policy_set: { title: 'Themes: who chooses, which are available, the default', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    // remove: true deletes a face and its files, so the tool as a whole is destructive.
-    aimeat_theme_font_save: { title: 'Themes: add, change or remove a face (font)', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     // destructiveHint: mints morsels (irreversible ledger change, financial action)
     aimeat_admin_mint: { title: 'Admin: Mint Morsels', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
 

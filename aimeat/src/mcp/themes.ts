@@ -17,6 +17,7 @@
  * @structure registerThemeTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage registerThemeTools(mcp, storage, config, agentGaii, scopes);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v2.3.0 — 2026-10-03 — aimeat_theme_font_save (add, change or remove a face the operator adds);
  *     aimeat_theme_list carries `fonts`, the owners' fonts in storage for the operator's agent only.
  *   v2.2.0 — 2026-09-24 — SECURITY (audit A8-1): the operator test at call time is asked of the
@@ -28,16 +29,15 @@
  *   v1.0.0 — 2026-09-24 — Initial (UI consolidation phase 4).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { ThemeService, ThemeError, type ThemeInput } from '../services/themes/service.js';
 import type { StyleInput } from '../services/themes/styles.js';
 import { FontError } from '../services/themes/fonts.js';
-import { FONT_KINDS } from '../services/themes/font-registry.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 const out = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
 
@@ -47,7 +47,6 @@ function refusal(err: unknown) {
     throw err;
 }
 
-const tokenMap = z.record(z.string(), z.string());
 const NOT_OPERATOR = 'Only the person who runs this installation can make or change its themes.';
 
 export function registerThemeTools(
@@ -65,7 +64,7 @@ export function registerThemeTools(
     mcp.tool(
         'aimeat_theme_list',
         descriptionFor('aimeat_theme_list'),
-        {},
+        zodShapeFor('aimeat_theme_list'),
         annotationsFor('aimeat_theme_list'),
         async () => {
             // `fonts` carries the owners' fonts in storage only for the operator's own agent.
@@ -76,20 +75,7 @@ export function registerThemeTools(
     mcp.tool(
         'aimeat_theme_font_save',
         descriptionFor('aimeat_theme_font_save'),
-        {
-            family: z.string().min(1).max(60).describe("The face's name as a style chooses it, for example 'Space Mono'."),
-            kind: z.enum(FONT_KINDS).optional().describe("What it falls back to while it loads: 'sans-serif' (default), 'serif', 'monospace' or 'cursive'."),
-            files: z.array(z.object({
-                weight: z.string().max(9).describe("'400', or '100 900' for a variable face."),
-                style: z.string().max(6).optional().describe("'normal' (default) or 'italic'."),
-                subset: z.string().max(30).optional().describe("A name for one part of a face shipped in parts, such as 'latin' or 'latin-ext'."),
-                unicodeRange: z.string().max(4000).optional().describe("That part's unicode-range as CSS writes it, for example 'U+0000-00FF, U+0131'."),
-            })).optional().describe('The woff2 files the face has; you get one upload_url for each. Leave it out on a change to keep the files.'),
-            licence: z.string().max(200).optional().describe("The licence, for example 'OFL-1.1'. Without it the face is marked licence unknown."),
-            copyright: z.string().max(500).optional().describe('Who holds the copyright, as the font says. Without it the face is marked licence unknown.'),
-            source: z.string().max(500).optional().describe('Where the face came from, an https:// address.'),
-            remove: z.boolean().optional().describe('true removes the face and its files; refused while a style uses it.'),
-        },
+        zodShapeFor('aimeat_theme_font_save'),
         annotationsFor('aimeat_theme_font_save'),
         async (args) => {
             const gaii = await operatorGaii();
@@ -113,7 +99,7 @@ export function registerThemeTools(
     mcp.tool(
         'aimeat_theme_get',
         descriptionFor('aimeat_theme_get'),
-        { id: z.string().min(1).max(40).describe("The theme's id, from aimeat_theme_list (for example 'aimeat').") },
+        zodShapeFor('aimeat_theme_get'),
         annotationsFor('aimeat_theme_get'),
         async ({ id }) => {
             try {
@@ -127,18 +113,7 @@ export function registerThemeTools(
     mcp.tool(
         'aimeat_theme_save',
         descriptionFor('aimeat_theme_save'),
-        {
-            id: z.string().max(40).optional().describe('The theme to change. Leave it out to make a new one.'),
-            name: z.string().max(60).optional().describe('What people see in the pill. 1 to 60 characters, and no other theme may have it (retired ones included).'),
-            basedOn: z.string().max(40).optional().describe("For a new theme: the theme it copies (default 'aimeat')."),
-            css: z.string().max(64000).optional().describe('Theme CSS for the whole theme; empty removes it.'),
-            shapes: z.record(z.string(), z.string().max(200)).optional().describe("The theme's shape values (corners, frames, shadows, letter case), only the ones you change; an empty value puts the built-in one back. aimeat_theme_list names them."),
-            defaultStyle: z.string().max(40).optional().describe('The style a person sees first in this theme.'),
-            offeredStyles: z.array(z.string().max(40)).max(40).optional().describe('The style ids of this theme the pill offers.'),
-            retired: z.boolean().optional().describe('true takes the theme out of the pill; false brings it back.'),
-            restoreVersion: z.number().int().min(1).optional().describe('Put back this saved version (from aimeat_theme_get).'),
-            dryRun: z.boolean().optional().describe('Check everything and save nothing.'),
-        },
+        zodShapeFor('aimeat_theme_save'),
         annotationsFor('aimeat_theme_save'),
         async (args) => {
             const gaii = await operatorGaii();
@@ -163,19 +138,7 @@ export function registerThemeTools(
     mcp.tool(
         'aimeat_theme_style_save',
         descriptionFor('aimeat_theme_style_save'),
-        {
-            theme: z.string().min(1).max(40).describe('The theme the style belongs to.'),
-            style: z.string().max(40).optional().describe('The style to change. Leave it out to make a new one.'),
-            name: z.string().max(60).optional().describe('What people see in the pill. 1 to 60 characters.'),
-            basedOn: z.string().max(40).optional().describe('For a new style: the style of this theme it copies.'),
-            light: tokenMap.optional().describe('Token → colour for light mode, only the ones you change.'),
-            dark: tokenMap.optional().describe('Token → colour for dark mode, only the ones you change.'),
-            faces: z.object({ headline: z.string().optional(), body: z.string().optional(), mono: z.string().optional() }).optional()
-                .describe('{ headline, body, mono }, each a face this server serves.'),
-            onlyMode: z.string().optional().describe("'light' or 'dark' for a style with one mode; empty for both."),
-            retired: z.boolean().optional().describe('true takes the style out of the pill; false brings it back.'),
-            dryRun: z.boolean().optional().describe('Check everything and save nothing.'),
-        },
+        zodShapeFor('aimeat_theme_style_save'),
         annotationsFor('aimeat_theme_style_save'),
         async (args) => {
             const gaii = await operatorGaii();
@@ -199,11 +162,7 @@ export function registerThemeTools(
     mcp.tool(
         'aimeat_theme_policy_set',
         descriptionFor('aimeat_theme_policy_set'),
-        {
-            personalChoice: z.boolean().optional().describe('People choose in the look picker (true), or everybody sees the default (false).'),
-            offered: z.array(z.string().max(40)).min(1).max(40).optional().describe("The theme ids people can choose, for example ['aimeat', 'pebble']."),
-            default: z.string().max(40).optional().describe('The default theme: one of the offered.'),
-        },
+        zodShapeFor('aimeat_theme_policy_set'),
         annotationsFor('aimeat_theme_policy_set'),
         async (args) => {
             if (!await operatorGaii()) return toolError('ACCESS_DENIED', NOT_OPERATOR);
@@ -217,12 +176,7 @@ export function registerThemeTools(
     mcp.tool(
         'aimeat_theme_component_css_set',
         descriptionFor('aimeat_theme_component_css_set'),
-        {
-            theme: z.string().min(1).max(40).describe('The theme the CSS belongs to.'),
-            component: z.string().min(1).max(60).describe("The component's id, from aimeat_ui_component_list (for example 'slab')."),
-            css: z.string().max(64000).optional().describe('The CSS; empty removes it.'),
-            dryRun: z.boolean().optional().describe('Check and save nothing.'),
-        },
+        zodShapeFor('aimeat_theme_component_css_set'),
         annotationsFor('aimeat_theme_component_css_set'),
         async (args) => {
             const gaii = await operatorGaii();
