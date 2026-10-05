@@ -503,53 +503,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     aimeat_contact_remove: 'messages:send',
     aimeat_contact_invite: 'messages:send',
 
-    // Commerce (TARGET-033/034 over MCP). NOTE: the REST commerce routes are requireAuth-only
-    // today — these MCP tools are gated STRICTER than REST on purpose (selling config touches
-    // PSP secrets; buying spends the owner's balance). commerce:sell = seller-side config (PSP,
-    // app-tool manifests, offer pricing); commerce:buy = spending through checkout sessions.
-    // Owner-attached '*' agents get both; granular agents opt in per scope.
-    // The seller's payment credentials: an agent that can rewrite these can repoint the payouts.
-    // PUT/DELETE /v1/commerce/payout/stripe are owner-only.
-    aimeat_commerce_psp_set: 'commerce:psp',
-    aimeat_commerce_psp_status: 'commerce:sell',
-    aimeat_commerce_psp_delete: 'commerce:psp',
-    aimeat_app_tools_publish: 'commerce:sell',
-    aimeat_offer_price_set: 'commerce:sell',
-    // aimeat_app_tools_get is intentionally ungated — it reads PUBLIC manifests (own always).
-    // Beneficiary splitting. Declaring who shares your revenue, and paying one of them, both move
-    // value out of the owner's own pocket, so they sit with the rest of the seller-side config.
-    // READING what you are owed is a wallet question, not a selling one: a beneficiary is usually
-    // not a seller at all, and gating their own receivables behind commerce:sell would mean an
-    // account could be owed money it had no way to see.
-    // The word REST asks for on the same four operations (routes/commerce-beneficiaries.ts:187,
-    // :250, :314, :444). They used to ask for commerce:sell here — not stricter or looser, simply a
-    // different gate, so an owner who withheld exchange:beneficiary still had an agent that could
-    // give their revenue away, and an agent granted exchange:beneficiary could not see the tools.
-    // services/scope-vocabulary-migration.ts hands the word to agents already holding commerce:sell,
-    // so nothing loses a tool it had and nothing gains one it did not.
-    aimeat_commerce_beneficiary_split_set: 'exchange:beneficiary',
-    aimeat_commerce_beneficiary_splits: 'exchange:beneficiary',
-    aimeat_commerce_beneficiary_release: 'exchange:beneficiary',
-    // Paying moves value out of the owner's own wallet, so it sits with the seller-side config
-    // rather than with the reads.
-    // POST /v1/commerce/beneficiary/payout asks for exchange:beneficiary (:444); the quote GET asks
-    // for wallet:read (:411). One tool covers both, so it takes the write word — a caller who may
-    // only read a quote can use the earnings tool, which is already gated on wallet:read.
-    aimeat_commerce_beneficiary_payout: 'exchange:beneficiary',
-    aimeat_commerce_beneficiary_earnings: 'wallet:read',
-    // The approval gate is operator-only at the handler; the scope keeps a narrow agent from even
-    // seeing the tool, so it is not offered to somebody who could never use it.
-    // This one tool covers BOTH halves: reading an approval state and recording one. REST splits
-    // them (GET wants wallet:read, POST wants the operator role), so the registration gate stays on
-    // the read word and the write word is checked inside the handler on the write branch only.
-    // Gating the whole tool on the write word would have made an account unable to see whether it
-    // may be paid, which is not the thing anyone meant to restrict.
-    aimeat_commerce_beneficiary_approve: 'wallet:read',
-
-    aimeat_checkout_open: 'commerce:buy',
-    aimeat_checkout_complete: 'commerce:buy',
-    aimeat_checkout_list: 'commerce:buy',
-
     // EXCHANGE marketplace (TARGET-045 over MCP). Like commerce, the REST /v1/exchange routes are
     // requireAuth-only today — these MCP tools are gated STRICTER on purpose: accepting/bidding mints
     // durable metered entitlements that authorise (charged) spend on the owner's balance. exchange:read

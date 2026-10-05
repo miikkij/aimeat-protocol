@@ -348,7 +348,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_onboarding_confirm_directives_read', 'aimeat_onboarding_declare_services',
         'aimeat_handbook_get',
         // Commerce, buyer side: the owner's personal agent buys priced offers/app-tools.
-        'aimeat_app_tools_get', 'aimeat_checkout_open', 'aimeat_checkout_complete', 'aimeat_checkout_list',
+        
         // EXCHANGE marketplace: browse/accept/post/bid the two-sided data-service market.
         'aimeat_exchange_offerings', 'aimeat_exchange_offering_get', 'aimeat_exchange_accept',
         'aimeat_exchange_contracts', 'aimeat_exchange_contract_off', 'aimeat_exchange_needs',
@@ -386,14 +386,14 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_handbook_get',
         // Commerce, both sides: a marketplace/provider agent sells (PSP credentials, app-tool
         // manifests, offer pricing) and buys (checkout) on the same commerce core.
-        'aimeat_commerce_psp_set', 'aimeat_commerce_psp_status', 'aimeat_commerce_psp_delete',
-        'aimeat_app_tools_publish', 'aimeat_app_tools_get', 'aimeat_offer_price_set',
-        'aimeat_checkout_open', 'aimeat_checkout_complete', 'aimeat_checkout_list',
+        
+        
+        
         // Beneficiary splits: a seller declares who else earns from a sale, releases what accrued
         // and pays it out; the beneficiary reads its own earnings. Selling-side, same as the rest.
-        'aimeat_commerce_beneficiary_split_set', 'aimeat_commerce_beneficiary_splits',
-        'aimeat_commerce_beneficiary_release', 'aimeat_commerce_beneficiary_payout',
-        'aimeat_commerce_beneficiary_earnings', 'aimeat_commerce_beneficiary_approve',
+        
+        
+        
         // EXCHANGE marketplace, both sides: a provider lists/bids/sees lineage; a consumer accepts contracts.
         'aimeat_exchange_offerings', 'aimeat_exchange_offering_get', 'aimeat_exchange_accept',
         'aimeat_exchange_contracts', 'aimeat_exchange_contract_off', 'aimeat_exchange_needs',
@@ -467,14 +467,14 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
     // payment for it and read what came in — credentials for the seller's own rails, priced tool
     // manifests, checkout, wallet, and the memory/storage the listing itself lives in.
     commerce: [
-        'aimeat_commerce_psp_set', 'aimeat_commerce_psp_status', 'aimeat_commerce_psp_delete',
-        'aimeat_app_tools_publish', 'aimeat_app_tools_get', 'aimeat_offer_price_set',
-        'aimeat_checkout_open', 'aimeat_checkout_complete', 'aimeat_checkout_list',
+        
+        
+        
         // Beneficiary splits: a seller declares who else earns from a sale, releases what accrued
         // and pays it out; the beneficiary reads its own earnings. Selling-side, same as the rest.
-        'aimeat_commerce_beneficiary_split_set', 'aimeat_commerce_beneficiary_splits',
-        'aimeat_commerce_beneficiary_release', 'aimeat_commerce_beneficiary_payout',
-        'aimeat_commerce_beneficiary_earnings', 'aimeat_commerce_beneficiary_approve',
+        
+        
+        
         'aimeat_memory_read', 'aimeat_memory_write', 'aimeat_memory_list', 'aimeat_memory_search', 'aimeat_memory_read_public',
         'aimeat_storage_upload', 'aimeat_storage_download', 'aimeat_storage_delete',
         'aimeat_datapackage_publish', 'aimeat_datapackage_export',
