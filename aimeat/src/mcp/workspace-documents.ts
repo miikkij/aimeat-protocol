@@ -11,9 +11,9 @@
  * @structure registerWorkspaceDocumentTools(mcp, deps)
  * @usage registerWorkspaceDocumentTools(mcp, { storage, config, agentGaii, ownerName });
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-09-02 — Initial (wish-workspace-append-ja-osiomuokkaus).
  */
-import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -23,6 +23,7 @@ import {
     appendToDocument, replaceDocumentSection, WorkspaceDocError,
     type DocEditCaller, type DocEditResult,
 } from '../services/workspace-doc-edit.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
@@ -60,11 +61,7 @@ export function registerWorkspaceDocumentTools(mcp: McpServer, deps: WorkspaceDo
     };
 
     mcp.tool('aimeat_workspace_doc_append', descriptionFor('aimeat_workspace_doc_append'),
-        {
-            organism_id: z.string(), ws: z.string(), space: z.string(), id: z.string(),
-            markdown: z.string(),
-            section: z.string().optional(),
-        },
+        zodShapeFor('aimeat_workspace_doc_append'),
         annotationsFor('aimeat_workspace_doc_append'),
         async ({ organism_id, ws, space, id, markdown, section }): Promise<TextResult> => {
             try {
@@ -77,10 +74,7 @@ export function registerWorkspaceDocumentTools(mcp: McpServer, deps: WorkspaceDo
         });
 
     mcp.tool('aimeat_workspace_doc_section_replace', descriptionFor('aimeat_workspace_doc_section_replace'),
-        {
-            organism_id: z.string(), ws: z.string(), space: z.string(), id: z.string(),
-            section: z.string(), markdown: z.string(),
-        },
+        zodShapeFor('aimeat_workspace_doc_section_replace'),
         annotationsFor('aimeat_workspace_doc_section_replace'),
         async ({ organism_id, ws, space, id, section, markdown }): Promise<TextResult> => {
             try {

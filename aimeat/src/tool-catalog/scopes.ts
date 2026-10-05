@@ -212,22 +212,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     aimeat_app_fork:                          'app:write',
     aimeat_app_publish:                       'app:write',
 
-  // Workspace ROW spaces. `organism:write` rather than `memory:write`, because these rows are NOT
-    // memory records: they live in their own table, are charged to the organism rather than to the
-    // member, and are governed by workspace membership. The word also matches what the REST routes
-    // enforce for the same capability — a tool gated on one word while its route enforces another is
-    // the drift invariant 15 exists for.
-    aimeat_workspace_rows_append:             'organism:write',
-    // Removes rows for good: memory:purge since 2026-10-02, held on the task-start floor. The
-    // handler also asks organism:write, as the REST DELETE routes do (mcp/workspace-rows.ts).
-    aimeat_workspace_rows_delete:             'memory:purge',
-
-    // The in-place document edits write the SAME record aimeat_workspace_write writes — a workspace
-    // draft — so they answer to the same word, and their REST routes enforce that word and not the
-    // organism:write their neighbours on that router use.
-    aimeat_workspace_doc_append:              'memory:write',
-    aimeat_workspace_doc_section_replace:     'memory:write',
-
     // A member's change to a workspace and the decision on a member's suggestion: the word their
     // REST doors ask (POST …/workspace/spaces, PUT …/workspace/sections/:space, POST …/suggestions/:sid).
     aimeat_workspace_space_add:               'organism:write',

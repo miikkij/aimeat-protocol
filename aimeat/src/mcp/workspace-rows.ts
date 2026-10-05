@@ -13,12 +13,12 @@
  * @structure registerWorkspaceRowTools(mcp, deps)
  * @usage registerWorkspaceRowTools(mcp, { storage, config, agentGaii, writerGaii, ownerName, scopes });
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-08-26 — Initial: extracted from mcp/workspaces.ts.
  *   v1.1.0 — 2026-09-29 — aimeat_workspace_rows_read passes the agent's classification reader (TARGET-082).
  *   v1.2.0 — 2026-10-02 — aimeat_workspace_rows_delete needs memory:purge (its catalog gate) and
  *     organism:write, the two words the REST DELETE routes ask (Jouni, 2026-10-02).
  */
-import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -30,6 +30,7 @@ import {
     appendRows, readRows, spaceStats, deleteRow, deleteRowsBefore,
     WorkspaceRowError, type RowCaller,
 } from '../services/workspace-rows/row-service.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
@@ -65,13 +66,7 @@ export function registerWorkspaceRowTools(mcp: McpServer, deps: WorkspaceRowTool
     };
 
     mcp.tool('aimeat_workspace_rows_append', descriptionFor('aimeat_workspace_rows_append'),
-        {
-            organism_id: z.string(), ws: z.string(), space: z.string(),
-            body: z.record(z.string(), z.unknown()).optional(),
-            row_id: z.string().optional(),
-            occurred_at: z.string().optional(),
-            rows: z.array(z.record(z.string(), z.unknown())).optional(),
-        },
+        zodShapeFor('aimeat_workspace_rows_append'),
         annotationsFor('aimeat_workspace_rows_append'),
         async ({ organism_id, ws, space, body, row_id, occurred_at, rows }): Promise<TextResult> => {
             try {
@@ -86,14 +81,7 @@ export function registerWorkspaceRowTools(mcp: McpServer, deps: WorkspaceRowTool
         });
 
     mcp.tool('aimeat_workspace_rows_read', descriptionFor('aimeat_workspace_rows_read'),
-        {
-            organism_id: z.string(), ws: z.string(), space: z.string(),
-            where: z.record(z.string(), z.unknown()).optional(),
-            since: z.string().optional(), until: z.string().optional(),
-            changed_since: z.string().optional(),
-            limit: z.number().optional(), cursor: z.string().optional(),
-            order: z.enum(['asc', 'desc']).optional(),
-        },
+        zodShapeFor('aimeat_workspace_rows_read'),
         annotationsFor('aimeat_workspace_rows_read'),
         async ({ organism_id, ws, space, where, since, until, changed_since, limit, cursor, order }): Promise<TextResult> => {
             try {
@@ -111,7 +99,7 @@ export function registerWorkspaceRowTools(mcp: McpServer, deps: WorkspaceRowTool
         });
 
     mcp.tool('aimeat_workspace_rows_stats', descriptionFor('aimeat_workspace_rows_stats'),
-        { organism_id: z.string(), ws: z.string(), space: z.string() },
+        zodShapeFor('aimeat_workspace_rows_stats'),
         annotationsFor('aimeat_workspace_rows_stats'),
         async ({ organism_id, ws, space }): Promise<TextResult> => {
             try {
@@ -120,10 +108,7 @@ export function registerWorkspaceRowTools(mcp: McpServer, deps: WorkspaceRowTool
         });
 
     mcp.tool('aimeat_workspace_rows_delete', descriptionFor('aimeat_workspace_rows_delete'),
-        {
-            organism_id: z.string(), ws: z.string(), space: z.string(),
-            row_id: z.string().optional(), before: z.string().optional(),
-        },
+        zodShapeFor('aimeat_workspace_rows_delete'),
         annotationsFor('aimeat_workspace_rows_delete'),
         async ({ organism_id, ws, space, row_id, before }): Promise<TextResult> => {
             // Exactly one, and neither defaults. A delete that quietly meant "everything" because a
