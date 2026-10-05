@@ -21,6 +21,9 @@
  *   listRequests/putRequest/removeRequest · AppMemberRecord/AppMemberRequest · writePrivateRecord
  * @usage const roster = await listMembers(storage, 'alice/app.html');
  * @version-history
+ *   v1.6.0 — 2026-10-05 — normalizeAccess lives here, beside the plan it reads (it was in
+ *     app-member-rules.ts for one commit, which made an import cycle through app-audit.ts), and
+ *     forgetVisit says whether there was a visit to forget (secaudit 2026-10, APP-1 and APP-5).
  *   v1.5.0 — 2026-10-01 — The carry plan holds `manageRoles`: members holding one of these roles
  *     manage the roster (services/app-member-rules.ts). A declined ask records when it was declined
  *     (`decidedAt`), which the 7-day wait before asking again counts from; asking again after a
@@ -46,7 +49,15 @@
 import { appKeySegment, equalAppId, readAppRecord, listAppRecords } from './app-record-keys.js';
 import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
-import { normalizeAccess } from './app-member-rules.js';
+
+/**
+ * A plan's `access` as it is stored: `members-only`, `free`, or `members-free` for anything else.
+ * `open` is what the first cut called `members-free`, and stored records still carry it. The plan
+ * route compares with this reading too (secaudit 2026-10, APP-1).
+ */
+export function normalizeAccess(raw: string | undefined): 'members-only' | 'free' | 'members-free' {
+  return raw === 'members-only' ? 'members-only' : raw === 'free' ? 'free' : 'members-free';
+}
 
 /** Platform-owned namespaces. Never an `ext:` one: that is the namespace the world can read. */
 export const NS_MEMBER = 'app-member';
