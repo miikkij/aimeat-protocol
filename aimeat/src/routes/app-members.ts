@@ -86,7 +86,7 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { listAppRecords } from '../services/app-record-keys.js';
 import {
   getMember, getMemberRow, removeMember, getRequest, putRequest, accountOf,
-  putCarryPlan, type AppCarryPlan, noteVisit, forgetVisit, isLive,
+  putCarryPlan, type AppCarryPlan, noteVisit, forgetVisit, isLive, normalizeAccess,
 } from '../services/app-members.js';
 import {
   APP_DEV_LEVEL_LIST, actsFor, levelName, parseDevLevel,
@@ -101,7 +101,7 @@ import { logger } from '../utils/logger.js';
 import { membersContext, type MembersCtx } from './app-members-context.js';
 import { appMembersExtraRouter } from './app-members-extra.js';
 import { approveMember, memberAddress, appDeepLink, appStem } from '../services/app-member-approve.js';
-import { ROLE_RE, RESERVED_ROLES, roleShapeError, isManagerRole, reaskRetryAt, suggestRole, parseRosterPaging, normalizeAccess, sameSet } from '../services/app-member-rules.js';
+import { ROLE_RE, RESERVED_ROLES, roleShapeError, isManagerRole, reaskRetryAt, suggestRole, parseRosterPaging, sameSet } from '../services/app-member-rules.js';
 import { rosterView, memberRosterView, displayNamesOf, sampleRoles } from '../services/app-member-roster.js';
 import { sendMemberNotice, memberActionLabel, noticeLang } from '../services/app-member-notices.js';
 import { listInvites, sendAppInvite, inviteView, MAX_OPEN_INVITES_PER_APP, INVITE_DAYS } from '../services/app-member-invites.js';
