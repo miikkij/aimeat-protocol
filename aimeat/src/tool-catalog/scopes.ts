@@ -385,17 +385,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     // The operator tools: organism break-glass and operator:admin (scopes-operator.ts).
     ...OPERATOR_TOOL_SCOPES,
 
-    // The node-wide compliance report and the register behind it. The handler resolves the caller's
-    // OWNER and refuses a non-operator, so the word alone gets nobody in; it is here as well because
-    // a tool is REGISTERED according to this table, and neither word is carried by any wildcard
-    // (SCOPES_OUTSIDE_WILDCARD). Read and write are separate words because they fail differently:
-    // reading discloses every account's AI activity, writing changes what the report says.
-    aimeat_compliance_register_read:          'compliance:read',
-    aimeat_compliance_register_write:         'compliance:write',
-    // The write word, because its save action adds a node-wide document to what the installation
-    // keeps. The handler asks for the read word instead when the action only looks at the shelf.
-    aimeat_compliance_snapshot:               'compliance:write',
-
     // Writes something other people see under the owner's name.
     aimeat_flag_report:                       'social:write',
     aimeat_organism_join:                     'social:write',

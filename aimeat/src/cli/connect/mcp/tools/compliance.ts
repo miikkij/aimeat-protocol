@@ -16,15 +16,16 @@
  * @structure registerComplianceTools(mcp, registry)
  * @usage registered from cli/connect/mcp/tools/index.ts
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-08-23 — BR-02, ring 1 (node-wide).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { agentNameSchema, payloadResult, pickAgent } from './_registry.js';
 import type { ApiResponse } from '../../api-client.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
+import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 // The WHOLE envelope is what these tools print, deliberately -- a compliance answer is read with
 // its protocol and timestamp -- so the payload is the response itself and the flag comes off `ok`.
@@ -32,14 +33,7 @@ const text = (resp: ApiResponse) => payloadResult(resp, resp);
 
 export function registerComplianceTools(mcp: McpServer, registry: AgentRegistry): void {
 
-  mcp.tool('aimeat_compliance_report', descriptionFor('aimeat_compliance_report'), {
-    agent_name: agentNameSchema,
-    scope: z.enum(['mine', 'node']).optional()
-      .describe('Whose report. "mine" (the default) is your own owner\'s slice; "node" is the whole installation and is operator-only.'),
-    since_days: z.number().int().min(1).max(3650).optional()
-      .describe('Rolling window in days (default 30). Ignored when month is given.'),
-    month: z.string().optional().describe('A whole calendar month, YYYY-MM. Wins over since_days.'),
-  }, annotationsFor('aimeat_compliance_report'), async ({ agent_name, scope, since_days, month }) => {
+  mcp.tool('aimeat_compliance_report', descriptionFor('aimeat_compliance_report'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_compliance_report') }, annotationsFor('aimeat_compliance_report'), async ({ agent_name, scope, since_days, month }) => {
     const { client } = pickAgent(registry, agent_name);
     const params = new URLSearchParams();
     if (month) params.set('month', month);
@@ -51,36 +45,20 @@ export function registerComplianceTools(mcp: McpServer, registry: AgentRegistry)
     return text(await client.get(`${path}${qs}`));
   });
 
-  mcp.tool('aimeat_compliance_register_read', descriptionFor('aimeat_compliance_register_read'), {
-    agent_name: agentNameSchema,
-    part: z.enum(['draft', 'usecases', 'questionnaire']).describe('Which document to read. Start with "draft".'),
-    since_days: z.number().int().min(1).max(3650).optional()
-      .describe('For "draft": how far back to look for activity (default 30).'),
-  }, annotationsFor('aimeat_compliance_register_read'), async ({ agent_name, part, since_days }) => {
+  mcp.tool('aimeat_compliance_register_read', descriptionFor('aimeat_compliance_register_read'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_compliance_register_read') }, annotationsFor('aimeat_compliance_register_read'), async ({ agent_name, part, since_days }) => {
     const { client } = pickAgent(registry, agent_name);
     const qs = part === 'draft' && since_days !== undefined ? `?since_days=${since_days}` : '';
     return text(await client.get(`/v1/admin/compliance/${part}${qs}`));
   });
 
-  mcp.tool('aimeat_compliance_register_write', descriptionFor('aimeat_compliance_register_write'), {
-    agent_name: agentNameSchema,
-    part: z.enum(['usecases', 'questionnaire']).describe('Which document to replace.'),
-    value: z.record(z.string(), z.unknown()).describe('The whole document — this replaces, it does not merge.'),
-    dry_run: z.boolean().optional().describe('Validate and return what would be stored, storing nothing.'),
-  }, annotationsFor('aimeat_compliance_register_write'), async ({ agent_name, part, value, dry_run }) => {
+  mcp.tool('aimeat_compliance_register_write', descriptionFor('aimeat_compliance_register_write'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_compliance_register_write') }, annotationsFor('aimeat_compliance_register_write'), async ({ agent_name, part, value, dry_run }) => {
     const { client } = pickAgent(registry, agent_name);
     // The preview is a query flag on the same route, so one handler validates both paths and a dry
     // run cannot come to disagree with the write it is previewing.
     return text(await client.put(`/v1/admin/compliance/${part}${dry_run ? '?dry_run=true' : ''}`, value));
   });
 
-  mcp.tool('aimeat_compliance_snapshot', descriptionFor('aimeat_compliance_snapshot'), {
-    agent_name: agentNameSchema,
-    action: z.enum(['list', 'read', 'save']).describe('What to do. Start with "list".'),
-    id: z.string().optional().describe('For "read": which stored report, e.g. 2026-08 or 2026-08-23-1930.'),
-    since_days: z.number().int().min(1).max(3650).optional()
-      .describe('For "save": the window the snapshot covers (default 30).'),
-  }, annotationsFor('aimeat_compliance_snapshot'), async ({ agent_name, action, id, since_days }) => {
+  mcp.tool('aimeat_compliance_snapshot', descriptionFor('aimeat_compliance_snapshot'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_compliance_snapshot') }, annotationsFor('aimeat_compliance_snapshot'), async ({ agent_name, action, id, since_days }) => {
     const { client } = pickAgent(registry, agent_name);
     if (action === 'save') {
       return text(await client.post('/v1/admin/compliance/snapshot',
