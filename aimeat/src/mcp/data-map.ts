@@ -18,6 +18,7 @@
  *   import { registerDataMapTools } from './data-map.js';
  *   registerDataMapTools(mcp, storage, config, () => agentGaii, () => scopes);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.2 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.0.1 — 2026-09-20 — The `data_map` parameter says spec /2 and shows a whole object
@@ -25,17 +26,16 @@
  *   v1.0.0 — 2026-08-25 — TARGET-073.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { DATA_MAP_PARAM } from '../tool-catalog/definitions/data-map.js';
 import {
   readProgramMap, stateProgramMap, handsOnKey, type DataMapCaller,
 } from '../services/data-map/data-map-access.js';
 import type { DataMap } from '../services/data-map/data-map-types.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v, null, 2) }] });
 const fail = (msg: string) => ({ isError: true, content: [{ type: 'text' as const, text: msg }] });
@@ -61,9 +61,7 @@ export function registerDataMapTools(
   mcp.tool(
     'aimeat_datamap_get',
     descriptionFor('aimeat_datamap_get'),
-    {
-      app: z.string().describe('The app, as "owner/filename.html".'),
-    },
+    zodShapeFor('aimeat_datamap_get'),
     annotationsFor('aimeat_datamap_get'),
     async ({ app }) => {
       const out = await readProgramMap(storage, config, caller(), app, new Date().toISOString());
@@ -77,11 +75,7 @@ export function registerDataMapTools(
   mcp.tool(
     'aimeat_datamap_set',
     descriptionFor('aimeat_datamap_set'),
-    {
-      app: z.string().describe('The app, as "owner/filename.html".'),
-      data_map: z.record(z.string(), z.unknown())
-        .describe(DATA_MAP_PARAM),
-    },
+    zodShapeFor('aimeat_datamap_set'),
     annotationsFor('aimeat_datamap_set'),
     async ({ app, data_map }) => {
       const out = await stateProgramMap(storage, config, caller(), app,
@@ -94,7 +88,7 @@ export function registerDataMapTools(
   mcp.tool(
     'aimeat_memory_hands',
     descriptionFor('aimeat_memory_hands'),
-    { key: z.string().describe('The exact memory key to ask about.') },
+    zodShapeFor('aimeat_memory_hands'),
     annotationsFor('aimeat_memory_hands'),
     async ({ key }) => {
       const out = await handsOnKey(storage, config, caller(), key);
