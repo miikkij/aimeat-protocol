@@ -11,6 +11,8 @@
  *   CLASSIFICATION_ACTIONS · checkClassificationInput()
  * @usage imported by catalog/definitions.ts and src/tool-dispatch/classification-call.ts
  * @version-history
+ *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
+ *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
  *   v1.7.0 — 2026-09-30 — Review of the texts: scan judges up to 3 keys at once (scan.ts NOW_MAX),
  *     not 20; exception_set says where an exception is withdrawn; POLICY_PENDING_NEXT names the page
  *     where the person accepts (the Data Wallet, the admin Security page) and keeps the REST route
@@ -33,6 +35,7 @@
  *   v1.1.0 — 2026-09-29 — V4: the audit action, and what an AI sees of classified content.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V2. Initial.
  */
+import { z } from 'zod';
 import { agentEverywhere, type AimeatToolDefinition } from './types.js';
 
 /**
@@ -88,21 +91,28 @@ export function checkClassificationInput(input: Record<string, unknown>): { ok: 
     return { ok: false, message: `action "${action}" does not take: ${foreign.join(', ')}. Its fields: ${fields.join(', ')}.` };
 }
 
-export const classificationTools: AimeatToolDefinition[] = [
+export const classificationTools = [
     {
         name: 'aimeat_classification',
         description: 'How sensitive a piece of content is, and the rules for that. Every memory record, workspace record or document, stored file and workspace row has a classification: public, internal, confidential, highly confidential, or a level the owner or an organism added, such as top secret. The classification decides which people and which AI may read it and whether it may leave its organism. ACTIONS: get (the classification of one item, its waiting suggestion and its last changes), set (give it a classification), review (the person accepts or rejects a waiting suggestion; relay their words in human_said; a PERSON_APPROVES suggestion only the person accepts, signed in themselves), policy_get (the labels, detection rules, default and AI mode that apply at level node, owner or organism, and whether classification is on), policy_set (replace a level: read it with policy_get and send `stored` back changed), audit (the log of a level: which classified items were shown to or used by an AI, which were refused and which classifications changed; one row per reader, item and action per minute, with a count), scan (the Content Classifier judges memory keys: `key` or up to 3 `keys` at once, more keys or a `prefix` wait in a queue the server works through within the daily caps; detection rules run first, then the decision model or the text model the policy names, with personal data removed before anything leaves; its label follows the same AI rules as yours), explorer (a page of the classifications stored on your owner\'s content, theirs and their agents\', or at level organism on an organism\'s content for its creator or an admin: filter with `label`, or with `pending: true` for the items where a suggestion waits for the person; pass `next` back as `cursor` for the next page; content with no stored classification reads as the default and is not listed), switch_set (the operator\'s own agent, with the operator:admin permission: set the node\'s switch `mode` to off, owner or all. Turning classification on, or from owner to all, applies at once; turning it off, or from all to owner, gives protection away and is refused from an AI with PERSON_REQUIRED, because the operator does that on the admin Config page. Every change is kept in the audit log at level node), exception_list (the exceptions list of a level, newest first: each act against a classification with who did it, the item, the classification and the reason. A person\'s exception lets one item leave (leave) or lets an AI send it out (ai-send) despite its classification; an app\'s act against a classification is recorded automatically (auto true: lower, policy, review, leave). Filter with exception_action and since; level node is the whole node, for an operator), exception_set (refused for you with PERSON_REQUIRED: an exception is the person\'s decision, made signed in themselves in their Data Wallet with a written reason; tell the person what you wanted to send and why. The person withdraws an exception there too, and an operator withdraws any on the admin Security page; this tool has no withdraw action). WHAT YOU SEE: by default you see everything; no default classification hides content from AI, and the sensitive ones (confidential, highly confidential) reach you with a warning. An owner or an organism may choose a classification that hides content from AI: such an item is not in your lists and reads as absent, and an AI call that names one is refused (CLASSIFIED). An item with a warning classification carries classification_warning, and you use it only for the task you were given. WHAT YOU SEND OUT: when content you send leaves (an export, a share link, another node, an outside service), an item whose classification hides it from AI stays behind, and so does an organism\'s item whose classification keeps it in the organism; the answer names each one with its reason, and the person can make an exception with a reason in their Data Wallet. WHAT YOU MAY DO: your own judgement never lowers a classification and never changes one a person set; it becomes a suggestion the person accepts or rejects. When the person told you what to set, pass their own words, verbatim, in human_said. A classification at least as strict then applies at once as theirs, also over one a person set. One that lowers it waits as a suggestion (PERSON_APPROVES) with their words on it, and the person accepts it signed in themselves: you cannot accept that suggestion, even with their words (PERSON_REQUIRED). A policy change that only tightens applies at once. One that gives anything away (turns classification off, lets an AI see more, drops an audit trail or a rule, lowers the default) waits until the person accepts it signed in themselves; you cannot accept it. A lower level only tightens the node: an owner or an organism adds its own labels between the node\'s ones and adds rules, and a refusal names the node\'s rule it would have loosened.',
         caller: 'agent',
         visibility: agentEverywhere,
+        // policy_set replaces a level; set and review change one item's classification.
+        annotations: { title: 'Classification: content and policy', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+        // Classification labels and policy are about stored content, so the memory words govern them:
+        // the tool needs memory:read, and its set, review, policy_set, scan, switch_set and exception_set
+        // actions check memory:write in the handler (mcp/classification.ts WRITES). TARGET-082 V2.
+        scope: 'memory:read',
+        surfaces: ['agent', 'admin'],
         input: {
             action: { type: 'string', required: true, enum: [...CLASSIFICATION_ACTIONS], description: 'What to do.' },
-            keys: { type: 'array', description: 'scan: memory keys to classify.' },
+            keys: { type: 'array', description: 'scan: memory keys to classify.', zod: z.array(z.string()).max(500) },
             prefix: { type: 'string', description: 'scan: classify every memory key under this prefix (queued).' },
             since: { type: 'string', description: 'audit, exception_list: only rows from this ISO time on.' },
             audit_action: { type: 'string', enum: [...AUDIT_ACTIONS], description: 'audit: only this kind of row. exception: an exception made, used or withdrawn.' },
             exception_action: { type: 'string', enum: [...EXCEPTION_ACTION_VALUES], description: 'exception_list: only exceptions of this act. exception_set: leave (the item may leave) or ai-send (an AI may send it out).' },
             until: { type: 'string', description: 'exception_set: when the exception ends, ISO. Absent: until it is withdrawn.' },
-            limit: { type: 'number', description: 'audit, exception_list: at most this many rows, default 200. explorer: items per page, default 50, at most 200.' },
+            limit: { type: 'number', description: 'audit, exception_list: at most this many rows, default 200. explorer: items per page, default 50, at most 200.', zod: z.number().int().min(1).max(1000) },
             pending: { type: 'boolean', description: 'explorer: only the items where a suggestion waits for a person.' },
             cursor: { type: 'string', description: 'explorer: the `next` value of the previous page.' },
             mode: { type: 'string', enum: ['off', 'owner', 'all'], description: "switch_set: the node's switch. off: nothing is classified; owner: each owner decides for their own content; all: on for every owner." },
@@ -116,11 +126,11 @@ export const classificationTools: AimeatToolDefinition[] = [
             label: { type: 'string', description: 'set: the label id, from policy_get. explorer: only items with this label.' },
             justification: { type: 'string', description: 'set: why the content is less sensitive, when lowering from a label that needs a reason.' },
             human_said: { type: 'string', description: "The person's own words, verbatim, when you relay their instruction. Never your own summary." },
-            confidence: { type: 'number', description: 'set: how sure you are, 0 to 1, when the label is your own judgement.' },
+            confidence: { type: 'number', description: 'set: how sure you are, 0 to 1, when the label is your own judgement.', zod: z.number().min(0).max(1) },
             reason: { type: 'string', description: 'set: why you chose the label, when it is your own judgement. exception_set: why the item may go out despite its classification.' },
             decision: { type: 'string', enum: ['accept', 'reject'], description: "review: the person's decision on the waiting suggestion." },
             level: { type: 'string', enum: ['node', 'owner', 'organism'], description: 'policy_get, policy_set, audit, exception_list: which level. Default owner. explorer: owner or organism. switch_set: node, the only one.' },
             policy: { type: 'object', description: 'policy_set: the WHOLE level as policy_get returned it in `stored`, changed. It replaces the level. A label: { id, name: { fi, en, es }, rank 0-999, color, description, aiVisibility hidden|warning|allowed, audit, mayLeaveOrganism, lowerNeedsJustification, audience: { roles, groups, people } }. A rule: { id, name, kind keyword|regex|classifier, pattern, flags, minLabel, enabled, appliesTo: { kinds, organismId, ws, keyPrefix } }. An owner or organism level also carries enabled, which turns classification on for its content when the node lets each owner decide.' },
         },
     },
-];
+] as const satisfies readonly AimeatToolDefinition[];

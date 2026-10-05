@@ -460,10 +460,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     // would be a permission that has to be enforced on every door or does not exist (invariant 15).
     aimeat_datamap_get: 'memory:read',
     aimeat_datamap_set: 'memory:write',
-    // Classification labels and policy are about stored content, so the memory words govern them:
-    // the tool needs memory:read, and its set, review, policy_set, scan, switch_set and exception_set
-    // actions check memory:write in the handler (mcp/classification.ts WRITES). TARGET-082 V2.
-    aimeat_classification: 'memory:read',
     aimeat_designbook_search: 'memory:read',
     aimeat_designbook_get: 'memory:read',
     aimeat_designbook_propose: 'memory:write',
