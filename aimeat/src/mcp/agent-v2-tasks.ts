@@ -8,12 +8,13 @@
  *   Nothing here decides who may move a task, what a terminal task refuses, or how a race between a
  *   completer and a canceller resolves.
  *
- *   A SESSION HERE IS AN AGENT, so the principal carries `roles: ['agent']` and the ops apply the
+ *   A SESSION HERE IS AN AGENT, so the principal is the session caller with the agent role and the ops apply the
  *   assignee rule and the caller rule to it exactly as they would on any other door.
  *
- * @structure registerAgentV2TaskTools(mcp, storage, config, getAgentGaii, getOwner)
- * @usage registerAgentV2TaskTools(mcp, storage, config, () => agentGaii, () => owner);
+ * @structure registerAgentV2TaskTools(mcp, storage, config, getAgentGaii, getOwner, caller?)
+ * @usage registerAgentV2TaskTools(mcp, storage, config, () => agentGaii, () => owner, caller);
  * @version-history
+ *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — aimeat_v2_task_list takes response_format and gives the catalog's concise view
  *     (secaudit 2026-10, M3).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -28,6 +29,7 @@ import { publicTask } from '../models/agent-v2-task.js';
 import { createTask, listTasks, getTask, setTaskStatus, cancelTask } from '../services/agent-v2-tasks-ops.js';
 import type { Principal, OpResult } from '../services/agent-v2-messaging-ops.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
 
 function reply<T>(out: OpResult<T>, shape: (value: T) => unknown) {
   if (!out.ok) {
@@ -45,8 +47,11 @@ export function registerAgentV2TaskTools(
   config: AimeatConfig,
   getAgentGaii: () => string,
   getOwner: () => string,
+  /** The session's caller (services/caller-context.ts). register-all.ts passes it; a caller that does
+   *  not (test/unit/v2-list-concise.test.ts) gets the same agent built from the arguments above. */
+  caller: () => CallerContext = () => agentSessionCaller(getAgentGaii(), getOwner(), [], config.nodeId, storage),
 ): void {
-  const principal = (): Principal => ({ sub: getAgentGaii(), owner: getOwner(), roles: ['agent'] });
+  const principal = (): Principal => caller().auth;
 
   mcp.tool(
     'aimeat_v2_task_create',

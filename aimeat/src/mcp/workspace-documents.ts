@@ -8,9 +8,10 @@
  *   THESE HOLD NO LOGIC OF THEIR OWN. services/workspace-doc-edit.ts is what the REST routes call
  *   too, so the manifest gate, the access rule, the archive guard, the schema check, the ceilings
  *   and the compare-and-swap retry cannot answer differently on one door than on the other.
- * @structure registerWorkspaceDocumentTools(mcp, deps)
- * @usage registerWorkspaceDocumentTools(mcp, { storage, config, agentGaii, ownerName });
+ * @structure registerWorkspaceDocumentTools(mcp, deps, caller)
+ * @usage registerWorkspaceDocumentTools(mcp, { storage, config }, caller);
  * @version-history
+ *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9). The deps no longer carry agentGaii and ownerName.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-09-02 — Initial (wish-workspace-append-ja-osiomuokkaus).
  */
@@ -24,23 +25,26 @@ import {
     type DocEditCaller, type DocEditResult,
 } from '../services/workspace-doc-edit.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
 export interface WorkspaceDocToolDeps {
     storage: Storage;
     config: AimeatConfig;
-    /** The session subject, which is what the shared access rule decides on. */
-    agentGaii: string;
-    ownerName: string;
 }
 
-export function registerWorkspaceDocumentTools(mcp: McpServer, deps: WorkspaceDocToolDeps): void {
-    const { storage, config, agentGaii, ownerName } = deps;
+export function registerWorkspaceDocumentTools(
+    mcp: McpServer, deps: WorkspaceDocToolDeps,
+    /** The session's caller (services/caller-context.ts): its principal is the session subject the
+     *  shared access rule decides on. */
+    caller: () => CallerContext,
+): void {
+    const { storage, config } = deps;
     const editDeps = { storage, config };
 
     const fail = (msg: string): TextResult => ({ content: [{ type: 'text', text: msg }], isError: true });
-    const caller = (): DocEditCaller => ({ principal: agentGaii, owner: ownerName, roles: ['agent'] });
+    const editCaller = (): DocEditCaller => caller().principalView;
 
     /** The same answer shape from both tools, and the same rendering of a refusal. */
     const ok = (r: DocEditResult): TextResult => ({
@@ -65,7 +69,7 @@ export function registerWorkspaceDocumentTools(mcp: McpServer, deps: WorkspaceDo
         annotationsFor('aimeat_workspace_doc_append'),
         async ({ organism_id, ws, space, id, markdown, section }): Promise<TextResult> => {
             try {
-                return ok(await appendToDocument(editDeps, caller(), {
+                return ok(await appendToDocument(editDeps, editCaller(), {
                     organismId: organism_id, wsId: ws, space, id, markdown,
                     ...(section ? { section } : {}),
                     pipeline: 'mcp.workspace_doc_append',
@@ -78,7 +82,7 @@ export function registerWorkspaceDocumentTools(mcp: McpServer, deps: WorkspaceDo
         annotationsFor('aimeat_workspace_doc_section_replace'),
         async ({ organism_id, ws, space, id, section, markdown }): Promise<TextResult> => {
             try {
-                return ok(await replaceDocumentSection(editDeps, caller(), {
+                return ok(await replaceDocumentSection(editDeps, editCaller(), {
                     organismId: organism_id, wsId: ws, space, id, section, markdown,
                     pipeline: 'mcp.workspace_doc_section',
                 }));

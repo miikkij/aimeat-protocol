@@ -13,9 +13,10 @@
  *
  *   The tools are declared on THREE surfaces, and this is one of them. See the catalog entry
  *   (tool-catalog/definitions/ai-jobs.ts) for the other two and for the gates that keep them in step.
- * @structure registerAiJobTools(mcp, storage, config, getAgentGaii, scopes)
- * @usage registerAiJobTools(mcp, storage, config, () => agentGaii, scopes);
+ * @structure registerAiJobTools(mcp, storage, config, getAgentGaii, scopes, caller)
+ * @usage registerAiJobTools(mcp, storage, config, () => agentGaii, scopes, caller);
  * @version-history
+ *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-08-31 — Initial.
  *   v1.0.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
@@ -37,20 +38,26 @@ import { AiJobError, getActiveAiJobService } from '../services/ai-jobs/index.js'
 import type { AiJobState } from '../services/ai-jobs/types.js';
 import { startedByOf } from '../services/ai-jobs/starter.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 export function registerAiJobTools(
     mcp: McpServer,
     storage: Storage,
     config: AimeatConfig,
     getAgentGaii: () => string,
-    /** The session's scopes. Recorded on a started job so it reads its inputs as this agent. */
-    scopes: readonly string[] = [],
+    /** The session's scopes. Unused here: the session caller below carries them. */
+    _scopes: readonly string[] = [],
+    /** The session's caller (services/caller-context.ts). Its scopes are recorded on a started job,
+     *  so the job reads its inputs as this agent. */
+    caller: () => CallerContext,
 ): void {
     const agentGaii = getAgentGaii();
     const owner = localAccountName(agentGaii);
     const ownerGhii = `${owner}@${config.nodeId}`;
-    // Every node MCP session is an agent (mcp/index.ts refuses any other credential).
-    const startedBy = startedByOf({ owner, roles: ['agent'], scopes }, agentGaii);
+    // Every node MCP session is an agent (mcp/index.ts refuses any other credential), so the starter
+    // is the session caller. Taken once, at registration, as it was before the caller existed.
+    const session = caller();
+    const startedBy = startedByOf(session.auth, session.principal);
 
     const text = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] });
     const err = (msg: string) => ({ content: [{ type: 'text' as const, text: msg }], isError: true });

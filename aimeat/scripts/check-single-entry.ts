@@ -29,6 +29,9 @@
  *   cd aimeat && pnpm check:single-entry --list    # every file each rule counts
  *   cd aimeat && pnpm check:single-entry --seed operator-role   # rewrite one rule's ceilings
  * @version-history
+ *   v1.2.0 — 2026-10-05 — Rules agent-role, wildcard-test and caller-built: the caller is the
+ *     CallerContext (services/caller-context.ts), and the remaining hand tests and hand-built callers
+ *     only go down (secaudit 2026-10, C9).
  *   v1.1.0 — 2026-10-05 — Rule html-escape: HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, C1, C2 and C7).
  */
@@ -115,6 +118,30 @@ const RULES: Rule[] = [
     label: 'An agent name is checked with validateAgentName or isValidAgentName (utils/gaii.ts); the looser {1,63} pattern admitted names no agent can have (M2)',
     pattern: /\[a-z0-9\]\[a-z0-9-\]\{1,63\}\$/,
     skipDirs: ['src/utils/gaii.ts'],
+  },
+  {
+    id: 'agent-role',
+    label: 'What kind of principal a caller is, is asked of its caller object (services/caller-context.ts: kind, inPerson), built once per request (callerOf) or per MCP session (C9)',
+    pattern: /roles\)?\??\.includes\(['"]agent['"]\)/,
+    skipDirs: ['src/auth/', 'src/utils/gaii.ts', 'src/services/caller-context.ts'],
+  },
+  {
+    id: 'wildcard-test',
+    label: 'A held scope is asked with scopeIsCovered (utils/scope-coverage.ts) or the caller object\'s has(word); a hand `includes(\'*\')` misses the words no wildcard carries (C9)',
+    pattern: /includes\(['"]\*['"]\)/,
+    skipDirs: ['src/utils/scope-coverage.ts', 'src/data/', 'src/static/'],
+  },
+  {
+    id: 'caller-built',
+    label: 'A caller is the CallerContext (services/caller-context.ts), not an object built at the call site with a literal role: the MCP session\'s comes from register-all.ts, a request\'s from callerOf (C9)',
+    pattern: /roles:\[['"]agent['"]\]/,
+    skipDirs: ['src/services/caller-context.ts', 'src/auth/'],
+  },
+  {
+    id: 'request-caller-built',
+    label: 'A route\'s caller is callerOf(req) (middleware/caller.ts), built once per request with its answers on it, not an object copied field by field from req.auth (C9)',
+    pattern: /roles:req\.auth!?\.roles/,
+    skipDirs: ['src/middleware/caller.ts', 'src/auth/'],
   },
 ];
 

@@ -17,12 +17,13 @@
  *
  *   THE SCOPE IS THE GATE. `packages:write` is what the route requires, and TOOL_SCOPES carries the
  *   same word here, so an agent without it is not handed the tool at all.
- * @structure registerPackageTools(mcp, storage, config, getAgentGaii, peers, sessionScopes) — registers
+ * @structure registerPackageTools(mcp, storage, config, getAgentGaii, peers, sessionScopes, caller) — registers
  *   aimeat_package_list, aimeat_package_get, aimeat_package_status_set, aimeat_package_install,
  *   aimeat_package_instances, aimeat_package_fork, aimeat_package_instance_set,
  *   aimeat_package_check_updates, aimeat_package_repository, aimeat_package_entitlements.
  * @usage import { registerPackageTools } from './packages.js';
  * @version-history
+ *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.15.0 — 2026-10-05 — aimeat_package_instance_set turns automatic updates on only with
  *     packages:install-code (secaudit 2026-10, PKG-12).
@@ -96,6 +97,7 @@ import { withdrawVersion } from '../services/packages/compose/package-withdrawal
 import { INSTALL_CODE_SCOPE } from '../services/packages/install/package-approvals.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 /** A package row as a conversation needs it: what it is, not every byte it holds. */
 function packageSummary(pkg: { packageGroupId: string; name: string; author: string; version: string; status: string; visibility: string; description: string; category: string; tags: string[]; components: { id: string; type: string; label: string }[] }) {
@@ -181,6 +183,9 @@ export function registerPackageTools(
     getAgentGaii: () => string,
     peers: Map<string, PeerInfo> = new Map(),
     sessionScopes: string[] = [],
+    /** The session's caller (services/caller-context.ts): what this session answers for when a
+     *  component writes into the owner's memory. */
+    caller: () => CallerContext,
 ): void {
     /** The owner this agent acts for. Never a caller-supplied id. */
     const ownerOf = (): string => {
@@ -188,8 +193,12 @@ export function registerPackageTools(
         return localAccountName(gaii);
     };
     registerPackageSaleTools(mcp, storage, config, getAgentGaii, ownerOf, peers);
-    /** What this session answers for when a component writes into the owner's memory. */
-    const grant = { roles: ['agent'], scopes: sessionScopes };
+    /** What this session answers for when a component writes into the owner's memory: the session
+     *  caller's roles and scopes, read per call. */
+    const grant = (): { roles: string[]; scopes: string[] } => {
+        const session = caller();
+        return { roles: [...session.roles], scopes: [...session.scopes] };
+    };
 
     mcp.tool('aimeat_package_list', descriptionFor('aimeat_package_list'), zodShapeFor('aimeat_package_list'), annotationsFor('aimeat_package_list'), async ({ search, author, status }) => {
         const result = await listPackagesFor(storage, ownerOf(), { search, author, status });
@@ -299,7 +308,7 @@ export function registerPackageTools(
         const owner = ownerOf();
         const gaii = getAgentGaii();
         const out = await updateOrRequest({ storage, config },
-            { owner, ownerGhii: await resolveGhii(storage, owner, config), sub: gaii, ...grant },
+            { owner, ownerGhii: await resolveGhii(storage, owner, config), sub: gaii, ...grant() },
             { instanceId: instance_id, dryRun: dryRun === true });
         if (!out.ok) {
             return {
@@ -341,7 +350,7 @@ export function registerPackageTools(
         // same branch POST /v1/packages/:groupId/install takes.
         const setDeps = { storage, config, peers, scheduler: getActiveScheduler() ?? undefined };
         if (await bundleInstallOf(setDeps, group_id, owner)) {
-            const set = await installSetForOwner(setDeps, { owner, sub: gaii, ownerGhii, ...grant }, {
+            const set = await installSetForOwner(setDeps, { owner, sub: gaii, ownerGhii, ...grant() }, {
                 groupId: group_id, config: installConfig, organismNames, dryRun: dryRun === true, grantApps,
             });
             if (!set.ok) return { ...toolError(set.code, set.problems ? `${set.message} ${set.problems.join(' | ')}` : set.message) };
@@ -352,7 +361,7 @@ export function registerPackageTools(
 
         const out = await installOrRequest(
             { storage, config, scheduler: getActiveScheduler() ?? undefined },
-            { owner, sub: gaii, ownerGhii, ...grant },
+            { owner, sub: gaii, ownerGhii, ...grant() },
             { groupId: group_id, label, version, dryRun: dryRun === true, mode, config: installConfig, grantApps },
         );
 

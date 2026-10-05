@@ -16,8 +16,9 @@
  *   - registerAgentScheduleTools() — registers the schedule tools on an McpServer
  * @usage
  *   import { registerAgentScheduleTools } from './agent-schedules.js';
- *   registerAgentScheduleTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
+ *   registerAgentScheduleTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.5.0 — 2026-09-29 — aimeat_schedule_create takes kind 'refinery' (input { prefix }).
  *   v1.4.0 — 2026-09-27 — aimeat_schedule_list takes `detail` (each schedule's prompt, description, purpose
@@ -51,6 +52,7 @@ import type { ScheduleWriteCaller } from '../services/schedule-write.js';
 import { writeMemoryRecord } from '../services/memory-write.js';
 import { schedulePromptOf } from '../services/schedule-prompt.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 export function registerAgentScheduleTools(
   mcp: McpServer,
@@ -61,6 +63,8 @@ export function registerAgentScheduleTools(
   _emitResourceListChanged: (agentGaii: string) => void,
   /** The session's own scopes, for the per-kind gate in services/schedule-gate.ts. */
   sessionScopes: string[] = [],
+  /** The session's caller (services/caller-context.ts). */
+  caller: () => CallerContext,
 ): void {
   const agentGaii = getAgentGaii();
   const parsed = parseGAII(agentGaii);
@@ -221,11 +225,10 @@ export function registerAgentScheduleTools(
       // storage meant no value-size limit, no key ceiling, no byte budget, no archive guard, no
       // schema lock and no memory change event — and the entries list is an unbounded array from the
       // caller, so the ceiling was the only thing that would ever have bounded it.
+      const session = caller();
       const written = await writeMemoryRecord({ storage, config }, {
-        principal: agentGaii,
-        targetGaii: agentGaii,
-        scopes: sessionScopes,
-        roles: ['agent'],
+        ...session.principalView,
+        targetGaii: session.principal,
       }, {
         key,
         value: { version: 1, updatedAt: now, entries },

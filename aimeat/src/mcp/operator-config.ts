@@ -16,6 +16,7 @@
  * @usage
  *   import { registerOperatorConfigTools } from './operator-config.js';
  * @version-history
+ *   2026-10-05 -- The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   v1.4.0 -- 2026-09-28 -- aimeat_operator_ai_config shows the node's recommended models (read-only) and points to aimeat_ai_policy_set.
  *   v1.3.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
@@ -64,6 +65,7 @@ import {
     normaliseAgentProfile, resolveAgentTarget, setAgentProfile,
     type AgentProfileFields,
 } from '../services/agent-profile-write.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 const CONFIGURE_ACTION = 'agent_configure';
 
@@ -116,6 +118,8 @@ export function registerOperatorConfigTools(
     _emitResourceListChanged: (agentGaii: string) => void,
     /** The session's own scopes, for the write-as-owner requirement on the AI settings tool. */
     sessionScopes: string[] = [],
+    /** The session's caller (services/caller-context.ts), for the shared memory write. */
+    caller: () => CallerContext,
 ): void {
     const agentGaii = getAgentGaii();
     const callerOwner = localAccountName(agentGaii) || null;
@@ -335,7 +339,7 @@ export function registerOperatorConfigTools(
             // POST /v1/memory does — this door used to reach storage itself, so a change to the
             // owner's AI settings landed with none of it and nothing else on the node heard about it.
             const written = await writeMemoryRecord({ storage, config }, {
-                principal: agentGaii, targetGaii: ownerGhii, scopes: sessionScopes, roles: ['agent'],
+                ...caller().principalView, targetGaii: ownerGhii,
             }, {
                 key: AI_SETTINGS_KEY,
                 value: merged,

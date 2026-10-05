@@ -15,9 +15,10 @@
  *   ONE IMPLEMENTATION. The work is services/packages/install/package-install-requests.ts, the same functions the
  *   /v1/package-install-requests doors call; this file resolves who is asking and renders the answer.
  *   packages:write is its word in TOOL_SCOPES, the one those doors ask.
- * @structure registerPackageInstallRequestTools(mcp, storage, config, getAgentGaii, sessionScopes)
- * @usage registerPackageInstallRequestTools(mcp, storage, config, agentGaii, scopes);  // register-all.ts
+ * @structure registerPackageInstallRequestTools(mcp, storage, config, getAgentGaii, sessionScopes, caller)
+ * @usage registerPackageInstallRequestTools(mcp, storage, config, agentGaii, scopes, caller);  // register-all.ts
  * @version-history
+ *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-09-25 — Initial: package installs by agents become requests.
  *   v1.0.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
@@ -31,20 +32,22 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
 import { listRequestsFor, readRequestFor, decideInstallRequest } from '../services/packages/install/package-install-requests.js';
 import { getActiveScheduler } from '../services/scheduler.js';
-import { localAccountName } from '../utils/gaii.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 export function registerPackageInstallRequestTools(
     mcp: McpServer,
     storage: Storage,
     config: AimeatConfig,
-    getAgentGaii: () => string,
-    sessionScopes: string[] = [],
+    _getAgentGaii: () => string,
+    _sessionScopes: string[] = [],
+    /** The session's caller (services/caller-context.ts). */
+    caller: () => CallerContext,
 ): void {
     mcp.tool('aimeat_package_install_requests', descriptionFor('aimeat_package_install_requests'), zodShapeFor('aimeat_package_install_requests'), annotationsFor('aimeat_package_install_requests'), async ({ request_id, decision }) => {
-        const gaii = getAgentGaii();
-        // Every MCP session is an agent's. The owner it acts for comes from its identity, never input.
-        const who = { sub: gaii, owner: localAccountName(gaii), roles: ['agent'], scopes: sessionScopes };
+        // Every MCP session is an agent's. The owner it acts for comes from its identity, never input:
+        // the session caller.
+        const who = caller().auth;
         const deps = { storage, config, scheduler: getActiveScheduler() ?? undefined };
 
         if (decision !== undefined) {

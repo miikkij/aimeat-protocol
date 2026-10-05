@@ -8,8 +8,9 @@
  *   - registerSharingGroupTools() -- registers all sharing group tools on an McpServer instance
  * @usage
  *   import { registerSharingGroupTools } from './sharing-groups.js';
- *   registerSharingGroupTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
+ *   registerSharingGroupTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.4.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
@@ -47,6 +48,7 @@ import {
     listIncomingShares,
 } from '../services/group-shares.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 export function registerSharingGroupTools(
     mcp: McpServer,
@@ -55,7 +57,10 @@ export function registerSharingGroupTools(
     getAgentGaii: () => string,
     emitResourceUpdated: (agentGaii: string, uri: string) => void,
     emitResourceListChanged: (agentGaii: string) => void,
-    sessionScopes: string[] = [],
+    /** The session's scopes. Unused here: the session caller below carries them. */
+    _sessionScopes: string[] = [],
+    /** The session's caller (services/caller-context.ts), for the share services. */
+    caller: () => CallerContext,
 ): void {
     const agentGaii = getAgentGaii();
 
@@ -276,12 +281,16 @@ export function registerSharingGroupTools(
         expires_at: s.expiresAt ?? null,
         created_at: s.createdAt,
     });
-    const caller = () => ({
-        ownerGaii: getOwnerGhii(),
-        principal: agentGaii,
-        scopes: sessionScopes,
-        roles: ['agent'],
-    });
+    /** The share services' caller, from the session caller: the owner's account, the agent, its scopes. */
+    const shareCaller = () => {
+        const session = caller();
+        return {
+            ownerGaii: session.ownerGhii,
+            principal: session.principal,
+            scopes: [...session.scopes],
+            roles: [...session.roles],
+        };
+    };
 
     // ── Tool 6: aimeat_share_create ──
     mcp.tool(
@@ -292,7 +301,7 @@ export function registerSharingGroupTools(
         async ({ group_id, key_pattern, note, expires_at }) => {
             const created = await createShare(
                 { storage, newId: () => randomUUID(), now: () => new Date().toISOString() },
-                caller(),
+                shareCaller(),
                 { groupId: group_id, keyPattern: key_pattern, note, expiresAt: expires_at ?? null },
             );
             if (!created.ok) return { content: [{ type: 'text' as const, text: `${created.code}: ${created.message}` }], isError: true };
@@ -328,7 +337,7 @@ export function registerSharingGroupTools(
         zodShapeFor('aimeat_share_revoke'),
         annotationsFor('aimeat_share_revoke'),
         async ({ share_id }) => {
-            const revoked = await revokeShare({ storage }, caller(), share_id);
+            const revoked = await revokeShare({ storage }, shareCaller(), share_id);
             if (!revoked.ok) return { content: [{ type: 'text' as const, text: `${revoked.code}: ${revoked.message}` }], isError: true };
             emitResourceUpdated(agentGaii, `aimeat://groups/${encodeURIComponent(revoked.value.groupId)}`);
             emitChange('groups');

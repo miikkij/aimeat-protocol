@@ -14,9 +14,10 @@
  *   this node, which stops the word from working when an ordinary owner is granted it, and the agent
  *   holds site:theme-write, which the registration filter also asks and a node run with
  *   AIMEAT_MCP_ENFORCE_SCOPES=false does not.
- * @structure registerThemeTools(mcp, storage, config, getAgentGaii, scopes)
- * @usage registerThemeTools(mcp, storage, config, agentGaii, scopes);
+ * @structure registerThemeTools(mcp, storage, config, getAgentGaii, scopes, caller)
+ * @usage registerThemeTools(mcp, storage, config, agentGaii, scopes, caller);
  * @version-history
+ *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v2.3.0 — 2026-10-03 — aimeat_theme_font_save (add, change or remove a face the operator adds);
  *     aimeat_theme_list carries `fonts`, the owners' fonts in storage for the operator's agent only.
@@ -38,6 +39,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 const out = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
 
@@ -50,15 +52,18 @@ function refusal(err: unknown) {
 const NOT_OPERATOR = 'Only the person who runs this installation can make or change its themes.';
 
 export function registerThemeTools(
-    mcp: McpServer, storage: Storage, config: AimeatConfig, getAgentGaii: () => string,
-    /** This session's granted scopes: the operator test asks site:theme-write of them. */
-    scopes: readonly string[] = [],
+    mcp: McpServer, storage: Storage, config: AimeatConfig, _getAgentGaii: () => string,
+    /** This session's granted scopes. Unused here: the session caller below carries them. */
+    _scopes: readonly string[] = [],
+    /** The session's caller (services/caller-context.ts): the operator test asks site:theme-write of
+     *  its scopes. */
+    caller: () => CallerContext,
 ): void {
     const svc = new ThemeService(config, storage);
     /** The acting identity when it is an operator's agent holding site:theme-write, else null. */
     const operatorGaii = async (): Promise<string | null> => {
-        const gaii = getAgentGaii();
-        return (await svc.callerIsOperator({ sub: gaii, roles: ['agent'], scopes })) ? gaii : null;
+        const session = caller();
+        return (await svc.callerIsOperator(session.auth)) ? session.principal : null;
     };
 
     mcp.tool(

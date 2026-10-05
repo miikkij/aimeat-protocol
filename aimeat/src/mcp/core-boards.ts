@@ -9,9 +9,10 @@
  *   to add anything pays for the split whoever they are; this is that payment, and boards are the
  *   cleanest unit to move — a self-contained pair at the end of the tool list, depending on nothing
  *   the rest of the file holds beyond storage, config and the caller's identity.
- * @structure registerCoreBoardTools(mcp, deps)
- * @usage registerCoreBoardTools(mcp, { storage, config, agentGaii });
+ * @structure registerCoreBoardTools(mcp, deps, caller)
+ * @usage registerCoreBoardTools(mcp, { storage, config, agentGaii }, caller);
  * @version-history
+ *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-09-03 — Extracted from core.ts (max-file-lines). No behaviour change.
  */
@@ -26,10 +27,13 @@ import { createBoardPost } from '../services/board-post.js';
 import { boardReadRefusal } from '../services/board-read-access.js';
 import { withoutHiddenPosts } from '../services/board-moderation.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 export function registerCoreBoardTools(
   mcp: McpServer,
   { storage, config, agentGaii }: { storage: Storage; config: AimeatConfig; agentGaii: string },
+  /** The session's caller (services/caller-context.ts): the author of a post. */
+  caller: () => CallerContext,
 ): void {
 // ── Tool 11: aimeat_board_read ──
 mcp.tool(
@@ -80,9 +84,10 @@ mcp.tool(
         // had no access check, no price on a public board, no pre_board_post hook and no bound
         // on title or body. Any agent holding social:write posted into any board on the node,
         // including another owner's private one, for free.
+        const session = caller();
         const posted = await createBoardPost({ storage, config }, {
-            gaii: agentGaii,
-            roles: ['agent'],
+            gaii: session.principal,
+            roles: [...session.roles],
         }, {
             boardId: board_id, title, body, category,
             declaredProvenanceId: ai_provenance_id,

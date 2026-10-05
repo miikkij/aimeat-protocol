@@ -10,9 +10,10 @@
  *   cannot answer differently on one door than on the other. That is not tidiness: the same defect
  *   was fixed three separate times inside one MCP tool because a rule lived in one door and not the
  *   other.
- * @structure registerWorkspaceRowTools(mcp, deps)
- * @usage registerWorkspaceRowTools(mcp, { storage, config, agentGaii, writerGaii, ownerName, scopes });
+ * @structure registerWorkspaceRowTools(mcp, deps, caller)
+ * @usage registerWorkspaceRowTools(mcp, { storage, config, agentGaii, writerGaii, scopes }, caller);
  * @version-history
+ *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9). The deps no longer carry ownerName.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-08-26 — Initial: extracted from mcp/workspaces.ts.
  *   v1.1.0 — 2026-09-29 — aimeat_workspace_rows_read passes the agent's classification reader (TARGET-082).
@@ -31,6 +32,7 @@ import {
     WorkspaceRowError, type RowCaller,
 } from '../services/workspace-rows/row-service.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
@@ -41,13 +43,16 @@ export interface WorkspaceRowToolDeps {
     agentGaii: string;
     /** The identity that AUTHORS: an agent's own GAII when an agent is calling, else the owner GHII. */
     writerGaii: string;
-    ownerName: string;
     /** The session's scopes. Removing rows needs organism:write beside the tool's memory:purge. */
     scopes: string[];
 }
 
-export function registerWorkspaceRowTools(mcp: McpServer, deps: WorkspaceRowToolDeps): void {
-    const { storage, config, agentGaii, writerGaii, ownerName, scopes } = deps;
+export function registerWorkspaceRowTools(
+    mcp: McpServer, deps: WorkspaceRowToolDeps,
+    /** The session's caller (services/caller-context.ts). */
+    caller: () => CallerContext,
+): void {
+    const { storage, config, agentGaii, writerGaii, scopes } = deps;
     const rowDeps = { storage, config };
 
     const ok = (obj: unknown): TextResult => ({ content: [{ type: 'text', text: JSON.stringify(obj, null, 2) }] });
@@ -55,9 +60,12 @@ export function registerWorkspaceRowTools(mcp: McpServer, deps: WorkspaceRowTool
 
     // `principal` is what the shared access rule decides on (it matches an organism agent by GAII);
     // `identity` is what gets STORED in createdBy, and it is the AGENT's own GAII when an agent is
-    // calling, so a row's author is the agent rather than the owner it acts for.
-    const rowCaller = (): RowCaller =>
-        ({ principal: agentGaii, identity: writerGaii, owner: ownerName, roles: ['agent'] });
+    // calling, so a row's author is the agent rather than the owner it acts for. The principal, the
+    // owner and the roles are the session caller's.
+    const rowCaller = (): RowCaller => {
+        const session = caller();
+        return { principal: session.principal, identity: writerGaii, owner: session.owner, roles: [...session.roles] };
+    };
 
     /** One place that renders a service refusal, so every row tool fails with the same sentence. */
     const rowFail = (err: unknown): TextResult => {

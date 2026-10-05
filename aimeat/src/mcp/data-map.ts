@@ -13,11 +13,12 @@
  *
  *   No new permission word: `memory:read` and `memory:write` already govern the record these read
  *   and write.
- * @structure registerDataMapTools(mcp, storage, config, getAgentGaii, getScopes)
+ * @structure registerDataMapTools(mcp, storage, config, getAgentGaii, getScopes, caller)
  * @usage
  *   import { registerDataMapTools } from './data-map.js';
- *   registerDataMapTools(mcp, storage, config, () => agentGaii, () => scopes);
+ *   registerDataMapTools(mcp, storage, config, () => agentGaii, () => scopes, caller);
  * @version-history
+ *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.2 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
@@ -28,7 +29,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import {
@@ -36,6 +36,7 @@ import {
 } from '../services/data-map/data-map-access.js';
 import type { DataMap } from '../services/data-map/data-map-types.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v, null, 2) }] });
 const fail = (msg: string) => ({ isError: true, content: [{ type: 'text' as const, text: msg }] });
@@ -44,17 +45,20 @@ export function registerDataMapTools(
   mcp: McpServer,
   storage: Storage,
   config: AimeatConfig,
-  getAgentGaii: () => string,
-  getScopes: () => string[],
+  _getAgentGaii: () => string,
+  /** The session's scopes. Unused here: the session caller below carries them. */
+  _getScopes: () => string[],
+  /** The session's caller (services/caller-context.ts). */
+  caller: () => CallerContext,
 ): void {
-  /** Who is asking, resolved once, in the terms the shared service takes. */
-  const caller = (): DataMapCaller => {
-    const principal = getAgentGaii();
+  /** Who is asking, resolved once per call from the session caller, in the terms the shared service takes. */
+  const mapCaller = (): DataMapCaller => {
+    const session = caller();
     return {
-      principal,
-      ownerName: localAccountName(principal),
-      roles: ['agent'],
-      scopes: getScopes(),
+      principal: session.principal,
+      ownerName: session.owner,
+      roles: [...session.roles],
+      scopes: [...session.scopes],
     };
   };
 
@@ -64,7 +68,7 @@ export function registerDataMapTools(
     zodShapeFor('aimeat_datamap_get'),
     annotationsFor('aimeat_datamap_get'),
     async ({ app }) => {
-      const out = await readProgramMap(storage, config, caller(), app, new Date().toISOString());
+      const out = await readProgramMap(storage, config, mapCaller(), app, new Date().toISOString());
       if ('refusal' in out) return fail(out.refusal.message);
       return text({
         app: out.app, data_map: out.dataMap, stamp: out.stamp, findings: out.findings,
@@ -78,7 +82,7 @@ export function registerDataMapTools(
     zodShapeFor('aimeat_datamap_set'),
     annotationsFor('aimeat_datamap_set'),
     async ({ app, data_map }) => {
-      const out = await stateProgramMap(storage, config, caller(), app,
+      const out = await stateProgramMap(storage, config, mapCaller(), app,
         data_map as Partial<DataMap>, new Date().toISOString());
       if ('refusal' in out) return fail(out.refusal.message);
       return text({ app: out.app, data_map: out.dataMap, findings: out.findings });
@@ -91,7 +95,7 @@ export function registerDataMapTools(
     zodShapeFor('aimeat_memory_hands'),
     annotationsFor('aimeat_memory_hands'),
     async ({ key }) => {
-      const out = await handsOnKey(storage, config, caller(), key);
+      const out = await handsOnKey(storage, config, mapCaller(), key);
       return text({ key: out.key, hands: out.hands, not_covered: out.notCovered });
     },
   );

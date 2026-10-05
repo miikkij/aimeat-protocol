@@ -7,10 +7,11 @@
  *   run. The full descriptor is passed as one `definition` object (validated server-side against the
  *   offer contract + DAG), so the surface stays small as the descriptor grows. Workflows belong to
  *   the owner (shared across their agents); an agent needs the `workflow:write` scope to author.
- * @structure registerWorkflowTools(mcp, storage, config, getAgentGaii, sessionScopes)
+ * @structure registerWorkflowTools(mcp, storage, config, getAgentGaii, sessionScopes, caller)
  * @usage import { registerWorkflowTools } from './workflows.js';
- *   registerWorkflowTools(mcp, storage, config, () => agentGaii, scopes);
+ *   registerWorkflowTools(mcp, storage, config, () => agentGaii, scopes, caller);
  * @version-history
+ *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.7.3 — 2026-09-26 — aimeat_workflow_save's definition says an ai step's call holds its share of
  *     maxCostUsd until it answers, the share is one attempt, and a step expected to cost more than the
@@ -55,21 +56,28 @@ import {
 import { syncWorkflowTriggers } from '../services/workflow/lifecycle.js';
 import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../services/operator-confirm.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 export function registerWorkflowTools(
   mcp: McpServer,
   storage: Storage,
   config: AimeatConfig,
   getAgentGaii: () => string,
-  sessionScopes: string[] = [],
+  _sessionScopes: string[] = [],
+  /** The session's caller (services/caller-context.ts). */
+  caller: () => CallerContext,
 ): void {
   const agentGaii = getAgentGaii();
   const owner = localAccountName(agentGaii);
   const ownerGhii = `${owner}@${config.nodeId}`;
   // This session answers for what a workflow's steps do, at save and at start, on the same words
-  // the HTTP door asks (services/workflow/step-authority.ts). An MCP session is always an agent's,
+  // the HTTP route asks (services/workflow/step-authority.ts). An MCP session is always an agent's,
   // and a save records that agent as the saver a trigger's run answers to (trigger-authority.ts).
-  const caller = { roles: ['agent'], scopes: sessionScopes, principal: agentGaii };
+  // Read per call from the session caller, so the scopes are the current request's.
+  const stepCaller = (): { roles: string[]; scopes: string[]; principal: string } => {
+    const session = caller();
+    return { roles: [...session.roles], scopes: [...session.scopes], principal: session.principal };
+  };
 
   const text = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] });
   const err = (msg: string) => ({ content: [{ type: 'text' as const, text: msg }], isError: true });
@@ -120,7 +128,7 @@ export function registerWorkflowTools(
         }
       }
 
-      const result = await saveWorkflow(storage, config, ownerGhii, owner, a.id, a.definition, agentGaii, caller);
+      const result = await saveWorkflow(storage, config, ownerGhii, owner, a.id, a.definition, agentGaii, stepCaller());
       if (result.denied) return err(`SCOPE_DENIED: ${result.denied.message}`);
       // routes/workflows.ts emits this on save. A workflow an agent authored did not appear in the
       // owner's list, which reads as the save having failed.
@@ -173,7 +181,7 @@ export function registerWorkflowTools(
       // asking for the same trial must get the same run. `target` is meaningless without a full
       // run, exactly as it is on the route.
       const mode = a.mode === 'full' ? (a.target === 'sandbox' ? 'full-sandbox' : 'full-live') : 'signals-only';
-      const result = await engine.startRun(ownerGhii, owner, a.id, { mode, ...(a.vars ? { vars: a.vars } : {}), caller });
+      const result = await engine.startRun(ownerGhii, owner, a.id, { mode, ...(a.vars ? { vars: a.vars } : {}), caller: stepCaller() });
       if ('error' in result) {
         return err(result.denied ? `SCOPE_DENIED: ${result.denied.message}` : `Could not start run:\n- ${result.error.join('\n- ')}`);
       }

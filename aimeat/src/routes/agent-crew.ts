@@ -25,6 +25,7 @@
  *   - GET    /v1/agents/:name/crew/llm        the model choice that applies now, for the runtime
  * @usage app.use(agentCrewRouter(config, storage));
  * @version-history
+ *   2026-10-05 — The crew caller is the request's CallerContext (middleware/caller.ts; secaudit 2026-10, C9).
  *   v1.3.0 — 2026-10-02 — GET .../crew/llm: the choice that applies to the agent's crew now, with
  *     thinking through the node as the default for an agent holding ai:use when the node can pay.
  *   v1.2.0 — 2026-09-01 — POST .../crew/seed. An agent the basic-agents button just created has no
@@ -47,7 +48,7 @@ import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { requireScopeUnlessSelf } from '../auth/self-or-scope.js';
 import { validateBody } from '../models/schemas.js';
-import { resolveIdentity } from '../utils/gaii.js';
+import { callerOf as requestCaller } from '../middleware/caller.js';
 import {
   crewState, crewValidate, crewTryStart, crewTryPoll, crewDraftSave, crewDraftDiscard, crewPublish, crewRestore, crewSeed, crewData,
   resolveCrewAgent, type CrewCaller, type CrewRefusal,
@@ -70,13 +71,8 @@ export function agentCrewRouter(config: AimeatConfig, storage: Storage): Router 
   const router = Router();
   const deps = { storage, config };
 
-  const callerOf = (req: Request, pipeline: string): CrewCaller => ({
-    principal: resolveIdentity(req.auth!, config.nodeId),
-    owner: req.auth!.owner as string,
-    scopes: req.auth!.scopes ?? [],
-    roles: req.auth!.roles,
-    pipeline,
-  });
+  // The request's caller (middleware/caller.ts, secaudit 2026-10, C9), in the shape the crew service takes.
+  const callerOf = (req: Request, pipeline: string): CrewCaller => ({ ...requestCaller(req, config.nodeId, storage).principalView, pipeline });
   const name = (req: Request) => decodeURIComponent(req.params.name as string);
   const refuse = (res: Response, r: CrewRefusal) => { res.status(r.status).json(error(config.nodeId, r.code, r.message, r.status, r.details)); };
 

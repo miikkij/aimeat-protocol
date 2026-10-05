@@ -14,8 +14,9 @@
  *   The tool declares its name, parameters and text answer. The capability itself lives in
  *   services/contribution-proofs.ts, which every other surface can call.
  * @structure registerAppdevProofTools()
- * @usage registerAppdevProofTools(mcp, storage, config, () => agentGaii, scopes);
+ * @usage registerAppdevProofTools(mcp, storage, config, () => agentGaii, scopes, caller);
  * @version-history
+ *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.1.0 -- 2026-08-11 -- The attach moved to services/contribution-proofs.ts and the record now
  *     goes through services/memory-write.ts. Writing it straight to storage meant a public,
@@ -31,26 +32,26 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { attachContributionProof } from '../services/contribution-proofs.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 export function registerAppdevProofTools(
     mcp: McpServer,
     storage: Storage,
     config: AimeatConfig,
-    getAgentGaii: () => string,
-    /** The session's own scopes, for the gate inside the shared memory write. */
-    sessionScopes: string[] = [],
+    _getAgentGaii: () => string,
+    /** The session's own scopes. Unused here: the session caller below carries them. */
+    _sessionScopes: string[] = [],
+    /** The session's caller (services/caller-context.ts): the agent and its scopes, for the gate
+     *  inside the shared memory write. */
+    caller: () => CallerContext,
 ): void {
-    const agentGaii = getAgentGaii();
-
     mcp.tool(
         'aimeat_appdev_proof_attach',
         descriptionFor('aimeat_appdev_proof_attach'),
         zodShapeFor('aimeat_appdev_proof_attach'),
         annotationsFor('aimeat_appdev_proof_attach'),
         async ({ subject_type, subject_id, model, verdict, evidence, test_set, tokens }) => {
-            const attached = await attachContributionProof({ storage, config }, {
-                principal: agentGaii, scopes: sessionScopes, roles: ['agent'],
-            }, {
+            const attached = await attachContributionProof({ storage, config }, caller().principalView, {
                 subjectType: subject_type,
                 subjectId: subject_id,
                 model, verdict, evidence,

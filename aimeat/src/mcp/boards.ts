@@ -9,8 +9,9 @@
  *   - registerBoardsTools() — registers all board tools and resources on an McpServer instance
  * @usage
  *   import { registerBoardsTools } from './boards.js';
- *   registerBoardsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
+ *   registerBoardsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.8.0 -- 2026-10-05 -- Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2). aimeat_board_rules_set on another person's board asks operatorOverride, as PATCH /v1/boards/:id/rules does.
  *   v1.0.0 — 2026-03-21 — Initial creation: 7 tools + 1 resource for board management via MCP
@@ -58,6 +59,7 @@ import {
 import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 /**
  * How long a post lives when neither the post nor the board names a lifetime.
@@ -109,6 +111,8 @@ export function registerBoardsTools(
     emitResourceListChanged: (agentGaii: string) => void,
     /** This session's granted scopes: the operator's reach is asked of them. */
     scopes: readonly string[] = [],
+    /** The session's caller (services/caller-context.ts). */
+    caller: () => CallerContext,
 ): void {
     const agentGaii = getAgentGaii();
 
@@ -256,7 +260,7 @@ export function registerBoardsTools(
             // two doors give the same answer. The operator's pass on another person's board is
             // operatorOverride, as on the route, so it writes the operator trail on both surfaces.
             if (board.ownerGaii !== agentGaii && !(await operatorOverride(storage, config,
-                { sub: agentGaii, roles: ['agent'], scopes },
+                caller().auth,
                 { ownerOf: board.ownerGaii, area: 'board', action: 'rules', subject: board.name }))) {
                 return { content: [{ type: 'text' as const, text: 'ACCESS_DENIED: Only the keeper of this board sets its rules. Ask them, or open a board of your own.' }], isError: true };
             }
@@ -347,7 +351,8 @@ export function registerBoardsTools(
             // the provenance stamp with the board's REAL visibility (this tool stamped every reply
             // 'public', so one on a private board carried a public-surface label), the record, the
             // change event and the subscriber fan-out.
-            const out = await createBoardReply({ storage, config }, { gaii: agentGaii, roles: ['agent'] }, {
+            const session = caller();
+            const out = await createBoardReply({ storage, config }, { gaii: session.principal, roles: [...session.roles] }, {
                 boardId: board_id, postId: post_id, body,
                 declaredProvenanceId: ai_provenance_id,
                 declaredProvenance: toDeclaredProvenance(ai_provenance),

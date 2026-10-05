@@ -9,8 +9,9 @@
  *   - registerExtensionsTools() — registers all extension tools and resources on an McpServer instance
  * @usage
  *   import { registerExtensionsTools } from './extensions.js';
- *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
+ *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v2.8.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v2.7.0 — 2026-10-05 — The action run passes the extension's capabilities to buildExtensionCtx
@@ -96,6 +97,7 @@ import { dependencyIndex, dependentsOf, visibleAppRefs, usedBySummary } from '..
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { defineAppIam } from '../services/iam/define-app-iam.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 export function registerExtensionsTools(
     mcp: McpServer,
@@ -104,8 +106,11 @@ export function registerExtensionsTools(
     getAgentGaii: () => string,
     emitResourceUpdated: (agentGaii: string, uri: string) => void,
     _emitResourceListChanged: (agentGaii: string) => void,
-    /** The session's own scopes, for the ownership guard on activate/deactivate/delete. */
-    sessionScopes: string[] = [],
+    /** The session's own scopes. Unused here: the session caller below carries them. */
+    _sessionScopes: string[] = [],
+    /** The session's caller (services/caller-context.ts), for the ownership guard on
+     *  activate/deactivate/delete and the caller an action runs as. */
+    caller: () => CallerContext,
 ): void {
     const agentGaii = getAgentGaii();
     /** The caller's owner GHII, the key the app listing decides visibility by. */
@@ -124,12 +129,16 @@ export function registerExtensionsTools(
      * carrying exactly ['agent'] (routes/agents/device-auth.ts:152). The owner's roles are not
      * copied here: the operator's reach is asked of the session (isOperatorCaller, inside
      * canManageExtensionAs), so only an operator's agent holding operator:admin carries it, the same
-     * answer REST gives. Written once so the call sites cannot drift apart.
+     * answer REST gives. The session caller's `auth` view, so the call sites cannot drift apart.
      */
     function resolveCaller(): ExtensionCaller {
-        const sub = getAgentGaii();
-        const owner = sub.includes('@') ? localAccountName(sub) : 'mcp-agent';
-        return { sub, owner, roles: ['agent'], scopes: sessionScopes };
+        return caller().auth;
+    }
+
+    /** The caller an action runs as, in the shape the sandbox context and the workspace capability take. */
+    function actionCaller(): { gaii: string; owner: string; roles: string[]; scopes: string[] } {
+        const session = caller();
+        return { gaii: session.principal, owner: session.owner, roles: [...session.roles], scopes: [...session.scopes] };
     }
 
     // ── Resource: extension details ──
@@ -278,8 +287,9 @@ export function registerExtensionsTools(
             const pay = await enforcePaywall({
                 config, storage, ext, action, callerGaii: agentGaii, res: refusal,
                 // An MCP session is an agent acting for its owner: no pay token, no internal pass,
-                // no named app tool, and no app grant that would need spend permission.
-                session: { roles: ['agent'], scopes: [], appGrantId: null },
+                // no named app tool, and no app grant that would need spend permission. The roles are
+                // the session caller's; the scopes stay empty, as they always were on this call.
+                session: { roles: [...caller().roles], scopes: [], appGrantId: null },
             });
             if (!pay.ok) {
                 return { content: [{ type: 'text' as const, text: refusal.refusal ? refusalText(refusal.refusal) : 'The call was refused.' }], isError: true };
@@ -292,22 +302,19 @@ export function registerExtensionsTools(
             // The caller's organism workspace, as this session's agent with this session's scopes,
             // when the manifest declares it (services/extension-workspace.ts). A refusal reaches
             // the caller as the action's error text, which carries the service's code and words.
-            const wsCap = attachExtensionWorkspace({ config, storage, ext, actionId: action.id,
-                caller: { gaii: agentGaii, owner: localAccountName(agentGaii), roles: ['agent'], scopes: sessionScopes } });
+            // Each consumer gets its own copy, so nothing the script does to ctx.caller reaches the
+            // lists the workspace capability and ctx.files decide on.
+            const runAs = actionCaller();
+            const wsCap = attachExtensionWorkspace({ config, storage, ext, actionId: action.id, caller: actionCaller() });
             const ctx: ExtensionCtx = buildExtensionCtx({
                 config, storage, extMemoryOwner,
                 extension: { name: ext.name, owner: ext.installedBy },
                 capabilities: capabilitiesOfRecord(ext),
                 workspace: wsCap.workspace,
-                caller: {
-                    gaii: agentGaii,
-                    owner: localAccountName(agentGaii),
-                    roles: ['agent'],
-                    // The session's own scopes, the same list the workspace capability above is
-                    // built with. A script that holds a permission word must see the same answer
-                    // through this door as through the HTTP one, or the word means two things.
-                    scopes: sessionScopes,
-                },
+                // The session's own scopes, the same list the workspace capability above is built
+                // with. A script that holds a permission word must see the same answer through this
+                // MCP tool as through the HTTP route, or the word means two things.
+                caller: runAs,
                 // Decrypted for the VM as routes/extensions/actions.ts does; the { encrypted } wrapper would silently break the script.
                 extConfig: decryptSecretFields(ext.config, getExtSecretKeys(ext), getEncryptionKey(config)),
                 instance: instance_id ? {
@@ -320,9 +327,9 @@ export function registerExtensionsTools(
                 // stores a file works over REST and answers UNAVAILABLE over MCP.
                 files: makeExtensionFiles({
                     config, storage,
-                    callerGaii: agentGaii,
-                    callerOwner: localAccountName(agentGaii),
-                    callerRoles: ['agent'], callerScopes: sessionScopes,
+                    callerGaii: runAs.gaii,
+                    callerOwner: runAs.owner,
+                    callerRoles: [...runAs.roles], callerScopes: [...runAs.scopes],
                     extName: ext.name,
                 }),
                 // Same capability as the REST road, and deliberately the same TARGET: a data package

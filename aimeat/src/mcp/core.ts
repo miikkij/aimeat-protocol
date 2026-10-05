@@ -9,8 +9,9 @@
  *   - registerCoreTools() — registers all tools and resources on an McpServer instance
  * @usage
  *   import { registerCoreTools } from './core.js';
- *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
+ *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
+ *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.33.0 — 2026-10-02 — aimeat_agents_list carries task_start, task_start_effective and
  *     task_start_held_by, like GET /v1/agents.
@@ -172,6 +173,7 @@ import { acceptWork, deliverWork } from '../services/work-lifecycle.js';
 import type { PeerInfo } from '../services/federation.js';
 import { taskStartView, scopeUseLookup } from '../services/agent-task-start-write.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 // F3: bound aimeat_memory_list so a default (and especially owner_scope) call cannot return an
 // unbounded payload. jsonContent() is the universal char-budget backstop; these caps stop the
@@ -189,6 +191,8 @@ export function registerCoreTools(
     sessionScopes: string[] = [],
     /** Known peers, for the provider resolution createWorkItem does on a cross-node commission. */
     peers: Map<string, PeerInfo> = new Map(),
+    /** The session's caller (services/caller-context.ts), for the memory write, the bin and the board post. */
+    caller: () => CallerContext,
 ): void {
     const agentGaii = getAgentGaii();
 
@@ -443,7 +447,7 @@ export function registerCoreTools(
         },
     );
 
-    registerMemoryBinTools(mcp, { storage, config, agentGaii });
+    registerMemoryBinTools(mcp, { storage, config }, caller);
 
     // ── Tool 4: aimeat_memory_write ──
     mcp.tool(
@@ -480,10 +484,8 @@ export function registerCoreTools(
             const writeGaii = target.gaii;
 
             const written = await writeMemoryRecord({ storage, config }, {
-                principal: agentGaii,
+                ...caller().principalView,
                 targetGaii: writeGaii,
-                scopes: sessionScopes,
-                roles: ['agent'],
             }, {
                 key, value, visibility,
                 groupId: visibility === 'group' ? group_id : undefined,
@@ -726,7 +728,7 @@ export function registerCoreTools(
     );
 
     // ── Board Tools (read/post) — extracted to ./core-boards.ts ──
-    registerCoreBoardTools(mcp, { storage, config, agentGaii });
+    registerCoreBoardTools(mcp, { storage, config, agentGaii }, caller);
 
     // ── Storage Tools (upload/download) — extracted to ./core-storage.ts ──
     registerCoreStorageTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);

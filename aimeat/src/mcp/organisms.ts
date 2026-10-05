@@ -9,8 +9,9 @@
  *   - registerOrganismsTools() — registers all organism tools and resources on an McpServer instance
  * @usage
  *   import { registerOrganismsTools } from './organisms.js';
- *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
+ *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9). The roster's operator answer is caller().operator(), which is isOperatorCaller for the session.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   2026-10-05 — The roster checks (the organism resource, aimeat_organism_get, aimeat_organism_members)
  *     pass isOperatorCaller's answer for the session (the caller's GAII, roles ['agent'], its scopes) to
@@ -75,7 +76,6 @@ import { writeProvenanceEcho } from './ai-provenance-result.js';
 import { provenanceForWrite } from '../services/ai-provenance.js';
 import { createOrganismRecord, updateOrganismRecord, joinOrganism, leaveOrganism } from '../services/organism-lifecycle.js';
 import { canSeeMembers, type RosterCaller } from '../services/organism-privacy.js';
-import { isOperatorCaller } from '../services/operator-override.js';
 import { emitChange } from '../services/event-bus.js';
 import { ZipSecurityError } from '../services/safe-zip.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
@@ -83,6 +83,7 @@ import { isOrganismOwner, organismOwners } from '../services/organism-ownership.
 import { agentBarred } from '../services/organism-agent-access.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 export function registerOrganismsTools(
     mcp: McpServer,
@@ -91,8 +92,11 @@ export function registerOrganismsTools(
     getAgentGaii: () => string,
     emitResourceUpdated: (agentGaii: string, uri: string) => void,
     emitResourceListChanged: (agentGaii: string) => void,
-    /** This session's granted scopes: the roster's operator check asks operator:admin of them. */
-    scopes: readonly string[] = [],
+    /** This session's granted scopes. Unused here: the session caller below carries them. */
+    _scopes: readonly string[] = [],
+    /** The session's caller (services/caller-context.ts): the roster's operator check asks
+     *  operator:admin of its scopes. */
+    caller: () => CallerContext,
 ): void {
     const agentGaii = getAgentGaii();
 
@@ -106,9 +110,10 @@ export function registerOrganismsTools(
     /** The roster caller as routes/organisms/membership.ts builds it from req.auth: the account name,
      *  and isOperatorCaller's answer for this session (the operator's agent holding operator:admin). */
     async function rosterCaller(): Promise<RosterCaller> {
+        const session = caller();
         return {
-            ownerName: getOwnerName(),
-            isOperator: await isOperatorCaller(storage, { sub: agentGaii, roles: ['agent'], scopes }),
+            ownerName: session.owner,
+            isOperator: await session.operator(),
         };
     }
 

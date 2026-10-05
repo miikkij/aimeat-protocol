@@ -18,8 +18,9 @@
  * @structure registerCommerceTools() — registers 9 tools on an McpServer instance
  * @usage
  *   import { registerCommerceTools } from './commerce.js';
- *   registerCommerceTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
+ *   registerCommerceTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.8.0 — 2026-10-01 — aimeat_commerce_psp_set refuses and gives the Wallet page link: the payment
  *     secret is screen-only (decision D5), as PUT /v1/commerce/payout/stripe already was for agents.
@@ -85,6 +86,7 @@ import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { resolveOperatorAgentName } from '../services/operator-principal.js';
 import { logger } from '../utils/logger.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 const PSP_KEY = 'commerce.psp';
 
@@ -130,8 +132,11 @@ export function registerCommerceTools(
     getAgentGaii: () => string,
     _emitResourceUpdated: (agentGaii: string, uri: string) => void,
     _emitResourceListChanged: (agentGaii: string) => void,
-    /** The session's own scopes, for the shared memory write behind putOwnerRecord(). */
+    /** The session's own scopes, for the beneficiary tools' operator and word checks. */
     sessionScopes: string[] = [],
+    /** The session's caller (services/caller-context.ts): the agent and its scopes, for the shared
+     *  memory write behind putOwnerRecord(), the offers write and the checkout's spend gate. */
+    caller: () => CallerContext,
 ): void {
     // The operator kill switch, honoured here too. routes/commerce.ts:139-146 turns the WHOLE
     // /v1/commerce surface off with a 503 when AIMEAT_COMMERCE_ENABLED=false, and that middleware
@@ -170,7 +175,7 @@ export function registerCommerceTools(
         authorisingScope: string,
     ): Promise<{ refusal: string } | { refusal: null; exchange: ReconcileReport | null }> {
         const written = await writeMemoryRecord({ storage, config }, {
-            principal: agentGaii, targetGaii: ownerGhii, scopes: sessionScopes, roles: ['agent'],
+            ...caller().principalView, targetGaii: ownerGhii,
         }, {
             key, value, visibility, tags,
             pipeline: 'mcp.commerce',
@@ -366,7 +371,7 @@ export function registerCommerceTools(
             // runs, because publishing an offers document is the same act either way. What stays
             // here is the price edit above and the answer below.
             const published = await publishAgentOffers({ storage, config }, {
-                principal: agentGaii, owner, scopes: sessionScopes, roles: ['agent'],
+                ...caller().principalView,
                 pipeline: 'mcp.offer_price_set',
                 authorisingScope: 'commerce:sell',
             }, agent_name, offers);
@@ -430,7 +435,7 @@ export function registerCommerceTools(
                 // day an app-grant or ecosystem principal can open an MCP session, contract:spend
                 // and the per-app cap apply here without anyone remembering to come back.
                 const completed = await completeSession(storage, config, session, handler, undefined, callerJwt, {
-                    sub: agentGaii, roles: ['agent'], scopes: sessionScopes, appGrantId: null,
+                    ...caller().auth, appGrantId: null,
                 });
                 return ok({ session: completed });
             } catch (err) { return commerceFail(err); }
