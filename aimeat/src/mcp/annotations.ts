@@ -137,9 +137,6 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // between "our store said no" and "Google said no".
     // Remote MCP servers. `openWorldHint` is true on all but the list, because everything else here
     // reaches a server this node does not run.
-    aimeat_workspace_space_add: { title: 'Add Workspace Space', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_workspace_sections_set: { title: 'Set Workspace Sections', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_workspace_suggestions: { title: 'Workspace Suggestions', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
 
     // ── Agents (owner's view) ──
 

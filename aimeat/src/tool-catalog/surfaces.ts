@@ -238,7 +238,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         
         
-        'aimeat_workspace_space_add', 'aimeat_workspace_sections_set', 'aimeat_workspace_suggestions',
+        
         
         
         'aimeat_app_fork', 
@@ -326,7 +326,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         
         
-        'aimeat_workspace_space_add', 'aimeat_workspace_sections_set', 'aimeat_workspace_suggestions',
+        
         
         
         
@@ -376,7 +376,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         
         
-        'aimeat_workspace_space_add', 'aimeat_workspace_sections_set', 'aimeat_workspace_suggestions',
+        
         
         
         

@@ -407,11 +407,7 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
   // ── A member's change to a workspace, and the decision on a member's suggestion: the node's REST
   //    doors, which apply the workspace's rule and decide who may decide. ──
   mcp.tool('aimeat_workspace_space_add', descriptionFor('aimeat_workspace_space_add'),
-    {
-      organism_id: z.string(), ws: z.string(),
-      spaces: z.any().describe('The space to add, { name, namespace, mode }, or an ARRAY of them. Defaults are filled.'),
-      schemas: z.any().optional().describe('Map of namespace → JSON Schema, only for records spaces added in this same call.'),
-    },
+    zodShapeFor('aimeat_workspace_space_add'),
     annotationsFor('aimeat_workspace_space_add'),
     async ({ organism_id, ws, spaces, schemas }) => {
       const body: Record<string, unknown> = { spaces: parseObj(spaces) };
@@ -421,11 +417,7 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
     });
 
   mcp.tool('aimeat_workspace_sections_set', descriptionFor('aimeat_workspace_sections_set'),
-    {
-      organism_id: z.string(), ws: z.string(),
-      space: z.string().describe('The document space, by name or namespace.'),
-      sections: z.any().describe('The WHOLE section index for that space: [{ id, name, parentId, documents:[docId], color? }].'),
-    },
+    zodShapeFor('aimeat_workspace_sections_set'),
     annotationsFor('aimeat_workspace_sections_set'),
     async ({ organism_id, ws, space, sections }) => {
       const r = await client.put(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace/sections/${encodeURIComponent(space)}?ws=${encodeURIComponent(ws)}`, { sections: parseObj(sections) });
@@ -433,15 +425,7 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
     });
 
   mcp.tool('aimeat_workspace_suggestions', descriptionFor('aimeat_workspace_suggestions'),
-    {
-      organism_id: z.string(),
-      action: z.enum(['list', 'decide']).describe("'list' = the suggestions you may see · 'decide' = approve or decline one"),
-      ws: z.string().optional().describe("action='list': only this workspace."),
-      status: z.enum(['pending', 'approved', 'declined', 'expired', 'all']).optional().describe("action='list': which ones. Default 'pending'."),
-      suggestion_id: z.string().optional().describe("action='decide': the suggestion's id."),
-      decision: z.enum(['approve', 'decline']).optional().describe("action='decide': 'approve' or 'decline'."),
-      note: z.string().optional().describe("action='decide': an optional note the member reads."),
-    },
+    zodShapeFor('aimeat_workspace_suggestions'),
     annotationsFor('aimeat_workspace_suggestions'),
     async ({ organism_id, action, ws, status, suggestion_id, decision, note }) => {
       const base = `/v1/organisms/${encodeURIComponent(organism_id)}/workspace/suggestions`;
