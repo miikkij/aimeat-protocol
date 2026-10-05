@@ -286,8 +286,8 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_v2_push_set', 'aimeat_v2_push_list', 'aimeat_v2_push_delete',
         'aimeat_v2_task_create', 'aimeat_v2_task_list', 'aimeat_v2_task_get',
         'aimeat_v2_task_status', 'aimeat_v2_task_cancel',
-        'aimeat_company_list', 'aimeat_company_create', 'aimeat_company_update',
-        'aimeat_company_front_page', 'aimeat_company_portfolio_publish',
+        
+        
         // Taking a shipped package into use, beside the company tools rather than with the
         // authoring ones on appdev. Installing is not building: it is the person's own agent
         // turning something this node ships into a copy they own, which is this surface's business.
@@ -304,7 +304,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         // Buying a package this node sells, for the person: the offer, the checkout, the renewals.
         'aimeat_package_buy',
         // The person's own welcome page, beside the company one: same act, different owner.
-        'aimeat_portfolio_publish',
+        
         'aimeat_contact_list', 'aimeat_contact_add', 'aimeat_contact_remove', 'aimeat_contact_resolve_email', 'aimeat_contact_invite',
         // Outbound connections and mail, beside the address book because that is where they meet:
         // a send takes a saved contact, and a mailbox is what it can leave through. Scopes still

@@ -400,8 +400,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     aimeat_flag_report:                       'social:write',
     aimeat_organism_join:                     'social:write',
 
-    // Stores a file, or takes one back — the same permission over the same namespace.
-    aimeat_portfolio_publish:                 'storage:write',
     // Arranging the node's pages. The word is one no wildcard carries, because what it changes is
     // what everyone sees on arrival. The read takes the same word: it carries the block vocabulary
     // the write needs, and it was open to every agent of the operator on the account role alone.
@@ -599,18 +597,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     aimeat_v2_task_create: 'task:write',
     aimeat_v2_task_status: 'task:write',
     aimeat_v2_task_cancel: 'task:write',
-
-    // Contacts (address book) — the owner's messaging graph, so the messaging scopes gate it:
-    // reading the list / resolving an email rides messages:read; editing the book (save/remove)
-    // rides messages:send (the same trust level as opening conversations on the owner's behalf).
-    // The company registry: reading the owner's companies rides company:read; registering one,
-    // filling in its legal identity, choosing its front page and publishing its page all write
-    // to a PUBLIC address, so they ride company:write.
-    aimeat_company_list: 'company:read',
-    aimeat_company_create: 'company:write',
-    aimeat_company_update: 'company:write',
-    aimeat_company_front_page: 'company:write',
-    aimeat_company_portfolio_publish: 'company:write',
 
     // Listing the book has its own word since 2026-10-01: contacts:read, the word GET /v1/contacts
     // asks, which the tool calls. The conversation fields on each row stay empty unless the caller

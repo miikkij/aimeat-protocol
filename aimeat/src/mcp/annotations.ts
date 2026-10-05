@@ -535,12 +535,6 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_v2_task_cancel: { title: 'Cancel Work', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
 
     // ── Companies (the registry + the co address family) ──
-    aimeat_company_list: { title: 'List Companies', readOnlyHint: true },
-    aimeat_company_create: { title: 'Register Company', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_company_update: { title: 'Update Company Details', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_company_front_page: { title: 'Set Company Front Page', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_company_portfolio_publish: { title: 'Publish Company Page', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_portfolio_publish: { title: 'Publish Your Welcome Page', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_surface_layout_get: { title: 'Read a Page Layout', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_surface_layout_set: { title: 'Arrange a Page', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
@@ -567,7 +561,6 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
 
     // ── Flags / moderation ──
     aimeat_flag_report: { title: 'Report Content for Moderation', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-
 
     // ── Admin (operator-only) ──
     aimeat_admin_stats: { title: 'Admin: Node Stats', readOnlyHint: true },
