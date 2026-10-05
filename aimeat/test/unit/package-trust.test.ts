@@ -23,6 +23,8 @@ import { createClaim, redeemClaim } from '../../src/services/package-claims.js';
 import { isOwnPackage } from '../../src/services/package-approvals.js';
 import { installSetRepositories } from '../../src/services/install-set-trust.js';
 import { peerCarriesAgents } from '../../src/services/federation.js';
+import { signedPackageHeaders, verifyPackageNode } from '../../src/services/package-node-auth.js';
+import { generateKeyPair } from '../../src/auth/keypair.js';
 import type { PackageRecord } from '../../src/storage/interface.js';
 
 const config = {
@@ -198,6 +200,18 @@ describe('PKG-7: concurrent grants and redeems do not overwrite each other', () 
         })));
         expect(outs.filter(o => o.ok).length).toBe(1);
         expect((await readEntitlements(s, 'g')).length).toBe(1);
+    });
+});
+
+describe('PKG-10: a signed package request is for one node and works once', () => {
+    it('the same signed headers are accepted once, and not by another node', async () => {
+        const keys = await generateKeyPair();
+        const storage = { getNodeKey: async () => ({ privateKey: keys.privateKey, publicKey: keys.publicKey }) } as unknown as Storage;
+        const peers = new Map([['aimeat-buyer-001', { nodeId: 'aimeat-buyer-001', url: 'https://b.example', publicKey: keys.publicKey, status: 'active' } as never]]);
+        const headers = await signedPackageHeaders(storage, { nodeId: 'aimeat-buyer-001' } as AimeatConfig, 'g', 'aimeat-repo-001');
+        expect(await verifyPackageNode(headers, peers, 'g', 'aimeat-other-repo')).toMatchObject({ ok: false, code: 'UNAUTHORIZED' });
+        expect(await verifyPackageNode(headers, peers, 'g', 'aimeat-repo-001')).toEqual({ ok: true, nodeId: 'aimeat-buyer-001' });
+        expect(await verifyPackageNode(headers, peers, 'g', 'aimeat-repo-001')).toMatchObject({ ok: false, code: 'REPLAYED' });
     });
 });
 

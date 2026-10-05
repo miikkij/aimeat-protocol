@@ -24,6 +24,8 @@
  *   import { pullPackage } from '../services/package-pull.js';
  *   const out = await pullPackage({ storage, config, peers }, caller, { groupId, nodeId });
  * @version-history
+ *   v1.6.0 — 2026-10-05 — Every signed pull names the repository it is for (signedPackageHeaders
+ *     audience; secaudit 2026-10, PKG-10).
  *   v1.5.0 — 2026-09-29 — With package federation off, the repository an install set named is still
  *     reached: the apply's pulls (`installSet`) and later pulls from a repository an applied set names
  *     (install-set-trust.ts). Everything else stays refused. Approved by Jouni on 2026-09-29.
@@ -273,7 +275,7 @@ export async function pullPackage(
         // Signed as this node, so a package repository can serve a private package to the nodes it
         // is entitled to (package-node-auth.ts). A public package is served whether or not it is.
         const res = await safeFetch(path, {
-            headers: await signedPackageHeaders(storage, config, groupId),
+            headers: await signedPackageHeaders(storage, config, groupId, source.nodeId),
             signal: AbortSignal.timeout(timeoutMs),
         });
         const ended = res.status === 403 ? await updatesEnded(res) : null;
@@ -435,7 +437,7 @@ export async function checkUpstream(
     let doc: AttestationDoc;
     try {
         const res = await safeFetch(url, {
-            headers: await signedPackageHeaders(deps.storage, config, up.groupId),
+            headers: await signedPackageHeaders(deps.storage, config, up.groupId, up.node),
             signal: AbortSignal.timeout(timeoutMs),
         });
         if (!res.ok) {
@@ -505,7 +507,7 @@ export async function listRepositoryPackages(
     const url = `${stripTrailingSlashes(gate.peer.url)}/v1/federation/packages`;
     try {
         const res = await safeFetch(url, {
-            headers: await signedPackageHeaders(deps.storage, deps.config, '*'),
+            headers: await signedPackageHeaders(deps.storage, deps.config, '*', nodeId),
             signal: AbortSignal.timeout(deps.config.federationTimeoutMs ?? 10000),
         });
         if (res.status === 404) return { ok: false, status: 404, code: 'NOT_A_REPOSITORY', message: `${nodeId} does not serve packages as a repository.` };

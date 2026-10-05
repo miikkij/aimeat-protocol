@@ -214,9 +214,10 @@ await test('An unsigned read of the private package answers 404', async () => {
 await test('A request naming C but signed with another key answers 401', async () => {
     const forged = await generateKeyPair();
     const timestamp = new Date().toISOString();
-    const signature = await sign(forged.privateKey, JSON.stringify({ source_node: C.nodeId, timestamp, purpose: 'package', group_id: groupOnR }));
+    const nonce = randomBytes(16).toString('hex');
+    const signature = await sign(forged.privateKey, JSON.stringify({ source_node: C.nodeId, timestamp, purpose: 'package', group_id: groupOnR, audience: R.nodeId, nonce }));
     const res = await fetch(`${R.baseUrl}/v1/packages/${encodeURIComponent(groupOnR)}/export`, {
-        headers: { 'x-source-node': C.nodeId, 'x-timestamp': timestamp, 'x-signature': signature },
+        headers: { 'x-source-node': C.nodeId, 'x-timestamp': timestamp, 'x-audience': R.nodeId, 'x-nonce': nonce, 'x-signature': signature },
     });
     assert(res.status === 401, `expected 401, got ${res.status}`);
 });

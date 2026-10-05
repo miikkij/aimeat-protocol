@@ -10,6 +10,8 @@
  *   GET /v1/packages/:groupId/entitlements · PUT and DELETE /v1/packages/:groupId/entitlements/:nodeId
  *   GET /v1/federation/packages (signed by the calling node) · GET /v1/packages/:groupId/config-needs
  * @version-history
+ *   v1.4.0 — 2026-10-05 — A grant passes the repository role (PKG-8), and the signed listing must name
+ *     this node as its audience (PKG-10; secaudit 2026-10).
  *   v1.3.0 — 2026-10-02 — A grant's new node counts against the packages-only peer cap (config.packagePeerCap).
  *   v1.2.0 — 2026-09-28 — GET /v1/packages/:groupId/config-needs: the questions a shop asks before payment.
  *   v1.1.0 — 2026-09-28 — The grant takes `node` ({ url, public_key }) and registers an unknown node as
@@ -87,7 +89,7 @@ export function registerPackageEntitlementRoutes(
         await adoptPendingPeer({ storage, peers, timeoutMs: config.federationTimeoutMs, thisNodeId: config.nodeId }, headerNode(req.headers));
         // A packages-only peer (catalogue not shared, registered with its grant) is heard for what it
         // holds, and its listing carries only that: the public catalogue is what the flag withholds.
-        const who = await verifyPackageNode(req.headers, peers, '*', Date.now(),
+        const who = await verifyPackageNode(req.headers, peers, '*', config.nodeId, Date.now(),
             async nodeId => (await entitledGroupsOf(storage, nodeId)).length > 0);
         if (!who) { res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'The listing is for peer nodes: sign the request as your node.')); return; }
         if (!who.ok) { res.status(who.status).json(error(config.nodeId, who.code, who.message)); return; }

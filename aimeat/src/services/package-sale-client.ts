@@ -17,6 +17,8 @@
  * @structure SaleRepositoryRef · saleRequest() · saleConfigNeeds() · saleGrant() · saleRevoke() ·
  *   saleOffer() · saleClaim() · redeemClaimAt()
  * @version-history
+ *   v1.3.0 — 2026-10-05 — A sale request names the repository it is for (signedSaleHeaders audience;
+ *     secaudit 2026-10, PKG-10).
  *   v1.2.0 — 2026-10-02 — saleOffer (the author's terms), saleClaim (a code for a node not known yet),
  *     redeemClaimAt (a node claims with its own key); a grant may carry `terms_id` (package sale
  *     design, phase 3).
@@ -73,7 +75,7 @@ export async function saleRequest(
     const repo = await repositoryUrl(deps, input.repository);
     if (!repo.ok) return repo;
     const body = input.method === 'PUT' || input.method === 'POST' ? (input.body ?? {}) : undefined;
-    const headers = await signedSaleHeaders(deps.storage, deps.config, input.method, input.path, body, input.purpose);
+    const headers = await signedSaleHeaders(deps.storage, deps.config, repo.nodeId, input.method, input.path, body, input.purpose);
     if (!headers['x-signature']) return { ok: false, status: 503, code: 'NODE_KEY_MISSING', message: 'This node has no key yet, so it cannot sign a sale.' };
     let res: Response;
     try {
