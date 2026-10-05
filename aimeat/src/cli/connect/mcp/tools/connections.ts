@@ -7,6 +7,7 @@
  *   seven tools locally. Thin proxies over the shared REST routes, so both surfaces behave
  *   identically and neither can drift into being the permissive one.
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.3.0 -- 2026-09-28 -- aimeat_mail_read takes store, filename, mime_type and key: the attachment
  *     is stored as a private file and the answer names it.
  *   v1.2.0 -- 2026-09-13 --aimeat_mail_send also reads the SEND_FAILED error (502 or 503) a current
@@ -18,30 +19,26 @@
  *   v1.0.0 -- 2026-08-26 -- Initial.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { refuseUnsentSend } from '../../../../tool-dispatch/tool-call-defs-connections.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
+import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerConnectionTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
   const out = (resp: { data?: unknown; ok?: boolean }) =>
     ({ content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) });
 
-  mcp.tool('aimeat_connection_providers', descriptionFor('aimeat_connection_providers'), {},
+  mcp.tool('aimeat_connection_providers', descriptionFor('aimeat_connection_providers'), zodShapeFor('aimeat_connection_providers'),
     annotationsFor('aimeat_connection_providers'),
     async () => out(await client.get('/v1/connections/providers')));
 
-  mcp.tool('aimeat_connection_list', descriptionFor('aimeat_connection_list'), {},
+  mcp.tool('aimeat_connection_list', descriptionFor('aimeat_connection_list'), zodShapeFor('aimeat_connection_list'),
     annotationsFor('aimeat_connection_list'),
     async () => out(await client.get('/v1/connections')));
 
-  mcp.tool('aimeat_connection_start', descriptionFor('aimeat_connection_start'), {
-    provider: z.string().describe("Which service, exactly as aimeat_connection_providers names it."),
-    instance: z.string().optional().describe('Only for a federated provider such as Mastodon.'),
-    return_url: z.string().optional().describe('Where the browser lands after the person approves.'),
-  }, annotationsFor('aimeat_connection_start'), async ({ provider, instance, return_url }) => out(
+  mcp.tool('aimeat_connection_start', descriptionFor('aimeat_connection_start'), zodShapeFor('aimeat_connection_start'), annotationsFor('aimeat_connection_start'), async ({ provider, instance, return_url }) => out(
     await client.post('/v1/connections/start', {
       provider, mode: 'personal',
       ...(instance ? { instance } : {}),
@@ -55,12 +52,7 @@ export function registerConnectionTools(mcp: McpServer, registry: AgentRegistry)
   const read = (connectionId: string, resource: string, params: Record<string, unknown>) =>
     client.post(`/v1/connections/${encodeURIComponent(connectionId)}/read/${encodeURIComponent(resource)}`, params);
 
-  mcp.tool('aimeat_mail_search', descriptionFor('aimeat_mail_search'), {
-    connection_id: z.string().describe('Which connected mailbox, from aimeat_connection_list.'),
-    query: z.string().optional().describe("The provider's own search syntax."),
-    limit: z.number().optional().describe('How many, default 25, max 100.'),
-    page_token: z.string().optional().describe('Continue a previous search.'),
-  }, annotationsFor('aimeat_mail_search'), async ({ connection_id, query, limit, page_token }) => out(
+  mcp.tool('aimeat_mail_search', descriptionFor('aimeat_mail_search'), zodShapeFor('aimeat_mail_search'), annotationsFor('aimeat_mail_search'), async ({ connection_id, query, limit, page_token }) => out(
     await read(connection_id, 'messages', {
       ...(query ? { query } : {}),
       ...(limit ? { limit } : {}),
@@ -68,15 +60,7 @@ export function registerConnectionTools(mcp: McpServer, registry: AgentRegistry)
     }),
   ));
 
-  mcp.tool('aimeat_mail_read', descriptionFor('aimeat_mail_read'), {
-    connection_id: z.string().describe('Which connected mailbox.'),
-    message_id: z.string().describe('The message, from aimeat_mail_search.'),
-    attachment_id: z.string().optional().describe('Fetch this attachment instead of the message body.'),
-    store: z.boolean().optional().describe("With attachment_id: store the attachment as your private file (up to the node's per-file limit) and answer its storage key, instead of its bytes. Needs storage:write."),
-    filename: z.string().optional().describe('With store: the file name, from the message parts (Gmail does not send it with the attachment).'),
-    mime_type: z.string().optional().describe('With store: the file type, from the message parts.'),
-    key: z.string().optional().describe('With store: the storage key. Default mail/<provider>/<message id>/<file name>.'),
-  }, annotationsFor('aimeat_mail_read'), async ({ connection_id, message_id, attachment_id, store, filename, mime_type, key }) => out(
+  mcp.tool('aimeat_mail_read', descriptionFor('aimeat_mail_read'), zodShapeFor('aimeat_mail_read'), annotationsFor('aimeat_mail_read'), async ({ connection_id, message_id, attachment_id, store, filename, mime_type, key }) => out(
     attachment_id
       ? await read(connection_id, 'attachment', {
         message_id, attachment_id,
@@ -88,25 +72,11 @@ export function registerConnectionTools(mcp: McpServer, registry: AgentRegistry)
       : await read(connection_id, 'message', { id: message_id }),
   ));
 
-  mcp.tool('aimeat_mail_aliases', descriptionFor('aimeat_mail_aliases'), {
-    connection_id: z.string().describe('A connected Gmail mailbox.'),
-  }, annotationsFor('aimeat_mail_aliases'), async ({ connection_id }) => out(
+  mcp.tool('aimeat_mail_aliases', descriptionFor('aimeat_mail_aliases'), zodShapeFor('aimeat_mail_aliases'), annotationsFor('aimeat_mail_aliases'), async ({ connection_id }) => out(
     await read(connection_id, 'sendAs', {}),
   ));
 
-  mcp.tool('aimeat_mail_send', descriptionFor('aimeat_mail_send'), {
-    contact_id: z.string().describe('A saved recipient. Never a free address.'),
-    subject: z.string().describe('The subject line.'),
-    body: z.string().describe('The message as plain text; the server renders and escapes it.'),
-    connection_id: z.string().optional().describe('Send through this connected mailbox of yours.'),
-    from_alias: z.string().optional().describe('A verified alias of that mailbox to send as.'),
-    kind: z.enum(['transactional', 'marketing']).optional().describe("Default 'transactional'."),
-    reply_to: z.string().optional().describe('Where a reply should go.'),
-    theme: z.string().optional()
-      .describe("What the message looks like: a built-in id (clean, space, warm, paper) or one of the owner's own."),
-    ai_disclosure: z.enum(['none', 'ai-assisted', 'ai-generated', 'autonomous']).optional()
-      .describe('Say in a header that a machine wrote this. Declare it if you wrote the body.'),
-  }, annotationsFor('aimeat_mail_send'), async ({ contact_id, subject, body, connection_id, from_alias, kind, reply_to, ai_disclosure, theme }) => out(
+  mcp.tool('aimeat_mail_send', descriptionFor('aimeat_mail_send'), zodShapeFor('aimeat_mail_send'), annotationsFor('aimeat_mail_send'), async ({ contact_id, subject, body, connection_id, from_alias, kind, reply_to, ai_disclosure, theme }) => out(
     // The outbound door, not around it: every gate lives behind this one route. A send that did not
     // go out is SEND_FAILED from a current node (502 or 503) and a 200 'failed' from an older one;
     // refuseUnsentSend makes both the same error result the CLI dispatch returns.

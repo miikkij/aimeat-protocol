@@ -248,17 +248,6 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // openWorldHint is TRUE on every one of these that leaves the node: they reach a provider whose
     // answer this node does not control, and a caller planning a retry needs to know the difference
     // between "our store said no" and "Google said no".
-    aimeat_connection_providers: { title: 'Which Services Can Be Connected', readOnlyHint: true },
-    aimeat_connection_list: { title: 'My Connected Accounts', readOnlyHint: true },
-    // It creates a pending authorization, so it is not read-only; it is idempotent in the sense
-    // that starting twice simply produces two addresses and connects nothing on its own.
-    aimeat_connection_start: { title: 'Start Connecting an Account', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
-    aimeat_mail_search: { title: 'Search a Connected Mailbox', readOnlyHint: true, openWorldHint: true },
-    aimeat_mail_read: { title: 'Read One Message', readOnlyHint: true, openWorldHint: true },
-    aimeat_mail_aliases: { title: 'Addresses This Mailbox May Send As', readOnlyHint: true, openWorldHint: true },
-    // NOT idempotent, and that is the whole point: a blind retry sends the message twice, which is
-    // the one mistake in this family a person actually notices.
-    aimeat_mail_send: { title: 'Send Mail', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     // Remote MCP servers. `openWorldHint` is true on all but the list, because everything else here
     // reaches a server this node does not run.
     aimeat_mcp_list: { title: 'Attached MCP Servers', readOnlyHint: true },

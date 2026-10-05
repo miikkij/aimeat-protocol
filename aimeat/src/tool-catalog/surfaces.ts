@@ -310,8 +310,8 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         // a send takes a saved contact, and a mailbox is what it can leave through. Scopes still
         // decide who sees which of them — reading the list of accounts, spending one, and sending
         // through one are three different words.
-        'aimeat_connection_providers', 'aimeat_connection_list', 'aimeat_connection_start',
-        'aimeat_mail_search', 'aimeat_mail_read', 'aimeat_mail_aliases', 'aimeat_mail_send',
+        
+        
         // The mail refinery: a batch that reads, classifies and files a connected mailbox.
         
         'aimeat_knowledge_list', 'aimeat_knowledge_get', 'aimeat_knowledge_contribute', 'aimeat_knowledge_links',

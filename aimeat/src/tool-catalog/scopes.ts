@@ -309,16 +309,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     // task-start floor (services/agent-task-rules.ts). memory:delete stays the undoable delete.
     aimeat_workspace_object_delete:           'memory:purge',
 
-    // Outbound connections. Four words, and the distinction between them is the design: READING the
-  // list of accounts you attached is knowing what you have, STARTING one is attaching another,
-  // publishing and sending THROUGH one is `use`, and reading what is IN one is `read-through`. An
-  // app granted the first, or the third, must not be able to open the mailbox.
-  aimeat_connection_start:                  'connections:write',
-  // Sending needs `connections:use` AND `outbound:send`; the tool is not registered without both,
-  // so a session holding one never sees a control whose only possible answer is a refusal. This map
-  // carries the mailbox half, because that is the surprising permission of the two.
-  aimeat_mail_send:                         'connections:use',
-
   // Workspace ROW spaces. `organism:write` rather than `memory:write`, because these rows are NOT
     // memory records: they live in their own table, are charged to the organism rather than to the
     // member, and are governed by workspace membership. The word also matches what the REST routes
@@ -595,16 +585,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     aimeat_contact_add: 'messages:send',
     aimeat_contact_remove: 'messages:send',
     aimeat_contact_invite: 'messages:send',
-
-    // Outbound connections, read side. `connections:read` is knowing WHAT you attached;
-    // `connections:read-through` is reading what is IN one: the mailbox, its attachments, its send-as
-    // addresses. It rode `connections:use`, the publish-and-send word, until 2026-09-24, so a grant
-    // made for publishing opened the mail (security audit A5-1). Enforced identically on the REST
-    // door, POST /v1/connections/:id/read/:resource, which the connector and CLI tools call.
-    aimeat_connection_list: 'connections:read',
-    aimeat_mail_search: 'connections:read-through',
-    aimeat_mail_read: 'connections:read-through',
-    aimeat_mail_aliases: 'connections:read-through',
 
     // Remote MCP servers. The same three-way split as connections above, and for the same reason:
     // knowing WHICH servers are attached, calling a tool THROUGH one, and attaching another are

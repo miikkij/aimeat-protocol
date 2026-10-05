@@ -23,6 +23,7 @@
  * @structure registerConnectionTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage registerConnectionTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.4.0 — 2026-09-28 — aimeat_mail_read takes store (with filename, mime_type, key): the attachment
  *     becomes a private file up to the node's per-file limit, through services/connections/attachment-store.ts.
  *   v1.3.0 — 2026-09-25 —aimeat_mail_send leaves out the `channel`, on a send and on a refusal: it
@@ -36,7 +37,6 @@
  *     It used to return a success result with a "Not sent" note, which an agent reported as sent.
  *   v1.0.0 — 2026-08-26 — Initial.
  */
-import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -52,6 +52,7 @@ import { emitResourceUpdated, emitResourceListChanged } from './resource-events.
 import { listSendAsAliases } from '../services/connections/send-mail.js';
 import { listOwnConnections, requireOwnConnection } from '../services/connections/access.js';
 import { sendOutbound, OutboundError } from '../services/outbound/outbound-service.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
@@ -90,7 +91,7 @@ export function registerConnectionTools(
     // ── Discovery ───────────────────────────────────────────────────────────────────────────────
 
     mcp.tool('aimeat_connection_providers', descriptionFor('aimeat_connection_providers'),
-        {},
+        zodShapeFor('aimeat_connection_providers'),
         annotationsFor('aimeat_connection_providers'),
         async (): Promise<TextResult> => {
             const off = capabilityOff();
@@ -101,7 +102,7 @@ export function registerConnectionTools(
         });
 
     mcp.tool('aimeat_connection_list', descriptionFor('aimeat_connection_list'),
-        {},
+        zodShapeFor('aimeat_connection_list'),
         annotationsFor('aimeat_connection_list'),
         async (): Promise<TextResult> => {
             const off = capabilityOff();
@@ -113,11 +114,7 @@ export function registerConnectionTools(
     // ── Connecting ──────────────────────────────────────────────────────────────────────────────
 
     mcp.tool('aimeat_connection_start', descriptionFor('aimeat_connection_start'),
-        {
-            provider: z.string().describe("Which service, from aimeat_connection_providers (e.g. 'google-mail')."),
-            instance: z.string().optional().describe('Only for a federated provider like Mastodon: the server address.'),
-            return_url: z.string().optional().describe('Where the browser lands after the person approves.'),
-        },
+        zodShapeFor('aimeat_connection_start'),
         annotationsFor('aimeat_connection_start'),
         async ({ provider, instance, return_url }): Promise<TextResult> => {
             const off = capabilityOff();
@@ -181,12 +178,7 @@ export function registerConnectionTools(
     };
 
     mcp.tool('aimeat_mail_search', descriptionFor('aimeat_mail_search'),
-        {
-            connection_id: z.string().describe('Which connected mailbox, from aimeat_connection_list.'),
-            query: z.string().optional().describe("The provider's own search, e.g. 'from:lasku@example.com has:attachment newer_than:90d'."),
-            limit: z.number().optional().describe('How many, default 25, max 100.'),
-            page_token: z.string().optional().describe('Continue a previous search.'),
-        },
+        zodShapeFor('aimeat_mail_search'),
         annotationsFor('aimeat_mail_search'),
         async ({ connection_id, query, limit, page_token }): Promise<TextResult> => readVia(
             connection_id, 'messages',
@@ -198,15 +190,7 @@ export function registerConnectionTools(
         ));
 
     mcp.tool('aimeat_mail_read', descriptionFor('aimeat_mail_read'),
-        {
-            connection_id: z.string().describe('Which connected mailbox.'),
-            message_id: z.string().describe('The message, from aimeat_mail_search.'),
-            attachment_id: z.string().optional().describe('Fetch one attachment instead of the message.'),
-            store: z.boolean().optional().describe('With attachment_id: store the attachment as your private file (up to the node\'s per-file limit) and answer its storage key, instead of its bytes. Needs storage:write.'),
-            filename: z.string().optional().describe('With store: the file name, from the message parts (Gmail does not send it with the attachment).'),
-            mime_type: z.string().optional().describe('With store: the file type, from the message parts.'),
-            key: z.string().optional().describe('With store: the storage key. Default mail/<provider>/<message id>/<file name>.'),
-        },
+        zodShapeFor('aimeat_mail_read'),
         annotationsFor('aimeat_mail_read'),
         async ({ connection_id, message_id, attachment_id, store, filename, mime_type, key }): Promise<TextResult> => {
             if (attachment_id && store === true) return storeVia(connection_id, { message_id, attachment_id, filename, mime_type, key });
@@ -218,7 +202,7 @@ export function registerConnectionTools(
         });
 
     mcp.tool('aimeat_mail_aliases', descriptionFor('aimeat_mail_aliases'),
-        { connection_id: z.string().describe('A connected Gmail mailbox.') },
+        zodShapeFor('aimeat_mail_aliases'),
         annotationsFor('aimeat_mail_aliases'),
         async ({ connection_id }): Promise<TextResult> => {
             const off = capabilityOff();
@@ -239,19 +223,7 @@ export function registerConnectionTools(
     // read-metrics capability exists to avoid.
     if (scopeIsCovered(scopes, 'outbound:send') && scopeIsCovered(scopes, 'connections:use')) {
         mcp.tool('aimeat_mail_send', descriptionFor('aimeat_mail_send'),
-            {
-                contact_id: z.string().describe('A saved recipient, from aimeat_contact_list. Never a free address.'),
-                subject: z.string().describe('The subject line.'),
-                body: z.string().describe('The message, as plain text. The server renders and escapes it.'),
-                connection_id: z.string().optional().describe('Send through this connected mailbox of yours, so it leaves from your own address.'),
-                from_alias: z.string().optional().describe('A verified alias of that mailbox to send as.'),
-                kind: z.enum(['transactional', 'marketing']).optional().describe("Default 'transactional'. 'marketing' is blocked by an opt-out and carries the unsubscribe link."),
-                reply_to: z.string().optional().describe('Where a reply should go, when it is not the sending address.'),
-                theme: z.string().optional()
-                    .describe("What the message looks like: a built-in id (clean, space, warm, paper) or one of the owner's own. 'clean' is the default and is what went out before themes existed. An unknown id falls back to it rather than failing the send."),
-                ai_disclosure: z.enum(['none', 'ai-assisted', 'ai-generated', 'autonomous']).optional()
-                    .describe("Say in a header that a machine wrote this. If YOU wrote the body, declare it: 'ai-generated' when you produced the text, 'ai-assisted' when a person wrote it and you edited. Optional, because the law does not oblige it for a message to one customer, and it goes in a header rather than the text because the audience for it is machines."),
-            },
+            zodShapeFor('aimeat_mail_send'),
             annotationsFor('aimeat_mail_send'),
             async ({ contact_id, subject, body, connection_id, from_alias, kind, reply_to, ai_disclosure, theme }): Promise<TextResult> => {
                 try {
