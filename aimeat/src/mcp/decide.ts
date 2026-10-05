@@ -16,6 +16,7 @@
  * @structure registerDecideTools(mcp, storage, config, getAgentGaii)
  * @usage registerDecideTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.3.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.3.0 — 2026-09-25 — aimeat_decision_review names the session's agent as the reviewer, never the
@@ -27,7 +28,6 @@
  *   v1.0.0 — 2026-09-19 — Initial (TARGET-080).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -44,6 +44,7 @@ import {
   startDecideRun, getDecideRun, listDecideRuns, resumeDecideRun, stopDecideRun, runSummary, type RunItem,
 } from '../services/decide/runs.js';
 import type { JevQuestion } from '../services/decide/limits.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerDecideTools(
   mcp: McpServer,
@@ -68,29 +69,11 @@ export function registerDecideTools(
     gaii: ownerGhii, principal: agentGaii, isOwner: false, ...(appId ? { appId } : {}),
   });
 
-  const questionsSchema = z.record(z.string(), z.object({
-    type: z.enum(['noul', 'choice', 'score']),
-    instructions: z.unknown(),
-    criteria: z.unknown().optional(),
-  })).describe('Your ids to questions. Instructions and criteria in English.');
-
   // ── aimeat_decide ──
   mcp.tool(
     'aimeat_decide',
     descriptionFor('aimeat_decide'),
-    {
-      state: z.unknown().describe('What is being judged: a string, an object with named fields, or an array.'),
-      rule: z.string().optional().describe('The id of one of the owner\'s decision rules. It holds the questions, thresholds and bands: send only the state beside it.'),
-      provider: z.string().optional().describe('The decision provider to ask (aimeat_decide_settings lists them). Leave out to let the node pick.'),
-      questions: questionsSchema.optional().describe('Required unless `rule` is given. Your ids to questions, in English.'),
-      subject: z.string().optional().describe('What the decision is about: a memory key or record id.'),
-      gates: z.string().optional().describe('What the answer decides, in plain words.'),
-      thresholds: z.record(z.string(), z.unknown()).optional().describe('The thresholds you will apply.'),
-      names: z.array(z.string()).optional().describe('Extra person names to remove before sending.'),
-      public_content: z.boolean().optional().describe('The content is already public. Honoured only when the owner\'s policy allows it.'),
-      cache: z.boolean().optional().describe('Reuse an identical earlier decision (default true).'),
-      app_id: z.string().optional().describe('App attribution for the per-app quota.'),
-    },
+    zodShapeFor('aimeat_decide'),
     annotationsFor('aimeat_decide'),
     async (a) => {
       if (!owner) return err('Could not resolve caller owner');
@@ -119,17 +102,7 @@ export function registerDecideTools(
   mcp.tool(
     'aimeat_decision_list',
     descriptionFor('aimeat_decision_list'),
-    {
-      decision_id: z.string().optional().describe('Read one decision.'),
-      subject: z.string().optional().describe('Only decisions about this subject.'),
-      rule: z.string().optional().describe('Only decisions one decision rule made (its id).'),
-      principal: z.string().optional().describe('Only decisions one principal asked for (an agent\'s full identity).'),
-      provider: z.string().optional().describe('Only decisions one decision provider answered (its id).'),
-      stats_by: z.enum(['rule', 'principal', 'provider']).optional().describe('Return the quality numbers instead, one group per rule, per principal or per provider.'),
-      app_id: z.string().optional().describe('Only decisions made for this app.'),
-      limit: z.number().optional().describe('How many (1-200, default 50).'),
-      before: z.string().optional().describe('Only decisions made before this ISO time.'),
-    },
+    zodShapeFor('aimeat_decision_list'),
     annotationsFor('aimeat_decision_list'),
     async (a) => {
       try {
@@ -163,12 +136,7 @@ export function registerDecideTools(
   mcp.tool(
     'aimeat_decision_review',
     descriptionFor('aimeat_decision_review'),
-    {
-      decision_id: z.string().describe('The decision.'),
-      outcome: z.enum(['confirmed', 'overridden']).describe('confirmed | overridden'),
-      note: z.string().optional().describe('Why, in the person\'s words.'),
-      override: z.record(z.string(), z.unknown()).optional().describe('What the person decided instead.'),
-    },
+    zodShapeFor('aimeat_decision_review'),
     annotationsFor('aimeat_decision_review'),
     async (a) => {
       try {
@@ -190,21 +158,7 @@ export function registerDecideTools(
   mcp.tool(
     'aimeat_decide_run',
     descriptionFor('aimeat_decide_run'),
-    {
-      action: z.enum(['start', 'get', 'list', 'resume', 'stop']).describe('start | get | list | resume | stop'),
-      run_id: z.string().optional().describe('The run, for get, resume and stop.'),
-      rule: z.string().optional().describe('For start: one of the owner\'s decision rules, in place of questions, thresholds and gates.'),
-      provider: z.string().optional().describe('For start: the decision provider every item is asked on.'),
-      questions: questionsSchema.optional(),
-      items: z.array(z.object({ subject: z.string(), state: z.unknown().optional() })).optional().describe('For start: [{ subject, state }].'),
-      keys: z.array(z.string()).optional().describe('For start: owner memory keys.'),
-      prefix: z.string().optional().describe('For start: every owner record under this key prefix.'),
-      fields: z.array(z.string()).optional().describe('For start: keep only these top-level fields of each state.'),
-      gates: z.string().optional().describe('What the answers decide.'),
-      thresholds: z.record(z.string(), z.unknown()).optional().describe('The thresholds you will apply.'),
-      names: z.array(z.string()).optional().describe('Extra person names to remove before sending.'),
-      app_id: z.string().optional().describe('App attribution for the per-app quota.'),
-    },
+    zodShapeFor('aimeat_decide_run'),
     annotationsFor('aimeat_decide_run'),
     async (a) => {
       if (!owner) return err('Could not resolve caller owner');
@@ -242,7 +196,7 @@ export function registerDecideTools(
   mcp.tool(
     'aimeat_decide_settings',
     descriptionFor('aimeat_decide_settings'),
-    {},
+    zodShapeFor('aimeat_decide_settings'),
     annotationsFor('aimeat_decide_settings'),
     async () => {
       try {
@@ -260,7 +214,7 @@ export function registerDecideTools(
   mcp.tool(
     'aimeat_decide_rules',
     descriptionFor('aimeat_decide_rules'),
-    { rule_id: z.string().optional().describe('Read one rule in full, with its questions, thresholds and bands.') },
+    zodShapeFor('aimeat_decide_rules'),
     annotationsFor('aimeat_decide_rules'),
     async (a) => {
       if (!owner) return err('Could not resolve caller owner');
@@ -288,10 +242,7 @@ export function registerDecideTools(
   mcp.tool(
     'aimeat_decide_rule_propose',
     descriptionFor('aimeat_decide_rule_propose'),
-    {
-      rule: z.record(z.string(), z.unknown()).describe('The proposed rule: { id, title, decides, sends, questions, thresholds, bands, use, gate, sample }. Questions in English.'),
-      reason: z.string().describe('Why this rule should exist, in a sentence the owner can decide from.'),
-    },
+    zodShapeFor('aimeat_decide_rule_propose'),
     annotationsFor('aimeat_decide_rule_propose'),
     async (a) => {
       if (!owner) return err('Could not resolve caller owner');

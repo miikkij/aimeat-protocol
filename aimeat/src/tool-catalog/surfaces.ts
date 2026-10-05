@@ -229,8 +229,8 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         'aimeat_voice_reply', 'aimeat_voice_speak',
         
-        'aimeat_decide', 'aimeat_decision_list', 'aimeat_decision_review', 'aimeat_decide_run', 'aimeat_decide_settings',
-        'aimeat_decide_rules', 'aimeat_decide_rule_propose',
+        
+        
         
         
         
@@ -250,8 +250,8 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         'aimeat_voice_reply', 'aimeat_voice_speak',
         
-        'aimeat_decide', 'aimeat_decision_list', 'aimeat_decision_review', 'aimeat_decide_run', 'aimeat_decide_settings',
-        'aimeat_decide_rules', 'aimeat_decide_rule_propose',
+        
+        
         'aimeat_memory_read', 'aimeat_memory_write', 'aimeat_memory_list', 'aimeat_memory_search', 'aimeat_memory_read_public',
         
         
