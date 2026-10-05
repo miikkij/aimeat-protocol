@@ -2623,10 +2623,10 @@
      "slug": "g-15-company-addresses",
      "cells": [
       "<strong>Company addresses</strong>",
-      "Claim <code>name.co.&lt;apex&gt;</code> and point it at an app you published or at your portfolio. A business runs on its own node; there is no separate company edition.",
+      "Claim <code>name.co.&lt;apex&gt;</code> and point it at an app you published or at your portfolio. A business runs on its own node; there is no separate company edition. The company's description says how it was made: when your AI writes it, the node records that, as it does for a board post, and a description you type yourself is not stamped.",
       "<code>/v1/companies</code>, <code>aimeat_company_*</code>"
      ],
-     "plain": "Company addresses Claim name.co.<apex> and point it at an app you published or at your portfolio. A business runs on its own node; there is no separate company edition. /v1/companies, aimeat_company_*"
+     "plain": "Company addresses Claim name.co.<apex> and point it at an app you published or at your portfolio. A business runs on its own node; there is no separate company edition. The company's description says how it was made: when your AI writes it, the node records that, as it does for a board post, and a description you type yourself is not stamped. /v1/companies, aimeat_company_*"
     },
     {
      "slug": "g-15-frictionless-data-packages",

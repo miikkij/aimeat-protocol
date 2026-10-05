@@ -14,6 +14,9 @@
  *   aimeat_company_list, _create, _update, _front_page, _portfolio_publish.
  * @usage import { registerCompanyTools } from './companies.js';
  * @version-history
+ *   2026-10-05 — aimeat_company_create and aimeat_company_update take ai_provenance and ai_provenance_id
+ *     for the description and answer the record (secaudit 2026-10, M3 follow-up; the developer's decision).
+ *     The update no longer sends the current description back, so only a new one gets a new record.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-08-08 — Initial: the company setup an AI chat can drive end to end.
  *   v1.0.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
@@ -29,7 +32,10 @@ import { emitChange } from '../services/event-bus.js';
 import { localAccountName } from '../utils/gaii.js';
 import {
     CompanyError, createCompany, updateCompany, setFrontPage, requireOwnCompany, companyAddress,
+    type CompanyProvenanceInput,
 } from '../services/company/company-service.js';
+import { toDeclaredProvenance, type AiProvenanceToolInput } from './ai-provenance-input.js';
+import { writeProvenanceEcho } from './ai-provenance-result.js';
 import { publishCompanyPortfolio } from '../services/company/company-portfolio.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { IDENTITY_FIELDS } from '../tool-catalog/definitions/companies.js';
@@ -61,7 +67,16 @@ export function registerCompanyTools(
     storage: Storage,
     config: AimeatConfig,
     getAgentGaii: () => string,
+    /** The session's scopes: declaring how a description was made needs provenance:write there too. */
+    scopes: readonly string[] = [],
 ): void {
+    /** The description's provenance input, for the agent writing it. */
+    const provenanceOf = (ai_provenance: AiProvenanceToolInput | undefined, ai_provenance_id: string | undefined): CompanyProvenanceInput => ({
+        config, principal: getAgentGaii(), scopes, pipeline: 'mcp.company',
+        ...(ai_provenance ? { declared: toDeclaredProvenance(ai_provenance) } : {}),
+        ...(ai_provenance_id ? { declaredId: ai_provenance_id } : {}),
+    });
+
     /** Companies belong to the OWNER — resolve the agent's owner GHII, never a client-supplied id. */
     const ownerGhii = (): string => {
         const owner = localAccountName(getAgentGaii());
@@ -110,7 +125,7 @@ export function registerCompanyTools(
         descriptionFor('aimeat_company_create'),
         zodShapeFor('aimeat_company_create'),
         annotationsFor('aimeat_company_create'),
-        async ({ name, slug, ...identity }) => {
+        async ({ name, slug, ai_provenance, ai_provenance_id, ...identity }) => {
             try {
                 // routes/companies.ts emits on every mutation, and the companies tab re-fetches
                 // only when the change carries this domain (companies-tab.js). Without it a company
@@ -118,8 +133,8 @@ export function registerCompanyTools(
                 emitChange('companies');
                 const company = await createCompany(storage, ownerGhii(), {
                     name, slug, ...toRecordFields(identity as IdentityInput),
-                } as never);
-                return ok({ company: wire(company) });
+                } as never, provenanceOf(ai_provenance, ai_provenance_id));
+                return ok({ company: wire(company), ...(await writeProvenanceEcho(storage, config, company.descriptionProvenanceId ?? undefined)) });
             } catch (e) { return fail(e); }
         },
     );
@@ -130,16 +145,18 @@ export function registerCompanyTools(
         descriptionFor('aimeat_company_update'),
         zodShapeFor('aimeat_company_update'),
         annotationsFor('aimeat_company_update'),
-        async ({ company_id, name, ...identity }) => {
+        async ({ company_id, name, ai_provenance, ai_provenance_id, ...identity }) => {
             try {
                 // Merge onto the CURRENT record so unmentioned fields keep their value: an update
                 // that gathers details over several turns must not blank what an earlier turn set.
                 const current = await requireOwnCompany(storage, ownerGhii(), company_id);
                 const patch = toRecordFields(identity as IdentityInput);
                 emitChange('companies');
+                // The description is left out unless the caller sent one: the service keeps a field it
+                // is not given, and a description it IS given gets a new provenance record.
                 const company = await updateCompany(storage, ownerGhii(), company_id, {
                     name: name ?? current.name,
-                    description: current.description, organismId: current.organismId,
+                    organismId: current.organismId,
                     businessId: current.businessId, vatId: current.vatId,
                     streetAddress: current.streetAddress, postalCode: current.postalCode,
                     city: current.city, country: current.country,
@@ -147,8 +164,12 @@ export function registerCompanyTools(
                     iban: current.iban, bic: current.bic,
                     einvoiceAddress: current.einvoiceAddress, einvoiceOperator: current.einvoiceOperator,
                     ...patch,
-                } as never);
-                return ok({ company: wire(company), updated_fields: Object.keys(patch) });
+                } as never, provenanceOf(ai_provenance, ai_provenance_id));
+                const wroteDescription = 'description' in patch;
+                return ok({
+                    company: wire(company), updated_fields: Object.keys(patch),
+                    ...(wroteDescription ? await writeProvenanceEcho(storage, config, company.descriptionProvenanceId ?? undefined) : {}),
+                });
             } catch (e) { return fail(e); }
         },
     );

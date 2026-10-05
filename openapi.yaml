@@ -67187,6 +67187,14 @@ paths:
                 bic: { type: string, nullable: true }
                 einvoice_address: { type: string, nullable: true }
                 einvoice_operator: { type: string, nullable: true }
+                ai_provenance:
+                  allOf:
+                    - $ref: '#/components/schemas/AiProvenanceDeclaration'
+                  description: >
+                    How the description was made. Recorded with the description and kept on the
+                    company as `descriptionProvenanceId`. A malformed block is a 400
+                    INVALID_PROVENANCE; declaring needs provenance:write.
+                ai_provenance_id: { type: string, description: 'Attach an existing provenance record of your own to the description instead.' }
       responses:
         '201': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -67222,9 +67230,42 @@ paths:
       operationId: updateCompany
       tags: [Companies]
       summary: Update a company's name and legal identity
-      description: The slug is the published address and is never moved by a rename.
+      description: >-
+        The slug is the published address and is never moved by a rename. Only the fields sent are
+        written. A description sent gets its own provenance record (`descriptionProvenanceId`); an
+        update that leaves the description out keeps the record it has.
       security: [{ BearerAuth: [] }]
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                name: { type: string, minLength: 2, maxLength: 140 }
+                description: { type: string, maxLength: 500, nullable: true }
+                organism_id: { type: string, nullable: true }
+                business_id: { type: string, nullable: true }
+                vat_id: { type: string, nullable: true }
+                street_address: { type: string, nullable: true }
+                postal_code: { type: string, nullable: true }
+                city: { type: string, nullable: true }
+                country: { type: string, minLength: 2, maxLength: 2, nullable: true }
+                email: { type: string, format: email, nullable: true }
+                phone: { type: string, nullable: true }
+                iban: { type: string, nullable: true }
+                bic: { type: string, nullable: true }
+                einvoice_address: { type: string, nullable: true }
+                einvoice_operator: { type: string, nullable: true }
+                ai_provenance:
+                  allOf:
+                    - $ref: '#/components/schemas/AiProvenanceDeclaration'
+                  description: >
+                    How the description was made. Recorded with the description and kept on the
+                    company as `descriptionProvenanceId`. A malformed block is a 400
+                    INVALID_PROVENANCE; declaring needs provenance:write.
+                ai_provenance_id: { type: string, description: 'Attach an existing provenance record of your own to the description instead.' }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/BadRequest' }

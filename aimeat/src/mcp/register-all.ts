@@ -24,6 +24,8 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   v1.20.3 — 2026-10-05 — registerCompanyTools receives the session's scopes: declaring how a company
+ *     description was made needs provenance:write there too.
  *   v1.20.2 — 2026-10-05 — registerAppManageTool no longer receives getToken: the member, plan,
  *     audit-keeping, builder and spec actions moved to services the routes call; aimeat_app_manage
  *     calls the service in place of the route over loopback HTTP (secaudit 2026-10, M6).
@@ -241,7 +243,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerDmOrganizeTools(mcp, storage, config, agentGaii);
     registerNotifyTools(mcp, storage, config, agentGaii);
     registerContactTools(mcp, storage, config, agentGaii, scopes);
-    registerCompanyTools(mcp, storage, config, agentGaii);
+    registerCompanyTools(mcp, storage, config, agentGaii, scopes);
     // peers: pulling a package from another node reads that node's address and key from the peer
     // record, never from the caller's arguments.
     registerPackageTools(mcp, storage, config, agentGaii, peers, scopes);

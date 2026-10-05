@@ -21,6 +21,9 @@
  *   requireOwnCompany · companyAddress
  * @usage const company = await createCompany(config, storage, ownerGhii, input);
  * @version-history
+ *   2026-10-05 — The description carries AI provenance (CompanyProvenanceInput): a declaration is refused
+ *     before anything is written, and the record's id is kept on the company (secaudit 2026-10, M3
+ *     follow-up; the developer's decision). The name is checked before any write on update.
  *   v1.1.1 — 2026-09-26 — setFrontPage takes both account names from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-08-08 — setFrontPage learns kind 'portfolio' and refuses it (409
  *     NO_PORTFOLIO) until a page exists, so the setting never outruns the document.
@@ -32,6 +35,7 @@ import type { Storage } from '../../storage/interface.js';
 import type { CompanyRecord, NewCompanyInput, CompanyFrontPage } from '../../models/company-schemas.js';
 import { RESERVED_SUBDOMAINS, SUBDOMAIN_RE } from '../../routes/subdomains.js';
 import { localAccountName } from '../../utils/gaii.js';
+import { provenanceForWrite, provenanceDeclarationRefusal, type DeclaredProvenance } from '../ai-provenance.js';
 
 export class CompanyError extends Error {
   constructor(public readonly code: string, public readonly statusCode: number, message: string) {
@@ -95,16 +99,66 @@ function trimOrNull(v: string | null | undefined, max: number): string | null {
   return t ? t.slice(0, max) : null;
 }
 
-export async function createCompany(storage: Storage, ownerGhii: string, input: NewCompanyInput): Promise<CompanyRecord> {
+/**
+ * Who writes a company's description and what they say about how it was made. The description is
+ * the sentence the front page and the company tools show, so it carries AI provenance like a board
+ * post: provenanceForWrite decides from the principal whether anything is minted (an owner typing it
+ * in person is not stamped; an agent's or an app's write is), and a declaration needs provenance:write.
+ */
+export interface CompanyProvenanceInput {
+  config: AimeatConfig;
+  /** The writer's resolved identity (resolveIdentity): the owner's GHII in person, an agent's GAII. */
+  principal: string;
+  /** The session's own words: a declaration needs provenance:write there too. */
+  scopes?: readonly string[];
+  declared?: DeclaredProvenance;
+  declaredId?: string;
+  /** Which interface wrote it: 'rest.companies' or 'mcp.company'. */
+  pipeline: string;
+}
+
+/** Refuse a declaration the writer may not make, before anything is written (invariant 14). */
+async function refuseDeclaration(storage: Storage, p: CompanyProvenanceInput | undefined): Promise<void> {
+  if (!p) return;
+  const refusal = await provenanceDeclarationRefusal(storage, {
+    principal: p.principal, declaredId: p.declaredId, declared: p.declared, enabled: p.config.aiProvenance, scopes: p.scopes,
+  });
+  if (refusal) throw new CompanyError(refusal.code, 403, refusal.message);
+}
+
+/** The provenance record of a description just written, or null when there is none to record. */
+async function descriptionProvenance(storage: Storage, description: string | null, p: CompanyProvenanceInput | undefined): Promise<string | null> {
+  if (!description || !p) return null;
+  const id = await provenanceForWrite(storage, {
+    principal: p.principal,
+    scopes: p.scopes,
+    content: description,
+    declaredId: p.declaredId,
+    declared: p.declared,
+    pipeline: p.pipeline,
+    // The company address serves it to anyone.
+    surface: { visibility: 'public', humanAudience: true, mediaKind: 'text' },
+    labelPolicy: p.config.aiLabelPublic,
+    nodeId: p.config.nodeId,
+    baseUrl: p.config.baseUrl,
+    enabled: p.config.aiProvenance,
+  });
+  return id ?? null;
+}
+
+export async function createCompany(storage: Storage, ownerGhii: string, input: NewCompanyInput, provenance?: CompanyProvenanceInput): Promise<CompanyRecord> {
   const name = (input.name ?? '').trim();
   if (name.length < 2 || name.length > 140) throw new CompanyError('INVALID_NAME', 400, 'name must be 2-140 characters');
   const slug = (input.slug?.trim().toLowerCase()) || slugify(name);
   assertSlug(slug);
 
+  await refuseDeclaration(storage, provenance);
   const now = new Date().toISOString();
+  const description = trimOrNull(input.description, 500);
   const record: CompanyRecord = {
     id: randomUUID(), slug, ownerGhii, name,
-    description: trimOrNull(input.description, 500),
+    description,
+    descriptionProvenanceId: await descriptionProvenance(storage, description, provenance),
     organismId: trimOrNull(input.organismId, 80),
     frontPage: { kind: 'none', target: '' },
     businessId: trimOrNull(input.businessId, 35),
@@ -133,12 +187,19 @@ export async function createCompany(storage: Storage, ownerGhii: string, input: 
   return record;
 }
 
-export async function updateCompany(storage: Storage, ownerGhii: string, id: string, input: Partial<NewCompanyInput>): Promise<CompanyRecord> {
+export async function updateCompany(storage: Storage, ownerGhii: string, id: string, input: Partial<NewCompanyInput>, provenance?: CompanyProvenanceInput): Promise<CompanyRecord> {
   const company = await requireOwnCompany(storage, ownerGhii, id);
+  const newName = input.name !== undefined ? (input.name ?? '').trim() : company.name;
+  if (newName.length < 2 || newName.length > 140) throw new CompanyError('INVALID_NAME', 400, 'name must be 2-140 characters');
+  // A new description gets its own record; an update that leaves it alone keeps the one it has.
+  const descriptionChanges = input.description !== undefined;
+  if (descriptionChanges) await refuseDeclaration(storage, provenance);
+  const description = descriptionChanges ? trimOrNull(input.description, 500) : company.description;
   const next: CompanyRecord = {
     ...company,
-    name: input.name !== undefined ? (input.name ?? '').trim() : company.name,
-    description: input.description !== undefined ? trimOrNull(input.description, 500) : company.description,
+    name: newName,
+    description,
+    descriptionProvenanceId: descriptionChanges ? await descriptionProvenance(storage, description, provenance) : company.descriptionProvenanceId,
     organismId: input.organismId !== undefined ? trimOrNull(input.organismId, 80) : company.organismId,
     businessId: input.businessId !== undefined ? trimOrNull(input.businessId, 35) : company.businessId,
     vatId: input.vatId !== undefined ? trimOrNull(input.vatId, 35) : company.vatId,
@@ -154,7 +215,6 @@ export async function updateCompany(storage: Storage, ownerGhii: string, id: str
     einvoiceOperator: input.einvoiceOperator !== undefined ? trimOrNull(input.einvoiceOperator, 35) : company.einvoiceOperator,
     updatedAt: new Date().toISOString(),
   };
-  if (next.name.length < 2 || next.name.length > 140) throw new CompanyError('INVALID_NAME', 400, 'name must be 2-140 characters');
   // The slug is the published address: renaming the company never silently moves it.
   await storage.updateCompany(next);
   return next;
