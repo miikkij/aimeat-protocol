@@ -187,15 +187,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     // (public/views/profile/agents/scope-model.js), so any of them can be taken away.
     // Reconfigure ANOTHER of the owner's agents. An agent describing itself needs nothing;
     // reaching sideways at a sibling principal with its own identity and trust score does.
-    aimeat_agent_mode_set:                    'agent:write',
-    aimeat_agent_description_set:             'agent:write',
-    aimeat_agent_run_mode_set:                'agent:write',
-    aimeat_agent_console_set:                 'agent:write',
-    aimeat_agent_basics_request:              'memory:write',
-    // A proposal IS a memory write — a record under `agents.proposals.` plus a line on the owner's
-    // open items — and the same word the sibling ask-route takes. Creating the agent is a different
-    // door with a different gate: the owner in person.
-    aimeat_agent_propose:                     'memory:write',
 
     // The destructive half: delete an app. Split from write because shipping an update and
     // removing the thing are different risks.
@@ -293,40 +284,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     // — so this parameter and POST /v1/provenance cannot answer differently.
 
     aimeat_wallet_transactions: 'wallet:read',
-    // Usage reports (GET /v1/usage/summary → wallet:read). The same word as the route it calls,
-    // because the tool IS that door: a permission enforced on one surface and not the other is a
-    // permission the owner was told they had.
-    aimeat_usage_report: 'wallet:read',
-
-    // Federated direct messages / inbox (REST: POST /v1/messages → messages:send). Distinct from the
-    // agent-dashboard aimeat_message_* tools, which are not scope-gated (agent↔own-owner only).
-    aimeat_dm_send: 'messages:send',
-    aimeat_dm_broadcast: 'messages:send',
-    aimeat_dm_ask: 'messages:send',
-    // Delegated "reply as me": send a federated DM AS THE OWNER. Its own scope so the owner grants it
-    // deliberately (it is part of the full '*' bundle; granular agents opt in separately). The sender is
-    // still derived server-side from the agent's owner, so the scope never enables cross-owner sends.
-    aimeat_dm_send_as_owner: 'messages:send-as-owner',
-    // Removing one message from the owner's mailbox, as the owner. A word of its own rather than
-    // send-as-owner: that one is already granted and is what "Reply with AI" runs on, so reusing it
-    // would hand every agent holding it the power to destroy the owner's correspondence with nobody
-    // asked. NOT part of the '*' bundle either (utils/scope-coverage.ts) -- it costs its own tick.
-    aimeat_dm_delete_as_owner: 'messages:delete-as-owner',
-    // Reading the owner's own mailbox, as the owner. `messages:read` on an agent is the agent's own
-    // messages (aimeat_dm_inbox below), so this is its own word, and NOT part of the '*' bundle: a
-    // read leaves nothing behind for the owner to see. Same doors as REST (GET /v1/messages/overview
-    // and /conversations/:id) through services/owner-mailbox-reads.ts.
-    aimeat_dm_inbox_as_owner: 'messages:read-as-owner',
-    aimeat_dm_thread_as_owner: 'messages:read-as-owner',
-    // Organising the owner's Messages list: archiving and restoring conversations, and the rules that
-    // fold, group or archive them. Its own word, NOT part of the '*' bundle: archiving deletes nothing
-    // but is how a message stops being seen. Same doors as REST (GET/PUT /v1/messages/organize and
-    // POST /v1/messages/organize/archive) through services/inbox-organize/record.ts.
-    aimeat_dm_archive_as_owner: 'messages:organize-as-owner',
-    aimeat_dm_organize_as_owner: 'messages:organize-as-owner',
-    aimeat_notify: 'notifications:send',
-    aimeat_dm_inbox: 'messages:read',
-    aimeat_dm_thread: 'messages:read',
 
     // Agent v2 messaging. Same words as the doors behind them, and the same words the DM tools take:
     // sending on this account's behalf is one permission however the turn is shaped. Registering a
@@ -345,15 +302,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     aimeat_v2_task_create: 'task:write',
     aimeat_v2_task_status: 'task:write',
     aimeat_v2_task_cancel: 'task:write',
-
-    // Listing the book has its own word since 2026-10-01: contacts:read, the word GET /v1/contacts
-    // asks, which the tool calls. The conversation fields on each row stay empty unless the caller
-    // may also read the owner's mailbox (messages:read-as-owner for an agent).
-    aimeat_contact_list: 'contacts:read',
-    aimeat_contact_resolve_email: 'messages:read',
-    aimeat_contact_add: 'messages:send',
-    aimeat_contact_remove: 'messages:send',
-    aimeat_contact_invite: 'messages:send',
 
 };
 

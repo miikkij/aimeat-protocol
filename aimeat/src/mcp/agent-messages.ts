@@ -8,6 +8,7 @@
  * @usage
  *   import { registerAgentMessageTools } from './agent-messages.js';
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.6.0 -- 2026-08-11 -- aimeat_message_send calls services/agent-message-send.ts, the same
  *     function POST /v1/agents/:name/messages calls, instead of building the record itself. Four
  *     things this copy did differently are gone with it: the create-time `processedAt` the REST twin
@@ -33,14 +34,14 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
+import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho, readProvenanceMany } from './ai-provenance-result.js';
 import { sendAgentMessage } from '../services/agent-message-send.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerAgentMessageTools(
     mcp: McpServer,
@@ -56,7 +57,7 @@ export function registerAgentMessageTools(
     mcp.tool(
         'aimeat_message_inbox',
         descriptionFor('aimeat_message_inbox'),
-        {},
+        zodShapeFor('aimeat_message_inbox'),
         annotationsFor('aimeat_message_inbox'),
         async () => {
             const messages = await storage.listPendingMessages(agentGaii);
@@ -84,20 +85,7 @@ export function registerAgentMessageTools(
     mcp.tool(
         'aimeat_message_send',
         descriptionFor('aimeat_message_send'),
-        {
-            content: z.string().min(1).max(200_000).describe('Message content (markdown supported)'),
-            thread_id: z.string().uuid().optional().describe('Thread ID to reply in (omit to start a new conversation; if you pass linked_task_id, the message auto-joins that task\'s thread)'),
-            linked_task_id: z.string().uuid().optional().describe('Link this message to a task ID. Strongly recommended for task-related messages: all messages sharing a linked_task_id are grouped into one conversation thread (the task\'s thread), instead of each message starting a new thread.'),
-            metadata: z.object({
-                tokens_used: z.number().optional().describe('Tokens consumed for this response'),
-                processing_ms: z.number().optional().describe('Processing time in ms'),
-                proposed_task: z.object({
-                    title: z.string().min(1).max(256),
-                    description: z.string().max(10_000),
-                }).optional().describe('Propose a task for user approval'),
-            }).optional().describe('Optional message metadata'),
-            ...aiProvenanceInputs,
-        },
+        zodShapeFor('aimeat_message_send'),
         annotationsFor('aimeat_message_send'),
         async ({ content, thread_id, linked_task_id, metadata, ai_provenance, ai_provenance_id }) => {
             // The record, the provenance stamp and the live-update emit are the REST route's, called
@@ -155,11 +143,7 @@ export function registerAgentMessageTools(
     mcp.tool(
         'aimeat_message_history',
         descriptionFor('aimeat_message_history'),
-        {
-            thread_id: z.string().optional().describe('Conversation thread to read (omit for recent messages across all threads)'),
-            page: z.number().int().positive().optional().describe('Page number (default 1)'),
-            per_page: z.number().int().positive().max(100).optional().describe('Messages per page (default 20, max 100)'),
-        },
+        zodShapeFor('aimeat_message_history'),
         annotationsFor('aimeat_message_history'),
         async ({ thread_id, page, per_page }) => {
             const result = await storage.listMessages(agentGaii, {

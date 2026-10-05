@@ -11,6 +11,7 @@
  *   import { registerAgentCapabilityTools } from './agent-capabilities.js';
  *   registerAgentCapabilityTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 -- 2026-05-20 -- Initial creation for Agent Dashboard Phase 2
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
@@ -23,12 +24,12 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { setAgentCapabilities } from '../services/agent-profile-write.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerAgentCapabilityTools(
     mcp: McpServer,
@@ -44,14 +45,7 @@ export function registerAgentCapabilityTools(
     mcp.tool(
         'aimeat_agent_capabilities_report',
         descriptionFor('aimeat_agent_capabilities_report'),
-        {
-            technical: z.array(z.object({
-                name: z.string().describe('Capability name (e.g. "playwright", "git", "python")'),
-                type: z.enum(['mcp', 'skill', 'tool']).describe('Capability type'),
-            })).optional().describe('Technical capabilities (MCP servers, skills, tools)'),
-            domain: z.array(z.string()).optional().describe('Domain expertise areas (e.g. "web development", "data analysis")'),
-            languages: z.array(z.string()).optional().describe('Human languages the agent can work in (e.g. "fi", "en", "de")'),
-        },
+        zodShapeFor('aimeat_agent_capabilities_report'),
         annotationsFor('aimeat_agent_capabilities_report'),
         async ({ technical, domain, languages }) => {
             // The caller reached this tool over an authenticated agent session, so the connection
@@ -83,10 +77,7 @@ export function registerAgentCapabilityTools(
     mcp.tool(
         'aimeat_agent_activity',
         descriptionFor('aimeat_agent_activity'),
-        {
-            days: z.number().optional().describe('Number of days of history to retrieve (default 30)'),
-            granularity: z.enum(['daily', 'hourly']).optional().describe('Granularity of history records (default daily)'),
-        },
+        zodShapeFor('aimeat_agent_activity'),
         annotationsFor('aimeat_agent_activity'),
         async ({ days, granularity }) => {
             const agent = await storage.getAgent(agentGaii);

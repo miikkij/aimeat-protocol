@@ -220,9 +220,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
   mcp.tool(
     'aimeat_agents_list',
     descriptionFor('aimeat_agents_list'),
-    {
-      agent_name: agentNameSchema,
-    },
+    { agent_name: agentNameSchema, ...zodShapeFor('aimeat_agents_list') },
     annotationsFor('aimeat_agents_list'),
     async ({ agent_name }) => {
       const { client } = pickAgent(registry, agent_name);

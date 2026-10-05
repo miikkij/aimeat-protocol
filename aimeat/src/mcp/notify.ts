@@ -9,6 +9,7 @@
  * @structure registerNotifyTools(mcp, storage, config, getAgentGaii)
  * @usage import { registerNotifyTools } from './notify.js';
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.1.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-09-07 — Reads `created`, not only `muted`. The try/catch below was correct and
@@ -18,24 +19,19 @@
  *   v1.0.0 — 2026-08-30 — Initial (design canvas "AIMEAT Ilmoitusten sivu", direction A).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { localAccountName } from '../utils/gaii.js';
 import { createPrincipalNotification, NotificationCreateError } from '../services/notification-create.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerNotifyTools(mcp: McpServer, storage: Storage, config: AimeatConfig, getAgentGaii: () => string): void {
     mcp.tool(
         'aimeat_notify',
         descriptionFor('aimeat_notify'),
-        {
-            title: z.string().max(200).describe('What happened, in one line; your name is put in front of it'),
-            body: z.string().max(10_000).optional().describe('The detail, a few lines at most'),
-            link: z.string().max(500).optional().describe('Where a click leads: a path on this AIMEAT starting with "/" (default: the Agents page)'),
-            type: z.string().max(64).optional().describe('A short machine word for the kind of event, e.g. report_ready'),
-        },
+        zodShapeFor('aimeat_notify'),
         annotationsFor('aimeat_notify'),
         async ({ title, body, link, type }) => {
             const gaii = getAgentGaii();

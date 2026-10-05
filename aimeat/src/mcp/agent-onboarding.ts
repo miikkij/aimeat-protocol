@@ -13,6 +13,7 @@
  *   import { registerAgentOnboardingTools } from './agent-onboarding.js';
  *   registerAgentOnboardingTools(mcp, storage, config, getAgentGaii, emitResourceUpdated);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.2.0 -- 2026-08-24 -- The status hints carry `stuck` (failed steps, or a pending
  *     accept_test_task whose task does not exist) via the shared buildStuckHint(); this surface
  *     never named support@operators before, and the REST route's hint fired only on 'failed'.
@@ -34,7 +35,6 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { refreshOnboarding, confirmOnboardingStep } from '../services/onboarding-progress.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { OnboardingStepId } from '../models/agent-onboarding-schemas.js';
 import { enrichSteps, buildStepGuide, buildOnboardingSummary, buildStuckHint } from '../services/onboarding-guide.js';
@@ -43,6 +43,7 @@ import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 type ToolTextResult = { content: Array<{ type: 'text'; text: string }>; isError?: boolean };
 
@@ -176,36 +177,22 @@ export function registerAgentOnboardingTools(
 ): void {
     const agentGaii = getAgentGaii();
 
-    mcp.tool('aimeat_onboarding_status', descriptionFor('aimeat_onboarding_status'), {}, annotationsFor('aimeat_onboarding_status'), async () => {
+    mcp.tool('aimeat_onboarding_status', descriptionFor('aimeat_onboarding_status'), zodShapeFor('aimeat_onboarding_status'), annotationsFor('aimeat_onboarding_status'), async () => {
         const status = await buildOnboardingStatus(agentGaii, storage);
         if (status.error) return asError(String(status.error));
         emitResourceUpdated(agentGaii, `aimeat://agents/${getAgentName(agentGaii)}/onboarding`);
         return asText(status);
     });
 
-    mcp.tool('aimeat_onboarding_identify_platform', descriptionFor('aimeat_onboarding_identify_platform'), {
-        platform: z.string().describe('Runtime/platform name, for example claude, openclaw, hermes, generic, or vscode'),
-        platform_version: z.string().optional().describe('Runtime/platform version if known'),
-        model: z.string().max(64).optional().describe('Primary LLM model driving this agent, for example claude-haiku-4.5 or kimi-k2.6. Self-reported and indicative — used for attribution and filtering, never auditing'),
-    }, annotationsFor('aimeat_onboarding_identify_platform'), async ({ platform, platform_version, model }) =>
+    mcp.tool('aimeat_onboarding_identify_platform', descriptionFor('aimeat_onboarding_identify_platform'), zodShapeFor('aimeat_onboarding_identify_platform'), annotationsFor('aimeat_onboarding_identify_platform'), async ({ platform, platform_version, model }) =>
         confirmStepAsText(agentGaii, 'identify_platform', { platform, platform_version, model }, storage, emitResourceUpdated));
 
-    mcp.tool('aimeat_onboarding_confirm_skill_installed', descriptionFor('aimeat_onboarding_confirm_skill_installed'), {
-        platform: z.string().describe('Runtime/platform using the bundle, for example generic, claude, openclaw, or hermes'),
-        version: z.string().describe('Bundle version if known; use local when no version is shown'),
-    }, annotationsFor('aimeat_onboarding_confirm_skill_installed'), async ({ platform, version }) =>
+    mcp.tool('aimeat_onboarding_confirm_skill_installed', descriptionFor('aimeat_onboarding_confirm_skill_installed'), zodShapeFor('aimeat_onboarding_confirm_skill_installed'), annotationsFor('aimeat_onboarding_confirm_skill_installed'), async ({ platform, version }) =>
         confirmStepAsText(agentGaii, 'install_skill', { platform, version }, storage, emitResourceUpdated));
 
-    mcp.tool('aimeat_onboarding_confirm_directives_read', descriptionFor('aimeat_onboarding_confirm_directives_read'), {
-        confirmed: z.boolean().optional().describe('Set true after reading the handbook/directives'),
-    }, annotationsFor('aimeat_onboarding_confirm_directives_read'), async ({ confirmed }) =>
+    mcp.tool('aimeat_onboarding_confirm_directives_read', descriptionFor('aimeat_onboarding_confirm_directives_read'), zodShapeFor('aimeat_onboarding_confirm_directives_read'), annotationsFor('aimeat_onboarding_confirm_directives_read'), async ({ confirmed }) =>
         confirmStepAsText(agentGaii, 'read_directives', { confirmed: confirmed ?? true }, storage, emitResourceUpdated));
 
-    mcp.tool('aimeat_onboarding_declare_services', descriptionFor('aimeat_onboarding_declare_services'), {
-        services: z.array(z.object({
-            name: z.string().describe('Service name'),
-            description: z.string().optional().describe('Short service description'),
-        })).optional().describe('Services the agent wants to declare; empty is allowed'),
-    }, annotationsFor('aimeat_onboarding_declare_services'), async ({ services }) =>
+    mcp.tool('aimeat_onboarding_declare_services', descriptionFor('aimeat_onboarding_declare_services'), zodShapeFor('aimeat_onboarding_declare_services'), annotationsFor('aimeat_onboarding_declare_services'), async ({ services }) =>
         confirmStepAsText(agentGaii, 'declare_services', { services: services ?? [] }, storage, emitResourceUpdated));
 }

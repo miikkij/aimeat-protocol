@@ -12,6 +12,7 @@
  * @structure registerDmMessageTools(mcp, storage, config, getAgentGaii, peers, scopes)
  * @usage import { registerDmMessageTools } from './dm-messages.js';
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.12.0 -- 2026-10-05 -- aimeat_dm_broadcast asks isOperatorCaller with the session (the caller's GAII, roles ['agent'], its scopes), as POST /v1/messages/broadcast now does: the operator's agent holding operator:admin may send to a node-wide audience (secaudit 2026-10, C2). The register function takes the session's scopes.
  *   v1.11.2 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
@@ -64,7 +65,6 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
@@ -78,17 +78,17 @@ import { delegateReaderFor, readOwnerOverview, readOwnerThread } from '../servic
 import { sendGroupMessage } from '../services/conversation-group.js';
 import { broadcastFromPrincipal, broadcastProvenanceStamp } from '../services/message-broadcast.js';
 import type { DeliveryCtx } from '../services/message-delivery.js';
-import { MessageAttachmentInputSchema, InteractiveQuestionSchema } from '../models/message-schemas.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { parseGaiiLoose, localAccountName } from '../utils/gaii.js';
 import { fileRefFor } from '../services/file-refs.js';
 import type { DirectMessageAttachment } from '../storage/interface.js';
-import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
+import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho, readProvenanceMany } from './ai-provenance-result.js';
 import { provenanceForWrite } from '../services/ai-provenance.js';
 import { logger } from '../utils/logger.js';
 import { isOperatorCaller } from '../services/operator-override.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 /**
  * How ONE attachment is shown to the agent reading its inbox. `ref` is the point: the descriptor used
@@ -147,16 +147,7 @@ export function registerDmMessageTools(
     mcp.tool(
         'aimeat_dm_send',
         descriptionFor('aimeat_dm_send'),
-        {
-            to: z.string().min(3).max(256).optional().describe('Recipient identity: a person (owner@node), an agent (agent#owner@node), or an app (eco:app#owner@node). A message to an agent/app is delivered to its owner\'s inbox. Use "support@operators" to reach whoever runs this node — that is the address to write to when something here does not work, when a step cannot be completed, or when you need a human decision; it opens a thread the operators answer in. Omit only when conversation_id names a group thread you are already in.'),
-            body: z.string().max(50000).optional().describe('Message body (GFM markdown). Optional only if you attach at least one file.'),
-            reply_to: z.string().uuid().optional().describe('Id of a message you are replying to (keeps the same conversation thread).'),
-            subject: z.string().min(1).max(200).optional().describe('Open a NEW topic thread with this title (instead of one endless thread with the recipient). For support@operators this is what the operators see in their list, so name the actual problem. Omit to use the default thread or continue one via conversation_id.'),
-            conversation_id: z.string().min(8).max(64).optional().describe('Continue a specific existing thread by its id (e.g. one returned by aimeat_dm_inbox, or the one a support@operators send returned). Omit for the default per-recipient thread.'),
-            attachments: z.array(MessageAttachmentInputSchema).max(20).optional()
-                .describe('Up to 20 files to attach. Upload each file first via aimeat_storage_upload (presigned), then pass its { storage_key, mime, kind, size, name } here — MCP does not carry the bytes.'),
-            ...aiProvenanceInputs,
-        },
+        zodShapeFor('aimeat_dm_send'),
         annotationsFor('aimeat_dm_send'),
         async ({ to, body, reply_to, subject, conversation_id, attachments, ai_provenance, ai_provenance_id }) => {
             const senderGhii = getAgentGaii();
@@ -289,26 +280,7 @@ export function registerDmMessageTools(
     mcp.tool(
         'aimeat_dm_broadcast',
         descriptionFor('aimeat_dm_broadcast'),
-        {
-            to: z.array(z.string().min(3).max(256)).max(500).optional()
-                .describe('Recipient identities: owner@node, agent#owner@node, eco:app#owner@node. Up to 500.'),
-            group_id: z.string().min(1).max(64).optional().describe('A Share Group whose members are the audience.'),
-            audience: z.enum(['node-users', 'federation-users']).optional()
-                .describe('Every human on this node, or across the federation. OPERATOR-ONLY: the node operator\'s own agent holding operator:admin may use it; any other agent uses `to` or `group_id`.'),
-            mode: z.enum(['broadcast', 'announcement']).optional()
-                .describe('"broadcast" (default) lets each recipient reply in their own thread; "announcement" disables replies.'),
-            subject: z.string().min(1).max(200).optional()
-                .describe('Titles the thread each recipient sees. Without it the copies land in the nameless per-pair thread.'),
-            body: z.string().max(200_000).optional().describe('Message body (GFM markdown). Optional only with attachments or questions.'),
-            attachments: z.array(MessageAttachmentInputSchema).max(20).optional()
-                .describe('Up to 20 files, each pre-uploaded via aimeat_storage_upload (presigned).'),
-            interactive: z.object({
-                role: z.literal('questions'), v: z.literal(1),
-                questions: z.array(InteractiveQuestionSchema).min(1).max(20),
-                submitLabel: z.string().max(60).optional(),
-            }).optional().describe('A question set — makes it a poll fanned out to everyone.'),
-            ...aiProvenanceInputs,
-        },
+        zodShapeFor('aimeat_dm_broadcast'),
         annotationsFor('aimeat_dm_broadcast'),
         async ({ to, group_id, audience, mode, subject, body, attachments, interactive, ai_provenance, ai_provenance_id }) => {
             const senderGhii = getAgentGaii();
@@ -374,16 +346,7 @@ export function registerDmMessageTools(
     mcp.tool(
         'aimeat_dm_send_as_owner',
         descriptionFor('aimeat_dm_send_as_owner'),
-        {
-            to: z.string().min(3).max(256).describe('Recipient identity: a person (owner@node), an agent (agent#owner@node), or an app (eco:app#owner@node).'),
-            body: z.string().max(50000).optional().describe('Message body (GFM markdown). Optional only if you attach at least one file.'),
-            reply_to: z.string().uuid().optional().describe('Id of a message you are replying to (keeps the same conversation thread).'),
-            subject: z.string().min(1).max(200).optional().describe('Open a NEW topic thread with this title. Omit to continue the owner\'s existing thread via conversation_id.'),
-            conversation_id: z.string().min(8).max(64).optional().describe('The owner\'s existing thread with the recipient (so the reply lands in that thread). Omit for the default per-pair thread.'),
-            attachments: z.array(MessageAttachmentInputSchema).max(20).optional()
-                .describe('Up to 20 files to attach, each pre-uploaded via aimeat_storage_upload (presigned).'),
-            ...aiProvenanceInputs,
-        },
+        zodShapeFor('aimeat_dm_send_as_owner'),
         annotationsFor('aimeat_dm_send_as_owner'),
         async ({ to, body, reply_to, subject, conversation_id, attachments, ai_provenance, ai_provenance_id }) => {
             const agentGaii = getAgentGaii();
@@ -479,9 +442,7 @@ export function registerDmMessageTools(
     mcp.tool(
         'aimeat_dm_delete_as_owner',
         descriptionFor('aimeat_dm_delete_as_owner'),
-        {
-            message_id: z.string().min(1).max(200).describe('Id of the message to remove, from aimeat_dm_inbox or aimeat_dm_thread.'),
-        },
+        zodShapeFor('aimeat_dm_delete_as_owner'),
         annotationsFor('aimeat_dm_delete_as_owner'),
         async ({ message_id }) => {
             const agentGaii = getAgentGaii();
@@ -506,10 +467,7 @@ export function registerDmMessageTools(
     mcp.tool(
         'aimeat_dm_inbox_as_owner',
         descriptionFor('aimeat_dm_inbox_as_owner'),
-        {
-            limit: z.number().int().positive().max(200).optional().describe('At most this many conversations, newest first (default 30, max 200).'),
-            unread_only: z.boolean().optional().describe('Only conversations with something unread.'),
-        },
+        zodShapeFor('aimeat_dm_inbox_as_owner'),
         annotationsFor('aimeat_dm_inbox_as_owner'),
         async ({ limit, unread_only }) => {
             const reader = delegateReaderFor(getAgentGaii(), config.nodeId);
@@ -555,11 +513,7 @@ export function registerDmMessageTools(
     mcp.tool(
         'aimeat_dm_thread_as_owner',
         descriptionFor('aimeat_dm_thread_as_owner'),
-        {
-            conversation_id: z.string().min(8).max(64).describe("The owner's conversation id (from aimeat_dm_inbox_as_owner or the reply context)."),
-            page: z.number().int().positive().optional().describe('Page number (default 1).'),
-            per_page: z.number().int().positive().max(200).optional().describe('Messages per page (default 50, max 200).'),
-        },
+        zodShapeFor('aimeat_dm_thread_as_owner'),
         annotationsFor('aimeat_dm_thread_as_owner'),
         async ({ conversation_id, page, per_page }) => {
             const reader = delegateReaderFor(getAgentGaii(), config.nodeId);
@@ -599,16 +553,7 @@ export function registerDmMessageTools(
     mcp.tool(
         'aimeat_dm_ask',
         descriptionFor('aimeat_dm_ask'),
-        {
-            to: z.string().min(3).max(256).describe('Recipient identity: a person (owner@node), an agent (agent#owner@node), or an app (eco:app#owner@node).'),
-            questions: z.array(InteractiveQuestionSchema).min(1).max(20)
-                .describe('1–20 questions. Each: { id, header (short chip), prompt, options:[{id,label}], multiSelect? (checkboxes), allowOther? (default true), required? }.'),
-            body: z.string().max(50000).optional().describe('Optional intro text shown above the questions (GFM markdown).'),
-            subject: z.string().min(1).max(200).optional().describe('Open a NEW topic thread with this title (else the default thread or conversation_id).'),
-            conversation_id: z.string().min(8).max(64).optional().describe('Continue a specific existing thread by its id.'),
-            submit_label: z.string().min(1).max(80).optional().describe('Optional submit-button label (the inbox defaults to a localized "Send answers").'),
-            ...aiProvenanceInputs,
-        },
+        zodShapeFor('aimeat_dm_ask'),
         annotationsFor('aimeat_dm_ask'),
         async ({ to, questions, body, subject, conversation_id, submit_label, ai_provenance, ai_provenance_id }) => {
             const senderGhii = getAgentGaii();
@@ -675,10 +620,7 @@ export function registerDmMessageTools(
     mcp.tool(
         'aimeat_dm_inbox',
         descriptionFor('aimeat_dm_inbox'),
-        {
-            page: z.number().int().positive().optional().describe('Page number (default 1).'),
-            per_page: z.number().int().positive().max(100).optional().describe('Messages per page (default 20, max 100).'),
-        },
+        zodShapeFor('aimeat_dm_inbox'),
         annotationsFor('aimeat_dm_inbox'),
         async ({ page, per_page }) => {
             const agentGaii = getAgentGaii();
@@ -709,11 +651,7 @@ export function registerDmMessageTools(
     mcp.tool(
         'aimeat_dm_thread',
         descriptionFor('aimeat_dm_thread'),
-        {
-            conversation_id: z.string().min(8).max(64).describe('Conversation id (from aimeat_dm_inbox or aimeat_dm_send).'),
-            page: z.number().int().positive().optional().describe('Page number (default 1).'),
-            per_page: z.number().int().positive().max(200).optional().describe('Messages per page (default 50, max 200).'),
-        },
+        zodShapeFor('aimeat_dm_thread'),
         annotationsFor('aimeat_dm_thread'),
         async ({ conversation_id, page, per_page }) => {
             const agentGaii = getAgentGaii();

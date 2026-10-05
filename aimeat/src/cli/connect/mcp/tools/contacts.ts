@@ -8,6 +8,7 @@
  *   behave identically: the routes decide who may call them (resolve takes an agent holding
  *   messages:read, invite one holding messages:send; the rest the owner).
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.2.1 -- 2026-09-26 -- Header only: POST /v1/contacts/invite admits an agent holding
  *     messages:send, so aimeat_contact_invite works here for the agents the server MCP serves.
  *   v1.2.0 -- 2026-08-30 -- aimeat_contact_list takes include; aimeat_contact_invite proxies
@@ -19,27 +20,17 @@
  *   v1.0.0 -- 2026-07-19 -- Initial: contact list/add/remove/resolve_email — connector-surface coverage.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
-
-/** The link shape both MCP surfaces accept, declared the same way on each. */
-const LinkSchema = z.object({
-  label: z.string().max(60).optional().describe('What to call this place.'),
-  url: z.string().max(500).describe('http(s) address.'),
-});
+import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerContactTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
   const out = (resp: { data?: unknown; ok?: boolean }) =>
     ({ content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) });
 
-  mcp.tool('aimeat_contact_list', descriptionFor('aimeat_contact_list'), {
-    q: z.string().optional().describe('Filter by id, name or email (case-insensitive substring).'),
-    state: z.enum(['pending', 'accepted', 'blocked']).optional().describe('Narrow to one consent state.'),
-    include: z.string().optional().describe('Comma-separated extras: "together" (shared organisms per person), "invites" (the owner\'s open invitation per person without an account).'),
-  }, annotationsFor('aimeat_contact_list'), async ({ q, state, include }) => {
+  mcp.tool('aimeat_contact_list', descriptionFor('aimeat_contact_list'), zodShapeFor('aimeat_contact_list'), annotationsFor('aimeat_contact_list'), async ({ q, state, include }) => {
     const params = new URLSearchParams();
     if (q) params.set('q', q);
     if (state) params.set('state', state);
@@ -48,36 +39,21 @@ export function registerContactTools(mcp: McpServer, registry: AgentRegistry): v
     return out(await client.get(`/v1/contacts${qs ? '?' + qs : ''}`));
   });
 
-  mcp.tool('aimeat_contact_invite', descriptionFor('aimeat_contact_invite'), {
-    email: z.string().max(200).describe('The address to invite; they get a link to open an account here.'),
-    message: z.string().max(1000).optional().describe('A short message from the owner, carried in the email.'),
-  }, annotationsFor('aimeat_contact_invite'), async ({ email, message }) => {
+  mcp.tool('aimeat_contact_invite', descriptionFor('aimeat_contact_invite'), zodShapeFor('aimeat_contact_invite'), annotationsFor('aimeat_contact_invite'), async ({ email, message }) => {
     return out(await client.post('/v1/contacts/invite', { email, message }));
   });
 
-  mcp.tool('aimeat_contact_add', descriptionFor('aimeat_contact_add'), {
-    contact_id: z.string().optional().describe('An identity: bare owner name, GHII, GAII, or GEAI.'),
-    name: z.string().max(140).optional().describe("A person's name, as the owner would write it (with email)."),
-    email: z.string().max(200).optional().describe("A person's email address (with name)."),
-    note: z.string().max(1000).optional().describe('Anything worth remembering about this person.'),
-    tags: z.array(z.string().max(40)).max(20).optional().describe("The owner's own labels."),
-    links: z.array(LinkSchema).max(12).optional().describe('Where else this person is.'),
-    relation: z.string().max(40).optional().describe("The owner's own word for the relationship."),
-  }, annotationsFor('aimeat_contact_add'), async ({ contact_id, name, email, note, tags, links, relation }) => {
+  mcp.tool('aimeat_contact_add', descriptionFor('aimeat_contact_add'), zodShapeFor('aimeat_contact_add'), annotationsFor('aimeat_contact_add'), async ({ contact_id, name, email, note, tags, links, relation }) => {
     // Every declared parameter is forwarded. The route decides which shape it is, so this surface
     // never has to hold a second opinion about what a contact is.
     return out(await client.post('/v1/contacts', { contact_id, name, email, note, tags, links, relation }));
   });
 
-  mcp.tool('aimeat_contact_remove', descriptionFor('aimeat_contact_remove'), {
-    contact_id: z.string().describe('The contact id to remove.'),
-  }, annotationsFor('aimeat_contact_remove'), async ({ contact_id }) => {
+  mcp.tool('aimeat_contact_remove', descriptionFor('aimeat_contact_remove'), zodShapeFor('aimeat_contact_remove'), annotationsFor('aimeat_contact_remove'), async ({ contact_id }) => {
     return out(await client.delete(`/v1/contacts/${encodeURIComponent(contact_id)}`));
   });
 
-  mcp.tool('aimeat_contact_resolve_email', descriptionFor('aimeat_contact_resolve_email'), {
-    email: z.string().describe('Email address to look up (exact match only).'),
-  }, annotationsFor('aimeat_contact_resolve_email'), async ({ email }) => {
+  mcp.tool('aimeat_contact_resolve_email', descriptionFor('aimeat_contact_resolve_email'), zodShapeFor('aimeat_contact_resolve_email'), annotationsFor('aimeat_contact_resolve_email'), async ({ email }) => {
     return out(await client.post('/v1/contacts/resolve', { email }));
   });
 }

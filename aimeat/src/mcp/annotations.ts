@@ -109,14 +109,8 @@ import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../tool-catalog/definitions.js';
 // catalog group per commit moves its entries onto the definitions, and this list only shrinks).
 const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // ── Core / discovery ──
-    aimeat_handbook_get: { title: 'Read Agent Handbook', readOnlyHint: true },
 
     // ── Onboarding ──
-    aimeat_onboarding_status: { title: 'Check Onboarding Status', readOnlyHint: true },
-    aimeat_onboarding_identify_platform: { title: 'Identify Runtime Platform', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_onboarding_confirm_skill_installed: { title: 'Confirm Skill Installed', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_onboarding_confirm_directives_read: { title: 'Confirm Directives Read', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_onboarding_declare_services: { title: 'Declare Agent Services', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
     // ── Memory ──
     aimeat_memory_read_public: { title: 'Read Public Memory', readOnlyHint: true },
@@ -198,7 +192,6 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_workspace_overview: { title: 'Workspace Structure Overview', readOnlyHint: true },
 
     // ── Agents (owner's view) ──
-    aimeat_agents_list: { title: 'List My Agents', readOnlyHint: true },
 
     // ── Tasks ──
 
@@ -210,24 +203,8 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // openWorldHint: dispatches to third-party action providers/capabilities/sandboxed code
 
     // ── Agent telemetry & capabilities ──
-    aimeat_agent_telemetry_report: { title: 'Report Agent Telemetry', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_agent_capabilities_report: { title: 'Report Agent Capabilities', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_agent_activity: { title: 'List Agent Activity', readOnlyHint: true },
-    aimeat_usage_report: { title: 'Usage Report', readOnlyHint: true },
-    aimeat_agent_statistics: { title: 'Get Agent Statistics', readOnlyHint: true },
 
     // ── Owner-managed agent classification ──
-    aimeat_agent_tags_set: { title: 'Set Agent Tags', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_agent_mode_set: { title: 'Set Agent Mode', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_agent_description_set: { title: 'Set Agent Description', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_agent_run_mode_set: { title: 'Set Agent Run Mode', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_agent_runtime_report: { title: 'Report What Code Runs This Agent', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_agent_console_set: { title: 'Set Agent Console Address', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_agent_basics_get: { title: 'Basic Agents: What and Whether', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_agent_basics_request: { title: 'Ask the Owner for the Basic Agents', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    // Idempotent because proposing a name that is already waiting returns the standing proposal
-    // rather than writing a second one.
-    aimeat_agent_propose: { title: 'Propose a New Agent', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
     // ── Crew definition (the chat path to building a JSON agent) ──
 
@@ -269,21 +246,6 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // ── Chat instances ──
 
     // ── Messages ──
-    aimeat_message_inbox: { title: 'Read Message Inbox', readOnlyHint: true },
-    aimeat_message_history: { title: 'Read Message Thread History', readOnlyHint: true },
-    aimeat_message_send: { title: 'Send Agent Message', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_dm_send: { title: 'Send Federated Direct Message', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-    aimeat_dm_broadcast: { title: 'Send One Message to Many', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-    aimeat_dm_send_as_owner: { title: 'Send Federated Direct Message As Owner', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-    aimeat_dm_delete_as_owner: { title: "Delete a Message From the Owner's Mailbox", readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
-    aimeat_dm_inbox_as_owner: { title: "Read the Owner's Mailbox", readOnlyHint: true },
-    aimeat_dm_thread_as_owner: { title: "Read a Thread From the Owner's Mailbox", readOnlyHint: true },
-    aimeat_dm_archive_as_owner: { title: "Archive or Restore the Owner's Conversations", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_dm_organize_as_owner: { title: "Organise the Owner's Messages List", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_notify: { title: 'Notify Your Owner', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_dm_ask: { title: 'Ask a Structured Question (Federated)', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-    aimeat_dm_inbox: { title: 'Read Federated DM Inbox', readOnlyHint: true },
-    aimeat_dm_thread: { title: 'Read Federated DM Thread', readOnlyHint: true },
 
     // ── Agent v2 messaging (a turn between two principals of one account) ──
     // Not openWorld: every one of these stays inside the account. The delivery target is the one
@@ -307,11 +269,6 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // ── Companies (the registry + the co address family) ──
 
     // ── Contacts (address book) ──
-    aimeat_contact_list: { title: 'List Contacts', readOnlyHint: true },
-    aimeat_contact_add: { title: 'Add Contact', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_contact_remove: { title: 'Remove Contact', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
-    aimeat_contact_resolve_email: { title: 'Resolve Email to Owner', readOnlyHint: true },
-    aimeat_contact_invite: { title: 'Invite a Person by Email', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
 
     // ── Consent ──
 
