@@ -65,6 +65,12 @@ guest receives is missing from that table, so change the table in the same commi
   scalar, the rest is read as a new key, and the action schema becomes garbage that fails validation
   as a 500 on install. Quote a description containing `: `; an install that does not parse answers
   with the line and column.
+- **Declare what the code may do beyond its own memory**: `capabilities: [network, ai, email, payments]`
+  at the top level of the manifest. The installer approves that list and the sandbox gives the code
+  nothing else: without `network`, `ctx.fetch` throws `CAPABILITY_NOT_DECLARED`, and without the
+  others `ctx.ai`, `ctx.email` and `ctx.buy` are `undefined`. A manifest without the field gets the
+  list from a broad word match on the scripts (`fetch`, `ai`, `email`, `buy`), so a computed name
+  gets nothing. The bridge's `__*` globals are deleted before the author's code runs (since 2026-10-05).
 - `aimeat_extension_install` does not upsert: pass `update: true` (it survives the presigned path).
 - **The node does not check `input` against the action's `input` schema.** The schema is published
   for callers and the market; the script checks the fields it reads.
