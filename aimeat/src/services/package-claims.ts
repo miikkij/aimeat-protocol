@@ -101,7 +101,7 @@ export async function createClaim(
  * The grant runs as the package's author on the seller's behalf, so the seller's limits apply.
  */
 export async function redeemClaim(
-    deps: { storage: Storage; peers: Map<string, PeerInfo>; timeoutMs?: number; thisNodeId?: string; peerCap?: number },
+    deps: { storage: Storage; peers: Map<string, PeerInfo>; timeoutMs?: number; thisNodeId?: string; peerCap?: number; repository?: boolean },
     input: { groupId: string; author: string; code: unknown; nodeId: string; node: { url: string; public_key: string } },
 ): Promise<EntitlementResult> {
     if (typeof input.code !== 'string' || !input.code.startsWith('pkgc_')) return fail(400, 'INVALID_INPUT', 'code is the claim code the seller gave.');
@@ -115,7 +115,7 @@ export async function redeemClaim(
     const out = await grantEntitlement(deps.storage, { owner: input.author, isOperator: false }, {
         groupId: input.groupId, nodeId: input.nodeId, updatesUntil: claim.updatesUntil, channel: claim.channel,
         note: `sold by ${claim.soldBy}${claim.note ? `: ${claim.note}` : ''}`, node: input.node, terms: claim.terms,
-    }, deps.peers, { timeoutMs: deps.timeoutMs ?? 10_000, seller: claim.soldBy, thisNodeId: deps.thisNodeId, peerCap: deps.peerCap });
+    }, deps.peers, { timeoutMs: deps.timeoutMs ?? 10_000, seller: claim.soldBy, thisNodeId: deps.thisNodeId, peerCap: deps.peerCap, repository: deps.repository });
     if (!out.ok) return out;
     const rest = { ...pending };
     delete rest[h];

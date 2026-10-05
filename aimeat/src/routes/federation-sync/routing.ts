@@ -5,6 +5,8 @@
  * @description Cross-node query routing — multi-hop relay with signed route manifest + routing-fee debit,
  *   GAII→node resolution, and cross-node work submission. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-10-05 — POST /v1/federation/cross-node/work goes only to a peer with routing on
+ *     (gatePeer 'allowRouting'); a packages-only or contact peer is refused (secaudit 2026-10, PKG-8).
  *   v1.5.0 — 2026-09-26 — The routing fee is routingFee (services/morsel.ts) on both endpoints, taken
  *     where the route begins as its first call goes out, after the address check. A balance that
  *     cannot cover it stops the route with 402 INSUFFICIENT_MORSELS before anything is sent. It goes
@@ -43,6 +45,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { buildRelayClaim } from '../../services/relay-claim.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { routingFee } from '../../services/morsel.js';
+import { gatePeer } from '../../services/federation-peer-gate.js';
 
 /**
  * Who may drive POST /v1/federation/route: this node's own account holder, or a peer relaying a hop.
@@ -397,6 +400,10 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
                 `No active peer for node ${target_node}`));
             return;
         }
+        // Work goes only to a peer this node routes to: a packages-only or contact peer has routing
+        // off, and any package author could add the former (secaudit 2026-10, PKG-8).
+        const gate = gatePeer(peers, target_node, 'allowRouting');
+        if (!gate.ok) { res.status(gate.status).json(error(config.nodeId, gate.code, gate.message)); return; }
 
         // Who asked, by the full identity: a person's GHII, an agent's GAII. The peer reads it as the
         // requester, and a bare account name names nobody there, or that node's namesake. The routing

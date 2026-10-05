@@ -27,6 +27,8 @@
  * @usage
  *   const pkg = await entitledVersion(storage, groupId, nodeId, versionParam);
  * @version-history
+ *   v1.7.0 — 2026-10-05 — A grant refuses this node's own id, and registers a new node only on a node
+ *     that runs the repository role (`repository` in the peer options; secaudit 2026-10, PKG-8).
  *   v1.6.0 — 2026-10-05 — A sale onto a grant another seller or the author made keeps the grant's
  *     channel: a later date with `channel: beta` moved the customer to beta (secaudit 2026-10, PKG-2).
  *     The second-buyer half is refused on the selling node (package-sale-checkout.ts, NODE_HELD).
@@ -168,11 +170,20 @@ export async function grantEntitlement(
     caller: { owner: string; isOperator: boolean },
     input: { groupId: string; nodeId: string; updatesUntil?: unknown; note?: unknown; channel?: unknown; node?: unknown; terms?: PackageEntitlement['terms'] },
     peers?: Map<string, PeerInfo>,
-    peerOpts: { timeoutMs?: number; seller?: string; thisNodeId?: string; peerCap?: number } = {},
+    peerOpts: { timeoutMs?: number; seller?: string; thisNodeId?: string; peerCap?: number; repository?: boolean } = {},
 ): Promise<EntitlementResult> {
     const refused = await mayManage(storage, input.groupId, caller);
     if (refused) return refused;
     if (!NODE_RE.test(input.nodeId)) return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'node_id is a node id such as "aimeat-customer-001".' };
+    // Neither this node itself nor, on a node that is not a package repository, a peer added on the
+    // side: any package author could add packages-only peers at an address they control, up to the
+    // cap, and name this node's own id among them (secaudit 2026-10, PKG-8).
+    if (peerOpts.thisNodeId && input.nodeId.toLowerCase() === peerOpts.thisNodeId.toLowerCase()) {
+        return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'node_id names this node itself, which needs no entitlement.' };
+    }
+    if (input.node !== undefined && input.node !== null && peerOpts.repository !== true) {
+        return { ok: false, status: 409, code: 'NOT_A_REPOSITORY', message: 'This node does not run the package repository role (federation.package_repository), so a grant cannot register a new node. Grant a node that is already a peer, or ask the operator.' };
+    }
     if (input.channel !== undefined && input.channel !== 'stable' && input.channel !== 'beta') {
         return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'channel is "stable" or "beta".' };
     }

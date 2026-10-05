@@ -21,6 +21,7 @@ import { appScopesOf, parseAppScopes } from '../../src/services/protected-resour
 import { grantEntitlement } from '../../src/services/package-entitlements.js';
 import { isOwnPackage } from '../../src/services/package-approvals.js';
 import { installSetRepositories } from '../../src/services/install-set-trust.js';
+import { peerCarriesAgents } from '../../src/services/federation.js';
 import type { PackageRecord } from '../../src/storage/interface.js';
 
 const config = {
@@ -159,6 +160,36 @@ describe('PKG-5: a package from another node is never the installer\'s own', () 
     it('a pulled or signed package is not, even when its descriptor names the installer as author', () => {
         const pulled = { ...base, upstream: { node: 'other-node', authorGhii: 'alice@test-node' } } as unknown as PackageRecord;
         expect(isOwnPackage(pulled, 'alice@test-node')).toBe(false);
+    });
+});
+
+describe('PKG-8: a grant adds no peer on a node that is not a repository, and never names the node itself', () => {
+    function repo(): Storage {
+        const mem = new Map<string, any>();
+        return {
+            listVersions: async () => ({ versions: [{ author: 'alice' }] }),
+            getMemory: async (ns: string, key: string) => mem.get(`${ns}/${key}`) ?? null,
+            setMemory: async (rec: any) => { mem.set(`${rec.ownerGaii}/${rec.key}`, rec); },
+        } as unknown as Storage;
+    }
+    const AUTHOR = { owner: 'alice', isOperator: false };
+
+    it('refuses this node\'s own id', async () => {
+        const out = await grantEntitlement(repo(), AUTHOR, { groupId: 'g', nodeId: 'aimeat-self-001' }, undefined, { thisNodeId: 'aimeat-self-001' });
+        expect(out.ok === false && out.code).toBe('INVALID_INPUT');
+    });
+
+    it('refuses to register a new node unless this node runs the repository role', async () => {
+        const node = { url: 'https://evil.example', public_key: 'k'.repeat(44) };
+        const out = await grantEntitlement(repo(), AUTHOR, { groupId: 'g', nodeId: 'aimeat-evil-001', node }, new Map(), { thisNodeId: 'aimeat-self-001' });
+        expect(out.ok === false && out.code).toBe('NOT_A_REPOSITORY');
+    });
+
+    it('agent resolution and port redirects use only peers that can hold an agent', () => {
+        expect(peerCarriesAgents({ status: 'active', allowRouting: false, allowMessaging: false })).toBe(false);
+        expect(peerCarriesAgents({ status: 'active', allowRouting: false, allowMessaging: true })).toBe(true);
+        expect(peerCarriesAgents({ status: 'active' })).toBe(true);
+        expect(peerCarriesAgents({ status: 'suspended' })).toBe(false);
     });
 });
 

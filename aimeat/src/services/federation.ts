@@ -11,6 +11,8 @@
  *   - gaiiCache/peerFailures: in-memory resolution cache and consecutive-failure counters
  *
  * @version-history
+ *   v1.6.0 — 2026-10-05 — peerCarriesAgents: agent resolution asks, and names a GAII to, only peers
+ *     with routing or messaging on, never a packages-only peer (secaudit 2026-10, PKG-8).
  *   v1.5.0 — 2026-10-01 — A peer purged at the end of its de-peering grace takes its recorded origin
  *     and any pending registration with it (peer-origin.ts forgetPeer), so the name is free.
  *   v1.4.0 — 2026-09-26 — resolveGaii answers local for a person of this node (a GHII with a record
@@ -125,6 +127,16 @@ export interface PeerInfo {
 }
 
 /**
+ * Whether an active peer can be where an agent lives: one with routing or messaging on. A
+ * packages-only peer (a `contact` tier with both off, package-peer-register.ts) is a source of
+ * packages and nothing else, and any package author could add one at an address they control, so
+ * agent resolution and an agent's port redirect never go to it (secaudit 2026-10, PKG-8).
+ */
+export function peerCarriesAgents(peer: Pick<PeerInfo, 'status' | 'allowRouting' | 'allowMessaging'>): boolean {
+    return peer.status === 'active' && (peer.allowRouting !== false || peer.allowMessaging !== false);
+}
+
+/**
  * Resolve which node hosts a GAII. Checks local cache first, then local storage,
  * then falls back to asking peers.
  */
@@ -165,7 +177,7 @@ export async function resolveGaii(
     const atIdx = gaii.lastIndexOf('@');
     if (atIdx !== -1) {
         const nodeHint = gaii.substring(atIdx + 1);
-        const peer = [...peers.values()].find(p => p.nodeId === nodeHint && p.status === 'active');
+        const peer = [...peers.values()].find(p => p.nodeId === nodeHint && peerCarriesAgents(p));
         if (peer) {
             gaiiCache.set(gaii, { nodeId: nodeHint, nodeUrl: peer.url, expiresAt: Date.now() + CACHE_TTL_MS });
             return { nodeId: nodeHint, nodeUrl: peer.url, local: false };
@@ -173,7 +185,8 @@ export async function resolveGaii(
     }
 
     // 4. Broadcast resolve to peers
-    const activePeers = [...peers.values()].filter(p => p.status === 'active');
+    // Peers that can hold an agent: a packages-only peer is told nobody's GAII (PKG-8).
+    const activePeers = [...peers.values()].filter(peerCarriesAgents);
     for (const peer of activePeers) {
         try {
             const resp = await fetch(`${peer.url}/v1/agents/${encodeURIComponent(gaii)}`, {
