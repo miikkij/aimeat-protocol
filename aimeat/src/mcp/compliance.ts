@@ -25,10 +25,10 @@
  *   import { registerComplianceTools } from './compliance.js';
  *   registerComplianceTools(mcp, storage, config, getAgentGaii);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-08-23 — BR-02, ring 1 (node-wide).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
@@ -43,6 +43,7 @@ import {
   writeQuestionnaire, writeUseCases, listStoredReports, readStoredReport, storedReportKind,
 } from '../services/compliance-register.js';
 import { saveComplianceSnapshot } from '../services/compliance-monthly-job.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
 const refuse = (message: string) => ({ content: [{ type: 'text' as const, text: message }], isError: true });
@@ -74,14 +75,7 @@ export function registerComplianceTools(
   mcp.tool(
     'aimeat_compliance_report',
     descriptionFor('aimeat_compliance_report'),
-    {
-      scope: z.enum(['mine', 'node']).optional()
-        .describe('Whose report. "mine" (the default) is your owner\'s own slice; "node" is the whole installation and is operator-only.'),
-      since_days: z.number().int().min(1).max(3650).optional()
-        .describe('Rolling window in days (default 30). Ignored when month is given.'),
-      month: z.string().optional()
-        .describe('A whole calendar month, YYYY-MM. Wins over since_days.'),
-    },
+    zodShapeFor('aimeat_compliance_report'),
     annotationsFor('aimeat_compliance_report'),
     async ({ scope, since_days, month }) => {
       if (month && !MONTH_RE.test(month)) {
@@ -102,11 +96,7 @@ export function registerComplianceTools(
   mcp.tool(
     'aimeat_compliance_register_read',
     descriptionFor('aimeat_compliance_register_read'),
-    {
-      part: z.enum(['draft', 'usecases', 'questionnaire']).describe('Which document to read. Start with "draft".'),
-      since_days: z.number().int().min(1).max(3650).optional()
-        .describe('For "draft": how far back to look for activity (default 30).'),
-    },
+    zodShapeFor('aimeat_compliance_register_read'),
     annotationsFor('aimeat_compliance_register_read'),
     async ({ part, since_days }) => {
       const denied = await gate(COMPLIANCE_READ_SCOPE);
@@ -125,12 +115,7 @@ export function registerComplianceTools(
   mcp.tool(
     'aimeat_compliance_register_write',
     descriptionFor('aimeat_compliance_register_write'),
-    {
-      part: z.enum(['usecases', 'questionnaire']).describe('Which document to replace.'),
-      value: z.record(z.string(), z.unknown()).describe('The whole document — this replaces, it does not merge.'),
-      dry_run: z.boolean().optional()
-        .describe('Validate and return what would be stored, storing nothing.'),
-    },
+    zodShapeFor('aimeat_compliance_register_write'),
     annotationsFor('aimeat_compliance_register_write'),
     async ({ part, value, dry_run }) => {
       const denied = await gate(COMPLIANCE_WRITE_SCOPE);
@@ -183,13 +168,7 @@ export function registerComplianceTools(
   mcp.tool(
     'aimeat_compliance_snapshot',
     descriptionFor('aimeat_compliance_snapshot'),
-    {
-      action: z.enum(['list', 'read', 'save']).describe('What to do. Start with "list".'),
-      id: z.string().optional()
-        .describe('For "read": which stored report, e.g. 2026-08 or 2026-08-23-1930.'),
-      since_days: z.number().int().min(1).max(3650).optional()
-        .describe('For "save": the window the snapshot covers (default 30).'),
-    },
+    zodShapeFor('aimeat_compliance_snapshot'),
     annotationsFor('aimeat_compliance_snapshot'),
     async ({ action, id, since_days }) => {
       // Saving adds a node-wide document to what the installation keeps, so it asks for the write

@@ -600,7 +600,6 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // Replacing a list is not destructive (the previous one was a setting, not data), and setting
     // the same list twice leaves the same list.
     aimeat_admin_cors_set: { title: 'Admin: Set Allowed Origins', readOnlyHint: false, destructiveHint: false, idempotentHint: true },
-    aimeat_compliance_report: { title: 'Compliance: Node Report', readOnlyHint: true },
     // Creates accounts, installs and organisms; applying again creates nothing twice, and it reaches
     // the package repository named in the set.
     aimeat_admin_install_set: { title: 'Admin: Apply an Install Set', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
@@ -622,14 +621,6 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // remove: true deletes a face and its files, so the tool as a whole is destructive.
     aimeat_theme_font_save: { title: 'Themes: add, change or remove a face (font)', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     aimeat_memory_hands: { title: 'Memory: who has written here', readOnlyHint: true },
-    aimeat_compliance_register_read: { title: 'Compliance: Read Register', readOnlyHint: true },
-    // destructiveHint: it REPLACES the document rather than merging into it, so a partial write
-    // silently drops every entry the caller did not resend.
-    aimeat_compliance_register_write: { title: 'Compliance: Replace Register', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
-    // Not readOnly, because action="save" adds a record; not destructive, because it only ever adds
-    // one, and a second save in the same minute writes a new version of that minute rather than
-    // replacing anything a person would miss.
-    aimeat_compliance_snapshot: { title: 'Compliance: Kept Reports', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     // destructiveHint: mints morsels (irreversible ledger change, financial action)
     aimeat_admin_mint: { title: 'Admin: Mint Morsels', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
 

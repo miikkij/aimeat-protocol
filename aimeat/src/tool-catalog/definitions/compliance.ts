@@ -18,21 +18,26 @@
  * @structure complianceTools — the four definitions
  * @usage imported by catalog/definitions.ts into CLI_FALLBACK_TOOL_DEFINITIONS
  * @version-history
+ *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
+ *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
  *   v1.1.0 — 2026-08-23 — aimeat_compliance_snapshot: what the installation has kept, and keeping
  *     one now. The schedule was writing reports nothing could read back.
  *   v1.0.0 — 2026-08-23 — BR-02, ring 1 (node-wide).
  */
+import { z } from 'zod';
 import { agentEverywhere, type AimeatToolDefinition } from './types.js';
 
-export const complianceTools: AimeatToolDefinition[] = [
+export const complianceTools = [
     {
         name: 'aimeat_compliance_report',
         description: 'The compliance report: AI activity joined to the written record of what AI is used for, and the difference between them. Defaults to scope="mine" — your owner\'s own slice, which any session may read and which needs no special permission. scope="node" is the whole installation across every account, and needs the exact permission "compliance:read" plus an account that runs the installation; no wildcard carries that word. Read `gaps` first — each entry is a model used and mentioned in no entry, an entry with unanswered questions and so no risk class, public content published without a label, or an app that says it generates content while the publish check found a disclosure gap. Read `not_covered` second, and note the two scopes state DIFFERENT limits: a total without its population reads as coverage. Use aimeat_compliance_register_read to see the written record raw, and aimeat_compliance_register_write to change it.',
         caller: 'agent',
         visibility: agentEverywhere,
+        annotations: { title: 'Compliance: Node Report', readOnlyHint: true },
+        surfaces: ['admin'],
         input: {
             scope: { type: 'string', enum: ['mine', 'node'], description: 'Whose report. "mine" (the default) is your owner\'s own slice; "node" is the whole installation and is operator-only.' },
-            since_days: { type: 'number', description: 'Rolling window in days (default 30). Ignored when month is given.' },
+            since_days: { type: 'number', description: 'Rolling window in days (default 30). Ignored when month is given.', zod: z.number().int().min(1).max(3650) },
             month: { type: 'string', description: 'A whole calendar month, YYYY-MM. Wins over since_days — a rolling window filed under a month\'s name is wrong in an archive somebody reads later.' },
         },
     },
@@ -41,9 +46,17 @@ export const complianceTools: AimeatToolDefinition[] = [
         description: 'Operator-only. Read what the compliance report is built from. part="draft" is the one to start with: the node composes a first draft of the register out of what actually ran, grouped by which agent or app called the model rather than by the model, with each agent\'s own name and description as the entry, and the two questions it can answer from the record already answered and marked as evidence. Nothing in a draft is stored. part="usecases" is the register as stored; part="questionnaire" is the risk-classification question set — the classes, and each question with the answers that imply each class. The question set is DATA and can be edited without a release. Read before writing, because a write replaces the whole document. Needs the exact permission "compliance:read".',
         caller: 'operator',
         visibility: agentEverywhere,
+        annotations: { title: 'Compliance: Read Register', readOnlyHint: true },
+        // The node-wide compliance report and the register behind it. The handler resolves the caller's
+        // OWNER and refuses a non-operator, so the word alone gets nobody in; it is here as well because
+        // a tool is REGISTERED according to this table, and neither word is carried by any wildcard
+        // (SCOPES_OUTSIDE_WILDCARD). Read and write are separate words because they fail differently:
+        // reading discloses every account's AI activity, writing changes what the report says.
+        scope: 'compliance:read',
+        surfaces: ['admin'],
         input: {
             part: { type: 'string', required: true, enum: ['draft', 'usecases', 'questionnaire'], description: 'Which document to read. Start with "draft".' },
-            since_days: { type: 'number', description: 'For "draft": how far back to look for activity (default 30).' },
+            since_days: { type: 'number', description: 'For "draft": how far back to look for activity (default 30).', zod: z.number().int().min(1).max(3650) },
         },
     },
     {
@@ -51,6 +64,11 @@ export const complianceTools: AimeatToolDefinition[] = [
         description: 'Operator-only. Replace one of the two stored documents. REPLACES, does not merge: send every use case or every question you want to keep, so read first. Pass dry_run=true to get back exactly what WOULD be stored, validated, without storing it — show that to the person and let them approve it before the real write. part="usecases" expects { usecases: [...] }; part="questionnaire" expects the whole set with version, classes, defaultClass and questions. Mark each answer in answerSources as "human", "ai" or "evidence": an auditor\'s question is which of the three, and answers that all read as considered would answer it wrongly. A question set naming a class it does not define, a choice question with no options, or a duplicate id is refused rather than stored. Adding a question takes effect on the next report with no release. Saving re-classifies everything: an entry whose answers no longer cover every question becomes unclassified and appears in the gap list. Needs the exact permission "compliance:write" — "compliance:read" is refused here, and no wildcard carries either.',
         caller: 'operator',
         visibility: agentEverywhere,
+        // destructiveHint: it REPLACES the document rather than merging into it, so a partial write
+        // silently drops every entry the caller did not resend.
+        annotations: { title: 'Compliance: Replace Register', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+        scope: 'compliance:write',
+        surfaces: ['admin'],
         input: {
             part: { type: 'string', required: true, enum: ['usecases', 'questionnaire'], description: 'Which document to replace.' },
             value: { type: 'object', required: true, description: 'The whole document. For "usecases", { usecases: [...] }. For "questionnaire", { version, note, classes, defaultClass, questions }.' },
@@ -62,10 +80,18 @@ export const complianceTools: AimeatToolDefinition[] = [
         description: 'Operator-only. The reports this installation has KEPT, as opposed to the live one aimeat_compliance_report builds each time it is asked. action="list" is the index, newest first: each entry has an id, a generated_at, and a kind — "monthly" for the one the schedule writes on the first of each month, "manual" for a moment somebody chose to keep. action="read" with that id returns that report exactly as it was stored, which is the point of it: the numbers in it will never change again. action="save" keeps the report as it stands right now and returns its new id; use since_days to say what window it should cover, because a snapshot describes its own period and will be read a year later by somebody who was not there. Reading needs "compliance:read"; saving needs "compliance:write", since it adds a node-wide document to what the installation keeps.',
         caller: 'operator',
         visibility: agentEverywhere,
+        // Not readOnly, because action="save" adds a record; not destructive, because it only ever adds
+        // one, and a second save in the same minute writes a new version of that minute rather than
+        // replacing anything a person would miss.
+        annotations: { title: 'Compliance: Kept Reports', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        // The write word, because its save action adds a node-wide document to what the installation
+        // keeps. The handler asks for the read word instead when the action only looks at the shelf.
+        scope: 'compliance:write',
+        surfaces: ['admin'],
         input: {
             action: { type: 'string', required: true, enum: ['list', 'read', 'save'], description: 'What to do. Start with "list".' },
             id: { type: 'string', description: 'For "read": which stored report, e.g. 2026-08 for a month or 2026-08-23-1930 for a saved moment.' },
-            since_days: { type: 'number', description: 'For "save": the window the snapshot covers (default 30).' },
+            since_days: { type: 'number', description: 'For "save": the window the snapshot covers (default 30).', zod: z.number().int().min(1).max(3650) },
         },
     },
-];
+] as const satisfies readonly AimeatToolDefinition[];
