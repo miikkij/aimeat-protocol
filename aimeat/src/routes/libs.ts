@@ -8,6 +8,7 @@
  *   bundles from src/static/sdk-libs/dist/ via sdkLibSource(); the /v1/libs catalogue; the dev harness.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v2.14.0 - 2026-10-05 - Serves aimeat-validate.js (input checked against a JSON Schema, messages per field).
  * v2.13.0 - 2026-09-29 - Serves aimeat-labels.js (content classification, TARGET-082 V5).
  * v2.12.0 - 2026-09-29 - The aimeat-auth prelude says whether the node sends mail (emailLogin), so the
  *   sign-in modal offers the emailed sign-in link only where it can arrive.
@@ -204,6 +205,8 @@ const SDK_LIB_NAMES = [
   'refinery',
   // aimeat-labels.js — the classification of content, its policy, audit and scan (TARGET-082 V5).
   'labels',
+  // aimeat-validate.js — what a person typed, checked against a JSON Schema, with messages per field.
+  'validate',
   // aimeat-rows.js — an app's door to an organism row space (the two-hand rule). Built by
   // scripts/build-sdk-libs.ts since 2026-08-29; this list is the second place a lib is named,
   // and a lib missing here is a 404 that the publish gate turns into APP_ARTIFACT_BROKEN.

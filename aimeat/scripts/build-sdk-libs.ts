@@ -15,6 +15,7 @@
  *   - checkSdkLibs()  → --check: fail (non-zero) if any committed bundle is stale vs its sources
  * @usage  pnpm build:sdk   ·   pnpm check:sdk   (also run by `pnpm dev`)
  * @version-history
+ *   v1.15.0 - 2026-10-05 - Register aimeat-validate (input checked against a JSON Schema).
  *   v1.14.0 — 2026-09-29 — Register aimeat-labels (content classification, TARGET-082 V5).
  *   v1.13.0 — 2026-09-29 — Register aimeat-refinery (an app's side of the mail refinery the node runs).
  *   v1.12.0 — 2026-09-28 — Register aimeat-webhook (an app sends to or reads an owner-allowlisted URL).
@@ -72,6 +73,7 @@ export const SDK_LIBS: SdkLib[] = [
   { name: 'decide', entry: 'decide/index.js' },
   { name: 'refinery', entry: 'refinery/index.js' },
   { name: 'labels', entry: 'labels/index.js' },
+  { name: 'validate', entry: 'validate/index.js' },
   { name: 'capabilities', entry: 'capabilities/index.js' },
   { name: 'agents', entry: 'agents/index.js' },
   { name: 'agentface', entry: 'agentface/index.js' },

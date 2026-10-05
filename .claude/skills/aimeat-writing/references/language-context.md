@@ -186,6 +186,9 @@ everywhere at once, and say so in the Changes section.
 | an act against a classification, kept with its reason | a person lets one item leave, or lets an AI send it out, with a written reason and an optional last day; an app's act against a classification is recorded as one automatically; the audit shows them all | exception | poikkeus | excepción |
 | why a person made an exception or lowered a classification | the person's own words, required, kept with the exception or the label and shown in the audit | reason | perustelu | motivo |
 | the rules of classification at one level | the server's, an owner's or an organism's labels, detection rules, default and AI mode; a lower level may add and tighten but never loosen, and an AI's loosening waits for a person | classification policy | luokittelukäytäntö | política de clasificación |
+| checking what a person typed against the rules before it is sent | the browser checks each field against a JSON Schema and says next to the field what to do; the node checks the same schema again when the value is written | input validation (on screen: check) | syötteiden tarkistus (ruudulla: tarkista) | validación de datos (en pantalla: revisa) |
+| the shape a typed value must have | a Business ID, an IBAN, an email address or a postal code; a field with a format shows an example under it. Not the Shapes tab of Themes & Styles, which names how boxes look | format | muoto | formato |
+| a button that waits until fields are right | still focusable, marked as held, and a line under it names the fields to complete or correct; pressed anyway, it shows their problems | held button; "Complete or correct these first" | "Täydennä tai korjaa ensin" | "Completa o corrige primero" |
 
 ## Never translated, in any language
 
@@ -445,3 +448,10 @@ service, the directory, the token, the identifier and the username: the test nam
   Spanish *fuente* is the word the operating systems use. A font's upright or italic is *pysty vai
   kursiivi* / *normal o cursiva* on screen, never *tyyli* / *estilo*, which already name a style of a
   theme.
+- **2026-10-05** — input validation, format and the held button, with the aimeat-validate library and
+  the Atelier form (wish-sy-tteiden-validointi-sovelluksiin-yksi-json-schema-ui-lle-a). *Tarkistus* and
+  *tarkista* follow the developer's own ask ("validoida", "tiedetään että input on OK") in the words
+  the screens already use for a check. *Muoto* meets the Shapes tab's *muodot* only on that tab, and a
+  sentence about a typed value names the value ("Y-tunnuksen muoto"). *Täydennä tai korjaa ensin*
+  covers a field left empty and a field filled in wrong; *täytä ensin* covered only the first, and the
+  browser check on 2026-10-05 showed the line naming a field that was filled in but did not match.

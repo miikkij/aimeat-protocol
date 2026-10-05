@@ -12,6 +12,8 @@
  *   fact and is read out of the stylesheet: the JavaScript can only put the class on.
  * @usage cd aimeat && pnpm exec vitest run test/unit/atelier-form-range.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-05 — The refusal reads "The largest allowed value is 45.": the form checks
+ *     through the validate core now, and a message next to its field no longer repeats the label.
  *   v1.0.0 — 2026-09-05 — Initial (atelier 0.53.0: the range field and the continuous path).
  */
 import { readFileSync } from 'node:fs';
@@ -135,8 +137,8 @@ describe('the range field', () => {
     handle.el.dispatchEvent({ type: 'submit', bubbles: true });
     const error = h.querySelector('[data-ak-part="error"]');
     expect(error.hidden).toBe(false);
-    expect(error.textContent).toContain('Lämpötila');
-    expect(error.textContent).toContain('45');
+    // The message stands next to its field, so it says the limit and not the label (form 0.66.0).
+    expect(error.textContent).toBe('The largest allowed value is 45.');
   });
 
   it('the hit area is the kit touch floor, and that is a stylesheet fact', () => {

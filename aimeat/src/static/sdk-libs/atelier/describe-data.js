@@ -133,7 +133,7 @@ export const PARTS = {
     file: "hero.js",
   },
   "form": {
-    parts: ["root","field","label","input","req","hint","error","range","readout","bar","submit","cancel"],
+    parts: ["root","field","label","input","req","hint","error","range","readout","alert","gate","bar","submit","cancel"],
     slots: [],
     variants: [],
     tokens: ["--ak-range-track","--ak-range-thumb"],

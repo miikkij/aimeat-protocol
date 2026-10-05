@@ -14688,6 +14688,19 @@ paths:
             application/javascript:
               schema: { type: string }
 
+  /v1/libs/aimeat-validate.js:
+    get:
+      operationId: getValidateLibrary
+      summary: Input validation browser library
+      description: Public JavaScript exposing AIMEAT.validate, which checks a value against a JSON Schema (draft-07) and returns a message per field in English, Finnish or Spanish, the hint a format field shows, and whether named fields are ready. Adds the formats fi-business-id, fi-personal-id, iban, fi-postal-code and phone, which the node's schema locks also accept. No storage or authorization side effects.
+      tags: [Discovery]
+      responses:
+        '200':
+          description: Self-contained validation JavaScript bundle
+          content:
+            application/javascript:
+              schema: { type: string }
+
   /v1/app-templates:
     get:
       operationId: listAppTemplates

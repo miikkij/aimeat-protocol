@@ -2,6 +2,10 @@
 // Rebuild: pnpm build:sdk  ·  Served at /v1/libs/aimeat-atelier.js (with a per-node config prelude).
 "use strict";
 (() => {
+  var __defProp = Object.defineProperty;
+  var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+  var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
+
   // src/static/sdk-libs/_core/namespace.js
   function namespace() {
     if (!window.AIMEAT) window.AIMEAT = {};
@@ -163,8 +167,8 @@
     return node;
   }
   function append(parent, kids) {
-    const list2 = Array.isArray(kids) ? kids : [kids];
-    for (const c of list2) {
+    const list3 = Array.isArray(kids) ? kids : [kids];
+    for (const c of list3) {
       if (c == null || c === false) continue;
       parent.appendChild(typeof c === "object" ? (
         /** @type {Node} */
@@ -1033,13 +1037,13 @@
         if (next.has(key)) return;
         if (row.parentNode === node) node.removeChild(row);
       });
-      let at = node.firstChild;
+      let at2 = node.firstChild;
       order.forEach(function(row) {
-        if (at === row) {
-          at = row.nextSibling;
+        if (at2 === row) {
+          at2 = row.nextSibling;
           return;
         }
-        node.insertBefore(row, at);
+        node.insertBefore(row, at2);
       });
       kept.clear();
       next.forEach(function(row, key) {
@@ -1085,6 +1089,8 @@
       signInHint: "Use the account button in the top corner.",
       required: "Required",
       optional: "Optional",
+      fillFirst: "Complete or correct these first: {fields}.",
+      formIncomplete: "the details above",
       total: "Total",
       you: "You",
       next: "Next",
@@ -1254,6 +1260,8 @@
       signInHint: "Käytä yläkulman tilinappia.",
       required: "Pakollinen",
       optional: "Valinnainen",
+      fillFirst: "Täydennä tai korjaa ensin: {fields}.",
+      formIncomplete: "yllä olevat tiedot",
       total: "Yhteensä",
       you: "Sinä",
       next: "Seuraava",
@@ -1423,6 +1431,8 @@
       signInHint: "Usa el botón de cuenta en la esquina superior.",
       required: "Obligatorio",
       optional: "Opcional",
+      fillFirst: "Completa o corrige primero: {fields}.",
+      formIncomplete: "los datos de arriba",
       total: "Total",
       you: "Tú",
       next: "Siguiente",
@@ -1610,20 +1620,20 @@
       return false;
     }
   }
-  function markPage(lang) {
+  function markPage(lang2) {
     if (typeof document === "undefined" || !document.documentElement) return;
-    const list2 = declared();
-    if (list2 ? list2.length < 2 || list2.indexOf(lang) < 0 : !chosen()) return;
+    const list3 = declared();
+    if (list3 ? list3.length < 2 || list3.indexOf(lang2) < 0 : !chosen()) return;
     try {
-      document.documentElement.setAttribute("lang", lang);
+      document.documentElement.setAttribute("lang", lang2);
     } catch {
     }
   }
-  function announce(lang) {
-    markPage(lang);
+  function announce(lang2) {
+    markPage(lang2);
     for (const cb of listeners.slice()) {
       try {
-        cb(lang);
+        cb(lang2);
       } catch {
       }
     }
@@ -1634,9 +1644,9 @@
         /** @type {any} */
         ev.detail
       );
-      const lang = detail && detail.lang || detect();
-      if (lang === current) return;
-      current = String(lang).slice(0, 2);
+      const lang2 = detail && detail.lang || detect();
+      if (lang2 === current) return;
+      current = String(lang2).slice(0, 2);
       announce(current);
     });
     markPage(current);
@@ -1657,8 +1667,8 @@
      * Set the language for the kit AND the platform (one key, `aimeat-lang`, shared with the site).
      * @param {string} lang
      */
-    setLang(lang) {
-      const next = String(lang).slice(0, 2);
+    setLang(lang2) {
+      const next = String(lang2).slice(0, 2);
       if (next === current) return;
       current = next;
       try {
@@ -1683,8 +1693,8 @@
         return dict[k] && typeof dict[k] === "object" && !Array.isArray(dict[k]);
       });
       if (looksNested) {
-        for (const lang in dict) {
-          HOST[lang] = Object.assign({}, HOST[lang] || {}, dict[lang]);
+        for (const lang2 in dict) {
+          HOST[lang2] = Object.assign({}, HOST[lang2] || {}, dict[lang2]);
         }
       } else {
         HOST[current] = Object.assign({}, HOST[current] || {}, dict);
@@ -1821,22 +1831,22 @@
     return true;
   }
   function dealIn(targets, opts) {
-    const list2 = typeof targets === "string" ? Array.from(document.querySelectorAll(targets)) : targets || [];
+    const list3 = typeof targets === "string" ? Array.from(document.querySelectorAll(targets)) : targets || [];
     if (reducedMotion()) return 0;
     const step = opts && opts.step || 70;
-    list2.forEach((el2, i) => {
+    list3.forEach((el2, i) => {
       if (!el2.animate) return;
       const rest = getComputedStyle(el2).transform;
-      const at = rest && rest !== "none" ? rest + " " : "";
+      const at2 = rest && rest !== "none" ? rest + " " : "";
       el2.animate(
         [
-          { opacity: 0, transform: at + "translateY(24px) scale(0.96)" },
+          { opacity: 0, transform: at2 + "translateY(24px) scale(0.96)" },
           { opacity: 1, transform: rest === "none" ? "none" : rest }
         ],
         { duration: 380, delay: i * step, easing: easeOf2(el2), fill: "backwards" }
       );
     });
-    return list2.length;
+    return list3.length;
   }
 
   // src/static/sdk-libs/atelier/state.js
@@ -3104,9 +3114,9 @@
   }
   function normalizePost(want) {
     if (!want) return [];
-    const list2 = Array.isArray(want) ? want : [want];
+    const list3 = Array.isArray(want) ? want : [want];
     const out = [];
-    for (const item of list2) {
+    for (const item of list3) {
       const id = typeof item === "string" ? item : item && typeof item === "object" ? String(item.id || "") : "";
       if (!postById(id)) {
         if (id) console.warn('aimeat-atelier: "' + id + '" is not a post pass this kit ships (' + POST_IDS.join(", ") + ").");
@@ -3989,21 +3999,21 @@
     function render() {
       clear(root);
       let group = null;
-      let list2 = null;
+      let list3 = null;
       for (const item of state.items) {
         const g = item.group || "";
-        if (list2 === null || g !== group) {
+        if (list3 === null || g !== group) {
           group = g;
-          list2 = el(
+          list3 = el(
             "div",
             { class: "ak-sidenav__group", "data-ak-part": "group", role: "group", "aria-label": g || null },
             g ? el("div", { class: "ak-sidenav__heading", "aria-hidden": "true", text: g }) : null
           );
-          root.appendChild(list2);
+          root.appendChild(list3);
         }
         const active = item.id === state.value;
         const given = partValue(spec, "item", item);
-        list2.appendChild(el("button", {
+        list3.appendChild(el("button", {
           type: "button",
           class: "ak-sidenav__item" + (active ? " ak-sidenav__item--active" : ""),
           "data-ak-part": "item",
@@ -4042,7 +4052,7 @@
     const total = typeof p === "number" ? 1 : Math.max(Number(p.total) || 0, 0);
     const ratio = total > 0 ? Math.min(Math.max(value / total, 0), 1) : 0;
     const tone = typeof p === "object" && p.tone ? toneOf(p.tone) : ratio >= 1 ? "ok" : "accent";
-    const fill = el("div", { class: cls + "__fill ak-tone-fill--" + tone, "data-ak-part": "fill", vars: { "--ak-fill": (ratio * 100).toFixed(1) + "%" } });
+    const fill2 = el("div", { class: cls + "__fill ak-tone-fill--" + tone, "data-ak-part": "fill", vars: { "--ak-fill": (ratio * 100).toFixed(1) + "%" } });
     return el("div", {
       class: cls + "__bar",
       "data-ak-part": "bar",
@@ -4051,7 +4061,7 @@
       "aria-valuemax": String(total || 1),
       "aria-valuenow": String(value),
       "aria-valuetext": total ? t("ofTotal", { value, total }) : null
-    }, fill);
+    }, fill2);
   }
   function statusBand(spec) {
     const s = Object.assign({}, spec);
@@ -5493,9 +5503,9 @@
     if (prior) {
       const p = prior.effect && prior.effect.getComputedTiming ? prior.effect.getComputedTiming().progress : null;
       if (typeof p === "number") {
-        const at = prior.__frames[Math.min(prior.__frames.length - 1, Math.round(p * (prior.__frames.length - 1)))];
+        const at2 = prior.__frames[Math.min(prior.__frames.length - 1, Math.round(p * (prior.__frames.length - 1)))];
         Object.keys(from).forEach(function(key) {
-          from[key] = prior.__from[key] + (prior.__to[key] - prior.__from[key]) * at;
+          from[key] = prior.__from[key] + (prior.__to[key] - prior.__from[key]) * at2;
         });
       }
       prior.cancel();
@@ -5508,10 +5518,10 @@
       } };
     }
     const sf = springFrames(Object.assign({}, opts, { el: node }));
-    const frames = sf.samples.map(function(at, i) {
+    const frames = sf.samples.map(function(at2, i) {
       const s = {};
       Object.keys(from).forEach(function(key) {
-        s[key] = from[key] + (dest[key] - from[key]) * at;
+        s[key] = from[key] + (dest[key] - from[key]) * at2;
       });
       return { offset: i / (sf.samples.length - 1), transform: transformOf(s), opacity: s.opacity };
     });
@@ -5539,14 +5549,14 @@
   }
   function stagger(targets, opts) {
     const o = opts || {};
-    const list2 = typeof targets === "string" ? Array.prototype.slice.call(document.querySelectorAll(targets)) : (
+    const list3 = typeof targets === "string" ? Array.prototype.slice.call(document.querySelectorAll(targets)) : (
       /** @type {any} */
       targets.length !== void 0 ? Array.prototype.slice.call(
         /** @type {any} */
         targets
       ) : [targets]
     );
-    const kids = list2.slice(0, o.max || 40);
+    const kids = list3.slice(0, o.max || 40);
     if (!kids.length || reducedMotion() || typeof kids[0].animate !== "function") return { finished: Promise.resolve() };
     const cs = getComputedStyle(kids[0]);
     const dist = o.distance !== void 0 ? o.distance : parseFloat(cs.getPropertyValue("--ak-enter-distance")) || 12;
@@ -5559,12 +5569,12 @@
     let timing = { duration: span, easing: ease, fill: "backwards" };
     if (o.spring) {
       const sf = springFrames({ el: kids[0], stiffness: o.stiffness, damping: o.damping, mass: o.mass });
-      frames = sf.samples.map(function(at, i) {
+      frames = sf.samples.map(function(at2, i) {
         return {
           offset: i / (sf.samples.length - 1),
-          opacity: Math.min(1, at * 1.4),
-          transform: o.from === "scale" ? "scale(" + (0.92 + 0.08 * at) + ")" : start.replace(/[-\d.]+px/, function(px) {
-            return (parseFloat(px) * (1 - at)).toFixed(2) + "px";
+          opacity: Math.min(1, at2 * 1.4),
+          transform: o.from === "scale" ? "scale(" + (0.92 + 0.08 * at2) + ")" : start.replace(/[-\d.]+px/, function(px) {
+            return (parseFloat(px) * (1 - at2)).toFixed(2) + "px";
           })
         };
       });
@@ -5766,31 +5776,31 @@
   // src/static/sdk-libs/atelier/menu.js
   var GAP = 6;
   var EDGE = 8;
-  function placeAt(box, at, o) {
+  function placeAt(box, at2, o) {
     const opts = o || {};
     const w = box.offsetWidth;
     const h = box.offsetHeight;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    let top = opts.placement === "above" ? at.top - GAP - h : at.bottom + GAP;
-    if (top + h > vh - EDGE && at.top - GAP - h >= EDGE) top = at.top - GAP - h;
-    if (top < EDGE && at.bottom + GAP + h <= vh - EDGE) top = at.bottom + GAP;
-    let left = opts.align === "end" ? at.right - w : opts.align === "center" ? (at.left + at.right) / 2 - w / 2 : at.left;
+    let top = opts.placement === "above" ? at2.top - GAP - h : at2.bottom + GAP;
+    if (top + h > vh - EDGE && at2.top - GAP - h >= EDGE) top = at2.top - GAP - h;
+    if (top < EDGE && at2.bottom + GAP + h <= vh - EDGE) top = at2.bottom + GAP;
+    let left = opts.align === "end" ? at2.right - w : opts.align === "center" ? (at2.left + at2.right) / 2 - w / 2 : at2.left;
     left = Math.max(EDGE, Math.min(left, vw - w - EDGE));
     top = Math.max(EDGE, Math.min(top, vh - h - EDGE));
     box.style.left = Math.round(left) + "px";
     box.style.top = Math.round(top) + "px";
-    const ox = Math.max(0, Math.min(w, (at.left + at.right) / 2 - left));
-    const oy = top >= at.bottom ? 0 : top + h <= at.top ? h : h / 2;
+    const ox = Math.max(0, Math.min(w, (at2.left + at2.right) / 2 - left));
+    const oy = top >= at2.bottom ? 0 : top + h <= at2.top ? h : h / 2;
     return ox.toFixed(0) + "px " + oy.toFixed(0) + "px";
   }
   function openMotion(box, origin) {
     box.style.transformOrigin = origin;
     if (motionOff(box) || typeof box.animate !== "function") return;
     const sf = springFrames({ el: box });
-    const frames = sf.samples.map(function(at, i) {
-      const s = 0.9 + 0.1 * at;
-      return { offset: i / (sf.samples.length - 1), transform: "scale(" + s.toFixed(4) + ")", opacity: Math.min(1, at * 1.6) };
+    const frames = sf.samples.map(function(at2, i) {
+      const s = 0.9 + 0.1 * at2;
+      return { offset: i / (sf.samples.length - 1), transform: "scale(" + s.toFixed(4) + ")", opacity: Math.min(1, at2 * 1.6) };
     });
     box.animate(frames, { duration: sf.duration, easing: "linear" });
   }
@@ -5843,13 +5853,13 @@
       ) : [];
     }
     function focusRow(i) {
-      const list2 = rows();
-      if (!list2.length) return;
-      cursor = (i + list2.length) % list2.length;
-      list2.forEach(function(r, j) {
+      const list3 = rows();
+      if (!list3.length) return;
+      cursor = (i + list3.length) % list3.length;
+      list3.forEach(function(r, j) {
         r.classList.toggle("ak-menu__item--on", j === cursor);
       });
-      list2[cursor].focus({ preventScroll: true });
+      list3[cursor].focus({ preventScroll: true });
       if (mark) mark.sync();
     }
     function choose(item) {
@@ -5870,19 +5880,19 @@
       blink.oncancel = finish;
     }
     function onKey(e) {
-      const list2 = rows();
+      const list3 = rows();
       if (e.key === "ArrowDown") {
         e.preventDefault();
         focusRow(cursor + 1);
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
-        focusRow(cursor < 0 ? list2.length - 1 : cursor - 1);
+        focusRow(cursor < 0 ? list3.length - 1 : cursor - 1);
       } else if (e.key === "Home") {
         e.preventDefault();
         focusRow(0);
       } else if (e.key === "End") {
         e.preventDefault();
-        focusRow(list2.length - 1);
+        focusRow(list3.length - 1);
       } else if (e.key === "Escape") {
         e.preventDefault();
         close(true);
@@ -5890,9 +5900,9 @@
         close(false);
       } else if (e.key.length === 1 && /\S/.test(e.key)) {
         const ch = e.key.toLowerCase();
-        for (let k = 1; k <= list2.length; k++) {
-          const j = (cursor + k) % list2.length;
-          if ((list2[j].textContent || "").trim().toLowerCase().indexOf(ch) === 0) {
+        for (let k = 1; k <= list3.length; k++) {
+          const j = (cursor + k) % list3.length;
+          if ((list3[j].textContent || "").trim().toLowerCase().indexOf(ch) === 0) {
             focusRow(j);
             break;
           }
@@ -5935,11 +5945,11 @@
       });
       return root;
     }
-    function open(at, fromKeys) {
+    function open(at2, fromKeys) {
       if (box) return;
       box = build();
       document.body.appendChild(wearLook(box, anchor));
-      const r = at ? { left: at.x, right: at.x, top: at.y, bottom: at.y } : anchor ? anchor.getBoundingClientRect() : { left: EDGE, right: EDGE, top: EDGE, bottom: EDGE };
+      const r = at2 ? { left: at2.x, right: at2.x, top: at2.y, bottom: at2.y } : anchor ? anchor.getBoundingClientRect() : { left: EDGE, right: EDGE, top: EDGE, bottom: EDGE };
       const origin = placeAt(box, r, { align: s.align });
       mark = ink2(box, { axis: "y", active: ".ak-menu__item--on", className: "ak-menu__ink" });
       openMotion(box, origin);
@@ -6214,7 +6224,7 @@
     const s = spec || { items: [] };
     let root = null;
     let box = null;
-    let list2 = null;
+    let list3 = null;
     let mark = null;
     let cursor = 0;
     let shown = [];
@@ -6228,7 +6238,7 @@
       const goneBox = box;
       root = null;
       box = null;
-      list2 = null;
+      list3 = null;
       if (mark) {
         mark.destroy();
         mark = null;
@@ -6259,21 +6269,21 @@
       const sx = to.width / Math.max(from.width, 1);
       const sy = to.height / Math.max(from.height, 1);
       const sf = springFrames({ el: box });
-      const frames = sf.samples.map(function(at, i) {
+      const frames = sf.samples.map(function(at2, i) {
         return {
           offset: i / (sf.samples.length - 1),
-          transform: "translate(" + (dx * at).toFixed(1) + "px, " + (dy * at).toFixed(1) + "px) scale(" + (1 + (sx - 1) * at).toFixed(4) + ", " + (1 + (sy - 1) * at).toFixed(4) + ")",
-          opacity: at > 0.85 ? 1 - (at - 0.85) / 0.15 : 1
+          transform: "translate(" + (dx * at2).toFixed(1) + "px, " + (dy * at2).toFixed(1) + "px) scale(" + (1 + (sx - 1) * at2).toFixed(4) + ", " + (1 + (sy - 1) * at2).toFixed(4) + ")",
+          opacity: at2 > 0.85 ? 1 - (at2 - 0.85) / 0.15 : 1
         };
       });
       box.style.transformOrigin = "0 0";
-      if (list2) list2.style.opacity = "0";
+      if (list3) list3.style.opacity = "0";
       const gone = root;
       root.animate([{ opacity: 1 }, { opacity: 0 }], { duration: Math.min(sf.duration, 260), easing: "ease-out", fill: "forwards" });
       const anim = box.animate(frames, { duration: sf.duration, easing: "linear", fill: "forwards" });
       root = null;
       box = null;
-      list2 = null;
+      list3 = null;
       if (mark) {
         mark.destroy();
         mark = null;
@@ -6290,8 +6300,8 @@
       anim.onfinish = hand;
     }
     function highlight() {
-      if (!list2) return;
-      const rows = Array.prototype.slice.call(list2.querySelectorAll(".ak-palette__item:not(.ak-layout__ghost)"));
+      if (!list3) return;
+      const rows = Array.prototype.slice.call(list3.querySelectorAll(".ak-palette__item:not(.ak-layout__ghost)"));
       rows.forEach(function(row, i) {
         row.setAttribute("aria-selected", i === cursor ? "true" : "false");
       });
@@ -6299,8 +6309,8 @@
       if (mark) mark.sync();
     }
     function paintList() {
-      if (!list2) return;
-      const host = list2;
+      if (!list3) return;
+      const host = list3;
       settle(host, function() {
         Array.prototype.slice.call(host.querySelectorAll(".ak-palette__item, .ak-palette__empty")).forEach(function(n) {
           host.removeChild(n);
@@ -6330,7 +6340,7 @@
       opener = from || null;
       cursor = 0;
       shown = s.items.slice();
-      list2 = el("ul", { class: "ak-palette__list", role: "listbox" });
+      list3 = el("ul", { class: "ak-palette__list", role: "listbox" });
       const input = el("input", { class: "ak-palette__input", type: "text", placeholder: s.placeholder || t("palettePlaceholder"), autocomplete: "off", on: {
         input: function() {
           const q = (
@@ -6364,12 +6374,12 @@
           }
         }
       } });
-      box = el("div", { class: "ak-palette__box", role: "dialog", "aria-modal": "true", "aria-label": s.placeholder || t("paletteLabel") }, [input, list2]);
+      box = el("div", { class: "ak-palette__box", role: "dialog", "aria-modal": "true", "aria-label": s.placeholder || t("paletteLabel") }, [input, list3]);
       root = el("div", { class: "ak-root ak-palette", on: { click: function(e) {
         if (e.target === root) close();
       } } }, [box]);
       document.body.appendChild(wearLook(root, opener));
-      mark = ink2(list2, { axis: "y", active: '.ak-palette__item[aria-selected="true"]:not(.ak-layout__ghost)', className: "ak-palette__ink" });
+      mark = ink2(list3, { axis: "y", active: '.ak-palette__item[aria-selected="true"]:not(.ak-layout__ghost)', className: "ak-palette__ink" });
       paintList();
       mark.jump();
       growFrom(box, opener);
@@ -6420,12 +6430,12 @@
     const dy = a.top - b.top;
     const sf = springFrames({ el: box });
     box.style.transformOrigin = "0 0";
-    box.animate(sf.samples.map(function(at, i) {
-      const k = 1 - at;
+    box.animate(sf.samples.map(function(at2, i) {
+      const k = 1 - at2;
       return {
         offset: i / (sf.samples.length - 1),
         transform: "translate(" + (dx * k).toFixed(1) + "px, " + (dy * k).toFixed(1) + "px) scale(" + (1 + (sx - 1) * k).toFixed(4) + ", " + (1 + (sy - 1) * k).toFixed(4) + ")",
-        opacity: Math.min(1, 0.4 + at)
+        opacity: Math.min(1, 0.4 + at2)
       };
     }), { duration: sf.duration, easing: "linear" });
   }
@@ -6453,17 +6463,17 @@
       if (s.onChange) s.onChange(pct);
     }
     let dragging = false;
-    function at(e) {
+    function at2(e) {
       const r = root.getBoundingClientRect();
       set((e.clientX - r.left) / Math.max(r.width, 1) * 100);
     }
     root.addEventListener("pointerdown", function(e) {
       dragging = true;
       root.setPointerCapture(e.pointerId);
-      at(e);
+      at2(e);
     });
     root.addEventListener("pointermove", function(e) {
-      if (dragging) at(e);
+      if (dragging) at2(e);
     });
     root.addEventListener("pointerup", function() {
       dragging = false;
@@ -6672,12 +6682,12 @@
   function tu(key, vars) {
     const hosted = i18n.t(key, vars);
     if (hosted !== key) return hosted;
-    const lang = i18n.lang();
+    const lang2 = i18n.lang();
     const table2 = (
       /** @type {Record<string, string>} */
       STRINGS[
         /** @type {'en'|'fi'|'es'} */
-        lang
+        lang2
       ] || STRINGS.en
     );
     const text = table2[key] || STRINGS.en[key] || key;
@@ -6923,12 +6933,12 @@
       if (!parts) return String(v);
       [y, m, d] = [Number(parts[1]), Number(parts[2]) - 1, Number(parts[3])];
     }
-    const at = new Date(Date.UTC(y, m, d, 12));
+    const at2 = new Date(Date.UTC(y, m, d, 12));
     const f = fmt();
     const withUtc = Object.assign({}, opts, { timeZone: "UTC" });
-    if (f && typeof f.date === "function") return f.date(at, withUtc);
+    if (f && typeof f.date === "function") return f.date(at2, withUtc);
     try {
-      return at.toLocaleDateString(void 0, withUtc);
+      return at2.toLocaleDateString(void 0, withUtc);
     } catch {
       return String(v);
     }
@@ -7234,9 +7244,9 @@
     const number = el("b", { class: "ak-rating__value", "data-ak-part": "value" });
     const track = el("span", { class: "ak-rating__track", "data-ak-part": "track" });
     track.appendChild(starRow());
-    const fill = el("span", { class: "ak-rating__fill", "data-ak-part": "fill" });
-    fill.appendChild(starRow());
-    track.appendChild(fill);
+    const fill2 = el("span", { class: "ak-rating__fill", "data-ak-part": "fill" });
+    fill2.appendChild(starRow());
+    track.appendChild(fill2);
     const words = el("span", { class: "ak-rating__words", "data-ak-part": "words" });
     root.appendChild(number);
     root.appendChild(track);
@@ -7244,7 +7254,7 @@
     function paint() {
       const frac = Math.min(Math.max(state.value / state.max, 0), 1);
       number.textContent = num(Math.round(state.value * 10) / 10);
-      fill.style.width = (frac * 100).toFixed(1) + "%";
+      fill2.style.width = (frac * 100).toFixed(1) + "%";
       if (hasPart(spec, "words")) {
         clear(words);
         fillPart(words, partValue(spec, "words", state));
@@ -7378,9 +7388,9 @@
       return parts.join("\n");
     }
     function actionsText() {
-      const list2 = s.actions || [];
-      if (!list2.length) return "This app declares no actions: answer with words only.";
-      return "ACTIONS you may propose (a person confirms before anything runs):\n" + list2.map(function(a) {
+      const list3 = s.actions || [];
+      if (!list3.length) return "This app declares no actions: answer with words only.";
+      return "ACTIONS you may propose (a person confirms before anything runs):\n" + list3.map(function(a) {
         const params = a.params ? " params: " + JSON.stringify(a.params) : "";
         return '- id "' + a.id + '": ' + a.summary + params;
       }).join("\n");
@@ -8349,7 +8359,7 @@
       const v = parseFloat(input.getAttribute(name) || "");
       return isFinite(v) ? v : fallback;
     }
-    function fill() {
+    function fill2() {
       const lo = num2("min", 0);
       const hi = num2("max", 100);
       const v = parseFloat(input.value);
@@ -8401,18 +8411,18 @@
       if (up && atMax || down && atMin) spring2.set(0, { velocity: (up ? 1 : -1) * 160 });
     };
     input.addEventListener("pointerdown", onDown);
-    input.addEventListener("input", fill);
-    input.addEventListener("change", fill);
+    input.addEventListener("input", fill2);
+    input.addEventListener("change", fill2);
     input.addEventListener("keydown", onKey);
-    fill();
+    fill2();
     return {
-      sync: fill,
+      sync: fill2,
       destroy() {
         onUp();
         spring2.destroy();
         input.removeEventListener("pointerdown", onDown);
-        input.removeEventListener("input", fill);
-        input.removeEventListener("change", fill);
+        input.removeEventListener("input", fill2);
+        input.removeEventListener("change", fill2);
         input.removeEventListener("keydown", onKey);
         if (stretch) draw(0);
       }
@@ -8632,12 +8642,12 @@
   function tai(key, vars) {
     const hosted = i18n.t(key, vars);
     if (hosted !== key) return hosted;
-    const lang = i18n.lang();
+    const lang2 = i18n.lang();
     const table2 = (
       /** @type {Record<string, string>} */
       STRINGS2[
         /** @type {'en'|'fi'|'es'} */
-        lang
+        lang2
       ] || STRINGS2.en
     );
     const text = table2[key] || STRINGS2.en[key] || key;
@@ -8647,8 +8657,1816 @@
     });
   }
 
-  // src/static/sdk-libs/atelier/form.js
+  // node_modules/.pnpm/@cfworker+json-schema@4.1.1/node_modules/@cfworker/json-schema/dist/esm/deep-compare-strict.js
+  function deepCompareStrict(a, b) {
+    const typeofa = typeof a;
+    if (typeofa !== typeof b) {
+      return false;
+    }
+    if (Array.isArray(a)) {
+      if (!Array.isArray(b)) {
+        return false;
+      }
+      const length = a.length;
+      if (length !== b.length) {
+        return false;
+      }
+      for (let i = 0; i < length; i++) {
+        if (!deepCompareStrict(a[i], b[i])) {
+          return false;
+        }
+      }
+      return true;
+    }
+    if (typeofa === "object") {
+      if (!a || !b) {
+        return a === b;
+      }
+      const aKeys = Object.keys(a);
+      const bKeys = Object.keys(b);
+      const length = aKeys.length;
+      if (length !== bKeys.length) {
+        return false;
+      }
+      for (const k of aKeys) {
+        if (!deepCompareStrict(a[k], b[k])) {
+          return false;
+        }
+      }
+      return true;
+    }
+    return a === b;
+  }
+
+  // node_modules/.pnpm/@cfworker+json-schema@4.1.1/node_modules/@cfworker/json-schema/dist/esm/pointer.js
+  function encodePointer(p) {
+    return encodeURI(escapePointer(p));
+  }
+  function escapePointer(p) {
+    return p.replace(/~/g, "~0").replace(/\//g, "~1");
+  }
+
+  // node_modules/.pnpm/@cfworker+json-schema@4.1.1/node_modules/@cfworker/json-schema/dist/esm/dereference.js
+  var schemaArrayKeyword = {
+    prefixItems: true,
+    items: true,
+    allOf: true,
+    anyOf: true,
+    oneOf: true
+  };
+  var schemaMapKeyword = {
+    $defs: true,
+    definitions: true,
+    properties: true,
+    patternProperties: true,
+    dependentSchemas: true
+  };
+  var ignoredKeyword = {
+    id: true,
+    $id: true,
+    $ref: true,
+    $schema: true,
+    $anchor: true,
+    $vocabulary: true,
+    $comment: true,
+    default: true,
+    enum: true,
+    const: true,
+    required: true,
+    type: true,
+    maximum: true,
+    minimum: true,
+    exclusiveMaximum: true,
+    exclusiveMinimum: true,
+    multipleOf: true,
+    maxLength: true,
+    minLength: true,
+    pattern: true,
+    format: true,
+    maxItems: true,
+    minItems: true,
+    uniqueItems: true,
+    maxProperties: true,
+    minProperties: true
+  };
+  var initialBaseURI = typeof self !== "undefined" && self.location && self.location.origin !== "null" ? new URL(self.location.origin + self.location.pathname + location.search) : new URL("https://github.com/cfworker");
+  function dereference(schema, lookup = /* @__PURE__ */ Object.create(null), baseURI = initialBaseURI, basePointer = "") {
+    if (schema && typeof schema === "object" && !Array.isArray(schema)) {
+      const id = schema.$id || schema.id;
+      if (id) {
+        const url = new URL(id, baseURI.href);
+        if (url.hash.length > 1) {
+          lookup[url.href] = schema;
+        } else {
+          url.hash = "";
+          if (basePointer === "") {
+            baseURI = url;
+          } else {
+            dereference(schema, lookup, baseURI);
+          }
+        }
+      }
+    } else if (schema !== true && schema !== false) {
+      return lookup;
+    }
+    const schemaURI = baseURI.href + (basePointer ? "#" + basePointer : "");
+    if (lookup[schemaURI] !== void 0) {
+      throw new Error(`Duplicate schema URI "${schemaURI}".`);
+    }
+    lookup[schemaURI] = schema;
+    if (schema === true || schema === false) {
+      return lookup;
+    }
+    if (schema.__absolute_uri__ === void 0) {
+      Object.defineProperty(schema, "__absolute_uri__", {
+        enumerable: false,
+        value: schemaURI
+      });
+    }
+    if (schema.$ref && schema.__absolute_ref__ === void 0) {
+      const url = new URL(schema.$ref, baseURI.href);
+      url.hash = url.hash;
+      Object.defineProperty(schema, "__absolute_ref__", {
+        enumerable: false,
+        value: url.href
+      });
+    }
+    if (schema.$recursiveRef && schema.__absolute_recursive_ref__ === void 0) {
+      const url = new URL(schema.$recursiveRef, baseURI.href);
+      url.hash = url.hash;
+      Object.defineProperty(schema, "__absolute_recursive_ref__", {
+        enumerable: false,
+        value: url.href
+      });
+    }
+    if (schema.$anchor) {
+      const url = new URL("#" + schema.$anchor, baseURI.href);
+      lookup[url.href] = schema;
+    }
+    for (let key in schema) {
+      if (ignoredKeyword[key]) {
+        continue;
+      }
+      const keyBase = `${basePointer}/${encodePointer(key)}`;
+      const subSchema = schema[key];
+      if (Array.isArray(subSchema)) {
+        if (schemaArrayKeyword[key]) {
+          const length = subSchema.length;
+          for (let i = 0; i < length; i++) {
+            dereference(subSchema[i], lookup, baseURI, `${keyBase}/${i}`);
+          }
+        }
+      } else if (schemaMapKeyword[key]) {
+        for (let subKey in subSchema) {
+          dereference(subSchema[subKey], lookup, baseURI, `${keyBase}/${encodePointer(subKey)}`);
+        }
+      } else {
+        dereference(subSchema, lookup, baseURI, keyBase);
+      }
+    }
+    return lookup;
+  }
+
+  // node_modules/.pnpm/@cfworker+json-schema@4.1.1/node_modules/@cfworker/json-schema/dist/esm/format.js
+  var DATE = /^(\d\d\d\d)-(\d\d)-(\d\d)$/;
+  var DAYS = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  var TIME = /^(\d\d):(\d\d):(\d\d)(\.\d+)?(z|[+-]\d\d(?::?\d\d)?)?$/i;
+  var HOSTNAME = /^(?=.{1,253}\.?$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[-0-9a-z]{0,61}[0-9a-z])?)*\.?$/i;
+  var URIREF = /^(?:[a-z][a-z0-9+\-.]*:)?(?:\/?\/(?:(?:[a-z0-9\-._~!$&'()*+,;=:]|%[0-9a-f]{2})*@)?(?:\[(?:(?:(?:(?:[0-9a-f]{1,4}:){6}|::(?:[0-9a-f]{1,4}:){5}|(?:[0-9a-f]{1,4})?::(?:[0-9a-f]{1,4}:){4}|(?:(?:[0-9a-f]{1,4}:){0,1}[0-9a-f]{1,4})?::(?:[0-9a-f]{1,4}:){3}|(?:(?:[0-9a-f]{1,4}:){0,2}[0-9a-f]{1,4})?::(?:[0-9a-f]{1,4}:){2}|(?:(?:[0-9a-f]{1,4}:){0,3}[0-9a-f]{1,4})?::[0-9a-f]{1,4}:|(?:(?:[0-9a-f]{1,4}:){0,4}[0-9a-f]{1,4})?::)(?:[0-9a-f]{1,4}:[0-9a-f]{1,4}|(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?))|(?:(?:[0-9a-f]{1,4}:){0,5}[0-9a-f]{1,4})?::[0-9a-f]{1,4}|(?:(?:[0-9a-f]{1,4}:){0,6}[0-9a-f]{1,4})?::)|[Vv][0-9a-f]+\.[a-z0-9\-._~!$&'()*+,;=:]+)\]|(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)|(?:[a-z0-9\-._~!$&'"()*+,;=]|%[0-9a-f]{2})*)(?::\d*)?(?:\/(?:[a-z0-9\-._~!$&'"()*+,;=:@]|%[0-9a-f]{2})*)*|\/(?:(?:[a-z0-9\-._~!$&'"()*+,;=:@]|%[0-9a-f]{2})+(?:\/(?:[a-z0-9\-._~!$&'"()*+,;=:@]|%[0-9a-f]{2})*)*)?|(?:[a-z0-9\-._~!$&'"()*+,;=:@]|%[0-9a-f]{2})+(?:\/(?:[a-z0-9\-._~!$&'"()*+,;=:@]|%[0-9a-f]{2})*)*)?(?:\?(?:[a-z0-9\-._~!$&'"()*+,;=:@/?]|%[0-9a-f]{2})*)?(?:#(?:[a-z0-9\-._~!$&'"()*+,;=:@/?]|%[0-9a-f]{2})*)?$/i;
+  var URITEMPLATE = /^(?:(?:[^\x00-\x20"'<>%\\^`{|}]|%[0-9a-f]{2})|\{[+#./;?&=,!@|]?(?:[a-z0-9_]|%[0-9a-f]{2})+(?::[1-9][0-9]{0,3}|\*)?(?:,(?:[a-z0-9_]|%[0-9a-f]{2})+(?::[1-9][0-9]{0,3}|\*)?)*\})*$/i;
+  var URL_ = /^(?:(?:https?|ftp):\/\/)(?:\S+(?::\S*)?@)?(?:(?!10(?:\.\d{1,3}){3})(?!127(?:\.\d{1,3}){3})(?!169\.254(?:\.\d{1,3}){2})(?!192\.168(?:\.\d{1,3}){2})(?!172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))|(?:(?:[a-z\u{00a1}-\u{ffff}0-9]+-?)*[a-z\u{00a1}-\u{ffff}0-9]+)(?:\.(?:[a-z\u{00a1}-\u{ffff}0-9]+-?)*[a-z\u{00a1}-\u{ffff}0-9]+)*(?:\.(?:[a-z\u{00a1}-\u{ffff}]{2,})))(?::\d{2,5})?(?:\/[^\s]*)?$/iu;
+  var UUID = /^(?:urn:uuid:)?[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
+  var JSON_POINTER = /^(?:\/(?:[^~/]|~0|~1)*)*$/;
+  var JSON_POINTER_URI_FRAGMENT = /^#(?:\/(?:[a-z0-9_\-.!$&'()*+,;:=@]|%[0-9a-f]{2}|~0|~1)*)*$/i;
+  var RELATIVE_JSON_POINTER = /^(?:0|[1-9][0-9]*)(?:#|(?:\/(?:[^~/]|~0|~1)*)*)$/;
+  var EMAIL = (input) => {
+    if (input[0] === '"')
+      return false;
+    const [name, host, ...rest] = input.split("@");
+    if (!name || !host || rest.length !== 0 || name.length > 64 || host.length > 253)
+      return false;
+    if (name[0] === "." || name.endsWith(".") || name.includes(".."))
+      return false;
+    if (!/^[a-z0-9.-]+$/i.test(host) || !/^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+$/i.test(name))
+      return false;
+    return host.split(".").every((part) => /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/i.test(part));
+  };
+  var IPV4 = /^(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)$/;
+  var IPV6 = /^((([0-9a-f]{1,4}:){7}([0-9a-f]{1,4}|:))|(([0-9a-f]{1,4}:){6}(:[0-9a-f]{1,4}|((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9a-f]{1,4}:){5}(((:[0-9a-f]{1,4}){1,2})|:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9a-f]{1,4}:){4}(((:[0-9a-f]{1,4}){1,3})|((:[0-9a-f]{1,4})?:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9a-f]{1,4}:){3}(((:[0-9a-f]{1,4}){1,4})|((:[0-9a-f]{1,4}){0,2}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9a-f]{1,4}:){2}(((:[0-9a-f]{1,4}){1,5})|((:[0-9a-f]{1,4}){0,3}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9a-f]{1,4}:){1}(((:[0-9a-f]{1,4}){1,6})|((:[0-9a-f]{1,4}){0,4}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(:(((:[0-9a-f]{1,4}){1,7})|((:[0-9a-f]{1,4}){0,5}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:)))$/i;
+  var DURATION = (input) => input.length > 1 && input.length < 80 && (/^P\d+([.,]\d+)?W$/.test(input) || /^P[\dYMDTHS]*(\d[.,]\d+)?[YMDHS]$/.test(input) && /^P([.,\d]+Y)?([.,\d]+M)?([.,\d]+D)?(T([.,\d]+H)?([.,\d]+M)?([.,\d]+S)?)?$/.test(input));
+  function bind(r) {
+    return r.test.bind(r);
+  }
+  var format = {
+    date: date2,
+    time: time2.bind(void 0, false),
+    "date-time": date_time,
+    duration: DURATION,
+    uri,
+    "uri-reference": bind(URIREF),
+    "uri-template": bind(URITEMPLATE),
+    url: bind(URL_),
+    email: EMAIL,
+    hostname: bind(HOSTNAME),
+    ipv4: bind(IPV4),
+    ipv6: bind(IPV6),
+    regex,
+    uuid: bind(UUID),
+    "json-pointer": bind(JSON_POINTER),
+    "json-pointer-uri-fragment": bind(JSON_POINTER_URI_FRAGMENT),
+    "relative-json-pointer": bind(RELATIVE_JSON_POINTER)
+  };
+  function isLeapYear(year) {
+    return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  }
+  function date2(str) {
+    const matches = str.match(DATE);
+    if (!matches)
+      return false;
+    const year = +matches[1];
+    const month = +matches[2];
+    const day3 = +matches[3];
+    return month >= 1 && month <= 12 && day3 >= 1 && day3 <= (month == 2 && isLeapYear(year) ? 29 : DAYS[month]);
+  }
+  function time2(full, str) {
+    const matches = str.match(TIME);
+    if (!matches)
+      return false;
+    const hour = +matches[1];
+    const minute = +matches[2];
+    const second = +matches[3];
+    const timeZone = !!matches[5];
+    return (hour <= 23 && minute <= 59 && second <= 59 || hour == 23 && minute == 59 && second == 60) && (!full || timeZone);
+  }
+  var DATE_TIME_SEPARATOR = /t|\s/i;
+  function date_time(str) {
+    const dateTime2 = str.split(DATE_TIME_SEPARATOR);
+    return dateTime2.length == 2 && date2(dateTime2[0]) && time2(true, dateTime2[1]);
+  }
+  var NOT_URI_FRAGMENT = /\/|:/;
+  var URI_PATTERN = /^(?:[a-z][a-z0-9+\-.]*:)(?:\/?\/(?:(?:[a-z0-9\-._~!$&'()*+,;=:]|%[0-9a-f]{2})*@)?(?:\[(?:(?:(?:(?:[0-9a-f]{1,4}:){6}|::(?:[0-9a-f]{1,4}:){5}|(?:[0-9a-f]{1,4})?::(?:[0-9a-f]{1,4}:){4}|(?:(?:[0-9a-f]{1,4}:){0,1}[0-9a-f]{1,4})?::(?:[0-9a-f]{1,4}:){3}|(?:(?:[0-9a-f]{1,4}:){0,2}[0-9a-f]{1,4})?::(?:[0-9a-f]{1,4}:){2}|(?:(?:[0-9a-f]{1,4}:){0,3}[0-9a-f]{1,4})?::[0-9a-f]{1,4}:|(?:(?:[0-9a-f]{1,4}:){0,4}[0-9a-f]{1,4})?::)(?:[0-9a-f]{1,4}:[0-9a-f]{1,4}|(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?))|(?:(?:[0-9a-f]{1,4}:){0,5}[0-9a-f]{1,4})?::[0-9a-f]{1,4}|(?:(?:[0-9a-f]{1,4}:){0,6}[0-9a-f]{1,4})?::)|[Vv][0-9a-f]+\.[a-z0-9\-._~!$&'()*+,;=:]+)\]|(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)|(?:[a-z0-9\-._~!$&'()*+,;=]|%[0-9a-f]{2})*)(?::\d*)?(?:\/(?:[a-z0-9\-._~!$&'()*+,;=:@]|%[0-9a-f]{2})*)*|\/(?:(?:[a-z0-9\-._~!$&'()*+,;=:@]|%[0-9a-f]{2})+(?:\/(?:[a-z0-9\-._~!$&'()*+,;=:@]|%[0-9a-f]{2})*)*)?|(?:[a-z0-9\-._~!$&'()*+,;=:@]|%[0-9a-f]{2})+(?:\/(?:[a-z0-9\-._~!$&'()*+,;=:@]|%[0-9a-f]{2})*)*)(?:\?(?:[a-z0-9\-._~!$&'()*+,;=:@/?]|%[0-9a-f]{2})*)?(?:#(?:[a-z0-9\-._~!$&'()*+,;=:@/?]|%[0-9a-f]{2})*)?$/i;
+  function uri(str) {
+    return NOT_URI_FRAGMENT.test(str) && URI_PATTERN.test(str);
+  }
+  var Z_ANCHOR = /[^\\]\\Z/;
+  function regex(str) {
+    if (Z_ANCHOR.test(str))
+      return false;
+    try {
+      new RegExp(str, "u");
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // node_modules/.pnpm/@cfworker+json-schema@4.1.1/node_modules/@cfworker/json-schema/dist/esm/types.js
+  var OutputFormat;
+  (function(OutputFormat2) {
+    OutputFormat2[OutputFormat2["Flag"] = 1] = "Flag";
+    OutputFormat2[OutputFormat2["Basic"] = 2] = "Basic";
+    OutputFormat2[OutputFormat2["Detailed"] = 4] = "Detailed";
+  })(OutputFormat || (OutputFormat = {}));
+
+  // node_modules/.pnpm/@cfworker+json-schema@4.1.1/node_modules/@cfworker/json-schema/dist/esm/ucs2-length.js
+  function ucs2length(s) {
+    let result = 0;
+    let length = s.length;
+    let index = 0;
+    let charCode;
+    while (index < length) {
+      result++;
+      charCode = s.charCodeAt(index++);
+      if (charCode >= 55296 && charCode <= 56319 && index < length) {
+        charCode = s.charCodeAt(index);
+        if ((charCode & 64512) == 56320) {
+          index++;
+        }
+      }
+    }
+    return result;
+  }
+
+  // node_modules/.pnpm/@cfworker+json-schema@4.1.1/node_modules/@cfworker/json-schema/dist/esm/validate.js
+  function validate(instance, schema, draft = "2019-09", lookup = dereference(schema), shortCircuit = true, recursiveAnchor = null, instanceLocation = "#", schemaLocation = "#", evaluated = /* @__PURE__ */ Object.create(null)) {
+    if (schema === true) {
+      return { valid: true, errors: [] };
+    }
+    if (schema === false) {
+      return {
+        valid: false,
+        errors: [
+          {
+            instanceLocation,
+            keyword: "false",
+            keywordLocation: instanceLocation,
+            error: "False boolean schema."
+          }
+        ]
+      };
+    }
+    const rawInstanceType = typeof instance;
+    let instanceType;
+    switch (rawInstanceType) {
+      case "boolean":
+      case "number":
+      case "string":
+        instanceType = rawInstanceType;
+        break;
+      case "object":
+        if (instance === null) {
+          instanceType = "null";
+        } else if (Array.isArray(instance)) {
+          instanceType = "array";
+        } else {
+          instanceType = "object";
+        }
+        break;
+      default:
+        throw new Error(`Instances of "${rawInstanceType}" type are not supported.`);
+    }
+    const { $ref, $recursiveRef, $recursiveAnchor, type: $type, const: $const, enum: $enum, required: $required, not: $not, anyOf: $anyOf, allOf: $allOf, oneOf: $oneOf, if: $if, then: $then, else: $else, format: $format, properties: $properties, patternProperties: $patternProperties, additionalProperties: $additionalProperties, unevaluatedProperties: $unevaluatedProperties, minProperties: $minProperties, maxProperties: $maxProperties, propertyNames: $propertyNames, dependentRequired: $dependentRequired, dependentSchemas: $dependentSchemas, dependencies: $dependencies, prefixItems: $prefixItems, items: $items, additionalItems: $additionalItems, unevaluatedItems: $unevaluatedItems, contains: $contains, minContains: $minContains, maxContains: $maxContains, minItems: $minItems, maxItems: $maxItems, uniqueItems: $uniqueItems, minimum: $minimum, maximum: $maximum, exclusiveMinimum: $exclusiveMinimum, exclusiveMaximum: $exclusiveMaximum, multipleOf: $multipleOf, minLength: $minLength, maxLength: $maxLength, pattern: $pattern, __absolute_ref__, __absolute_recursive_ref__ } = schema;
+    const errors = [];
+    if ($recursiveAnchor === true && recursiveAnchor === null) {
+      recursiveAnchor = schema;
+    }
+    if ($recursiveRef === "#") {
+      const refSchema = recursiveAnchor === null ? lookup[__absolute_recursive_ref__] : recursiveAnchor;
+      const keywordLocation = `${schemaLocation}/$recursiveRef`;
+      const result = validate(instance, recursiveAnchor === null ? schema : recursiveAnchor, draft, lookup, shortCircuit, refSchema, instanceLocation, keywordLocation, evaluated);
+      if (!result.valid) {
+        errors.push({
+          instanceLocation,
+          keyword: "$recursiveRef",
+          keywordLocation,
+          error: "A subschema had errors."
+        }, ...result.errors);
+      }
+    }
+    if ($ref !== void 0) {
+      const uri2 = __absolute_ref__ || $ref;
+      const refSchema = lookup[uri2];
+      if (refSchema === void 0) {
+        let message = `Unresolved $ref "${$ref}".`;
+        if (__absolute_ref__ && __absolute_ref__ !== $ref) {
+          message += `  Absolute URI "${__absolute_ref__}".`;
+        }
+        message += `
+Known schemas:
+- ${Object.keys(lookup).join("\n- ")}`;
+        throw new Error(message);
+      }
+      const keywordLocation = `${schemaLocation}/$ref`;
+      const result = validate(instance, refSchema, draft, lookup, shortCircuit, recursiveAnchor, instanceLocation, keywordLocation, evaluated);
+      if (!result.valid) {
+        errors.push({
+          instanceLocation,
+          keyword: "$ref",
+          keywordLocation,
+          error: "A subschema had errors."
+        }, ...result.errors);
+      }
+      if (draft === "4" || draft === "7") {
+        return { valid: errors.length === 0, errors };
+      }
+    }
+    if (Array.isArray($type)) {
+      let length = $type.length;
+      let valid = false;
+      for (let i = 0; i < length; i++) {
+        if (instanceType === $type[i] || $type[i] === "integer" && instanceType === "number" && instance % 1 === 0 && instance === instance) {
+          valid = true;
+          break;
+        }
+      }
+      if (!valid) {
+        errors.push({
+          instanceLocation,
+          keyword: "type",
+          keywordLocation: `${schemaLocation}/type`,
+          error: `Instance type "${instanceType}" is invalid. Expected "${$type.join('", "')}".`
+        });
+      }
+    } else if ($type === "integer") {
+      if (instanceType !== "number" || instance % 1 || instance !== instance) {
+        errors.push({
+          instanceLocation,
+          keyword: "type",
+          keywordLocation: `${schemaLocation}/type`,
+          error: `Instance type "${instanceType}" is invalid. Expected "${$type}".`
+        });
+      }
+    } else if ($type !== void 0 && instanceType !== $type) {
+      errors.push({
+        instanceLocation,
+        keyword: "type",
+        keywordLocation: `${schemaLocation}/type`,
+        error: `Instance type "${instanceType}" is invalid. Expected "${$type}".`
+      });
+    }
+    if ($const !== void 0) {
+      if (instanceType === "object" || instanceType === "array") {
+        if (!deepCompareStrict(instance, $const)) {
+          errors.push({
+            instanceLocation,
+            keyword: "const",
+            keywordLocation: `${schemaLocation}/const`,
+            error: `Instance does not match ${JSON.stringify($const)}.`
+          });
+        }
+      } else if (instance !== $const) {
+        errors.push({
+          instanceLocation,
+          keyword: "const",
+          keywordLocation: `${schemaLocation}/const`,
+          error: `Instance does not match ${JSON.stringify($const)}.`
+        });
+      }
+    }
+    if ($enum !== void 0) {
+      if (instanceType === "object" || instanceType === "array") {
+        if (!$enum.some((value) => deepCompareStrict(instance, value))) {
+          errors.push({
+            instanceLocation,
+            keyword: "enum",
+            keywordLocation: `${schemaLocation}/enum`,
+            error: `Instance does not match any of ${JSON.stringify($enum)}.`
+          });
+        }
+      } else if (!$enum.some((value) => instance === value)) {
+        errors.push({
+          instanceLocation,
+          keyword: "enum",
+          keywordLocation: `${schemaLocation}/enum`,
+          error: `Instance does not match any of ${JSON.stringify($enum)}.`
+        });
+      }
+    }
+    if ($not !== void 0) {
+      const keywordLocation = `${schemaLocation}/not`;
+      const result = validate(instance, $not, draft, lookup, shortCircuit, recursiveAnchor, instanceLocation, keywordLocation);
+      if (result.valid) {
+        errors.push({
+          instanceLocation,
+          keyword: "not",
+          keywordLocation,
+          error: 'Instance matched "not" schema.'
+        });
+      }
+    }
+    let subEvaluateds = [];
+    if ($anyOf !== void 0) {
+      const keywordLocation = `${schemaLocation}/anyOf`;
+      const errorsLength = errors.length;
+      let anyValid = false;
+      for (let i = 0; i < $anyOf.length; i++) {
+        const subSchema = $anyOf[i];
+        const subEvaluated = Object.create(evaluated);
+        const result = validate(instance, subSchema, draft, lookup, shortCircuit, $recursiveAnchor === true ? recursiveAnchor : null, instanceLocation, `${keywordLocation}/${i}`, subEvaluated);
+        errors.push(...result.errors);
+        anyValid = anyValid || result.valid;
+        if (result.valid) {
+          subEvaluateds.push(subEvaluated);
+        }
+      }
+      if (anyValid) {
+        errors.length = errorsLength;
+      } else {
+        errors.splice(errorsLength, 0, {
+          instanceLocation,
+          keyword: "anyOf",
+          keywordLocation,
+          error: "Instance does not match any subschemas."
+        });
+      }
+    }
+    if ($allOf !== void 0) {
+      const keywordLocation = `${schemaLocation}/allOf`;
+      const errorsLength = errors.length;
+      let allValid = true;
+      for (let i = 0; i < $allOf.length; i++) {
+        const subSchema = $allOf[i];
+        const subEvaluated = Object.create(evaluated);
+        const result = validate(instance, subSchema, draft, lookup, shortCircuit, $recursiveAnchor === true ? recursiveAnchor : null, instanceLocation, `${keywordLocation}/${i}`, subEvaluated);
+        errors.push(...result.errors);
+        allValid = allValid && result.valid;
+        if (result.valid) {
+          subEvaluateds.push(subEvaluated);
+        }
+      }
+      if (allValid) {
+        errors.length = errorsLength;
+      } else {
+        errors.splice(errorsLength, 0, {
+          instanceLocation,
+          keyword: "allOf",
+          keywordLocation,
+          error: `Instance does not match every subschema.`
+        });
+      }
+    }
+    if ($oneOf !== void 0) {
+      const keywordLocation = `${schemaLocation}/oneOf`;
+      const errorsLength = errors.length;
+      const matches = $oneOf.filter((subSchema, i) => {
+        const subEvaluated = Object.create(evaluated);
+        const result = validate(instance, subSchema, draft, lookup, shortCircuit, $recursiveAnchor === true ? recursiveAnchor : null, instanceLocation, `${keywordLocation}/${i}`, subEvaluated);
+        errors.push(...result.errors);
+        if (result.valid) {
+          subEvaluateds.push(subEvaluated);
+        }
+        return result.valid;
+      }).length;
+      if (matches === 1) {
+        errors.length = errorsLength;
+      } else {
+        errors.splice(errorsLength, 0, {
+          instanceLocation,
+          keyword: "oneOf",
+          keywordLocation,
+          error: `Instance does not match exactly one subschema (${matches} matches).`
+        });
+      }
+    }
+    if (instanceType === "object" || instanceType === "array") {
+      Object.assign(evaluated, ...subEvaluateds);
+    }
+    if ($if !== void 0) {
+      const keywordLocation = `${schemaLocation}/if`;
+      const conditionResult = validate(instance, $if, draft, lookup, shortCircuit, recursiveAnchor, instanceLocation, keywordLocation, evaluated).valid;
+      if (conditionResult) {
+        if ($then !== void 0) {
+          const thenResult = validate(instance, $then, draft, lookup, shortCircuit, recursiveAnchor, instanceLocation, `${schemaLocation}/then`, evaluated);
+          if (!thenResult.valid) {
+            errors.push({
+              instanceLocation,
+              keyword: "if",
+              keywordLocation,
+              error: `Instance does not match "then" schema.`
+            }, ...thenResult.errors);
+          }
+        }
+      } else if ($else !== void 0) {
+        const elseResult = validate(instance, $else, draft, lookup, shortCircuit, recursiveAnchor, instanceLocation, `${schemaLocation}/else`, evaluated);
+        if (!elseResult.valid) {
+          errors.push({
+            instanceLocation,
+            keyword: "if",
+            keywordLocation,
+            error: `Instance does not match "else" schema.`
+          }, ...elseResult.errors);
+        }
+      }
+    }
+    if (instanceType === "object") {
+      if ($required !== void 0) {
+        for (const key of $required) {
+          if (!(key in instance)) {
+            errors.push({
+              instanceLocation,
+              keyword: "required",
+              keywordLocation: `${schemaLocation}/required`,
+              error: `Instance does not have required property "${key}".`
+            });
+          }
+        }
+      }
+      const keys2 = Object.keys(instance);
+      if ($minProperties !== void 0 && keys2.length < $minProperties) {
+        errors.push({
+          instanceLocation,
+          keyword: "minProperties",
+          keywordLocation: `${schemaLocation}/minProperties`,
+          error: `Instance does not have at least ${$minProperties} properties.`
+        });
+      }
+      if ($maxProperties !== void 0 && keys2.length > $maxProperties) {
+        errors.push({
+          instanceLocation,
+          keyword: "maxProperties",
+          keywordLocation: `${schemaLocation}/maxProperties`,
+          error: `Instance does not have at least ${$maxProperties} properties.`
+        });
+      }
+      if ($propertyNames !== void 0) {
+        const keywordLocation = `${schemaLocation}/propertyNames`;
+        for (const key in instance) {
+          const subInstancePointer = `${instanceLocation}/${encodePointer(key)}`;
+          const result = validate(key, $propertyNames, draft, lookup, shortCircuit, recursiveAnchor, subInstancePointer, keywordLocation);
+          if (!result.valid) {
+            errors.push({
+              instanceLocation,
+              keyword: "propertyNames",
+              keywordLocation,
+              error: `Property name "${key}" does not match schema.`
+            }, ...result.errors);
+          }
+        }
+      }
+      if ($dependentRequired !== void 0) {
+        const keywordLocation = `${schemaLocation}/dependantRequired`;
+        for (const key in $dependentRequired) {
+          if (key in instance) {
+            const required = $dependentRequired[key];
+            for (const dependantKey of required) {
+              if (!(dependantKey in instance)) {
+                errors.push({
+                  instanceLocation,
+                  keyword: "dependentRequired",
+                  keywordLocation,
+                  error: `Instance has "${key}" but does not have "${dependantKey}".`
+                });
+              }
+            }
+          }
+        }
+      }
+      if ($dependentSchemas !== void 0) {
+        for (const key in $dependentSchemas) {
+          const keywordLocation = `${schemaLocation}/dependentSchemas`;
+          if (key in instance) {
+            const result = validate(instance, $dependentSchemas[key], draft, lookup, shortCircuit, recursiveAnchor, instanceLocation, `${keywordLocation}/${encodePointer(key)}`, evaluated);
+            if (!result.valid) {
+              errors.push({
+                instanceLocation,
+                keyword: "dependentSchemas",
+                keywordLocation,
+                error: `Instance has "${key}" but does not match dependant schema.`
+              }, ...result.errors);
+            }
+          }
+        }
+      }
+      if ($dependencies !== void 0) {
+        const keywordLocation = `${schemaLocation}/dependencies`;
+        for (const key in $dependencies) {
+          if (key in instance) {
+            const propsOrSchema = $dependencies[key];
+            if (Array.isArray(propsOrSchema)) {
+              for (const dependantKey of propsOrSchema) {
+                if (!(dependantKey in instance)) {
+                  errors.push({
+                    instanceLocation,
+                    keyword: "dependencies",
+                    keywordLocation,
+                    error: `Instance has "${key}" but does not have "${dependantKey}".`
+                  });
+                }
+              }
+            } else {
+              const result = validate(instance, propsOrSchema, draft, lookup, shortCircuit, recursiveAnchor, instanceLocation, `${keywordLocation}/${encodePointer(key)}`);
+              if (!result.valid) {
+                errors.push({
+                  instanceLocation,
+                  keyword: "dependencies",
+                  keywordLocation,
+                  error: `Instance has "${key}" but does not match dependant schema.`
+                }, ...result.errors);
+              }
+            }
+          }
+        }
+      }
+      const thisEvaluated = /* @__PURE__ */ Object.create(null);
+      let stop = false;
+      if ($properties !== void 0) {
+        const keywordLocation = `${schemaLocation}/properties`;
+        for (const key in $properties) {
+          if (!(key in instance)) {
+            continue;
+          }
+          const subInstancePointer = `${instanceLocation}/${encodePointer(key)}`;
+          const result = validate(instance[key], $properties[key], draft, lookup, shortCircuit, recursiveAnchor, subInstancePointer, `${keywordLocation}/${encodePointer(key)}`);
+          if (result.valid) {
+            evaluated[key] = thisEvaluated[key] = true;
+          } else {
+            stop = shortCircuit;
+            errors.push({
+              instanceLocation,
+              keyword: "properties",
+              keywordLocation,
+              error: `Property "${key}" does not match schema.`
+            }, ...result.errors);
+            if (stop)
+              break;
+          }
+        }
+      }
+      if (!stop && $patternProperties !== void 0) {
+        const keywordLocation = `${schemaLocation}/patternProperties`;
+        for (const pattern in $patternProperties) {
+          const regex2 = new RegExp(pattern, "u");
+          const subSchema = $patternProperties[pattern];
+          for (const key in instance) {
+            if (!regex2.test(key)) {
+              continue;
+            }
+            const subInstancePointer = `${instanceLocation}/${encodePointer(key)}`;
+            const result = validate(instance[key], subSchema, draft, lookup, shortCircuit, recursiveAnchor, subInstancePointer, `${keywordLocation}/${encodePointer(pattern)}`);
+            if (result.valid) {
+              evaluated[key] = thisEvaluated[key] = true;
+            } else {
+              stop = shortCircuit;
+              errors.push({
+                instanceLocation,
+                keyword: "patternProperties",
+                keywordLocation,
+                error: `Property "${key}" matches pattern "${pattern}" but does not match associated schema.`
+              }, ...result.errors);
+            }
+          }
+        }
+      }
+      if (!stop && $additionalProperties !== void 0) {
+        const keywordLocation = `${schemaLocation}/additionalProperties`;
+        for (const key in instance) {
+          if (thisEvaluated[key]) {
+            continue;
+          }
+          const subInstancePointer = `${instanceLocation}/${encodePointer(key)}`;
+          const result = validate(instance[key], $additionalProperties, draft, lookup, shortCircuit, recursiveAnchor, subInstancePointer, keywordLocation);
+          if (result.valid) {
+            evaluated[key] = true;
+          } else {
+            stop = shortCircuit;
+            errors.push({
+              instanceLocation,
+              keyword: "additionalProperties",
+              keywordLocation,
+              error: `Property "${key}" does not match additional properties schema.`
+            }, ...result.errors);
+          }
+        }
+      } else if (!stop && $unevaluatedProperties !== void 0) {
+        const keywordLocation = `${schemaLocation}/unevaluatedProperties`;
+        for (const key in instance) {
+          if (!evaluated[key]) {
+            const subInstancePointer = `${instanceLocation}/${encodePointer(key)}`;
+            const result = validate(instance[key], $unevaluatedProperties, draft, lookup, shortCircuit, recursiveAnchor, subInstancePointer, keywordLocation);
+            if (result.valid) {
+              evaluated[key] = true;
+            } else {
+              errors.push({
+                instanceLocation,
+                keyword: "unevaluatedProperties",
+                keywordLocation,
+                error: `Property "${key}" does not match unevaluated properties schema.`
+              }, ...result.errors);
+            }
+          }
+        }
+      }
+    } else if (instanceType === "array") {
+      if ($maxItems !== void 0 && instance.length > $maxItems) {
+        errors.push({
+          instanceLocation,
+          keyword: "maxItems",
+          keywordLocation: `${schemaLocation}/maxItems`,
+          error: `Array has too many items (${instance.length} > ${$maxItems}).`
+        });
+      }
+      if ($minItems !== void 0 && instance.length < $minItems) {
+        errors.push({
+          instanceLocation,
+          keyword: "minItems",
+          keywordLocation: `${schemaLocation}/minItems`,
+          error: `Array has too few items (${instance.length} < ${$minItems}).`
+        });
+      }
+      const length = instance.length;
+      let i = 0;
+      let stop = false;
+      if ($prefixItems !== void 0) {
+        const keywordLocation = `${schemaLocation}/prefixItems`;
+        const length2 = Math.min($prefixItems.length, length);
+        for (; i < length2; i++) {
+          const result = validate(instance[i], $prefixItems[i], draft, lookup, shortCircuit, recursiveAnchor, `${instanceLocation}/${i}`, `${keywordLocation}/${i}`);
+          evaluated[i] = true;
+          if (!result.valid) {
+            stop = shortCircuit;
+            errors.push({
+              instanceLocation,
+              keyword: "prefixItems",
+              keywordLocation,
+              error: `Items did not match schema.`
+            }, ...result.errors);
+            if (stop)
+              break;
+          }
+        }
+      }
+      if ($items !== void 0) {
+        const keywordLocation = `${schemaLocation}/items`;
+        if (Array.isArray($items)) {
+          const length2 = Math.min($items.length, length);
+          for (; i < length2; i++) {
+            const result = validate(instance[i], $items[i], draft, lookup, shortCircuit, recursiveAnchor, `${instanceLocation}/${i}`, `${keywordLocation}/${i}`);
+            evaluated[i] = true;
+            if (!result.valid) {
+              stop = shortCircuit;
+              errors.push({
+                instanceLocation,
+                keyword: "items",
+                keywordLocation,
+                error: `Items did not match schema.`
+              }, ...result.errors);
+              if (stop)
+                break;
+            }
+          }
+        } else {
+          for (; i < length; i++) {
+            const result = validate(instance[i], $items, draft, lookup, shortCircuit, recursiveAnchor, `${instanceLocation}/${i}`, keywordLocation);
+            evaluated[i] = true;
+            if (!result.valid) {
+              stop = shortCircuit;
+              errors.push({
+                instanceLocation,
+                keyword: "items",
+                keywordLocation,
+                error: `Items did not match schema.`
+              }, ...result.errors);
+              if (stop)
+                break;
+            }
+          }
+        }
+        if (!stop && $additionalItems !== void 0) {
+          const keywordLocation2 = `${schemaLocation}/additionalItems`;
+          for (; i < length; i++) {
+            const result = validate(instance[i], $additionalItems, draft, lookup, shortCircuit, recursiveAnchor, `${instanceLocation}/${i}`, keywordLocation2);
+            evaluated[i] = true;
+            if (!result.valid) {
+              stop = shortCircuit;
+              errors.push({
+                instanceLocation,
+                keyword: "additionalItems",
+                keywordLocation: keywordLocation2,
+                error: `Items did not match additional items schema.`
+              }, ...result.errors);
+            }
+          }
+        }
+      }
+      if ($contains !== void 0) {
+        if (length === 0 && $minContains === void 0) {
+          errors.push({
+            instanceLocation,
+            keyword: "contains",
+            keywordLocation: `${schemaLocation}/contains`,
+            error: `Array is empty. It must contain at least one item matching the schema.`
+          });
+        } else if ($minContains !== void 0 && length < $minContains) {
+          errors.push({
+            instanceLocation,
+            keyword: "minContains",
+            keywordLocation: `${schemaLocation}/minContains`,
+            error: `Array has less items (${length}) than minContains (${$minContains}).`
+          });
+        } else {
+          const keywordLocation = `${schemaLocation}/contains`;
+          const errorsLength = errors.length;
+          let contained = 0;
+          for (let j = 0; j < length; j++) {
+            const result = validate(instance[j], $contains, draft, lookup, shortCircuit, recursiveAnchor, `${instanceLocation}/${j}`, keywordLocation);
+            if (result.valid) {
+              evaluated[j] = true;
+              contained++;
+            } else {
+              errors.push(...result.errors);
+            }
+          }
+          if (contained >= ($minContains || 0)) {
+            errors.length = errorsLength;
+          }
+          if ($minContains === void 0 && $maxContains === void 0 && contained === 0) {
+            errors.splice(errorsLength, 0, {
+              instanceLocation,
+              keyword: "contains",
+              keywordLocation,
+              error: `Array does not contain item matching schema.`
+            });
+          } else if ($minContains !== void 0 && contained < $minContains) {
+            errors.push({
+              instanceLocation,
+              keyword: "minContains",
+              keywordLocation: `${schemaLocation}/minContains`,
+              error: `Array must contain at least ${$minContains} items matching schema. Only ${contained} items were found.`
+            });
+          } else if ($maxContains !== void 0 && contained > $maxContains) {
+            errors.push({
+              instanceLocation,
+              keyword: "maxContains",
+              keywordLocation: `${schemaLocation}/maxContains`,
+              error: `Array may contain at most ${$maxContains} items matching schema. ${contained} items were found.`
+            });
+          }
+        }
+      }
+      if (!stop && $unevaluatedItems !== void 0) {
+        const keywordLocation = `${schemaLocation}/unevaluatedItems`;
+        for (i; i < length; i++) {
+          if (evaluated[i]) {
+            continue;
+          }
+          const result = validate(instance[i], $unevaluatedItems, draft, lookup, shortCircuit, recursiveAnchor, `${instanceLocation}/${i}`, keywordLocation);
+          evaluated[i] = true;
+          if (!result.valid) {
+            errors.push({
+              instanceLocation,
+              keyword: "unevaluatedItems",
+              keywordLocation,
+              error: `Items did not match unevaluated items schema.`
+            }, ...result.errors);
+          }
+        }
+      }
+      if ($uniqueItems) {
+        for (let j = 0; j < length; j++) {
+          const a = instance[j];
+          const ao = typeof a === "object" && a !== null;
+          for (let k = 0; k < length; k++) {
+            if (j === k) {
+              continue;
+            }
+            const b = instance[k];
+            const bo = typeof b === "object" && b !== null;
+            if (a === b || ao && bo && deepCompareStrict(a, b)) {
+              errors.push({
+                instanceLocation,
+                keyword: "uniqueItems",
+                keywordLocation: `${schemaLocation}/uniqueItems`,
+                error: `Duplicate items at indexes ${j} and ${k}.`
+              });
+              j = Number.MAX_SAFE_INTEGER;
+              k = Number.MAX_SAFE_INTEGER;
+            }
+          }
+        }
+      }
+    } else if (instanceType === "number") {
+      if (draft === "4") {
+        if ($minimum !== void 0 && ($exclusiveMinimum === true && instance <= $minimum || instance < $minimum)) {
+          errors.push({
+            instanceLocation,
+            keyword: "minimum",
+            keywordLocation: `${schemaLocation}/minimum`,
+            error: `${instance} is less than ${$exclusiveMinimum ? "or equal to " : ""} ${$minimum}.`
+          });
+        }
+        if ($maximum !== void 0 && ($exclusiveMaximum === true && instance >= $maximum || instance > $maximum)) {
+          errors.push({
+            instanceLocation,
+            keyword: "maximum",
+            keywordLocation: `${schemaLocation}/maximum`,
+            error: `${instance} is greater than ${$exclusiveMaximum ? "or equal to " : ""} ${$maximum}.`
+          });
+        }
+      } else {
+        if ($minimum !== void 0 && instance < $minimum) {
+          errors.push({
+            instanceLocation,
+            keyword: "minimum",
+            keywordLocation: `${schemaLocation}/minimum`,
+            error: `${instance} is less than ${$minimum}.`
+          });
+        }
+        if ($maximum !== void 0 && instance > $maximum) {
+          errors.push({
+            instanceLocation,
+            keyword: "maximum",
+            keywordLocation: `${schemaLocation}/maximum`,
+            error: `${instance} is greater than ${$maximum}.`
+          });
+        }
+        if ($exclusiveMinimum !== void 0 && instance <= $exclusiveMinimum) {
+          errors.push({
+            instanceLocation,
+            keyword: "exclusiveMinimum",
+            keywordLocation: `${schemaLocation}/exclusiveMinimum`,
+            error: `${instance} is less than ${$exclusiveMinimum}.`
+          });
+        }
+        if ($exclusiveMaximum !== void 0 && instance >= $exclusiveMaximum) {
+          errors.push({
+            instanceLocation,
+            keyword: "exclusiveMaximum",
+            keywordLocation: `${schemaLocation}/exclusiveMaximum`,
+            error: `${instance} is greater than or equal to ${$exclusiveMaximum}.`
+          });
+        }
+      }
+      if ($multipleOf !== void 0) {
+        const remainder = instance % $multipleOf;
+        if (Math.abs(0 - remainder) >= 11920929e-14 && Math.abs($multipleOf - remainder) >= 11920929e-14) {
+          errors.push({
+            instanceLocation,
+            keyword: "multipleOf",
+            keywordLocation: `${schemaLocation}/multipleOf`,
+            error: `${instance} is not a multiple of ${$multipleOf}.`
+          });
+        }
+      }
+    } else if (instanceType === "string") {
+      const length = $minLength === void 0 && $maxLength === void 0 ? 0 : ucs2length(instance);
+      if ($minLength !== void 0 && length < $minLength) {
+        errors.push({
+          instanceLocation,
+          keyword: "minLength",
+          keywordLocation: `${schemaLocation}/minLength`,
+          error: `String is too short (${length} < ${$minLength}).`
+        });
+      }
+      if ($maxLength !== void 0 && length > $maxLength) {
+        errors.push({
+          instanceLocation,
+          keyword: "maxLength",
+          keywordLocation: `${schemaLocation}/maxLength`,
+          error: `String is too long (${length} > ${$maxLength}).`
+        });
+      }
+      if ($pattern !== void 0 && !new RegExp($pattern, "u").test(instance)) {
+        errors.push({
+          instanceLocation,
+          keyword: "pattern",
+          keywordLocation: `${schemaLocation}/pattern`,
+          error: `String does not match pattern.`
+        });
+      }
+      if ($format !== void 0 && format[$format] && !format[$format](instance)) {
+        errors.push({
+          instanceLocation,
+          keyword: "format",
+          keywordLocation: `${schemaLocation}/format`,
+          error: `String does not match format "${$format}".`
+        });
+      }
+    }
+    return { valid: errors.length === 0, errors };
+  }
+
+  // node_modules/.pnpm/@cfworker+json-schema@4.1.1/node_modules/@cfworker/json-schema/dist/esm/validator.js
+  var Validator = class {
+    constructor(schema, draft = "2019-09", shortCircuit = true) {
+      __publicField(this, "schema");
+      __publicField(this, "draft");
+      __publicField(this, "shortCircuit");
+      __publicField(this, "lookup");
+      this.schema = schema;
+      this.draft = draft;
+      this.shortCircuit = shortCircuit;
+      this.lookup = dereference(schema);
+    }
+    validate(instance) {
+      return validate(instance, this.schema, this.draft, this.lookup, this.shortCircuit);
+    }
+    addSchema(schema, id) {
+      if (id) {
+        schema = { ...schema, $id: id };
+      }
+      dereference(schema, this.lookup);
+    }
+  };
+
+  // src/static/sdk-libs/validate/formats.js
+  var IBAN_LENGTHS = {
+    AD: 24,
+    AE: 23,
+    AL: 28,
+    AT: 20,
+    AZ: 28,
+    BA: 20,
+    BE: 16,
+    BG: 22,
+    BH: 22,
+    BR: 29,
+    BY: 28,
+    CH: 21,
+    CR: 22,
+    CY: 28,
+    CZ: 24,
+    DE: 22,
+    DK: 18,
+    DO: 28,
+    EE: 20,
+    EG: 29,
+    ES: 24,
+    FI: 18,
+    FO: 18,
+    FR: 27,
+    GB: 22,
+    GE: 22,
+    GI: 23,
+    GL: 18,
+    GR: 27,
+    GT: 28,
+    HR: 21,
+    HU: 28,
+    IE: 22,
+    IL: 23,
+    IQ: 23,
+    IS: 26,
+    IT: 27,
+    JO: 30,
+    KW: 30,
+    KZ: 20,
+    LB: 28,
+    LC: 32,
+    LI: 21,
+    LT: 20,
+    LU: 20,
+    LV: 21,
+    MC: 27,
+    MD: 24,
+    ME: 22,
+    MK: 19,
+    MR: 27,
+    MT: 31,
+    MU: 30,
+    NL: 18,
+    NO: 15,
+    PK: 24,
+    PL: 28,
+    PS: 29,
+    PT: 25,
+    QA: 29,
+    RO: 24,
+    RS: 22,
+    SA: 24,
+    SC: 31,
+    SE: 24,
+    SI: 19,
+    SK: 24,
+    SM: 27,
+    ST: 25,
+    SV: 28,
+    TL: 23,
+    TN: 24,
+    TR: 26,
+    UA: 29,
+    VA: 22,
+    VG: 24,
+    XK: 20
+  };
+  var HETU_CHECK = "0123456789ABCDEFHJKLMNPRSTUVWXY";
+  var HETU_CENTURY = { "+": 1800, "-": 1900, Y: 1900, X: 1900, W: 1900, V: 1900, U: 1900, A: 2e3, B: 2e3, C: 2e3, D: 2e3, E: 2e3, F: 2e3 };
+  function realDay(y, m, d) {
+    if (m < 1 || m > 12 || d < 1) return false;
+    const days = [31, y % 4 === 0 && y % 100 !== 0 || y % 400 === 0 ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    return d <= days[m - 1];
+  }
+  function mod97(digits) {
+    let rest = 0;
+    for (let i = 0; i < digits.length; i += 7) rest = Number(String(rest) + digits.slice(i, i + 7)) % 97;
+    return rest;
+  }
+  var FORMAT_TESTS = {
+    /** Y-tunnus: seven digits, a hyphen and a check digit (weights 7 9 10 5 8 4 2, mod 11). */
+    "fi-business-id": function(value) {
+      const m = /^(\d{7})-(\d)$/.exec(String(value).trim());
+      if (!m) return "shape";
+      const weights = [7, 9, 10, 5, 8, 4, 2];
+      let sum = 0;
+      for (let i = 0; i < 7; i++) sum += Number(m[1][i]) * weights[i];
+      const rest = sum % 11;
+      if (rest === 1) return "check";
+      return (rest === 0 ? 0 : 11 - rest) === Number(m[2]) ? true : "check";
+    },
+    /** Henkilötunnus: DDMMYY, a century separator, a three-digit individual number and a check character. */
+    "fi-personal-id": function(value) {
+      const m = /^(\d{2})(\d{2})(\d{2})([-+ABCDEFUVWXY])(\d{3})([0-9A-Y])$/.exec(String(value).trim().toUpperCase());
+      if (!m) return "shape";
+      const year = HETU_CENTURY[
+        /** @type {keyof typeof HETU_CENTURY} */
+        m[4]
+      ] + Number(m[3]);
+      if (!realDay(year, Number(m[2]), Number(m[1]))) return "date";
+      return HETU_CHECK[Number(m[1] + m[2] + m[3] + m[5]) % 31] === m[6] ? true : "check";
+    },
+    /** IBAN: country, two check digits and the account, spaces allowed; length per country, then mod 97. */
+    iban: function(value) {
+      const compact = String(value).replace(/\s+/g, "").toUpperCase();
+      if (!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(compact)) return "shape";
+      const expected = IBAN_LENGTHS[
+        /** @type {keyof typeof IBAN_LENGTHS} */
+        compact.slice(0, 2)
+      ];
+      if (expected && compact.length !== expected) return "length";
+      const moved = compact.slice(4) + compact.slice(0, 4);
+      const digits = moved.replace(/[A-Z]/g, function(c) {
+        return String(c.charCodeAt(0) - 55);
+      });
+      return mod97(digits) === 1 ? true : "check";
+    },
+    /** Postinumero: five digits. */
+    "fi-postal-code": function(value) {
+      return /^\d{5}$/.test(String(value).trim()) ? true : "shape";
+    },
+    /** A phone number: an optional +, then 6 to 15 digits; spaces, hyphens, dots and brackets are allowed between them. */
+    phone: function(value) {
+      const s = String(value).trim();
+      if (!/^\+?[\d\s().-]+$/.test(s)) return "shape";
+      const digits = s.replace(/\D/g, "");
+      return digits.length >= 6 && digits.length <= 15 ? true : "shape";
+    }
+  };
+
+  // src/static/sdk-libs/validate/messages.js
+  var MESSAGES = {
+    en: {
+      required: "Fill in this field.",
+      requiredBecause: "Fill in this field too, because {other} is filled in.",
+      minLength: "Write at least {n} characters.",
+      minLength1: "Write at least one character.",
+      maxLength: "At most {n} characters. There are {len} now.",
+      pattern: "Check the format.",
+      format: "Check the format.",
+      minimum: "The smallest allowed value is {n}.",
+      maximum: "The largest allowed value is {n}.",
+      exclusiveMinimum: "The value must be greater than {n}.",
+      exclusiveMaximum: "The value must be less than {n}.",
+      multipleOf: "Use steps of {n}.",
+      enum: "Choose one of the options.",
+      const: "The value must be {value}.",
+      constTrue: "Tick this to continue.",
+      typeNumber: "Write a number here.",
+      typeInteger: "Write a whole number here.",
+      type: "This value does not fit this field.",
+      minItems: "Choose at least {n}.",
+      maxItems: "Choose at most {n}.",
+      uniqueItems: "The same value is in the list twice.",
+      sameAs: "This does not match {other}.",
+      anyOf: "Fill in at least one of these: {fields}.",
+      oneOf: "Fill in only one of these: {fields}.",
+      choice: "Check these details.",
+      not: "This value is not accepted.",
+      additional: "This information is not accepted here."
+    },
+    fi: {
+      required: "Täytä tämä kenttä.",
+      requiredBecause: "Täytä myös tämä, koska {other} on täytetty.",
+      minLength: "Kirjoita vähintään {n} merkkiä.",
+      minLength1: "Kirjoita vähintään yksi merkki.",
+      maxLength: "Enintään {n} merkkiä. Nyt merkkejä on {len}.",
+      pattern: "Tarkista muoto.",
+      format: "Tarkista muoto.",
+      minimum: "Pienin sallittu arvo on {n}.",
+      maximum: "Suurin sallittu arvo on {n}.",
+      exclusiveMinimum: "Arvon pitää olla suurempi kuin {n}.",
+      exclusiveMaximum: "Arvon pitää olla pienempi kuin {n}.",
+      multipleOf: "Sallitut arvot menevät {n}:n välein.",
+      enum: "Valitse jokin vaihtoehdoista.",
+      const: "Arvon pitää olla {value}.",
+      constTrue: "Valitse tämä, jotta voit jatkaa.",
+      typeNumber: "Kirjoita tähän luku.",
+      typeInteger: "Kirjoita tähän kokonaisluku.",
+      type: "Tämä arvo ei sovi tähän kenttään.",
+      minItems: "Valitse vähintään {n}.",
+      maxItems: "Valitse enintään {n}.",
+      uniqueItems: "Sama arvo on luettelossa kahdesti.",
+      sameAs: "Tämä ei ole sama kuin kentässä {other}.",
+      anyOf: "Täytä ainakin yksi näistä: {fields}.",
+      oneOf: "Täytä vain yksi näistä: {fields}.",
+      choice: "Tarkista nämä tiedot.",
+      not: "Tämä arvo ei kelpaa.",
+      additional: "Tätä tietoa ei voi antaa tässä."
+    },
+    es: {
+      required: "Completa este campo.",
+      requiredBecause: "Completa también este campo, porque {other} tiene un valor.",
+      minLength: "Escribe al menos {n} caracteres.",
+      minLength1: "Escribe al menos un carácter.",
+      maxLength: "Máximo {n} caracteres. Ahora hay {len}.",
+      pattern: "Revisa el formato.",
+      format: "Revisa el formato.",
+      minimum: "El valor mínimo es {n}.",
+      maximum: "El valor máximo es {n}.",
+      exclusiveMinimum: "El valor debe ser mayor que {n}.",
+      exclusiveMaximum: "El valor debe ser menor que {n}.",
+      multipleOf: "Usa valores de {n} en {n}.",
+      enum: "Elige una de las opciones.",
+      const: "El valor debe ser {value}.",
+      constTrue: "Marca esta casilla para continuar.",
+      typeNumber: "Escribe un número aquí.",
+      typeInteger: "Escribe un número entero aquí.",
+      type: "Este valor no corresponde a este campo.",
+      minItems: "Elige al menos {n}.",
+      maxItems: "Elige como máximo {n}.",
+      uniqueItems: "El mismo valor aparece dos veces en la lista.",
+      sameAs: "No coincide con {other}.",
+      anyOf: "Completa al menos uno de estos: {fields}.",
+      oneOf: "Completa solo uno de estos: {fields}.",
+      choice: "Revisa estos datos.",
+      not: "Este valor no es válido.",
+      additional: "Este dato no se acepta aquí."
+    }
+  };
+  var LIST_WORD = { en: "or", fi: "tai", es: "o" };
+  var FORMAT_HINTS = {
+    en: {
+      email: "For example name@example.com.",
+      uri: "Starts with https://, for example https://example.com.",
+      url: "Starts with https://, for example https://example.com.",
+      date: "For example 2026-10-05.",
+      time: "For example 14:30:00.",
+      "fi-business-id": "Seven digits, a hyphen and a check digit, for example 0737546-2.",
+      "fi-personal-id": "For example 131052-308T.",
+      iban: "For example FI21 1234 5600 0007 85.",
+      "fi-postal-code": "Five digits, for example 00100.",
+      phone: "For example +358 40 123 4567."
+    },
+    fi: {
+      email: "Esimerkiksi nimi@esimerkki.fi.",
+      uri: "Alkaa https://, esimerkiksi https://esimerkki.fi.",
+      url: "Alkaa https://, esimerkiksi https://esimerkki.fi.",
+      date: "Esimerkiksi 2026-10-05.",
+      time: "Esimerkiksi 14:30:00.",
+      "fi-business-id": "Seitsemän numeroa, väliviiva ja tarkistusnumero, esimerkiksi 0737546-2.",
+      "fi-personal-id": "Esimerkiksi 131052-308T.",
+      iban: "Esimerkiksi FI21 1234 5600 0007 85.",
+      "fi-postal-code": "Viisi numeroa, esimerkiksi 00100.",
+      phone: "Esimerkiksi +358 40 123 4567."
+    },
+    es: {
+      email: "Por ejemplo nombre@ejemplo.com.",
+      uri: "Empieza por https://, por ejemplo https://ejemplo.com.",
+      url: "Empieza por https://, por ejemplo https://ejemplo.com.",
+      date: "Por ejemplo 2026-10-05.",
+      time: "Por ejemplo 14:30:00.",
+      "fi-business-id": "Siete dígitos, un guion y un dígito de control, por ejemplo 0737546-2.",
+      "fi-personal-id": "Por ejemplo 131052-308T.",
+      iban: "Por ejemplo FI21 1234 5600 0007 85.",
+      "fi-postal-code": "Cinco dígitos, por ejemplo 00100.",
+      phone: "Por ejemplo +57 300 123 4567."
+    }
+  };
+  var FORMAT_MESSAGES = {
+    en: {
+      email: { shape: "This is not an email address." },
+      uri: { shape: "This is not a web address. A web address starts with https://, for example." },
+      url: { shape: "This is not a web address. A web address starts with https://, for example." },
+      date: { shape: "This is not a date." },
+      time: { shape: "This is not a time." },
+      "date-time": { shape: "This is not a date and time." },
+      "fi-business-id": {
+        shape: "A Business ID has seven digits, a hyphen and a check digit.",
+        check: "The check digit of the Business ID does not match. Check the digits."
+      },
+      "fi-personal-id": {
+        shape: "A personal identity code has six digits, a century sign and four characters.",
+        date: "The personal identity code does not start with a real date.",
+        check: "The check character of the personal identity code does not match. Check the characters."
+      },
+      iban: {
+        shape: "An IBAN starts with a country code and two digits, such as FI21.",
+        length: "The IBAN has the wrong number of characters for its country.",
+        check: "The check digits of the IBAN do not match. Check the account number."
+      },
+      "fi-postal-code": { shape: "A postal code has five digits." },
+      phone: { shape: "This is not a phone number. Use digits, with a + at the start if needed." }
+    },
+    fi: {
+      email: { shape: "Tämä ei ole sähköpostiosoite." },
+      uri: { shape: "Tämä ei ole verkko-osoite. Osoite alkaa esimerkiksi https://." },
+      url: { shape: "Tämä ei ole verkko-osoite. Osoite alkaa esimerkiksi https://." },
+      date: { shape: "Tämä ei ole päivämäärä." },
+      time: { shape: "Tämä ei ole kellonaika." },
+      "date-time": { shape: "Tämä ei ole päivämäärä ja kellonaika." },
+      "fi-business-id": {
+        shape: "Y-tunnuksessa on seitsemän numeroa, väliviiva ja tarkistusnumero.",
+        check: "Y-tunnuksen tarkistusnumero ei täsmää. Tarkista numerot."
+      },
+      "fi-personal-id": {
+        shape: "Henkilötunnuksessa on kuusi numeroa, välimerkki ja neljä merkkiä.",
+        date: "Henkilötunnuksen alussa ei ole oikeaa päivämäärää.",
+        check: "Henkilötunnuksen tarkistusmerkki ei täsmää. Tarkista merkit."
+      },
+      iban: {
+        shape: "IBAN alkaa maatunnuksella ja kahdella numerolla, esimerkiksi FI21.",
+        length: "IBANissa on väärä määrä merkkejä tälle maalle.",
+        check: "IBANin tarkistusnumerot eivät täsmää. Tarkista tilinumero."
+      },
+      "fi-postal-code": { shape: "Postinumerossa on viisi numeroa." },
+      phone: { shape: "Tämä ei ole puhelinnumero. Käytä numeroita ja tarvittaessa alussa +-merkkiä." }
+    },
+    es: {
+      email: { shape: "Esto no es una dirección de correo." },
+      uri: { shape: "Esto no es una dirección web. Una dirección web empieza, por ejemplo, por https://." },
+      url: { shape: "Esto no es una dirección web. Una dirección web empieza, por ejemplo, por https://." },
+      date: { shape: "Esto no es una fecha." },
+      time: { shape: "Esto no es una hora." },
+      "date-time": { shape: "Esto no es una fecha con hora." },
+      "fi-business-id": {
+        shape: "El Y-tunnus tiene siete dígitos, un guion y un dígito de control.",
+        check: "El dígito de control del Y-tunnus no coincide. Revisa los dígitos."
+      },
+      "fi-personal-id": {
+        shape: "El número de identidad tiene seis dígitos, un signo de siglo y cuatro caracteres.",
+        date: "El número de identidad no empieza con una fecha real.",
+        check: "El carácter de control del número de identidad no coincide. Revisa los caracteres."
+      },
+      iban: {
+        shape: "El IBAN empieza con el código del país y dos dígitos, por ejemplo FI21.",
+        length: "El IBAN no tiene el número de caracteres que corresponde a su país.",
+        check: "Los dígitos de control del IBAN no coinciden. Revisa el número de cuenta."
+      },
+      "fi-postal-code": { shape: "El código postal tiene cinco dígitos." },
+      phone: { shape: "Esto no es un número de teléfono. Usa dígitos y, si hace falta, un + al principio." }
+    }
+  };
+
+  // src/static/sdk-libs/validate/core.js
+  var LANGS = ["en", "fi", "es"];
+  var CUSTOM = {};
+  for (const name of Object.keys(FORMAT_TESTS)) {
+    format[name] = function(v) {
+      return FORMAT_TESTS[name](v) === true;
+    };
+  }
+  var WRAPPERS = /* @__PURE__ */ new Set([
+    "properties",
+    "patternProperties",
+    "additionalProperties",
+    "unevaluatedProperties",
+    "allOf",
+    "if",
+    "$ref",
+    "$recursiveRef",
+    "items",
+    "prefixItems",
+    "additionalItems",
+    "unevaluatedItems",
+    "dependentSchemas",
+    "propertyNames",
+    "contains"
+  ]);
+  function lang(wanted) {
+    let l = wanted;
+    const ns = typeof window !== "undefined" ? (
+      /** @type {any} */
+      window.AIMEAT
+    ) : null;
+    if (!l && ns && ns.auth && typeof ns.auth.getLang === "function") l = ns.auth.getLang();
+    if (!l && typeof document !== "undefined") l = document.documentElement.lang;
+    if (!l && typeof navigator !== "undefined") l = navigator.language;
+    const short = String(l || "en").slice(0, 2).toLowerCase();
+    return LANGS.indexOf(short) >= 0 ? short : "en";
+  }
+  function inLang(text, l) {
+    if (text == null) return "";
+    if (typeof text !== "object") return String(text);
+    const byLang = (
+      /** @type {Record<string, unknown>} */
+      text
+    );
+    if (typeof byLang[l] === "string") return (
+      /** @type {string} */
+      byLang[l]
+    );
+    if (typeof byLang.en === "string") return (
+      /** @type {string} */
+      byLang.en
+    );
+    for (const k of Object.keys(byLang)) if (typeof byLang[k] === "string") return (
+      /** @type {string} */
+      byLang[k]
+    );
+    return "";
+  }
+  function fill(s, vars) {
+    return s.replace(/\{(\w+)\}/g, function(m, k) {
+      return vars[k] != null ? String(vars[k]) : m;
+    });
+  }
+  function list2(items, l) {
+    if (items.length < 2) return items.join("");
+    return items.slice(0, -1).join(", ") + " " + LIST_WORD[
+      /** @type {'en'} */
+      l
+    ] + " " + items[items.length - 1];
+  }
+  function dropEmpty(value) {
+    if (Array.isArray(value)) return value.map(dropEmpty);
+    if (!value || typeof value !== "object") return value;
+    const out = {};
+    for (const [k, v] of Object.entries(value)) {
+      if (v === "" || v === null || v === void 0) continue;
+      out[k] = dropEmpty(v);
+    }
+    return out;
+  }
+  function segments(pointer) {
+    return String(pointer || "#").replace(/^#\/?/, "").split("/").filter(Boolean).map(function(s) {
+      return decodeURI(s).replace(/~1/g, "/").replace(/~0/g, "~");
+    });
+  }
+  function propSchema(schema, path) {
+    let s = schema;
+    for (const seg of path) {
+      if (!s || typeof s !== "object") return null;
+      if (s.properties && s.properties[seg]) s = s.properties[seg];
+      else if (s.items && typeof s.items === "object" && /^\d+$/.test(seg)) s = s.items;
+      else return null;
+    }
+    return s;
+  }
+  function at(value, path) {
+    let v = (
+      /** @type {any} */
+      value
+    );
+    for (const seg of path) {
+      if (v == null) return void 0;
+      v = v[seg];
+    }
+    return v;
+  }
+  function atPointer(schema, pointer) {
+    let s = schema;
+    for (const seg of segments(pointer)) {
+      if (s == null || typeof s !== "object") return null;
+      s = s[seg];
+    }
+    return s == null ? null : s;
+  }
+  function choiceFields(branches) {
+    if (!Array.isArray(branches)) return [];
+    const out = [];
+    for (const b of branches) {
+      if (!b || typeof b !== "object" || !Array.isArray(b.required)) return [];
+      const extra = Object.keys(b).filter(function(k) {
+        return k !== "required" && k !== "title" && k !== "description" && k.indexOf("x-") !== 0;
+      });
+      if (extra.length) return [];
+      for (const r of b.required) if (out.indexOf(r) < 0) out.push(r);
+    }
+    return out;
+  }
+  function lastNumber(text) {
+    const m = /(-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)\D*$/i.exec(text);
+    return m ? Number(m[1]) : null;
+  }
+  function quoted(text) {
+    const out = [];
+    const re = /"((?:[^"\\]|\\.)*)"/g;
+    let m;
+    while (m = re.exec(text)) out.push(m[1]);
+    return out;
+  }
+  function compile2(schema) {
+    const root = (
+      /** @type {any} */
+      schema || {}
+    );
+    const validator = new Validator(
+      /** @type {any} */
+      root,
+      "7",
+      false
+    );
+    const order = Object.keys(root.properties || {});
+    function place2(field) {
+      if (!field) return order.length + 1;
+      const i = order.indexOf(field.split(".")[0]);
+      return i < 0 ? order.length : i;
+    }
+    function label(field, opts, l) {
+      if (opts.labels && opts.labels[field]) return opts.labels[field];
+      const s = propSchema(root, field ? field.split(".") : []);
+      return s && inLang(s.title, l) || field;
+    }
+    function hint(field, wanted) {
+      const l = lang(wanted);
+      const s = propSchema(root, field ? field.split(".") : []);
+      if (!s) return "";
+      if (s["x-hint"]) return inLang(s["x-hint"], l);
+      if (s.format && CUSTOM[s.format] && CUSTOM[s.format].hint) return inLang(CUSTOM[s.format].hint, l);
+      if (s.format) return FORMAT_HINTS[l][s.format] || "";
+      return "";
+    }
+    function words(field, rule, key, vars, l) {
+      const s = propSchema(root, field ? field.split(".") : []);
+      const own = s && s["x-messages"] && s["x-messages"][rule];
+      return fill(own ? inLang(own, l) : MESSAGES[l][key], vars);
+    }
+    function check3(values, options) {
+      const opts = options || {};
+      const l = lang(opts.lang);
+      const data = opts.keepEmpty ? values : dropEmpty(values);
+      const raw = validator.validate(data).errors;
+      const issues = [];
+      const add = function(field, rule, message, params, fields2) {
+        const issue = { field, rule, message, hint: hint(field, l), params };
+        if (fields2) issue.fields = fields2;
+        issues.push(issue);
+      };
+      const nested = raw.filter(function(e) {
+        return /\/(anyOf|oneOf|not)\/\d+/.test(e.keywordLocation);
+      });
+      for (const e of raw) {
+        const kw = e.keyword;
+        if (WRAPPERS.has(kw)) continue;
+        if (nested.indexOf(e) >= 0) continue;
+        const path = segments(e.instanceLocation);
+        const here = path.join(".");
+        const value = at(data, path);
+        if (kw === "required" || kw === "dependencies" && /does not have/.test(e.error)) {
+          const names = quoted(e.error);
+          const field = (here ? here + "." : "") + names[names.length - 1];
+          if (kw === "dependencies") {
+            const other = label((here ? here + "." : "") + names[0], opts, l);
+            add(field, "required", words(field, "required", "requiredBecause", { other }, l), { because: names[0] });
+          } else {
+            add(field, "required", words(field, "required", "required", {}, l), {});
+          }
+          continue;
+        }
+        if (kw === "dependencies") continue;
+        if (kw === "format") {
+          const name = quoted(e.error)[0] || "";
+          const custom = CUSTOM[name];
+          const reason = custom ? custom.test(value) : FORMAT_TESTS[name] ? FORMAT_TESTS[name](String(value)) : "shape";
+          const reasonKey = typeof reason === "string" ? reason : "shape";
+          const s = propSchema(root, path);
+          const own = s && s["x-messages"] && s["x-messages"].format;
+          let message;
+          if (own) message = inLang(own, l);
+          else if (custom && custom.message) message = inLang(custom.message, l);
+          else {
+            const table2 = FORMAT_MESSAGES[l][name];
+            message = table2 ? table2[reasonKey] || table2.shape : MESSAGES[l].format;
+          }
+          add(here, "format", message, { format: name, reason: reasonKey });
+          continue;
+        }
+        if (kw === "anyOf" || kw === "oneOf") {
+          const names = choiceFields(atPointer(root, e.keywordLocation)).map(function(n) {
+            return (here ? here + "." : "") + n;
+          });
+          const many = kw === "oneOf" && !/\(0 matches\)/.test(e.error);
+          const key2 = !names.length ? "choice" : many ? "oneOf" : "anyOf";
+          const labels = names.map(function(n) {
+            return label(n, opts, l);
+          });
+          add(here, kw, words(here, kw, key2, { fields: list2(labels, l) }, l), { fields: names }, names.length ? names : void 0);
+          continue;
+        }
+        let key = kw;
+        const params = {};
+        if (kw === "minLength") {
+          params.n = lastNumber(e.error);
+          key = params.n === 1 ? "minLength1" : "minLength";
+        } else if (kw === "maxLength") {
+          params.n = lastNumber(e.error);
+          params.len = typeof value === "string" ? Array.from(value).length : "";
+        } else if (kw === "minimum" || kw === "maximum" || kw === "exclusiveMinimum" || kw === "exclusiveMaximum" || kw === "multipleOf") params.n = lastNumber(e.error);
+        else if (kw === "minItems" || kw === "maxItems") params.n = lastNumber(e.error);
+        else if (kw === "const") {
+          const s = propSchema(root, path);
+          const expected = s ? s.const : void 0;
+          params.value = expected;
+          if (expected === true) key = "constTrue";
+        } else if (kw === "type") {
+          const want = quoted(e.error).slice(1).join(" ");
+          key = /\binteger\b/.test(want) ? "typeInteger" : /\bnumber\b/.test(want) ? "typeNumber" : "type";
+          params.expected = want;
+        } else if (kw === "false") key = "additional";
+        else if (!MESSAGES[l][kw]) key = "choice";
+        add(here, kw === "false" ? "additional" : kw, words(here, kw === "false" ? "additional" : kw, key, params, l), params);
+      }
+      sameAsIssues(
+        root,
+        /** @type {any} */
+        data,
+        [],
+        function(field, other) {
+          add(field, "sameAs", words(field, "sameAs", "sameAs", { other: label(other, opts, l) }, l), { other });
+        }
+      );
+      issues.sort(function(a, b) {
+        return place2(a.field) - place2(b.field);
+      });
+      const fields = {};
+      const form2 = [];
+      for (const i of issues) {
+        if (!i.field) form2.push(i);
+        else if (!fields[i.field]) fields[i.field] = i;
+      }
+      return { valid: issues.length === 0, errors: issues, fields, form: form2 };
+    }
+    function missing(values, names, opts) {
+      const r = check3(values, opts);
+      const out = [];
+      for (const i of r.errors) {
+        const touched = [i.field].concat(i.fields || []);
+        for (const f of touched) {
+          if (names ? names.indexOf(f) >= 0 : true) {
+            if (out.indexOf(f) < 0) out.push(f);
+          }
+        }
+      }
+      return out;
+    }
+    return {
+      schema: root,
+      check: check3,
+      /**
+       * One field's problem, the whole value checked so a rule between fields counts.
+       * @param {string} name @param {unknown} values @param {CheckOptions} [opts]
+       * @returns {Issue|null}
+       */
+      field: function(name, values, opts) {
+        const r = check3(values, opts);
+        if (r.fields[name]) return r.fields[name];
+        return r.errors.find(function(i) {
+          return (i.fields || []).indexOf(name) >= 0;
+        }) || null;
+      },
+      /** Whether every named field (or the whole value) is filled in correctly. @param {unknown} values @param {string[]} [names] @param {CheckOptions} [opts] */
+      ready: function(values, names, opts) {
+        return missing(values, names, opts).length === 0;
+      },
+      missing,
+      hint,
+      /** @param {string} field @param {CheckOptions} [opts] */
+      label: function(field, opts) {
+        const o = opts || {};
+        return label(field, o, lang(o.lang));
+      }
+    };
+  }
+  function sameAsIssues(schema, data, path, report) {
+    if (!schema || typeof schema !== "object" || !schema.properties || !data || typeof data !== "object") return;
+    for (const [name, s] of Object.entries(schema.properties)) {
+      const sub = (
+        /** @type {any} */
+        s
+      );
+      if (!sub || typeof sub !== "object") continue;
+      const other = sub["x-same-as"];
+      if (typeof other === "string" && data[name] !== void 0 && data[name] !== data[other]) {
+        report(path.concat(name).join("."), path.concat(other).join("."));
+      }
+      if (sub.properties) sameAsIssues(sub, data[name], path.concat(name), report);
+    }
+  }
+
+  // src/static/sdk-libs/atelier/form-check.js
+  var FIELD_FORMAT = { email: "email", url: "uri", tel: "phone" };
   var NUMERIC = ["number", "range"];
+  function schemaFromFields(fields, schema) {
+    const base = schema && typeof schema === "object" ? schema : {};
+    const props = Object.assign({}, base.properties || {});
+    const required = Array.isArray(base.required) ? base.required.slice() : [];
+    for (const f of fields || []) {
+      if (!f || !f.name) continue;
+      const type = f.type || "text";
+      const p = Object.assign({}, props[f.name] || {});
+      if (p.title == null && typeof f.label === "string") p.title = f.label;
+      if (p.type == null) {
+        if (NUMERIC.indexOf(type) >= 0) p.type = "number";
+        else if (type === "checkbox" || type === "toggle") p.type = "boolean";
+        else p.type = "string";
+      }
+      const fmt2 = f.format || FIELD_FORMAT[
+        /** @type {keyof typeof FIELD_FORMAT} */
+        type
+      ];
+      if (fmt2 && p.format == null) p.format = fmt2;
+      if (f.pattern != null && p.pattern == null) p.pattern = String(f.pattern);
+      if (f.minLength != null && p.minLength == null) p.minLength = f.minLength;
+      if (f.maxLength != null && p.maxLength == null && NUMERIC.indexOf(type) < 0) p.maxLength = f.maxLength;
+      if (NUMERIC.indexOf(type) >= 0) {
+        if (f.min != null && p.minimum == null) p.minimum = f.min;
+        if (f.max != null && p.maximum == null) p.maximum = f.max;
+      }
+      if (f.sameAs && p["x-same-as"] == null) p["x-same-as"] = f.sameAs;
+      if (f.messages && typeof f.messages === "object") p["x-messages"] = Object.assign({}, p["x-messages"] || {}, f.messages);
+      if (f.required && (type === "checkbox" || type === "toggle") && p.const == null) p.const = true;
+      if (f.required && required.indexOf(f.name) < 0) required.push(f.name);
+      props[f.name] = p;
+    }
+    const out = Object.assign({}, base, { type: base.type || "object", properties: props });
+    if (required.length) out.required = required;
+    return out;
+  }
+
+  // src/static/sdk-libs/atelier/form.js
+  var NUMERIC2 = ["number", "range"];
+  var RULE_KEYS = [
+    "format",
+    "pattern",
+    "minLength",
+    "maxLength",
+    "minimum",
+    "maximum",
+    "exclusiveMinimum",
+    "exclusiveMaximum",
+    "multipleOf",
+    "const",
+    "enum",
+    "x-same-as"
+  ];
   function modelControl(field, id, describedBy) {
     const ns = (
       /** @type {any} */
@@ -8695,7 +10513,7 @@
     const extra = function(v) {
       return el("option", { value: v }, rows ? tai("modelField.notListed", { model: v }) : v);
     };
-    function fill(keep) {
+    function fill2(keep) {
       clear(select);
       select.appendChild(el("option", { value: "" }, tai("modelField.default")));
       for (const r of rows || []) {
@@ -8707,12 +10525,12 @@
       if (!rows) select.appendChild(el("option", { value: "", disabled: true }, tai(failed ? "modelField.failed" : "modelField.loading")));
       select.value = keep || "";
     }
-    fill(current2);
+    fill2(current2);
     Promise.resolve().then(function() {
       return lib.models({ capability: field.capability || "text" });
     }).then(
-      function(list2) {
-        rows = Array.isArray(list2) ? list2 : [];
+      function(list3) {
+        rows = Array.isArray(list3) ? list3 : [];
       },
       function(e) {
         failed = true;
@@ -8720,7 +10538,7 @@
       }
     ).then(function() {
       select.removeAttribute("aria-busy");
-      fill(select.value);
+      fill2(select.value);
     });
     return {
       input: select,
@@ -8733,6 +10551,123 @@
     const controls = /* @__PURE__ */ new Map();
     const root = el("form", { class: "ak-root ak-form", "data-ak-part": "root", novalidate: true });
     if (spec.target) resolve(spec.target).appendChild(root);
+    let drawn = spec.fields || [];
+    let checker = compile2(schemaFromFields(drawn, spec.schema));
+    const touched = /* @__PURE__ */ new Set();
+    const gates = [];
+    const formAlert = el("p", { class: "ak-form__error ak-form__alert", "data-ak-part": "alert", role: "alert" });
+    formAlert.hidden = true;
+    const gateNote = spec.gate ? el("p", { class: "ak-form__gate", "data-ak-part": "gate", "aria-live": "polite" }) : null;
+    function isRequired(name) {
+      const req = checker.schema.required;
+      return Array.isArray(req) && req.indexOf(name) >= 0;
+    }
+    function hasRule(name) {
+      if (isRequired(name)) return true;
+      const p = (checker.schema.properties || {})[name] || {};
+      return RULE_KEYS.some(function(k) {
+        return p[k] != null;
+      });
+    }
+    function checkOpts() {
+      const labels = {};
+      for (const [name, c] of controls) if (typeof c.field.label === "string") labels[name] = c.field.label;
+      return { lang: i18n.lang(), labels };
+    }
+    function checkNow() {
+      return checker.check(values(), checkOpts());
+    }
+    function issueOf(r, name) {
+      if (r.fields[name]) return r.fields[name];
+      return r.errors.find(function(i) {
+        return (i.fields || []).indexOf(name) >= 0;
+      }) || null;
+    }
+    function missingFrom(r, names) {
+      const out = [];
+      for (const i of r.errors) {
+        for (const f of [i.field].concat(i.fields || [])) {
+          if (names ? names.indexOf(f) >= 0 : true) {
+            if (out.indexOf(f) < 0) out.push(f);
+          }
+        }
+      }
+      return out;
+    }
+    function mark(name, message) {
+      const c = controls.get(name);
+      if (!c) return;
+      c.error.textContent = message;
+      c.error.hidden = false;
+      c.wrap.classList.add("ak-form__field--invalid");
+      c.wrap.classList.remove("ak-form__field--valid");
+      c.input.setAttribute("aria-invalid", "true");
+    }
+    function unmark(name) {
+      const c = controls.get(name);
+      if (!c) return;
+      c.error.hidden = true;
+      c.error.textContent = "";
+      c.wrap.classList.remove("ak-form__field--invalid");
+      c.input.removeAttribute("aria-invalid");
+      const v = valueOf(name);
+      const filled = !(v === "" || v == null || v === false || typeof v === "number" && Number.isNaN(v));
+      c.wrap.classList.toggle("ak-form__field--valid", touched.has(name) && filled && hasRule(name));
+    }
+    function recheck(name) {
+      const issue = issueOf(checkNow(), name);
+      if (issue) mark(name, issue.message);
+      else unmark(name);
+    }
+    function gateState(button2, note, miss) {
+      const held = miss.length > 0;
+      if (held) button2.setAttribute("aria-disabled", "true");
+      else button2.removeAttribute("aria-disabled");
+      if (!note) return;
+      const names = miss.filter(Boolean).map(function(n) {
+        const c = controls.get(n);
+        return c && typeof c.field.label === "string" ? c.field.label : checker.label(n, checkOpts());
+      });
+      note.textContent = held ? t("fillFirst", { fields: names.length ? names.join(", ") : t("formIncomplete") }) : "";
+      note.hidden = !held;
+    }
+    function refreshGates() {
+      if (!gates.length && !spec.onValidity) return;
+      const r = checkNow();
+      for (const g of gates) g(r);
+      if (spec.onValidity) spec.onValidity({ valid: r.valid, missing: missingFrom(r) });
+    }
+    function showProblems(names) {
+      const r = checkNow();
+      let firstBad = null;
+      for (const [name, c] of controls) {
+        if (names && names.indexOf(name) < 0) continue;
+        touched.add(name);
+        const issue = issueOf(r, name);
+        if (issue) {
+          mark(name, issue.message);
+          attention(c.wrap, "shake");
+          if (!firstBad) firstBad = name;
+        } else unmark(name);
+      }
+      if (!names) {
+        const loose = r.errors.filter(function(i) {
+          return !controls.has(i.field) && !(i.fields || []).some(function(f) {
+            return controls.has(f);
+          });
+        });
+        formAlert.textContent = loose.map(function(i) {
+          return i.message;
+        }).join(" ");
+        formAlert.hidden = loose.length === 0;
+        if (!firstBad && loose.length) firstBad = "";
+      }
+      if (firstBad) {
+        const c = controls.get(firstBad);
+        if (c) c.input.focus();
+      }
+      return firstBad;
+    }
     function valueOf(name) {
       const c = controls.get(name);
       if (!c) return void 0;
@@ -8742,7 +10677,7 @@
         c.input
       );
       if (type === "checkbox" || type === "toggle") return node.checked;
-      if (NUMERIC.indexOf(type) >= 0) return node.value === "" ? null : Number(node.value);
+      if (NUMERIC2.indexOf(type) >= 0) return node.value === "" ? null : Number(node.value);
       return node.value;
     }
     function reading(field, raw) {
@@ -8765,7 +10700,9 @@
       const id = field.id || uid("ak-f");
       const hintId = id + "-hint";
       const errId = id + "-err";
-      const describedBy = (field.hint ? hintId + " " : "") + errId;
+      const hintText = field.hint || checker.hint(field.name, i18n.lang());
+      const required = !!field.required || isRequired(field.name);
+      const describedBy = (hintText ? hintId + " " : "") + errId;
       let input;
       let readout = null;
       let ensure = null;
@@ -8810,10 +10747,10 @@
       }
       const label = el("label", { class: "ak-form__label", "data-ak-part": "label", for: id }, [
         field.label,
-        field.required ? el("span", { class: "ak-form__req", "data-ak-part": "req", "aria-hidden": "true", text: "*" }) : null,
-        field.required ? el("span", { class: "ak-sr-only", text: " (" + t("required") + ")" }) : null
+        required ? el("span", { class: "ak-form__req", "data-ak-part": "req", "aria-hidden": "true", text: "*" }) : null,
+        required ? el("span", { class: "ak-sr-only", text: " (" + t("required") + ")" }) : null
       ]);
-      const hint = field.hint ? el("p", { class: "ak-form__hint", "data-ak-part": "hint", id: hintId, text: field.hint }) : null;
+      const hint = hintText ? el("p", { class: "ak-form__hint", "data-ak-part": "hint", id: hintId, text: hintText }) : null;
       const error = el("p", { class: "ak-form__error", "data-ak-part": "error", id: errId, role: "alert" });
       error.hidden = true;
       const body = readout ? el("div", { class: "ak-form__range", "data-ak-part": "range" }, [input, readout]) : input;
@@ -8828,10 +10765,19 @@
       input.addEventListener("input", function() {
         refreshReadout(field.name);
         if (field.onInput) field.onInput(valueOf(field.name), field);
+        if (touched.has(field.name)) recheck(field.name);
+        refreshGates();
       });
       input.addEventListener("change", function() {
         refreshReadout(field.name);
         if (field.onChange) field.onChange(valueOf(field.name), field);
+        if (inline || type === "select" || type === "model" || type === "range") touched.add(field.name);
+        if (touched.has(field.name)) recheck(field.name);
+        refreshGates();
+      });
+      input.addEventListener("blur", function() {
+        touched.add(field.name);
+        recheck(field.name);
       });
       refreshReadout(field.name);
       if (type === "toggle") controls.get(field.name).motion = switchMotion(
@@ -8848,10 +10794,7 @@
     function setError(name, message) {
       const c = controls.get(name);
       if (!c) return;
-      c.error.textContent = message;
-      c.error.hidden = false;
-      c.wrap.classList.add("ak-form__field--invalid");
-      c.input.setAttribute("aria-invalid", "true");
+      mark(name, message);
       attention(c.wrap, "shake");
     }
     function clearErrors() {
@@ -8861,31 +10804,13 @@
         c.wrap.classList.remove("ak-form__field--invalid");
         c.input.removeAttribute("aria-invalid");
       }
+      formAlert.hidden = true;
+      formAlert.textContent = "";
     }
     function values() {
       const out = {};
       for (const [name] of controls) out[name] = valueOf(name);
       return out;
-    }
-    function validate() {
-      clearErrors();
-      let firstBad = null;
-      for (const [name, c] of controls) {
-        const f = c.field;
-        const type = f.type || "text";
-        const numeric = NUMERIC.indexOf(type) >= 0;
-        const v = valueOf(name);
-        let problem = null;
-        if (f.required && (v === "" || v == null || v === false)) problem = f.label + ": " + t("required").toLowerCase();
-        else if (numeric && v != null && Number.isNaN(v)) problem = f.label + ": " + t("required").toLowerCase();
-        else if (numeric && v != null && f.min != null && v < f.min) problem = f.label + " ≥ " + f.min;
-        else if (numeric && v != null && f.max != null && v > f.max) problem = f.label + " ≤ " + f.max;
-        if (problem) {
-          setError(name, problem);
-          if (!firstBad) firstBad = name;
-        }
-      }
-      return firstBad;
     }
     const wantsBar = spec.submit !== false;
     const submitBtn = el(
@@ -8906,22 +10831,26 @@
       submitBtn
     ]) : null;
     function render(fields) {
+      drawn = fields;
+      checker = compile2(schemaFromFields(fields, spec.schema));
+      touched.clear();
       controls.clear();
       clear(root);
       for (const field of fields) root.appendChild(buildControl(field));
+      root.appendChild(formAlert);
+      if (gateNote) root.appendChild(gateNote);
       if (bar2) root.appendChild(bar2);
       enter(root);
     }
     render(spec.fields || []);
+    if (spec.gate && bar2) gates.push(function(r) {
+      gateState(submitBtn, gateNote, missingFrom(r));
+    });
+    refreshGates();
     root.addEventListener("submit", function(ev) {
       ev.preventDefault();
       if (!spec.onSubmit) return;
-      const bad = validate();
-      if (bad) {
-        const c = controls.get(bad);
-        if (c) c.input.focus();
-        return;
-      }
+      if (showProblems() !== null) return;
       whileBusy(submitBtn, Promise.resolve().then(function() {
         return spec.onSubmit(values());
       })).catch(function(e) {
@@ -8931,7 +10860,8 @@
           const c = controls.get(e.field);
           if (c) c.input.focus();
         } else {
-          setError(controls.keys().next().value, e && e.message || String(e));
+          formAlert.textContent = e && e.message || String(e);
+          formAlert.hidden = false;
         }
       });
     });
@@ -8949,13 +10879,65 @@
           else c.input.value = next[name] == null ? "" : String(next[name]);
           refreshReadout(name);
           if (c.motion) c.motion.sync();
+          if (touched.has(name)) recheck(name);
         }
+        refreshGates();
       },
       setError,
       clearErrors,
-      /** @param {{ fields?: FormField[] }} patch */
+      /** Everything the rules say about what the form holds now: { valid, errors, fields, form }. */
+      check: checkNow,
+      /** Whether the named fields (all, when omitted) are filled in correctly. @param {string[]} [names] */
+      ready(names) {
+        return missingFrom(checkNow(), names).length === 0;
+      },
+      /** The named fields (all, when omitted) that are not yet filled in correctly. @param {string[]} [names] */
+      missing(names) {
+        return missingFrom(checkNow(), names);
+      },
+      /**
+       * Hold a button of the host's own (Next, in a form of several steps) until the named fields are
+       * right. Held, it is aria-disabled and still focusable, and a line after it names what is
+       * missing; pressed anyway, it shows those fields' problems and moves focus to the first.
+       * @param {string|Element} target @param {string[]} [names]
+       */
+      gate(target, names) {
+        const button2 = (
+          /** @type {HTMLElement} */
+          resolve(target)
+        );
+        const note = el("p", { class: "ak-form__gate", "data-ak-part": "gate", "aria-live": "polite" });
+        button2.insertAdjacentElement("afterend", note);
+        const hold = function(ev) {
+          if (missingFrom(checkNow(), names).length === 0) return;
+          ev.preventDefault();
+          ev.stopImmediatePropagation();
+          showProblems(names || Array.from(controls.keys()));
+        };
+        button2.addEventListener("click", hold, true);
+        const g = function(r) {
+          gateState(button2, note, missingFrom(r, names));
+        };
+        gates.push(g);
+        g(checkNow());
+        return {
+          refresh() {
+            g(checkNow());
+          },
+          destroy() {
+            button2.removeEventListener("click", hold, true);
+            button2.removeAttribute("aria-disabled");
+            if (note.parentNode) note.parentNode.removeChild(note);
+            const i = gates.indexOf(g);
+            if (i >= 0) gates.splice(i, 1);
+          }
+        };
+      },
+      /** @param {{ fields?: FormField[], schema?: Record<string, any> }} patch */
       set(patch) {
-        if (patch && patch.fields) render(patch.fields);
+        if (patch && patch.schema !== void 0) spec.schema = patch.schema;
+        if (patch && (patch.fields || patch.schema !== void 0)) render(patch.fields || drawn);
+        refreshGates();
       },
       destroy() {
         if (root.parentNode) root.parentNode.removeChild(root);
@@ -9655,11 +11637,11 @@
     const CY = H4 / 2 + 4;
     const R = 118;
     const angle = (i) => -Math.PI / 2 + 2 * Math.PI * i / axes.length;
-    const at = (i, r) => `${(CX + Math.cos(angle(i)) * r).toFixed(1)} ${(CY + Math.sin(angle(i)) * r).toFixed(1)}`;
+    const at2 = (i, r) => `${(CX + Math.cos(angle(i)) * r).toFixed(1)} ${(CY + Math.sin(angle(i)) * r).toFixed(1)}`;
     const node = svg("svg", { viewBox: `0 0 ${W7} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
     for (const frac of [0.25, 0.5, 0.75, 1]) {
       node.appendChild(svg("polygon", {
-        points: axes.map((a, i) => at(i, R * frac)).join(" "),
+        points: axes.map((a, i) => at2(i, R * frac)).join(" "),
         class: "ak-chart__radarring"
       }));
     }
@@ -9684,7 +11666,7 @@
     });
     const still2 = ctx.still();
     series.forEach((s, si) => {
-      const points = axes.map((a, i) => at(i, R * Math.min(Math.max((Number(s.values[i]) || 0) / max, 0), 1))).join(" ");
+      const points = axes.map((a, i) => at2(i, R * Math.min(Math.max((Number(s.values[i]) || 0) / max, 0), 1))).join(" ");
       const shape = svg("polygon", { points, class: "ak-chart__radarshape" });
       shape.style.fill = SERIES_VARS[si % SERIES_VARS.length];
       shape.style.stroke = SERIES_VARS[si % SERIES_VARS.length];
@@ -10215,11 +12197,11 @@
       root.setAttribute("aria-label", (spec.title ? spec.title + " — " : "") + nodes.map((n) => n.label).join(", "));
       const widths = /* @__PURE__ */ new Map();
       for (const item of nodes) widths.set(item.id, pillWidth(item.label));
-      const at = place(nodes, widths);
+      const at2 = place(nodes, widths);
       const node = svg2("svg", { viewBox: `0 0 ${W2} ${H2}`, class: "ak-graph__svg", "aria-hidden": "true" });
       for (const edge of edges) {
-        const a = at.get(edge.from);
-        const b = at.get(edge.to);
+        const a = at2.get(edge.from);
+        const b = at2.get(edge.to);
         if (!a || !b) continue;
         node.appendChild(svg2("line", { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: "ak-graph__edge" }));
         if (edge.label) {
@@ -10234,7 +12216,7 @@
         }
       }
       for (const item of nodes) {
-        const p = at.get(item.id);
+        const p = at2.get(item.id);
         const width = widths.get(item.id);
         const g = svg2("g", { class: "ak-graph__node ak-graph__node--" + (item.tone || "plain"), transform: `translate(${p.x}, ${p.y})` });
         g.appendChild(svg2("rect", { x: -width / 2, y: -PILL_H / 2, width, height: PILL_H, rx: PILL_H / 2, class: "ak-graph__pill" }));
@@ -10750,8 +12732,8 @@
         const sun = new THREE.DirectionalLight();
         sun.intensity = 2.2;
         sun.position.set(4, 8, 6);
-        const fill = new THREE.HemisphereLight(new THREE.Color(surface), new THREE.Color(ink3), 0.7);
-        group.add(sun, fill);
+        const fill2 = new THREE.HemisphereLight(new THREE.Color(surface), new THREE.Color(ink3), 0.7);
+        group.add(sun, fill2);
       }
       frameCamera(barCols);
       clock.start = performance.now();
@@ -10905,9 +12887,9 @@
       }, "✕")
     ]);
     panel.appendChild(head);
-    const list2 = el("nav", { class: "ak-drawer__list" });
+    const list3 = el("nav", { class: "ak-drawer__list" });
     for (const item of spec.items || []) {
-      list2.appendChild(el("button", {
+      list3.appendChild(el("button", {
         type: "button",
         class: "ak-drawer__item",
         ...item.current ? { "aria-current": "page" } : {},
@@ -10922,7 +12904,7 @@
         item.sub != null ? el("span", { class: "ak-drawer__sub", text: item.sub }) : null
       ]));
     }
-    if ((spec.items || []).length) panel.appendChild(list2);
+    if ((spec.items || []).length) panel.appendChild(list3);
     if (spec.body) {
       const host = el("div", { class: "ak-drawer__body" });
       spec.body(host);
@@ -11165,11 +13147,11 @@
     }
     let drag2 = null;
     viewport.addEventListener("pointerdown", function(ev) {
-      const at = (
+      const at2 = (
         /** @type {Element|null} */
         ev.target instanceof Element ? ev.target : null
       );
-      if (at && at.closest(".ak-mosaic__tilecover")) return;
+      if (at2 && at2.closest(".ak-mosaic__tilecover")) return;
       drag2 = { x: ev.clientX, y: ev.clientY };
       viewport.setPointerCapture(ev.pointerId);
     });
@@ -11631,9 +13613,9 @@
     const root = el("div", { class: "ak-root ak-queue", "data-ak-part": "root" });
     applyVariant(root, spec, ["dense", "plain"]);
     const strip = el("div", { class: "ak-queue__strip", role: "status", "data-ak-part": "strip" });
-    const list2 = el("div", { class: "ak-queue__list", role: "list", "data-ak-part": "list" });
+    const list3 = el("div", { class: "ak-queue__list", role: "list", "data-ak-part": "list" });
     root.appendChild(strip);
-    root.appendChild(list2);
+    root.appendChild(list3);
     if (spec.target) resolve(spec.target).appendChild(root);
     let emptyCard = null;
     function render(data) {
@@ -11644,19 +13626,19 @@
       const items = data && Array.isArray(data.items) ? data.items : [];
       if (!items.length) {
         clear(strip);
-        keyedRows(list2, [], { key: function() {
+        keyedRows(list3, [], { key: function() {
           return "";
         }, build: function() {
           return el("div");
         } });
         strip.hidden = true;
-        list2.hidden = true;
+        list3.hidden = true;
         const e = spec.empty || {};
         emptyCard = emptyState({ target: root, tone: "quiet", title: e.title || t("empty"), hint: e.hint || t("emptyHint") });
         return;
       }
       strip.hidden = false;
-      list2.hidden = false;
+      list3.hidden = false;
       const counts = {};
       for (const item of items) {
         const s = QUEUE_STATES.indexOf(item.state) >= 0 ? item.state : "waiting";
@@ -11671,7 +13653,7 @@
           [el("strong", { text: String(counts[s]) }), el("span", { text: " " + t("queue." + s) })]
         ));
       }
-      keyedRows(list2, items, {
+      keyedRows(list3, items, {
         key: function(item, i) {
           return item && item.id != null ? String(item.id) : "job-" + i;
         },
@@ -11936,15 +13918,15 @@
     } };
   }
   function deal(targets) {
-    let list2;
-    if (typeof targets === "string") list2 = Array.prototype.slice.call(document.querySelectorAll(targets));
-    else if (targets instanceof Element) list2 = [
+    let list3;
+    if (typeof targets === "string") list3 = Array.prototype.slice.call(document.querySelectorAll(targets));
+    else if (targets instanceof Element) list3 = [
       /** @type {HTMLElement} */
       targets
     ];
-    else list2 = Array.prototype.slice.call(targets || []);
+    else list3 = Array.prototype.slice.call(targets || []);
     if (reducedMotion()) return 0;
-    list2.forEach((node, i) => {
+    list3.forEach((node, i) => {
       node.style.setProperty("--ak-deal-i", String(i));
       node.classList.remove("ak-move--deal");
       void node.offsetWidth;
@@ -11956,7 +13938,7 @@
       };
       node.addEventListener("animationend", done);
     });
-    return list2.length;
+    return list3.length;
   }
 
   // src/static/sdk-libs/atelier/flow-parts.js
@@ -12028,7 +14010,7 @@
         },
         onMove: function(dx, dy) {
           const all = rows();
-          const at = all.indexOf(row);
+          const at2 = all.indexOf(row);
           const others = all.filter(function(r) {
             return r !== row;
           });
@@ -12036,8 +14018,8 @@
           const step = row.offsetHeight + gap();
           others.forEach(function(r, i) {
             let to = 0;
-            if (want > at && i >= at && i < want) to = -step;
-            else if (want < at && i >= want && i < at) to = step;
+            if (want > at2 && i >= at2 && i < want) to = -step;
+            else if (want < at2 && i >= want && i < at2) to = step;
             if ((held.get(r) || 0) === to) return;
             held.set(r, to);
             spring(r, { y: to }, CARRY);
@@ -12046,11 +14028,11 @@
         onEnd: function(dx, dy) {
           row.classList.remove("is-carried");
           const all = rows();
-          const at = all.indexOf(row);
+          const at2 = all.indexOf(row);
           const want = Math.max(0, Math.min(wanted(row, dy), all.length - 1));
           held.set(row, dy);
           place2(row, want);
-          if (want !== at) tell();
+          if (want !== at2) tell();
         }
       }, { axis: "y", back: false });
     }
@@ -12353,8 +14335,8 @@
     function adopt(source) {
       picked = {};
       Object.keys(source || {}).forEach(function(key) {
-        const list2 = source[key];
-        if (Array.isArray(list2) && list2.length) picked[key] = list2.slice();
+        const list3 = source[key];
+        if (Array.isArray(list3) && list3.length) picked[key] = list3.slice();
       });
     }
     adopt(s.selected);
@@ -12383,18 +14365,18 @@
     }
     function toggle2(rec) {
       const facet = rec.facet;
-      const list2 = picked[facet.id] ? picked[facet.id].slice() : [];
-      const at = list2.indexOf(rec.option.id);
+      const list3 = picked[facet.id] ? picked[facet.id].slice() : [];
+      const at2 = list3.indexOf(rec.option.id);
       if (facet.multi) {
-        if (at >= 0) list2.splice(at, 1);
-        else list2.push(rec.option.id);
-      } else if (at >= 0) {
-        list2.length = 0;
+        if (at2 >= 0) list3.splice(at2, 1);
+        else list3.push(rec.option.id);
+      } else if (at2 >= 0) {
+        list3.length = 0;
       } else {
-        list2.length = 0;
-        list2.push(rec.option.id);
+        list3.length = 0;
+        list3.push(rec.option.id);
       }
-      if (list2.length) picked[facet.id] = list2;
+      if (list3.length) picked[facet.id] = list3;
       else delete picked[facet.id];
       paint();
       if (s.onChange) s.onChange(selection());
@@ -13086,12 +15068,12 @@
   function tc(key, vars) {
     const hosted = i18n.t("commercial." + key, vars);
     if (hosted !== "commercial." + key) return hosted;
-    const lang = i18n.lang();
+    const lang2 = i18n.lang();
     const table2 = (
       /** @type {Record<string, string>} */
       STRINGS3[
         /** @type {'en'|'fi'|'es'} */
-        lang
+        lang2
       ] || STRINGS3.en
     );
     const text = table2[key] || STRINGS3.en[key] || key;
@@ -13154,8 +15136,8 @@
     let s = String(principal || "");
     const hash = s.lastIndexOf("#");
     if (hash >= 0) s = s.slice(hash + 1);
-    const at = s.indexOf("@");
-    return at >= 0 ? s.slice(0, at) : s;
+    const at2 = s.indexOf("@");
+    return at2 >= 0 ? s.slice(0, at2) : s;
   }
   function legalPath(ref) {
     return apiBase() + "/v1/apps/" + encodeURIComponent(ref.owner) + "/" + encodeURIComponent(ref.filename) + "/legal";
@@ -13396,13 +15378,13 @@
       window.AIMEAT
     );
     if (!ns || !ns.rows) return Promise.reject(new Error("aimeat-rows.js is not loaded"));
-    const at = ev.occurredAt || (/* @__PURE__ */ new Date()).toISOString();
+    const at2 = ev.occurredAt || (/* @__PURE__ */ new Date()).toISOString();
     return ns.rows.append(
       ev.org,
       ev.ws,
       ev.space,
-      { app: ev.app, kind: ev.kind, actor: ev.actor, at, detail: ev.detail == null ? null : ev.detail },
-      { rowId: ev.rowId, occurredAt: at }
+      { app: ev.app, kind: ev.kind, actor: ev.actor, at: at2, detail: ev.detail == null ? null : ev.detail },
+      { rowId: ev.rowId, occurredAt: at2 }
     );
   }
   function feedbackForm(spec) {
@@ -13897,12 +15879,12 @@
   function tm(key, vars) {
     const hosted = i18n.t("members." + key, vars);
     if (hosted !== "members." + key) return hosted;
-    const lang = i18n.lang();
+    const lang2 = i18n.lang();
     const table2 = (
       /** @type {Record<string, string>} */
       STRINGS4[
         /** @type {'en'|'fi'|'es'} */
-        lang
+        lang2
       ] || STRINGS4.en
     );
     const text = table2[key] || STRINGS4.en[key] || key;
@@ -14117,7 +16099,7 @@
       }) : rows;
       return { rows: hit.slice(0, shown), more: hit.length - Math.min(hit.length, shown) };
     }
-    function list2(part, rows, none, more) {
+    function list3(part, rows, none, more) {
       const host = el("div", { class: "ak-mem__group", "data-ak-part": part });
       if (!rows.length) host.appendChild(el("p", { class: "ak-mem__none" }, none));
       else host.appendChild(el("ul", { class: "ak-mem__rows" }, rows));
@@ -14295,7 +16277,7 @@
           const v = visible(asked, function(q) {
             return q.owner + " " + (q.displayName || "") + " " + (q.email || "") + " " + (q.note || "");
           });
-          body.appendChild(list2("asked", v.rows.map(function(q) {
+          body.appendChild(list3("asked", v.rows.map(function(q) {
             const sel = roles.length > 1 ? roleSelect(roles, oneClick, tm("members.role")) : null;
             if (sel) sel.disabled = sample;
             return row(person(q.owner, q.displayName, q.email), q.note || "", [
@@ -14314,7 +16296,7 @@
           const v = visible(seen, function(s) {
             return s.owner + " " + (s.displayName || "") + " " + (s.email || "");
           });
-          body.appendChild(list2("seen", v.rows.map(function(s) {
+          body.appendChild(list3("seen", v.rows.map(function(s) {
             const sel = roles.length > 1 ? roleSelect(roles, oneClick, tm("members.role")) : null;
             if (sel) sel.disabled = sample;
             const visits = s.visits ? tm(s.visits === 1 ? "members.visit1" : "members.visits", { n: s.visits, d: day2(s.lastSeen) }) : "";
@@ -14365,13 +16347,13 @@
               }, sample)
             ]), columnsOf(m));
           });
-          body.appendChild(variant === "table" ? table2(v.rows, rows, v.more) : list2("roster", rows, tm("members.rosterNone"), v.more));
+          body.appendChild(variant === "table" ? table2(v.rows, rows, v.more) : list3("roster", rows, tm("members.rosterNone"), v.more));
         } else if (tab === "invites") {
           body.appendChild(addPanel());
           const v = visible(invites, function(i) {
             return (i.emailShown || "") + " " + i.role;
           });
-          body.appendChild(list2("invites", v.rows.map(function(i) {
+          body.appendChild(list3("invites", v.rows.map(function(i) {
             return row(person(i.emailShown || "", null), tm("members.invited", { role: i.role, d: day2(i.at), until: day2(i.expiresAt) }), [
               button2(tm("members.cancelInvite"), "ghost", sample ? noop : function() {
                 act(function() {
@@ -14387,7 +16369,7 @@
           (sample ? Promise.resolve(auditRows) : iam.audit({ limit: 100 })).then(function(rows) {
             clear(body);
             const list0 = Array.isArray(rows) ? rows : [];
-            body.appendChild(list2("history", list0.map(function(h) {
+            body.appendChild(list3("history", list0.map(function(h) {
               return el("li", { class: "ak-mem__row ak-mem__row--line", "data-ak-part": "row" }, [
                 el("span", { class: "ak-mem__when" }, day2(h.at)),
                 el("span", { class: "ak-mem__meta" }, tm("history." + h.action, {
@@ -14409,7 +16391,7 @@
           body.appendChild(el("p", { class: "ak-mem__none" }, tm("members.loading")));
           Promise.resolve(spec.payingCustomers ? spec.payingCustomers() : []).then(function(rows) {
             clear(body);
-            body.appendChild(list2("paying", (rows || []).map(function(c) {
+            body.appendChild(list3("paying", (rows || []).map(function(c) {
               return row(person(c.label || c.id, null), c.spend || "", []);
             }), tm("members.payingNone"), 0));
           });
@@ -15050,12 +17032,12 @@
   function tw(key, vars) {
     const hosted = i18n.t("workspace." + key, vars);
     if (hosted !== "workspace." + key) return hosted;
-    const lang = i18n.lang();
+    const lang2 = i18n.lang();
     const table2 = (
       /** @type {Record<string, string>} */
       STRINGS5[
         /** @type {'en'|'fi'|'es'} */
-        lang
+        lang2
       ] || STRINGS5.en
     );
     const text = table2[key] || STRINGS5.en[key] || key;
@@ -15120,7 +17102,7 @@
     const root = el("div", { class: "ak-ws-follow", "data-ak-part": "follow" });
     if (spec.target) resolve(spec.target).appendChild(root);
     let inner = null;
-    let at = "";
+    let at2 = "";
     let stopped = false;
     function line(key) {
       clear(root);
@@ -15134,8 +17116,8 @@
     function mount(c) {
       if (stopped || !c) return;
       if (c.private) {
-        if (at === "private") return;
-        at = "private";
+        if (at2 === "private") return;
+        at2 = "private";
         if (inner) inner.destroy();
         inner = null;
         line("follow.private");
@@ -15143,8 +17125,8 @@
       }
       if (!c.orgId || !c.wsId) return;
       const key = c.orgId + "/" + c.wsId;
-      if (key === at) return;
-      at = key;
+      if (key === at2) return;
+      at2 = key;
       if (inner) inner.destroy();
       clear(root);
       inner = factory(Object.assign({}, spec, { target: root, org: c.orgId, ws: c.wsId }));
@@ -15166,7 +17148,7 @@
       if (!o || typeof o.recall !== "function") return;
       try {
         const c = await o.recall(spec.app, { verify: true });
-        if (!at && c && c.orgId && c.wsId) mount(c);
+        if (!at2 && c && c.orgId && c.wsId) mount(c);
       } catch (e) {
         console.debug("aimeat-atelier: remembered workspace not read", e);
       }
@@ -15179,11 +17161,11 @@
       recall();
     }
     const stopWatch = watch2(function() {
-      if (at === "private") {
+      if (at2 === "private") {
         line("follow.private");
         return;
       }
-      if (at) return;
+      if (at2) return;
       waiting();
       recall();
     }, root);
@@ -15259,13 +17241,13 @@
     }
   }
   function roleSel(value) {
-    const list2 = ROLES.indexOf(value) === -1 && value ? ROLES.concat([value]) : ROLES;
+    const list3 = ROLES.indexOf(value) === -1 && value ? ROLES.concat([value]) : ROLES;
     const s = (
       /** @type {HTMLSelectElement} */
       el(
         "select",
         { class: "ak-input ak-mem__role", "aria-label": tw("team.role"), "data-ak-part": "role" },
-        list2.map(function(r) {
+        list3.map(function(r) {
           return el("option", { value: r, selected: r === value ? true : null }, tw("role." + r));
         })
       )
@@ -15325,7 +17307,7 @@
         el("span", { class: "ak-mem__acts", "data-ak-part": "acts" }, acts.filter(Boolean))
       ]);
     }
-    function list2(part, rows, none) {
+    function list3(part, rows, none) {
       return el(
         "div",
         { class: "ak-mem__group", "data-ak-part": part },
@@ -15366,8 +17348,8 @@
         const invited = typeof lib.invitations === "function" ? Promise.resolve().then(function() {
           return lib.invitations(spec.org, { ws: watched });
         }).then(
-          function(list3) {
-            return { list: Array.isArray(list3) ? list3 : [], refused: "" };
+          function(list4) {
+            return { list: Array.isArray(list4) ? list4 : [], refused: "" };
           },
           function(e) {
             return { list: [], refused: refusal(e) || String(e) };
@@ -15433,7 +17415,7 @@
         });
       }
       function requestsTab() {
-        return list2("requests", requests.map(function(q) {
+        return list3("requests", requests.map(function(q) {
           const sel = roleSel("viewer");
           sel.disabled = sample;
           const meta = [q.message || "", q.at ? tw("team.asked", { d: day2(q.at) }) : ""].filter(Boolean).join(" · ");
@@ -15503,7 +17485,7 @@
       }
       function peopleTab() {
         const rows = peopleRows();
-        if (variant !== "table" || !rows.length) return list2("people", rows, tw("team.peopleNone"));
+        if (variant !== "table" || !rows.length) return list3("people", rows, tw("team.peopleNone"));
         return el("div", { class: "ak-mem__group ak-mem__table-wrap", "data-ak-part": "people" }, [
           el("table", { class: "ak-mem__table" }, [
             el("thead", {}, [el("tr", {}, [
@@ -15642,7 +17624,7 @@
             el("p", { class: "ak-mem__none", "data-ak-part": "refused" }, tw("failed", { why: open.refused }))
           ]);
         }
-        return list2("invitations", (open && open.list || []).map(function(inv) {
+        return list3("invitations", (open && open.list || []).map(function(inv) {
           const into = (inv.workspaces || []).map(function(w) {
             return tw("team.wsRole", { ws: wsLabel(w.ws), role: tw("role." + w.role) });
           }).join(", ");
@@ -15919,11 +17901,11 @@
           el("div", { class: "ak-mem__field" }, [wsIn])
         ]));
       }
-      const list2 = orgs || [];
+      const list3 = orgs || [];
       root.appendChild(el("div", { class: "ak-mem__group", "data-ak-part": "orgs" }, [
         el("h4", { class: "ak-mem__group-title" }, tw("picker.choose")),
         el("p", { class: "ak-mem__hint" }, tw("picker.wsWill", { name: multiple ? typedWs.trim() || wsName : wsName })),
-        list2.length ? el("ul", { class: "ak-mem__rows" }, list2.map(function(o) {
+        list3.length ? el("ul", { class: "ak-mem__rows" }, list3.map(function(o) {
           return el("li", { class: "ak-mem__row", "data-ak-part": "row" }, [
             person(o.name, null),
             el("span", { class: "ak-mem__meta" }, [el("span", { class: "ak-ws__chip", "data-ak-part": "chip" }, tw("orgRole." + o.role))]),
@@ -15981,10 +17963,10 @@
       if (!o) return;
       try {
         if (!c.orgName) {
-          const list2 = orgs || await o.organisms();
+          const list3 = orgs || await o.organisms();
           if (mine !== gen) return;
-          orgs = orgs || list2;
-          const hit = (list2 || []).filter(function(x) {
+          orgs = orgs || list3;
+          const hit = (list3 || []).filter(function(x) {
             return x && x.id === c.orgId;
           })[0];
           if (hit) c.orgName = hit.name;
@@ -16005,9 +17987,9 @@
     async function loadOrgs(mine) {
       const o = lib();
       try {
-        const list2 = await o.organisms();
+        const list3 = await o.organisms();
         if (mine !== gen) return;
-        orgs = Array.isArray(list2) ? list2 : [];
+        orgs = Array.isArray(list3) ? list3 : [];
       } catch (e) {
         if (mine !== gen) return;
         orgs = [];
@@ -16623,12 +18605,12 @@
   function ti(key, vars) {
     const hosted = i18n.t(key, vars);
     if (hosted !== key) return hosted;
-    const lang = i18n.lang();
+    const lang2 = i18n.lang();
     const table2 = (
       /** @type {Record<string, string>} */
       STRINGS6[
         /** @type {'en'|'fi'|'es'} */
-        lang
+        lang2
       ] || STRINGS6.en
     );
     const text = table2[key] || STRINGS6.en[key] || key;
@@ -16707,8 +18689,8 @@
       /** @type {Record<string, unknown>} */
       v
     );
-    const lang = String(i18n.lang() || "en").slice(0, 2);
-    for (const k of [lang, "en"]) {
+    const lang2 = String(i18n.lang() || "en").slice(0, 2);
+    for (const k of [lang2, "en"]) {
       if (typeof by[k] === "string" && by[k]) return (
         /** @type {string} */
         by[k]
@@ -16722,12 +18704,12 @@
     }
     return "";
   }
-  function labelled(def, list2, labelFn) {
+  function labelled(def, list3, labelFn) {
     const raw = /* @__PURE__ */ new Map();
     for (const f of def && Array.isArray(def.fields) ? def.fields : []) {
       if (f && typeof f === "object") raw.set(String(f.key != null ? f.key : f.name), f);
     }
-    return list2.map(function(f) {
+    return list3.map(function(f) {
       const r = raw.get(f.name);
       const out = Object.assign({}, f);
       if (r && r.label && typeof r.label === "object") out.label = inLanguage(r.label) || f.name;
@@ -16792,10 +18774,10 @@
       const mine = ++gen;
       const kept = snapshot();
       let def;
-      let list2;
+      let list3;
       if (sample) {
         def = sampleForm();
-        list2 = def.fields;
+        list3 = def.fields;
       } else {
         const lib = intakeOf();
         if (!lib) {
@@ -16814,21 +18796,21 @@
           return;
         }
         if (mine !== gen) return;
-        list2 = typeof lib.fields === "function" ? lib.fields(def) : [];
+        list3 = typeof lib.fields === "function" ? lib.fields(def) : [];
       }
-      list2 = labelled(def, list2, spec.label);
+      list3 = labelled(def, list3, spec.label);
       clear(root);
       heading(def);
-      draw(def, list2, kept);
+      draw(def, list3, kept);
     }
-    function draw(def, list2, kept) {
+    function draw(def, list3, kept) {
       const controls = /* @__PURE__ */ new Map();
       const failure = el("p", { class: "ak-intake__failure", role: "alert", "data-ak-part": "failure", hidden: true });
       const sent = el("p", { class: "ak-intake__sent", role: "status", "data-ak-part": "sent", hidden: true });
       const form2 = el("form", { class: "ak-form ak-intake__form", "data-ak-part": "form", novalidate: true });
       root.appendChild(failure);
-      if (!list2.length) root.appendChild(el("p", { class: "ak-intake__intro" }, ti("intake.noFields")));
-      for (const f of list2) form2.appendChild(fieldNode(f, controls));
+      if (!list3.length) root.appendChild(el("p", { class: "ak-intake__intro" }, ti("intake.noFields")));
+      for (const f of list3) form2.appendChild(fieldNode(f, controls));
       const hpName = def && def.honeypot_field || HONEYPOT;
       const hp = (
         /** @type {HTMLInputElement} */
@@ -16889,7 +18871,7 @@
           });
         }
       }
-      function validate() {
+      function validate2() {
         let first = null;
         for (const [name, c] of controls) {
           const v = valueOf(c);
@@ -16930,7 +18912,7 @@
         ev.preventDefault();
         clearErrors();
         sent.hidden = true;
-        const bad = validate();
+        const bad = validate2();
         if (bad) {
           const c = controls.get(bad);
           if (c) c.inputs[0].focus();
@@ -17184,13 +19166,13 @@
       }
       function tellByHand(url) {
         const whole = ti("intake.copyByHand", { url });
-        const at = whole.lastIndexOf(url);
+        const at2 = whole.lastIndexOf(url);
         clear(noticeEl);
         const link = el("span", { text: url });
-        if (at < 0) noticeEl.appendChild(el("span", { text: whole + " " }));
-        else if (at > 0) noticeEl.appendChild(document.createTextNode(whole.slice(0, at)));
+        if (at2 < 0) noticeEl.appendChild(el("span", { text: whole + " " }));
+        else if (at2 > 0) noticeEl.appendChild(document.createTextNode(whole.slice(0, at2)));
         noticeEl.appendChild(link);
-        if (at >= 0 && at + url.length < whole.length) noticeEl.appendChild(document.createTextNode(whole.slice(at + url.length)));
+        if (at2 >= 0 && at2 + url.length < whole.length) noticeEl.appendChild(document.createTextNode(whole.slice(at2 + url.length)));
         noticeEl.hidden = false;
         selectForHand(link);
       }
@@ -17995,12 +19977,12 @@
   function twf(key, vars) {
     const hosted = i18n.t(key, vars);
     if (hosted !== key) return hosted;
-    const lang = i18n.lang();
+    const lang2 = i18n.lang();
     const table2 = (
       /** @type {Record<string, string>} */
       STRINGS7[
         /** @type {'en'|'fi'|'es'} */
-        lang
+        lang2
       ] || STRINGS7.en
     );
     const text = table2[key] || STRINGS7.en[key] || key;
@@ -18030,8 +20012,8 @@
   }
   function listOf(r) {
     if (Array.isArray(r)) return r;
-    const list2 = r && (r.inputs || r.items);
-    return Array.isArray(list2) ? list2 : [];
+    const list3 = r && (r.inputs || r.items);
+    return Array.isArray(list3) ? list3 : [];
   }
   function local(v) {
     if (v == null) return "";
@@ -18040,9 +20022,9 @@
     const base = function(k) {
       return k.toLowerCase().split(/[-_]/)[0];
     };
-    const lang = i18n.lang();
+    const lang2 = i18n.lang();
     const hit = keys2.find(function(k) {
-      return base(k) === lang;
+      return base(k) === lang2;
     }) || keys2.find(function(k) {
       return base(k) === "en";
     }) || keys2[0];
@@ -18060,7 +20042,7 @@
   }
   function sampleInputs() {
     const now2 = Date.now();
-    const at = function(hours) {
+    const at2 = function(hours) {
       return new Date(now2 + hours * 36e5).toISOString();
     };
     return [
@@ -18070,8 +20052,8 @@
         stepId: "review",
         mode: "full-live",
         workflowTitle: twf("wf.sample.wf1"),
-        askedAt: at(-2),
-        deadline: at(22),
+        askedAt: at2(-2),
+        deadline: at2(22),
         question: {
           header: twf("wf.sample.header1"),
           prompt: twf("wf.sample.q1"),
@@ -18089,8 +20071,8 @@
         stepId: "pick-suppliers",
         mode: "full-sandbox",
         workflowTitle: twf("wf.sample.wf2"),
-        askedAt: at(-20),
-        deadline: at(52),
+        askedAt: at2(-20),
+        deadline: at2(52),
         question: {
           prompt: twf("wf.sample.q2"),
           multiSelect: true,
@@ -18598,9 +20580,9 @@
     }
     host.appendChild(el("div", { class: cls || "ak-aitask__text" }, text));
   }
-  function madeWhen(at) {
-    if (at == null || at === "") return "";
-    const d = new Date(at);
+  function madeWhen(at2) {
+    if (at2 == null || at2 === "") return "";
+    const d = new Date(at2);
     if (!isFinite(d.getTime())) return "";
     return dateTime(d.toISOString(), { dateStyle: "medium", timeStyle: "short" });
   }
@@ -18981,9 +20963,9 @@
     lines.push("THE QUESTION", question);
     return lines.join("\n");
   }
-  function turnsOf(list2) {
-    if (!Array.isArray(list2)) return [];
-    return list2.filter(function(m) {
+  function turnsOf(list3) {
+    if (!Array.isArray(list3)) return [];
+    return list3.filter(function(m) {
       return m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string";
     }).map(function(m) {
       return Object.assign({}, m);
@@ -19088,14 +21070,14 @@
       const log = parts.log;
       if (!log) return;
       clear(log);
-      const list2 = shown();
-      if (!list2.length) {
+      const list3 = shown();
+      if (!list3.length) {
         if (live) log.appendChild(el("p", { class: "ak-aichat__empty", "data-ak-part": "empty" }, tai("aiChat.empty")));
         log.hidden = !live;
         return;
       }
       log.hidden = false;
-      for (const m of list2) log.appendChild(drawTurn(m));
+      for (const m of list3) log.appendChild(drawTurn(m));
     }
     function drawTurn(m) {
       const mine = m.role === "user";
@@ -19709,12 +21691,12 @@
   function td(key, vars) {
     const hosted = i18n.t(key, vars);
     if (hosted !== key) return hosted;
-    const lang = i18n.lang();
+    const lang2 = i18n.lang();
     const table2 = (
       /** @type {Record<string, string>} */
       STRINGS8[
         /** @type {'en'|'fi'|'es'} */
-        lang
+        lang2
       ] || STRINGS8.en
     );
     const text = table2[key] || STRINGS8.en[key] || key;
@@ -19779,11 +21761,11 @@
       body.appendChild(node);
       root.setAttribute("data-ak-state", state);
     }
-    function drawSources(list2) {
+    function drawSources(list3) {
       clear(sources);
       const md = mdOf();
       const items = el("ul", { class: "ak-doc__source-list" });
-      for (const c of list2 || []) {
+      for (const c of list3 || []) {
         const href = md && typeof md.sanitizeHref === "function" ? md.sanitizeHref(c.url) : c.url;
         if (!href) continue;
         items.appendChild(el("li", { class: "ak-doc__source", "data-ak-part": "source" }, [
@@ -19946,9 +21928,9 @@
       const rows = Object.keys(probs).sort(function(x, y) {
         return Number(probs[y]) - Number(probs[x]);
       }).slice(0, OPTIONS_SHOWN);
-      const list2 = el("div", { class: "ak-dec__options", "data-ak-part": "options" });
-      for (const k of rows) list2.appendChild(bar(a.type === "score" ? levelWords(a, k) : k, Number(probs[k]), null, "ak-dec__meter--option"));
-      li.appendChild(list2);
+      const list3 = el("div", { class: "ak-dec__options", "data-ak-part": "options" });
+      for (const k of rows) list3.appendChild(bar(a.type === "score" ? levelWords(a, k) : k, Number(probs[k]), null, "ak-dec__meter--option"));
+      li.appendChild(list3);
     }
     return li;
   }
@@ -19994,13 +21976,13 @@
     return { result, thresholds };
   }
   function reviewedWords(rev) {
-    const at = day2(rev.at);
+    const at2 = day2(rev.at);
     let words;
-    if (rev.outcome === "confirmed") words = td("decision.reviewed.confirmed", { at });
-    else if (rev.override === void 0 || rev.override === null) words = td("decision.reviewed.overridden", { at });
+    if (rev.outcome === "confirmed") words = td("decision.reviewed.confirmed", { at: at2 });
+    else if (rev.override === void 0 || rev.override === null) words = td("decision.reviewed.overridden", { at: at2 });
     else {
       const v = rev.override === true ? td("decision.yes") : rev.override === false ? td("decision.no") : String(rev.override);
-      words = td("decision.reviewed.overriddenTo", { at, v });
+      words = td("decision.reviewed.overriddenTo", { at: at2, v });
     }
     return rev.note ? words + " " + td("decision.reviewed.note", { note: rev.note }) : words;
   }
@@ -20152,8 +22134,8 @@
       return result;
     }
     function providerName(id) {
-      const list2 = providerList && providerList.providers || [];
-      const p = list2.find(function(x) {
+      const list3 = providerList && providerList.providers || [];
+      const p = list3.find(function(x) {
         return x.id === id;
       });
       return p && p.title || id;
@@ -20315,12 +22297,12 @@
       return el("div", { class: "ak-dec__stamp", "data-ak-part": "verdict" }, typeof v === "object" ? v : String(v));
     }
     function answerList(r, round, ownWord) {
-      const list2 = el("ul", { class: "ak-dec__answers", "data-ak-part": "answers" });
+      const list3 = el("ul", { class: "ak-dec__answers", "data-ak-part": "answers" });
       const ts = round > 0 && s.rule && !storedId ? s.thresholds || {} : thresholdsNow();
       for (const q of Object.keys(r.answers || {})) {
-        list2.appendChild(drawAnswer(q, r.answers[q], ts[q], r.passed ? r.passed[q] : void 0, labelOf2(q), ownWord));
+        list3.appendChild(drawAnswer(q, r.answers[q], ts[q], r.passed ? r.passed[q] : void 0, labelOf2(q), ownWord));
       }
-      return list2;
+      return list3;
     }
     function storedLines(row) {
       const rec = row.record || {};
@@ -20378,9 +22360,9 @@
         body.appendChild(failLine(td("decision.providersFailed", { why: providerError })));
         return;
       }
-      const list2 = providerList && providerList.providers || [];
-      if (!list2.length) return;
-      if (!pick) pick = String(providerList.default || providerList.node_default || list2[0].id);
+      const list3 = providerList && providerList.providers || [];
+      if (!list3.length) return;
+      if (!pick) pick = String(providerList.default || providerList.node_default || list3[0].id);
       const id = uid("ak-dec-prov");
       const note = el("p", { class: "ak-dec__fine", "data-ak-part": "providerNote" });
       const select = (
@@ -20388,7 +22370,7 @@
         el(
           "select",
           { id, class: "ak-input ak-dec__provider", "data-ak-part": "provider" },
-          list2.map(function(p) {
+          list3.map(function(p) {
             const words = String(p.title || p.id) + (p.kind === "local" ? " · " + td("decision.where.local") : "");
             return el(
               "option",
@@ -20400,7 +22382,7 @@
       );
       select.value = pick;
       function statement() {
-        const p = list2.find(function(x) {
+        const p = list3.find(function(x) {
           return x.id === pick;
         });
         note.textContent = p && p.data_statement || "";
@@ -20999,17 +22981,17 @@
   }
   function uploader(o) {
     const up = o.upload || {};
-    const list2 = el("ul", { class: "ak-root ak-dropzone__files", "data-ak-part": "files", "aria-live": "polite" });
+    const list3 = el("ul", { class: "ak-root ak-dropzone__files", "data-ak-part": "files", "aria-live": "polite" });
     let queue2 = [];
     let running = 0;
     let gone = false;
     function place2() {
-      if (list2.parentNode) return;
+      if (list3.parentNode) return;
       if (up.target) {
-        resolve(up.target).appendChild(list2);
+        resolve(up.target).appendChild(list3);
         return;
       }
-      if (o.zone.parentNode) o.zone.parentNode.insertBefore(list2, o.zone.nextSibling);
+      if (o.zone.parentNode) o.zone.parentNode.insertBefore(list3, o.zone.nextSibling);
     }
     function row(file) {
       const state = el("span", { class: "ak-dropzone__hint", "data-ak-part": "state" }, tu("upload.waiting"));
@@ -21023,7 +23005,7 @@
         state,
         bar2
       ]);
-      list2.appendChild(li);
+      list3.appendChild(li);
       return { li, state, bar: bar2 };
     }
     function optsFor(file) {
@@ -21121,7 +23103,7 @@
       destroy() {
         gone = true;
         queue2 = [];
-        if (list2.parentNode) list2.parentNode.removeChild(list2);
+        if (list3.parentNode) list3.parentNode.removeChild(list3);
       }
     };
   }
@@ -21315,8 +23297,8 @@
     if (s.target) resolve(s.target).appendChild(root);
     let up = null;
     let warned = false;
-    function take(list2) {
-      const files = Array.prototype.slice.call(list2 || []);
+    function take(list3) {
+      const files = Array.prototype.slice.call(list3 || []);
       const bad = files.find(function(f) {
         if (!acceptsFile(f, accept)) return true;
         return s.maxBytes ? f.size > s.maxBytes : false;
@@ -21497,21 +23479,21 @@
     };
   }
   var STATUS_KEYS = { sent: "threadSent", read: "threadRead", failed: "threadFailed" };
-  function dateOf(at) {
-    if (!at) return null;
-    const d = new Date(at);
+  function dateOf(at2) {
+    if (!at2) return null;
+    const d = new Date(at2);
     return Number.isNaN(d.getTime()) ? null : d;
   }
-  function dayKeyOf(at) {
-    const d = dateOf(at);
+  function dayKeyOf(at2) {
+    const d = dateOf(at2);
     if (!d) return "unknown";
     return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
   }
-  function dayLabelOf(at) {
-    const d = dateOf(at);
+  function dayLabelOf(at2) {
+    const d = dateOf(at2);
     if (!d) return t("earlier");
     const now2 = /* @__PURE__ */ new Date();
-    const key = dayKeyOf(at);
+    const key = dayKeyOf(at2);
     if (key === dayKeyOf(now2)) return t("today");
     const back = new Date(now2.getTime() - 864e5);
     if (key === dayKeyOf(back)) return t("yesterday");
@@ -21520,8 +23502,8 @@
     }
     return d.toDateString();
   }
-  function timeLabelOf(at) {
-    const d = dateOf(at);
+  function timeLabelOf(at2) {
+    const d = dateOf(at2);
     if (!d) return "";
     if (typeof Intl === "object" && Intl.DateTimeFormat) {
       return time(d, { hour: "2-digit", minute: "2-digit" });
@@ -21577,8 +23559,8 @@
         bubble
       ]);
     }
-    function render(list2) {
-      const msgs = Array.isArray(list2) ? list2 : [];
+    function render(list3) {
+      const msgs = Array.isArray(list3) ? list3 : [];
       if (!msgs.length) {
         shown.clear();
         dayRows.clear();
@@ -22084,8 +24066,8 @@
     ]);
     function eventsByDay() {
       const byDay = {};
-      const list2 = data && Array.isArray(data.events) ? data.events : [];
-      for (const e of list2) {
+      const list3 = data && Array.isArray(data.events) ? data.events : [];
+      for (const e of list3) {
         if (!e || typeof e.date !== "string") continue;
         const key = e.date.slice(0, 10);
         if (!byDay[key]) byDay[key] = [];
@@ -22297,7 +24279,7 @@
       });
       roll();
     }
-    function segments(periods) {
+    function segments2(periods) {
       periodButtons = [];
       const bar2 = el("div", { class: "ak-price__periods", role: "group", "aria-label": t("pricePeriods") });
       periods.forEach(function(p) {
@@ -22370,7 +24352,7 @@
       if (periods.indexOf(period) < 0) period = periods[0];
       if (s.title) root.appendChild(el("div", { class: "ak-price__title" }, String(s.title)));
       if (periods.length > 1) {
-        root.appendChild(segments(periods));
+        root.appendChild(segments2(periods));
         warmAnime();
       }
       const cards = el("div", { class: "ak-price__cards" });
@@ -24177,12 +26159,12 @@
   function tb(key, vars) {
     const hosted = i18n.t("board." + key, vars);
     if (hosted !== "board." + key) return hosted;
-    const lang = i18n.lang();
+    const lang2 = i18n.lang();
     const table2 = (
       /** @type {Record<string, string>} */
       STRINGS9[
         /** @type {'en'|'fi'|'es'} */
-        lang
+        lang2
       ] || STRINGS9.en
     );
     const text = table2[key] || STRINGS9.en[key] || key;
@@ -24824,8 +26806,8 @@
       return v;
     }
     if (typeof v === "object") {
-      const lang = i18n.lang();
-      return String(v[lang] || v.en || v[Object.keys(v)[0]] || "");
+      const lang2 = i18n.lang();
+      return String(v[lang2] || v.en || v[Object.keys(v)[0]] || "");
     }
     return String(v);
   }
@@ -24966,7 +26948,7 @@
         t2 || c.from || null
       );
     }
-    function fill(host, v) {
+    function fill2(host, v) {
       clear(host);
       if (v == null || v === false) return;
       if (typeof v === "function") {
@@ -24990,19 +26972,19 @@
         toc.appendChild(el("p", { class: "ak-handbook__empty", "data-ak-part": "empty", text: hb(shown.length ? "empty" : "none") }));
         return;
       }
-      let group = null, list2 = null;
+      let group = null, list3 = null;
       hits.forEach(function(c) {
         const g = wordsOf(c.group) || hb("group");
-        if (g !== group || !list2) {
+        if (g !== group || !list3) {
           group = g;
-          list2 = el(
+          list3 = el(
             "div",
             { class: "ak-handbook__group", "data-ak-part": "group", role: "group", "aria-label": g },
             [el("div", { class: "ak-handbook__groupname", text: g, "aria-hidden": "true" })]
           );
-          toc.appendChild(list2);
+          toc.appendChild(list3);
         }
-        list2.appendChild(el("button", {
+        list3.appendChild(el("button", {
           type: "button",
           class: "ak-handbook__entry",
           "data-ak-part": "entry",
@@ -25032,7 +27014,7 @@
       if (!c) return;
       article.appendChild(el("h3", { class: "ak-handbook__heading", "data-ak-part": "heading", text: wordsOf(c.title) }));
       const body = el("div", { class: "ak-handbook__text", "data-ak-part": "text" });
-      fill(body, parts.body ? parts.body(c) : c.body);
+      fill2(body, parts.body ? parts.body(c) : c.body);
       article.appendChild(body);
       if (c.target || c.from) {
         const note = el("p", { class: "ak-handbook__note", "data-ak-part": "note", hidden: true, text: hb("away") });
@@ -25626,9 +27608,9 @@
     return m ? m[0] : null;
   }
   function splitTarget(target, selfOwner) {
-    const at = String(target || "").trim();
-    const cut = at.indexOf("/");
-    return cut < 0 ? { gaii: selfOwner || "", key: at } : { gaii: at.slice(0, cut), key: at.slice(cut + 1) };
+    const at2 = String(target || "").trim();
+    const cut = at2.indexOf("/");
+    return cut < 0 ? { gaii: selfOwner || "", key: at2 } : { gaii: at2.slice(0, cut), key: at2.slice(cut + 1) };
   }
   function verbs(spec) {
     const root = (
@@ -25846,8 +27828,8 @@
             return k + ": " + input[k];
           }).join("\n");
           say(out, tb("verbs.thinking"));
-          const lang = (spec.lang || document.documentElement.lang || "en").slice(0, 2);
-          const prompt2 = ask2 + (vals ? "\n\n" + vals : "") + "\n\nAnswer in " + (lang === "fi" ? "Finnish" : lang === "es" ? "Spanish" : "English") + ", plainly, with no preamble. Just the answer.";
+          const lang2 = (spec.lang || document.documentElement.lang || "en").slice(0, 2);
+          const prompt2 = ask2 + (vals ? "\n\n" + vals : "") + "\n\nAnswer in " + (lang2 === "fi" ? "Finnish" : lang2 === "es" ? "Spanish" : "English") + ", plainly, with no preamble. Just the answer.";
           const asker = adapters.ai || async function(p) {
             if (!ns.ai || !ns.ai.complete) throw new Error(tb("verbs.notHere"));
             const a = await ns.ai.complete({ prompt: p });
@@ -26332,18 +28314,18 @@
       if (mono) mono.textContent = (Array.from(String(line.title || "?"))[0] || "?").toUpperCase();
     }
     function render(data) {
-      const list2 = (data && Array.isArray(data.lines) ? data.lines : []).filter(function(l) {
+      const list3 = (data && Array.isArray(data.lines) ? data.lines : []).filter(function(l) {
         return l && l.id != null;
       });
       unit = data && data.currency || "€";
       shape = data || null;
-      mu = speaksMicros(shape, list2, ["price"]);
-      current2 = list2;
+      mu = speaksMicros(shape, list3, ["price"]);
+      current2 = list3;
       if (emptyCard) {
         emptyCard.destroy();
         emptyCard = null;
       }
-      if (!list2.length) {
+      if (!list3.length) {
         clear(root);
         clear(lines);
         shown.clear();
@@ -26363,7 +28345,7 @@
       root.appendChild(foot);
       root.appendChild(note);
       const live = {};
-      list2.forEach(function(l) {
+      list3.forEach(function(l) {
         live[String(l.id)] = 1;
       });
       Array.from(shown.keys()).forEach(function(id) {
@@ -26372,7 +28354,7 @@
         shown.delete(id);
         if (rec.node.parentNode) rec.node.parentNode.removeChild(rec.node);
       });
-      list2.forEach(function(line) {
+      list3.forEach(function(line) {
         const id = String(line.id);
         let rec = shown.get(id);
         if (!rec) {
@@ -27104,8 +29086,8 @@
         deep: String(h.tagName).toUpperCase() !== "H2"
       };
     });
-    const fill = el("span", { class: "ak-reading__fill", "aria-hidden": "true" });
-    const line = el("div", { class: "ak-reading__line", "aria-hidden": "true" }, [fill]);
+    const fill2 = el("span", { class: "ak-reading__fill", "aria-hidden": "true" });
+    const line = el("div", { class: "ak-reading__line", "aria-hidden": "true" }, [fill2]);
     const links = items.map(function(it) {
       return el("a", {
         class: "ak-reading__link",
@@ -27118,13 +29100,13 @@
         }
       }, it.text);
     });
-    const list2 = el("ol", { class: "ak-reading__list" }, links.map(function(a, i) {
+    const list3 = el("ol", { class: "ak-reading__list" }, links.map(function(a, i) {
       return el("li", { class: "ak-reading__item" + (items[i].deep ? " ak-reading__item--deep" : "") }, [a]);
     }));
     const nav = el("nav", {
       class: "ak-reading" + (s.target ? " ak-reading--inset" : ""),
       "aria-label": "Contents"
-    }, [line, list2]);
+    }, [line, list3]);
     const parent = (
       /** @type {HTMLElement} */
       s.target ? resolve(s.target) : document.body
@@ -27166,13 +29148,13 @@
       const v = viewOf(scroller);
       const r = article.getBoundingClientRect();
       const through = clamp012((v.top - r.top) / Math.max(1, r.height - v.h));
-      fill.style.setProperty("--ak-fill", (through * 100).toFixed(2) + "%");
+      fill2.style.setProperty("--ak-fill", (through * 100).toFixed(2) + "%");
       const edge = v.top + v.h / READ_LINE;
-      let at = 0;
+      let at2 = 0;
       items.forEach(function(it, i) {
-        if (it.head.getBoundingClientRect().top <= edge) at = i;
+        if (it.head.getBoundingClientRect().top <= edge) at2 = i;
       });
-      mark(items.length ? at : -1);
+      mark(items.length ? at2 : -1);
     };
     let rafId = 0;
     const onScroll = function() {
@@ -27318,9 +29300,9 @@
       if (by === "lines") return sp.lines;
       return sp.words;
     }
-    function travel3(a, list2) {
-      if (!list2 || !list2.length) return;
-      a.animate(list2, Object.assign({}, REVEAL_FROM[from], {
+    function travel3(a, list3) {
+      if (!list3 || !list3.length) return;
+      a.animate(list3, Object.assign({}, REVEAL_FROM[from], {
         duration: duration2,
         delay: a.stagger(each),
         ease: from === "flip" ? "outBack" : "outExpo"
@@ -27430,8 +29412,8 @@
       });
     }
     function progress(p) {
-      const at = Math.max(0, Math.min(1, Number(p) || 0));
-      setDraw("0 " + at);
+      const at2 = Math.max(0, Math.min(1, Number(p) || 0));
+      setDraw("0 " + at2);
     }
     function reset() {
       setDraw("0 0");
@@ -27594,22 +29576,22 @@
   }
   function settle2(node, props) {
     let moved = false;
-    const at = { x: 0, y: 0, scale: 1, rotate: 0 };
+    const at2 = { x: 0, y: 0, scale: 1, rotate: 0 };
     END_KEYS.forEach(function(key) {
       const end = endOf(props[key]);
       if (end == null) return;
       moved = true;
       if (key === "opacity") node.style.opacity = String(end);
-      else at[key] = parseFloat(String(end)) || 0;
+      else at2[key] = parseFloat(String(end)) || 0;
     });
     if (!moved) return;
     if (props.x !== void 0 || props.y !== void 0 || props.scale !== void 0 || props.rotate !== void 0) {
-      node.style.transform = "translate(" + at.x + "px, " + at.y + "px) scale(" + (props.scale === void 0 ? 1 : at.scale) + ") rotate(" + at.rotate + "deg)";
+      node.style.transform = "translate(" + at2.x + "px, " + at2.y + "px) scale(" + (props.scale === void 0 ? 1 : at2.scale) + ") rotate(" + at2.rotate + "deg)";
     }
   }
   function sequence(steps2, opts) {
     const o = opts || {};
-    const list2 = (Array.isArray(steps2) ? steps2 : []).filter(function(s) {
+    const list3 = (Array.isArray(steps2) ? steps2 : []).filter(function(s) {
       return s && s.targets && s.props;
     });
     let tl = null;
@@ -27623,7 +29605,7 @@
       queued.push([name, arg]);
     }
     if (reducedMotion()) {
-      list2.forEach(function(step) {
+      list3.forEach(function(step) {
         toElements(step.targets).forEach(function(node) {
           settle2(node, step.props);
         });
@@ -27631,7 +29613,7 @@
     } else {
       withAnime2(function(a) {
         tl = a.createTimeline({ autoplay: false, loop: o.loop || false });
-        list2.forEach(function(step) {
+        list3.forEach(function(step) {
           tl.add(step.targets, step.props, step.at);
         });
         queued.forEach(function(want) {
@@ -27773,9 +29755,9 @@
        * @param {number} p
        */
       seek: function(p) {
-        const at = Math.max(0, Math.min(1, Number(p) || 0));
+        const at2 = Math.max(0, Math.min(1, Number(p) || 0));
         runs.forEach(function(run) {
-          run.seek(at * duration2);
+          run.seek(at2 * duration2);
         });
       },
       destroy: function() {
@@ -27881,17 +29863,17 @@
   }
   function settle3(node, props) {
     let moved = false;
-    const at = { x: 0, y: 0, scale: 1, rotate: 0 };
+    const at2 = { x: 0, y: 0, scale: 1, rotate: 0 };
     END_KEYS2.forEach(function(key) {
       const end = endOf2(props[key]);
       if (end == null) return;
       moved = true;
       if (key === "opacity") node.style.opacity = String(end);
-      else at[key] = parseFloat(String(end)) || 0;
+      else at2[key] = parseFloat(String(end)) || 0;
     });
     if (!moved) return;
     if (props.x !== void 0 || props.y !== void 0 || props.scale !== void 0 || props.rotate !== void 0) {
-      node.style.transform = "translate(" + at.x + "px, " + at.y + "px) scale(" + (props.scale === void 0 ? 1 : at.scale) + ") rotate(" + at.rotate + "deg)";
+      node.style.transform = "translate(" + at2.x + "px, " + at2.y + "px) scale(" + (props.scale === void 0 ? 1 : at2.scale) + ") rotate(" + at2.rotate + "deg)";
     }
   }
   var MORPHABLE = "path, polygon, polyline";
@@ -27930,13 +29912,13 @@
       });
     }
     const names = Object.keys(spares);
-    let at = shown && shown.getAttribute ? shown.getAttribute("data-shape") : null;
+    let at2 = shown && shown.getAttribute ? shown.getAttribute("data-shape") : null;
     warmAnime3();
     function to(name) {
       const spare = spares[name];
       if (!shown || !spare) return Promise.resolve();
       const prop = geometryProp(shown);
-      at = name;
+      at2 = name;
       return new Promise(function(done) {
         const swap = function() {
           shown.setAttribute(prop, spare.getAttribute(prop) || "");
@@ -27961,7 +29943,7 @@
     }
     function cycle() {
       if (!names.length) return Promise.resolve();
-      const i = at === null ? 0 : (names.indexOf(at) + 1) % names.length;
+      const i = at2 === null ? 0 : (names.indexOf(at2) + 1) % names.length;
       return to(names[i]);
     }
     return {
@@ -27970,7 +29952,7 @@
       cycle,
       /** The name of the shape on the screen, or null while the author's own shape is showing. */
       current: function() {
-        return at;
+        return at2;
       },
       /** Every name this call can reach, in the order `cycle` walks them. */
       names: function() {
@@ -28053,7 +30035,7 @@
     }
     function build(a) {
       if (gone || dg || held) return;
-      const at = { x: seat.x, y: seat.y };
+      const at2 = { x: seat.x, y: seat.y };
       if (floor) {
         floor.destroy();
         floor = null;
@@ -28092,9 +30074,9 @@
         params.minVelocity = 0;
       }
       dg = a.createDraggable(node, params);
-      if (at.x || at.y) {
-        dg.setX(at.x, true);
-        dg.setY(at.y, true);
+      if (at2.x || at2.y) {
+        dg.setX(at2.x, true);
+        dg.setY(at2.y, true);
       }
     }
     function handover() {
@@ -28165,12 +30147,12 @@
     const distance = o.distance || 140;
     const duration2 = o.duration || 1100;
     const box = host.getBoundingClientRect();
-    const at = o.from || { x: box.width / 2, y: box.height / 2 };
+    const at2 = o.from || { x: box.width / 2, y: box.height / 2 };
     const lend = getComputedStyle(host).position === "static";
     if (lend) host.classList.add("ak-burst-host");
     const layer = el("div", { class: "ak-burst", "aria-hidden": "true" });
-    layer.style.setProperty("--ak-burst-x", (Number(at.x) || 0) + "px");
-    layer.style.setProperty("--ak-burst-y", (Number(at.y) || 0) + "px");
+    layer.style.setProperty("--ak-burst-x", (Number(at2.x) || 0) + "px");
+    layer.style.setProperty("--ak-burst-y", (Number(at2.y) || 0) + "px");
     host.appendChild(layer);
     const clean = function() {
       layer.remove();
@@ -28242,7 +30224,7 @@
       /** @type {HTMLElement} */
       resolve(target)
     );
-    const list2 = (Array.isArray(steps2) ? steps2 : []).filter(function(s) {
+    const list3 = (Array.isArray(steps2) ? steps2 : []).filter(function(s) {
       return s && s.targets && s.props;
     });
     let tl = null;
@@ -28251,7 +30233,7 @@
     let last = 0;
     let gone = false;
     if (reducedMotion()) {
-      list2.forEach(function(step) {
+      list3.forEach(function(step) {
         toElements2(step.targets).forEach(function(n) {
           settle3(n, step.props);
         });
@@ -28321,12 +30303,12 @@
       } else {
         tl = a.createTimeline({ autoplay: false });
       }
-      list2.forEach(function(step) {
+      list3.forEach(function(step) {
         tl.add(step.targets, step.props, step.at);
       });
       if (!watcher) bindByHand();
     }, function() {
-      list2.forEach(function(step) {
+      list3.forEach(function(step) {
         toElements2(step.targets).forEach(function(n) {
           settle3(n, step.props);
         });
@@ -28493,8 +30475,8 @@
       return k == null ? kid : k;
     }
     function drop(ghost) {
-      const at = ghosts.indexOf(ghost);
-      if (at >= 0) ghosts.splice(at, 1);
+      const at2 = ghosts.indexOf(ghost);
+      if (at2 >= 0) ghosts.splice(at2, 1);
       if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
     }
     function ghostOf(kid, box) {
@@ -28845,7 +30827,7 @@
     const owned = classes.filter(function(c) {
       return c !== "ak-micro" && c !== "ak-micro--glow";
     });
-    function bind(M) {
+    function bind2(M) {
       const feel = paceOf2(node);
       const hoverMove = hoverKind && hoverKind !== "glow" ? MOVES[hoverKind] : null;
       const pressMove = pressKind ? MOVES[pressKind] : null;
@@ -28874,7 +30856,7 @@
     if (owned.length) {
       ensureMotion2().then(function(M) {
         if (dead || reducedMotion() || !M || typeof M.hover !== "function") return;
-        bind(M);
+        bind2(M);
       }, function() {
       });
     }
@@ -29016,7 +30998,7 @@
       file: "hero.js"
     },
     "form": {
-      parts: ["root", "field", "label", "input", "req", "hint", "error", "range", "readout", "bar", "submit", "cancel"],
+      parts: ["root", "field", "label", "input", "req", "hint", "error", "range", "readout", "alert", "gate", "bar", "submit", "cancel"],
       slots: [],
       variants: [],
       tokens: ["--ak-range-track", "--ak-range-thumb"],
@@ -29344,7 +31326,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.65.1",
+    version: "0.66.0",
     /**
      * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
      * named parts (every one carries `data-ak-part`, so an app's own CSS reaches it), the slots

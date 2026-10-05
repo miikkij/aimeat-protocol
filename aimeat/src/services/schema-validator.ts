@@ -8,6 +8,9 @@
  *   also checked against the workspace manifest's write guards (services/write-guards.ts)
  *   here, so one call site covers the REST, MCP and publish surfaces alike.
  * @version-history
+ *   v1.5.0 — 2026-10-05 — Both validators know the AIMEAT formats (fi-business-id, fi-personal-id,
+ *     iban, fi-postal-code, phone) and the keywords x-hint, x-messages and x-same-as
+ *     (input-formats.ts), so a schema an app's form checks with aimeat-validate can lock a space.
  *   v1.4.0 — 2026-09-20 — validateValueAgainstSchema asks a validator WITHOUT allErrors first, and
  *     builds the full violation list only for a value under 256 kB. The depth bound added earlier
  *     the same day did not answer the finding, and CodeQL was right to keep it open: the cost is
@@ -31,6 +34,7 @@ import type { ValidateFunction } from 'ajv';
 import type { Storage } from '../storage/interface.js';
 import { getStats } from './stats.js';
 import { logger } from '../utils/logger.js';
+import { registerInputFormats } from './input-formats.js';
 
 // CJS-ESM interop: ajv and ajv-formats are CJS packages
 const require = createRequire(import.meta.url);
@@ -45,22 +49,28 @@ const addFormats = formatsPkg.default ?? formatsPkg;
  
 const ajv = new AjvClass({ allErrors: true, verbose: true }) as {
   compile: (schema: object) => ValidateFunction;
-  addKeyword: (def: { keyword: string }) => void;
+  addKeyword: (def: Record<string, unknown>) => void;
+  addFormat: (name: string, format: { type: 'string'; validate: (value: string) => boolean }) => void;
 };
 addFormats(ajv);
 // "x-default" is a UI annotation (e.g. "currentUser" pre-fills the signed-in identity in
 // workspace record forms). Register it as a no-op keyword so strict-mode compile accepts it.
 ajv.addKeyword({ keyword: 'x-default' });
+// The formats and keywords the served aimeat-validate library checks in the browser, so a schema
+// an app's form uses can lock a workspace space unchanged (input-formats.ts).
+registerInputFormats(ajv);
 
 // The same validator without allErrors: it stops at the first violation, so its cost does not grow
 // with the number of things wrong in the value. See getFirstErrorValidator for why the untrusted
 // door asks this one first.
 const ajvFirstError = new AjvClass({ allErrors: false, verbose: true }) as {
   compile: (schema: object) => ValidateFunction;
-  addKeyword: (def: { keyword: string }) => void;
+  addKeyword: (def: Record<string, unknown>) => void;
+  addFormat: (name: string, format: { type: 'string'; validate: (value: string) => boolean }) => void;
 };
 addFormats(ajvFirstError);
 ajvFirstError.addKeyword({ keyword: 'x-default' });
+registerInputFormats(ajvFirstError);
 
 // Compiled validator cache — key = JSON.stringify(schema). Bounded as an LRU (memory audit
 // 2026-08-17): the values are COMPILED FUNCTIONS with closures, the keys arrive from

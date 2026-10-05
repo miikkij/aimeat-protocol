@@ -25,6 +25,7 @@
  * @structure norm · contractPairs · codePairs · NOT_API · DECLARED_ELSEWHERE · main
  * @usage pnpm check:openapi-routes   (add --list to print every pair the code declares)
  * @version-history
+ *   v1.0.3 — 2026-10-05 — GET /v1/libs/aimeat-validate.js answered by the libs family route.
  *   v1.0.2 — 2026-09-26 — GET /app-frame-core.js answered as a static asset (the module it imports).
  *   v1.0.1 — 2026-09-25 — GET /app-frame.js answered as a static asset (the isolated frame's page script).
  *   v1.0.0 — 2026-09-18 — Initial. Instruction review, item 13.
@@ -100,6 +101,7 @@ const DECLARED_ELSEWHERE: Record<string, string> = {
     'POST /v1/scim/v2/{}/Users': 'The same SCIM sub-router.',
     'GET /v1/libs/aimeat-calendar.js': 'Served by the one family route /v1/libs/aimeat-:name.js in routes/libs.ts; the contract documents these two libraries by name.',
     'GET /v1/libs/aimeat-print.js': 'The same family route.',
+    'GET /v1/libs/aimeat-validate.js': 'The same family route.',
 };
 
 function filesUnder(dir: string): string[] {

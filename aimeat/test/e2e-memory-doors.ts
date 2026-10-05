@@ -24,6 +24,9 @@
  *     test/run-e2e-ci.ts --test=memory-doors
  *
  * @version-history
+ *   v1.2.0 — 2026-10-05 — A schema lock with the aimeat-validate formats (fi-business-id, iban) and
+ *     the x- keywords registers, accepts a right value and refuses a wrong check digit and a differing
+ *     x-same-as with 422.
  *   v1.1.0 — 2026-09-08 — export with ?agent by an agent session asserts 403 (fixed in
  *     routes/memory/bulk.ts) instead of pinning the 200.
  *   v1.0.0 — 2026-09-08 — Initial suite
@@ -118,6 +121,8 @@ const PUBLIC_KEY_NAME = `memdoors.shared.note${Date.now()}`;
 // dot: `memdoorsschema123` covers `memdoorsschema123.record`. Registering `memdoorsschema123.`
 // matches nothing and the write sails through, which is what the first draft of this suite did.
 const SCHEMA_PREFIX = `memdoorsschema${Date.now()}`;
+// A second segment of its own, so the format lock is not covered by the first one.
+const FORMAT_PREFIX = `memdoorsformat${Date.now()}`;
 
 console.log('\n=== AIMEAT Memory Doors E2E ===\n');
 
@@ -537,6 +542,50 @@ await test('PUT of a value the key\'s schema refuses → 422 SCHEMA_VALIDATION_F
 
   const still = await json(`/v1/memory/${encodeURIComponent(key)}`, { headers: agentAuth() });
   assert(still.body.data?.value?.n === 1, `the refused PUT stored the bad value: ${JSON.stringify(still.body.data?.value)}`);
+});
+
+await test('a schema lock with the aimeat-validate formats and x- keywords: a right write passes, a wrong check digit → 422 naming the field', async () => {
+  // The schema an app's form checks with AIMEAT.validate, unchanged. Before input-formats.ts the
+  // node refused to register it at all (Ajv strict: unknown format, unknown keyword).
+  const lock = await json(`/v1/memory/${encodeURIComponent(FORMAT_PREFIX)}/schema`, {
+    method: 'PUT', headers: ownerAuth(),
+    body: JSON.stringify({
+      apply_to: 'prefix',
+      schema_mode: 'open',
+      schema: {
+        type: 'object',
+        required: ['ytunnus'],
+        properties: {
+          ytunnus: { type: 'string', format: 'fi-business-id', 'x-hint': { fi: 'Y-tunnus', en: 'Business ID' } },
+          iban: { type: 'string', format: 'iban', 'x-messages': { format: 'Check the IBAN.' } },
+          email: { type: 'string', format: 'email' },
+          email2: { type: 'string', 'x-same-as': 'email' },
+        },
+      },
+    }),
+  });
+  assert(lock.status === 200, `schema lock ${lock.status}: ${JSON.stringify(lock.body?.error)}`);
+
+  const key = `${FORMAT_PREFIX}.company`;
+  const good = await json('/v1/memory', {
+    method: 'POST', headers: agentAuth(),
+    body: JSON.stringify({ key, value: { ytunnus: '0737546-2', iban: 'FI21 1234 5600 0007 85', email: 'a@b.fi', email2: 'a@b.fi' }, visibility: 'private' }),
+  });
+  assert(good.status === 201, `a right value is accepted: ${good.status} ${JSON.stringify(good.body?.error)}`);
+
+  const bad = await json(`/v1/memory/${encodeURIComponent(key)}`, {
+    method: 'PUT', headers: agentAuth(), body: JSON.stringify({ value: { ytunnus: '0737546-3' }, version: 1 }),
+  });
+  assert(bad.status === 422, `a wrong check digit: expected 422, got ${bad.status}`);
+  assert(JSON.stringify(bad.body.error?.details?.violations ?? []).includes('ytunnus'), `the refusal names the field: ${JSON.stringify(bad.body.error?.details)}`);
+
+  const differs = await json(`/v1/memory/${encodeURIComponent(key)}`, {
+    method: 'PUT', headers: agentAuth(), body: JSON.stringify({ value: { ytunnus: '0737546-2', email: 'a@b.fi', email2: 'c@b.fi' }, version: 1 }),
+  });
+  assert(differs.status === 422, `x-same-as: expected 422, got ${differs.status}`);
+
+  const unlock = await json(`/v1/memory/${encodeURIComponent(FORMAT_PREFIX)}/schema`, { method: 'DELETE', headers: ownerAuth() });
+  assert(unlock.status === 200, `schema delete ${unlock.status}`);
 });
 
 await test('PUT and DELETE without auth → 401', async () => {
