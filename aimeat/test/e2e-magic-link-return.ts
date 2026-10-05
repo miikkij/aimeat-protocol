@@ -173,14 +173,16 @@ async function run() {
     const email = `${userName}@aimeat.test`;
     let userToken = '';
     let appOrigin = '';
+    const opName = `mrop${stamp}`;
+    let opToken = '';
 
     await test('setup: an operator exists, so the next account is an ordinary one', async () => {
-        const opName = `mrop${stamp}`;
         const reg = await json('/v1/ghii/register-web', {
             method: 'POST',
             body: JSON.stringify({ username: opName, display_name: 'Return Operator', email: `${opName}@aimeat.test` }),
         });
         assert(reg.status === 201, `operator register ${reg.status}: ${JSON.stringify(reg.body).slice(0, 300)}`);
+        opToken = await ownerToken(opName, reg.body.data.private_key);
     });
 
     await test('setup: the person registers and verifies the address, which turns the link on', async () => {
@@ -228,6 +230,23 @@ async function run() {
         const r = await open(link);
         assert(r.status === 302 && r.location === back, `expected ${back}, got ${r.status} ${r.location}`);
         assert(r.session, 'the link must open a session');
+    });
+
+    // Secaudit 2026-10, WEB-3: anyone may ask for a link to somebody's address naming any app here, so
+    // the address must be the account's own app, or one it holds a grant for.
+    await test('a link that names another person\'s app the account never used lands on the front page, signed in', async () => {
+        const html = '<!doctype html><html><head><title>Other</title></head><body>other</body></html>';
+        const pub = await json('/v1/apps', {
+            method: 'POST', headers: { Authorization: `Bearer ${opToken}` },
+            body: JSON.stringify({ filename: 'other-demo.html', content: Buffer.from(html).toString('base64'), name: 'Other', description: 'd', category: 'utility', tags: [] }),
+        });
+        assert(pub.status === 201, `publish ${pub.status}: ${JSON.stringify(pub.body).slice(0, 300)}`);
+        const r0 = await fetch(`${BASE}/v1/apps/${opName}/other-demo.html?mode=inline`, { redirect: 'manual' });
+        const otherOrigin = new URL(r0.headers.get('location') ?? '').origin;
+        assert(otherOrigin !== appOrigin && otherOrigin.includes(APP_HOST), `the other app's origin: ${otherOrigin}`);
+        const r = await open(await askLink(email, `${otherOrigin}/`));
+        assert(r.status === 302 && r.location === `${BASE}/`, `expected the front page, got ${r.status} ${r.location}`);
+        assert(r.session, 'the good token still signs the person in');
     });
 
     await test('a link asked for with no return address still lands on the front page', async () => {

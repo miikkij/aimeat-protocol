@@ -6,6 +6,8 @@
  *   POST /v1/ghii/verify-email, POST /v1/ghii/magic-link, GET /v1/ghii/magic-link/verify. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.12.0 — 2026-10-05 — GET /v1/ghii/magic-link/verify checks and spends the link with
+ *     redeemLoginLink, the emailed link's own check, instead of a copy of it (secaudit 2026-10, AUTH-3).
  *   v1.11.0 — 2026-10-01 — POST /v1/ghii/verify-email applies the open app roster invitations of the
  *     address it verifies (services/app-member-invites.ts), beside the contact promotion.
  *   v1.10.0 — 2026-09-29 — POST /v1/ghii/magic-link takes `redirect`, the place the link returns to
@@ -46,7 +48,7 @@ import { generateKeyPair } from '../../auth/keypair.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
-import { sendLoginLink, LOGIN_LINK_TTL_MS } from '../../services/login-link.js';
+import { sendLoginLink, LOGIN_LINK_TTL_MS, redeemLoginLink } from '../../services/login-link.js';
 import { registerLoginLinkOpenRoute } from './login-link-open.js';
 import { validateOwnerName, buildGAII } from '../../utils/gaii.js';
 import { issueJWT } from '../../auth/jwt.js';
@@ -477,47 +479,31 @@ export function registerWebVerifyRoutes(
             return;
         }
 
-        const record = await storage.getEmailVerification(token);
-        if (!record || record.status !== 'pending' || record.purpose !== 'login') {
-            res.status(401).json(error(config.nodeId, 'INVALID_TOKEN', 'Invalid or expired magic link'));
+        // The one check and spend of a sign-in link (services/login-link.ts redeemLoginLink), the one
+        // the emailed link's endpoint runs: the account is live, its link is still on, the address the
+        // link was mailed to is still the account's, and the link is spent once under concurrent
+        // clicks. This endpoint had its own copy, which checked the first and spent unconditionally
+        // (secaudit 2026-10, AUTH-3). Every refusal comes before anything is written: the BR-04
+        // refusal once sat below the re-key, so a link for a DEACTIVATED account replaced the
+        // owner's pinned public key on a request that was then refused (invariant 14).
+        const redeemed = await redeemLoginLink(storage, config, token);
+        if (!redeemed.ok) {
+            if (redeemed.code === 'ACCOUNT_DISABLED') {
+                res.status(403).json(error(config.nodeId, 'ACCOUNT_DISABLED', 'The account this agent acts for has been deactivated'));
+            } else {
+                res.status(401).json(error(config.nodeId, redeemed.code, redeemed.code === 'EXPIRED' ? 'Magic link has expired' : 'Invalid or expired magic link'));
+            }
             return;
         }
+        const record = { ownerName: redeemed.ghii.ownerName };
 
-        if (new Date(record.expiresAt).getTime() < Date.now()) {
-            await storage.updateEmailVerification(token, { status: 'expired' });
-            res.status(401).json(error(config.nodeId, 'EXPIRED', 'Magic link has expired'));
-            return;
-        }
-
-        // REFUSE BEFORE YOU WRITE (invariant 14), and this is the sharpest instance of it in the
-        // repo. The BR-04 refusal used to sit below the re-key, so clicking a magic link for a
-        // DEACTIVATED account replaced the owner's pinned public key and the app agent's, and then
-        // answered 403. The person's own private key stopped authenticating on a request that was
-        // refused, and requesting another link is free, so it could be done again. The check is one
-        // read; it goes above everything that changes.
-        const linkMintOwner = await storage.getOwner(record.ownerName);
-        if (linkMintOwner?.disabledAt) {
-            res.status(403).json(error(config.nodeId, 'ACCOUNT_DISABLED', 'The account this agent acts for has been deactivated'));
-            return;
-        }
-
-        // Mark verification as used
+        // Update GHII last login (the redeem verified the address: clicking the link proves the mailbox).
         const now = new Date().toISOString();
-        await storage.updateEmailVerification(token, {
-            status: 'verified',
-            verifiedAt: now,
+        const ghii = redeemed.ghii.ghii;
+        await storage.updateGHII(ghii, {
+            lastLoginAt: now,
+            loginCount: (redeemed.ghii.loginCount ?? 0) + 1,
         });
-
-        // Update GHII last login + auto-verify email (clicking magic link IS email verification)
-        const ghii = `${record.ownerName}@${config.nodeId}`;
-        const ghiiRecord = await storage.getGHII(ghii);
-        if (ghiiRecord) {
-            await storage.updateGHII(ghii, {
-                lastLoginAt: now,
-                loginCount: (ghiiRecord.loginCount ?? 0) + 1,
-                verificationLevel: Math.max(ghiiRecord.verificationLevel ?? 0, 1) as 0 | 1 | 2 | 3,
-            });
-        }
 
         // Re-key owner
         const ownerKeyPair = await generateKeyPair();

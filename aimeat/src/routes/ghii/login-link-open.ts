@@ -14,6 +14,9 @@
  *   with an agent token and private keys: correct for a program, and raw JSON for a person clicking
  *   the link in their mail. That endpoint is unchanged; only the emailed address moved here.
  * @version-history
+ *   v1.2.0 — 2026-10-05 — The return address is checked after the redeem, against the account it
+ *     signed in: an app address must be the account's own app or one it holds a grant for (secaudit
+ *     2026-10, WEB-3).
  *   v1.1.0 — 2026-09-29 — The link returns to the place it was asked from. The address is checked
  *     here, before the token is spent, because the link in a mailbox can be edited.
  *   v1.0.0 — 2026-09-29 — Initial (install packages: users created at install can sign in).
@@ -34,12 +37,13 @@ export function registerLoginLinkOpenRoute(router: Router, config: AimeatConfig,
         const token = typeof req.query.token === 'string' ? req.query.token : '';
         try {
             // Checked again on open: the link was mailed with an address that passed when it was
-            // asked for, and anything in a mailbox can be edited before it is clicked. It only reads,
-            // so it comes before the token is spent. A failed check is not a refusal: the token is
-            // good, so the person is signed in and lands on the front page.
-            const back = await loginReturnTarget(storage, config, req.query.redirect);
+            // asked for, and anything in a mailbox can be edited before it is clicked. A failed check
+            // is not a refusal: the token is good, so the person is signed in and lands on the front
+            // page. Checked after the redeem, which names the account: an app address must be one of
+            // the account's own apps or one it holds a grant for (secaudit 2026-10, WEB-3).
             const result = await redeemLoginLink(storage, config, token);
             if (!result.ok) { fail(result.code); return; }
+            const back = await loginReturnTarget(storage, config, req.query.redirect, result.ghii.ownerName);
             await establishForGhii(storage, config, req, res, result.ghii);
             res.redirect(back ?? `${config.baseUrl}/`);
         } catch (err) {

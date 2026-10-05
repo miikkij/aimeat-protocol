@@ -348,6 +348,35 @@ async function run() {
         assert(/token=[a-f0-9]{64}/.test(mail), 'the link must carry a token');
     });
 
+    // Secaudit 2026-10, AUTH-3: the spend was a read and a write, so two clicks at once both signed in,
+    // and a link stayed good after the person moved their account to another address.
+    // The JSON endpoint answers a new owner key (it re-keys the owner); the next case signs in with it.
+    let ownerKeyNow = '';
+    await test('a link is spent once when it is opened four times at the same moment', async () => {
+        inbox.length = 0;
+        const r = await json('/v1/ghii/magic-link', { method: 'POST', body: JSON.stringify({ email: victimEmail }) });
+        assert(r.status === 200, `magic-link ${r.status}`);
+        const token = /magic-link\/open\?token=([a-f0-9]+)/.exec(await waitForMail(victimEmail, /magic-link\/open\?token=/))![1];
+        const all = await Promise.all([1, 2, 3, 4].map(() => json(`/v1/ghii/magic-link/verify?token=${token}`)));
+        const won = all.filter(b => b.status === 200);
+        assert(won.length === 1, `exactly one open may sign in, got ${won.length}: ${all.map(b => b.status).join(', ')}`);
+        ownerKeyNow = won[0]!.body.data.owner_private_key;
+    });
+
+    await test('a link mailed before the person changed their address no longer signs in', async () => {
+        inbox.length = 0;
+        const r = await json('/v1/ghii/magic-link', { method: 'POST', body: JSON.stringify({ email: victimEmail }) });
+        assert(r.status === 200, `magic-link ${r.status}`);
+        const stale = /magic-link\/open\?token=([a-f0-9]+)/.exec(await waitForMail(victimEmail, /magic-link\/open\?token=/))![1];
+        const tok = await ownerToken(victimName, ownerKeyNow);
+        assert(tok.status === 200, `owner token ${tok.status}`);
+        const moved = await json('/v1/ghii', { method: 'PUT', headers: bearer(tok.token), body: JSON.stringify({ notification_email: `moved.${victimEmail}` }) });
+        assert(moved.status === 200, `address change ${moved.status}: ${JSON.stringify(moved.body).slice(0, 300)}`);
+        const open = await fetch(`${BASE}/v1/ghii/magic-link/open?token=${stale}`, { redirect: 'manual' });
+        assert(open.status === 302 && open.headers.get('location') === `${BASE}/?auth_error=INVALID_TOKEN`,
+            `expected the link refused, got ${open.status} ${open.headers.get('location')}`);
+    });
+
     await stopAll();
     console.log(`\nMagic-link refusal E2E: ${passed} passed, ${failed} failed (${passed + failed} total)\n`);
     process.exit(failed > 0 ? 1 : 0);
