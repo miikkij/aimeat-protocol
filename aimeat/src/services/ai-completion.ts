@@ -21,6 +21,8 @@
  *   import { completeForOwner, AiCompletionError } from '../services/ai-completion.js';
  *   const r = await completeForOwner(storage, config, gaii, { prompt });
  * @version-history
+ *   v3.10.0 — 2026-10-05 — prepareAiCall takes `estimate`, and a text call passes its prompt's size and
+ *     its maxTokens, so the price ceiling per call measures this call (secaudit 2026-10, AI-4).
  *   v3.9.1 — 2026-10-05 — The planner's node-key answer is nodeKeyStanding (ai-allowance.ts), with the
  *     operator's mode once an allowance is spent (secaudit 2026-10, AI-1).
  *   v3.9.0 — 2026-10-02 — prepareAiCall's refusal carries `fix` for the person, `agentFix` and
@@ -329,6 +331,9 @@ export interface PrepareAiCallOptions {
   role?: string;
   /** The request's word on the person's language, for the sentence a refusal carries. */
   lang?: RequestLanguage;
+  /** The call's size, for the owner's price ceiling per call: without it the ceiling assumes 1,024
+   *  tokens each way, so a long prompt passed a ceiling it was far over (secaudit 2026-10, AI-4). */
+  estimate?: { promptTokens?: number; maxTokens?: number };
 }
 
 /**
@@ -453,6 +458,7 @@ async function planAiCall(
     ...(appPrefer?.length ? { appPrefer } : {}),
     ...(role ? { roleOrder: role.role.capabilities[capability] ?? [] } : {}),
     ...(role?.declared?.context ? { minContext: role.declared.context } : {}),
+    ...(opts.estimate ? { estimate: opts.estimate } : {}),
     legacyModel,
     nodeAllowance: () => nodeKeyStanding(storage, config, gaii),
   });
@@ -638,6 +644,11 @@ export async function completeForOwner(
     ...(opts.provider ? { provider: opts.provider } : {}),
     ...(opts.fallback !== undefined ? { fallback: opts.fallback } : {}),
     ...(capability ? { capability } : {}), ...(opts.lang ? { lang: opts.lang } : {}),
+    // About four characters to a token; the answer's ceiling when the call set one.
+    estimate: {
+      promptTokens: Math.ceil((opts.prompt.length + (opts.systemPrompt?.length ?? 0)) / 4),
+      ...(typeof opts.maxTokens === 'number' && opts.maxTokens > 0 ? { maxTokens: opts.maxTokens | 0 } : {}),
+    },
   });
   const { prefs } = plan;
 
