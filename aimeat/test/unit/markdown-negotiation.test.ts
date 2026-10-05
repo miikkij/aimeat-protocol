@@ -12,7 +12,17 @@
  */
 import { describe, it, expect } from 'vitest';
 import type { Response } from 'express';
-import { sendMarkdown } from '../../src/services/markdown-negotiation.js';
+import { sendMarkdown, decodeEntities } from '../../src/services/markdown-negotiation.js';
+
+// Secaudit 2026-10, C8: each entity is decoded once.
+describe('decodeEntities', () => {
+    it('decodes each entity once, so an escaped entity stays text', () => {
+        expect(decodeEntities('&amp;lt;b&amp;gt;')).toBe('&lt;b&gt;');
+        expect(decodeEntities('&amp;#38;lt;')).toBe('&#38;lt;');
+        expect(decodeEntities('&lt;p&gt; &#65;&#x42; &mdash; &amp;')).toBe('<p> AB — &');
+        expect(decodeEntities('&unknown;')).toBe('&unknown;');
+    });
+});
 
 /** Minimal stand-in for the parts of an Express response sendMarkdown touches. */
 function fakeRes() {

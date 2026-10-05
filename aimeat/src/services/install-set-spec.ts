@@ -29,6 +29,8 @@
  *   const set = parseInstallSet(body.install_set);
  *   if (!set.ok) return refusal(set.message);
  * @version-history
+ *   v1.2.1 — 2026-10-05 — Addresses are checked with isValidEmail (utils/email-validator.ts), which
+ *     also caps the length (secaudit 2026-10, M2).
  *   v1.2.0 — 2026-10-04 — The set takes `grant_apps` (default true: the owner's grant for each app it
  *     installs is recorded, the purchase being the approval) and `landing` (the app the owner's
  *     welcome link opens).
@@ -37,6 +39,7 @@
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 4).
  */
 import type { PackageRecord } from '../storage/interface.js';
+import { isValidEmail } from '../utils/email-validator.js';
 
 export const BUNDLE_SPEC = 'aimeat.install-bundle/1';
 export const INSTALL_SET_SPEC = 'aimeat.install-set/1';
@@ -45,7 +48,6 @@ const KEY_RE = /^[a-z][a-z0-9-]{0,39}$/;
 /** The shape of an account name; apply asks validateOwnerName (utils/gaii.ts) for the reserved ones. */
 const NAME_RE = /^[a-z0-9-]{3,64}$/;
 const NAME_RULE = '3 to 64 lowercase letters, digits and hyphens';
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_ITEMS = 50;
 
 export type PackageMode = 'managed' | 'editable';
@@ -264,13 +266,13 @@ export function parseInstallSet(raw: unknown, bundle: InstallBundle | null = nul
         const ownerName = str(ow.name, 64);
         if (!ownerName || !NAME_RE.test(ownerName)) fail(`owner.name is an account name: ${NAME_RULE}.`);
         const ownerEmail = str(ow.email, 254);
-        if (!ownerEmail || !EMAIL_RE.test(ownerEmail)) fail('owner.email is required: every user has an email.');
+        if (!ownerEmail || !isValidEmail(ownerEmail)) fail('owner.email is required: every user has an email.');
         const seen = new Set<string>([(ownerEmail as string).toLowerCase()]);
         const members = list(doc.members, 'members').map((u, i): InstallSetUser => {
             if (!isObj(u)) fail(`members[${i}] is an object.`);
             const o = u as Obj;
             const email = str(o.email, 254);
-            if (!email || !EMAIL_RE.test(email)) fail(`members[${i}].email is required: every user has an email.`);
+            if (!email || !isValidEmail(email)) fail(`members[${i}].email is required: every user has an email.`);
             const lower = (email as string).toLowerCase();
             if (seen.has(lower)) fail(`${email} is listed twice.`);
             seen.add(lower);

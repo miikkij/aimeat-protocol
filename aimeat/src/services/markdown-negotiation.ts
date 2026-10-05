@@ -21,6 +21,8 @@
  *   import { prefersMarkdown, sendMarkdown, htmlToMarkdown } from '../services/markdown-negotiation.js';
  *   if (prefersMarkdown(req)) { sendMarkdown(res, htmlToMarkdown(html), html); return; }
  * @version-history
+ *   2026-10-05 - decodeEntities decodes in one pass, with the same answers, and is exported for its
+ *     test (secaudit 2026-10, C8).
  *   2026-09-24 - sendMarkdown sets X-Content-Type-Options: nosniff, like sendPlainText (A7-3).
  *   2026-09-18 - The landing markdown tells an agent how to get in, from services/first-steps.ts:
  *     MCP first. It listed addresses and left the order to the reader.
@@ -94,18 +96,20 @@ const NAMED_ENTITIES: Record<string, string> = {
   copy: '©', middot: '·', bull: '•', times: '×', deg: '°', trade: '™',
 };
 
-function decodeEntities(s: string): string {
-  return s
-    .replace(/&#x([0-9a-f]+);/gi, (m, hex: string) => {
-      const cp = parseInt(hex, 16);
+/**
+ * One pass, so each entity is decoded once: `&amp;lt;` is the text `&lt;`. The chain of four replaces
+ * this was gave the same answers, because it decoded `&amp;` last; one pass keeps that true whatever
+ * order a later edit puts the steps in, and is the shape routes/unfurl.ts uses (secaudit 2026-10, C8).
+ */
+export function decodeEntities(s: string): string {
+  return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, body: string) => {
+    if (body[0] === '#') {
+      const cp = body[1] === 'x' || body[1] === 'X' ? parseInt(body.slice(2), 16) : Number(body.slice(1));
       return cp <= 0x10ffff ? String.fromCodePoint(cp) : m;
-    })
-    .replace(/&#(\d+);/g, (m, dec: string) => {
-      const cp = Number(dec);
-      return cp <= 0x10ffff ? String.fromCodePoint(cp) : m;
-    })
-    .replace(/&([a-z]+);/gi, (m, name: string) => NAMED_ENTITIES[name.toLowerCase()] ?? m)
-    .replace(/&amp;/gi, '&');
+    }
+    const name = body.toLowerCase();
+    return name === 'amp' ? '&' : NAMED_ENTITIES[name] ?? m;
+  });
 }
 
 /**

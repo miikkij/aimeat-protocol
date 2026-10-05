@@ -13,6 +13,7 @@
  *   - resolve(): identity resolution via resolveIdentity for owner-scoped writes
  *
  * @version-history
+ *   v1.9.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.9.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.8.2 — 2026-09-26 — The board's owner in the members door comes from localAccountName, so a board
  *     a visitor from another node owns is never the local namesake's (secaudit 2026-09, F-1).
@@ -85,7 +86,7 @@ import {
   publicBoardCeiling,
 } from '../services/board-write.js';
 import { operatorOverride, rolesWithOperator } from '../services/operator-override.js';
-import { resolveIdentity, isSameOwner, localAccountName, isForeignPrincipal } from '../utils/gaii.js';
+import { resolveIdentity, isSameOwner, localAccountName, isOwnerInPerson } from '../utils/gaii.js';
 import {
   loadServedProvenance, loadServedProvenanceMany, provenanceItemBlock, setProvenanceHeaders,
 } from '../services/ai-provenance-marks.js';
@@ -262,9 +263,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     // A federated session is rejected with them: the ownership test below compares owner NAMES, and
     // a visitor from another node carries the local part of THEIR name, which matches the local
     // account that shares it. Their boards are on their home node.
-    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent')
-      && !isForeignPrincipal(req.auth);
-    if (!isOwnerSession) {
+    if (!isOwnerInPerson(req.auth)) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the board owner (owner session) or operator can manage members'));
       return;
     }

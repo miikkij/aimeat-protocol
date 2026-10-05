@@ -14,6 +14,7 @@
  *   - GET /v1/agents/:name/refusals      -- calls the node refused this agent, still unresolved
  *   - POST /v1/agents/:name/refusals/decline -- the owner will not give those permissions
  * @version-history
+ *   v1.6.1 -- 2026-10-05 -- The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.6.0 -- 2026-09-30 -- POST /refusals/decline: the owner's "no", in person; GET /refusals flags
  *     a declined refusal and still returns it to the agent.
  *   v1.5.0 -- 2026-09-30 -- GET /refusals: what the node refused this agent for a missing permission,
@@ -36,7 +37,7 @@ import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { refuseNotYours } from '../middleware/refusals.js';
 import { requireAuth } from '../auth/middleware.js';
-import { agentGaiiFromIdentifier, ownerGhiiOf } from '../utils/gaii.js';
+import { agentGaiiFromIdentifier, ownerGhiiOf, isOwnerInPerson } from '../utils/gaii.js';
 import { readAgentAccess, refusalView, scopeRequestView, declineRefusals } from '../services/agent-refusals.js';
 import { requireOwnerPrincipal } from '../auth/account-security.js';
 import { recomputeAndCacheStatistics } from '../services/agent-statistics.js';
@@ -59,8 +60,7 @@ export function agentActivityRouter(config: AimeatConfig, storage: Storage): Rou
 
   /** Check if current session can access this agent */
   function canAccess(req: Express.Request, agentGaii: string): boolean {
-    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
-    if (isOwnerSession) return true;
+    if (isOwnerInPerson(req.auth)) return true;
     return req.auth!.sub === agentGaii;
   }
 

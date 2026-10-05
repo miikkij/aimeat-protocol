@@ -19,6 +19,8 @@
  * @structure runJobOp(deps, job, prompt, signal) → JobOpOutcome · assertAudioInReach(deps, owner, key)
  * @usage const outcome = await runJobOp({ storage, config }, entry.job, entry.prompt, signal);
  * @version-history
+ *   v1.6.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
+ *     A job's run passes `limit: 'exempt'`: the job's start counted it.
  *   v1.5.0 — 2026-10-05 — The model call runs as the app or agent that started the job (starter.ts
  *     jobCaller): the owner's per-app and per-agent rules and the agent's cap apply. Before, every job
  *     was planned as the owner in person (secaudit 2026-10, AI-3).
@@ -110,6 +112,9 @@ export async function runJobOp(
     if (op === 'image') {
         const r = await generateForOwner(storage, config, payer, {
             ...common,
+            // The job's start (POST /v1/ai/jobs, aimeat_ai_job_start) counted the AI call limit;
+            // the run is the node's own work and is not counted again.
+            limit: 'exempt',
             prompt,
             ...(job.size ? { size: job.size } : {}),
             // A public result record that pointed at a private picture would answer 401 to every
@@ -134,6 +139,7 @@ export async function runJobOp(
         if (!file) throw new AiJobError('NOT_FOUND', 404, `No such file in your storage: audio_key "${key}".`);
         const r = await transcribeForOwner(storage, config, payer, {
             ...common,
+            limit: 'exempt', // counted at the job's start, as the image op above
             audio: {
                 data: file.data,
                 mime: file.mimeType || 'application/octet-stream',

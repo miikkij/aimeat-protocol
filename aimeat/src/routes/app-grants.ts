@@ -20,6 +20,9 @@
  *     routes/app-grants-manage.ts.
  * @usage app.use(appGrantsRouter(config, storage));
  * @version-history
+ *   v1.24.1 — 2026-10-05 — The grant redirect check asks appOriginHostFamily (services/app-origin-target.ts)
+ *     for the host families, as resolveAppOriginTarget does; a subdomain two labels deep under the app
+ *     host is no longer an app address (secaudit 2026-10, C8).
  *   v1.24.0 — 2026-10-05 — The silent bridge reads who is signed in with checkRefreshSession
  *     (owner-session.ts), the refresh's own check: a session that outlived its account, or a
  *     previous token replayed past its grace window, approved apps here (secaudit 2026-10, AUTH-1).
@@ -132,7 +135,7 @@ import { resolveIdentity, localAccountName } from '../utils/gaii.js';
 import { issueJWT } from '../auth/jwt.js';
 import { ownerRefuses, recordIssuedAt } from '../auth/credential-age.js';
 import { readRefreshCookie, checkRefreshSession } from '../services/owner-session.js';
-import { PORTFOLIO_TARGET_PREFIX, resolveAppOriginTarget, resolveFrameAppTarget } from '../services/app-origin-target.js';
+import { PORTFOLIO_TARGET_PREFIX, appOriginHostFamily, resolveAppOriginTarget, resolveFrameAppTarget } from '../services/app-origin-target.js';
 import { apexOrigin, frameRedirect } from '../services/app-frame-redirect.js';
 import { parseAppScopes } from '../services/protected-resource.js';
 import { heldOwnerAdded, narrowToDeclared } from '../services/app-grant-scopes.js';
@@ -325,11 +328,13 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     if (u.protocol !== 'https:' && u.protocol !== 'http:') return { ok: false };
     const host = u.hostname.toLowerCase();
     const appHost = (config.appHost || '').toLowerCase();
-    const coHost = (config.coOriginEnabled ? (config.coHost || '') : '').toLowerCase();
-    // The app host or a per-app subdomain of it — never the apex SPA origin.
-    const onApps = !!appHost && (host === appHost || host.endsWith('.' + appHost));
+    // The host families are services/app-origin-target.ts appOriginHostFamily, the test
+    // resolveAppOriginTarget asks too (secaudit 2026-10, C8). A per-app subdomain, or the app host
+    // itself, which serves apps by path — never the apex SPA origin.
+    const family = appOriginHostFamily(config, host);
+    const onApps = !!appHost && (host === appHost || family?.family === 'app');
     // A company address. Bare `co.<apex>` names no company, so it is not one.
-    const onCo = !!coHost && host !== coHost && host.endsWith('.' + coHost);
+    const onCo = family?.family === 'co';
     // No app origin provisioned (dev): allow localhost so the flow stays testable. Gated on the
     // app host being absent, exactly as before — a node that HAS one must not accept loopback.
     const onDevLoopback = !appHost && (host === 'localhost' || host === '127.0.0.1');

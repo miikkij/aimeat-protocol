@@ -19,6 +19,7 @@
  * @usage
  *   const html = partPreviewHtml(part);   // a complete self-contained page, kit assets relative
  * @version-history
+ *   v1.6.1 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   v1.6.0 — 2026-10-01 — A part with a block that draws markdown (doc, aiTask) loads
  *     aimeat-markdown.js before the kit, so its sample renders as it does in an app instead of
  *     showing the raw marks. Every other preview page is unchanged.
@@ -55,6 +56,7 @@ import { LOOKS } from '../../data/atelier-looks.js';
 import type { DesignBookPart } from './service.js';
 import { componentPreviewHtml, type ComponentBody } from './component.js';
 import { lookStage, layerStage, wornStage, lookForShape } from './preview-stages.js';
+import { escapeHtml } from '../../utils/html-escape.js';
 
 /** A representative arrangement for parts that are seasoning rather than a dish: a look or
  *  motion sheet is benched by rendering THIS demo layout wearing it, so an override that breaks
@@ -309,9 +311,7 @@ export function benchPageHtml(body: Record<string, unknown>, theme: 'light' | 'd
 
 /** No character from an illustration's words may close an attribute or open a tag; the propose
  *  bench already refuses declaration characters, and this escape stands even if that changes. */
-function esc(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
+const esc = escapeHtml;
 
 /** An illustration is art direction as words — there is no image to show without running the
  *  imagery pipeline, so its page sets the words themselves in the kit's own type. */

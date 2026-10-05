@@ -5,6 +5,8 @@
  * @description File-storage routes under /v1/memory/files: upload (presigned or inline base64),
  *   visibility/tags PATCH, list, download, delete. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.2 -- 2026-10-05 -- The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
+ *     secaudit 2026-10, C4).
  *   v1.6.1 -- 2026-10-05 -- The file's workspace binding goes to fileTarget (secaudit 2026-10, DATA-4).
  *   v1.6.0 -- 2026-09-29 -- The download passes the classification reader (TARGET-082).
  *   v1.5.0 -- 2026-09-24 -- POST refuses an app's icon and screenshot keys with 403, through the
@@ -30,7 +32,7 @@ import type { Router } from 'express';
 import type { StorageFileRecord } from '../../storage/interface.js';
 import { normalizeWorkspaceRefs } from '../../utils/workspace-ref.js';
 import { requireAuth, requireExternalPrincipal, requireScope } from '../../auth/middleware.js';
-import { isForeignPrincipal } from '../../utils/gaii.js';
+import { isOwnerInPerson } from '../../utils/gaii.js';
 import { success, error } from '../../middleware/envelope.js';
 import { checkStorageQuota, chargeOverage } from '../../services/quota.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
@@ -237,14 +239,13 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
   // GET /v1/memory/files — list files (owner sees all agents' files + GHII files)
   // ...and listing them is a read, which GET /v1/memory/files/:key beside it has always said.
   router.get('/v1/memory/files', requireAuth(), requireExternalPrincipal(), requireScope('storage:read'), async (req, res) => {
-    // `!federated` for the same reason /v1/work/sent has it: the owner branch builds the GHII from
+    // `!federated` (inside isOwnerInPerson) for the same reason /v1/work/sent has it: the owner branch builds the GHII from
     // the owner NAME, and a session signed in from another node carries the local part of THEIR
     // name — so a visitor called `alice` listed the local alice's files and every one of her
     // agents'. requireExternalPrincipal admits the `owner` role and asks nothing about which node
     // the session came from. A federated session falls to the else branch and sees its own `sub`,
     // which is what a visitor should see. Found by the AI triage of 2026-09-13.
-    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent')
-      && !isForeignPrincipal(req.auth);
+    const isOwnerSession = isOwnerInPerson(req.auth);
     let files: Awaited<ReturnType<typeof storage.listStorageFiles>>;
     if (isOwnerSession) {
       const callerOwner = req.auth!.owner as string;

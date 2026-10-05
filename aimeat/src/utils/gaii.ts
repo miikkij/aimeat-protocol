@@ -20,6 +20,9 @@
  *   - Chat instance + device-auth user-code helpers
  * @usage import { resolveIdentity, parseGEAI, isGEAI } from '../utils/gaii.js';
  * @version-history
+ *   v1.10.1 — 2026-10-05 — isValidAgentName: validateAgentName as a yes or no (secaudit 2026-10, M2).
+ *   v1.10.0 — 2026-10-05 — isOwnerInPerson moves here from auth/effective-scopes.ts, the one test for
+ *     the account holder in person (secaudit 2026-10, C4). resolveIdentity asks it too.
  *   v1.9.1 — 2026-09-30 — 'classifier' is a reserved name (the Content Classifier's identity).
  *   v1.9.0 — 2026-09-26 — currentNodeId is exported, so the auth layer reads the storage, config and
  *     anonymous identity of the node the code runs as (auth/node-auth.ts).
@@ -122,6 +125,13 @@ export function validateAgentName(name: string): string | null {
   if (!AGENT_RE.test(name)) return 'Agent name must be 3-64 lowercase alphanumeric characters with hyphens';
   if (RESERVED_NAMES.has(name)) return `Name "${name}" is reserved`;
   return null;
+}
+
+/** validateAgentName as a yes or no, for a check that names its own refusal. Four looser copies
+ *  admitted a trailing hyphen and 65 characters, so records were written for names no agent can
+ *  have (secaudit 2026-10, M2). */
+export function isValidAgentName(name: unknown): name is string {
+  return typeof name === 'string' && validateAgentName(name) === null;
 }
 
 // ── GEAI (ecosystem application) identity ────────────────────────────────
@@ -256,6 +266,19 @@ export function isForeignPrincipal(auth: { federated?: boolean } | null | undefi
 }
 
 /**
+ * Is this session the account holder IN PERSON? The test requireScope's role bypass makes, as a
+ * value: the owner role, and nothing acting in the owner's name. A visitor from another node, an
+ * agent, an ecosystem app and an app under a grant never are, whatever their role list says, and a
+ * name cannot answer it: an app grant resolves to its owner's GHII. The one copy (secaudit 2026-10,
+ * C4): about 80 hand-written forms of it left out one role or another.
+ */
+export function isOwnerInPerson(auth: { roles?: readonly string[] | null; federated?: boolean } | null | undefined): boolean {
+  const roles = auth?.roles ?? [];
+  return roles.includes('owner') && !isForeignPrincipal(auth)
+    && !roles.includes('agent') && !roles.includes('ecosystem') && !roles.includes('app');
+}
+
+/**
  * A visitor's own identity: its HOME GHII (`alice@their-node`). Idempotent, so a name already in that
  * shape is kept. A session with no home node gets a name that resolves to nothing rather than one
  * that could resolve to a local account.
@@ -381,9 +404,9 @@ export function resolveIdentity(
   // Since 2026-09-24 verifyJWT already hands a visitor its home GHII as `owner`; homeIdentityOf keeps
   // a name in that shape and composes one only for a caller that built the auth object by hand.
   if (isForeignPrincipal(auth)) return homeIdentityOf(auth);
-  const isOwnerSession = auth.roles.includes('owner') &&
-    !auth.roles.includes('agent') && !auth.roles.includes('ecosystem');
-  return isOwnerSession ? `${auth.owner}@${nodeId}` : auth.sub;
+  // isOwnerInPerson also refuses 'app'. An app grant token carries roles ['app'] and never 'owner'
+  // (routes/app-grants.ts issueAccessToken, services/schedule-actor.ts), so it gets `sub` either way.
+  return isOwnerInPerson(auth) ? `${auth.owner}@${nodeId}` : auth.sub;
 }
 
 /**

@@ -16,6 +16,8 @@
  * @structure setCompanySmtp · getCompanySmtpPublic · resolveCompanySender · sendAsCompany
  * @usage const sender = await resolveCompanySender(config, storage, sendingCompany.company);
  * @version-history
+ *   v1.1.1 — 2026-10-05 — Addresses are checked with isValidEmail (utils/email-validator.ts), which
+ *     also caps the length (secaudit 2026-10, M2).
  *   v1.1.0 — 2026-08-24 — resolveCompanySender no longer authorizes. Sending as a company is no
  *     longer the same question as owning it (an organism's members may speak for a company bound
  *     to that organism), and a second copy of that rule here would drift from the one that
@@ -32,6 +34,7 @@ import { toPublicSmtp } from '../../models/company-smtp-schemas.js';
 import type { EmailAttachment } from '../email.js';
 import { encrypt, decrypt, getEncryptionKey } from '../encryption.js';
 import { logger } from '../../utils/logger.js';
+import { isValidEmail } from '../../utils/email-validator.js';
 import { CompanyError, requireOwnCompany } from './company-service.js';
 import type { CompanyRecord } from '../../models/company-schemas.js';
 
@@ -47,7 +50,6 @@ export interface CompanySmtpInput {
   replyTo?: string | null;
 }
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** Stores (or replaces) a company's sending identity. Refuses a password it cannot encrypt. */
 export async function setCompanySmtp(
@@ -58,10 +60,10 @@ export async function setCompanySmtp(
   const host = (input.host ?? '').trim();
   if (!host || host.length > 253) throw new CompanyError('INVALID_SMTP', 400, 'host is required');
   const fromAddress = (input.fromAddress ?? '').trim().toLowerCase();
-  if (!EMAIL_RE.test(fromAddress)) throw new CompanyError('INVALID_SMTP', 400, 'fromAddress must be an email address');
+  if (!isValidEmail(fromAddress)) throw new CompanyError('INVALID_SMTP', 400, 'fromAddress must be an email address');
   const port = input.port ?? 587;
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new CompanyError('INVALID_SMTP', 400, 'port must be 1-65535');
-  if (input.replyTo && !EMAIL_RE.test(input.replyTo.trim())) {
+  if (input.replyTo && !isValidEmail(input.replyTo.trim())) {
     throw new CompanyError('INVALID_SMTP', 400, 'replyTo must be an email address');
   }
 

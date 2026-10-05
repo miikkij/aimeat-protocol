@@ -10,6 +10,7 @@
  *   - GET    /v1/agents/:name/messages         -- List message history
  *   - PATCH  /v1/agents/:name/messages/:id     -- Update message status
  * @version-history
+ *   v1.6.1 -- 2026-10-05 -- The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.6.0 -- 2026-08-15 -- PATCH /:name/messages/:id authorizes against the MESSAGE, not just the
  *     agent name in the path. canAccessAgent() answers "may you act as this agent", built against
  *     the caller's own owner, and the message id was a second, unchecked coordinate — so any agent
@@ -42,7 +43,7 @@ import type { Storage, AgentMessageRecord } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { refuseNotYours } from '../middleware/refusals.js';
-import { resolveIdentity, agentGaiiFromIdentifier, isSameOwner } from '../utils/gaii.js';
+import { resolveIdentity, agentGaiiFromIdentifier, isSameOwner, isOwnerInPerson } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
 import { AgentMessageStatusSchema } from '../models/agent-message-schemas.js';
@@ -86,9 +87,8 @@ export function agentMessagesRouter(config: AimeatConfig, storage: Storage, webh
 
   /** Check if current session can access an agent's messages */
   function canAccessAgent(req: Express.Request, agentName: string): boolean {
+    if (isOwnerInPerson(req.auth)) return true;
     const roles = req.auth!.roles as string[];
-    const isOwnerSession = roles.includes('owner') && !roles.includes('agent');
-    if (isOwnerSession) return true;
     // Agent can access own messages
     if (roles.includes('agent')) {
       const gaii = resolveAgentGaii(req, agentName);
@@ -116,9 +116,7 @@ export function agentMessagesRouter(config: AimeatConfig, storage: Storage, webh
     }
 
     // Determine sender identity
-    const roles = req.auth!.roles as string[];
-    const isOwnerSession = roles.includes('owner') && !roles.includes('agent');
-    const senderGaii = isOwnerSession
+    const senderGaii = isOwnerInPerson(req.auth)
       ? `${req.auth!.owner}@${config.nodeId}`
       : req.auth!.sub as string;
 

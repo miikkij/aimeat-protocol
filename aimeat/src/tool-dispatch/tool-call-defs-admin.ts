@@ -1,5 +1,5 @@
 /**
- * @file cli/connect/tool-call-defs-admin.ts
+ * @file src/tool-dispatch/tool-call-defs-admin.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The operator's CORS connect-call tool definitions: the CORS page in one read and the

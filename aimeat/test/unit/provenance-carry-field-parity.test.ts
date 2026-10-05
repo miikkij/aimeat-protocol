@@ -6,7 +6,7 @@
  *   not in the record.
  *
  *   The reason it keeps recurring is a two-surface split. `src/mcp/ai-provenance-input.ts` is the
- *   NODE's own MCP surface; `src/cli/connect/ai-provenance-carry.ts` is what BOTH the shell
+ *   NODE's own MCP surface; `src/tool-dispatch/ai-provenance-carry.ts` is what BOTH the shell
  *   `aimeat connect call` path and the connector's MCP tools go through — and crews reach the node
  *   only through `aimeat connect serve`. Adding a field to the first changes nothing a crew can
  *   observe. `provider` was added to the first and not the second.
@@ -18,7 +18,7 @@
  *   v1.0.0 — 2026-08-02 — Initial: schema→body parity + the model/provider generator merge.
  */
 import { describe, it, expect } from 'vitest';
-import { toDeclareBody } from '../../src/cli/connect/ai-provenance-carry.js';
+import { toDeclareBody } from '../../src/tool-dispatch/ai-provenance-carry.js';
 import { AiProvenanceBlockSchema, type AiProvenanceToolInput } from '../../src/mcp/ai-provenance-input.js';
 
 /**
@@ -86,7 +86,7 @@ describe('generator merges model and provider', () => {
 
 describe('the error naming valid fields stays truthful', () => {
   it('names every schema field, so a caller is not told a real field does not exist', async () => {
-    const { parseDeclarationInput, ProvenanceCarryError } = await import('../../src/cli/connect/ai-provenance-carry.js');
+    const { parseDeclarationInput, ProvenanceCarryError } = await import('../../src/tool-dispatch/ai-provenance-carry.js');
     let message = '';
     try { parseDeclarationInput('not an object'); }
     catch (err) { expect(err).toBeInstanceOf(ProvenanceCarryError); message = (err as Error).message; }

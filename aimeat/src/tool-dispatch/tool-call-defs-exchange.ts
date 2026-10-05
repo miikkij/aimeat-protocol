@@ -1,5 +1,5 @@
 /**
- * @file cli/connect/tool-call-defs-exchange.ts
+ * @file src/tool-dispatch/tool-call-defs-exchange.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description EXCHANGE marketplace connect-call tool definitions — the shell fallback (`aimeat connect

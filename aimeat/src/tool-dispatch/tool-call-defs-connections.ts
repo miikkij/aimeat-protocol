@@ -1,5 +1,5 @@
 /**
- * @file cli/connect/tool-call-defs-connections.ts
+ * @file src/tool-dispatch/tool-call-defs-connections.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Outbound connections and mail, on the CLI dispatch — the door a fleet daemon

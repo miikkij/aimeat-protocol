@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.4 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.11.3 — 2026-10-05 — The bundle passes a file's workspace binding to fileTarget (secaudit 2026-10, DATA-4).
  *   v1.11.2 — 2026-10-05 — discover passes the config, so the listing leaves out an organism record
  *     kept inside its organism (services/memory-discover.ts, secaudit 2026-10, DATA-3).
@@ -68,6 +69,7 @@ import { batchKeyRefusal, storageReferenceRefusal } from './batch-guards.js';
 import { writeMemoryBatch } from '../../services/memory-batch-write.js';
 import { classifyAfterWrite } from '../../services/classify-on-write.js';
 import { isKeyArchived } from '../../services/archive.js';
+import { isOwnerInPerson } from '../../utils/gaii.js';
 import { discoverMemory } from '../../services/memory-discover.js';
 
 export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
@@ -112,7 +114,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     let gaii = resolve(req);
     const agentParam = body.agent as string | undefined;
     if (agentParam && agentParam !== gaii) {
-      const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+      const isOwnerSession = isOwnerInPerson(req.auth);
       if (!isOwnerSession) {
         res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only owner sessions may bulk-write under a specific agent'));
         return;
@@ -193,7 +195,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
   // backup. Owner sessions export across their GHII + agents + ecosystem apps (owner-scope); agent
   // sessions export their own keyspace. Optional ?prefix= scopes the export to one namespace.
   router.get('/v1/memory/export', requireAuth(), requireLocalSession(), requireExternalPrincipal(), requireScope('memory:read'), async (req, res) => {
-    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    const isOwnerSession = isOwnerInPerson(req.auth);
     // Resolved like bulk, import and bulk-delete: an owner session's sub is the bare account name.
     let gaii = resolve(req);
     const agentParam = req.query.agent as string | undefined;
@@ -263,7 +265,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     let gaii = resolve(req);
     const agentParam = body.agent as string | undefined;
     if (agentParam && agentParam !== gaii) {
-      const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+      const isOwnerSession = isOwnerInPerson(req.auth);
       if (!isOwnerSession) {
         res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only owner sessions may import under a specific agent'));
         return;
@@ -395,7 +397,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       return;
     }
 
-    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    const isOwnerSession = isOwnerInPerson(req.auth);
     let gaii = resolve(req);
     const agentParam = body.agent as string | undefined;
     if (agentParam && agentParam !== gaii) {
@@ -446,7 +448,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     }
 
     // Allowed owners = the caller's own identity + (owner sessions only) their agents' GAIIs.
-    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    const isOwnerSession = isOwnerInPerson(req.auth);
     const callerGaii = resolve(req);
     const allowed = new Set<string>([callerGaii]);
     if (isOwnerSession) {

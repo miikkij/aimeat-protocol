@@ -9,6 +9,8 @@
  *   modeSwitchHtml/wireModeSwitch · ensureAuthPillStyles · pillInitials.
  * @usage import { escHtml, modeSwitchHtml, wireModeSwitch } from './theme.js';
  * @version-history
+ *   v1.8.1 — 2026-10-05 — escHtml escapes all five characters, quotes included, for the attributes
+ *     the sign-in form fills (secaudit 2026-10, C8).
  *   v1.8.0 — 2026-09-26 — The pill's frames, its label's and its actions' letter case and spacing read the
  *     page theme's shape values (--shape-frame, --shape-frame-colour, --shape-case-label and -action,
  *     --shape-tracking-label and -action), each falling back to the value it replaces. The AIMEAT theme
@@ -49,7 +51,13 @@
 
 import { inkVarsCss } from './ink.js';
 
-export function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+/** HTML-escape a string for text and for a quoted attribute: all five characters. The DOM form
+ *  (textContent → innerHTML) left `"` and `'` as they were, and the sign-in form puts the result in
+ *  placeholder="…" and aria-label="…" (secaudit 2026-10, C8). */
+export function escHtml(s) {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
 
 // ── Theme toggle (travels with the login pill) ──
 var AIMEAT_THEME_KEY = 'aimeat-theme';

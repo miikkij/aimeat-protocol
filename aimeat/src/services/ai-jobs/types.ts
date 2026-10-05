@@ -13,6 +13,8 @@
  * @structure AiJobState · AiJobRecord · AiJobStartedBy · AiJobLogEntry · StartAiJobInput · AiJobError
  * @usage import type { AiJobRecord } from './types.js';
  * @version-history
+ *   v1.6.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
+ *     StartAiJobContext.limit: 'exempt' for ctx.ai.start.
  *   v1.5.0 — 2026-10-05 — `started_by.app`: the app an app grant names, so the job's model call runs
  *     as that app (secaudit 2026-10, AI-3).
  *   v1.4.0 — 2026-09-30 — `classification_warnings` on the record and on the start answer: the
@@ -27,6 +29,7 @@
  */
 import type { AiOp } from './op.js';
 import type { warningsNote } from '../classification/reader.js';
+import type { AiCallLimitMark } from '../account-limits.js';
 
 export type { AiOp as AiJobOp } from './op.js';
 
@@ -210,6 +213,9 @@ export interface StartAiJobContext {
     parentJob?: string;
     chainDepth?: number;
     onRefused?: (reason: AiJobChainStop) => void;
+    /** 'exempt' for a start the node makes itself (ctx.ai.start in an extension); absent, the start
+     *  counts against the account's AI call limit (services/account-limits.ts). */
+    limit?: AiCallLimitMark;
 }
 
 /**

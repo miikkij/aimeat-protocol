@@ -28,10 +28,11 @@
  *   const refusal = decisionRefusal(decider, request, 'approve');
  *   if (refusal) return refusal;
  * @version-history
+ *   v1.0.1 — 2026-10-05 — The owner test is isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.0.0 — 2026-09-25 — Initial: package installs by agents become requests.
  */
-import { ownerBypassesScopes, uncoveredScopes, WRITE_AS_OWNER_SCOPE } from '../utils/scope-coverage.js';
-import { isForeignPrincipal } from '../utils/gaii.js';
+import { uncoveredScopes, WRITE_AS_OWNER_SCOPE } from '../utils/scope-coverage.js';
+import { isOwnerInPerson, isForeignPrincipal } from '../utils/gaii.js';
 
 /** How long a request waits for a decision. */
 export const INSTALL_REQUEST_DAYS = 7;
@@ -72,7 +73,7 @@ export function decisionRefusal(
     request: DecidableRequest,
     decision: 'approve' | 'decline',
 ): DecisionRefusal | null {
-    if (ownerBypassesScopes(decider)) return null;
+    if (isOwnerInPerson(decider)) return null;
     const roles = decider.roles ?? [];
     const isAgent = roles.includes('agent') && !roles.includes('ecosystem') && !roles.includes('app') && !isForeignPrincipal(decider);
     if (!isAgent) {

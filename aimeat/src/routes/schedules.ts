@@ -31,6 +31,7 @@
  *   import { schedulesRouter } from './routes/schedules.js';
  *   app.use(schedulesRouter(config, storage, scheduler));
  * @version-history
+ *   2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   2026-10-05 — A schedule an app makes records the app's grant (secaudit 2026-10, AI-2).
  *   2026-09-27 — GET /v1/schedules?detail=true names each schedule's prompt; PATCH takes `prompt` (services/schedule-prompt.ts).
  *   v1.8.0 — 2026-08-16 — The aggregate tells a manifest-declared extension job from the owner's own
@@ -82,7 +83,7 @@ import type { Storage, ScheduledJobRecord } from '../storage/interface.js';
 import type { Scheduler } from '../services/scheduler.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
-import { buildGAII, resolveIdentity } from '../utils/gaii.js';
+import { buildGAII, resolveIdentity, isOwnerInPerson } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { createScheduleRecord, updateScheduleRecord, deleteScheduleRecord, triggerScheduleRecord } from '../services/schedule-write.js';
 import type { ScheduleWriteCaller } from '../services/schedule-write.js';
@@ -107,14 +108,12 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
   const router = Router();
 
   const ownerGhii = (req: Express.Request) => `${req.auth!.owner}@${config.nodeId}`;
-  const isOwnerSession = (req: Express.Request) =>
-    req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
 
   /** This session in the terms services/schedule-write.ts speaks. */
   const writeCaller = (req: Express.Request): ScheduleWriteCaller => ({
     owner: req.auth!.owner as string,
     identity: resolveIdentity(req.auth!, config.nodeId),
-    isOwnerSession: isOwnerSession(req),
+    isOwnerSession: isOwnerInPerson(req.auth),
     scopes: req.auth!.scopes ?? [],
     ...(req.auth!.roles.includes('app') && req.auth!.app_grant ? { appGrant: req.auth!.app_grant } : {}),
   });

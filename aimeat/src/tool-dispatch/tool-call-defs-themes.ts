@@ -1,5 +1,5 @@
 /**
- * @file cli/connect/tool-call-defs-themes.ts
+ * @file src/tool-dispatch/tool-call-defs-themes.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The third surface of Themes & Styles (`aimeat connect call` and POST /local/call):

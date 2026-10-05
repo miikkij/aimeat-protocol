@@ -21,6 +21,7 @@
  *   import { parseWelcomeMat } from '../services/welcome-mat-parse.js';
  *   const parsed = parseWelcomeMat(req.body.paste);
  * @version-history
+ *   v1.1.1 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   v1.1.0 — 2026-10-03 — The profile interview's answers travel in the page as one
  *     `<script type="application/json" id="aimeat-profile">` element. A successful parse returns
  *     them as `profile` and returns the page WITHOUT that element, because the page is published
@@ -28,6 +29,7 @@
  *     removed as well and yields no profile.
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 2).
  */
+import { escapeHtml } from '../utils/html-escape.js';
 
 export const WELCOME_MAT_BEGIN = '<!-- AIMEAT WELCOME MAT BEGIN -->';
 export const WELCOME_MAT_END = '<!-- AIMEAT WELCOME MAT END -->';
@@ -153,19 +155,14 @@ function fromBodyFragment(raw: string): string | null {
 function wrapFragment(fragment: string, meta: WelcomeMatMeta): string {
     const tags = [
         meta.declared ? '<meta name="aimeat-welcome-mat" content="1">' : '',
-        meta.authorSays ? `<meta name="aimeat-author-says" content="${escapeAttr(meta.authorSays)}">` : '',
-        meta.model ? `<meta name="ai-model" content="${escapeAttr(meta.model)}">` : '',
-        meta.vendor ? `<meta name="ai-vendor" content="${escapeAttr(meta.vendor)}">` : '',
-        meta.client ? `<meta name="ai-client" content="${escapeAttr(meta.client)}">` : '',
-        meta.canMcp ? `<meta name="ai-can-mcp" content="${escapeAttr(meta.canMcp)}">` : '',
+        meta.authorSays ? `<meta name="aimeat-author-says" content="${escapeHtml(meta.authorSays)}">` : '',
+        meta.model ? `<meta name="ai-model" content="${escapeHtml(meta.model)}">` : '',
+        meta.vendor ? `<meta name="ai-vendor" content="${escapeHtml(meta.vendor)}">` : '',
+        meta.client ? `<meta name="ai-client" content="${escapeHtml(meta.client)}">` : '',
+        meta.canMcp ? `<meta name="ai-can-mcp" content="${escapeHtml(meta.canMcp)}">` : '',
     ].filter(Boolean).map(t => `\n  ${t}`).join('');
     const title = escapeHtml(meta.title ?? 'Welcome');
     return `<!doctype html>\n<html>\n<head>\n  <meta charset="utf-8">\n  <title>${title}</title>${tags}\n</head>\n${fragment}\n</html>\n`;
-}
-
-/** Quote-safe attribute value. */
-function escapeAttr(s: string): string {
-    return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 /**
@@ -184,11 +181,6 @@ function hasVisibleContent(html: string): boolean {
     if (stripped.length > 0) return true;
     // A page can be entirely visual. Those count.
     return /<(img|svg|canvas|video|picture|iframe)\b/i.test(html);
-}
-
-function escapeHtml(s: string): string {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 /**

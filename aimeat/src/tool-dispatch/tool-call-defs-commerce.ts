@@ -1,5 +1,5 @@
 /**
- * @file cli/connect/tool-call-defs-commerce.ts
+ * @file src/tool-dispatch/tool-call-defs-commerce.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The selling side of the shell / local-call dispatch: a seller's PSP credentials, the

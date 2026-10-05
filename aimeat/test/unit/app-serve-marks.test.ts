@@ -12,6 +12,12 @@
  * @structure one `it` per fixture case, plus the idempotency and never-on-the-way-in guarantees.
  * @usage pnpm exec vitest run test/unit/app-serve-marks.test.ts
  * @version-history
+ *   v1.7.0 — 2026-10-05 — Goldens updated for the seventh intentional output change: HTML is escaped
+ *     with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10,
+ *     C8). 9 of 19 cases changed, exactly the nine that carry the discovery block, and each by two
+ *     `'` → `&#39;` in its <noscript> text ("the app's MCP server card", "this app's own"): with
+ *     `&#39;` read back as `'`, old and new are byte-identical. The third of the three cases: the
+ *     assertion was right and the behaviour changed under it.
  *   v1.6.0 — 2026-09-29 — Goldens re-captured for the sixth intentional output change: the marks
  *     share one row at the bottom-left (app-badge v2.2.0, ai-provenance-marks v1.8.0) and the
  *     reserved strip is 46px (app-chrome-reserve v1.2.0). 16 of 19 cases changed: every case that

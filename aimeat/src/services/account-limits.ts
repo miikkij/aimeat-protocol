@@ -13,16 +13,27 @@
  *
  *   WHAT IS NOT COUNTED. Work the node does itself (an install set inviting the people it names)
  *   passes `exempt`; the caller says why.
+ *
+ *   AI CALLS. An AI call that a person or an agent starts directly (a REST route or an MCP tool) is
+ *   counted in the AI service function both call, against `config.rateLimits.openrouter` (the number
+ *   the REST path limiter had). Node-internal AI work (a schedule, a workflow step, a refinery batch,
+ *   a classifier, a background job's run, a provider test's inner call) passes `limit: 'exempt'`,
+ *   because it is not one request per call and the limit would break a batch.
  * @structure AccountLimitRefusal · accountLimiter(name, limit, sentence) · MAIL_SEND_LIMIT ·
- *   INVITE_EMAIL_LIMIT · takeMailSend · takeInviteEmail
+ *   INVITE_EMAIL_LIMIT · takeMailSend · takeInviteEmail · AiCallLimitMark · AI_CALL_DEFAULT_LIMIT ·
+ *   takeAiCall · requireAiCallTurn · retryAfterOf
  * @usage
  *   const turn = takeMailSend(senderGhii);
  *   if (!turn.ok) return refuse(429, turn.code, turn.message);
+ *   requireAiCallTurn(config, gaii, opts.limit);   // throws AiCompletionError RATE_LIMITED 429
  * @version-history
+ *   v1.1.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, C5).
  */
+import type { RateLimitTier } from '../config-types.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { rateBuckets } from './rate-buckets.js';
+import { AiCompletionError } from './ai/errors.js';
 
 /** The answer when the account has used its allowance for this window. */
 export interface AccountLimitRefusal {
@@ -64,3 +75,56 @@ export const takeMailSend = accountLimiter(MAIL_SEND_LIMIT, (max, s) =>
 
 export const takeInviteEmail = accountLimiter(INVITE_EMAIL_LIMIT, (max, s) =>
   `This account has sent ${max} email invitations in the last ten minutes, which is the most one account may send. Try again in ${s} seconds.`);
+
+/**
+ * What an AI service is told about the limit. `'exempt'` is node-internal work (see the file
+ * header); absent, the service counts the call against the account.
+ */
+export type AiCallLimitMark = 'exempt';
+
+/** One limiter per distinct limit: the operator can change the number while the node runs
+ *  (config-overrides.ts), and a new number starts a new count. */
+const aiCallLimiters = new Map<string, (principal: string) => AccountTurn>();
+
+/** The number config.ts gives `rateLimits.openrouter` when AIMEAT_RL_OPENROUTER is unset; used only
+ *  when a caller hands in a config without the tier (a partial config in a unit test). */
+export const AI_CALL_DEFAULT_LIMIT = { windowMs: 60_000, max: 30 } as const;
+
+/** The config shape the AI call limit reads: only the one tier. */
+export interface AiCallLimitConfig { rateLimits?: { openrouter?: RateLimitTier } }
+
+/**
+ * Count one AI call, started on a request, against the principal's account. The limit is
+ * `config.rateLimits.openrouter` (AIMEAT_RL_OPENROUTER, 30 a minute by default).
+ */
+export function takeAiCall(config: AiCallLimitConfig, principal: string): AccountTurn {
+  const { windowMs, max } = config.rateLimits?.openrouter ?? AI_CALL_DEFAULT_LIMIT;
+  const id = `${windowMs}:${max}`;
+  let take = aiCallLimiters.get(id);
+  if (!take) {
+    take = accountLimiter({ windowMs, max }, (m, s) =>
+      `This account has started ${m} AI calls in the last minute, which is the most one account may start. Try again in ${s} seconds.`);
+    aiCallLimiters.set(id, take);
+  }
+  return take(principal);
+}
+
+/**
+ * The AI services' own question: count the call unless it is `'exempt'`, and throw the refusal as
+ * AiCompletionError RATE_LIMITED 429 with `details.retry_after_sec`, which every AI route and MCP
+ * tool already answers. Called before anything is written or spent.
+ */
+export function requireAiCallTurn(
+  config: AiCallLimitConfig, principal: string, mark: AiCallLimitMark | undefined,
+): void {
+  if (mark === 'exempt') return;
+  const turn = takeAiCall(config, principal);
+  if (!turn.ok) throw new AiCompletionError(turn.code, 429, turn.message, { retry_after_sec: turn.retryAfterSec });
+}
+
+/** The Retry-After seconds of an AI call refusal, for the route that answers it; undefined otherwise. */
+export function retryAfterOf(e: unknown): number | undefined {
+  if (!(e instanceof AiCompletionError) || e.code !== 'RATE_LIMITED') return undefined;
+  const s = e.details?.retry_after_sec;
+  return typeof s === 'number' ? s : undefined;
+}

@@ -242,7 +242,7 @@ await test('6. a plain-email recipient falls to the email channel; no SMTP → 5
 await test('6b. a failed send names its send-log row, and the row says the same', async () => {
   // The id and the reason ride in error.details so a caller can still find the attempt, and the
   // connector and CLI doors lift exactly these fields into the tool's error (refuseUnsentSend in
-  // cli/connect/tool-call-defs-connections.ts). A rename here would leave those doors answering
+  // tool-dispatch/tool-call-defs-connections.ts). A rename here would leave those doors answering
   // SEND_FAILED with no row to point at, with nothing else going red.
   const r = await json('/v1/outbound/send', {
     method: 'POST', headers: authed(A.token),

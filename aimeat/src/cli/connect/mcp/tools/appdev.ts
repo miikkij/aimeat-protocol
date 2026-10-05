@@ -32,7 +32,7 @@ import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 import { defineAppIam } from '../../../../services/iam/define-app-iam.js';
 import type { LevelDef } from '../../../../services/iam/model.js';
 import type { CommandDef } from '../../../../services/iam/app-commands.js';
-import { attachProofOverHttp } from '../../tool-call-defs-apps.js';
+import { attachProofOverHttp } from '../../../../tool-dispatch/tool-call-defs-apps.js';
 
 export function registerAppdevTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();

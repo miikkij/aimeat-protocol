@@ -18,7 +18,7 @@ import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 import { appManageShape } from '../../../../mcp/app-manage-shape.js';
-import { appManageCall } from '../../app-manage-call.js';
+import { appManageCall } from '../../../../tool-dispatch/app-manage-call.js';
 
 export function registerAppManageTool(mcp: McpServer, registry: AgentRegistry): void {
   const { client, owner } = registry.resolve();

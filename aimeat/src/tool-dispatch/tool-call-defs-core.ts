@@ -1,5 +1,5 @@
 /**
- * @file cli/connect/tool-call-defs-core.ts
+ * @file src/tool-dispatch/tool-call-defs-core.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Memory, discovery, work, wallet, storage, admin, compliance, capabilities, catalogue, consent, flag, group, share, instance and knowledge connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.

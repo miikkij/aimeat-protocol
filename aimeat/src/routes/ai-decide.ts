@@ -19,6 +19,9 @@
  * @structure decideRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.6.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
+ *     decide, runs and resume lose the path limiter (decideForOwner, startDecideRun and
+ *     resumeDecideRun count); the two key tests count the account on the route (aiCallLimit).
  *   v1.5.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.4.0 — 2026-09-25 — POST /v1/ai/decisions/:id/review hands the service the reviewer as the
  *     principal that acted (callerPrincipal, so an app is its GEAI) and whether it is the owner in
@@ -45,7 +48,8 @@ import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { testDecideKey } from '../services/decide/key-test.js';
 import { assertAiUseAllowed } from '../auth/ai-gate.js';
 import { requireOwnerPrincipal, isOwnerPrincipal } from '../auth/account-security.js';
-import { rateLimit } from '../middleware/rate-limit.js';
+import { aiCallLimit } from '../middleware/ai-call-limit.js';
+import { retryAfterOf } from '../services/account-limits.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, isForeignPrincipal, callerPrincipal } from '../utils/gaii.js';
 import { isOwnerInPerson } from '../auth/effective-scopes.js';
@@ -122,20 +126,25 @@ export function decideInputOf(body: Record<string, unknown>): DecideInput {
 
 export function decideRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
-  const aiRateLimit = rateLimit(config.rateLimits.openrouter);
+  // testDecideKey is reached by no MCP tool, so the two key tests count the account's AI call limit
+  // on the route. decide, runs and resume are counted in their services, which the MCP tools share.
+  const keyTestLimit = aiCallLimit(config);
 
   const fail = (res: Response, e: unknown) => {
     if (e instanceof DecideError || e instanceof AiCompletionError) {
       const details = e instanceof DecideError ? e.details : undefined;
       const retry = (details as { retry_after_ms?: number } | undefined)?.retry_after_ms;
       if (retry) res.setHeader('Retry-After', String(Math.ceil(retry / 1000)));
+      // The account's AI call limit (services/account-limits.ts) says when to come back.
+      const limited = retryAfterOf(e);
+      if (limited !== undefined) res.setHeader('Retry-After', String(limited));
       return res.status(e.status).json(error(config.nodeId, e.code, e.message, e.status, details));
     }
     return res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', (e as Error).message));
   };
 
   // ── POST /v1/ai/decide ── ask the decision model
-  router.post('/v1/ai/decide', requireAuth(), aiRateLimit, async (req: Request, res: Response) => {
+  router.post('/v1/ai/decide', requireAuth(), async (req: Request, res: Response) => {
     if (!assertAiUseAllowed(req, res, config.nodeId)) return;
     const body = (req.body ?? {}) as Record<string, unknown>;
     try {
@@ -185,7 +194,7 @@ export function decideRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // ── POST /v1/ai/decide/runs ── one decision over many records, in the background
-  router.post('/v1/ai/decide/runs', requireAuth(), aiRateLimit, async (req: Request, res: Response) => {
+  router.post('/v1/ai/decide/runs', requireAuth(), async (req: Request, res: Response) => {
     if (!assertAiUseAllowed(req, res, config.nodeId)) return;
     const body = (req.body ?? {}) as Record<string, unknown>;
     try {
@@ -227,7 +236,7 @@ export function decideRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // ── POST /v1/ai/decide/runs/:id/resume ──
-  router.post('/v1/ai/decide/runs/:id/resume', requireAuth(), aiRateLimit, async (req: Request, res: Response) => {
+  router.post('/v1/ai/decide/runs/:id/resume', requireAuth(), async (req: Request, res: Response) => {
     if (!assertAiUseAllowed(req, res, config.nodeId)) return;
     try {
       const run = await resumeDecideRun(storage, config, decideCallerOf(req, config.nodeId), req.params.id as string);
@@ -270,14 +279,14 @@ export function decideRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // ── POST /v1/ai/decide/settings/test ── one tiny real call on the key that would pay for this owner
-  router.post('/v1/ai/decide/settings/test', requireAuth(), requireOwnerPrincipal(OWNER_SETS_THE_MODEL), aiRateLimit, async (req: Request, res: Response) => {
+  router.post('/v1/ai/decide/settings/test', requireAuth(), requireOwnerPrincipal(OWNER_SETS_THE_MODEL), keyTestLimit, async (req: Request, res: Response) => {
     try {
       res.json(success(config.nodeId, await testDecideKey(storage, config, { gaii: decideOwnerOf(req.auth!, config.nodeId), which: 'mine' })));
     } catch (e) { fail(res, e); }
   });
 
   // ── POST /v1/admin/decide/test ── the operator tests the node's own key
-  router.post('/v1/admin/decide/test', requireAuth(), requireOperator(storage), aiRateLimit, async (req: Request, res: Response) => {
+  router.post('/v1/admin/decide/test', requireAuth(), requireOperator(storage), keyTestLimit, async (req: Request, res: Response) => {
     try {
       res.json(success(config.nodeId, await testDecideKey(storage, config, { gaii: decideOwnerOf(req.auth!, config.nodeId), which: 'node' })));
     } catch (e) { fail(res, e); }

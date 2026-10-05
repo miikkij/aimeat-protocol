@@ -17,7 +17,7 @@
  *   v1.0.0 — 2026-09-27 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { appManageCall } from '../../src/cli/connect/app-manage-call.js';
+import { appManageCall } from '../../src/tool-dispatch/app-manage-call.js';
 import { CONNECT_CLI_TOOLS } from '../../src/cli/connect/tool-call.js';
 import type { AimeatClient } from '../../src/cli/connect/api-client.js';
 import {

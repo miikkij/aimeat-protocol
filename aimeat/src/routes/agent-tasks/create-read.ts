@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Agent-task create + read routes (POST create, GET list, GET detail). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.6.0 — 2026-10-04 — The task list gives a declined task its `outcome`, so the agent's reason shows
  *     without opening the task.
  *   v1.5.0 — 2026-10-02 — `start` on create, allowed as 'automatic' only to a caller who may loosen
@@ -30,6 +31,7 @@ import { readerFor } from '../../services/classification/reader.js';
 import { success, error } from '../../middleware/envelope.js';
 import { refuseNotYours, refuseNeedsPermission } from '../../middleware/refusals.js';
 import { requireAuth, agentNotFoundResponse } from '../../auth/middleware.js';
+import { isOwnerInPerson } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { emitResourceUpdated } from '../../mcp/index.js';
 import { createTask } from '../../services/agent-task-write.js';
@@ -79,7 +81,7 @@ export function registerTaskCreateReadRoutes(
 
     // Authorize: owner JWT, same-owner agent JWT, OR a same-owner app grant holding task:write.
     const callerRoles = req.auth!.roles as string[];
-    const isOwner = callerRoles.includes('owner') && !callerRoles.includes('agent');
+    const isOwner = isOwnerInPerson(req.auth);
     const isAgent = callerRoles.includes('agent');
     const isApp = callerRoles.includes('app');
     if (!isOwner && !isAgent && !isApp) {
@@ -159,7 +161,7 @@ export function registerTaskCreateReadRoutes(
    */
   router.get('/v1/agents/:name/tasks', requireAuth(), async (req, res) => {
     const agentName = req.params.name as string;
-    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    const isOwnerSession = isOwnerInPerson(req.auth);
     // An H-2 app grant with task:read reads its OWN owner's tasks, so it takes the owner-scoped
     // path (listAgentTasksByOwner filters by the app's owner GHII — never another owner's tasks).
     const isAppReading = req.auth!.roles.includes('app') && tokenHasScope(req, 'task:read');

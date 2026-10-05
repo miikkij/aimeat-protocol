@@ -20,6 +20,7 @@
  *   key can be tested again; a pass marks it `ok` and records when it was tested.
  * @structure testProvider · silentWav
  * @version-history
+ *   v1.3.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *   v1.2.0 — 2026-10-05 — `caller` is required: every call says who asks (secaudit 2026-10, AI-3).
  *   v1.1.0 — 2026-09-28 — Speech and embeddings are testable (V5 of the System 2 plan).
  *   v1.0.0 — 2026-09-28 — Initial (V3 of the System 2 plan).
@@ -37,6 +38,7 @@ import { persistHealth } from './provider-store.js';
 import { providerIdOf } from '../ai-provider-common.js';
 import type { CallerClass } from './policy.js';
 import type { AiCapability } from './types.js';
+import { requireAiCallTurn } from '../account-limits.js';
 
 const TESTABLE: readonly AiCapability[] = ['text', 'vision', 'files', 'image', 'transcription', 'speech', 'embed'];
 const APP_ID = 'ai-provider-test';
@@ -87,6 +89,10 @@ export async function testProvider(
     throw new AiCompletionError('AI_TEST_COSTS_MONEY', 400,
       'An image test makes one small picture, which the provider charges for. Send accept_cost: true to run it.');
   }
+  // One test is one AI call started on a request: POST /v1/ai/providers/:id/test and
+  // aimeat_ai_provider_test both arrive here, and count against the account before the health is
+  // cleared or anything is spent. The inner call below is then 'exempt', so it is not counted twice.
+  requireAiCallTurn(config, gaii, undefined);
   // What the process knew no longer holds: the owner is testing, maybe after a new key.
   clearHealth(gaii, id);
   const who = {
@@ -95,22 +101,23 @@ export async function testProvider(
     caller: input.caller,
     ...(input.verifiedApp ? { verifiedApp: input.verifiedApp } : {}),
   };
+  const counted = { limit: 'exempt' as const };
   const started = Date.now();
   let model: string; let cost: number; let keySource: ProviderTestResult['key_source'];
   if (capability === 'image') {
-    const r = await generateForOwner(storage, config, gaii, { ...who, prompt: 'A small plain blue square.', size: '256x256' });
+    const r = await generateForOwner(storage, config, gaii, { ...who, ...counted, prompt: 'A small plain blue square.', size: '256x256' });
     model = r.model; cost = r.usage.costUsd; keySource = r.keySource;
   } else if (capability === 'transcription') {
-    const r = await transcribeForOwner(storage, config, gaii, { ...who, audio: { data: silentWav(), mime: 'audio/wav', filename: 'silence.wav' } });
+    const r = await transcribeForOwner(storage, config, gaii, { ...who, ...counted, audio: { data: silentWav(), mime: 'audio/wav', filename: 'silence.wav' } });
     model = r.model; cost = r.usage.costUsd; keySource = r.keySource;
   } else if (capability === 'embed') {
-    const r = await embedForOwner(storage, config, gaii, { ...who, input: ['ok'] });
+    const r = await embedForOwner(storage, config, gaii, { ...who, ...counted, input: ['ok'] });
     model = r.model; cost = r.usage.costUsd; keySource = r.keySource;
   } else if (capability === 'speech') {
     // One word, spoken. The audio is read and dropped; the `done` event carries the model and cost.
     let done: Record<string, unknown> | undefined;
     await streamSpeech(storage, config, gaii, {
-      input: 'ok', app_id: APP_ID, provider: id, response_format: 'mp3', speed: 1,
+      input: 'ok', app_id: APP_ID, provider: id, response_format: 'mp3', speed: 1, ...counted,
       caller: input.caller, ...(input.verifiedApp ? { verifiedApp: input.verifiedApp } : {}),
     }, AbortSignal.timeout(60_000), async (e) => { if (e.type === 'done') done = e; });
     model = String(done?.model ?? ''); cost = typeof done?.cost_usd === 'number' ? done.cost_usd : 0;

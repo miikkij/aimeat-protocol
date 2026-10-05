@@ -34,6 +34,7 @@
  *   const agent = agentNameOf(caller.principal, caller.gaii);
  *   const key = agent ? await readAgentKey(storage, config, caller.gaii, agent, 'decide') : null;
  * @version-history
+ *   v1.2.1 — 2026-10-05 — An agent name is checked with isValidAgentName, the grammar agents have (secaudit 2026-10, M2).
  *   v1.2.0 — 2026-10-03 — addAgentSpend splits an agent's spend by app or endpoint (`per_app`), so the
  *     owner's usage says what each agent spent on what.
  *   v1.1.0 — 2026-09-20 — aiPayerOf: an agent's text call is paid by its owner. The cap reads the
@@ -45,7 +46,7 @@ import type { Storage } from '../storage/interface.js';
 import { encrypt, decrypt, getEncryptionKey } from './encryption.js';
 import { upsertPrivateRecord } from './private-record.js';
 import { emitChange } from './event-bus.js';
-import { parseGAII } from '../utils/gaii.js';
+import { parseGAII, isValidAgentName } from '../utils/gaii.js';
 
 /** The two models an agent may hold a key for. */
 export type AgentAiModel = 'decide' | 'openrouter';
@@ -53,7 +54,6 @@ export type AgentAiModel = 'decide' | 'openrouter';
 const RECORD_BASE: Record<AgentAiModel, string> = { decide: 'decide.apikey', openrouter: 'openrouter.apikey' };
 const SETTINGS_RECORD = 'openrouter.settings';
 const ENV_RE = /^[A-Z][A-Z0-9_]{1,63}$/;
-const AGENT_RE = /^[a-z0-9][a-z0-9-]{1,63}$/;
 
 /** A refusal a route maps to a status. No throw type of its own, so this module imports no service. */
 export class AgentAiKeyError extends Error {
@@ -94,7 +94,7 @@ export function agentKeyRecord(model: AgentAiModel, agent: string): string {
 }
 
 function assertAgentName(agent: string): void {
-  if (!AGENT_RE.test(agent)) throw new AgentAiKeyError('INVALID_AGENT', 400, 'Not an agent name.');
+  if (!isValidAgentName(agent)) throw new AgentAiKeyError('INVALID_AGENT', 400, 'Not an agent name.');
 }
 
 function encryptionKeyOf(config: AimeatConfig): Buffer {

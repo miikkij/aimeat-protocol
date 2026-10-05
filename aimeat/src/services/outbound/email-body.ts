@@ -23,8 +23,10 @@
  * @structure buildOutboundBody
  * @usage const { htmlBody, textBody } = buildOutboundBody({ body, kind, unsubscribeUrl, links });
  * @version-history
+ *   v1.0.1 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   v1.0.0 — 2026-08-24 — Pure extraction out of sendOutbound, plus links and the open counter.
  */
+import { escapeHtml } from '../../utils/html-escape.js';
 
 /** A button, as the caller names it. */
 export interface OutboundLink {
@@ -45,11 +47,6 @@ export interface BodyInput {
 /** At most this many buttons; past it a message is a page and belongs behind a link. */
 const MAX_LINKS = 10;
 const MAX_LABEL = 120;
-
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
 
 /** Only http(s) survives. Anything else is dropped whole rather than escaped — see the header. */
 export function usableLinks(links: OutboundLink[] | undefined): OutboundLink[] {

@@ -46,6 +46,7 @@
  *   const body = applyServeMarks(app.data, {
  *     badge: true, provenance: prov, visibleLabel: { config, locale }, discovery, headMeta });
  * @version-history
+ *   v1.5.1 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   v1.5.0 — 2026-09-26 — `visibleLabel.publiclyReadable`: the app as served now, for the
  *     reviewer's re-decision of the visible label. Absent means public, so the goldens are unchanged.
  *   v1.4.1 — 2026-09-13 — Comment only: the publish now strips what this pass writes
@@ -82,16 +83,13 @@ import {
   APP_REF_MARK, DISCOVERY_MARK, agentDiscoverySnippet, appRefSnippet, type AppDiscoverySpec,
 } from '../utils/app-agent-discovery.js';
 import { applyAppHeadMeta, type AppHeadSpec } from '../utils/app-head-meta.js';
+import { escapeHtml } from '../utils/html-escape.js';
 import {
   PROVENANCE_HTML_MARK, aiDisclosureParts, markDocumentElement, type ServedProvenance,
 } from './ai-provenance-marks.js';
 
 /** The attribute that names the reviewer tag, and the idempotency marker for it. */
 export const REVIEWED_MARK = 'name="aimeat-reviewed-by"';
-
-function escAttr(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
 
 /** Before `</head>` when there is one; else before the body opens; else at the front. */
 function injectIntoHead(html: string, snippet: string): string {
@@ -238,7 +236,7 @@ export function applyServeMarks(data: Buffer | Uint8Array | string, spec: ServeM
     // an author" checks see it. Two tags: the standard one every crawler reads, and the one that
     // says what it means here — a person reviewed this and answers for it.
     if (spec.reviewedBy && !text.includes(REVIEWED_MARK)) {
-      const name = escAttr(spec.reviewedBy);
+      const name = escapeHtml(spec.reviewedBy);
       out = injectIntoHead(out,
         `<meta name="author" content="${name}"><meta ${REVIEWED_MARK} content="${name}">`);
     }

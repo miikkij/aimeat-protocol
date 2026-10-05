@@ -23,6 +23,7 @@
  *   import { resolveTags, extractTags } from './site-tags.js';
  *   const html = await resolveTags(template, { config, storage, ownerGaii: SITE_OWNER_GAII });
  * @version-history
+ *   v1.0.1 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   v1.0.0 — 2026-08-26 — Pure extraction from site.ts (v1.3.0): the tag grammar, escapeHtml, the
  *     config whitelist, the board renderer and the batching resolver move here as free functions
  *     taking their dependencies. No behaviour change; site.ts calls these instead of its own
@@ -30,6 +31,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import { escapeHtml } from '../utils/html-escape.js';
 
 /** The five things a portal template may pull in. */
 export type TagType = 'config' | 'memory' | 'storage' | 'kv' | 'board';
@@ -53,10 +55,8 @@ export interface TagDeps {
     ownerGaii: string;
 }
 
-export function escapeHtml(str: string): string {
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
+/** Re-exported because services/design-book/component.ts imports it from here. */
+export { escapeHtml };
 
 /** Every distinct `type:key` the template names, deduped. */
 export function extractTags(template: string): string[] {

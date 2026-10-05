@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description RFC 8628 device authorization flow routes (authorize, token poll, consent info, verify submit). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.2 — 2026-10-05 — The approving owner token must be the owner in person (isOwnerInPerson;
+ *     secaudit 2026-10, C4).
  *   v1.11.1 — 2026-10-05 — The node's scope ceiling is exceedsCeiling (utils/scope-coverage.ts; secaudit 2026-10, C3).
  *   v1.11.0 — 2026-09-30 — An approval records what was asked for and granted (services/agent-refusals.ts).
  *   v1.10.2 — 2026-09-26 — POST /v1/agents/verify asks credentialRevoked of the owner token in its
@@ -78,7 +80,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, DeviceAuthorizationRecord } from '../../storage/interface.js';
 import { generateKeyPair } from '../../auth/keypair.js';
 import { success, error } from '../../middleware/envelope.js';
-import { validateAgentName, buildGAII, generateUserCode, localAccountName } from '../../utils/gaii.js';
+import { validateAgentName, buildGAII, generateUserCode, localAccountName, isOwnerInPerson } from '../../utils/gaii.js';
 import { executeHooks } from '../../services/hooks.js';
 import { recordAccountEvent } from '../../services/account-events.js';
 import { fireHook } from '../../utils/fire-hook.js';
@@ -697,8 +699,11 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
     // takes here the credential check every authenticated route takes (credentialRevoked): a revoked
     // token, a signed-out session, and a token of an account that no longer holds the owner name are
     // refused.
+    // Approving an agent is the account holder's act in person: isOwnerInPerson, the one test, also
+    // refuses a token that carries the owner role beside an agent, ecosystem or app role, or that a
+    // visitor from another node holds (secaudit 2026-10, C4).
     const ownerPayload = await verifyJWT(owner_token);
-    if (!ownerPayload || !ownerPayload.roles?.includes('owner') || await credentialRevoked(owner_token, ownerPayload)) {
+    if (!ownerPayload || !isOwnerInPerson(ownerPayload) || await credentialRevoked(owner_token, ownerPayload)) {
       res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Invalid or expired owner token'));
       return;
     }

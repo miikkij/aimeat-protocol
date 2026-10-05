@@ -35,6 +35,9 @@
  * @usage
  *   html = injectPageBody(html, page, config, isShell);
  * @version-history
+ *   v1.2.1 - 2026-10-05 - HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
+ *     A link's URL is decoded from all five entities before it is escaped again, so `'` and `"` in
+ *     a URL are not escaped twice.
  *   v1.2.0 - 2026-10-01 - The page title is the block's visible <h1>, replacing the visually-hidden
  *     <h1> spa.html carried on every page. Bing's guidelines treat text a crawler sees and a person
  *     does not as cloaking, and the front page had sat at "Discovered but not crawled" since May.
@@ -43,14 +46,15 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { PublicPage } from '../data/public-pages.js';
+import { escapeHtml } from './html-escape.js';
 
 /** HTML-escape. Runs before any markup is emitted, so nothing downstream can produce a tag. */
-function esc(t: string): string {
-  return t
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+const esc = escapeHtml;
+
+/** The five entities escapeHtml writes, decoded in one pass so `&amp;lt;` stays the text `&lt;`. */
+const ESCAPED: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" };
+function unescapeHtml(t: string): string {
+  return t.replace(/&(?:amp|lt|gt|quot|#39);/g, (e) => ESCAPED[e]!);
 }
 
 /**
@@ -88,9 +92,9 @@ function inline(escaped: string): string {
   s = s.replace(/\*\*([^*]{1,300})\*\*/g, '<strong>$1</strong>');
 
   s = s.replace(/\[([^\]]{1,300})\]\(([^)\s]{1,500})\)/g, (_whole, label: string, url: string) => {
-    // The URL arrives escaped, which turns `&` into `&amp;` — correct inside an attribute, so it
-    // is checked in that form and emitted unchanged.
-    const href = safeHref(url.replace(/&amp;/g, '&'));
+    // The URL arrives escaped (`&` is `&amp;`, `'` is `&#39;`). It is decoded once, checked as the
+    // URL it is, and escaped again for the attribute, so no character is escaped twice.
+    const href = safeHref(unescapeHtml(url));
     if (!href) return label;
     return `<a href="${esc(href)}">${label}</a>`;
   });

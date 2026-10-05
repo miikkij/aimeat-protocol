@@ -11,7 +11,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { CONNECT_CLI_TOOLS } from '../../src/cli/connect/tool-call.js';
-import type { JsonObject } from '../../src/cli/connect/tool-call-helpers.js';
+import type { JsonObject } from '../../src/tool-dispatch/tool-call-helpers.js';
 
 interface Sent { method: string; path: string; body?: unknown }
 

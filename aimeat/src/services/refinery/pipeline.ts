@@ -24,6 +24,8 @@
  *     through readAiFile (useForAi first); a refused one is named on the row and left out.
  *   v1.0.3 — 2026-10-05 — The extraction runs as whoever runs the batch, an app or an agent included
  *     (services/ai/caller-context.ts; secaudit 2026-10, AI-3).
+ *   v1.0.4 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
+ *     The batch's decisions pass `limit: 'exempt'`: one batch is many calls, not one request each.
  */
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
@@ -174,7 +176,7 @@ async function classify(ctx: Ctx, msg: MailMessage): Promise<Json> {
   const body = redact(msg.text.slice(0, 6000));
   const subj = redact(msg.subject);
   const r = await decideForOwner(ctx.deps.storage, ctx.deps.config,
-    { gaii: ctx.caller.ownerGhii, principal: ctx.caller.principal, appRef: ctx.caller.appRef, appId: ctx.def.app, isOwner: ctx.caller.isOwner },
+    { gaii: ctx.caller.ownerGhii, principal: ctx.caller.principal, appRef: ctx.caller.appRef, appId: ctx.def.app, isOwner: ctx.caller.isOwner, limit: 'exempt' },
     {
       state: { from_domain: senderDomain(msg.from), subject: subj.text, text: body.text, attachments: msg.attachments.map((a) => a.filename).join(', ') },
       questions: { kind: { type: 'choice', instructions: 'Which kind of email message is this?', criteria } } as never,

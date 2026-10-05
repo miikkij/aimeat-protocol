@@ -44,6 +44,8 @@
  *   const actor = labelActorOf(req.auth!, config.nodeId);
  *   await setLabel({ storage, config }, actor, memoryTarget(owner, key), { label: 'luottamuksellinen' });
  * @version-history
+ *   v1.8.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
+ *     secaudit 2026-10, C4).
  *   v1.8.0 — 2026-10-05 — A file shared into an organism workspace takes the organism's
  *     classification: fileTarget(owner, key, workspaceRef) answers the organism's address, and
  *     fileAddressOf moves a label request that names only the holder and key there too (Jouni,
@@ -75,7 +77,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Storage, ContentLabelRow, ContentLabelTarget, ContentLabelKind } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
-import { isSameOwner, isForeignPrincipal, callerPrincipal, localAccountOf, isGEAI, ownerGhiiOf } from '../../utils/gaii.js';
+import { isSameOwner, isForeignPrincipal, isOwnerInPerson, callerPrincipal, localAccountOf, isGEAI, ownerGhiiOf } from '../../utils/gaii.js';
 import { agentBarred } from '../organism-agent-access.js';
 import { decideWorkspaceRead } from '../workspace-access.js';
 import { checkOrganismNamespaceAccess } from '../organism-namespace-access.js';
@@ -269,8 +271,8 @@ function rolesOf(actor: LabelActor): string[] {
 
 /** Is this the account holder in their own session (not an agent, an app or an ecosystem app)? */
 export function isOwnerPerson(actor: LabelActor): boolean {
-  const roles = rolesOf(actor);
-  return actor.kind === 'human' && roles.includes('owner') && !roles.some(r => r === 'agent' || r === 'ecosystem' || r === 'app');
+  // labelActorOf refuses a visitor from another node, so the roles are the whole question here.
+  return actor.kind === 'human' && isOwnerInPerson({ roles: rolesOf(actor) });
 }
 
 /**

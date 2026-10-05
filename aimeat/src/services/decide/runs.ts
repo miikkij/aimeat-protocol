@@ -29,6 +29,8 @@
  * @usage
  *   const run = await startDecideRun(storage, config, caller, { questions, keys, fields });
  * @version-history
+ *   v1.6.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
+ *     A run counts once at its start and once at a resume; its items pass `limit: 'exempt'`.
  *   v1.5.0 — 2026-09-30 — One classification reader per run, and the warning-classified records it
  *     sent to the decision model are kept on the run as `classification_warnings` (TARGET-082
  *     review, item 2), so a run's record and its summary name them.
@@ -61,6 +63,7 @@ import { isReservedServerKey } from '../../utils/reserved-keys.js';
 import { readAiRecords } from '../ai-inputs.js';
 import { systemReader, warningsNote, type ContentReader } from '../classification/reader.js';
 import { ClassificationError } from '../classification/labels.js';
+import { requireAiCallTurn } from '../account-limits.js';
 
 const RUN_PREFIX = 'decide.runs.';
 const RUNS_KEPT = 50;
@@ -212,7 +215,8 @@ async function work(storage: Storage, config: AimeatConfig, caller: DecideCaller
       if (flag.stop) return;
       try {
         // A run that names a rule sends each state and nothing else, exactly as a single call does.
-        const r = await decideForOwner(storage, config, caller, {
+        // The run's start or resume counted the AI call limit once; its items are not counted again.
+        const r = await decideForOwner(storage, config, { ...caller, limit: 'exempt' }, {
           state: project(state, run.fields), subject: item.subject,
           ...(run.rule ? { rule: run.rule } : {
             questions: run.questions,
@@ -286,6 +290,9 @@ export async function startDecideRun(
   if (!config.decideEnabled) {
     throw new DecideError('DECIDE_DISABLED', 503, 'The operator has turned the decision model off on this node.');
   }
+  // POST /v1/ai/decide/runs and aimeat_decide_run both arrive here: a run is one AI call started on
+  // a request, counted against the account before the run record is written.
+  requireAiCallTurn(config, caller.gaii, caller.limit);
   validateInput(input);
   if (input.rule !== undefined) {
     // Refused here, once, rather than a thousand times in the background: the rule is not there, is
@@ -393,6 +400,8 @@ export async function resumeDecideRun(
   if (!run) return null;
   if (active.has(id)) return run;
   if (run.state === 'done') return run;
+  // A resume starts the work again: counted once, as the start was, before anything is written.
+  requireAiCallTurn(config, caller.gaii, caller.limit);
   // Failed items get another chance too: the reason they failed (money, a key) may be fixed now.
   for (const [k, r] of Object.entries(run.results)) if (r.error) delete run.results[k];
   run.state = 'running';

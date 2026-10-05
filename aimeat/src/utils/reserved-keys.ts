@@ -20,6 +20,8 @@
  *   appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   v1.20.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
+ *     secaudit 2026-10, C4).
  *   v1.20.0 — 2026-10-02 — `scope-use.` is a SERVICE-OWNED prefix: the record of the permissions an
  *     agent holding `*` used, which nobody but services/scope-use.ts may write, restore or delete.
  *   v1.19.0 — 2026-09-29 — `classification.policy.` is also a SERVICE-OWNED prefix: no memory route
@@ -94,6 +96,8 @@
  *     OpenRouter key exfiltration via openrouter.settings.baseUrl, ai-usage budget-cap reset, and
  *     profile/directory poisoning — all via a granted app's memory:write into the owner namespace).
  */
+
+import { isOwnerInPerson } from './gaii.js';
 
 /**
  * Owner-namespace key prefixes the server reads and trusts for behavior — never app-writable.
@@ -350,8 +354,7 @@ export function appMayWriteKey(
   roles: string[], key: string, delegatedOwnerWrite = false, reservedAllowed = false,
 ): boolean {
   if (isServiceOwnedKey(key)) return false;
-  const isOwnerSession = roles.includes('owner') && !roles.includes('agent') && !roles.includes('ecosystem');
-  if (isOwnerSession) return true;
+  if (isOwnerInPerson({ roles })) return true;
   if (!roles.includes('app') && !delegatedOwnerWrite) return true;
   // The owner can hand even these over, deliberately and per agent — see WRITE_RESERVED_SCOPE in
   // routes/memory/owner-target.ts for why that grant is NOT part of the '*' bundle.

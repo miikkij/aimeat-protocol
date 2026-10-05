@@ -1,5 +1,5 @@
 /**
- * @file cli/connect/tool-call-defs-agent.ts
+ * @file src/tool-dispatch/tool-call-defs-agent.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.

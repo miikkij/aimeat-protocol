@@ -12,6 +12,7 @@
  *   callAuthority(auth) → both, for the remote MCP chokepoint
  * @usage req.auth = await withCurrentScopes(storage, verified);
  * @version-history
+ *   v1.4.1 -- 2026-10-05 -- isOwnerInPerson moves to utils/gaii.ts and is re-exported here (secaudit 2026-10, C4).
  *   v1.4.0 -- 2026-09-24 -- isOwnerInPerson and callAuthority: a door tells the remote MCP chokepoint
  *     whether the caller is the owner in person, so an app grant, which resolves to its owner's
  *     account, is never taken for them. heldScopes asks isOwnerInPerson, with isForeignPrincipal.
@@ -32,7 +33,7 @@ import type { Storage } from '../storage/interface.js';
 import type { VerifiedToken } from './jwt.js';
 import { scopeIsCovered, SCOPES_OUTSIDE_WILDCARD } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
-import { isForeignPrincipal } from '../utils/gaii.js';
+import { isForeignPrincipal, isOwnerInPerson } from '../utils/gaii.js';
 
 /**
  * The permissions a principal holding `token` has, given that its record currently allows `record`.
@@ -134,16 +135,9 @@ export async function withCurrentOperatorRole(storage: Storage | null, v: Verifi
   return { ...v, roles: v.roles.filter(r => r !== 'operator') };
 }
 
-/**
- * Is this session the account holder IN PERSON? The test requireScope's role bypass makes, as a
- * value: the owner role, and nothing acting in the owner's name. A visitor from another node, an
- * agent, an ecosystem app and an app under a grant never are, whatever their role list says, and a
- * name cannot answer it: an app grant resolves to its owner's GHII.
- */
-export function isOwnerInPerson(auth: { roles: string[]; federated?: boolean }): boolean {
-  return auth.roles.includes('owner') && !isForeignPrincipal(auth)
-    && !auth.roles.includes('agent') && !auth.roles.includes('ecosystem') && !auth.roles.includes('app');
-}
+// isOwnerInPerson moved to utils/gaii.ts beside isForeignPrincipal, so a service asks it without
+// reaching into auth/ (secaudit 2026-10, C4). Re-exported so every existing import resolves here.
+export { isOwnerInPerson };
 
 /**
  * Every scope this session holds, as a list a service can ask scopeIsCovered() about.

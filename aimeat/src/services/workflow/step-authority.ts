@@ -23,6 +23,7 @@
  *   const missing = missingStepScopes(def, caller, 'full');
  *   if (missing.length > 0) return stepScopeRefusal(missing);   // 403 SCOPE_DENIED, the words named
  * @version-history
+ *   v1.3.1 — 2026-10-05 — ownerInPerson asks isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.3.0 — 2026-09-25 — An agent step costs work:request, the word for giving an agent work, for a
  *     workflow saved under WORKFLOW_AUTHORITY_VERSION 2; a workflow keeps the rules it was saved
  *     under, so one saved before keeps its agent steps free, at a run and at its trigger.
@@ -34,7 +35,8 @@
  *     too: every signal leaf reads a record and the run keeps what it saw, which workflow:read serves.
  *   v1.0.0 — 2026-09-24 — Initial.
  */
-import { scopeIsCovered, ownerBypassesScopes } from '../../utils/scope-coverage.js';
+import { scopeIsCovered } from '../../utils/scope-coverage.js';
+import { isOwnerInPerson } from '../../utils/gaii.js';
 import type { WorkflowStep, Signal, WorkflowSaver } from '../../models/workflow-schemas.js';
 
 /** Every kind of step. A step with no `action` is an agent step. */
@@ -136,10 +138,10 @@ export function saverFromCaller(caller: WorkflowCaller, ownerGhii: string): Work
 
 /**
  * The account holder in person, whom requireScope waves through every door. The rule lives in
- * utils/scope-coverage.ts ownerBypassesScopes, beside the rule for what a scope covers.
+ * utils/gaii.ts isOwnerInPerson, the one test for the account holder in person.
  */
 export function ownerInPerson(caller: WorkflowCaller): boolean {
-    return ownerBypassesScopes(caller);
+    return isOwnerInPerson(caller);
 }
 
 function kindOf(step: Pick<WorkflowStep, 'action'>): StepKind {

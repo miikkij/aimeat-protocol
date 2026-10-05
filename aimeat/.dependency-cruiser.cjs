@@ -22,6 +22,10 @@
  *   cd aimeat && pnpm check:deps          # the gate
  *   cd aimeat && pnpm deps:graph          # the same graph as an SVG, to look at
  * @version-history
+ *   v1.1.0 — 2026-10-05 — The exclude is anchored, so the connector's MCP tools are read; four layer
+ *     rules (services and mcp do not import routes, services do not import mcp, mcp does not import
+ *     the cli) with today's edges in the baseline; a warning for a server module src/index.ts never
+ *     reaches (secaudit 2026-10, M1).
  *   v1.0.0 — 2026-09-04 — Initial.
  */
 module.exports = {
@@ -87,6 +91,41 @@ module.exports = {
             to: { path: '^src/cli' },
         },
         {
+            name: 'services-do-not-import-routes',
+            comment:
+                'A service is what every surface calls; a route is one surface. A service reaching '
+                + 'into a route makes the other surfaces depend on HTTP code (secaudit 2026-10, M1). '
+                + 'Today\'s edges are the known-violations baseline and may only shrink.',
+            severity: 'error',
+            from: { path: '^src/services' },
+            to: { path: '^src/routes', dependencyTypesNot: ['type-only'] },
+        },
+        {
+            name: 'services-do-not-import-mcp',
+            comment: 'The same direction for the MCP surface (secaudit 2026-10, M1).',
+            severity: 'error',
+            from: { path: '^src/services' },
+            to: { path: '^src/mcp', dependencyTypesNot: ['type-only'] },
+        },
+        {
+            name: 'mcp-does-not-import-routes',
+            comment:
+                'An MCP tool calls the service a route calls, never the route (one capability, one '
+                + 'implementation; .claude/rules/backend.md). Secaudit 2026-10, M1.',
+            severity: 'error',
+            from: { path: '^src/mcp' },
+            to: { path: '^src/routes', dependencyTypesNot: ['type-only'] },
+        },
+        {
+            name: 'mcp-does-not-import-the-cli',
+            comment:
+                'The CLI is a client of this node. The node\'s MCP surface reaching into it means a '
+                + 'capability lives in the client (secaudit 2026-10, M1; mcp/contacts.ts did, through a shim).',
+            severity: 'error',
+            from: { path: '^src/mcp' },
+            to: { path: '^src/cli', dependencyTypesNot: ['type-only'] },
+        },
+        {
             name: 'no-orphans',
             comment:
                 'A module nothing imports is either dead or was meant to be wired up and never was. '
@@ -101,6 +140,22 @@ module.exports = {
                 ],
             },
             to: {},
+        },
+        {
+            name: 'reachable-from-the-node',
+            comment:
+                'A server module the node never loads from src/index.ts is dead or wired by a path no '
+                + 'graph sees (a dynamic import with a computed name). no-orphans misses a module that '
+                + 'is imported only by other unreachable modules, such as a forwarding file nobody '
+                + 'loads (secaudit 2026-10, M1). The CLI, the browser bundles and the type files have '
+                + 'entry points of their own.',
+            severity: 'warn',
+            from: { path: '^src/index[.]ts$' },
+            to: {
+                path: '^src/',
+                pathNot: ['^src/(cli|static|types|generated)/', '/__tests__/', '[.]d[.]ts$', '^src/index[.]ts$'],
+                reachable: false,
+            },
         },
         {
             name: 'not-to-dev-dep',
@@ -121,7 +176,9 @@ module.exports = {
     ],
     options: {
         doNotFollow: { path: 'node_modules' },
-        exclude: { path: '(^|/)(test|tools|scripts)/' },
+        // Anchored: the unanchored form `(^|/)(test|tools|scripts)/` also matched
+        // src/cli/connect/mcp/tools/, so 58 connector tool files were never read (secaudit 2026-10, M1).
+        exclude: { path: '^(test|tools|scripts)/' },
         tsConfig: { fileName: 'tsconfig.json' },
         tsPreCompilationDeps: true,
         enhancedResolveOptions: { exportsFields: ['exports'], conditionNames: ['import', 'require', 'node', 'default'] },

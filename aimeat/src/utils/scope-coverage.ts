@@ -25,12 +25,14 @@
  *
  *   Neither was an escalation before this scope existed. Both were, the moment it did.
  * @structure SCOPES_OUTSIDE_WILDCARD · scopeIsCovered(held, scope) · uncoveredScopes(held, wanted) ·
- *   ownerBypassesScopes(caller)
+ *   exceedsCeiling(ceiling, requested)
  * @usage
  *   import { uncoveredScopes } from '../utils/scope-coverage.js';
  *   const added = uncoveredScopes(agent.defaultScopes ?? [], proposed.scopes);
  *   if (added.length > 0) return err(`…${added.join(', ')}`);
  * @version-history
+ *   v1.13.0 — 2026-10-05 — ownerBypassesScopes is gone: its callers ask isOwnerInPerson (utils/gaii.ts),
+ *     the one test for the account holder in person (secaudit 2026-10, C4).
  *   v1.12.0 — 2026-10-05 — exceedsCeiling(ceiling, requested): the node's scope ceiling, which five
  *     grant paths wrote out by hand (secaudit 2026-10, C3).
  *   v1.11.1 — 2026-09-25 — The OPERATOR_ADMIN_SCOPE note says the operator's full-access agents got
@@ -72,7 +74,6 @@
  *   v1.0.0 — 2026-08-08 — Initial, closing the two paths that let an agent grant itself
  *     memory:write-reserved without the owner's tick.
  */
-import { isForeignPrincipal } from './gaii.js';
 
 /** The scope an owner grants an agent to write into the owner's own namespace. */
 export const WRITE_AS_OWNER_SCOPE = 'memory:write-as-owner';
@@ -342,15 +343,4 @@ export function exceedsCeiling(ceiling: readonly string[], requested: readonly s
         const [domain] = s.split(':');
         return !ceiling.includes(s) && !ceiling.includes(`${domain}:*`);
     });
-}
-
-/**
- * The account holder in person, whom requireScope waves past every scope (auth/middleware.ts): an
- * owner role, and none of the three things that make a role list a scoped principal's. An agent, an
- * ecosystem app and a visitor from another node answer for their words; an app grant carries no
- * owner role at all. For a service that decides the same question without an Express request.
- */
-export function ownerBypassesScopes(caller: { roles: readonly string[]; federated?: boolean }): boolean {
-    return caller.roles.includes('owner') && !isForeignPrincipal(caller)
-        && !caller.roles.includes('agent') && !caller.roles.includes('ecosystem');
 }

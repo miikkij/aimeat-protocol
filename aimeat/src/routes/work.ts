@@ -12,6 +12,8 @@
  *   - Routes: POST /v1/work[/request|/batch], GET inbox/sent/:tc, POST :tc/{accept,progress,reject,deliver,rate}
  *
  * @version-history
+ *   v1.5.2 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
+ *     secaudit 2026-10, C4).
  *   v1.5.1 — 2026-09-26 — A person's inbox and sent list read their ecosystem apps' identities beside
  *     their agents' (services/db/owner-identity.ts identitiesActingFor), so work on an action an app of
  *     theirs published, a cortex's action among them, reaches the person (secaudit 2026-09, R4 3).
@@ -52,7 +54,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { MailboxNotificationService } from '../services/mailbox-notification.js';
 import { requireAuth, requireExternalPrincipal, requireScope } from '../auth/middleware.js';
-import { isForeignPrincipal, resolveIdentity } from '../utils/gaii.js';
+import { isOwnerInPerson, resolveIdentity } from '../utils/gaii.js';
 import { refuseWorkBetween } from '../services/work-parties.js';
 import { isIdentityShaped } from '../services/local-identity.js';
 import { success, error } from '../middleware/envelope.js';
@@ -363,8 +365,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
   router.get('/v1/work/inbox', requireAuth(), requireExternalPrincipal(), requireScope('work:read'), async (req, res) => {
     // Not a federated session: the fan-out below resolves agents from the owner NAME, which for a
     // visitor from another node is the local part of their own name and names the local namesake.
-    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent')
-      && !isForeignPrincipal(req.auth);
+    const isOwnerSession = isOwnerInPerson(req.auth);
     const me = resolveIdentity(req.auth!, config.nodeId);
     let items: Awaited<ReturnType<typeof storage.listWorkByProvider>>;
     if (isOwnerSession) {
@@ -398,8 +399,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     // called `alice` was handed the work sent by the local `alice`'s agents. requireExternalPrincipal
     // admits the `owner` role and asks nothing about where the session came from, so it does not
     // cover this. Found by the AI triage of 2026-09-13.
-    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent')
-      && !isForeignPrincipal(req.auth);
+    const isOwnerSession = isOwnerInPerson(req.auth);
     const me = resolveIdentity(req.auth!, config.nodeId);
     let items: Awaited<ReturnType<typeof storage.listWorkByRequester>>;
     if (isOwnerSession) {
@@ -431,8 +431,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
   const workTabDb = createWorkTabService(storage);
   router.get('/v1/work/overview', requireAuth(), requireExternalPrincipal(), requireScope('work:read'), async (req, res) => {
     // Same reason as /v1/work/inbox above: an owner-name fan-out is not a visitor's own work.
-    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent')
-      && !isForeignPrincipal(req.auth);
+    const isOwnerSession = isOwnerInPerson(req.auth);
     const data = await workTabDb.overview(isOwnerSession, req.auth!.owner as string, resolveIdentity(req.auth!, config.nodeId));
     res.json(success(config.nodeId, data));
   });

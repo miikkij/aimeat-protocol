@@ -15,7 +15,7 @@
  *   its own request, and only with every word the install needs. An app grant, an ecosystem app and a
  *   visitor from another node are refused. `requireOwnerPrincipal()` is not the gate, because it would
  *   admit an agent holding account:security past the not-its-own and the words rules; the policy asks
- *   ownerBypassesScopes(), which is requireScope's own owner test.
+ *   isOwnerInPerson() (utils/gaii.ts), which is requireScope's own owner test.
  *
  *   packages:write ON ALL THREE. Deciding an install is taking part in installing, and the tool on the
  *   MCP surfaces carries the same word, so the two cannot disagree. The owner passes as at every door.
@@ -23,6 +23,7 @@
  * @structure actCallerOf(req, owner, ownerGhii) · registerInstallRequestRoutes(router, config, storage, scheduler)
  * @usage registerInstallRequestRoutes(router, config, storage, scheduler);  // from routes/instances.ts
  * @version-history
+ *   v1.0.1 — 2026-10-05 — The comment names isOwnerInPerson, which replaced ownerBypassesScopes (secaudit 2026-10, C4).
  *   v1.0.0 — 2026-09-25 — Initial: package installs by agents become requests.
  */
 import type { Router, Request } from 'express';

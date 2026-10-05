@@ -55,7 +55,7 @@ import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 import { AI_ROLE_PARAM } from '../../../../mcp/catalog/definitions/ai-models.js';
 import { PACKAGE_CONFIG_PARAM, GRANT_APPS_PARAM } from '../../../../mcp/catalog/definitions/packages.js';
 import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
-import { provenanceEchoedResult, readPayloadWithProvenance } from '../../ai-provenance-carry.js';
+import { provenanceEchoedResult, readPayloadWithProvenance } from '../../../../tool-dispatch/ai-provenance-carry.js';
 import { envelopeResult, payloadResult } from './_registry.js';
 
 export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void {

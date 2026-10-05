@@ -1,5 +1,5 @@
 /**
- * @file cli/connect/tool-call-defs-ai-jobs.ts
+ * @file src/tool-dispatch/tool-call-defs-ai-jobs.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The four AI-job tools for the shell / local-call dispatch: start one, list them,

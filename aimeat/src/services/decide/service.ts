@@ -56,6 +56,8 @@
  *   const r = await decideForOwner(storage, config, { gaii, principal, appId, isOwner }, { state, questions });
  *   const g = await decideForOwner(storage, config, caller, { state, rule: 'send-reply' });
  * @version-history
+ *   v1.4.5 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
+ *     DecideCaller.limit 'exempt' is passed by a run's items, the classifier and the refinery.
  *   v1.4.4 — 2026-10-05 — The node's key asks nodeKeyStanding (ai-allowance.ts), the one answer every
  *     call on that key gets, with the operator's mode once an allowance is spent (secaudit 2026-10, AI-1).
  *   v1.4.3 — 2026-09-29 — strictScrub: the Content Classifier's calls scrub everything (TARGET-082 V3).
@@ -106,6 +108,7 @@ import { agentNameOf, readAgentKey, agentCapRefusal } from '../agent-ai-keys.js'
 import { ruleForCaller, type RuleCallerKind } from './rules.js';
 import { evaluateRule, fieldsOutside, type DecisionRule } from './rule-validate.js';
 import { gateSettingOf, gateApplies, openGateItem } from './gate.js';
+import { requireAiCallTurn, type AiCallLimitMark } from '../account-limits.js';
 
 export interface DecideCaller {
   /** The resolved identity whose account pays and owns the record. */
@@ -118,6 +121,10 @@ export interface DecideCaller {
   appId?: string;
   /** The human owner acting directly. Only they may skip the scrubber without a policy saying so. */
   isOwner: boolean;
+  /** 'exempt' for node-internal work (an item of a run, the classifier, a refinery batch); absent,
+   *  the decision counts against the account's AI call limit (services/account-limits.ts). Set by
+   *  the code that builds the caller, never read from a request body. */
+  limit?: AiCallLimitMark;
 }
 
 export interface DecideInput {
@@ -380,6 +387,9 @@ export async function decideForOwner(
   if (!config.decideEnabled) {
     throw new DecideError('DECIDE_DISABLED', 503, 'The operator has turned the decision model off on this node.');
   }
+  // POST /v1/ai/decide, the rule try route and aimeat_decide all arrive here: one count per account,
+  // before anything is read, sent or recorded.
+  requireAiCallTurn(config, caller.gaii, caller.limit);
   const limits = {
     ...DEFAULT_DECIDE_LIMITS,
     maxRequestTokens: config.decideMaxRequestTokens,

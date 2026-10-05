@@ -44,6 +44,8 @@
  *   firstJsonObject()
  * @usage const out = await classifyText(deps, target, text);
  * @version-history
+ *   v2.0.2 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
+ *     The classifier's decisions pass `limit: 'exempt'`: it is node-internal work drained from a queue.
  *   v2.0.1 — 2026-09-30 — readSystem, UNCHANGED and updateSystem moved unchanged to system-record.ts,
  *     which the exceptions list writes through too.
  *   v2.0.0 — 2026-09-29 — Review fixes: a queue per owner with an index, compare-and-swap writes for
@@ -245,7 +247,7 @@ function criteriaOf(policy: ClassificationPolicy): Record<string, string> {
 
 async function askJev(deps: Deps, payer: string, policy: ClassificationPolicy, target: ContentLabelTarget, content: string) {
   const r = await decideForOwner(deps.storage, deps.config,
-    { gaii: payer, principal: `classifier@${deps.config.nodeId}`, appId: 'classification', isOwner: false },
+    { gaii: payer, principal: `classifier@${deps.config.nodeId}`, appId: 'classification', isOwner: false, limit: 'exempt' },
     {
       state: { content },
       questions: { label: { type: 'choice', instructions: 'Which classification fits this content? Pick the most sensitive one the content calls for.', criteria: criteriaOf(policy) } } as never,

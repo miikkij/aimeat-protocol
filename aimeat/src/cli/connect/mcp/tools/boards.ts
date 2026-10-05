@@ -23,7 +23,7 @@ import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
-import { provenanceEchoedResult } from '../../ai-provenance-carry.js';
+import { provenanceEchoedResult } from '../../../../tool-dispatch/ai-provenance-carry.js';
 import { envelopeResult } from './_registry.js';
 
 /**

@@ -19,7 +19,7 @@ import { createHash } from 'node:crypto';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { registerAppsTools } from '../src/cli/connect/mcp/tools/apps.js';
-import { appTools } from '../src/cli/connect/tool-call-defs-apps.js';
+import { appTools } from '../src/tool-dispatch/tool-call-defs-apps.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';

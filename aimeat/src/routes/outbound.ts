@@ -13,6 +13,7 @@
  * @structure zod schemas · sendErr mapper · outboundRouter
  * @usage app.use(outboundRouter(config, storage)) in routes-loader
  * @version-history
+ *   2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   2026-10-05 — The per-minute send limit moves from this route into sendOutbound, counted per
  *     account, so the MCP tool shares it (secaudit 2026-10, C5).
  *   2026-09-28 — The send names its principal, so an organism's company refuses an agent the organism does not admit.
@@ -281,9 +282,7 @@ export function outboundRouter(config: AimeatConfig, storage: Storage): Router {
   function holdsConnectionsUse(req: Request): boolean {
     const auth = req.auth;
     if (!auth) return false;
-    if (auth.roles.includes('owner') && !auth.roles.includes('agent') && !auth.roles.includes('ecosystem')) {
-      return true;
-    }
+    if (isOwnerInPerson(auth)) return true;
     return scopeIsCovered(auth.scopes, 'connections:use');
   }
 

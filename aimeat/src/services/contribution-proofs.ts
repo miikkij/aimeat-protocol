@@ -9,7 +9,7 @@
  *   whole capability inline: the owner gate on the community pack, the append-only duplicate rule,
  *   the ContributionProof shape, and the storage write itself. There is no REST route for the
  *   attach, so the copies that drifted are the two CLI connector definitions
- *   (`cli/connect/mcp/tools/appdev.ts` and `cli/connect/tool-call-defs-apps.ts`), which post the
+ *   (`cli/connect/mcp/tools/appdev.ts` and `tool-dispatch/tool-call-defs-apps.ts`), which post the
  *   same `libpack.proofs.{packId}` record over POST /v1/memory with a different proof shape
  *   (`summary` + `created`, no `verdict`, no `date`, no `selfReported`), no owner gate, no
  *   duplicate check, and a SET where this path APPENDS. `routes/library-packs.ts` reads every

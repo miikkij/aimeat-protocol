@@ -12,6 +12,7 @@
  *   - GET    /v1/agents/:name/webhook/log   -- Get delivery log
  *   - GET    /v1/agents/:name/integration/overview -- Integration subtab composite (webhook + delivery log + onboarding checklist)
  * @version-history
+ *   v1.1.1 -- 2026-10-05 -- The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.1.0 -- 2026-07-16 -- Add GET /integration/overview composite folding the Integration subtab's
  *     webhook + delivery-log + onboarding-checklist mount reads (skill-bundle/version stays separate).
  *   v1.0.0 -- 2026-05-23 -- Initial creation for Agent Dashboard webhook management
@@ -25,7 +26,7 @@ import type { Storage, AgentRecord } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { refuseNotYours } from '../middleware/refusals.js';
 import { requireAuth } from '../auth/middleware.js';
-import { agentGaiiFromIdentifier } from '../utils/gaii.js';
+import { agentGaiiFromIdentifier, isOwnerInPerson } from '../utils/gaii.js';
 import { validateOutboundUrl, safeFetch } from '../utils/url-validator.js';
 import { emitChange } from '../services/event-bus.js';
 import { createAgentIntegrationOverviewService } from '../services/db/agent-integration-overview-db-service.js';
@@ -48,9 +49,8 @@ export function agentWebhookRouter(config: AimeatConfig, storage: Storage): Rout
 
   /** Check if current session can access an agent's webhook */
   function canAccessAgent(req: Express.Request, agentName: string): boolean {
+    if (isOwnerInPerson(req.auth)) return true;
     const roles = req.auth!.roles as string[];
-    const isOwnerSession = roles.includes('owner') && !roles.includes('agent');
-    if (isOwnerSession) return true;
     if (roles.includes('agent')) {
       return req.auth!.sub === resolveAgentGaii(req, agentName);
     }

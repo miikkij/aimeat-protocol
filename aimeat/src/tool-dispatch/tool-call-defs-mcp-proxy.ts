@@ -1,5 +1,5 @@
 /**
- * @file cli/connect/tool-call-defs-mcp-proxy.ts
+ * @file src/tool-dispatch/tool-call-defs-mcp-proxy.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The remote MCP servers this node connects OUT to, on the CLI dispatch — the door a

@@ -9,6 +9,7 @@
  * @structure i18n string table + wrapHtml() layout + per-template builder functions.
  * @usage import { inviteEmailHtml, inviteEmailSubject } from './email-templates.js';
  * @version-history
+ *   2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   2026-09-30 — Export emailTemplateLang, so the organism invitation can answer which language its
  *     email went out in.
  *   2026-09-28 — The invitation email names each workspace by its name, not its id.
@@ -28,6 +29,7 @@
  *   v1.3.0 — 2026-07-07 — Add keyCredentialsEmailHtml/keyCredentialsEmailSubject: durable login
  *     (username + freshly issued password) emailed on a provisioned-code account's first sign-in (TARGET-011).
  */
+import { escapeHtml as esc } from '../utils/html-escape.js';
 
 // ── i18n strings ─────────────────────────────────────────
 
@@ -238,15 +240,9 @@ const i18n: Record<string, Record<string, string>> = {
   },
 };
 
-/** Minimal HTML escape for user-controlled fields interpolated into email HTML. */
-export function esc(s: string): string {
-  return String(s ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+/** HTML escape for user-controlled fields interpolated into email HTML. The name `esc` stays
+ *  exported because the other email template files import it from here. */
+export { esc };
 
 /** The language this email is written in: the requested one when we have it, else English. */
 function emailLang(locale: string | undefined): string {

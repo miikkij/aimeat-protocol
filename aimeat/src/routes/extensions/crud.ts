@@ -6,6 +6,7 @@
  *   inspect, action-script get/patch, uninstall (DELETE), activate/deactivate. Extracted from
  *   src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.1 — 2026-10-05 — POST /v1/extensions drops its unused owner-role variable, so no hand-written owner test is left here (secaudit 2026-10, C4).
  *   v1.9.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/extensions.ts (max-file-lines)
  *   v1.1.0 — 2026-08-10 — GET :name/actions/:actionId checks installedBy, as the PATCH beside it
@@ -112,9 +113,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
   // ── POST /v1/extensions — Install extension from YAML manifest + JS scripts ──
   router.post('/v1/extensions', requireAuth(), validateBody(ExtensionInstallSchema, config.nodeId), async (req, res) => {
     try {
-      const roles = req.auth!.roles;
       const isOperator = await isOperatorCaller(storage, req.auth);
-      const isOwner = roles.includes('owner');
 
       if (!(await hasExtWritePermission(req, config, storage))) {
         res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE',
@@ -174,8 +173,6 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       }
       const record = built.record;
       const name = record.name;
-      // Silence unused-var warning for legacy isOwner reference.
-      void isOwner;
 
       // POST never replaces an installed extension; PUT is the door for a redeploy. The check stays
       // here because the answer is this route's: a conflict, not an offer to upsert.

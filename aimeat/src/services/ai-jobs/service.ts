@@ -22,6 +22,8 @@
  *   const service = new AiJobService(config, storage);
  *   await service.startJob({ prompt, result_key }, { ownerGhii, createdBy });
  * @version-history
+ *   v1.8.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
+ *     A start answers 429 RATE_LIMITED with a Retry-After past it; ctx.ai.start passes `limit: 'exempt'`.
  *   v1.7.0 — 2026-09-30 — The warning-classified items a job gives its model are kept on the job
  *     (`classification_warnings`): the prompt's records at the start, which the start answer names
  *     too, and a transcription's audio when it runs (TARGET-082 review, item 2).
@@ -64,6 +66,7 @@ import { warningsNote } from '../classification/reader.js';
 import { fireOnDone } from './on-done.js';
 import { aiOpOf, aiOpRefusal } from './op.js';
 import { runJobOp, assertAudioInReach } from './run-op.js';
+import { takeAiCall } from '../account-limits.js';
 import {
     readJob, writeJob, foldIntoLog, findInLogs, listLiveJobs, listLogged, pruneLogs,
     readActiveIndex, addToActiveIndex, removeFromActiveIndex,
@@ -146,6 +149,15 @@ export class AiJobService implements AiJobStarter {
         const { prompt, warnings } = await this.prepareInput(ownerGhii, {
             ...input, op, ...(ctx.startedBy ? { started_by: ctx.startedBy } : {}),
         });
+
+        // The account's AI call limit (services/account-limits.ts): POST /v1/ai/jobs and
+        // aimeat_ai_job_start both arrive here and draw on one count per account. A start from
+        // ctx.ai.start in an extension is 'exempt' (the node's own work); the run itself is not
+        // counted again (run-op.ts).
+        if (ctx.limit !== 'exempt') {
+            const turn = takeAiCall(this.config, ownerGhii);
+            if (!turn.ok) throw new AiJobError(turn.code, 429, turn.message, turn.retryAfterSec);
+        }
 
         // ── nothing above this line has written anything ──
 

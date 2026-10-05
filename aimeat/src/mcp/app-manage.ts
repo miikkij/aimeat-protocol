@@ -25,6 +25,7 @@
  * @structure registerAppManageTool
  * @usage registerAppManageTool(mcp, storage, config, agentGaii, scopes, getToken)
  * @version-history
+ *   v1.5.2 — 2026-10-05 — config_get's owner test is isSameAccount (utils/same-account.ts; secaudit 2026-10, C8).
  *   v1.5.1 — 2026-10-05 — config_get passes the reader to getAppConfig: the session's owner or the
  *     operator's agent passes an app's own gates (secaudit 2026-10, APP-6).
  *   v1.5.0 — 2026-10-02 — spec, spec_set and spec_clear go over loopback to the design-spec routes with
@@ -54,6 +55,7 @@ import { requiredScopeForAction } from './catalog/action-scopes.js';
 import { answer, refusalText, plainRefusal, type ToolAnswer } from './app-manage-answers.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { localAccountName } from '../utils/gaii.js';
+import { isSameAccount } from '../utils/same-account.js';
 import { emitChange } from '../services/event-bus.js';
 import { resolveAppTargetScope } from '../services/app-lifecycle.js';
 import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/operator-principal.js';
@@ -288,7 +290,7 @@ export function registerAppManageTool(
             case 'config_get': {
                 // The same gates as the REST read: this session's owner, or an operator, passes them.
                 const out = await getAppConfig(storage, appOwner, filename, {
-                    ownerOrOperator: localAccountName(appOwner) === localAccountName(callerOwner)
+                    ownerOrOperator: isSameAccount(appOwner, callerOwner)
                         || !!(await resolveOperatorAgentName(storage, callerGaii, scopes)),
                 });
                 return out.ok ? answer(out.view) : toolError(out.code, out.message);

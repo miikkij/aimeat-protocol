@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description `aimeat start` / `serve` runtime: asset self-heal, server listen + banner, WebSocket upgrade routing (personal tunnel / connector tunnel / realtime P2P + echat), and graceful shutdown. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.1 — 2026-10-05 — The anonymous chat connection limit counts with services/rate-buckets.ts
+ *     in place of a hand copy that never pruned its map (secaudit 2026-10, C5).
  *   v1.6.0 — 2026-10-02 — The connect tunnel upgrade reads X-AIMEAT-Run-Modes, the run modes the
  *     connector can honour, and hands them to the tunnel manager beside the install id.
  *   v1.5.0 — 2026-10-02 — Graceful shutdown flushes the scope-use record (services/scope-use.ts).
@@ -215,19 +217,12 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
     const connectMaxPayload = (config.jsonBodyLimitLargeMb + 1) * 1024 * 1024;
     const connectWss = connectTunnelManager ? new WebSocketServer({ noServer: true, maxPayload: connectMaxPayload }) : null;
 
-    // Echat anonymous connection rate limiter (10 connections per IP per minute)
-    const echatIpCounts = new Map<string, { count: number; resetAt: number }>();
-    function echatRateCheck(ip: string): boolean {
-      const now = Date.now();
-      const entry = echatIpCounts.get(ip);
-      if (!entry || now > entry.resetAt) {
-        echatIpCounts.set(ip, { count: 1, resetAt: now + 60_000 });
-        return true;
-      }
-      if (entry.count >= 10) return false;
-      entry.count++;
-      return true;
-    }
+    // Echat anonymous connection rate limiter (10 connections per IP per minute). The counting is
+    // services/rate-buckets.ts, which every limiter shares: the hand copy here never pruned its map,
+    // so each new address stayed in memory for the life of the process (secaudit 2026-10, C5).
+    const { rateBuckets } = await import('./services/rate-buckets.js');
+    const echatTake = rateBuckets(60_000);
+    const echatRateCheck = (ip: string): boolean => echatTake(`echat:${ip}`, 10).ok;
 
     const onUpgrade = async (request: IncomingMessage, socket: Duplex, head: Buffer): Promise<void> => {
       const url = new URL(request.url ?? '', `http://${request.headers.host}`);

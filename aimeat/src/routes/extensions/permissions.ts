@@ -5,6 +5,7 @@
  * @description Extension write/manage permission helpers — role/scope gates and ownership guard.
  *   Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.2 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.3.1 — 2026-10-05 — ext:write is asked with scopeIsCovered (secaudit 2026-10, C3).
  *   v1.3.0 — 2026-10-05 — The sync canManageInstalledExt and canSeeExtensionInstance are gone: routes/extensions/instances.ts asks mayManageInstalledExt, and canSeeExtensionInstanceAs takes the caller's isOperatorCaller() answer instead of reading the operator role off the session (secaudit 2026-10, C2).
  *   v1.2.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2). hasExtWritePermission and canManageExtensionAs are async and take storage; mayManageInstalledExt is the async request form. canManageInstalledExt and canSeeExtensionInstance(As) keep the sync role check for routes/extensions/instances.ts, which is outside this change.
@@ -18,7 +19,7 @@
 import type { Request } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { localAccountName } from '../../utils/gaii.js';
+import { localAccountName, isOwnerInPerson } from '../../utils/gaii.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import { isOperatorCaller, operatorOverride, type OperatorAuth } from '../../services/operator-override.js';
 
@@ -49,7 +50,7 @@ function callerOf(req: Request): ExtensionCaller | null {
  *  write permission (owner role where extInstallRole allows it, or the ext:write scope). */
 function installerMayManage(caller: ExtensionCaller, config: AimeatConfig, installedBy: string): boolean {
   if (caller.owner !== installedBy) return false;
-  if (config.extInstallRole === 'owner' && caller.roles.includes('owner') && !caller.roles.includes('agent')) return true;
+  if (config.extInstallRole === 'owner' && isOwnerInPerson(caller)) return true;
   return scopeIsCovered(caller.scopes, 'ext:write');
 }
 
@@ -61,9 +62,8 @@ export async function hasExtWritePermission(req: Request, config: AimeatConfig, 
   const auth = req.auth;
   if (!auth) return false;
   if (await isOperatorCaller(storage, auth)) return true;
-  const roles = auth.roles || [];
   const allowOwner = config.extInstallRole === 'owner';
-  if (allowOwner && roles.includes('owner') && !roles.includes('agent')) return true;
+  if (allowOwner && isOwnerInPerson(auth)) return true;
   const scopes = (auth as { scopes?: string[] }).scopes || [];
   return scopeIsCovered(scopes, 'ext:write');
 }

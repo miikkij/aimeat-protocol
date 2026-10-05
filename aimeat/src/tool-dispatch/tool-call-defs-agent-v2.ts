@@ -1,5 +1,5 @@
 /**
- * @file cli/connect/tool-call-defs-agent-v2.ts
+ * @file src/tool-dispatch/tool-call-defs-agent-v2.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The v2 AGENT-PLANE half of the shell / local-call dispatch: the message doors, the

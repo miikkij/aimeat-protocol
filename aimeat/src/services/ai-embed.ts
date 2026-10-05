@@ -14,6 +14,7 @@
  * @usage
  *   const r = await embedForOwner(storage, config, payer, { input: ['a', 'b'], appId: 'notes' });
  * @version-history
+ *   v1.4.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *   v1.3.0 — 2026-10-05 — `caller` is required: every call says who asks (secaudit 2026-10, AI-3).
  *   v1.2.0 — 2026-10-02 — Takes `lang`, so a refusal's sentence is in the person's language.
  *   v1.1.0 — 2026-09-28 — Takes `role`, the AI role the call runs as (services/ai/roles.ts).
@@ -30,6 +31,7 @@ import { callCost } from './ai/catalog/price.js';
 import type { AiCandidate } from './ai/route-plan.js';
 import type { CallerClass } from './ai/policy.js';
 import type { RequestLanguage } from './ai/ai-fix-words.js';
+import { requireAiCallTurn, type AiCallLimitMark } from './account-limits.js';
 
 /** One call's ceiling: enough for a page of notes, small enough to answer inside a request. */
 export const EMBED_LIMITS = { maxInputs: 256, maxTotalChars: 500_000 } as const;
@@ -49,6 +51,9 @@ export interface EmbedForOwnerOptions {
   /** The AI role the call runs as (services/ai/roles.ts). A named model or provider wins over it. */
   role?: string;
   signal?: AbortSignal;
+  /** 'exempt' for node-internal work; absent, the call counts against the account's AI call limit
+   *  (services/account-limits.ts). */
+  limit?: AiCallLimitMark;
 }
 
 export interface EmbedForOwnerResult {
@@ -74,6 +79,8 @@ export async function embedForOwner(
     throw new AiCompletionError('INPUT_TOO_LARGE', 400,
       `One call takes at most ${EMBED_LIMITS.maxInputs} texts and ${EMBED_LIMITS.maxTotalChars} characters; this had ${input.length} and ${total}. Split it into several calls.`);
   }
+  // POST /v1/ai/embed and aimeat_ai_embed both arrive here: one count per account, before any spend.
+  requireAiCallTurn(config, gaii, opts.limit);
 
   const plan = await prepareAiCall(storage, config, gaii, {
     op: 'embed', model: opts.model, appId: opts.appId, ...(opts.agent ? { agent: opts.agent } : {}),

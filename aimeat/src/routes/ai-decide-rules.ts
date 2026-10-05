@@ -24,6 +24,8 @@
  * @structure decideRulesRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.3.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
+ *     The rule try route has no path limiter: decideForOwner counts, as it does for aimeat_decide.
  *   v1.2.0 — 2026-09-23 — The quality numbers group by provider too (`group_by=provider`).
  *   v1.1.0 — 2026-09-20 — The five owner-only doors say what they are and what an agent's own way in
  *     is; they were answering with the sign-in gate's sentence, which named the wrong permission.
@@ -35,8 +37,8 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { assertAiUseAllowed } from '../auth/ai-gate.js';
 import { requireOwnerPrincipal, isOwnerPrincipal } from '../auth/account-security.js';
-import { rateLimit } from '../middleware/rate-limit.js';
 import { success, error } from '../middleware/envelope.js';
+import { retryAfterOf } from '../services/account-limits.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { AiCompletionError } from '../services/ai-completion.js';
 import { decideForOwner, decisionStats, ruleCallerKind, DecideError } from '../services/decide/service.js';
@@ -61,11 +63,13 @@ const OWNER_WRITES_RULES =
 
 export function decideRulesRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
-  const aiRateLimit = rateLimit(config.rateLimits.openrouter);
 
   const fail = (res: Response, e: unknown) => {
     if (e instanceof DecideError || e instanceof AiCompletionError) {
       const details = e instanceof DecideError ? e.details : undefined;
+      // The account's AI call limit (services/account-limits.ts) says when to come back.
+      const retryAfter = retryAfterOf(e);
+      if (retryAfter !== undefined) res.setHeader('Retry-After', String(retryAfter));
       return res.status(e.status).json(error(config.nodeId, e.code, e.message, e.status, details));
     }
     return res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', (e as Error).message));
@@ -143,7 +147,7 @@ export function decideRulesRouter(config: AimeatConfig, storage: Storage): Route
   });
 
   // ── POST /v1/ai/decide/rules/:id/try ── run the sample (or a state given here). A real, paid call.
-  router.post('/v1/ai/decide/rules/:id/try', requireAuth(), requireOwnerPrincipal(OWNER_WRITES_RULES), aiRateLimit, async (req: Request, res: Response) => {
+  router.post('/v1/ai/decide/rules/:id/try', requireAuth(), requireOwnerPrincipal(OWNER_WRITES_RULES), async (req: Request, res: Response) => {
     const gaii = decideOwnerOf(req.auth!, config.nodeId);
     const body = (req.body ?? {}) as Record<string, unknown>;
     try {

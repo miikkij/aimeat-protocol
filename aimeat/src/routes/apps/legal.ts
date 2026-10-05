@@ -22,6 +22,7 @@
  *   the MCP tool, both through services/app-legal.ts.
  * @structure registerLegalRoutes(router, config, storage, canonicalOwner)
  * @version-history
+ *   v1.5.1 — 2026-10-05 — The owner test is isSameAccount (utils/same-account.ts; secaudit 2026-10, C8).
  *   v1.5.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.4.0 — 2026-10-01 — Keeping the audit log (IAM round 2 leftover 7): the read names the archived
  *     years and the limit in force and reads a year with ?archive=; the owner archives entries before
@@ -62,6 +63,7 @@ import { applyServeMarks } from '../../services/app-serve-marks.js';
 import { loadServedProvenance, setProvenanceHeaders } from '../../services/ai-provenance-marks.js';
 import { appReviewedBy } from '../../services/app-marks.js';
 import { localAccountName } from '../../utils/gaii.js';
+import { isSameAccount } from '../../utils/same-account.js';
 import type { CanonicalOwner } from './helpers.js';
 import { operatorOverride } from '../../services/operator-override.js';
 
@@ -87,7 +89,7 @@ export function registerLegalRoutes(
     if (!app && bare !== owner) app = await storage.getAppByOwnerName(bare, filename);
     if (!app) return null;
     if (app.operatorHidden) {
-      const isOwner = authenticated(req) ? (await canonicalOwner(req)).owner === app.ownerName : false;
+      const isOwner = authenticated(req) ? isSameAccount((await canonicalOwner(req)).owner, app.ownerName) : false;
       // The operator reading another person's hidden app writes the operator trail.
       if (!isOwner && !(await operatorOverride(storage, config, req.auth, {
         ownerOf: app.ownerName, area: 'app', action: 'read', subject: filename,
@@ -98,7 +100,7 @@ export function registerLegalRoutes(
 
   async function isOwnerOf(req: Request, app: AppRecord): Promise<boolean> {
     if (!authenticated(req)) return false;
-    return (await canonicalOwner(req)).owner === app.ownerName;
+    return isSameAccount((await canonicalOwner(req)).owner, app.ownerName);
   }
 
   // `me` in the owner slot means the signed-in account: the connector and CLI doors carry a

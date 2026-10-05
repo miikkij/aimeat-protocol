@@ -29,10 +29,12 @@
  * @usage
  *   if (prefersHtmlPage(req)) return res.type('html').send(provenancePage(serve(row, isOwner), {...}));
  * @version-history
+ *   v1.0.1 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   v1.0.0 — 2026-08-02 — Initial. LUOTAIN finding: the label's second layer was machine-only.
  */
 import type { AiProvenance } from '../models/ai-provenance-schemas.js';
 import type { Locale } from '../i18n.js';
+import { escapeHtml } from '../utils/html-escape.js';
 
 export interface ProvenancePageOptions {
   /** The node's apex, for the links out. */
@@ -43,11 +45,7 @@ export interface ProvenancePageOptions {
   recordUrl: string;
 }
 
-function esc(s: string): string {
-  return String(s)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
+const esc = escapeHtml;
 
 /**
  * The escaped href for a caller-supplied URL, or `null` when its SCHEME is not one we will link.

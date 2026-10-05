@@ -8,7 +8,7 @@
  *   v1.0.0 — 2026-09-18 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { handbookTierPath } from '../../src/cli/connect/handbook-path.js';
+import { handbookTierPath } from '../../src/tool-dispatch/handbook-path.js';
 
 describe('handbookTierPath', () => {
   it('sends "build-app" to the first part, never to the 66 kB core or the 95 kB full text', () => {

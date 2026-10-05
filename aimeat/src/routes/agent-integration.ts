@@ -10,6 +10,7 @@
  *   - GET /v1/agents/:name/integration-kit  -- Full integration kit JSON
  *   - GET /v1/agents/:name/tasks/wait       -- Long poll for new tasks
  * @version-history
+ *   v1.1.1 -- 2026-10-05 -- The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  *   v1.1.0 -- 2026-05-23 -- Add cursor-based ?since= and ?limit= to inbox endpoint
  */
@@ -20,7 +21,7 @@ import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { refuseNotYours } from '../middleware/refusals.js';
 import { requireAuth } from '../auth/middleware.js';
-import { agentGaiiFromIdentifier } from '../utils/gaii.js';
+import { agentGaiiFromIdentifier, isOwnerInPerson } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 
 /* ── Cursor helpers for inbox pagination ── */
@@ -59,8 +60,7 @@ export function agentIntegrationRouter(config: AimeatConfig, storage: Storage): 
 
   /** Check if the caller is allowed to access this agent's data */
   function canAccessAgent(req: Express.Request, agentName: string): boolean {
-    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
-    if (isOwnerSession) return true; // Owners can access all their agents
+    if (isOwnerInPerson(req.auth)) return true; // Owners can access all their agents
     // Agent session -- must be the named agent
     const expectedGaii = resolveAgentGaii(req, agentName);
     return req.auth!.sub === expectedGaii;

@@ -29,6 +29,7 @@
  *   import { applyInstanceMigration } from '../services/package-migrate.js';
  *   const out = await applyInstanceMigration({ storage, config }, caller, { instanceId, targetVersion, actions });
  * @version-history
+ *   v1.7.1 — 2026-10-05 — The owner test is isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.7.0 — 2026-10-02 — A target version that can do more than the install was approved for needs the
  *     owner, or an agent holding packages:install-code: without it the refusal names the word and the
  *     doors file a request. A finished migration records the new approval (package-approvals.ts, T7).
@@ -63,7 +64,7 @@ import { planInstanceUpdate } from './package-update-plan.js';
 import { forkedUpdateRefusal } from './package-managed.js';
 import { packageCapabilities, widenedItems } from './package-capabilities.js';
 import { approvedItems, codeInstallRefusal, recordApproval } from './package-approvals.js';
-import { ownerBypassesScopes } from '../utils/scope-coverage.js';
+import { isOwnerInPerson } from '../utils/gaii.js';
 import { emitChange } from './event-bus.js';
 import { logger } from '../utils/logger.js';
 
@@ -547,7 +548,7 @@ export async function applyInstanceMigration(
     }
     // The install is now approved for what the new version can do: the owner, or the agent that held
     // packages:install-code (or that widened nothing).
-    await recordApproval(storage, instanceId, targetCaps, targetVersion, ownerBypassesScopes(caller) ? ownerGhii : caller.sub);
+    await recordApproval(storage, instanceId, targetCaps, targetVersion, isOwnerInPerson(caller) ? ownerGhii : caller.sub);
 
     emitChange('instances');
     if (newInstalledComponents.some(c => c.type === 'skill')) emitChange('skills');

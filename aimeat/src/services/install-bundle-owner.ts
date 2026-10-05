@@ -20,6 +20,7 @@
  *   what was made is kept in the same record an install set keeps.
  * @structure bundleInstallOf() · installSetForOwner()
  * @version-history
+ *   v1.1.1 — 2026-10-05 — The owner test is isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.1.0 — 2026-10-04 — `grantApps` passes to each package's install, whose answer the record keeps
  *     in `app_grants`; the plan names each package's apps and whether the install approves them.
  *   v1.0.0 — 2026-10-02 — Initial (package sale design, phase 4).
@@ -30,7 +31,8 @@ import { getPackageFor } from './package-read.js';
 import { installOrRequest, type PackageActCaller } from './package-install-requests.js';
 import { installPackage } from './package-install.js';
 import { checkWorkspaceManifest } from './workspace-provision.js';
-import { ownerBypassesScopes, scopeIsCovered } from '../utils/scope-coverage.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { isOwnerInPerson } from '../utils/gaii.js';
 import {
     reach, localGroupOf, installedInstanceOf, readRecord, writeRecord, appliedRecordKey,
     newAppliedRecord, createOrganisms, linkAppsToWorkspaces, type ApplyDeps, type AppliedRecord,
@@ -79,7 +81,7 @@ export async function installSetForOwner(deps: ApplyDeps, caller: PackageActCall
     for (const g of Object.keys(setConfig)) {
         if (!bundle.packages.some(p => p.groupId === g)) return { ok: false, status: 400, code: 'INVALID_INPUT', message: `config names package "${g}", which the set does not list.` };
     }
-    if (bundle.organisms.length && !ownerBypassesScopes(caller) && !scopeIsCovered(caller.scopes, 'organism:write')) {
+    if (bundle.organisms.length && !isOwnerInPerson(caller) && !scopeIsCovered(caller.scopes, 'organism:write')) {
         return { ok: false, status: 403, code: 'SCOPE_DENIED', message: 'This set makes organisms for your owner, which needs organism:write. Ask your owner to grant it, or to install the set themselves.' };
     }
 

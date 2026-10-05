@@ -222,9 +222,7 @@
 
   // src/static/sdk-libs/auth/theme.js
   function escHtml(s) {
-    const d = document.createElement("div");
-    d.textContent = s;
-    return d.innerHTML;
+    return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
   var AIMEAT_THEME_KEY = "aimeat-theme";
   function aimeatReadTheme() {

@@ -1,5 +1,5 @@
 /**
- * @file cli/connect/tool-call-defs-workflows.ts
+ * @file src/tool-dispatch/tool-call-defs-workflows.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Agent-workflow tools for the shell / local-call dispatch: save, get, run, answer a

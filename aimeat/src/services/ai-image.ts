@@ -21,6 +21,7 @@
  *   import { generateForOwner } from '../services/ai-image.js';
  *   const out = await generateForOwner(storage, config, gaii, { prompt: 'a red bicycle' });
  * @version-history
+ *   v2.5.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *   v2.4.0 — 2026-10-05 — `caller` is required: every call says who asks (secaudit 2026-10, AI-3).
  *   v2.3.0 — 2026-10-02 — Takes `lang`, so a refusal's sentence is in the person's language.
  *   v2.2.0 — 2026-09-28 — Takes `role`, the AI role the call runs as (services/ai/roles.ts).
@@ -57,6 +58,7 @@ import { contentHashOf } from './ai-provenance.js';
 import type { CallerClass } from './ai/policy.js';
 import type { RequestLanguage } from './ai/ai-fix-words.js';
 import { logger } from '../utils/logger.js';
+import { requireAiCallTurn, type AiCallLimitMark } from './account-limits.js';
 
 /**
  * Said when neither the call, the owner nor the node has named an image model. Lives in
@@ -94,6 +96,9 @@ export interface GenerateForOwnerOptions {
   fallback?: boolean;
   /** The AI role the call runs as (services/ai/roles.ts). A named model or provider wins over it. */
   role?: string;
+  /** 'exempt' for node-internal work; absent, the call counts against the account's AI call limit
+   *  (services/account-limits.ts). */
+  limit?: AiCallLimitMark;
 }
 
 export interface GenerateForOwnerResult {
@@ -157,6 +162,8 @@ export async function generateForOwner(
     throw new AiCompletionError('PROMPT_TOO_LONG', 400,
       `Prompt is ${prompt.length} characters; the limit is ${MAX_PROMPT_CHARS}.`);
   }
+  // POST /v1/ai/image and aimeat_image_generate both arrive here: one count per account, before any spend.
+  requireAiCallTurn(config, gaii, opts.limit);
 
   const plan = await prepareAiCall(storage, config, gaii, {
     op: 'image', model: opts.model, appId: opts.appId, ...(opts.agent ? { agent: opts.agent } : {}),

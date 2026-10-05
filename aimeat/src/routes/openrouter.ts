@@ -14,6 +14,8 @@
  *   - POST /v1/openrouter/test — test API key validity
  *   - POST /v1/openrouter/complete — run AI completion for generator step
  * @version-history
+ *   v1.17.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
+ *     POST /v1/openrouter/complete counts the account on the route (aiCallLimit), not per principal.
  *   v1.16.0 — 2026-10-02 — A new settings record names no model, so the node's default model applies
  *     to an owner's own key until they choose one; an explicit `model` is stored with `modelChosen`.
  *     A key-only PUT wrote 'openrouter/free', which came before the node's default: measured on a
@@ -85,7 +87,7 @@ import type { Request, Response, RequestHandler } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
-import { rateLimit } from '../middleware/rate-limit.js';
+import { aiCallLimit } from '../middleware/ai-call-limit.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { encrypt, decrypt, getEncryptionKey } from '../services/encryption.js';
@@ -190,7 +192,9 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
   const router = Router();
   const legacy = legacyAiSettingsRoute(config);
   const resolve = (req: Request) => resolveIdentity(req.auth!, config.nodeId);
-  const orRateLimit = rateLimit(config.rateLimits.openrouter);
+  // The legacy completion reaches completeForOwner, which no MCP tool calls, so the route counts the
+  // account's AI call limit itself (aiCallLimit), the one /v1/ai/complete and the MCP tools draw on.
+  const completeLimit = aiCallLimit(config);
 
   // Helper: get encryption key or return 503
   function requireEncryption(res: Response): Buffer | null {
@@ -518,7 +522,7 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
 
   // ── POST /v1/openrouter/complete ──
   router.post('/v1/openrouter/complete',
-    requireAuth(), requireRole('owner'), orRateLimit,
+    requireAuth(), requireRole('owner'), completeLimit,
     async (req: Request, res: Response) => {
       // Extend request timeout to 10 minutes for slow AI models
       req.setTimeout(1_800_000);

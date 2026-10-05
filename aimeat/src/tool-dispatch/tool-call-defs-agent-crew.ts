@@ -1,5 +1,5 @@
 /**
- * @file cli/connect/tool-call-defs-agent-crew.ts
+ * @file src/tool-dispatch/tool-call-defs-agent-crew.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The CREW half of the shell / local-call dispatch: read an agent's crew definition,

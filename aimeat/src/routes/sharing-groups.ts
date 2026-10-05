@@ -18,6 +18,8 @@
  *   - GET    /v1/shares/incoming     -- What has been shared WITH me
  *   - DELETE /v1/shares/:shareId     -- Stop sharing
  * @version-history
+ *   v1.2.1 -- 2026-10-05 -- The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
+ *     secaudit 2026-10, C4).
  *   v1.2.0 -- 2026-08-11 -- Key-space shares. A group could only ever be pointed at one record at a
  *     time (`visibility:'group'` + one `groupId` on the record), which meant a subscription had to
  *     re-share every new key and could not hand anyone a space that does not exist yet. A share is
@@ -46,7 +48,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
-import { resolveIdentity } from '../utils/gaii.js';
+import { resolveIdentity, isOwnerInPerson } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import {
   SharingGroupUpdateSchema,
@@ -80,7 +82,7 @@ export function sharingGroupsRouter(config: AimeatConfig, storage: Storage): Rou
 
   /* ── GET /v1/groups -- List own + member-of groups ── */
   router.get('/v1/groups', requireAuth(), requireScope('memory:read'), async (req, res) => {
-    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    const isOwnerSession = isOwnerInPerson(req.auth);
     const identity = resolve(req);
 
     let groups;
@@ -123,7 +125,7 @@ export function sharingGroupsRouter(config: AimeatConfig, storage: Storage): Rou
     const isMember = group.members.some(m => m.identifier === identity);
 
     // For owner sessions, also check if the bare owner matches
-    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    const isOwnerSession = isOwnerInPerson(req.auth);
     const ownerGhii = isOwnerSession ? `${req.auth!.owner}@${config.nodeId}` : null;
     const isOwnerByGhii = ownerGhii ? group.ownerGaii === ownerGhii : false;
     const isMemberByGhii = ownerGhii ? group.members.some(m => m.identifier === ownerGhii) : false;

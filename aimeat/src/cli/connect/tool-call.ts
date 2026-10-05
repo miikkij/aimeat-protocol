@@ -52,7 +52,7 @@ import { loadConfig, loadAgentByName, type AimeatConnectConfig } from './config.
 import { resolveToken } from './agent-key.js';
 import { readLiveDiscovery } from './mcp/local-discovery.js';
 import { LOOPBACK_REFUSAL } from './mcp/local-admission.js';
-import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
+import type { JsonObject, ConnectCliToolDefinition } from '../../tool-dispatch/tool-call-helpers.js';
 import { CONNECT_CLI_TOOLS } from '../../tool-dispatch/index.js';
 export { CONNECT_CLI_TOOLS } from '../../tool-dispatch/index.js';
 import { movedToolMessage } from '../../mcp/catalog/moved-tools.js';

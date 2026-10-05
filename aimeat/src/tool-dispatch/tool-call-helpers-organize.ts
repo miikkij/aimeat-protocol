@@ -1,5 +1,5 @@
 /**
- * @file cli/connect/tool-call-helpers-organize.ts
+ * @file src/tool-dispatch/tool-call-helpers-organize.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The one translation from aimeat_dm_organize_as_owner's flat parameters to the body of

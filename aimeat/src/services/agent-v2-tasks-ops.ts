@@ -24,12 +24,14 @@
  * @usage const out = await createTask(storage, config, req.auth!, req.body);
  * @version-history
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V5).
+ *   v1.0.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
+ *     secaudit 2026-10, C4).
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentV2TaskRecord, AgentV2TaskStatus } from '../storage/interface.js';
 import { V2_TASK_STATUSES } from '../storage/types/agent-v2-tasks.js';
-import { resolveIdentity } from '../utils/gaii.js';
+import { resolveIdentity, isOwnerInPerson } from '../utils/gaii.js';
 import { validateTaskInput, validateStatusInput, allowedFrom, isTerminal } from '../models/agent-v2-task.js';
 import { resolveRecipient, type Principal, type OpResult } from './agent-v2-messaging-ops.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
@@ -41,11 +43,6 @@ export const TASK_ASSIGNED_KIND = 'v2.task.assigned';
 export const TASK_UPDATED_KIND = 'v2.task.updated';
 
 const MAX_LIST_LIMIT = 200;
-
-function isOwnerSession(auth: Principal): boolean {
-  const roles = auth.roles ?? [];
-  return roles.includes('owner') && !roles.includes('agent') && !roles.includes('ecosystem');
-}
 
 /** Tell a principal something happened to a task it cares about. Never fails the operation. */
 function notify(target: string, kind: string, task: AgentV2TaskRecord): void {
@@ -180,7 +177,7 @@ export async function setTaskStatus(
   if (!task) return { ok: false, status: 404, code: 'NOT_FOUND', message: 'No such task on this account.' };
 
   const self = resolveIdentity(auth, config.nodeId);
-  if (task.assignedTo !== self && !isOwnerSession(auth)) {
+  if (task.assignedTo !== self && !isOwnerInPerson(auth)) {
     return {
       ok: false, status: 403, code: 'ACCESS_DENIED',
       message: 'A task\'s status is the assignee\'s to report. To stop work you asked for, cancel it instead.',
@@ -234,7 +231,7 @@ export async function cancelTask(
   if (!task) return { ok: false, status: 404, code: 'NOT_FOUND', message: 'No such task on this account.' };
 
   const self = resolveIdentity(auth, config.nodeId);
-  if (task.createdBy !== self && !isOwnerSession(auth)) {
+  if (task.createdBy !== self && !isOwnerInPerson(auth)) {
     return {
       ok: false, status: 403, code: 'ACCESS_DENIED',
       message: 'Cancelling belongs to whoever asked for the work. If you will not do it, report it failed with a reason.',

@@ -1,5 +1,5 @@
 /**
- * @file cli/connect/tool-call-defs-packages.ts
+ * @file src/tool-dispatch/tool-call-defs-packages.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The component-package tools for the shell / local-call dispatch: /v1/packages, its

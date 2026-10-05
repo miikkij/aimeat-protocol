@@ -27,6 +27,7 @@
  *   const refusal = await checkOrganismNamespaceAccess({ storage, config }, caller, key, 'write');
  *   if (refusal) return { ok: false, ...refusal };
  * @version-history
+ *   2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   2026-09-28 — An organism that admits only listed agents refuses the others; a listed agent of an
  *     active member acts with the member's rights (services/organism-agent-access.ts).
  *   v1.0.0 -- 2026-08-11 -- Extracted from middleware/workspace-access.ts (security audit, MCP/REST
@@ -43,6 +44,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { findWorkspaceRegistration } from './workspace-meta.js';
 import { agentBarred, agentBarredMessage, attachedAsParticipant } from './organism-agent-access.js';
+import { isOwnerInPerson } from '../utils/gaii.js';
 
 /** The session asking, in the terms this rule decides on. */
 export interface OrganismAccessCaller {
@@ -50,7 +52,7 @@ export interface OrganismAccessCaller {
     principal: string;
     /** The bare owner name behind that principal. Memberships are keyed by this, not by the GHII. */
     owner: string;
-    /** The session's roles. 'owner' without 'agent' is the human principal. */
+    /** The session's roles. isOwnerInPerson (utils/gaii.ts) reads the human principal from them. */
     roles: string[];
 }
 
@@ -125,7 +127,7 @@ export async function checkOrganismNamespaceAccess(
 
     // A human owner-role session acting as an active member is the principal — it does not consent
     // to itself. The consent layer governs AGENT access and cross-node sharing.
-    const isHumanOwnerSession = caller.roles.includes('owner') && !caller.roles.includes('agent');
+    const isHumanOwnerSession = isOwnerInPerson(caller);
 
     // An AGENT of the workspace's own creator is that creator's tool, and likewise does not consent
     // to itself. A cross-owner member's agent still needs a granted contributor role.

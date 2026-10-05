@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Agent-task completion + review routes (event, complete, fail, rate, triage, todos, events, deliverables). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.6.0 — 2026-10-04 — POST …/decline: the agent refuses the request with its reason, and the task
  *     ends as 'declined' rather than 'failed'.
  *   v1.5.0 — 2026-08-14 — /complete and /fail are now nothing but the door: the state gate, the
@@ -36,6 +37,7 @@ import { RATING_CONTEXTS_REQUIRING_GROUNDING } from '../../storage/interface.js'
 import { success, error } from '../../middleware/envelope.js';
 import { refuseNotYours } from '../../middleware/refusals.js';
 import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
+import { isOwnerInPerson } from '../../utils/gaii.js';
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
 import { completeTask, failTask, declineTask } from '../../services/agent-task-fanout.js';
@@ -203,8 +205,7 @@ export function registerTaskCompletionRoutes(
     }
 
     // Authorize: caller must share the task's owner.
-    const callerRoles = req.auth!.roles as string[];
-    const isOwnerSession = callerRoles.includes('owner') && !callerRoles.includes('agent');
+    const isOwnerSession = isOwnerInPerson(req.auth);
     const ownerGhii = `${req.auth!.owner}@${config.nodeId}`;
     if (task.ownerGaii !== ownerGhii) {
       res.status(403).json(refuseNotYours(config, { thing: 'task', action: 'open', listUrl: '/v1/agents' }));

@@ -31,6 +31,7 @@
  *   const reserved = reservedKeysInComponent(comp.type, comp.content, registeredAs);
  *   if (reserved.length > 0) return refusal;   // before the first write
  * @version-history
+ *   v1.3.1 — 2026-10-05 — The owner test is isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.3.0 — 2026-09-30 — A skill component costs memory:write, what POST /v1/skills asks; an
  *     ecosystem app is refused it as it is a memory component.
  *   v1.2.0 — 2026-09-25 — A translation component costs nothing beyond packages:write: its one record
@@ -43,7 +44,8 @@
  */
 import type { PackageComponentType } from '../storage/interface.js';
 import { isReservedServerKey } from '../utils/reserved-keys.js';
-import { scopeIsCovered, ownerBypassesScopes, WRITE_AS_OWNER_SCOPE } from '../utils/scope-coverage.js';
+import { scopeIsCovered, WRITE_AS_OWNER_SCOPE } from '../utils/scope-coverage.js';
+import { isOwnerInPerson } from '../utils/gaii.js';
 
 export interface MemoryComponentEntry { key: string; value: unknown; visibility?: string; tags?: string[] }
 
@@ -100,7 +102,7 @@ export interface ComponentWriteCaller {
  * owner-target.ts), which is an agent.
  */
 export function memoryWordsFor(caller: ComponentWriteCaller, ownerGhii: string): string[] {
-    if (ownerBypassesScopes(caller)) return [];
+    if (isOwnerInPerson(caller)) return [];
     return caller.sub === ownerGhii ? ['memory:write'] : ['memory:write', WRITE_AS_OWNER_SCOPE];
 }
 
@@ -123,7 +125,7 @@ export function memoryComponentWriteRefusal(
 ): { status: 403; code: 'SCOPE_DENIED' | 'FORBIDDEN'; message: string; missing: string[] } | null {
     const writers = components.filter(c => c.type === 'memory' || c.type === 'skill');
     const memory = writers.find(c => c.type === 'memory') ?? writers[0];
-    if (!memory || ownerBypassesScopes(caller)) return null;
+    if (!memory || isOwnerInPerson(caller)) return null;
     if (caller.roles.includes('ecosystem')) {
         return {
             status: 403, code: 'FORBIDDEN', missing: [],

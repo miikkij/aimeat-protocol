@@ -9,6 +9,7 @@
  *   - GET /v1/agents/:name/skill-bundle          -- Download ZIP bundle
  *   - GET /v1/agents/:name/skill-bundle/version   -- Version check (lightweight)
  * @version-history
+ *   v1.0.3 -- 2026-10-05 -- The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.0.0 -- 2026-05-23 -- Initial creation for Agent Integration Phase A
  *   v1.0.1 -- 2026-06-13 -- archiver v8: archiver('zip') -> new ZipArchive()
  *   v1.0.2 -- 2026-09-26 -- The agent's owner name comes from localAccountName (utils/gaii.ts), which
@@ -22,7 +23,7 @@ import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { refuseNotYours } from '../middleware/refusals.js';
 import { requireAuth } from '../auth/middleware.js';
-import { buildGAII, localAccountName } from '../utils/gaii.js';
+import { buildGAII, localAccountName, isOwnerInPerson } from '../utils/gaii.js';
 import { generateBundle } from '../services/skill-bundle/generator.js';
 import { HermesAdapter } from '../services/skill-bundle/hermes-adapter.js';
 import { GenericAdapter } from '../services/skill-bundle/generic-adapter.js';
@@ -73,8 +74,7 @@ export function agentSkillBundleRouter(config: AimeatConfig, storage: Storage): 
 
   function resolveAndAuthorize(req: Express.Request, agentName: string): string | null {
     const roles = req.auth!.roles as string[];
-    const isOwner = roles.includes('owner') && !roles.includes('agent');
-    if (isOwner) return buildGAII(agentName, req.auth!.owner as string, config.nodeId);
+    if (isOwnerInPerson(req.auth)) return buildGAII(agentName, req.auth!.owner as string, config.nodeId);
     if (roles.includes('agent')) {
       const agentGaii = buildGAII(agentName, req.auth!.owner as string, config.nodeId);
       return req.auth!.sub === agentGaii ? agentGaii : null;

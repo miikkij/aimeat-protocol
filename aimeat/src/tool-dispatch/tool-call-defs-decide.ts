@@ -1,5 +1,5 @@
 /**
- * @file cli/connect/tool-call-defs-decide.ts
+ * @file src/tool-dispatch/tool-call-defs-decide.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The decision tools for the shell / local-call dispatch (TARGET-080): ask, read, review,

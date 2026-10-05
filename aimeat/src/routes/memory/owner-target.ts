@@ -28,12 +28,14 @@
  *   const t = resolveWriteTarget(req, config, body.owner_scope === true);
  *   if ('deny' in t) { res.status(403).json(error(...t.deny)); return; }
  * @version-history
+ *   v1.0.2 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
+ *     secaudit 2026-10, C4).
  *   v1.0.1 — 2026-10-05 — hasWriteAsOwner is scopeIsCovered (secaudit 2026-10, C3).
  *   v1.0.0 — 2026-08-08 — Initial.
  */
 import type { Request } from 'express';
 import type { AimeatConfig } from '../../config.js';
-import { resolveIdentity } from '../../utils/gaii.js';
+import { resolveIdentity, isOwnerInPerson } from '../../utils/gaii.js';
 import { appMayWriteKey } from '../../utils/reserved-keys.js';
 
 /**
@@ -95,7 +97,7 @@ export function resolveWriteTarget(
 ): WriteTarget | WriteTargetDenied {
     const own = resolveIdentity(req.auth!, config.nodeId);
     const roles = req.auth!.roles ?? [];
-    const isOwnerSession = roles.includes('owner') && !roles.includes('agent') && !roles.includes('ecosystem');
+    const isOwnerSession = isOwnerInPerson(req.auth);
 
     if (!ownerScopeRequested) {
         return { gaii: own, delegatedOwnerWrite: false, reservedAllowed: false };

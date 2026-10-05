@@ -21,6 +21,7 @@
  *   import { aiRouter } from './routes/ai.js';
  *   app.use(aiRouter(config, storage));
  * @version-history
+ *   v1.x — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *   v1.x — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.x — 2026-10-03 — GET /v1/ai/usage answers `per_agent`: each agent's spend today, split by app,
  *     or by endpoint for a call that named no app (services/ai-usage-record.ts).
@@ -83,6 +84,8 @@ import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { assertAiUseAllowed } from '../auth/ai-gate.js';
 import { aiCallerOf } from './ai-policy.js';
 import { rateLimit } from '../middleware/rate-limit.js';
+import { aiCallLimit } from '../middleware/ai-call-limit.js';
+import { retryAfterOf } from '../services/account-limits.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { aiPayerOf } from '../services/agent-ai-keys.js';
@@ -119,8 +122,18 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
   const legacy = legacyAiSettingsRoute(config);
   registerVoiceRoutes(router, config, storage);
   const resolve = (req: Request) => resolveIdentity(req.auth!, config.nodeId);
-  // Reuse the openrouter rate limit bucket — same provider, same spend concerns.
+  // GET /v1/ai/available keeps the per-principal path limiter: it starts no AI call, so it does not
+  // draw on the account's AI call limit. /transcribe and /image are counted in their services
+  // (transcribeForOwner, generateForOwner), which aimeat_ai_transcribe and aimeat_image_generate
+  // share. /complete reaches completeForOwner, which no MCP tool calls and which schedules,
+  // workflows and the classifier also call, so the route counts the account (aiCallLimit).
   const aiRateLimit = rateLimit(config.rateLimits.openrouter);
+  const completeLimit = aiCallLimit(config);
+  /** The account's AI call limit (services/account-limits.ts) says when to come back. */
+  const setAiRetryAfter = (res: Response, e: unknown): void => {
+    const s = retryAfterOf(e);
+    if (s !== undefined) res.setHeader('Retry-After', String(s));
+  };
 
   const upsertMemory = (gaii: string, key: string, value: unknown, tags: string[]): Promise<void> =>
     upsertPrivateRecord(storage, gaii, key, value, tags);
@@ -140,7 +153,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
 
   // ── POST /v1/ai/complete ──
   router.post('/v1/ai/complete',
-    requireAuth(), aiRateLimit,
+    requireAuth(), completeLimit,
     async (req: Request, res: Response) => {
       if (!gateOwnerOrAiUseAgent(req, res)) return;
       req.setTimeout(1_800_000);
@@ -228,6 +241,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
         }, undefined, envelopeMeta(prov)));
       } catch (e) {
         if (e instanceof AiCompletionError) {
+          setAiRetryAfter(res, e);
           return res.status(e.status).json(error(config.nodeId, e.code, e.message, e.status, e.details));
         }
         // A file no model may read is refused before the call, and said as that, not as a provider fault.
@@ -248,7 +262,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
   // so one account cannot transcribe another's files. A key belonging to someone else answers 404
   // rather than 403: whether it exists is not information this route gives away.
   router.post('/v1/ai/transcribe',
-    requireAuth(), aiRateLimit,
+    requireAuth(),
     async (req: Request, res: Response) => {
       if (!gateOwnerOrAiUseAgent(req, res)) return;
       req.setTimeout(180_000);
@@ -338,6 +352,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
         }, undefined, envelopeMeta(prov)));
       } catch (e) {
         if (e instanceof AiCompletionError) {
+          setAiRetryAfter(res, e);
           return res.status(e.status).json(error(config.nodeId, e.code, e.message, e.status, e.details));
         }
         return res.status(502).json(error(config.nodeId, 'PROVIDER_ERROR', (e as Error).message));
@@ -353,7 +368,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
   // where the route-scope audit can read it. The in-handler gate stays because it also refuses an
   // owner-role token that is really an agent or an ecosystem app, which a scope word cannot express.
   router.post('/v1/ai/image',
-    requireAuth(), requireScope('ai:use'), aiRateLimit,
+    requireAuth(), requireScope('ai:use'),
     async (req: Request, res: Response) => {
       if (!gateOwnerOrAiUseAgent(req, res)) return;
       req.setTimeout(300_000);
@@ -410,6 +425,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
         ], envelopeMeta(prov)));
       } catch (e) {
         if (e instanceof AiCompletionError) {
+          setAiRetryAfter(res, e);
           return res.status(e.status).json(error(config.nodeId, e.code, e.message, e.status, e.details));
         }
         return res.status(502).json(error(config.nodeId, 'PROVIDER_ERROR', (e as Error).message));
