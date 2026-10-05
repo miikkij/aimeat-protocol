@@ -69,7 +69,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
-import { descriptionFor, shapeResponse, jsonContent, responseFormatSchema } from '../../../../tool-catalog/shape.js';
+import { descriptionFor, shapeResponse, jsonContent } from '../../../../tool-catalog/shape.js';
 import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
 import { carrierAttach, provenanceEchoedResult, readPayloadWithProvenance } from '../../../../tool-dispatch/ai-provenance-carry.js';
 import { agentNameSchema, pickAgent, envelopeResult, payloadResult, flagged } from './_registry.js';
@@ -79,17 +79,7 @@ import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void {
   // ── Memory ──────────────────────────────────────────────────────────
 
-  mcp.tool('aimeat_memory_read', descriptionFor('aimeat_memory_read'), {
-    agent_name: agentNameSchema,
-    key: z.string().describe('Memory entry key'),
-    // MEASURED IN PRODUCTION BEFORE THIS EXISTED. A crew's public mirror, whose whole job was to
-    // copy six agents' writes, had only ever seen its own namespace: aimeat_memory_read came back
-    // NOT_FOUND while GET /v1/memory/<key>?owner_scope=true returned 455 kB of the same record. The
-    // route had honoured the flag all along; this surface had no way to send it, and a dropped
-    // permission parameter looks exactly like a missing key, so nobody thinks to check a scope.
-    owner_scope: z.boolean().optional().describe("Also look in the OWNER's namespace and your sibling agents', not only your own. The node decides whether you may: this only asks."),
-    response_format: responseFormatSchema,
-  }, annotationsFor('aimeat_memory_read'), async ({ agent_name, key, owner_scope, response_format }) => {
+  mcp.tool('aimeat_memory_read', descriptionFor('aimeat_memory_read'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_memory_read') }, annotationsFor('aimeat_memory_read'), async ({ agent_name, key, owner_scope, response_format }) => {
     const { client } = pickAgent(registry, agent_name);
     const resp = await client.get(`/v1/memory/${encodeURIComponent(key)}${owner_scope ? '?owner_scope=true' : ''}`);
     // readPayloadWithProvenance, not `resp.data ?? resp`: this route serves the record on the
@@ -100,22 +90,14 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
 
   // The bin, on the connector's door. Both are thin proxies onto the same route the CLI dispatch
   // and the node MCP reach, so who may remove what is decided in one place.
-  mcp.tool('aimeat_memory_delete', descriptionFor('aimeat_memory_delete'), {
-    agent_name: agentNameSchema,
-    key: z.string().describe('Memory entry key to delete'),
-    owner_scope: z.boolean().optional().describe("Also reach the OWNER's namespace and your sibling agents', not only your own."),
-  }, annotationsFor('aimeat_memory_delete'), async ({ agent_name, key, owner_scope }) => {
+  mcp.tool('aimeat_memory_delete', descriptionFor('aimeat_memory_delete'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_memory_delete') }, annotationsFor('aimeat_memory_delete'), async ({ agent_name, key, owner_scope }) => {
     const { client } = pickAgent(registry, agent_name);
     const q = owner_scope ? '?owner_scope=true' : '';
     const resp = await client.delete(`/v1/memory/${encodeURIComponent(key)}${q}`);
     return flagged(jsonContent(resp), resp);
   });
 
-  mcp.tool('aimeat_memory_restore', descriptionFor('aimeat_memory_restore'), {
-    agent_name: agentNameSchema,
-    key: z.string().describe('Memory entry key to put back'),
-    owner_scope: z.boolean().optional().describe("Also reach the OWNER's namespace and your sibling agents'."),
-  }, annotationsFor('aimeat_memory_restore'), async ({ agent_name, key, owner_scope }) => {
+  mcp.tool('aimeat_memory_restore', descriptionFor('aimeat_memory_restore'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_memory_restore') }, annotationsFor('aimeat_memory_restore'), async ({ agent_name, key, owner_scope }) => {
     const { client } = pickAgent(registry, agent_name);
     // As the delete above and the node's own tool: the owner's reach, only when asked for.
     const q = owner_scope ? '?owner_scope=true' : '';
@@ -160,15 +142,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     }, resp);
   });
 
-  mcp.tool('aimeat_memory_list', descriptionFor('aimeat_memory_list'), {
-    agent_name: agentNameSchema,
-    prefix: z.string().optional().describe('Key prefix filter'),
-    visibility: z.string().optional().describe('Optional visibility filter'),
-    tags: z.array(z.string()).optional().describe('Optional tag filters'),
-    owner_scope: z.boolean().optional().describe('When true, list same-owner GHII and agent memory'),
-    limit: z.number().optional().describe('Maximum entries to return'),
-    response_format: responseFormatSchema,
-  }, annotationsFor('aimeat_memory_list'), async ({ agent_name, prefix, visibility, tags, owner_scope, limit, response_format }) => {
+  mcp.tool('aimeat_memory_list', descriptionFor('aimeat_memory_list'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_memory_list') }, annotationsFor('aimeat_memory_list'), async ({ agent_name, prefix, visibility, tags, owner_scope, limit, response_format }) => {
     const { client } = pickAgent(registry, agent_name);
     const params = new URLSearchParams();
     if (prefix) params.set('prefix', prefix);
@@ -184,14 +158,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     return flagged(jsonContent(shapeResponse('aimeat_memory_list', response_format, resp.data ?? resp)), resp);
   });
 
-  mcp.tool('aimeat_memory_search', descriptionFor('aimeat_memory_search'), {
-    agent_name: agentNameSchema,
-    query: z.string().optional().describe('Search query. Optional when `type` names a single type.'),
-    type: z.string().optional().describe('Narrow to what a record IS: a semantic type, or several separated by commas (schema:Person, aimeat:Task, or a full IRI). Matches whichever spelling the writer used.'),
-    visibility: z.string().optional().describe('Optional visibility filter'),
-    limit: z.number().optional().describe('Max hits to return (default 50, cap 200).'),
-    include_versions: z.boolean().optional().describe('Include `.version.N` history snapshots (skipped by default -- they are immutable history and the main source of bloat).'),
-  }, annotationsFor('aimeat_memory_search'), async ({ agent_name, query, type, visibility, limit, include_versions }) => {
+  mcp.tool('aimeat_memory_search', descriptionFor('aimeat_memory_search'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_memory_search') }, annotationsFor('aimeat_memory_search'), async ({ agent_name, query, type, visibility, limit, include_versions }) => {
     const { client } = pickAgent(registry, agent_name);
     // SNIPPETS, like the node MCP tool of the same name. This asked for the plain search, which
     // answers with the FULL value of every hit, so a broad query pulled whole records across the

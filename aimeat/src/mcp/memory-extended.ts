@@ -11,6 +11,7 @@
  *   import { registerMemoryExtendedTools } from './memory-extended.js';
  *   registerMemoryExtendedTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-03-21 — Initial creation: aimeat_memory_search + aimeat_memory_read_public
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
@@ -45,6 +46,7 @@ import { ownDoorRefusal } from '../utils/own-door-keys.js';
 import { presentMemories, presentMemory } from '../services/classification/present-memory.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { shareCarriesKey } from '../services/group-shares-classification.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerMemoryExtendedTools(
     mcp: McpServer,
@@ -70,13 +72,7 @@ export function registerMemoryExtendedTools(
     mcp.tool(
         'aimeat_memory_search',
         descriptionFor('aimeat_memory_search'),
-        {
-            query: z.string().optional(),
-            type: z.string().optional().describe('Narrow to what a record IS: a semantic type, or several separated by commas (schema:Person, aimeat:Task, or a full IRI). Matches whichever spelling the writer used.'),
-            visibility: z.enum(['private', 'owner', 'group', 'members', 'public']).optional(),
-            limit: z.number().optional().describe('Max hits to return (default 50).'),
-            include_versions: z.boolean().optional().describe('Include `.version.N` history snapshots (skipped by default — they are immutable history and the main source of bloat).'),
-        },
+        zodShapeFor('aimeat_memory_search'),
         annotationsFor('aimeat_memory_search'),
         async ({ query, type, visibility, limit, include_versions }) => {
             const cap = Math.max(1, Math.min(limit ?? 50, 200));

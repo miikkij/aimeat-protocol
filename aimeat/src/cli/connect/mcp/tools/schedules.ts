@@ -8,6 +8,7 @@
  *   has no dedicated REST route (it is a structured memory write), so it writes the
  *   `agents.<name>.scheduler` mirror via /v1/memory.
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.4.0 -- 2026-09-29 -- aimeat_schedule_create takes kind 'refinery' (input { prefix }), as the node MCP server does.
  *   v1.3.0 -- 2026-09-27 -- aimeat_schedule_list takes `detail` (GET /v1/schedules?detail=true) and
  *     aimeat_schedule_update takes `prompt` (PATCH /v1/schedules/:id), as the node MCP server does.
@@ -21,85 +22,40 @@
  *     update/delete/report_internal).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
+import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerSchedulesTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client, agent } = registry.resolve();
   const out = (resp: { data?: unknown; ok?: boolean }) =>
     ({ content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) });
 
-  mcp.tool('aimeat_schedule_create', descriptionFor('aimeat_schedule_create'), {
-    kind: z.enum(['ai', 'agent_task', 'extension', 'refinery']).describe('ai = server-side OpenRouter completion; agent_task = queue a task each fire; extension = run an installed extension action; refinery = one mail refinery batch (input { prefix }).'),
-    cron: z.string().describe('Cron expression, e.g. "0 7 * * *".'),
-    display_name: z.string().describe('Human-readable label.'),
-    timezone: z.string().optional().describe('IANA timezone, e.g. "Europe/Helsinki".'),
-    description: z.string().optional(),
-    purpose: z.string().optional(),
-    target_agent: z.string().optional().describe('agent_task only: target agent name (defaults to yourself).'),
-    prompt: z.string().optional().describe('ai: the instruction applied to the input memory values.'),
-    input_keys: z.array(z.string()).optional().describe('ai: owner memory keys fed in as context.'),
-    system_prompt: z.string().optional(),
-    model: z.string().optional(),
-    output_key: z.string().optional(),
-    task_title: z.string().optional().describe('agent_task: title of the task created each fire.'),
-    task_description: z.string().optional(),
-    extension_name: z.string().optional(),
-    action_id: z.string().optional(),
-    // The action's own parameters, which the route has always stored and no surface declared.
-    input: z.record(z.string(), z.unknown()).optional().describe('refinery: { prefix }. extension: the action\'s own parameters, passed on every fire.'),
-    instance_id: z.string().optional().describe('extension: run the action on one named instance rather than the default.'),
-  }, annotationsFor('aimeat_schedule_create'), async (a) => {
+  mcp.tool('aimeat_schedule_create', descriptionFor('aimeat_schedule_create'), zodShapeFor('aimeat_schedule_create'), annotationsFor('aimeat_schedule_create'), async (a) => {
     return out(await client.post('/v1/schedules', a as Record<string, unknown>));
   });
 
-  mcp.tool('aimeat_schedule_list', descriptionFor('aimeat_schedule_list'), {
-    detail: z.boolean().optional().describe('true also returns each schedule\x27s prompt, system prompt or task title, description, purpose and input.'),
-  }, annotationsFor('aimeat_schedule_list'), async ({ detail }) => {
+  mcp.tool('aimeat_schedule_list', descriptionFor('aimeat_schedule_list'), zodShapeFor('aimeat_schedule_list'), annotationsFor('aimeat_schedule_list'), async ({ detail }) => {
     return out(await client.get(detail ? '/v1/schedules?detail=true' : '/v1/schedules'));
   });
 
-  mcp.tool('aimeat_schedule_update', descriptionFor('aimeat_schedule_update'), {
-    schedule_id: z.string(),
-    enabled: z.boolean().optional().describe('false = pause, true = resume.'),
-    cron: z.string().optional(),
-    timezone: z.string().optional(),
-    display_name: z.string().optional(),
-    prompt: z.string().optional().describe('New prompt: an ai schedule\x27s instruction, or the description of the task an agent_task schedule creates. Other kinds have none.'),
-  }, annotationsFor('aimeat_schedule_update'), async ({ schedule_id, ...rest }) => {
+  mcp.tool('aimeat_schedule_update', descriptionFor('aimeat_schedule_update'), zodShapeFor('aimeat_schedule_update'), annotationsFor('aimeat_schedule_update'), async ({ schedule_id, ...rest }) => {
     return out(await client.patch(`/v1/schedules/${encodeURIComponent(schedule_id)}`, rest as Record<string, unknown>));
   });
 
-  mcp.tool('aimeat_schedule_delete', descriptionFor('aimeat_schedule_delete'), {
-    schedule_id: z.string(),
-  }, annotationsFor('aimeat_schedule_delete'), async ({ schedule_id }) => {
+  mcp.tool('aimeat_schedule_delete', descriptionFor('aimeat_schedule_delete'), zodShapeFor('aimeat_schedule_delete'), annotationsFor('aimeat_schedule_delete'), async ({ schedule_id }) => {
     return out(await client.delete(`/v1/schedules/${encodeURIComponent(schedule_id)}`));
   });
 
-  mcp.tool('aimeat_schedule_trigger', descriptionFor('aimeat_schedule_trigger'), {
-    schedule_id: z.string(),
-  }, annotationsFor('aimeat_schedule_trigger'), async ({ schedule_id }) => {
+  mcp.tool('aimeat_schedule_trigger', descriptionFor('aimeat_schedule_trigger'), zodShapeFor('aimeat_schedule_trigger'), annotationsFor('aimeat_schedule_trigger'), async ({ schedule_id }) => {
     return out(await client.post(`/v1/schedules/${encodeURIComponent(schedule_id)}/trigger`, {}));
   });
 
   // No dedicated REST route: the internal-scheduler mirror is a structured memory record under
   // `agents.<name>.scheduler` (matches the server MCP tool). Write it via /v1/memory.
-  mcp.tool('aimeat_schedule_report_internal', descriptionFor('aimeat_schedule_report_internal'), {
-    entries: z.array(z.object({
-      id: z.string().optional(),
-      name: z.string(),
-      description: z.string().optional(),
-      purpose: z.string().optional(),
-      cron: z.string().optional(),
-      timezone: z.string().optional(),
-      schedule: z.string().optional().describe('Human-readable schedule if no cron, e.g. "Every day 07:00".'),
-      status: z.enum(['active', 'paused']).optional(),
-      kind: z.string().optional(),
-    })).describe('Your full set of internal schedules (replaces the previous report).'),
-  }, annotationsFor('aimeat_schedule_report_internal'), async ({ entries }) => {
+  mcp.tool('aimeat_schedule_report_internal', descriptionFor('aimeat_schedule_report_internal'), zodShapeFor('aimeat_schedule_report_internal'), annotationsFor('aimeat_schedule_report_internal'), async ({ entries }) => {
     const key = `agents.${agent}.scheduler`;
     const value = { version: 1, updatedAt: new Date().toISOString(), entries: entries.map(e => ({ id: e.id ?? randomUUID(), ...e })) };
     const resp = await client.post('/v1/memory', { key, value, visibility: 'owner', tags: ['scheduler', 'internal'] });

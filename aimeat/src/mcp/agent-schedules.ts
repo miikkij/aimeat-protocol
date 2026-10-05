@@ -18,6 +18,7 @@
  *   import { registerAgentScheduleTools } from './agent-schedules.js';
  *   registerAgentScheduleTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.5.0 — 2026-09-29 — aimeat_schedule_create takes kind 'refinery' (input { prefix }).
  *   v1.4.0 — 2026-09-27 — aimeat_schedule_list takes `detail` (each schedule's prompt, description, purpose
  *     and input) and aimeat_schedule_update takes `prompt` (services/schedule-prompt.ts, via the update service).
@@ -38,7 +39,6 @@
  *   v1.0.0 — 2026-06-03 — Initial: agent-created recurring schedules + internal mirror
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -50,6 +50,7 @@ import { createScheduleRecord, updateScheduleRecord, deleteScheduleRecord, trigg
 import type { ScheduleWriteCaller } from '../services/schedule-write.js';
 import { writeMemoryRecord } from '../services/memory-write.js';
 import { schedulePromptOf } from '../services/schedule-prompt.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerAgentScheduleTools(
   mcp: McpServer,
@@ -82,35 +83,7 @@ export function registerAgentScheduleTools(
   mcp.tool(
     'aimeat_schedule_create',
     descriptionFor('aimeat_schedule_create'),
-    {
-      kind: z.enum(['ai', 'agent_task', 'extension', 'refinery']).describe('ai = server-side OpenRouter completion; agent_task = queue a task for this agent each fire; extension = run an installed extension action; refinery = one mail refinery batch (input { prefix }).'),
-      cron: z.string().describe('Cron expression, e.g. "0 7 * * *" for 07:00 daily.'),
-      display_name: z.string().describe('Human-readable label, e.g. "Morning news translation".'),
-      timezone: z.string().optional().describe('IANA timezone, e.g. "Europe/Helsinki" (recommended for daily schedules).'),
-      description: z.string().optional(),
-      purpose: z.string().optional().describe('Why this runs (shown in the owner UI).'),
-      target_agent: z.string().optional().describe('agent_task only: target agent name (defaults to yourself; must be same owner).'),
-      // ai
-      prompt: z.string().optional().describe('ai: the instruction applied to the input memory values.'),
-      input_keys: z.array(z.string()).optional().describe('ai: owner memory keys whose values are fed in as context.'),
-      system_prompt: z.string().optional(),
-      model: z.string().optional(),
-      output_key: z.string().optional().describe('ai: memory key to store the result (auto-generated if omitted).'),
-      // agent_task
-      task_title: z.string().optional().describe('agent_task: title of the task created each fire.'),
-      task_description: z.string().optional().describe('agent_task: the instruction for each created task.'),
-      // extension
-      extension_name: z.string().optional(),
-      action_id: z.string().optional(),
-      // The action's own parameters. POST /v1/schedules has stored these since the route was
-      // written (services/schedule-write.ts, the kind === 'extension' branch), and a manifest
-      // schedule uses the same field — but no tool surface declared it, so an owner could only ever
-      // put an action on a clock with its built-in defaults. Measured 2026-09-05: the AI Music
-      // Charts radar swept the same thirty search terms for six days and added nothing, while the
-      // same action with a wider term list found sixty-three tracks the bank had never held.
-      input: z.record(z.string(), z.unknown()).optional().describe('refinery: { prefix }. extension: the action\'s own parameters, passed on every fire.'),
-      instance_id: z.string().optional().describe('extension: run the action on one named instance rather than the default.'),
-    },
+    zodShapeFor('aimeat_schedule_create'),
     annotationsFor('aimeat_schedule_create'),
     async (a) => {
       if (!owner) return err('Could not resolve caller owner');
@@ -153,9 +126,7 @@ export function registerAgentScheduleTools(
   mcp.tool(
     'aimeat_schedule_list',
     descriptionFor('aimeat_schedule_list'),
-    {
-      detail: z.boolean().optional().describe('true also returns each schedule\x27s prompt, system prompt or task title, description, purpose and input.'),
-    },
+    zodShapeFor('aimeat_schedule_list'),
     annotationsFor('aimeat_schedule_list'),
     async ({ detail }) => {
       const all = await storage.listScheduledJobs({ ownerScope });
@@ -177,14 +148,7 @@ export function registerAgentScheduleTools(
   mcp.tool(
     'aimeat_schedule_update',
     descriptionFor('aimeat_schedule_update'),
-    {
-      schedule_id: z.string(),
-      enabled: z.boolean().optional().describe('false = pause, true = resume.'),
-      cron: z.string().optional(),
-      timezone: z.string().optional(),
-      display_name: z.string().optional(),
-      prompt: z.string().optional().describe('New prompt: an ai schedule\x27s instruction, or the description of the task an agent_task schedule creates. Other kinds have none.'),
-    },
+    zodShapeFor('aimeat_schedule_update'),
     annotationsFor('aimeat_schedule_update'),
     async (a) => {
       // Same service as PATCH /v1/schedules/:id, which means an edit here is judged the way an edit
@@ -205,7 +169,7 @@ export function registerAgentScheduleTools(
   mcp.tool(
     'aimeat_schedule_delete',
     descriptionFor('aimeat_schedule_delete'),
-    { schedule_id: z.string() },
+    zodShapeFor('aimeat_schedule_delete'),
     annotationsFor('aimeat_schedule_delete'),
     async (a) => {
       const out = await deleteScheduleRecord({ storage, config }, writeCaller, a.schedule_id);
@@ -220,7 +184,7 @@ export function registerAgentScheduleTools(
   mcp.tool(
     'aimeat_schedule_trigger',
     descriptionFor('aimeat_schedule_trigger'),
-    { schedule_id: z.string() },
+    zodShapeFor('aimeat_schedule_trigger'),
     annotationsFor('aimeat_schedule_trigger'),
     async (a) => {
       // Same service as POST /v1/schedules/:id/trigger: same manage rule, same clock, same outcome.
@@ -247,19 +211,7 @@ export function registerAgentScheduleTools(
   mcp.tool(
     'aimeat_schedule_report_internal',
     descriptionFor('aimeat_schedule_report_internal'),
-    {
-      entries: z.array(z.object({
-        id: z.string().optional(),
-        name: z.string(),
-        description: z.string().optional(),
-        purpose: z.string().optional(),
-        cron: z.string().optional(),
-        timezone: z.string().optional(),
-        schedule: z.string().optional().describe('Human-readable schedule if no cron, e.g. "Every day 07:00".'),
-        status: z.enum(['active', 'paused']).optional(),
-        kind: z.string().optional(),
-      })).describe('Your full set of internal schedules (replaces the previous report).'),
-    },
+    zodShapeFor('aimeat_schedule_report_internal'),
     annotationsFor('aimeat_schedule_report_internal'),
     async (a) => {
       const key = `agents.${selfName}.scheduler`;

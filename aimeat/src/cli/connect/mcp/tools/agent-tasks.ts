@@ -7,6 +7,7 @@
  *   mode, each tool accepts an optional `agent_name` parameter; if omitted, the
  *   registry's primary agent is used.
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   2026-10-04 — aimeat_task_decline: the agent refuses a task with its reason (POST …/decline).
  *   2026-10-02 — aimeat_agent_scope_narrow (ruling C).
  *   2026-10-02 — aimeat_task_create takes `start`, propose_todos takes `effects` per todo, and
@@ -30,22 +31,16 @@
  *     message alias) to match server MCP. REST /fail still receives the value as `message`.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { agentNameSchema, pickAgent, envelopeResult } from './_registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
-import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
 import { provenanceEchoedResult } from '../../../../tool-dispatch/ai-provenance-carry.js';
+import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry): void {
 
-  mcp.tool('aimeat_task_list', descriptionFor('aimeat_task_list'), {
-    agent_name: agentNameSchema,
-    status: z.string().optional().describe('Filter by task status'),
-    page: z.number().optional().describe('Page number (default 1)'),
-    per_page: z.number().optional().describe('Results per page (default 20, max 100)'),
-  }, annotationsFor('aimeat_task_list'), async ({ agent_name, status, page, per_page }) => {
+  mcp.tool('aimeat_task_list', descriptionFor('aimeat_task_list'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_task_list') }, annotationsFor('aimeat_task_list'), async ({ agent_name, status, page, per_page }) => {
     const { client, agent } = pickAgent(registry, agent_name);
     const enc = encodeURIComponent(agent);
     const params = new URLSearchParams();
@@ -60,21 +55,7 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
   mcp.tool(
     'aimeat_task_create',
     descriptionFor('aimeat_task_create'),
-    {
-      agent_name: agentNameSchema,
-      target_agent: z.string().describe('Name of the agent the task is FOR. Must be owned by the same owner as the calling agent. Example: "demo-crew".'),
-      title: z.string().describe('Short human-readable title for the task. Shows up in the owner\'s dashboard. Example: "Research 2026 agent orchestration trends".'),
-      description: z.string().describe('The actual prompt / instruction for the target agent. This is what its liaison / runtime will read and act on.'),
-      status: z.enum(['draft', 'queued']).optional().describe('Default "queued" (visible to the target agent immediately). Use "draft" if you want the owner to review before it goes live.'),
-      files: z.array(z.string()).max(20).optional().describe('Files the target agent needs, by REFERENCE: "<owner@node>/<storage key>" each (a bare key means a file the calling agent owns). The caller must be able to read each file itself; the target agent gets a presigned download_url from aimeat_task_get.'),
-      scope: z.array(z.object({
-        name: z.string().describe('Field name the receiving runner reads, e.g. "kind", "memory_key", "app_id".'),
-        value: z.string(),
-        type: z.enum(['text', 'url', 'memory_key', 'number', 'cron']).optional().describe('How to read the value. Defaults to "text".'),
-        description: z.string().optional(),
-      })).max(20).optional().describe('Named parameters the receiving runner DISPATCHES on, as opposed to the description, which is prose for a model. A fleet runner recognises work by a `kind` entry here and takes its pointers from the others.'),
-      start: z.enum(['automatic', 'confirm']).optional().describe("How THIS task starts: 'confirm' waits for the owner's OK, 'automatic' lets the agent go on (needs agent:write, never your own task). Omit for the agent's own setting."),
-    },
+    { agent_name: agentNameSchema, ...zodShapeFor('aimeat_task_create') },
     annotationsFor('aimeat_task_create'),
     async ({ agent_name, target_agent, title, description, status, files, scope, start }) => {
       const { client } = pickAgent(registry, agent_name);
@@ -95,27 +76,14 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
     },
   );
 
-  mcp.tool('aimeat_task_get', descriptionFor('aimeat_task_get'), {
-    agent_name: agentNameSchema,
-    task_id: z.string().describe('Task identifier'),
-  }, annotationsFor('aimeat_task_get'), async ({ agent_name, task_id }) => {
+  mcp.tool('aimeat_task_get', descriptionFor('aimeat_task_get'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_task_get') }, annotationsFor('aimeat_task_get'), async ({ agent_name, task_id }) => {
     const { client, agent } = pickAgent(registry, agent_name);
     const enc = encodeURIComponent(agent);
     const resp = await client.get(`/v1/agents/${enc}/tasks/${encodeURIComponent(task_id)}`);
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_task_propose_todos', descriptionFor('aimeat_task_propose_todos'), {
-    agent_name: agentNameSchema,
-    task_id: z.string().describe('Task identifier'),
-    todos: z.array(z.object({
-      title: z.string().describe('TODO title'),
-      description: z.string().optional().describe('TODO details'),
-      verification: z.string().optional().describe('How completion can be verified'),
-      estimate_minutes: z.number().optional().describe('Estimated work time in minutes'),
-      effects: z.array(z.enum(['spend', 'send_as_owner', 'delete'])).optional().describe("What this step does that the owner must see first; such a plan waits for the owner's OK."),
-    })).describe('Proposed TODO plan'),
-  }, annotationsFor('aimeat_task_propose_todos'), async ({ agent_name, task_id, todos }) => {
+  mcp.tool('aimeat_task_propose_todos', descriptionFor('aimeat_task_propose_todos'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_task_propose_todos') }, annotationsFor('aimeat_task_propose_todos'), async ({ agent_name, task_id, todos }) => {
     const { client, agent } = pickAgent(registry, agent_name);
     const enc = encodeURIComponent(agent);
     // Dedicated endpoint handles the queued/revision_requested state machine
@@ -135,53 +103,33 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_task_start', descriptionFor('aimeat_task_start'), {
-    agent_name: agentNameSchema,
-    task_id: z.string().describe('The waiting task to start.'),
-  }, annotationsFor('aimeat_task_start'), async ({ agent_name, task_id }) => {
+  mcp.tool('aimeat_task_start', descriptionFor('aimeat_task_start'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_task_start') }, annotationsFor('aimeat_task_start'), async ({ agent_name, task_id }) => {
     const { client, agent } = pickAgent(registry, agent_name);
     // The route reads the task by id; the name segment is the caller's own and decides nothing.
     const resp = await client.post(`/v1/agents/${encodeURIComponent(agent)}/tasks/${encodeURIComponent(task_id)}/start`, {});
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_agent_scope_narrow', descriptionFor('aimeat_agent_scope_narrow'), {
-    agent_name: agentNameSchema,
-    target_agent_name: z.string().describe('The agent holding * to narrow (same owner).'),
-  }, annotationsFor('aimeat_agent_scope_narrow'), async ({ agent_name, target_agent_name }) => {
+  mcp.tool('aimeat_agent_scope_narrow', descriptionFor('aimeat_agent_scope_narrow'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_agent_scope_narrow') }, annotationsFor('aimeat_agent_scope_narrow'), async ({ agent_name, target_agent_name }) => {
     const { client } = pickAgent(registry, agent_name);
     const resp = await client.post(`/v1/agents/${encodeURIComponent(target_agent_name)}/scope-narrowing`, {});
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_agent_task_start_set', descriptionFor('aimeat_agent_task_start_set'), {
-    agent_name: agentNameSchema,
-    target_agent_name: z.string().describe('The agent this is about (same owner, never yourself).'),
-    task_start: z.enum(['automatic', 'confirm']).nullable().describe("'automatic', 'confirm', or null to leave it to the agent's mode."),
-  }, annotationsFor('aimeat_agent_task_start_set'), async ({ agent_name, target_agent_name, task_start }) => {
+  mcp.tool('aimeat_agent_task_start_set', descriptionFor('aimeat_agent_task_start_set'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_agent_task_start_set') }, annotationsFor('aimeat_agent_task_start_set'), async ({ agent_name, target_agent_name, task_start }) => {
     const { client } = pickAgent(registry, agent_name);
     const resp = await client.patch(`/v1/agents/${encodeURIComponent(target_agent_name)}/task-start`, { task_start });
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_task_request_changes', descriptionFor('aimeat_task_request_changes'), {
-    agent_name: agentNameSchema,
-    task_id: z.string().describe('Task identifier (must be a queued task that already has proposed todos)'),
-    message: z.string().describe("Owner's free-text change request explaining how the plan should be revised"),
-  }, annotationsFor('aimeat_task_request_changes'), async ({ agent_name, task_id, message }) => {
+  mcp.tool('aimeat_task_request_changes', descriptionFor('aimeat_task_request_changes'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_task_request_changes') }, annotationsFor('aimeat_task_request_changes'), async ({ agent_name, task_id, message }) => {
     const { client, agent } = pickAgent(registry, agent_name);
     const enc = encodeURIComponent(agent);
     const resp = await client.post(`/v1/agents/${enc}/tasks/${encodeURIComponent(task_id)}/request-changes`, { message });
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_task_event', descriptionFor('aimeat_task_event'), {
-    agent_name: agentNameSchema,
-    task_id: z.string().describe('Task identifier'),
-    type: z.string().describe('Event type'),
-    message: z.string().describe('Event message'),
-    details: z.record(z.string(), z.unknown()).optional().describe('Optional event details (may include telemetry)'),
-  }, annotationsFor('aimeat_task_event'), async ({ agent_name, task_id, type, message, details }) => {
+  mcp.tool('aimeat_task_event', descriptionFor('aimeat_task_event'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_task_event') }, annotationsFor('aimeat_task_event'), async ({ agent_name, task_id, type, message, details }) => {
     const { client, agent } = pickAgent(registry, agent_name);
     const enc = encodeURIComponent(agent);
     const body: Record<string, unknown> = { type, message };
@@ -190,12 +138,7 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_task_todo', descriptionFor('aimeat_task_todo'), {
-    agent_name: agentNameSchema,
-    task_id: z.string().describe('Task identifier'),
-    todo_id: z.string().describe('TODO item identifier'),
-    status: z.string().describe('New status for the TODO item'),
-  }, annotationsFor('aimeat_task_todo'), async ({ agent_name, task_id, todo_id, status }) => {
+  mcp.tool('aimeat_task_todo', descriptionFor('aimeat_task_todo'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_task_todo') }, annotationsFor('aimeat_task_todo'), async ({ agent_name, task_id, todo_id, status }) => {
     const { client, agent } = pickAgent(registry, agent_name);
     const enc = encodeURIComponent(agent);
     const resp = await client.patch(
@@ -205,21 +148,7 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_task_complete', descriptionFor('aimeat_task_complete'), {
-    agent_name: agentNameSchema,
-    task_id: z.string().describe('Task identifier'),
-    message: z.string().optional().describe('Completion message'),
-    // MISSING HERE, PRESENT ON BOTH OTHER DOORS, AND THAT IS THE WHOLE FAILURE. The REST route reads
-    // `deliverable_key` and the server MCP tool declares it; this one did not, so zod stripped it
-    // from the call before it ever left the client. The completion then succeeded — the parameter is
-    // optional, so nothing had grounds to refuse — and the pointer to the agent's own output simply
-    // was not there afterwards. A crew spent an afternoon proving the node had lost it.
-    deliverable_key: z.string().max(256).optional().describe(
-      'The memory key, under the TARGET AGENT\'s own namespace, where the result was published. '
-      + "It is what the owner's task card links to, and a deliverable written with visibility=public "
-      + "reaches the node's activity feed when it is named here."),
-    ...aiProvenanceInputs,
-  }, annotationsFor('aimeat_task_complete'), async ({ agent_name, task_id, message, deliverable_key, ai_provenance, ai_provenance_id }) => {
+  mcp.tool('aimeat_task_complete', descriptionFor('aimeat_task_complete'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_task_complete') }, annotationsFor('aimeat_task_complete'), async ({ agent_name, task_id, message, deliverable_key, ai_provenance, ai_provenance_id }) => {
     const { client, agent } = pickAgent(registry, agent_name);
     const enc = encodeURIComponent(agent);
     const body: Record<string, unknown> = {};
@@ -230,11 +159,7 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
       { tool: 'aimeat_task_complete', declared: ai_provenance, declaredId: ai_provenance_id }, resp);
   });
 
-  mcp.tool('aimeat_task_fail', descriptionFor('aimeat_task_fail'), {
-    agent_name: agentNameSchema,
-    task_id: z.string().describe('Task identifier'),
-    reason: z.string().describe('Reason for failure'),
-  }, annotationsFor('aimeat_task_fail'), async ({ agent_name, task_id, reason }) => {
+  mcp.tool('aimeat_task_fail', descriptionFor('aimeat_task_fail'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_task_fail') }, annotationsFor('aimeat_task_fail'), async ({ agent_name, task_id, reason }) => {
     const { client, agent } = pickAgent(registry, agent_name);
     const enc = encodeURIComponent(agent);
     // REST /fail reads `message`; server MCP exposes this as `reason`.
@@ -242,11 +167,7 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_task_decline', descriptionFor('aimeat_task_decline'), {
-    agent_name: agentNameSchema,
-    task_id: z.string().describe('Task identifier'),
-    reason: z.string().describe('Why you decline the request, in a sentence the owner reads'),
-  }, annotationsFor('aimeat_task_decline'), async ({ agent_name, task_id, reason }) => {
+  mcp.tool('aimeat_task_decline', descriptionFor('aimeat_task_decline'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_task_decline') }, annotationsFor('aimeat_task_decline'), async ({ agent_name, task_id, reason }) => {
     const { client, agent } = pickAgent(registry, agent_name);
     const enc = encodeURIComponent(agent);
     const resp = await client.post(`/v1/agents/${enc}/tasks/${encodeURIComponent(task_id)}/decline`, { reason });

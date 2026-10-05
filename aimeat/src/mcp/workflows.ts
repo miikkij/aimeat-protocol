@@ -11,6 +11,7 @@
  * @usage import { registerWorkflowTools } from './workflows.js';
  *   registerWorkflowTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.7.3 — 2026-09-26 — aimeat_workflow_save's definition says an ai step's call holds its share of
  *     maxCostUsd until it answers, the share is one attempt, and a step expected to cost more than the
  *     whole cap starts alone (secaudit 2026-09, A6-11).
@@ -53,6 +54,7 @@ import {
 } from '../services/workflow/store.js';
 import { syncWorkflowTriggers } from '../services/workflow/lifecycle.js';
 import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../services/operator-confirm.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerWorkflowTools(
   mcp: McpServer,
@@ -139,9 +141,7 @@ export function registerWorkflowTools(
   mcp.tool(
     'aimeat_workflow_get',
     descriptionFor('aimeat_workflow_get'),
-    {
-      id: z.string().optional().describe('Omit to list all your workflows; pass an id for its definition + derived blueprint + recent runs.'),
-    },
+    zodShapeFor('aimeat_workflow_get'),
     annotationsFor('aimeat_workflow_get'),
     async (a) => {
       if (!a.id) {
@@ -164,12 +164,7 @@ export function registerWorkflowTools(
   mcp.tool(
     'aimeat_workflow_run',
     descriptionFor('aimeat_workflow_run'),
-    {
-      id: z.string().describe('The workflow id.'),
-      mode: z.enum(['signals-only', 'full']).describe('signals-only = evaluate every step\'s signals against existing memory (no dispatch — an instant health check); full = execute the steps live.'),
-      vars: z.record(z.string(), z.string()).optional().describe('The run\'s input, as { varName: value } over the vars the workflow declares. A workflow that takes input is a constant without this. Anything it does not declare is ignored, and a declared var left out falls back to its default.'),
-      target: z.enum(['live', 'sandbox']).optional().describe('With mode="full": "sandbox" writes every key behind a per-run prefix so a trial cannot touch what a live run produced. Default "live".'),
-    },
+    zodShapeFor('aimeat_workflow_run'),
     annotationsFor('aimeat_workflow_run'),
     async (a) => {
       const engine = getActiveWorkflowEngine();
@@ -207,7 +202,7 @@ export function registerWorkflowTools(
   mcp.tool(
     'aimeat_workflow_pending_inputs',
     descriptionFor('aimeat_workflow_pending_inputs'),
-    {},
+    zodShapeFor('aimeat_workflow_pending_inputs'),
     annotationsFor('aimeat_workflow_pending_inputs'),
     async () => {
       // The walk and the deadline arithmetic are services/workflow/lifecycle.ts. A deadline
@@ -226,13 +221,7 @@ export function registerWorkflowTools(
   mcp.tool(
     'aimeat_workflow_answer',
     descriptionFor('aimeat_workflow_answer'),
-    {
-      workflow_id: z.string().describe('The workflow id.'),
-      run_id: z.string().describe('The run id (from aimeat_workflow_pending_inputs).'),
-      step_id: z.string().describe('The waiting step id.'),
-      picks: z.array(z.string()).describe('Option ids from the pinned question (may be empty when answering with `other` alone).'),
-      other: z.string().optional().describe('Free-text answer; only when the question allows it.'),
-    },
+    zodShapeFor('aimeat_workflow_answer'),
     annotationsFor('aimeat_workflow_answer'),
     async (a) => {
       const engine = getActiveWorkflowEngine();

@@ -136,7 +136,7 @@ import { readOwnerAgentAccess, agentAccessView } from '../services/agent-refusal
 import type { ResourceChangeEvent } from './index.js';
 import { resourceEvents } from './index.js';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor, shapeResponse, jsonContent, responseFormatSchema, structuredResult } from '../tool-catalog/shape.js';
+import { descriptionFor, shapeResponse, jsonContent, structuredResult } from '../tool-catalog/shape.js';
 import { buildDiscoveryRegistry, runDiscovery, computeFacets, type DiscoveryType } from '../services/discovery/index.js';
 import { getAgentSkillLinks } from '../services/skills.js';
 import { getOwnerScopeMemory } from '../services/owner-memory.js';
@@ -390,7 +390,7 @@ export function registerCoreTools(
     // ── Tool 3: aimeat_memory_read ──
     mcp.registerTool(
         'aimeat_memory_read',
-        { description: descriptionFor('aimeat_memory_read'), inputSchema: { key: z.string(), owner_scope: flexibleBoolean.optional().describe("Also look in the OWNER's namespace and your sibling agents', not only your own. The same opt-in GET /v1/memory/:key?owner_scope=true has always had — the record was readable by policy the whole time, only this tool's lookup was namespaced."), response_format: responseFormatSchema }, outputSchema: memoryEntryOutput, annotations: annotationsFor('aimeat_memory_read') },
+        { description: descriptionFor('aimeat_memory_read'), inputSchema: zodShapeFor('aimeat_memory_read'), outputSchema: memoryEntryOutput, annotations: annotationsFor('aimeat_memory_read') },
         async ({ key, owner_scope, response_format }) => {
             // Own namespace first, so a caller that holds its own copy is unaffected by the opt-in.
             const parsedRead = parseGAII(agentGaii);
@@ -544,14 +544,7 @@ export function registerCoreTools(
     // ── Tool 5: aimeat_memory_list ──
     mcp.registerTool(
         'aimeat_memory_list',
-        { description: descriptionFor('aimeat_memory_list'), outputSchema: memoryListOutput, annotations: annotationsFor('aimeat_memory_list'), inputSchema: {
-            prefix: z.string().optional(),
-            visibility: z.string().optional(),
-            tags: z.array(z.string()).optional().describe('Optional tag filters'),
-            owner_scope: flexibleBoolean.optional().describe('When true, list same-owner GHII and agent memory'),
-            limit: z.number().int().positive().max(MEMORY_LIST_MAX_LIMIT).optional().describe(`Max entries to return (default ${MEMORY_LIST_DEFAULT_LIMIT}, hard cap ${MEMORY_LIST_MAX_LIMIT})`),
-            response_format: responseFormatSchema,
-        } },
+        { description: descriptionFor('aimeat_memory_list'), outputSchema: memoryListOutput, annotations: annotationsFor('aimeat_memory_list'), inputSchema: zodShapeFor('aimeat_memory_list') },
         async ({ prefix, visibility, tags, owner_scope, limit, response_format }) => {
             const cap = Math.min(limit ?? MEMORY_LIST_DEFAULT_LIMIT, MEMORY_LIST_MAX_LIMIT);
             let entries: Awaited<ReturnType<Storage['listMemoryMeta']>>;

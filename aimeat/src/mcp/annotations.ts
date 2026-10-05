@@ -119,17 +119,7 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_onboarding_declare_services: { title: 'Declare Agent Services', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
     // ── Memory ──
-    aimeat_memory_read: { title: 'Read Memory Entry', readOnlyHint: true },
-    aimeat_memory_list: { title: 'List Memory Entries', readOnlyHint: true },
-    aimeat_memory_search: { title: 'Search Memory', readOnlyHint: true },
     aimeat_memory_read_public: { title: 'Read Public Memory', readOnlyHint: true },
-    aimeat_memory_write: { title: 'Write Memory Entry', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    // destructiveHint TRUE even though a delete is takeable back for the grace window: the client
-    // showing this hint is asking whether to warn a person, and "it can be undone for a few days"
-    // is not the same promise as "nothing is lost". Restore is the opposite — it only ever puts
-    // something back — and repeating it changes nothing, so it is idempotent.
-    aimeat_memory_delete: { title: 'Delete Memory Entry', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
-    aimeat_memory_restore: { title: 'Restore Deleted Memory Entry', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
     // ── Skills registry ──
 
@@ -211,34 +201,8 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_agents_list: { title: 'List My Agents', readOnlyHint: true },
 
     // ── Tasks ──
-    aimeat_task_list: { title: 'List Tasks', readOnlyHint: true },
-    aimeat_task_get: { title: 'Get Task', readOnlyHint: true },
-    aimeat_task_create: { title: 'Create Task', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_task_propose_todos: { title: 'Propose Task TODOs', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_task_request_changes: { title: 'Request TODO Plan Changes', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_task_start: { title: 'Start a Waiting Task', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_agent_scope_narrow: { title: 'Narrow an Agent to What It Used', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_agent_task_start_set: { title: 'Set How an Agent\'s Tasks Start', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_task_event: { title: 'Append Task Event', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_task_todo: { title: 'Update Task TODO', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_task_complete: { title: 'Complete Task', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_task_fail: { title: 'Fail Task', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_task_decline: { title: 'Decline Task', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
     // ── Schedules (agent-created recurring jobs) ──
-    aimeat_schedule_create: { title: 'Create Schedule', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_schedule_list: { title: 'List Schedules', readOnlyHint: true },
-    aimeat_schedule_update: { title: 'Update Schedule', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_schedule_delete: { title: 'Delete Schedule', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
-    // Not idempotent: each call is another real run of the job, with whatever that job does to the
-    // world. openWorld because the job it runs may itself reach outside the node (ai, extension).
-    aimeat_schedule_trigger: { title: 'Run Schedule Now', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-    aimeat_schedule_report_internal: { title: 'Report Internal Schedules', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_workflow_save: { title: 'Save Workflow', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_workflow_get: { title: 'Get Workflow', readOnlyHint: true },
-    aimeat_workflow_run: { title: 'Run Workflow', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_workflow_pending_inputs: { title: 'List Pending Workflow Inputs', readOnlyHint: true },
-    aimeat_workflow_answer: { title: 'Answer Workflow Input', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
 
     // ── Work queue ──
 

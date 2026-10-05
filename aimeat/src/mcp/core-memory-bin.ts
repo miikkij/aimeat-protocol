@@ -14,21 +14,21 @@
  * @structure registerMemoryBinTools(mcp, deps)
  * @usage registerMemoryBinTools(mcp, { storage, config, agentGaii });
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.2 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.0.1 — 2026-09-24 — aimeat_memory_restore hands the service the agent role, as the delete
  *     does, now that restore asks the organism namespace rule too (A6-12).
  *   v1.0.0 — 2026-09-03 — Extracted from core.ts (max-file-lines), with the tools it holds.
  */
-import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { annotationsFor } from './annotations.js';
-import { flexibleBoolean } from './schema-flags.js';
 import { deleteMemoryRecord, restoreMemoryRecord } from '../services/memory-bin.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerMemoryBinTools(
   mcp: McpServer,
@@ -42,10 +42,7 @@ export function registerMemoryBinTools(
 mcp.tool(
     'aimeat_memory_delete',
     descriptionFor('aimeat_memory_delete'),
-    {
-        key: z.string().describe('Memory entry key to delete'),
-        owner_scope: flexibleBoolean.optional().describe("Also reach the OWNER's namespace and your sibling agents', not only your own."),
-    },
+    zodShapeFor('aimeat_memory_delete'),
     annotationsFor('aimeat_memory_delete'),
     async ({ key, owner_scope }) => {
         const out = await deleteMemoryRecord({ storage, config }, {
@@ -68,10 +65,7 @@ mcp.tool(
 mcp.tool(
     'aimeat_memory_restore',
     descriptionFor('aimeat_memory_restore'),
-    {
-        key: z.string().describe('Memory entry key to put back'),
-        owner_scope: flexibleBoolean.optional().describe("Also reach the OWNER's namespace and your sibling agents'."),
-    },
+    zodShapeFor('aimeat_memory_restore'),
     annotationsFor('aimeat_memory_restore'),
     async ({ key, owner_scope }) => {
         const out = await restoreMemoryRecord({ storage, config }, {
