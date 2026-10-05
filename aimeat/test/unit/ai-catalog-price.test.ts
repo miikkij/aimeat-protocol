@@ -14,7 +14,7 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { writeCatalog } from '../../src/services/ai/catalog/store.js';
 import { callCost, servesCapability } from '../../src/services/ai/catalog/price.js';
 import { canonicalModelKey, equivalentModels } from '../../src/services/ai/catalog/equivalence.js';
-import { refreshDue, parsePriceOverrides } from '../../src/services/ai/catalog/refresh.js';
+import { refreshDue, parsePriceOverrides, buildCatalog } from '../../src/services/ai/catalog/refresh.js';
 import type { CatalogMeta, CatalogModel, ModelCaps } from '../../src/services/ai/catalog/types.js';
 
 const caps = (over: Partial<ModelCaps>): ModelCaps => ({
@@ -112,6 +112,34 @@ describe('the scheduled refresh', () => {
     expect(refreshDue({ ...config, aiCatalogRefresh: 'daily' } as AimeatConfig, meta, at(1))).toBe(true);
     expect(refreshDue({ ...config, aiCatalogRefresh: 'off' } as AimeatConfig, meta, at(100))).toBe(false);
     expect(refreshDue(config, { ...meta, origin: 'seed' }, at(0))).toBe(true);
+  });
+
+  // Secaudit 2026-10, AI-5: the recorded cost is what the node key's allowance and the price ceiling
+  // count, so a source answering "free" for a paid model let the node's key pay without counting.
+  it('a source that prices a paid model at zero does not make it free; the operator\'s correction still can', async () => {
+    const { createServer } = await import('node:http');
+    const server = createServer((req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      if (req.url === '/openrouter') {
+        res.end(JSON.stringify({ data: [{ id: 'anthropic/claude-opus-5.5', name: 'Opus', architecture: { input_modalities: ['text'], output_modalities: ['text'] }, pricing: { prompt: '0', completion: '0' } }] }));
+      } else res.end('{}');
+    });
+    await new Promise<void>(ok => server.listen(0, '127.0.0.1', () => ok()));
+    const port = (server.address() as { port: number }).port;
+    const saved = process.env.AIMEAT_ALLOW_PRIVATE_EGRESS;
+    process.env.AIMEAT_ALLOW_PRIVATE_EGRESS = 'true';
+    try {
+      const sources = JSON.stringify({ openRouter: `http://127.0.0.1:${port}/openrouter`, modelsDev: `http://127.0.0.1:${port}/x`, liteLlm: `http://127.0.0.1:${port}/x` });
+      const before = [model({ type: 'openrouter', id: 'anthropic/claude-opus-5.5', sources: ['openrouter'], price: { inPerMtok: 4, outPerMtok: 20 } })];
+      const built = await buildCatalog({ ...config, aiCatalogSources: sources } as AimeatConfig, before, '2026-10-05T00:00:00.000Z');
+      const opus = built.models.find(m => m.id === 'anthropic/claude-opus-5.5');
+      expect(opus?.price).toMatchObject({ inPerMtok: 4, outPerMtok: 20 });
+      const corrected = await buildCatalog({ ...config, aiCatalogSources: sources, aiPriceOverrides: '{"openrouter:anthropic/claude-opus-5.5": {"inPerMtok": 0, "outPerMtok": 0}}' } as AimeatConfig, before, '2026-10-05T00:00:00.000Z');
+      expect(corrected.models.find(m => m.id === 'anthropic/claude-opus-5.5')?.price).toMatchObject({ inPerMtok: 0, outPerMtok: 0 });
+    } finally {
+      server.close();
+      if (saved === undefined) delete process.env.AIMEAT_ALLOW_PRIVATE_EGRESS; else process.env.AIMEAT_ALLOW_PRIVATE_EGRESS = saved;
+    }
   });
 
   it('a price correction that does not read is left out, never an error', () => {

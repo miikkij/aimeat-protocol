@@ -14,8 +14,10 @@
  *
  *   A RETIRED MODEL THE OPERATOR RECOMMENDS is told to the operators once per refresh that retires
  *   it (plan 06, section 6); the node never changes anybody's model itself.
- * @structure parsePriceOverrides · refreshDue · refreshCatalog · buildCatalog
+ * @structure parsePriceOverrides · refreshDue · refreshCatalog · keepPaidPrices · buildCatalog
  * @version-history
+ *   v1.1.0 — 2026-10-05 — keepPaidPrices: a refresh never makes a paid model free; the operator's
+ *     override still can (secaudit 2026-10, AI-5).
  *   v1.0.0 — 2026-09-28 — Initial (V4 of the System 2 plan).
  */
 import type { AimeatConfig } from '../../../config.js';
@@ -67,6 +69,26 @@ export interface BuiltCatalog {
   answered: number;
 }
 
+const paidText = (p: ModelPrice): boolean => (p.inPerMtok ?? 0) > 0 || (p.outPerMtok ?? 0) > 0;
+
+/**
+ * A model whose text price was above zero keeps that price when a refresh says it is free. The
+ * recorded cost is what the node's AI allowance and the price ceiling count, so a source that answers
+ * with a zero price (by mistake, or tampered with) would have let the node's key pay for that model
+ * without counting it (secaudit 2026-10, AI-5). The operator's own correction (AIMEAT_AI_PRICE_OVERRIDES)
+ * still sets any price, zero included.
+ */
+export function keepPaidPrices(previous: CatalogModel[], fresh: CatalogModel[], overrides: Record<string, Partial<ModelPrice>>): CatalogModel[] {
+  const before = new Map(previous.map(m => [`${m.type}:${m.id}`, m]));
+  return fresh.map(m => {
+    const ref = `${m.type}:${m.id}`;
+    const prev = before.get(ref);
+    if (!prev || !paidText(prev.price) || paidText(m.price) || overrides[ref]) return m;
+    logger.warn('[ai-catalog] a source priced a paid model at zero; the earlier price is kept', { model: ref });
+    return { ...m, price: { ...m.price, inPerMtok: prev.price.inPerMtok, outPerMtok: prev.price.outPerMtok } };
+  });
+}
+
 /**
  * Fetch every source and merge them over `previous`. A failed source's last models are carried
  * unchanged, so the retirement rules see only what the answering sources dropped.
@@ -95,7 +117,8 @@ export async function buildCatalog(config: AimeatConfig, previous: CatalogModel[
     }
   });
   const answered = names.length - failed.length;
-  let fresh = mergeSources(parts, parsePriceOverrides(config.aiPriceOverrides));
+  const overrides = parsePriceOverrides(config.aiPriceOverrides);
+  let fresh = keepPaidPrices(previous, mergeSources(parts, overrides), overrides);
   if (failed.length && answered) {
     // What only the failed sources knew stays as it was: absent from them is not absent from the world.
     const seen = new Set(fresh.map(m => `${m.type}:${m.id}`));
