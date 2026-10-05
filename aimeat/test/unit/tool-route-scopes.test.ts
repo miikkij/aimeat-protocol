@@ -16,6 +16,8 @@
  *   entry that no longer differs.
  * @usage pnpm test -- tool-route-scopes
  * @version-history
+ *   v1.1.0 — 2026-10-06 — The UNREVIEWED pairs are triaged: each tool asks its route's words, and
+ *     aimeat_skill_list carries its answer (secaudit 2026-10 follow-up, A4).
  *   v1.0.1 — 2026-10-05 — Two pairs the AI-model dispatch definitions hid behind a spread name are listed
  *     (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, C3).
@@ -127,37 +129,9 @@ const KNOWN: Record<string, string> = {
   aimeat_workspace_write: 'LOOKUP: reads the workspace to find the section before it writes.',
   aimeat_workspace_object_delete: 'LOOKUP: lists the memory keys of the object before it deletes them.',
   aimeat_offer_price_set: 'LOOKUP: reads the agent\'s offers before it sets the price.',
-  aimeat_app_tools_publish: 'UNREVIEWED: the tool asks commerce:sell; the memory write it runs on asks memory:write.',
-  aimeat_dm_send_as_owner: 'UNREVIEWED: the tool asks messages:send-as-owner; POST /v1/messages asks messages:send as well.',
-  aimeat_operator_agent_configure: 'UNREVIEWED: the tool asks agent:permissions; PATCH /v1/agents/:name/mode asks agent:write.',
-  aimeat_workspace_transfer: 'UNREVIEWED: the tool asks organism:write; the export it starts with asks organism:read.',
-  aimeat_cortex_list: 'UNREVIEWED',
-  aimeat_appdev_overview: 'UNREVIEWED',
-  aimeat_appdev_pitfall_list: 'UNREVIEWED',
-  aimeat_app_template_list: 'UNREVIEWED',
-  aimeat_app_template_get: 'UNREVIEWED',
-  aimeat_mail_send: 'UNREVIEWED: the tool asks connections:use; POST /v1/outbound/send asks outbound:send.',
-  aimeat_datapackage_publish: 'UNREVIEWED: the route asks memory:write as well as storage:write.',
-  aimeat_catalogue_directory: 'UNREVIEWED',
-  aimeat_group_list: 'UNREVIEWED',
-  aimeat_group_get: 'UNREVIEWED',
-  aimeat_instance_status: 'UNREVIEWED',
-  aimeat_organism_overview: 'UNREVIEWED',
-  aimeat_organism_export: 'UNREVIEWED',
-  aimeat_organism_search: 'UNREVIEWED',
-  aimeat_workspace_comments: 'UNREVIEWED',
-  aimeat_workspace_rows_delete: 'UNREVIEWED: the route asks organism:write as well as memory:purge.',
-  aimeat_workspace_read: 'UNREVIEWED',
-  aimeat_workspace_overview: 'UNREVIEWED',
-  aimeat_workspace_publish: 'UNREVIEWED: the tool asks memory:write; the route asks organism:write.',
-  aimeat_workspace_revert_to_draft: 'UNREVIEWED: the tool asks memory:write; the route asks organism:write.',
-  aimeat_package_publish: 'UNREVIEWED: the tool asks app:write; the route asks packages:write.',
-  aimeat_skill_list: 'UNREVIEWED',
-  aimeat_workflow_pending_inputs: 'UNREVIEWED',
-  // Visible since 2026-10-05, when the AI-model dispatch definitions wrote their names out (they had
-  // spread them from the catalog, and the pairing reads a literal name; secaudit 2026-10, M3).
-  aimeat_ai_policy_set: 'UNREVIEWED: the tool asks memory:write-reserved; the GET /v1/ai/policy it reads first asks ai:use.',
-  aimeat_ai_routing_set: 'UNREVIEWED: the tool asks memory:write-reserved; the GET /v1/ai/routing it reads first asks ai:use.',
+  // The 30 UNREVIEWED pairs were triaged on 2026-10-06 (secaudit 2026-10 follow-up, A4): 29 tools now
+  // ask the words their route asks, and this one is answered.
+  aimeat_skill_list: 'BRANCH: only view=linked calls GET /v1/agents/:name/skills/links (memory:read), and on the node\'s MCP that view asks memory:read too; the library, mine and workspace views call GET /v1/skills, which asks no word.',
 };
 
 describe('an MCP tool asks the scope words of the route it runs on', () => {

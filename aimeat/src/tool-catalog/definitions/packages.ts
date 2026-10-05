@@ -118,7 +118,8 @@ export const packagesTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Publish Package', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-        scope: 'app:write',
+        // The words POST /v1/packages asks (secaudit 2026-10 follow-up, A4).
+        scope: 'packages:write',
         input: {
             name: { type: 'string', required: true, description: 'Package name. With the author it forms the group id, e.g. "company-brain::alice".' },
             description: { type: 'string', description: 'What the package is for.' },

@@ -301,6 +301,8 @@ export const organismsWorkspacesAppsTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Search Organism Content', readOnlyHint: true },
+        // The words GET /v1/organisms/:id/search asks (secaudit 2026-10 follow-up, A4).
+        scope: 'organism:read',
         surfaces: ['appdev', 'agent', 'service'],
         input: {
             organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
@@ -334,6 +336,8 @@ export const organismsWorkspacesAppsTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List Workspace Comments', readOnlyHint: true },
+        // The words GET /v1/organisms/:id/comments asks (secaudit 2026-10 follow-up, A4).
+        scope: 'organism:read',
         surfaces: ['appdev', 'agent', 'service'],
         input: {
             organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
@@ -373,6 +377,8 @@ export const organismsWorkspacesAppsTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Read Workspace', readOnlyHint: true },
+        // The words GET /v1/organisms/:id/workspace asks (secaudit 2026-10 follow-up, A4).
+        scope: 'organism:read',
         // On `primitives`: Know things together.
         surfaces: ['appdev', 'agent', 'service', 'primitives', 'chat'],
         input: {
@@ -389,6 +395,8 @@ export const organismsWorkspacesAppsTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Organism Structure Overview', readOnlyHint: true },
+        // The words GET /v1/organisms/:id/overview asks (secaudit 2026-10 follow-up, A4).
+        scope: 'organism:read',
         surfaces: ['appdev', 'agent', 'service'],
         input: { organism_id: { type: 'string', required: true, description: 'Organism identifier.' } },
     },
@@ -398,6 +406,8 @@ export const organismsWorkspacesAppsTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Workspace Structure Overview', readOnlyHint: true },
+        // The words GET /v1/organisms/:id/workspace/overview asks (secaudit 2026-10 follow-up, A4).
+        scope: 'organism:read',
         surfaces: ['appdev', 'agent', 'service'],
         input: {
             organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
@@ -429,7 +439,8 @@ export const organismsWorkspacesAppsTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Publish Workspace Draft', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-        scope: 'memory:write',
+        // The words POST /v1/organisms/:id/publish asks (secaudit 2026-10 follow-up, A4).
+        scope: 'organism:write',
         surfaces: ['appdev', 'agent', 'service'],
         input: {
             organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
@@ -444,7 +455,8 @@ export const organismsWorkspacesAppsTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Reopen Published Record', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-        scope: 'memory:write',
+        // The words POST /v1/organisms/:id/revert asks (secaudit 2026-10 follow-up, A4).
+        scope: 'organism:write',
         surfaces: ['appdev', 'agent', 'service'],
         input: {
             organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
@@ -630,7 +642,8 @@ export const organismsWorkspacesAppsTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Export / Import Workspace', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-        scope: 'organism:write',
+        // The words GET .../workspace/export and POST .../workspace/import asks (secaudit 2026-10 follow-up, A4).
+        scope: ['organism:read', 'organism:write'],
         surfaces: ['appdev', 'agent', 'service'],
         input: {
             organism_id: { type: 'string', required: true, description: 'Organism identifier (source for export, target for import).' },
@@ -645,6 +658,8 @@ export const organismsWorkspacesAppsTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Export Organism', readOnlyHint: true },
+        // The words GET /v1/organisms/:id/export asks (secaudit 2026-10 follow-up, A4).
+        scope: 'organism:read',
         surfaces: ['appdev', 'agent', 'service'],
         input: {
             organism_id: { type: 'string', required: true, description: 'Organism to export.' },

@@ -223,7 +223,8 @@ export const commerceTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Publish App Tool Manifest', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-        scope: 'commerce:sell',
+        // commerce:sell, and the word POST /v1/memory asks, where the tool manifest is written (secaudit 2026-10 follow-up, A4).
+        scope: ['commerce:sell', 'memory:write'],
         surfaces: ['service', 'commerce'],
         input: {
             app_id: { type: 'string', required: true, description: 'The app\'s published filename (e.g. "shop.html") — the manifest key is apps.{app_id}.tools. A name without the extension ("shop") is stored under your app "shop.html" when you have one, and the answer names the filename.' },

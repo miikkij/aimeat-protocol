@@ -106,7 +106,8 @@ describe('reading a connected mailbox is its own word', () => {
             expect(scopeAllowsTool(['connections:read-through'], t)).toBe(true);
             expect(scopeAllowsTool(['*'], t)).toBe(true);
         }
-        expect(requiredScopeForTool('aimeat_mail_send')).toBe('connections:use');
+        // Sending asks outbound:send as well, the word POST /v1/outbound/send asks (secaudit 2026-10 follow-up, A4).
+        expect(requiredScopesForTool('aimeat_mail_send')).toEqual(['connections:use', 'outbound:send']);
     });
 });
 

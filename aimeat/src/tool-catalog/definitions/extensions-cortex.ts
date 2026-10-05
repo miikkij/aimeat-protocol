@@ -153,6 +153,8 @@ export const extensionsCortexTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List Cortex Extensions', readOnlyHint: true },
+        // The words GET /v1/cortex asks (secaudit 2026-10 follow-up, A4).
+        scope: 'catalogue:read',
         surfaces: ['appdev'],
         input: {
             name: { type: 'string', description: 'One cortex, in full, instead of the list.' },

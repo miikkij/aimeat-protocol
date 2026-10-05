@@ -237,7 +237,8 @@ export const discoveryWorkBoardsTools = [
         // Publishing a data package writes BYTES and a catalogue entry. storage:write is the one that
         // matters — the catalogue is a projection of what was stored, and a package with bytes and no
         // listing is a package; a listing with no bytes is not.
-        scope: 'storage:write',
+        // The words POST /v1/datapackages asks (secaudit 2026-10 follow-up, A4).
+        scope: ['storage:write', 'memory:write'],
         surfaces: ['appdev', 'agent', 'service', 'commerce'],
         input: {
             ...aiProvenanceCatalogInput,
