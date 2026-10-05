@@ -21,6 +21,8 @@
  *   import { completeForOwner, AiCompletionError } from '../services/ai-completion.js';
  *   const r = await completeForOwner(storage, config, gaii, { prompt });
  * @version-history
+ *   v3.9.1 — 2026-10-05 — The planner's node-key answer is nodeKeyStanding (ai-allowance.ts), with the
+ *     operator's mode once an allowance is spent (secaudit 2026-10, AI-1).
  *   v3.9.0 — 2026-10-02 — prepareAiCall's refusal carries `fix` for the person, `agentFix` and
  *     `settingsUrl` (ai/ai-fix-words.ts); `lang` in the options names the request's language.
  *   v3.8.0 — 2026-09-28 — Capabilities for apps and agents (System 2 plan, V5): prepareAiCall knows
@@ -152,7 +154,7 @@ import { mintProvenance } from './ai-provenance.js';
 import type { AiProvenanceRecordRow } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { resolveModelFor, type ModelRole } from './ai-model-defaults.js';
-import { debitAllowance, readAllowance, remainingOf } from './ai-allowance.js';
+import { debitAllowance, nodeKeyStanding } from './ai-allowance.js';
 import { todayKey, getTodayUsage, recordAiUsage, emptyUsage, type UsageRecord } from './ai-usage-record.js';
 import { agentCapRefusal } from './agent-ai-keys.js';
 import { withPersonFix, type RequestLanguage } from './ai/ai-fix-words.js';
@@ -443,7 +445,7 @@ async function planAiCall(
     ...(role ? { roleOrder: role.role.capabilities[capability] ?? [] } : {}),
     ...(role?.declared?.context ? { minContext: role.declared.context } : {}),
     legacyModel,
-    nodeAllowance: async () => ({ remainingUsd: remainingOf(await readAllowance(storage, config, gaii)) }),
+    nodeAllowance: () => nodeKeyStanding(storage, config, gaii),
   });
   const opRole = OP_ROLE[op];
   if (!route.candidates.length) throw refusalFor(route, op, capability, opRole ? roleModel(opRole) : textModel);

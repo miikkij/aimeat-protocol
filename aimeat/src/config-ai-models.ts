@@ -15,6 +15,8 @@
  *   import { aiModelDefaults } from './config-ai-models.js';
  *   const config = { ...aiModelDefaults(), ... };
  * @version-history
+ *   v1.5.0 — 2026-10-05 — aiNodeKeyWhenSpent, aiNodeKeyAccountDailyUsd, aiNodeKeyNodeDailyUsd: what the
+ *     node's key does once a person's allowance is spent (secaudit 2026-10, AI-1).
  *   v1.4.0 — 2026-09-28 — Capabilities for apps and agents (System 2 plan, V5): modelDefaultTts,
  *     modelDefaultEmbed and ttsVoiceDefault.
  *   v1.3.0 — 2026-09-28 — The model catalogue (System 2 plan, V4): aiCatalogRefresh, aiPriceOverrides,
@@ -30,6 +32,7 @@ import type { AiCapabilityConfig } from './config-types-ai.js';
 
 type AiModelSettings = Pick<AiCapabilityConfig,
   'openrouterInstanceKey' | 'chatFreeAllowanceUsd' | 'modelFreeFallback'
+  | 'aiNodeKeyWhenSpent' | 'aiNodeKeyAccountDailyUsd' | 'aiNodeKeyNodeDailyUsd'
   | 'modelDefaultChat' | 'modelDefaultReasoning' | 'modelDefaultExecution'
   | 'modelDefaultVision' | 'modelDefaultStt' | 'modelDefaultImage' | 'sttLanguageDefault'
   | 'modelDefaultTts' | 'modelDefaultEmbed' | 'ttsVoiceDefault'
@@ -37,12 +40,21 @@ type AiModelSettings = Pick<AiCapabilityConfig,
   | 'aiProviderTypes' | 'aiFixedBaseUrlOverrides' | 'aiLegacySettingsRoutes'
   | 'aiCatalogRefresh' | 'aiPriceOverrides' | 'aiCatalogSources'>;
 
+/** A non-negative amount from the environment, or `fallback` when it is missing or not a number. */
+function nonNegative(raw: string | undefined, fallback: number): number {
+  const n = raw === undefined || raw.trim() === '' ? NaN : Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+
 /** The node's AI key and model defaults, from the environment. */
 export function aiModelDefaults(): AiModelSettings {
   return {
     openrouterInstanceKey: process.env.AIMEAT_OPENROUTER_INSTANCE_KEY ?? '',
     chatFreeAllowanceUsd: parseFloat(process.env.AIMEAT_CHAT_FREE_ALLOWANCE_USD ?? '0') || 0,
     modelFreeFallback: process.env.AIMEAT_MODEL_FREE_FALLBACK ?? 'openrouter/free',
+    aiNodeKeyWhenSpent: process.env.AIMEAT_AI_NODE_KEY_WHEN_SPENT === 'limits' ? 'limits' : 'refuse',
+    aiNodeKeyAccountDailyUsd: nonNegative(process.env.AIMEAT_AI_NODE_KEY_ACCOUNT_DAILY_USD, 1),
+    aiNodeKeyNodeDailyUsd: nonNegative(process.env.AIMEAT_AI_NODE_KEY_NODE_DAILY_USD, 10),
     modelDefaultChat: process.env.AIMEAT_MODEL_DEFAULT_CHAT ?? '',
     modelDefaultReasoning: process.env.AIMEAT_MODEL_DEFAULT_REASONING ?? '',
     modelDefaultExecution: process.env.AIMEAT_MODEL_DEFAULT_EXECUTION ?? '',

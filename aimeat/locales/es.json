@@ -8893,6 +8893,9 @@
     "cfg_tasks_archive_after_hours": "Archivar después de",
     "cfg_ai_instance_key": "Clave OpenRouter del servidor",
     "cfg_ai_free_allowance_usd": "Crédito inicial gratuito",
+    "cfg_ai_node_key_when_spent": "Cuando se agota el saldo de IA",
+    "cfg_ai_node_key_account_daily_usd": "Límite diario por cuenta",
+    "cfg_ai_node_key_node_daily_usd": "Límite diario para todas las cuentas",
     "cfg_ai_model_free_fallback": "Modelo tras agotar el crédito",
     "cfg_ai_model_default_chat": "Modelo de chat predeterminado",
     "cfg_ai_model_default_reasoning": "Modelo de razonamiento predeterminado",
@@ -9203,6 +9206,9 @@
     "cfgDesc_tasks_archive_after_hours": "Horas que una tarea completada queda en Recientes antes de archivarse.",
     "cfgDesc_ai_instance_key": "La clave OpenRouter propia del servidor, que gasta quien no ha traído la suya (medida por persona con el crédito de abajo).",
     "cfgDesc_ai_free_allowance_usd": "Crédito inicial gratuito en USD sobre la clave del servidor, concedido UNA vez por persona y nunca renovado. 0 no concede nada.",
+    "cfgDesc_ai_node_key_when_spent": "Qué hace la clave del servidor cuando se agota el saldo de IA de una persona: refuse (ya no paga nada, pida la llamada el modelo que pida) o limits (sigue pagando hasta los dos límites diarios).",
+    "cfgDesc_ai_node_key_account_daily_usd": "Con limits: lo máximo que las llamadas de una cuenta pueden costar a la clave del servidor en un día (UTC), en dólares.",
+    "cfgDesc_ai_node_key_node_daily_usd": "Con limits: lo máximo que las llamadas de todas las cuentas juntas pueden costar a la clave del servidor en un día (UTC), en dólares.",
     "cfgDesc_ai_model_free_fallback": "Modelo usado cuando una persona en la clave del servidor agotó su crédito. Vacío rechaza en vez de degradar.",
     "cfgDesc_ai_model_default_chat": "Modelo de chat por defecto cuando el propietario no ha elegido uno.",
     "cfgDesc_ai_model_default_reasoning": "Modelo de razonamiento por defecto cuando el propietario no ha elegido uno.",
@@ -21635,6 +21641,36 @@
           "ex2": "El nombre de un modelo: todos en este servidor reciben incrustaciones, y las paga la clave del servidor.",
           "ex3": "Otro modelo más adelante: la búsqueda encuentra las entradas nuevas, pero las antiguas coinciden mal.",
           "tip": "Elige el modelo una vez y mantenlo. Un cambio divide las entradas guardadas en dos grupos que la búsqueda no puede comparar."
+        },
+        "node_key_when_spent": {
+          "title": "Cuando se agota el saldo de IA",
+          "short": "Qué hace la clave del servidor cuando una persona agota su saldo de IA: rechaza las llamadas o sigue pagando hasta los límites diarios.",
+          "what": "La clave del servidor paga las llamadas de IA de las personas que no tienen clave propia. Cada persona recibe un saldo de IA, y la clave del servidor paga hasta que ese saldo se agota. Este ajuste dice qué pasa después. Con refuse, la clave del servidor ya no paga nada. Una llamada que no nombra ningún modelo sigue recibiendo el modelo gratuito, si la restricción de modelos de la persona lo permite. Con limits, la clave del servidor sigue pagando, pero solo hasta dos límites diarios: uno para cada cuenta y otro para todas las cuentas juntas. El día es un día UTC.",
+          "range": "refuse o limits. El valor por defecto es refuse.",
+          "ex1": "refuse (por defecto): quien agota su saldo pone una clave propia o recibe más saldo.",
+          "ex2": "limits, con 1 USD por cuenta y 10 USD para todas: cada persona puede usar cerca de 1 USD más de la clave del servidor cada día, y el servidor paga como máximo 10 USD al día.",
+          "ex3": "limits, con 0 USD por cuenta: lo mismo que refuse.",
+          "tip": "Elige limits solo si estás dispuesto a pagar por las personas de este servidor. Quien pone una clave propia paga sus propias llamadas."
+        },
+        "node_key_account_daily_usd": {
+          "title": "Límite diario por cuenta",
+          "short": "Con limits: lo máximo que las llamadas de una cuenta pueden costar a la clave del servidor en un día.",
+          "what": "Este límite solo cuenta cuando Cuando se agota el saldo de IA vale limits. Es lo máximo que las llamadas de una cuenta pueden costar a la clave del servidor en un día UTC, en dólares. Los agentes y las apps de la cuenta cuentan para el mismo límite. Las llamadas que se hacen a la vez pueden pasarse del límite en lo que cuestan. Entonces se rechaza la llamada siguiente.",
+          "range": "De 0 a 1000 USD. El valor por defecto es 1.",
+          "ex1": "1 (por defecto): unos 1 USD de llamadas por cuenta y día después de agotar el saldo.",
+          "ex2": "0: ninguna llamada después de agotar el saldo, lo mismo que refuse.",
+          "ex3": "5: quien usa mucho la IA puede trabajar todo el día con la clave del servidor.",
+          "tip": "Mantén bajo este límite, y el de todas las cuentas lo bastante alto para el número de personas del servidor."
+        },
+        "node_key_node_daily_usd": {
+          "title": "Límite diario para todas las cuentas",
+          "short": "Con limits: lo máximo que las llamadas de todas las cuentas juntas pueden costar a la clave del servidor en un día.",
+          "what": "Este límite solo cuenta cuando Cuando se agota el saldo de IA vale limits. Es lo máximo que las llamadas de todas las cuentas juntas pueden costar a la clave del servidor en un día UTC, en dólares, una vez agotados sus saldos. Cuando se alcanza, la clave del servidor rechaza todas esas llamadas hasta el día siguiente. Es lo máximo que el servidor paga en un día por las personas que ya agotaron su saldo.",
+          "range": "De 0 a 100000 USD. El valor por defecto es 10.",
+          "ex1": "10 (por defecto): el servidor paga como máximo 10 USD al día además de los saldos.",
+          "ex2": "0: ninguna llamada después de agotar el saldo, lo mismo que refuse.",
+          "ex3": "100: margen para muchas personas que agotan cada una su límite diario por cuenta.",
+          "tip": "Pon aquí lo máximo que estás dispuesto a pagar en un día."
         }
       },
       "federation_sync": {

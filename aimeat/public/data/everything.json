@@ -1480,10 +1480,10 @@
      "slug": "g-9-ai-completions-for-apps-and-agents",
      "cells": [
       "<strong>AI completions for apps and agents</strong>",
-      "Anyone with <code>ai:use</code> gets completions on the owner's providers, under a daily USD budget, a per-app quota and a provider allowlist. A call may carry pictures, and files or PDFs that the model reads itself. Repeat clicks on a paid button collapse into one call.",
-      "<code>POST /v1/ai/complete</code>, <code>POST /v1/ai/stream</code>, <code>/v1/ai/usage</code>"
+      "Anyone with <code>ai:use</code> gets completions on the owner's providers, under a daily USD budget, a per-app quota and a provider allowlist. A call may carry pictures, and files or PDFs that the model reads itself. Repeat clicks on a paid button collapse into one call. On the node's own key, each person spends an AI allowance; once it is used up, the operator decides what the key does: it pays for nothing more (the default), or it keeps paying up to a daily cap per account and a daily cap for all accounts.",
+      "<code>POST /v1/ai/complete</code>, <code>POST /v1/ai/stream</code>, <code>/v1/ai/usage</code>, <code>AIMEAT_AI_NODE_KEY_WHEN_SPENT</code>, <code>AIMEAT_AI_NODE_KEY_ACCOUNT_DAILY_USD</code>, <code>AIMEAT_AI_NODE_KEY_NODE_DAILY_USD</code>"
      ],
-     "plain": "AI completions for apps and agents Anyone with ai:use gets completions on the owner's providers, under a daily USD budget, a per-app quota and a provider allowlist. A call may carry pictures, and files or PDFs that the model reads itself. Repeat clicks on a paid button collapse into one call. POST /v1/ai/complete, POST /v1/ai/stream, /v1/ai/usage"
+     "plain": "AI completions for apps and agents Anyone with ai:use gets completions on the owner's providers, under a daily USD budget, a per-app quota and a provider allowlist. A call may carry pictures, and files or PDFs that the model reads itself. Repeat clicks on a paid button collapse into one call. On the node's own key, each person spends an AI allowance; once it is used up, the operator decides what the key does: it pays for nothing more (the default), or it keeps paying up to a daily cap per account and a daily cap for all accounts. POST /v1/ai/complete, POST /v1/ai/stream, /v1/ai/usage, AIMEAT_AI_NODE_KEY_WHEN_SPENT, AIMEAT_AI_NODE_KEY_ACCOUNT_DAILY_USD, AIMEAT_AI_NODE_KEY_NODE_DAILY_USD"
     },
     {
      "slug": "g-9-ai-capabilities",
