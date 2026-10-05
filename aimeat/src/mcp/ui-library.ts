@@ -12,11 +12,11 @@
  * @structure registerUiLibraryTools(mcp, storage, config)
  * @usage registerUiLibraryTools(mcp, storage, config);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.1.0 — 2026-09-24 — aimeat_ui_component_get names the themes that carry CSS for the part.
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 1).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
@@ -24,6 +24,7 @@ import { getUiComponent, listUiComponents } from '../services/ui-library/catalog
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { ThemeService } from '../services/themes/service.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 const out = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
 
@@ -32,11 +33,7 @@ export function registerUiLibraryTools(mcp: McpServer, storage: Storage, config:
     mcp.tool(
         'aimeat_ui_component_list',
         descriptionFor('aimeat_ui_component_list'),
-        {
-            kind: z.enum(['component', 'shape']).optional().describe("'component' or 'shape'."),
-            status: z.enum(['active', 'unused']).optional().describe("'active' or 'unused'."),
-            q: z.string().max(200).optional().describe('Words to find; every word must match.'),
-        },
+        zodShapeFor('aimeat_ui_component_list'),
         annotationsFor('aimeat_ui_component_list'),
         async ({ kind, status, q }) => {
             const components = listUiComponents({ kind, status, q });
@@ -47,9 +44,7 @@ export function registerUiLibraryTools(mcp: McpServer, storage: Storage, config:
     mcp.tool(
         'aimeat_ui_component_get',
         descriptionFor('aimeat_ui_component_get'),
-        {
-            id: z.string().min(1).max(80).describe("The component's id or name, from aimeat_ui_component_list."),
-        },
+        zodShapeFor('aimeat_ui_component_get'),
         annotationsFor('aimeat_ui_component_get'),
         async ({ id }) => {
             const entry = getUiComponent(id);
