@@ -349,21 +349,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
 
     // Writes keys the server itself trusts (openrouter.*, ai-usage.*, profile.*).
     aimeat_operator_ai_config:                'memory:write-reserved',
-    // Which models every AI call of the owner may use: a rule the owner set over their own apps and agents.
-    aimeat_ai_policy_set:                     'memory:write-reserved',
-    // Which provider answers first and whether a fallback may leave this machine: the owner's rule.
-    aimeat_ai_routing_set:                    'memory:write-reserved',
-    // Reading the providers shows no key; a test spends like a call.
-    aimeat_ai_providers:                      'ai:use',
-    aimeat_ai_provider_test:                  'ai:use',
-    // What the caller can do, the catalogue, and two calls that spend like any other.
-    aimeat_ai_capabilities:                   'ai:use',
-    aimeat_ai_models:                         'ai:use',
-    aimeat_ai_transcribe:                     'ai:use',
-    aimeat_ai_embed:                          'ai:use',
-    // The roles show no key; changing one or binding an app's role is the owner's rule, as the routing is.
-    aimeat_ai_roles:                          'ai:use',
-    aimeat_ai_role_set:                       'memory:write-reserved',
 
     // Changes WHO ELSE can read the owner's knowledge. A different promise than changing
     // the knowledge, which is why it is not organism:write.

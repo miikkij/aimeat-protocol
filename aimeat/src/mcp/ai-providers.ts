@@ -17,11 +17,11 @@
  *   change to the roles or a binding of an app's role is a proposal the owner confirms, as the routing is.
  * @structure registerAiProviderTools(mcp, storage, config, getAgentGaii)
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.1.0 — 2026-09-28 — aimeat_ai_roles and aimeat_ai_role_set (AI roles).
  *   v1.0.0 — 2026-09-28 — Initial (System 2 plan, V3).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -36,6 +36,7 @@ import { setRoles } from '../services/ai/roles.js';
 import { aiRolesView, knownRoleProviders } from '../services/ai/roles-view.js';
 import type { AiCapability } from '../services/ai/types.js';
 import { aiCallerOfPrincipal } from '../services/ai/caller-context.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerAiProviderTools(
   mcp: McpServer,
@@ -49,7 +50,7 @@ export function registerAiProviderTools(
     throw e;
   };
 
-  mcp.tool('aimeat_ai_providers', descriptionFor('aimeat_ai_providers'), {}, annotationsFor('aimeat_ai_providers'), async () => {
+  mcp.tool('aimeat_ai_providers', descriptionFor('aimeat_ai_providers'), zodShapeFor('aimeat_ai_providers'), annotationsFor('aimeat_ai_providers'), async () => {
     const { payer, agent } = aiPayerOf(getAgentGaii());
     try { return text(await aiProvidersView(storage, config, payer, agent)); } catch (e) { return refusal(e); }
   });
@@ -57,11 +58,7 @@ export function registerAiProviderTools(
   mcp.tool(
     'aimeat_ai_provider_test',
     descriptionFor('aimeat_ai_provider_test'),
-    {
-      provider: z.string().describe('The provider id, from aimeat_ai_providers.'),
-      capability: z.string().optional().describe('text | vision | files | transcription | speech | embed | image. Default text.'),
-      accept_cost: z.boolean().optional().describe('Required true for an image test, which the provider charges for.'),
-    },
+    zodShapeFor('aimeat_ai_provider_test'),
     annotationsFor('aimeat_ai_provider_test'),
     async ({ provider, capability, accept_cost }) => {
       const { payer, agent } = aiPayerOf(getAgentGaii());
@@ -77,10 +74,7 @@ export function registerAiProviderTools(
   mcp.tool(
     'aimeat_ai_routing_set',
     descriptionFor('aimeat_ai_routing_set'),
-    {
-      routing: z.record(z.string(), z.unknown()).optional().describe('{ defaults?: {capability: [provider ids]}, rules?: {...}, agent?: name }. Omit to read.'),
-      confirm_token: z.string().optional().describe('Token from the propose step; omit to propose.'),
-    },
+    zodShapeFor('aimeat_ai_routing_set'),
     annotationsFor('aimeat_ai_routing_set'),
     async ({ routing, confirm_token }) => {
       const principal = getAgentGaii();
@@ -98,7 +92,7 @@ export function registerAiProviderTools(
   );
 
   // ── AI roles (services/ai/roles.ts): the functions GET and PUT /v1/ai/roles call ──
-  mcp.tool('aimeat_ai_roles', descriptionFor('aimeat_ai_roles'), {}, annotationsFor('aimeat_ai_roles'), async () => {
+  mcp.tool('aimeat_ai_roles', descriptionFor('aimeat_ai_roles'), zodShapeFor('aimeat_ai_roles'), annotationsFor('aimeat_ai_roles'), async () => {
     const { payer } = aiPayerOf(getAgentGaii());
     try { return text(await aiRolesView(storage, config, payer)); } catch (e) { return refusal(e); }
   });
@@ -106,11 +100,7 @@ export function registerAiProviderTools(
   mcp.tool(
     'aimeat_ai_role_set',
     descriptionFor('aimeat_ai_role_set'),
-    {
-      roles: z.record(z.string(), z.unknown()).optional().describe('{ "<role id>": { title, purpose?, capabilities: {capability: [{provider, model?}]}, local?, maxCostPerCallUsd? } or null }.'),
-      bindings: z.record(z.string(), z.unknown()).optional().describe('{ "<owner>/<file>.html#<role name>": "<your role id>" or null }.'),
-      confirm_token: z.string().optional().describe('Token from the propose step; omit to propose.'),
-    },
+    zodShapeFor('aimeat_ai_role_set'),
     annotationsFor('aimeat_ai_role_set'),
     async ({ roles, bindings, confirm_token }) => {
       // Over MCP a change is a proposal first, whoever is connected, as for the routing above.

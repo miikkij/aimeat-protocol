@@ -11,6 +11,7 @@
  *   storage and the call is paid by the owner, in the agent's name, as the REST route does.
  * @structure registerAiCapabilityTools(mcp, storage, config, getAgentGaii)
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.3.0 — 2026-09-30 — aimeat_ai_transcribe answers `classification_warnings` when the audio is
  *     warning-classified, as POST /v1/ai/transcribe does (TARGET-082 review, item 2); audio no model
  *     may read answers `CLASSIFIED: …` rather than a thrown error.
@@ -19,7 +20,6 @@
  *   v1.0.0 — 2026-09-28 — Initial (System 2 plan, V5).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -34,7 +34,7 @@ import { embedForOwner } from '../services/ai-embed.js';
 import { readCallerAudio } from '../services/ai/call-files.js';
 import { readerForAgent, warningsNote } from '../services/classification/reader.js';
 import { ClassificationError } from '../services/classification/labels.js';
-import { AI_ROLE_PARAM } from '../tool-catalog/definitions/ai-models.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerAiCapabilityTools(
   mcp: McpServer,
@@ -53,9 +53,7 @@ export function registerAiCapabilityTools(
     return { payer, ...(agent ? { agent } : {}), caller: (agent ? 'agent' : 'owner') as 'agent' | 'owner' };
   };
 
-  mcp.tool('aimeat_ai_capabilities', descriptionFor('aimeat_ai_capabilities'), {
-    app_id: z.string().optional().describe('The app you act for, when you do: its own model list and preferences count.'),
-  }, annotationsFor('aimeat_ai_capabilities'), async ({ app_id }) => {
+  mcp.tool('aimeat_ai_capabilities', descriptionFor('aimeat_ai_capabilities'), zodShapeFor('aimeat_ai_capabilities'), annotationsFor('aimeat_ai_capabilities'), async ({ app_id }) => {
     const w = who();
     try {
       return text(await aiCapabilitiesView(storage, config, w.payer, {
@@ -64,12 +62,7 @@ export function registerAiCapabilityTools(
     } catch (e) { return refusal(e); }
   });
 
-  mcp.tool('aimeat_ai_models', descriptionFor('aimeat_ai_models'), {
-    capability: z.string().optional().describe('text | vision | files | image | speech | transcription | embed.'),
-    type: z.string().optional().describe('openrouter | openai | anthropic | xai | mistral | deepseek.'),
-    status: z.string().optional().describe('Comma-separated: active, retiring, retired; or all. Default active,retiring.'),
-    allowed: z.boolean().optional().describe('true: only the models you can use now.'),
-  }, annotationsFor('aimeat_ai_models'), async ({ capability, type, status, allowed }) => {
+  mcp.tool('aimeat_ai_models', descriptionFor('aimeat_ai_models'), zodShapeFor('aimeat_ai_models'), annotationsFor('aimeat_ai_models'), async ({ capability, type, status, allowed }) => {
     try {
       return text(await queryModels(storage, config, who(), {
         ...(capability ? { capability } : {}), ...(type ? { type } : {}), ...(status ? { status } : {}), allowed: allowed === true,
@@ -77,15 +70,7 @@ export function registerAiCapabilityTools(
     } catch (e) { return refusal(e); }
   });
 
-  mcp.tool('aimeat_ai_transcribe', descriptionFor('aimeat_ai_transcribe'), {
-    storage_key: z.string().describe('The audio file\'s key in your storage.'),
-    filename: z.string().optional().describe('The file name the provider sees; its extension names the format. Defaults to the key\'s last part.'),
-    language: z.string().optional().describe('ISO-639-1 hint (fi, en). Omit to let the model detect it.'),
-    model: z.string().optional().describe('A model reference; omit to let the owner\'s providers choose.'),
-    provider: z.string().optional().describe('A provider id or type to use, with no fallback.'),
-    app_id: z.string().optional().describe('The app this is for, so its spend is attributed.'),
-    role: z.string().min(1).max(300).optional().describe(AI_ROLE_PARAM),
-  }, annotationsFor('aimeat_ai_transcribe'), async ({ storage_key, filename, language, model, provider, app_id, role }) => {
+  mcp.tool('aimeat_ai_transcribe', descriptionFor('aimeat_ai_transcribe'), zodShapeFor('aimeat_ai_transcribe'), annotationsFor('aimeat_ai_transcribe'), async ({ storage_key, filename, language, model, provider, app_id, role }) => {
     const w = who();
     try {
       // The caller's own storage, never another namespace: the lookup /v1/ai/transcribe makes.
@@ -106,13 +91,7 @@ export function registerAiCapabilityTools(
     } catch (e) { return refusal(e); }
   });
 
-  mcp.tool('aimeat_ai_embed', descriptionFor('aimeat_ai_embed'), {
-    input: z.array(z.string()).min(1).describe('The texts, one vector each.'),
-    model: z.string().optional().describe('A model reference; omit to let the owner\'s providers choose.'),
-    provider: z.string().optional().describe('A provider id or type to use, with no fallback.'),
-    app_id: z.string().optional().describe('The app this is for, so its spend is attributed.'),
-    role: z.string().min(1).max(300).optional().describe(AI_ROLE_PARAM),
-  }, annotationsFor('aimeat_ai_embed'), async ({ input, model, provider, app_id, role }) => {
+  mcp.tool('aimeat_ai_embed', descriptionFor('aimeat_ai_embed'), zodShapeFor('aimeat_ai_embed'), annotationsFor('aimeat_ai_embed'), async ({ input, model, provider, app_id, role }) => {
     const w = who();
     try {
       const r = await embedForOwner(storage, config, w.payer, {
