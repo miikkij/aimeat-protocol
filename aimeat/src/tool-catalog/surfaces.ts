@@ -259,7 +259,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         
         // The parts this node's own interface is built from, read before a page is changed.
-        'aimeat_ui_component_list', 'aimeat_ui_component_get',
+        
         // The node's themes: the look of every page. Saving is the operator's, gated in the tool.
         'aimeat_theme_list', 'aimeat_theme_get', 'aimeat_theme_save', 'aimeat_theme_style_save', 'aimeat_theme_component_css_set',
         'aimeat_theme_policy_set', 'aimeat_theme_font_save',
@@ -435,7 +435,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         // Arranging this node's front page and the page its members land on.
         'aimeat_surface_layout_get', 'aimeat_surface_layout_set',
         // ...and the parts those pages are drawn from, and the themes they wear.
-        'aimeat_ui_component_list', 'aimeat_ui_component_get',
+        
         'aimeat_theme_list', 'aimeat_theme_get', 'aimeat_theme_save', 'aimeat_theme_style_save', 'aimeat_theme_component_css_set',
         'aimeat_theme_policy_set', 'aimeat_theme_font_save',
         // The operator's break-glass over an organism whose creator account is unreachable, plus the

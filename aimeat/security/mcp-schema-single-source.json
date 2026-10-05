@@ -217,8 +217,6 @@
     "aimeat_theme_policy_set",
     "aimeat_theme_save",
     "aimeat_theme_style_save",
-    "aimeat_ui_component_get",
-    "aimeat_ui_component_list",
     "aimeat_usage_report",
     "aimeat_v2_message_list",
     "aimeat_v2_message_send",

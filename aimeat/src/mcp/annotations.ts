@@ -500,8 +500,6 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // Replacing a list is not destructive (the previous one was a setting, not data), and setting
     // the same list twice leaves the same list.
     aimeat_admin_cors_set: { title: 'Admin: Set Allowed Origins', readOnlyHint: false, destructiveHint: false, idempotentHint: true },
-    aimeat_ui_component_list: { title: 'Interface parts: list', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_ui_component_get: { title: 'Interface parts: one, whole', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_theme_list: { title: 'Themes: list, with the operator\'s choices', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_theme_get: { title: 'Themes: one, whole', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_theme_save: { title: 'Themes: make, change, copy, retire or put back a version', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
