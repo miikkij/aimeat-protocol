@@ -103,6 +103,7 @@ export const classificationTools = [
         // the tool needs memory:read, and its set, review, policy_set, scan, switch_set and exception_set
         // actions check memory:write in the handler (mcp/classification.ts WRITES). TARGET-082 V2.
         scope: 'memory:read',
+        // On `admin`: TARGET-082: the operator's AI sets the node's classification switch and policy.
         surfaces: ['agent', 'admin'],
         input: {
             action: { type: 'string', required: true, enum: [...CLASSIFICATION_ACTIONS], description: 'What to do.' },

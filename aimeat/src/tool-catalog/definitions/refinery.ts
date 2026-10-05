@@ -19,6 +19,7 @@ export const refineryTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Mail Refinery Class Packs', readOnlyHint: true, openWorldHint: false },
+        // On `agent`: The mail refinery: a batch that reads, classifies and files a connected mailbox.
         surfaces: ['agent'],
         input: {},
     },

@@ -27,7 +27,14 @@ export const connectionTools = [
         description: "Which outside services this node can connect an account at, and what each one is good for. Every entry says whether the NODE holds an application for it: when it does not, someone who brings their own app can still use it, so an absent registration removes an option from nobody. Read this before aimeat_connection_start, because the names are exact ('google-mail' reads Gmail, 'google-mail-send' sends from it) and mail deliberately comes in read/send PAIRS — reading a person's mail and writing in their name are different consent, and neither implies the other.",
         caller: 'agent',
         visibility: agentEverywhere,
+        // openWorldHint is TRUE on every one of these that leaves the node: they reach a provider whose
+        // answer this node does not control, and a caller planning a retry needs to know the difference
+        // between "our store said no" and "Google said no".
         annotations: { title: 'Which Services Can Be Connected', readOnlyHint: true },
+        // On `agent`: Outbound connections and mail, beside the address book because that is where they meet:
+        // a send takes a saved contact, and a mailbox is what it can leave through. Scopes still
+        // decide who sees which of them — reading the list of accounts, spending one, and sending
+        // through one are three different words.
         surfaces: ['agent'],
         input: {},
     },

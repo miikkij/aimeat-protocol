@@ -25,6 +25,8 @@ export const uiLibraryTools = [
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: true, cliFallback: true },
         annotations: { title: 'Interface parts: list', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        // On `admin`: ...and the parts those pages are drawn from, and the themes they wear.
+        // On `agent`: The parts this node's own interface is built from, read before a page is changed.
         surfaces: ['agent', 'admin'],
         input: {
             kind: { type: 'string', description: "'component' or 'shape'.", zod: z.enum(['component', 'shape']) },

@@ -65,6 +65,7 @@ export const agentMessagingTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Read Agent Handbook', readOnlyHint: true },
+        // On `chat`: Where to start, what exists, and the door to everything else.
         surfaces: ['appdev', 'agent', 'service', 'commerce', 'chat'],
         input: {
             module: { type: 'string', description: 'Optional handbook module name, such as tasks or messages.' },
@@ -292,6 +293,11 @@ export const agentMessagingTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Basic Agents: What and Whether', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        // On `admin`: What the one-press basic agents would give this account, and a proposal for a new one.
+        // On `agent` too, because their usual caller is one of the owner's own agents telling the
+        // person where to press; here for the owner-side agent management this surface carries.
+        // On `agent`: A person asks THEIR OWN agent for a new agent, so the proposal tools belong here. They sat
+        // on `admin` alone until 2026-10-02, under a comment saying they were on this list.
         surfaces: ['agent', 'admin'],
         input: {},
     },
@@ -336,6 +342,7 @@ export const agentMessagingTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Read Message Inbox', readOnlyHint: true },
+        // On `primitives`: Talk to the person.
         surfaces: ['agent', 'primitives'],
         input: {},
     },
@@ -657,6 +664,7 @@ export const agentMessagingTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List My Agents', readOnlyHint: true },
+        // On `chat`: Their agents, a new one, and work for them. A schedule is found when it is needed.
         surfaces: ['agent', 'service', 'chat'],
         input: {},
     },

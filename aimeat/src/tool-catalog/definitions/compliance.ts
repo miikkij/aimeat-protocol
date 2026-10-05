@@ -34,6 +34,9 @@ export const complianceTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Compliance: Node Report', readOnlyHint: true },
+        // On `admin`: The node-wide compliance report and the two documents behind it. On this surface rather
+        // than 'service' because it is the node's own governance rather than anything the node
+        // sells, and because the only caller it will ever have is the operator's own agent.
         surfaces: ['admin'],
         input: {
             scope: { type: 'string', enum: ['mine', 'node'], description: 'Whose report. "mine" (the default) is your owner\'s own slice; "node" is the whole installation and is operator-only.' },

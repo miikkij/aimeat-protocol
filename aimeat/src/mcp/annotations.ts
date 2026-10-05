@@ -2,13 +2,14 @@
  * @file annotations.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Single source of truth for MCP tool annotations across the public
- *   server MCP surface (`aimeat/src/mcp/*.ts`) and the local connector MCP surface
- *   (`aimeat/src/cli/connect/mcp/tools/*.ts`). Provides a `title` plus
+ * @description MCP tool annotations for the public server MCP surface (`aimeat/src/mcp/*.ts`)
+ *   and the local connector MCP surface (`aimeat/src/cli/connect/mcp/tools/*.ts`), read from each
+ *   tool's catalog entry (`annotations` on its definition, src/tool-catalog/definitions/; until
+ *   2026-10-05 a hand-kept table here). Provides a `title` plus
  *   read-only / destructive / idempotent / open-world hints required by Anthropic's
  *   Connectors Directory review. Missing annotations are the #1 cause of directory
  *   rejection per the May 2026 review-criteria analysis -- every registered tool
- *   MUST have an entry here.
+ *   MUST have them.
  * @structure
  *   - TOOL_ANNOTATIONS -- Record<string, ToolAnnotations> keyed by tool name
  *   - annotationsFor(name) -- lookup with explicit "missing entry" error so new
@@ -23,6 +24,8 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   2026-10-05 — TOOL_ANNOTATIONS is the catalog's: the hand-kept table is gone, and its notes sit beside
+ *     the definitions they explain (secaudit 2026-10, M3).
  *   2026-10-05 — TOOL_ANNOTATIONS is each catalog entry's `annotations` plus the list here, which only
  *     shrinks as each catalog group carries its own (secaudit 2026-10, M3).
  *   2026-10-04 — aimeat_task_decline (a write, not destructive, idempotent like aimeat_task_fail).
@@ -105,105 +108,10 @@ import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../tool-catalog/definitions.js';
  *   side-effects are not bounded by AIMEAT itself (capability invoke, extension
  *   invoke, action execute).
  */
-// The tools whose catalog entry does not carry its `annotations` yet (secaudit 2026-10, M3: one
-// catalog group per commit moves its entries onto the definitions, and this list only shrinks).
-const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
-    // ── Core / discovery ──
-
-    // ── Onboarding ──
-
-    // ── Memory ──
-
-    // ── Skills registry ──
-
-    // ── Operator config enactment ──
-
-    // ── Storage ──
-
-    // ── Wallet & morsels ──
-
-    // ── Boards ──
-
-    // ── Sharing groups ──
-
-    // ── Organisms ──
-    // In-place document edits. The append is NOT idempotent — running it twice adds the text twice,
-    // which is the honest answer for an operation that exists to accumulate. The section replace is:
-    // the same block replacing the same heading leaves the same document.
-
-    // ── Outbound connections and mail ──
-    // openWorldHint is TRUE on every one of these that leaves the node: they reach a provider whose
-    // answer this node does not control, and a caller planning a retry needs to know the difference
-    // between "our store said no" and "Google said no".
-    // Remote MCP servers. `openWorldHint` is true on all but the list, because everything else here
-    // reaches a server this node does not run.
-
-    // ── Agents (owner's view) ──
-
-    // ── Tasks ──
-
-    // ── Schedules (agent-created recurring jobs) ──
-
-    // ── Work queue ──
-
-    // ── Actions & capabilities ──
-    // openWorldHint: dispatches to third-party action providers/capabilities/sandboxed code
-
-    // ── Agent telemetry & capabilities ──
-
-    // ── Owner-managed agent classification ──
-
-    // ── Crew definition (the chat path to building a JSON agent) ──
-
-    // ── Knowledge packages ──
-
-    // ── Apps ──
-    // Component packages (/v1/packages). A different thing from an app, and named so since
-    // 2026-08-16 — these five were called aimeat_app_* on the connector doors while the node's MCP
-    // used the same names for the web apps at /v1/apps.
-    // Destructive because some actions are: ui_set replaces a layout, subdomain_delete and
-    // screenshot_clear remove, an empty access_code clears one. Not idempotent: agent_deploy starts
-    // a new task on every call. A client that confirms each call is the safe reading of a mixed tool.
-
-    // ── Extensions ──
-
-    // ── Cortex ──
-
-    // ── Chat instances ──
-
-    // ── Messages ──
-
-    // ── Agent v2 messaging (a turn between two principals of one account) ──
-    // Not openWorld: every one of these stays inside the account. The delivery target is the one
-    // thing that reaches outward, and it is a configuration, not a call — the outbound POST happens
-    // later, from the node, and goes through safeFetch.
-
-    // ── Companies (the registry + the co address family) ──
-
-    // ── Contacts (address book) ──
-
-    // ── Consent ──
-
-    // ── The owner's secrets vault ──
-    // set is idempotent (the same name and value twice leaves the same row) and NOT destructive,
-    // even though it replaces: what it replaces is a value nobody could read, and the caller
-    // supplied the new one. delete IS destructive — whatever named that secret stops working.
-
-    // ── Flags / moderation ──
-
-    // ── Admin (operator-only) ──
-    // destructiveHint: mints morsels (irreversible ledger change, financial action)
-
-    // ── Commerce (TARGET-033/034 over MCP) ──
-
-    // ── Exchange marketplace (TARGET-045 over MCP) ──
-};
-
-/** Tool -> its annotations: each catalog entry's `annotations`, and the list above. */
-export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
-    ...LISTED_ANNOTATIONS,
-    ...Object.fromEntries(CLI_FALLBACK_TOOL_DEFINITIONS.filter(d => d.annotations).map(d => [d.name, d.annotations!])),
-};
+/** Tool -> its annotations: each catalog entry's `annotations` (src/tool-catalog/definitions/). */
+export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = Object.fromEntries(
+    CLI_FALLBACK_TOOL_DEFINITIONS.filter(d => d.annotations).map(d => [d.name, d.annotations!]),
+);
 
 /**
  * Returns the annotations for a registered tool. Throws if the tool has no entry
@@ -214,8 +122,8 @@ export function annotationsFor(name: string): ToolAnnotations {
     const annotations = TOOL_ANNOTATIONS[name];
     if (!annotations) {
         throw new Error(
-            `Missing tool annotations for "${name}". Add an entry to TOOL_ANNOTATIONS ` +
-            `in aimeat/src/mcp/annotations.ts before registering the tool. ` +
+            `Missing tool annotations for "${name}". Give its catalog entry \`annotations\` ` +
+            `(src/tool-catalog/definitions/) before registering the tool. ` +
             `See docs/plans/2026-05-29-connectors-directory-submission.md section A.`,
         );
     }

@@ -143,370 +143,68 @@ export const V2_EXCLUDED: readonly string[] = [
 ];
 
 /**
- * role -> the tools whose catalog entry does not carry its `surfaces` yet. Derived from
- * docs/mcp_audit/11-v2-mcp-design.md §2/§3. Secaudit 2026-10, M3: one catalog group per commit moves
- * its names onto the definitions, and these lists only shrink.
+ * role -> allowlist of tool names. Each catalog entry names the roles that carry it (`surfaces`
+ * on its definition, with the reason beside it); `full` is computed. Derived from
+ * docs/mcp_audit/11-v2-mcp-design.md §2/§3. Until 2026-10-05 these were hand-kept lists here, one
+ * per role, beside the catalog (secaudit 2026-10, M3).
+ *
+ * `primitives`:
+ * The PRIMITIVES surface (/v2/mcp/primitives) — Agent v2, V2.
+ *
+ * Twelve tools instead of several hundred. Not a smaller version of `agent`: a different
+ * proposition. The other surfaces answer "here is everything of this kind"; this one answers
+ * "here is how to hold this node in your head". Everything else on the node is reachable
+ * through `aimeat_discover` (find a capability) and `aimeat_invoke` (run it as yourself), so
+ * the catalogue is data the agent reads when it needs it rather than context it carries always.
+ *
+ * The other five surfaces and /v1/mcp are untouched and still register their full sets. Nothing
+ * here removes a tool from anywhere; this is one more door.
+ *
+ * WHY THESE TWELVE. They are the ones an agent cannot discover its way to, because they are what
+ * it uses to work at all: read and write what it knows, read and write what a group knows, take
+ * work and hand it back, speak to its person, put a file somewhere and fetch it. Everything past
+ * that is a capability, and capabilities are found rather than carried.
+ *
+ * `chat`:
+ * The CHAT surface (/v2/mcp/chat): what the node's own chat starts every turn with.
+ *
+ * WHY. The node chat used /v1/mcp and so read every tool the agent may use on every model round:
+ * 324 tools, about 515 000 characters, about 129 000 tokens (measured 2026-10-02). A one-line
+ * question cost 0.033 USD on a hosted place, and every round waited 15 to 30 s for its first
+ * token. Tool descriptions were most of what each message paid for.
+ *
+ * HOW. This list is what is ON when the session opens: the tools the handbook's common jobs need.
+ * Every other tool the agent's permissions allow is still REGISTERED on the session, switched
+ * off (mcp/tool-loader.ts). aimeat_tools_find searches them by purpose and switches the matches
+ * on for the rest of the session, and a call to a switched-off tool by name switches it on and
+ * runs it. Nothing is unreachable; it is only not in every round's prompt.
+ *
+ * `commerce`:
+ * The selling surface (/v2/mcp/commerce): everything an agent needs to price something, take
+ * payment for it and read what came in — credentials for the seller's own rails, priced tool
+ * manifests, checkout, wallet, and the memory/storage the listing itself lives in.
+ *
+ * `full`:
+ * The FULL surface (/v2/mcp/full) — everything v2 may carry, and NOT a hand-kept list.
+ *
+ * It is the catalog minus V2_EXCLUDED, computed at load. That is the whole point: a `full`
+ * written out by hand would be the first list to go stale, and it would go stale silently,
+ * because nothing downstream can tell an omission from a decision. Computed, a new tool is on
+ * it the moment it exists, and the only way to keep one off is to say so in V2_EXCLUDED, where
+ * every entry already carries its reason.
+ *
+ * WHO IT IS FOR. A client that wants what /v1/mcp gives but addressed the v2 way, and the
+ * honest answer for an agent whose work does not fit one of the focused surfaces. It is not
+ * the default: a focused surface is smaller context and fewer ways to misfire, and that is the
+ * reason the other surfaces exist at all.
  */
-const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
-    /**
-     * The PRIMITIVES surface (/v2/mcp/primitives) — Agent v2, V2.
-     *
-     * Twelve tools instead of several hundred. Not a smaller version of `agent`: a different
-     * proposition. The other surfaces answer "here is everything of this kind"; this one answers
-     * "here is how to hold this node in your head". Everything else on the node is reachable
-     * through `aimeat_discover` (find a capability) and `aimeat_invoke` (run it as yourself), so
-     * the catalogue is data the agent reads when it needs it rather than context it carries always.
-     *
-     * The other five surfaces and /v1/mcp are untouched and still register their full sets. Nothing
-     * here removes a tool from anywhere; this is one more door.
-     *
-     * WHY THESE TWELVE. They are the ones an agent cannot discover its way to, because they are what
-     * it uses to work at all: read and write what it knows, read and write what a group knows, take
-     * work and hand it back, speak to its person, put a file somewhere and fetch it. Everything past
-     * that is a capability, and capabilities are found rather than carried.
-     */
-    primitives: [
-        // Know things.
-        
-        // Know things together.
-        
-        // Take work, hand it back.
-        
-        // Talk to the person.
-        
-        // Carry bytes.
-        
-        // And the pair that reaches everything else.
-        
-    ],
-    /**
-     * The CHAT surface (/v2/mcp/chat): what the node's own chat starts every turn with.
-     *
-     * WHY. The node chat used /v1/mcp and so read every tool the agent may use on every model round:
-     * 324 tools, about 515 000 characters, about 129 000 tokens (measured 2026-10-02). A one-line
-     * question cost 0.033 USD on a hosted place, and every round waited 15 to 30 s for its first
-     * token. Tool descriptions were most of what each message paid for.
-     *
-     * HOW. This list is what is ON when the session opens: the tools the handbook's common jobs need.
-     * Every other tool the agent's permissions allow is still REGISTERED on the session, switched
-     * off (mcp/tool-loader.ts). aimeat_tools_find searches them by purpose and switches the matches
-     * on for the rest of the session, and a call to a switched-off tool by name switches it on and
-     * runs it. Nothing is unreachable; it is only not in every round's prompt.
-     */
-    chat: [
-        // Where to start, what exists, and the door to everything else.
-        
-        // What the person knows.
-        
-        // What their groups know. Writing to a workspace is found when it is needed: its description
-        // alone is 6 500 characters, which every round would pay for.
-        
-        // Their apps and skills.
-        
-        // Their agents, a new one, and work for them. A schedule is found when it is needed.
-        
-        
-    ],
-    appdev: [
-        
-        
-        
-        
-        // Component packages — a different backend from the apps above, named so since 2026-08-16.
-        // Four of them are registered on this node's /v1/mcp (mcp/packages.ts) and the v2 surface
-        // must list exactly what is registered. Authoring by hand (publish) and pruning history
-        // (versions, delete) stay on the connector doors; see V2_EXCLUDED for why.
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-    ],
-    agent: [
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        // The parts this node's own interface is built from, read before a page is changed.
-        
-        // The node's themes: the look of every page. Saving is the operator's, gated in the tool.
-        
-        
-        
-        
-        // NOTE: aimeat_task_request_changes is connector-only (owner tool, not registered on the
-        // server /v1/mcp), so it cannot appear on a server v2 surface — intentionally omitted here.
-        
-        
-        // The person's own AI starting a waiting task on their word, and setting whether an agent's
-        // tasks start on their own at all.
-        
-        
-        
-        
-        
-        
-        
-        
-        // A turn between two principals of ONE account, beside the owner thread and the federated
-        // DM above it rather than instead of either. Agent surface only: the service surface carries
-        // no messaging at all, and the primitives surface reaches these through aimeat_invoke.
-        
-        
-        
-        
-        
-        
-        // Taking a shipped package into use, beside the company tools rather than with the
-        // authoring ones on appdev. Installing is not building: it is the person's own agent
-        // turning something this node ships into a copy they own, which is this surface's business.
-        // Finding and reading one comes with it, because an agent that cannot list cannot name the
-        // group id install requires, and publishing because a package is created private.
-        
-        
-        
-        
-        
-        
-        // An install that lacked the words becomes a request; the person's own agent answers it here.
-        
-        // Buying a package this node sells, for the person: the offer, the checkout, the renewals.
-        
-        // The person's own welcome page, beside the company one: same act, different owner.
-        
-        
-        // Outbound connections and mail, beside the address book because that is where they meet:
-        // a send takes a saved contact, and a mailbox is what it can leave through. Scopes still
-        // decide who sees which of them — reading the list of accounts, spending one, and sending
-        // through one are three different words.
-        
-        
-        // The mail refinery: a batch that reads, classifies and files a connected mailbox.
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        // A person asks THEIR OWN agent for a new agent, so the proposal tools belong here. They sat
-        // on `admin` alone until 2026-10-02, under a comment saying they were on this list.
-        
-        
-        
-        
-        // Who holds a key to the owner's account: the Access page's read, for the agent the owner
-        // trusted with account:security. Read-only; every revoke stays on the page.
-        
-        // The owner's secrets vault. On the agent surface because setting up an integration is
-        // exactly the work an owner's own agent does, and a key it stores is one the owner never
-        // has to paste anywhere. It can store and remove; nothing anywhere reads a value back.
-        
-        
-        
-        
-        // Commerce, buyer side: the owner's personal agent buys priced offers/app-tools.
-        
-        // EXCHANGE marketplace: browse/accept/post/bid the two-sided data-service market.
-        
-        
-        
-        // Act on EXCHANGE (generic, any MCP client): call an app-tool, run agent-work, renegotiate.
-        
-        
-    ],
-    service: [
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        // Commerce, both sides: a marketplace/provider agent sells (PSP credentials, app-tool
-        // manifests, offer pricing) and buys (checkout) on the same commerce core.
-        
-        
-        
-        // Beneficiary splits: a seller declares who else earns from a sale, releases what accrued
-        // and pays it out; the beneficiary reads its own earnings. Selling-side, same as the rest.
-        
-        
-        
-        // EXCHANGE marketplace, both sides: a provider lists/bids/sees lineage; a consumer accepts contracts.
-        
-        
-        
-        // Act on EXCHANGE (generic, any MCP client): call an app-tool, run agent-work, renegotiate.
-        
-        
-    ],
-    admin: [
-        
-        // TARGET-082: the operator's AI sets the node's classification switch and policy.
-        
-        // BR-04: the operator connects an organisation's identity provider and offboards by hand.
-        
-        
-        
-        // The Security page in one read, and resolving a refused-and-kept incident.
-        
-        // The CORS page in one read, and the write that sets a person's or an agent's list.
-        
-        // The Hooks page in one read, and the write that binds a moment to an address.
-        
-        // The Statistics page in one read: the counters, their day tallies, and the live gauges.
-        
-        // Is a newer AIMEAT on npm, what is new in it, and the prompt that updates the node.
-        
-        // The Usage page in one read: whose money paid for the AI, and the key nothing here meters.
-        
-        // The Knowledge page in one read: the whole collection, its shape, and who has already looked.
-        
-        // The Federation page in one read: the peers, what waits on a person, and the book's age.
-        // And two writes beside it: a peer kept on its own relay-claim setting, and a peer removed.
-        
-        // Setting this node up from an install set: owner, packages, organisms, users, crew agents.
-        
-        // Selling a repository's packages from this node, signed by its own key, and redeeming a
-        // package claim code for this node with that key.
-        
-        // Arranging this node's front page and the page its members land on.
-        
-        // ...and the parts those pages are drawn from, and the themes they wear.
-        
-        
-        
-        // The operator's break-glass over an organism whose creator account is unreachable, plus the
-        // read that shows the roster before it is re-pointed.
-        
-        // The node-wide compliance report and the two documents behind it. On this surface rather
-        // than 'service' because it is the node's own governance rather than anything the node
-        // sells, and because the only caller it will ever have is the operator's own agent.
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        // What the one-press basic agents would give this account, and a proposal for a new one.
-        // On `agent` too, because their usual caller is one of the owner's own agents telling the
-        // person where to press; here for the owner-side agent management this surface carries.
-        
-        
-        
-        
-        
-    ],
-    // The selling surface (/v2/mcp/commerce): everything an agent needs to price something, take
-    // payment for it and read what came in — credentials for the seller's own rails, priced tool
-    // manifests, checkout, wallet, and the memory/storage the listing itself lives in.
-    commerce: [
-        
-        
-        
-        // Beneficiary splits: a seller declares who else earns from a sale, releases what accrued
-        // and pays it out; the beneficiary reads its own earnings. Selling-side, same as the rest.
-        
-        
-        
-        
-        
-        
-        
-        
-        
-    ],
+const FULL = CLI_FALLBACK_TOOL_DEFINITIONS
+    .map(d => d.name)
+    .filter(name => !V2_EXCLUDED.includes(name) && !CHAT_ONLY.includes(name));
 
-    /**
-     * The FULL surface (/v2/mcp/full) — everything v2 may carry, and NOT a hand-kept list.
-     *
-     * It is the catalog minus V2_EXCLUDED, computed at load. That is the whole point: a `full`
-     * written out by hand would be the first list to go stale, and it would go stale silently,
-     * because nothing downstream can tell an omission from a decision. Computed, a new tool is on
-     * it the moment it exists, and the only way to keep one off is to say so in V2_EXCLUDED, where
-     * every entry already carries its reason.
-     *
-     * WHO IT IS FOR. A client that wants what /v1/mcp gives but addressed the v2 way, and the
-     * honest answer for an agent whose work does not fit one of the focused surfaces. It is not
-     * the default: a focused surface is smaller context and fewer ways to misfire, and that is the
-     * reason the other surfaces exist at all.
-     */
-    full: CLI_FALLBACK_TOOL_DEFINITIONS
-        .map(d => d.name)
-        .filter(name => !V2_EXCLUDED.includes(name) && !CHAT_ONLY.includes(name)),
-};
-
-/** role -> allowlist of tool names: the lists above, then each catalog entry that names the role. */
-export const MCP_SURFACES: Record<SurfaceRole, string[]> = Object.fromEntries(V2_ROLES.map(role => [role, [
-    ...LISTED_SURFACES[role],
-    ...(role === 'full' ? [] : CLI_FALLBACK_TOOL_DEFINITIONS.filter(d => d.surfaces?.includes(role)).map(d => d.name)),
-]])) as Record<SurfaceRole, string[]>;
+export const MCP_SURFACES: Record<SurfaceRole, string[]> = Object.fromEntries(V2_ROLES.map(role => [role,
+    role === 'full' ? FULL : CLI_FALLBACK_TOOL_DEFINITIONS.filter(d => d.surfaces?.includes(role)).map(d => d.name),
+])) as Record<SurfaceRole, string[]>;
 
 const _surfaceSets: Record<SurfaceRole, Set<string>> = {
     primitives: new Set(MCP_SURFACES.primitives),

@@ -63,7 +63,19 @@ export const packagesTools = [
         description: 'List component packages on this node. These are NOT the single-file web apps — for those use aimeat_app_list.',
         caller: 'agent',
         visibility: agentEverywhere,
+        // Component packages (/v1/packages). A different thing from an app, and named so since
+        // 2026-08-16 — these five were called aimeat_app_* on the connector doors while the node's MCP
+        // used the same names for the web apps at /v1/apps.
         annotations: { title: 'List Packages', readOnlyHint: true },
+        // On `agent`: Taking a shipped package into use, beside the company tools rather than with the
+        // authoring ones on appdev. Installing is not building: it is the person's own agent
+        // turning something this node ships into a copy they own, which is this surface's business.
+        // Finding and reading one comes with it, because an agent that cannot list cannot name the
+        // group id install requires, and publishing because a package is created private.
+        // On `appdev`: Component packages — a different backend from the apps above, named so since 2026-08-16.
+        // Four of them are registered on this node's /v1/mcp (mcp/packages.ts) and the v2 surface
+        // must list exactly what is registered. Authoring by hand (publish) and pruning history
+        // (versions, delete) stay on the connector doors; see V2_EXCLUDED for why.
         surfaces: ['appdev', 'agent'],
         input: {
             search: { type: 'string', description: 'Optional search over name, description and tags.' },
@@ -413,6 +425,7 @@ export const packagesTools = [
         // all three doors: approving an install is taking part in installing. The words the install itself
         // needs are asked of the approving agent inside the service, not here.
         scope: 'packages:write',
+        // On `agent`: An install that lacked the words becomes a request; the person's own agent answers it here.
         surfaces: ['appdev', 'agent'],
         input: {
             request_id: { type: 'string', description: 'One request. Omit to list them all.' },
@@ -441,6 +454,7 @@ export const packagesTools = [
         visibility: agentEverywhere,
         annotations: { title: 'Buy a Package', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
         scope: 'commerce:buy',
+        // On `agent`: Buying a package this node sells, for the person: the offer, the checkout, the renewals.
         surfaces: ['agent'],
         input: {
             action: { type: 'string', required: true, enum: ['offer', 'checkout', 'renew', 'subscriptions', 'auto_renew'], description: 'offer: what you would buy and at what price; checkout: open the checkout; renew: open the checkout of the next update period; subscriptions: what you hold and the requests you made; auto_renew: turn automatic renewal on or off.' },

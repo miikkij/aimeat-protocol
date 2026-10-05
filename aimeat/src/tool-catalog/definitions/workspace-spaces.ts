@@ -25,6 +25,9 @@ export const workspaceSpaceTools = [
         description: "Add markdown to a workspace DOCUMENT without sending the rest of it back — at the end, or at the end of one named section. This is how a long document is amended: aimeat_workspace_write replaces the whole thing, so amending a 57,000-character spec through it means retyping all of it, and what that fails at is silent. The insert never removes an existing character, so two sessions can append to the same document and both survive — the write is a compare-and-swap that re-reads and re-applies if somebody got there first. `section` names a heading by its exact TEXT ('Concurrency', not '## Concurrency' — either is accepted); the new text lands at the end of that section, before the next heading. Two headings with the same text is a refusal naming both, because guessing which one you meant is how an edit lands in the wrong half of a long document. Edits the DRAFT, seeding it from the published version when there is no draft yet; publish with aimeat_workspace_publish. Member-only.",
         caller: 'agent',
         visibility: agentEverywhere,
+        // In-place document edits. The append is NOT idempotent — running it twice adds the text twice,
+        // which is the honest answer for an operation that exists to accumulate. The section replace is:
+        // the same block replacing the same heading leaves the same document.
         annotations: { title: 'Append To Workspace Document', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
         // The in-place document edits write the SAME record aimeat_workspace_write writes — a workspace
         // draft — so they answer to the same word, and their REST routes enforce that word and not the

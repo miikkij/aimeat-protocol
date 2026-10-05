@@ -45,6 +45,8 @@
  *   cd aimeat && pnpm check:scope-parity --strict  # gate (pre-commit + CI)
  *   cd aimeat && pnpm check:scope-parity --seed    # rewrite the exemption file from today's state
  * @version-history
+ *   v1.0.2 — 2026-10-05 — scopes-operator.ts is gone: every tool's scope is on its catalog definition
+ *     (secaudit 2026-10, M3).
  *   v1.0.2 — 2026-10-05 — A TOOL_SCOPES entry may name several words (secaudit 2026-10, C3).
  *   v1.0.1 — 2026-09-29 — tool-catalog/scopes-operator.ts counts as a definition file: it is the operator
  *     rows of the tool table, moved out of scopes.ts unchanged.
@@ -69,8 +71,8 @@ const EXEMPTIONS = join(AIMEAT, 'security', 'scope-parity-exemptions.json');
  * binds the names. Counting those would make every word look asked-for, and the whole gate would
  * answer nothing. Same exclusion list the inventory uses, for the same reason.
  */
-// scopes-operator.ts is part of the tool table, moved out of scopes.ts for the line ceiling.
-const DEFINITION_FILES = ['tool-catalog/scopes.ts', 'tool-catalog/scopes-operator.ts', 'utils/scope-coverage.ts'];
+// A tool's own `scope` is on its catalog definition since 2026-10-05 and counts as that tool's demand.
+const DEFINITION_FILES = ['tool-catalog/scopes.ts', 'utils/scope-coverage.ts'];
 
 interface ExemptionFile { note: string; exempt: Record<string, string> }
 

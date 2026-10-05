@@ -59,6 +59,8 @@ export const exchangeTools = [
         // = browse/detail/needs/contracts/lineage; exchange:write = accept/off/post/bid/bid-accept.
         // Owner-attached '*' agents get both; granular agents opt in per scope.
         scope: 'exchange:read',
+        // On `service`: EXCHANGE marketplace, both sides: a provider lists/bids/sees lineage; a consumer accepts contracts.
+        // On `agent`: EXCHANGE marketplace: browse/accept/post/bid the two-sided data-service market.
         surfaces: ['agent', 'service'],
         input: {
             q: { type: 'string', required: false, description: 'Free-text match over title/description/ext/action/tags.', zod: z.string().max(400) },
@@ -205,6 +207,8 @@ export const exchangeTools = [
         visibility: agentMcp,
         annotations: { title: 'Invoke App Tool (metered, via contract)', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
         scope: 'exchange:write',
+        // On `service`: Act on EXCHANGE (generic, any MCP client): call an app-tool, run agent-work, renegotiate.
+        // On `agent`: Act on EXCHANGE (generic, any MCP client): call an app-tool, run agent-work, renegotiate.
         surfaces: ['agent', 'service'],
         input: {
             owner: { type: 'string', required: true, description: 'The provider app\'s owner (bare name or GHII).', zod: z.string().min(1).max(120) },

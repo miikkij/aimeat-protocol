@@ -127,6 +127,7 @@ export const companyTools = [
         annotations: { title: 'Publish Your Welcome Page', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         // Stores a file, or takes one back — the same permission over the same namespace.
         scope: 'storage:write',
+        // On `agent`: The person's own welcome page, beside the company one: same act, different owner.
         surfaces: ['agent'],
         input: {
             html: { type: 'string', required: true, description: "The complete HTML document to serve as this person's welcome page." },

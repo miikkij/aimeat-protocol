@@ -30,6 +30,7 @@ export const installSetTools = [
         // the package repository named in the set.
         annotations: { title: 'Admin: Apply an Install Set', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
         scope: 'operator:admin',
+        // On `admin`: Setting this node up from an install set: owner, packages, organisms, users, crew agents.
         surfaces: ['admin'],
         input: {
             action: { type: 'string', required: true, enum: ['plan', 'apply', 'list'], description: 'plan: what the set would make, and every problem, writing nothing. apply: make it. list: the sets applied on this node.' },
@@ -45,6 +46,8 @@ export const installSetTools = [
         // Reaches the package repository, and a revoke stops a customer's updates.
         annotations: { title: 'Sell a Package', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
         scope: 'operator:admin',
+        // On `admin`: Selling a repository's packages from this node, signed by its own key, and redeeming a
+        // package claim code for this node with that key.
         surfaces: ['admin'],
         input: {
             action: { type: 'string', required: true, enum: ['needs', 'grant', 'revoke', 'offer', 'claim', 'catalogue', 'price', 'review', 'requests', 'decide'], description: 'needs: the questions to ask; grant: serve (or change, or end the updates of) a customer node; revoke: stop serving it; offer: the author\'s terms and what the version on sale can do; claim: a one-time code for a node not known yet; catalogue: what this node sells; price: put a package on sale here at this node\'s own price, or change it; review: approve what the version on sale can do, which opens new sales; requests: sales waiting for approval; decide: approve or refuse one.' },

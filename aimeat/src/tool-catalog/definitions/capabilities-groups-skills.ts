@@ -200,6 +200,8 @@ export const capabilitiesGroupsSkillsTools = [
         // The Access page's read (GET /v1/access/overview → owner, or account:security). Every key to the
         // account in one answer, so the word that opens it is the one no wildcard carries.
         scope: 'account:security',
+        // On `agent`: Who holds a key to the owner's account: the Access page's read, for the agent the owner
+        // trusted with account:security. Read-only; every revoke stays on the page.
         surfaces: ['agent', 'admin'],
         input: {},
     },
@@ -208,6 +210,9 @@ export const capabilitiesGroupsSkillsTools = [
         description: "The named keys and passwords in your owner's vault: for each one its name, when it was first stored, when its value last changed, and which extensions have used it in the last 30 days. NEVER a value — nothing on this node reads one back, including this tool and including the owner. Use it to see what is already stored before asking a person for a key again, and to see what would break before removing one. Needs secrets:manage, which no wildcard carries — the owner ticks it per agent.",
         caller: 'agent',
         visibility: agentEverywhere,
+        // set is idempotent (the same name and value twice leaves the same row) and NOT destructive,
+        // even though it replaces: what it replaces is a value nobody could read, and the caller
+        // supplied the new one. delete IS destructive — whatever named that secret stops working.
         annotations: { title: 'Secrets: What Is Stored', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         // The owner's secrets vault (GET/PUT/DELETE /v1/secrets* → secrets:manage). The same word as
         // the routes, because the tools ARE those doors: a permission enforced on one surface and not
@@ -215,6 +220,9 @@ export const capabilitiesGroupsSkillsTools = [
         // the list is names and dates, and an agent that could read a name and not set it has nothing
         // it can act on. No wildcard carries it (utils/scope-coverage.ts).
         scope: 'secrets:manage',
+        // On `agent`: The owner's secrets vault. On the agent surface because setting up an integration is
+        // exactly the work an owner's own agent does, and a key it stores is one the owner never
+        // has to paste anywhere. It can store and remove; nothing anywhere reads a value back.
         surfaces: ['agent', 'admin'],
         input: {},
     },

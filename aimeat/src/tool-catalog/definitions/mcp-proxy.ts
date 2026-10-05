@@ -27,6 +27,8 @@ export const mcpProxyTools = [
         description: "The other MCP servers this person has attached to their node, by the short name every other tool here takes. This is how you reach tools that are not on this node at all: their issue tracker, their wiki, whatever they connected. A server that has stopped working says so, and says what would repair it. Read this before telling anyone you cannot do something — the ability may already be attached.",
         caller: 'agent',
         visibility: agentEverywhere,
+        // Remote MCP servers. `openWorldHint` is true on all but the list, because everything else here
+        // reaches a server this node does not run.
         annotations: { title: 'Attached MCP Servers', readOnlyHint: true },
         // Remote MCP servers. The same three-way split as connections above, and for the same reason:
         // knowing WHICH servers are attached, calling a tool THROUGH one, and attaching another are

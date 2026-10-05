@@ -78,6 +78,7 @@ export const discoveryWorkBoardsTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Discover (Master Directory)', readOnlyHint: true, openWorldHint: true },
+        // On `primitives`: And the pair that reaches everything else.
         surfaces: ['appdev', 'agent', 'service', 'commerce', 'primitives', 'chat'],
         supportsResponseFormat: true,
         conciseFields: ['type', 'id', 'title', 'segment'],
@@ -133,6 +134,7 @@ export const discoveryWorkBoardsTools = [
         description: 'Hire another agent, or a person, to run a catalogue action: holds the morsel cost in escrow and creates a pending work item, returning a tracking_code and the cost breakdown. Discover actions and their providers with aimeat_catalogue_search first. Fails if your morsel balance is insufficient. The provider then accepts and delivers (aimeat_work_accept / aimeat_work_deliver); to invoke a server-side capability instead, use aimeat_capabilities_invoke.',
         caller: 'agent',
         visibility: agentEverywhere,
+        // openWorldHint: dispatches to third-party action providers/capabilities/sandboxed code
         annotations: { title: 'Execute Catalogue Action', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
         scope: 'work:request',
         surfaces: ['service'],
@@ -281,6 +283,7 @@ export const discoveryWorkBoardsTools = [
         visibility: agentEverywhere,
         annotations: { title: 'Upload Storage File', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         scope: 'storage:write',
+        // On `primitives`: Carry bytes.
         surfaces: ['appdev', 'agent', 'service', 'commerce', 'primitives'],
         input: {
             key: { type: 'string', required: true, description: 'Storage key (path-like identifier).' },
@@ -359,6 +362,7 @@ export const discoveryWorkBoardsTools = [
         visibility: agentEverywhere,
         annotations: { title: 'Admin: List SSO Connections', readOnlyHint: true },
         scope: 'operator:admin',
+        // On `admin`: BR-04: the operator connects an organisation's identity provider and offboards by hand.
         surfaces: ['admin'],
         input: {},
     },
@@ -491,6 +495,7 @@ export const discoveryWorkBoardsTools = [
         visibility: agentEverywhere,
         annotations: { title: 'Admin: Security Overview', readOnlyHint: true },
         scope: 'operator:admin',
+        // On `admin`: The Security page in one read, and resolving a refused-and-kept incident.
         surfaces: ['admin'],
         input: {},
     },
@@ -515,6 +520,7 @@ export const discoveryWorkBoardsTools = [
         visibility: agentEverywhere,
         annotations: { title: 'Admin: CORS Overview', readOnlyHint: true },
         scope: 'operator:admin',
+        // On `admin`: The CORS page in one read, and the write that sets a person's or an agent's list.
         surfaces: ['admin'],
         input: {},
     },
@@ -525,6 +531,8 @@ export const discoveryWorkBoardsTools = [
         visibility: agentEverywhere,
         annotations: { title: 'Admin: Federation', readOnlyHint: true },
         scope: 'operator:admin',
+        // On `admin`: The Federation page in one read: the peers, what waits on a person, and the book's age.
+        // And two writes beside it: a peer kept on its own relay-claim setting, and a peer removed.
         surfaces: ['admin'],
         input: {},
     },
@@ -564,6 +572,7 @@ export const discoveryWorkBoardsTools = [
         visibility: agentEverywhere,
         annotations: { title: 'Admin: Knowledge', readOnlyHint: true },
         scope: 'operator:admin',
+        // On `admin`: The Knowledge page in one read: the whole collection, its shape, and who has already looked.
         surfaces: ['admin'],
         input: {
             page: { type: 'number', required: false, description: 'Which page of packages, from 1. A page past the end comes back as the last page rather than empty.', zod: z.number().int() },
@@ -582,6 +591,7 @@ export const discoveryWorkBoardsTools = [
         // Read-only about this node, but `ask_provider` reaches a third party, so it is not closed-world.
         annotations: { title: 'Admin: Usage', readOnlyHint: true, openWorldHint: true },
         scope: 'operator:admin',
+        // On `admin`: The Usage page in one read: whose money paid for the AI, and the key nothing here meters.
         surfaces: ['admin'],
         input: {
             from: { type: 'string', required: false, description: 'First day of the period, inclusive, as YYYY-MM-DD. Give `to` as well or neither is used.' },
@@ -596,6 +606,7 @@ export const discoveryWorkBoardsTools = [
         visibility: agentEverywhere,
         annotations: { title: 'Admin: Statistics', readOnlyHint: true },
         scope: 'operator:admin',
+        // On `admin`: The Statistics page in one read: the counters, their day tallies, and the live gauges.
         surfaces: ['admin'],
         input: {
             from: { type: 'string', required: false, description: 'First day of the period, inclusive, as YYYY-MM-DD. Give `to` as well or neither is used.' },
@@ -610,6 +621,7 @@ export const discoveryWorkBoardsTools = [
         // Reads npm, an outside service, but changes nothing anywhere.
         annotations: { title: 'Admin: Newer AIMEAT Version', readOnlyHint: true, openWorldHint: true },
         scope: 'operator:admin',
+        // On `admin`: Is a newer AIMEAT on npm, what is new in it, and the prompt that updates the node.
         surfaces: ['admin'],
         input: {
             refresh: { type: 'boolean', required: false, description: 'Ask the registry now instead of answering from the six-hour cache.' },
@@ -622,6 +634,7 @@ export const discoveryWorkBoardsTools = [
         visibility: agentEverywhere,
         annotations: { title: 'Admin: Hooks', readOnlyHint: true },
         scope: 'operator:admin',
+        // On `admin`: The Hooks page in one read, and the write that binds a moment to an address.
         surfaces: ['admin'],
         input: {},
     },
@@ -665,6 +678,8 @@ export const discoveryWorkBoardsTools = [
         // here as well because a tool is REGISTERED according to this table, and no wildcard carries this
         // one (SCOPES_OUTSIDE_WILDCARD), so an operator's agent holds it only by an explicit tick.
         scope: 'operator:organism-repair',
+        // On `admin`: The operator's break-glass over an organism whose creator account is unreachable, plus the
+        // read that shows the roster before it is re-pointed.
         surfaces: ['admin'],
         input: {
             organism_id: { type: 'string', required: true, description: 'The organism ID.' },

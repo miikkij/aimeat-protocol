@@ -30,6 +30,7 @@ export const themeTools = [
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: true, cliFallback: true },
         annotations: { title: 'Themes: list, with the operator\'s choices', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        // On `agent`: The node's themes: the look of every page. Saving is the operator's, gated in the tool.
         surfaces: ['agent', 'admin'],
         input: {},
     },
