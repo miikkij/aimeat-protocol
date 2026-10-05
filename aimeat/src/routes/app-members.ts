@@ -26,6 +26,10 @@
  *   (across all of them). The audit read and the invitation cancel are in routes/app-members-extra.ts.
  * @usage app.use(appMembersRouter(config, storage))
  * @version-history
+ *   v1.6.0 — 2026-10-05 — Secaudit 2026-10. APP-1: the app's own token may not change a plan's access,
+ *     manageRoles or rosterVisibility. APP-3: adding by email looks the address up only for the owner
+ *     in person; any other caller gets an invitation, so the answer says nothing about who has an
+ *     account. APP-5: dismissing a guest writes an audit row only when there was a visit.
  *   v1.5.1 — 2026-10-02 — builderNext tells the invited person's AI to read the app's design spec
  *     before changing anything and to write it back after a publish (services/app-design-spec.ts).
  *   v1.5.0 — 2026-10-02 — The per-app dev-grants answers are written for an agent working from a
@@ -76,6 +80,7 @@ import { requireAuth, requireOwnerPrincipal, requireScope } from '../auth/middle
 // Every roster route that reads or changes membership: a scope word for an agent or another app,
 // none for the app's own token, which is the app managing its own roster (auth/app-own-gate.ts).
 import { requireScopeOrOwnApp, tokenOfThisApp } from '../auth/app-own-gate.js';
+import { isOwnerInPerson } from '../auth/effective-scopes.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { listAppRecords } from '../services/app-record-keys.js';
@@ -96,7 +101,7 @@ import { logger } from '../utils/logger.js';
 import { membersContext, type MembersCtx } from './app-members-context.js';
 import { appMembersExtraRouter } from './app-members-extra.js';
 import { approveMember, memberAddress, appDeepLink, appStem } from '../services/app-member-approve.js';
-import { ROLE_RE, RESERVED_ROLES, roleShapeError, isManagerRole, reaskRetryAt, suggestRole, parseRosterPaging } from '../services/app-member-rules.js';
+import { ROLE_RE, RESERVED_ROLES, roleShapeError, isManagerRole, reaskRetryAt, suggestRole, parseRosterPaging, normalizeAccess, sameSet } from '../services/app-member-rules.js';
 import { rosterView, memberRosterView, displayNamesOf, sampleRoles } from '../services/app-member-roster.js';
 import { sendMemberNotice, memberActionLabel, noticeLang } from '../services/app-member-notices.js';
 import { listInvites, sendAppInvite, inviteView, MAX_OPEN_INVITES_PER_APP, INVITE_DAYS } from '../services/app-member-invites.js';
@@ -230,6 +235,18 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
         return forbidden(res, `The app's own token may keep or drop the offerings a role is carried on, not add one (${added.slice(0, 5).join(', ')}): `
           + 'carrying an offering gives away free access to it. Add it from the owner\'s own session, or an agent of theirs holding commerce:sell.');
       }
+      // Who pays and who manages are the owner's to change. `access: "free"` makes every call of the
+      // owner's paid service free before any settlement (extensions/paywall.ts), which is more than an
+      // added offering gives away; manageRoles hands out the roster (secaudit 2026-10, APP-1).
+      const changed = [
+        b.access !== undefined && normalizeAccess(String(b.access)) !== (c.plan?.access ?? 'members-free') ? 'access' : null,
+        b.manageRoles !== undefined && !sameSet(b.manageRoles as unknown[], c.plan?.manageRoles ?? []) ? 'manageRoles' : null,
+        b.rosterVisibility !== undefined && b.rosterVisibility !== (c.plan?.rosterVisibility ?? 'owner') ? 'rosterVisibility' : null,
+      ].filter((x): x is string => !!x);
+      if (changed.length) {
+        return forbidden(res, `The app's own token may not change ${changed.join(', ')}: who pays and who manages the roster are the owner's to decide. `
+          + 'Change it from the owner\'s own session, or an agent of theirs holding commerce:sell.');
+      }
     }
     const seats: Record<string, number> = {};
     for (const [role, v] of Object.entries(b.seats || {})) {
@@ -283,10 +300,12 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
     if (sendContextError(res, c)) return;
     if (!c.canManage) return forbidden(res, 'Only the app owner, or a member who manages its roster, manages its guest list');
     const account = accountOf(String(req.params.account ?? ''));
-    await forgetVisit(storage, c.appId, account);
-    await audit(c, 'visitor.dismissed', { account });
+    // Only a visit that was there leaves an audit row: a made-up name changes nothing and writes
+    // nothing, so a manager cannot grow the owner's log with it (secaudit 2026-10, APP-5).
+    const had = await forgetVisit(storage, c.appId, account);
+    if (had) await audit(c, 'visitor.dismissed', { account });
     return res.json(success(config.nodeId, {
-      dismissed: true,
+      dismissed: had,
       note: 'Removed from the list of people who turned up. They are recorded again on their next visit.',
     }));
   });
@@ -369,6 +388,12 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
         if (e instanceof InvitationError) return bad(e.message);
         throw e;
       }
+      // Whether an address belongs to an account here is the contacts lookup's answer, and that door
+      // admits a person's own session or an agent holding messages:read, never an app's token
+      // (POST /v1/contacts/resolve). Anybody else asking here (the app's own token, an agent, a
+      // manager) gets an invitation whatever the address is, so the answer tells them nothing about
+      // who has an account; the account holder accepts it from their mail (secaudit 2026-10, APP-3).
+      if (!isOwnerInPerson(req.auth!)) return invite(c, res, { email, role, note, lang });
       let hit: Awaited<ReturnType<typeof resolveContactEmail>>;
       try {
         hit = await resolveContactEmail(storage, c.callerGaii, email);

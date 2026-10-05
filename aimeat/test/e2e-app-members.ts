@@ -1931,6 +1931,43 @@ await test('A2 link: a cancel kills the link, a new invitation to the same addre
     assert(take.status === 404, `the cancelled link made an account: ${take.status} ${JSON.stringify(take.body?.error ?? take.body.data)}`);
 });
 
+// ── 2026-10-05: secaudit 2026-10, APP-1, APP-3 and APP-5 ─────────────────────────────────────────
+
+await test('APP-1: the app\'s own token may not change who pays or who manages; the plan\'s offerings it may still keep', async () => {
+    const own = await appTokenFor(owner, `${owner.name}/${R2}`, 'memory:read');
+    const set = await json(`${r2()}/plan`, { method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ roles: { member: [] }, access: 'members-free' }) });
+    assert(set.status === 200, `owner sets the plan: ${set.status} ${JSON.stringify(set.body?.error)}`);
+    for (const body of [{ roles: { member: [] }, access: 'free' }, { roles: { member: [] }, manageRoles: ['member'] }, { roles: { member: [] }, rosterVisibility: 'members' }]) {
+        const r = await json(`${r2()}/plan`, { method: 'PUT', headers: auth(own), body: JSON.stringify(body) });
+        assert(r.status === 403 && r.body.error.code === 'FORBIDDEN', `the app's token changed ${Object.keys(body)[1]}: ${r.status} ${JSON.stringify(r.body?.error ?? r.body.data?.plan)}`);
+    }
+    const keep = await json(`${r2()}/plan`, { method: 'PUT', headers: auth(own), body: JSON.stringify({ roles: { member: [] }, access: 'members-free' }) });
+    assert(keep.status === 200, `the same plan from the app's token: ${keep.status} ${JSON.stringify(keep.body?.error)}`);
+    const plan = await json(`${r2()}/plan`, { headers: auth(owner.token) });
+    assert(plan.body.data.plan?.access === 'members-free', `the access stayed the owner's: ${JSON.stringify(plan.body.data.plan)}`);
+});
+
+await test('APP-3: adding by email tells only the owner in person whether the address has an account here', async () => {
+    const email = `r2probe.${Date.now()}@example.com`;
+    await provisionWithEmail(email, 'prb');
+    const own = await appTokenFor(owner, `${owner.name}/${R2}`, 'memory:read');
+    const viaApp = await json(r2(), { method: 'POST', headers: auth(own), body: JSON.stringify({ email, role: 'member' }) });
+    assert(viaApp.status === 201 && !viaApp.body.data.found && !!viaApp.body.data.invite,
+        `the app's token gets an invitation and no account name: ${viaApp.status} ${JSON.stringify(viaApp.body.data ?? viaApp.body?.error)}`);
+    const viaOwner = await json(r2(), { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ email, role: 'member' }) });
+    assert(viaOwner.status === 201 && !!viaOwner.body.data.found, `the owner in person finds the account: ${viaOwner.status} ${JSON.stringify(viaOwner.body.data ?? viaOwner.body?.error)}`);
+});
+
+await test('APP-5: dismissing a guest who never came writes nothing to the audit log', async () => {
+    const before = await json(`${r2()}/audit`, { headers: auth(owner.token) });
+    const count = before.body.data?.total;
+    assert(typeof count === 'number' && count > 0, `the log holds the earlier round's rows: ${JSON.stringify(before.body.data)}`);
+    const r = await json(`${r2()}/seen/nobody${Date.now()}`, { method: 'DELETE', headers: auth(owner.token) });
+    assert(r.status === 200 && r.body.data.dismissed === false, `a made-up guest: ${r.status} ${JSON.stringify(r.body.data)}`);
+    const after = await json(`${r2()}/audit`, { headers: auth(owner.token) });
+    assert(after.body.data?.total === count, `the log grew from ${count} to ${after.body.data?.total}`);
+});
+
 console.log(`\napp member roster E2E: ${passed} passed, ${failed} failed (${passed + failed} total)\n`);
 if (failed > 0) process.exit(1);
 
