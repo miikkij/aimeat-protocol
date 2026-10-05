@@ -26,6 +26,7 @@
  * @structure registerAdminStatisticsTools(mcp, storage, config, getAgentGaii, scopes) — two reads.
  * @usage registerAdminStatisticsTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.2.0 — 2026-09-24 — SECURITY (audit A8-1): the operator test asks the operator:admin word as
  *     well as the account (services/owner-lifecycle.ts resolveOperatorAgentName).
  *   v1.1.0 — 2026-09-12 — aimeat_admin_usage: what AI costs here and whose money paid, including
@@ -33,7 +34,6 @@
  *   v1.0.0 — 2026-09-12 — Initial: aimeat_admin_statistics.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { getStats } from '../services/stats.js';
@@ -42,6 +42,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
 import { buildStatsSnapshot } from '../services/stats-page.js';
 import { buildUsagePage } from '../services/usage-page.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 const text = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
 const refuse = (message: string) => ({ content: [{ type: 'text' as const, text: message }], isError: true });
@@ -60,10 +61,7 @@ export function registerAdminStatisticsTools(
   const operatorName = () => resolveOperatorAgentName(storage, agentGaii, scopes);
 
   mcp.tool('aimeat_admin_statistics', descriptionFor('aimeat_admin_statistics'),
-    {
-      from: z.string().optional().describe('First day of the period, inclusive, as YYYY-MM-DD. Give `to` as well, or neither is used and you get the whole life of this node.'),
-      to: z.string().optional().describe('Last day of the period, inclusive, as YYYY-MM-DD. Give `from` as well, or neither is used.'),
-    },
+    zodShapeFor('aimeat_admin_statistics'),
     annotationsFor('aimeat_admin_statistics'),
     async ({ from, to }) => {
       if (!(await operatorName())) return refuse(OPERATOR_AGENT_REFUSAL);
@@ -89,11 +87,7 @@ export function registerAdminStatisticsTools(
     });
 
   mcp.tool('aimeat_admin_usage', descriptionFor('aimeat_admin_usage'),
-    {
-      from: z.string().optional().describe('First day of the period, inclusive, as YYYY-MM-DD. Give `to` as well, or neither is used and you get the trailing thirty days.'),
-      to: z.string().optional().describe('Last day of the period, inclusive, as YYYY-MM-DD. Give `from` as well, or neither is used.'),
-      ask_provider: z.boolean().optional().describe('Ask the provider what this node\'s own house and chat keys have actually spent. One outbound call per key, cached for a minute. Off by default, because it reaches a third party.'),
-    },
+    zodShapeFor('aimeat_admin_usage'),
     annotationsFor('aimeat_admin_usage'),
     async ({ from, to, ask_provider }) => {
       if (!(await operatorName())) return refuse(OPERATOR_AGENT_REFUSAL);

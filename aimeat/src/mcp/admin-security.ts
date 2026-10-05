@@ -11,6 +11,7 @@
  * @structure registerAdminSecurityTools(mcp, storage, config, getAgentGaii, scopes) — two operator tools.
  * @usage registerAdminSecurityTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.2.2 — 2026-09-26 — The `resolution` description names the app grants and access tokens too.
  *   v1.2.1 — 2026-09-26 — The `resolution` description names the cortexes and ecosystem apps a
  *     decision covers.
@@ -22,7 +23,6 @@
  *   v1.0.0 — 2026-09-05 — Initial: aimeat_admin_security_overview, aimeat_admin_incident_resolve.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -32,6 +32,7 @@ import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/ow
 import { buildSecurityOverview } from '../services/security-overview.js';
 import { resolveSecurityIncident } from '../services/security-incident.js';
 import { resolveHeldName } from '../services/held-account-names.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 const text = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
 const refuse = (message: string) => ({ content: [{ type: 'text' as const, text: message }], isError: true });
@@ -48,18 +49,14 @@ export function registerAdminSecurityTools(
   const operatorName = () => resolveOperatorAgentName(storage, agentGaii, scopes);
 
   mcp.tool('aimeat_admin_security_overview', descriptionFor('aimeat_admin_security_overview'),
-    {}, annotationsFor('aimeat_admin_security_overview'),
+    zodShapeFor('aimeat_admin_security_overview'), annotationsFor('aimeat_admin_security_overview'),
     async () => {
       if (!(await operatorName())) return refuse(OPERATOR_AGENT_REFUSAL);
       return text(await buildSecurityOverview(config, storage));
     });
 
   mcp.tool('aimeat_admin_incident_resolve', descriptionFor('aimeat_admin_incident_resolve'),
-    {
-      id: z.string().describe('The incident id, from the overview\'s incidents list.'),
-      name: z.string().optional().describe('To decide one name of an incident the move to the full identity opened: the account name, from the incident\'s names.'),
-      resolution: z.string().optional().describe('With `name`: "holder" (its rows, cortexes, ecosystem apps, app grants and access tokens are the account\'s that holds the name now) or "previous" (they were a previous holder\'s).'),
-    },
+    zodShapeFor('aimeat_admin_incident_resolve'),
     annotationsFor('aimeat_admin_incident_resolve'),
     async ({ id, name, resolution }) => {
       if (!(await operatorName())) return refuse(OPERATOR_AGENT_REFUSAL);

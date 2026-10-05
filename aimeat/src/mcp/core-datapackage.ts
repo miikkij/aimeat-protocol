@@ -25,6 +25,7 @@
  *   import { registerCoreDataPackageTools } from './core-datapackage.js';
  *   registerCoreDataPackageTools(mcp, storage, config, getAgentGaii);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v1.0.0 -- 2026-08-15 -- Initial (TARGET-063 vaihe 1, B3).
  */
@@ -41,6 +42,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { publishPackage, openPackage, readRows } from '../services/datapackage/store.js';
 import { toCsv } from '../services/datapackage/table.js';
 import type { TableSchema } from '../services/datapackage/contract.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 /** What one tool call may carry as rows. Same number as the sandbox bridge, for one reason a person
  *  can remember: "8 MB is what crosses in one call, wherever you are standing". */
@@ -170,15 +172,7 @@ export function registerCoreDataPackageTools(
     mcp.tool(
         'aimeat_datapackage_export',
         descriptionFor('aimeat_datapackage_export'),
-        {
-            ref: z.string().describe('pkg:owner/name for the newest version, or pkg:owner/name@sha256:… to pin one.'),
-            resource: z.string().describe('Which resource of the package.'),
-            format: z.enum(['url', 'csv', 'json']).default('url')
-                .describe('url = the permanent CSV address (default, and what you want in almost every case). csv/json = the bytes inline, for a small table you must reason over.'),
-            limit: z.number().int().positive().max(5000).optional().describe('Rows, for csv/json. Default 500.'),
-            offset: z.number().int().nonnegative().optional(),
-            select: z.array(z.string()).optional().describe('Only these columns.'),
-        },
+        zodShapeFor('aimeat_datapackage_export'),
         annotationsFor('aimeat_datapackage_export'),
         async ({ ref, resource, format, limit, offset, select }) => {
             const opened = await openPackage(store, ref, config.nodeId);

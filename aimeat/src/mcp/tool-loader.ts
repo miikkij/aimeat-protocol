@@ -28,14 +28,15 @@
  *     aimeat_invoke runs the session's own tools
  * @usage in createMcpServer, for role 'chat' only
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import type { McpServer, RegisteredTool } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { getAimeatToolDefinition } from '../tool-catalog/definitions.js';
 import { annotationsFor } from './annotations.js';
 import { logger } from '../utils/logger.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export interface ToolEntry { name: string; description: string; enabled: boolean }
 
@@ -116,10 +117,7 @@ export function registerToolLoader(mcp: McpServer): void {
     mcp.tool(
         'aimeat_tools_find',
         descriptionFor('aimeat_tools_find'),
-        {
-            purpose: z.string().describe('What you want to do, in a few words.'),
-            limit: z.number().optional().describe('How many tools to add at most (default 6, max 12).'),
-        },
+        zodShapeFor('aimeat_tools_find'),
         annotationsFor('aimeat_tools_find'),
         async ({ purpose, limit }) => {
             const tools = registered(mcp);

@@ -12,10 +12,10 @@
  * @structure registerAdminNodeUpdateTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage registerAdminNodeUpdateTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-09-30 — Initial.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -23,6 +23,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
 import { getNodeUpdateStatus } from '../services/node-update-check.js';
 import { toolError } from './tool-error.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 const text = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
 
@@ -37,9 +38,7 @@ export function registerAdminNodeUpdateTools(
   const agentGaii = getAgentGaii();
 
   mcp.tool('aimeat_admin_node_update', descriptionFor('aimeat_admin_node_update'),
-    {
-      refresh: z.boolean().optional().describe('Ask the registry now instead of answering from the six-hour cache. Use it right after an update, to confirm the new version.'),
-    },
+    zodShapeFor('aimeat_admin_node_update'),
     annotationsFor('aimeat_admin_node_update'),
     async ({ refresh }) => {
       if (!(await resolveOperatorAgentName(storage, agentGaii, scopes))) return toolError('FORBIDDEN', OPERATOR_AGENT_REFUSAL);

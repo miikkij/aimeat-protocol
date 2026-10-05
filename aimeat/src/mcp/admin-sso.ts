@@ -11,6 +11,7 @@
  * @structure registerAdminSsoTools(mcp, storage, config, getAgentGaii, scopes) — ten operator tools.
  * @usage registerAdminSsoTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.2.0 — 2026-09-24 — SECURITY (audit A8-1): the operator test asks the operator:admin word as
  *     well as the account (services/owner-lifecycle.ts resolveOperatorAgentName). The account alone
  *     let any agent of the operator reset a person's second factor or deactivate their account.
@@ -19,7 +20,6 @@
  *   v1.0.0 — 2026-08-24 — Initial (BR-04 phase 1's MCP batch).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -34,6 +34,7 @@ import {
 } from '../services/owner-lifecycle.js';
 import { resetTotpByOperator } from '../services/totp-recovery.js';
 import { emitChange } from '../services/event-bus.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 const text = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
 const refuse = (message: string) => ({ content: [{ type: 'text' as const, text: message }], isError: true });
@@ -54,7 +55,7 @@ export function registerAdminSsoTools(
   const operatorName = () => resolveOperatorAgentName(storage, agentGaii, scopes);
 
   mcp.tool('aimeat_admin_sso_list', descriptionFor('aimeat_admin_sso_list'),
-    {}, annotationsFor('aimeat_admin_sso_list'),
+    zodShapeFor('aimeat_admin_sso_list'), annotationsFor('aimeat_admin_sso_list'),
     async () => {
       if (!(await operatorName())) return refuse(OPERATOR_AGENT_REFUSAL);
       // The same build the HTTP list calls. It used to assemble `{ connections }` here, which was
@@ -63,7 +64,7 @@ export function registerAdminSsoTools(
     });
 
   mcp.tool('aimeat_admin_sso_get', descriptionFor('aimeat_admin_sso_get'),
-    { id: z.string().describe('The connection id (slug).') },
+    zodShapeFor('aimeat_admin_sso_get'),
     annotationsFor('aimeat_admin_sso_get'),
     async ({ id }) => {
       if (!(await operatorName())) return refuse(OPERATOR_AGENT_REFUSAL);
@@ -72,14 +73,7 @@ export function registerAdminSsoTools(
     });
 
   mcp.tool('aimeat_admin_sso_create', descriptionFor('aimeat_admin_sso_create'),
-    {
-      id: z.string().describe('Permanent slug id (lowercase letters, digits, dashes; 2-31 chars).'),
-      name: z.string().describe('The organisation\'s name — the sign-in button label when listed.'),
-      domains: z.array(z.string()).optional().describe('Email domains this organisation vouches for, e.g. ["contoso.com"].'),
-      organism_id: z.string().optional().describe('Organism its people are added to on first sign-in or provisioning.'),
-      login_visibility: z.enum(['listed', 'hidden']).optional().describe('"listed" shows a sign-in button; "hidden" keeps the organisation off the public modal (default listed).'),
-      allow_idp_initiated: z.boolean().optional().describe('Accept sign-ins started from the IdP\'s own portal tile (default false).'),
-    },
+    zodShapeFor('aimeat_admin_sso_create'),
     annotationsFor('aimeat_admin_sso_create'),
     async (input) => {
       const by = await operatorName();
@@ -89,14 +83,7 @@ export function registerAdminSsoTools(
     });
 
   mcp.tool('aimeat_admin_sso_update', descriptionFor('aimeat_admin_sso_update'),
-    {
-      id: z.string().describe('The connection id.'),
-      name: z.string().optional().describe('New organisation name.'),
-      domains: z.array(z.string()).optional().describe('New email-domain list (replaces the old one).'),
-      organism_id: z.string().optional().describe('New organism binding; an empty string clears it.'),
-      login_visibility: z.enum(['listed', 'hidden']).optional().describe('"listed" or "hidden".'),
-      allow_idp_initiated: z.boolean().optional().describe('Accept IdP-initiated sign-ins.'),
-    },
+    zodShapeFor('aimeat_admin_sso_update'),
     annotationsFor('aimeat_admin_sso_update'),
     async ({ id, ...input }) => {
       if (!(await operatorName())) return refuse(OPERATOR_AGENT_REFUSAL);
@@ -105,7 +92,7 @@ export function registerAdminSsoTools(
     });
 
   mcp.tool('aimeat_admin_sso_delete', descriptionFor('aimeat_admin_sso_delete'),
-    { id: z.string().describe('The connection id.') },
+    zodShapeFor('aimeat_admin_sso_delete'),
     annotationsFor('aimeat_admin_sso_delete'),
     async ({ id }) => {
       if (!(await operatorName())) return refuse(OPERATOR_AGENT_REFUSAL);
@@ -114,12 +101,7 @@ export function registerAdminSsoTools(
     });
 
   mcp.tool('aimeat_admin_sso_idp_metadata', descriptionFor('aimeat_admin_sso_idp_metadata'),
-    {
-      id: z.string().describe('The connection id.'),
-      url: z.string().optional().describe('The IdP metadata URL (e.g. Entra\'s federation metadata address).'),
-      xml: z.string().optional().describe('The IdP metadata document itself, when a URL is not reachable.'),
-      name_id_format: z.string().optional().describe('Requested NameID format, when the IdP\'s default is not wanted.'),
-    },
+    zodShapeFor('aimeat_admin_sso_idp_metadata'),
     annotationsFor('aimeat_admin_sso_idp_metadata'),
     async ({ id, ...input }) => {
       if (!(await operatorName())) return refuse(OPERATOR_AGENT_REFUSAL);
@@ -128,7 +110,7 @@ export function registerAdminSsoTools(
     });
 
   mcp.tool('aimeat_admin_sso_scim_token', descriptionFor('aimeat_admin_sso_scim_token'),
-    { id: z.string().describe('The connection id.') },
+    zodShapeFor('aimeat_admin_sso_scim_token'),
     annotationsFor('aimeat_admin_sso_scim_token'),
     async ({ id }) => {
       if (!(await operatorName())) return refuse(OPERATOR_AGENT_REFUSAL);
@@ -137,7 +119,7 @@ export function registerAdminSsoTools(
     });
 
   mcp.tool('aimeat_admin_owner_disable', descriptionFor('aimeat_admin_owner_disable'),
-    { name: z.string().describe('The owner name to deactivate.') },
+    zodShapeFor('aimeat_admin_owner_disable'),
     annotationsFor('aimeat_admin_owner_disable'),
     async ({ name }) => {
       const by = await operatorName();
@@ -154,7 +136,7 @@ export function registerAdminSsoTools(
     });
 
   mcp.tool('aimeat_admin_owner_enable', descriptionFor('aimeat_admin_owner_enable'),
-    { name: z.string().describe('The owner name to reactivate.') },
+    zodShapeFor('aimeat_admin_owner_enable'),
     annotationsFor('aimeat_admin_owner_enable'),
     async ({ name }) => {
       if (!(await operatorName())) return refuse(OPERATOR_AGENT_REFUSAL);
@@ -165,7 +147,7 @@ export function registerAdminSsoTools(
     });
 
   mcp.tool('aimeat_admin_totp_reset', descriptionFor('aimeat_admin_totp_reset'),
-    { name: z.string().describe('The owner name whose two-step sign-in should be removed.') },
+    zodShapeFor('aimeat_admin_totp_reset'),
     annotationsFor('aimeat_admin_totp_reset'),
     async ({ name }) => {
       const by = await operatorName();

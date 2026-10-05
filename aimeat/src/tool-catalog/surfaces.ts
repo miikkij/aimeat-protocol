@@ -175,9 +175,9 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         // Talk to the person.
         'aimeat_message_inbox', 'aimeat_message_send',
         // Carry bytes.
-        'aimeat_storage_upload', 'aimeat_storage_download',
+        
         // And the pair that reaches everything else.
-        'aimeat_discover', 'aimeat_invoke',
+        
     ],
     /**
      * The CHAT surface (/v2/mcp/chat): what the node's own chat starts every turn with.
@@ -195,7 +195,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
      */
     chat: [
         // Where to start, what exists, and the door to everything else.
-        'aimeat_handbook_get', 'aimeat_discover', 'aimeat_tools_find', 'aimeat_invoke',
+        'aimeat_handbook_get', 
         // What the person knows.
         'aimeat_memory_read', 'aimeat_memory_write', 'aimeat_memory_search', 'aimeat_memory_list',
         // What their groups know. Writing to a workspace is found when it is needed: its description
@@ -208,9 +208,9 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_task_create', 'aimeat_task_get', 'aimeat_task_list',
     ],
     appdev: [
-        'aimeat_storage_upload', 'aimeat_storage_download', 'aimeat_storage_delete',
-        'aimeat_datapackage_publish', 'aimeat_datapackage_export',
-        'aimeat_discover',
+        
+        
+        
         'aimeat_app_publish', 'aimeat_app_draft_save', 'aimeat_app_draft_publish', 'aimeat_app_draft_discard', 'aimeat_app_list', 'aimeat_app_get', 'aimeat_app_manage', 'aimeat_app_delete',
         // Component packages — a different backend from the apps above, named so since 2026-08-16.
         // Four of them are registered on this node's /v1/mcp (mcp/packages.ts) and the v2 surface
@@ -263,8 +263,8 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         // The node's themes: the look of every page. Saving is the operator's, gated in the tool.
         
         
-        'aimeat_storage_upload', 'aimeat_storage_download', 'aimeat_storage_delete',
-        'aimeat_datapackage_publish', 'aimeat_datapackage_export',
+        
+        
         // NOTE: aimeat_task_request_changes is connector-only (owner tool, not registered on the
         // server /v1/mcp), so it cannot appear on a server v2 surface — intentionally omitted here.
         'aimeat_task_create', 'aimeat_task_list', 'aimeat_task_get', 'aimeat_task_propose_todos',
@@ -327,10 +327,10 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_workspace_rows_append', 'aimeat_workspace_rows_read', 'aimeat_workspace_rows_stats', 'aimeat_workspace_rows_delete',
         'aimeat_workspace_doc_append', 'aimeat_workspace_doc_section_replace',
         'aimeat_workspace_space_add', 'aimeat_workspace_sections_set', 'aimeat_workspace_suggestions',
-        'aimeat_discover',
         
-        'aimeat_board_read',
-        'aimeat_agent_profile', 'aimeat_agent_activity', 'aimeat_agent_capabilities_report', 'aimeat_agent_tags_set', 'aimeat_agent_telemetry_report', 'aimeat_agents_list',
+        
+        
+        'aimeat_agent_activity', 'aimeat_agent_capabilities_report', 'aimeat_agent_tags_set', 'aimeat_agent_telemetry_report', 'aimeat_agents_list',
         // A person asks THEIR OWN agent for a new agent, so the proposal tools belong here. They sat
         // on `admin` alone until 2026-10-02, under a comment saying they were on this list.
         'aimeat_agent_basics_get', 'aimeat_agent_basics_request', 'aimeat_agent_propose',
@@ -358,18 +358,18 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
     ],
     service: [
-        'aimeat_discover',
-        'aimeat_catalogue_search', 
+        
+        
         'aimeat_memory_read', 'aimeat_memory_write', 'aimeat_memory_list', 'aimeat_memory_search', 'aimeat_memory_read_public',
-        'aimeat_storage_upload', 'aimeat_storage_download', 'aimeat_storage_delete',
-        'aimeat_datapackage_publish', 'aimeat_datapackage_export',
         
         
-        'aimeat_board_list', 'aimeat_board_read', 'aimeat_board_create', 'aimeat_board_post', 'aimeat_board_reply',
-        'aimeat_board_react', 'aimeat_board_subscribe', 'aimeat_board_members', 'aimeat_board_rules_set', 'aimeat_board_delete',
-        'aimeat_work_inbox', 'aimeat_work_accept', 'aimeat_work_deliver',
-        'aimeat_action_execute',
-        'aimeat_wallet_balance', 'aimeat_wallet_transactions',
+        
+        
+        
+        
+        
+        
+        'aimeat_wallet_transactions',
         
         
         'aimeat_organism_list', 'aimeat_organism_get', 'aimeat_organism_members', 'aimeat_organism_invite', 'aimeat_organism_invite_email', 'aimeat_organism_invitations_email', 'aimeat_organism_invitation_email_cancel', 'aimeat_organism_member_add', 'aimeat_organism_member_remove', 'aimeat_organism_owner_add', 'aimeat_organism_owner_remove', 'aimeat_organism_invitation_update', 'aimeat_organism_invitation_cancel', 'aimeat_organism_invitations', 'aimeat_organism_invitation_respond', 'aimeat_organism_search', 'aimeat_organism_join', 'aimeat_organism_leave', 'aimeat_organism_create', 'aimeat_organism_update', 'aimeat_organism_archive', 'aimeat_organism_export', 'aimeat_organism_import',
@@ -377,7 +377,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_workspace_rows_append', 'aimeat_workspace_rows_read', 'aimeat_workspace_rows_stats', 'aimeat_workspace_rows_delete',
         'aimeat_workspace_doc_append', 'aimeat_workspace_doc_section_replace',
         'aimeat_workspace_space_add', 'aimeat_workspace_sections_set', 'aimeat_workspace_suggestions',
-        'aimeat_agent_profile', 'aimeat_agent_activity', 'aimeat_agent_capabilities_report', 'aimeat_agent_tags_set', 'aimeat_agent_telemetry_report', 'aimeat_agents_list',
+        'aimeat_agent_activity', 'aimeat_agent_capabilities_report', 'aimeat_agent_tags_set', 'aimeat_agent_telemetry_report', 'aimeat_agents_list',
         
         
         'aimeat_usage_report',
@@ -403,30 +403,30 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
     ],
     admin: [
-        'aimeat_admin_stats', 'aimeat_admin_agents', 'aimeat_admin_config', 'aimeat_admin_mint',
+        'aimeat_admin_mint',
         // TARGET-082: the operator's AI sets the node's classification switch and policy.
         
         // BR-04: the operator connects an organisation's identity provider and offboards by hand.
-        'aimeat_admin_sso_list', 'aimeat_admin_sso_get', 'aimeat_admin_sso_create', 'aimeat_admin_sso_update',
-        'aimeat_admin_sso_delete', 'aimeat_admin_sso_idp_metadata', 'aimeat_admin_sso_scim_token',
-        'aimeat_admin_owner_disable', 'aimeat_admin_owner_enable', 'aimeat_admin_totp_reset',
+        
+        
+        
         // The Security page in one read, and resolving a refused-and-kept incident.
-        'aimeat_admin_security_overview', 'aimeat_admin_incident_resolve',
+        
         // The CORS page in one read, and the write that sets a person's or an agent's list.
-        'aimeat_admin_cors_overview', 'aimeat_admin_cors_set',
+        
         // The Hooks page in one read, and the write that binds a moment to an address.
-        'aimeat_admin_hooks', 'aimeat_admin_hook_set',
+        
         // The Statistics page in one read: the counters, their day tallies, and the live gauges.
-        'aimeat_admin_statistics',
+        
         // Is a newer AIMEAT on npm, what is new in it, and the prompt that updates the node.
-        'aimeat_admin_node_update',
+        
         // The Usage page in one read: whose money paid for the AI, and the key nothing here meters.
-        'aimeat_admin_usage',
+        
         // The Knowledge page in one read: the whole collection, its shape, and who has already looked.
-        'aimeat_admin_knowledge',
+        
         // The Federation page in one read: the peers, what waits on a person, and the book's age.
         // And two writes beside it: a peer kept on its own relay-claim setting, and a peer removed.
-        'aimeat_admin_federation', 'aimeat_admin_federation_relay_claim_set', 'aimeat_admin_federation_peer_remove',
+        
         // Setting this node up from an install set: owner, packages, organisms, users, crew agents.
         
         // Selling a repository's packages from this node, signed by its own key, and redeeming a
@@ -440,7 +440,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         // The operator's break-glass over an organism whose creator account is unreachable, plus the
         // read that shows the roster before it is re-pointed.
-        'aimeat_admin_organism_ownership', 'aimeat_admin_organism_owner_add',
+        
         // The node-wide compliance report and the two documents behind it. On this surface rather
         // than 'service' because it is the node's own governance rather than anything the node
         // sells, and because the only caller it will ever have is the operator's own agent.
@@ -476,10 +476,10 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         
         'aimeat_memory_read', 'aimeat_memory_write', 'aimeat_memory_list', 'aimeat_memory_search', 'aimeat_memory_read_public',
-        'aimeat_storage_upload', 'aimeat_storage_download', 'aimeat_storage_delete',
-        'aimeat_datapackage_publish', 'aimeat_datapackage_export',
-        'aimeat_wallet_balance', 'aimeat_wallet_transactions',
-        'aimeat_discover',
+        
+        
+        'aimeat_wallet_transactions',
+        
         'aimeat_handbook_get',
     ],
 

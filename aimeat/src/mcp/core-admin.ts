@@ -13,6 +13,7 @@
  *   import { registerCoreAdminTools } from './core-admin.js';
  *   registerCoreAdminTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.5.0 — 2026-09-29 — aimeat_admin_config reports the classification switch (classification_mode)
  *     and names aimeat_classification switch_set, which sets it (TARGET-082). This tool stays read-only.
  *   v1.4.0 — 2026-09-24 — SECURITY (audit A8-1): the operator test asks the word as well as the
@@ -46,6 +47,7 @@ import { addOrganismOwner, organismOwners } from '../services/organism-ownership
 import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
 import { OPERATOR_ORGANISM_REPAIR_SCOPE } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerCoreAdminTools(
     mcp: McpServer,
@@ -76,7 +78,7 @@ export function registerCoreAdminTools(
     mcp.tool(
         'aimeat_admin_stats',
         descriptionFor('aimeat_admin_stats'),
-        {},
+        zodShapeFor('aimeat_admin_stats'),
         annotationsFor('aimeat_admin_stats'),
         async () => {
             if (!(await isOperator())) return notOperator;
@@ -114,7 +116,7 @@ export function registerCoreAdminTools(
     mcp.tool(
         'aimeat_admin_agents',
         descriptionFor('aimeat_admin_agents'),
-        { limit: z.number().optional() },
+        zodShapeFor('aimeat_admin_agents'),
         annotationsFor('aimeat_admin_agents'),
         async ({ limit }) => {
             if (!(await isOperator())) return notOperator;
@@ -140,7 +142,7 @@ export function registerCoreAdminTools(
     mcp.tool(
         'aimeat_admin_config',
         descriptionFor('aimeat_admin_config'),
-        {},
+        zodShapeFor('aimeat_admin_config'),
         annotationsFor('aimeat_admin_config'),
         async () => {
             if (!(await isOperator())) return notOperator;
@@ -205,7 +207,7 @@ export function registerCoreAdminTools(
     mcp.tool(
         'aimeat_admin_organism_ownership',
         descriptionFor('aimeat_admin_organism_ownership'),
-        { organism_id: z.string() },
+        zodShapeFor('aimeat_admin_organism_ownership'),
         annotationsFor('aimeat_admin_organism_ownership'),
         async ({ organism_id }) => {
             if (!(await isOperator(OPERATOR_ORGANISM_REPAIR_SCOPE))) return notRepairer;
@@ -233,7 +235,7 @@ export function registerCoreAdminTools(
     mcp.tool(
         'aimeat_admin_organism_owner_add',
         descriptionFor('aimeat_admin_organism_owner_add'),
-        { organism_id: z.string(), ghii: z.string() },
+        zodShapeFor('aimeat_admin_organism_owner_add'),
         annotationsFor('aimeat_admin_organism_owner_add'),
         async ({ organism_id, ghii }) => {
             if (!(await isOperator(OPERATOR_ORGANISM_REPAIR_SCOPE))) return notRepairer;

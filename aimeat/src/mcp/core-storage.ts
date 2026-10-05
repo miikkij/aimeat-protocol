@@ -16,6 +16,7 @@
  *   import { registerCoreStorageTools } from './core-storage.js';
  *   registerCoreStorageTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.1.0 — 2026-09-29 — aimeat_storage_upload takes visibility 'workspace' with workspace_refs,
  *     the binding POST /v1/storage takes; it had no way to name a workspace.
  *   v1.0.0 — 2026-07-26 — Extracted from src/mcp/core.ts together with the reference-read change.
@@ -38,7 +39,6 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { readerForAgent } from '../services/classification/reader.js';
@@ -51,6 +51,7 @@ import { versionedAddress } from '../utils/http-range.js';
 import { decodeStrictBase64 } from '../utils/base64.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor, jsonContent } from '../tool-catalog/shape.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 /** F11: storage holds binaries (images, video, large blobs). aimeat_storage_download returns a
  *  handle (resource_link + presigned download_url) instead of base64 so bytes never enter the
@@ -74,14 +75,7 @@ export function registerCoreStorageTools(
     mcp.tool(
         'aimeat_storage_upload',
         descriptionFor('aimeat_storage_upload'),
-        {
-            key: z.string().describe('Storage key (path-like identifier)'),
-            data_base64: z.string().optional().describe('Base64-encoded file data. Omit to get an upload URL instead (recommended for files > 1KB).'),
-            mime_type: z.string().optional().describe('MIME type (default: application/octet-stream)'),
-            visibility: z.enum(['private', 'owner', 'group', 'public', 'workspace']).optional().describe('Access control (default: private)'),
-            group_id: z.string().optional().describe('ID of sharing group for group visibility'),
-            workspace_refs: z.array(z.string()).optional().describe('For visibility "workspace": the workspaces the file is shared with, each "<organismId>/<workspaceId>"'),
-        },
+        zodShapeFor('aimeat_storage_upload'),
         annotationsFor('aimeat_storage_upload'),
         async ({ key, data_base64, mime_type, visibility, group_id, workspace_refs }) => {
             const deps = { storage, config, emitResourceUpdated, emitResourceListChanged };
@@ -164,11 +158,7 @@ export function registerCoreStorageTools(
     mcp.tool(
         'aimeat_storage_download',
         descriptionFor('aimeat_storage_download'),
-        {
-            key: z.string().describe('Storage key in your own namespace, OR a full reference "owner@node/path/file.pdf" for a file someone else owns.'),
-            owner: z.string().optional().describe('GHII/GAII that owns the file (e.g. alice@aimeat-fi-001-genesis). Omit for your own files. Use this for your owner\'s uploads and for DM/task attachments.'),
-            inline: z.boolean().optional().describe('Only for small text files (<= 32 KB): return content inline. Binaries always return a download handle, never base64 in context.'),
-        },
+        zodShapeFor('aimeat_storage_download'),
         annotationsFor('aimeat_storage_download'),
         async ({ key, owner, inline }) => {
             const ref = owner ? `${owner}/${key}` : key;
@@ -232,9 +222,7 @@ export function registerCoreStorageTools(
     mcp.tool(
         'aimeat_storage_delete',
         descriptionFor('aimeat_storage_delete'),
-        {
-            key: z.string().describe('Storage key in your own namespace. You can only delete files you uploaded.'),
-        },
+        zodShapeFor('aimeat_storage_delete'),
         annotationsFor('aimeat_storage_delete'),
         async ({ key }) => {
             const removed = await removeStorageFile(
