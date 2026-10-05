@@ -18,7 +18,8 @@ import {
 } from '../../src/services/extension-capability-declaration.js';
 import { packageCapabilities } from '../../src/services/package-capabilities.js';
 import { appScopesOf, parseAppScopes } from '../../src/services/protected-resource.js';
-import { grantEntitlement } from '../../src/services/package-entitlements.js';
+import { grantEntitlement, readEntitlements } from '../../src/services/package-entitlements.js';
+import { createClaim, redeemClaim } from '../../src/services/package-claims.js';
 import { isOwnPackage } from '../../src/services/package-approvals.js';
 import { installSetRepositories } from '../../src/services/install-set-trust.js';
 import { peerCarriesAgents } from '../../src/services/federation.js';
@@ -160,6 +161,43 @@ describe('PKG-5: a package from another node is never the installer\'s own', () 
     it('a pulled or signed package is not, even when its descriptor names the installer as author', () => {
         const pulled = { ...base, upstream: { node: 'other-node', authorGhii: 'alice@test-node' } } as unknown as PackageRecord;
         expect(isOwnPackage(pulled, 'alice@test-node')).toBe(false);
+    });
+});
+
+describe('PKG-7: concurrent grants and redeems do not overwrite each other', () => {
+    /** A repository store with the compare-and-swap writes the providers have. */
+    function casRepo(): Storage {
+        const mem = new Map<string, any>();
+        const tick = () => new Promise(r => setTimeout(r, 1));
+        const id = (o: string, k: string) => `${o}/${k}`;
+        return {
+            listVersions: async () => { await tick(); return { versions: [{ author: 'alice' }] }; },
+            getMemory: async (o: string, k: string) => { await tick(); return mem.get(id(o, k)) ?? null; },
+            setMemory: async (rec: any) => { await tick(); mem.set(id(rec.ownerGaii, rec.key), rec); },
+            createMemoryIfAbsent: async (rec: any) => { await tick(); if (mem.has(id(rec.ownerGaii, rec.key))) return null; mem.set(id(rec.ownerGaii, rec.key), rec); return rec; },
+            setMemoryIfVersion: async (rec: any, v: number) => { await tick(); const cur = mem.get(id(rec.ownerGaii, rec.key)); if (!cur || cur.version !== v) return null; mem.set(id(rec.ownerGaii, rec.key), rec); return rec; },
+        } as unknown as Storage;
+    }
+    const AUTHOR = { owner: 'alice', isOperator: false };
+
+    it('two nodes granted at the same moment both hold the package', async () => {
+        const s = casRepo();
+        await Promise.all(['aimeat-node-a', 'aimeat-node-b', 'aimeat-node-c'].map(nodeId => grantEntitlement(s, AUTHOR, { groupId: 'g', nodeId })));
+        expect((await readEntitlements(s, 'g')).map(e => e.nodeId).sort()).toEqual(['aimeat-node-a', 'aimeat-node-b', 'aimeat-node-c']);
+    });
+
+    it('one claim code redeemed four times at once grants one node', async () => {
+        const s = casRepo();
+        const made = await createClaim(s, { groupId: 'g', seller: 'shop-node' });
+        if (!made.ok) throw new Error('claim');
+        const key = 'k'.repeat(44);
+        const nodes = ['aimeat-r-1', 'aimeat-r-2', 'aimeat-r-3', 'aimeat-r-4'];
+        const peers = new Map(nodes.map(n => [n, { nodeId: n, url: `https://${n}.example`, publicKey: key, status: 'active' } as never]));
+        const outs = await Promise.all(nodes.map(nodeId => redeemClaim({ storage: s, peers, repository: true }, {
+            groupId: 'g', author: 'alice', code: made.claim_code, nodeId, node: { url: `https://${nodeId}.example`, public_key: key },
+        })));
+        expect(outs.filter(o => o.ok).length).toBe(1);
+        expect((await readEntitlements(s, 'g')).length).toBe(1);
     });
 });
 

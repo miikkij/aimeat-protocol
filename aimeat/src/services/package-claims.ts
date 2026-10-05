@@ -21,6 +21,9 @@
  *   30 days.
  * @structure CLAIM_DAYS · createClaim() · redeemClaim()
  * @version-history
+ *   v1.2.0 — 2026-10-05 — A redeem consumes the code in one compare-and-swap before the grant's network
+ *     step and gives it back when the grant is refused; create and redeem never overwrite each other
+ *     (record-cas.ts; secaudit 2026-10, PKG-7).
  *   v1.1.0 — 2026-10-02 — A redeemed claim's new node counts against the packages-only peer cap (`peerCap`).
  *   v1.0.0 — 2026-10-02 — Initial (package sale design, phase 3).
  */
@@ -28,6 +31,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from './federation.js';
 import { NS_PACKAGE_ENTITLEMENTS, grantEntitlement, type PackageEntitlement, type EntitlementResult } from './package-entitlements.js';
+import { updateRecord, UNCHANGED } from './record-cas.js';
 
 export const CLAIM_DAYS = 30;
 
@@ -48,19 +52,16 @@ const fail = (status: number, code: string, message: string): Fail => ({ ok: fal
 const key = (groupId: string): string => `claims.${groupId}`;
 const hashOf = (code: string): string => createHash('sha256').update(code).digest('hex');
 
-async function read(storage: Storage, groupId: string): Promise<{ rec: Awaited<ReturnType<Storage['getMemory']>>; value: ClaimsRecord }> {
-    const rec = await storage.getMemory(NS_PACKAGE_ENTITLEMENTS, key(groupId));
-    const v = rec?.value as ClaimsRecord | undefined;
-    return { rec, value: v?.pending ? v : { groupId, pending: {} } };
-}
-
-async function write(storage: Storage, groupId: string, value: ClaimsRecord, prev: Awaited<ReturnType<Storage['getMemory']>>): Promise<void> {
-    const now = new Date().toISOString();
-    await storage.setMemory({
-        key: key(groupId), ownerGaii: NS_PACKAGE_ENTITLEMENTS, value,
-        visibility: 'private', tags: ['package-claims'], ttlHours: null,
-        version: prev ? prev.version + 1 : 1, createdAt: prev?.createdAt ?? now, updatedAt: now,
-    });
+/**
+ * Change the group's claims with a compare-and-swap write (record-cas.ts): a concurrent create or
+ * redeem is never overwritten by a copy read before it (secaudit 2026-10, PKG-7).
+ */
+function updateClaims(
+    storage: Storage, groupId: string, mutate: (cur: ClaimsRecord) => ClaimsRecord | typeof UNCHANGED,
+): Promise<ClaimsRecord> {
+    return updateRecord<ClaimsRecord>(storage, NS_PACKAGE_ENTITLEMENTS, key(groupId),
+        v => ((v as ClaimsRecord | undefined)?.pending ? v as ClaimsRecord : { groupId, pending: {} }),
+        mutate, { tag: 'package-claims' });
 }
 
 /** Drop the expired claims, so the record does not grow with sales nobody redeemed. */
@@ -84,7 +85,6 @@ export async function createClaim(
     }
     const code = `pkgc_${randomBytes(18).toString('base64url')}`;
     const now = Date.now();
-    const { rec, value } = await read(storage, input.groupId);
     const claim: PendingClaim = {
         soldBy: input.seller, updatesUntil, channel: (input.channel as 'stable' | 'beta' | undefined) ?? 'stable',
         ...(typeof input.note === 'string' && input.note ? { note: input.note.slice(0, 500) } : {}),
@@ -92,7 +92,7 @@ export async function createClaim(
         createdAt: new Date(now).toISOString(),
         expiresAt: new Date(now + CLAIM_DAYS * 86_400_000).toISOString(),
     };
-    await write(storage, input.groupId, { groupId: input.groupId, pending: { ...live(value.pending, now), [hashOf(code)]: claim } }, rec);
+    await updateClaims(storage, input.groupId, cur => ({ groupId: input.groupId, pending: { ...live(cur.pending, now), [hashOf(code)]: claim } }));
     return { ok: true, claim_code: code, expires_at: claim.expiresAt };
 }
 
@@ -106,19 +106,27 @@ export async function redeemClaim(
 ): Promise<EntitlementResult> {
     if (typeof input.code !== 'string' || !input.code.startsWith('pkgc_')) return fail(400, 'INVALID_INPUT', 'code is the claim code the seller gave.');
     const now = Date.now();
-    const { rec, value } = await read(deps.storage, input.groupId);
-    const pending = live(value.pending, now);
     const h = hashOf(input.code);
-    const claim = pending[h];
+    // Consumed FIRST, in one compare-and-swap, before the grant's network step: the code was a read, a
+    // grant and a delete, so two redeems of one code inside the card read's wait could both win, one
+    // code for two nodes (secaudit 2026-10, PKG-7).
+    let claim: PendingClaim | undefined;
+    await updateClaims(deps.storage, input.groupId, cur => {
+        const pending = live(cur.pending, now);
+        claim = pending[h];
+        if (!claim) return UNCHANGED;
+        const rest = { ...pending };
+        delete rest[h];
+        return { groupId: input.groupId, pending: rest };
+    });
     // One answer for a wrong, a used and an expired code: a guesser learns nothing.
     if (!claim) return fail(404, 'CLAIM_NOT_FOUND', 'No claim with that code waits for this package. A code works once and for 30 days.');
+    const taken: PendingClaim = claim;
     const out = await grantEntitlement(deps.storage, { owner: input.author, isOperator: false }, {
-        groupId: input.groupId, nodeId: input.nodeId, updatesUntil: claim.updatesUntil, channel: claim.channel,
-        note: `sold by ${claim.soldBy}${claim.note ? `: ${claim.note}` : ''}`, node: input.node, terms: claim.terms,
-    }, deps.peers, { timeoutMs: deps.timeoutMs ?? 10_000, seller: claim.soldBy, thisNodeId: deps.thisNodeId, peerCap: deps.peerCap, repository: deps.repository });
-    if (!out.ok) return out;
-    const rest = { ...pending };
-    delete rest[h];
-    await write(deps.storage, input.groupId, { groupId: input.groupId, pending: rest }, rec);
+        groupId: input.groupId, nodeId: input.nodeId, updatesUntil: taken.updatesUntil, channel: taken.channel,
+        note: `sold by ${taken.soldBy}${taken.note ? `: ${taken.note}` : ''}`, node: input.node, terms: taken.terms,
+    }, deps.peers, { timeoutMs: deps.timeoutMs ?? 10_000, seller: taken.soldBy, thisNodeId: deps.thisNodeId, peerCap: deps.peerCap, repository: deps.repository });
+    // A refused grant gives the code back, so the person can redeem it on the right node.
+    if (!out.ok) await updateClaims(deps.storage, input.groupId, cur => ({ groupId: input.groupId, pending: { ...cur.pending, [h]: taken } }));
     return out;
 }
