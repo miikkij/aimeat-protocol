@@ -43,8 +43,6 @@
  *   recordClassificationAudit({ scope, ownerGaii, kind: 'memory', key, label: 'luottamuksellinen',
  *     reader: 'claude#alice@node', readerKind: 'ai', action: 'used', purpose: 'chat:anthropic/claude' });
  * @version-history
- *   v1.2.1 — 2026-10-05 — purgeClassificationAudit({ owner }) also drops the waiting rows where the
- *     erased person was the reader; the stored ones take the erasure's pseudonym (secaudit 2026-10, STO-1).
  *   v1.2.0 — 2026-09-30 — The action `exception` (an entry of the exceptions list made, used or
  *     withdrawn): evidence, never evicted, and to the millisecond like a change.
  *   v1.1.0 — 2026-09-29 — Review fixes: evidence (refused, changed) is never evicted and flushes
@@ -202,11 +200,8 @@ export function purgeClassificationAudit(what: { owner?: string; scope?: string 
   let n = 0;
   for (const m of [routine, evidence]) {
     for (const [address, r] of m) {
-      // A waiting row where the erased person was only the reader goes too: the stored ones take the
-      // erasure's pseudonym in the storage cascade, which a row written after it would not have
-      // (secaudit 2026-10, STO-1). At most one batch interval of such rows is lost.
       const hit = (scope && r.scope === scope)
-        || (owner && (r.ownerGaii === owner || ownerGhiiOf(r.scope) === owner || ownerGhiiOf(r.reader) === owner));
+        || (owner && (r.ownerGaii === owner || ownerGhiiOf(r.scope) === owner));
       if (hit) { m.delete(address); n++; }
     }
   }

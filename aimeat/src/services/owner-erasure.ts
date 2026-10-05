@@ -23,6 +23,9 @@
  * @structure eraseOwner(storage, nodeId, name) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name);
  * @version-history
+ *   v1.8.0 — 2026-10-05 — The classification audit rows still waiting are written before the cascade,
+ *     so the rows where the person read someone else's content take the erasure's pseudonym there
+ *     (secaudit 2026-10, STO-1).
  *   v1.7.0 — 2026-10-01 — Exchange contracts and grants the account is a party to, as consumer or as
  *     provider, are revoked (services/entitlement-erasure.ts). Their keys hash the owner GHII, which
  *     a reused name reproduces, so the next holder of the name was authorised on them.
@@ -52,7 +55,7 @@
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { evictAgentTelemetry } from './telemetry-buffer.js';
-import { purgeClassificationAudit } from './classification/audit.js';
+import { purgeClassificationAudit, flushClassificationAudit } from './classification/audit.js';
 import { purgeExceptions } from './classification/exceptions.js';
 import { eraseAppMembership } from './app-member-erasure.js';
 import { revokeEntitlementsOfAccount } from './entitlement-erasure.js';
@@ -85,6 +88,10 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
   // Classification audit rows still in memory would be written after the cascade and bring the
   // erased owner back into the log (TARGET-082 review).
   purgeClassificationAudit({ owner: ghii });
+  // What stays waiting is other people's content, some of it read by this person: written now, so the
+  // cascade below gives those rows the erasure's pseudonym as it does the stored ones (secaudit
+  // 2026-10, STO-1). Written after the cascade, they would carry the name.
+  await flushClassificationAudit();
 
   await storage.transaction(async () => {
     // 1. The agents' cached telemetry. Their work is settled inside storage.deleteOwner(), on every
