@@ -16,7 +16,7 @@
  *   v1.0.0 — 2026-09-27 — Initial.
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { movedToolMessage } from './catalog/moved-tools.js';
+import { movedToolMessage } from '../tool-catalog/moved-tools.js';
 import { logger } from '../utils/logger.js';
 
 type RequestHandler = (request: { method: string; params?: { name?: unknown } }, extra: unknown) => Promise<unknown>;

@@ -34,7 +34,7 @@ import { nodeEntryArgs } from './helpers/node-entry.js';
 import { pinnedEnv } from './run-e2e-server.js';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { createStorage } from '../src/storage/storage-factory.js';
-import { TOOL_SCOPES } from '../src/mcp/catalog/scopes.js';
+import { TOOL_SCOPES } from '../src/tool-catalog/scopes.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 

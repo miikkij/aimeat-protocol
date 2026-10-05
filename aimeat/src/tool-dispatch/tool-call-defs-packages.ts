@@ -45,7 +45,7 @@
  *     at apps. Pure extraction: the handlers are unchanged, only their names and their home.
  */
 import type { ConnectCliToolDefinition, JsonObject } from './tool-call-helpers.js';
-import { PACKAGE_CONFIG_PARAM, GRANT_APPS_PARAM } from '../mcp/catalog/definitions/packages.js';
+import { PACKAGE_CONFIG_PARAM, GRANT_APPS_PARAM } from '../tool-catalog/definitions/packages.js';
 import {
     query, requiredString, optionalString, optionalBoolean, optionalArray, optionalRecord, requiredArray,
 } from './tool-call-helpers.js';

@@ -62,7 +62,7 @@ import {
 import { upsertCortex, cortexLibUrls } from '../routes/cortex.js';
 import { annotationsFor } from './annotations.js';
 import { dependencyIndex, visibleAppRefs, usedBySummary } from '../services/dependency-map.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 import { cortexDetail, cortexSource } from '../services/cortex-read.js';
 import { toolError } from './tool-error.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';

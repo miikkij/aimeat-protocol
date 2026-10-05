@@ -30,8 +30,8 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor } from './catalog/shape.js';
-import { DATA_MAP_PARAM } from './catalog/definitions/data-map.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
+import { DATA_MAP_PARAM } from '../tool-catalog/definitions/data-map.js';
 import {
   readProgramMap, stateProgramMap, handsOnKey, type DataMapCaller,
 } from '../services/data-map/data-map-access.js';

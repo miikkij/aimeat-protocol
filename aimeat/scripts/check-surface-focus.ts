@@ -36,7 +36,7 @@
  *     (NOT_A_PLACEMENT): its list is what a session starts with, not where a tool lives.
  *   v1.0.0 — 2026-09-03 — Initial, with the `full` surface it measures against.
  */
-import { MCP_SURFACES, V2_ROLES, type SurfaceRole } from '../src/mcp/catalog/surfaces.js';
+import { MCP_SURFACES, V2_ROLES, type SurfaceRole } from '../src/tool-catalog/surfaces.js';
 
 /**
  * How many tools each surface leaves OUT of `full`, on the day this was written. Higher is more

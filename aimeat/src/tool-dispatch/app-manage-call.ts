@@ -31,7 +31,7 @@
  *   v1.0.0 — 2026-09-27 — Initial.
  */
 import type { AimeatClient, ApiResponse } from './api-client.js';
-import { checkAppManageInput, uiReadQuery } from '../mcp/catalog/definitions/app-manage.js';
+import { checkAppManageInput, uiReadQuery } from '../tool-catalog/definitions/app-manage.js';
 
 type Input = Record<string, unknown>;
 

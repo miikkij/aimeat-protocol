@@ -5,7 +5,7 @@
  * @description Operating handbook for the v2 `agent` surface (/v2/mcp/agent · `aimeat connect serve
  *   --surface agent`). Self-contained — one role, one handbook (kept separate from prompt-defaults.ts
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
- *   src/mcp/catalog/surfaces.ts → MCP_SURFACES.agent.
+ *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
  *   v1.25.0 -- 2026-10-04 -- aimeat_task_decline: a request the agent should not take is declined with
  *     the reason, not failed.

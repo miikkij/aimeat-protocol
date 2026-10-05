@@ -67,7 +67,7 @@ export function envelopeResult(resp: ApiResponse): ToolResult {
  */
 /**
  * Put the flag on a result somebody else built -- `jsonContent()` and `structuredResult()` from
- * mcp/catalog/shape.ts, which shape a payload and know nothing about the envelope it came from.
+ * tool-catalog/shape.ts, which shape a payload and know nothing about the envelope it came from.
  *
  * Those two are shared with the NODE's MCP surface, so they are left alone here rather than taught
  * about `ok`: the same flag is missing there too, and that is a second surface with its own blast

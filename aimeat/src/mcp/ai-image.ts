@@ -28,13 +28,13 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 import { resolveAppOwnerScope } from '../services/app-lifecycle.js';
 import { generateForOwner } from '../services/ai-image.js';
 import { AiCompletionError } from '../services/ai-completion.js';
 import { aiPayerOf } from '../services/agent-ai-keys.js';
 import { aiCallerOfPrincipal } from '../services/ai/caller-context.js';
-import { AI_ROLE_PARAM } from './catalog/definitions/ai-models.js';
+import { AI_ROLE_PARAM } from '../tool-catalog/definitions/ai-models.js';
 
 export function registerAiImageTool(
     mcp: McpServer,

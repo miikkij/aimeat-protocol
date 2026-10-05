@@ -23,7 +23,7 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
 import { aiPayerOf } from '../services/agent-ai-keys.js';
 import { AiCompletionError } from '../services/ai/errors.js';
@@ -34,7 +34,7 @@ import { embedForOwner } from '../services/ai-embed.js';
 import { readCallerAudio } from '../services/ai-call-files.js';
 import { readerForAgent, warningsNote } from '../services/classification/reader.js';
 import { ClassificationError } from '../services/classification/labels.js';
-import { AI_ROLE_PARAM } from './catalog/definitions/ai-models.js';
+import { AI_ROLE_PARAM } from '../tool-catalog/definitions/ai-models.js';
 
 export function registerAiCapabilityTools(
   mcp: McpServer,

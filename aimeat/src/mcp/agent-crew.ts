@@ -30,7 +30,7 @@ import {
     resolveCrewAgent, type CrewCaller, type CrewRefusal,
 } from '../services/crew-ops.js';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 import { crewMenu, writeLlmChoice } from '../services/crew-menu.js';
 
 const DocSchema = z.record(z.string(), z.unknown());

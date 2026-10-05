@@ -15,7 +15,7 @@
 // does not carry among them), and a memory:read agent can neither find nor run memory_write.
 // Run: cd aimeat && pnpm exec tsx test/e2e-mcp-v2.ts
 
-import { MCP_SURFACES } from '../src/mcp/catalog/surfaces.js';
+import { MCP_SURFACES } from '../src/tool-catalog/surfaces.js';
 import { NOT_IN_WILDCARD } from '../public/views/profile/agents/scope-model.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';

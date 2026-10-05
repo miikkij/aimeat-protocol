@@ -1,5 +1,5 @@
 /**
- * @file src/mcp/catalog/definitions/ai-jobs.ts
+ * @file src/tool-catalog/definitions/ai-jobs.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Catalog entries for the four AI-job tools: start one, list them, read one, stop one.
@@ -12,7 +12,7 @@
  *   parameter published here actually leaves the process on the third surface, which is the one a
  *   fleet daemon calls and the one a parameter has three times been silently dropped on.
  * @structure aiJobTools -- AimeatToolDefinition[]
- * @usage imported by mcp/catalog/definitions.ts
+ * @usage imported by tool-catalog/definitions.ts
  * @version-history
  *   v1.3.0 — 2026-09-28 — aimeat_ai_job_start takes `role`, the AI role the call runs as.
  *   v1.2.0 — 2026-09-28 — System 2 plan, V5: aimeat_ai_job_start takes `op` (text, image,

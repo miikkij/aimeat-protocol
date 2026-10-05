@@ -20,7 +20,7 @@ import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { agentNameSchema, pickAgent } from './_registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
-import { descriptionFor } from '../../../../mcp/catalog/shape.js';
+import { descriptionFor } from '../../../../tool-catalog/shape.js';
 
 /** One node answer, as MCP content. A refusal keeps the node's own words and code. */
 function answer(resp: { ok?: boolean; data?: unknown }) {

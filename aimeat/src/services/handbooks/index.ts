@@ -12,7 +12,7 @@
  *   v1.1.0 -- 2026-07-14 -- Add the enterprise surface handbook (company commerce)
  *   v1.0.0 -- 2026-05-30 -- Aggregate the 4 v2 surface handbooks
  */
-import type { SurfaceRole } from '../../mcp/catalog/surfaces.js';
+import type { SurfaceRole } from '../../tool-catalog/surfaces.js';
 import { AGENT_HANDBOOK } from './agent.js';
 import { APPDEV_HANDBOOK } from './appdev.js';
 import { SERVICE_HANDBOOK } from './service.js';

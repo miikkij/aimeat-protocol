@@ -1,5 +1,5 @@
 /**
- * @file src/mcp/catalog/definitions/designbook.ts
+ * @file src/tool-catalog/definitions/designbook.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The Design Book tools (TARGET-074 phase 5): the shared library of PROVEN screen

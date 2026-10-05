@@ -12,7 +12,7 @@
  *   v1.0.0 -- 2026-06-09 -- Initial: cliFallback ↔ CONNECT_CLI_TOOLS parity, both directions.
  */
 import { describe, it, expect } from 'vitest';
-import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../../src/mcp/catalog/definitions.js';
+import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../../src/tool-catalog/definitions.js';
 import { CONNECT_CLI_TOOLS } from '../../src/cli/connect/tool-call.js';
 
 /**

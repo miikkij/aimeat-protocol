@@ -66,7 +66,7 @@ import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import { canonicalAppToolsId } from '../services/app-tools-key.js';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor, responseFormatSchema, shapeResponse } from './catalog/shape.js';
+import { descriptionFor, responseFormatSchema, shapeResponse } from '../tool-catalog/shape.js';
 import { AppToolsDocSchema, appToolsKey, appIdFromToolsKey } from '../models/app-tool-schemas.js';
 import { loadAgentOffers, publishAgentOffers } from '../services/agent-offers-write.js';
 import { integerMicros, isSupportedMoneyCurrency } from '../commerce/money.js';
@@ -157,7 +157,7 @@ export function registerCommerceTools(
      * a seller who is properly configured. WHICH commerce word is the caller's to say, because the
      * two records do not share one: the PSP credentials ride `commerce:psp` and the app-tool
      * manifest rides `commerce:sell`, exactly as the registration filter has them
-     * (mcp/catalog/scopes.ts). Naming one for both meant an agent granted only `commerce:psp` had
+     * (tool-catalog/scopes.ts). Naming one for both meant an agent granted only `commerce:psp` had
      * psp_set registered and then had its write refused.
      *
      * Answers the refusal text, or null and the EXCHANGE projection's report when the key is a

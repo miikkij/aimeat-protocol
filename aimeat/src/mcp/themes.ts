@@ -36,7 +36,7 @@ import type { StyleInput } from '../services/themes/styles.js';
 import { FontError } from '../services/themes/fonts.js';
 import { FONT_KINDS } from '../services/themes/font-registry.js';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
 
 const out = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });

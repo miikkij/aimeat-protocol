@@ -25,7 +25,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 import { annotationsFor } from './annotations.js';
 import { flexibleBoolean } from './schema-flags.js';
 import { deleteMemoryRecord, restoreMemoryRecord } from '../services/memory-bin.js';

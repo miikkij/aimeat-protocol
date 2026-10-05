@@ -26,7 +26,7 @@
  *   cd aimeat && pnpm exec tsx scripts/inventory/build-inventory.ts
  *   cd aimeat && pnpm exec tsx scripts/inventory/build-inventory.ts --json-only
  * @version-history
- *   v1.0.1 — 2026-09-29 — mcp/catalog/scopes-operator.ts counts as a definition file (the operator rows
+ *   v1.0.1 — 2026-09-29 — tool-catalog/scopes-operator.ts counts as a definition file (the operator rows
  *     of the tool table, moved out of scopes.ts unchanged).
  *   v1.0.0 — 2026-09-03 — Initial (wish-invarianttiauditointi, phase 1, analysis only).
  */
@@ -38,7 +38,7 @@ import { collectDoors, toRows, type Row } from './doors.js';
 import { scopeMentions } from './scope-mentions.js';
 import { readVocabulary } from './scope-vocabulary.js';
 import { srcProgram } from './program.js';
-import { TOOL_SCOPES, toolScopeWords } from '../../src/mcp/catalog/scopes.js';
+import { TOOL_SCOPES, toolScopeWords } from '../../src/tool-catalog/scopes.js';
 
 // readVocabulary moved to ./scope-vocabulary.ts by pure extraction on 2026-09-04: check:scope-parity
 // needs the identical answer, and a second copy would drift the day one of them learned a new shape.
@@ -105,7 +105,7 @@ function report(rows: Row[], mentions: Map<string, Array<{ file: string; line: n
     say();
     say('Wishin kohta A. Sanasto on se jonka omistaja NÄKEE ja voi myöntää');
     say('(public/views/profile/agents/scope-model.js), kysyjät ovat REST-portit ja MCP:n');
-    say('työkalutaulukko (mcp/catalog/scopes.ts). Nolla kysyjää = sanaa ei ole olemassa:');
+    say('työkalutaulukko (tool-catalog/scopes.ts). Nolla kysyjää = sanaa ei ole olemassa:');
     say('myöntäminen ei tee mitään ja epääminen ei suojaa mitään.');
     say();
     say('| scope | REST-ovia | MCP-työkaluja |');
@@ -173,7 +173,7 @@ function main(): void {
     const rows = toRows(collectDoors(files));
     // The two files that DEFINE the vocabulary rather than demand it. Counting a definition as a
     // demand would make every word look asked-for, which is the opposite of what this measures.
-    const mentions = scopeMentions(files, VOCABULARY, AIMEAT, ['mcp/catalog/scopes.ts', 'mcp/catalog/scopes-operator.ts', 'utils/scope-coverage.ts']);
+    const mentions = scopeMentions(files, VOCABULARY, AIMEAT, ['tool-catalog/scopes.ts', 'tool-catalog/scopes-operator.ts', 'utils/scope-coverage.ts']);
     mkdirSync(OUT_DIR, { recursive: true });
 
     writeFileSync(join(OUT_DIR, 'inventory.json'), JSON.stringify({

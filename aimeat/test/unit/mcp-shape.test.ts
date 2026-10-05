@@ -1,6 +1,6 @@
 /**
  * @file mcp-shape.test.ts
- * @description Unit tests for the shared MCP response-shaping helpers (src/mcp/catalog/shape.ts).
+ * @description Unit tests for the shared MCP response-shaping helpers (src/tool-catalog/shape.ts).
  *   shapeResponse() is the single piece of logic both MCP surfaces share for response_format,
  *   so it must correctly handle the server's bare-array/record payloads AND the connector's
  *   REST-wrapped payloads, and must degrade safely when field names don't match.
@@ -8,7 +8,7 @@
  *   v1.0.0 -- 2026-05-30 -- MCP audit Phase 1 (F5): cover concise projection + empty-projection guard
  */
 import { describe, it, expect } from 'vitest';
-import { shapeResponse, descriptionFor, truncateResult, jsonContent, structuredResult } from '../../src/mcp/catalog/shape.js';
+import { shapeResponse, descriptionFor, truncateResult, jsonContent, structuredResult } from '../../src/tool-catalog/shape.js';
 
 describe('shapeResponse — response_format projection', () => {
   it('returns data unchanged for detailed / undefined format', () => {

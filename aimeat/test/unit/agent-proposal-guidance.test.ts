@@ -21,7 +21,7 @@
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { descriptionFor } from '../../src/mcp/catalog/shape.js';
+import { descriptionFor } from '../../src/tool-catalog/shape.js';
 import { agentTools } from '../../src/tool-dispatch/tool-call-defs-agent.js';
 import { AGENT_HANDBOOK } from '../../src/services/handbooks/agent.js';
 import { FULL_HANDBOOK } from '../../src/services/handbooks/full.js';

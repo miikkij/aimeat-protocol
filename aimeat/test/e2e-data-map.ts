@@ -213,7 +213,7 @@ async function publish(o: Owner, filename: string): Promise<void> {
         // Both MCP doors spelled the spec by hand as /1 while the service took only /2, so the tool
         // told every builder to send what it would refuse. The example is parsed out of the text a
         // builder reads and written for real, so it cannot go false in silence again.
-        const { DATA_MAP_PARAM } = await import('../src/mcp/catalog/definitions/data-map.js');
+        const { DATA_MAP_PARAM } = await import('../src/tool-catalog/definitions/data-map.js');
         const start = DATA_MAP_PARAM.indexOf('{ "spec"');
         const end = DATA_MAP_PARAM.indexOf('"elsewhere": [] }') + '"elsewhere": [] }'.length;
         assert(start > 0 && end > start, 'the parameter text carries an example object');

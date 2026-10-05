@@ -15,7 +15,7 @@ import { voiceReplySchema, voiceSpeechSchema } from '../services/ai-voice-contra
 import { createVoiceResult } from '../services/ai-voice-result.js';
 import { aiCallerOfPrincipal } from '../services/ai/caller-context.js';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
 import { AiCompletionError } from '../services/ai/errors.js';
 

@@ -33,7 +33,7 @@ import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
 import {
   ClassificationError, labelActorOf, readContentLabel, reviewLabel, setLabel, targetOf,
@@ -41,7 +41,7 @@ import {
 import { readAuditLog, readPolicy, writePolicy } from '../services/classification/policy-admin.js';
 import {
   AUDIT_ACTIONS, checkClassificationInput, CLASSIFICATION_ACTIONS, classificationTools, EXCEPTION_ACTION_VALUES, POLICY_PENDING_NEXT,
-} from './catalog/definitions/classification.js';
+} from '../tool-catalog/definitions/classification.js';
 import { scanContent } from '../services/classification/scan.js';
 import { explorerQueryOf, listLabels } from '../services/classification/explorer.js';
 import { setClassificationSwitch } from '../services/classification/switch.js';

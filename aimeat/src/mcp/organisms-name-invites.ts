@@ -24,7 +24,7 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, OrganismRecord } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 import { isOrganismOwner, addOrganismOwner, removeOrganismOwner } from '../services/organism-ownership.js';
 import {
     InvitationError, createNameInvitation, updateNameInvitation, cancelNameInvitation,

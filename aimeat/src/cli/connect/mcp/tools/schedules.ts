@@ -25,7 +25,7 @@ import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
-import { descriptionFor } from '../../../../mcp/catalog/shape.js';
+import { descriptionFor } from '../../../../tool-catalog/shape.js';
 
 export function registerSchedulesTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client, agent } = registry.resolve();

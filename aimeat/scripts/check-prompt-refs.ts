@@ -39,8 +39,8 @@ import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse as parseYaml } from 'yaml';
-import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../src/mcp/catalog/definitions.js';
-import { MCP_SURFACES, type SurfaceRole } from '../src/mcp/catalog/surfaces.js';
+import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../src/tool-catalog/definitions.js';
+import { MCP_SURFACES, type SurfaceRole } from '../src/tool-catalog/surfaces.js';
 import { MODEL_RECOMMENDATION, MODEL_REVIEW_MAX_AGE_DAYS, modelReviewAgeDays } from '../src/services/model-recommendation.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -97,7 +97,7 @@ const SOURCES: string[] = [
     'aimeat/src/data/builtin-skills-games.menus-audio.ts',
     'aimeat/src/data/builtin-skills-games.saves-controls.ts',
     'aimeat/src/data/builtin-skills-games.world.ts',
-    'aimeat/src/mcp/catalog/definitions',
+    'aimeat/src/tool-catalog/definitions',
     'aimeat/public/views/profile/agents/connect-prompts.js',
     'aimeat/public/views/home/journey-prompts.js',
     'aimeat/public/views/landing-prompts.js',

@@ -9,14 +9,14 @@
  *   - MCP_SCOPE_PROFILES — agent mode -> the scopes it is provisioned with
  *   - scopesForProfile() — the bundle for a mode, with a logged fallback for an unknown one
  * @usage
- *   import { scopesForProfile } from '../catalog/scopes.js';
+ *   import { scopesForProfile } from './scopes.js';
  *   const scopes = scopesForProfile('task-runner');
  * @version-history
  *   v1.1.0 -- 2026-10-01 -- coordinator holds contacts:read, the word the contact list now asks for.
  *   v1.0.0 -- 2026-09-26 -- Moved unchanged from scopes.ts (v1.30.1), which had passed the 800-line
  *     limit.
  */
-import { logger } from '../../utils/logger.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Role-based scope bundles for provisioning agents (e.g. at device-auth approval). Maps the

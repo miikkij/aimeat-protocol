@@ -1,5 +1,5 @@
 /**
- * @file src/mcp/catalog/definitions/install-sets.ts
+ * @file src/tool-catalog/definitions/install-sets.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Catalog entry for aimeat_admin_install_set: the operator sets up this node from an

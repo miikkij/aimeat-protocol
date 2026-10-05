@@ -11,7 +11,7 @@
  *   v1.1.0 -- 2026-09-27 -- Integrate the published app-manage tool into the shared dispatch table.
  *   v1.0.0 -- 2026-09-27 -- Extracted unchanged from the CLI shell adapter.
  */
-import { getAimeatToolDefinition } from '../mcp/catalog/definitions.js';
+import { getAimeatToolDefinition } from '../tool-catalog/definitions.js';
 import type { ConnectCliToolDefinition } from './tool-call-helpers.js';
 
 import { agentTools } from './tool-call-defs-agent.js';

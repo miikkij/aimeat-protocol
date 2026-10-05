@@ -28,8 +28,8 @@
  *   v1.0.0 — 2026-09-04 — Initial: anonymous `tools/list` so capability is discoverable without an
  *     account. `initialize` deliberately still answers 401 — see mcp/index.ts for why.
  */
-import { CLI_FALLBACK_TOOL_DEFINITIONS } from './catalog/definitions.js';
-import type { ToolInputField } from './catalog/definitions/types.js';
+import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../tool-catalog/definitions.js';
+import type { ToolInputField } from '../tool-catalog/definitions/types.js';
 
 /** One tool as MCP's `tools/list` describes it: a name, a sentence, and a JSON Schema for the input. */
 interface PublicTool {

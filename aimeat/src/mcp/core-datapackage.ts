@@ -37,7 +37,7 @@ import { annotationsFor } from './annotations.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
 import { emitChange } from '../services/event-bus.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 import { publishPackage, openPackage, readRows } from '../services/datapackage/store.js';
 import { toCsv } from '../services/datapackage/table.js';
 import type { TableSchema } from '../services/datapackage/contract.js';

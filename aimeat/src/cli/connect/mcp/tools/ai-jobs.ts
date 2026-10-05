@@ -22,8 +22,8 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
-import { descriptionFor } from '../../../../mcp/catalog/shape.js';
-import { AI_ROLE_PARAM } from '../../../../mcp/catalog/definitions/ai-models.js';
+import { descriptionFor } from '../../../../tool-catalog/shape.js';
+import { AI_ROLE_PARAM } from '../../../../tool-catalog/definitions/ai-models.js';
 
 export function registerAiJobTools(mcp: McpServer, registry: AgentRegistry): void {
     const { client } = registry.resolve();

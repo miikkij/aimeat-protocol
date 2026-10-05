@@ -52,7 +52,7 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 import { handbookForRole } from '../services/handbooks/index.js';
 import { proactiveGuidance } from '../services/proactive-mode.js';
 import { skillsBySituation } from '../services/skills-by-situation.js';
@@ -65,7 +65,7 @@ import { atelierPieceIds } from '../services/build-atelier-layers.js';
 import { atelierPieceWithBook } from '../services/build-atelier-book.js';
 import { toolError } from './tool-error.js';
 import { parseGaiiLoose, localAccountName } from '../utils/gaii.js';
-import { V2_ROLES, toolsForSurface, type SurfaceRole } from './catalog/surfaces.js';
+import { V2_ROLES, toolsForSurface, type SurfaceRole } from '../tool-catalog/surfaces.js';
 import { featureMapPiece, featureMapPieceIds } from '../services/feature-map.js';
 import { settingsExplainPiece, settingsExplainPieceIds } from '../services/settings-explain.js';
 

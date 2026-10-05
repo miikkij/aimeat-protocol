@@ -52,8 +52,8 @@ import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
-import { descriptionFor } from '../../../../mcp/catalog/shape.js';
-import { BOOK_VIEW_PARAM } from '../../../../mcp/catalog/definitions/designbook.js';
+import { descriptionFor } from '../../../../tool-catalog/shape.js';
+import { BOOK_VIEW_PARAM } from '../../../../tool-catalog/definitions/designbook.js';
 
 export function registerDesignbookTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();

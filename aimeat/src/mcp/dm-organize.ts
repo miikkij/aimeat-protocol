@@ -21,7 +21,7 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 import { localAccountName } from '../utils/gaii.js';
 import { ownerMailbox } from '../services/direct-message-delete.js';
 import { CONVERSATION_ID, InboxOrganizePatchSchema, InboxRuleInputSchema } from '../models/inbox-organize-schemas.js';

@@ -8,7 +8,7 @@
  *     delete): a plan that declares one waits for the owner's OK.
  *   v1.0.0 -- 2026-07-13 -- Extracted from tool-call.ts (max-file-lines)
  */
-import type { ToolInputField } from '../mcp/catalog/definitions.js';
+import type { ToolInputField } from '../tool-catalog/definitions.js';
 import type { AimeatClient, ApiResponse } from './api-client.js';
 
 export type JsonObject = Record<string, unknown>;

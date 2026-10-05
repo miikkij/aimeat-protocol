@@ -272,11 +272,11 @@ function main(): void {
         // A file counts as writing if it touches storage directly OR REGISTERS a tool that declares
         // itself mutating. The second half is what catches a file writing through a service.
         //
-        // src/mcp/catalog/ is excluded from that half: those files are the metadata tables — tool
+        // src/tool-catalog/ is excluded from that half: those files are the metadata tables — tool
         // descriptions, scope requirements, surface membership — so they NAME every tool without
         // being any tool's surface. Including them would make the check noise on its first run,
         // which is how a gate stops being read.
-        const isCatalog = rel.startsWith('src/mcp/catalog/');
+        const isCatalog = rel.startsWith('src/tool-catalog/');
         const registersMutating = !isCatalog && [...mutating].some(t => source.includes(`mcp.tool(
         '${t}'`)
             || source.includes(`mcp.tool('${t}'`) || source.includes(`'${t}',

@@ -1731,17 +1731,17 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The owner-scope read helper; each caller that hands a value on is listed and checked on its own."
     },
+    "src/services/package-app-tools.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-02, the node's own read: whether the installer already has a tool list for the app, so an install never overwrites it. Only the presence is used; nothing is shown."
+    },
     "src/services/package-approvals.ts": {
       "reads": {
         "getMemory": 2
       },
       "why": "Reviewed 2026-10-02 (package sale design, phase 2), the node's own read: the approval record of an install, in the system namespace package-approvals that no principal addresses, read to answer GET /v1/instances/:id and to tell whether an update adds to what was approved. It holds capability names, not the owner's content."
-    },
-    "src/services/package-claims.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-10-02 (package sale design, phase 3), the node's own read: pending claim codes of one package, keyed by the hash of the code, in the package-entitlements system namespace that no principal addresses. Grant terms, not anybody's content."
     },
     "src/services/package-component-collisions.ts": {
       "reads": {
@@ -1749,9 +1749,15 @@
       },
       "why": "Reviewed 2026-10-02 (package sale design, phase 1), the node's own read: a memory component's own key list and whether each key it names already exists, read only to refuse an install that would overwrite the owner's record. Only the record's tags are looked at; no value leaves."
     },
+    "src/services/package-compose.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-02, the node's own read: the composer's own tool list for an app they put in a package, copied into the package without prices. Tool names and schemas are the app's interface, not classified content, and the composer reads their own record."
+    },
     "src/services/package-entitlements.ts": {
       "reads": {
-        "getMemory": 2,
+        "getMemory": 1,
         "listMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Package entitlement records."
@@ -1820,18 +1826,6 @@
       },
       "why": "Reviewed 2026-10-02 (package sale design, phase 5), the node's own read: the withdrawn versions of a package group and their reasons, in the system namespace package-withdrawals that no principal addresses."
     },
-    "src/services/package-compose.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-10-02, the node's own read: the composer's own tool list for an app they put in a package, copied into the package without prices. Tool names and schemas are the app's interface, not classified content, and the composer reads their own record."
-    },
-    "src/services/package-app-tools.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-10-02, the node's own read: whether the installer already has a tool list for the app, so an install never overwrites it. Only the presence is used; nothing is shown."
-    },
     "src/services/peer-incidents.ts": {
       "reads": {
         "getMemory": 1,
@@ -1888,6 +1882,12 @@
         "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: File sizes and key existence for quota."
+    },
+    "src/services/record-cas.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "The node's own read (secaudit 2026-10, PKG-7): updateRecord reads a service record and its version to rewrite it with compare-and-swap (the classification service's records, package entitlements and claims, an agent's daily spend); its callers decide what reaches a caller, and nothing is shown from here."
     },
     "src/services/refinery/pipeline.ts": {
       "reads": {
@@ -2009,14 +2009,6 @@
       },
       "why": "Reviewed 2026-10-02, the node's own read: the two run-once markers under the node's system identity that say a one-time task-start change has run. No content is shown to anyone."
     },
-    "src/services/themes/service.ts": {
-      "reads": {
-        "listAllMemoryMeta": 1,
-        "getMemory": 5,
-        "listMemoryHistory": 2
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 review), the node's own read: system theme records, their earlier versions, and each person's theme choice."
-    },
     "src/services/themes/fonts.ts": {
       "reads": {
         "listAllMemoryMeta": 1,
@@ -2024,6 +2016,14 @@
         "getStorageFile": 1
       },
       "why": "Reviewed 2026-10-03 (the font manager), the node's own read: the added-face records (ui.font.*) and their woff2 files, both under the node's system identity, served to every visitor as fonts.css and the face files. No person's content is read; the owners' fonts inventory reads file metadata only, through listFontFilesAcrossOwners."
+    },
+    "src/services/themes/service.ts": {
+      "reads": {
+        "listAllMemoryMeta": 1,
+        "getMemory": 5,
+        "listMemoryHistory": 2
+      },
+      "why": "Reviewed 2026-09-29 (TARGET-082 review), the node's own read: system theme records, their earlier versions, and each person's theme choice."
     },
     "src/services/track-registry.ts": {
       "reads": {

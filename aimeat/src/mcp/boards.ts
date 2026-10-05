@@ -48,7 +48,7 @@ import { localAccountName } from '../utils/gaii.js';
 import { resolveOperatorAgentName } from '../services/operator-principal.js';
 import { operatorOverride } from '../services/operator-override.js';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 import { createBoardReply, boardPostPrice } from '../services/board-post.js';
 import { withoutHiddenPosts } from '../services/board-moderation.js';
 import {

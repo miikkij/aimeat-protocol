@@ -25,7 +25,7 @@ import type { Storage } from '../storage/interface.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { annotationsFor } from './annotations.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 import {
     appendRows, readRows, spaceStats, deleteRow, deleteRowsBefore,
     WorkspaceRowError, type RowCaller,

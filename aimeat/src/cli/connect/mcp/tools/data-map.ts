@@ -18,8 +18,8 @@ import type { AgentRegistry } from '../../agent-registry.js';
 import { agentNameSchema, payloadResult, pickAgent } from './_registry.js';
 import type { ApiResponse } from '../../api-client.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
-import { descriptionFor } from '../../../../mcp/catalog/shape.js';
-import { DATA_MAP_PARAM } from '../../../../mcp/catalog/definitions/data-map.js';
+import { descriptionFor } from '../../../../tool-catalog/shape.js';
+import { DATA_MAP_PARAM } from '../../../../tool-catalog/definitions/data-map.js';
 
 const text = (resp: ApiResponse) => payloadResult(resp, resp);
 /** A refusal this tool makes itself, before any call. It did not happen either. */

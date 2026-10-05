@@ -17,7 +17,7 @@
  */
 import type { ConnectCliToolDefinition } from './tool-call-helpers.js';
 import { optionalBoolean, optionalRecord, optionalString, requiredArray, requiredString } from './tool-call-helpers.js';
-import { aiModelTools as catalog } from '../mcp/catalog/definitions/ai-models.js';
+import { aiModelTools as catalog } from '../tool-catalog/definitions/ai-models.js';
 
 const def = (name: string) => catalog.find((t) => t.name === name)!;
 

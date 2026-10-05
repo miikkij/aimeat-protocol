@@ -18,7 +18,7 @@
  *      as a permission.
  *   2. **The owner granted `memory:write-as-owner`** on that agent. Granular agents opt in; a `*`
  *      agent already has it, matching how `messages:send-as-owner` is bundled
- *      (src/mcp/catalog/scopes.ts).
+ *      (src/tool-catalog/scopes.ts).
  *
  *   What this does NOT touch: `visibility`. Where a record lands and who may read it are different
  *   axes. A record written into the owner's namespace with `visibility:'public'` is exactly as

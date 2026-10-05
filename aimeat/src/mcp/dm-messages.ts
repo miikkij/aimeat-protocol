@@ -80,7 +80,7 @@ import { broadcastFromPrincipal, broadcastProvenanceStamp } from '../services/me
 import type { DeliveryCtx } from '../services/message-delivery.js';
 import { MessageAttachmentInputSchema, InteractiveQuestionSchema } from '../models/message-schemas.js';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 import { parseGaiiLoose, localAccountName } from '../utils/gaii.js';
 import { fileRefFor } from '../services/file-refs.js';
 import type { DirectMessageAttachment } from '../storage/interface.js';

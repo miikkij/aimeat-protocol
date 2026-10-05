@@ -4,7 +4,7 @@
  * @version-history v1.0.0 - 2026-09-19 - Third voice tool surface.
  */
 import type { ConnectCliToolDefinition } from './tool-call-helpers.js';
-import { voiceTools as catalog } from '../mcp/catalog/definitions/ai-voice.js';
+import { voiceTools as catalog } from '../tool-catalog/definitions/ai-voice.js';
 
 export const voiceTools: ConnectCliToolDefinition[] = [
   { ...catalog[0], handler: ({ client }, input) => client.post('/v1/ai/stream?json=1', input) },

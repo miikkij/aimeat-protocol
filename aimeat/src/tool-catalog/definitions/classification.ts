@@ -1,5 +1,5 @@
 /**
- * @file src/mcp/catalog/definitions/classification.ts
+ * @file src/tool-catalog/definitions/classification.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The classification tool (TARGET-082 V2): the classification of a piece of content,

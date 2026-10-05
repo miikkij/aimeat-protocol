@@ -23,7 +23,7 @@ import type { ConnectCliToolDefinition, JsonObject } from './tool-call-helpers.j
 import {
     requiredString, optionalString, optionalNumber, optionalBoolean, optionalArray, optionalRecord,
 } from './tool-call-helpers.js';
-import { AI_ROLE_PARAM } from '../mcp/catalog/definitions/ai-models.js';
+import { AI_ROLE_PARAM } from '../tool-catalog/definitions/ai-models.js';
 
 export const aiJobTools: ConnectCliToolDefinition[] = [
     {

@@ -1,6 +1,6 @@
 /**
  * @file mcp-surfaces.test.ts
- * @description Unit tests for the v2 MCP surface registry (src/mcp/catalog/surfaces.ts). Asserts the
+ * @description Unit tests for the v2 MCP surface registry (src/tool-catalog/surfaces.ts). Asserts the
  *   role allowlists are catalog-valid, every catalog tool is placed (or explicitly excluded), and the
  *   purpose boundaries hold (e.g. agent has no marketplace tools, appdev is build-only).
  * @version-history
@@ -9,8 +9,8 @@
  *   v1.0.0 -- 2026-05-30 -- MCP audit v2 S1
  */
 import { describe, it, expect } from 'vitest';
-import { MCP_SURFACES, toolsForSurface, toolsRegisteredOn, validateSurfaces, V2_EXCLUDED, CHAT_ONLY, V2_ROLES, isV2Role } from '../../src/mcp/catalog/surfaces.js';
-import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../../src/mcp/catalog/definitions.js';
+import { MCP_SURFACES, toolsForSurface, toolsRegisteredOn, validateSurfaces, V2_EXCLUDED, CHAT_ONLY, V2_ROLES, isV2Role } from '../../src/tool-catalog/surfaces.js';
+import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../../src/tool-catalog/definitions.js';
 
 describe('v2 MCP surfaces', () => {
     it('every surface tool exists in the catalog and every catalog tool is placed or excluded', () => {
