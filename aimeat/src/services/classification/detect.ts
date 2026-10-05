@@ -26,6 +26,9 @@
  * @structure RuleHit · REGEX_TEXT · ruleApplies() · matchRules() · resetRegexBudgets()
  * @usage const hit = matchRules(policy, target, text); if (hit) await setLabel(deps, ruleActor, target, { label: hit.label });
  * @version-history
+ *   v1.3.0 — 2026-10-05 — The budget of personal content is its owner's, whichever agent holds it,
+ *     and the node has a cap of its own (NODE_MS_PER_MINUTE): an owner with many agents multiplied
+ *     the budget (secaudit 2026-10, DATA-1).
  *   v1.2.0 — 2026-09-30 — A regex time budget per scope per minute (SCOPE_MS_PER_MINUTE), so one
  *     owner's slow rules cannot block the node write after write (TARGET-082 second review, S4).
  *   v1.1.1 — 2026-09-30 — Time limits 500 ms per rule and 1000 ms per item: a loaded CPU reached 100 ms on a safe rule.
@@ -36,6 +39,7 @@
  */
 import type { ContentLabelTarget } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
+import { ownerGhiiOf } from '../../utils/gaii.js';
 import type { ClassificationPolicy, ClassificationRule } from './defaults.js';
 import { scopeOrganism } from './policy.js';
 import { testWithin, unsafeRegexReason } from './regex-safety.js';
@@ -68,22 +72,48 @@ const ITEM_MS = 1000;
  * the minute is over (TARGET-082 second review, S4).
  */
 const SCOPE_MS_PER_MINUTE = 3000;
+/**
+ * The regex time the whole node may spend per minute, whoever spends it: a quarter of each minute.
+ * Many owners, each within their own budget, could otherwise still hold the event loop between them
+ * (secaudit 2026-10, DATA-1).
+ */
+const NODE_MS_PER_MINUTE = 15_000;
+const NODE_BUDGET = '\u0000node';
 const scopeSpent = new Map<string, { since: number; ms: number }>();
 
-function scopeLeft(scope: string, now: number): number {
-  const s = scopeSpent.get(scope);
-  if (!s || now - s.since >= 60_000) return SCOPE_MS_PER_MINUTE;
-  return SCOPE_MS_PER_MINUTE - s.ms;
+/**
+ * Whose budget an item's regex time comes from: an organism's own, and for personal content the
+ * OWNER's, whichever of their agents holds it. Keyed by the item's own scope, every agent of one
+ * owner had a budget of its own, so one owner multiplied it by their number of agents
+ * (secaudit 2026-10, DATA-1).
+ */
+function budgetKeyOf(scope: string): string {
+  return scopeOrganism(scope) ? scope : ownerGhiiOf(scope);
 }
 
-function chargeScope(scope: string, ms: number, now: number): void {
-  const s = scopeSpent.get(scope);
+function spentOf(key: string, cap: number, now: number): number {
+  const s = scopeSpent.get(key);
+  if (!s || now - s.since >= 60_000) return cap;
+  return cap - s.ms;
+}
+
+function scopeLeft(scope: string, now: number): number {
+  return Math.min(spentOf(budgetKeyOf(scope), SCOPE_MS_PER_MINUTE, now), spentOf(NODE_BUDGET, NODE_MS_PER_MINUTE, now));
+}
+
+function charge(key: string, ms: number, now: number): void {
+  const s = scopeSpent.get(key);
   if (!s || now - s.since >= 60_000) {
     if (scopeSpent.size > 10_000) scopeSpent.clear();
-    scopeSpent.set(scope, { since: now, ms });
+    scopeSpent.set(key, { since: now, ms });
   } else {
     s.ms += ms;
   }
+}
+
+function chargeScope(scope: string, ms: number, now: number): void {
+  charge(budgetKeyOf(scope), ms, now);
+  charge(NODE_BUDGET, ms, now);
 }
 
 /** Forget what each scope spent. For tests. */
