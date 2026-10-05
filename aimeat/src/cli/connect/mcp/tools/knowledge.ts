@@ -8,6 +8,7 @@
  *   registered and refuses: the capability has no HTTP route for the connector to proxy.
  * @usage registerKnowledgeTools(mcp, registry);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.5.0 -- 2026-08-11 -- aimeat_knowledge_contribute stops posting {entry_key, content} to
  *     POST /v1/knowledge/:id/contribute, which is the organism-sharing route and answered
  *     400 MISSING_FIELDS for every call. It now serves the one refusal in tool-call-defs-core.ts,
@@ -30,18 +31,17 @@ import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
 import { readPayloadWithProvenance } from '../../../../tool-dispatch/ai-provenance-carry.js';
 import { knowledgeContributeUnreachable, KNOWLEDGE_CONTRIBUTE_CONNECTOR_NOTE } from '../../../../tool-dispatch/tool-call-defs-core.js';
 import { envelopeResult, payloadResult } from './_registry.js';
+import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerKnowledgeTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
 
-  mcp.tool('aimeat_knowledge_list', descriptionFor('aimeat_knowledge_list'), {}, annotationsFor('aimeat_knowledge_list'), async () => {
+  mcp.tool('aimeat_knowledge_list', descriptionFor('aimeat_knowledge_list'), zodShapeFor('aimeat_knowledge_list'), annotationsFor('aimeat_knowledge_list'), async () => {
     const resp = await client.get('/v1/catalogue/knowledge');
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_knowledge_get', descriptionFor('aimeat_knowledge_get'), {
-    package_id: z.string().describe('Knowledge package identifier'),
-  }, annotationsFor('aimeat_knowledge_get'), async ({ package_id }) => {
+  mcp.tool('aimeat_knowledge_get', descriptionFor('aimeat_knowledge_get'), zodShapeFor('aimeat_knowledge_get'), annotationsFor('aimeat_knowledge_get'), async ({ package_id }) => {
     const resp = await client.get(`/v1/knowledge/${encodeURIComponent(package_id)}`);
     // The package manifest read serves its record on meta.provenance — see core.ts memory_read.
     return payloadResult(readPayloadWithProvenance(resp), resp);
@@ -60,10 +60,7 @@ export function registerKnowledgeTools(mcp: McpServer, registry: AgentRegistry):
     return { content: [{ type: 'text' as const, text: JSON.stringify(refusal, null, 2) }], isError: true };
   });
 
-  mcp.tool('aimeat_knowledge_links', descriptionFor('aimeat_knowledge_links'), {
-    package_id: z.string().describe('Knowledge package identifier'),
-    direction: z.enum(['outgoing', 'incoming', 'both']).optional().describe('Link direction (default: both)'),
-  }, annotationsFor('aimeat_knowledge_links'), async ({ package_id, direction }) => {
+  mcp.tool('aimeat_knowledge_links', descriptionFor('aimeat_knowledge_links'), zodShapeFor('aimeat_knowledge_links'), annotationsFor('aimeat_knowledge_links'), async ({ package_id, direction }) => {
     const query = direction ? `?direction=${encodeURIComponent(direction)}` : '';
     const resp = await client.get(`/v1/knowledge/${encodeURIComponent(package_id)}/links${query}`);
     return envelopeResult(resp);

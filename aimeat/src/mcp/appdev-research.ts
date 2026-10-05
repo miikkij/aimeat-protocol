@@ -10,6 +10,7 @@
  * @structure registerAppdevResearchTools() — aimeat_appdev_overview
  * @usage registerAppdevResearchTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.2 — 2026-09-29 — TARGET-082 V4: the overview is built with the session's classification
  *     reader (readerForAgent), so a record this agent may not see is left out.
  *   v1.0.1 — 2026-09-13 — The model parameter's description: it orders learned pitfalls, never filters.
@@ -17,13 +18,13 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { buildAppdevOverview, OVERVIEW_SECTIONS } from '../services/appdev-overview.js';
+import { buildAppdevOverview } from '../services/appdev-overview.js';
 import { readerForAgent } from '../services/classification/reader.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerAppdevResearchTools(
     mcp: McpServer,
@@ -36,10 +37,7 @@ export function registerAppdevResearchTools(
     mcp.tool(
         'aimeat_appdev_overview',
         descriptionFor('aimeat_appdev_overview'),
-        {
-            model: z.string().max(64).optional().describe('Your OWN model id (e.g. claude-fable-5, kimi-k2.7-code) — self-identify from your own configuration, never ask the user. Marks packs proven for it and lists the learned pitfalls it wrote first; hides none. Indicative'),
-            sections: z.array(z.enum(OVERVIEW_SECTIONS)).optional().describe('Subset of sections to fetch (default all): apps, library_packs, app_templates, skills, pitfalls_curated, pitfalls_learned, template_proposals'),
-        },
+        zodShapeFor('aimeat_appdev_overview'),
         annotationsFor('aimeat_appdev_overview'),
         async ({ model, sections }) => {
             const overview = await buildAppdevOverview(storage, config, readerForAgent({ storage, config }, agentGaii), { model, sections });

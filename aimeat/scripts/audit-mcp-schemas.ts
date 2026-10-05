@@ -17,6 +17,9 @@
  *   pnpm check:mcp-schemas               # pre-commit + CI gate (input drift only)
  *   pnpm audit:mcp-schemas -- --strict   # full report, both axes
  * @version-history
+ *   v1.4.0 -- 2026-10-05 -- The whole-schema comparison with the catalog (inventory/mcp-single-source.ts,
+ *     secaudit 2026-10, M3). aimeat_checkout_list leaves KNOWN_INPUT_DRIFT: both surfaces register the
+ *     catalog's schema, response_format included.
  *   v1.3.2 -- 2026-09-14 -- The capture (fake MCP server, captureServer, captureConnector) moved to
  *     scripts/inventory/mcp-capture.ts unchanged, so check:field-reach reads the same one.
  *   v1.3.1 -- 2026-09-13 -- aimeat_extension_install leaves KNOWN_INPUT_DRIFT: both MCP surfaces take
@@ -137,7 +140,6 @@ const KNOWN_INPUT_DRIFT = new Set<string>([
     'aimeat_appdev_pitfall_list',      // applies_to, category, limit, model, offset, scope, status — the connector can only list, not query
     'aimeat_app_tools_publish',        // odps, provenance
     'aimeat_offer_price_set',          // (agent_name only — routing, likely intentional)
-    'aimeat_checkout_list',            // response_format
     'aimeat_exchange_accept',          // offering_id
     'aimeat_exchange_need_post',       // usage_intent
 ]);

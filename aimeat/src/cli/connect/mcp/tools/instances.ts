@@ -5,6 +5,7 @@
  * @description MCP tool registrations for instance management -- listing,
  *   creating, and checking instance status.
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.1.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
@@ -18,24 +19,21 @@
  *     package instances under a description promising chat sessions.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
 import { envelopeResult } from './_registry.js';
+import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerInstancesTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
 
-  mcp.tool('aimeat_instance_list', descriptionFor('aimeat_instance_list'), {}, annotationsFor('aimeat_instance_list'), async () => {
+  mcp.tool('aimeat_instance_list', descriptionFor('aimeat_instance_list'), zodShapeFor('aimeat_instance_list'), annotationsFor('aimeat_instance_list'), async () => {
     const resp = await client.get('/v1/chat-instances');
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_instance_create', descriptionFor('aimeat_instance_create'), {
-    name: z.string().describe('Application name for this instance'),
-    model: z.string().optional().describe('AI model identifier (e.g. gpt-4o, claude-3-5-sonnet)'),
-  }, annotationsFor('aimeat_instance_create'), async ({ name, model }) => {
+  mcp.tool('aimeat_instance_create', descriptionFor('aimeat_instance_create'), zodShapeFor('aimeat_instance_create'), annotationsFor('aimeat_instance_create'), async ({ name, model }) => {
     // Same derivation as the node MCP tool: the parameter is a model id, the record's platform is
     // its vendor segment.
     const platform = model ? model.split('-')[0] ?? 'unknown' : 'unknown';
@@ -43,9 +41,7 @@ export function registerInstancesTools(mcp: McpServer, registry: AgentRegistry):
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_instance_status', descriptionFor('aimeat_instance_status'), {
-    instance_id: z.string().describe('Chat instance ID'),
-  }, annotationsFor('aimeat_instance_status'), async ({ instance_id }) => {
+  mcp.tool('aimeat_instance_status', descriptionFor('aimeat_instance_status'), zodShapeFor('aimeat_instance_status'), annotationsFor('aimeat_instance_status'), async ({ instance_id }) => {
     const resp = await client.get(`/v1/chat-instances/${encodeURIComponent(instance_id)}`);
     return envelopeResult(resp);
   });

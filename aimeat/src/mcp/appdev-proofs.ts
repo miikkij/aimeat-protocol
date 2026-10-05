@@ -16,6 +16,7 @@
  * @structure registerAppdevProofTools()
  * @usage registerAppdevProofTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.1.0 -- 2026-08-11 -- The attach moved to services/contribution-proofs.ts and the record now
  *     goes through services/memory-write.ts. Writing it straight to storage meant a public,
  *     append-only ledger with no archive guard, no value-size or key ceiling, no byte quota and no
@@ -24,12 +25,12 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { attachContributionProof } from '../services/contribution-proofs.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerAppdevProofTools(
     mcp: McpServer,
@@ -44,15 +45,7 @@ export function registerAppdevProofTools(
     mcp.tool(
         'aimeat_appdev_proof_attach',
         descriptionFor('aimeat_appdev_proof_attach'),
-        {
-            subject_type: z.enum(['library_pack', 'app_template']).describe('library_pack = a COMMUNITY pack you own (your public cortex lib); app_template = one of your template proposals'),
-            subject_id: z.string().min(1).max(80).describe('The community pack id (cortex name) or template proposal id'),
-            model: z.string().min(1).max(64).describe('REQUIRED: model the run was made with (indicative, self-reported)'),
-            verdict: z.enum(['pass', 'fail']).describe('Did the pack/template accelerate the run — honest fails make passes credible'),
-            evidence: z.string().min(3).max(500).describe('URL or node storage/memory ref pointing at the run evidence'),
-            test_set: z.string().max(120).optional().describe('Repeatable test-set/spec identifier, when one was used'),
-            tokens: z.number().int().min(0).optional().describe('Output tokens the run consumed, when known'),
-        },
+        zodShapeFor('aimeat_appdev_proof_attach'),
         annotationsFor('aimeat_appdev_proof_attach'),
         async ({ subject_type, subject_id, model, verdict, evidence, test_set, tokens }) => {
             const attached = await attachContributionProof({ storage, config }, {

@@ -111,9 +111,6 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // ── Core / discovery ──
     aimeat_handbook_get: { title: 'Read Agent Handbook', readOnlyHint: true },
     aimeat_catalogue_search: { title: 'Search Action Catalogue', readOnlyHint: true },
-    aimeat_catalogue_agents: { title: 'Search Agent Directory', readOnlyHint: true },
-    aimeat_catalogue_boards: { title: 'Browse Public Boards', readOnlyHint: true },
-    aimeat_catalogue_directory: { title: 'Search People Directory', readOnlyHint: true },
     aimeat_discover: { title: 'Discover (Master Directory)', readOnlyHint: true, openWorldHint: true },
     // NOT read-only and NOT idempotent: it runs whatever it was pointed at, and what that does is
     // the target capability's business. openWorld, because the set of what it can reach is data.
@@ -143,16 +140,8 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_memory_restore: { title: 'Restore Deleted Memory Entry', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
     // ── Skills registry ──
-    aimeat_skill_list: { title: 'Browse Skills Registry', readOnlyHint: true },
-    aimeat_skill_get: { title: 'Resolve Skill', readOnlyHint: true },
-    aimeat_skill_publish: { title: 'Publish Skill', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_skill_link: { title: 'Link Skill to Agent', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_skill_unlink: { title: 'Unlink Skill from Agent', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
-    aimeat_skill_update: { title: 'Change Skill Visibility', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
     // ── Operator config enactment ──
-    aimeat_operator_agent_configure: { title: 'Configure Agent (Propose-then-Confirm)', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_operator_ai_config: { title: 'Configure AI Routing & Budget (Propose-then-Confirm)', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
     // ── Storage ──
     aimeat_storage_download: { title: 'Download Storage File', readOnlyHint: true },
@@ -182,17 +171,6 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_board_rules_set: { title: 'Set Board Rules', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
     // ── Sharing groups ──
-    aimeat_group_list: { title: 'List Sharing Groups', readOnlyHint: true },
-    aimeat_group_get: { title: 'Get Sharing Group', readOnlyHint: true },
-    aimeat_group_create: { title: 'Create Sharing Group', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    // Idempotent: the same pattern to the same group returns the share that already exists rather
-    // than adding a second row that revoking the first would not undo.
-    aimeat_share_create: { title: 'Share a Key Space', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_share_list: { title: 'List Shares', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    // Destructive in the sense that matters: someone who could read loses that access.
-    aimeat_share_revoke: { title: 'Stop Sharing', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
-    aimeat_group_add_member: { title: 'Add Group Member', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_group_remove_member: { title: 'Remove Group Member', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
 
     // ── Organisms ──
     aimeat_organism_list: { title: 'List Organisms', readOnlyHint: true },
@@ -298,13 +276,6 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // ── Actions & capabilities ──
     // openWorldHint: dispatches to third-party action providers/capabilities/sandboxed code
     aimeat_action_execute: { title: 'Execute Catalogue Action', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-    aimeat_capabilities_list: { title: 'List Capabilities', readOnlyHint: true },
-    aimeat_capabilities_get: { title: 'Get Capability', readOnlyHint: true },
-    aimeat_capabilities_invoke: { title: 'Invoke Capability', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-    aimeat_capabilities_create: { title: 'Create Capability', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_capabilities_update: { title: 'Update Capability', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_capabilities_delete: { title: 'Delete Capability', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
-    aimeat_capabilities_vouch: { title: 'Vouch for Capability', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
     // ── Agent telemetry & capabilities ──
     aimeat_agent_telemetry_report: { title: 'Report Agent Telemetry', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -329,19 +300,6 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // ── Crew definition (the chat path to building a JSON agent) ──
 
     // ── Knowledge packages ──
-    aimeat_knowledge_list: { title: 'List Knowledge Packages', readOnlyHint: true },
-    aimeat_knowledge_get: { title: 'Read Knowledge Package', readOnlyHint: true },
-    aimeat_knowledge_links: { title: 'Get Knowledge Links', readOnlyHint: true },
-    aimeat_knowledge_contribute: { title: 'Contribute to Knowledge Package', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_appdev_overview: { title: 'AppDev Research Overview', readOnlyHint: true },
-    aimeat_app_template_propose: { title: 'Propose App Template', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_app_template_list: { title: 'List App Template Proposals', readOnlyHint: true },
-    aimeat_app_template_get: { title: 'Read App Template Proposal', readOnlyHint: true },
-    aimeat_app_template_delete: { title: 'Delete App Template Proposal', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
-    aimeat_appdev_proof_attach: { title: 'Attach Acceleration Proof', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_appdev_pitfall_report: { title: 'Report AppDev Pitfall', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_appdev_pitfall_list: { title: 'List AppDev Pitfalls', readOnlyHint: true },
-    aimeat_appdev_pitfall_delete: { title: 'Delete AppDev Pitfall', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
 
     // ── Apps ──
     // Component packages (/v1/packages). A different thing from an app, and named so since
@@ -377,9 +335,6 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // ── Cortex ──
 
     // ── Chat instances ──
-    aimeat_instance_list: { title: 'List Chat Instances', readOnlyHint: true },
-    aimeat_instance_status: { title: 'Get Chat Instance Status', readOnlyHint: true },
-    aimeat_instance_create: { title: 'Create Chat Instance', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
 
     // ── Messages ──
     aimeat_message_inbox: { title: 'Read Message Inbox', readOnlyHint: true },
@@ -427,21 +382,13 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_contact_invite: { title: 'Invite a Person by Email', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
 
     // ── Consent ──
-    aimeat_consent_list: { title: 'List Consents', readOnlyHint: true },
-    aimeat_consent_grant: { title: 'Grant Consent', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_consent_revoke: { title: 'Revoke Consent', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
-    aimeat_access_list: { title: 'Access: Who Holds a Key', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
     // ── The owner's secrets vault ──
     // set is idempotent (the same name and value twice leaves the same row) and NOT destructive,
     // even though it replaces: what it replaces is a value nobody could read, and the caller
     // supplied the new one. delete IS destructive — whatever named that secret stops working.
-    aimeat_secret_list: { title: 'Secrets: What Is Stored', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_secret_set: { title: 'Store a Secret', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_secret_delete: { title: 'Remove a Secret', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
 
     // ── Flags / moderation ──
-    aimeat_flag_report: { title: 'Report Content for Moderation', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
 
     // ── Admin (operator-only) ──
     aimeat_admin_stats: { title: 'Admin: Node Stats', readOnlyHint: true },

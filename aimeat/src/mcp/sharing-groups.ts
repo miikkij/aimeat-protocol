@@ -10,6 +10,7 @@
  *   import { registerSharingGroupTools } from './sharing-groups.js';
  *   registerSharingGroupTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.4.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.1.0 -- 2026-09-08 -- A refusal carries its code (`CODE: message`), as the REST doors and the
@@ -27,7 +28,6 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { GroupShareRecord, Storage } from '../storage/interface.js';
@@ -46,6 +46,7 @@ import {
     listOutgoingShares,
     listIncomingShares,
 } from '../services/group-shares.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerSharingGroupTools(
     mcp: McpServer,
@@ -70,7 +71,7 @@ export function registerSharingGroupTools(
     mcp.tool(
         'aimeat_group_list',
         descriptionFor('aimeat_group_list'),
-        {},
+        zodShapeFor('aimeat_group_list'),
         annotationsFor('aimeat_group_list'),
         async () => {
             const ownerGhii = getOwnerGhii();
@@ -113,9 +114,7 @@ export function registerSharingGroupTools(
     mcp.tool(
         'aimeat_group_get',
         descriptionFor('aimeat_group_get'),
-        {
-            group_id: z.string().describe('The sharing group ID'),
-        },
+        zodShapeFor('aimeat_group_get'),
         annotationsFor('aimeat_group_get'),
         async ({ group_id }) => {
             const group = await storage.getSharingGroup(group_id);
@@ -159,18 +158,7 @@ export function registerSharingGroupTools(
     mcp.tool(
         'aimeat_group_create',
         descriptionFor('aimeat_group_create'),
-        {
-            name: z.string().describe('Group name'),
-            description: z.string().optional().describe('Group description'),
-            members: z.array(z.object({
-                identifier: z.string().describe('GAII or GHII of the member'),
-                identifier_type: z.enum(['gaii', 'ghii']).describe('Type of identifier'),
-                permissions: z.object({
-                    read: z.boolean(),
-                    write: z.boolean(),
-                }).optional().describe('Member permissions (defaults to read:true, write:false)'),
-            })).optional().describe('Initial members to add'),
-        },
+        zodShapeFor('aimeat_group_create'),
         annotationsFor('aimeat_group_create'),
         async ({ name, description, members }) => {
             const ownerGhii = getOwnerGhii();
@@ -209,15 +197,7 @@ export function registerSharingGroupTools(
     mcp.tool(
         'aimeat_group_add_member',
         descriptionFor('aimeat_group_add_member'),
-        {
-            group_id: z.string().describe('The sharing group ID'),
-            identifier: z.string().describe('GAII or GHII of the member to add'),
-            identifier_type: z.enum(['gaii', 'ghii']).describe('Type of identifier'),
-            permissions: z.object({
-                read: z.boolean(),
-                write: z.boolean(),
-            }).optional().describe('Member permissions (defaults to group default)'),
-        },
+        zodShapeFor('aimeat_group_add_member'),
         annotationsFor('aimeat_group_add_member'),
         async ({ group_id, identifier, identifier_type, permissions }) => {
             const ownerGhii = getOwnerGhii();
@@ -258,10 +238,7 @@ export function registerSharingGroupTools(
     mcp.tool(
         'aimeat_group_remove_member',
         descriptionFor('aimeat_group_remove_member'),
-        {
-            group_id: z.string().describe('The sharing group ID'),
-            identifier: z.string().describe('GAII or GHII of the member to remove'),
-        },
+        zodShapeFor('aimeat_group_remove_member'),
         annotationsFor('aimeat_group_remove_member'),
         async ({ group_id, identifier }) => {
             const ownerGhii = getOwnerGhii();
@@ -310,12 +287,7 @@ export function registerSharingGroupTools(
     mcp.tool(
         'aimeat_share_create',
         descriptionFor('aimeat_share_create'),
-        {
-            group_id: z.string().describe('The sharing group whose members should be able to read'),
-            key_pattern: z.string().describe('A key or a pattern, e.g. "deliveries.abc.**". `*` is one segment, `**` is the whole subtree. Keys written later are covered automatically.'),
-            note: z.string().optional().describe('A reminder for the owner\'s own list. The reader never sees it.'),
-            expires_at: z.string().optional().describe('ISO timestamp when the share stops granting. Omit for "until revoked".'),
-        },
+        zodShapeFor('aimeat_share_create'),
         annotationsFor('aimeat_share_create'),
         async ({ group_id, key_pattern, note, expires_at }) => {
             const created = await createShare(
@@ -334,10 +306,7 @@ export function registerSharingGroupTools(
     mcp.tool(
         'aimeat_share_list',
         descriptionFor('aimeat_share_list'),
-        {
-            direction: z.enum(['outgoing', 'incoming']).default('outgoing')
-                .describe('outgoing = what your owner shares with others; incoming = what others have shared with your owner (and with you)'),
-        },
+        zodShapeFor('aimeat_share_list'),
         annotationsFor('aimeat_share_list'),
         async ({ direction }) => {
             const shares = direction === 'incoming'
@@ -356,7 +325,7 @@ export function registerSharingGroupTools(
     mcp.tool(
         'aimeat_share_revoke',
         descriptionFor('aimeat_share_revoke'),
-        { share_id: z.string().describe('The share to withdraw. Reads stop at once; copies already taken are not recalled.') },
+        zodShapeFor('aimeat_share_revoke'),
         annotationsFor('aimeat_share_revoke'),
         async ({ share_id }) => {
             const revoked = await revokeShare({ storage }, caller(), share_id);

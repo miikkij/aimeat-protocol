@@ -9,6 +9,7 @@
  *   inline-only — the local runtime has the files at hand, so presigned ZIP upload is not
  *   needed (that mode lives on the server MCP surface).
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v1.1.0 -- 2026-09-03 -- aimeat_skill_update proxies PATCH /v1/skills/:name (visibility without
  *     a republish).
@@ -20,17 +21,10 @@ import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
 import { agentNameSchema, envelopeResult, pickAgent } from './_registry.js';
+import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerSkillsTools(mcp: McpServer, registry: AgentRegistry): void {
-  mcp.tool('aimeat_skill_publish', descriptionFor('aimeat_skill_publish'), {
-    skill_md: z.string().optional().describe('The SKILL.md content (frontmatter + body). Required on the connector (no presigned upload mode here).'),
-    files: z.record(z.string(), z.string()).optional().describe('Additional files as relative-path -> content (scripts/, references/, assets/).'),
-    scope: z.enum(['user', 'node', 'workspace']).optional().describe('Registry scope (default user). node is operator-only; workspace requires organism_id + workspace_id.'),
-    visibility: z.enum(['owner', 'members', 'public']).optional().describe('Registry visibility (node/user; workspace skills are always workspace-visible).'),
-    organism_id: z.string().optional().describe('Workspace scope: the organism id.'),
-    workspace_id: z.string().optional().describe('Workspace scope: the workspace id.'),
-    agent_name: agentNameSchema,
-  }, annotationsFor('aimeat_skill_publish'), async ({ skill_md, files, scope, visibility, organism_id, workspace_id, agent_name }) => {
+  mcp.tool('aimeat_skill_publish', descriptionFor('aimeat_skill_publish'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_skill_publish') }, annotationsFor('aimeat_skill_publish'), async ({ skill_md, files, scope, visibility, organism_id, workspace_id, agent_name }) => {
     if (!skill_md) {
       return { content: [{ type: 'text' as const, text: 'skill_md is required on the connector — pass the SKILL.md content inline.' }], isError: true };
     }
@@ -53,12 +47,7 @@ export function registerSkillsTools(mcp: McpServer, registry: AgentRegistry): vo
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_skill_get', descriptionFor('aimeat_skill_get'), {
-    ref: z.string().optional().describe('Full skill ref: node:{name} or user:{owner}/{name}.'),
-    name: z.string().optional().describe('Bare skill name (own registry first, then node library).'),
-    manifest_only: z.boolean().optional().describe('Return only the manifest, no file bodies.'),
-    agent_name: agentNameSchema,
-  }, annotationsFor('aimeat_skill_get'), async ({ ref, name, manifest_only, agent_name }) => {
+  mcp.tool('aimeat_skill_get', descriptionFor('aimeat_skill_get'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_skill_get') }, annotationsFor('aimeat_skill_get'), async ({ ref, name, manifest_only, agent_name }) => {
     const { client } = pickAgent(registry, agent_name);
     let path: string;
     if (ref) {
@@ -100,12 +89,7 @@ export function registerSkillsTools(mcp: McpServer, registry: AgentRegistry): vo
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_skill_update', descriptionFor('aimeat_skill_update'), {
-    name: z.string().describe('The skill name (the bare name from its frontmatter).'),
-    visibility: z.enum(['owner', 'members', 'public']).describe('Who may read it from now on.'),
-    scope: z.enum(['user', 'node']).optional().describe('Which registry the skill is in (default user, your owner\'s own).'),
-    agent_name: agentNameSchema,
-  }, annotationsFor('aimeat_skill_update'), async ({ name, visibility, scope, agent_name }) => {
+  mcp.tool('aimeat_skill_update', descriptionFor('aimeat_skill_update'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_skill_update') }, annotationsFor('aimeat_skill_update'), async ({ name, visibility, scope, agent_name }) => {
     const { client } = pickAgent(registry, agent_name);
     const resp = await client.patch(`/v1/skills/${encodeURIComponent(name)}?scope=${scope ?? 'user'}`, { visibility });
     return envelopeResult(resp);

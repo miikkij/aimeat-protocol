@@ -11,6 +11,7 @@
  *   import { registerConsentTools } from './consent.js';
  *   registerConsentTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-03-21 — Initial creation: 3 tools + 1 resource for consent management via MCP
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
@@ -20,13 +21,13 @@
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { grantConsent, revokeConsent } from '../services/consent-write.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerConsentTools(
     mcp: McpServer,
@@ -99,13 +100,7 @@ export function registerConsentTools(
     mcp.tool(
         'aimeat_consent_grant',
         descriptionFor('aimeat_consent_grant'),
-        {
-            target_gaii: z.string().describe('Recipient GAII, "*", or prefixed identifier (organism.x, domain:x, node:x)'),
-            scope: z.enum(['private', 'dmz', 'federation']).describe('Consent scope zone'),
-            data_pattern: z.string().describe('Glob pattern for data keys (e.g. "profile.*")'),
-            purpose: z.string().describe('Human-readable purpose for this consent'),
-            ttl_hours: z.number().optional().describe('Expiry in hours from now (omit for indefinite)'),
-        },
+        zodShapeFor('aimeat_consent_grant'),
         annotationsFor('aimeat_consent_grant'),
         async ({ target_gaii, scope, data_pattern, purpose, ttl_hours }) => {
             // ONE implementation (services/consent-write.ts). This tool used to build the record
@@ -148,7 +143,7 @@ export function registerConsentTools(
     mcp.tool(
         'aimeat_consent_list',
         descriptionFor('aimeat_consent_list'),
-        {},
+        zodShapeFor('aimeat_consent_list'),
         annotationsFor('aimeat_consent_list'),
         async () => {
             const ghii = ownerGhii();
@@ -177,9 +172,7 @@ export function registerConsentTools(
     mcp.tool(
         'aimeat_consent_revoke',
         descriptionFor('aimeat_consent_revoke'),
-        {
-            consent_id: z.string().describe('ID of the consent to revoke'),
-        },
+        zodShapeFor('aimeat_consent_revoke'),
         annotationsFor('aimeat_consent_revoke'),
         async ({ consent_id }) => {
             // Same function the REST door calls: it owns the ownership check, the audit entry and

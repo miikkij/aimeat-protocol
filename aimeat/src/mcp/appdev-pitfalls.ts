@@ -12,6 +12,7 @@
  * @structure registerAppdevPitfallTools() — aimeat_appdev_pitfall_report / _list / _delete
  * @usage registerAppdevPitfallTools(mcp, storage, config, () => agentGaii, emitResourceUpdated);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.4.0 -- 2026-09-29 -- TARGET-082 V4: the list reads own and shared learned entries through
  *     services/appdev-kb.ts ownPitfallRecords() and sharedPitfallRecords() with the session's
  *     classification reader, so an entry this agent may not see is left out and a warning-labelled
@@ -49,10 +50,9 @@ import {
 import { getSoftwareVersion } from '../utils/version.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { classificationWarningOf } from '../services/classification/present-memory.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export { PITFALL_PACKAGE_ID };
-
-const SEVERITIES = ['info', 'warn', 'critical'] as const;
 
 type PitfallEntryValue = LearnedPitfallValue;
 
@@ -94,19 +94,7 @@ export function registerAppdevPitfallTools(
     mcp.tool(
         'aimeat_appdev_pitfall_report',
         descriptionFor('aimeat_appdev_pitfall_report'),
-        {
-            model: z.string().min(1).max(64).describe('REQUIRED: YOUR OWN model id — the model that hit/solved this (e.g. claude-fable-5, kimi-k2.7-code). Self-identify from your own configuration, never ask the user. Indicative attribution'),
-            category: z.string().min(1).max(40).describe('Kebab-case category, e.g. auth, ext, cortex, realtime, mobile, publish, ai, data'),
-            title: z.string().min(3).max(160).describe('Short imperative title of the pitfall'),
-            symptom: z.string().min(5).max(10_000).describe('What the builder observes when hitting it'),
-            resolution: z.string().min(5).max(40_000).describe('What to do instead — the better way'),
-            slug: z.string().max(64).optional().describe('Stable kebab-case slug; same {category, slug} UPDATES the entry (better wording replaces old). Derived from the title when omitted'),
-            applies_to: z.array(z.string().max(20)).max(8).optional().describe('Areas this applies to (app, auth, ext, cortex, iam, realtime, ai, mobile, publish)'),
-            severity: z.enum(SEVERITIES).optional().describe('Default warn'),
-            status: z.enum(['active', 'outdated']).optional().describe('Mark outdated when models no longer stumble on it (kept, hidden from default lists)'),
-            app_ref: z.string().max(200).optional().describe('Related app, e.g. owner/filename.html'),
-            share: z.boolean().optional().describe('true = publish this entry platform-wide (public visibility) so other owners\' agents learn from it; default = private to your owner scope'),
-        },
+        zodShapeFor('aimeat_appdev_pitfall_report'),
         annotationsFor('aimeat_appdev_pitfall_report'),
         async ({ model, category, title, symptom, resolution, slug, applies_to, severity, status, app_ref, share }) => {
             // The whole report is services/appdev-kb.ts reportLearnedPitfall(), the same function
@@ -209,10 +197,7 @@ export function registerAppdevPitfallTools(
     mcp.tool(
         'aimeat_appdev_pitfall_delete',
         descriptionFor('aimeat_appdev_pitfall_delete'),
-        {
-            category: z.string().min(1).max(40),
-            slug: z.string().min(1).max(64),
-        },
+        zodShapeFor('aimeat_appdev_pitfall_delete'),
         annotationsFor('aimeat_appdev_pitfall_delete'),
         async ({ category, slug }) => {
             // The delete itself (record + manifest ref + live update) is deletePitfallEntry, the

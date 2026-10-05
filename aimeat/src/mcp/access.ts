@@ -18,6 +18,7 @@
  * @structure registerAccessTools(mcp, storage, config, getAgentGaii)
  * @usage registerAccessTools(mcp, storage, config, agentGaii) — from mcp/register-all.ts
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-09-05 — Initial (design canvas "AIMEAT Pääsy-sivu", decision 8).
  *   v1.0.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
@@ -29,6 +30,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { createAccessTabService } from '../services/db/access-tab-db-service.js';
 import { ownerGhiiOf, localAccountName } from '../utils/gaii.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerAccessTools(
     mcp: McpServer,
@@ -38,7 +40,7 @@ export function registerAccessTools(
 ): void {
     const accessDb = createAccessTabService(storage, config);
 
-    mcp.tool('aimeat_access_list', descriptionFor('aimeat_access_list'), {}, annotationsFor('aimeat_access_list'), async () => {
+    mcp.tool('aimeat_access_list', descriptionFor('aimeat_access_list'), zodShapeFor('aimeat_access_list'), annotationsFor('aimeat_access_list'), async () => {
         // The human behind this session, whichever principal is speaking: the keys are the owner's,
         // and an agent asking about "my access" is asking about the account it acts within.
         const ownerGhii = ownerGhiiOf(getAgentGaii());

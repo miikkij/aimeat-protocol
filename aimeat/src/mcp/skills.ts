@@ -14,6 +14,7 @@
  *   import { registerSkillsTools } from './skills.js';
  *   registerSkillsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.3.0 -- 2026-09-29 -- TARGET-082 V4: the skill accessor carries the agent's ContentReader
  *     (readerForAgent), so the registry filters user and workspace skills through it.
  *   v1.2.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
@@ -42,6 +43,7 @@ import {
   listSkillsByBinding, type SkillAccessor, type SkillScope,
 } from '../services/skills.js';
 import { readerForAgent } from '../services/classification/reader.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerSkillsTools(
     mcp: McpServer,
@@ -74,14 +76,7 @@ export function registerSkillsTools(
     mcp.tool(
         'aimeat_skill_publish',
         descriptionFor('aimeat_skill_publish'),
-        {
-            skill_md: z.string().optional().describe('The SKILL.md content (YAML frontmatter + markdown body). Omit to receive a presigned upload URL for a skill-directory ZIP instead.'),
-            files: z.record(z.string(), z.string()).optional().describe('Additional files as relative-path -> content (scripts/, references/, assets/). Only with skill_md.'),
-            scope: z.enum(['user', 'node', 'workspace']).optional().describe('Registry scope (default user). node is operator-only; workspace requires organism_id + workspace_id and organism membership.'),
-            visibility: z.enum(['owner', 'members', 'public']).optional().describe('Registry visibility (node/user scopes). Defaults: user->owner, node->members. public = federated. Workspace skills are always workspace-visible.'),
-            organism_id: z.string().optional().describe('Workspace scope: the organism id.'),
-            workspace_id: z.string().optional().describe('Workspace scope: the workspace id.'),
-        },
+        zodShapeFor('aimeat_skill_publish'),
         annotationsFor('aimeat_skill_publish'),
         async ({ skill_md, files, scope, visibility, organism_id, workspace_id }) => {
             if (!ownerName) return err('Could not resolve the calling agent\'s owner');
@@ -184,11 +179,7 @@ export function registerSkillsTools(
     mcp.tool(
         'aimeat_skill_get',
         descriptionFor('aimeat_skill_get'),
-        {
-            ref: z.string().optional().describe('Full skill ref: node:{name} or user:{owner}/{name}.'),
-            name: z.string().optional().describe('Bare skill name — resolved against your own registry first, then the node library. Ignored when ref is given.'),
-            manifest_only: z.boolean().optional().describe('Return only the manifest (no file bodies).'),
-        },
+        zodShapeFor('aimeat_skill_get'),
         annotationsFor('aimeat_skill_get'),
         async ({ ref, name, manifest_only }) => {
             const acc = await accessor();
@@ -262,11 +253,7 @@ export function registerSkillsTools(
     mcp.tool(
         'aimeat_skill_update',
         descriptionFor('aimeat_skill_update'),
-        {
-            name: z.string().describe('The skill name (the bare name from its frontmatter).'),
-            visibility: z.enum(['owner', 'members', 'public']).describe('Who may read it from now on.'),
-            scope: z.enum(['user', 'node']).optional().describe('Which registry the skill is in (default user, your owner\'s own).'),
-        },
+        zodShapeFor('aimeat_skill_update'),
         annotationsFor('aimeat_skill_update'),
         async ({ name, visibility, scope }) => {
             if (!ownerName) return err('Could not resolve the calling agent\'s owner');

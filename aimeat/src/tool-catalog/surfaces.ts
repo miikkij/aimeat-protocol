@@ -202,7 +202,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         // alone is 6 500 characters, which every round would pay for.
         'aimeat_organism_list', 'aimeat_workspace_list', 'aimeat_workspace_read',
         // Their apps and skills.
-        'aimeat_app_list', 'aimeat_skill_list', 'aimeat_skill_get',
+        'aimeat_app_list', 
         // Their agents, a new one, and work for them. A schedule is found when it is needed.
         'aimeat_agents_list', 'aimeat_agent_propose',
         'aimeat_task_create', 'aimeat_task_get', 'aimeat_task_list',
@@ -239,10 +239,10 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_workspace_rows_append', 'aimeat_workspace_rows_read', 'aimeat_workspace_rows_stats', 'aimeat_workspace_rows_delete',
         'aimeat_workspace_doc_append', 'aimeat_workspace_doc_section_replace',
         'aimeat_workspace_space_add', 'aimeat_workspace_sections_set', 'aimeat_workspace_suggestions',
-        'aimeat_skill_publish', 'aimeat_skill_list', 'aimeat_skill_get', 'aimeat_skill_link', 'aimeat_skill_unlink', 'aimeat_skill_update',
-        'aimeat_appdev_overview', 'aimeat_appdev_pitfall_report', 'aimeat_appdev_pitfall_list', 'aimeat_appdev_pitfall_delete',
-        'aimeat_app_fork', 'aimeat_app_template_propose', 'aimeat_app_template_list', 'aimeat_app_template_get', 'aimeat_app_template_delete',
-        'aimeat_appdev_proof_attach',
+        
+        
+        'aimeat_app_fork', 
+        
         'aimeat_handbook_get',
     ],
     agent: [
@@ -314,21 +314,21 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         // The mail refinery: a batch that reads, classifies and files a connected mailbox.
         
-        'aimeat_knowledge_list', 'aimeat_knowledge_get', 'aimeat_knowledge_contribute', 'aimeat_knowledge_links',
-        'aimeat_appdev_overview', 'aimeat_appdev_pitfall_report', 'aimeat_appdev_pitfall_list', 'aimeat_appdev_pitfall_delete',
-        'aimeat_app_template_propose', 'aimeat_app_template_list', 'aimeat_app_template_get', 'aimeat_app_template_delete',
-        'aimeat_appdev_proof_attach',
-        'aimeat_skill_publish', 'aimeat_skill_list', 'aimeat_skill_get', 'aimeat_skill_link', 'aimeat_skill_unlink', 'aimeat_skill_update',
-        'aimeat_operator_agent_configure', 'aimeat_operator_ai_config', 
         
-        'aimeat_capabilities_list', 'aimeat_capabilities_get', 'aimeat_capabilities_invoke',
+        
+        
+        
+        
+        
+        
+        
         'aimeat_organism_list', 'aimeat_organism_get', 'aimeat_organism_members', 'aimeat_organism_invite', 'aimeat_organism_invite_email', 'aimeat_organism_invitations_email', 'aimeat_organism_invitation_email_cancel', 'aimeat_organism_member_add', 'aimeat_organism_member_remove', 'aimeat_organism_owner_add', 'aimeat_organism_owner_remove', 'aimeat_organism_invitation_update', 'aimeat_organism_invitation_cancel', 'aimeat_organism_invitations', 'aimeat_organism_invitation_respond', 'aimeat_organism_search', 'aimeat_organism_join', 'aimeat_organism_leave', 'aimeat_organism_create', 'aimeat_organism_update', 'aimeat_organism_archive', 'aimeat_organism_export', 'aimeat_organism_import',
         'aimeat_workspace_create', 'aimeat_workspace_list', 'aimeat_workspace_read', 'aimeat_workspace_overview', 'aimeat_organism_overview', 'aimeat_workspace_write', 'aimeat_workspace_publish', 'aimeat_workspace_revert_to_draft', 'aimeat_workspace_object_delete', 'aimeat_workspace_update', 'aimeat_workspace_access', 'aimeat_workspace_member_grant', 'aimeat_workspace_member_revoke', 'aimeat_workspace_members', 'aimeat_workspace_transfer', 'aimeat_workspace_comment', 'aimeat_workspace_comments', 'aimeat_workspace_comment_delete',
         'aimeat_workspace_rows_append', 'aimeat_workspace_rows_read', 'aimeat_workspace_rows_stats', 'aimeat_workspace_rows_delete',
         'aimeat_workspace_doc_append', 'aimeat_workspace_doc_section_replace',
         'aimeat_workspace_space_add', 'aimeat_workspace_sections_set', 'aimeat_workspace_suggestions',
         'aimeat_discover',
-        'aimeat_catalogue_agents', 'aimeat_catalogue_directory', 'aimeat_catalogue_boards',
+        
         'aimeat_board_read',
         'aimeat_agent_profile', 'aimeat_agent_activity', 'aimeat_agent_capabilities_report', 'aimeat_agent_tags_set', 'aimeat_agent_telemetry_report', 'aimeat_agents_list',
         // A person asks THEIR OWN agent for a new agent, so the proposal tools belong here. They sat
@@ -339,11 +339,11 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_usage_report',
         // Who holds a key to the owner's account: the Access page's read, for the agent the owner
         // trusted with account:security. Read-only; every revoke stays on the page.
-        'aimeat_access_list',
+        
         // The owner's secrets vault. On the agent surface because setting up an integration is
         // exactly the work an owner's own agent does, and a key it stores is one the owner never
         // has to paste anywhere. It can store and remove; nothing anywhere reads a value back.
-        'aimeat_secret_list', 'aimeat_secret_set', 'aimeat_secret_delete',
+        
         'aimeat_onboarding_status', 'aimeat_onboarding_identify_platform', 'aimeat_onboarding_confirm_skill_installed',
         'aimeat_onboarding_confirm_directives_read', 'aimeat_onboarding_declare_services',
         'aimeat_handbook_get',
@@ -359,19 +359,19 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
     ],
     service: [
         'aimeat_discover',
-        'aimeat_catalogue_search', 'aimeat_catalogue_agents', 'aimeat_catalogue_boards',
+        'aimeat_catalogue_search', 
         'aimeat_memory_read', 'aimeat_memory_write', 'aimeat_memory_list', 'aimeat_memory_search', 'aimeat_memory_read_public',
         'aimeat_storage_upload', 'aimeat_storage_download', 'aimeat_storage_delete',
         'aimeat_datapackage_publish', 'aimeat_datapackage_export',
-        'aimeat_knowledge_list', 'aimeat_knowledge_get', 'aimeat_knowledge_contribute', 'aimeat_knowledge_links',
-        'aimeat_skill_publish', 'aimeat_skill_list', 'aimeat_skill_get', 'aimeat_skill_link', 'aimeat_skill_unlink', 'aimeat_skill_update',
+        
+        
         'aimeat_board_list', 'aimeat_board_read', 'aimeat_board_create', 'aimeat_board_post', 'aimeat_board_reply',
         'aimeat_board_react', 'aimeat_board_subscribe', 'aimeat_board_members', 'aimeat_board_rules_set', 'aimeat_board_delete',
         'aimeat_work_inbox', 'aimeat_work_accept', 'aimeat_work_deliver',
         'aimeat_action_execute',
         'aimeat_wallet_balance', 'aimeat_wallet_transactions',
-        'aimeat_capabilities_list', 'aimeat_capabilities_get', 'aimeat_capabilities_invoke',
-        'aimeat_capabilities_create', 'aimeat_capabilities_update', 'aimeat_capabilities_delete', 'aimeat_capabilities_vouch',
+        
+        
         'aimeat_organism_list', 'aimeat_organism_get', 'aimeat_organism_members', 'aimeat_organism_invite', 'aimeat_organism_invite_email', 'aimeat_organism_invitations_email', 'aimeat_organism_invitation_email_cancel', 'aimeat_organism_member_add', 'aimeat_organism_member_remove', 'aimeat_organism_owner_add', 'aimeat_organism_owner_remove', 'aimeat_organism_invitation_update', 'aimeat_organism_invitation_cancel', 'aimeat_organism_invitations', 'aimeat_organism_invitation_respond', 'aimeat_organism_search', 'aimeat_organism_join', 'aimeat_organism_leave', 'aimeat_organism_create', 'aimeat_organism_update', 'aimeat_organism_archive', 'aimeat_organism_export', 'aimeat_organism_import',
         'aimeat_workspace_create', 'aimeat_workspace_list', 'aimeat_workspace_read', 'aimeat_workspace_overview', 'aimeat_organism_overview', 'aimeat_workspace_write', 'aimeat_workspace_publish', 'aimeat_workspace_revert_to_draft', 'aimeat_workspace_object_delete', 'aimeat_workspace_update', 'aimeat_workspace_access', 'aimeat_workspace_member_grant', 'aimeat_workspace_member_revoke', 'aimeat_workspace_members', 'aimeat_workspace_transfer', 'aimeat_workspace_comment', 'aimeat_workspace_comments', 'aimeat_workspace_comment_delete',
         'aimeat_workspace_rows_append', 'aimeat_workspace_rows_read', 'aimeat_workspace_rows_stats', 'aimeat_workspace_rows_delete',
@@ -446,12 +446,12 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         // sells, and because the only caller it will ever have is the operator's own agent.
         
         
-        'aimeat_flag_report',
-        'aimeat_group_list', 'aimeat_group_get', 'aimeat_group_create', 'aimeat_group_add_member', 'aimeat_group_remove_member',
-        'aimeat_share_create', 'aimeat_share_list', 'aimeat_share_revoke',
-        'aimeat_consent_grant', 'aimeat_consent_list', 'aimeat_consent_revoke',
-        'aimeat_access_list',
-        'aimeat_secret_list', 'aimeat_secret_set', 'aimeat_secret_delete',
+        
+        
+        
+        
+        
+        
         'aimeat_agent_mode_set', 'aimeat_agent_run_mode_set', 'aimeat_agent_runtime_report', 'aimeat_agent_description_set',
         'aimeat_agent_tags_set', 'aimeat_agent_console_set',
         // What the one-press basic agents would give this account, and a proposal for a new one.
@@ -460,7 +460,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_agent_basics_get', 'aimeat_agent_basics_request', 'aimeat_agent_propose',
         
         
-        'aimeat_operator_agent_configure', 'aimeat_operator_ai_config', 
+        
         
     ],
     // The selling surface (/v2/mcp/commerce): everything an agent needs to price something, take

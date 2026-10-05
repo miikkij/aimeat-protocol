@@ -11,6 +11,7 @@
  *   import { registerChatInstancesTools } from './chat-instances.js';
  *   registerChatInstancesTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-03-21 — Initial creation: 3 tools + 1 resource for chat instance management via MCP
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
@@ -24,13 +25,13 @@
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { registerChatInstance } from '../services/chat-instance-write.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerChatInstancesTools(
     mcp: McpServer,
@@ -96,7 +97,7 @@ export function registerChatInstancesTools(
     mcp.tool(
         'aimeat_instance_list',
         descriptionFor('aimeat_instance_list'),
-        {},
+        zodShapeFor('aimeat_instance_list'),
         annotationsFor('aimeat_instance_list'),
         async () => {
             const instances = await storage.listChatInstances({ ownerName: ownerName() });
@@ -123,10 +124,7 @@ export function registerChatInstancesTools(
     mcp.tool(
         'aimeat_instance_create',
         descriptionFor('aimeat_instance_create'),
-        {
-            name: z.string().describe('Application name for this instance'),
-            model: z.string().optional().describe('AI model identifier (e.g. gpt-4o, claude-3-5-sonnet)'),
-        },
+        zodShapeFor('aimeat_instance_create'),
         annotationsFor('aimeat_instance_create'),
         async ({ name, model }) => {
             // The tool's own parameter is a model id; the record's platform is its vendor segment.
@@ -163,9 +161,7 @@ export function registerChatInstancesTools(
     mcp.tool(
         'aimeat_instance_status',
         descriptionFor('aimeat_instance_status'),
-        {
-            instance_id: z.string().describe('Chat instance ID'),
-        },
+        zodShapeFor('aimeat_instance_status'),
         annotationsFor('aimeat_instance_status'),
         async ({ instance_id }) => {
             const inst = await storage.getChatInstance(instance_id);

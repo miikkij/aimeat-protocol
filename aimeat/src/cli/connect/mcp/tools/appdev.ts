@@ -41,13 +41,11 @@ export function registerAppdevTools(mcp: McpServer, registry: AgentRegistry): vo
   const out = (resp: { data?: unknown; ok?: boolean }) =>
     ({ content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) });
 
-  mcp.tool('aimeat_appdev_overview', descriptionFor('aimeat_appdev_overview'), {
-    model: z.string().optional().describe('Your own model (indicative): marks proven packs and orders learned pitfalls; filters nothing.'),
-    sections: z.string().optional().describe('Comma-separated section filter (apps,library_packs,templates,pitfalls,...).'),
-  }, annotationsFor('aimeat_appdev_overview'), async ({ model, sections }) => {
+  mcp.tool('aimeat_appdev_overview', descriptionFor('aimeat_appdev_overview'), zodShapeFor('aimeat_appdev_overview'), annotationsFor('aimeat_appdev_overview'), async ({ model, sections }) => {
     const params = new URLSearchParams();
     if (model) params.set('model', model);
-    if (sections) params.set('sections', sections);
+    // The node takes a list; the route reads it comma-separated.
+    if (sections?.length) params.set('sections', sections.join(','));
     const qs = params.toString();
     return out(await client.get(`/v1/appdev/overview${qs ? '?' + qs : ''}`));
   });
@@ -58,28 +56,13 @@ export function registerAppdevTools(mcp: McpServer, registry: AgentRegistry): vo
     return out(await client.get(`/v1/appdev/pitfalls/learned${include_shared ? '?include_shared=1' : ''}`));
   });
 
-  mcp.tool('aimeat_appdev_pitfall_delete', descriptionFor('aimeat_appdev_pitfall_delete'), {
-    category: z.string().describe('Kebab-case category.'),
-    slug: z.string().describe('Kebab-case slug.'),
-  }, annotationsFor('aimeat_appdev_pitfall_delete'), async ({ category, slug }) => {
+  mcp.tool('aimeat_appdev_pitfall_delete', descriptionFor('aimeat_appdev_pitfall_delete'), zodShapeFor('aimeat_appdev_pitfall_delete'), annotationsFor('aimeat_appdev_pitfall_delete'), async ({ category, slug }) => {
     return out(await client.delete(`/v1/appdev/pitfalls/learned/${encodeURIComponent(category)}/${encodeURIComponent(slug)}`));
   });
 
   // Report/upsert a learned pitfall — the server MCP writes the knowledge record + manifest directly;
   // the connector writes the same owner memory record via POST /v1/memory (manifest side-index skipped).
-  mcp.tool('aimeat_appdev_pitfall_report', descriptionFor('aimeat_appdev_pitfall_report'), {
-    model: z.string().describe('YOUR OWN model id (self-identify; indicative).'),
-    category: z.string().describe('Kebab-case category (auth, ext, cortex, ...).'),
-    title: z.string().describe('Short imperative title.'),
-    symptom: z.string().describe('What the builder observes.'),
-    resolution: z.string().describe('What to do instead.'),
-    slug: z.string().optional().describe('Stable kebab-case slug (derived from title when omitted).'),
-    applies_to: z.array(z.string()).optional().describe('Areas this applies to.'),
-    severity: z.enum(['info', 'warn', 'critical']).optional().describe('Default warn.'),
-    status: z.enum(['active', 'outdated']).optional().describe('Default active.'),
-    app_ref: z.string().optional().describe('Related app owner/filename.html.'),
-    share: z.boolean().optional().describe('true = publish platform-wide (public).'),
-  }, annotationsFor('aimeat_appdev_pitfall_report'), async ({ model, category, title, symptom, resolution, slug, applies_to, severity, status, app_ref, share }) => {
+  mcp.tool('aimeat_appdev_pitfall_report', descriptionFor('aimeat_appdev_pitfall_report'), zodShapeFor('aimeat_appdev_pitfall_report'), annotationsFor('aimeat_appdev_pitfall_report'), async ({ model, category, title, symptom, resolution, slug, applies_to, severity, status, app_ref, share }) => {
     // The node's own function behind POST /v1/appdev/pitfalls/learned: manifest, upsert into the
     // identity that already holds the entry, and the verification stamp. This door used to write
     // POST /v1/memory itself and got none of the three.
@@ -96,34 +79,21 @@ export function registerAppdevTools(mcp: McpServer, registry: AgentRegistry): vo
 
   // Attach a self-reported acceleration proof. The capability is services/contribution-proofs.ts and
   // has no REST route, so both connector doors run the same append over /v1/memory: attachProofOverHttp().
-  mcp.tool('aimeat_appdev_proof_attach', descriptionFor('aimeat_appdev_proof_attach'), {
-    subject_type: z.enum(['library_pack', 'app_template']).describe('library_pack = a COMMUNITY pack you own (your public cortex lib); app_template = one of your template proposals.'),
-    subject_id: z.string().min(1).max(80).describe('The community pack id (cortex name) or template proposal id.'),
-    model: z.string().min(1).max(64).describe('YOUR OWN model id (self-identify; indicative).'),
-    verdict: z.enum(['pass', 'fail']).describe('Did the pack or template accelerate the run. Honest fails make your passes credible.'),
-    evidence: z.string().min(3).max(500).describe('URL or node storage/memory ref pointing at the run evidence.'),
-    test_set: z.string().max(120).optional().describe('Repeatable test-set identifier, when one was used.'),
-    tokens: z.number().int().min(0).optional().describe('Output tokens the run consumed, when known.'),
-  }, annotationsFor('aimeat_appdev_proof_attach'), async ({ subject_type, subject_id, model, verdict, evidence, test_set, tokens }) => {
+  mcp.tool('aimeat_appdev_proof_attach', descriptionFor('aimeat_appdev_proof_attach'), zodShapeFor('aimeat_appdev_proof_attach'), annotationsFor('aimeat_appdev_proof_attach'), async ({ subject_type, subject_id, model, verdict, evidence, test_set, tokens }) => {
     return out(await attachProofOverHttp(client, {
       subjectType: subject_type, subjectId: subject_id, model, verdict, evidence, testSet: test_set, tokens,
     }));
   });
 
-  mcp.tool('aimeat_app_template_list', descriptionFor('aimeat_app_template_list'), {}, annotationsFor('aimeat_app_template_list'), async () => {
+  mcp.tool('aimeat_app_template_list', descriptionFor('aimeat_app_template_list'), zodShapeFor('aimeat_app_template_list'), annotationsFor('aimeat_app_template_list'), async () => {
     return out(await client.get('/v1/appdev/templates'));
   });
 
-  mcp.tool('aimeat_app_template_get', descriptionFor('aimeat_app_template_get'), {
-    id: z.string().describe('Template id.'),
-    part: z.number().int().min(1).optional().describe('Only for a template the node ships whose file is too large for one answer: which part to return (1-based). The first answer says how many parts there are.'),
-  }, annotationsFor('aimeat_app_template_get'), async ({ id, part }) => {
+  mcp.tool('aimeat_app_template_get', descriptionFor('aimeat_app_template_get'), zodShapeFor('aimeat_app_template_get'), annotationsFor('aimeat_app_template_get'), async ({ id, part }) => {
     return out(await client.get(`/v1/appdev/templates/${encodeURIComponent(id)}${part ? `?part=${part}` : ''}`));
   });
 
-  mcp.tool('aimeat_app_template_delete', descriptionFor('aimeat_app_template_delete'), {
-    id: z.string().describe('Template id.'),
-  }, annotationsFor('aimeat_app_template_delete'), async ({ id }) => {
+  mcp.tool('aimeat_app_template_delete', descriptionFor('aimeat_app_template_delete'), zodShapeFor('aimeat_app_template_delete'), annotationsFor('aimeat_app_template_delete'), async ({ id }) => {
     return out(await client.delete(`/v1/appdev/templates/${encodeURIComponent(id)}`));
   });
 

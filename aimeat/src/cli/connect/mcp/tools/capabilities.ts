@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description MCP tool registrations for capability CRUD, invocation, and vouching.
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.1.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
@@ -18,17 +19,12 @@ import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
 import { envelopeResult } from './_registry.js';
+import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerCapabilitiesTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
 
-  mcp.tool('aimeat_capabilities_list', descriptionFor('aimeat_capabilities_list'), {
-    search: z.string().optional().describe('Full-text search on name and summary'),
-    tags: z.array(z.string()).optional().describe('Filter by tags'),
-    callable: z.boolean().optional().describe('Filter callable capabilities only'),
-    authRequired: z.string().optional().describe('Filter by auth level: none, anonymous, registered'),
-    source_type: z.string().optional().describe('Filter by source type: extension, action, cortex, manual'),
-  }, annotationsFor('aimeat_capabilities_list'), async ({ search, tags, callable, authRequired, source_type }) => {
+  mcp.tool('aimeat_capabilities_list', descriptionFor('aimeat_capabilities_list'), zodShapeFor('aimeat_capabilities_list'), annotationsFor('aimeat_capabilities_list'), async ({ search, tags, callable, authRequired, source_type }) => {
     const params = new URLSearchParams();
     if (search) params.set('search', search);
     if (tags?.length) params.set('tags', tags.join(','));
@@ -40,18 +36,12 @@ export function registerCapabilitiesTools(mcp: McpServer, registry: AgentRegistr
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_capabilities_get', descriptionFor('aimeat_capabilities_get'), {
-    id: z.string().describe('Capability identifier'),
-  }, annotationsFor('aimeat_capabilities_get'), async ({ id }) => {
+  mcp.tool('aimeat_capabilities_get', descriptionFor('aimeat_capabilities_get'), zodShapeFor('aimeat_capabilities_get'), annotationsFor('aimeat_capabilities_get'), async ({ id }) => {
     const resp = await client.get(`/v1/capabilities/${encodeURIComponent(id)}`);
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_capabilities_invoke', descriptionFor('aimeat_capabilities_invoke'), {
-    id: z.string().describe('Capability identifier'),
-    input: z.record(z.string(), z.unknown()).optional().describe('Input parameters'),
-    mode: z.enum(['normal', 'raw']).optional().describe('normal = normalized result, raw = original response'),
-  }, annotationsFor('aimeat_capabilities_invoke'), async ({ id, input, mode }) => {
+  mcp.tool('aimeat_capabilities_invoke', descriptionFor('aimeat_capabilities_invoke'), zodShapeFor('aimeat_capabilities_invoke'), annotationsFor('aimeat_capabilities_invoke'), async ({ id, input, mode }) => {
     const qs = mode ? `?mode=${encodeURIComponent(mode)}` : '';
     const resp = await client.post(`/v1/capabilities/${encodeURIComponent(id)}/invoke${qs}`, { input: input ?? {} });
     return envelopeResult(resp);
@@ -104,17 +94,12 @@ export function registerCapabilitiesTools(mcp: McpServer, registry: AgentRegistr
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_capabilities_delete', descriptionFor('aimeat_capabilities_delete'), {
-    id: z.string().describe('Capability identifier'),
-  }, annotationsFor('aimeat_capabilities_delete'), async ({ id }) => {
+  mcp.tool('aimeat_capabilities_delete', descriptionFor('aimeat_capabilities_delete'), zodShapeFor('aimeat_capabilities_delete'), annotationsFor('aimeat_capabilities_delete'), async ({ id }) => {
     const resp = await client.delete(`/v1/capabilities/${encodeURIComponent(id)}`);
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_capabilities_vouch', descriptionFor('aimeat_capabilities_vouch'), {
-    id: z.string().describe('Capability identifier'),
-    comment: z.string().optional().describe('Optional comment explaining why you vouch for this capability'),
-  }, annotationsFor('aimeat_capabilities_vouch'), async ({ id, comment }) => {
+  mcp.tool('aimeat_capabilities_vouch', descriptionFor('aimeat_capabilities_vouch'), zodShapeFor('aimeat_capabilities_vouch'), annotationsFor('aimeat_capabilities_vouch'), async ({ id, comment }) => {
     const body: Record<string, unknown> = {};
     if (comment) body.comment = comment;
     const resp = await client.post(`/v1/capabilities/${encodeURIComponent(id)}/vouch`, body);

@@ -9,6 +9,7 @@
  * @structure registerAccessTools(mcp, registry)
  * @usage Called by `aimeat connect serve` via the MCP tool registry (tools/index.ts).
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-09-05 — Initial, mirroring mcp/access.ts.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -16,11 +17,12 @@ import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
 import { envelopeResult } from './_registry.js';
+import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerAccessTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
 
-  mcp.tool('aimeat_access_list', descriptionFor('aimeat_access_list'), {}, annotationsFor('aimeat_access_list'), async () => {
+  mcp.tool('aimeat_access_list', descriptionFor('aimeat_access_list'), zodShapeFor('aimeat_access_list'), annotationsFor('aimeat_access_list'), async () => {
     const resp = await client.get('/v1/access/overview');
     return envelopeResult(resp);
   });
