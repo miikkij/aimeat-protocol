@@ -123,7 +123,7 @@ operating guide for every app it installed. The installed skill carries `fromPac
 (`{ groupId, instanceId }`). The installer's own skill always wins: when they already have a skill
 of that name that the package did not publish, the install leaves it as it is and names it in
 `warnings`. An update replaces, and an uninstall with `removeComponents` removes, only a skill that
-install published. Code: `services/package-skill-component.ts`.
+install published. Code: `services/packages/install/package-skill-component.ts`.
 
 ## Consuming from crewaimeat (JSON crew definitions)
 

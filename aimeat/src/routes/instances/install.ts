@@ -2,7 +2,7 @@
  * @file src/routes/instances/install.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Package install route — the HTTP door onto services/package-install.ts. The work
+ * @description Package install route — the HTTP door onto services/packages/install/package-install.ts. The work
  *   itself (dry_run validation, component registration, @activate-cron firing, rollback on failure)
  *   lives in the service, so this door and the MCP tool run the same code.
  * @version-history
@@ -14,11 +14,11 @@
  *   v1.10.0 — 2026-10-01 — The 201 answer carries `agents_proposed`: the package's agents, each waiting
  *     for the owner's approval (services/app-agent-propose.ts).
  *   v1.9.0 — 2026-09-30 — The 201 answer carries `warnings` when the install left out a skill because
- *     the owner has one of that name of their own (services/package-skill-component.ts).
+ *     the owner has one of that name of their own (services/packages/install/package-skill-component.ts).
  *   v1.8.0 — 2026-09-28 — The body takes `mode` (managed | editable) and `config` (each part's config),
  *     handed to the service unchanged.
  *   v1.7.0 — 2026-09-25 — An agent or an app grant lacking the words a memory part needs gets 202 and
- *     a request for the owner instead of 403 (services/package-install-requests.ts installOrRequest).
+ *     a request for the owner instead of 403 (services/packages/install/package-install-requests.ts installOrRequest).
  *   v1.6.0 — 2026-09-24 — The session's roles and scopes go to installPackage, which asks them for a
  *     package whose memory component writes into the owner's memory.
  *   v1.5.0 — 2026-09-14 — requireLocalSession, as on every other instance door: the install files
@@ -28,7 +28,7 @@
  *     an owner session can no longer file the install under the bare account name. The `sub` still
  *     handed to installPackage is a different thing: the principal recorded on the schedules the
  *     manifest brings. wish-identity-gate-sees-resolveghii.
- *   v1.4.0 — 2026-08-23 — The body moved to services/package-install.ts so the node's own MCP
+ *   v1.4.0 — 2026-08-23 — The body moved to services/packages/install/package-install.ts so the node's own MCP
  *     surface can install too. Pure extraction: same statuses, same messages, same shape.
  *   v1.3.0 — 2026-08-16 — Manifest schedules go through services/extension-schedules.ts, the one
  *     builder every install door now shares. The hand-built copy here left out `ownerScope`, without
@@ -46,7 +46,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireScope, requireLocalSession } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
-import { installOrRequest, requestedBody } from '../../services/package-install-requests.js';
+import { installOrRequest, requestedBody } from '../../services/packages/install/package-install-requests.js';
 import { resolveGhii } from '../../utils/ghii-resolver.js';
 import type { Scheduler } from '../../services/scheduler.js';
 import { actCallerOf } from './install-requests.js';

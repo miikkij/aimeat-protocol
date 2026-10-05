@@ -1,0 +1,640 @@
+/**
+ * @file services/packages/install/package-migrate.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Moving one installed package onto another version: replace a component, keep the
+ *   one the owner edited, take a merged version, install a part the new version adds.
+ *
+ *   WHY THIS IS A SERVICE. Two doors need it — the migration the owner drives component by
+ *   component, and the one act that updates a whole instance — and a second copy of this loop is a
+ *   second copy of the decision about whose bytes survive.
+ *
+ *   THREE THINGS THE EXTRACTION FIXED, each of which had produced a broken install in silence:
+ *
+ *   1. THE URL REWRITES WERE NOT REPEATED. An app component's source is rewritten at install time so
+ *      `/v1/cortex/<author's name>/` points at THIS instance's copy. Every registerComponent call
+ *      here was made without `urlRewrites`, so an updated app went back to the author's names and
+ *      404ed its own library the moment it was updated. The map is rebuilt from the instance.
+ *   2. A NEW COMPONENT GOT A NAME NOTHING COULD ADDRESS. `install_new` built
+ *      `{package}-{owner}-{componentId}`, missing the instance's short id and the `.html` an app
+ *      needs to be given an address at all. The instance's own short id is recovered from a name it
+ *      already carries.
+ *   3. A FAILED REGISTRATION WAS RECORDED AS A SUCCESS. `if (!result.success) {}` was an empty
+ *      block, and the component was written into the instance either way — so a refused component
+ *      left the instance claiming to hold something that is not there, with the old copy already
+ *      deleted. A failure now keeps the previous entry and is reported.
+ * @structure MigrationAction · MigrationRequest · MigrateOutcome · PackageMigrateResult ·
+ *   applyInstanceMigration(deps, caller, input)
+ * @usage
+ *   import { applyInstanceMigration } from './package-migrate.js';
+ *   const out = await applyInstanceMigration({ storage, config }, caller, { instanceId, targetVersion, actions });
+ * @version-history
+ *   v1.7.1 — 2026-10-05 — The owner test is isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
+ *   v1.7.0 — 2026-10-02 — A target version that can do more than the install was approved for needs the
+ *     owner, or an agent holding packages:install-code: without it the refusal names the word and the
+ *     doors file a request. A finished migration records the new approval (package-approvals.ts, T7).
+ *   v1.6.0 — 2026-09-30 — A `skill` component: named after itself, bound to this instance's copy of its
+ *     app, and carrying this instance's tag, so replace deletes only a skill this instance published.
+ *     One the owner has of their own is skipped and named in `warnings` (package-skill-component.ts).
+ *   v1.5.0 — 2026-09-28 — A replaced extension keeps the owner's config, secrets included: it was
+ *     rebuilt from the new manifest's defaults, which dropped every value an install had given.
+ *   v1.4.0 — 2026-09-28 — A forked install is refused (409 FORKED). A managed one takes only
+ *     `replace` and `install_new`: `custom` and `skip` would leave code the package did not ship.
+ *   v1.3.0 — 2026-09-25 — The words a caller lacks for a memory component are gathered through the
+ *     whole pre-flight and refused once at its end, carrying `missing`, the target version and the
+ *     instance, so a door can file a request for the owner that the node would then carry out.
+ *   v1.2.0 — 2026-09-24 — A memory or translation component brought by an agent or an app grant costs
+ *     the memory door's write words (memoryComponentWriteRefusal), asked before anything is deleted.
+ *   v1.1.0 — 2026-09-24 — A memory component that names a key the node trusts is refused with 403
+ *     RESERVED_KEY, for replace, custom and install_new alike, before anything is deleted.
+ *   v1.0.0 — 2026-09-05 — Extraction out of routes/instances/migration.ts, plus the three fixes.
+ */
+import YAML from 'yaml';
+import type { AimeatConfig } from '../../../config.js';
+import type {
+    Storage, InstalledComponent, PackageComponent, PackageComponentType, PackageRecord,
+    PackageInstanceRecord,
+} from '../../../storage/interface.js';
+import {
+    registerComponent, validateComponentContent, deleteComponent, computeHash,
+} from '../../component-registrar.js';
+import { registeredNameFor } from './package-install.js';
+import { reservedKeysInComponent, reservedComponentMessage, memoryComponentWriteRefusal } from './package-memory-component.js';
+import { planInstanceUpdate } from './package-update-plan.js';
+import { forkedUpdateRefusal } from './package-managed.js';
+import { packageCapabilities, widenedItems } from './package-capabilities.js';
+import { approvedItems, codeInstallRefusal, recordApproval } from './package-approvals.js';
+import { isOwnerInPerson } from '../../../utils/gaii.js';
+import { emitChange } from '../../event-bus.js';
+import { logger } from '../../../utils/logger.js';
+
+export const MIGRATION_ACTIONS = ['replace', 'skip', 'custom', 'install_new'] as const;
+export type MigrationAction = (typeof MIGRATION_ACTIONS)[number];
+
+export interface MigrationRequest {
+    componentId: string;
+    action: MigrationAction;
+    content?: string;
+}
+
+export interface MigrateOutcome {
+    migrated: boolean;
+    updatedComponents: string[];
+    newComponents: string[];
+    skippedComponents: string[];
+    /** A component whose registration was refused. Its previous copy is left in place. */
+    failedComponents: { componentId: string; error: string }[];
+    newVersion: string;
+    /** A skill left out because the owner has one of that name of their own (package-skill-component.ts). */
+    warnings?: string[];
+}
+
+/**
+ * A refusal. On SCOPE_DENIED for a memory component it also names the words the caller lacks, the
+ * target version and the instance as it stood, which is what a request for the owner records.
+ */
+export interface PackageMigrateRefusal {
+    ok: false; status: number; code: string; message: string;
+    missing?: string[];
+    target?: PackageRecord;
+    instance?: PackageInstanceRecord;
+}
+
+export type PackageMigrateResult =
+    | { ok: true; outcome: MigrateOutcome }
+    | PackageMigrateRefusal;
+
+/** One component the owner has edited, and the door that merges it. */
+export interface NeedsYouEntry {
+    componentId: string;
+    type: PackageComponentType;
+    reason: string;
+    mergeWith: string;
+}
+
+export interface InstanceUpdateAnswer {
+    currentVersion: string;
+    latestVersion: string;
+    updateAvailable: boolean;
+    changelog: string | null;
+    dryRun: boolean;
+    willUpdate: string[];
+    needsYou: NeedsYouEntry[];
+    /** Components the new version no longer has. Reported, never removed by this act. */
+    removed: { componentId: string; type: PackageComponentType }[];
+    applied: MigrateOutcome | null;
+}
+
+export type InstanceUpdateResult =
+    | { ok: true; answer: InstanceUpdateAnswer }
+    | PackageMigrateRefusal;
+
+export interface PackageMigrateDeps { storage: Storage; config: AimeatConfig }
+export interface PackageMigrateCaller {
+    owner: string;
+    ownerGhii: string;
+    sub: string;
+    /** What the session carries, for the write a memory component makes into the owner's memory. */
+    roles: string[];
+    scopes: string[];
+    federated?: boolean;
+}
+
+export interface PackageMigrateInput {
+    instanceId: string;
+    targetVersion: string;
+    actions: MigrationRequest[];
+}
+
+/**
+ * The instance's own short id, from a name it already carries.
+ *
+ * Every component of one instance was registered as `{package}-{owner}-{shortId}-{componentId}`, so
+ * any of them will do. Returns null for an instance installed before that scheme, and the caller
+ * then falls back to the older name shape rather than inventing an id that would not match its
+ * siblings.
+ */
+function instanceShortId(instance: PackageInstanceRecord, packageName: string, owner: string): string | null {
+    const prefix = `${packageName}-${owner}-`;
+    for (const ic of instance.installedComponents) {
+        if (!ic.registeredAs.startsWith(prefix)) continue;
+        const rest = ic.registeredAs.slice(prefix.length);
+        const candidate = rest.slice(0, 8);
+        if (/^[0-9a-f]{8}$/.test(candidate) && rest.charAt(8) === '-') return candidate;
+    }
+    return null;
+}
+
+/**
+ * The short name a cortex or extension component was published under.
+ *
+ * Read from `originalShortName` when the instance carries it. Instances installed before that field
+ * existed fall back to the package's own manifest, which is where the registrar read it the first
+ * time.
+ */
+function shortNameOf(installed: InstalledComponent, comp: PackageComponent | undefined): string | null {
+    if (installed.originalShortName) return installed.originalShortName;
+    if (!comp) return null;
+    try {
+        const parsed = JSON.parse(comp.content) as { manifest?: string };
+        const manifestStr = parsed.manifest ?? comp.content;
+        const meta = (YAML.parse(manifestStr) ?? {}) as Record<string, unknown>;
+        const metadata = (meta.metadata ?? meta) as Record<string, unknown>;
+        return (metadata.name as string) || null;
+    } catch (err) {
+        logger.warn('package-migrate: could not read a component short name, rewrites may be incomplete',
+            { component: installed.componentId, error: String(err) });
+        return null;
+    }
+}
+
+/**
+ * Rebuild the rewrite maps this instance's app components were installed with.
+ *
+ * Without these an updated app keeps the package author's cortex and extension names and 404s its
+ * own library. The maps are keyed on the name the SOURCE uses and valued with what this instance
+ * registered it as.
+ */
+function rewritesFor(
+    instance: PackageInstanceRecord, pkg: PackageRecord,
+): { cortexNames: Map<string, string>; extensionNames: Map<string, string> } {
+    const byId = new Map(pkg.components.map(c => [c.id, c]));
+    const cortexNames = new Map<string, string>();
+    const extensionNames = new Map<string, string>();
+
+    for (const ic of instance.installedComponents) {
+        if (ic.type !== 'cortex' && ic.type !== 'extension') continue;
+        const short = shortNameOf(ic, byId.get(ic.componentId));
+        if (!short) continue;
+        if (ic.type === 'cortex') cortexNames.set(short, ic.registeredAs);
+        else extensionNames.set(short, ic.registeredAs);
+    }
+    return { cortexNames, extensionNames };
+}
+
+/**
+ * Apply a set of per-component decisions and move the instance onto the target version.
+ *
+ * Authorisation happened before this call. What is decided HERE is that only the instance's owner
+ * may migrate it, and that content the node would refuse is refused BEFORE the existing component
+ * is deleted, which is the ordering the route has held since 2026-08-10.
+ */
+export async function applyInstanceMigration(
+    deps: PackageMigrateDeps,
+    caller: PackageMigrateCaller,
+    input: PackageMigrateInput,
+): Promise<PackageMigrateResult> {
+    const { storage, config } = deps;
+    const { owner, ownerGhii } = caller;
+    const { instanceId, targetVersion, actions } = input;
+
+    if (!targetVersion || typeof targetVersion !== 'string') {
+        return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'targetVersion is required' };
+    }
+    if (!Array.isArray(actions) || actions.length === 0) {
+        return {
+            ok: false, status: 400, code: 'INVALID_INPUT',
+            message: 'components must be an array of { componentId, action, content? }',
+        };
+    }
+
+    const instance = await storage.getInstance(instanceId);
+    if (!instance) {
+        return { ok: false, status: 404, code: 'NOT_FOUND', message: `Instance not found: ${instanceId}` };
+    }
+    if (instance.owner !== owner) {
+        return { ok: false, status: 403, code: 'FORBIDDEN', message: 'Only the instance owner can apply migrations' };
+    }
+    const forked = forkedUpdateRefusal(instance);
+    if (forked) return forked;
+    // A managed install takes the package's version of every component: `custom` would put the
+    // owner's bytes in, and `skip` would leave an older component under the new version number.
+    if (instance.mode === 'managed') {
+        const off = actions.find(a => a && (a.action === 'custom' || a.action === 'skip'));
+        if (off) {
+            return {
+                ok: false, status: 409, code: 'MANAGED_BY_PACKAGE',
+                message: `Component "${off.componentId}": a managed install takes the package's version of every component, `
+                    + 'so only "replace" and "install_new" apply. To keep your own version, fork the install first: '
+                    + `POST /v1/instances/${instanceId}/fork.`,
+            };
+        }
+    }
+
+    const targetPkg = await storage.getPackageByGroupAndVersion(instance.packageGroupId, targetVersion);
+    if (!targetPkg) {
+        return { ok: false, status: 404, code: 'NOT_FOUND', message: `Target version not found: ${targetVersion}` };
+    }
+
+    const installedPkg = await storage.getPackage(instance.packageRecordId);
+    const targetCompMap = new Map(targetPkg.components.map(c => [c.id, c]));
+    const existingMap = new Map(instance.installedComponents.map(ic => [ic.componentId, ic]));
+
+    // Built once from the instance, and handed to every registration below.
+    const urlRewrites = rewritesFor(instance, installedPkg ?? targetPkg);
+    const shortId = instanceShortId(instance, targetPkg.name, owner);
+
+    /** The name a component of THIS instance is registered under. A skill keeps its own name. */
+    const nameFor = (compId: string, type: PackageComponentType): string => {
+        const existing = existingMap.get(compId);
+        if (existing) return existing.registeredAs;
+        return shortId || type === 'skill'
+            ? registeredNameFor(targetPkg.name, owner, shortId ?? '', { id: compId, type, content: targetCompMap.get(compId)?.content })
+            : `${targetPkg.name}-${owner}-${compId}`;
+    };
+    // A skill component binds to this instance's copy of its app and carries this instance's tag, so it
+    // replaces and removes only a skill this instance published (package-skill-component.ts).
+    const pkgRef = { config, groupId: instance.packageGroupId, instanceId };
+    const packageContext = {
+        groupId: instance.packageGroupId, instanceId,
+        appNames: new Map([...instance.installedComponents, ...targetPkg.components.map(c => ({ componentId: c.id, type: c.type }))]
+            .filter(c => c.type === 'app').map(c => [c.componentId, nameFor(c.componentId, 'app')])),
+    };
+    const warnings: string[] = [];
+
+    const updatedComponents: string[] = [];
+    const newComponents: string[] = [];
+    const skippedComponents: string[] = [];
+    const failedComponents: { componentId: string; error: string }[] = [];
+    const newInstalledComponents: InstalledComponent[] = [];
+
+    // The words this caller lacks for a memory component, gathered rather than refused on the spot:
+    // the rest of the checks still run, so a request filed from this refusal is one the node would
+    // carry out, and the owner is never asked to approve content it would then turn down.
+    const missingWords = new Set<string>();
+    let lackingComponent = '';
+
+    // Refuse content this node will not accept BEFORE anything is deleted. `replace` and `custom`
+    // both delete the existing component and then register the new one.
+    for (const action of actions) {
+        const compId = action?.componentId;
+        if (!compId || typeof compId !== 'string') continue;
+        if (!(MIGRATION_ACTIONS as readonly string[]).includes(action.action)) {
+            return {
+                ok: false, status: 400, code: 'INVALID_INPUT',
+                message: `Invalid action "${action.action}" for component "${compId}". Valid: ${MIGRATION_ACTIONS.join(', ')}`,
+            };
+        }
+        // A memory component may not write a key the node reads and trusts, whichever action brings
+        // it (services/packages/install/package-memory-component.ts). install_new is checked too: it deletes nothing,
+        // but the other actions in the same call would already have moved.
+        if (action.action !== 'skip') {
+            const target = targetCompMap.get(compId);
+            const type = target?.type ?? existingMap.get(compId)?.type ?? 'csm';
+            const content = action.action === 'install_new' ? (target?.content ?? '') : (action.content ?? target?.content ?? '');
+            const reserved = reservedKeysInComponent(type, content, nameFor(compId, type));
+            if (reserved.length > 0) {
+                return {
+                    ok: false, status: 403, code: 'RESERVED_KEY',
+                    message: `${reservedComponentMessage(compId, reserved)} Nothing was changed.`,
+                };
+            }
+            // The component writes into the owner's memory, so the caller answers for that write.
+            const writeRefusal = memoryComponentWriteRefusal([{ id: compId, type }], caller, ownerGhii);
+            if (writeRefusal && writeRefusal.missing.length === 0) {
+                return { ok: false, status: writeRefusal.status, code: writeRefusal.code, message: `${writeRefusal.message} Nothing was changed.` };
+            }
+            if (writeRefusal) {
+                for (const word of writeRefusal.missing) missingWords.add(word);
+                lackingComponent ||= compId;
+            }
+        }
+        if (action.action !== 'replace' && action.action !== 'custom') continue;
+
+        const targetComp = targetCompMap.get(compId);
+        const existingComp = existingMap.get(compId);
+        const compType = targetComp?.type ?? existingComp?.type ?? 'csm';
+        const proposed = action.content ?? targetComp?.content ?? '';
+        const check = validateComponentContent(compType, proposed, nameFor(compId, compType), config, owner);
+        if (!check.ok) {
+            return {
+                ok: false, status: 400, code: 'INVALID_COMPONENT',
+                message: `Component "${compId}" was not applied: ${check.error}`,
+            };
+        }
+
+        // AND THE CHECKS THAT ONLY THE REGISTRATION KNOWS. validateComponentContent above answers
+        // for `extension` and returns ok for every other type, so an app whose artifact lint fails,
+        // a crew-def that does not validate, or a quota ceiling was found AFTER the loop below had
+        // deleted the owner's working copy — and the code admitted it in a comment ("The old copy
+        // was already deleted, so there is nothing to keep") instead of preventing it. The same
+        // registration, run dry: it writes nothing and refuses for the same reasons.
+        const wouldRegister = await registerComponent(storage, {
+            config,
+            dryRun: true,
+            componentId: compId,
+            type: compType,
+            registeredAs: nameFor(compId, compType),
+            content: proposed,
+            label: targetComp?.label ?? compId,
+            owner,
+            ownerGaii: ownerGhii,
+            packageName: targetPkg.name,
+            packageCategory: targetPkg.category,
+            packageTags: targetPkg.tags,
+            packageDescription: targetPkg.description,
+            meta: targetComp?.meta,
+            callerGaii: caller.sub,
+            urlRewrites,
+            packageContext,
+        });
+        if (!wouldRegister.success) {
+            return {
+                ok: false, status: 400, code: 'INVALID_COMPONENT',
+                message: `Component "${compId}" was not applied: ${wouldRegister.error ?? 'registration would fail'}`,
+            };
+        }
+    }
+
+    // Everything else holds; only the words are missing. Nothing has been deleted or written.
+    // What the target version can do beyond what this install was approved for (package-approvals.ts).
+    // An agent or an app without packages:install-code does not widen it on its own; the owner does.
+    const targetCaps = packageCapabilities(targetPkg.components, config, owner);
+    const widened = widenedItems(await approvedItems(storage, config, instance), targetCaps.items);
+    const codeRefusal = codeInstallRefusal(targetCaps, caller, widened);
+    if (codeRefusal && codeRefusal.missing.length === 0) {
+        return { ok: false, status: codeRefusal.status, code: codeRefusal.code, message: `${codeRefusal.message} Nothing was changed.` };
+    }
+    if (codeRefusal) for (const word of codeRefusal.missing) missingWords.add(word);
+
+    if (missingWords.size > 0) {
+        const missing = [...missingWords];
+        return {
+            ok: false, status: 403, code: 'SCOPE_DENIED',
+            message: lackingComponent
+                ? `Component "${lackingComponent}" writes into the owner's memory, which needs ${missing.map(s => `"${s}"`).join(' and ')}, `
+                    + `and this session does not carry ${missing.length === 1 ? 'it' : 'them'}. Nothing was changed.`
+                : `${codeRefusal!.message} Nothing was changed.`,
+            missing, target: targetPkg, instance,
+        };
+    }
+
+    for (const action of actions) {
+        const compId = action?.componentId;
+        if (!compId || typeof compId !== 'string') continue;
+
+        const targetComp = targetCompMap.get(compId);
+        const existing = existingMap.get(compId);
+        const type = targetComp?.type ?? existing?.type ?? 'csm';
+
+        switch (action.action) {
+            case 'skip': {
+                if (existing) newInstalledComponents.push({ ...existing });
+                skippedComponents.push(compId);
+                break;
+            }
+
+            case 'replace':
+            case 'custom': {
+                const isCustom = action.action === 'custom';
+                const newContent = action.content ?? targetComp?.content ?? '';
+                const registeredAs = nameFor(compId, type);
+
+                // Safe to delete first ONLY because the loop above already ran this registration
+                // dry and every one of them passed. The delete has to come first: createCsm and its
+                // siblings throw NAME_TAKEN rather than overwrite.
+                // An extension's config is the owner's (the install config, secrets included), so it is
+                // read before the delete and carried into the replacement.
+                const previousConfig = existing?.type === 'extension'
+                    ? (await storage.getExtension(registeredAs))?.config : undefined;
+                if (existing) await deleteComponent(storage, existing.type, registeredAs, ownerGhii, pkgRef);
+
+                const result = await registerComponent(storage, {
+                    ...(previousConfig ? { previousConfig } : {}),
+                    config,
+                    componentId: compId,
+                    type,
+                    registeredAs,
+                    content: newContent,
+                    label: targetComp?.label ?? compId,
+                    owner,
+                    ownerGaii: ownerGhii,
+                    packageName: targetPkg.name,
+                    packageCategory: targetPkg.category,
+                    packageTags: targetPkg.tags,
+                    packageDescription: targetPkg.description,
+                    meta: targetComp?.meta,
+                    callerGaii: caller.sub,
+                    urlRewrites,
+                    packageContext,
+                });
+
+                if (result.skipped) {
+                    // The owner's own skill of that name: left as it is, and no longer this instance's.
+                    warnings.push(result.skipped);
+                    skippedComponents.push(compId);
+                    break;
+                }
+                if (!result.success) {
+                    // The old copy was already deleted, so there is nothing to keep; saying so is the
+                    // only honest answer, and the instance keeps no entry claiming it is there.
+                    failedComponents.push({ componentId: compId, error: result.error ?? 'registration failed' });
+                    break;
+                }
+
+                newInstalledComponents.push({
+                    componentId: compId,
+                    type,
+                    registeredAs,
+                    originalHash: targetComp?.contentHash ?? computeHash(newContent),
+                    customized: isCustom && !!action.content,
+                    ...(result.originalShortName ? { originalShortName: result.originalShortName } : {}),
+                });
+                updatedComponents.push(compId);
+                break;
+            }
+
+            case 'install_new': {
+                if (!targetComp) break;
+                const registeredAs = nameFor(compId, targetComp.type);
+
+                const result = await registerComponent(storage, {
+                    config,
+                    componentId: compId,
+                    type: targetComp.type,
+                    registeredAs,
+                    content: targetComp.content,
+                    label: targetComp.label,
+                    owner,
+                    ownerGaii: ownerGhii,
+                    packageName: targetPkg.name,
+                    packageCategory: targetPkg.category,
+                    packageTags: targetPkg.tags,
+                    packageDescription: targetPkg.description,
+                    meta: targetComp.meta,
+                    callerGaii: caller.sub,
+                    urlRewrites,
+                    packageContext,
+                });
+
+                if (result.skipped) {
+                    warnings.push(result.skipped);
+                    skippedComponents.push(compId);
+                    break;
+                }
+                if (!result.success) {
+                    failedComponents.push({ componentId: compId, error: result.error ?? 'registration failed' });
+                    break;
+                }
+
+                newInstalledComponents.push({
+                    componentId: compId,
+                    type: targetComp.type,
+                    registeredAs,
+                    originalHash: targetComp.contentHash,
+                    customized: false,
+                    ...(result.originalShortName ? { originalShortName: result.originalShortName } : {}),
+                });
+                newComponents.push(compId);
+                break;
+            }
+        }
+    }
+
+    // Anything the actions did not mention keeps its entry untouched.
+    for (const ic of instance.installedComponents) {
+        if (!actions.some(a => a?.componentId === ic.componentId)) newInstalledComponents.push({ ...ic });
+    }
+
+    const updated = await storage.updateInstance(instanceId, {
+        packageVersion: targetVersion,
+        packageRecordId: targetPkg.id,
+        installedComponents: newInstalledComponents,
+        updatedAt: new Date().toISOString(),
+    });
+
+    if (!updated) {
+        return { ok: false, status: 500, code: 'MIGRATION_FAILED', message: 'Failed to update instance record' };
+    }
+    // The install is now approved for what the new version can do: the owner, or the agent that held
+    // packages:install-code (or that widened nothing).
+    await recordApproval(storage, instanceId, targetCaps, targetVersion, isOwnerInPerson(caller) ? ownerGhii : caller.sub);
+
+    emitChange('instances');
+    if (newInstalledComponents.some(c => c.type === 'skill')) emitChange('skills');
+
+    return {
+        ok: true,
+        outcome: {
+            migrated: true,
+            updatedComponents,
+            newComponents,
+            skippedComponents,
+            failedComponents,
+            newVersion: targetVersion,
+            ...(warnings.length ? { warnings } : {}),
+        },
+    };
+}
+
+/**
+ * Move a whole installed package onto its latest version in one act.
+ *
+ * WHAT IT WILL NOT DO IS THE FEATURE. A component the owner has edited is left exactly as it is and
+ * reported in `needsYou` with the address of the prompt that merges it; a component the new version
+ * DROPPED is reported and left alone, because deleting somebody's copy of something deserves to be
+ * asked for rather than done as a side effect of pressing update. Everything else moves.
+ *
+ * `dryRun` answers the same shape and writes nothing, so a page or a chat can say "three update, one
+ * needs you" before anybody commits to it.
+ */
+export async function updateInstanceToLatest(
+    deps: PackageMigrateDeps,
+    caller: PackageMigrateCaller,
+    input: { instanceId: string; dryRun?: boolean },
+): Promise<InstanceUpdateResult> {
+    const { instanceId } = input;
+    const dryRun = input.dryRun === true;
+
+    const planned = await planInstanceUpdate(
+        { storage: deps.storage }, { owner: caller.owner, ownerGhii: caller.ownerGhii }, instanceId,
+    );
+    if (!planned.ok) return planned;
+
+    const { plan } = planned;
+
+    const needsYou: NeedsYouEntry[] = plan.componentDiffs
+        .filter(d => d.action === 'migration_needed')
+        .map(d => ({
+            componentId: d.componentId,
+            type: d.type,
+            reason: 'You have edited this one, so an update would overwrite your work.',
+            mergeWith: `/v1/instances/${instanceId}/migration-prompt`,
+        }));
+
+    const removed = plan.componentDiffs
+        .filter(d => d.action === 'remove')
+        .map(d => ({ componentId: d.componentId, type: d.type }));
+
+    const actions: MigrationRequest[] = plan.componentDiffs
+        .filter(d => d.action === 'safe_overwrite' || d.action === 'install_new')
+        .map(d => ({
+            componentId: d.componentId,
+            action: d.action === 'install_new' ? 'install_new' : 'replace',
+        }));
+
+    const answer: InstanceUpdateAnswer = {
+        currentVersion: plan.currentVersion,
+        latestVersion: plan.latestVersion,
+        updateAvailable: plan.updateAvailable,
+        changelog: plan.changelog,
+        dryRun,
+        willUpdate: actions.map(a => a.componentId),
+        needsYou,
+        removed,
+        applied: null,
+    };
+
+    // Nothing is applied when there is nothing safe to apply. An instance whose every changed
+    // component the owner edited answers here, with the list of what to merge.
+    if (!plan.updateAvailable || dryRun || actions.length === 0) {
+        return { ok: true, answer };
+    }
+
+    const out = await applyInstanceMigration(deps, caller, {
+        instanceId, targetVersion: plan.latestVersion, actions,
+    });
+    if (!out.ok) return out;
+
+    return { ok: true, answer: { ...answer, applied: out.outcome } };
+}

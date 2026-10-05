@@ -1,0 +1,522 @@
+/**
+ * @file services/packages/peer/package-pull.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Fetching a package published on another node, proving it is what that node signed,
+ *   and landing it here as this owner's own.
+ *
+ *   REFUSE BEFORE YOU WRITE, AND REFUSE BEFORE YOU FETCH. The order below is the whole design. The
+ *   quota and the name conflict are checked BEFORE a byte is downloaded, so a ten-megabyte fetch is
+ *   never spent to answer a 409. The signature and the digests are checked before anything is
+ *   written. Nothing is stored until every one of them has passed.
+ *
+ *   VERIFICATION IS TWO STEPS, NOT ONE. The signature proves the source node signed the descriptor;
+ *   recomputing every component's sha256 proves the bytes that arrived are the bytes it signed
+ *   about. A caller that does the first alone has checked nothing about the payload, which is why
+ *   both live here rather than in the caller.
+ *
+ *   THE KEY NEVER COMES FROM THE BODY. For a known peer it comes from the peers map, keyed by the
+ *   node id, and so does the base URL. That is invariant 13: a gate reads the normalized value. A
+ *   pull that took the URL or the key from the request would verify the attacker's signature against
+ *   the attacker's key and call it proof.
+ * @structure PullRefusal · PackagePullResult · pullPackage(deps, caller, input)
+ * @usage
+ *   import { pullPackage } from './package-pull.js';
+ *   const out = await pullPackage({ storage, config, peers }, caller, { groupId, nodeId });
+ * @version-history
+ *   v1.6.0 — 2026-10-05 — Every signed pull names the repository it is for (signedPackageHeaders
+ *     audience; secaudit 2026-10, PKG-10).
+ *   v1.5.0 — 2026-09-29 — With package federation off, the repository an install set named is still
+ *     reached: the apply's pulls (`installSet`) and later pulls from a repository an applied set names
+ *     (install-set-trust.ts). Everything else stays refused. Approved by Jouni on 2026-09-29.
+ *   v1.4.0 — 2026-09-28 — `preview`: fetch and verify, store nothing, and answer with the verified
+ *     parts (an install set's plan, install-set-apply.ts).
+ *   v1.3.0 — 2026-09-28 — The pull and the upstream check are signed as this node, so a package
+ *     repository serves an entitled node its private package (package-node-auth.ts); a repository's
+ *     UPDATES_ENDED is passed on as itself; `fromUpstream` refreshes a copy from its pinned source;
+ *     listRepositoryPackages() reads what a repository serves this node.
+ *   v1.2.1 — 2026-09-26 — The node card (64 KB) and the upstream statement (256 KB) are read through
+ *     utils/read-capped.ts too (secaudit 2026-09, N3).
+ *   v1.2.0 — 2026-09-24 — The package body is read through utils/read-capped.ts, which stops at
+ *     packageMaxSizeMb while the stream arrives (secaudit 2026-09, A6-13). A source that sent no
+ *     Content-Length passed the declared-size check, and arrayBuffer() then held its whole answer
+ *     in memory before the cap measured it.
+ *   v1.1.0 — 2026-09-12 — PackagePullCaller loses `sub`, which travelled from the federation route
+ *     through here into importParsedPackage to be resolveGhii's fallback identity.
+ *     wish-identity-gate-sees-resolveghii.
+ *   v1.0.1 — 2026-09-06 — Both trailing-slash strips of a caller-supplied address go through
+ *     stripTrailingSlashes, which is a scan rather than a backtracking regex (CodeQL
+ *     js/polynomial-redos, alerts 1609 and 1610).
+ *   v1.0.0 — 2026-09-05 — Initial.
+ */
+import type { AimeatConfig } from '../../../config.js';
+import type { Storage, PackageRecord, UpstreamRef } from '../../../storage/interface.js';
+import type { PeerInfo } from '../../federation.js';
+import { gatePeer } from '../../federation-peer-gate.js';
+import { safeFetch, stripTrailingSlashes } from '../../../utils/url-validator.js';
+import { readBodyCapped } from '../../../utils/read-capped.js';
+import { parseZip, ZipValidationError, type ParsedPackage } from '../compose/package-zip.js';
+import { installSetRepositories } from '../../install-set-trust.js';
+import {
+    verifyAttestation, verifyComponentDigests, type AttestationDoc,
+} from './package-attestation.js';
+import { importParsedPackage } from '../compose/package-import.js';
+import { getPackageFor } from '../compose/package-read.js';
+import { signedPackageHeaders } from './package-node-auth.js';
+import { logger } from '../../../utils/logger.js';
+
+export interface PackagePullDeps {
+    storage: Storage;
+    config: AimeatConfig;
+    peers: Map<string, PeerInfo>;
+}
+
+export interface PackagePullCaller {
+    owner: string;
+    /** Operator role is what the arbitrary-URL branch requires. */
+    isOperator: boolean;
+}
+
+export interface PackagePullInput {
+    groupId: string;
+    /** A known peer. Its URL and key are read from the peers map, never from this request. */
+    nodeId?: string;
+    /** Any node, operator only, and only together with trust: 'tofu'. */
+    sourceUrl?: string;
+    trust?: string;
+    version?: string;
+    /**
+     * Refresh the caller's own copy of `groupId` from the source it was first pulled from, under the
+     * key pinned then. The first pull was the decision to trust that source; a refresh repeats it and
+     * decides nothing new. A source that is a peer still passes the peer gate, so an operator who
+     * switched the peer off stops its refreshes too. Used by the scheduled update check
+     * (package-upstream-refresh.ts).
+     */
+    fromUpstream?: boolean;
+    /**
+     * Fetch and verify, and store nothing: the answer carries the verified parts instead. An install
+     * set's plan reads a bundle this way before the operator decides to apply it
+     * (install-set-apply.ts), so a plan writes nothing, not even a copy of the package.
+     */
+    preview?: boolean;
+    /**
+     * An install set's own pull from the repository it names (install-set-apply.ts): allowed with
+     * package federation off. Set by that service only; no endpoint passes it.
+     */
+    installSet?: boolean;
+}
+
+export type PackagePullResult =
+    | { ok: true; applied: true; package: PackageRecord; upstream: UpstreamRef }
+    | { ok: true; applied: false; reason: 'not_newer'; upstream: UpstreamRef }
+    | { ok: true; applied: false; reason: 'preview'; upstream: UpstreamRef; parsed: ParsedPackage }
+    | { ok: false; status: number; code: string; message: string };
+
+/** The source a pull resolved to: where to fetch from, and whose key proves it. */
+interface ResolvedSource {
+    nodeId: string;
+    baseUrl: string;
+    publicKey: string;
+}
+
+/** The most a node card may be: a few hundred bytes of identity and key in the standard envelope. */
+const MAX_NODE_CARD_BYTES = 64 * 1024;
+/** The most a signed statement about one package may be: a descriptor and its signature. */
+const MAX_ATTESTATION_BYTES = 256 * 1024;
+
+/**
+ * The repository's words when a 403 says this node's updates ended (package-entitlements.ts), or
+ * null for any other refusal. Read with a cap, like everything this file reads from another node.
+ */
+async function updatesEnded(res: Response): Promise<string | null> {
+    const raw = await readBodyCapped(res, 16 * 1024);
+    if (!raw) return null;
+    let body: { error?: { code?: string; message?: string } } | null;
+    try { body = JSON.parse(raw.toString('utf8')); }
+    // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: a body that is not JSON is not the UPDATES_ENDED answer
+    catch { return null; }
+    return body?.error?.code === 'UPDATES_ENDED' ? (body.error.message ?? 'The repository no longer serves this node new versions.') : null;
+}
+
+/** A node's own public key, from the address every AIMEAT node publishes it at. */
+async function tofuKeyOf(baseUrl: string, timeoutMs: number): Promise<ResolvedSource | null> {
+    const res = await safeFetch(`${stripTrailingSlashes(baseUrl)}/.well-known/aimeat`, {
+        signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!res.ok) return null;
+    // Read with its cap while it arrives, like the package itself: the address is the one a caller
+    // named, and json() would hold whatever it sent before anything measured it.
+    const raw = await readBodyCapped(res, MAX_NODE_CARD_BYTES);
+    if (!raw) return null;
+    // The node card is inside the standard envelope, like every other answer this protocol gives.
+    const body = JSON.parse(raw.toString('utf8')) as { data?: { node_id?: string; public_key?: string | null } };
+    const card = body?.data;
+    if (!card?.node_id || !card?.public_key) return null;
+    return { nodeId: card.node_id, baseUrl, publicKey: card.public_key };
+}
+
+/**
+ * Pull one package version from another node.
+ *
+ * Authorisation happened before this call — `packages:write` on every door. What is decided HERE is
+ * WHERE an authorised caller may pull from, and on what proof.
+ */
+export async function pullPackage(
+    deps: PackagePullDeps,
+    caller: PackagePullCaller,
+    input: PackagePullInput,
+): Promise<PackagePullResult> {
+    const { storage, config, peers } = deps;
+    const timeoutMs = config.federationTimeoutMs ?? 10000;
+
+    // 1. One switch, both directions. A pulled extension runs code in the sandbox and a pulled app
+    //    gets an address, so an operator needs an inbound off switch and this is it. With the switch
+    //    off, the one source still allowed is a package repository an install set on this node named
+    //    (install-set-trust.ts): the set is that decision already. Checked once the source is known,
+    //    below; an arbitrary URL is refused here, before anything is fetched.
+    const federationOff = !config.packageFederationEnabled;
+    const federationRefusal: PackagePullResult = {
+        ok: false, status: 403, code: 'PACKAGE_FEDERATION_DISABLED',
+        message: 'This node does not exchange packages with other nodes. An operator turns it on with AIMEAT_PACKAGE_FEDERATION_ENABLED; the repository an install set names is reached without it.',
+    };
+    if (federationOff && !input.nodeId && !input.fromUpstream) return federationRefusal;
+    // A named node is known before anything else is looked up, so it is answered here too.
+    if (federationOff && input.nodeId && !input.installSet && !(await installSetRepositories(storage)).has(input.nodeId)) {
+        return federationRefusal;
+    }
+
+    // 2. The group id, before anything else is looked up.
+    const groupId = typeof input.groupId === 'string' ? input.groupId.trim() : '';
+    if (!groupId || !groupId.includes('::')) {
+        return {
+            ok: false, status: 400, code: 'INVALID_INPUT',
+            message: 'group_id is required and looks like "package-name::author"',
+        };
+    }
+
+    // 3. Where this may be pulled from, and whose key proves it.
+    let source: ResolvedSource;
+    if (input.fromUpstream) {
+        const mine = await getPackageFor(storage, `${groupId.split('::')[0]}::${caller.owner}`, caller.owner);
+        const up = mine?.upstream;
+        if (!up || up.groupId !== groupId || !up.publicKey) {
+            return { ok: false, status: 400, code: 'NO_UPSTREAM', message: `Your copy of ${groupId} was not pulled under a key, so there is nothing to refresh it from.` };
+        }
+        if (peers.has(up.node)) {
+            const gate = gatePeer(peers, up.node, 'shareCatalogue');
+            if (!gate.ok) return { ok: false, status: gate.status, code: gate.code, message: gate.message };
+        }
+        source = { nodeId: up.node, baseUrl: up.url, publicKey: up.publicKey };
+    } else if (input.nodeId) {
+        const gate = gatePeer(peers, input.nodeId, 'shareCatalogue');
+        if (!gate.ok) return { ok: false, status: gate.status, code: gate.code, message: gate.message };
+        source = { nodeId: gate.peer.nodeId, baseUrl: gate.peer.url, publicKey: gate.peer.publicKey };
+    } else if (input.sourceUrl) {
+        if (!caller.isOperator) {
+            return {
+                ok: false, status: 403, code: 'FORBIDDEN',
+                message: 'Pulling from a node that is not a peer is an operator decision.',
+            };
+        }
+        if (input.trust !== 'tofu') {
+            return {
+                ok: false, status: 403, code: 'UNKNOWN_ISSUER',
+                message: 'That node is not a peer, so nothing here knows its key. Add it as a peer, or repeat with trust:"tofu" to accept the key it publishes and pin it.',
+            };
+        }
+        const resolved = await tofuKeyOf(input.sourceUrl, timeoutMs).catch(err => {
+            logger.warn('package-pull: could not read the source node key', { error: String(err) });
+            return null;
+        });
+        if (!resolved) {
+            return {
+                ok: false, status: 502, code: 'SOURCE_UNREACHABLE',
+                message: 'That address did not answer with an AIMEAT node card carrying a public key.',
+            };
+        }
+        source = resolved;
+    } else {
+        return {
+            ok: false, status: 400, code: 'INVALID_INPUT',
+            message: 'Name the peer to pull from (node_id), or an address (source_url) as an operator.',
+        };
+    }
+
+    // 3b. With federation off, only the repository an install set named (step 1).
+    if (federationOff && !input.installSet && !(await installSetRepositories(storage)).has(source.nodeId)) {
+        return federationRefusal;
+    }
+
+    // 4. What is already here, and whether this may be written at all — BEFORE the download.
+    const localGroupId = `${groupId.split('::')[0]}::${caller.owner}`;
+    const existing = await getPackageFor(storage, localGroupId, caller.owner);
+    if (existing?.upstream && existing.upstream.node !== source.nodeId) {
+        return {
+            ok: false, status: 409, code: 'CONFLICT',
+            message: `Your package "${existing.name}" was pulled from ${existing.upstream.node}, not from ${source.nodeId}.`,
+        };
+    }
+    if (existing?.upstream && existing.upstream.publicKey !== source.publicKey) {
+        // A source whose key changed is a refusal, never a silent downgrade: this is the only thing
+        // between a pinned upstream and somebody else answering for it.
+        return {
+            ok: false, status: 409, code: 'KEY_CHANGED',
+            message: `${source.nodeId} is signing with a different key than the one your copy was pulled under. An operator has to look at that before anything else happens.`,
+        };
+    }
+
+    // 5. Fetch, with a cap and a clock.
+    const base = stripTrailingSlashes(source.baseUrl);
+    const path = `${base}/v1/packages/${encodeURIComponent(groupId)}/export`
+        + (input.version ? `?version=${encodeURIComponent(input.version)}` : '');
+
+    let buf: Buffer;
+    try {
+        // Signed as this node, so a package repository can serve a private package to the nodes it
+        // is entitled to (package-node-auth.ts). A public package is served whether or not it is.
+        const res = await safeFetch(path, {
+            headers: await signedPackageHeaders(storage, config, groupId, source.nodeId),
+            signal: AbortSignal.timeout(timeoutMs),
+        });
+        const ended = res.status === 403 ? await updatesEnded(res) : null;
+        if (ended) return { ok: false, status: 403, code: 'UPDATES_ENDED', message: ended };
+        if (res.status === 404) {
+            return { ok: false, status: 404, code: 'NOT_FOUND', message: `${source.nodeId} does not serve a package "${groupId}" you may read.` };
+        }
+        if (!res.ok) {
+            return { ok: false, status: 502, code: 'SOURCE_REFUSED', message: `${source.nodeId} answered ${res.status} for that package.` };
+        }
+        const declared = Number(res.headers.get('content-length') ?? '0');
+        const capBytes = config.packageMaxSizeMb * 1024 * 1024;
+        if (declared > capBytes) {
+            return {
+                ok: false, status: 413, code: 'SIZE_EXCEEDED',
+                message: `That package is ${(declared / 1024 / 1024).toFixed(1)}MB, over this node's ${config.packageMaxSizeMb}MB limit.`,
+            };
+        }
+        // The cap holds while the body arrives. Content-Length is the source's own word and may be
+        // missing or wrong, and arrayBuffer() held the whole body before its length was measured.
+        const body = await readBodyCapped(res, capBytes);
+        if (body === null) {
+            return {
+                ok: false, status: 413, code: 'SIZE_EXCEEDED',
+                message: `That package is over this node's ${config.packageMaxSizeMb}MB limit.`,
+            };
+        }
+        buf = body;
+    } catch (err) {
+        return { ok: false, status: 502, code: 'SOURCE_UNREACHABLE', message: `Could not fetch from ${source.nodeId}: ${String(err)}` };
+    }
+
+    // 6. The archive's own validation chain: magic bytes, size, bomb, traversal, manifest.
+    let parsed;
+    try {
+        parsed = await parseZip(buf, { maxSizeMb: config.packageMaxSizeMb });
+    } catch (err) {
+        if (err instanceof ZipValidationError) {
+            const status = err.code === 'SIZE_EXCEEDED' || err.code === 'DECOMPRESSION_BOMB' ? 413 : 400;
+            return { ok: false, status, code: err.code, message: err.message };
+        }
+        throw err;
+    }
+
+    // 7. The signature. On this road it is not optional and no setting makes it so.
+    const doc = parsed.attestation as AttestationDoc | undefined;
+    if (!doc?.descriptor) {
+        return {
+            ok: false, status: 400, code: 'MISSING_ATTESTATION',
+            message: `${source.nodeId} served that package without a signature, so nothing here can say what it is.`,
+        };
+    }
+    if (doc.descriptor.source_node !== source.nodeId) {
+        return {
+            ok: false, status: 401, code: 'INVALID_SIGNATURE',
+            message: `That package is signed as coming from ${doc.descriptor.source_node}, not from ${source.nodeId}.`,
+        };
+    }
+    if (!(await verifyAttestation(source.publicKey, doc))) {
+        return {
+            ok: false, status: 401, code: 'INVALID_SIGNATURE',
+            message: `The signature on that package does not check out against ${source.nodeId}'s key.`,
+        };
+    }
+
+    // 8. And the bytes that arrived are the bytes it signed about.
+    const digests = verifyComponentDigests(doc.descriptor, parsed.components);
+    if (!digests.ok) {
+        return { ok: false, status: 400, code: 'DIGEST_MISMATCH', message: digests.reason };
+    }
+
+    const upstream: UpstreamRef = {
+        node: source.nodeId,
+        url: base,
+        groupId,
+        version: doc.descriptor.version,
+        publishedAt: doc.descriptor.published_at,
+        authorGhii: doc.descriptor.author_ghii,
+        publicKey: source.publicKey,
+        verifiedAt: new Date().toISOString(),
+    };
+
+    // 9. Not-newer gate, on the instant inside the signature rather than on a version string. The
+    //    string sorts by luck; the instant is asserted by the signer and cannot be moved backwards
+    //    without their private key.
+    if (existing?.upstream) {
+        const have = Date.parse(existing.upstream.publishedAt);
+        const offered = Date.parse(upstream.publishedAt);
+        if (Number.isFinite(have) && Number.isFinite(offered) && offered <= have) {
+            return { ok: true, applied: false, reason: 'not_newer', upstream: existing.upstream };
+        }
+    }
+
+    if (input.preview) return { ok: true, applied: false, reason: 'preview', upstream, parsed };
+
+    // 10. Only now.
+    const written = await importParsedPackage({ storage, config },
+        { owner: caller.owner }, { parsed, upstream, via: 'pull' });
+    if (!written.ok) return written;
+
+    return { ok: true, applied: true, package: written.package, upstream };
+}
+
+export interface UpstreamCheckAnswer {
+    hasUpstream: true;
+    updateAvailable: boolean;
+    node: string;
+    haveVersion: string;
+    havePublishedAt: string;
+    upstreamVersion: string;
+    upstreamPublishedAt: string;
+    /**
+     * Was a signature checked at all? False for a copy brought in as a ZIP by hand: upstreamFromZip
+     * pins no key (it has none to pin) and takes the address from the archive's own `source_url`,
+     * so there is nothing to check the answer against and nobody vouching for where it came from.
+     */
+    signerChecked: boolean;
+    /**
+     * True only when a PINNED key verified this answer. False means one of two things, and
+     * `signerChecked` says which: no key was pinned, so nothing was verified — or a key was pinned
+     * and did not verify, which never reaches here because that is a 409 KEY_CHANGED.
+     *
+     * It was hardcoded `true` until 2026-09-14, so an unpinned upstream — a ZIP somebody dropped in,
+     * answering at an address the ZIP itself named — was told its signer was unchanged, with no
+     * signature read. The field's own line above it promised the opposite.
+     */
+    signerUnchanged: boolean;
+}
+
+export type UpstreamCheckResult =
+    | { ok: true; answer: UpstreamCheckAnswer }
+    | { ok: false; status: number; code: string; message: string };
+
+/**
+ * Ask the source node what it has now, without downloading anything.
+ *
+ * Reads the signed statement and nothing else, so this costs one small JSON read. Where a key was
+ * pinned it still VERIFIES that statement: a wrongly signed answer is not an update notice, it is a
+ * 409 and a reason to stop. Writes nothing either way.
+ *
+ * WHERE NO KEY WAS PINNED it verifies nothing, because there is nothing to verify against — and it
+ * says so, in `signerChecked`. This sentence used to read "it still VERIFIES that statement" flat,
+ * while the return hardcoded `signerUnchanged: true`, so the one case with no signature at all was
+ * the case that claimed the strongest answer.
+ */
+export async function checkUpstream(
+    deps: PackagePullDeps, pkg: PackageRecord,
+): Promise<UpstreamCheckResult> {
+    const { config } = deps;
+    const up = pkg.upstream;
+    if (!up) {
+        return { ok: false, status: 400, code: 'NO_UPSTREAM', message: 'This package was made here, so there is nowhere to check.' };
+    }
+
+    const timeoutMs = config.federationTimeoutMs ?? 10000;
+    const base = up.url.replace(/\/+$/, '');
+    const url = `${base}/v1/federation/packages/${encodeURIComponent(up.groupId)}/attestation`;
+
+    let doc: AttestationDoc;
+    try {
+        const res = await safeFetch(url, {
+            headers: await signedPackageHeaders(deps.storage, config, up.groupId, up.node),
+            signal: AbortSignal.timeout(timeoutMs),
+        });
+        if (!res.ok) {
+            const ended = res.status === 403 ? await updatesEnded(res) : null;
+            if (ended) return { ok: false, status: 403, code: 'UPDATES_ENDED', message: ended };
+            return { ok: false, status: 502, code: 'SOURCE_REFUSED', message: `${up.node} answered ${res.status}.` };
+        }
+        // Read with its cap while it arrives: a statement is small, and json() held all of it first.
+        const raw = await readBodyCapped(res, MAX_ATTESTATION_BYTES);
+        if (!raw) {
+            return { ok: false, status: 502, code: 'MISSING_ATTESTATION', message: `${up.node} answered with more than a signed statement can be, so none of it was read.` };
+        }
+        const body = JSON.parse(raw.toString('utf8')) as { data?: AttestationDoc };
+        const found = body?.data;
+        if (!found?.descriptor) {
+            return { ok: false, status: 502, code: 'MISSING_ATTESTATION', message: `${up.node} did not answer with a signed statement.` };
+        }
+        doc = found;
+    } catch (err) {
+        return { ok: false, status: 502, code: 'SOURCE_UNREACHABLE', message: `Could not reach ${up.node}: ${String(err)}` };
+    }
+
+    // The pinned key, not whatever the answer would like to be checked against.
+    const signerChecked = up.publicKey.length > 0;
+    const signerUnchanged = signerChecked && await verifyAttestation(up.publicKey, doc);
+    if (signerChecked && !signerUnchanged) {
+        return {
+            ok: false, status: 409, code: 'KEY_CHANGED',
+            message: `${up.node} is answering with a signature that does not check out against the key your copy was pulled under.`,
+        };
+    }
+
+    const have = Date.parse(up.publishedAt);
+    const offered = Date.parse(doc.descriptor.published_at);
+    const updateAvailable = Number.isFinite(have) && Number.isFinite(offered) && offered > have;
+
+    return {
+        ok: true,
+        answer: {
+            hasUpstream: true,
+            updateAvailable,
+            node: up.node,
+            haveVersion: up.version,
+            havePublishedAt: up.publishedAt,
+            upstreamVersion: doc.descriptor.version,
+            upstreamPublishedAt: doc.descriptor.published_at,
+            signerChecked,
+            signerUnchanged,
+        },
+    };
+}
+
+/** The most a repository's listing may be: one row per package it serves this node. */
+const MAX_LISTING_BYTES = 1024 * 1024;
+
+/**
+ * What a package repository serves this node (GET /v1/federation/packages there, signed as this
+ * node): its public packages and the private ones this node is entitled to, each with the version
+ * the entitlement reaches. The repository must be an active peer with the catalogue shared, the same
+ * gate a pull from it passes. Pull one with pullPackage and its group id.
+ */
+export async function listRepositoryPackages(
+    deps: PackagePullDeps, nodeId: string,
+): Promise<{ ok: true; node: string; packages: unknown[] } | { ok: false; status: number; code: string; message: string }> {
+    const gate = gatePeer(deps.peers, nodeId, 'shareCatalogue');
+    if (!gate.ok) return { ok: false, status: gate.status, code: gate.code, message: gate.message };
+    const url = `${stripTrailingSlashes(gate.peer.url)}/v1/federation/packages`;
+    try {
+        const res = await safeFetch(url, {
+            headers: await signedPackageHeaders(deps.storage, deps.config, '*', nodeId),
+            signal: AbortSignal.timeout(deps.config.federationTimeoutMs ?? 10000),
+        });
+        if (res.status === 404) return { ok: false, status: 404, code: 'NOT_A_REPOSITORY', message: `${nodeId} does not serve packages as a repository.` };
+        if (!res.ok) return { ok: false, status: 502, code: 'SOURCE_REFUSED', message: `${nodeId} answered ${res.status}.` };
+        const raw = await readBodyCapped(res, MAX_LISTING_BYTES);
+        if (!raw) return { ok: false, status: 502, code: 'SOURCE_REFUSED', message: `${nodeId} answered with more than a listing can be.` };
+        const body = JSON.parse(raw.toString('utf8')) as { data?: { packages?: unknown[] } };
+        return { ok: true, node: nodeId, packages: Array.isArray(body?.data?.packages) ? body.data.packages.slice(0, 1000) : [] };
+    } catch (err) {
+        return { ok: false, status: 502, code: 'SOURCE_UNREACHABLE', message: `Could not reach ${nodeId}: ${String(err)}` };
+    }
+}

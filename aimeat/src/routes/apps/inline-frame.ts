@@ -31,7 +31,7 @@ import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { appIsolationMode } from '../../services/app-isolation.js';
-import { isPackageApp } from '../../services/package-approvals.js';
+import { isPackageApp } from '../../services/packages/install/package-approvals.js';
 import { appCsp } from '../../utils/app-csp.js';
 import { appFrameHostHtml, withFrameShim } from '../../utils/app-frame-assets.js';
 

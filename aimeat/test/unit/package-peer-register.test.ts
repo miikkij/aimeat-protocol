@@ -8,7 +8,7 @@
  *   v1.0.0 — 2026-09-28 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { checkPackagePeer } from '../../src/services/package-peer-register.js';
+import { checkPackagePeer } from '../../src/services/packages/peer/package-peer-register.js';
 import type { PeerInfo } from '../../src/services/federation.js';
 
 const KEY = 'ed25519-public-key';

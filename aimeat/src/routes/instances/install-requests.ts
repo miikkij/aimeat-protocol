@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The doors onto package install requests: an install, update or migration an agent or
- *   an app asked for and could not do alone (services/package-install-requests.ts).
+ *   an app asked for and could not do alone (services/packages/install/package-install-requests.ts).
  *
  *   GET  /v1/package-install-requests               the account's requests; an app sees its own
  *   GET  /v1/package-install-requests/:id           one of them
@@ -34,7 +34,7 @@ import { requireAuth, requireScope, requireLocalSession } from '../../auth/middl
 import { success, error } from '../../middleware/envelope.js';
 import {
   listRequestsFor, readRequestFor, decideInstallRequest, type PackageActCaller, type RequestViewer,
-} from '../../services/package-install-requests.js';
+} from '../../services/packages/install/package-install-requests.js';
 
 /** The caller of an install, update or migration door, with what names an app grant and an MCP client. */
 export function actCallerOf(req: Request, owner: string, ownerGhii: string): PackageActCaller {

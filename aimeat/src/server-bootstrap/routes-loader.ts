@@ -9,7 +9,7 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
- *   v1.22.0 — 2026-10-02 — The `package` sellable kind (services/package-sale-checkout.ts).
+ *   v1.22.0 — 2026-10-02 — The `package` sellable kind (services/packages/sale/package-sale-checkout.ts).
  *   v1.21.1 — 2026-09-30 — robotsHeader() moved to server.ts, ahead of the static files.
  *   v1.21.0 — 2026-09-29 — Mounts refineryRouter (/v1/refinery/classes, /v1/refinery/runs). The
  *     connections, refinery and mcp-servers mounts moved to routes-loader-outbound.ts in their order (a pure move, max-file-lines).
@@ -76,7 +76,7 @@ import { invoicePaymentHandler } from '../commerce/invoice-handler.js';
 import { getWebBotAuthState, signOutboundRequest, resetWebBotAuth } from '../services/web-bot-auth.js';
 import { setOutboundRequestSigner } from '../utils/url-validator.js';
 import { registerSellableResolver, resetSellableResolvers, offerSellableResolver, appToolSellableResolver, extCallSellableResolver } from '../commerce/sellable-resolvers.js';
-import { packageSellableResolver } from '../services/package-sale-checkout.js';
+import { packageSellableResolver } from '../services/packages/sale/package-sale-checkout.js';
 import { commerceRouter } from '../routes/commerce.js';
 import { commerceUcpRouter } from '../routes/commerce-ucp.js';
 import { commerceAcpRouter } from '../routes/commerce-acp.js';

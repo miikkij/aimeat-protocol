@@ -7,14 +7,14 @@
  *
  *   ON THE REPOSITORY:
  *   - the author names the nodes that sell their packages (GET, PUT, DELETE /v1/package-sellers);
- *   - a seller node asks, signed with its own key (services/package-sale-auth.ts), for a package's
+ *   - a seller node asks, signed with its own key (services/packages/sale/package-sale-auth.ts), for a package's
  *     questions, and grants, ends or revokes a customer node's entitlement
  *     (/v1/federation/package-sales/...). The work is the same services the author's own endpoints
  *     call (package-config-needs.ts, package-entitlements.ts), acting for the package's author.
  *
  *   ON THE SELLING NODE (the shop's own node): its operator, or an agent of the operator holding the
  *   exact word operator:admin, asks its node to make the signed request (/v1/package-sales/...,
- *   services/package-sale-client.ts). A node signs as itself, so this is an operator act: any member
+ *   services/packages/sale/package-sale-client.ts). A node signs as itself, so this is an operator act: any member
  *   who could make it would sell the author's packages in the node's name.
  * @structure registerPackageSaleRoutes(router, config, storage, peers)
  * @version-history
@@ -43,17 +43,17 @@ import { requireAuth, requireScope, requireLocalSession, requireOperatorPrincipa
 import { success, error } from '../middleware/envelope.js';
 import { OPERATOR_ADMIN_SCOPE } from '../utils/scope-coverage.js';
 import { isOperatorCaller, operatorOverride } from '../services/operator-override.js';
-import { verifySaleRequest, verifyRequestWithKey, CLAIM_PURPOSE } from '../services/package-sale-auth.js';
-import { listSellers, addSeller, removeSeller, isSellerFor } from '../services/package-sellers.js';
-import { grantEntitlement, revokeEntitlement, type PackageEntitlement } from '../services/package-entitlements.js';
-import { packageConfigNeeds } from '../services/package-config-needs.js';
-import { saleConfigNeeds, saleGrant, saleRevoke, saleClaim, saleOffer, claimPackageHere } from '../services/package-sale-client.js';
-import { readOffer, setOffer, publicOffer, termsById, offerCapabilities } from '../services/package-offer.js';
-import { createClaim, redeemClaim } from '../services/package-claims.js';
+import { verifySaleRequest, verifyRequestWithKey, CLAIM_PURPOSE } from '../services/packages/sale/package-sale-auth.js';
+import { listSellers, addSeller, removeSeller, isSellerFor } from '../services/packages/sale/package-sellers.js';
+import { grantEntitlement, revokeEntitlement, type PackageEntitlement } from '../services/packages/sale/package-entitlements.js';
+import { packageConfigNeeds } from '../services/packages/compose/package-config-needs.js';
+import { saleConfigNeeds, saleGrant, saleRevoke, saleClaim, saleOffer, claimPackageHere } from '../services/packages/sale/package-sale-client.js';
+import { readOffer, setOffer, publicOffer, termsById, offerCapabilities } from '../services/packages/sale/package-offer.js';
+import { createClaim, redeemClaim } from '../services/packages/sale/package-claims.js';
 import {
     readCatalogue, setCatalogueEntry, readRequests, subscriptionsOf, setAutoRenew,
-} from '../services/package-sale-catalogue.js';
-import { buyerOfferView, decideSaleRequest, reviewSale } from '../services/package-sale-checkout.js';
+} from '../services/packages/sale/package-sale-catalogue.js';
+import { buyerOfferView, decideSaleRequest, reviewSale } from '../services/packages/sale/package-sale-checkout.js';
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 
 export function registerPackageSaleRoutes(
@@ -77,7 +77,7 @@ export function registerPackageSaleRoutes(
         res.json(success(config.nodeId, { removed: true }));
     });
 
-    // ── The repository: the terms a package is sold on (services/package-offer.ts) ─────────────
+    // ── The repository: the terms a package is sold on (services/packages/sale/package-offer.ts) ─────────────
     // The author's own read. Only a private package has an offer, so a read open to anyone would tell
     // a stranger that the package exists and who wrote it; a seller reads it signed, a buyer through
     // the selling node. Anyone else gets the answer a package with no offer gets.
@@ -135,7 +135,7 @@ export function registerPackageSaleRoutes(
     });
 
     // The author's offer, read by a seller node: every terms entry, so a renewal can name the terms
-    // its buyer accepted (services/package-offer.ts).
+    // its buyer accepted (services/packages/sale/package-offer.ts).
     router.get('/v1/federation/package-sales/:groupId/offer', async (req, res) => {
         const act = await sellerAct(req, res);
         if (!act) return;
@@ -145,7 +145,7 @@ export function registerPackageSaleRoutes(
         res.json(success(config.nodeId, { ...publicOffer(offer), all_terms: offer.terms, latest: await offerCapabilities(storage, config, act.groupId) }));
     });
 
-    // A one-time code for a sale whose customer node does not exist yet (services/package-claims.ts).
+    // A one-time code for a sale whose customer node does not exist yet (services/packages/sale/package-claims.ts).
     router.put('/v1/federation/package-sales/:groupId/claims', async (req, res) => {
         const act = await sellerAct(req, res);
         if (!act) return;
@@ -237,18 +237,18 @@ export function registerPackageSaleRoutes(
         forward(res, await saleRevoke(deps, str(req.query.repository), str(req.query.group_id), str(req.query.node_id)));
     });
 
-    // The author's terms, read as a seller before this node prices the package (services/package-offer.ts).
+    // The author's terms, read as a seller before this node prices the package (services/packages/sale/package-offer.ts).
     router.get('/v1/package-sales/author-offer', ...operatorOnly, async (req, res) => {
         forward(res, await saleOffer(deps, str(req.query.repository), str(req.query.group_id)));
     });
 
-    // A claim code for a sale the shop makes outside this node's checkout (services/package-claims.ts).
+    // A claim code for a sale the shop makes outside this node's checkout (services/packages/sale/package-claims.ts).
     router.put('/v1/package-sales/claims', ...operatorOnly, async (req, res) => {
         const body = (req.body ?? {}) as Record<string, unknown>;
         forward(res, await saleClaim(deps, body.repository, str(body.group_id), body));
     });
 
-    // ── The selling node: what it sells, at its own price (services/package-sale-catalogue.ts) ──
+    // ── The selling node: what it sells, at its own price (services/packages/sale/package-sale-catalogue.ts) ──
     router.get('/v1/package-sales/catalogue', ...operatorOnly, async (_req, res) => {
         res.json(success(config.nodeId, { entries: await readCatalogue(storage) }));
     });

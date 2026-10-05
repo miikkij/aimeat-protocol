@@ -47,15 +47,15 @@
  *     app's filename key (services/app-tools-key.ts).
  *   v1.10.1 — 2026-09-26 — Anonymous mode is switched on for this node's id (auth/node-auth.ts).
  *   v1.11.0 — 2026-09-28 — The `package-upstream-check` core handler, registered after the peers load
- *     (services/package-upstream-refresh.ts).
+ *     (services/packages/peer/package-upstream-refresh.ts).
  *   v1.12.0 — 2026-09-28 — The install set named by AIMEAT_INSTALL_SET is applied after the peers load
  *     (services/install-set-startup.ts).
  *   v1.15.0 — 2026-10-02 — The two task-start one-time changes (services/task-start-migrations.ts):
  *     basic agents nobody has set start on their own, app grants with memory:delete get memory:purge.
  *   v1.14.0 — 2026-10-02 — The `package-peer-cleanup` core handler, on a package repository
- *     (services/package-peer-limits.ts).
+ *     (services/packages/peer/package-peer-limits.ts).
  *   v1.13.0 — 2026-10-02 — The `package-renewals` core handler, after the peers load
- *     (services/package-renewals.ts).
+ *     (services/packages/sale/package-renewals.ts).
  *   v1.13.0 — 2026-09-29 — The `refinery` schedule kind's executor is registered on the scheduler
  *     (services/refinery/scheduled-job.ts), which the scheduler cannot import without a cycle.
  *   v1.13.1 — 2026-09-29 — The daily package check also runs with package federation off when an
@@ -85,7 +85,7 @@ import { seedSystemPrompts } from '../services/prompt-seeder.js';
 import { loadCatalog } from '../services/ai/catalog/store.js';
 import { seedBundledCortexes } from '../services/cortex-seeder.js';
 import { seedBuiltinExtensions } from '../services/builtin-extension-seeder.js';
-import { seedExamplePackages } from '../services/package-seeder.js';
+import { seedExamplePackages } from '../services/packages/compose/package-seeder.js';
 import { migrateScopeVocabulary } from '../services/scope-vocabulary-migration.js';
 import { migrateMailReadConsent } from '../services/mail-read-consent.js';
 import { migrateBasicAgentsTaskStartOnce, grantPurgeToAppGrantsOnce } from '../services/task-start-migrations.js';
@@ -394,31 +394,31 @@ export async function initializeServices(
   }
 
   // The daily package update check needs the peers, so its handler is registered here rather than
-  // with the other core handlers above (services/package-upstream-refresh.ts).
+  // with the other core handlers above (services/packages/peer/package-upstream-refresh.ts).
   scheduler.registerCoreHandler('package-upstream-check', async () => {
     // With federation off, the repository an install set named is still checked (install-set-trust.ts).
     if (!config.packageFederationEnabled) {
       const { installSetRepositories } = await import('../services/install-set-trust.js');
       if ((await installSetRepositories(storage)).size === 0) return;
     }
-    const { refreshInstalledPackages } = await import('../services/package-upstream-refresh.js');
+    const { refreshInstalledPackages } = await import('../services/packages/peer/package-upstream-refresh.js');
     const outcomes = await refreshInstalledPackages({ storage, config, peers }, {}, { notify: true });
     const moved = outcomes.filter(o => o.pulled || o.result === 'updated' || o.result === 'notified').length;
     if (moved > 0) logger.info(`Package update check: ${moved} of ${outcomes.length} installs moved or were told`);
   });
 
   // Automatic renewals of the package update services this node sold: they reach the repository by
-  // the signed seller request, so the handler needs the peers too (services/package-renewals.ts).
+  // the signed seller request, so the handler needs the peers too (services/packages/sale/package-renewals.ts).
   scheduler.registerCoreHandler('package-renewals', async () => {
-    const { runAutoRenewals } = await import('../services/package-renewals.js');
+    const { runAutoRenewals } = await import('../services/packages/sale/package-renewals.js');
     const outcomes = await runAutoRenewals({ storage, config, peers });
     if (outcomes.length > 0) logger.info(`Package renewals: ${outcomes.filter(o => o.result === 'renewed').length} renewed, ${outcomes.filter(o => o.result === 'failed').length} failed`);
   });
 
-  // Unused packages-only peers removed, on a package repository (services/package-peer-limits.ts).
+  // Unused packages-only peers removed, on a package repository (services/packages/peer/package-peer-limits.ts).
   scheduler.registerCoreHandler('package-peer-cleanup', async () => {
     if (!config.packageRepository) return;
-    const { cleanupPackagePeers } = await import('../services/package-peer-limits.js');
+    const { cleanupPackagePeers } = await import('../services/packages/peer/package-peer-limits.js');
     const removed = await cleanupPackagePeers({ storage, config, peers });
     if (removed.length > 0) logger.info(`Package peer cleanup: removed ${removed.length} unused packages-only peer(s): ${removed.join(', ')}`);
   });

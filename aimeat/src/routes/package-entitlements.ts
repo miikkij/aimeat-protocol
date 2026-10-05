@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description A package repository's REST endpoints (install packages, phase 3): which peer nodes a
  *   private package is served to and up to when, and the listing a customer node reads to see what
- *   it may pull. The work is services/package-entitlements.ts; the MCP tool aimeat_package_entitlements
+ *   it may pull. The work is services/packages/sale/package-entitlements.ts; the MCP tool aimeat_package_entitlements
  *   calls the same functions.
  * @structure registerPackageEntitlementRoutes(router, config, storage, peers)
  *   GET /v1/packages/:groupId/entitlements · PUT and DELETE /v1/packages/:groupId/entitlements/:nodeId
@@ -27,10 +27,10 @@ import { requireAuth, requireScope, requireLocalSession } from '../auth/middlewa
 import { success, error } from '../middleware/envelope.js';
 import {
     listEntitlements, grantEntitlement, revokeEntitlement, repositoryListing, entitledGroupsOf, headerNode,
-} from '../services/package-entitlements.js';
-import { adoptPendingPeer } from '../services/package-peer-register.js';
-import { verifyPackageNode } from '../services/package-node-auth.js';
-import { packageConfigNeeds } from '../services/package-config-needs.js';
+} from '../services/packages/sale/package-entitlements.js';
+import { adoptPendingPeer } from '../services/packages/peer/package-peer-register.js';
+import { verifyPackageNode } from '../services/packages/peer/package-node-auth.js';
+import { packageConfigNeeds } from '../services/packages/compose/package-config-needs.js';
 import { isOperatorCaller, type OperatorAuth } from '../services/operator-override.js';
 
 export function registerPackageEntitlementRoutes(
@@ -65,7 +65,7 @@ export function registerPackageEntitlementRoutes(
     });
 
     // What a package or an install bundle needs the customer to give: the questions a shop asks
-    // before payment, with the permission it grants with (services/package-config-needs.ts).
+    // before payment, with the permission it grants with (services/packages/compose/package-config-needs.ts).
     router.get('/v1/packages/:groupId/config-needs', requireAuth(), requireLocalSession(), requireScope('packages:write'), async (req, res) => {
         const out = await packageConfigNeeds(storage, config, await callerOf(req), decodeURIComponent(req.params.groupId as string));
         if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }

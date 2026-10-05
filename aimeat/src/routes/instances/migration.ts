@@ -19,7 +19,7 @@
  *   v1.2.1 — 2026-09-12 — The same bare-name trap the v1.2.0 entry below describes is now closed at
  *     its source: resolveGhii takes the node and no longer accepts a fallback identity from a
  *     caller, so a route cannot hand it `sub` by accident. wish-identity-gate-sees-resolveghii.
- *   v1.2.0 — 2026-09-05 — The apply-migration body moves to services/package-migrate.ts, so the
+ *   v1.2.0 — 2026-09-05 — The apply-migration body moves to services/packages/install/package-migrate.ts, so the
  *     whole-instance update act runs the same loop rather than a second copy of it. Three defects
  *     went with it, argued in that file: the cortex and extension rewrites were never repeated, a
  *     newly added component got a name nothing could address, and a refused registration was
@@ -41,7 +41,7 @@ import { fetchComponentContentForAi } from '../../services/component-content.js'
 import { readerFor } from '../../services/classification/reader.js';
 import { ClassificationError } from '../../services/classification/labels.js';
 import { resolveGhii } from '../../utils/ghii-resolver.js';
-import { migrateOrRequest, updateOrRequest, requestedBody } from '../../services/package-install-requests.js';
+import { migrateOrRequest, updateOrRequest, requestedBody } from '../../services/packages/install/package-install-requests.js';
 import { actCallerOf as callerOf } from './install-requests.js';
 
 // ── Register migration routes ─────────────────────────────────────────

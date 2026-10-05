@@ -144,7 +144,7 @@ import type { AppGrantRecord } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 
 import { APP_GRANTABLE_SCOPES } from './app-grant-vocabulary.js';
-import { isPackageApp } from '../services/package-approvals.js';
+import { isPackageApp } from '../services/packages/install/package-approvals.js';
 export { APP_GRANTABLE_SCOPES };
 
 /**

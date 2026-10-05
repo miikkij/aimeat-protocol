@@ -192,7 +192,7 @@ const DELEGATES: Record<string, string> = {
         + 'emit the same domain from the same line, and none of them can be the door that forgets.',
     'src/mcp/commerce.ts': "services/memory-write.ts ('memory') and services/agent-offers-write.ts ('agents')",
     'src/mcp/operator-config.ts': "services/memory-write.ts ('memory') and services/agent-profile-write.ts ('agents')",
-    'src/mcp/packages.ts': "services/package-install.ts, which emits 'instances' where it creates "
+    'src/mcp/packages.ts': "services/packages/install/package-install.ts, which emits 'instances' where it creates "
         + 'the instance record — the same line POST /v1/packages/:groupId/install reaches, since '
         + 'that route is a door onto the same function. Verified by reading the emit out of the '
         + 'service rather than trusting the delegation.',

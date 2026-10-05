@@ -18,7 +18,7 @@ import { generateKeyPair } from '../../src/auth/keypair.js';
 import {
     buildDescriptor, attestationSignString, signAttestation, verifyAttestation,
     verifyComponentDigests, ATTESTATION_SPEC,
-} from '../../src/services/package-attestation.js';
+} from '../../src/services/packages/peer/package-attestation.js';
 import type { PackageRecord } from '../../src/storage/interface.js';
 
 function pkg(components: Array<{ id: string; content: string }>): PackageRecord {

@@ -13,7 +13,7 @@
  *   v1.0.0 — 2026-09-25 — Initial, written before the module existed.
  */
 import { describe, it, expect } from 'vitest';
-import { decisionRefusal, requestExpired, INSTALL_REQUEST_DAYS } from '../../src/services/package-install-request-policy.js';
+import { decisionRefusal, requestExpired, INSTALL_REQUEST_DAYS } from '../../src/services/packages/install/package-install-request-policy.js';
 
 const OWNER = 'alice@node-1';
 const NARROW = `narrow#${OWNER}`;

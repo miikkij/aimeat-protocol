@@ -16,14 +16,14 @@ import { buildExtensionRecordFromManifest } from '../../src/services/extension-m
 import {
     capabilitiesOfRecord, CAPABILITY_DECLARATION_KEY, type ExtensionCapabilitySet,
 } from '../../src/services/extension-capability-declaration.js';
-import { packageCapabilities } from '../../src/services/package-capabilities.js';
+import { packageCapabilities } from '../../src/services/packages/install/package-capabilities.js';
 import { appScopesOf, parseAppScopes } from '../../src/services/protected-resource.js';
-import { grantEntitlement, readEntitlements } from '../../src/services/package-entitlements.js';
-import { createClaim, redeemClaim } from '../../src/services/package-claims.js';
-import { isOwnPackage } from '../../src/services/package-approvals.js';
+import { grantEntitlement, readEntitlements } from '../../src/services/packages/sale/package-entitlements.js';
+import { createClaim, redeemClaim } from '../../src/services/packages/sale/package-claims.js';
+import { isOwnPackage } from '../../src/services/packages/install/package-approvals.js';
 import { installSetRepositories } from '../../src/services/install-set-trust.js';
 import { peerCarriesAgents } from '../../src/services/federation.js';
-import { signedPackageHeaders, verifyPackageNode } from '../../src/services/package-node-auth.js';
+import { signedPackageHeaders, verifyPackageNode } from '../../src/services/packages/peer/package-node-auth.js';
 import { generateKeyPair } from '../../src/auth/keypair.js';
 import type { PackageRecord } from '../../src/storage/interface.js';
 

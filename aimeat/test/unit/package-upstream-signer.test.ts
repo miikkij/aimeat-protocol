@@ -19,7 +19,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { checkUpstream } from '../../src/services/package-pull.js';
+import { checkUpstream } from '../../src/services/packages/peer/package-pull.js';
 import type { PackageRecord, PeerInfo } from '../../src/storage/interface.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';

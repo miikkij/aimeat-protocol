@@ -56,8 +56,8 @@ import type { Server } from 'node:http';
 import { setActiveEmailService, type EmailService } from '../src/services/email.js';
 import { provisionOwner } from '../src/services/owner-provisioning.js';
 import { publishSkill } from '../src/services/skills.js';
-import { signedPackageHeaders } from '../src/services/package-node-auth.js';
-import { refreshInstalledPackages, UPDATES_ENDED_SENTENCE } from '../src/services/package-upstream-refresh.js';
+import { signedPackageHeaders } from '../src/services/packages/peer/package-node-auth.js';
+import { refreshInstalledPackages, UPDATES_ENDED_SENTENCE } from '../src/services/packages/peer/package-upstream-refresh.js';
 import type { Storage } from '../src/storage/interface.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());

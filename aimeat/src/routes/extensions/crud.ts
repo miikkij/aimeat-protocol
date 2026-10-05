@@ -29,7 +29,7 @@
  *                         kept yet; the answer names it and the previous one. It swapped the script
  *                         under the unchanged version, so a call pinned to that version ran the patch.
  *   v1.8.0 — 2026-09-28 — PATCH :name/actions/:actionId refuses a script change on an extension a
- *                         managed package install owns, 409 MANAGED_BY_PACKAGE (services/package-managed.ts).
+ *                         managed package install owns, 409 MANAGED_BY_PACKAGE (services/packages/install/package-managed.ts).
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -50,7 +50,7 @@ import {
   snapshotExtensionVersion,
 } from '../../services/component-versions.js';
 import { buildExtensionRecordFromManifest } from '../../services/extension-manifest.js';
-import { managedChangeRefusal } from '../../services/package-managed.js';
+import { managedChangeRefusal } from '../../services/packages/install/package-managed.js';
 import { hasExtWritePermission, mayManageInstalledExt } from './permissions.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
 import { generateUploadToken, buildUploadMeta } from '../../services/upload-token.js';
@@ -431,7 +431,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
         return;
       }
       // An action script is code; on an extension a managed package install owns it comes from the
-      // package (services/package-managed.ts).
+      // package (services/packages/install/package-managed.ts).
       const managed = await managedChangeRefusal(storage, ext.installedBy, 'extension', name, 'code');
       if (managed) {
         res.status(managed.status).json(error(config.nodeId, managed.code, managed.message, managed.status, managed.details));

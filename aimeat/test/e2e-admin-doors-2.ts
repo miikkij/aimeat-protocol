@@ -663,7 +663,7 @@ console.log('\nSection D — seeding, redirects, translations, enable');
 // The defect this section used to pin, fixed on 2026-09-15: the door republished every example
 // package with a minute-stamped version, so a second press inside one minute of the boot seed
 // collided on (packageGroupId, version) and answered 500 SEED_FAILED / PACKAGE_EXISTS. It now runs
-// the boot's own sync (services/package-seeder.ts), which publishes only a package whose bundled
+// the boot's own sync (services/packages/compose/package-seeder.ts), which publishes only a package whose bundled
 // content changed. The node has already seeded these at boot, so here every press finds them
 // unchanged.
 await test('POST /v1/admin/seed-examples: the operator JWT gets past the gate', async () => {

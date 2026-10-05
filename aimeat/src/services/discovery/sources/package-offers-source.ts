@@ -16,7 +16,7 @@
 import type { AimeatConfig } from '../../../config.js';
 import type { Storage } from '../../../storage/interface.js';
 import type { DiscoveryContext, DiscoveryEntry, DiscoverySource, RawHit } from '../types.js';
-import { readCatalogue, type CatalogueEntry } from '../../package-sale-catalogue.js';
+import { readCatalogue, type CatalogueEntry } from '../../packages/sale/package-sale-catalogue.js';
 
 export const PACKAGE_OFFERS_SOURCE_ID = 'package-offers';
 const MAX_LIMIT = 100;

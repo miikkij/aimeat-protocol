@@ -33,11 +33,11 @@
       "count": 1,
       "why": "linkRepository, behind the operator check (requireOperatorPrincipal with operator:admin, or the operator's own start-up file): the repository the set names is written only after its own card answers with the same node id and key (2026-10-01)."
     },
-    "src/services/package-sale-client.ts": {
+    "src/services/packages/sale/package-sale-client.ts": {
       "count": 1,
       "why": "claimPackageHere, behind requireOperatorPrincipal with operator:admin on POST /v1/package-claims and resolveOperatorAgentName on MCP: after the repository accepted this node's signed claim, the repository's existing peer record is saved with shareCatalogue true, so pulls reach it. Only that flag changes; the url and key are the ones linkPackagePeer pinned after the repository's own card answered with them (2026-10-02)."
     },
-    "src/services/package-peer-register.ts": {
+    "src/services/packages/peer/package-peer-register.ts": {
       "count": 1,
       "why": "registerPackagePeer, from linkPackagePeer and adoptPendingPeer only: a package author, an operator or a seller node of the author asked, and the node's own card answered with the same id and key. Written packages-only (contact tier, messaging off). The card does not prove the id is the asker's (docs/pitfalls.md section 103); the readers below keep such a peer to packages."
     },
@@ -151,23 +151,23 @@
       "count": 3,
       "why": "Messages and read receipts go only to a peer that takes messages (peerTakesMessages: active or degraded, messaging on); the plain fetch is the federation carve-out of security/outbound-fetch-exemptions.json (2026-10-01)."
     },
-    "src/services/package-import.ts": {
+    "src/services/packages/compose/package-import.ts": {
       "count": 2,
       "why": "A pulled package's statement is verified with the pinned key of the node it names as signer; a node id with no key here is imported as not verified. A packages-only peer registered under a node id that is not its owner's would verify statements in that id's name: the pull gate (shareCatalogue) is what stands in front of it."
     },
-    "src/services/package-node-auth.ts": {
+    "src/services/packages/peer/package-node-auth.ts": {
       "count": 1,
       "why": "A customer node's signed request verified with its pinned key; a peer sharing no catalogue is heard only for what it holds an entitlement to."
     },
-    "src/services/package-pull.ts": {
+    "src/services/packages/peer/package-pull.ts": {
       "count": 3,
       "why": "A pull goes to a peer sharing the catalogue, verified with its pinned key; an address given directly is read for its card through safeFetch (trust on first use, the caller's own decision)."
     },
-    "src/services/package-sale-auth.ts": {
+    "src/services/packages/sale/package-sale-auth.ts": {
       "count": 2,
       "why": "A seller node's signed sale request verified with its pinned key; the seller must also be named by the package's author (isSellerFor)."
     },
-    "src/services/package-sale-client.ts": {
+    "src/services/packages/sale/package-sale-client.ts": {
       "count": 1,
       "why": "This node's operator signs a sale and sends it to an active repository peer whose card was checked when it was linked."
     },

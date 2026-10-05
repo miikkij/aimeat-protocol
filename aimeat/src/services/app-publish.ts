@@ -51,7 +51,7 @@
  *   2026-09-28 — The app's `aimeat-config` declaration is parsed into `manifest.configSchema`, and one
  *     that cannot be used is refused, 422 APP_CONFIG_SCHEMA_INVALID (services/app-config.ts).
  *   2026-09-28 — An app a managed package install owns is refused a new version (409
- *     MANAGED_BY_PACKAGE, services/package-managed.ts) unless the package itself registers it.
+ *     MANAGED_BY_PACKAGE, services/packages/install/package-managed.ts) unless the package itself registers it.
  *   2026-09-28 — A declared model the catalogue does not know is a hint (app-ai-model-hints.ts; System 2 plan, V5).
  *   2026-09-26 — A provenance declaration the caller may not make (no provenance:write) is refused
  *     above the dry-run return, 403 SCOPE_DENIED with the held scopes (bbfbeca149de): the mint threw
@@ -139,7 +139,7 @@ import { appSeoIndexable } from './app-seo.js';
 import { announceApp } from './indexnow.js';
 import { logger } from '../utils/logger.js';
 import { refreshAppDependencies } from './dependency-map.js';
-import { managedChangeRefusal } from './package-managed.js';
+import { managedChangeRefusal } from './packages/install/package-managed.js';
 import { parseAppConfigSchema } from './app-config.js';
 import { parseAppWorkspaces, checkAppWorkspaces } from './app-workspaces.js';
 import { parseFormatMdMeta, formatMdRefusal } from './app-format-md.js';
@@ -373,7 +373,7 @@ export async function publishApp(
 
   const live = isUpdate ? await storage.getApp(ownerGhii, filename) : null;
   const prev = live?.manifest;
-  // AN APP A MANAGED INSTALL OWNS changes only through its package (services/package-managed.ts).
+  // AN APP A MANAGED INSTALL OWNS changes only through its package (services/packages/install/package-managed.ts).
   // The package's own update registers through here with source `package-install`, which is the one
   // publish the lock lets through. Above the dry run, so a dry run answers what the publish would.
   if (isUpdate && input.source !== 'package-install') {
@@ -429,7 +429,7 @@ export async function publishApp(
   // provenance and writes. `pnpm check:route-scopes` will not tell you that; the `return { refusal`
   // sites will.
   //
-  // WHO ASKS FOR ONE. services/package-migrate.ts, whose `replace` and `custom` actions delete the
+  // WHO ASKS FOR ONE. services/packages/install/package-migrate.ts, whose `replace` and `custom` actions delete the
   // owner's installed component before registering its replacement. Without a way to ask "would
   // this register?", a lint or quota refusal left the owner with neither copy. One implementation:
   // the answer comes from the same checks the real publish runs, not from a second reading of them.

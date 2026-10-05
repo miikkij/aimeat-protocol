@@ -3,7 +3,7 @@
  * @description Managed package installs: the package owns the code and layout, the owner keeps the
  *   settings, an update replaces everything, and a fork gives the owner the code and ends the updates.
  *
- *   WHAT IT PROVES. The lock is one check (services/package-managed.ts) asked by every code path that
+ *   WHAT IT PROVES. The lock is one check (services/packages/install/package-managed.ts) asked by every code path that
  *   changes an app, its draft, its bundled crews, its layout or a cortex. Each path is driven here
  *   against a managed copy and must answer 409 MANAGED_BY_PACKAGE, and the same act against an
  *   editable copy of the same package must go through, so a lock that refused everything would fail

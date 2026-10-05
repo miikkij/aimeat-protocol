@@ -21,7 +21,7 @@ import type { Storage, PackageComponentType, ContentLabelTarget } from '../stora
 import { logger } from '../utils/logger.js';
 import { memoryTarget } from './classification/labels.js';
 import type { ContentReader } from './classification/reader.js';
-import { fetchSkillComponentContent, skillFileTargets } from './package-skill-component.js';
+import { fetchSkillComponentContent, skillFileTargets } from './packages/install/package-skill-component.js';
 
 // ── Fetch component content ──────────────────────────────────────────
 

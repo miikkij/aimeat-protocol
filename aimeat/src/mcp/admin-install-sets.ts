@@ -32,9 +32,9 @@ import { toolError } from './tool-error.js';
 import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
 import { applyInstallSet, listAppliedSets } from '../services/install-set-apply.js';
 import { getActiveScheduler } from '../services/scheduler.js';
-import { saleConfigNeeds, saleGrant, saleRevoke, saleOffer, saleClaim, claimPackageHere } from '../services/package-sale-client.js';
-import { readCatalogue, readRequests, setCatalogueEntry } from '../services/package-sale-catalogue.js';
-import { decideSaleRequest, reviewSale } from '../services/package-sale-checkout.js';
+import { saleConfigNeeds, saleGrant, saleRevoke, saleOffer, saleClaim, claimPackageHere } from '../services/packages/sale/package-sale-client.js';
+import { readCatalogue, readRequests, setCatalogueEntry } from '../services/packages/sale/package-sale-catalogue.js';
+import { decideSaleRequest, reviewSale } from '../services/packages/sale/package-sale-checkout.js';
 
 const text = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
 
@@ -84,7 +84,7 @@ export function registerAdminInstallSetTools(
         const agentName = await resolveOperatorAgentName(storage, getAgentGaii(), scopes);
         if (!agentName) return { content: [{ type: 'text' as const, text: OPERATOR_AGENT_REFUSAL }], isError: true };
         const deps = { storage, config, peers };
-        // This node's own records: the catalogue, the requests (services/package-sale-catalogue.ts).
+        // This node's own records: the catalogue, the requests (services/packages/sale/package-sale-catalogue.ts).
         if (input.action === 'catalogue') return text({ entries: await readCatalogue(storage) });
         if (input.action === 'requests') return text({ requests: await readRequests(storage) });
         if (input.action === 'decide') {

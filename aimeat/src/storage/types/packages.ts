@@ -18,7 +18,7 @@
 /** Shared type alias for all AIMEAT component types that can be included in a package. */
 /**
  * `skill`: an app's operating guide, a SKILL.md pack bound to one app component of the same package
- * (services/package-skill-component.ts). The installer publishes it in their own skill registry,
+ * (services/packages/install/package-skill-component.ts). The installer publishes it in their own skill registry,
  * bound to their installed copy of that app.
  */
 export type PackageComponentType = 'csm' | 'extension' | 'cortex' | 'app' | 'msm' | 'memory' | 'translation' | 'skill';
@@ -129,9 +129,9 @@ export interface PackageRecord {
   tags: string[];                  // free-form tags for search
   visibility: 'private' | 'public';
   /**
-   * `beta`: released on a repository's beta channel only (services/package-entitlements.ts).
+   * `beta`: released on a repository's beta channel only (services/packages/sale/package-entitlements.ts).
    * `withdrawn`: taken back by its author or an operator, with a reason; never served again
-   * (services/package-withdrawals.ts).
+   * (services/packages/compose/package-withdrawals.ts).
    */
   status: 'draft' | 'published' | 'beta' | 'archived' | 'withdrawn';
 
@@ -239,7 +239,7 @@ export interface PackageInstanceRecord {
    * How the owner may change what this install registered.
    *
    * `managed`: the code and layout of every component come from the package. A local edit is refused
-   * (services/package-managed.ts) and an update replaces every component. The owner still changes the
+   * (services/packages/install/package-managed.ts) and an update replaces every component. The owner still changes the
    * settings: an app's name, description, access code, parking, search visibility and legal texts.
    * `editable`: the owner may edit anything, and an update keeps what they edited.
    *
@@ -253,7 +253,7 @@ export interface PackageInstanceRecord {
    */
   forkedAt?: string;
   /**
-   * Whether the daily package check (services/package-upstream-refresh.ts) updates this install by
+   * Whether the daily package check (services/packages/peer/package-upstream-refresh.ts) updates this install by
    * itself when its source has a newer version (true), or tells the owner an update is ready (false).
    * Configurable (Jouni, 2026-09-28): an install sets it; managed installs default to true.
    */

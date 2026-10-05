@@ -1,7 +1,7 @@
 /**
  * @file test/e2e-app-config.ts
  * @description App config: what an app declares it needs to work, filled in by a package install and
- *   changed by its owner later (services/app-config.ts, services/package-config.ts).
+ *   changed by its owner later (services/app-config.ts, services/packages/compose/package-config.ts).
  *
  *   WHAT IT PROVES. Publish refuses a declaration it cannot use (a secret field, not JSON) and stores a
  *   good one. The config reads publicly with defaults and names the required fields still empty. Only

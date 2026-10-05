@@ -233,7 +233,7 @@ The source column identifies the implementation or rule to read at the next chan
 | [docs/security/threat-model.md](security/threat-model.md) | maintained | Operational security guidance; check current enforcement and verification evidence | `aimeat/src/auth` |
 | [docs/security/verification-matrix.md](security/verification-matrix.md) | maintained | Operational security guidance; check current enforcement and verification evidence | `aimeat/src/auth` |
 | [docs/skills-registry.md](skills-registry.md) | maintained | Current feature or operating guide; verify against implementation when changing it | `aimeat/src` |
-| [docs/specs/package-sale-design.md](specs/package-sale-design.md) | reference | Proposed design: package offer, checkout that grants the entitlement, set composer, trust checks before selling | `aimeat/src/services/package-entitlements.ts` |
+| [docs/specs/package-sale-design.md](specs/package-sale-design.md) | reference | Proposed design: package offer, checkout that grants the entitlement, set composer, trust checks before selling | `aimeat/src/services/packages/sale/package-entitlements.ts` |
 | [docs/specs/secretary-decision-contract.md](specs/secretary-decision-contract.md) | historical | Earlier plan, draft or audit; retained as history, not current instructions | `docs/README.md` |
 | [docs/specs/signals-contract.md](specs/signals-contract.md) | maintained | Signals contract | `aimeat/src/routes/signals.ts` |
 | [docs/specs/tracked-response-contract.md](specs/tracked-response-contract.md) | maintained | Tracked response contract | `aimeat/src/routes/tracked-responses.ts` |

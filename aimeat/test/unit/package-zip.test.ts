@@ -21,7 +21,7 @@
 import { describe, it } from 'vitest';
 import assert from 'node:assert/strict';
 import { ZipArchive } from 'archiver';
-import { buildZip, parseZip, ZipValidationError } from '../../src/services/package-zip.js';
+import { buildZip, parseZip, ZipValidationError } from '../../src/services/packages/compose/package-zip.js';
 import type { PackageRecord } from '../../src/storage/interface.js';
 
 // ---------------------------------------------------------------------------
