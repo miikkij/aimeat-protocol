@@ -25,6 +25,8 @@
  * @structure registerAppManageTool
  * @usage registerAppManageTool(mcp, storage, config, agentGaii, scopes, getToken)
  * @version-history
+ *   v1.5.1 — 2026-10-05 — config_get passes the reader to getAppConfig: the session's owner or the
+ *     operator's agent passes an app's own gates (secaudit 2026-10, APP-6).
  *   v1.5.0 — 2026-10-02 — spec, spec_set and spec_clear go over loopback to the design-spec routes with
  *     the member actions (MEMBER_ACTIONS in tool-dispatch/app-manage-call.ts).
  *   v1.4.0 — 2026-10-02 — builders, builder_set and builder_remove go over loopback to the dev-grants
@@ -284,7 +286,11 @@ export function registerAppManageTool(
                 return answer(await ui.restore(app.ownerGaii, filename, Number(args.version), { principal: callerGaii }));
             }
             case 'config_get': {
-                const out = await getAppConfig(storage, appOwner, filename);
+                // The same gates as the REST read: this session's owner, or an operator, passes them.
+                const out = await getAppConfig(storage, appOwner, filename, {
+                    ownerOrOperator: localAccountName(appOwner) === localAccountName(callerOwner)
+                        || !!(await resolveOperatorAgentName(storage, callerGaii, scopes)),
+                });
                 return out.ok ? answer(out.view) : toolError(out.code, out.message);
             }
             case 'config_set': {

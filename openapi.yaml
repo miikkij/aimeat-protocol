@@ -29317,10 +29317,17 @@ paths:
         declares no config answers `schema: null`. An app that declares workspaces in its
         `aimeat-workspace` block, installed as part of a set, also answers `workspaces`: by contract,
         the `{ organism_id, workspace_id, name }` the install made (`AIMEAT.data.appWorkspace()`).
+        The app's own gates apply: an app an operator hid answers 404 except to its owner, their
+        agents and operators, and an app behind an access code answers `workspaces` only to its owner,
+        their agents, an operator, or a caller with the code (`code` or `X-Access-Code`) or the unlock
+        token the app was served with (`access`).
       tags: [Apps]
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string } }
         - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: code, in: query, required: false, schema: { type: string }, description: The app's access code. }
+        - { name: access, in: query, required: false, schema: { type: string }, description: The unlock token the app origin was served with. }
+        - { name: X-Access-Code, in: header, required: false, schema: { type: string }, description: The app's access code, as a header. }
       responses:
         '200':
           description: '`data` is `{ app, schema, values, missing: [{ field, description? }], updated_at }`.'

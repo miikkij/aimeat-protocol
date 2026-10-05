@@ -30,6 +30,9 @@
  *   const parsed = parseAppConfigSchema(html);   // null | { schema } | { error }
  *   const out = await setAppConfig(storage, { callerOwnerGhii, ownerName, filename, values: { currency: 'EUR' } });
  * @version-history
+ *   v1.2.0 — 2026-10-05 — getAppConfig takes the reader: an operator-hidden app is not found except
+ *     for its owner and operators, and an access-coded app's workspace ids need the code, the unlock
+ *     token, or the owner (secaudit 2026-10, APP-6).
  *   v1.1.0 — 2026-10-02 — getAppConfig answers `workspaces`: where an install made the workspaces the
  *     app declares, by contract (app-workspaces.ts; package sale design, phase 4).
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 2).
@@ -38,6 +41,7 @@ import type { Storage } from '../storage/interface.js';
 import { validateValueAgainstSchema, validateSchemaItself } from './schema-validator.js';
 import { emitChange } from './event-bus.js';
 import { readAppWorkspaceLinks, type AppWorkspaceLink } from './app-workspaces.js';
+import { appAccessGranted } from './app-access-token.js';
 
 /** The declaration an app makes: a flat JSON Schema object of scalar fields. */
 export interface AppConfigSchema {
@@ -218,15 +222,33 @@ export type AppConfigResult =
     | { ok: true; view: AppConfigView }
     | { ok: false; status: number; code: string; message: string; details?: Record<string, unknown> };
 
-/** The config of one published app, as anyone who may open the app reads it. */
-export async function getAppConfig(storage: Storage, ownerName: string, filename: string): Promise<AppConfigResult> {
+/** Who reads an app's config, as far as the app's own gates care (secaudit 2026-10, APP-6). */
+export interface AppConfigReader {
+    /** The app's owner, an agent of theirs, or an operator. */
+    ownerOrOperator: boolean;
+    /** The access code the caller sent, or the unlock token the apex minted (app-access-token.ts). */
+    code?: string;
+    accessToken?: string;
+}
+
+/**
+ * The config of one published app, as anyone who may open the app reads it. An app an operator hid
+ * is not found except for its owner and operators, as the app itself is (routes/apps/read.ts). The
+ * workspace ids of an app behind an access code go only to its owner, an operator, or a caller with
+ * the code or the unlock token; the values stay readable, because the app reads them before anyone
+ * signs in and they hold nothing secret (secaudit 2026-10, APP-6).
+ */
+export async function getAppConfig(storage: Storage, ownerName: string, filename: string, reader: AppConfigReader): Promise<AppConfigResult> {
     const app = await storage.getAppByOwnerName(ownerName, filename);
-    if (!app) return { ok: false, status: 404, code: 'NOT_FOUND', message: `No published app "${filename}" under "${ownerName}".` };
+    const notFound: AppConfigResult = { ok: false, status: 404, code: 'NOT_FOUND', message: `No published app "${filename}" under "${ownerName}".` };
+    if (!app || (app.operatorHidden && !reader.ownerOrOperator)) return notFound;
     const schema = (app.manifest.configSchema as AppConfigSchema | undefined) ?? null;
     const { values, updatedAt } = await readAppConfigValues(storage, app.ownerGaii, filename);
+    const unlocked = !app.accessCode || reader.ownerOrOperator || reader.code === app.accessCode
+        || (!!reader.accessToken && await appAccessGranted(reader.accessToken, app.ownerName, filename));
     // The workspace ids an install made for this copy travel with the config, on the one read an app
     // already makes; an app that declares none gets no field.
-    const workspaces = app.manifest.workspaces?.length ? await readAppWorkspaceLinks(storage, app.ownerGaii, filename) : {};
+    const workspaces = unlocked && app.manifest.workspaces?.length ? await readAppWorkspaceLinks(storage, app.ownerGaii, filename) : {};
     return {
         ok: true,
         view: { ...appConfigView(`${ownerName}/${filename}`, schema, values, updatedAt), ...(Object.keys(workspaces).length ? { workspaces } : {}) },
