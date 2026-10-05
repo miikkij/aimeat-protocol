@@ -47,6 +47,10 @@
     }
   },
   "readers": {
+    "src/routes/federation-auth.ts": {
+      "count": 1,
+      "why": "POST /v1/federation/auth/verify, the home node's answer to a federated sign-in: gatePeer admits only an active peer with a key, the tier ceiling must allow sign-ins, and the request's signature is verified against that peer's pinned key before any account is read. The key is read, never the url (secaudit 2026-10, D1)."
+    },
     "src/routes/apps/catalogue-admin.ts": {
       "count": 3,
       "why": "Peer app search for an operator: active peers only, url checked with validateOutboundUrl first; reads public app listings and sends nothing private."
