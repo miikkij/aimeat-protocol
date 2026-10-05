@@ -1231,7 +1231,7 @@
           "sharedOriginWhy": "Only one person has an account here, so the apps that person made run with their sign-in. An app a package installed runs in an isolated frame, with only the permissions it was given. When a second person gets an account, every app moves into an isolated frame by itself.",
           "isolatedFrame": "Apps run in an isolated frame",
           "isolatedFrameWhy": "This server has {people} accounts, and apps have no address of their own. The frame cannot read anybody's sign-in or stored data here, and an app reaches this server only with the permissions it was given. In the frame an app cannot use a browser database, a service worker or notifications, and it cannot be installed.",
-          "isolatedFrameFix": "To give every app an address of its own: point *.{host} at this server with a TLS certificate that covers it, set AIMEAT_APP_HOST={host} and AIMEAT_APP_ORIGIN_ENABLED=true, and restart."
+          "isolatedFrameFix": "To give every app an address of its own: point *.{host} and {host} itself at this server with a TLS certificate that covers both, set AIMEAT_APP_HOST={host} and AIMEAT_APP_ORIGIN_ENABLED=true, and restart. If this server's own name answers only through a wildcard record, write it as a record of its own first: once any name exists below it, the wildcard stops answering for it."
         },
         "doors": {
           "security": "Settings · Security",

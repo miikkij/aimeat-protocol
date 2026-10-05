@@ -1231,7 +1231,7 @@
           "sharedOriginWhy": "Täällä on vain yhden ihmisen tili, joten hänen tekemänsä sovellukset toimivat hänen kirjautumisellaan. Paketin asentama sovellus toimii eristetyssä kehyksessä, ja se saa vain sille annetut oikeudet. Kun toinen ihminen saa tilin, jokainen sovellus siirtyy itsestään eristettyyn kehykseen.",
           "isolatedFrame": "Sovellukset toimivat eristetyssä kehyksessä",
           "isolatedFrameWhy": "Tällä palvelimella on {people} tiliä, eikä sovelluksilla ole omaa osoitetta. Kehys ei näe kenenkään kirjautumista eikä tallennettuja tietoja, ja sovellus pääsee palvelimelle vain niillä oikeuksilla, jotka sille on annettu. Kehyksessä sovellus ei voi käyttää selaimen tietokantaa tai service worker -skriptiä eikä lähettää ilmoituksia, eikä sitä voi asentaa.",
-          "isolatedFrameFix": "Näin annat jokaiselle sovellukselle oman osoitteen: ohjaa *.{host} tälle palvelimelle TLS-varmenteella, joka kattaa sen, aseta AIMEAT_APP_HOST={host} ja AIMEAT_APP_ORIGIN_ENABLED=true ja käynnistä palvelin uudelleen."
+          "isolatedFrameFix": "Näin annat jokaiselle sovellukselle oman osoitteen: ohjaa *.{host} ja {host} tälle palvelimelle TLS-varmenteella, joka kattaa molemmat, aseta AIMEAT_APP_HOST={host} ja AIMEAT_APP_ORIGIN_ENABLED=true ja käynnistä palvelin uudelleen. Jos palvelimen oma nimi vastaa vain wildcard-tietueen kautta, kirjoita sille ensin oma tietue: kun sen alle tulee yksikin nimi, wildcard lakkaa vastaamasta sen puolesta."
         },
         "doors": {
           "security": "Asetukset · Turvallisuus",
