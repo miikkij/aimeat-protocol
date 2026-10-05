@@ -471,11 +471,6 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_image_generate: { title: 'Generate Image', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     aimeat_voice_reply: { title: 'Generate Voice Reply', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     aimeat_voice_speak: { title: 'Generate Speech', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-    aimeat_ai_job_start: { title: 'Start AI Job', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-    aimeat_ai_job_list: { title: 'List AI Jobs', readOnlyHint: true },
-    aimeat_ai_job_get: { title: 'Get AI Job', readOnlyHint: true },
-    // Destructive: it stops work the owner asked for, and a cancelled job cannot be resumed.
-    aimeat_ai_job_cancel: { title: 'Cancel AI Job', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     // The decision provider (TARGET-080). Asking sends scrubbed data to an outside model: open world.
     aimeat_decide: { title: 'Ask the Decision Model', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     aimeat_decision_list: { title: 'List AI Decisions', readOnlyHint: true },

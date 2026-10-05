@@ -242,14 +242,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     aimeat_image_generate:                    'ai:use',
     aimeat_voice_reply:                       'ai:use',
     aimeat_voice_speak:                       'ai:use',
-    // Background AI jobs. The same word as every other door that spends the owner's AI budget --
-    // starting one IS a completion, only with a handle instead of a held request. Reading and
-    // cancelling take it too: a job is the owner's own AI activity, and the routes admit exactly
-    // who assertAiUseAllowed admits.
-    aimeat_ai_job_start:                      'ai:use',
-    aimeat_ai_job_list:                       'ai:use',
-    aimeat_ai_job_get:                        'ai:use',
-    aimeat_ai_job_cancel:                     'ai:use',
     // The decision provider (TARGET-080): the same money and the same gate as a completion.
     aimeat_decide:                            'ai:use',
     aimeat_decision_list:                     'ai:use',

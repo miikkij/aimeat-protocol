@@ -228,7 +228,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_image_generate', 'aimeat_ai_providers', 'aimeat_ai_provider_test', 'aimeat_ai_roles',
         'aimeat_ai_capabilities', 'aimeat_ai_models', 'aimeat_ai_transcribe', 'aimeat_ai_embed',
         'aimeat_voice_reply', 'aimeat_voice_speak',
-        'aimeat_ai_job_start', 'aimeat_ai_job_list', 'aimeat_ai_job_get', 'aimeat_ai_job_cancel',
+        
         'aimeat_decide', 'aimeat_decision_list', 'aimeat_decision_review', 'aimeat_decide_run', 'aimeat_decide_settings',
         'aimeat_decide_rules', 'aimeat_decide_rule_propose',
         'aimeat_extension_install', 'aimeat_extension_invoke', 'aimeat_extension_get', 'aimeat_extension_list',
@@ -249,7 +249,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_image_generate', 'aimeat_ai_providers', 'aimeat_ai_provider_test', 'aimeat_ai_roles',
         'aimeat_ai_capabilities', 'aimeat_ai_models', 'aimeat_ai_transcribe', 'aimeat_ai_embed',
         'aimeat_voice_reply', 'aimeat_voice_speak',
-        'aimeat_ai_job_start', 'aimeat_ai_job_list', 'aimeat_ai_job_get', 'aimeat_ai_job_cancel',
+        
         'aimeat_decide', 'aimeat_decision_list', 'aimeat_decision_review', 'aimeat_decide_run', 'aimeat_decide_settings',
         'aimeat_decide_rules', 'aimeat_decide_rule_propose',
         'aimeat_memory_read', 'aimeat_memory_write', 'aimeat_memory_list', 'aimeat_memory_search', 'aimeat_memory_read_public',
