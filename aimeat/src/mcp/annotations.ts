@@ -592,8 +592,6 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // Creates accounts, installs and organisms; applying again creates nothing twice, and it reaches
     // the package repository named in the set.
     aimeat_admin_install_set: { title: 'Admin: Apply an Install Set', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
-    aimeat_datamap_get: { title: 'Data map: read', readOnlyHint: true },
-    aimeat_datamap_set: { title: 'Data map: state it', destructiveHint: true, idempotentHint: true },
     aimeat_designbook_search: { title: 'Design Book: browse the parts', readOnlyHint: true },
     aimeat_designbook_get: { title: 'Design Book: one part, whole', readOnlyHint: true },
     aimeat_designbook_propose: { title: 'Design Book: propose (benched first)', idempotentHint: true },
@@ -609,7 +607,6 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_theme_policy_set: { title: 'Themes: who chooses, which are available, the default', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     // remove: true deletes a face and its files, so the tool as a whole is destructive.
     aimeat_theme_font_save: { title: 'Themes: add, change or remove a face (font)', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
-    aimeat_memory_hands: { title: 'Memory: who has written here', readOnlyHint: true },
     // destructiveHint: mints morsels (irreversible ledger change, financial action)
     aimeat_admin_mint: { title: 'Admin: Mint Morsels', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
 
