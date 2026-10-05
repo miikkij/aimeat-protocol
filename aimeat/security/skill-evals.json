@@ -2,16 +2,16 @@
   "about": "For each skill with an eval suite under .claude/evals/<skill>/: the digest of the skill and its suite at the last decision, and whether the eval ran (with scores) or was skipped (with the reason and who decided). pnpm check:skill-evals fails when the digest changes. The eval costs money, so the developer decides: run it, or record a skip. Reasoning: aimeat/scripts/check-skill-evals.ts.",
   "skills": {
     "aimeat-writing": {
-      "digest": "sha256:536862135240e6bf7c24762d",
-      "decision": "skipped",
+      "digest": "sha256:1f0b998446f11329c1032d56",
+      "decision": "ran",
       "on": "2026-10-05",
-      "note": "Three language-context rows (input validation, format, the held button) with the aimeat-validate library; the skill text itself did not change; Jouni decided to skip, 2026-10-05"
+      "note": "opus, 3 runs per arm per case, with/without: commit-message 1.00/1.00, finnish-ui-copy 0.83/0.92 (one run timed out at 300 s), operator-help-line 0.83/0.75; mean delta +0.00; cost 3.56 USD; Jouni decided to run it, 2026-10-05"
     },
     "aimeat-ai-capabilities": {
-      "digest": "sha256:485bf557e6f87ddc278c013e",
-      "decision": "skipped",
-      "on": "2026-10-02",
-      "note": "fix/settingsUrl/agentFix fields and one instruction added, cases and structure unchanged; Jouni decided 2026-10-02"
+      "digest": "sha256:1352e7fda6c137c429849b1b",
+      "decision": "ran",
+      "on": "2026-10-05",
+      "note": "opus, 3 runs per arm per case, with/without: image-button-app 1.00/0.25, large-collection-duplicates 1.00/1.00, mid-collection-fits-prompt 1.00/1.00, needs-one-model 0.67/0.17, small-collection-no-embeddings 1.00/0.67, voice-note-summary 1.00/none (partial: the cost ceiling stopped the without-arm); mean delta +0.32; cost 10.11 USD; Jouni decided to run it, 2026-10-05"
     }
   }
 }
