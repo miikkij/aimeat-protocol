@@ -18,9 +18,11 @@
  *   - GET /v1/unfurl?url=      → { url, resolvedUrl, title, description, image, siteName }  (cached ~1h)
  *   - GET /v1/unfurl/image?url= → the remote image bytes, streamed back same-origin (auth'd, size-capped)
  *   - parseMeta(html, base)    → extract OG/Twitter/<title> metadata, resolving relative image URLs
- *   - readCapped(resp, max)    → read a response body up to a byte cap, then stop
  *
  * @version-history
+ *   v1.1.0 — 2026-10-05 — The page is read with readBodyPrefix and the image with readBodyCapped
+ *     (utils/read-capped.ts) in place of a private copy, so an image over the ceiling is refused (413)
+ *     rather than served cut (secaudit 2026-10, C6).
  *   v1.0.0 — 2026-07-21 — Initial link-preview endpoints (inbox message link cards).
  *   v1.0.1 — 2026-09-29 — decodeEntities decodes in one pass and is exported for its test. The chain
  *     decoded &amp; before &lt;, so a page title with `&amp;lt;` came out as `<` (CodeQL
@@ -33,6 +35,7 @@ import { requireAuth } from '../auth/middleware.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { cached } from '../services/cache.js';
 import { logger } from '../utils/logger.js';
+import { readBodyCapped, readBodyPrefix } from '../utils/read-capped.js';
 
 /** Page fetch caps — an unfurl only needs the <head>, so a small ceiling covers real pages. */
 const MAX_HTML_BYTES = 512 * 1024;      // 512 KB of HTML is plenty to reach the OG tags
@@ -42,23 +45,6 @@ const UNFURL_TTL_MS = 3_600_000;         // preview metadata is stable — cache
 /** A desktop UA — some sites serve a bare / bot-hostile page to an unknown client, hiding OG tags. */
 const UA = 'Mozilla/5.0 (compatible; AIMEAT-LinkPreview/1.0; +https://aimeat.io)';
 
-/** Read a response body into a Buffer, stopping once `maxBytes` is exceeded (then cancelling the stream). */
-async function readCapped(resp: Response, maxBytes: number): Promise<Buffer> {
-  const reader = resp.body?.getReader();
-  if (!reader) return Buffer.alloc(0);
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (value) {
-      total += value.length;
-      if (total > maxBytes) { try { await reader.cancel(); } catch (err) { logger.warn('readCapped: noop', { error: String(err) }); } break; }
-      chunks.push(value);
-    }
-  }
-  return Buffer.concat(chunks);
-}
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", '#39': "'", '#039': "'", '#x27': "'", nbsp: ' ' };
 
@@ -126,7 +112,7 @@ async function computePreview(rawUrl: string): Promise<Preview> {
     try { siteName = new URL(resolvedUrl).hostname.replace(/^www\./, ''); } catch { /* noop */ }
     return { url: rawUrl, resolvedUrl, title: null, description: null, image: null, siteName };
   }
-  const buf = await readCapped(resp, MAX_HTML_BYTES);
+  const buf = await readBodyPrefix(resp, MAX_HTML_BYTES);
   return parseMeta(buf.toString('utf8'), rawUrl, resolvedUrl);
 }
 
@@ -167,7 +153,12 @@ export function unfurlRouter(config: AimeatConfig): Router {
         res.status(415).json(error(config.nodeId, 'NOT_AN_IMAGE', 'The URL did not resolve to an image.'));
         return;
       }
-      const buf = await readCapped(resp, MAX_IMAGE_BYTES);
+      // A cut image is a broken image: over the ceiling it is refused, not served in part.
+      const buf = await readBodyCapped(resp, MAX_IMAGE_BYTES);
+      if (!buf) {
+        res.status(413).json(error(config.nodeId, 'IMAGE_TOO_LARGE', 'The preview image is larger than this node serves.'));
+        return;
+      }
       res.setHeader('Content-Type', ctype.split(';')[0]);
       res.setHeader('Cache-Control', 'private, max-age=3600');
       res.setHeader('X-Content-Type-Options', 'nosniff');

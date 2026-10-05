@@ -32,10 +32,12 @@
  *   import { readKeySpend } from './openrouter-key.js';
  *   const spend = await readKeySpend(config, config.openrouterInstanceKey, 'house');
  * @version-history
+ *   v1.0.1 — 2026-10-05 — The key's status is read under a 64 kB ceiling (secaudit 2026-10, C6).
  *   v1.0.0 — 2026-09-12 — Initial: the Usage page stops being unable to see the operator's own bill.
  */
 import type { AimeatConfig } from '../config.js';
 import { safeFetch } from '../utils/url-validator.js';
+import { readJson } from '../utils/read-capped.js';
 import { logger } from '../utils/logger.js';
 
 const ENDPOINT = 'https://openrouter.ai/api/v1/key';
@@ -119,7 +121,7 @@ export async function readKeySpend(
       cache.set(cacheKey, { at: Date.now(), value: out });
       return out;
     }
-    const body = await res.json() as { data?: Record<string, unknown> };
+    const body = await readJson(res, 64 * 1024) as { data?: Record<string, unknown> };
     const d = body?.data ?? {};
     const numberOrNull = (v: unknown): number | null => (typeof v === 'number' ? v : null);
     const out: KeySpend = {
