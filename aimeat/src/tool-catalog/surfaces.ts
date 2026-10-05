@@ -428,10 +428,10 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         // And two writes beside it: a peer kept on its own relay-claim setting, and a peer removed.
         'aimeat_admin_federation', 'aimeat_admin_federation_relay_claim_set', 'aimeat_admin_federation_peer_remove',
         // Setting this node up from an install set: owner, packages, organisms, users, crew agents.
-        'aimeat_admin_install_set',
+        
         // Selling a repository's packages from this node, signed by its own key, and redeeming a
         // package claim code for this node with that key.
-        'aimeat_package_sale', 'aimeat_package_claim',
+        
         // Arranging this node's front page and the page its members land on.
         'aimeat_surface_layout_get', 'aimeat_surface_layout_set',
         // ...and the parts those pages are drawn from, and the themes they wear.
