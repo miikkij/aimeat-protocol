@@ -2,6 +2,18 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does.",
   "entries": [
     {
+      "date": "2026-10-05",
+      "kind": "feature",
+      "title": {
+        "en": "Forms say what is wrong, field by field",
+        "fi": "Lomake kertoo kentän vieressä, mikä on väärin"
+      },
+      "body": {
+        "en": "A form in an app now tells you next to each field what to do, in your language: \"Fill in this field\", or \"The check digit of the Business ID does not match\". A field that needs a format shows an example before you type. Finnish Business IDs, personal identity codes, IBANs, postal codes and phone numbers are checked with their check digits. A Next or Send button waits until the fields are right and says which ones still need you. The app's builder writes the rules once, and the same rules guard the workspace, so what an AI writes there is checked the same way as what you type.",
+        "fi": "Sovelluksen lomake kertoo nyt jokaisen kentän vieressä, mitä sinun pitää tehdä, ja sinun kielelläsi: \"Täytä tämä kenttä\" tai \"Y-tunnuksen tarkistusnumero ei täsmää\". Muotoa vaativa kenttä näyttää esimerkin, ennen kuin kirjoitat mitään. Y-tunnus, henkilötunnus, IBAN, postinumero ja puhelinnumero tarkistetaan tarkistusnumeroineen. Seuraava- tai Lähetä-painike odottaa, kunnes kentät ovat oikein, ja kertoo, mitkä kentät vielä puuttuvat. Sovelluksen tekijä kirjoittaa säännöt kerran, ja samat säännöt suojaavat työtilaa: tekoälyn sinne kirjoittamat tiedot tarkistetaan samalla tavalla kuin sinun syötteesi."
+      }
+    },
+    {
       "date": "2026-10-04",
       "kind": "feature",
       "title": {
