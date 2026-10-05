@@ -29,6 +29,8 @@
  * @structure getNodeUpdateStatus(config, opts) · detectInstall() · whatsNew() · NodeUpdateStatus
  * @usage const status = await getNodeUpdateStatus(config, { refresh: false });
  * @version-history
+ *   v1.1.0 — 2026-10-05 — The registry's latest version must be a semantic version (SEMVER_RE); it
+ *     goes into the shell commands of the update prompt (secaudit 2026-10, PKG-11).
  *   v1.0.0 — 2026-09-30 — Initial.
  */
 import { existsSync, readFileSync } from 'node:fs';
@@ -46,6 +48,8 @@ import { buildNodeUpdatePrompt, type InstallMethod } from './node-update-prompt.
 const PACKAGE = 'aimeat';
 const DEFAULT_REGISTRY = 'https://registry.npmjs.org';
 const DEFAULT_FILES = 'https://unpkg.com';
+/** A semantic version as npm publishes one: three numbers, an optional pre-release, no build part needed. */
+export const SEMVER_RE = /^\d{1,6}\.\d{1,6}\.\d{1,6}(-[0-9A-Za-z.-]{1,40})?$/;
 const OK_TTL_MS = 6 * 60 * 60 * 1000;
 const FAIL_TTL_MS = 30 * 60 * 1000;
 const TIMEOUT_MS = 8000;
@@ -144,8 +148,14 @@ async function check(source: string): Promise<Checked> {
   const at = Date.now();
   try {
     const latestDoc = await getJson<{ version?: string }>(`${registry}/${PACKAGE}/latest`, 512 * 1024);
-    const latest = typeof latestDoc?.version === 'string' ? latestDoc.version : null;
-    if (!latest) return { source, at, latest: null, releasedAt: null, remoteLog: null, error: 'The package registry did not name a latest version.' };
+    const named = typeof latestDoc?.version === 'string' ? latestDoc.version : null;
+    if (!named) return { source, at, latest: null, releasedAt: null, remoteLog: null, error: 'The package registry did not name a latest version.' };
+    // The version goes into shell commands the operator's AI runs (node-update-prompt.ts) and into
+    // registry URLs, so anything but a plain semantic version is refused (secaudit 2026-10, PKG-11).
+    if (!SEMVER_RE.test(named)) {
+      return { source, at, latest: null, releasedAt: null, remoteLog: null, error: 'The package registry named a latest version that is not a semantic version, so it is not offered.' };
+    }
+    const latest = named;
     if (compareVersions(getSoftwareVersion(), latest) >= 0) {
       return { source, at, latest, releasedAt: null, remoteLog: null, error: null };
     }
