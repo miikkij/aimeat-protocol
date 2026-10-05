@@ -47,7 +47,7 @@ const limits = { memoryMb: 64, timeoutMs: 10_000, maxApiCalls: 10 };
 const KEY = 'sk-owner-provider-key-ZZ9';
 const HOSTS = ['api.example-ai.com', 'eu.example-ai.com'];
 
-const ctxWith = (providerCall?: Parameters<typeof buildExtensionCtx>[0]['providerCall']) => buildExtensionCtx({
+const ctxWith = (providerCall?: Parameters<typeof buildExtensionCtx>[0]['providerCall']) => buildExtensionCtx({ capabilities: { network: true, ai: true, email: true, payments: true, declared: true },
     config, storage: {} as Storage, extMemoryOwner: 'ext:example-ai',
     caller: { gaii: 'alice@node-1', owner: 'alice', roles: ['operator'] }, extConfig: {}, logPrefix: '[ext:example-ai]',
     extension: { name: 'example-ai', owner: 'alice' },

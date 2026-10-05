@@ -148,7 +148,7 @@ describe('TARGET-082 review: what a read hands out, and in which order it asks',
     it('ctx.memory.getPublic hands an AI caller the warning beside the value', async () => {
       await storage.setMemory(mem(ALICE, 'pub.conf', { text: 'x' }, 'public'));
       await label(ALICE, 'pub.conf', WARN);
-      const ctx = buildExtensionCtx({ config, storage, extMemoryOwner: 'ext:x', caller: { gaii: AGENT, owner: 'alice', roles: ['agent'], scopes: [] }, extConfig: {}, logPrefix: '[t]' });
+      const ctx = buildExtensionCtx({ capabilities: { network: true, ai: true, email: true, payments: true, declared: true }, config, storage, extMemoryOwner: 'ext:x', caller: { gaii: AGENT, owner: 'alice', roles: ['agent'], scopes: [] }, extConfig: {}, logPrefix: '[t]' });
       expect(await ctx.memory.getPublic(ALICE, 'pub.conf')).toEqual({ text: 'x', classificationWarning: W });
     });
 

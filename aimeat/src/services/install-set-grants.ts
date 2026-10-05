@@ -20,19 +20,19 @@
  *   (config.js APP_DEFAULT_SCOPES), which is also what the silent bridge falls back to.
  *
  *   A set may say `grant_apps: false`; then every app asks on its first visit, as before.
- * @structure DEFAULT_APP_SCOPES · AppGrantStep · grantInstalledApps() · landingPath()
+ * @structure AppGrantStep · grantInstalledApps() · landingPath()
  * @usage await grantInstalledApps(storage, config, owner, record);
  * @version-history
+ *   v1.1.0 — 2026-10-05 — The app's scopes come from appScopesOf (protected-resource.ts), the reading
+ *     the package approval now uses too, so what the owner approved and what the set grants are read
+ *     alike (secaudit 2026-10, PKG-4). DEFAULT_APP_SCOPES moved there.
  *   v1.0.0 — 2026-10-04 — Initial.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, PackageInstanceRecord } from '../storage/interface.js';
 import { APP_GRANTABLE_SCOPES } from '../routes/app-grant-vocabulary.js';
-import { parseAppScopes } from './protected-resource.js';
+import { appScopesOf } from './protected-resource.js';
 import { upsertAppGrant } from './app-grant-upsert.js';
-
-/** What an app page asks for when it declares nothing (sdk-libs/auth/config.js APP_DEFAULT_SCOPES). */
-export const DEFAULT_APP_SCOPES = ['memory:read', 'memory:write', 'storage:read', 'storage:write'];
 
 /** One app's grant, as the apply record keeps it, by grant target `owner/filename`. */
 export interface AppGrantStep {
@@ -61,9 +61,8 @@ async function appOriginOf(storage: Storage, config: AimeatConfig, target: strin
 /** The scopes an app's HTML declares, in the grant vocabulary; the SDK's default when it declares none. */
 function declaredScopes(data: unknown): string[] {
     const html = typeof data === 'string' ? data : Buffer.from(data as Uint8Array).toString('utf-8');
-    const declared = parseAppScopes(html);
-    if (declared.length === 0) return [...DEFAULT_APP_SCOPES];
-    return [...new Set(declared.filter(s => Object.prototype.hasOwnProperty.call(APP_GRANTABLE_SCOPES, s)))];
+    const { scopes, declared } = appScopesOf(html);
+    return declared ? scopes.filter(s => Object.prototype.hasOwnProperty.call(APP_GRANTABLE_SCOPES, s)) : scopes;
 }
 
 /**

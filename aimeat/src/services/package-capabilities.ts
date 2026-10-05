@@ -24,6 +24,12 @@
  *   const caps = packageCapabilities(pkg.components, config, owner);
  *   if (caps.carriesCode) ...   // an extension, app, cortex or skill part
  * @version-history
+ *   v1.2.0 — 2026-10-05 — An extension's network, ai, email and payments come from
+ *     capabilitiesOfRecord, the list the sandbox now enforces; the regex for `ctx.fetch(` and the like
+ *     missed an aliased call, which the sandbox then ran (secaudit 2026-10, PKG-3). An app's scopes come from appScopesOf (protected-resource.ts), the reading
+ *     every grant uses. The regex here read the whole page and preferred a name-first tag, so an app
+ *     with two tags, or one past 64 KB, showed the owner one list and got another (secaudit 2026-10,
+ *     PKG-4).
  *   v1.1.0 — 2026-10-02 — An app's carried tools are capabilities (`app:<c>:tool:<name>`): an update that adds one asks again.
  *   v1.0.0 — 2026-10-02 — Initial (package sale design, phase 2).
  */
@@ -37,9 +43,8 @@ import { SECRET_KEYS_FIELD } from './extension-secrets.js';
 import { cortexComponentsOf } from './package-component-collisions.js';
 import { memoryComponentEntries } from './package-memory-component.js';
 import { skillComponentName } from './package-skill-component.js';
-
-/** What every app asks for when it declares nothing (sdk-libs/auth/config.js APP_DEFAULT_SCOPES). */
-const APP_DEFAULT_SCOPES = ['memory:read', 'memory:write', 'storage:read', 'storage:write'];
+import { appScopesOf } from './protected-resource.js';
+import { capabilitiesOfRecord } from './extension-capability-declaration.js';
 
 export interface ExtensionCapabilities {
   component: string; name: string; actions: string[];
@@ -71,16 +76,6 @@ export interface CapabilitySummary {
   carriesCode: boolean;
 }
 
-/** The scopes an app's HTML asks for: its `<meta name="aimeat-scopes">`, else the default. */
-function appScopes(html: string): { scopes: string[]; declared: boolean } {
-  const m = /<meta\s+[^>]*name=["']aimeat-scopes["'][^>]*content=["']([^"']*)["']/i.exec(html)
-    ?? /<meta\s+[^>]*content=["']([^"']*)["'][^>]*name=["']aimeat-scopes["']/i.exec(html);
-  const declared = m?.[1]?.trim();
-  return declared
-    ? { scopes: [...new Set(declared.split(/\s+/).filter(Boolean))].sort(), declared: true }
-    : { scopes: [...APP_DEFAULT_SCOPES], declared: false };
-}
-
 function extensionCapabilities(comp: PackageComponent, config: AimeatConfig, owner: string): ExtensionCapabilities | null {
   let parsed: { manifest?: string; scripts?: Record<string, string> };
   try { parsed = JSON.parse(comp.content); }
@@ -89,7 +84,9 @@ function extensionCapabilities(comp: PackageComponent, config: AimeatConfig, own
   const built = buildExtensionRecordFromManifest(parsed.manifest ?? '', parsed.scripts ?? {}, config, owner, new Date().toISOString(), false);
   if (!built.ok) return null;
   const rec = built.record;
-  const code = rec.actions.map(a => a.scriptContent ?? '').join('\n') + '\n' + Object.values(parsed.scripts ?? {}).join('\n');
+  // The list the sandbox enforces (services/extension-capability-declaration.ts), so the approval
+  // shows exactly what the scripts will be allowed to do.
+  const can = capabilitiesOfRecord(rec);
   const cfg = (rec.config ?? {}) as Record<string, unknown>;
   const ws = cfg[WORKSPACE_DECLARATION_KEY] as { read?: boolean; write?: boolean } | undefined;
   const ap = cfg[AI_PROVIDER_DECLARATION_KEY] as { hosts?: string[] } | undefined;
@@ -98,10 +95,10 @@ function extensionCapabilities(comp: PackageComponent, config: AimeatConfig, own
     component: comp.id,
     name: rec.name,
     actions: rec.actions.map(a => a.id).sort(),
-    network: /ctx\.fetch\s*\(/.test(code),
-    ai: /ctx\.ai\.\w+\s*\(/.test(code),
-    email: /ctx\.email\.\w+\s*\(/.test(code),
-    payments: /ctx\.buy\s*\(/.test(code),
+    network: can.network,
+    ai: can.ai,
+    email: can.email,
+    payments: can.payments,
     ...(ws && (ws.read || ws.write) ? { workspace: { read: !!ws.read, write: !!ws.write } } : {}),
     ...(ap?.hosts?.length ? { ai_provider_hosts: [...ap.hosts].sort() } : {}),
     secrets: (Array.isArray(cfg[SECRET_KEYS_FIELD]) ? cfg[SECRET_KEYS_FIELD] as string[] : []).slice().sort(),
@@ -124,7 +121,7 @@ export function packageCapabilities(components: PackageComponent[], config: Aime
       case 'app': {
         const meta = comp.meta as { app?: { name?: string; tools?: Array<{ name?: unknown }> } } | undefined;
         const tools = (Array.isArray(meta?.app?.tools) ? meta.app.tools : []).map(t => String(t?.name ?? '')).filter(Boolean).sort();
-        caps.apps.push({ component: comp.id, name: meta?.app?.name ?? comp.label, ...appScopes(comp.content), ...(tools.length ? { tools } : {}) });
+        caps.apps.push({ component: comp.id, name: meta?.app?.name ?? comp.label, ...appScopesOf(comp.content), ...(tools.length ? { tools } : {}) });
         break;
       }
       case 'cortex': {

@@ -173,6 +173,7 @@ federation:
 | `instances.config_per_instance` | No | Per-instance configuration schema |
 | `federation` | No | Cross-node capability advertising |
 | `workspace` | No | `{ read: bool, write: bool }`. Gives the sandbox `ctx.workspace`, which acts on the CALLER's organism workspace as the caller. Absent means no such capability |
+| `capabilities` | No (declare it) | `[network, ai, email, payments]`: what the scripts may do beyond their own memory. `network` gives `ctx.fetch`, `ai` gives `ctx.ai`, `email` gives `ctx.email`, `payments` gives `ctx.buy`. The installer approves this list, and the sandbox gives nothing else: without `network`, `ctx.fetch` throws `CAPABILITY_NOT_DECLARED`; without the others, those members are `undefined`. Absent, the node reads the list from the scripts' text, so a computed call such as `ctx['fe' + 'tch']` is refused |
 
 ## Writing Action Scripts
 

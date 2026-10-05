@@ -18,6 +18,8 @@
  * @usage import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
+ *   v1.5.5 — 2026-10-05 — ADDITIVE: the manifest's `capabilities:` and what the sandbox does without
+ *     them (secaudit 2026-10, PKG-3).
  *   v1.5.4 — 2026-09-28 — ADDITIVE: an extension as an AI provider, provides.ai_provider and the ai.<op> shapes (V6).
  *   v1.5.3 — 2026-09-28 — ADDITIVE: ctx.ai.start takes op, provider, audio_key, language, size (System 2 plan, V5).
  *   v1.5.2 — 2026-09-26 — ADDITIVE: ctx.fetch reads at most 4 MB of one answer and throws
@@ -87,6 +89,14 @@ function sandboxSection(): string {
     '```',
     '',
     'Helpers and consts declared ABOVE the export are preserved, so you may structure the file.',
+    '',
+    'What your code may do beyond its own memory is the manifest\'s top-level',
+    '`capabilities: [network, ai, email, payments]`: `network` for `ctx.fetch`, `ai` for `ctx.ai`,',
+    '`email` for `ctx.email`, `payments` for `ctx.buy`. The person who installs your extension sees',
+    'this list and approves it, and the sandbox gives the code nothing else: without `network`,',
+    '`ctx.fetch` throws `CAPABILITY_NOT_DECLARED`, and without the others those members are',
+    '`undefined`. A manifest without the field gets the list read from the scripts\' text, so declare',
+    'it. Reach these only through `ctx`: the bridge\'s own `__` functions are gone before your code runs.',
     '',
     'The `ctx` object, in full. Some members exist only on some runs; the table after this one says',
     'which.',

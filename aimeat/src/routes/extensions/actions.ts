@@ -7,6 +7,8 @@
  *   consent/trust/notify/email) and runs the action script. Extracted from src/routes/extensions.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.13.0 — 2026-10-05 — Both handlers pass the extension's capabilities to buildExtensionCtx
+ *     (secaudit 2026-10, PKG-3).
  *   v1.12.0 — 2026-09-29 — Both handlers give ctx.files the caller's roles and scopes, so a file read
  *     passes the classification check as this caller (TARGET-082 V4).
  *   v1.11.1 — 2026-09-28 — A sandbox timeout answers EXTENSION_TIMEOUT again: QuickJS reports it as
@@ -64,6 +66,7 @@ import { INTERNAL_PASS_HEADER } from './internal-pass.js';
 import { enforcePaywall, APP_TOOL_HEADER } from './paywall.js';
 import { resolveGatedApp } from './permissions.js';
 import { buildExtensionCtx, buildExtensionWallet, buildExtensionNotify, buildExtensionEmail, sandboxLimits } from '../../services/extension-ctx.js';
+import { capabilitiesOfRecord } from '../../services/extension-capability-declaration.js';
 import { attachExtensionWorkspace, workspaceRefusalFor, type ExtensionWorkspaceCapability } from '../../services/extension-workspace.js';
 import { maybeExtensionAi, getActiveAiJobService } from '../../services/ai-jobs/index.js';
 import { takeDesignations } from '../../commerce/beneficiary-designation.js';
@@ -191,6 +194,7 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
       const ctx: ExtensionCtx = buildExtensionCtx({
         config, storage, extMemoryOwner,
         extension: { name: ext.name, owner: ext.installedBy },
+        capabilities: capabilitiesOfRecord(ext),
         workspace: wsCap.workspace,
         caller: {
           gaii: callerGaii, owner: req.auth!.owner as string, roles: req.auth!.roles,
@@ -374,6 +378,7 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
       const ctx: ExtensionCtx = buildExtensionCtx({
         config, storage, extMemoryOwner,
         extension: { name: ext.name, owner: ext.installedBy },
+        capabilities: capabilitiesOfRecord(ext),
         workspace: wsCap.workspace,
         caller: {
           gaii: callerGaii, owner: req.auth!.owner as string, roles: req.auth!.roles,

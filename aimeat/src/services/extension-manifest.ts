@@ -5,6 +5,10 @@
  * @description Shared extension-manifest validator/builder — validates a YAML manifest + scripts map
  *   and builds the ExtensionRecord it describes. Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 — 2026-10-05 — A manifest may declare `capabilities: [network, ai, email, payments]`,
+ *                         stored as `config.__capabilities`; the sandbox allows only those, and the
+ *                         package approval shows them (services/extension-capability-declaration.ts,
+ *                         secaudit 2026-10, PKG-3).
  *   v1.8.0 — 2026-09-28 — System 2 plan, V6: a manifest may declare `provides: { ai_provider: … }`
  *                         (ops, models, data_statement, hosts, auth_header). Every op needs an action
  *                         with the id `ai.<op>`; hosts are bare hostnames only. Stored as
@@ -44,6 +48,7 @@ import { parse as parseYaml } from 'yaml';
 import { SECRET_KEYS_FIELD, computeManifestSecretKeys, stripClientEncryptedValues } from './extension-secrets.js';
 import { MONEY_CURRENCIES } from '../commerce/money.js';
 import { WORKSPACE_DECLARATION_KEY, type WorkspaceDeclaration } from './extension-workspace-declaration.js';
+import { CAPABILITY_DECLARATION_KEY, parseCapabilityDeclaration } from './extension-capability-declaration.js';
 import { localAccountName } from '../utils/gaii.js';
 import {
   AI_PROVIDER_DECLARATION_KEY, AI_OP_ACTION_PREFIX, EXTENSION_AI_OPS,
@@ -581,6 +586,12 @@ export function buildExtensionRecordFromManifest(
   if ('ok' in provided) return provided;
   const aiProviderDecl = provided.decl;
 
+  // `capabilities: [network, ai, email, payments]` is what the sandbox lets the scripts do beyond
+  // their own memory, and what the package approval shows. Without it the node infers the list from
+  // the scripts' text (services/extension-capability-declaration.ts).
+  const capabilityDecl = parseCapabilityDeclaration(manifest.capabilities);
+  if (!capabilityDecl.ok) return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: capabilityDecl.message };
+
   for (const [scriptKey, scriptContent] of Object.entries(scripts)) {
     const sizeKb = Buffer.byteLength(scriptContent, 'utf8') / 1024;
     if (sizeKb > config.extensionMaxCodeSizeKb) {
@@ -699,6 +710,7 @@ export function buildExtensionRecordFromManifest(
       ...(manifestSchedules ? { __schedules: manifestSchedules } : {}),
       ...(workspaceDecl ? { [WORKSPACE_DECLARATION_KEY]: workspaceDecl } : {}),
       ...(aiProviderDecl ? { [AI_PROVIDER_DECLARATION_KEY]: aiProviderDecl } : {}),
+      ...(capabilityDecl.list ? { [CAPABILITY_DECLARATION_KEY]: capabilityDecl.list } : {}),
       // Record which config fields are `type: 'secret'` so the route can encrypt their values
       // at rest and the runtime can decrypt before the VM (the descriptor type is otherwise
       // lost by the flatten above). See services/extension-secrets.ts.

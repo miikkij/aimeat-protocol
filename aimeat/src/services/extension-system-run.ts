@@ -33,6 +33,8 @@
  *     logLabel: 'scheduler',
  *   });
  * @version-history
+ *   v1.4.0 — 2026-10-05 — The run passes the extension's capabilities to buildExtensionCtx (secaudit
+ *     2026-10, PKG-3).
  *   v1.3.0 -- 2026-09-28 -- System 2 plan, V6: `providerCall` (passed to buildExtensionCtx) and
  *     `signal` (passed to executeExtensionAction), so the AI gateway can run an extension as a
  *     provider. The owner check below is unchanged and is what refuses another owner's extension.
@@ -50,6 +52,7 @@ import { executeExtensionAction } from './extension-runtime.js';
 import { trackMemoryAccess } from './extension-runtime-tracking.js';
 import type { ExtensionCtx } from './extension-runtime.js';
 import { buildExtensionCtx, buildExtensionNotify, buildExtensionEmail, sandboxLimits } from './extension-ctx.js';
+import { capabilitiesOfRecord } from './extension-capability-declaration.js';
 import type { ExtensionCtxDeps } from './extension-ctx.js';
 import { makeExtensionFiles } from './extension-files.js';
 import { makeExtensionDataPackage } from './datapackage/ext-capability.js';
@@ -160,6 +163,7 @@ export async function runExtensionActionAsSystem(deps: SystemRunDeps, args: Syst
         storage,
         extMemoryOwner,
         extension: { name: ext.name, owner: ext.installedBy },
+        capabilities: capabilitiesOfRecord(ext),
         // 'operator' is what the sandbox reads to decide no human is present. It is the role even
         // when `gaii` names the owner: a workflow step acts in the owner's name, it is not the owner
         // sitting at a screen, and an IAM gate that treats the two the same would let an unattended

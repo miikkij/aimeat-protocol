@@ -28,7 +28,7 @@ import { loadConfig } from '../../src/config.js';
 const EXT_OWNER = 'ext:shop';
 
 function makeCtx(storage: SqliteStorage): ExtensionCtx {
-    return buildExtensionCtx({
+    return buildExtensionCtx({ capabilities: { network: true, ai: true, email: true, payments: true, declared: true },
         config: loadConfig().config,
         storage: storage as never,
         extMemoryOwner: EXT_OWNER,
