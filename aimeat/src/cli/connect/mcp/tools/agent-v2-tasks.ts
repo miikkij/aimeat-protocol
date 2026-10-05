@@ -11,15 +11,16 @@
  *
  *   Distinct from agent-tasks.ts, which is the owner's dashboard work item and is untouched.
  * @version-history
+ *   2026-10-05 — aimeat_v2_task_list takes response_format and gives the catalog's concise view
+ *     (secaudit 2026-10, M3).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V5).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { agentNameSchema, pickAgent } from './_registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
-import { descriptionFor } from '../../../../tool-catalog/shape.js';
+import { descriptionFor, shapeResponse } from '../../../../tool-catalog/shape.js';
 import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 function answer(resp: { ok?: boolean; data?: unknown }) {
@@ -39,14 +40,7 @@ export function registerAgentV2TaskTools(mcp: McpServer, registry: AgentRegistry
     }));
   });
 
-  mcp.tool('aimeat_v2_task_list', descriptionFor('aimeat_v2_task_list'), {
-    agent_name: agentNameSchema,
-    assigned_to: z.string().optional().describe('Tasks given to this principal.'),
-    created_by: z.string().optional().describe('Tasks this principal asked for.'),
-    context_id: z.string().optional().describe('Tasks in one exchange.'),
-    status: z.string().optional().describe('One status or a comma-separated list.'),
-    limit: z.number().optional().describe('Max tasks to return (default 50, max 200).'),
-  }, annotationsFor('aimeat_v2_task_list'), async (args) => {
+  mcp.tool('aimeat_v2_task_list', descriptionFor('aimeat_v2_task_list'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_v2_task_list') }, annotationsFor('aimeat_v2_task_list'), async (args) => {
     const { client } = pickAgent(registry, args.agent_name);
     const q = new URLSearchParams();
     if (args.assigned_to) q.set('assigned_to', args.assigned_to);
@@ -55,7 +49,8 @@ export function registerAgentV2TaskTools(mcp: McpServer, registry: AgentRegistry
     if (args.status) q.set('status', args.status);
     if (typeof args.limit === 'number') q.set('limit', String(args.limit));
     const qs = q.toString() ? `?${q.toString()}` : '';
-    return answer(await client.get(`/v1/agents/v2/tasks${qs}`));
+    const resp = await client.get(`/v1/agents/v2/tasks${qs}`);
+    return answer(resp.ok === false ? resp : { ...resp, data: shapeResponse('aimeat_v2_task_list', args.response_format, resp.data) });
   });
 
   mcp.tool('aimeat_v2_task_get', descriptionFor('aimeat_v2_task_get'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_v2_task_get') }, annotationsFor('aimeat_v2_task_get'), async ({ agent_name, task_id }) => {

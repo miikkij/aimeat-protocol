@@ -21,8 +21,6 @@
     "aimeat_skill_link",
     "aimeat_skill_list",
     "aimeat_skill_unlink",
-    "aimeat_v2_message_list",
-    "aimeat_v2_task_list",
     "aimeat_workflow_save",
     "aimeat_workspace_publish",
     "aimeat_workspace_update"

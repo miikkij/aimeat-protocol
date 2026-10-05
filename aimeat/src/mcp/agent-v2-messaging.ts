@@ -16,15 +16,16 @@
  * @structure registerAgentV2MessagingTools(mcp, storage, config, getAgentGaii, getOwner)
  * @usage registerAgentV2MessagingTools(mcp, storage, config, () => agentGaii, () => owner);
  * @version-history
+ *   2026-10-05 — aimeat_v2_message_list takes response_format and gives the catalog's concise view
+ *     (secaudit 2026-10, M3).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V4).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor } from '../tool-catalog/shape.js';
+import { descriptionFor, shapeResponse } from '../tool-catalog/shape.js';
 import {
   sendTurn, listTurns, setPushTarget, listPushTargets, deletePushTarget,
   type Principal, type OpResult,
@@ -68,18 +69,12 @@ export function registerAgentV2MessagingTools(
   mcp.tool(
     'aimeat_v2_message_list',
     descriptionFor('aimeat_v2_message_list'),
-    {
-      context_id: z.string().optional().describe('One exchange.'),
-      task_id: z.string().optional().describe('The turns of one task.'),
-      to: z.string().optional().describe('Turns addressed to this principal.'),
-      from: z.string().optional().describe('Turns sent by this principal.'),
-      since: z.string().optional().describe('ISO timestamp, exclusive: turns created after it.'),
-      limit: z.number().optional().describe('Max turns to return (default 50, max 200).'),
-    },
+    zodShapeFor('aimeat_v2_message_list'),
     annotationsFor('aimeat_v2_message_list'),
-    async (args) => reply(
+    async ({ response_format, ...args }) => reply(
       await listTurns(storage, principal(), args),
-      (messages) => ({ messages, count: messages.length }),
+      // The catalog's concise view: each turn's id, role, from, to and time.
+      (messages) => shapeResponse('aimeat_v2_message_list', response_format, { messages, count: messages.length }),
     ),
   );
 

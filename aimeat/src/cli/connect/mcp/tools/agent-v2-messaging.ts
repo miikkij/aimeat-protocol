@@ -13,15 +13,16 @@
  *   Distinct from agent-messages.ts (this agent and its own owner) and dm-messages.ts (a person
  *   reaching another person). Both keep working exactly as they did.
  * @version-history
+ *   2026-10-05 — aimeat_v2_message_list takes response_format and gives the catalog's concise view
+ *     (secaudit 2026-10, M3).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V4).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { agentNameSchema, pickAgent } from './_registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
-import { descriptionFor } from '../../../../tool-catalog/shape.js';
+import { descriptionFor, shapeResponse } from '../../../../tool-catalog/shape.js';
 import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 /** One node answer, as MCP content. A refusal keeps the node's own words and code. */
@@ -40,15 +41,7 @@ export function registerAgentV2MessagingTools(mcp: McpServer, registry: AgentReg
     }));
   });
 
-  mcp.tool('aimeat_v2_message_list', descriptionFor('aimeat_v2_message_list'), {
-    agent_name: agentNameSchema,
-    context_id: z.string().optional().describe('One exchange.'),
-    task_id: z.string().optional().describe('The turns of one task.'),
-    to: z.string().optional().describe('Turns addressed to this principal.'),
-    from: z.string().optional().describe('Turns sent by this principal.'),
-    since: z.string().optional().describe('ISO timestamp, exclusive: turns created after it.'),
-    limit: z.number().optional().describe('Max turns to return (default 50, max 200).'),
-  }, annotationsFor('aimeat_v2_message_list'), async ({ agent_name, context_id, task_id, to, from, since, limit }) => {
+  mcp.tool('aimeat_v2_message_list', descriptionFor('aimeat_v2_message_list'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_v2_message_list') }, annotationsFor('aimeat_v2_message_list'), async ({ agent_name, context_id, task_id, to, from, since, limit, response_format }) => {
     const { client } = pickAgent(registry, agent_name);
     const q = new URLSearchParams();
     if (context_id) q.set('context_id', context_id);
@@ -58,7 +51,8 @@ export function registerAgentV2MessagingTools(mcp: McpServer, registry: AgentReg
     if (since) q.set('since', since);
     if (typeof limit === 'number') q.set('limit', String(limit));
     const qs = q.toString() ? `?${q.toString()}` : '';
-    return answer(await client.get(`/v1/agents/v2/messages${qs}`));
+    const resp = await client.get(`/v1/agents/v2/messages${qs}`);
+    return answer(resp.ok === false ? resp : { ...resp, data: shapeResponse('aimeat_v2_message_list', response_format, resp.data) });
   });
 
   mcp.tool('aimeat_v2_push_set', descriptionFor('aimeat_v2_push_set'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_v2_push_set') }, annotationsFor('aimeat_v2_push_set'), async ({ agent_name, url, token, authentication, id, principal }) => {
