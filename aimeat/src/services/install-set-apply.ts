@@ -34,6 +34,8 @@
  * @usage
  *   const out = await applyInstallSet({ storage, config, peers }, { installSet, secrets, dryRun: true });
  * @version-history
+ *   v1.8.1 — 2026-10-05 — The record keeps `landing_path`, the path the owner's welcome link opens
+ *     (no token), so a test can check the landing without reading the mail (aimeat-commercial).
  *   v1.8.0 — 2026-10-04 — After the apps are linked to their workspaces, the owner's grant for each
  *     installed app is recorded (`app_grants`), and the owner's welcome link opens the set's
  *     `landing` app. The plan shows both. Jouni: the purchase is the approval.
@@ -121,6 +123,8 @@ export interface AppliedRecord {
     /** Emails of the accounts this set created, and of those already sent the welcome sign-in link. */
     accounts_created?: string[];
     welcomed?: string[];
+    /** The node path the owner's welcome link opens (the set's `landing`), or null; never the token. */
+    landing_path?: string | null;
     applied_by: string;
     created_at: string;
     applied_at: string;
@@ -407,6 +411,8 @@ export async function applyInstallSet(deps: ApplyDeps, input: ApplyInput): Promi
     // The owner's link opens the set's landing app, signed in, when the set names one.
     const landing = await landingPath(storage, ownerName, set.landing, record.packages);
     const landingByEmail: Record<string, string> = landing ? { [set.owner.email.toLowerCase()]: landing } : {};
+    // Where the owner's link opens, without the token, so the landing can be checked with no mailbox.
+    record.landing_path = landing;
     record.welcomed = [...(record.welcomed ?? []), ...await welcomeCreated(storage, config, toWelcome, record.welcomed ?? [], landingByEmail)];
     await writeRecord(storage, key, record);
     return { ok: true, dry_run: false, record, owner_created: owner.created, warnings: setWarnings(record) };

@@ -47528,7 +47528,8 @@ paths:
                     update that asks for more scopes still asks; the owner can revoke each grant, and
                     a revoke stays when the set is applied again. The record lists them in
                     `app_grants`. `landing` names an app component of one of the bundle's packages:
-                    the owner's welcome link opens that app, signed in.
+                    the owner's welcome link opens that app, signed in, and the record keeps that path
+                    (no token) as `landing_path`, so the landing can be checked without the mail.
                 secrets:
                   type: object
                   description: 'Secret config values, `{ <group id>: { <component id>: { <field>: value } } }`. Never stored.'

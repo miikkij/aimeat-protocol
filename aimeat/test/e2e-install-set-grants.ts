@@ -207,6 +207,8 @@ await test('The apply records the owner\'s grant for the installed app, for exac
     appTarget = keys[0];
     assert(grants[appTarget].result === 'granted', `granted: ${JSON.stringify(grants[appTarget])}`);
     assert([...grants[appTarget].scopes].sort().join(' ') === SCOPES.split(' ').sort().join(' '), `the declared scopes: ${JSON.stringify(grants[appTarget].scopes)}`);
+    const filename = appTarget.slice(appTarget.indexOf('/') + 1);
+    assert(r.body.data.record.landing_path === `/v1/apps/${ACME}/${filename}?mode=inline`, `the record names the landing path: ${r.body.data.record.landing_path}`);
     const row = await storage.getAppGrantByOwnerAndApp(ACME, appTarget);
     assert(!!row && !row.revoked, `a live grant row for ${appTarget}`);
 });

@@ -10,6 +10,8 @@
  * @structure AppIsolationStatus · isolationStatusFor(input) (pure) · appIsolationStatus(config, storage)
  * @usage const apps = await appIsolationStatus(config, storage);
  * @version-history
+ *   v1.1.1 — 2026-10-05 — The steps name the app host itself beside its wildcard, and the DNS trap: a
+ *     server name that answers only through a wildcard record stops answering once a name exists below it.
  *   v1.1.0 — 2026-10-04 — A node one person uses is `watch` too and is told how to give apps addresses
  *     of their own, and its summary says an app a package installed runs in the isolated frame.
  *   v1.0.0 — 2026-09-25 — Initial (audit A7-1: apps on shared nodes without an app origin).
@@ -60,7 +62,12 @@ export function isolationStatusFor(input: {
   // A real host when the node has one; on localhost or an IP address no public subdomain family can
   // exist, so the suggestion is a placeholder the operator replaces.
   const suggested = appHost || deriveAppHost(baseUrl) || 'apps.your-domain.example';
-  const whatToSet = `Point the wildcard name *.${suggested} at this server, with a TLS certificate that covers it. `
+  // The DNS trap is aimeat-commercial's, measured on 2026-10-05: a fleet place answered through a
+  // *.aimeat.io wildcard, and the first record below its name (apps.<place>, or the certificate's
+  // challenge record) took the place's own address off the air for about 20 minutes.
+  const whatToSet = `Point the wildcard name *.${suggested} and the name ${suggested} itself at this server, with a TLS certificate that covers both. `
+    + 'If this server\'s own name answers only through a wildcard record, write it as a record of its own first: '
+    + 'once any name exists below it (the app names, or a certificate challenge), the wildcard stops answering for it. '
     + `Then set AIMEAT_APP_HOST=${suggested} and AIMEAT_APP_ORIGIN_ENABLED=true, and restart the node.`;
   const settings = { AIMEAT_APP_HOST: suggested, AIMEAT_APP_ORIGIN_ENABLED: 'true' };
   // Every app is meant to run on an address of its own (Jouni, 2026-10-04), so a node without them is
