@@ -15,6 +15,8 @@
  *   MEMBER_AUDIT_ACTIONS · memberAuditRows
  * @usage if (!canManageRoster(plan, isOwner, callerMember)) return res.status(403)...
  * @version-history
+ *   v1.1.0 — 2026-10-05 — normalizeAccess and sameSet, for the plan route's rule that the app's own
+ *     token may not change who pays or who manages (secaudit 2026-10, APP-1).
  *   v1.0.0 — 2026-10-01 — Initial: display names, approve by email, paging, managers, audit and the
  *     decline wait on the member roster (IAM round 2, items A1-A5 and B1-B4).
  */
@@ -25,6 +27,20 @@ import type { AppAuditEntry } from './app-audit.js';
  * and `*` are refused: the browser library reads `owner` as the app's owner and `*` as every
  * capability, so a member holding either would be shown, and could reach, what only the owner may.
  */
+/**
+ * A plan's `access` as it is stored: `members-only`, `free`, or `members-free` for anything else.
+ * `open` is what the first cut called `members-free`, and stored records still carry it.
+ */
+export function normalizeAccess(raw: string | undefined): 'members-only' | 'free' | 'members-free' {
+  return raw === 'members-only' ? 'members-only' : raw === 'free' ? 'free' : 'members-free';
+}
+
+/** Whether two lists of names hold the same names, order and repeats aside. */
+export function sameSet(a: readonly unknown[], b: readonly unknown[]): boolean {
+  const sa = new Set(a.map(String)), sb = new Set(b.map(String));
+  return sa.size === sb.size && [...sa].every(x => sb.has(x));
+}
+
 export const ROLE_RE = /^[A-Za-z][A-Za-z0-9_.-]{0,39}$/;
 export const RESERVED_ROLES = new Set(['owner']);
 

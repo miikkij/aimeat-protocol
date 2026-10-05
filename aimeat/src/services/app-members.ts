@@ -46,6 +46,7 @@
 import { appKeySegment, equalAppId, readAppRecord, listAppRecords } from './app-record-keys.js';
 import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
+import { normalizeAccess } from './app-member-rules.js';
 
 /** Platform-owned namespaces. Never an `ext:` one: that is the namespace the world can read. */
 export const NS_MEMBER = 'app-member';
@@ -163,9 +164,11 @@ export async function listVisits(storage: Storage, appId: string): Promise<AppMe
 }
 
 /** Forget one visitor. Used when they become a member, and when the owner dismisses them. */
-export async function forgetVisit(storage: Storage, appId: string, principal: string): Promise<void> {
-  await readAppRecord(storage, NS_SEEN, seenKey(appId, principal), appId);
+/** Forget one visitor of one app. Answers whether there was a visit to forget. */
+export async function forgetVisit(storage: Storage, appId: string, principal: string): Promise<boolean> {
+  const had = !!(await readAppRecord(storage, NS_SEEN, seenKey(appId, principal), appId));
   await storage.deleteMemory(NS_SEEN, seenKey(appId, principal));
+  return had;
 }
 
 /**
@@ -428,9 +431,7 @@ export async function putCarryPlan(
     appId: input.appId, roles, seats, terms,
     // `open` is the name the first cut of this used for what is now `members-free`. Stored records
     // carry it, so it is read as what it always meant rather than silently becoming something else.
-    access: input.access === 'members-only' ? 'members-only'
-      : input.access === 'free' ? 'free'
-      : 'members-free',
+    access: normalizeAccess(input.access),
     rosterVisibility: input.rosterVisibility === 'members' ? 'members' : 'owner',
     manageRoles: [...new Set((input.manageRoles ?? []).filter(r => typeof r === 'string' && r))],
     updatedAt: new Date().toISOString(), setBy: input.setBy,
