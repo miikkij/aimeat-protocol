@@ -18,6 +18,9 @@
  *   who could make it would sell the author's packages in the node's name.
  * @structure registerPackageSaleRoutes(router, config, storage, peers)
  * @version-history
+ *   v1.5.0 — 2026-10-05 — A signed sale or claim must name this node as its audience and carry a nonce
+ *     not seen before; a grant passes the repository role to grantEntitlement (secaudit 2026-10,
+ *     PKG-8 and PKG-10).
  *   v1.4.0 — 2026-10-02 — The seller's signed offer read carries `latest` (what the version on sale can
  *     do); POST /v1/package-sales/catalogue/review records the operator's review (design phase 5).
  *   v1.3.0 — 2026-10-02 — The package sale (design phase 3). On the repository: the author's offer
@@ -101,7 +104,7 @@ export function registerPackageSaleRoutes(
             return null;
         }
         const body = req.method === 'PUT' ? req.body : undefined;
-        const who = await verifySaleRequest(req.headers, peers, req.method, req.originalUrl, body);
+        const who = await verifySaleRequest(req.headers, peers, config.nodeId, req.method, req.originalUrl, body);
         if (!who.ok) { res.status(who.status).json(error(config.nodeId, who.code, who.message)); return null; }
         const groupId = decodeURIComponent(req.params.groupId as string);
         const pkg = (await storage.listVersions(groupId, 1, 0)).versions[0];
@@ -159,7 +162,7 @@ export function registerPackageSaleRoutes(
         }
         const body = (req.body ?? {}) as Record<string, unknown>;
         const publicKey = str(body.public_key);
-        const who = await verifyRequestWithKey(req.headers, publicKey, CLAIM_PURPOSE, req.method, req.originalUrl, req.body);
+        const who = await verifyRequestWithKey(req.headers, publicKey, CLAIM_PURPOSE, config.nodeId, req.method, req.originalUrl, req.body);
         if (!who.ok) { res.status(who.status).json(error(config.nodeId, who.code, who.message)); return; }
         if (who.nodeId !== str(body.node_id)) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'node_id is the node that signs the request.')); return; }
         const groupId = decodeURIComponent(req.params.groupId as string);

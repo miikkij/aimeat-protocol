@@ -634,7 +634,7 @@ await test('When D\'s bundle update period is over, the repository says so, and 
     });
     assert(end.status === 200, `end D's updates: ${end.status} ${JSON.stringify(end.body)}`);
     try {
-        const headers = await signedPackageHeaders(D!.storage, D!.config, shopOnR);
+        const headers = await signedPackageHeaders(D!.storage, D!.config, shopOnR, R.nodeId);
         const read = await fetch(`${R.baseUrl}/v1/federation/packages/${encodeURIComponent(shopOnR)}/attestation`, { headers });
         const body = await read.json() as any;
         assert(read.status === 403 && body.error?.code === 'UPDATES_ENDED', `the repository says the updates ended: ${read.status} ${JSON.stringify(body.error)}`);
@@ -774,10 +774,18 @@ await test('A seller\'s signature taken for reading the questions does not grant
     const path = `/v1/federation/package-sales/${encodeURIComponent(setupOnR)}/config-needs`;
     const timestamp = new Date().toISOString();
     const digest = createHash('sha256').update('{}').digest('hex');
-    const signature = await sign(seller.privateKey, JSON.stringify({ source_node: sellerId, timestamp, purpose: 'package-sale', method: 'GET', path, body_sha256: digest }));
-    const headers = { 'x-source-node': sellerId, 'x-timestamp': timestamp, 'x-signature': signature };
+    // Since secaudit 2026-10 (PKG-10) the message names the repository it is for and a one-time nonce.
+    const nonce = randomBytes(16).toString('hex');
+    const signature = await sign(seller.privateKey, JSON.stringify({ source_node: sellerId, timestamp, purpose: 'package-sale', method: 'GET', path, body_sha256: digest, audience: R.nodeId, nonce }));
+    const headers = { 'x-source-node': sellerId, 'x-timestamp': timestamp, 'x-audience': R.nodeId, 'x-nonce': nonce, 'x-signature': signature };
     const read = await R.json(path, { headers });
     assert(read.status === 200, `the signed read works: ${read.status} ${JSON.stringify(read.body)}`);
+    const again = await R.json(path, { headers });
+    assert(again.status === 401 && again.body.error?.code === 'REPLAYED', `the same signed read a second time is refused: ${again.status} ${JSON.stringify(again.body)}`);
+    // The same request without the audience and nonce, as an older node would send it.
+    const oldSig = await sign(seller.privateKey, JSON.stringify({ source_node: sellerId, timestamp, purpose: 'package-sale', method: 'GET', path, body_sha256: digest }));
+    const old = await R.json(path, { headers: { 'x-source-node': sellerId, 'x-timestamp': timestamp, 'x-signature': oldSig } });
+    assert(old.status === 401, `a request that names no audience is refused: ${old.status} ${JSON.stringify(old.body)}`);
     const replay = await R.json(`/v1/federation/package-sales/${encodeURIComponent(setupOnR)}/entitlements/${sellerId}`, {
         method: 'PUT', headers, body: JSON.stringify({ note: 'replayed' }),
     });

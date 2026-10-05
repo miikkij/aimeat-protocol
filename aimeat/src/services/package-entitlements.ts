@@ -362,7 +362,7 @@ export async function resolveNodeRead(
     if (!config.packageRepository) return { kind: 'unsigned' };
     // A node granted while it did not answer is registered on its first signed request.
     await adoptPendingPeer({ storage, peers, timeoutMs: config.federationTimeoutMs ?? 10_000, thisNodeId: config.nodeId }, headerNode(headers));
-    const who = await verifyPackageNode(headers, peers, groupId, Date.now(),
+    const who = await verifyPackageNode(headers, peers, groupId, config.nodeId ?? '', Date.now(),
         // A node whose bundle's updates ended is let through the peer gate too, so its signature is
         // checked before it hears anything about its purchase; it is served nothing.
         async nodeId => (await entitlementOf(storage, groupId, nodeId)) !== null || await updatesEndedInBundle(storage, groupId, nodeId));

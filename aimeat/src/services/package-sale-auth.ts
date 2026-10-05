@@ -22,6 +22,9 @@
  *   const headers = await signedSaleHeaders(storage, config, 'PUT', path, body);   // the seller
  *   const who = await verifySaleRequest(req.headers, peers, req.method, req.originalUrl, req.body);   // the repository
  * @version-history
+ *   v1.2.0 — 2026-10-05 — The signed message names the node it is for (x-audience) and a one-time
+ *     x-nonce; both verifiers require them and accept a nonce once (request-nonce.ts). A request
+ *     carrying neither comes from an older node and is refused (secaudit 2026-10, PKG-10).
  *   v1.1.0 — 2026-10-02 — A purpose other than the sale (a buyer node's claim), and verifyRequestWithKey:
  *     a node that is not a peer yet signs with the key it names (package sale design, phase 3).
  *   v1.0.0 — 2026-09-29 — Initial (install packages, phase 5: seller nodes).
@@ -31,6 +34,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from './federation.js';
 import { sign, verify } from '../auth/keypair.js';
+import { newNonce, nonceAccepted } from './request-nonce.js';
 
 export const SALE_PURPOSE = 'package-sale';
 const WINDOW_MS = 5 * 60 * 1000;
@@ -43,22 +47,44 @@ export function bodyDigest(body: unknown): string {
 /** The purpose a buyer node signs a claim with (package-claims.ts). */
 export const CLAIM_PURPOSE = 'package-claim';
 
-function message(sourceNode: string, timestamp: string, method: string, path: string, digest: string, purpose = SALE_PURPOSE): string {
-    return JSON.stringify({ source_node: sourceNode, timestamp, purpose, method: method.toUpperCase(), path, body_sha256: digest });
+/** What is signed: the exact request, and since 2026-10-05 the node it is for and a one-time nonce (PKG-10). */
+function message(sourceNode: string, timestamp: string, method: string, path: string, digest: string, audience: string, nonce: string, purpose = SALE_PURPOSE): string {
+    return JSON.stringify({ source_node: sourceNode, timestamp, purpose, method: method.toUpperCase(), path, body_sha256: digest, audience, nonce });
 }
 
-/** Headers that prove this node asked for this exact request, or none when the node has no key yet. */
+/** Headers that prove this node asked `audience` for this exact request, or none when the node has no key yet. */
 export async function signedSaleHeaders(
-    storage: Storage, config: AimeatConfig, method: string, path: string, body: unknown, purpose = SALE_PURPOSE,
+    storage: Storage, config: AimeatConfig, audience: string, method: string, path: string, body: unknown, purpose = SALE_PURPOSE,
 ): Promise<Record<string, string>> {
     const key = await storage.getNodeKey();
     if (!key?.privateKey) return {};
     const timestamp = new Date().toISOString();
+    const nonce = newNonce();
     return {
         'x-source-node': config.nodeId,
         'x-timestamp': timestamp,
-        'x-signature': await sign(key.privateKey, message(config.nodeId, timestamp, method, path, bodyDigest(body), purpose)),
+        'x-audience': audience,
+        'x-nonce': nonce,
+        'x-signature': await sign(key.privateKey, message(config.nodeId, timestamp, method, path, bodyDigest(body), audience, nonce, purpose)),
     };
+}
+
+/**
+ * The audience and nonce a signed request carries, checked: it names this node, and the nonce has a
+ * shape. The nonce is accepted (once) only after the signature checks out (acceptNonce).
+ */
+function audienceOf(pick: (h: string) => string | undefined, thisNodeId: string): { audience: string; nonce: string } | SaleNodeCheck {
+    const audience = pick('x-audience');
+    const nonce = pick('x-nonce');
+    if (audience !== thisNodeId || !nonce) {
+        return { ok: false, status: 401, code: 'UNAUTHORIZED', message: `A signed request names the node it is for (x-audience: ${thisNodeId}) and a one-time x-nonce. A node that sends neither runs an older version.` };
+    }
+    return { audience, nonce };
+}
+
+function acceptNonce(sourceNode: string, nonce: string, now: number): SaleNodeCheck | null {
+    return nonceAccepted(sourceNode, nonce, now) ? null
+        : { ok: false, status: 401, code: 'REPLAYED', message: 'This signed request was already received. A node signs every request anew.' };
 }
 
 /**
@@ -68,7 +94,7 @@ export async function signedSaleHeaders(
  * card check's to answer (package-peer-register.ts).
  */
 export async function verifyRequestWithKey(
-    headers: Record<string, string | string[] | undefined>, publicKey: string, purpose: string,
+    headers: Record<string, string | string[] | undefined>, publicKey: string, purpose: string, thisNodeId: string,
     method: string, path: string, body: unknown, now = Date.now(),
 ): Promise<SaleNodeCheck> {
     const pick = (h: string): string | undefined => { const v = headers[h]; return Array.isArray(v) ? v[0] : v; };
@@ -82,10 +108,12 @@ export async function verifyRequestWithKey(
     if (!Number.isFinite(ts) || Math.abs(now - ts) > WINDOW_MS) {
         return { ok: false, status: 400, code: 'STALE_TIMESTAMP', message: 'The timestamp is missing, invalid, or outside the 5-minute window.' };
     }
-    if (!await verify(publicKey, message(sourceNode, timestamp, method, path, bodyDigest(body), purpose), signature)) {
+    const aud = audienceOf(pick, thisNodeId);
+    if ('ok' in aud) return aud;
+    if (!await verify(publicKey, message(sourceNode, timestamp, method, path, bodyDigest(body), aud.audience, aud.nonce, purpose), signature)) {
         return { ok: false, status: 401, code: 'UNAUTHORIZED', message: 'The signature does not check out with the key this request names.' };
     }
-    return { ok: true, nodeId: sourceNode };
+    return acceptNonce(sourceNode, aud.nonce, now) ?? { ok: true, nodeId: sourceNode };
 }
 
 export type SaleNodeCheck =
@@ -100,6 +128,7 @@ export type SaleNodeCheck =
 export async function verifySaleRequest(
     headers: Record<string, string | string[] | undefined>,
     peers: Map<string, PeerInfo>,
+    thisNodeId: string,
     method: string, path: string, body: unknown,
     now = Date.now(),
 ): Promise<SaleNodeCheck> {
@@ -121,8 +150,10 @@ export async function verifySaleRequest(
     if (!Number.isFinite(ts) || Math.abs(now - ts) > WINDOW_MS) {
         return { ok: false, status: 400, code: 'STALE_TIMESTAMP', message: 'The timestamp is missing, invalid, or outside the 5-minute window.' };
     }
-    if (!await verify(peer.publicKey, message(sourceNode, timestamp, method, path, bodyDigest(body)), signature)) {
+    const aud = audienceOf(pick, thisNodeId);
+    if ('ok' in aud) return aud;
+    if (!await verify(peer.publicKey, message(sourceNode, timestamp, method, path, bodyDigest(body), aud.audience, aud.nonce), signature)) {
         return { ok: false, status: 401, code: 'UNAUTHORIZED', message: 'The node signature on this sale request does not check out for this method, path and body.' };
     }
-    return { ok: true, nodeId: sourceNode };
+    return acceptNonce(sourceNode, aud.nonce, now) ?? { ok: true, nodeId: sourceNode };
 }

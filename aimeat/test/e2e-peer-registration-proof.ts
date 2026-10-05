@@ -297,8 +297,10 @@ await test('The node\'s first signed request reads its card, registers it, and i
     // The node comes up, under the key the grant named, and asks the repository what it may pull.
     const node = await startStub(waiting, { port: waitingPort, cardKey: waitingKeys.publicKey }); stubs.push(node);
     const timestamp = new Date().toISOString();
-    const signature = await sign(waitingKeys.privateKey, JSON.stringify({ source_node: waiting, timestamp, purpose: 'package', group_id: '*' }));
-    const r = await R.json('/v1/federation/packages', { headers: { 'x-source-node': waiting, 'x-timestamp': timestamp, 'x-signature': signature } });
+    // The repository it is for and a one-time nonce are part of the signed message (secaudit 2026-10, PKG-10).
+    const nonce = randomBytes(16).toString('hex');
+    const signature = await sign(waitingKeys.privateKey, JSON.stringify({ source_node: waiting, timestamp, purpose: 'package', group_id: '*', audience: R.nodeId, nonce }));
+    const r = await R.json('/v1/federation/packages', { headers: { 'x-source-node': waiting, 'x-timestamp': timestamp, 'x-audience': R.nodeId, 'x-nonce': nonce, 'x-signature': signature } });
     assert(r.status === 200 && (r.body.data.packages as any[]).some(p => p.group_id === groupId), `listing: ${r.status} ${JSON.stringify(r.body)}`);
     const list = await peerList();
     const p = list.peers.find(x => x.node_id === waiting);

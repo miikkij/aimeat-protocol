@@ -19,9 +19,12 @@
  *   the packages-only peer a grant registers.
  * @structure signedPackageHeaders() · verifyPackageNode()
  * @usage
- *   const headers = await signedPackageHeaders(storage, config, groupId);
- *   const who = await verifyPackageNode(req.headers, peers, groupId);   // null when unsigned
+ *   const headers = await signedPackageHeaders(storage, config, groupId, repositoryNodeId);
+ *   const who = await verifyPackageNode(req.headers, peers, groupId, config.nodeId);   // null when unsigned
  * @version-history
+ *   v1.2.0 — 2026-10-05 — The signed message names the node it is for (x-audience) and a one-time
+ *     x-nonce, and the repository accepts a nonce once (request-nonce.ts). A request carrying neither
+ *     comes from an older node and is refused (secaudit 2026-10, PKG-10).
  *   v1.1.0 — 2026-09-28 — `entitled`: a packages-only peer (catalogue not shared) is heard for what it
  *     holds an entitlement to. Jouni approved the packages-only peer on 2026-09-28 (install packages,
  *     phase 5: the shop's automation registers the customer node with its grant).
@@ -32,22 +35,27 @@ import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from './federation.js';
 import { sign, verify } from '../auth/keypair.js';
 import { gatePeer } from './federation-peer-gate.js';
+import { newNonce, nonceAccepted, NONCE_WINDOW_MS } from './request-nonce.js';
 
-const WINDOW_MS = 5 * 60 * 1000;
+const WINDOW_MS = NONCE_WINDOW_MS;
 
-function message(sourceNode: string, timestamp: string, groupId: string): string {
-    return JSON.stringify({ source_node: sourceNode, timestamp, purpose: 'package', group_id: groupId });
+/** What is signed: the group, and since 2026-10-05 the node it is for and a one-time nonce (PKG-10). */
+function message(sourceNode: string, timestamp: string, groupId: string, audience: string, nonce: string): string {
+    return JSON.stringify({ source_node: sourceNode, timestamp, purpose: 'package', group_id: groupId, audience, nonce });
 }
 
-/** Headers that prove this node asked for `groupId`, or none when the node has no key yet. */
-export async function signedPackageHeaders(storage: Storage, config: AimeatConfig, groupId: string): Promise<Record<string, string>> {
+/** Headers that prove this node asked `audience` for `groupId`, or none when the node has no key yet. */
+export async function signedPackageHeaders(storage: Storage, config: AimeatConfig, groupId: string, audience: string): Promise<Record<string, string>> {
     const key = await storage.getNodeKey();
     if (!key?.privateKey) return {};
     const timestamp = new Date().toISOString();
+    const nonce = newNonce();
     return {
         'x-source-node': config.nodeId,
         'x-timestamp': timestamp,
-        'x-signature': await sign(key.privateKey, message(config.nodeId, timestamp, groupId)),
+        'x-audience': audience,
+        'x-nonce': nonce,
+        'x-signature': await sign(key.privateKey, message(config.nodeId, timestamp, groupId, audience, nonce)),
     };
 }
 
@@ -64,6 +72,8 @@ export async function verifyPackageNode(
     headers: Record<string, string | string[] | undefined>,
     peers: Map<string, PeerInfo>,
     groupId: string,
+    /** This node's id: the request must name it as its audience. */
+    thisNodeId: string,
     now = Date.now(),
     /**
      * Whether the node holds an entitlement here. An entitlement is itself the permission to read
@@ -101,8 +111,17 @@ export async function verifyPackageNode(
     if (!Number.isFinite(ts) || Math.abs(now - ts) > WINDOW_MS) {
         return { ok: false, status: 400, code: 'STALE_TIMESTAMP', message: 'The timestamp is missing, invalid, or outside the 5-minute window.' };
     }
-    if (!await verify(peer.publicKey, message(sourceNode, timestamp, groupId), signature)) {
+    const audience = pick('x-audience');
+    const nonce = pick('x-nonce');
+    if (audience !== thisNodeId || !nonce) {
+        return { ok: false, status: 401, code: 'UNAUTHORIZED', message: `A package request names the node it is for (x-audience: ${thisNodeId}) and a one-time x-nonce. A node that sends neither runs an older version.` };
+    }
+    if (!await verify(peer.publicKey, message(sourceNode, timestamp, groupId, audience, nonce), signature)) {
         return { ok: false, status: 401, code: 'UNAUTHORIZED', message: 'The node signature on this package request does not check out.' };
+    }
+    // After the signature, so a forged request cannot use up a real node's nonce.
+    if (!nonceAccepted(sourceNode, nonce, now)) {
+        return { ok: false, status: 401, code: 'REPLAYED', message: 'This signed request was already received. A node signs every request anew.' };
     }
     return { ok: true, nodeId: sourceNode };
 }
