@@ -186,7 +186,7 @@ export interface AiCapabilityConfig extends DecideConfig {
    * punish someone with thirty apps for having thirty apps, and a per-app cap would punish an app
    * for fanning out ten perspectives on one question, which is the point of the feature. The right
    * currency for "this app is using too much" is money, and that control already exists
-   * (`app_quotas.<app>.daily_usd` and the daily budget in services/ai-completion.ts).
+   * (`app_quotas.<app>.daily_usd` and the daily budget in services/ai/completion.ts).
    */
   aiJobSlots: number;
   /**

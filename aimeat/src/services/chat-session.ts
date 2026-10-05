@@ -77,7 +77,7 @@ import { CHAT_AGENT_NAME, ensureChatAgent, mintChatAgentToken } from './chat-age
 import { AgentPool, type AgentLease, type PoolStart } from './chat-agent-pool.js';
 import { chatUsesSharedKey } from './goose-env.js';
 import { ensureChatGooseConfig } from './goose-chat-config.js';
-import { prepareAiCall } from './ai-completion.js';
+import { prepareAiCall } from './ai/completion.js';
 import { appendTurn, readThread, setGooseSession, type ChatTurn } from './chat-threads.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
 import { readAttachments, MAX_ATTACHMENTS_PER_TURN } from './chat-attachments.js';

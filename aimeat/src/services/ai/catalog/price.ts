@@ -25,7 +25,7 @@ import type { AiCapability, CostSource } from '../types.js';
 import { catalogModel, catalogSnapshot } from './store.js';
 import type { CatalogModel } from './types.js';
 
-/** The same fallback rates services/ai-completion.ts estimateCostUsd has always used. */
+/** The same fallback rates services/ai/completion.ts estimateCostUsd has always used. */
 const FALLBACK_IN_PER_TOKEN = 0.000005;
 const FALLBACK_OUT_PER_TOKEN = 0.000015;
 

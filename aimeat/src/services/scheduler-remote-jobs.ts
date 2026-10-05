@@ -32,7 +32,7 @@ import type { AimeatConfig } from '../config.js';
 import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
 import type { Storage, ScheduledJobRecord } from '../storage/interface.js';
 import type { JobRunResult } from './scheduler.js';
-import { completeForOwner } from './ai-completion.js';
+import { completeForOwner } from './ai/completion.js';
 import { getActiveWorkflowEngine } from './workflow/engine.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { buildGEAI, isSameOwner, localAccountName } from '../utils/gaii.js';

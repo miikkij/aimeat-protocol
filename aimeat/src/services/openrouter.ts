@@ -314,7 +314,7 @@ export interface CompletionOptions {
  * a second place that can forget to meter the call.
  *
  * Deciding whether the call may happen, whose key pays and what it cost is NOT this function's job —
- * that is services/ai-completion.ts, and every caller of this goes through it first.
+ * that is services/ai/completion.ts, and every caller of this goes through it first.
  */
 export async function chatCompletionRaw(
   apiKey: string | undefined,

@@ -56,7 +56,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { EmailService } from '../email.js';
 import { SlotPool, SlotAbortedError } from '../slot-pool.js';
-import { AiCompletionError } from '../ai-completion.js';
+import { AiCompletionError } from '../ai/completion.js';
 import { aiJobKeyRefusal } from '../ai-job-keys.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';

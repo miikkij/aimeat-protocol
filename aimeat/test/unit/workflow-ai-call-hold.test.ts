@@ -60,8 +60,8 @@ const sandbox = vi.hoisted(() => ({ runs: [] as Array<{ resolve: (v: unknown) =>
 /** The versions the publish stand-in made, by package name. Each one writes `out.pkg`. */
 const packages = vi.hoisted(() => ({ published: [] as string[] }));
 
-vi.mock('../../src/services/ai-completion.js', async importOriginal => ({
-    ...await importOriginal<typeof import('../../src/services/ai-completion.js')>(),
+vi.mock('../../src/services/ai/completion.js', async importOriginal => ({
+    ...await importOriginal<typeof import('../../src/services/ai/completion.js')>(),
     completeForOwner: (_s: unknown, _c: unknown, _g: string, opts: { prompt: string }) =>
         new Promise(resolve => { model.calls.push({ prompt: opts.prompt, resolve }); }),
 }));

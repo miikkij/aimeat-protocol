@@ -585,7 +585,7 @@ export async function provenanceDeclarationRefusal(
  * `stampedBy: 'node'` with `observed: false`: the node is the one asserting this, and it composed
  * the output — but it did not stand and watch a model generate the bytes, so recording an inference
  * as an observation would be the one lie in the design. Where the node DID watch (a completion
- * through ai-completion.ts), carry that record instead of calling this.
+ * through ai/completion.ts), carry that record instead of calling this.
  */
 export async function stampAutonomousOutput(
   storage: Storage,

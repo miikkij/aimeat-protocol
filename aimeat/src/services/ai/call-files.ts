@@ -1,5 +1,5 @@
 /**
- * @file ai-call-files.ts
+ * @file ai/call-files.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The files of a text call (the `files` capability, System 2 plan V5; docs/internal/
@@ -16,11 +16,11 @@
  *     classification reader, so a file a model may not read is refused before the call (TARGET-082).
  *   v1.0.0 — 2026-09-28 — Initial (V5 of the System 2 plan).
  */
-import type { Storage } from '../storage/interface.js';
-import { AiCompletionError } from './ai/errors.js';
-import type { TextFile } from './ai/gateway.js';
-import { readAiFile } from './ai-inputs.js';
-import type { ContentReader } from './classification/reader.js';
+import type { Storage } from '../../storage/interface.js';
+import { AiCompletionError } from './errors.js';
+import type { TextFile } from './gateway.js';
+import { readAiFile } from '../ai-inputs.js';
+import type { ContentReader } from '../classification/reader.js';
 
 /** At most this many files, and this many bytes in all: a few documents, inside one request. */
 export const CALL_FILE_LIMITS = { maxFiles: 5, maxTotalBytes: 20 * 1024 * 1024 } as const;

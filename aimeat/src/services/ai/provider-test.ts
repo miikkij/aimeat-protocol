@@ -27,7 +27,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { completeForOwner } from '../ai-completion.js';
+import { completeForOwner } from './completion.js';
 import { generateForOwner } from '../ai-image.js';
 import { transcribeForOwner } from '../ai-transcription.js';
 import { embedForOwner } from '../ai-embed.js';

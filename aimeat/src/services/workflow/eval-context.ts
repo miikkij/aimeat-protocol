@@ -32,7 +32,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { localAccountName } from '../../utils/gaii.js';
-import { completeForOwner } from '../ai-completion.js';
+import { completeForOwner } from '../ai/completion.js';
 import { validateValueAgainstSchema } from '../schema-validator.js';
 import { listOwnerScopeMemory, getOwnerScopeMemory } from '../owner-memory.js';
 import { presentMemories, presentMemory } from '../classification/present-memory.js';

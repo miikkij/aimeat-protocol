@@ -6,7 +6,7 @@
  *   but without the project-id gate: any logged-in owner (or agent with `ai:use`
  *   scope) can call it from a sandboxed app or extension. The actual completion,
  *   budget enforcement, key decrypt, and usage accounting live in the shared
- *   services/ai-completion.ts module (also used by the scheduler's `ai` jobs);
+ *   services/ai/completion.ts module (also used by the scheduler's `ai` jobs);
  *   this router is a thin HTTP wrapper + the owner-only settings/usage endpoints.
  * @structure
  *   - POST /v1/ai/complete       — owner or any token with ai:use scope, runs one completion
@@ -33,7 +33,7 @@
  *     classification reader (TARGET-082).
  *   v1.x — 2026-09-28 — AI roles: /complete, /transcribe and /image take `role` (1 to 300 characters,
  *     readCallRole), the AI role the call runs as; a named model or provider wins over it.
- *   v1.x — 2026-09-28 — Capabilities (System 2, V5): /complete takes `files` (services/ai-call-files.ts);
+ *   v1.x — 2026-09-28 — Capabilities (System 2, V5): /complete takes `files` (services/ai/call-files.ts);
  *     GET /v1/ai/available asks the gate a text call runs, instead of the old OpenRouter setting;
  *     POST /v1/ai/image answers a signed download_url for a private picture, so an app with only
  *     ai:use can show it (found by the V5 browser check).
@@ -55,7 +55,7 @@
  *     as the in-handler check, so the route says which permission it needs where an audit can read
  *     it; an owner session bypasses scopes, so the two admit the same callers.
  *   v1.0.0 — 2026-05-29 — Initial: app-level AI calls with budget enforcement
- *   v1.1.0 — 2026-06-03 — Delegate completion to services/ai-completion.ts (shared
+ *   v1.1.0 — 2026-06-03 — Delegate completion to services/ai/completion.ts (shared
  *     with the scheduler); route is now a thin wrapper.
  *   v1.2.0 — 2026-06-24 — Accept an optional `images` array (data:/https URLs) on
  *     /v1/ai/complete for vision-capable models (Secretary doc/image intake).
@@ -93,14 +93,14 @@ import { recordAccountEvent } from '../services/account-events.js';
 import {
   completeForOwner, prepareAiCall, AiCompletionError, getTodayUsage, getDailyBudgetUsd,
   DEFAULT_DAILY_BUDGET_USD,
-} from '../services/ai-completion.js';
+} from '../services/ai/completion.js';
 import { getAdminAiUsage } from '../services/ai-usage-admin.js';
 import { getUsageHistory } from '../services/ai-usage-history.js';
 import { transcribeForOwner } from '../services/ai-transcription.js';
 import { registerVoiceRoutes, voiceAppId } from './ai-voice.js';
 import { generateForOwner } from '../services/ai-image.js';
-import { readCallFiles, readCallerAudio } from '../services/ai-call-files.js';
-import { readCallRole } from '../services/ai-call-guards.js';
+import { readCallFiles, readCallerAudio } from '../services/ai/call-files.js';
+import { readCallRole } from '../services/ai/call-guards.js';
 import { generateDownloadToken } from '../services/download-token.js';
 
 /** How long the signed address of a private picture loads without a sign-in. */
@@ -187,7 +187,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
         // The AI role the call runs as (services/ai/roles.ts), refused before anything is read.
         const role = readCallRole(roleField);
         // Files for a model that reads them itself (the files capability), from the caller's own
-        // storage or a data: URL (services/ai-call-files.ts).
+        // storage or a data: URL (services/ai/call-files.ts).
         const reader = readerFor({ storage, config }, req.auth);
         const fileList = files !== undefined ? await readCallFiles(storage, reader, resolve(req), files) : undefined;
         const r = await completeForOwner(storage, config, gaii, {

@@ -2,7 +2,7 @@
  * @file policy-gate.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The model policy applied to one call, for prepareAiCall (services/ai-completion.ts):
+ * @description The model policy applied to one call, for prepareAiCall (services/ai/completion.ts):
  *   load the layers, refuse when they leave nothing, and choose the model (docs/internal/
  *   llmproviderintegrations/05, section 4).
  *

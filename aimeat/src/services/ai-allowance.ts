@@ -43,7 +43,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { AiCompletionError, decryptOwnerKey } from './ai-completion.js';
+import { AiCompletionError, decryptOwnerKey } from './ai/completion.js';
 import { DEFAULT_BASE_URLS, type ProviderType } from './openrouter.js';
 import { readSystem, updateSystem } from './classification/system-record.js';
 import { logger } from '../utils/logger.js';
@@ -215,7 +215,7 @@ export async function resolveAiKey(
   baseUrl: string,
   opts: {
     /** False when the node's key may not pay for this operation at all (nodeKeyPaysFor in
-     *  ai-completion.ts: an image or a transcription for which the operator named no default model). */
+     *  ai/completion.ts: an image or a transcription for which the operator named no default model). */
     nodeKey?: boolean;
   } = {},
 ): Promise<AiKeyChoice> {

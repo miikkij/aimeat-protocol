@@ -22,7 +22,7 @@ import { systemReader } from '../../src/services/classification/reader.js';
 /** Every prompt a completion was asked for: what would have left the node. */
 const sentToProvider: string[] = [];
 
-vi.mock('../../src/services/ai-completion.js', () => {
+vi.mock('../../src/services/ai/completion.js', () => {
     class AiCompletionError extends Error { code = 'AI_COMPLETION_FAILED'; }
     return {
         AiCompletionError,

@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { writeStorageFile } from './storage-file-write.js';
-import { AiCompletionError } from './ai-completion.js';
+import { AiCompletionError } from './ai/completion.js';
 
 export function createVoiceResult() {
   let text = '', size = 0, done: Record<string, unknown> | undefined;

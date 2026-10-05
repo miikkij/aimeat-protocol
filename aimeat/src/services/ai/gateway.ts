@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The System 2 AI gateway: the one module that calls the AI SDK's generation functions.
  *
- *   Every model call runs prepareAiCall → gateway → settleAiCall (services/ai-completion.ts). The
+ *   Every model call runs prepareAiCall → gateway → settleAiCall (services/ai/completion.ts). The
  *   gateway does the middle step only: it takes a target prepareAiCall resolved (adapter type,
  *   address, the key that pays) and a model id, asks the adapter registry for a model INSTANCE, and
  *   calls generateText, generateImage or transcribe with it. It decides nothing about who may call,

@@ -68,8 +68,8 @@ import { aiPayerOf } from '../services/agent-ai-keys.js';
 import { aiCallerOf } from './ai-policy.js';
 import {
     prepareAiCall, settleAiCall, AiCompletionError, planFor, recordFailedAttempts, type AiCallPlan,
-} from '../services/ai-completion.js';
-import { readCallRole } from '../services/ai-call-guards.js';
+} from '../services/ai/completion.js';
+import { readCallRole } from '../services/ai/call-guards.js';
 import { chatCompletionRaw, listModels } from '../services/openrouter.js';
 import { openAiChat, speaksOpenAiChat, type OpenAiChatBody } from '../services/ai/gateway.js';
 import { runRoute } from '../services/ai/route-run.js';

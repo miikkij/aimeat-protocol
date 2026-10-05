@@ -21,7 +21,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { getTodayUsage, recordAiUsage } from '../ai-completion.js';
+import { getTodayUsage, recordAiUsage } from '../ai/completion.js';
 import { logger } from '../../utils/logger.js';
 import { callSystemOne, SystemOneError } from './systemone-client.js';
 import { readOwnDecideKey } from './settings.js';

@@ -24,7 +24,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ScheduledJobRecord, ScheduleConstraint, AgentRecord } from '../storage/interface.js';
-import { getTodayUsage } from './ai-completion.js';
+import { getTodayUsage } from './ai/completion.js';
 
 export interface ConstraintContext {
   storage: Storage;

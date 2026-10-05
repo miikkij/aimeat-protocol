@@ -24,7 +24,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 const decideMock = vi.fn();
 const completeMock = vi.fn();
 vi.mock('../../src/services/decide/service.js', () => ({ decideForOwner: (...a: unknown[]) => decideMock(...a) }));
-vi.mock('../../src/services/ai-completion.js', () => ({ completeForOwner: (...a: unknown[]) => completeMock(...a) }));
+vi.mock('../../src/services/ai/completion.js', () => ({ completeForOwner: (...a: unknown[]) => completeMock(...a) }));
 
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { classifyText, drainQueue, enqueue, readQueue, type QueuedItem } from '../../src/services/classification/classifier.js';

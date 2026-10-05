@@ -5,7 +5,7 @@
  * @description What the node says when an operation has no model: neither the call, the owner nor
  *   the operator named one. A refusal rather than a fallback, because a chat model handed an image
  *   request or an audio file answers with prose or an opaque provider error, and the person is left
- *   without the name of the setting to fill in. A leaf, so the gate (services/ai-completion.ts) and
+ *   without the name of the setting to fill in. A leaf, so the gate (services/ai/completion.ts) and
  *   the services that re-export the wording (ai-image.ts, ai-transcription.ts) share one copy.
  * @structure
  *   - IMAGE_UNSET_MESSAGE / STT_UNSET_MESSAGE — the wording, unchanged since 2026-08

@@ -33,7 +33,7 @@ import { hideFromAiOnNode } from './classification-fixtures.js';
 
 const usage = { promptTokens: 1, completionTokens: 1, totalTokens: 2, costUsd: 0.001, costExact: true };
 const budget = { dailyBudgetUsd: 1, spentTodayUsd: 0, remainingUsd: 1 };
-vi.mock('../../src/services/ai-completion.js', async (orig) => ({
+vi.mock('../../src/services/ai/completion.js', async (orig) => ({
   ...(await orig<object>()),
   completeForOwner: vi.fn(async () => ({ content: 'answer', model: 'm', finishReason: 'stop', truncated: false, route: {}, usage, budget })),
 }));

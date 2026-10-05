@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Which providers may answer one call, in order, and why each of the others may not
  *   (docs/internal/llmproviderintegrations/11, sections 6 and 7). prepareAiCall (services/
- *   ai-completion.ts) runs this; the gateway tries the candidates (services/ai/route-run.ts).
+ *   ai/completion.ts) runs this; the gateway tries the candidates (services/ai/route-run.ts).
  *
  *   THE CALL SAYS AT LEAST THE CAPABILITY. The less it says, the more the node chooses:
  *   - a model (`anthropic:claude-opus-5-5` or a bare id): only that model, on the owner's providers of
@@ -135,7 +135,7 @@ export interface RoutePlanInput {
    */
   legacyModel: (capability: AiCapability) => string | undefined;
   /** Whether the node's key may pay for this owner (ai-allowance.ts nodeKeyStanding), read at most once.
-   *  The shape is written out here: importing it would close a cycle through ai-completion.ts. */
+   *  The shape is written out here: importing it would close a cycle through ai/completion.ts. */
   nodeAllowance: () => Promise<NodeKeyAnswer>;
   /** What the call will use, for the owner's price ceiling: the prompt's tokens (a quarter of its
    *  length) and the answer's cap. Absent, a text call is estimated at 1024 tokens each way. */

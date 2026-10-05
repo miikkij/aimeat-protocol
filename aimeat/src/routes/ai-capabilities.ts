@@ -31,7 +31,7 @@ import { aiPayerOf } from '../services/agent-ai-keys.js';
 import { AiCompletionError } from '../services/ai/errors.js';
 import { aiCapabilitiesView } from '../services/ai/capabilities.js';
 import { embedForOwner } from '../services/ai-embed.js';
-import { readCallRole } from '../services/ai-call-guards.js';
+import { readCallRole } from '../services/ai/call-guards.js';
 import { aiCallerOf } from './ai-policy.js';
 
 export function aiCapabilitiesRouter(config: AimeatConfig, storage: Storage): Router {

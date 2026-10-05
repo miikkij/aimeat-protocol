@@ -2,7 +2,7 @@
  * @file src/services/ai/caller-context.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Who is asking for an AI call, in the words the planner reads (ai-completion.ts
+ * @description Who is asking for an AI call, in the words the planner reads (ai/completion.ts
  *   PrepareAiCallOptions): the caller class, the agent by bare name, the app its grant names. One
  *   function makes it from a verified credential, so a route, an AI job, a schedule and a workflow
  *   all answer the same way for the same principal.

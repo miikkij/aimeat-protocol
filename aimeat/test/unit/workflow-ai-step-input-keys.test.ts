@@ -30,7 +30,7 @@ import type { WorkflowRun, WorkflowStep } from '../../src/models/workflow-schema
 /** The prompt the step handed to the model, captured instead of a provider call. */
 const captured = vi.hoisted(() => ({ prompt: '' }));
 
-vi.mock('../../src/services/ai-completion.js', () => ({
+vi.mock('../../src/services/ai/completion.js', () => ({
     completeForOwner: async (_s: unknown, _c: unknown, _g: string, opts: { prompt: string }) => {
         captured.prompt = opts.prompt;
         return { content: 'assembled' };

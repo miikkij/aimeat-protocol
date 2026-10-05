@@ -35,7 +35,7 @@ import { requireOwnerPrincipal, isOwnerPrincipal } from '../auth/account-securit
 import { aiCallLimit } from '../middleware/ai-call-limit.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, buildGAII } from '../utils/gaii.js';
-import { AiCompletionError, completeForOwner } from '../services/ai-completion.js';
+import { AiCompletionError, completeForOwner } from '../services/ai/completion.js';
 import {
   agentAiView, writeAgentKey, clearAgentKey, writeAgentCap, AgentAiKeyError, type AgentAiModel,
 } from '../services/agent-ai-keys.js';

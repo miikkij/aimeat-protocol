@@ -33,7 +33,7 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { localAccountName } from '../utils/gaii.js';
-import { AiCompletionError } from '../services/ai-completion.js';
+import { AiCompletionError } from '../services/ai/completion.js';
 import {
   decideForOwner, listDecisions, getDecision, reviewDecision, decisionStats, ruleCallerKind, DecideError, type DecideCaller,
 } from '../services/decide/service.js';

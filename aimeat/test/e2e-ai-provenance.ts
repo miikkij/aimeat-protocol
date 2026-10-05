@@ -489,7 +489,7 @@ async function startStub(): Promise<void> {
 
     // ── 8b. PHASE 8b: the LEGACY raw completion route runs through the same chokepoint ──
     //
-    // `POST /v1/openrouter/complete` predates ai-completion.ts and spoke to the provider directly, so
+    // `POST /v1/openrouter/complete` predates ai/completion.ts and spoke to the provider directly, so
     // it produced model output that nothing stamped AND nothing billed. Both halves are asserted from
     // OUTSIDE — the record is read back through /v1/provenance/:id and the charge through
     // /v1/ai/usage — because "the code calls the right function" is not evidence that either happened.

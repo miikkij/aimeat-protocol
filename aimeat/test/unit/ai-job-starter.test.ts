@@ -33,7 +33,7 @@ vi.mock('../../src/services/ai-inputs.js', () => {
         }),
     };
 });
-vi.mock('../../src/services/ai-completion.js', () => {
+vi.mock('../../src/services/ai/completion.js', () => {
     class AiCompletionError extends Error { code = 'AI_COMPLETION_FAILED'; }
     return {
         AiCompletionError,

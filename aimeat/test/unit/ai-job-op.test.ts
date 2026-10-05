@@ -22,7 +22,7 @@ import type { WorkflowRun, WorkflowStep } from '../../src/models/workflow-schema
 /** Every call a service function received, by which one. */
 const calls = vi.hoisted(() => ({ complete: [] as unknown[], image: [] as unknown[], transcribe: [] as unknown[] }));
 
-vi.mock('../../src/services/ai-completion.js', () => {
+vi.mock('../../src/services/ai/completion.js', () => {
     class AiCompletionError extends Error { code = 'AI_COMPLETION_FAILED'; }
     return {
         AiCompletionError,
