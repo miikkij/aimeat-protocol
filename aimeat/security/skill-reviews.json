@@ -36,7 +36,7 @@
         "aimeat/src/mcp/agent-schedules.ts",
         "aimeat/src/routes/agents-v2/agent-proposals.ts"
       ],
-      "digest": "sha256:dfbe4fdbd804b1b90185ea88"
+      "digest": "sha256:95fa0a08454aecd772f3bdc7"
     },
     "node:aimeat-first-conversation": {
       "reviewedOn": "2026-10-02",
@@ -244,7 +244,7 @@
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:53f5c3c8f6b61f2076ca504f"
+      "digest": "sha256:233d5a49329e85f0d6b22993"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-10-05",
@@ -322,7 +322,7 @@
         "aimeat/src/services/scheduler.ts",
         "aimeat/src/services/ai/route-plan.ts"
       ],
-      "digest": "sha256:e9ece0fdecc180a777880bb8"
+      "digest": "sha256:1a537e0a2065a874046e03b6"
     },
     "node:aimeat-game-apps": {
       "reviewedOn": "2026-09-19",
@@ -371,7 +371,7 @@
         ".githooks/pre-commit",
         "aimeat/src/services/build-extension-prompt.ts"
       ],
-      "digest": "sha256:ff46731b77d3f75e71156899"
+      "digest": "sha256:6fc445719ccf106ccfaa6158"
     },
     "project:aimeat-organism-records": {
       "reviewedOn": "2026-09-19",
@@ -504,7 +504,7 @@
       "aimeat/src/mcp/core-admin.ts": "fd3a6da1b1490f40"
     },
     "node:manage-my-agents": {
-      "aimeat/src/mcp/core.ts": "0b3c7ece162f4982",
+      "aimeat/src/mcp/core.ts": "7591cf465d668dbb",
       "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "5c6ae0067c166273"
     },
     "node:manage-my-profile-data": {
@@ -534,7 +534,7 @@
     },
     "node:diagnose-a-workflow": {
       "aimeat/src/models/workflow-schemas.ts": "e90ed3079802d6f0",
-      "aimeat/src/mcp/agent-schedules.ts": "e8474cbbc8ef73a9",
+      "aimeat/src/mcp/agent-schedules.ts": "323e1d07edc9f647",
       "aimeat/src/services/scheduler.ts": "3fb3a96d2a3bf98a",
       "aimeat/src/services/ai/route-plan.ts": "332ec0a3c395ce8f"
     },
@@ -573,7 +573,7 @@
     },
     "node:aimeat-recurring-work": {
       "aimeat/src/services/schedule-gate.ts": "d10acbe327138c37",
-      "aimeat/src/mcp/agent-schedules.ts": "e8474cbbc8ef73a9",
+      "aimeat/src/mcp/agent-schedules.ts": "323e1d07edc9f647",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "26be98a71d067631"
     },
     "node:aimeat-decide": {
