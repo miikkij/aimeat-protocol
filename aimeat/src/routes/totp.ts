@@ -12,6 +12,8 @@
  *   - POST /v1/ghii/totp/setup: create encrypted secret, backup codes, and provisioning URI/QR
  *
  * @version-history
+ *   v1.3.1 — 2026-10-05 — The TOTP settings come from services/totp.ts totpConfigOf(), shared with the
+ *     sign-in check (services/password-check.ts).
  *   v1.3.0 — 2026-09-04 — Arming and removing the factor land on the person's own feed as account
  *     events. The operator reset that answers a lost phone lives in services/totp-recovery.ts,
  *     behind DELETE /v1/admin/owners/:name/totp.
@@ -36,23 +38,13 @@ import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { recordAccountEvent } from '../services/account-events.js';
 import { eraseTotp } from '../services/totp-recovery.js';
-import { setupTotp, validateTotpCode, validateBackupCode, generateBackupCodes } from '../services/totp.js';
+import { setupTotp, validateTotpCode, validateBackupCode, generateBackupCodes, totpConfigOf } from '../services/totp.js';
 import type { TotpConfig } from '../services/totp.js';
 
 export function totpRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
-  const totpConfig: TotpConfig = {
-    issuer: config.totpIssuer,
-    algorithm: 'SHA1' as const,
-    digits: 6 as const,
-    period: config.totpPeriod,
-    window: config.totpWindow,
-    backupCodeCount: config.totpBackupCodeCount,
-    encryptionKey: config.totpSecretEncryptionKey
-      ? Buffer.from(config.totpSecretEncryptionKey, 'hex')
-      : undefined,
-  };
+  const totpConfig: TotpConfig = totpConfigOf(config);
 
   // POST /v1/ghii/totp/setup — Start TOTP setup (account holder only)
   // The secret is returned to whoever calls this, and it becomes the account's second factor. It

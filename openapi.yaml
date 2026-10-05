@@ -26140,9 +26140,13 @@ paths:
       summary: Verify credentials for federated login
       description: |
         Called by a remote node when a user tries to log in as username@thisNode
-        on that remote node. Verifies the password locally and checks that the
-        user has granted an auth consent to the requesting node. Returns a signed
-        attestation on success.
+        on that remote node. The requesting node must be an active peer whose link
+        may carry a sign-in, and it signs the request with its node key. The user's
+        auth consent for that node is checked before the password; a missing consent,
+        a missing account and a wrong password all answer 401 FEDERATION_AUTH_FAILED.
+        The password has the same per-account lock as the sign-in route (429
+        PASSWORD_LOCKED), and an account with two-step sign-in needs its code
+        (401 TOTP_REQUIRED without one). Returns a signed attestation on success.
       tags: [Federation]
       requestBody:
         required: true
@@ -26150,7 +26154,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [username, password, requesting_node, timestamp]
+              required: [username, password, requesting_node, timestamp, signature]
               properties:
                 username:
                   type: string
@@ -26163,6 +26167,15 @@ paths:
                   type: string
                   format: date-time
                   description: ISO timestamp (must be within 5 minutes of server time)
+                signature:
+                  type: string
+                  description: "The requesting node's Ed25519 signature over JSON.stringify({ purpose: 'federation-auth-verify', username, requesting_node, timestamp })"
+                totp_code:
+                  type: string
+                  description: The person's TOTP code, for an account with two-step sign-in
+                backup_code:
+                  type: string
+                  description: One of the person's backup codes, instead of a TOTP code
       responses:
         '200':
           description: Signed attestation confirming user identity
@@ -26210,6 +26223,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '429':
+          description: PASSWORD_LOCKED or TOTP_LOCKED, the account's own lock, or the per-IP limit
 
   # ── Federation Internal (node-to-node) ─────────────────────
   /v1/federation/ping:

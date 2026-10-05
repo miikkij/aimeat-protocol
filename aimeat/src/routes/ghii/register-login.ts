@@ -6,6 +6,11 @@
  *   POST /v1/ghii/login (password + federated + TOTP), POST /v1/ghii/login/attach-email. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.12.0 — 2026-10-05 — Secaudit 2026-10, D1 and C1. The password and the second factor are
+ *     services/password-check.ts, shared with attach-email and the home node's federation check. A
+ *     federated sign-in signs its request to the home node (services/federation-auth-payload.ts),
+ *     passes on the person's TOTP or backup code, refuses a redirect, reads the answer up to 64 kB,
+ *     and says a lock (429) as a lock.
  *   v1.11.0 — 2026-10-01 — Federated login, two refusals (the peer-registration incident, finding F).
  *     Under `all_peers` a home node must be a peer whose tier may carry federated sign-in at all
  *     (member or genesis): a contact link and a packages-only peer (which any package grant could
@@ -54,15 +59,16 @@ import type { Storage } from '../../storage/interface.js';
 import type { EmailService } from '../../services/email.js';
 import type { PeerInfo } from '../../services/federation.js';
 import { coerceTier, tierCeiling } from '../../services/federation-tiers.js';
-import { generateKeyPair } from '../../auth/keypair.js';
+import { generateKeyPair, sign } from '../../auth/keypair.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { validateOwnerName, FEDERATED_ROLE, homeIdentityOf } from '../../utils/gaii.js';
 import { issueJWT } from '../../auth/jwt.js';
 import { createHash } from 'node:crypto';
-import { validateTotpCode, validateBackupCode } from '../../services/totp.js';
-import type { TotpConfig } from '../../services/totp.js';
-import { hashPassword, verifyPassword, isLegacyHash } from '../../services/password.js';
+import { hashPassword } from '../../services/password.js';
+import { checkPassword, checkSecondFactor } from '../../services/password-check.js';
+import { federationAuthPayload } from '../../services/federation-auth-payload.js';
+import { readBodyCapped } from '../../utils/read-capped.js';
 import { completeOwnerLogin } from './owner-session.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { loginTarpit } from '../../middleware/login-tarpit.js';
@@ -327,19 +333,6 @@ export function registerRegisterLoginRoutes(
         emitChange('ghii');
     });
 
-    // TOTP config for login 2FA verification (Phase 0.5)
-    const totpConfig: TotpConfig = {
-        issuer: config.totpIssuer,
-        algorithm: 'SHA1' as const,
-        digits: 6 as const,
-        period: config.totpPeriod,
-        window: config.totpWindow,
-        backupCodeCount: config.totpBackupCodeCount,
-        encryptionKey: config.totpSecretEncryptionKey
-            ? Buffer.from(config.totpSecretEncryptionKey, 'hex')
-            : undefined,
-    };
-
     // POST /v1/ghii/login — Login with username + password from any device
     // Mints a fresh owner keypair only when the client has none locally
     // (request_owner_key) or the owner has no key yet; otherwise reuses the
@@ -400,8 +393,18 @@ export function registerRegisterLoginRoutes(
                 return;
             }
 
-            // Send verification request to the home node
+            // Send verification request to the home node, signed with this node's key (the home node
+            // verifies it, secaudit 2026-10 D1). The address is the peer record's, which the operator
+            // approved; `redirect: 'error'` keeps the password from following a redirect anywhere else.
             try {
+                const nodeKey = await storage.getNodeKey();
+                if (!nodeKey) {
+                    res.status(500).json(error(config.nodeId, 'INTERNAL', 'Node keys not available'));
+                    return;
+                }
+                const timestamp = new Date().toISOString();
+                const signature = await sign(nodeKey.privateKey,
+                    federationAuthPayload({ username: loginName, requesting_node: config.nodeId, timestamp }));
                 const verifyResp = await fetch(`${homePeer.url}/v1/federation/auth/verify`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -409,21 +412,31 @@ export function registerRegisterLoginRoutes(
                         username: loginName,
                         password,
                         requesting_node: config.nodeId,
-                        timestamp: new Date().toISOString(),
+                        timestamp,
+                        signature,
+                        // The person's second factor, typed here, checked at home.
+                        ...(typeof totp_code === 'string' && totp_code ? { totp_code } : {}),
+                        ...(typeof backup_code === 'string' && backup_code ? { backup_code } : {}),
                     }),
+                    redirect: 'error',
                     signal: AbortSignal.timeout(10_000),
                 });
 
+                // The home node's answer is read up to 64 kB: an attestation is a few hundred bytes.
+                const raw = await readBodyCapped(verifyResp, 64 * 1024);
+                let parsed: unknown = null;
+                try { parsed = raw ? JSON.parse(raw.toString('utf8')) : null; } catch { parsed = null; }   // eslint-disable-line aimeat/no-silent-catch -- an unreadable answer is refused just below
                 if (!verifyResp.ok) {
-                    const body = await verifyResp.json().catch(() => ({})) as Record<string, unknown>;   // eslint-disable-line aimeat/no-silent-catch -- body only enriches an error already reported
+                    const body = (parsed ?? {}) as Record<string, unknown>;
                     const errCode = (body as { error?: { code?: string } }).error?.code ?? 'FEDERATION_AUTH_FAILED';
                     const errMsg = (body as { error?: { message?: string } }).error?.message ?? 'Remote authentication failed';
-                    res.status(verifyResp.status === 403 ? 403 : 401).json(
-                        error(config.nodeId, errCode as string, errMsg as string));
+                    // A lock (429) is said as a lock; everything else as a refused sign-in.
+                    const status = verifyResp.status === 403 || verifyResp.status === 429 ? verifyResp.status : 401;
+                    res.status(status).json(error(config.nodeId, errCode as string, errMsg as string));
                     return;
                 }
 
-                const result = await verifyResp.json() as {
+                const result = (parsed ?? {}) as {
                     data?: {
                         verified?: boolean;
                         ghii?: string;
@@ -561,45 +574,12 @@ export function registerRegisterLoginRoutes(
             return;
         }
 
-        if (!ghiiRecord.passwordHash) {
-            res.status(400).json(error(config.nodeId, 'NO_PASSWORD', 'This account has no password set. Password login is not available.'));
+        // The password, its lock and the hash upgrade: services/password-check.ts, the one check every
+        // route that takes a password calls.
+        const pw = await checkPassword(storage, config, ghiiRecord, password);
+        if (!pw.ok) {
+            res.status(pw.status).json(error(config.nodeId, pw.code, pw.message));
             return;
-        }
-
-        // Per-account password lockout (brute-force protection)
-        if (ghiiRecord.passwordLockedUntil) {
-            const lockExpires = new Date(ghiiRecord.passwordLockedUntil).getTime();
-            if (Date.now() < lockExpires) {
-                res.status(429).json(error(config.nodeId, 'PASSWORD_LOCKED',
-                    `Account temporarily locked due to too many failed login attempts. Try again after ${ghiiRecord.passwordLockedUntil}`));
-                return;
-            }
-            await storage.updateGHII(ghiiRecord.ghii, { passwordFailedAttempts: 0, passwordLockedUntil: null });
-            ghiiRecord.passwordFailedAttempts = 0;
-            ghiiRecord.passwordLockedUntil = undefined;
-        }
-
-        const valid = await verifyPassword(password, ghiiRecord.passwordHash);
-        if (!valid) {
-            const attempts = (ghiiRecord.passwordFailedAttempts ?? 0) + 1;
-            const update: Record<string, unknown> = { passwordFailedAttempts: attempts };
-            if (attempts >= config.passwordLockoutAttempts) {
-                update.passwordLockedUntil = new Date(Date.now() + config.passwordLockoutMinutes * 60_000).toISOString();
-            }
-            await storage.updateGHII(ghiiRecord.ghii, update);
-            res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Invalid username or password'));
-            return;
-        }
-
-        // Reset failed attempts on successful login
-        if (ghiiRecord.passwordFailedAttempts) {
-            await storage.updateGHII(ghiiRecord.ghii, { passwordFailedAttempts: 0, passwordLockedUntil: null });
-        }
-
-        // Transparent scrypt parameter upgrade (v1 -> v2)
-        if (ghiiRecord.passwordHash && isLegacyHash(ghiiRecord.passwordHash)) {
-            const newHash = await hashPassword(password);
-            await storage.updateGHII(ghiiRecord.ghii, { passwordHash: newHash });
         }
 
         // Email confirmation check — if operator requires it, block unverified users.
@@ -614,89 +594,11 @@ export function registerRegisterLoginRoutes(
             return;
         }
 
-        // TOTP 2FA check (Phase 0.5) — if TOTP is enabled, require a valid code
-        if (ghiiRecord.totpEnabled && ghiiRecord.totpSecret) {
-            // Check lockout
-            if (ghiiRecord.totpLockedUntil) {
-                const lockExpires = new Date(ghiiRecord.totpLockedUntil).getTime();
-                if (Date.now() < lockExpires) {
-                    res.status(429).json(error(config.nodeId, 'TOTP_LOCKED',
-                        `Account temporarily locked due to too many failed TOTP attempts. Try again after ${ghiiRecord.totpLockedUntil}`));
-                    return;
-                }
-                // Lock expired — reset counters
-                await storage.updateGHII(ghiiRecord.ghii, {
-                    totpFailedAttempts: 0,
-                    totpLockedUntil: null,
-                });
-                ghiiRecord.totpFailedAttempts = 0;
-                ghiiRecord.totpLockedUntil = undefined;
-            }
-
-            let totpVerified = false;
-
-            // Try TOTP code
-            if (totp_code && typeof totp_code === 'string') {
-                // Replay protection: reject if same code was just used
-                if (ghiiRecord.totpLastUsedCode === totp_code) {
-                    res.status(401).json(error(config.nodeId, 'TOTP_REPLAY', 'This TOTP code has already been used. Wait for the next code.'));
-                    return;
-                }
-                const totpResult = validateTotpCode(ghiiRecord.totpSecret, totp_code, totpConfig);
-                if (totpResult.valid) {
-                    totpVerified = true;
-                    await storage.updateGHII(ghiiRecord.ghii, {
-                        totpLastUsedAt: new Date().toISOString(),
-                        totpLastUsedCode: totp_code,
-                        totpFailedAttempts: 0,
-                        totpLockedUntil: null,
-                    });
-                }
-            }
-
-            // Try backup code
-            if (!totpVerified && backup_code && typeof backup_code === 'string' && ghiiRecord.totpBackupCodes) {
-                const backupResult = validateBackupCode(backup_code, ghiiRecord.totpBackupCodes);
-                if (backupResult.valid) {
-                    totpVerified = true;
-                    // Remove used backup code
-                    const updatedCodes = [...ghiiRecord.totpBackupCodes];
-                    updatedCodes.splice(backupResult.index, 1);
-                    await storage.updateGHII(ghiiRecord.ghii, {
-                        totpBackupCodes: updatedCodes,
-                        totpFailedAttempts: 0,
-                        totpLockedUntil: null,
-                    });
-                }
-            }
-
-            if (!totpVerified) {
-                // If neither code was provided at all, tell the client TOTP is required
-                if (!totp_code && !backup_code) {
-                    res.status(401).json(error(config.nodeId, 'TOTP_REQUIRED',
-                        'This account uses two-step sign-in. Enter the code from your app, or one of your backup codes.'));
-                    return;
-                }
-
-                // Increment failed attempts
-                const attempts = (ghiiRecord.totpFailedAttempts ?? 0) + 1;
-                const lockUntil = attempts >= config.totpMaxFailedAttempts
-                    ? new Date(Date.now() + config.totpLockoutSeconds * 1000).toISOString()
-                    : undefined;
-                await storage.updateGHII(ghiiRecord.ghii, {
-                    totpFailedAttempts: attempts,
-                    totpLockedUntil: lockUntil,
-                });
-
-                if (lockUntil) {
-                    res.status(429).json(error(config.nodeId, 'TOTP_LOCKED',
-                        `Too many wrong codes, so this account is paused until ${lockUntil}. Wait until then and try again.`));
-                    return;
-                }
-
-                res.status(401).json(error(config.nodeId, 'INVALID_TOTP', 'Invalid TOTP code or backup code.'));
-                return;
-            }
+        // The second factor of an account with TOTP on (services/password-check.ts).
+        const second = await checkSecondFactor(storage, config, ghiiRecord, { totp_code, backup_code });
+        if (!second.ok) {
+            res.status(second.status).json(error(config.nodeId, second.code, second.message));
+            return;
         }
 
         // The credential checked out. Everything from here — the deactivation refusal, the login

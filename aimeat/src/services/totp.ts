@@ -7,14 +7,18 @@
  *   secret at rest with AES-256-GCM.
  *
  * @structure
+ *   - totpConfigOf(): the node's TOTP settings from its config
  *   - setupTotp(): create secret, QR, and hashed/encrypted material for storage
  *   - validateTotpCode() / validateBackupCode(): verify a submitted code (timing-safe backup compare)
  *   - generateBackupCodes(): mint a fresh set of plain + hashed backup codes
  *   - encryptSecret() / decryptSecret(): internal AES-256-GCM (iv:authTag:ciphertext) at-rest crypto
  *
  * @version-history
+ *   v1.1.0 — 2026-10-05 — totpConfigOf(): the settings were built twice (routes/totp.ts and the login
+ *     route), and now also feed services/password-check.ts.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
+import type { AimeatConfig } from '../config.js';
 import { TOTP, Secret } from 'otpauth';
 import { createRequire } from 'node:module';
 import { createCipheriv, createDecipheriv, randomBytes, createHash, timingSafeEqual } from 'node:crypto';
@@ -35,6 +39,19 @@ export interface TotpConfig {
   window: number;
   backupCodeCount: number;
   encryptionKey?: Buffer;
+}
+
+/** The node's TOTP settings, built in one place for the setup routes and every sign-in check. */
+export function totpConfigOf(config: Pick<AimeatConfig, 'totpIssuer' | 'totpPeriod' | 'totpWindow' | 'totpBackupCodeCount' | 'totpSecretEncryptionKey'>): TotpConfig {
+  return {
+    issuer: config.totpIssuer,
+    algorithm: 'SHA1' as const,
+    digits: 6 as const,
+    period: config.totpPeriod,
+    window: config.totpWindow,
+    backupCodeCount: config.totpBackupCodeCount,
+    encryptionKey: config.totpSecretEncryptionKey ? Buffer.from(config.totpSecretEncryptionKey, 'hex') : undefined,
+  };
 }
 
 // ── Setup Result ──

@@ -20,6 +20,10 @@
  *     from plain authentication. A non-operator owner (fedLoginUser, proven non-operator by decoding
  *     its token) is now refused list, add, re-tune and de-peer on Node B, against a throwaway peer so
  *     no mutation can cascade into the routing tests, with operator positive controls on the same doors.
+ *   v1.4.0 -- 2026-10-05 -- Secaudit 2026-10, D1: the federated sign-in runs end to end (a Node B
+ *     account signs in on Node A, which signs the request, and B verifies it), and B refuses Node C,
+ *     which is not its peer. The old tests posted unsigned requests naming C, which B took on the
+ *     body's word; their setup no longer matches the route.
  */
 
 // Run: cd aimeat && pnpm exec tsx test/federation-multinode.ts
@@ -627,13 +631,16 @@ await test('A non-operator on Node B cannot add, re-tune or de-peer → 403, and
     assert(!!a && a.status === 'active', `Node A must still be an active peer of B: ${JSON.stringify(finalRows.map(p => [p.node_id, p.status]))}`);
 });
 
-await test('Create auth consent for Node C on Node B', async () => {
+// Since secaudit 2026-10 (D1) the home node answers only an active peer that signs the request, so the
+// sign-in goes the way a person's does: through a node that peers with the home node. A is the hub;
+// B peers with A, not with C.
+await test('Create auth consent for Node A on Node B', async () => {
     const { status, body } = await nodeB!.json('/v1/consent', {
         method: 'POST',
         headers: { Authorization: `Bearer ${fedLoginToken}` },
         body: JSON.stringify({
             data_pattern: '_identity',
-            recipient: 'node:aimeat-node-001-testc',
+            recipient: 'node:aimeat-hub-001-testa',
             scope: 'auth',
             purpose: 'federation_login',
         }),
@@ -642,50 +649,32 @@ await test('Create auth consent for Node C on Node B', async () => {
     assert(body.ok === true, 'consent ok');
 });
 
-await test('Auth verify succeeds on Node B for Node C with valid credentials', async () => {
-    const timestamp = new Date().toISOString();
-    const { status, body } = await nodeB!.json('/v1/federation/auth/verify', {
+await test('A Node B account signs in on Node A: A signs the request, B verifies it and attests', async () => {
+    const { status, body } = await nodeA!.json('/v1/ghii/login', {
         method: 'POST',
-        body: JSON.stringify({
-            username: fedLoginUser,
-            password: fedLoginPassword,
-            requesting_node: 'aimeat-node-001-testc',
-            timestamp,
-        }),
+        body: JSON.stringify({ username: `${fedLoginUser}@aimeat-node-001-testb`, password: fedLoginPassword }),
     });
-    assert(status === 200, `auth verify: ${status}: ${JSON.stringify(body)}`);
-    assert(body.ok === true, 'ok');
-    assert(body.data.verified === true, 'verified is true');
-    assert(body.data.ghii.includes(fedLoginUser), `ghii contains username: ${body.data.ghii}`);
-    assert(body.data.requesting_node === 'aimeat-node-001-testc', 'requesting_node matches');
-    assert(typeof body.data.signature === 'string', 'signature exists');
+    assert(status === 200, `federated login: ${status}: ${JSON.stringify(body.error ?? body)}`);
+    assert(body.data?.federated === true && typeof body.data?.token === 'string', `a federated session, got ${JSON.stringify(body.data)}`);
+    assert(body.data.home_node === 'aimeat-node-001-testb', `home node: ${body.data.home_node}`);
 });
 
-await test('Auth verify fails for unauthorized node (Node A has no consent)', async () => {
+await test('Auth verify on Node B refuses Node C, which is not its peer, before reading any account', async () => {
     const timestamp = new Date().toISOString();
+    const signature = await signMsg(nodeC!.nodeKey.privateKey, JSON.stringify({
+        purpose: 'federation-auth-verify', username: fedLoginUser, requesting_node: 'aimeat-node-001-testc', timestamp,
+    }));
     const { status, body } = await nodeB!.json('/v1/federation/auth/verify', {
         method: 'POST',
-        body: JSON.stringify({
-            username: fedLoginUser,
-            password: fedLoginPassword,
-            requesting_node: 'aimeat-hub-001-testa',
-            timestamp,
-        }),
+        body: JSON.stringify({ username: fedLoginUser, password: fedLoginPassword, requesting_node: 'aimeat-node-001-testc', timestamp, signature }),
     });
-    assert(status === 403, `expected 403, got ${status}: ${JSON.stringify(body)}`);
-    assert(body.error?.code === 'NO_AUTH_CONSENT', `error code: ${body.error?.code}`);
+    assert(status === 403 && body.error?.code === 'FORBIDDEN', `expected 403 FORBIDDEN, got ${status}: ${JSON.stringify(body)}`);
 });
 
-await test('Auth verify fails with wrong password', async () => {
-    const timestamp = new Date().toISOString();
-    const { status, body } = await nodeB!.json('/v1/federation/auth/verify', {
+await test('A wrong password through Node A is refused by the home node', async () => {
+    const { status, body } = await nodeA!.json('/v1/ghii/login', {
         method: 'POST',
-        body: JSON.stringify({
-            username: fedLoginUser,
-            password: 'WrongPassword999',
-            requesting_node: 'aimeat-node-001-testc',
-            timestamp,
-        }),
+        body: JSON.stringify({ username: `${fedLoginUser}@aimeat-node-001-testb`, password: 'WrongPassword999' }),
     });
     assert(status === 401, `expected 401, got ${status}: ${JSON.stringify(body)}`);
     assert(body.error?.code === 'FEDERATION_AUTH_FAILED', `error code: ${body.error?.code}`);
