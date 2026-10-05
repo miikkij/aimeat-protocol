@@ -91,6 +91,27 @@ describe('matchRules with regex rules', () => {
     resetRegexBudgets();
   });
 
+  // Secaudit 2026-10, DATA-1: an agent's content has the agent as its scope, so each agent had a
+  // budget of its own and one owner multiplied it by the number of their agents.
+  it('one owner\'s agents share the owner\'s budget; they do not each get a minute of their own', () => {
+    resetRegexBudgets();
+    const policy = defaultPolicy();
+    policy.rules = [
+      { id: 'slow', name: 'Slow', kind: 'regex', pattern: '[a-z]*x', flags: '', minLabel: 'luottamuksellinen', enabled: true },
+      { id: 'fi', name: 'FI', kind: 'regex', pattern: '\\bFI\\d{16}\\b', flags: '', minLabel: 'luottamuksellinen', enabled: true },
+    ];
+    const text = `pay to FI2112345600000785 ${'a'.repeat(REGEX_TEXT)}`;
+    // The first agent writes until its scope's minute is spent: the IBAN rule then no longer runs.
+    let writes = 0;
+    while (matchRules(policy, memoryTarget('bot0#mallory@n', `notes.${writes}`), text) && writes < 5000) writes++;
+    expect(writes).toBeLessThan(5000);
+    // A second agent of the same owner is out of time too.
+    expect(matchRules(policy, memoryTarget('bot1#mallory@n', 'notes.other'), text)).toBeNull();
+    // POSITIVE CONTROL: another owner's agent still has its owner's minute.
+    expect(matchRules(policy, memoryTarget('bot#alice@n', 'notes.bank'), text)?.label).toBe('luottamuksellinen');
+    resetRegexBudgets();
+  }, 60_000);
+
   it("skips a rule whose label is retired, so setLabel never sees it", () => {
     const p = defaultPolicy();
     p.labels.push({ ...p.labels[2]!, id: 'vanha', rank: 25, status: 'retired' });
