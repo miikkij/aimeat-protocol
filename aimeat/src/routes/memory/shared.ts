@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Shared context type + small pure helpers for the memory route group modules. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-05 — MEMORY_LIST_MAX_LIMIT moved unchanged to models/tool-input-vocabulary.ts and is
+ *     re-exported: the tool catalog states it (secaudit 2026-10, M3).
  *   v1.1.0 — 2026-08-01 — memoryContentBytes(): the one definition of "which bytes a memory value's
  *     provenance record is about", shared by every write path (TARGET-058).
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/memory.ts (max-file-lines)
@@ -25,7 +27,8 @@ import type { MemoryDbService } from '../../services/db/memory-db-service.js';
  * group, so the MCP surface can read it without the cycle that exporting from crud.ts creates
  * (crud → mcp/index → register-all → core → crud, caught by `pnpm check:deps`).
  */
-export const MEMORY_LIST_MAX_LIMIT = 1000;
+import { MEMORY_LIST_MAX_LIMIT } from '../../models/tool-input-vocabulary.js';
+export { MEMORY_LIST_MAX_LIMIT };
 
 /** Context shared by every memory route group module (closed-over deps from memoryRouter). */
 export interface MemoryRouteCtx {

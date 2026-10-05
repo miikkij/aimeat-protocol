@@ -23,6 +23,8 @@
  * @usage
  *   const report = await readUsageReport(storage, { report: 'model', ownerGhii, from, to });
  * @version-history
+ *   2026-10-05 — OWNER_REPORTS moved unchanged to models/tool-input-vocabulary.ts and is re-exported:
+ *     the tool catalog states it (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-08-14 — Initial: one read service over the precomputed rollups.
  */
 import type {
@@ -32,18 +34,9 @@ import { findCut, type UsageDim } from './rollup-cuts.js';
 import { pendingRollupDeltas } from './rollup-engine.js';
 import { pendingUsageCalls } from './usage-buffer.js';
 
-/** Reports an owner may ask about their OWN usage. Every cut here carries ownerGhii. */
-export const OWNER_REPORTS: Record<string, string> = {
-  day: 'llm.owner',
-  model: 'llm.owner.model',
-  app: 'llm.owner.app',
-  agent: 'llm.actor',
-  tool: 'call.owner.tool',
-  surface: 'call.owner.surface',
-  'apps-used': 'call.owner.app',
-  activity: 'call.owner',
-  sold: 'call.provider.coordinate',
-};
+/** Reports an owner may ask about their OWN usage. Every cut here carries ownerGhii. In models/ since 2026-10-05 (the tool catalog states it). */
+import { OWNER_REPORTS } from '../../models/tool-input-vocabulary.js';
+export { OWNER_REPORTS };
 
 /** Reports across every owner. Operator-only: the calling route MUST gate on the operator role. */
 export const NODE_REPORTS: Record<string, string> = {

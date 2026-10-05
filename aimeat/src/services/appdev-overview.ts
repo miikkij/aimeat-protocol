@@ -14,6 +14,8 @@
  *   import { buildAppdevOverview } from '../services/appdev-overview.js';
  *   const overview = await buildAppdevOverview(storage, config, readerFor({ storage, config }, req.auth), { model, sections });
  * @version-history
+ *   2026-10-05 — OVERVIEW_SECTIONS moved unchanged to models/tool-input-vocabulary.ts and is
+ *     re-exported: the tool catalog states it (secaudit 2026-10, M3).
  *   v1.4.1 — 2026-10-05 — The skills section lists through the caller's reader too, so a skill hidden
  *     from AI stays hidden from an AI on a personal access token (secaudit 2026-10, DATA-2).
  *   v1.4.0 — 2026-09-29 — TARGET-082 V4: takes the caller's classification reader instead of an
@@ -58,10 +60,9 @@ import { logger } from '../utils/logger.js';
 
 const CAP = 25;
 
-export const OVERVIEW_SECTIONS = [
-    'apps', 'library_packs', 'app_templates', 'skills',
-    'pitfalls_curated', 'pitfalls_learned', 'template_proposals',
-] as const;
+// In models/ since 2026-10-05: the tool catalog states them (secaudit 2026-10, M3).
+import { OVERVIEW_SECTIONS } from '../models/tool-input-vocabulary.js';
+export { OVERVIEW_SECTIONS };
 export type OverviewSection = (typeof OVERVIEW_SECTIONS)[number];
 
 export interface AppdevOverviewOpts {

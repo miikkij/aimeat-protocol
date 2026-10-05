@@ -31,6 +31,8 @@
  *   const split = await readSplit(storage, providerGhii, ext, action);
  *   const { pool, lines, providerNet } = computeSplit(providerGross, split, designations);
  * @version-history
+ *   2026-10-05 — BENEFICIARIES_MAX moved unchanged to models/tool-input-vocabulary.ts and is
+ *     re-exported: the tool catalog states it (secaudit 2026-10, M3).
  *   v1.0.1 — 2026-09-04 — listSplitsByProvider sorts null-safe: a record without capabilityLabel threw
  *     inside the sort and GET /v1/commerce/beneficiary-splits answered 500 on aimeat.io.
  *   v1.0.0 — 2026-07-30 — Initial: multi-beneficiary revenue splitting on the metered settlement path.
@@ -42,8 +44,9 @@ import { percentCut } from './money.js';
 /** System namespace — provider configuration the server trusts, so never in a principal's own space. */
 export const NS_BENEFICIARY_SPLIT = 'beneficiary-split';
 
-/** How many beneficiary rows one split may carry, static and dynamic together. */
-export const BENEFICIARIES_MAX = 32;
+/** How many beneficiary rows one split may carry, static and dynamic together. In models/ since 2026-10-05 (the tool catalog states it). */
+import { BENEFICIARIES_MAX } from '../models/tool-input-vocabulary.js';
+export { BENEFICIARIES_MAX };
 
 /** One party entitled to a slice of the pool, and how large a slice relative to the others. */
 export interface BeneficiaryShare {

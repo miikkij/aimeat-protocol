@@ -38,6 +38,8 @@
  *   const out = await createModerationFlag({ storage, config }, flaggedBy, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-10-05 — FLAG_TARGET_TYPES and FLAG_REASONS moved unchanged to models/tool-input-vocabulary.ts
+ *     and are re-exported: the tool catalog states them (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-08-11 — Initial (August 2026 audit step 8): the flag write moves off both surfaces.
  */
 import { randomBytes } from 'node:crypto';
@@ -59,8 +61,9 @@ import { logger } from '../utils/logger.js';
  * label's own "details" link goes to `/v1/provenance/<id>`, so reporting it is a copy-paste rather
  * than an investigation.
  */
-export const FLAG_TARGET_TYPES = ['memory', 'board_post', 'action', 'agent', 'app', 'ai_provenance'] as const;
-export const FLAG_REASONS = ['unreliable', 'inappropriate', 'illegal', 'spam', 'other', 'undisclosed_ai'] as const;
+// In models/ since 2026-10-05: the tool catalog states them (secaudit 2026-10, M3).
+import { FLAG_TARGET_TYPES, FLAG_REASONS } from '../models/tool-input-vocabulary.js';
+export { FLAG_TARGET_TYPES, FLAG_REASONS };
 
 export type FlagTargetType = typeof FLAG_TARGET_TYPES[number];
 export type FlagReason = typeof FLAG_REASONS[number];
