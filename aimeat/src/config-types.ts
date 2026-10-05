@@ -297,6 +297,10 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   screenshotIntervalMin: number;
   /** Ms to wait after load before the screenshot, so apps that fetch/render late aren't captured blank (default 6000). */
   screenshotSettleMs: number;
+  /** Exact origins (scheme, host, port) a page rendered by the node's headless browser may reach
+   *  although private (services/headless-network.ts). Empty by default: an app being photographed
+   *  or playtested reaches public addresses and the node's own origin only. */
+  screenshotEgress: string;
   jwtTtlSeconds: number;
   agentJwtTtlSeconds: number;
   ecoJwtTtlSeconds: number; // GEAI (ecosystem app) credential lifetime

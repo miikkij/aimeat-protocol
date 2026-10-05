@@ -21,6 +21,9 @@
  * @usage
  *   const result = await runPartBench(storage, config, 'leiska-cover');
  * @version-history
+ *   v1.7.0 — 2026-10-05 — The bench page's requests go through the headless browser's guard
+ *     (headless-network.ts) and serveDocumentOnce, not the browser's own network (secaudit 2026-10,
+ *     SSRF-1): a part's CSS or HTML is somebody's writing, and it ran on the node's machine.
  *   v1.6.2 — 2026-09-26 — The part is read as stored (storedPart): a component is benched again as its
  *     page is built, and one that no longer passes renders as the bench's reason.
  *   v1.6.1 — 2026-09-20 — A genre that grew out of an app is not run here, and the answer says why.
@@ -57,6 +60,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { systemGhiiFor } from '../compliance-register.js';
 import { withHeadlessContext, NO_HEADLESS_BROWSER } from '../screenshot-capture.js';
+import { serveDocumentOnce, type HeadlessRoutable } from '../headless-network.js';
 import { DesignBookService, partKey, type DesignBookPart } from './service.js';
 import { DesignBookError } from './validate.js';
 import { renderableBodyFor, benchPageHtml } from './preview.js';
@@ -100,10 +104,9 @@ export interface DesignBookBenchResult {
 }
 
 /** The slice of the Playwright page surface the bench drives; playwright-core stays lazy. */
-interface BenchPage {
+interface BenchPage extends HeadlessRoutable {
   goto(u: string, o: unknown): Promise<unknown>;
   waitForTimeout(ms: number): Promise<void>;
-  route(m: string, h: (r: { request(): { resourceType(): string }; fulfill(o: unknown): void; continue(): void }) => void): Promise<void>;
   evaluate<T>(fn: string): Promise<T>;
   close(): Promise<void>;
   on(event: 'pageerror', callback: () => void): void;
@@ -198,20 +201,12 @@ export async function runPartBench(
     // 500 tells the operator nothing and an unavailable bench is never a passed bench.
     let measured: Measured | null;
     try {
-      measured = await withHeadlessContext({ width: vp.width, height: vp.height }, async (ctx) => {
+      measured = await withHeadlessContext(config, { width: vp.width, height: vp.height }, async (ctx) => {
         const page = await ctx.newPage() as BenchPage;
         try {
           page.on('pageerror', () => { consoleErrors++; });
           page.on('console', (message) => { if (message.type() === 'error') consoleErrors++; });
-          let fulfilled = false;
-          await page.route('**/*', (route) => {
-            if (!fulfilled && route.request().resourceType() === 'document') {
-              fulfilled = true;
-              route.fulfill({ status: 200, contentType: 'text/html', body: html });
-            } else {
-              route.continue();
-            }
-          });
+          await serveDocumentOnce(page, html, 'text/html');
           // domcontentloaded, not load: a slow or unreachable IMAGE (a hero photo on another
           // host) must never time the whole bench out — layout is measured after the settle.
           await page.goto(url, { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT_MS });

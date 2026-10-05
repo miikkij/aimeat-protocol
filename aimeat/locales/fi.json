@@ -10368,6 +10368,7 @@
     "cfg_ai_providers": "Palvelimen tekoälyn tarjoajat",
     "cfg_ai_builtin_providers": "Paikalliset tekoälypalvelimet",
     "cfg_ai_provider_egress": "Palvelimen omien paikallisten tekoälypalvelimien osoitteet",
+    "cfg_security_screenshot_egress": "Yksityiset palvelimet, joihin palvelimen avaama sivu saa ottaa yhteyttä",
     "cfg_ai_provider_types": "Sallitut tarjoajatyypit",
     "cfg_ai_fixed_baseurl_overrides": "Kiinteiden tarjoajien testiosoitteet",
     "cfg_ai_legacy_settings_routes": "Tekoälyasetusten vanhat reitit",
@@ -10681,6 +10682,7 @@
     "cfgDesc_ai_providers": "Palvelimen muut tekoälyn tarjoajat JSON-listana tarjoajatietueita (id, title, type, baseUrl, auth, capabilities). Tunnisteena on none tai ympäristömuuttujan NIMI, ei koskaan avain.",
     "cfgDesc_ai_builtin_providers": "Paikalliset tekoälypalvelimet, jotka otetaan käyttöön, pilkulla eroteltuina: lmstudio, ollama, llamacpp. Ne ovat tällä koneella tavallisissa porteissaan.",
     "cfgDesc_ai_provider_egress": "Palvelimen omien paikallisten tekoälypalvelimien tarkat osoitteet (skeema, isäntä, portti) pilkulla eroteltuina. Vain palvelimen omat tarjoajat saavat käyttää niitä. Ihmisen oma tarjoaja ei käytä niitä koskaan.",
+    "cfgDesc_security_screenshot_egress": "Omien yksityisten palvelimiesi tarkat osoitteet (skeema, isäntä, portti) pilkulla eroteltuina. Sivu, jonka palvelin avaa omassa selaimessaan (kuvakaappaus, pelitesti, Design Bookin testipenkki), saa hakea niistä. Tyhjänä sivu saa vain julkiset osoitteet ja tämän palvelimen.",
     "cfgDesc_ai_provider_types": "Kiinteät tarjoajatyypit, jotka tämä palvelin sallii, pilkulla eroteltuina: openrouter, openai, anthropic, mistral, xai. Tyhjä arvo sallii kaikki viisi niiden virallisissa osoitteissa.",
     "cfgDesc_ai_fixed_baseurl_overrides": "Vain testeihin: ohjaa kiinteän tarjoajatyypin toiseen osoitteeseen, JSON-muodossa. Julkinen palvelin ei hyväksy tätä.",
     "cfgDesc_ai_legacy_settings_routes": "Tekoälyasetusten vanhat reitit vastaavat yhä. Ne on merkitty vanhentuneiksi, ja versio 4.0.0 poistaa ne. Kun asetus on pois päältä, reitit vastaavat, että ne on poistettu, ja nimeävät uudet reitit.",
@@ -23868,6 +23870,17 @@
           "ex2": "0: ei kutsuja sen jälkeen, kun saldo on käytetty, sama kuin refuse.",
           "ex3": "100: tilaa monelle ihmiselle, joista jokainen käyttää tilikohtaisen päivärajansa.",
           "tip": "Aseta tähän suurin summa, jonka olet valmis maksamaan yhdessä päivässä."
+        }
+      },
+      "security": {
+        "screenshot_egress": {
+          "title": "Yksityiset palvelimet, joihin palvelimen avaama sivu saa ottaa yhteyttä",
+          "short": "Mistä omista yksityisistä palvelimistasi sivu saa hakea, kun palvelin avaa sen omassa selaimessaan.",
+          "what": "Palvelin avaa sivuja omassa selaimessaan: se ottaa kuvakaappauksen julkaistusta sovelluksesta, testaa pelin ja ajaa Design Bookin osan testipenkissä. Sivun koodin on kirjoittanut joku muu, ja se ajetaan palvelimen koneella. Siksi palvelin vastaa itse jokaiseen osoitteeseen, jota sivu pyytää. Sivu saa tämän palvelimen omat sivut ja julkiset osoitteet. Yksityisestä osoitteesta (koti- tai toimistoverkko, tämän koneen muut palvelut, pilven metatieto-osoite) se ei saa mitään, ellei osoite ole tällä listalla.",
+          "range": "Tarkat osoitteet pilkulla eroteltuina: skeema, isäntä ja portti ilman polkua. Oletus on tyhjä.",
+          "ex1": "Tyhjä (oletus): kuvakaappaus sovelluksesta, joka lukee intranetiäsi, näyttää sovelluksen ilman niitä tietoja.",
+          "ex2": "http://intranet.local:8080: palvelimen avaama sivu saa hakea tältä yhdeltä palvelimelta, mutta ei mistään muusta yksityisestä osoitteesta.",
+          "tip": "Lisää vain palvelimia, joiden sisältö saa näkyä julkisessa kuvakaappauksessa. Julkaistun sovelluksen kuvakaappaus on julkinen."
         }
       },
       "federation_sync": {

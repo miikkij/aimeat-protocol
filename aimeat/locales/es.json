@@ -8912,6 +8912,7 @@
     "cfg_ai_providers": "Proveedores de IA del servidor",
     "cfg_ai_builtin_providers": "Servidores de IA locales",
     "cfg_ai_provider_egress": "Direcciones de los servidores de IA locales del servidor",
+    "cfg_security_screenshot_egress": "Servidores privados a los que puede llegar una página que abre el servidor",
     "cfg_ai_provider_types": "Tipos de proveedor permitidos",
     "cfg_ai_fixed_baseurl_overrides": "Direcciones de prueba de los proveedores fijos",
     "cfg_ai_legacy_settings_routes": "Rutas antiguas de la configuración de IA",
@@ -9225,6 +9226,7 @@
     "cfgDesc_ai_providers": "Más proveedores de IA de este servidor, como una lista JSON de registros de proveedor (id, title, type, baseUrl, auth, capabilities). La autenticación es none o el NOMBRE de una variable de entorno, nunca una clave.",
     "cfgDesc_ai_builtin_providers": "Servidores de IA locales que se activan, separados por comas: lmstudio, ollama, llamacpp, en sus puertos habituales de esta máquina.",
     "cfgDesc_ai_provider_egress": "Direcciones exactas (esquema, host, puerto) de los servidores de IA locales de este servidor, separadas por comas. Solo los proveedores propios del servidor pueden usarlas; el proveedor de una persona nunca las usa.",
+    "cfgDesc_security_screenshot_egress": "Direcciones exactas (esquema, host, puerto) de tus propios servidores privados, separadas por comas. Una página que el servidor abre en su propio navegador (una captura de pantalla, una prueba de juego, el banco de pruebas del Design Book) puede cargar de ellos. Vacío: esa página solo llega a direcciones públicas y a este servidor.",
     "cfgDesc_ai_provider_types": "Qué tipos fijos de proveedor de IA permite este servidor, separados por comas: openrouter, openai, anthropic, mistral, xai. Vacío permite los cinco en sus direcciones oficiales.",
     "cfgDesc_ai_fixed_baseurl_overrides": "Solo para pruebas: dirige un tipo fijo de proveedor de IA a otra dirección, como JSON. Un servidor público lo rechaza.",
     "cfgDesc_ai_legacy_settings_routes": "Las rutas de configuración de IA anteriores a los proveedores siguen respondiendo. Están obsoletas y la versión 4.0.0 las elimina. Desactivadas, responden que ya no existen e indican las rutas nuevas.",
@@ -21673,6 +21675,17 @@
           "ex2": "0: ninguna llamada después de agotar el saldo, lo mismo que refuse.",
           "ex3": "100: margen para muchas personas que agotan cada una su límite diario por cuenta.",
           "tip": "Pon aquí lo máximo que estás dispuesto a pagar en un día."
+        }
+      },
+      "security": {
+        "screenshot_egress": {
+          "title": "Servidores privados a los que puede llegar una página que abre el servidor",
+          "short": "De cuáles de tus servidores privados puede cargar una página cuando el servidor la abre en su propio navegador.",
+          "what": "El servidor abre páginas en un navegador propio: hace una captura de pantalla de una app publicada, prueba un juego y pasa una parte del Design Book por el banco de pruebas. El código de esa página lo escribió otra persona, y se ejecuta en la máquina del servidor. Por eso el servidor responde él mismo a cada dirección que pide la página. La página recibe las páginas de este servidor y cualquier dirección pública. De una dirección privada (una red de casa o de oficina, otros servicios de esta máquina, la dirección de metadatos de la nube) no recibe nada, salvo que esa dirección esté en esta lista.",
+          "range": "Direcciones exactas separadas por comas: esquema, host y puerto, sin ruta. El valor por defecto es vacío.",
+          "ex1": "Vacío (por defecto): la captura de una app que lee tu intranet muestra la app sin esos datos.",
+          "ex2": "http://intranet.local:8080: una página que abre el servidor puede cargar de ese servidor y de ninguna otra dirección privada.",
+          "tip": "Pon solo servidores cuyo contenido pueda aparecer en una captura pública. La captura de una app publicada es pública."
         }
       },
       "federation_sync": {
