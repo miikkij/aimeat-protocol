@@ -23,6 +23,7 @@
  * @structure registerAppManageTool
  * @usage registerAppManageTool(mcp, storage, config, agentGaii, scopes)
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.6.0 — 2026-10-05 — The member, plan, audit_archive, audit_keep, builder and spec actions call
  *     the services their routes call (mcp/app-manage-members.ts) and are checked against their
  *     permission word before dispatch; the loopback HTTP call, AimeatClient and the getToken
@@ -51,8 +52,7 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
-import { aiProvenanceInputs, toDeclaredProvenance, type AiProvenanceToolInput } from './ai-provenance-input.js';
-import { appManageShape } from './app-manage-shape.js';
+import { toDeclaredProvenance, type AiProvenanceToolInput } from './ai-provenance-input.js';
 import { checkAppManageInput } from '../tool-catalog/definitions/app-manage.js';
 import { requiredScopeForAction } from '../tool-catalog/action-scopes.js';
 import { answer, refusalText, plainRefusal, type ToolAnswer } from './app-manage-answers.js';
@@ -85,6 +85,7 @@ import {
     listSubdomainSites, createSubdomainSite, updateSubdomainSite, deleteSubdomainSite,
 } from '../services/subdomain-sites.js';
 import { appManageMemberAction } from './app-manage-members.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 type Args = Record<string, unknown>;
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v ? v : undefined);
@@ -108,7 +109,7 @@ export function registerAppManageTool(
     mcp.tool(
         'aimeat_app_manage',
         descriptionFor('aimeat_app_manage'),
-        { ...appManageShape, ...aiProvenanceInputs },
+        zodShapeFor('aimeat_app_manage'),
         annotationsFor('aimeat_app_manage'),
         async (raw) => {
             const args = raw as Args;

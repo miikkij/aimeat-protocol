@@ -21,6 +21,8 @@
  *   const checked = checkAppManageInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
+ *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
+ *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
  *   2026-10-02 — The design spec beside the app: spec, spec_set and spec_clear over the design-spec
  *     routes, and the markdown and expected_revision fields. A second builder had nothing that said
  *     what the app was (wish-sovelluksen-design-speksi-sovelluksen-l-helle-settings-contr).
@@ -47,6 +49,7 @@
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v1.0.0 — 2026-09-27 — Initial (wish-app-toiminnot-ilman-mcp-ty-kalua-ja-ty-kalujen-m-r-n-hallint).
  */
+import { z } from 'zod';
 import type { AimeatToolDefinition, ToolInputField } from './types.js';
 import { agentEverywhere } from './types.js';
 import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
@@ -68,7 +71,7 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     index: { type: 'boolean', description: 'For seo: true makes the app findable in search engines, false takes it back out. Off until you ask.' },
     title: { type: 'string', description: 'For seo: title for search results and social cards. Empty derives it from the app name.' },
     description: { type: 'string', description: 'For seo: the search-result description (empty derives it). For settings: the app\'s own catalogue description.' },
-    keywords: { type: 'array', description: 'For seo: keywords. Empty uses the app tags.' },
+    keywords: { type: 'array', description: 'For seo: keywords. Empty uses the app tags.', zod: z.array(z.string()) },
     image: { type: 'string', description: 'For seo: absolute https URL for the social card. Empty uses the app screenshot.' },
     lang: { type: 'string', description: 'For seo: language tag such as "fi". Empty reads what the app declares.' },
     // marks
@@ -80,24 +83,24 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     content: { type: 'string', description: 'For legal: the page text, the HTML document, or the absolute https URL.' },
     remove: { type: 'boolean', description: 'For legal: true removes the named page.' },
     // audit
-    limit: { type: 'number', description: 'For audit and member_audit: how many of the newest entries. Default 50, at most 500. For members: how many people per list on one page. Default 100, at most 500.' },
+    limit: { type: 'number', description: 'For audit and member_audit: how many of the newest entries. Default 50, at most 500. For members: how many people per list on one page. Default 100, at most 500.', zod: z.number().int().min(1).max(500) },
     playtest: { type: 'boolean', description: 'For audit: also open the app in a headless browser, signed out, and report what it did (about a minute).' },
     // visitors
-    days: { type: 'number', description: 'For visitors: the trailing window in days, 0 to 360. 0 is today only. Default 30. For member_set: how many days the membership lasts, counted from now; omit it to use the role\'s term from the plan.' },
+    days: { type: 'number', description: 'For visitors: the trailing window in days, 0 to 360. 0 is today only. Default 30. For member_set: how many days the membership lasts, counted from now; omit it to use the role\'s term from the plan.', zod: z.number().int().min(0).max(36500) },
     on: { type: 'boolean', description: 'For visitors_measure: true starts counting who opens the app; false stops and keeps what was counted.' },
     geo: { type: 'string', enum: ['off', 'country', 'region', 'city'], description: 'For visitors_measure: the place kept for each person. Choose the coarsest that answers the question. Omit to keep what it was.' },
     // ui
-    detail: { type: 'array', description: UI_DETAIL_PARAM },
+    detail: { type: 'array', description: UI_DETAIL_PARAM, zod: z.array(z.string()) },
     layout: { type: 'object', description: 'For ui_set: the WHOLE layout { v: 1, look?, nav?, blocks: [{ id, component, props }] }. It replaces what is there; read it first with ui_get.' },
     note: { type: 'string', description: 'For ui_set: one line on what this change was for. For member_set and builder_set: the owner\'s own note on the decision (at most 400 characters; the person does not see it). For member_request: your message to the owner, who sees it with the request.' },
-    version: { type: 'number', description: 'For ui_restore: the layout version to put back (ui_set answers with the one it replaced).' },
+    version: { type: 'number', description: 'For ui_restore: the layout version to put back (ui_set answers with the one it replaced).', zod: z.number().int().min(1) },
     // settings
     name: { type: 'string', description: 'For settings: the app\'s display name. Changes it without a new version.' },
-    descriptions: { type: 'object', description: 'For settings: the description per language, { "fi": "…", "es": "…" }.' },
+    descriptions: { type: 'object', description: 'For settings: the description per language, { "fi": "…", "es": "…" }.', zod: z.record(z.string(), z.string()) },
     parked: { type: 'boolean', description: 'For settings: true hides the app from the public catalogue (it still works by link and for you); false lists it again.' },
     forkable: { type: 'boolean', description: 'For settings: true lets anyone signed in fork the app into their own catalogue.' },
     access_code: { type: 'string', description: 'For settings: a code visitors must type to open the app. An empty string removes it. Never read back.' },
-    protection: { type: 'object', description: 'For settings: copy protection { obfuscate, domainLock, watermark, noRawDownload }, each true or false.' },
+    protection: { type: 'object', description: 'For settings: copy protection { obfuscate, domainLock, watermark, noRawDownload }, each true or false.', zod: z.record(z.string(), z.boolean()) },
     // screenshot_upload
     screenshot: { type: 'string', description: 'For screenshot_upload: the image as base64, at most 2 MB.' },
     screenshot_mime_type: { type: 'string', description: 'For screenshot_upload: image/png, image/jpeg or image/webp. Default image/png.' },
@@ -117,25 +120,25 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     dev_level: { type: 'string', enum: ['full', 'publisher', 'drafter'], description: 'For builder_set: how much the person may do to the app. drafter writes drafts and you publish them; publisher also publishes and keeps the app\'s name, description and look; full works on it as on their own app. No level deletes the app, changes its price or licence, or passes the right on. Use drafter unless the person asked for more.' },
     role: { type: 'string', description: 'For member_set: the role to give, in the app\'s own words (e.g. "member", "editor"). It starts with a letter and holds letters, digits, ".", "_" or "-", at most 40 characters. "owner" is refused: the owner already reaches everything.' },
     level: { type: 'number', description: 'For member_set: an optional rank inside the app, where a lower number is more power. Most apps leave it out.' },
-    offerings: { type: 'array', description: 'For member_set: the offering ids this membership gives free access to. Omit it to use what the app\'s plan says for the role (member_plan_get).' },
+    offerings: { type: 'array', description: 'For member_set: the offering ids this membership gives free access to. Omit it to use what the app\'s plan says for the role (member_plan_get).', zod: z.array(z.string()) },
     expires_at: { type: 'string', description: 'For member_set: when the membership ends, as a date such as "2026-12-31T00:00:00Z". It wins over days. An empty string means it does not end.' },
-    roles: { type: 'object', description: 'For member_plan_set: each role and the offering ids a member in that role uses free, { "member": ["<offering id>"] }. A role with no entry gives nothing free.' },
-    seats: { type: 'object', description: 'For member_plan_set: each role and how many people may hold it at once, { "editor": 3 }. A role with no entry has no limit.' },
-    terms: { type: 'object', description: 'For member_plan_set: each role and how long it lasts, { "member": { "days": 30, "renewal": "manual" } }. renewal is "manual", "self-serve" or "none" and only says what is meant to happen; nothing renews or charges by itself.' },
+    roles: { type: 'object', description: 'For member_plan_set: each role and the offering ids a member in that role uses free, { "member": ["<offering id>"] }. A role with no entry gives nothing free.', zod: z.record(z.string(), z.array(z.string())) },
+    seats: { type: 'object', description: 'For member_plan_set: each role and how many people may hold it at once, { "editor": 3 }. A role with no entry has no limit.', zod: z.record(z.string(), z.number().min(0)) },
+    terms: { type: 'object', description: 'For member_plan_set: each role and how long it lasts, { "member": { "days": 30, "renewal": "manual" } }. renewal is "manual", "self-serve" or "none" and only says what is meant to happen; nothing renews or charges by itself.', zod: z.record(z.string(), z.object({ days: z.number().positive().optional(), renewal: z.enum(['manual', 'self-serve', 'none']).optional() })) },
     access: { type: 'string', enum: ['members-free', 'free', 'members-only'], description: 'For member_plan_set: who pays for the app\'s paid calls. members-free (default): members pay nothing, everybody else pays. free: nobody pays. members-only: only members get in at all.' },
     roster_visibility: { type: 'string', enum: ['owner', 'members'], description: 'For member_plan_set: who reads the roster. owner (default) or members, who then see names, roles and join dates only.' },
-    manage_roles: { type: 'array', description: 'For member_plan_set: the roles whose holders manage the roster beside the owner: they approve, decline, change and remove roles that do not manage, invite by email and read the history. They never change the plan, run the sweep, or give or take away a managing role. Empty: the owner alone.' },
+    manage_roles: { type: 'array', description: 'For member_plan_set: the roles whose holders manage the roster beside the owner: they approve, decline, change and remove roles that do not manage, invite by email and read the history. They never change the plan, run the sweep, or give or take away a managing role. Empty: the owner alone.', zod: z.array(z.string()) },
     email: { type: 'string', description: 'For member_set, instead of account: an email address. When it belongs to a verified account on this server, that person is approved; any other address gets an invitation by email, valid 7 days, with a sign-up link: opening it makes the account with that address and a member at once. When no email could leave, the answer carries acceptUrl, the link to pass on yourself. Open invitations are listed by members and cancelled with member_invite_cancel, which also stops the link.' },
     locale: { type: 'string', enum: ['en', 'fi', 'es'], description: 'For member_set with email: the language of the invitation email. Omit it to use your own language.' },
-    q: { type: 'string', description: 'For members: show only people whose account name, display name, email or note contains this text.' },
-    offset: { type: 'number', description: 'For members: how many people to skip on each list, for the next page. Default 0.' },
+    q: { type: 'string', description: 'For members: show only people whose account name, display name, email or note contains this text.', zod: z.string().max(100) },
+    offset: { type: 'number', description: 'For members: how many people to skip on each list, for the next page. Default 0.', zod: z.number().int().min(0) },
     before: { type: 'string', description: 'For member_audit: the time of the oldest entry you already have, to read the page before it. For audit_archive: a date or ISO time; the entries older than it move into the archive.' },
-    year: { type: 'string', description: 'For audit: read that year\'s archived entries (four digits, e.g. "2026") instead of the active log. The audit answer lists the archived years.' },
-    keep: { type: 'string', description: 'For audit_keep: "all" keeps every entry of every app\'s audit log (nothing deleted), a whole number such as "1000" keeps that many newest entries per app and deletes the rest, "default" returns to the node default. Omit it to read the setting. A number is the account holder\'s own decision: it is refused here and set on the app page, signed in.' },
+    year: { type: 'string', description: 'For audit: read that year\'s archived entries (four digits, e.g. "2026") instead of the active log. The audit answer lists the archived years.', zod: z.string().regex(/^\d{4}$/) },
+    keep: { type: 'string', description: 'For audit_keep: "all" keeps every entry of every app\'s audit log (nothing deleted), a whole number such as "1000" keeps that many newest entries per app and deletes the rest, "default" returns to the node default. Omit it to read the setting. A number is the account holder\'s own decision: it is refused here and set on the app page, signed in.', zod: z.string().max(20) },
     invite_id: { type: 'string', description: 'For member_invite_cancel: the invitation id, from the invites list of members.' },
     // design spec (routes/apps/design-spec.ts)
     markdown: { type: 'string', description: 'For spec_set: the WHOLE design spec as one markdown document, at most 64 KB. It replaces what is there. Sending the text that is there marks the spec current for the app\'s version without a new revision.' },
-    expected_revision: { type: 'number', description: 'For spec_set: the revision you read (spec answers it). When the stored revision differs the write is refused with REVISION_MISMATCH and the current document, so read again and write from that. Omit it to replace whatever is there.' },
+    expected_revision: { type: 'number', description: 'For spec_set: the revision you read (spec answers it). When the stored revision differs the write is refused with REVISION_MISMATCH and the current document, so read again and write from that. Omit it to replace whatever is there.', zod: z.number().int().min(0) },
 };
 
 /** One action: its fields (true = required), its permission word (null = none), and one line. */
@@ -329,16 +332,18 @@ const DESCRIPTION = 'Manage one of your apps: its settings, search visibility, l
     + '\nPermissions are checked per action: an action needs the word shown by the refusal, so an agent without app:write can still read versions, lineage and agent status.'
     + AI_PROVENANCE_TOOL_NOTE;
 
-export const appManageTools: AimeatToolDefinition[] = [
+export const appManageTools = [
     {
         name: 'aimeat_app_manage',
         description: DESCRIPTION,
         caller: 'agent',
         visibility: agentEverywhere,
+        annotations: { title: 'Manage an App', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+        surfaces: ['appdev', 'agent'],
         input: {
             action: { type: 'string', required: true, enum: APP_MANAGE_ACTION_NAMES, description: 'What to do. The description lists each action with its fields.' },
             ...APP_MANAGE_FIELDS,
             ...aiProvenanceCatalogInput,
         },
     },
-];
+] as const satisfies readonly AimeatToolDefinition[];

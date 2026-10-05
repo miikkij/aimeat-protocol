@@ -164,7 +164,6 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // Destructive because some actions are: ui_set replaces a layout, subdomain_delete and
     // screenshot_clear remove, an empty access_code clears one. Not idempotent: agent_deploy starts
     // a new task on every call. A client that confirms each call is the safe reading of a mixed tool.
-    aimeat_app_manage: { title: 'Manage an App', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
 
     // ── Extensions ──
 

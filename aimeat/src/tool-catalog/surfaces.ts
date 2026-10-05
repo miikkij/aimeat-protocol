@@ -211,7 +211,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         
         
-        'aimeat_app_manage', 
+        
         // Component packages — a different backend from the apps above, named so since 2026-08-16.
         // Four of them are registered on this node's /v1/mcp (mcp/packages.ts) and the v2 surface
         // must list exactly what is registered. Authoring by hand (publish) and pruning history
@@ -255,7 +255,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         
         
-        'aimeat_app_manage',
+        
         
         
         // The parts this node's own interface is built from, read before a page is changed.

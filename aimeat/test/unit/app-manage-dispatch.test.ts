@@ -6,6 +6,8 @@
  *   end by test/e2e-app-manage.ts.
  * @usage pnpm test -- app-manage-dispatch
  * @version-history
+ *   v1.6.1 — 2026-10-05 — The shape compared is zodShapeFor('aimeat_app_manage'): src/mcp/app-manage-shape.ts
+ *     is gone and both MCP surfaces register the catalog's schema (secaudit 2026-10, M3).
  *   v1.6.0 — 2026-10-02 — spec, spec_set and spec_clear, and the markdown and expected_revision fields.
  *   v1.5.0 — 2026-10-02 — builders, builder_set and builder_remove, and the dev_level field.
  *   v1.4.0 — 2026-10-01 — year on audit, and audit_archive and audit_keep.
@@ -23,7 +25,7 @@ import type { AimeatClient } from '../../src/cli/connect/api-client.js';
 import {
     APP_MANAGE_ACTIONS, APP_MANAGE_ACTION_NAMES, APP_MANAGE_FIELDS, checkAppManageInput, appManageTools,
 } from '../../src/tool-catalog/definitions/app-manage.js';
-import { appManageShape } from '../../src/mcp/app-manage-shape.js';
+import { zodShapeFor } from '../../src/tool-catalog/zod-shape.js';
 import { TOOL_ACTION_SCOPES } from '../../src/tool-catalog/action-scopes.js';
 import { fileURLToPath } from 'node:url';
 import { readVocabulary } from '../../scripts/inventory/scope-vocabulary.js';
@@ -255,9 +257,11 @@ describe('aimeat_app_manage: a wrong call is refused whole, before anything is s
 
 describe('aimeat_app_manage: one table, three surfaces', () => {
     it('the zod shape and the catalog list the same fields', () => {
-        const catalog = Object.keys(appManageTools[0]!.input).filter(f => !f.startsWith('ai_provenance')).sort();
-        expect(Object.keys(appManageShape).sort()).toEqual(catalog);
-        expect(Object.keys(APP_MANAGE_FIELDS).length + 1).toBe(catalog.length);
+        // Both MCP surfaces register zodShapeFor('aimeat_app_manage') since 2026-10-05 (secaudit 2026-10, M3).
+        const catalog = Object.keys(appManageTools[0]!.input).sort();
+        expect(Object.keys(zodShapeFor('aimeat_app_manage')).sort()).toEqual(catalog);
+        // The fields, `action`, and the two provenance fields.
+        expect(Object.keys(APP_MANAGE_FIELDS).length + 3).toBe(catalog.length);
     });
 
     it('every action field is a declared field, and every action has its permission word', () => {
