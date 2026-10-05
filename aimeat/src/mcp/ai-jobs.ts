@@ -16,6 +16,7 @@
  * @structure registerAiJobTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage registerAiJobTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-08-31 — Initial.
  *   v1.0.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
@@ -27,16 +28,15 @@
  *     session's scopes as a fifth parameter.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { AI_ROLE_PARAM } from '../tool-catalog/definitions/ai-models.js';
 import { localAccountName } from '../utils/gaii.js';
 import { AiJobError, getActiveAiJobService } from '../services/ai-jobs/index.js';
 import type { AiJobState } from '../services/ai-jobs/types.js';
 import { startedByOf } from '../services/ai-jobs/starter.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerAiJobTools(
     mcp: McpServer,
@@ -68,25 +68,7 @@ export function registerAiJobTools(
     mcp.tool(
         'aimeat_ai_job_start',
         descriptionFor('aimeat_ai_job_start'),
-        {
-            prompt: z.string().optional().describe('The prompt. Required unless prompt_key names a record holding it.'),
-            prompt_key: z.string().optional().describe('An owner memory key holding the prompt text (a string, or an object with a `prompt` field).'),
-            input_keys: z.array(z.string()).optional().describe('Memory keys read and pasted into the prompt, labelled by key. The model has no tools; this is the only way it sees stored data. A missing record is stated as missing rather than left for it to invent.'),
-            result_key: z.string().describe('Where the answer is written, in the owner\'s own namespace.'),
-            result_visibility: z.enum(['private', 'owner', 'public']).optional().describe('Visibility of the record written at result_key. Default private.'),
-            model: z.string().optional().describe('Explicit model id. Omit to use the owner\'s configured model.'),
-            system_prompt: z.string().optional().describe('Optional system prompt.'),
-            json: z.boolean().optional().describe('Parse the answer as JSON before storing it.'),
-            app_id: z.string().optional().describe('App attribution — enables the per-app allowlist and per-app daily quota.'),
-            on_done: z.object({ extension: z.string(), action: z.string() }).optional()
-                .describe('An extension action of the job\'s OWN owner, invoked with { job_id, state, result_key } when the job finishes.'),
-            op: z.enum(['text', 'image', 'transcribe']).optional().describe('The kind of model call: "text" (default), "image" (one picture from the prompt) or "transcribe" (speech-to-text over audio_key).'),
-            provider: z.string().optional().describe('A provider to use, by id or by type. Naming one turns fallback off.'),
-            audio_key: z.string().optional().describe('For op "transcribe" (required there): the storage key of an audio file in your own storage.'),
-            language: z.string().optional().describe('For op "transcribe": an ISO-639-1 language hint.'),
-            size: z.string().optional().describe('For op "image": a provider-specific size, e.g. "1024x1024".'),
-            role: z.string().min(1).max(300).optional().describe(AI_ROLE_PARAM),
-        },
+        zodShapeFor('aimeat_ai_job_start'),
         annotationsFor('aimeat_ai_job_start'),
         async (a) => {
             if (!owner) return err('Could not resolve caller owner');
@@ -120,11 +102,7 @@ export function registerAiJobTools(
     mcp.tool(
         'aimeat_ai_job_list',
         descriptionFor('aimeat_ai_job_list'),
-        {
-            state: z.enum(['queued', 'running', 'done', 'failed', 'cancelled', 'live', 'all']).optional()
-                .describe('Which jobs to list. "live" (the default) is queued + running.'),
-            limit: z.number().optional().describe('How many to return (1-500, default 50).'),
-        },
+        zodShapeFor('aimeat_ai_job_list'),
         annotationsFor('aimeat_ai_job_list'),
         async (a) => {
             try {
@@ -143,7 +121,7 @@ export function registerAiJobTools(
     mcp.tool(
         'aimeat_ai_job_get',
         descriptionFor('aimeat_ai_job_get'),
-        { job_id: z.string().describe('The job id from aimeat_ai_job_start.') },
+        zodShapeFor('aimeat_ai_job_get'),
         annotationsFor('aimeat_ai_job_get'),
         async (a) => {
             try {
@@ -162,7 +140,7 @@ export function registerAiJobTools(
     mcp.tool(
         'aimeat_ai_job_cancel',
         descriptionFor('aimeat_ai_job_cancel'),
-        { job_id: z.string().describe('The job id to stop.') },
+        zodShapeFor('aimeat_ai_job_cancel'),
         annotationsFor('aimeat_ai_job_cancel'),
         async (a) => {
             try {

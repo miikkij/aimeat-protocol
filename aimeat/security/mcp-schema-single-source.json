@@ -30,7 +30,6 @@
     "aimeat_agent_task_start_set",
     "aimeat_agent_telemetry_report",
     "aimeat_ai_embed",
-    "aimeat_ai_job_start",
     "aimeat_ai_policy_set",
     "aimeat_ai_role_set",
     "aimeat_ai_transcribe",
