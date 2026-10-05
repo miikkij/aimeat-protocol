@@ -16,15 +16,24 @@
  *   openPreview(html, target) · initPreviewHost()
  * @usage import { openPreview, previewTarget, initPreviewHost } from './preview-host.js'
  * @version-history
+ *   v1.1.0 — 2026-10-05 — Secaudit 2026-10, WEB-1 and WEB-2: each preview frame gets a secret in its
+ *     boot data and this page answers only a message that carries it, on the request's MessagePort; a
+ *     frame document without boot data gets the preview opened again; a preview asks the node as
+ *     unpublished code, so the owner's own app widens its grant only through the consent window.
  *   v1.0.0 — 2026-09-26 — Initial: the preview gets the app's own grant, never the owner's session
  *     (main.js answered `aimeat-request-auth` with the session token).
  */
-import { silentGrant, consentWindow } from '../../app-frame-core.js';
+import { silentGrant, consentWindow, frameSecret, bootName, fromFrame, FRAME_BOOT } from '../../app-frame-core.js';
 import { showNotice } from './ui.js';
 import { t } from './i18n.js';
 
 /** The app the preview frame holds, as the node names it (`owner/file`), or '' when it has no name. */
 var currentTarget = '';
+
+/** The secret the current preview frame was given in its boot data, and the code it shows. */
+var currentSecret = '';
+var currentHtml = '';
+var reopened = [];
 
 /** The script the node puts in front of an app in a frame of its own (fetched once, revalidated). */
 var shimSource = null;
@@ -84,30 +93,52 @@ function withSupport(html) {
 export function openPreview(html, target) {
   var iframe = document.getElementById('app-iframe');
   currentTarget = target || '';
+  currentHtml = html;
+  currentSecret = frameSecret();
   // A browser reads an iframe's name into the frame only when the frame is created, so every preview
   // gets a fresh copy of the element (its id, sandbox and data attributes come along).
   var fresh = /** @type {HTMLIFrameElement} */ (iframe.cloneNode(false));
   fresh.removeAttribute('src');
-  fresh.name = 'aimeat-frame:' + JSON.stringify({ v: 1, origin: location.origin, ls: {}, ss: {} });
+  fresh.name = bootName({ origin: location.origin, secret: currentSecret });
   fresh.srcdoc = withSupport(html);
   iframe.replaceWith(fresh);
 }
 
-/** The one door in: this page's own preview frame, while it is sandboxed (its origin is opaque). */
+/**
+ * The one door in: this page's own preview frame, while it is sandboxed (its origin is opaque), and
+ * only with the secret the frame was given. A preview is code that is not the published version, so
+ * its grant is asked as unpublished. Answers go back on the request's MessagePort.
+ */
 export function initPreviewHost() {
   fetch('/app-frame-shim.js', { cache: 'no-cache' })
     .then(function (r) { return r.ok ? r.text() : ''; })
     .then(function (text) { shimSource = text ? text.replace(/^\s*\/\*[\s\S]*?\*\/\s*/, '') : null; })
     .catch(function () { shimSource = null; });
-  var deps = { grant: silentGrant, consent: consentForPreview, origin: location.origin };
+  var deps = {
+    grant: function (app, scope) { return silentGrant(app, scope, { unpublished: true }); },
+    consent: consentForPreview,
+    origin: location.origin,
+  };
   window.addEventListener('message', function (e) {
-    var iframe = document.getElementById('app-iframe');
+    var iframe = /** @type {HTMLIFrameElement|null} */ (document.getElementById('app-iframe'));
     if (!iframe || !iframe.contentWindow || e.source !== iframe.contentWindow || e.origin !== 'null') return;
+    var d = e.data;
+    if (d && typeof d === 'object' && d.type === FRAME_BOOT) {
+      // A reload inside the preview frame: show the same preview in a new frame (bounded).
+      var now = Date.now();
+      reopened = reopened.filter(function (t) { return now - t < 10000; });
+      if (currentTarget !== '' || currentHtml) {
+        if (reopened.length < 5) { reopened.push(now); openPreview(currentHtml, currentTarget); }
+      }
+      return;
+    }
+    if (!fromFrame(e, iframe, currentSecret)) return;
+    var port = e.ports && e.ports[0];
+    if (!port) return;
     var target = currentTarget;
-    answerPreview(e.data, target, deps).then(function (answer) {
-      // '*' because the frame's origin is opaque; the answer goes to this page's own frame only, and
-      // only while it still holds the preview that asked.
-      if (answer && currentTarget === target && iframe.contentWindow) iframe.contentWindow.postMessage(answer, '*');
+    answerPreview(d, target, deps).then(function (answer) {
+      // On the port of the document that asked, and only while the frame still holds that preview.
+      if (answer && currentTarget === target) port.postMessage(answer);
     });
   });
 }
@@ -115,4 +146,6 @@ export function initPreviewHost() {
 /** Forget the preview when the frame closes, so a late answer cannot reach the next one. */
 export function clearPreview() {
   currentTarget = '';
+  currentSecret = '';
+  currentHtml = '';
 }

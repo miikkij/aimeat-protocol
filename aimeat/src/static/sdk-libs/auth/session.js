@@ -12,6 +12,9 @@
  *   scheduleAutoRefresh/createSession · refreshOnFocus · the `auth` object.
  * @usage import { auth, api, isAppOrigin, restoreSessionFromAppOrigin } from './session.js';
  * @version-history
+ *   v1.6.1 — 2026-10-05 — requestParentAuth waits through app-frame.js parentAuth: in the node's
+ *     isolated frame with the frame's secret and a port, elsewhere from the parent window only
+ *     (secaudit 2026-10, WEB-1; it took an answer from any window).
  *   v1.6.0 — 2026-10-04 — signIn({ register: true }) or { tab: 'register' } on an app origin opens the
  *     consent window on the create-account form (restoreSessionFromAppOrigin's `prompt`, 'create').
  *   v1.5.1 — 2026-09-25 — isAppOrigin()'s comment names the isolated frame too (app-origin.js v1.2.0).
@@ -48,6 +51,7 @@ import { isAppOrigin, appScopeDrift, silentAppToken, apexLogout, requestConsentP
 import { passkeySupported, passkeySignIn, passkeyAdd } from './passkey.js';
 import { api, authApi, sessionHeaders } from './http.js';
 import { onLoginWhileOpen } from './on-login.js';
+import { parentAuth } from './app-frame.js';
 
 // The app-origin helpers moved to ./app-origin.js on 2026-09-04 (pure extraction, 800-line ceiling).
 // Re-exported from here because pill.js and the SDK's consumers import them from './session.js'.
@@ -725,24 +729,12 @@ export const auth = {
    * @returns {Promise<object|null>} Session-like object with .jwt and .fetch(), or null
    */
   requestParentAuth(timeout = 3000) {
-    return new Promise((resolve) => {
-      if (window === window.parent) { resolve(null); return; }
-
-      let resolved = false;
-      const timer = setTimeout(() => { if (!resolved) { resolved = true; resolve(null); } }, timeout);
-
-      function handler(e) {
-        if (resolved) return;
-        if (!e.data || e.data.type !== 'aimeat-auth') return;
-        resolved = true;
-        clearTimeout(timer);
-        window.removeEventListener('message', handler);
-
-        const jwt = e.data.jwt;
-        const parentNodeUrl = e.data.nodeUrl;
-        if (!jwt) { resolve(null); return; }
-
-        const effectiveNodeUrl = parentNodeUrl || NODE_URL;
+    if (window === window.parent) return Promise.resolve(null);
+    // The waiting, the secret and the port are app-frame.js parentAuth (secaudit 2026-10, WEB-1).
+    return parentAuth(timeout).then((answer) => {
+        if (!answer) return null;
+        const jwt = answer.jwt;
+        const effectiveNodeUrl = answer.nodeUrl || NODE_URL;
 
         const session = /** @type {Record<string, any>} */ ({
           jwt,
@@ -775,11 +767,7 @@ export const auth = {
 
         currentSession = session;
         emit('login', session, { restored: true });   // handed over by the embedding page
-        resolve(session);
-      }
-
-      window.addEventListener('message', handler);
-      window.parent.postMessage({ type: 'aimeat-request-auth' }, '*');
+        return session;
     });
   },
 

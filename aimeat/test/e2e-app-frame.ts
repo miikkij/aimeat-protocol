@@ -15,6 +15,8 @@
  *       app's address is refused.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-app-frame.ts
  * @version-history
+ *   v1.3.0 — 2026-10-05 — Phase 3: code that is not the published version (`bytes=unpublished`)
+ *     keeps the owner's held grant and cannot widen it silently (secaudit 2026-10, WEB-2).
  *   v1.2.0 — 2026-10-04 — Phase 1: on a one-owner node, an app a package installed gets the frame page
  *     and its grant from the install; the owner's own app stays on the node's address.
  *   v1.1.0 — 2026-09-26 — Phase 1: the grant door answers a page of the node by name on a one-owner
@@ -117,10 +119,10 @@ async function publish(token: string, filename: string, marker: string): Promise
 }
 
 /** Call the grant door the way the frame page does: same-origin, with the session cookie. */
-async function frameGrant(app: string, scope: string, cookie: string | null, extraHeaders: Record<string, string> = {}) {
+async function frameGrant(app: string, scope: string, cookie: string | null, extraHeaders: Record<string, string> = {}, extraQuery = '') {
     const headers: Record<string, string> = { 'Sec-Fetch-Site': 'same-origin', 'Sec-Fetch-Mode': 'cors', ...extraHeaders };
     if (cookie) headers.Cookie = `aimeat_rt=${encodeURIComponent(cookie)}`;
-    const res = await fetch(`${BASE}/v1/auth/app-grant-silent?app=${encodeURIComponent(app)}&scope=${encodeURIComponent(scope)}`, { headers });
+    const res = await fetch(`${BASE}/v1/auth/app-grant-silent?app=${encodeURIComponent(app)}&scope=${encodeURIComponent(scope)}${extraQuery}`, { headers });
     const body = await res.json() as any;
     return body.data as { ok: boolean; error?: string; access_token?: string; refresh_token?: string; scope?: string; own?: boolean; app?: string };
 }
@@ -293,6 +295,16 @@ async function main() {
         await test('the grant is not the session: an owner-only door refuses it', async () => {
             const res = await fetch(`${BASE}/v1/auth/sessions`, { headers: { Authorization: `Bearer ${ownToken}` } });
             assert(res.status === 403, `an app grant must not list the person's sign-ins, got ${res.status}`);
+        });
+        await test('code that is not the published version keeps the grant the owner holds', async () => {
+            // A preview, a checkpoint or a builder's draft runs under the owner's own app name, but
+            // another person may have written it (secaudit 2026-10, WEB-2).
+            const r = await frameGrant(`${a}/${SOLO}`, 'memory:read memory:write', A.rt, {}, '&bytes=unpublished');
+            assert(r.ok === true && !!r.access_token && r.scope === 'memory:read memory:write', `expected the held grant, got ${JSON.stringify(r)}`);
+        });
+        await test('code that is not the published version cannot widen the owner\'s grant silently', async () => {
+            const r = await frameGrant(`${a}/${SOLO}`, 'memory:read memory:write memory:delete messages:read', A.rt, {}, '&bytes=unpublished');
+            assert(r.ok === false && r.error === 'consent_required' && !r.access_token, `expected consent_required, got ${JSON.stringify(r)}`);
         });
         await test('another person\'s app gets nothing without consent', async () => {
             const r = await frameGrant(`${bn}/${OTHER}`, 'memory:read', A.rt);

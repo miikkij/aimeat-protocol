@@ -6,10 +6,23 @@
  *   (app-catalog/js/preview-host.js, which esbuild bundles this into). Both ask the node for the
  *   app's own grant, run the visible consent for it, and hand the frame the access token alone. The
  *   node's session stays on the page that imports this.
- * @structure b64url · pkce · forFrame · silentGrant(app, scope) · consentWindow(app, scope, manage,
- *   redirectUri, onBlocked)
- * @usage import { silentGrant, consentWindow } from './app-frame-core.js';
+ *
+ *   A page trusts its frame by a secret, never by the frame's origin. Every document a sandboxed
+ *   iframe loads has the opaque origin 'null', a foreign page that a link opened inside the frame
+ *   included, so `e.source === frame.contentWindow && e.origin === 'null'` admits that page too
+ *   (secaudit 2026-10, WEB-1). The page makes a secret per frame, hands it over once in the frame's
+ *   name, the frame support script (app-frame-shim.js) takes it and clears the name before the app's
+ *   first byte runs, and every message the page acts on carries it. A frame document that finds no
+ *   boot data asks for a new frame (FRAME_BOOT), which the page answers by building one; that request
+ *   needs no secret, because all it can cause is a fresh frame holding the app's own address.
+ * @structure b64url · pkce · forFrame · frameSecret() · bootName(boot) · fromFrame(e, frame, secret) ·
+ *   silentGrant(app, scope, opts) · consentWindow(app, scope, manage, redirectUri, onBlocked)
+ * @usage import { silentGrant, consentWindow, frameSecret, bootName, fromFrame, FRAME_BOOT } from './app-frame-core.js';
  * @version-history
+ *   v1.2.0 — 2026-10-05 — frameSecret, bootName, fromFrame and FRAME_BOOT: the page admits a message
+ *     only with its frame's secret (secaudit 2026-10, WEB-1). silentGrant takes { unpublished }: code
+ *     that is not the published version (a draft, a checkpoint, a proposal) never approves its own
+ *     owner's widening silently (WEB-2).
  *   v1.1.0 — 2026-10-04 — consentWindow takes `prompt`; 'create' sends prompt=create to authorize.
  *   v1.0.0 — 2026-09-26 — Initial: moved out of app-frame.js unchanged, so the App Catalog's preview
  *     asks for the same grant the isolated frame does instead of handing over the session.
@@ -39,15 +52,55 @@ export function forFrame(data) {
   return out;
 }
 
+/** The prefix of the boot data in a frame's name; app-frame-shim.js reads the same string. */
+export var BOOT_PREFIX = 'aimeat-frame:';
+
+/** The message a frame document sends when it starts with no boot data: build me a new frame. */
+export var FRAME_BOOT = 'aimeat_frame_boot';
+
+/** A fresh secret for one frame: 128 random bits, base64url. */
+export function frameSecret() {
+  return b64url(crypto.getRandomValues(new Uint8Array(16)).buffer);
+}
+
+/**
+ * The name a new frame is created with. A browser reads it into the frame only at creation, and the
+ * frame support script clears it at once, so the boot data and the secret are never left where a
+ * later document of the same frame could read them.
+ * @param {{ origin: string, secret: string, ls?: Record<string,string>, ss?: Record<string,string> }} boot
+ */
+export function bootName(boot) {
+  return BOOT_PREFIX + JSON.stringify({ v: 1, origin: boot.origin, secret: boot.secret, ls: boot.ls || {}, ss: boot.ss || {} });
+}
+
+/**
+ * Whether a message event comes from this page's frame while it is sandboxed (opaque origin) AND
+ * carries that frame's secret. The secret is what tells the app's own document from any other
+ * document the same frame may have navigated to.
+ * @param {MessageEvent} e
+ * @param {HTMLIFrameElement|null} frame
+ * @param {string} secret
+ */
+export function fromFrame(e, frame, secret) {
+  if (!frame || !frame.contentWindow || e.source !== frame.contentWindow || e.origin !== 'null') return false;
+  var d = e.data;
+  return !!(d && typeof d === 'object' && typeof d.secret === 'string' && secret && d.secret === secret);
+}
+
 /**
  * The app's own scoped grant from the silent door, asked by the app's name with this page's session
  * cookie, which the frame cannot send. The node answers only a page of its own origin here. The owner's
  * own app is granted silently; another person's app answers consent_required until that person agrees.
+ * `opts.unpublished` says the frame holds code that is not the app's published version (a draft, a
+ * checkpoint, a proposal): another person may have written it, so the node approves the owner's own
+ * app silently only within the grant the owner already holds, and asks for consent beyond it.
  * @param {string} app  owner/filename
  * @param {string} scope  space-separated scopes the app declares
+ * @param {{ unpublished?: boolean }} [opts]
  */
-export function silentGrant(app, scope) {
-  return fetch('/v1/auth/app-grant-silent?app=' + encodeURIComponent(app) + '&scope=' + encodeURIComponent(scope || ''),
+export function silentGrant(app, scope, opts) {
+  return fetch('/v1/auth/app-grant-silent?app=' + encodeURIComponent(app) + '&scope=' + encodeURIComponent(scope || '')
+    + (opts && opts.unpublished ? '&bytes=unpublished' : ''),
     { credentials: 'include', cache: 'no-store' })
     .then(function (r) { return r.json(); })
     .then(function (j) { return (j && j.data) ? forFrame(j.data) : { ok: false, error: 'failed' }; })

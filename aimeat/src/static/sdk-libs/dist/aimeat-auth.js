@@ -1694,35 +1694,75 @@
     }
   }
   var sequence = 0;
-  function askFrameHost(op, payload, timeoutMs) {
+  function frameHost() {
+    var named = (
+      /** @type {any} */
+      window.__AIMEAT_FRAME__
+    );
+    return {
+      host: named && typeof named.origin === "string" && named.origin || location.protocol + "//" + location.host,
+      secret: named && typeof named.secret === "string" && named.secret || ""
+    };
+  }
+  function postToFrameHost(message, timeoutMs, accept) {
     return new Promise(function(resolve) {
-      var id = "f" + ++sequence + "-" + Math.random().toString(36).slice(2);
-      var named = (
-        /** @type {any} */
-        window.__AIMEAT_FRAME__
-      );
-      var host = named && typeof named.origin === "string" && named.origin || location.protocol + "//" + location.host;
+      var at = frameHost();
+      var channel = new MessageChannel();
       var timer = null;
       function done(value) {
-        window.removeEventListener("message", onMessage);
         if (timer) clearTimeout(timer);
+        try {
+          channel.port1.close();
+        } catch {
+        }
         resolve(value);
       }
-      function onMessage(e) {
-        if (e.source !== window.parent || e.origin !== host) return;
+      channel.port1.onmessage = function(e) {
         var d = e.data || {};
-        if (d.type !== "aimeat_frame_res" || d.id !== id) return;
-        done(d.result === void 0 ? null : d.result);
-      }
-      window.addEventListener("message", onMessage);
+        if (accept && !accept(d)) return;
+        done(d);
+      };
       if (timeoutMs) timer = setTimeout(function() {
         done(null);
       }, timeoutMs);
       try {
-        window.parent.postMessage(Object.assign({ type: "aimeat_frame_req", id, op }, payload || {}), host);
+        window.parent.postMessage(Object.assign({}, message, { secret: at.secret }), at.host, [channel.port2]);
       } catch {
         done(null);
       }
+    });
+  }
+  function parentAuth(timeoutMs) {
+    var pick = function(d) {
+      return d && d.type === "aimeat-auth" && d.jwt ? { jwt: String(d.jwt), nodeUrl: d.nodeUrl ? String(d.nodeUrl) : "" } : null;
+    };
+    if (inIsolatedFrame()) {
+      return postToFrameHost({ type: "aimeat-request-auth" }, timeoutMs, function(d) {
+        return d.type === "aimeat-auth";
+      }).then(pick);
+    }
+    return new Promise(function(resolve) {
+      var timer = setTimeout(function() {
+        window.removeEventListener("message", onMessage);
+        resolve(null);
+      }, timeoutMs);
+      function onMessage(e) {
+        if (e.source !== window.parent || !e.data || e.data.type !== "aimeat-auth") return;
+        clearTimeout(timer);
+        window.removeEventListener("message", onMessage);
+        resolve(pick(e.data));
+      }
+      window.addEventListener("message", onMessage);
+      window.parent.postMessage({ type: "aimeat-request-auth" }, "*");
+    });
+  }
+  function askFrameHost(op, payload, timeoutMs) {
+    var id = "f" + ++sequence + "-" + Math.random().toString(36).slice(2);
+    var request = Object.assign({}, payload || {}, { type: "aimeat_frame_req", id, op });
+    return postToFrameHost(request, timeoutMs, function(d) {
+      return d.type === "aimeat_frame_res" && d.id === id;
+    }).then(function(d) {
+      return d && d.result !== void 0 ? d.result : null;
     });
   }
 
@@ -3197,69 +3237,46 @@
      * @returns {Promise<object|null>} Session-like object with .jwt and .fetch(), or null
      */
     requestParentAuth(timeout = 3e3) {
-      return new Promise((resolve) => {
-        if (window === window.parent) {
-          resolve(null);
-          return;
-        }
-        let resolved = false;
-        const timer = setTimeout(() => {
-          if (!resolved) {
-            resolved = true;
-            resolve(null);
-          }
-        }, timeout);
-        function handler(e) {
-          if (resolved) return;
-          if (!e.data || e.data.type !== "aimeat-auth") return;
-          resolved = true;
-          clearTimeout(timer);
-          window.removeEventListener("message", handler);
-          const jwt = e.data.jwt;
-          const parentNodeUrl = e.data.nodeUrl;
-          if (!jwt) {
-            resolve(null);
-            return;
-          }
-          const effectiveNodeUrl = parentNodeUrl || NODE_URL;
-          const session = (
-            /** @type {Record<string, any>} */
-            {
-              jwt,
-              nodeUrl: effectiveNodeUrl,
-              owner: null,
-              gaii: null,
-              ghii: null,
-              identity: null,
-              get valid() {
-                return jwt && !isExpired(jwt);
-              },
-              async fetch(path, opts = {}) {
-                const url = effectiveNodeUrl + path;
-                const headers = sessionHeaders(opts.headers, jwt, opts.body);
-                const resp = await fetch(url, { ...opts, headers });
-                return resp.json();
-              },
-              async notify(title, opts = {}) {
-                return session.fetch("/v1/notifications", {
-                  method: "POST",
-                  body: JSON.stringify({ title, body: opts.body, link: opts.link, type: opts.type })
-                });
-              }
+      if (window === window.parent) return Promise.resolve(null);
+      return parentAuth(timeout).then((answer) => {
+        if (!answer) return null;
+        const jwt = answer.jwt;
+        const effectiveNodeUrl = answer.nodeUrl || NODE_URL;
+        const session = (
+          /** @type {Record<string, any>} */
+          {
+            jwt,
+            nodeUrl: effectiveNodeUrl,
+            owner: null,
+            gaii: null,
+            ghii: null,
+            identity: null,
+            get valid() {
+              return jwt && !isExpired(jwt);
+            },
+            async fetch(path, opts = {}) {
+              const url = effectiveNodeUrl + path;
+              const headers = sessionHeaders(opts.headers, jwt, opts.body);
+              const resp = await fetch(url, { ...opts, headers });
+              return resp.json();
+            },
+            async notify(title, opts = {}) {
+              return session.fetch("/v1/notifications", {
+                method: "POST",
+                body: JSON.stringify({ title, body: opts.body, link: opts.link, type: opts.type })
+              });
             }
-          );
-          const payload = parseJwt(jwt);
-          if (payload) {
-            session.gaii = payload.sub || null;
-            session.owner = payload.owner || null;
-            session.identity = session.gaii || session.ghii || null;
           }
-          currentSession = session;
-          emit("login", session, { restored: true });
-          resolve(session);
+        );
+        const payload = parseJwt(jwt);
+        if (payload) {
+          session.gaii = payload.sub || null;
+          session.owner = payload.owner || null;
+          session.identity = session.gaii || session.ghii || null;
         }
-        window.addEventListener("message", handler);
-        window.parent.postMessage({ type: "aimeat-request-auth" }, "*");
+        currentSession = session;
+        emit("login", session, { restored: true });
+        return session;
       });
     },
     // Capability flag so an embedding app can feature-detect the compact login pill.

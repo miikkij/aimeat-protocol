@@ -13,8 +13,17 @@
  *   node for the app's own sign-in) and tells that page the app's title. Nothing here reaches the
  *   node's session: what the frame page hands over is the app's own data, and on request the app's
  *   own grant.
+ *
+ *   The boot data in window.name carries the secret the page around the frame admits messages by.
+ *   This script takes it and clears window.name before any line of the app runs, so no later document
+ *   of the frame (a page a link opened in it) can read the app's storage or the secret there. Every
+ *   message to the page carries the secret; the SDK reads it from window.__AIMEAT_FRAME__.secret. A
+ *   document that starts inside a frame with no boot data (a reload in the frame) asks the page for a
+ *   new frame and stops, so the app never runs without its storage.
  *   The leading comment block is removed before the script is served (utils/app-frame-assets.ts).
  * @version-history
+ *   v1.2.0 — 2026-10-05 — Secaudit 2026-10, WEB-1: the secret, window.name cleared at once, the
+ *     request for a new frame when there is no boot data.
  *   v1.0.0 — 2026-09-25 — Initial (audit A7-1: apps on shared nodes without an app origin).
  *   v1.1.0 — 2026-09-26 — The page around the frame names its origin in the boot data, and the SDK
  *     reads it from window.__AIMEAT_FRAME__: the App Catalog's preview is written into its frame as
@@ -31,19 +40,39 @@
   try {
     if (typeof window.name === 'string' && window.name.indexOf(PREFIX) === 0) boot = JSON.parse(window.name.slice(PREFIX.length));
   } catch (e) { boot = null; }
-  var hasHost = !!(boot && boot.v === 1) && window.parent !== window;
+  // Read once, then gone: a later document of this frame must not find the storage or the secret here.
+  try { if (typeof window.name === 'string' && window.name.indexOf(PREFIX) === 0) window.name = ''; } catch (e) { /* nothing to clear */ }
+  var secret = boot && typeof boot.secret === 'string' ? boot.secret : '';
+  var framed = window.parent !== window;
+  var hasHost = !!(boot && boot.v === 1 && secret) && framed;
   // The origin of the page around the frame, where it listens. It says so in the boot data; an older
   // page did not, and then it is the address this document was served from (a preview written into
   // the frame as srcdoc has no such address, which is why the page says it).
   var hostOrigin = boot && typeof boot.origin === 'string' && /^https?:\/\/[^/?#\s]+$/.test(boot.origin)
     ? boot.origin
     : location.protocol + '//' + location.host;
+
+  // In a frame, with no boot data: a reload inside the frame (the name was cleared on the first load).
+  // Ask the page for a new frame and stop here, before the app runs without its storage. Only the
+  // node's own pages may frame these bytes (frame-ancestors 'self'), so the page that hears this is
+  // the node's. A srcdoc preview has no address of its own, so it asks on '*'.
+  if (framed && !boot) {
+    try {
+      var srcdoc = location.protocol === 'about:';
+      window.parent.postMessage({ type: 'aimeat_frame_boot', path: srcdoc ? '' : location.pathname + location.search + location.hash }, srcdoc ? '*' : hostOrigin);
+    } catch (e) { /* the page is gone */ }
+    try { window.stop(); } catch (e) { /* stopping is best effort; the write below ends the document */ }
+    try { document.write('<plaintext hidden>'); } catch (e) { /* the document has ended already */ }
+    return;
+  }
+
   try {
-    Object.defineProperty(window, '__AIMEAT_FRAME__', { value: Object.freeze({ v: 1, host: hasHost, origin: hostOrigin }) });
+    Object.defineProperty(window, '__AIMEAT_FRAME__', { value: Object.freeze({ v: 1, host: hasHost, origin: hostOrigin, secret: secret }) });
   } catch (e) { /* defined already */ }
 
   function post(message) {
     if (!hasHost) return;
+    message.secret = secret;
     try { window.parent.postMessage(message, hostOrigin); } catch (e) { /* the page is gone */ }
   }
 
