@@ -7932,6 +7932,7 @@ paths:
         - { in: query, name: origin, required: false, schema: { type: string }, description: "The embedding app's origin (a <sub>.apps.<host> origin). Required unless `app` is given." }
         - { in: query, name: app, required: false, schema: { type: string }, description: "owner/filename, from a page of the node that holds the app in a frame (the isolated frame, the App Catalog's preview)" }
         - { in: query, name: scope, required: false, schema: { type: string }, description: Space-separated grantable scopes }
+        - { in: query, name: bytes, required: false, schema: { type: string, enum: [unpublished] }, description: "`unpublished` when the frame holds code that is not the app's published version (a draft, a checkpoint, a preview). The owner's own app is then approved silently only within the grant the owner already holds; a wider request answers consent_required." }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
 

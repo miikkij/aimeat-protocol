@@ -14,12 +14,25 @@
  *       browser storage keeps its data between visits (app-frame-shim.js is the frame's half);
  *     - the page title.
  *   The node's session never leaves this page. The frame gets the app's grant and the app's own data.
- * @structure appFromPath · the storage areas · the frame · onMessage → login / consent / logout /
- *   store / title / the legacy aimeat-request-auth · the bar shown when a browser blocks the window.
- *   The grant, the consent window and the refresh-token rule are app-frame-core.js, shared with the
- *   App Catalog's preview.
+ *
+ *   The page acts on a message only when it carries the frame's secret (app-frame-core.js fromFrame):
+ *   every document the sandboxed frame loads has the origin 'null', a foreign page a link opened in
+ *   it included. The secret and the app's storage reach the frame once, in its name at creation, and
+ *   the frame support script clears the name; the page never writes the name again. A document that
+ *   starts with no boot data (a reload inside the frame) asks for a new frame, and the page builds
+ *   one at the app's own address with a new secret. Answers that carry a grant go back on the
+ *   MessagePort the request brought, which belongs to the document that asked and to no later one.
+ * @structure appFromPath · the storage areas · build(src) the frame · onMessage → boot / login /
+ *   consent / logout / store / title / the legacy aimeat-request-auth · the bar shown when a browser
+ *   blocks the window. The grant, the consent window, the secret and the refresh-token rule are
+ *   app-frame-core.js, shared with the App Catalog's preview.
  * @usage Served at /app-frame.js as a module; referenced by app-frame.html.
  * @version-history
+ *   v1.3.0 — 2026-10-05 — Secaudit 2026-10, WEB-1 and WEB-2. A message counts only with the frame's
+ *     secret; the storage is no longer written back into the frame's name after each change (a foreign
+ *     page in the frame read the app's storage, the SDK's access token in it, from window.name); a
+ *     frame document without boot data gets a new frame; grant answers go back on the request's
+ *     MessagePort; a draft (`?preview=`) asks the node as unpublished code.
  *   v1.2.0 — 2026-10-04 — The consent request's `prompt` ('create') reaches the consent window, so
  *     signIn({ register: true }) opens on the create-account form in the isolated frame too.
  *   v1.1.0 — 2026-09-26 — A module: the grant, the consent window and forFrame moved unchanged to
@@ -27,7 +40,7 @@
  *     own origin in the boot data.
  *   v1.0.0 — 2026-09-25 — Initial (audit A7-1: apps on shared nodes without an app origin).
  */
-import { silentGrant, consentWindow } from './app-frame-core.js';
+import { silentGrant, consentWindow, frameSecret, bootName as nameFor, fromFrame, FRAME_BOOT } from './app-frame-core.js';
 
 (function () {
   'use strict';
@@ -47,7 +60,6 @@ import { silentGrant, consentWindow } from './app-frame-core.js';
   // Features the app may ask the person for, each behind the browser's own prompt.
   var ALLOW = 'camera; microphone; geolocation; fullscreen; clipboard-read; clipboard-write; autoplay; '
     + 'display-capture; screen-wake-lock; web-share; midi; picture-in-picture; accelerometer; gyroscope; magnetometer';
-  var NAME_PREFIX = 'aimeat-frame:';
   // Characters per storage area, the same ceiling app-frame-shim.js keeps.
   var STORE_LIMIT = 1000000;
   // The node-wide choices an app follows until it makes one of its own.
@@ -77,8 +89,8 @@ import { silentGrant, consentWindow } from './app-frame-core.js';
   var areas = { ls: local() ? readArea(local(), KEYS.ls) : Object.create(null), ss: session() ? readArea(session(), KEYS.ss) : Object.create(null) };
   var sizes = { ls: sizeOf(areas.ls), ss: sizeOf(areas.ss) };
 
-  /** What the frame reads before its first byte: its own storage, and the node's choices it follows. */
-  function bootName() {
+  /** What the frame reads before its first byte: its own storage, the node's choices it follows, its secret. */
+  function bootName(secret) {
     var ls = Object.create(null);
     Object.keys(areas.ls).forEach(function (k) { ls[k] = areas.ls[k]; });
     var store = local();
@@ -86,21 +98,55 @@ import { silentGrant, consentWindow } from './app-frame-core.js';
       if (k in ls || !store) return;
       try { var v = store.getItem(k); if (typeof v === 'string') ls[k] = v; } catch (e) { /* nothing to follow */ }
     });
-    return NAME_PREFIX + JSON.stringify({ v: 1, origin: location.origin, ls: ls, ss: areas.ss });
+    return nameFor({ origin: location.origin, secret: secret, ls: ls, ss: areas.ss });
   }
 
   // ── The frame ──
-  var frame = document.createElement('iframe');
-  frame.id = 'aimeat-app-frame';
-  frame.setAttribute('sandbox', SANDBOX);
-  frame.setAttribute('allow', ALLOW);
-  frame.setAttribute('allowfullscreen', '');
-  frame.setAttribute('title', file);
-  frame.name = bootName();
-  var query = new URLSearchParams(location.search);
-  query.set('mode', 'frame');
-  frame.src = location.pathname + '?' + query.toString() + location.hash;
-  document.body.appendChild(frame);
+  var frame = null;
+  var secret = '';
+  // Whether the frame holds code that is not the app's published version: a draft opened with its
+  // preview token. Decided from the address each frame is built with.
+  var unpublished = false;
+
+  /** The frame's address: this page's own path, its query with mode=frame, and a hash. */
+  function frameSrc(search, hash) {
+    var query = new URLSearchParams(search);
+    query.set('mode', 'frame');
+    return { src: location.pathname + '?' + query.toString() + (hash || ''), unpublished: query.has('preview') };
+  }
+
+  /** A new frame at `target`, with a new secret. The old frame, and whatever document it holds, goes. */
+  function build(target) {
+    secret = frameSecret();
+    unpublished = target.unpublished;
+    var next = document.createElement('iframe');
+    next.id = 'aimeat-app-frame';
+    next.setAttribute('sandbox', SANDBOX);
+    next.setAttribute('allow', ALLOW);
+    next.setAttribute('allowfullscreen', '');
+    next.setAttribute('title', file);
+    next.name = bootName(secret);
+    next.src = target.src;
+    if (frame) frame.replaceWith(next); else document.body.appendChild(next);
+    frame = next;
+  }
+  build(frameSrc(location.search, location.hash));
+
+  // A document in the frame that found no boot data: a reload inside the frame, or a page the frame
+  // navigated to. It gets a new frame at the app's own address, never the old frame's name. Bounded,
+  // so a document that asks on every load cannot keep the page rebuilding.
+  var rebuilds = [];
+  function rebuild(path) {
+    var now = Date.now();
+    rebuilds = rebuilds.filter(function (t) { return now - t < 10000; });
+    if (rebuilds.length >= 5) return;
+    rebuilds.push(now);
+    var url = null;
+    try { url = new URL(typeof path === 'string' ? path : '', location.origin); } catch (e) { url = null; }
+    // Only this app's own address; anything else is the address this page was opened with.
+    if (url && url.origin === location.origin && url.pathname === location.pathname) build(frameSrc(url.search, url.hash));
+    else build(frameSrc(location.search, location.hash));
+  }
 
   var flushTimer = null;
   function flush() {
@@ -110,8 +156,8 @@ import { silentGrant, consentWindow } from './app-frame-core.js';
       try { console.warn('[aimeat] this browser has no room left for the app\'s data; it is kept until the page closes.'); } catch (e2) { /* no console */ }
     }
     try { if (ss) ss.setItem(KEYS.ss, JSON.stringify(areas.ss)); } catch (e) { /* the same, for this tab */ }
-    // A reload inside the frame starts from what the app wrote.
-    frame.name = bootName();
+    // The frame's name is never written here: a later document of the frame could read it. A reload
+    // inside the frame asks for a new frame instead (rebuild), which starts from what the app wrote.
   }
   function schedule() { if (!flushTimer) flushTimer = setTimeout(flush, 250); }
   window.addEventListener('pagehide', function () { if (flushTimer) { clearTimeout(flushTimer); flush(); } });
@@ -140,12 +186,17 @@ import { silentGrant, consentWindow } from './app-frame-core.js';
   }
 
   // ── Answers to the frame ──
-  function send(message) {
-    // '*' because the frame's origin is opaque and has no name to target. The message goes to the one
-    // window this page created, and only after a request that came from that window.
-    try { frame.contentWindow.postMessage(message, '*'); } catch (e) { /* the frame is gone */ }
+  /**
+   * An answer goes back on the MessagePort the request brought. A port belongs to the document that
+   * made it, so an answer that carries a grant cannot reach a page the frame navigated to after it
+   * asked. A request without a port gets no answer.
+   */
+  function send(e, message) {
+    var port = e.ports && e.ports[0];
+    if (!port) return;
+    try { port.postMessage(message); } catch (err) { /* the asking document is gone */ }
   }
-  function reply(id, op, result) { send({ type: 'aimeat_frame_res', id: id, op: op, result: result === undefined ? null : result }); }
+  function reply(e, id, op, result) { send(e, { type: 'aimeat_frame_res', id: id, op: op, result: result === undefined ? null : result }); }
 
   /**
    * The visible grant flow for this page's app (app-frame-core.js). The redirect is this page's own
@@ -207,23 +258,29 @@ import { silentGrant, consentWindow } from './app-frame-core.js';
 
   // ── The one door in ──
   window.addEventListener('message', function (e) {
-    // Only this page's own frame, and only while it is sandboxed: its origin is then opaque.
-    if (e.source !== frame.contentWindow || e.origin !== 'null') return;
     var d = e.data;
-    if (!d || typeof d !== 'object') return;
+    // A frame document with no boot data asks for a new frame. No secret: it has none, and all the
+    // request can cause is a fresh frame at this app's own address.
+    if (frame && e.source === frame.contentWindow && e.origin === 'null' && d && typeof d === 'object' && d.type === FRAME_BOOT) {
+      rebuild(d.path);
+      return;
+    }
+    // Everything else: this page's own frame, sandboxed, and holding the secret this page gave it.
+    if (!fromFrame(e, frame, secret)) return;
     if (d.type === 'aimeat_frame_store') { onStore(d); return; }
     if (d.type === 'aimeat_frame_title') { document.title = String(d.title || '').slice(0, 200) || file; return; }
+    var opts = { unpublished: unpublished };
     if (d.type === 'aimeat-request-auth') {
-      // The older sandbox road (AIMEAT.auth.requestParentAuth): the app's own grant, never a session.
-      silentGrant(app, '').then(function (r) {
-        send({ type: 'aimeat-auth', jwt: r && r.ok ? r.access_token : null, nodeUrl: location.origin });
+      // The older sandbox request (AIMEAT.auth.requestParentAuth): the app's own grant, never a session.
+      silentGrant(app, '', opts).then(function (r) {
+        send(e, { type: 'aimeat-auth', jwt: r && r.ok ? r.access_token : null, nodeUrl: location.origin });
       });
       return;
     }
     if (d.type !== 'aimeat_frame_req' || typeof d.id !== 'string') return;
-    if (d.op === 'login') silentGrant(app, String(d.scope || '')).then(function (r) { reply(d.id, d.op, r); });
-    else if (d.op === 'consent') consent(String(d.scope || ''), !!d.manage, d.prompt === 'create' ? 'create' : '').then(function (r) { reply(d.id, d.op, r); });
-    else if (d.op === 'logout') signOut().then(function (r) { reply(d.id, d.op, r); });
-    else reply(d.id, d.op, null);
+    if (d.op === 'login') silentGrant(app, String(d.scope || ''), opts).then(function (r) { reply(e, d.id, d.op, r); });
+    else if (d.op === 'consent') consent(String(d.scope || ''), !!d.manage, d.prompt === 'create' ? 'create' : '').then(function (r) { reply(e, d.id, d.op, r); });
+    else if (d.op === 'logout') signOut().then(function (r) { reply(e, d.id, d.op, r); });
+    else reply(e, d.id, d.op, null);
   });
 })();

@@ -635,7 +635,13 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     // one person who wrote the line that triggered it. Their drift is closed by the narrowing above
     // and by the same narrowing on refresh, without a prompt anywhere.
     // An app a package installed is somebody else's code under the owner's name: consent, not self-approval (package-approvals.ts).
-    const isOwnApp = owner === grantOwner && !(await isPackageApp(storage, owner, grantTarget));
+    // So is code that is not the app's published version (`bytes=unpublished`: a draft, a checkpoint,
+    // an AI proposal in a preview): a builder or a fork's author may have written it, and the owner
+    // has not published it. It keeps the grant the owner holds and asks for consent beyond it
+    // (secaudit 2026-10, WEB-2). Only a page of the node's own origin reaches this line (the caller
+    // check above), and the frame's code cannot remove the flag the page adds.
+    const unpublishedBytes = req.query.bytes === 'unpublished';
+    const isOwnApp = owner === grantOwner && !unpublishedBytes && !(await isPackageApp(storage, owner, grantTarget));
     const existing = await storage.getAppGrantByOwnerAndApp(owner, grantTarget);
     const fallback = ['memory:read', 'memory:write', 'storage:read', 'storage:write'];
     const wanted = requested.length ? requested : (existing?.scopes ?? fallback);

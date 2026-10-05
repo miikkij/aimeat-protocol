@@ -10397,9 +10397,22 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     });
     return out;
   }
-  function silentGrant(app, scope) {
+  var BOOT_PREFIX = "aimeat-frame:";
+  var FRAME_BOOT = "aimeat_frame_boot";
+  function frameSecret() {
+    return b64url(crypto.getRandomValues(new Uint8Array(16)).buffer);
+  }
+  function bootName(boot) {
+    return BOOT_PREFIX + JSON.stringify({ v: 1, origin: boot.origin, secret: boot.secret, ls: boot.ls || {}, ss: boot.ss || {} });
+  }
+  function fromFrame(e, frame, secret) {
+    if (!frame || !frame.contentWindow || e.source !== frame.contentWindow || e.origin !== "null") return false;
+    var d = e.data;
+    return !!(d && typeof d === "object" && typeof d.secret === "string" && secret && d.secret === secret);
+  }
+  function silentGrant(app, scope, opts) {
     return fetch(
-      "/v1/auth/app-grant-silent?app=" + encodeURIComponent(app) + "&scope=" + encodeURIComponent(scope || ""),
+      "/v1/auth/app-grant-silent?app=" + encodeURIComponent(app) + "&scope=" + encodeURIComponent(scope || "") + (opts && opts.unpublished ? "&bytes=unpublished" : ""),
       { credentials: "include", cache: "no-store" }
     ).then(function(r) {
       return r.json();
@@ -10475,6 +10488,9 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
 
   // src/static/app-catalog/js/preview-host.js
   var currentTarget = "";
+  var currentSecret = "";
+  var currentHtml = "";
+  var reopened = [];
   var shimSource = null;
   function previewTarget(owner, filename) {
     return owner && filename ? String(owner) + "/" + String(filename) : "";
@@ -10513,12 +10529,14 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
   function openPreview(html, target) {
     var iframe = document.getElementById("app-iframe");
     currentTarget = target || "";
+    currentHtml = html;
+    currentSecret = frameSecret();
     var fresh = (
       /** @type {HTMLIFrameElement} */
       iframe.cloneNode(false)
     );
     fresh.removeAttribute("src");
-    fresh.name = "aimeat-frame:" + JSON.stringify({ v: 1, origin: location.origin, ls: {}, ss: {} });
+    fresh.name = bootName({ origin: location.origin, secret: currentSecret });
     fresh.srcdoc = withSupport(html);
     iframe.replaceWith(fresh);
   }
@@ -10530,18 +10548,46 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     }).catch(function() {
       shimSource = null;
     });
-    var deps = { grant: silentGrant, consent: consentForPreview, origin: location.origin };
+    var deps = {
+      grant: function(app, scope) {
+        return silentGrant(app, scope, { unpublished: true });
+      },
+      consent: consentForPreview,
+      origin: location.origin
+    };
     window.addEventListener("message", function(e) {
-      var iframe = document.getElementById("app-iframe");
+      var iframe = (
+        /** @type {HTMLIFrameElement|null} */
+        document.getElementById("app-iframe")
+      );
       if (!iframe || !iframe.contentWindow || e.source !== iframe.contentWindow || e.origin !== "null") return;
+      var d = e.data;
+      if (d && typeof d === "object" && d.type === FRAME_BOOT) {
+        var now = Date.now();
+        reopened = reopened.filter(function(t2) {
+          return now - t2 < 1e4;
+        });
+        if (currentTarget !== "" || currentHtml) {
+          if (reopened.length < 5) {
+            reopened.push(now);
+            openPreview(currentHtml, currentTarget);
+          }
+        }
+        return;
+      }
+      if (!fromFrame(e, iframe, currentSecret)) return;
+      var port = e.ports && e.ports[0];
+      if (!port) return;
       var target = currentTarget;
-      answerPreview(e.data, target, deps).then(function(answer) {
-        if (answer && currentTarget === target && iframe.contentWindow) iframe.contentWindow.postMessage(answer, "*");
+      answerPreview(d, target, deps).then(function(answer) {
+        if (answer && currentTarget === target) port.postMessage(answer);
       });
     });
   }
   function clearPreview() {
     currentTarget = "";
+    currentSecret = "";
+    currentHtml = "";
   }
 
   // src/static/app-catalog/js/detail.js
