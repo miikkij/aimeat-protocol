@@ -1005,6 +1005,12 @@
       },
       "why": "The node's own read (TARGET-082 second review, 2026-09-30): whether a record with a waiting suggestion still exists, so a deleted one is left out of the list; the value is never returned or used."
     },
+    "src/services/classification/labels.ts": {
+      "reads": {
+        "getStorageFile": 1
+      },
+      "why": "Reviewed 2026-10-05, the node's own read: fileAddressOf reads a file's record only for its workspace binding, to give a label request the address the file's classification lives at (secaudit 2026-10, DATA-4). Nothing of the file is shown or returned."
+    },
     "src/services/classification/policy-admin.ts": {
       "reads": {
         "getMemory": 1
