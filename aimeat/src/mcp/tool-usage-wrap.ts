@@ -29,7 +29,7 @@
 import { recordUsageCall } from '../services/usage/usage-buffer.js';
 import { noteAgentRefusal } from '../services/agent-refusals.js';
 import { noteScopeUse } from '../services/scope-use.js';
-import { requiredScopesForTool } from './catalog/scopes.js';
+import { requiredScopesForTool } from '../tool-catalog/scopes.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import type { UsageActorKind } from '../storage/interface.js';
 

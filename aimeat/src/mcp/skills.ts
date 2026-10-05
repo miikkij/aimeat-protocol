@@ -33,7 +33,7 @@ import type { Storage } from '../storage/interface.js';
 import { parseGAII, localAccountName } from '../utils/gaii.js';
 import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/operator-principal.js';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 import { emitChange } from '../services/event-bus.js';
 import { generateUploadToken } from '../services/upload-token.js';
 import {

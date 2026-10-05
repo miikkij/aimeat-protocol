@@ -20,7 +20,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
-import { descriptionFor } from '../../../../mcp/catalog/shape.js';
+import { descriptionFor } from '../../../../tool-catalog/shape.js';
 
 /** The optional fields create and update share — the server MCP's shape, verbatim. */
 const identityShape = {

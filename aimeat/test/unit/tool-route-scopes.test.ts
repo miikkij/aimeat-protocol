@@ -1,7 +1,7 @@
 /**
  * @file test/unit/tool-route-scopes.test.ts
  * @description An MCP tool is offered for the scope words its REST route asks (secaudit 2026-10, C3).
- *   The node offers a tool only to an agent holding the words in TOOL_SCOPES (mcp/catalog/scopes.ts);
+ *   The node offers a tool only to an agent holding the words in TOOL_SCOPES (tool-catalog/scopes.ts);
  *   the route the same capability runs on asks its own words with requireScope. When the two lists
  *   differ, an agent is shown a tool it cannot use, or is refused on one surface what it is given on
  *   the other. The refinery run was listed on one word while its route asked four.
@@ -24,7 +24,7 @@ import path from 'node:path';
 import ts from 'typescript';
 import { guardArraysIn, collectRestRoutes } from '../../scripts/inventory/entries.js';
 import type { GuardCall } from '../../scripts/inventory/principals.js';
-import { TOOL_SCOPES, toolScopeWords } from '../../src/mcp/catalog/scopes.js';
+import { TOOL_SCOPES, toolScopeWords } from '../../src/tool-catalog/scopes.js';
 import { scopeIsCovered } from '../../src/utils/scope-coverage.js';
 
 const ROOT = path.resolve(__dirname, '..', '..');

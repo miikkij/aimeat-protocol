@@ -22,9 +22,9 @@ import { CONNECT_CLI_TOOLS } from '../../src/cli/connect/tool-call.js';
 import type { AimeatClient } from '../../src/cli/connect/api-client.js';
 import {
     APP_MANAGE_ACTIONS, APP_MANAGE_ACTION_NAMES, APP_MANAGE_FIELDS, checkAppManageInput, appManageTools,
-} from '../../src/mcp/catalog/definitions/app-manage.js';
+} from '../../src/tool-catalog/definitions/app-manage.js';
 import { appManageShape } from '../../src/mcp/app-manage-shape.js';
-import { TOOL_ACTION_SCOPES } from '../../src/mcp/catalog/action-scopes.js';
+import { TOOL_ACTION_SCOPES } from '../../src/tool-catalog/action-scopes.js';
 import { fileURLToPath } from 'node:url';
 import { readVocabulary } from '../../scripts/inventory/scope-vocabulary.js';
 

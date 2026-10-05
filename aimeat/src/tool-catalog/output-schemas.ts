@@ -8,7 +8,7 @@
  *   the full ('detailed') payload and the trimmed ('concise', response_format) projection.
  * @structure ZodRawShape objects passed as registerTool({ outputSchema }).
  * @usage
- *   import { memoryEntryOutput } from '../catalog/output-schemas.js';
+ *   import { memoryEntryOutput } from './output-schemas.js';
  *   mcp.registerTool('aimeat_memory_read', { description, inputSchema, outputSchema: memoryEntryOutput, annotations }, handler)
  * @version-history
  *   v1.2.0 -- 2026-09-29 -- memoryEntryOutput declares classification_warning (TARGET-082 V4), or the

@@ -37,7 +37,7 @@ import { blocksForSurface, operatorLabelKey } from '../services/surface-layout/r
 import type { SurfaceId } from '../services/surface-layout/types.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 
 interface TextResult {
     content: Array<{ type: 'text'; text: string }>;

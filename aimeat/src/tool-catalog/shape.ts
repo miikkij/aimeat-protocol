@@ -13,7 +13,7 @@
  *   - shapeResponse(name, format, data) -- apply 'concise' projection per catalog conciseFields
  *   - jsonContent(data) -- standard MCP text content envelope
  * @usage
- *   import { descriptionFor, shapeResponse, jsonContent, responseFormatSchema } from '../catalog/shape.js';
+ *   import { descriptionFor, shapeResponse, jsonContent, responseFormatSchema } from './shape.js';
  *   mcp.tool('aimeat_memory_read', descriptionFor('aimeat_memory_read'),
  *     { key: z.string(), response_format: responseFormatSchema },
  *     annotationsFor('aimeat_memory_read'),
@@ -57,7 +57,7 @@ export function descriptionFor(name: string): string {
     if (!def) {
         throw new Error(
             `Missing tool definition for "${name}". Add an entry to CLI_FALLBACK_TOOL_DEFINITIONS ` +
-            `in src/mcp/catalog/definitions.ts before registering the tool (the catalog is the ` +
+            `in src/tool-catalog/definitions.ts before registering the tool (the catalog is the ` +
             `canonical source of tool descriptions for both MCP surfaces).`,
         );
     }

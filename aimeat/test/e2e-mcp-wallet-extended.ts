@@ -279,7 +279,7 @@ await test('5. aimeat_wallet_transactions transaction shape has required fields'
 // of its own — it goes straight to storage.getTransactions, unlike its HTTP twin GET
 // /v1/wallet/transactions which carries requireScope('wallet:read') — so the registration filter is
 // the ENTIRE gate. Delete the `aimeat_wallet_transactions: 'wallet:read'` entry from
-// mcp/catalog/scopes.ts and every agent the owner ever connected reads the whole morsel ledger:
+// tool-catalog/scopes.ts and every agent the owner ever connected reads the whole morsel ledger:
 // counterparties, tracking codes, amounts. All eleven tests stay green.
 await test('12. An agent WITHOUT wallet:read neither sees the tool nor can call it', async () => {
     const reg = await json('/v1/agents', {

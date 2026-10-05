@@ -1,5 +1,5 @@
 /**
- * @file src/mcp/catalog/definitions/ai-provenance-note.ts
+ * @file src/tool-catalog/definitions/ai-provenance-note.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The AI-transparency sentence appended to every write tool's description, and the two

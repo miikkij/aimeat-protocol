@@ -105,7 +105,7 @@ import { mintDraftPreview } from '../services/app-draft-preview.js';
 import { validateCortexAgents } from '../models/crew-def-schemas.js';
 import { annotationsFor } from './annotations.js';
 import { requirementsOf, appRef as depAppRef } from '../services/dependency-map.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 import { publishApp } from '../services/app-publish.js';
 import { servedMarksResponse } from '../services/app-serve-marks-strip.js';
 import {

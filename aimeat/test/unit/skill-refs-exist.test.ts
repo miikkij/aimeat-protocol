@@ -21,7 +21,7 @@
  *     TARGET-071's agent side.
  */
 import { describe, it, expect } from 'vitest';
-import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../../src/mcp/catalog/definitions.js';
+import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../../src/tool-catalog/definitions.js';
 import { BUILTIN_SKILLS } from '../../src/data/builtin-skills.js';
 
 /** `node:some-skill-name`, as a description would write it. Trailing punctuation is not the name. */

@@ -1,5 +1,5 @@
 /**
- * @file mcp/catalog/definitions/packages.ts
+ * @file tool-catalog/definitions/packages.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Catalog entries for the component-package tools (/v1/packages).

@@ -40,7 +40,7 @@ import { sendPlainText } from '../middleware/plain-text.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { handbookForRole } from '../services/handbooks/index.js';
-import { isV2Role, V2_ROLES } from '../mcp/catalog/surfaces.js';
+import { isV2Role, V2_ROLES } from '../tool-catalog/surfaces.js';
 import { DRAFT_OFFER_PROMPT } from '../services/draft-offer-prompt.js';
 import { OFFERINGS_HANDBOOK } from '../services/offerings-handbook.js';
 import { buildAppPrompt, buildAppSpecToken } from '../services/build-app-prompt.js';

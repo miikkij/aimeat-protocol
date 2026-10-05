@@ -32,8 +32,8 @@
  */
 import type { McpServer, RegisteredTool } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { descriptionFor } from './catalog/shape.js';
-import { getAimeatToolDefinition } from './catalog/definitions.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
+import { getAimeatToolDefinition } from '../tool-catalog/definitions.js';
 import { annotationsFor } from './annotations.js';
 import { logger } from '../utils/logger.js';
 

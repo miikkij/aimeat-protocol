@@ -21,7 +21,7 @@
  *   - toolsForSurface(role) -> Set<string>
  *   - validateSurfaces() -> coverage report (used by the unit test / audit)
  * @usage
- *   import { toolsForSurface } from '../catalog/surfaces.js';
+ *   import { toolsForSurface } from './surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
  *   2026-10-04 — aimeat_task_decline on the agent surface, beside aimeat_task_fail.

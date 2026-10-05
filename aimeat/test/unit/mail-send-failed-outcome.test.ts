@@ -27,7 +27,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerConnectionTools as registerNodeConnectionTools } from '../../src/mcp/connections.js';
 import { registerConnectionTools as registerConnectorConnectionTools } from '../../src/cli/connect/mcp/tools/connections.js';
 import { connectionCliTools } from '../../src/tool-dispatch/tool-call-defs-connections.js';
-import { getAimeatToolDefinition } from '../../src/mcp/catalog/definitions.js';
+import { getAimeatToolDefinition } from '../../src/tool-catalog/definitions.js';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';

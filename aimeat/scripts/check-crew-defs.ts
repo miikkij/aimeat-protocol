@@ -74,7 +74,7 @@ const TAG_CHARSET = /^[a-z0-9._-]+$/;
  * THE TOOL MENU IS NOT OURS, SO THIS FILE NO LONGER ENFORCES ONE.
  *
  * It used to. A copy of crewaimeat's list lived here and in a comment in
- * src/mcp/catalog/definitions/crew.ts, and on 2026-09-02 that copy rejected `crew_registry` as
+ * src/tool-catalog/definitions/crew.ts, and on 2026-09-02 that copy rejected `crew_registry` as
  * "not a tool" — so I removed it from crew-forge's Registrar, the one agent whose entire job is
  * creating agents, on the authority of a stale transcription. crewaimeat had ADDED that tool in
  * their first round, for exactly that agent. The copy was older than the list.

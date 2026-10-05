@@ -8034,20 +8034,6 @@
   {
     "type": "dependency",
     "from": "src/services/chat-agent.ts",
-    "to": "src/mcp/catalog/scopes.ts",
-    "unresolvedTo": "../mcp/catalog/scopes.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "services-do-not-import-mcp"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/services/chat-agent.ts",
     "to": "src/mcp/resource-events.ts",
     "unresolvedTo": "../mcp/resource-events.js",
     "dependencyTypes": [
@@ -8064,34 +8050,6 @@
     "from": "src/services/datapackage/store.ts",
     "to": "src/mcp/resource-events.ts",
     "unresolvedTo": "../../mcp/resource-events.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "services-do-not-import-mcp"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/services/node-capabilities.ts",
-    "to": "src/mcp/catalog/definitions.ts",
-    "unresolvedTo": "../mcp/catalog/definitions.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "services-do-not-import-mcp"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/services/node-invoke.ts",
-    "to": "src/mcp/catalog/moved-tools.ts",
-    "unresolvedTo": "../mcp/catalog/moved-tools.js",
     "dependencyTypes": [
       "local",
       "import"

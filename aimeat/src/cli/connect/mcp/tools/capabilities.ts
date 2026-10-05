@@ -16,7 +16,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
-import { descriptionFor } from '../../../../mcp/catalog/shape.js';
+import { descriptionFor } from '../../../../tool-catalog/shape.js';
 import { envelopeResult } from './_registry.js';
 
 export function registerCapabilitiesTools(mcp: McpServer, registry: AgentRegistry): void {

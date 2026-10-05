@@ -43,7 +43,7 @@ import type { Storage, AgentRecord } from '../storage/interface.js';
 import { buildGAII } from '../utils/gaii.js';
 import { generateKeyPair } from '../auth/keypair.js';
 import { issueJWT } from '../auth/jwt.js';
-import { scopesForProfile } from '../mcp/catalog/scopes.js';
+import { scopesForProfile } from '../tool-catalog/scopes.js';
 import { emitChange } from './event-bus.js';
 import { emitToolListChanged } from '../mcp/resource-events.js';
 import { logger } from '../utils/logger.js';

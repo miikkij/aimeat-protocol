@@ -1,5 +1,5 @@
 /**
- * @file src/mcp/catalog/moved-tools.ts
+ * @file src/tool-catalog/moved-tools.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The tools that were replaced by an action of another tool, and the answer a call to

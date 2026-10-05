@@ -38,7 +38,7 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
 import { isVersionKey, searchHitShape, matchesType } from '../services/memory-search-shape.js';
 import { ownDoorRefusal } from '../utils/own-door-keys.js';

@@ -50,7 +50,7 @@ import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
 import { versionedAddress } from '../utils/http-range.js';
 import { decodeStrictBase64 } from '../utils/base64.js';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor, jsonContent } from './catalog/shape.js';
+import { descriptionFor, jsonContent } from '../tool-catalog/shape.js';
 
 /** F11: storage holds binaries (images, video, large blobs). aimeat_storage_download returns a
  *  handle (resource_link + presigned download_url) instead of base64 so bytes never enter the

@@ -1,5 +1,5 @@
 /**
- * @file src/mcp/catalog/definitions/themes.ts
+ * @file src/tool-catalog/definitions/themes.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The tools of Themes & Styles: the node's themes read, made, styled and repaired from a

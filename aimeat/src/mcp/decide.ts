@@ -12,7 +12,7 @@
  *   is named as the principal that asked. An agent is never the owner in person, so it cannot skip the
  *   scrubber unless the owner's policy says agents may.
  *
- *   One of three surfaces. See mcp/catalog/definitions/decide.ts for the other two.
+ *   One of three surfaces. See tool-catalog/definitions/decide.ts for the other two.
  * @structure registerDecideTools(mcp, storage, config, getAgentGaii)
  * @usage registerDecideTools(mcp, storage, config, () => agentGaii);
  * @version-history
@@ -31,7 +31,7 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 import { localAccountName } from '../utils/gaii.js';
 import { AiCompletionError } from '../services/ai-completion.js';
 import {

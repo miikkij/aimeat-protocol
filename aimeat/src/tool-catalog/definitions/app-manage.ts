@@ -1,5 +1,5 @@
 /**
- * @file src/mcp/catalog/definitions/app-manage.ts
+ * @file src/tool-catalog/definitions/app-manage.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description aimeat_app_manage: every setting and read of one of the owner's apps, in ONE tool

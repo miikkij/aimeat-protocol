@@ -19,7 +19,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { instructionsFor, INSTRUCTIONS_CUT_AT, SURFACE_INTROS } from '../../src/mcp/instructions.js';
-import { V2_ROLES } from '../../src/mcp/catalog/surfaces.js';
+import { V2_ROLES } from '../../src/tool-catalog/surfaces.js';
 
 const ROLES = ['all', ...V2_ROLES] as const;
 /** Where one client was measured to stop the string, mid-word (2026-09-18). */

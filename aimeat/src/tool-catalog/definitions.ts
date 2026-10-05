@@ -11,7 +11,7 @@
  *   - CLI_FALLBACK_TOOL_DEFINITIONS -- first catalog slice used by `aimeat connect call`
  *   - getAimeatToolDefinition() -- lookup helper by tool name
  * @usage
- *   import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../../mcp/catalog/definitions.js';
+ *   import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
  * @version-history
  *   v1.x -- 2026-09-29 -- definitions/classification.ts: aimeat_classification (TARGET-082 V2).
  *   v1.x -- 2026-09-29 -- definitions/refinery.ts: aimeat_refinery_classes, _run and _status (wish aimeat-refinery).

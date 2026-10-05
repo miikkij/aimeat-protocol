@@ -20,7 +20,7 @@ import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { agentNameSchema, envelopeResult, pickAgent } from './_registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
-import { descriptionFor } from '../../../../mcp/catalog/shape.js';
+import { descriptionFor } from '../../../../tool-catalog/shape.js';
 
 export function registerOnboardingTools(mcp: McpServer, registry: AgentRegistry): void {
 

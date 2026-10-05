@@ -37,7 +37,7 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
 import { buildKnowledgeOverview, DEFAULT_PER_PAGE, MAX_PER_PAGE } from '../services/knowledge-overview.js';
 import { readerForAgent } from '../services/classification/reader.js';

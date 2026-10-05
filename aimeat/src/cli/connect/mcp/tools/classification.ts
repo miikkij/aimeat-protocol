@@ -20,10 +20,10 @@ import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { agentNameSchema, envelopeResult, pickAgent } from './_registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
-import { descriptionFor } from '../../../../mcp/catalog/shape.js';
+import { descriptionFor } from '../../../../tool-catalog/shape.js';
 import {
   AUDIT_ACTIONS, CLASSIFICATION_ACTIONS, classificationTools, EXCEPTION_ACTION_VALUES,
-} from '../../../../mcp/catalog/definitions/classification.js';
+} from '../../../../tool-catalog/definitions/classification.js';
 import { classificationCall } from '../../../../tool-dispatch/classification-call.js';
 
 /** A parameter's description, from the catalog entry every surface publishes. */

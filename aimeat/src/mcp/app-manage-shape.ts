@@ -21,7 +21,7 @@
  *   v1.0.0 — 2026-09-27 — Initial.
  */
 import { z } from 'zod';
-import { APP_MANAGE_ACTION_NAMES, APP_MANAGE_FIELDS } from './catalog/definitions/app-manage.js';
+import { APP_MANAGE_ACTION_NAMES, APP_MANAGE_FIELDS } from '../tool-catalog/definitions/app-manage.js';
 import { APP_LEGAL_KINDS } from '../storage/types/apps.js';
 import { SIGNAL_GEO_LEVELS } from '../models/signal-schemas.js';
 

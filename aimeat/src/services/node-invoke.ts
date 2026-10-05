@@ -37,7 +37,7 @@ import { CONNECT_CLI_TOOLS } from '../tool-dispatch/index.js';
 import { AimeatClient } from '../tool-dispatch/api-client.js';
 import { findNodeCapability, NON_INVOKABLE, listNodeCapabilities } from './node-capabilities.js';
 import { logger } from '../utils/logger.js';
-import { movedToolMessage } from '../mcp/catalog/moved-tools.js';
+import { movedToolMessage } from '../tool-catalog/moved-tools.js';
 
 export interface InvokeRefusal { ok: false; status: number; code: string; message: string; details?: unknown }
 export interface InvokeSuccess { ok: true; capability: string; result: unknown; duration_ms: number }
@@ -67,7 +67,7 @@ export async function invokeNodeCapability(
     return { ok: false, status: 400, code: 'NOT_INVOKABLE', message: 'That one cannot run itself. Name the capability you actually want.' };
   }
   const capability = findNodeCapability(id);
-  // A tool that became an action of another names the call that replaces it (mcp/catalog/moved-tools.ts).
+  // A tool that became an action of another names the call that replaces it (tool-catalog/moved-tools.ts).
   const moved = capability ? null : movedToolMessage(id);
   if (moved) return { ok: false, status: 410, code: 'TOOL_MOVED', message: moved };
   if (!capability) {

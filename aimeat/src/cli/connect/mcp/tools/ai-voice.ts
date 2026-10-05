@@ -7,7 +7,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { voiceReplySchema, voiceSpeechSchema } from '../../../../services/ai-voice-contract.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
-import { descriptionFor } from '../../../../mcp/catalog/shape.js';
+import { descriptionFor } from '../../../../tool-catalog/shape.js';
 
 export function registerAiVoiceTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();

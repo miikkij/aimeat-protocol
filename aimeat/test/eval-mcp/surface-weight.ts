@@ -15,9 +15,9 @@
  * @version-history
  *   v1.0.0 -- 2026-05-30 -- MCP audit Phase 5 (F2): tool-surface context-cost report
  */
-import { CLI_FALLBACK_TOOL_DEFINITIONS, type AimeatToolDefinition } from '../../src/mcp/catalog/definitions.js';
+import { CLI_FALLBACK_TOOL_DEFINITIONS, type AimeatToolDefinition } from '../../src/tool-catalog/definitions.js';
 import { TOOL_ANNOTATIONS } from '../../src/mcp/annotations.js';
-import { TOOL_SCOPES, toolScopeWords } from '../../src/mcp/catalog/scopes.js';
+import { TOOL_SCOPES, toolScopeWords } from '../../src/tool-catalog/scopes.js';
 
 /** Rough token estimate (English ≈ 4 chars/token). Good enough for relative before/after comparison. */
 function estimateTokens(text: string): number {

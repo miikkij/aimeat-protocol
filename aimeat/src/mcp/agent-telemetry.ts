@@ -34,7 +34,7 @@ import type { AimeatConfig } from '../config.js';
 import { pushTelemetry, recordTelemetryActivity } from '../services/telemetry-buffer.js';
 import type { Storage, TelemetryEvent } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 import { readUsageReport, OWNER_REPORTS, UnknownReportError } from '../services/usage/usage-read.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 

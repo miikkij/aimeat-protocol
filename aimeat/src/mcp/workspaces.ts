@@ -157,7 +157,7 @@ import { registerWorkspaceDocumentTools } from './workspace-documents.js';
 import { archivedRefusal } from '../services/workspace-write-guards.js';
 import { parseGAII, localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 import { checkDeleteGuard } from '../services/write-guards.js';
 import { canReadWorkspace } from '../services/workspace-access.js';
 import { readerForAgent } from '../services/classification/reader.js';

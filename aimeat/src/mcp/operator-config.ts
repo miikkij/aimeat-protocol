@@ -53,7 +53,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentRecord } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../services/operator-confirm.js';
 import { logger } from '../utils/logger.js';
 import { uncoveredScopes } from '../utils/scope-coverage.js';
@@ -343,7 +343,7 @@ export function registerOperatorConfigTools(
                 tags: record?.tags ?? ['openrouter'],
                 pipeline: 'mcp.operator_ai_config',
                 ownerScoped: true,
-                // The word the owner ticked for this door (mcp/catalog/scopes.ts), rather than a
+                // The word the owner ticked for this door (tool-catalog/scopes.ts), rather than a
                 // memory:write that nobody granting an operator agent was asked about.
                 authorisingScope: 'memory:write-reserved',
             });

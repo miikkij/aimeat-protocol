@@ -89,7 +89,7 @@ import { setAgentTaskStart, taskStartView } from '../services/agent-task-start-w
 import { narrowAgent } from '../services/scope-narrowing.js';
 import { toolError } from './tool-error.js';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 import { parseGAII, buildGAII, localAccountName, ownerGhiiOf } from '../utils/gaii.js';
 import { taskWithFileHandles } from '../services/task-files.js';
 import { taskOutcome } from '../services/task-outcome.js';

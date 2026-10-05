@@ -27,7 +27,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { listNodeCapabilities, NON_INVOKABLE } from '../../src/services/node-capabilities.js';
-import { TOOL_SCOPES, SCOPE_EXEMPT_TOOLS } from '../../src/mcp/catalog/scopes.js';
+import { TOOL_SCOPES, SCOPE_EXEMPT_TOOLS } from '../../src/tool-catalog/scopes.js';
 import { TOOL_ANNOTATIONS } from '../../src/mcp/annotations.js';
 
 /** A capability that changes something. The annotation is the node's own answer to that question. */

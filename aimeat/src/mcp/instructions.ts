@@ -51,7 +51,7 @@
  *   v1.0.0 — 2026-08-09 — Initial: the handshake carried no instructions field, so every agent met
  *     the surface cold. Positive framing per docs/coding-guidelines/prompt-writing.md.
  */
-import type { SurfaceRole } from './catalog/surfaces.js';
+import type { SurfaceRole } from '../tool-catalog/surfaces.js';
 
 /**
  * One line per v2 surface, naming what it is for. Wording tracks the purposes in

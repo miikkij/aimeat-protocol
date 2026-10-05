@@ -320,7 +320,7 @@ ninety-one, and each of the six had TWO independent reasons to be left alone —
 the word, and the two extension reads already carried an owner fence in the handler (15c). The
 mechanical pass saw neither.
 
-*Check:* `TOOL_SCOPES` in `src/mcp/catalog/scopes.ts` is the register, and the tool NAMES in it are
+*Check:* `TOOL_SCOPES` in `src/tool-catalog/scopes.ts` is the register, and the tool NAMES in it are
 what you read — `aimeat_x_list` and `aimeat_x_read` demanding a word is what makes that word safe on
 a GET. `pnpm check:scope-parity` fails when a word lives on one side only, in either direction, which
 is the same question asked before either side exists.

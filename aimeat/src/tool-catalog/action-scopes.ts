@@ -1,5 +1,5 @@
 /**
- * @file src/mcp/catalog/action-scopes.ts
+ * @file src/tool-catalog/action-scopes.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The permission word each ACTION of a grouped tool needs, for the tools whose actions

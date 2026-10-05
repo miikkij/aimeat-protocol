@@ -50,11 +50,11 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 import { DesignBookService } from '../services/design-book/service.js';
 import { DesignBookError } from '../services/design-book/validate.js';
 import { MAP_NOTE, REASONS_NOTE } from '../services/design-book/map.js';
-import { BOOK_VIEW_PARAM } from './catalog/definitions/designbook.js';
+import { BOOK_VIEW_PARAM } from '../tool-catalog/definitions/designbook.js';
 
 /** One text block per answer; refusals carry the service's words verbatim. */
 function text(payload: unknown, isError = false) {

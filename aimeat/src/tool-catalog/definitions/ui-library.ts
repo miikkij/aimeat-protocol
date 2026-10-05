@@ -1,5 +1,5 @@
 /**
- * @file src/mcp/catalog/definitions/ui-library.ts
+ * @file src/tool-catalog/definitions/ui-library.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The two tools that read the component catalogue of this node's own interface: the

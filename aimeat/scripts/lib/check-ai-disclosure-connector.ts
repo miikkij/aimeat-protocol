@@ -37,7 +37,7 @@ export function createConnectorChecks(context: CheckContext): { check(): void; c
 // worse than the missing wiring, because it is the thing that was supposed to prevent it.
 //
 // THE CATALOG IS THE CONTRACT, and that is what makes this checkable rather than a taste question.
-// `src/mcp/catalog/definitions/` declares `ai_provenance` on a tool; three surfaces implement those
+// `src/tool-catalog/definitions/` declares `ai_provenance` on a tool; three surfaces implement those
 // tools; every one of them must carry it. When somebody adds the fifteenth tool, or the NEXT field,
 // the two that were updated pass and the one that was forgotten fails here by name.
 
@@ -45,7 +45,7 @@ const CONNECTOR_CARRIERS = 'src/tool-dispatch/ai-provenance-carry.ts';
 
 /** Tool names the canonical catalog declares `ai_provenance` on. The contract all surfaces answer to. */
 function catalogProvenanceTools(): string[] {
-  const dir = join(root, 'src', 'mcp', 'catalog', 'definitions');
+  const dir = join(root, 'src', 'tool-catalog', 'definitions');
   const out: string[] = [];
   for (const file of walk(dir)) {
     const src = stripped(file);
@@ -77,7 +77,7 @@ function checkSurfaces(): void {
   const promised = catalogProvenanceTools();
   if (promised.length === 0) {
     fail('connector-provenance', 'the catalog declares ai_provenance on no tool at all',
-      'this check reads src/mcp/catalog/definitions/ for `...aiProvenanceCatalogInput`. If the catalog '
+      'this check reads src/tool-catalog/definitions/ for `...aiProvenanceCatalogInput`. If the catalog '
       + 'stopped declaring it, assertion 2 and this one are both checking nothing.');
     return;
   }

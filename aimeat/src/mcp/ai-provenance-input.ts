@@ -61,7 +61,7 @@ import type { DeclaredProvenance } from '../services/ai-provenance.js';
 // The sentence appended to every write tool's description lives in the catalog (a leaf module the
 // CLI fallback path can load without pulling in zod or the services layer) and is re-exported here
 // so there is exactly one copy of it.
-export { AI_PROVENANCE_TOOL_NOTE } from './catalog/definitions/ai-provenance-note.js';
+export { AI_PROVENANCE_TOOL_NOTE } from '../tool-catalog/definitions/ai-provenance-note.js';
 
 const sourceInput = z.object({
   // The SAME scheme rule the stored record enforces, applied at the door. This field used to be a

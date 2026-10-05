@@ -25,7 +25,8 @@
  *   v1.1.0 — 2026-10-05 — The exclude is anchored, so the connector's MCP tools are read; four layer
  *     rules (services and mcp do not import routes, services do not import mcp, mcp does not import
  *     the cli) with today's edges in the baseline; a warning for a server module src/index.ts never
- *     reaches (secaudit 2026-10, M1).
+ *     reaches (secaudit 2026-10, M1). tool-catalog-is-a-bottom-layer: the catalog moved from
+ *     src/mcp/catalog/ to src/tool-catalog/ and imports nothing above utils/ (M4).
  *   v1.0.0 — 2026-09-04 — Initial.
  */
 module.exports = {
@@ -140,6 +141,22 @@ module.exports = {
                 ],
             },
             to: {},
+        },
+        {
+            name: 'tool-catalog-is-a-bottom-layer',
+            comment:
+                'The tool catalog (names, descriptions, input shapes, scopes) is read by the node MCP, '
+                + 'the connector and the shared dispatch, so it imports nothing above utils/: a catalog '
+                + 'that imports a service drags that service into the CLI (secaudit 2026-10, M4). It '
+                + 'lived under src/mcp/ until 2026-10-05.',
+            severity: 'error',
+            from: { path: '^src/tool-catalog/' },
+            to: {
+                path: '^src/(routes|services|mcp|cli|storage|auth|tool-dispatch|commerce|middleware)/',
+                // The data map's spec string: a leaf that imports one type and nothing else.
+                pathNot: '^src/services/data-map/data-map-types[.]ts$',
+                dependencyTypesNot: ['type-only'],
+            },
         },
         {
             name: 'reachable-from-the-node',

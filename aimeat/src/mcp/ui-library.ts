@@ -18,7 +18,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
 import { getUiComponent, listUiComponents } from '../services/ui-library/catalogue.js';
 import type { AimeatConfig } from '../config.js';

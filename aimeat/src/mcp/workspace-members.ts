@@ -23,7 +23,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 import { emitChange } from '../services/event-bus.js';
 import { granteeOwner, listWorkspaceMemberRoles, type WsRole } from '../services/workspace-roles.js';
 import { decideAccessRequest, requestStatus } from '../services/workspace-access-decision.js';

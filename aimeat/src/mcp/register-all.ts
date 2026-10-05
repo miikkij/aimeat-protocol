@@ -138,7 +138,7 @@ import { registerRefineryTools } from './refinery.js';
 import { registerMcpProxyTools } from './mcp-proxy.js';
 import { registerAccessTools } from './access.js';
 import { registerSecretTools } from './secrets.js';
-import type { SurfaceRole } from './catalog/surfaces.js';
+import type { SurfaceRole } from '../tool-catalog/surfaces.js';
 
 /** What every tool group needs. The two emitters are passed in so this file has no cycle home. */
 export interface ServerToolDeps {

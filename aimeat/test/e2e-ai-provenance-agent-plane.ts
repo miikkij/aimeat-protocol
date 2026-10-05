@@ -401,7 +401,7 @@ async function connectAgent(ownerToken: string, ownerName: string, agentName: st
     // is stamped when it is PUBLISHED, so a second record at save time would describe bytes nobody
     // has been shown. That reason is recorded next to the tool in scripts/check-ai-disclosure.ts.
 
-    // `organism:write` is the word src/mcp/catalog/scopes.ts maps aimeat_organism_create,
+    // `organism:write` is the word src/tool-catalog/scopes.ts maps aimeat_organism_create,
     // aimeat_workspace_create and aimeat_workspace_comment to, and an unheld scope DELETES a tool
     // from the session's surface rather than refusing the call (src/mcp/index.ts wraps mcp.tool).
     // The list below predates that mapping — it was written on 2026-08-01, the mapping landed on

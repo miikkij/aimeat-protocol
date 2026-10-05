@@ -42,8 +42,8 @@
  *     that lost its own output. An audit nobody runs is a document, not a gate. The nine remaining
  *     drifts are recorded in KNOWN_INPUT_DRIFT with what each one costs a caller.
  */
-import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../src/mcp/catalog/definitions.js';
-import { MCP_SURFACES, V2_ROLES, validateSurfaces } from '../src/mcp/catalog/surfaces.js';
+import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../src/tool-catalog/definitions.js';
+import { MCP_SURFACES, V2_ROLES, validateSurfaces } from '../src/tool-catalog/surfaces.js';
 
 // ── Both surfaces, registered for real against a fake MCP server (shared with check:field-reach) ──
 import { captureServer, captureConnector } from './inventory/mcp-capture.js';

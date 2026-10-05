@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { rankTools, type ToolEntry } from '../../src/mcp/tool-loader.js';
-import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../../src/mcp/catalog/definitions.js';
+import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../../src/tool-catalog/definitions.js';
 
 const catalog: ToolEntry[] = CLI_FALLBACK_TOOL_DEFINITIONS.map((d) => ({ name: d.name, description: d.description, enabled: false }));
 const top = (purpose: string, n = 3) => rankTools(purpose, catalog, n).map((t) => t.name);

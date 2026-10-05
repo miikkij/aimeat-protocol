@@ -22,7 +22,7 @@ import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { refuseUnsentSend } from '../../../../tool-dispatch/tool-call-defs-connections.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
-import { descriptionFor } from '../../../../mcp/catalog/shape.js';
+import { descriptionFor } from '../../../../tool-catalog/shape.js';
 
 export function registerConnectionTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();

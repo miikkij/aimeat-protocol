@@ -6,7 +6,7 @@
  *   names its own operator word) and requireOperator (operator:admin, every operator route). Moved
  *   unchanged out of auth/middleware.ts when that file passed 800 lines; middleware.ts re-exports both.
  * @structure requireOperatorPrincipal(storage, scope) · requireOperator(storage)
- * @usage router.get('/v1/admin/x', requireAuth(), requireOperator(storage), handler);
+ * @usage const operator = [requireAuth(), requireOperator(storage)]; then spread `...operator` into a route.
  * @version-history
  *   v1.0.0 — 2026-10-05 — Moved from auth/middleware.ts (max-file-lines), with requireOperator added
  *     the same day (secaudit 2026-10, C2).

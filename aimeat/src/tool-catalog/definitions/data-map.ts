@@ -1,5 +1,5 @@
 /**
- * @file src/mcp/catalog/definitions/data-map.ts
+ * @file src/tool-catalog/definitions/data-map.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The data-map tools: read an app's map before you touch it, and write one.
@@ -22,7 +22,7 @@
  *   v1.0.0 — 2026-08-25 — TARGET-073.
  */
 import { agentEverywhere, type AimeatToolDefinition } from './types.js';
-import { DATA_MAP_SPEC } from '../../../services/data-map/data-map-types.js';
+import { DATA_MAP_SPEC } from '../../services/data-map/data-map-types.js';
 
 /**
  * What the `data_map` parameter says about itself, on both MCP doors. ONE text built from the

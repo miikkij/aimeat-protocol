@@ -132,12 +132,12 @@ import { resolveSupportRoute } from '../services/message-alias.js';
 // Every tool group, in one list this file no longer keeps: mcp/register-all.ts.
 import { registerAllServerTools } from './register-all.js';
 import { registerRemoteTools } from './remote-tools.js';
-import { scopeAllowsTool } from './catalog/scopes.js';
+import { scopeAllowsTool } from '../tool-catalog/scopes.js';
 import { withResourceGate } from './resource-gate.js';
 import { wrapToolHandler } from './tool-usage-wrap.js';
 import { withOrganismAgentGate } from './organism-agent-gate.js';
 import { withErrorNextStep } from './error-next-step.js';
-import { toolsForSurface, toolsRegisteredOn, isV2Role, V2_ROLES, type SurfaceRole } from './catalog/surfaces.js';
+import { toolsForSurface, toolsRegisteredOn, isV2Role, V2_ROLES, type SurfaceRole } from '../tool-catalog/surfaces.js';
 import { keepOnly, answerSwitchedOffTools } from './tool-loader.js';
 import { instructionsFor } from './instructions.js';
 import { proactiveGuidance } from '../services/proactive-mode.js';

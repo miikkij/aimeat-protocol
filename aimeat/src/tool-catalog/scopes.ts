@@ -19,7 +19,7 @@
  *   - MCP_SCOPE_PROFILES / scopesForProfile() — role-based scope bundles for agent provisioning,
  *     re-exported from ./scope-profiles.ts
  * @usage
- *   import { scopeAllowsTool } from '../catalog/scopes.js';
+ *   import { scopeAllowsTool } from './scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
  *   v1.49.0 -- 2026-10-05 -- An entry may name several words, all needed (ToolScope, toolScopeWords,
@@ -149,7 +149,7 @@
  *   v1.1.0 -- 2026-06-23 -- Add the `secretary` scope profile (Secretary feature Phase 0).
  *   v1.0.0 -- 2026-05-30 -- MCP audit Phase 3 (F1): tool->scope map + wildcard check + scope profiles
  */
-import { scopeIsCovered } from '../../utils/scope-coverage.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { OPERATOR_TOOL_SCOPES } from './scopes-operator.js';
 
 /**

@@ -32,7 +32,7 @@ import { registerAllTools } from '../../src/cli/connect/mcp/tools/index.js';
 
 // ── The CLI dispatch table and the catalog it takes its declared input from ──
 import { CONNECT_CLI_TOOLS } from '../../src/cli/connect/tool-call.js';
-import { getAimeatToolDefinition } from '../../src/mcp/catalog/definitions.js';
+import { getAimeatToolDefinition } from '../../src/tool-catalog/definitions.js';
 
 export interface CapturedTool {
     inputKeys: string[];

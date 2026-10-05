@@ -218,7 +218,7 @@ await test('CONNECTOR MCP: aimeat_memory_write advertises ai_provenance and ai_p
 });
 
 await test('CONNECTOR MCP: every catalog tool that declares ai_provenance carries it here too', async () => {
-  const { CLI_FALLBACK_TOOL_DEFINITIONS } = await import('../src/mcp/catalog/definitions.js');
+  const { CLI_FALLBACK_TOOL_DEFINITIONS } = await import('../src/tool-catalog/definitions.js');
   const expected = CLI_FALLBACK_TOOL_DEFINITIONS
     .filter(d => d.input && 'ai_provenance' in d.input)
     .map(d => d.name);

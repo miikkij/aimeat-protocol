@@ -1,5 +1,5 @@
 /**
- * @file src/mcp/catalog/definitions/surface-layout.ts
+ * @file src/tool-catalog/definitions/surface-layout.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The two tools an operator's AI needs to arrange this node's front page and the page

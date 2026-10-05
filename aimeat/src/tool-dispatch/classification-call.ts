@@ -26,7 +26,7 @@
  */
 import type { AimeatClient, ApiResponse } from './api-client.js';
 import { query } from './tool-call-helpers.js';
-import { checkClassificationInput, POLICY_PENDING_NEXT } from '../mcp/catalog/definitions/classification.js';
+import { checkClassificationInput, POLICY_PENDING_NEXT } from '../tool-catalog/definitions/classification.js';
 
 type Input = Record<string, unknown>;
 

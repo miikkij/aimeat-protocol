@@ -52,7 +52,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { CONNECT_CLI_TOOLS } from '../../src/cli/connect/tool-call.js';
-import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../../src/mcp/catalog/definitions.js';
+import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../../src/tool-catalog/definitions.js';
 import type { JsonObject } from '../../src/tool-dispatch/tool-call-helpers.js';
 
 /** Handled by withProvenanceCarrying() around every definition, not by the handlers themselves. */

@@ -12,12 +12,12 @@
  * @usage registerLocalCallRoute(app, resolveAgent);
  * @version-history
  *   v1.0.0 — 2026-09-27 — Extracted from local-server.ts. A tool that became an action of another
- *     answers 410 TOOL_MOVED with the call that replaces it (mcp/catalog/moved-tools.ts).
+ *     answers 410 TOOL_MOVED with the call that replaces it (tool-catalog/moved-tools.ts).
  */
 import type { Express, Request, Response } from 'express';
 import type { RegisteredAgent } from '../agent-registry.js';
 import { CONNECT_CLI_TOOLS } from '../tool-call.js';
-import { movedToolMessage } from '../../../mcp/catalog/moved-tools.js';
+import { movedToolMessage } from '../../../tool-catalog/moved-tools.js';
 
 export function registerLocalCallRoute(app: Express, resolveAgent: (req: Request) => RegisteredAgent): void {
   app.post('/local/call/:tool', async (req: Request, res: Response) => {
@@ -30,7 +30,7 @@ export function registerLocalCallRoute(app: Express, resolveAgent: (req: Request
     const toolName = req.params.tool as string;
     const tool = CONNECT_CLI_TOOLS.find(t => t.name === toolName);
     if (!tool) {
-      // A tool that became an action of another names the call that replaces it (mcp/catalog/moved-tools.ts).
+      // A tool that became an action of another names the call that replaces it (tool-catalog/moved-tools.ts).
       const moved = movedToolMessage(toolName);
       if (moved) { res.status(410).json({ ok: false, error: { code: 'TOOL_MOVED', message: moved } }); return; }
       res.status(404).json({ ok: false, error: { code: 'UNKNOWN_TOOL', message: `Unknown shell-callable tool: ${toolName}` } });

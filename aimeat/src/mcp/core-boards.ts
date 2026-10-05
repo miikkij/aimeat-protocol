@@ -18,7 +18,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { descriptionFor, shapeResponse, jsonContent, responseFormatSchema } from './catalog/shape.js';
+import { descriptionFor, shapeResponse, jsonContent, responseFormatSchema } from '../tool-catalog/shape.js';
 import { annotationsFor } from './annotations.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho, readProvenanceMany } from './ai-provenance-result.js';

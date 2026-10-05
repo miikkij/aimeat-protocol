@@ -1,5 +1,5 @@
 /**
- * @file src/mcp/catalog/scopes-operator.ts
+ * @file src/tool-catalog/scopes-operator.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The operator tools' rows of TOOL_SCOPES: the organism break-glass words and

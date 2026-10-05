@@ -46,7 +46,7 @@
  *   cd aimeat && pnpm check:scope-parity --seed    # rewrite the exemption file from today's state
  * @version-history
  *   v1.0.2 — 2026-10-05 — A TOOL_SCOPES entry may name several words (secaudit 2026-10, C3).
- *   v1.0.1 — 2026-09-29 — mcp/catalog/scopes-operator.ts counts as a definition file: it is the operator
+ *   v1.0.1 — 2026-09-29 — tool-catalog/scopes-operator.ts counts as a definition file: it is the operator
  *     rows of the tool table, moved out of scopes.ts unchanged.
  *   v1.0.0 — 2026-09-04 — Initial (wish-invarianttiauditointi N3: the same word on every door).
  */
@@ -55,8 +55,8 @@ import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from '
 import { join, relative } from 'node:path';
 import { scopeMentions } from './inventory/scope-mentions.js';
 import { readVocabulary, demandedScopes } from './inventory/scope-vocabulary.js';
-import { TOOL_SCOPES, toolScopeWords } from '../src/mcp/catalog/scopes.js';
-import { actionScopeWords } from '../src/mcp/catalog/action-scopes.js';
+import { TOOL_SCOPES, toolScopeWords } from '../src/tool-catalog/scopes.js';
+import { actionScopeWords } from '../src/tool-catalog/action-scopes.js';
 
 const AIMEAT = process.cwd();
 const SRC = join(AIMEAT, 'src');
@@ -70,7 +70,7 @@ const EXEMPTIONS = join(AIMEAT, 'security', 'scope-parity-exemptions.json');
  * answer nothing. Same exclusion list the inventory uses, for the same reason.
  */
 // scopes-operator.ts is part of the tool table, moved out of scopes.ts for the line ceiling.
-const DEFINITION_FILES = ['mcp/catalog/scopes.ts', 'mcp/catalog/scopes-operator.ts', 'utils/scope-coverage.ts'];
+const DEFINITION_FILES = ['tool-catalog/scopes.ts', 'tool-catalog/scopes-operator.ts', 'utils/scope-coverage.ts'];
 
 interface ExemptionFile { note: string; exempt: Record<string, string> }
 

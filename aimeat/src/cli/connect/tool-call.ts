@@ -45,7 +45,7 @@
  */
 
 import { existsSync, readFileSync } from 'node:fs';
-import { CLI_FALLBACK_TOOL_DEFINITIONS, getAimeatToolDefinition } from '../../mcp/catalog/definitions.js';
+import { CLI_FALLBACK_TOOL_DEFINITIONS, getAimeatToolDefinition } from '../../tool-catalog/definitions.js';
 import type { AimeatClient, ApiResponse } from './api-client.js';
 import { AimeatClient as Client } from './api-client.js';
 import { loadConfig, loadAgentByName, type AimeatConnectConfig } from './config.js';
@@ -55,7 +55,7 @@ import { LOOPBACK_REFUSAL } from './mcp/local-admission.js';
 import type { JsonObject, ConnectCliToolDefinition } from '../../tool-dispatch/tool-call-helpers.js';
 import { CONNECT_CLI_TOOLS } from '../../tool-dispatch/index.js';
 export { CONNECT_CLI_TOOLS } from '../../tool-dispatch/index.js';
-import { movedToolMessage } from '../../mcp/catalog/moved-tools.js';
+import { movedToolMessage } from '../../tool-catalog/moved-tools.js';
 
 /** What an unknown name answers: the replacing call for a tool that moved, else that it is unknown. */
 function unknownToolMessage(name: string): string {

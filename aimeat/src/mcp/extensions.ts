@@ -93,7 +93,7 @@ import { generateUploadToken, buildUploadMeta } from '../services/upload-token.j
 import { makeExtensionFiles } from '../services/extension-files.js';
 import { annotationsFor } from './annotations.js';
 import { dependencyIndex, dependentsOf, visibleAppRefs, usedBySummary } from '../services/dependency-map.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 import { defineAppIam } from '../services/iam/define-app-iam.js';
 
 export function registerExtensionsTools(

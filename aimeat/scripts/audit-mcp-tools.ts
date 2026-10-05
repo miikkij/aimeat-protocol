@@ -23,9 +23,9 @@ import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CONNECT_CLI_TOOLS } from '../src/cli/connect/tool-call.js';
-import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../src/mcp/catalog/definitions.js';
+import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../src/tool-catalog/definitions.js';
 import { TOOL_ANNOTATIONS } from '../src/mcp/annotations.js';
-import { TOOL_SCOPES, SCOPE_EXEMPT_TOOLS } from '../src/mcp/catalog/scopes.js';
+import { TOOL_SCOPES, SCOPE_EXEMPT_TOOLS } from '../src/tool-catalog/scopes.js';
 
 interface SurfaceConfig {
     id: 'server' | 'connector';

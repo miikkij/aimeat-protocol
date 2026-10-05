@@ -12,7 +12,7 @@
  *   how the same defect came to be fixed three separate times inside aimeat_memory_write.
  *
  *   The tools are declared on THREE surfaces, and this is one of them. See the catalog entry
- *   (mcp/catalog/definitions/ai-jobs.ts) for the other two and for the gates that keep them in step.
+ *   (tool-catalog/definitions/ai-jobs.ts) for the other two and for the gates that keep them in step.
  * @structure registerAiJobTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage registerAiJobTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
@@ -31,8 +31,8 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor } from './catalog/shape.js';
-import { AI_ROLE_PARAM } from './catalog/definitions/ai-models.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
+import { AI_ROLE_PARAM } from '../tool-catalog/definitions/ai-models.js';
 import { localAccountName } from '../utils/gaii.js';
 import { AiJobError, getActiveAiJobService } from '../services/ai-jobs/index.js';
 import type { AiJobState } from '../services/ai-jobs/types.js';

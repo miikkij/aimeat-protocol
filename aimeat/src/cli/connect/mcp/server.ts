@@ -47,7 +47,7 @@ import { treatNullAsAbsent } from '../../../mcp/null-as-absent.js';
 import { registerResources } from './resources.js';
 import { startPollerForAgent } from './poller.js';
 import { isRunner } from '../task-runner.js';
-import { toolsForSurface, isV2Role, V2_ROLES, type SurfaceRole } from '../../../mcp/catalog/surfaces.js';
+import { toolsForSurface, isV2Role, V2_ROLES, type SurfaceRole } from '../../../tool-catalog/surfaces.js';
 
 /**
  * Build a fully tool-registered MCP server for the given surface role. The

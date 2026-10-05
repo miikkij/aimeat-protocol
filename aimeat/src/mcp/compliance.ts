@@ -33,7 +33,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 import { COMPLIANCE_READ_SCOPE, COMPLIANCE_WRITE_SCOPE } from '../utils/scope-coverage.js';
 import { complianceRefusal } from '../services/compliance-access.js';
 import { buildComplianceReport, MONTH_RE } from '../services/compliance-report.js';

@@ -66,6 +66,6 @@ export const SCOPE_EXEMPT_TOOLS = new Set<string>([
     'aimeat_task_fail',                              // isOwnTask() at agent-tasks
     'aimeat_task_decline',                           // isOwnTask() at agent-tasks
     'aimeat_task_propose_todos',                     // Authorization is isOwnTask(), defined at agent-tasks
-    'aimeat_task_request_changes',                   // It is never registered on the server /v1/mcp: it sits in V2_EXCLUDED (src/mcp/catalog/surfaces
+    'aimeat_task_request_changes',                   // It is never registered on the server /v1/mcp: it sits in V2_EXCLUDED (src/tool-catalog/surfaces
     'aimeat_task_todo',                              // isOwnTask() at agent-tasks
 ]);

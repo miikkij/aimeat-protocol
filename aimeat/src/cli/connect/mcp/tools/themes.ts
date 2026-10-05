@@ -21,7 +21,7 @@ import type { AgentRegistry } from '../../agent-registry.js';
 import type { ApiResponse } from '../../api-client.js';
 import { themeRequests } from '../../../../tool-dispatch/tool-call-defs-themes.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
-import { descriptionFor } from '../../../../mcp/catalog/shape.js';
+import { descriptionFor } from '../../../../tool-catalog/shape.js';
 
 export function registerThemeTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();

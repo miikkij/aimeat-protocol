@@ -60,7 +60,7 @@ import { describeBasicAgents, requestBasicAgents } from '../services/basic-agent
 import { proposeAgent, proposalApprovalUrl, proposalNextStep } from '../services/agent-proposals.js';
 import { VALID_MODES } from '../routes/agents/constants.js';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 
 export function registerAgentManagementTools(
     mcp: McpServer,

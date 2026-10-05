@@ -25,7 +25,7 @@
  *     operator:admin for is offered and answered; the HTTP admin doors answer as they did.
  *   v1.1.0 — 2026-08-15 — The '*' agent is now asserted NEGATIVELY as well. The suite checked only
  *     that four ordinary tools ARE present, so reintroducing a local wildcard rule inside
- *     scopeAllowsTool — the exact regression mcp/catalog/scopes.ts v1.7.0 records — kept it green
+ *     scopeAllowsTool — the exact regression tool-catalog/scopes.ts v1.7.0 records — kept it green
  *     while a Full-access agent gained twelve reserved tools, among them the URL a decrypted AI key
  *     is sent to and the seller's payment credentials. Both new cases derive their tool list from
  *     TOOL_SCOPES x SCOPES_OUTSIDE_WILDCARD, because a hand-written list is how the rule was lost the
@@ -63,9 +63,9 @@ async function json(path: string, opts: RequestInit = {}) {
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
-import { TOOL_SCOPES } from '../src/mcp/catalog/scopes.js';
+import { TOOL_SCOPES } from '../src/tool-catalog/scopes.js';
 import { SCOPES_OUTSIDE_WILDCARD } from '../src/utils/scope-coverage.js';
-import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../src/mcp/catalog/definitions.js';
+import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../src/tool-catalog/definitions.js';
 import { ZipArchive } from 'archiver';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -264,7 +264,7 @@ await test('Broad agent (*) sees the full tool surface', async () => {
 //
 // The test above asserts only that four ordinary tools ARE present, which is the hole: reintroduce a
 // local wildcard rule inside scopeAllowsTool that answers yes to '*' for everything — the exact
-// regression src/mcp/catalog/scopes.ts v1.7.0 records — and this suite stays green while a Full-access
+// regression src/tool-catalog/scopes.ts v1.7.0 records — and this suite stays green while a Full-access
 // agent gains every one of those tools.
 //
 // Derived from TOOL_SCOPES and SCOPES_OUTSIDE_WILDCARD rather than a copied list of tool names, so a

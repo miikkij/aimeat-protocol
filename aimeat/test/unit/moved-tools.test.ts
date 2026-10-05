@@ -10,9 +10,9 @@
  *   v1.0.0 — 2026-09-27 — Initial.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { MOVED_TOOLS, movedToolMessage } from '../../src/mcp/catalog/moved-tools.js';
-import { APP_MANAGE_ACTIONS } from '../../src/mcp/catalog/definitions/app-manage.js';
-import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../../src/mcp/catalog/definitions.js';
+import { MOVED_TOOLS, movedToolMessage } from '../../src/tool-catalog/moved-tools.js';
+import { APP_MANAGE_ACTIONS } from '../../src/tool-catalog/definitions/app-manage.js';
+import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../../src/tool-catalog/definitions.js';
 import { runToolCall } from '../../src/cli/connect/tool-call.js';
 
 afterEach(() => { vi.restoreAllMocks(); process.exitCode = 0; });

@@ -1,6 +1,6 @@
 /**
  * @file mcp-scopes.test.ts
- * @description Unit tests for MCP tool scope gating (src/mcp/catalog/scopes.ts). Locks the
+ * @description Unit tests for MCP tool scope gating (src/tool-catalog/scopes.ts). Locks the
  *   wildcard-matching semantics (exact / domain:* / global *) that decide which tools the
  *   /v1/mcp surface registers per agent (F1), and the role->scope profile bundles.
  * @version-history
@@ -14,11 +14,11 @@
  *   v1.0.0 -- 2026-05-30 -- MCP audit Phase 3 (F1)
  */
 import { describe, it, expect } from 'vitest';
-import { scopeAllowsTool, requiredScopesForTool, scopesForProfile, MCP_SCOPE_PROFILES } from '../../src/mcp/catalog/scopes.js';
+import { scopeAllowsTool, requiredScopesForTool, scopesForProfile, MCP_SCOPE_PROFILES } from '../../src/tool-catalog/scopes.js';
 
 /** The one word a single-word tool needs; undefined for an ungated tool, the words joined with + otherwise. */
 const requiredScopeForTool = (tool: string): string | undefined => requiredScopesForTool(tool).join('+') || undefined;
-import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../../src/mcp/catalog/definitions.js';
+import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../../src/tool-catalog/definitions.js';
 import { isOutsideWildcard } from '../../src/utils/scope-coverage.js';
 
 describe('scopeAllowsTool', () => {

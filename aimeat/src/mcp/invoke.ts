@@ -24,7 +24,7 @@ import type { AimeatConfig } from '../config.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { invokeNodeCapability } from '../services/node-invoke.js';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 
 export function registerInvokeTool(
     mcp: McpServer,

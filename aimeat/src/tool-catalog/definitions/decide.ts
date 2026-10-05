@@ -1,5 +1,5 @@
 /**
- * @file src/mcp/catalog/definitions/decide.ts
+ * @file src/tool-catalog/definitions/decide.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Catalog entries for the decision tools (TARGET-080, AIMEAT.decide): ask the decision
@@ -21,7 +21,7 @@
  *   a rule decides whether an agent acts, so an agent that could write one could write its own
  *   permission. The owner's press creates it.
  * @structure decideTools -- AimeatToolDefinition[]
- * @usage imported by mcp/catalog/definitions.ts
+ * @usage imported by tool-catalog/definitions.ts
  * @version-history
  *   v1.2.2 — 2026-09-25 — aimeat_decision_review says a decision the agent asked for itself is refused
  *     (OWN_DECISION), and that the review names the one who recorded it.

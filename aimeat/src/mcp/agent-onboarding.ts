@@ -42,7 +42,7 @@ import { createT, DEFAULT_LOCALE } from '../i18n.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor } from './catalog/shape.js';
+import { descriptionFor } from '../tool-catalog/shape.js';
 
 type ToolTextResult = { content: Array<{ type: 'text'; text: string }>; isError?: boolean };
 

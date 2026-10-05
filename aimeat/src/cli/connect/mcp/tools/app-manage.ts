@@ -16,7 +16,7 @@ import type { AgentRegistry } from '../../agent-registry.js';
 import type { ApiResponse } from '../../api-client.js';
 import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
-import { descriptionFor } from '../../../../mcp/catalog/shape.js';
+import { descriptionFor } from '../../../../tool-catalog/shape.js';
 import { appManageShape } from '../../../../mcp/app-manage-shape.js';
 import { appManageCall } from '../../../../tool-dispatch/app-manage-call.js';
 

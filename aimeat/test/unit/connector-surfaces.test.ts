@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import { registerAllTools } from '../../src/cli/connect/mcp/tools/index.js';
 import type { AgentRegistry } from '../../src/cli/connect/agent-registry.js';
-import { MCP_SURFACES, toolsForSurface } from '../../src/mcp/catalog/surfaces.js';
+import { MCP_SURFACES, toolsForSurface } from '../../src/tool-catalog/surfaces.js';
 
 /** Capture the tool names the connector registers (fake MCP + fake registry). */
 function captureConnectorTools(): Set<string> {

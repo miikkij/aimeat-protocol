@@ -24,7 +24,7 @@ import type { AgentRegistry } from '../../agent-registry.js';
 import { agentNameSchema, payloadResult, pickAgent } from './_registry.js';
 import type { ApiResponse } from '../../api-client.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
-import { descriptionFor } from '../../../../mcp/catalog/shape.js';
+import { descriptionFor } from '../../../../tool-catalog/shape.js';
 
 // The WHOLE envelope is what these tools print, deliberately -- a compliance answer is read with
 // its protocol and timestamp -- so the payload is the response itself and the flag comes off `ok`.
