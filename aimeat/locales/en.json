@@ -8673,6 +8673,8 @@
   "notiftext.package_renewal_due.body": "{label} keeps working after that, but gets no new versions. Renew the update service where you bought it.",
   "notiftext.package_renewal_failed.title": "The update service for {name} could not be renewed",
   "notiftext.package_renewal_failed.body": "Your card could not be charged. The update service ends on {date} unless you renew it yourself. The charge is tried again each day until then.",
+  "notiftext.package_renewal_agent_limit.title": "The update service for {name} could not be renewed",
+  "notiftext.package_renewal_agent_limit.body": "Your agent turned automatic renewal on, and this renewal would go over the most it may spend in a day, or it has no limit. Your card was not charged. The update service ends on {date} unless you renew it yourself or raise the agent's limit. The renewal is tried again each day until then.",
   "notiftext.package_renewed.title": "The update service for {name} was renewed",
   "notiftext.package_renewed.body": "Your card was charged {amount}, and new versions come for another {days} days.",
   "notiftext.package_sale_request_approved.title": "Your request for {name} was approved",

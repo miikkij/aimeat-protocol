@@ -46262,6 +46262,9 @@ paths:
       description: >-
         For one package on one node. On needs a card saved at purchase (409 NO_SAVED_PAYMENT otherwise).
         Automatic renewal charges the card three days before the update service ends. Requires commerce:buy.
+        When an agent turns it on, the subscription names the agent (`auto_renew_by`) and each renewal is
+        that agent's purchase, held to the daily purchase limit its owner set (a renewal past it is not
+        charged and the owner is told). The owner turning it on in person removes the name.
       tags: [Packages]
       security:
         - BearerAuth: []

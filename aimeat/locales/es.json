@@ -7547,6 +7547,8 @@
   "notiftext.package_renewal_due.body": "{label} sigue funcionando después, pero ya no recibe versiones nuevas. Renueva el servicio de actualizaciones donde lo compraste.",
   "notiftext.package_renewal_failed.title": "No se pudo renovar el servicio de actualizaciones de {name}",
   "notiftext.package_renewal_failed.body": "No se pudo hacer el cobro a tu tarjeta. El servicio de actualizaciones termina el {date}, a menos que lo renueves a mano. El cobro se intenta de nuevo cada día hasta entonces.",
+  "notiftext.package_renewal_agent_limit.title": "No se pudo renovar el servicio de actualizaciones de {name}",
+  "notiftext.package_renewal_agent_limit.body": "Tu agente activó la renovación automática, y esta renovación pasaría de lo máximo que puede gastar en un día, o no tiene límite. No se hizo ningún cobro a tu tarjeta. El servicio de actualizaciones termina el {date}, a menos que lo renueves a mano o subas el límite del agente. La renovación se intenta de nuevo cada día hasta entonces.",
   "notiftext.package_renewed.title": "Se renovó el servicio de actualizaciones de {name}",
   "notiftext.package_renewed.body": "Se cobraron {amount} a tu tarjeta, y las versiones nuevas siguen llegando durante {days} días más.",
   "notiftext.package_sale_request_approved.title": "Se aprobó tu solicitud de {name}",

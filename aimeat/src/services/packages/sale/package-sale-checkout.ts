@@ -27,6 +27,8 @@
  * @structure packageSellableResolver() · carryOutSale() · parsePackageLine() · readOfferAsSeller() ·
  *   decideSaleRequest() · reviewSale()
  * @version-history
+ *   v1.3.0 — 2026-10-06 — A purchase an agent completes with automatic renewal names that agent on the
+ *     subscription (`auto_renew_by`; secaudit 2026-10 follow-up, A6).
  *   v1.2.0 — 2026-10-05 — A sale naming a node another buyer on this node holds is refused with
  *     NODE_HELD, and the payment is refunded; the first sale to a node records its buyer (secaudit
  *     2026-10, PKG-2).
@@ -48,6 +50,7 @@ import {
     type CatalogueEntry, type Subscription, type SaleRequest,
 } from './package-sale-catalogue.js';
 import { notify } from '../../notify.js';
+import { isValidGAII } from '../../../utils/gaii.js';
 
 type Deps = { storage: Storage; config: AimeatConfig; peers: Map<string, PeerInfo> };
 
@@ -140,6 +143,7 @@ export function packageSellableResolver(peers: Map<string, PeerInfo>): SellableR
                     const result = await carryOutSale(deps, {
                         entry, offer, line, buyer: session.buyerOwner, order: session.id, input,
                         paid: { amount: session.total, currency: session.currency }, payment,
+                        buyerIdentity: session.buyerIdentity,
                     });
                     void ctx;
                     return { result };
@@ -158,6 +162,8 @@ export async function carryOutSale(
     args: {
         entry: CatalogueEntry; offer: OfferView; line: ReturnType<typeof parsePackageLine>; buyer: string; order: string;
         input: PackageLineInput; paid: { amount: number; currency: string }; approved?: boolean;
+        /** Who completed the checkout: an agent's GAII is named on a subscription it turns automatic renewal on for. */
+        buyerIdentity?: string;
         /** The handler that collected, and the card it kept when the buyer turned automatic renewal on. */
         payment?: { handler: string; saved?: { customer?: string; payment_method?: string } };
     },
@@ -229,6 +235,8 @@ export async function carryOutSale(
         const sub: Subscription = {
             repository: entry.repository, group_id: entry.group_id, node_id: nodeId, buyer,
             terms_id: terms.id, renewal: entry.renewal, updates_until: until, auto_renew: autoRenew,
+            // An agent that bought with automatic renewal is named: each renewal is its purchase (A6).
+            ...(autoRenew && args.buyerIdentity && isValidGAII(args.buyerIdentity) ? { auto_renew_by: args.buyerIdentity } : {}),
             ...(saved && args.payment ? { payment: { handler: args.payment.handler, ...saved } } : {}),
             last_order: order, createdAt: now, updatedAt: now,
         };
