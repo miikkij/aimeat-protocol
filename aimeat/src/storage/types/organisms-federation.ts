@@ -489,6 +489,9 @@ export interface ScheduledJobRecord {
   agentName?: string;        // target/associated agent (agent_task; optional otherwise)
   agentGaii?: string;        // resolved GAII of the target agent
   createdByAgent?: boolean;  // true = created via MCP by an agent
+  /** The app grant id when an app made it: the schedule fires as that app while the grant is live
+   *  (services/schedule-actor.ts; secaudit 2026-10, AI-2). Set only by the schedule writer. */
+  createdByApp?: string;
   displayName?: string;      // human label ("Morning news translation")
   description?: string;      // human description
   purpose?: string;          // why this runs (shown in the master scheduler)

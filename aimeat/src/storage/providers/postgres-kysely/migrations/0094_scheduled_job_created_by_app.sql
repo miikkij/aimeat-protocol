@@ -1,0 +1,13 @@
+-- 0094_scheduled_job_created_by_app.sql
+--
+-- The app grant that made a schedule, when an app made it.
+--
+-- A schedule an app made was stored with the owner's identity as its maker, the same as one the
+-- owner made, and fired with the owner's whole authority: a refinery schedule ran with every scope
+-- and the owner's role, and kept firing after the owner revoked the app (secaudit 2026-10, AI-2).
+-- The scheduler now fires such a schedule as that app, with the grant's scopes, and only while the
+-- grant is live (services/schedule-actor.ts). Only the schedule writer sets it. NULL = not made by
+-- an app.
+--
+-- Mirrors the SQLite column added in schema-columns-scheduler.ts.
+ALTER TABLE "ScheduledJob" ADD COLUMN IF NOT EXISTS "createdByApp" TEXT;

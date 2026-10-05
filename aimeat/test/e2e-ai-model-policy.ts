@@ -354,6 +354,47 @@ const toolJson = (r: any) => JSON.parse(r?.result?.content?.[0]?.text ?? '{}');
       assert(granted.status === 403 && granted.body.error?.code === 'AI_MODEL_NOT_ALLOWED', `the granted app: ${granted.status} ${granted.body.error?.code}`);
       assert(granted.body.error.details.source === 'owner-app', `the owner's per-app rule refused: ${JSON.stringify(granted.body.error.details)}`);
     });
+
+    await test('12. an AI job the app starts is bound by the same per-app list (secaudit 2026-10, AI-3)', async () => {
+      // Until 2026-10-05 a job's model call was planned as the owner in person, whose list allows
+      // this model, so the app's job ran on a model the owner had ruled out for that app.
+      const appToken = await appGrantToken(a, 'policy-grant.html');
+      const started = await json('/v1/ai/jobs', { method: 'POST', headers: auth(appToken), body: JSON.stringify({ prompt: 'Say one word.', model: 'stub/good-model', result_key: 'policy-job.answer' }) });
+      assert(started.status === 202, `job start ${started.status}: ${JSON.stringify(started.body?.error)}`);
+      const id = started.body.data.job_id;
+      let job: any = null;
+      for (let i = 0; i < 40; i++) {
+        const r = await json(`/v1/ai/jobs/${id}`, { headers: auth(appToken) });
+        job = r.body.data;
+        if (job && (job.state === 'done' || job.state === 'failed')) break;
+        await new Promise((ok) => setTimeout(ok, 250));
+      }
+      assert(job?.state === 'failed' && job.error?.code === 'AI_MODEL_NOT_ALLOWED', `the app's job is refused by the owner's per-app list: ${JSON.stringify({ state: job?.state, error: job?.error })}`);
+    });
+
+    await test('13. a schedule the app makes fires as that app, and not at all once the app is revoked (secaudit 2026-10, AI-2/AI-3)', async () => {
+      // Until 2026-10-05 an app's schedule was stored as the owner's and fired with the owner's
+      // whole authority, after a revoke too.
+      const appToken = await appGrantToken(a, 'policy-grant.html');
+      const made = await json('/v1/schedules', { method: 'POST', headers: auth(appToken), body: JSON.stringify({
+        kind: 'ai', cron: '0 3 * * *', display_name: 'policy app schedule',
+        prompt: 'Say one word.', model: 'stub/good-model', input_keys: [], output_key: 'policy-sched.answer',
+      }) });
+      assert(made.status === 201, `schedule ${made.status}: ${JSON.stringify(made.body?.error)}`);
+      const id = made.body.data.schedule?.id ?? made.body.data.id;
+      // While the grant is live it runs as the app: the owner's per-app list refuses this model.
+      const first = await json(`/v1/schedules/${id}/trigger`, { method: 'POST', headers: auth(a.token) });
+      assert(first.status === 200 && /AI_MODEL_NOT_ALLOWED|not allowed/i.test(JSON.stringify(first.body.data)),
+        `the app's schedule asks as the app: ${JSON.stringify(first.body.data?.outcome)} ${JSON.stringify(first.body.data?.reason ?? first.body.data?.schedule?.lastRunError)}`);
+      // The owner revokes the app; the schedule no longer runs, and says why.
+      const grantId = JSON.parse(Buffer.from(appToken.split('.')[1], 'base64url').toString('utf8')).app_grant;
+      const rev = await json(`/v1/app-grants/${grantId}`, { method: 'DELETE', headers: auth(a.token) });
+      assert(rev.status === 200, `revoke ${rev.status}: ${JSON.stringify(rev.body?.error)}`);
+      const second = await json(`/v1/schedules/${id}/trigger`, { method: 'POST', headers: auth(a.token) });
+      assert(/no longer holds your permission/.test(JSON.stringify(second.body.data)),
+        `a revoked app's schedule does not run: ${JSON.stringify(second.body.data?.outcome)} ${JSON.stringify(second.body.data?.reason ?? second.body.data?.schedule?.lastRunError)}`);
+      await json(`/v1/schedules/${id}`, { method: 'DELETE', headers: auth(a.token) });
+    });
   } finally {
     await stopServer(server);
     await provider.close();

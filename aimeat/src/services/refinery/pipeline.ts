@@ -22,6 +22,8 @@
  *   v1.0.1 — 2026-09-29 — The "already filed?" row read uses a system classification reader (TARGET-082).
  *   v1.0.2 — 2026-09-29 — TARGET-082 review: an attachment whose text goes to the model is read
  *     through readAiFile (useForAi first); a refused one is named on the row and left out.
+ *   v1.0.3 — 2026-10-05 — The extraction runs as whoever runs the batch, an app or an agent included
+ *     (services/ai/caller-context.ts; secaudit 2026-10, AI-3).
  */
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
@@ -42,6 +44,7 @@ import { writeMemoryRecord } from '../memory-write.js';
 import { systemReader, readerForCaller } from '../classification/reader.js';
 import { ClassificationError } from '../classification/labels.js';
 import { readAiFile } from '../ai-inputs.js';
+import { aiCallerFromCredential } from '../ai/caller-context.js';
 import {
   parseMessage, listPage, isGraph, redact, senderDomain, ruleFor, extractionPrompt, parseJsonAnswer, queueFor,
   type MailMessage, type RefineryRule, type Queue,
@@ -229,8 +232,12 @@ async function extract(ctx: Ctx, cls: RefineryClass, msg: MailMessage, att: { te
     ? await readCallFiles(ctx.deps.storage, callerReader(ctx), ctx.caller.principal, att.fileKeys.map((k) => ({ storage_key: k })))
     : undefined;
   const model = (files ? ctx.def.models.vision : ctx.def.models.text) || undefined;
+  // As whoever runs the batch: the app or agent that started it, under the owner's rules for it
+  // (services/ai/caller-context.ts; secaudit 2026-10, AI-3).
+  const who = aiCallerFromCredential({ roles: ctx.caller.roles, app: ctx.caller.appRef }, ctx.caller.principal);
   const ask = () => completeForOwner(ctx.deps.storage, ctx.deps.config, ctx.caller.ownerGhii, {
     prompt: extractionPrompt(cls, msg, att.text, att.fileKeys.length), model, temperature: 0, appId: ctx.def.app, files,
+    caller: who.caller, ...(who.agent ? { agent: who.agent } : {}), ...(who.verifiedApp ? { verifiedApp: who.verifiedApp } : {}),
   });
   let tries = 1;
   let r;

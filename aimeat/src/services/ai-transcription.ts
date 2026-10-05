@@ -13,6 +13,7 @@
  *   import { transcribeForOwner } from '../services/ai-transcription.js';
  *   const r = await transcribeForOwner(storage, config, gaii, { audio, appId: 'inbox' });
  * @version-history
+ *   v2.4.0 — 2026-10-05 — `caller` is required: every call says who asks (secaudit 2026-10, AI-3).
  *   v2.3.0 — 2026-10-02 — Takes `lang`, so a refusal's sentence is in the person's language.
  *   v2.2.0 — 2026-09-28 — Takes `role`, the AI role the call runs as (services/ai/roles.ts).
  *   v2.1.0 — 2026-09-28 — Takes caller and verifiedApp for the owner's model policy (V2).
@@ -71,7 +72,7 @@ export interface TranscribeForOwnerOptions {
    *  caller derives it from the principal (aiPayerOf), never from a request body. */
   agent?: string;
   /** Whose call this is and the app its grant names, for the owner's model policy. */
-  caller?: CallerClass;
+  caller: CallerClass;
   verifiedApp?: string;
   /** The request's word on the person's language, for a refusal's sentence. */
   lang?: RequestLanguage;
@@ -132,7 +133,7 @@ export async function transcribeForOwner(
   // refusal stays: handing audio to a chat model turns a clear local error into an opaque provider one.
   const plan = await prepareAiCall(storage, config, gaii, {
     op: 'transcribe', model: opts.model, appId: opts.appId, ...(opts.agent ? { agent: opts.agent } : {}),
-    ...(opts.caller ? { caller: opts.caller } : {}), ...(opts.verifiedApp ? { verifiedApp: opts.verifiedApp } : {}),
+    caller: opts.caller, ...(opts.verifiedApp ? { verifiedApp: opts.verifiedApp } : {}),
     ...(opts.lang ? { lang: opts.lang } : {}),
     ...(opts.provider ? { provider: opts.provider } : {}), ...(opts.fallback !== undefined ? { fallback: opts.fallback } : {}),
     ...(opts.role ? { role: opts.role } : {}),

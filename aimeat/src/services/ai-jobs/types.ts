@@ -13,6 +13,8 @@
  * @structure AiJobState · AiJobRecord · AiJobStartedBy · AiJobLogEntry · StartAiJobInput · AiJobError
  * @usage import type { AiJobRecord } from './types.js';
  * @version-history
+ *   v1.5.0 — 2026-10-05 — `started_by.app`: the app an app grant names, so the job's model call runs
+ *     as that app (secaudit 2026-10, AI-3).
  *   v1.4.0 — 2026-09-30 — `classification_warnings` on the record and on the start answer: the
  *     warning-classified items the job gave its model (TARGET-082 review, item 2).
  *   v1.3.0 — 2026-09-29 — `started_by` on the record and `startedBy` on the start context: the
@@ -118,6 +120,9 @@ export interface AiJobStartedBy {
     scopes: string[];
     /** 'pat' when the credential was made from a personal access token (auth/jwt.ts). */
     via?: string;
+    /** The app an app grant names (`owner/file.html`), when an app started the job. The job's
+     *  model call then runs as that app, under the owner's rules for it (secaudit 2026-10, AI-3). */
+    app?: string;
 }
 
 /**

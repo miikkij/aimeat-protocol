@@ -33,6 +33,7 @@ import { resolveAppOwnerScope } from '../services/app-lifecycle.js';
 import { generateForOwner } from '../services/ai-image.js';
 import { AiCompletionError } from '../services/ai-completion.js';
 import { aiPayerOf } from '../services/agent-ai-keys.js';
+import { aiCallerOfPrincipal } from '../services/ai/caller-context.js';
 import { AI_ROLE_PARAM } from './catalog/definitions/ai-models.js';
 
 export function registerAiImageTool(
@@ -72,7 +73,7 @@ export function registerAiImageTool(
                 const r = await generateForOwner(storage, config, gaii, {
                     prompt, size, storageKey: storage_key,
                     publicVisibility: isPublic === true, model, appId: app_id,
-                    ...(agent ? { agent } : {}),
+                    ...(agent ? { agent } : {}), caller: aiCallerOfPrincipal(getAgentGaii()).caller,
                     ...(provider ? { provider } : {}),
                     ...(fallback !== undefined ? { fallback } : {}),
                     ...(role ? { role } : {}),

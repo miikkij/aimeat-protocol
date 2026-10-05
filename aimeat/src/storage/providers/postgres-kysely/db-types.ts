@@ -2020,6 +2020,7 @@ export interface ScheduledJob {
   createdAt: Generated<Timestamp>;
   createdBy: string;
   createdByAgent: Generated<boolean>;
+  createdByApp: string | null;
   cron: string;
   description: string | null;
   displayName: string | null;

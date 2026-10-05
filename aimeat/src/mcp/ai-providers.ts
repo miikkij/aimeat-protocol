@@ -35,6 +35,7 @@ import { setRouting } from '../services/ai/routing.js';
 import { setRoles } from '../services/ai/roles.js';
 import { aiRolesView, knownRoleProviders } from '../services/ai/roles-view.js';
 import type { AiCapability } from '../services/ai/types.js';
+import { aiCallerOfPrincipal } from '../services/ai/caller-context.js';
 
 export function registerAiProviderTools(
   mcp: McpServer,
@@ -67,7 +68,7 @@ export function registerAiProviderTools(
       try {
         return text(await testProvider(storage, config, payer, {
           provider, ...(capability ? { capability: capability as AiCapability } : {}), acceptCost: accept_cost === true,
-          ...(agent ? { agent, caller: 'agent' as const } : {}),
+          ...(agent ? { agent } : {}), caller: aiCallerOfPrincipal(getAgentGaii()).caller,
         }));
       } catch (e) { return refusal(e); }
     },

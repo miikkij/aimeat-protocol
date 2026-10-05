@@ -70,6 +70,8 @@
  *   v1.17.0 — 2026-09-28 — System 2 plan, V5: the `ai` step action's type and schema moved unchanged
  *     to workflow-ai-step.ts (max-file-lines), where they gain `op`, `provider`, `audio_key`,
  *     `language` and `size`.
+ *   v1.18.0 — 2026-10-05 — WorkflowRun.aiCaller: who the run's AI calls run as, decided at its start
+ *     (services/workflow/ai-caller.ts; secaudit 2026-10, AI-3).
  */
 import { z } from 'zod';
 import { SignalSchema, type Signal } from './workflow-signals.js';
@@ -546,6 +548,12 @@ export interface WorkflowRun {
     ranAsOwner?: { runId: string; at: string };
   };
   steps: Record<string, WorkflowRunStep>;
+  /**
+   * Who the run's AI calls run as (services/workflow/ai-caller.ts), decided when it starts: the
+   * principal that started it, or for a trigger's run the workflow's saver. Absent on a run started
+   * before 2026-10-05, whose saver stands in.
+   */
+  aiCaller?: { caller: 'owner' | 'chat' | 'agent' | 'app'; agent?: string; verifiedApp?: string };
   /** Inspector tasks dispatched on RED steps (best-effort enrichment; the owner push is guaranteed). */
   inspections?: Array<{ stepId: string; taskId: string; reason: string; at: string }>;
   /** Set once the finish notification (notify_on_finish) has been sent, so it fires exactly once even

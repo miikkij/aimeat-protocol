@@ -25,6 +25,8 @@
  *     the credential mask it lacked, and the classification check (TARGET-082).
  *   v1.6.0 — 2026-09-29 — An `ai` job reads its inputs as an unattended AI run (ai-jobs/starter.ts
  *     unattendedReader), not as the node's own reader (TARGET-082 V4).
+ *   v1.7.0 — 2026-10-05 — An `ai` job's model call runs as whoever made the schedule, asked at the
+ *     fire (services/schedule-actor.ts): gone, or without ai:use, it does not run (secaudit 2026-10, AI-3).
  */
 import type { AimeatConfig } from '../config.js';
 import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
@@ -37,6 +39,8 @@ import { buildGEAI, isSameOwner, localAccountName } from '../utils/gaii.js';
 import { aiJobKeyRefusal } from './ai-job-keys.js';
 import { readAiRecords } from './ai-inputs.js';
 import { unattendedReader } from './ai-jobs/starter.js';
+import { scheduleActor } from './schedule-actor.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
 
 /**
  * `ai` kind: gather predefined input memory keys, compose the prompt, run a
@@ -90,11 +94,22 @@ export async function runAiJob(storage: Storage, config: AimeatConfig, job: Sche
   }
   const composedPrompt = parts.join('\n');
 
+  // As whoever made the schedule, asked now (services/schedule-actor.ts): an agent's cap and the
+  // owner's rules for that agent or app apply, and a maker that is gone or lost ai:use stops it.
+  // Until 2026-10-05 it asked as the owner in person (secaudit 2026-10, AI-3).
+  const actor = await scheduleActor(storage, job);
+  if (!actor.ok) throw new Error(actor.reason);
+  if (!actor.isOwner && !scopeIsCovered(actor.scopes, 'ai:use')) {
+    throw new Error('What made this schedule no longer holds ai:use, so it does not run. Approve it again, or delete this schedule.');
+  }
   const result = await completeForOwner(storage, config, owner, {
     prompt: composedPrompt,
     systemPrompt: cfg.systemPrompt,
     model: cfg.model,
     appId: `schedule:${job.id}`,
+    caller: actor.ai.caller,
+    ...(actor.ai.agent ? { agent: actor.ai.agent } : {}),
+    ...(actor.ai.verifiedApp ? { verifiedApp: actor.ai.verifiedApp } : {}),
   });
 
   const outputKey = cfg.outputKey || `scheduler.${job.id}.output`;

@@ -20,6 +20,7 @@
  *   key can be tested again; a pass marks it `ok` and records when it was tested.
  * @structure testProvider · silentWav
  * @version-history
+ *   v1.2.0 — 2026-10-05 — `caller` is required: every call says who asks (secaudit 2026-10, AI-3).
  *   v1.1.0 — 2026-09-28 — Speech and embeddings are testable (V5 of the System 2 plan).
  *   v1.0.0 — 2026-09-28 — Initial (V3 of the System 2 plan).
  */
@@ -58,7 +59,7 @@ export interface ProviderTestInput {
   /** An image test makes a picture, which costs money. */
   acceptCost?: boolean;
   agent?: string;
-  caller?: CallerClass;
+  caller: CallerClass;
   verifiedApp?: string;
 }
 
@@ -91,7 +92,7 @@ export async function testProvider(
   const who = {
     appId: APP_ID, provider: id, fallback: false,
     ...(input.agent ? { agent: input.agent } : {}),
-    ...(input.caller ? { caller: input.caller } : {}),
+    caller: input.caller,
     ...(input.verifiedApp ? { verifiedApp: input.verifiedApp } : {}),
   };
   const started = Date.now();
@@ -110,7 +111,7 @@ export async function testProvider(
     let done: Record<string, unknown> | undefined;
     await streamSpeech(storage, config, gaii, {
       input: 'ok', app_id: APP_ID, provider: id, response_format: 'mp3', speed: 1,
-      ...(input.caller ? { caller: input.caller } : {}), ...(input.verifiedApp ? { verifiedApp: input.verifiedApp } : {}),
+      caller: input.caller, ...(input.verifiedApp ? { verifiedApp: input.verifiedApp } : {}),
     }, AbortSignal.timeout(60_000), async (e) => { if (e.type === 'done') done = e; });
     model = String(done?.model ?? ''); cost = typeof done?.cost_usd === 'number' ? done.cost_usd : 0;
     keySource = (done?.key_source as ProviderTestResult['key_source'] | undefined) ?? 'own';

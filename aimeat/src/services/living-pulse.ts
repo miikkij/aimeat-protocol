@@ -50,6 +50,7 @@ import { inheritSourceLabels, type SourceCopy } from './living-source-labels.js'
 import type { PushService } from './push.js';
 import type { EmailService } from './email.js';
 import { emitDelivery } from './event-bus.js';
+import { OWNER_CALLER } from './ai/caller-context.js';
 
 /** Optional notify services for stop/retire alerts (web-push + email). The in-UI retired badge + ledger
  *  are written regardless; these are the extra out-of-app nudges. */
@@ -311,7 +312,8 @@ export async function pulseInstanceServer(
       await systemReader({ storage, config }, ownerGaii).useForAi(activeRecs.map(i => memoryTarget(i.ownerGaii, i.key)), { capability: 'text' });
       const srcList = active.map(s => `- ${s.text}${s.origin ? ` 〔${s.origin}〕` : ''}`).join('\n');
       const prompt = `Section: ${sec.section}\nScope: ${sec.desc || ''}\nDocument scope: ${charter.scope || ''}\n\nSources:\n${srcList}\n\nWrite the section.`;
-      const r = await completeForOwner(storage, config, ownerGaii, { prompt, systemPrompt: DERIVE_SYSTEM, appId: 'living' });
+      // The node's pulse writes the owner's living document with nobody else asking.
+      const r = await completeForOwner(storage, config, ownerGaii, { prompt, systemPrompt: DERIVE_SYSTEM, appId: 'living', caller: OWNER_CALLER.caller });
       costUsd += r.usage.costUsd || 0;
       const md = (r.content || '').trim();
       const der = { slot, markdown: md, derivedFrom: active.map(s => s.id), producedAt: new Date().toISOString(), producedBy: 'pulse', pending: gated };
@@ -370,7 +372,7 @@ async function evaluateStop(
       const r = await completeForOwner(storage, config, ownerGaii, {
         prompt: `Stop condition: ${stopWhen}\n\nCurrent document:\n${renderedDoc.slice(0, 12000)}\n\nIs the stop condition met? Answer only YES or NO.`,
         systemPrompt: 'You judge whether a living document has met its stop condition. Answer with only YES or NO.',
-        appId: 'living',
+        appId: 'living', caller: OWNER_CALLER.caller,
       });
       if (/^\s*yes\b/i.test(r.content || '')) return `condition met: ${stopWhen}`;
     } catch (err) { logger.warn('evaluateStop: judge best-effort; do not retire on error', { error: String(err) }); }

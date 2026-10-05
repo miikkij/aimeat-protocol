@@ -11,17 +11,21 @@
  *   from the request body, and it holds only what a reader is rebuilt from: the identity, the
  *   account name, the roles, the scopes and the `via` mark. Never a token. Nothing here grants the
  *   job anything: whose key pays and whose namespace it reads is still the job's `owner`.
- * @structure startedByOf(auth, principal) · jobReader(deps, job) · unattendedReader(deps, ownerGaii)
+ * @structure startedByOf(auth, principal) · jobReader(deps, job) · jobCaller(job) · unattendedReader(deps, ownerGaii)
  * @usage
  *   startJob(input, { ownerGhii, createdBy, startedBy: startedByOf(req.auth!, ownerGhii) });
  *   const reader = jobReader({ storage, config }, job);
  * @version-history
+ *   v1.1.0 — 2026-10-05 — The starter keeps the app an app grant names, and jobCaller() says who the
+ *     job's model call runs as, so the owner's rules for that app or agent apply to it (secaudit
+ *     2026-10, AI-3).
  *   v1.0.0 — 2026-09-29 — TARGET-082 V4. Initial.
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { readerForCaller, type ContentReader } from '../classification/reader.js';
+import { aiCallerFromCredential, aiCallerOfPrincipal, type AiCallerContext } from '../ai/caller-context.js';
 import type { AiJobRecord, AiJobStartedBy } from './types.js';
 
 type ReaderDeps = { storage: Storage; config: AimeatConfig };
@@ -32,6 +36,8 @@ interface StarterCredential {
     roles: readonly string[];
     scopes?: readonly string[];
     via?: string;
+    /** The app an app grant names (`req.auth.app`). */
+    app?: string | null;
 }
 
 /**
@@ -45,7 +51,18 @@ export function startedByOf(auth: StarterCredential, principal: string): AiJobSt
         roles: [...auth.roles],
         scopes: [...(auth.scopes ?? [])],
         ...(auth.via ? { via: auth.via } : {}),
+        ...(auth.roles.includes('app') && auth.app ? { app: auth.app } : {}),
     };
+}
+
+/**
+ * Who the job's model call runs as (services/ai/caller-context.ts): the app or the agent that
+ * started it, under the owner's rules for that app or agent. A job with no starter recorded, from
+ * before starters were kept, runs as the identity that owns it.
+ */
+export function jobCaller(job: Pick<AiJobRecord, 'owner' | 'started_by'>): AiCallerContext {
+    const s = job.started_by;
+    return s ? aiCallerFromCredential({ roles: s.roles, app: s.app }, s.principal) : aiCallerOfPrincipal(job.owner);
 }
 
 /**

@@ -40,6 +40,8 @@
  *   const out = await createScheduleRecord({ storage, config, scheduler }, caller, body);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-10-05 — An app's schedule records its grant (`createdByApp`), so it fires as that app and
+ *     stops with the grant (services/schedule-actor.ts; secaudit 2026-10, AI-2).
  *   2026-09-29 — The `refinery` kind: create and edit check input.prefix, the definition, and that its
  *     mailbox is the runner's own (services/refinery/schedule-input.ts); only the prefix is stored.
  *   2026-09-27 — An edit takes `prompt` and puts it where the kind keeps it (services/schedule-prompt.ts):
@@ -87,6 +89,9 @@ export interface ScheduleWriteCaller {
     /** True only for a session acting as the owner themselves. Drives the scope bypass and canManage. */
     isOwnerSession: boolean;
     scopes: string[];
+    /** The app grant an app's token was issued under (`req.auth.app_grant`): the schedule fires as
+     *  that app, while the grant is live (services/schedule-actor.ts). */
+    appGrant?: string;
 }
 
 export type ScheduleWriteErrorCode =
@@ -284,6 +289,9 @@ export async function createScheduleRecord(
         // the creating agent can manage its own schedules. Derived from session type
         // (not a literal 'agent' role, which agent tokens don't always carry).
         createdByAgent: !caller.isOwnerSession,
+        // An app's schedule names its grant, so it fires as that app and stops with the grant
+        // (services/schedule-actor.ts; secaudit 2026-10, AI-2).
+        ...(caller.appGrant ? { createdByApp: caller.appGrant } : {}),
         displayName: displayName.slice(0, 200),
         description: typeof body.description === 'string' ? body.description.slice(0, 2000) : undefined,
         purpose: typeof body.purpose === 'string' ? body.purpose.slice(0, 500) : undefined,

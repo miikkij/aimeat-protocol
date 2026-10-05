@@ -151,6 +151,8 @@ export function agentAiKeysRouter(config: AimeatConfig, storage: Storage): Route
       try {
         const r = await completeForOwner(storage, config, t.ownerGhii, {
           prompt: 'Reply with the single word: ok', appId: 'agent-key-test', agent: t.agent,
+          // The test takes the path the agent's own calls take.
+          caller: 'agent',
         });
         res.json(success(config.nodeId, { ok: true, key_source: r.keySource, model: r.model }));
       } catch (e) {

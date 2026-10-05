@@ -9,16 +9,23 @@
  *   IT RUNS AS WHOEVER MADE IT. A schedule the owner (or one of their apps) made reads the owner's
  *   mailbox; a schedule an agent made reads only a mailbox that agent connected, because a connection
  *   belongs to the principal that made it (mcp/connections.ts).
- * @structure REFINERY_PREFIX_RE · refineryRunAs · checkRefineryScheduleInput
+ * @structure REFINERY_PREFIX_RE · REFINERY_RUN_SCOPES · refineryRunAs · checkRefineryScheduleInput
  * @usage const bad = await checkRefineryScheduleInput(storage, ownerScope, refineryRunAs(job), input);
  * @version-history
+ *   v1.1.0 — 2026-10-05 — REFINERY_RUN_SCOPES lives here, the one copy the route, the MCP tool and the
+ *     scheduler import; the prefix rule is the one copy too.
  *   v1.0.0 — 2026-09-29 — Initial (wish aimeat-refinery).
  */
 import type { Storage, ScheduledJobRecord } from '../../storage/interface.js';
 import { requireOwnConnection } from '../connections/access.js';
 
-/** A refinery definition's name: the `<prefix>` of `<prefix>.config`. */
+/** A refinery definition's name: the `<prefix>` of `<prefix>.config`. The REST route, the MCP tool
+ *  and the scheduler read this one copy. */
 export const REFINERY_PREFIX_RE = /^[a-z0-9][a-z0-9_-]{1,40}$/;
+
+/** The scopes a batch spends, all four needed. One copy for the REST route, the MCP tool and a
+ *  schedule's fire; three copies stood here before 2026-10-05 (secaudit 2026-10, drift 1). */
+export const REFINERY_RUN_SCOPES = ['connections:read-through', 'ai:use', 'organism:rows', 'memory:write'] as const;
 
 /** Who a refinery schedule runs as: its maker when an agent made it, else the owner. */
 export function refineryRunAs(job: Pick<ScheduledJobRecord, 'createdByAgent' | 'createdBy' | 'ownerScope'>): string {
