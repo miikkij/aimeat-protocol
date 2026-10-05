@@ -18,6 +18,9 @@
  * @structure zodShapeFor(name) · fieldSchema(field)
  * @usage mcp.tool('aimeat_board_post', descriptionFor('aimeat_board_post'), zodShapeFor('aimeat_board_post'), annotationsFor('aimeat_board_post'), handler)
  * @version-history
+ *   v1.0.1 — 2026-10-05 — A field that is not required gets `.optional()` unless its schema is
+ *     optional on input already (a default). `z.unknown()` takes undefined, and the earlier test on
+ *     that let a JSON Schema reader see the field as required.
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, M3).
  */
 import { z } from 'zod';
@@ -70,7 +73,9 @@ function coarseSchema(field: ToolInputField): z.ZodType {
 /** One field's schema: its exact or coarse type, optional unless required, with its description. */
 export function fieldSchema(field: ToolInputField): z.ZodType {
     let schema = field.zod ?? coarseSchema(field);
-    if (!field.required && !schema.safeParse(undefined).success) schema = schema.optional();
+    // Optional unless required, or unless the schema is optional already on input (a default):
+    // `z.unknown()` takes undefined too, but a JSON Schema reader lists it as required without this.
+    if (!field.required && (schema as { _zod?: { optin?: string } })._zod?.optin !== 'optional') schema = schema.optional();
     return field.description ? schema.describe(field.description) : schema;
 }
 
