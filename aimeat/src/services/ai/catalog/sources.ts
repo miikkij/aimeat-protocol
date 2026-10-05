@@ -13,10 +13,13 @@
  *   answer is reported, never fatal: the refresh keeps what it had (refresh.ts).
  * @structure SourceName · DEFAULT_SOURCE_URLS · sourceUrls · fetchSource
  * @version-history
+ *   v1.1.0 — 2026-10-05 — fetchSource reads the body with readBodyCapped, so the size limit holds while
+ *     the body arrives (secaudit 2026-10, AI-5).
  *   v1.0.0 — 2026-09-28 — Initial (V4 of the System 2 plan).
  */
 import type { AimeatConfig } from '../../../config.js';
 import { safeFetch } from '../../../utils/url-validator.js';
+import { readBodyCapped } from '../../../utils/read-capped.js';
 import { logger } from '../../../utils/logger.js';
 
 export type SourceName = 'modelsDev' | 'openRouter' | 'liteLlm';
@@ -56,7 +59,9 @@ export async function fetchSource(url: string): Promise<unknown> {
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   const length = Number(resp.headers.get('content-length') ?? '0');
   if (length > MAX_BYTES) throw new Error(`larger than ${MAX_BYTES} bytes`);
-  const text = await resp.text();
-  if (text.length > MAX_BYTES) throw new Error(`larger than ${MAX_BYTES} bytes`);
-  return JSON.parse(text) as unknown;
+  // Capped while it arrives: text() held the whole body before the length was measured, so a source
+  // with no or a false Content-Length could fill the process (secaudit 2026-10, AI-5).
+  const body = await readBodyCapped(resp, MAX_BYTES);
+  if (body === null) throw new Error(`larger than ${MAX_BYTES} bytes`);
+  return JSON.parse(body.toString('utf8')) as unknown;
 }
